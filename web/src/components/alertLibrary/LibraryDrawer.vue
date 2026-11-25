@@ -61,7 +61,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alert_library.drawer.detects") }}
         </h3>
         <p class="text-text-body text-sm" data-test="alert-library-drawer-description">
-          {{ entry.description || t("alert_library.drawer.noDescription") }}
+          {{ description || t("alert_library.drawer.noDescription") }}
+        </p>
+        <p
+          v-if="streamSwap"
+          class="text-text-secondary pt-1 text-xs"
+          data-test="alert-library-drawer-swap"
+        >
+          {{
+            t("alerts.librarySuggest.swap", {
+              from: raw(streamSwap.written_for),
+              to: raw(streamSwap.will_use),
+            })
+          }}
         </p>
       </section>
 
@@ -167,19 +179,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <h3 class="text-text-secondary flex items-center gap-1.5 pb-2 text-xs font-semibold">
             <OIcon name="query-stats" size="xs" />
             <span>{{ t("alerts.preview") }}</span>
-            <template v-if="evaluation">
-              <OTag
-                :variant="evaluation.wouldTrigger ? 'error-soft' : 'success-soft'"
-                size="xs"
-                :label="
-                  evaluation.wouldTrigger
-                    ? t('alert_library.drawer.wouldTrigger')
-                    : t('alert_library.drawer.wouldNotTrigger')
-                "
-                data-test="alert-library-drawer-evaluation"
-              />
-              <span class="text-text-secondary normal-case">{{ raw(evaluation.reason) }}</span>
-            </template>
+            <span
+              v-if="verdictText"
+              class="text-text-secondary font-normal normal-case"
+              data-test="alert-library-drawer-evaluation"
+              >{{ verdictText }}</span
+            >
           </h3>
 
           <p v-if="!ready" class="text-text-secondary text-xs">
@@ -205,7 +210,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <template #footer>
-      <div class="flex w-full justify-end gap-2">
+      <div v-if="mode === 'form'" class="flex w-full justify-end gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          data-test="alert-library-drawer-back"
+          @click="emit('update:open', false)"
+        >
+          {{ t("common.back") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :disabled="!file"
+          data-test="alert-library-drawer-use"
+          @click="useInForm"
+        >
+          {{ t("alerts.librarySuggest.use") }}
+        </OButton>
+      </div>
+      <div v-else class="flex w-full justify-end gap-2">
         <!-- The editor prefill speaks the scheduled alert shape only. -->
         <OButton
           v-if="!isAnomaly"
@@ -235,6 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { previewVerdictSentence } from "@/utils/alerts/alertReadBack";
 import { computed, nextTick, ref, watch } from "vue";
 
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
@@ -250,6 +275,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamDataState } from "@/types/alertLibrary";
 import { formatDistanceToNowStrict } from "date-fns";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { inThresholdUnit } from "@/utils/alerts/lookAlike";
 
 import {
   alertTypeOf,
@@ -272,12 +298,20 @@ const props = defineProps<{
   dataState?: StreamDataState;
   /** Microsecond epoch of their oldest last-ingest, when they have one. */
   lastIngestedMicros?: number | null;
+  /** `form`: opened from the alert form, whose footer fills the form instead of installing. */
+  mode?: "page" | "form";
+  /** The form's stream replaces the one the entry was written for. */
+  streamSwap?: { written_for: string; will_use: string } | null;
+  /** The alert as the server already shaped it for this stream; nothing is fetched. */
+  presetFile?: AlertLibraryFile | null;
 }>();
 
 const emit = defineEmits<{
   (e: "update:open", value: boolean): void;
   /** The wizard owns install; this hands it the file the drawer fetched. */
   (e: "install", payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }): void;
+  /** Form mode: fill the open alert form from this entry. */
+  (e: "use", payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -285,6 +319,17 @@ const { loadAlertFile } = useAlertLibrary();
 const { customizeInEditor } = useLibraryCustomize();
 
 const file = ref<AlertLibraryFile | null>(null);
+// The description quotes its threshold the way the query reads it, so "> 80%" never sits beside a 0.8.
+const description = computed(() =>
+  props.entry?.description && file.value
+    ? raw(
+        inThresholdUnit(
+          props.entry.description,
+          file.value as Parameters<typeof inThresholdUnit>[1],
+        ),
+      )
+    : props.entry?.description,
+);
 const isLoading = ref(false);
 const loadFailed = ref(false);
 /** Bumped per open so the chart remounts instead of showing the last alert's. */
@@ -307,7 +352,7 @@ const load = async (entry: AlertLibraryEntry) => {
   reset();
   isLoading.value = true;
   try {
-    const loaded = await loadAlertFile(entry);
+    const loaded = props.presetFile ?? (await loadAlertFile(entry));
     if (token !== loadToken) return;
     file.value = loaded;
   } catch {
@@ -345,7 +390,9 @@ const drawerTitle = computed(() => raw(props.entry?.title ?? ""));
 const drawerSubtitle = computed(() => {
   const entry = props.entry;
   if (!entry) return raw("");
-  return raw(`${entry.id} · ${categoryLabel(entry.category)} · ${packLabel(entry.pack)}`);
+  return raw(
+    [entry.id, categoryLabel(entry.category), packLabel(entry.pack)].filter(Boolean).join(" · "),
+  );
 });
 
 const severityValue = computed(() => severityBadgeValue(props.entry?.severity ?? ""));
@@ -489,7 +536,7 @@ const availability = computed(() => {
   return {
     variant: "success-soft" as const,
     icon: "check-circle",
-    label: t("alert_library.drawer.dataAvailable"),
+    label: t("alerts.discovery.groupReceiving"),
     callout: null,
   };
 });
@@ -520,6 +567,16 @@ const isAggregationEnabled = computed(
 );
 
 const evaluation = computed(() => previewRef.value?.evaluationStatus ?? null);
+// The form's own verdict sentence, so the drawer never shows the preview's internal comparison.
+const verdictText = computed(() =>
+  evaluation.value
+    ? previewVerdictSentence(
+        evaluation.value,
+        { ...previewFormData.value, is_real_time: "false" },
+        t,
+      )
+    : null,
+);
 
 /**
  * PreviewAlert evaluates itself on mount for SQL, but deliberately skips PromQL
@@ -554,5 +611,11 @@ const customize = async () => {
 const install = () => {
   if (!props.entry || !file.value) return;
   emit("install", { entry: props.entry, file: fileForInstall(props.entry, file.value) });
+};
+
+const useInForm = () => {
+  if (!props.entry || !file.value) return;
+  emit("use", { entry: props.entry, file: file.value });
+  emit("update:open", false);
 };
 </script>

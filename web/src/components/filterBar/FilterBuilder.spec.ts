@@ -225,6 +225,15 @@ describe("FilterBuilder", () => {
     });
   });
 
+  it("opens its field list when the host activates it, so one click starts a condition", async () => {
+    mountBuilder("anomaly", []);
+    await flushPromises();
+    expect(rowKeys()).toEqual([]);
+    (wrapper!.vm as unknown as { activate: () => void }).activate();
+    await flushPromises();
+    expect(rowKeys()).toContain("level");
+  });
+
   describe("vertical layout (alerts engine tree)", () => {
     const saved = v2(leaf("level", "error"), leaf("service", "api", "AND"), {
       filterType: "group",
@@ -640,6 +649,33 @@ describe("FilterBuilder", () => {
       await pickRow("payments-api");
       expect(JSON.stringify(state.value)).toContain(`"value":"payments-api"`);
     });
+  });
+
+  it("lets a host name an empty field in the list and its value step, and judge a value by its operator", async () => {
+    const empty = (field: string) => (field === "service" ? "Nothing in 24 h" : undefined);
+    const valueHint = vi.fn((_field: string, values: string[], operator?: string) =>
+      operator === "eq" ? `${values[0]} not seen` : undefined,
+    );
+    mountBuilder("alert", null, {
+      loadValues: vi.fn(async () => []),
+      fieldDetail: empty,
+      valueEmptyText: empty,
+      valueHint,
+    });
+    await find("input").trigger("click");
+    await flushPromises();
+    const row = (key: string) =>
+      document.body.querySelector(`[data-test="${DT}-suggest-item-${key}"]`)!.textContent ?? "";
+    expect(row("service")).toContain("Nothing in 24 h");
+    expect(row("level")).not.toContain("Nothing in 24 h");
+    await type("service");
+    await press("Enter");
+    await pickRow("eq");
+    await vi.waitFor(() => expect(document.body.textContent).toContain("Nothing in 24 h"));
+    await type("x");
+    await press("Enter");
+    expect(valueHint).toHaveBeenCalledWith("service", ["x"], "eq");
+    expect(find("chip-service").text()).toContain("x not seen");
   });
 
   describe("horizontal layout", () => {

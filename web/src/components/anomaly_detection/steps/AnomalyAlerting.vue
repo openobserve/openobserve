@@ -15,261 +15,317 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-anomaly-alerting h-full">
+  <div class="step-anomaly-alerting" :class="bare ? '' : 'h-full'">
     <div
-      class="step-content rounded-default bg-surface-overlay border-border-default h-full overflow-y-auto border px-3 py-4"
+      class="step-content"
+      :class="
+        bare
+          ? ''
+          : 'rounded-default bg-surface-overlay border-border-default h-full overflow-y-auto border'
+      "
     >
-      <!-- Priority & tags (Feature 2). Anomaly configs appear in the same
-           alert list, so they carry the same triage metadata. -->
-      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
-          {{ t("alerts.priority") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-            <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
-          </OIcon>
-        </div>
-        <div class="flex h-11 items-center">
-          <OSelect
-            v-model="configModel.priority"
-            :options="priorityOptions"
-            labelKey="label"
-            valueKey="value"
-            :searchable="false"
-            clearable
-            width="xs"
-            :placeholder="t('alerts.priorityUnset')"
-            :aria-label="t('alerts.priority')"
-            data-test="anomaly-priority-select"
-          />
-        </div>
-      </div>
-
-      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
-          {{ t("alerts.tags") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-            <OTooltip :content="t('alerts.tagsTooltip')" side="right" />
-          </OIcon>
-        </div>
-        <div class="min-w-60 flex-1">
-          <OTagInput
-            v-model="tagsModel"
-            :aria-label="t('alerts.tags')"
-            :placeholder="t('alerts.placeholders.addTag')"
-            data-test="anomaly-tags-input"
-          />
-        </div>
-      </div>
-
-      <!-- Enable Notifications toggle -->
-      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div
-          id="anomaly-alert-enabled-heading"
-          class="flex h-9 w-47.5 shrink-0 items-center font-semibold"
-        >
-          {{ t("alerts.anomaly.notifications") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-            <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
-          </OIcon>
-        </div>
-        <div class="flex h-11 items-center">
-          <OSwitch
-            id="anomaly-alert-enabled-switch"
-            v-model="configModel.alert_enabled"
-            aria-labelledby="anomaly-alert-enabled-heading anomaly-alert-enabled-switch-label"
-            :label="
-              config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')
-            "
-            data-test="anomaly-alert-enabled"
-          />
-        </div>
-      </div>
-
-      <!-- Destination picker (shown when alert_enabled) -->
-      <div v-if="config.alert_enabled" class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
-          {{ t("alerts.destination") }}
-        </div>
-        <div class="flex min-w-0 flex-1 basis-60 flex-col">
-          <div class="flex flex-wrap items-center gap-y-1">
-            <OSelect
-              v-model="configModel.alert_destination_ids"
-              :options="destinations"
-              labelKey="name"
-              valueKey="name"
-              multiple
-              searchable
-              :placeholder="t('alerts.summary.noDestination')"
-              class="h-auto! min-h-auto! max-w-105 min-w-0 flex-1 basis-75"
-              :aria-label="t('alerts.destination')"
-              data-test="anomaly-destination"
-            >
-              <template #selected-item="{ index, opt, removeAtIndex }">
-                <OTag v-if="index < visibleChipCount" type="selectionChip">
-                  {{ typeof opt === "object" ? opt.name : opt }}
-                  <template #trailing>
-                    <button
-                      type="button"
-                      :aria-label="t('common.remove')"
-                      class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
-                      @click="removeAtIndex(index)"
-                    >
-                      <OIcon name="close" size="xs" />
-                    </button>
-                  </template>
-                </OTag>
-                <span
-                  v-if="
-                    index === visibleChipCount &&
-                    config.alert_destination_ids.length > visibleChipCount
-                  "
-                  class="text-compact text-text-secondary ms-1 whitespace-nowrap"
-                >
-                  +{{ config.alert_destination_ids.length - visibleChipCount }}
-                </span>
-              </template>
-              <template #empty>
-                <span>{{ t("alerts.anomaly.noDestinationsFound") }}</span>
-              </template>
-            </OSelect>
-            <OButton
-              variant="ghost"
-              size="sm"
-              class="ms-1"
-              :title="t('alerts.alertSettings.refreshDestinations')"
-              data-test="anomaly-refresh-destinations"
-              @click="$emit('refresh:destinations')"
-              icon-left="refresh"
-            />
-            <OButton variant="outline" size="sm" class="ms-2" @click="openAddDestination">
-              {{ t("alerts.anomaly.addNewDestination") }}
-            </OButton>
-          </div>
-          <!-- Same field hint as the alert form's Destination field. -->
-          <p
-            class="text-input-help-text pt-1 text-xs"
-            :data-test="
-              config.alert_destination_ids.length === 0
-                ? 'anomaly-destination-note'
-                : 'anomaly-destination-status'
-            "
-          >
-            {{ destinationStatus }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Template override: a user template that applies to anomaly, or the destination's own. -->
-      <div v-if="config.alert_enabled" class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
-          {{ t("alerts.templateOverride.label") }}
-        </div>
-        <div class="min-w-0 flex-1 basis-60">
-          <TemplateOverridePicker
-            kind="anomaly"
-            :model-value="config.template ?? null"
-            :destinations="selectedDestinations"
-            :server-error="config.template_error ?? null"
-            @update:model-value="onTemplateChange"
-          />
-        </div>
-      </div>
-
-      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
-          {{ t("alerts.anomaly.alertDirection") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-            <OTooltip :content="t('alerts.anomaly.alertDirectionTooltip')" side="right" />
-          </OIcon>
-        </div>
-        <div class="flex h-11 items-center">
-          <OSelect
-            v-model="directionModel"
-            :options="directionOptions"
-            labelKey="label"
-            valueKey="value"
-            :searchable="false"
-            width="sm"
-            :aria-label="t('alerts.anomaly.alertDirection')"
-            data-test="anomaly-alert-direction"
-          />
-        </div>
-      </div>
-
-      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
-          {{ t("alerts.anomaly.windowShare") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-            <OTooltip :content="t('alerts.anomaly.windowShareTooltip')" side="right" />
-          </OIcon>
-        </div>
-        <div class="flex min-w-0 flex-1 basis-60 flex-col gap-1">
-          <div class="flex flex-wrap items-start gap-3">
-            <OInput
-              v-model="configModel.alert_window_buckets"
-              type="number"
-              :model-modifiers="{ number: true }"
-              :label="t('alerts.anomaly.windowBuckets')"
-              :placeholder="raw('1')"
-              :error="!!windowShareErrors.buckets"
-              width="xs"
-              data-test="anomaly-window-buckets"
-            />
-            <OInput
-              v-model="configModel.alert_window_fire_pct"
-              type="number"
-              :model-modifiers="{ number: true }"
-              :label="t('alerts.anomaly.windowFirePct')"
-              :placeholder="raw('100')"
-              :error="!!windowShareErrors.fire"
-              width="xs"
-              data-test="anomaly-window-fire-pct"
-            />
-            <OInput
-              v-model="configModel.alert_window_recover_pct"
-              type="number"
-              :model-modifiers="{ number: true }"
-              :label="t('alerts.anomaly.windowRecoverPct')"
-              :placeholder="t('alerts.anomaly.windowRecoverSameAsFire')"
-              :error="!!windowShareErrors.recover"
-              width="xs"
-              data-test="anomaly-window-recover-pct"
-            />
-          </div>
-          <div
-            v-for="message in windowShareMessages"
-            :key="message"
-            class="text-input-error-text text-xs"
-            data-test="anomaly-window-share-error"
-            role="alert"
-          >
-            {{ message }}
-          </div>
-          <span
-            v-if="!windowShareMessages.length"
-            class="text-text-secondary text-xs"
-            data-test="anomaly-window-share-hint"
-          >
-            {{ windowShareHint }}
-          </span>
-        </div>
-      </div>
-
-      <!-- Info note when notifications disabled -->
-      <div
-        v-if="!config.alert_enabled"
-        class="mt-2 flex items-start gap-2 text-xs"
-        :class="'text-text-secondary'"
+      <OSettingRow
+        v-if="config.alert_enabled"
+        :label="t('alerts.destination')"
+        data-test="anomaly-destination-row"
+        fill
       >
-        <OIcon name="info" size="sm" class="mt-px flex-shrink-0" />
-        <span>{{ t("alerts.anomaly.disabledNotificationsInfo") }}</span>
-      </div>
+        <div class="flex items-center">
+          <OSelect
+            v-model="configModel.alert_destination_ids"
+            :options="destinations"
+            labelKey="name"
+            valueKey="name"
+            multiple
+            searchable
+            :placeholder="t('alerts.summary.noDestination')"
+            class="h-auto! min-h-auto! max-w-75 min-w-0 flex-1 max-md:max-w-none max-md:basis-full"
+            :aria-label="t('alerts.destination')"
+            data-test="anomaly-destination"
+          >
+            <template #selected-item="{ index, opt, removeAtIndex }">
+              <OTag v-if="index < visibleChipCount" type="selectionChip">
+                {{ typeof opt === "object" ? opt.name : opt }}
+                <template #trailing>
+                  <button
+                    type="button"
+                    :aria-label="t('common.remove')"
+                    class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
+                    @click="removeAtIndex(index)"
+                  >
+                    <OIcon name="close" size="xs" />
+                  </button>
+                </template>
+              </OTag>
+              <span
+                v-if="
+                  index === visibleChipCount &&
+                  config.alert_destination_ids.length > visibleChipCount
+                "
+                class="text-compact text-text-secondary ms-1 whitespace-nowrap"
+              >
+                +{{ config.alert_destination_ids.length - visibleChipCount }}
+              </span>
+            </template>
+            <template #empty>
+              <span>{{ t("alerts.anomaly.noDestinationsFound") }}</span>
+            </template>
+          </OSelect>
+        </div>
+        <template #note>
+          <span class="flex flex-wrap items-start gap-x-3 gap-y-0.5">
+            <span
+              class="basis-full"
+              :data-test="
+                config.alert_destination_ids.length === 0
+                  ? 'anomaly-destination-note'
+                  : 'anomaly-destination-status'
+              "
+              >{{ destinationStatus }}</span
+            >
+            <OButton
+              variant="link"
+              class="shrink-0"
+              data-test="anomaly-add-destination"
+              @click="openAddDestination"
+            >
+              {{ t("alerts.alertSettings.addNewDestination") }}
+            </OButton>
+          </span>
+        </template>
+        <template #actions>
+          <OButton
+            variant="ghost"
+            size="icon-circle-sm"
+            :title="t('alerts.alertSettings.refreshDestinations')"
+            data-test="anomaly-refresh-destinations"
+            @click="$emit('refresh:destinations')"
+          >
+            <OIcon name="refresh" size="sm" />
+          </OButton>
+        </template>
+      </OSettingRow>
+
+      <AlertTierPlace id="anomalyTemplate">
+        <OSettingRow
+          v-if="config.alert_enabled && tierShows('anomalyTemplate')"
+          :label="t('alerts.plain.messageTemplate')"
+          data-test="anomaly-template-row"
+          fill
+        >
+          <div class="w-75 max-w-full">
+            <TemplateOverridePicker
+              ref="templatePickerRef"
+              kind="anomaly"
+              :model-value="config.template ?? null"
+              :destinations="selectedDestinations"
+              :server-error="config.template_error ?? null"
+              :help-text="t('alerts.form.anomaly.templateNote')"
+              help-outside
+              @update:model-value="onTemplateChange"
+            />
+          </div>
+          <template #actions>
+            <OButton
+              variant="ghost-primary"
+              size="icon-circle-sm"
+              :title="t('alerts.alertSettings.learnAboutTemplates')"
+              :aria-label="t('alerts.alertSettings.learnAboutTemplates')"
+              data-test="template-override-help-btn"
+              @click="templatePickerRef?.openHelp()"
+            >
+              <OIcon name="help" size="sm" />
+            </OButton>
+          </template>
+        </OSettingRow>
+      </AlertTierPlace>
+
+      <AlertTierPlace id="anomalyRecordOnly">
+        <AlertSentenceRow
+          v-if="!config.alert_enabled"
+          :label="t('alerts.anomaly.notifications')"
+          :info="t('alerts.anomaly.disabledNotificationsInfo')"
+          data-test="anomaly-record-only-row"
+          removable
+          @remove="stopRecordOnly"
+        >
+          {{ t("alerts.tiers.names.anomalyRecordOnly") }}
+        </AlertSentenceRow>
+        <OSettingRow
+          v-else-if="tierShows('anomalyRecordOnly')"
+          :label="t('alerts.tiers.names.anomalyRecordOnly')"
+          :description="t('alerts.anomaly.recordOnlyHelp')"
+          data-test="anomaly-notifications-row"
+          fill
+        >
+          <div class="flex min-h-8.5 items-center">
+            <OSwitch
+              :model-value="!config.alert_enabled"
+              off-tone="neutral"
+              state-text
+              :aria-label="t('alerts.tiers.names.anomalyRecordOnly')"
+              data-test="anomaly-alert-enabled"
+              @update:model-value="setRecordOnly(Boolean($event))"
+            />
+          </div>
+        </OSettingRow>
+      </AlertTierPlace>
+
+      <Teleport
+        :to="sectionTargets?.anomalyConditionMore"
+        :disabled="!sectionTargets?.anomalyConditionMore"
+      >
+        <AlertTierPlace id="anomalyDirection">
+          <OSettingRow
+            v-if="tierShows('anomalyDirection')"
+            :label="t('alerts.tiers.names.anomalyDirection')"
+            :description="t('alerts.form.anomaly.directionHelp')"
+            :info="t('alerts.anomaly.alertDirectionTooltip')"
+            data-test="anomaly-alert-direction-row"
+          >
+            <OSelect
+              v-model="directionModel"
+              :options="directionOptions"
+              labelKey="label"
+              valueKey="value"
+              :searchable="false"
+              class="w-50!"
+              :aria-label="t('alerts.anomaly.alertDirection')"
+              data-test="anomaly-alert-direction"
+            />
+          </OSettingRow>
+        </AlertTierPlace>
+
+        <AlertTierPlace id="anomalyWindow">
+          <OSettingRow
+            v-if="tierShows('anomalyWindow')"
+            :label="t('alerts.tiers.names.anomalyWindow')"
+            :info="t('alerts.form.anomaly.windowTooltip', { noun: bucketNoun(1) })"
+            data-test="anomaly-window-share-row"
+            fill
+          >
+            <div class="flex flex-col gap-2">
+              <i18n-t
+                keypath="alerts.form.anomaly.windowCountWords"
+                :plural="windowBucketCount"
+                tag="div"
+                class="text-text-body flex flex-wrap items-center gap-x-1.5 gap-y-2 text-sm"
+                data-test="anomaly-window-sentence"
+              >
+                <template #fire>
+                  <OInput
+                    v-model="fireCountModel"
+                    type="number"
+                    :model-modifiers="{ number: true }"
+                    fit-content
+                    :aria-label="t('alerts.anomaly.windowFireCount')"
+                    :placeholder="raw(String(windowBucketCount))"
+                    :error="!!windowShareErrors.fire"
+                    data-test="anomaly-window-fire-count"
+                  />
+                </template>
+                <template #buckets>
+                  <OInput
+                    v-model="bucketsModel"
+                    type="number"
+                    :model-modifiers="{ number: true }"
+                    fit-content
+                    :aria-label="t('alerts.anomaly.windowRecent')"
+                    :placeholder="raw('1')"
+                    :error="!!windowShareErrors.buckets"
+                    data-test="anomaly-window-buckets"
+                  />
+                </template>
+                <template #noun>{{ bucketNoun(windowBucketCount, false) }}</template>
+              </i18n-t>
+              <i18n-t
+                keypath="alerts.form.anomaly.windowRecoverCountWords"
+                tag="div"
+                class="text-text-body flex flex-wrap items-center gap-x-1.5 gap-y-2 text-sm"
+              >
+                <template #recover>
+                  <OInput
+                    v-model="recoverCountModel"
+                    type="number"
+                    :model-modifiers="{ number: true }"
+                    fit-content
+                    :aria-label="t('alerts.anomaly.windowRecoverCount')"
+                    :placeholder="raw(String(windowCounts.fire))"
+                    :error="!!windowShareErrors.recover"
+                    data-test="anomaly-window-recover-count"
+                  />
+                </template>
+              </i18n-t>
+              <div
+                v-for="message in windowShareMessages"
+                :key="message"
+                class="text-input-error-text text-xs"
+                data-test="anomaly-window-share-error"
+                role="alert"
+              >
+                {{ message }}
+              </div>
+            </div>
+            <template #note>
+              <span data-test="anomaly-window-note">{{ windowNote }}</span>
+            </template>
+          </OSettingRow>
+        </AlertTierPlace>
+      </Teleport>
+
+      <Teleport :to="sectionTargets?.anomalyDetails" :disabled="!sectionTargets?.anomalyDetails">
+        <AlertTierPlace id="anomalyPriority">
+          <OSettingRow
+            v-if="tierShows('anomalyPriority')"
+            :label="t('alerts.priority')"
+            :info="t('alerts.priorityTooltip')"
+            data-test="anomaly-priority-row"
+            fill
+          >
+            <OSelect
+              v-model="configModel.priority"
+              :options="priorityOptions"
+              labelKey="label"
+              valueKey="value"
+              :searchable="false"
+              clearable
+              width="sm"
+              :placeholder="
+                store.state.zoConfig?.oncall_enabled === true
+                  ? t('alerts.priorityUnsetPagesAs')
+                  : t('alerts.priorityUnset')
+              "
+              :aria-label="t('alerts.priority')"
+              data-test="anomaly-priority-select"
+            />
+          </OSettingRow>
+        </AlertTierPlace>
+
+        <AlertTierPlace id="anomalyTags">
+          <OSettingRow
+            v-if="tierShows('anomalyTags')"
+            :label="t('alerts.tags')"
+            :info="t('alerts.tagsTooltip')"
+            data-test="anomaly-tags-row"
+            fill
+          >
+            <div>
+              <OTagInput
+                v-model="tagsModel"
+                :aria-label="t('alerts.tags')"
+                :placeholder="t('alerts.placeholders.addTag')"
+                data-test="anomaly-tags-input"
+              />
+            </div>
+          </OSettingRow>
+        </AlertTierPlace>
+      </Teleport>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, type PropType } from "vue";
+import { computed, defineComponent, inject, ref, watch, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -278,16 +334,37 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
+import { SETTING_ROW_BARE_KEY } from "@/lib/core/SettingRow/OSettingRow.types";
 import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.vue";
+import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
+import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useTierVisibility,
+} from "@/composables/alerts/useAlertSettingTiers";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
+import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
+import { durationText } from "@/utils/alerts/alertCopy";
+import type { I18nKey, I18nText } from "@/types/i18n";
 import {
   ANOMALY_DIRECTION_KEYS,
-  anomalyWindowShareEffective,
+  anomalyIntervalSeconds,
+  anomalyWindowCounts,
+  anomalyWindowPct,
   anomalyWindowShareErrors,
 } from "./AnomalyDetectionConfig.schema";
+
+const SPAN_UNITS: ReadonlyArray<readonly [I18nKey, number]> = [
+  ["alerts.form.anomaly.span.days", 86400],
+  ["alerts.form.anomaly.span.hours", 3600],
+  ["alerts.form.anomaly.span.minutes", 60],
+];
+const isBlank = (v: unknown): boolean => v === "" || v === null || v === undefined;
+const wholeCount = (v: unknown): number | null =>
+  Number.isInteger(Number(v)) && Number(v) >= 1 && !isBlank(v) ? Number(v) : null;
 
 export default defineComponent({
   name: "AnomalyAlerting",
@@ -297,10 +374,12 @@ export default defineComponent({
     OSelect,
     OInput,
     OTagInput,
-    OTooltip,
     OIcon,
     OTag,
+    OSettingRow,
     TemplateOverridePicker,
+    AlertSentenceRow,
+    AlertTierPlace,
   },
 
   props: {
@@ -312,6 +391,10 @@ export default defineComponent({
       type: Array as PropType<(SelectOption & { name: string; destination_type_name?: string })[]>,
       default: () => [],
     },
+    sectionTargets: {
+      type: Object as PropType<AlertSectionTargets>,
+      default: undefined,
+    },
   },
 
   emits: ["refresh:destinations"],
@@ -320,6 +403,10 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const router = useRouter();
     const store = useStore();
+    // The sectioned alert editor provides this; its rows sit flat on the page instead of in a card.
+    const bare = inject(SETTING_ROW_BARE_KEY, false);
+    const tierShows = useTierVisibility();
+    const tiers = inject(ALERT_SETTING_TIERS_KEY, null);
 
     // Alias for the config prop; same reference, mutation stays identical.
     const configModel = computed(() => props.config);
@@ -358,19 +445,98 @@ export default defineComponent({
     });
 
     const windowShareErrors = computed(() => anomalyWindowShareErrors(props.config));
-    const windowShareMessages = computed(() =>
-      [
-        windowShareErrors.value.buckets,
-        windowShareErrors.value.fire,
-        windowShareErrors.value.recover,
-      ]
-        .filter((key): key is string => key !== null)
-        .map((key) => t(key as any)),
+    // Counts convert at the last whole N typed, so clearing N to retype it keeps "2 of" as 2.
+    const lastBuckets = ref(wholeCount(props.config.alert_window_buckets) ?? 1);
+    watch(
+      () => wholeCount(props.config.alert_window_buckets),
+      (n) => {
+        if (n !== null) lastBuckets.value = n;
+      },
     );
-
-    const windowShareHint = computed(() =>
-      t("alerts.anomaly.windowShareHint", anomalyWindowShareEffective(props.config)),
+    const windowBucketCount = computed(
+      () => wholeCount(props.config.alert_window_buckets) ?? lastBuckets.value,
     );
+    const windowCounts = computed(() =>
+      anomalyWindowCounts({ ...props.config, alert_window_buckets: windowBucketCount.value }),
+    );
+    // The counts the user last set, so typing "10" over N passes through "1" without losing "3 of".
+    const held = ref({ fire: windowCounts.value.fire, recover: windowCounts.value.recover });
+    watch(
+      () => props.config,
+      () => {
+        held.value = { fire: windowCounts.value.fire, recover: windowCounts.value.recover };
+      },
+    );
+    const countModel = (field: "fire" | "recover") =>
+      computed({
+        get: () =>
+          isBlank(props.config[`alert_window_${field}_pct`]) ? "" : windowCounts.value[field],
+        set: (v: unknown) => {
+          if (!isBlank(v)) held.value[field] = Number(v);
+          configModel.value[`alert_window_${field}_pct`] = isBlank(v)
+            ? null
+            : anomalyWindowPct(Number(v), windowBucketCount.value);
+        },
+      });
+    const fireCountModel = countModel("fire");
+    const recoverCountModel = countModel("recover");
+    // A new N keeps the counts the sentence shows, so "1 of the last 1" becomes "1 of the last 5".
+    const bucketsModel = computed({
+      get: () => props.config.alert_window_buckets ?? "",
+      set: (v: unknown) => {
+        const cfg = configModel.value;
+        cfg.alert_window_buckets = v;
+        const n = wholeCount(v);
+        if (n === null) return;
+        for (const field of ["fire", "recover"] as const) {
+          if (!isBlank(cfg[`alert_window_${field}_pct`]))
+            cfg[`alert_window_${field}_pct`] = anomalyWindowPct(Math.min(held.value[field], n), n);
+        }
+      },
+    });
+    const bucketSeconds = computed(() =>
+      anomalyIntervalSeconds(
+        Number(props.config.histogram_interval_value),
+        String(props.config.histogram_interval_unit),
+      ),
+    );
+    // "5-minute count": what one bucket holds, so the rule never says bucket or measure.
+    const bucketNoun = (count: number, withSpan = true): I18nText => {
+      const secs = withSpan ? bucketSeconds.value : null;
+      const unit = secs ? SPAN_UNITS.find(([, size]) => secs % size === 0) : undefined;
+      const span = !secs
+        ? raw("")
+        : unit
+          ? t(unit[0], { count: secs / unit[1] })
+          : t("alerts.form.anomaly.span.seconds", { count: secs });
+      const counts =
+        props.config.query_mode !== "custom_sql" && props.config.detection_function === "count";
+      return raw(
+        t(
+          counts ? "alerts.form.anomaly.bucketCount" : "alerts.form.anomaly.bucketValue",
+          { span },
+          count,
+        ).trim(),
+      );
+    };
+    const windowNote = computed(() => {
+      const { buckets, fire } = windowCounts.value;
+      if (fire <= 1) return t("alerts.form.anomaly.windowAtOnce", { noun: bucketNoun(1) });
+      const secs = bucketSeconds.value;
+      const span = secs ? durationText(secs * buckets, t) : raw("");
+      return fire >= buckets
+        ? t("alerts.form.anomaly.windowInARow", { noun: bucketNoun(1), span })
+        : t("alerts.form.anomaly.windowShareOf", { fire, noun: bucketNoun(2), span });
+    });
+    const templatePickerRef = ref<{ openHelp: () => void } | null>(null);
+    const windowShareMessages = computed(() => {
+      const e = windowShareErrors.value;
+      return [
+        e.buckets && t(e.buckets as any),
+        e.fire && t(e.fire as any, { max: windowBucketCount.value }),
+        e.recover && t(e.recover as any, { max: windowCounts.value.fire }),
+      ].filter((m): m is I18nText => !!m);
+    });
 
     // One name reads better than "1 destination"; more than one is a count.
     const destinationStatus = computed(() => {
@@ -417,6 +583,16 @@ export default defineComponent({
       configModel.value.template_error = null;
     };
 
+    const setRecordOnly = (on: boolean) => {
+      configModel.value.alert_enabled = !on;
+    };
+
+    // Turning notifications back on returns the setting to its More options line.
+    const stopRecordOnly = () => {
+      setRecordOnly(false);
+      tiers?.conceal("anomalyRecordOnly");
+    };
+
     const openAddDestination = () => {
       const route = router.resolve({
         name: "alertDestinations",
@@ -426,9 +602,21 @@ export default defineComponent({
     };
 
     return {
+      windowBucketCount,
+      windowCounts,
+      fireCountModel,
+      recoverCountModel,
+      bucketsModel,
+      bucketNoun,
+      windowNote,
+      templatePickerRef,
       t,
       raw,
       store,
+      bare,
+      tierShows,
+      setRecordOnly,
+      stopRecordOnly,
       configModel,
       priorityOptions,
       tagsModel,
@@ -441,7 +629,6 @@ export default defineComponent({
       directionModel,
       windowShareErrors,
       windowShareMessages,
-      windowShareHint,
     };
   },
 });

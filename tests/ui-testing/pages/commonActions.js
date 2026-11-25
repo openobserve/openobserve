@@ -99,7 +99,7 @@ export async function gotoStreamsViaNav(page) {
 }
 
 /**
- * Select the alerts list's Total tile; the list opens on Firing, and flows that look for an alert they made need every row.
+ * Select the alerts list's Total tile, which clears any state tile a `?state=` link picked, so every row lists.
  * @param {import('@playwright/test').Page} page
  */
 export async function showAllAlertStates(page) {

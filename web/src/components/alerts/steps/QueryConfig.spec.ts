@@ -23,14 +23,23 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { defineComponent, nextTick, reactive } from "vue";
+import { defineComponent, nextTick, reactive, ref } from "vue";
 import QueryConfig from "./QueryConfig.vue";
 import i18n from "@/locales";
+import { cloneDeep } from "lodash-es";
+import { getAlertPayload } from "@/utils/alerts/alertPayload";
+import { countComparisonWords } from "@/utils/alerts/countComparison";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import { buildForecastAlertPromql } from "@/utils/alerts/forecastAlert";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
+import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
+import { publishGroupRanking } from "@/composables/alerts/groupRanking";
 
 // The composed orchestrator schema — messages resolve through the real locale.
 const t = (key: string, named?: Record<string, unknown>): string =>
@@ -131,6 +140,15 @@ vi.mock("vuex", async () => {
 
 // Module-level store reference updated in beforeEach
 let mockStoreInstance: any;
+
+// Streams by name, as getStream answers them; a test fills it before mounting.
+const { streamFixtures } = vi.hoisted(() => ({ streamFixtures: {} as Record<string, any> }));
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStream: vi.fn(async (name: string) => streamFixtures[name] ?? null),
+    getStreams: vi.fn(async () => ({ list: [] })),
+  }),
+}));
 
 // Mock useSuggestions composable
 vi.mock("@/composables/useSuggestions", async () => {
@@ -246,8 +264,8 @@ describe("QueryConfig.vue", () => {
         groupId: "",
         conditions: [],
       },
-      sql: "",
-      promql: "",
+      sql: "SELECT * FROM logs",
+      promql: "up",
       type: "custom",
       aggregation: null,
       promql_condition: null,
@@ -270,6 +288,7 @@ describe("QueryConfig.vue", () => {
     formOverrides: Record<string, any> = {},
     storeOverride?: any,
     onSubmit: (values: any) => void = () => {},
+    extraProvide: Record<string | symbol, unknown> = {},
   ) {
     const props = reactive({ ...baseQCProps(), ...qcOverrides });
     const theStore = storeOverride ?? mockStore;
@@ -282,7 +301,7 @@ describe("QueryConfig.vue", () => {
         onSubmit,
       }),
       template: `
-        <OForm :schema="schema" :default-values="defaultValues" @submit="onSubmit">
+        <OForm validate-on="leave" :schema="schema" :default-values="defaultValues" @submit="onSubmit">
           <QueryConfig v-bind="qcProps" />
         </OForm>
       `,
@@ -290,7 +309,7 @@ describe("QueryConfig.vue", () => {
     const h = mount(Host, {
       global: {
         mocks: { $store: theStore },
-        provide: { store: theStore },
+        provide: { store: theStore, ...extraProvide },
         plugins: [i18n],
       },
     });
@@ -330,6 +349,14 @@ describe("QueryConfig.vue", () => {
     if (host) {
       host.unmount();
     }
+  });
+
+  describe("Operator wording", () => {
+    it("echoes a count warning row's operator in the same words as its select", () => {
+      expect(wrapper.vm.operatorLabel(">=")).toBe("at least");
+      expect(wrapper.vm.operatorLabel("<")).toBe("less than");
+      expect(wrapper.vm.operatorLabel("~=")).toBe("~=");
+    });
   });
 
   describe("Timezone Options", () => {
@@ -443,6 +470,56 @@ describe("QueryConfig.vue", () => {
     });
   });
 
+  it("lists group-by fields in the order step 1 ranked them", async () => {
+    publishGroupRanking({ org: "test-org", streamType: "logs", streamName: "test-stream" }, [
+      "field2",
+    ]);
+    await flushPromises();
+    expect(wrapper.vm.groupByOptions.map((o: { value: string }) => o.value)).toEqual([
+      "field2",
+      "field1",
+    ]);
+  });
+
+  describe("a new alert on a counter metric", () => {
+    it.each([
+      ["counter", "rate(node_cpu_seconds_total[10m])"],
+      ["gauge", undefined],
+    ])("on a %s first reads %s", async (metricType, promql) => {
+      streamFixtures.node_cpu_seconds_total = {
+        schema: [{ name: "value" }],
+        metrics_meta: { metric_type: metricType },
+      };
+      await setQCProps({ streamType: "metrics", streamName: "node_cpu_seconds_total" });
+      await flushPromises();
+      expect(wrapper.emitted("update:promqlQuery")?.at(-1)?.[0]).toBe(promql);
+      expect(wrapper.emitted("update:tab")?.at(-1)?.[0]).toBe(promql ? "promql" : undefined);
+    });
+
+    it.each([
+      ["counter", "", "rate(b_count[10m])", "promql"],
+      ["gauge", "", "", "custom"],
+      ["counter", 'sum(rate(a_count{code="5"}[5m]))', 'sum(rate(b_count{code="5"}[5m]))', "promql"],
+    ])("a switch to a %s turns %j into %j", async (type, written, promql, tab) => {
+      streamFixtures.a_count = {
+        schema: [{ name: "value" }],
+        metrics_meta: { metric_type: "counter" },
+      };
+      streamFixtures.b_count = { schema: [{ name: "value" }], metrics_meta: { metric_type: type } };
+      await setQCProps({
+        "onUpdate:promqlQuery": (v: string) => (qcProps.promqlQuery = v),
+        "onUpdate:tab": (v: string) => (qcProps.tab = v),
+        streamType: "metrics",
+        streamName: "a_count",
+      });
+      await flushPromises();
+      if (written) await setQCProps({ promqlQuery: written });
+      await setQCProps({ streamName: "b_count" });
+      await flushPromises();
+      expect([qcProps.promqlQuery, qcProps.tab]).toEqual([promql, tab]);
+    });
+  });
+
   describe("Tab Options Computation", () => {
     it("should show all three tabs for metrics stream type", async () => {
       await setQCProps({ streamType: "metrics" });
@@ -451,14 +528,14 @@ describe("QueryConfig.vue", () => {
       expect(tabOptions.map((t: any) => t.value)).toEqual(["custom", "sql", "promql"]);
     });
 
-    it("should show only custom and SQL tabs for logs stream type", async () => {
+    it("should show the builder then SQL for logs stream type", async () => {
       await setQCProps({ streamType: "logs" });
       const tabOptions = wrapper.vm.tabOptions;
       expect(tabOptions.length).toBe(2);
       expect(tabOptions.map((t: any) => t.value)).toEqual(["custom", "sql"]);
     });
 
-    it("should show only custom and SQL tabs for traces stream type", async () => {
+    it("should show the builder then SQL for traces stream type", async () => {
       await setQCProps({ streamType: "traces" });
       const tabOptions = wrapper.vm.tabOptions;
       expect(tabOptions.length).toBe(2);
@@ -713,6 +790,21 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.emitted("input:update")![0]).toEqual(["conditions", tree]);
     });
 
+    it("re-reads the measure from the form after a fill written from outside", async () => {
+      hostForm().setFieldValue("query_condition.aggregation", {
+        function: "p95",
+        having: { column: "took", operator: ">", value: "" },
+        group_by: [],
+      });
+      await setQCProps({ isAggregationEnabled: true });
+      wrapper.vm.syncMeasureFromForm();
+      expect(wrapper.vm.selectedFunction).toBe("p95");
+      hostForm().setFieldValue("query_condition.aggregation", null);
+      await setQCProps({ isAggregationEnabled: false });
+      wrapper.vm.syncMeasureFromForm();
+      expect(wrapper.vm.selectedFunction).toBe("total_events");
+    });
+
     it("hands the builder the stream columns as typed fields", async () => {
       await setQCProps({
         columns: [
@@ -876,24 +968,31 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.find('[data-test="alert-threshold-value-input"]').exists()).toBe(true);
     });
 
+    it("one per series keeps the one-alert limit line in place, out of reach", async () => {
+      const limit = () => wrapper.find('[data-test="add-alert-group-limit"]');
+      expect(limit().attributes("inert")).toBeUndefined();
+      wrapper.vm.onGroupAnswer("each");
+      await flushPromises();
+      expect(limit().attributes("inert")).toBeDefined();
+    });
+
     it("locks Multi only while rule mode has a pending duration", async () => {
       await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
       await flushPromises();
-      const toggle = () => wrapper.findComponent({ name: "AlertMultiToggle" });
-      expect(toggle().props("disabled")).toBe(false);
+      const one = () => wrapper.find('[data-test="add-alert-group-question-one"]');
+      expect(one().attributes("disabled")).toBeUndefined();
       hostForm().setFieldValue("pending_period_sec", 4);
       await flushPromises();
       expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(true);
-      expect(toggle().props("disabled")).toBe(true);
-      expect(wrapper.find('[data-test-value="false"]').attributes("disabled")).toBeDefined();
+      expect(one().attributes("disabled")).toBeDefined();
       hostForm().setFieldValue("query_condition.promql_multi_alert", false);
       await flushPromises();
       expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(true);
       expect(await submit()).toBe(true);
       hostForm().setFieldValue("pending_period_sec", 0);
       await flushPromises();
-      expect(toggle().props("disabled")).toBe(false);
-      await wrapper.find('[data-test-value="false"]').trigger("click");
+      expect(one().attributes("disabled")).toBeUndefined();
+      wrapper.vm.onGroupAnswer("one");
       await flushPromises();
       expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(false);
       expect(await submit()).toBe(true);
@@ -1078,12 +1177,6 @@ describe("QueryConfig.vue", () => {
       await input.trigger("blur");
       await flushPromises();
       expect(host.find('[data-test="alert-forecast-horizon-error"]').exists()).toBe(false);
-    });
-
-    it("keeps “within” together with the horizon input so it never wraps alone", () => {
-      const group = host.find('[data-test="alert-forecast-horizon-group"]');
-      expect(group.text()).toContain(t("alerts.forecast.within"));
-      expect(group.find('[data-test="alert-forecast-horizon"]').exists()).toBe(true);
     });
 
     it("reopens its own generated query with the same fields, not as a nested expression", async () => {
@@ -1999,45 +2092,6 @@ describe("QueryConfig.vue", () => {
       await flushPromises();
       expect(form.state.isValid).toBe(true);
     });
-
-    // ── group_by field array — MANDATORY non-last-row delete test (Rule ①) ──
-    it("deletes a NON-last logs group-by row and the RENDERED inputs shift correctly", async () => {
-      // Enter logs measure mode so the group-by row renders.
-      wrapper.vm.selectedFunction = "avg";
-      await nextTick();
-
-      const form = hostForm();
-      form.setFieldValue("logGroupBy", ["field1", "field2", "field3"]);
-      await nextTick();
-      await flushPromises();
-
-      const namesFor = () =>
-        wrapper
-          .findAllComponents(OFormSelect)
-          .filter((c: any) => /^logGroupBy\[\d+\]$/.test(c.props("name")));
-
-      // 3 rendered rows, values in order.
-      let rows = namesFor();
-      expect(rows.length).toBe(3);
-      expect(rows.map((c: any) => c.findComponent(OSelect).props("modelValue"))).toEqual([
-        "field1",
-        "field2",
-        "field3",
-      ]);
-
-      // Delete the MIDDLE (non-last) row.
-      wrapper.vm.deleteLogGroupByColumn(1);
-      await nextTick();
-      await flushPromises();
-
-      rows = namesFor();
-      expect(rows.length).toBe(2);
-      // The RENDERED inputs (not just form.state.values) must be ["field1","field3"].
-      expect(rows.map((c: any) => c.findComponent(OSelect).props("modelValue"))).toEqual([
-        "field1",
-        "field3",
-      ]);
-    });
   });
 
   describe("Real OForm behavior — metrics / promql modes", () => {
@@ -2102,6 +2156,42 @@ describe("QueryConfig.vue", () => {
       h.unmount();
     });
 
+    it("promql: the value limit offers the same worded comparisons as a count", async () => {
+      const h = mountMetrics();
+      await flushPromises();
+      const select = h
+        .findAllComponents({ name: "OFormSelect" })
+        .find((c) => c.props("name") === "query_condition.promql_condition.operator");
+      const qc = h.findComponent(QueryConfig).vm as any;
+      expect(select?.props("options")).toEqual(qc.plainOperators);
+      h.unmount();
+    });
+
+    it("sql: an empty editor shows a static example, not one that types itself out", async () => {
+      const { h } = mountHost({
+        tab: "sql",
+        sqlQuery: "",
+        streamName: "k8s_events",
+        columns: [{ label: "level", value: "level", type: "Utf8" }],
+      });
+      await flushPromises();
+      const placeholder = () => h.get('[data-test="alert-query-editor-placeholder"]').text();
+      const first = placeholder();
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      expect(first).toContain("SELECT");
+      expect(placeholder()).toBe(first);
+      h.unmount();
+    });
+
+    it("promql: an empty editor shows a static example and keeps the query empty", async () => {
+      const h = mountMetrics({ streamName: "cpu_usage", promqlQuery: "" });
+      await flushPromises();
+      const placeholder = h.get('[data-test="alert-query-editor-placeholder"]').text();
+      expect(placeholder).toContain("cpu_usage");
+      expect(h.findComponent(QueryConfig).emitted("update:promqlQuery")).toBeUndefined();
+      h.unmount();
+    });
+
     it('promql: value "" BLOCKS (§4 restore)', async () => {
       const h = mountMetrics({ promqlCondition: { operator: ">=", value: "" } });
       await flushPromises();
@@ -2127,24 +2217,12 @@ describe("QueryConfig.vue", () => {
         "query_condition.aggregation.having.value",
       );
 
-    it("logs: first switch to a measure fn opens on the threshold (3), not 1", async () => {
+    it("logs: a new alert's first measure opens with no value, not the event count", async () => {
       const { h } = mountHost();
-      await flushPromises();
-      h.findComponent(QueryConfig).vm.onLogFunctionChange("count");
-      await flushPromises();
-      expect(havingValue(h)).toBe(3);
-      h.unmount();
-    });
-
-    it("logs: seeds from the LOADED threshold, not the hardcoded default", async () => {
-      const { h } = mountHost(
-        {},
-        { trigger_condition: { ...hostDefaults().trigger_condition, threshold: 7 } },
-      );
       await flushPromises();
       h.findComponent(QueryConfig).vm.onLogFunctionChange("min");
       await flushPromises();
-      expect(havingValue(h)).toBe(7);
+      expect(havingValue(h)).toBe("");
       h.unmount();
     });
 
@@ -2221,6 +2299,896 @@ describe("QueryConfig.vue", () => {
   // active, so such a test passes with the bug still present. The only honest probe
   // is to drive a real VALUE context and require Value-kind items to reach the editor.
 
+  describe("Condition section", () => {
+    const remount = (qc: Record<string, any>, form: Record<string, any> = {}, provide = {}) => {
+      host.unmount();
+      const { h, props } = mountHost(qc, form, undefined, () => {}, provide);
+      host = h;
+      qcProps = props;
+      wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
+    };
+    const columns = ["service", "status"].map((c) => ({ label: c, value: c, type: "utf8" }));
+    const sectioned = { sectionTargets: {} };
+    const mockInputDataShape = () => ({
+      conditions: { filterType: "group", logicalOperator: "AND", conditions: [] },
+      period: 10,
+      multi_time_range: [],
+    });
+    const leaf = (column: string, value: string, logicalOperator = "AND") => ({
+      filterType: "condition",
+      column,
+      operator: "=",
+      value,
+      logicalOperator,
+    });
+    const group = (...conditions: any[]) => ({
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions,
+    });
+    const tiersWith = (revealed: string[] = []) => {
+      const tiers = useAlertSettingTiers({
+        available: () => true,
+        isSet: () => false,
+        showAll: ref(false),
+      });
+      revealed.forEach((id) => tiers.reveal(id as any));
+      return { [ALERT_SETTING_TIERS_KEY as symbol]: tiers };
+    };
+    const formConditions = () => hostForm().state.values.query_condition.conditions;
+
+    it("the condition's window is the look back, edited in place", async () => {
+      vi.useFakeTimers();
+      try {
+        remount({ ...sectioned, triggerCondition: { period: 10 } });
+        const input = host.find('[data-test="alert-settings-period-input"] input');
+        expect((input.element as HTMLInputElement).value).toBe("10");
+        await input.setValue("5");
+        vi.advanceTimersByTime(300);
+        expect(wrapper.emitted("update:period")?.at(-1)).toEqual([5]);
+        expect(hostForm().state.values.trigger_condition.period).toBe("5");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("filters read as a sentence and Change opens the builder", async () => {
+      remount({
+        ...sectioned,
+        inputData: { ...mockInputData, conditions: group(leaf("level", "error")) },
+      });
+      const sentence = host.find('[data-test="add-alert-filter-sentence"]');
+      expect(sentence.text()).toContain("level");
+      expect(sentence.text()).toContain("error");
+      expect(host.findComponent({ name: "FilterBuilder" }).isVisible()).toBe(false);
+      await host.find('[data-test="add-alert-filter-sentence-change"]').trigger("click");
+      expect(host.findComponent({ name: "FilterBuilder" }).isVisible()).toBe(true);
+    });
+
+    it("the and/or word on the sentence switches the stored connector", async () => {
+      const conditions = group(leaf("level", "error"), leaf("service", "cart"));
+      remount({ ...sectioned, inputData: { ...mockInputData, conditions } });
+      await host.find('[data-test^="add-alert-filter-sentence-connector-"]').trigger("click");
+      expect(formConditions().conditions.map((c: any) => c.logicalOperator)).toEqual(["AND", "OR"]);
+    });
+
+    it("Remove clears the filters", async () => {
+      remount({
+        ...sectioned,
+        inputData: { ...mockInputData, conditions: group(leaf("level", "error")) },
+      });
+      await host.find('[data-test="add-alert-filter-sentence-remove"]').trigger("click");
+      expect(formConditions().conditions).toEqual([]);
+      await setQCProps({ inputData: { ...mockInputData, conditions: formConditions() } });
+      expect(host.find('[data-test="add-alert-add-filters"]').exists()).toBe(true);
+    });
+
+    it.each([
+      ["custom", "false", true],
+      ["custom", "true", true],
+      ["sql", "false", false],
+      ["promql", "false", false],
+    ])("Show generated SQL in %s mode, real-time %s: %s", (tab, isRealTime, shown) => {
+      remount(
+        { ...sectioned, tab, isRealTime, streamType: "metrics", generatedSqlQuery: "SELECT 1" },
+        {},
+        tiersWith(["generatedSql"]),
+      );
+      expect(host.find('[data-test="add-alert-generated-sql"]').exists()).toBe(shown);
+      // The theme-aware code block, not a fixed dark one, with its copy button.
+      if (shown)
+        expect(host.find('[data-test="alert-query-preview-copy-btn"]').exists()).toBe(true);
+      // Real-time has no window or threshold, so its note says so instead of where a threshold applies.
+      if (isRealTime === "true")
+        expect(host.find('[data-test="add-alert-generated-sql-threshold"]').text()).toBe(
+          i18n.global.t("alerts.form.generatedSql.realtime"),
+        );
+    });
+
+    it.each([
+      [12, true],
+      [4, false],
+    ])("a %i-line query folds: %s", async (lines, folds) => {
+      const sql = Array.from({ length: lines }, (_, i) => `-- line ${i + 1}`).join("\n");
+      remount({ ...sectioned, tab: "sql", sqlQuery: sql });
+      const fold = host.find('[data-test="add-alert-editor-fold"]');
+      expect(fold.exists()).toBe(folds);
+      if (!folds) return;
+      expect(wrapper.vm.foldedLines).toBe(lines);
+      await fold.trigger("click");
+      expect(wrapper.vm.editorFolded).toBe(false);
+    });
+
+    const tiersFor = (showAll: boolean) => ({
+      [ALERT_SETTING_TIERS_KEY as symbol]: useAlertSettingTiers({
+        available: () => true,
+        isSet: () => false,
+        showAll: ref(showAll),
+      }),
+    });
+    const tiersOf = (provide: Record<symbol, unknown>) =>
+      provide[ALERT_SETTING_TIERS_KEY as symbol] as any;
+    const shown = (id: string) => host.find(`[data-test="${id}"]`).exists();
+    const sql = { tab: "sql", sqlQuery: "SELECT * FROM t" };
+    const sqlForm = {
+      query_condition: { ...hostDefaults().query_condition, type: "sql", sql: sql.sqlQuery },
+    };
+    const sqlLimit = ["alert-trigger-operator-select", "alert-trigger-threshold-input"];
+
+    it.each([
+      ["More options", (p: any) => tiersOf(p).toggle("condition"), false],
+      ["Find", (p: any) => tiersOf(p).reveal("vrl"), false],
+      ["Show all settings", () => {}, true],
+    ])("revealing VRL through %s leaves it off and the limit in place", async (_c, reveal, all) => {
+      const provide = tiersFor(all);
+      remount({ ...sectioned, ...sql }, sqlForm, provide);
+      reveal(provide);
+      await flushPromises();
+      expect(shown("add-alert-vrl-pane")).toBe(false);
+      expect(shown("alert-vrl-toggle")).toBe(true);
+      sqlLimit.forEach((id) => expect(shown(id)).toBe(true));
+    });
+
+    it.each([
+      ["a saved function", { vrlFunction: ".x = 1" }, false],
+      ["the user's switch", {}, true],
+    ])("SQL with VRL on from %s keeps the limit", async (_c, qc, flip) => {
+      remount({ ...sectioned, ...sql, ...qc }, sqlForm, tiersFor(true));
+      if (flip) await host.find('[data-test="alert-vrl-toggle-btn"]').trigger("click");
+      await flushPromises();
+      expect(shown("add-alert-vrl-pane")).toBe(true);
+      sqlLimit.forEach((id) => expect(shown(id)).toBe(true));
+    });
+
+    const promql = {
+      tab: "promql",
+      streamType: "metrics",
+      promqlQuery: "avg(x)",
+      promqlCondition: { operator: ">=", value: 1 },
+    };
+    const promqlForm = {
+      query_condition: {
+        ...hostDefaults().query_condition,
+        type: "promql",
+        promql: "avg(x)",
+        promql_condition: { column: "value", operator: ">=", value: 1 },
+      },
+    };
+    it.each([
+      ["Builder", { tab: "custom" }, {}],
+      ["SQL", sql, sqlForm],
+      ["SQL with VRL", { ...sql, vrlFunction: ".x = 1" }, sqlForm],
+      ["PromQL", promql, promqlForm],
+    ])("+ Add warning and the threshold's level show by default in %s", async (_c, qc, form) => {
+      remount({ ...sectioned, ...qc }, form, tiersFor(false));
+      await flushPromises();
+      expect(shown("alert-add-warning-button")).toBe(true);
+      expect(shown("alert-threshold-level")).toBe(true);
+    });
+
+    it("the SQL warning can be added and removed", async () => {
+      remount({ ...sectioned, ...sql }, sqlForm, tiersFor(false));
+      await host.find('[data-test="alert-add-warning-button"]').trigger("click");
+      expect(shown("alert-warning-threshold-input-1020")).toBe(true);
+      const remove = host.find('[data-test="alert-remove-warning-button"]');
+      // Tab from the value never lands on Remove, where Enter would drop the warning.
+      expect(remove.attributes("tabindex")).toBe("-1");
+      await remove.trigger("click");
+      expect(shown("alert-warning-threshold-input-1020")).toBe(false);
+      expect(hostForm().state.values.trigger_condition.warning_threshold).toBe("");
+    });
+
+    it.each([
+      ["a complete filter, clicking elsewhere", true, false, true],
+      ["an unfinished filter, clicking elsewhere", false, false, false],
+      ["a complete filter, clicking inside it", true, true, false],
+    ])("the open builder with %s folds: %s", async (_c, valid, inside, folds) => {
+      remount({
+        ...sectioned,
+        inputData: { ...mockInputData, conditions: group(leaf("level", "error")) },
+      });
+      await host.find('[data-test="add-alert-filter-sentence-change"]').trigger("click");
+      const builder = host.findComponent({ name: "FilterBuilder" });
+      builder.vm.$emit("update:valid", valid);
+      const target = inside ? builder.element : document.body;
+      target.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+      await flushPromises();
+      expect(host.findComponent({ name: "FilterBuilder" }).isVisible()).toBe(!folds);
+    });
+
+    it("a failed Save keeps the builder open after its filter is fixed", async () => {
+      remount({
+        ...sectioned,
+        inputData: { ...mockInputData, conditions: group(leaf("level", "error")) },
+      });
+      const builder = host.findComponent({ name: "FilterBuilder" });
+      builder.vm.$emit("update:valid", false);
+      await hostForm().handleSubmit();
+      builder.vm.$emit("update:valid", true);
+      await flushPromises();
+      expect(builder.isVisible()).toBe(true);
+    });
+
+    it("the forecast link switches to forecast mode and Remove switches back", async () => {
+      remount(
+        {
+          ...sectioned,
+          tab: "promql",
+          streamType: "metrics",
+          promqlQuery: "avg(x)",
+          promqlCondition: { operator: ">=", value: 1 },
+        },
+        {
+          query_condition: {
+            ...hostDefaults().query_condition,
+            type: "promql",
+            promql: "avg(x)",
+            promql_condition: { column: "value", operator: ">=", value: 1 },
+          },
+        },
+      );
+      await flushPromises();
+      await host.find('[data-test="add-alert-add-forecast"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.vm.isForecastMode).toBe(true);
+      await host.find('[data-test="alert-forecast-fields-remove"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.vm.isForecastMode).toBe(false);
+    });
+
+    it("Use as rule turns rule mode on", async () => {
+      const handlers: Record<string, () => void> = {};
+      const suggestions = {
+        current: () => null,
+        add: vi.fn(),
+        notNow: vi.fn(),
+        onApply: (id: string, handler: () => void) => {
+          handlers[id] = handler;
+          return () => delete handlers[id];
+        },
+      };
+      remount(
+        { ...sectioned, tab: "promql", streamType: "metrics" },
+        {},
+        { [ALERT_SUGGESTIONS_KEY as symbol]: suggestions },
+      );
+      handlers.ruleExpression();
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_rule_mode).toBe(true);
+    });
+
+    const forecast = { U: "x", T: 1, direction: "rises", W: "2d", H: 7 };
+    const tenLabels = Array.from({ length: 10 }, (_, i) => `label_${i + 1}`);
+    it.each([
+      [
+        "SQL without GROUP BY",
+        { tab: "sql", sqlQuery: "SELECT * FROM t" },
+        {},
+        true,
+        [],
+        "sqlUngrouped",
+      ],
+      [
+        "SQL GROUP BY service",
+        {
+          tab: "sql",
+          sqlQuery: "SELECT service, count(*) AS n FROM t GROUP BY service ORDER BY n",
+        },
+        {},
+        true,
+        ["service"],
+        "grouped",
+      ],
+      [
+        "PromQL sum by (a,b,c)",
+        {
+          tab: "promql",
+          streamType: "metrics",
+          promqlQuery: "sum by (a, b, c) (x) > 1",
+          promqlCondition: { operator: ">=", value: 1 },
+        },
+        {},
+        true,
+        ["a", "b", "c"],
+        "groupedMany",
+      ],
+      [
+        "PromQL by 10 labels",
+        {
+          tab: "promql",
+          streamType: "metrics",
+          promqlQuery: `sum by (${tenLabels.join(",")}) (x)`,
+          promqlCondition: { operator: ">=", value: 1 },
+        },
+        {},
+        true,
+        tenLabels,
+        "groupedMany",
+      ],
+      [
+        "PromQL forecast",
+        { tab: "promql", streamType: "metrics", promqlQuery: "x" },
+        { _ui: { checkEvery: 10, forecast } },
+        false,
+        [],
+        null,
+      ],
+      ["Builder count", { tab: "custom" }, {}, false, [], null],
+      [
+        "Builder avg grouped by service",
+        {
+          tab: "custom",
+          isAggregationEnabled: true,
+          inputData: {
+            ...mockInputDataShape(),
+            aggregation: {
+              function: "avg",
+              group_by: ["service"],
+              having: { column: "n", operator: ">=", value: 1 },
+            },
+          },
+        },
+        {
+          logGroupBy: ["service"],
+          query_condition: {
+            ...hostDefaults().query_condition,
+            aggregation: {
+              function: "avg",
+              group_by: ["service"],
+              having: { column: "n", operator: ">=", value: 1 },
+            },
+          },
+        },
+        true,
+        ["service"],
+        "grouped",
+      ],
+    ])("the per-group question for %s", (_case, qc, form, offered, labels, titleKey) => {
+      remount({ ...sectioned, ...qc }, form);
+      const q = wrapper.vm.groupQuestion;
+      expect(q.offered).toBe(offered);
+      // The builder's own Group by toggle shows even before anything is grouped.
+      expect(host.find('[data-test="add-alert-group-question"]').exists()).toBe(
+        offered || qc.tab === "custom",
+      );
+      if (!offered) return;
+      expect(q.labels).toEqual(labels);
+      if (titleKey === "grouped") {
+        expect(wrapper.vm.groupQuestionTitle).toBe(
+          t("alerts.form.group.grouped", { label: labels[0] }),
+        );
+      } else {
+        expect(wrapper.vm.groupQuestionTitle).toBe(t(`alerts.form.group.${titleKey}`));
+      }
+      labels.forEach((label: string) => expect(wrapper.vm.groupEachLabel).toContain(label));
+    });
+
+    it("switching to one per row keeps the one-alert limit", async () => {
+      remount(
+        { ...sectioned, tab: "sql", sqlQuery: "SELECT * FROM t" },
+        {
+          trigger_condition: { ...hostDefaults().trigger_condition, operator: ">", threshold: 5 },
+          query_condition: {
+            ...hostDefaults().query_condition,
+            type: "sql",
+            sql: "SELECT * FROM t",
+          },
+        },
+      );
+      await flushPromises();
+      const column = () =>
+        host.find('[data-test="add-alert-group-limit"] [data-test="alert-sql-agg-column-select"]');
+      // The unpicked answer's controls stay hidden; the picked one's line starts at the column.
+      expect(column().exists()).toBe(false);
+      wrapper.vm.onGroupAnswer("each");
+      wrapper.vm.onGroupAnswer("one");
+      wrapper.vm.onGroupAnswer("each");
+      await flushPromises();
+      expect(column().exists()).toBe(true);
+      const v = hostForm().state.values;
+      expect(v.query_condition.aggregation.multi_alert).toBe(true);
+      expect([v.trigger_condition.operator, v.trigger_condition.threshold]).toEqual([">", 5]);
+    });
+
+    it("one alert takes the per-group condition into HAVING, and one per group takes it back out", async () => {
+      const perGroup = "SELECT k, avg(x) AS a FROM t GROUP BY k ORDER BY a DESC";
+      remount(
+        { ...sectioned, tab: "sql", sqlQuery: perGroup, sqlAggColumnOptions: ["k", "a"] },
+        {
+          query_condition: {
+            ...hostDefaults().query_condition,
+            type: "sql",
+            sql: perGroup,
+            aggregation: {
+              multi_alert: true,
+              function: "count",
+              group_by: [],
+              having: { column: "a", operator: ">", value: 500 },
+            },
+          },
+        },
+      );
+      await flushPromises();
+      wrapper.vm.onGroupAnswer("one");
+      expect(wrapper.emitted("update:sqlQuery")!.at(-1)).toEqual([
+        "SELECT k, avg(x) AS a FROM t GROUP BY k HAVING avg(x) > 500",
+      ]);
+      expect(hostForm().state.values.query_condition.aggregation.having.column).toBe("");
+      wrapper.vm.onGroupAnswer("each");
+      expect(wrapper.emitted("update:sqlQuery")!.at(-1)).toEqual([perGroup]);
+      expect(hostForm().state.values.query_condition.aggregation.having).toMatchObject({
+        column: "a",
+        operator: ">",
+        value: 500,
+      });
+    });
+
+    it("with VRL on, the plain row limit is the only limit drawn", async () => {
+      remount(
+        { ...sectioned, tab: "sql", sqlQuery: "SELECT * FROM t" },
+        {
+          query_condition: {
+            ...hostDefaults().query_condition,
+            type: "sql",
+            sql: "SELECT * FROM t",
+          },
+        },
+      );
+      wrapper.vm.showVrl = true;
+      await flushPromises();
+      expect(host.findAll('[data-test="alert-trigger-operator-select"]')).toHaveLength(1);
+      expect(host.find('[data-test="add-alert-group-question"]').exists()).toBe(false);
+    });
+
+    it("+ Use a cron schedule turns the row into Run on cron with a timezone, and Remove returns to the minutes it had", async () => {
+      remount({ ...sectioned });
+      await host.find('[data-test="add-alert-add-cron"]').trigger("click");
+      await flushPromises();
+      expect(hostForm().state.values.trigger_condition.frequency_type).toBe("cron");
+      expect(host.find('[data-test="add-alert-cron-row"]').exists()).toBe(true);
+      expect(host.find('[data-test="alert-cron-timezone-select"]').exists()).toBe(true);
+      await host.find('[data-test="add-alert-cron-row-remove"]').trigger("click");
+      await flushPromises();
+      const tc = hostForm().state.values.trigger_condition;
+      expect([tc.frequency_type, tc.frequency, wrapper.vm.frequencyMode]).toEqual([
+        "minutes",
+        10,
+        "minutes",
+      ]);
+    });
+
+    it.each([
+      ["limit", "alert-trigger-threshold-input", "alert-if-row-logs-error", ["-5", "2.5", "3"]],
+      ["check every", "alert-check-every-input", "alert-check-every-error", ["0", "-1", "5"]],
+      ["cron", "alert-cron-input", "alert-cron-error", ["0 9 * * 1-5", "", "0 0 9 * * 1-5"]],
+    ])(
+      "the %s shows its error once left, then on every change until fixed",
+      async (name, inputId, errorId, [bad, worse, good]) => {
+        remount({ ...sectioned });
+        if (name === "cron") await host.find('[data-test="add-alert-add-cron"]').trigger("click");
+        const input = () => host.find(`[data-test="${inputId}"] input`);
+        const error = () => host.find(`[data-test="${errorId}"]`);
+        await input().setValue(bad);
+        await flushPromises();
+        expect(error().exists()).toBe(false);
+        await input().trigger("blur");
+        await vi.waitFor(() => expect(error().exists()).toBe(true));
+        await input().setValue(worse);
+        await vi.waitFor(() => expect(error().exists()).toBe(true));
+        await input().setValue(good);
+        await vi.waitFor(() => expect(error().exists()).toBe(false));
+      },
+    );
+
+    it.each([
+      ["sql", "alerts.messages.sqlQueryEmpty"],
+      ["promql", "alerts.messages.promqlQueryEmpty"],
+    ])("an empty %s editor asks for a query once left", async (tab, key) => {
+      remount(
+        { ...sectioned, tab, sqlQuery: "", promqlQuery: "", streamType: "metrics" },
+        { stream_type: "metrics", _meta: defaultAddAlertMeta({ tab: tab as any }) },
+      );
+      const error = () => host.find('[data-test="add-alert-query-required-error"]');
+      hostForm().setFieldValue("query_condition.sql", "");
+      hostForm().setFieldValue("query_condition.promql", "");
+      await flushPromises();
+      expect(error().exists()).toBe(false);
+      await wrapper.vm.onBlurInlineSqlEditor();
+      await vi.waitFor(() => expect(error().text()).toBe(t(key)));
+    });
+
+    it("the unit select offers minutes and hours only", () => {
+      expect(wrapper.vm.frequencyUnitOptions.map((o: any) => o.value)).toEqual([
+        "minutes",
+        "hours",
+      ]);
+    });
+
+    it("an invalid SQL error shows under the editor with Use 'service'", async () => {
+      const sql = "SELECT *\nFROM t\nWHERE servce = 'a'";
+      remount(
+        {
+          tab: "sql",
+          sqlQuery: sql,
+          columns,
+          sqlQueryErrorMsg: "Schema error: No field named servce",
+        },
+        { query_condition: { ...hostDefaults().query_condition, type: "sql", sql } },
+      );
+      await flushPromises();
+      const error = host.find('[data-test="add-alert-sql-error"]');
+      expect(error.attributes("role")).toBe("alert");
+      await host.find('[data-test="add-alert-sql-error-fix"]').trigger("click");
+      expect(wrapper.emitted("update:sqlQuery")?.at(-1)).toEqual([
+        "SELECT *\nFROM t\nWHERE service = 'a'",
+      ]);
+    });
+
+    const metricPromqlForm = (
+      promql: string,
+      condition: any = { column: "value", operator: ">", value: 0.85 },
+    ) => ({
+      stream_type: "metrics",
+      stream_name: "node_cpu_seconds_total",
+      query_condition: {
+        ...hostDefaults().query_condition,
+        type: "promql",
+        promql,
+        promql_condition: condition,
+      },
+      _meta: defaultAddAlertMeta({ tab: "promql" }),
+    });
+    const promqlProps = (promql: string) => ({
+      ...sectioned,
+      tab: "promql",
+      streamType: "metrics",
+      streamName: "node_cpu_seconds_total",
+      promqlQuery: promql,
+      promqlCondition: { column: "value", operator: ">", value: 0.85 },
+    });
+
+    it("a PromQL by-label the metric lacks reads red, listing the metric's labels", async () => {
+      streamFixtures.node_cpu_seconds_total = {
+        schema: ["_timestamp", "k8s_node_name", "cpu", "mode", "value"].map((name) => ({ name })),
+        metrics_meta: { unit: "s" },
+      };
+      const query = "avg by (instance) (rate(node_cpu_seconds_total[5m]))";
+      remount(promqlProps(query), metricPromqlForm(query));
+      await flushPromises();
+      const guard = host.find('[data-test="add-alert-query-label-guard"]');
+      expect(guard.attributes("role")).toBe("alert");
+      expect(guard.text()).toBe(
+        "instance isn't a label of node_cpu_seconds_total. Its labels: k8s_node_name, cpu, and mode.",
+      );
+      await hostForm().handleSubmit();
+      await flushPromises();
+      expect(hostForm().state.isValid).toBe(false);
+      const errors = hostForm().state.fieldMeta["query_condition.promql"]?.errors ?? [];
+      expect(errors.map((e: any) => e?.message ?? e)).toContain(guard.text());
+      expect(host.find('[data-test="add-alert-query-required-error"]').exists()).toBe(false);
+    });
+
+    it("the query's help line names the metric the query reads", async () => {
+      streamFixtures.node_cpu_seconds_total = { schema: [{ name: "value" }] };
+      const query = "node_cpu_seconds_total";
+      remount(
+        { ...promqlProps(query), promqlStreamNote: "Reads node_cpu_seconds_total, from the query" },
+        metricPromqlForm(query),
+      );
+      await flushPromises();
+      expect(host.text()).toContain("Reads node_cpu_seconds_total, from the query");
+    });
+
+    it.each([
+      ["a bare selector shows the metric's unit", "node_cpu_seconds_total", "s"],
+      ["a rate changes the unit, so none shows", "rate(node_cpu_seconds_total[5m])", ""],
+      ["a query scaled by 100 reads in percent", "rate(node_cpu_seconds_total[5m]) * 100", "%"],
+    ])("%s, on the threshold and the warning alike", async (_name, query, unit) => {
+      streamFixtures.node_cpu_seconds_total = {
+        schema: [{ name: "value" }],
+        metrics_meta: { unit: "seconds" },
+      };
+      const form = metricPromqlForm(query);
+      form.query_condition.promql_warning_value = 0.5;
+      remount(promqlProps(query), form);
+      await flushPromises();
+      const shown = host.findAll('[data-test="alert-threshold-unit"]').map((el) => el.text());
+      expect(shown).toEqual(unit ? [unit, unit] : []);
+    });
+
+    it("a percent typed against 0-1 values offers the ratio in place, and one click sets it", async () => {
+      streamFixtures.node_cpu_seconds_total = { schema: [{ name: "value" }] };
+      const query = "1 - avg(rate(node_cpu_seconds_total{mode='idle'}[5m]))";
+      const form = metricPromqlForm(query, { column: "value", operator: ">", value: 90 });
+      remount(
+        { ...promqlProps(query), previewValueRange: { min: 0, max: 0.85, fractional: true } },
+        form,
+      );
+      await flushPromises();
+      const hint = () => host.find('[data-test="alert-threshold-ratio-hint"]');
+      expect(hint().attributes("class")).toContain("text-status-warning-text");
+
+      await host.find('[data-test="alert-threshold-ratio-hint-action"]').trigger("click");
+      await flushPromises();
+      expect(hostForm().getFieldValue("query_condition.promql_condition.value")).toBe(0.9);
+      expect(hint().exists()).toBe(false);
+    });
+
+    it("Rule mode moves a typed threshold into the query, and back when turned off", async () => {
+      const query = "max by (pod) (mem)";
+      remount(promqlProps(query), metricPromqlForm(query));
+      await flushPromises();
+      wrapper.vm.onPromRuleModeChange(true);
+      expect(wrapper.emitted("update:promqlQuery")?.at(-1)).toEqual([`${query} > 0.85`]);
+      expect(wrapper.vm.keptThresholdText).toBe("Kept your threshold in the query: > 0.85");
+      wrapper.vm.onPromRuleModeChange(false);
+      expect(wrapper.emitted("update:promqlQuery")?.at(-1)).toEqual([query]);
+      expect(hostForm().getFieldValue("query_condition.promql_condition")).toMatchObject({
+        operator: ">",
+        value: 0.85,
+      });
+    });
+
+    it.each([
+      ["SELECT count(*) AS errors FROM t", true],
+      ["SELECT service, count(*) FROM t GROUP BY service", false],
+    ])("SQL %s warns amber that one row always fires: %s", async (sql, warns) => {
+      remount(
+        { ...sectioned, tab: "sql", sqlQuery: sql },
+        {
+          query_condition: { ...hostDefaults().query_condition, type: "sql", sql },
+          trigger_condition: { ...hostDefaults().trigger_condition, threshold: 1 },
+          _meta: defaultAddAlertMeta({ tab: "sql" }),
+        },
+      );
+      await flushPromises();
+      expect(host.find('[data-test="add-alert-query-one-row-guard"]').exists()).toBe(warns);
+    });
+
+    it("Group by on total events counts the field per field, keeps the limit, and says so", async () => {
+      remount(
+        { ...sectioned, columns },
+        {
+          trigger_condition: { ...hostDefaults().trigger_condition, operator: ">", threshold: 50 },
+        },
+        tiersWith(),
+      );
+      await flushPromises();
+      wrapper.vm.setGroupBy(["service"]);
+      await flushPromises();
+      expect(hostForm().getFieldValue("query_condition.aggregation")).toMatchObject({
+        function: "count",
+        group_by: ["service"],
+        having: { column: "service", operator: ">", value: 50 },
+      });
+      expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(1);
+      const groupRow = host.find('[data-test="add-alert-group-question-row"]');
+      expect(groupRow.find('[data-test="add-alert-group-question-each"]').text()).toContain(
+        "service",
+      );
+      expect(groupRow.text()).toContain("Switched to count, so it counts events per service");
+      wrapper.vm.setGroupBy([]);
+      await flushPromises();
+      expect(wrapper.vm.selectedFunction).toBe("total_events");
+      expect(hostForm().getFieldValue("trigger_condition")).toMatchObject({
+        operator: ">",
+        threshold: 50,
+      });
+    });
+
+    it("Group by opens on One alert; One per with two fields splits by both, unticking all is One alert again", async () => {
+      remount({ ...sectioned, columns });
+      await flushPromises();
+      const toggle = () => host.find('[data-test="add-alert-group-question"]');
+      const picker = () => host.find('[data-test="alert-group-by-picker"]');
+      expect(wrapper.vm.builderGroupAnswer).toBe("one");
+      expect(picker().exists()).toBe(false);
+
+      await host.find('[data-test="add-alert-group-question-each"]').trigger("click");
+      expect(picker().exists()).toBe(true);
+      host
+        .findComponent({ name: "AlertGroupByPicker" })
+        .vm.$emit("update:modelValue", ["service", "status"]);
+      await flushPromises();
+      expect(hostForm().getFieldValue("query_condition.aggregation")).toMatchObject({
+        group_by: ["service", "status"],
+        multi_alert: true,
+      });
+      expect(toggle().text()).toContain("service");
+
+      host.findComponent({ name: "AlertGroupByPicker" }).vm.$emit("update:modelValue", []);
+      await flushPromises();
+      expect(wrapper.vm.builderGroupAnswer).toBe("one");
+      expect(hostForm().getFieldValue("query_condition.aggregation")).toMatchObject({
+        group_by: [],
+        multi_alert: false,
+      });
+    });
+
+    it("One per fields can send one alert once N groups cross, saved and read back like main's having-groups", async () => {
+      remount({ ...sectioned, columns });
+      await flushPromises();
+      await host.find('[data-test="add-alert-group-question-each"]').trigger("click");
+      host
+        .findComponent({ name: "AlertGroupByPicker" })
+        .vm.$emit("update:modelValue", ["service", "status"]);
+      await flushPromises();
+      const rule = () => host.find('[data-test="add-alert-group-limit-rule"]');
+      expect(rule().attributes("inert")).toBeDefined();
+
+      await host.find('[data-test="add-alert-group-limit-on"]').trigger("click");
+      await host.find('[data-test="add-alert-group-limit-threshold"] input').setValue("3");
+      await flushPromises();
+      // The toggle names what is sent: one alert, still over the picked fields.
+      const sends = () => ({
+        answer: wrapper.vm.builderGroupAnswer,
+        fields: host.findComponent({ name: "AlertGroupByPicker" }).exists()
+          ? host.findComponent({ name: "AlertGroupByPicker" }).props("modelValue")
+          : null,
+      });
+      expect(sends()).toEqual({ answer: "one", fields: ["service", "status"] });
+      const saved = cloneDeep(hostForm().state.values);
+      const payload = getAlertPayload({ ...saved, context_attributes: [], description: "" }, {
+        store: mockStore,
+        isAggregationEnabled: { value: true },
+        getSelectedTab: { value: "custom" },
+        beingUpdated: false,
+      } as any);
+      expect(payload.query_condition.aggregation).toMatchObject({
+        group_by: ["service", "status"],
+        multi_alert: false,
+      });
+      expect(payload.trigger_condition).toMatchObject({ operator: ">=", threshold: 3 });
+
+      remount(
+        {
+          ...sectioned,
+          columns,
+          beingUpdated: true,
+          isAggregationEnabled: true,
+          inputData: { ...mockInputData, aggregation: saved.query_condition.aggregation },
+        },
+        {
+          query_condition: saved.query_condition,
+          trigger_condition: saved.trigger_condition,
+          logGroupBy: saved.logGroupBy,
+        },
+      );
+      await flushPromises();
+      expect(sends()).toEqual({ answer: "one", fields: ["service", "status"] });
+      expect(rule().attributes("inert")).toBeUndefined();
+      await host.find('[data-test="add-alert-group-limit-off"]').trigger("click");
+      await flushPromises();
+      expect(sends()).toEqual({ answer: "each", fields: ["service", "status"] });
+      expect(hostForm().getFieldValue("query_condition.aggregation.multi_alert")).toBe(true);
+      expect(hostForm().getFieldValue("trigger_condition")).toMatchObject({
+        operator: ">=",
+        threshold: 1,
+      });
+    });
+
+    it.each([">=", ">", "<=", "<", "=", "!="])(
+      "the group count offers %s with its own words in Filters and PromQL",
+      async (op) => {
+        const label = countComparisonWords(op, i18n.global.t as any);
+        const grouped = {
+          function: "count",
+          group_by: ["service"],
+          multi_alert: false,
+          having: { column: "service", operator: ">=", value: 1 },
+        };
+        remount(
+          {
+            ...sectioned,
+            columns,
+            isAggregationEnabled: true,
+            inputData: { ...mockInputData, aggregation: grouped },
+          },
+          {
+            query_condition: { ...hostDefaults().query_condition, aggregation: grouped },
+            logGroupBy: ["service"],
+          },
+        );
+        await flushPromises();
+        const picker = host.findComponent('[data-test="add-alert-group-limit-operator"]') as any;
+        expect(picker.props("options").map((o: any) => o.value)).toContain(op);
+        picker.vm.$emit("update:modelValue", op);
+        hostForm().setFieldValue("trigger_condition.operator", op);
+        await flushPromises();
+        expect(hostForm().getFieldValue("trigger_condition.operator")).toBe(op);
+        expect(host.find('[data-test="add-alert-group-limit"]').text()).toContain(String(label));
+
+        const measure = {
+          function: "avg",
+          group_by: [],
+          having: { column: "value", operator: ">=", value: 1 },
+        };
+        remount(
+          {
+            ...sectioned,
+            tab: "promql",
+            streamType: "metrics",
+            promqlQuery: "up",
+            promqlCondition: { operator: ">=", value: 1 },
+            isAggregationEnabled: true,
+            inputData: { ...mockInputData, aggregation: measure },
+          },
+          {
+            query_condition: {
+              ...hostDefaults().query_condition,
+              type: "promql",
+              aggregation: measure,
+              promql_condition: { operator: ">=", value: 1 },
+            },
+            trigger_condition: { ...hostDefaults().trigger_condition, operator: op },
+          },
+        );
+        await flushPromises();
+        const limit = host.find('[data-test="add-alert-group-limit"]');
+        const promqlPicker = limit.findComponent(OFormSelect) as any;
+        promqlPicker.vm.$emit("update:modelValue", op);
+        hostForm().setFieldValue("trigger_condition.operator", op);
+        hostForm().setFieldValue("trigger_condition.threshold", 2);
+        // AddAlert hands the emitted trigger back as the prop; a measure on the side must not reset it.
+        await setQCProps({ triggerCondition: { ...hostForm().state.values.trigger_condition } });
+        await flushPromises();
+        expect(hostForm().getFieldValue("trigger_condition")).toMatchObject({
+          operator: op,
+          threshold: 2,
+        });
+        expect(limit.text()).toContain(String(label));
+      },
+    );
+
+    it("a span duration typed in ms is stored in microseconds; a loaded one shows whole", async () => {
+      const agg = (value: unknown) => ({
+        group_by: [],
+        function: "p95",
+        having: { column: "duration", operator: ">", value },
+      });
+      remount(
+        {
+          ...sectioned,
+          streamType: "traces",
+          isAggregationEnabled: true,
+          inputData: { ...mockInputData, aggregation: agg(1500000) },
+        },
+        {
+          stream_type: "traces",
+          query_condition: { ...hostDefaults().query_condition, aggregation: agg(1500000) },
+        },
+      );
+      await flushPromises();
+      expect(wrapper.vm.durationUnit).toBe("ms");
+      expect(hostForm().getFieldValue("_ui.durationValue")).toBe(1500);
+      wrapper.vm.onDurationValueChange("500");
+      expect(hostForm().getFieldValue("query_condition.aggregation.having.value")).toBe(500000);
+      hostForm().setFieldValue("_ui.durationValue", "500");
+      wrapper.vm.onDurationUnitChange("s");
+      expect(hostForm().getFieldValue("query_condition.aggregation.having.value")).toBe(500000000);
+    });
+  });
+
   describe("QueryConfig — N1 context keywords reach the inline editor", () => {
     let host: any;
     let editorStub: any;
@@ -2228,7 +3196,13 @@ describe("QueryConfig.vue", () => {
     const inlineEditorStub = {
       name: "UnifiedQueryEditor",
       template: '<div class="stub-inline-editor" />',
-      props: ["query", "keywords", "suggestions", "dataTestPrefix"],
+      props: {
+        query: null,
+        keywords: null,
+        suggestions: null,
+        dataTestPrefix: null,
+        escapeThenTab: Boolean,
+      },
       emits: ["update:query", "focus", "blur"],
       methods: {
         // handleInlineQueryUpdate reads these off the ref.
@@ -2283,6 +3257,17 @@ describe("QueryConfig.vue", () => {
     // that end to end against the real composable. What IS provable here, and
     // what N1 actually is, is WHICH list the template binds. The mock returns
     // distinct arrays for the base and context-aware views.
+
+    it("leaves the editor on Esc then Tab, hinting it only while the editor has focus", async () => {
+      const hint = () => host.find('[data-test="alert-query-editor-tab-out-hint"]').exists();
+      expect(editorStub.props("escapeThenTab")).toBe(true);
+      expect(hint()).toBe(false);
+      await editorStub.vm.$emit("focus");
+      expect(hint()).toBe(true);
+      await editorStub.vm.$emit("blur");
+      await flushPromises();
+      expect(hint()).toBe(false);
+    });
 
     it("binds the context-aware keyword view, not the base list", () => {
       const delivered = editorStub.props("keywords") as any[];

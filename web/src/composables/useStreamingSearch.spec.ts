@@ -214,6 +214,23 @@ describe("useHttpStreaming", () => {
       await streamPromise;
     });
 
+    it("keeps the HTTP status when the error body has a status of its own", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: vi.fn().mockResolvedValue({ status: "error", error: "invalid promql query" }),
+        body: new MockReadableStream() as any,
+      });
+
+      await httpStreaming.fetchQueryDataWithHttpStream(mockData, mockHandlers);
+      await flushPromises();
+
+      expect(mockHandlers.error).toHaveBeenCalledWith(
+        mockData,
+        expect.objectContaining({ content: expect.objectContaining({ status: 400 }) }),
+      );
+    });
+
     it("lets a caller skip the result cache without the clear_cache flag", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,

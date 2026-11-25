@@ -3,6 +3,17 @@
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+import {
+  ALERT_NAME_FIELD,
+  expandAlertSettingGroups,
+  expectSaveNamesIssues,
+  fillAlertName,
+  goToAlertSection,
+  openAlertFilterBuilder,
+  pickAlertDestination,
+  selectAlertStreamType,
+  settleIntoView,
+} from './alertSectionHelpers.js';
 const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 /**
@@ -26,17 +37,12 @@ export class AlertSaveQueryModePage {
 
       // ── the editor ──────────────────────────────────────────────────────
       submit: '[data-test="add-alert-submit-btn"]',
-      nameTrigger: '[data-test="add-alert-name-input-trigger"]',
-      nameInput: '[data-test="add-alert-name-input-input"]',
       streamTrigger: '[data-test="add-alert-stream-name-select-dropdown-trigger"]',
-      destinationTrigger: '[data-test="alert-destinations-select-trigger"]',
+      watchSummary: '[data-test="add-alert-watch-summary"] > span:first-child',
       threshold: '[data-test="alert-trigger-threshold-input-field"]',
       realtimeTab: '[data-test="add-alert-type-tab-true"]',
       scheduledTab: '[data-test="add-alert-type-tab-false"]',
-      alertRulesTab: '[data-test="add-alert-tab-condition"]',
-      advancedTab: '[data-test="add-alert-tab-advanced"]',
-      streamTypeTrigger: '[data-test="add-alert-stream-type-select-dropdown-trigger"]',
-      // Compare-with-Past lives on the Advanced tab, not Alert Rules.
+      // Compare-with-Past is a tucked setting of "When is it a problem?".
       multiWindowAdd: '[data-test="multi-time-range-alerts-add-btn"]',
       multiWindowDelete: '[data-test="multi-time-range-alerts-delete-btn"]',
       modeToggle: '[data-test="step2-query-tabs"]',
@@ -59,11 +65,10 @@ export class AlertSaveQueryModePage {
   async openEditor(alertId, { folder = 'default' } = {}) {
     await this.page.goto(`/web/alerts?org_identifier=${getOrgIdentifier()}&action=update&alert_id=${alertId}&folder=${folder}`);
     await expect(this.page.locator(this.locators.submit)).toBeVisible({ timeout: 30000 });
-    // The form shell renders before the alert is fetched, and a Save fired in
-    // that window reads an unpopulated form. The stream select is empty until
-    // the alert lands, so it doubles as the "data is in" signal.
-    await expect(this.page.locator(this.locators.streamTrigger))
-      .not.toHaveAttribute('data-test-selected-value', '', { timeout: 30000 });
+    // A Save fired before the alert is fetched reads an empty form. Edit locks section 1 to a
+    // "type · stream · how" summary whose stream slot stays blank until the alert lands.
+    await expect(this.page.locator(this.locators.watchSummary)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.locators.watchSummary)).not.toHaveText(/·\s*·/, { timeout: 30000 });
     testLogger.info('Opened alert editor', { alertId });
   }
 
@@ -81,7 +86,11 @@ export class AlertSaveQueryModePage {
 
   /** Reka's listbox renders into a portal, so options are addressed by role. */
   async #pickFromDropdown(trigger, optionName) {
+    await settleIntoView(this.page, this.page.locator(trigger));
     await this.page.locator(trigger).click();
+    // The option list is virtual: an option past the rendered window is not in the DOM until filtered.
+    const search = this.page.locator(trigger.replace(/-trigger"\]$/, '-search"]'));
+    if (await search.count()) await search.fill(optionName);
     const choice = this.page.getByRole('option', { name: optionName, exact: true });
     await choice.waitFor({ state: 'visible', timeout: 15000 });
     await choice.click();
@@ -91,21 +100,20 @@ export class AlertSaveQueryModePage {
     await this.#pickFromDropdown(this.locators.streamTrigger, streamName);
   }
 
-  /** Multi-select: the popover stays open after a pick, so it needs dismissing. */
   async selectDestination(destinationName) {
-    await this.#pickFromDropdown(this.locators.destinationTrigger, destinationName);
-    await this.page.keyboard.press('Escape');
+    await pickAlertDestination(this.page, destinationName);
   }
 
   async addBuilderCondition(column, value) {
+    // A field list opened mid-scroll loses its anchor when the snap settles, and the list hides.
+    await openAlertFilterBuilder(this.page);
     await new FilterBuilderDriver(this.page, 'alert-conditions').addCondition(column, '=', value);
   }
 
-  /** The name field is an inline edit: open it, then type. Enter submits the form. */
+  /** Enter in the name field submits the form. */
   async setName(name, { submit = false } = {}) {
-    await this.page.locator(this.locators.nameTrigger).click();
-    await this.page.locator(this.locators.nameInput).fill(name);
-    if (submit) await this.page.locator(this.locators.nameInput).press('Enter');
+    await fillAlertName(this.page, name);
+    if (submit) await this.page.locator(ALERT_NAME_FIELD).first().press('Enter');
   }
 
   async setThreshold(value) {
@@ -117,23 +125,26 @@ export class AlertSaveQueryModePage {
   }
 
   async selectRealtime() {
+    await goToAlertSection(this.page, 'watch');
     await this.page.locator(this.locators.realtimeTab).click();
   }
 
   async selectScheduled() {
+    await goToAlertSection(this.page, 'watch');
     await this.page.locator(this.locators.scheduledTab).click();
   }
 
   async selectStreamType(streamType) {
-    await this.#pickFromDropdown(this.locators.streamTypeTrigger, streamType);
+    await selectAlertStreamType(this.page, streamType.toLowerCase());
   }
 
   async openAdvancedTab() {
-    await this.page.locator(this.locators.advancedTab).click();
+    await expandAlertSettingGroups(this.page, ['condition']);
+    await goToAlertSection(this.page, 'condition');
     await expect(this.page.locator(this.locators.multiWindowAdd)).toBeVisible({ timeout: 20000 });
   }
 
-  /** Compare-with-Past reference window. Requires the Advanced tab to be open. */
+  /** Compare-with-Past reference window. Requires openAdvancedTab() first. */
   async addCompareWithPastWindow() {
     const before = await this.page.locator(this.locators.multiWindowDelete).count();
     await this.page.locator(this.locators.multiWindowAdd).click();
@@ -181,9 +192,16 @@ export class AlertSaveQueryModePage {
       await input.fill(sql, { force: true });
       await expect(editor).toContainText(table, { timeout: 5000 });
     }).toPass({ timeout: 40000 });
-    // Click away afterwards: the stream-name sync runs off the committed value,
-    // which is why #15091/#15092 both say "click outside the editor and wait".
-    await this.page.locator(this.locators.alertRulesTab).click();
+    // The stream-name sync runs off the value Monaco commits on blur; a click-away
+    // lands on the signature-help popup the fill opens, so close it and blur directly.
+    await this.page.keyboard.press('Escape');
+    await input.evaluate((el) => el.blur());
+    // Edit locks section 1, so there is no stream select to follow the FROM table.
+    const trigger = this.page.locator(this.locators.streamTrigger);
+    if (!(await trigger.count())) return;
+    await expect(trigger).toHaveAttribute('data-test-selected-value', table, {
+      timeout: 15000,
+    });
   }
 
   // ── dialog actions ─────────────────────────────────────────────────────
@@ -266,8 +284,14 @@ export class AlertSaveQueryModePage {
     await expect(this.page.locator(this.locators.submit)).toBeHidden({ timeout: 30000 });
   }
 
+  /** On edit section 1 is locked, so the stream shows only in its summary. */
   async expectStreamName(streamName) {
-    await expect(this.page.locator(this.locators.streamTrigger)).toHaveText(streamName, { timeout: 20000 });
+    const trigger = this.page.locator(this.locators.streamTrigger);
+    if (await trigger.count()) {
+      await expect(trigger).toHaveText(streamName, { timeout: 20000 });
+      return;
+    }
+    await expect(this.page.locator(this.locators.watchSummary)).toContainText(`· ${streamName} ·`, { timeout: 20000 });
   }
 
   async expectThreshold(value) {
@@ -281,9 +305,7 @@ export class AlertSaveQueryModePage {
   }
 
   async expectValidationToast() {
-    await expect(
-      this.page.getByText('Please fix the highlighted fields before saving.').first(),
-    ).toBeVisible({ timeout: 15000 });
+    await expectSaveNamesIssues(this.page);
   }
 
   async expectDetailConditionCountOnly() {

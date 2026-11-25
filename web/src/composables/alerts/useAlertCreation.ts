@@ -92,6 +92,9 @@ export const closeAlertCreationDialog = (): void => {
   dialogState.value = null;
 };
 
+/** Bumped when a prefill lands on the add-alert route already open, whose form does not remount on its own. */
+export const formPrefillRevision = ref(0);
+
 export interface UseAlertCreationDeps {
   /** Supplied by callers outside a setup() context, which cannot call useRouter/useStore. */
   router?: any;
@@ -121,7 +124,8 @@ export const useAlertCreation = (deps: UseAlertCreationDeps = {}) => {
 
     writeAlertPrefill(normalized);
 
-    router.push({
+    const onOpenForm = router.currentRoute?.value?.name === "addAlert";
+    const navigation = router.push({
       name: "addAlert",
       query: {
         org_identifier: store.state.selectedOrganization.identifier,
@@ -130,6 +134,7 @@ export const useAlertCreation = (deps: UseAlertCreationDeps = {}) => {
         prefill: normalized.source,
       },
     });
+    if (onOpenForm) void Promise.resolve(navigation).then(() => (formPrefillRevision.value += 1));
 
     return true;
   };

@@ -261,7 +261,8 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
-import { useAlertLibrary, useAnomalyLibraryAccess } from "@/composables/alerts/useAlertLibrary";
+import { useAnomalyLibraryAccess } from "@/composables/alerts/useAlertLibrary";
+import { useLibraryInstall, type InstallStatus } from "@/composables/alerts/useLibraryInstall";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -273,23 +274,13 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { saveAlertMutation } from "@/services/alerts.queries";
-import { alertKeys } from "@/services/alerts.querykeys";
-import { saveAnomalyConfigMutation } from "@/services/anomaly_detection.queries";
-import { useMutation } from "@tanstack/vue-query";
-import analytics from "@/services/product_analytics";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getFoldersListByType } from "@/utils/commons";
 
 import { alertTypeOf } from "./libraryFacets";
-import {
-  buildAnomalyInstallPayload,
-  buildInstallPayload,
-  InstallPayloadError,
-  type InstallOverrides,
-} from "./libraryInstall";
-import { coerceTunable, fileForInstall, readTunables, DEFAULT_TUNABLES } from "./libraryTunables";
+import type { InstallOverrides } from "./libraryInstall";
+import { coerceTunable, readTunables, DEFAULT_TUNABLES } from "./libraryTunables";
 
 const props = defineProps<{
   open: boolean;
@@ -317,21 +308,11 @@ const LARGE_BATCH = 50;
 
 const { t } = useI18nTyped();
 const store = useStore();
-const { loadAlertFile } = useAlertLibrary();
 const anomalyAccess = useAnomalyLibraryAccess();
-
-/** Optional-chained: a missing organization must not throw out of a click handler. */
-const orgIdentifier = (): string => store.state.selectedOrganization?.identifier ?? "";
-
-type InstallStatus = "pending" | "running" | "installed" | "failed";
-
-interface InstallResult {
-  id: string;
-  title: I18nText;
-  status: InstallStatus;
-  /** Server text on failure — shown verbatim, so never a catalogue key. */
-  message?: I18nText;
-}
+const installer = useLibraryInstall({
+  seedFile: (entry) => (props.seed && props.seed.entry.id === entry.id ? props.seed.file : null),
+});
+const { results, isInstalling, hasRun, failedIds } = installer;
 
 const step = ref(1);
 
@@ -345,11 +326,6 @@ const tuneFrequency = ref(DEFAULT_TUNABLES.frequency);
 const tuneSilence = ref(DEFAULT_TUNABLES.silence);
 
 // ── run ────────────────────────────────────────────────────────────────────
-// Frozen at run start: the gallery can prune `preselect` mid-run, which would drop unread result rows.
-const roster = ref<AlertLibraryEntry[]>([]);
-const results = ref<InstallResult[]>([]);
-const isInstalling = ref(false);
-const hasRun = ref(false);
 const anomalyInstalled = ref(false);
 
 // A locked anomaly alert stays out of the batch even if a caller hands one in.
@@ -403,10 +379,6 @@ watch([candidates, folderId], () => {
   largeBatchConfirmed.value = false;
 });
 
-const failedIds = computed(() =>
-  results.value.filter((result) => result.status === "failed").map((result) => result.id),
-);
-
 // ── lifecycle ──────────────────────────────────────────────────────────────
 const reset = () => {
   sessionToken += 1;
@@ -415,10 +387,7 @@ const reset = () => {
   folderId.value = "default";
   folderName.value = "";
   tuneEnabled.value = false;
-  results.value = [];
-  roster.value = [];
-  hasRun.value = false;
-  isInstalling.value = false;
+  installer.reset();
   anomalyInstalled.value = false;
   largeBatchConfirmed.value = false;
   // Seed the bulk pair from the alert the user was just looking at, so the
@@ -459,23 +428,6 @@ const onOpenChange = (value: boolean) => {
   emit("update:open", value);
 };
 
-const errorText = (error: unknown): I18nText => {
-  // The builder refuses a file it cannot read by CODE, because it has no `t`.
-  // Resolving it here is what keeps that refusal translatable instead of
-  // showing the user the literal string "unreadable_conditions".
-  if (error instanceof InstallPayloadError) {
-    return error.code === "anomaly_unavailable"
-      ? t("alert_library.install.anomalyUnavailable")
-      : t("alert_library.install.unreadableConditions");
-  }
-  const response = (error as { response?: { data?: { message?: string } } })?.response;
-  return (
-    raw(response?.data?.message) ||
-    raw((error as { message?: string })?.message) ||
-    t("alert_library.install.unknownError")
-  );
-};
-
 // Tune exists only for scheduled alerts, so an anomaly-only batch steps over it.
 const goNext = () => {
   step.value = step.value === 1 && !batchHasScheduled.value ? 3 : step.value + 1;
@@ -504,121 +456,19 @@ const statusClass = (status: InstallStatus) => {
   return "text-text-secondary";
 };
 
-const setResult = (id: string, patch: Partial<InstallResult>) => {
-  results.value = results.value.map((result) =>
-    result.id === id ? { ...result, ...patch } : result,
-  );
-};
-
-// Each create drops the scope itself, so nothing refreshes after the batch.
-const installAlert = useMutation(() => saveAlertMutation(orgIdentifier(), () => false));
-// The Alerts list shows anomaly configs too, and the shared mutation drops only the anomaly scope.
-const installAnomaly = useMutation(() => {
-  const options = saveAnomalyConfigMutation(orgIdentifier(), () => undefined);
-  return {
-    ...options,
-    meta: {
-      ...options.meta,
-      invalidates: [...(options.meta?.invalidates ?? []), alertKeys.all(orgIdentifier())],
-    },
-  };
-});
-
-const installOne = async (
-  entry: AlertLibraryEntry,
-  overrides: InstallOverrides | undefined,
-): Promise<boolean> => {
-  const file =
-    props.seed && props.seed.entry.id === entry.id
-      ? props.seed.file
-      : fileForInstall(entry, await loadAlertFile(entry));
-
-  // The file is checked too: on OSS an anomaly body is stored as a broken scheduled alert.
-  const isAnomaly = alertTypeOf(entry) === "anomaly" || file.alert_type === "anomaly_detection";
-  if (isAnomaly) {
-    if (anomalyAccess.value !== "enabled") throw new InstallPayloadError("anomaly_unavailable");
-    const payload = buildAnomalyInstallPayload({
-      entry,
-      file,
-      folderId: folderId.value,
-    });
-    await installAnomaly.mutateAsync({ payload, folderId: folderId.value });
-    return true;
-  }
-
-  const payload = buildInstallPayload({
-    entry,
-    file,
-    folderId: folderId.value,
-    owner: store.state.userInfo?.email ?? "",
-    timezone: store.state.timezone,
-    overrides,
-  });
-  await installAlert.mutateAsync({ payload, folderId: folderId.value });
-  return false;
-};
-
 const install = async (ids: string[]) => {
-  if (isInstalling.value) return;
-
-  // Freeze the roster on the FIRST run; a retry reports on the same set.
-  if (!hasRun.value) {
-    roster.value = [...candidates.value];
-  }
-
-  const batch = roster.value.filter((entry) => ids.includes(entry.id));
-  // `batch`, not `ids`: an id with no entry behind it would otherwise flip
-  // `hasRun` and toast a result for a run that never happened.
-  if (batch.length === 0) return;
-
-  // Rows in this batch restart at pending; rows outside it keep the verdict the
-  // earlier pass gave them.
-  const previous = new Map(results.value.map((result) => [result.id, result]));
-  results.value = roster.value.map((entry) => {
-    const carried = previous.get(entry.id);
-    if (!ids.includes(entry.id) && carried) return carried;
-    return { id: entry.id, title: raw(entry.title), status: "pending" as const };
-  });
-
-  isInstalling.value = true;
-  hasRun.value = true;
   // Read once, so a batch cannot change tuning halfway through itself.
-  const batchOverrides: InstallOverrides | undefined = tuneEnabled.value
+  const overrides: InstallOverrides | undefined = tuneEnabled.value
     ? { frequency: tuneFrequency.value, silence: tuneSilence.value }
     : undefined;
+  const run = await installer.install(candidates.value, ids, {
+    folderId: folderId.value,
+    overrides,
+  });
+  if (!run) return;
 
-  // Only what this pass created. Re-announcing everything in `results` would
-  // make a retry repeat ids the parent already counted.
-  const installedNow: string[] = [];
-  let anomalyNow = 0;
-
-  // Sequential on purpose: one rejected create must not take the rest of the
-  // batch with it, and a burst of parallel POSTs is what rate limits.
-  try {
-    for (const entry of batch) {
-      setResult(entry.id, { status: "running", message: undefined });
-      try {
-        if (await installOne(entry, batchOverrides)) anomalyNow += 1;
-        setResult(entry.id, { status: "installed" });
-        installedNow.push(entry.id);
-      } catch (error) {
-        setResult(entry.id, { status: "failed", message: errorText(error) });
-      }
-    }
-  } finally {
-    // Nothing escapes the per-alert catch today, but if anything ever did the
-    // dialog would become uncloseable by every path at once.
-    isInstalling.value = false;
-  }
-
-  if (anomalyNow > 0) anomalyInstalled.value = true;
-  if (installedNow.length > 0) {
-    emit("installed", { entryIds: installedNow });
-    analytics.track("library_alert_installed", {
-      count: installedNow.length,
-      anomaly_count: anomalyNow,
-    });
-  }
+  if (run.anomalyCount > 0) anomalyInstalled.value = true;
+  if (run.installedIds.length > 0) emit("installed", { entryIds: run.installedIds });
 
   const failed = failedIds.value.length;
   toast(

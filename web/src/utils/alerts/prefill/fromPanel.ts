@@ -274,6 +274,22 @@ export const panelQueryChoices = (
     query: executedPanelQuery(metadataQueries, index) ?? queries[index]?.query ?? "",
   }));
 
+/** The input of an outermost `avg|sum|min|max(…)` with no grouping, which folds every series into one;
+ * null for any other shape. Per series, each of these is the series itself. */
+export const perSeriesPromql = (expr: string): string | null => {
+  const masked = expr.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, (m) => " ".repeat(m.length));
+  const head = /^\s*(?:avg|sum|min|max)\s*\(/i.exec(masked);
+  if (!head) return null;
+  let depth = 1;
+  for (let i = head[0].length; i < masked.length; i++) {
+    if (masked[i] === "(") depth++;
+    else if (masked[i] === ")" && --depth === 0) {
+      return masked.slice(i + 1).trim() ? null : expr.slice(head[0].length, i).trim() || null;
+    }
+  }
+  return null;
+};
+
 export const buildPrefillFromPanel = (
   input: PanelPrefillInput,
   makeId: () => string = () => Math.random().toString(36).slice(2),

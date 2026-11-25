@@ -4,12 +4,13 @@
  */
 
 import searchService from "@/services/search";
+import useHttpStreaming from "@/composables/useStreamingSearch";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import CronExpressionParser from "cron-parser";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
-import type { I18nText } from "@/types/i18n";
+import { raw, type I18nText } from "@/types/i18n";
 
 /**
  * Injected translator. Same shape as the one the alerts `*.schema.ts` factories
@@ -408,7 +409,6 @@ export interface ValidationContext {
   store: any;
   /** vue-i18n `t`, injected by the composable (this module has no Vue context). */
   t: Translator;
-  validateSqlQueryPromise: any;
   sqlQueryErrorMsg: any;
   /** Ref<SqlErrorRange[]> — editor squiggle ranges (optional). */
   sqlErrorRanges?: any;
@@ -564,21 +564,96 @@ export const validateInputs = (
   return true;
 };
 
+/** Outcome of one SQL check; `request_failed` means the check itself could not run. */
+export type SqlCheckResult =
+  "valid" | "skipped" | "sql_error" | "function_error" | "request_failed";
+
+/** Save keeps the one-shot `validate` check, which `_search_stream` lacks; editing streams. */
+export type SqlCheckPurpose = "edit" | "save";
+
+interface SqlCheckError {
+  response?: { status?: number; data?: { message?: string; code?: number; error_detail?: string } };
+}
+
+/** A refused check: `status` when the request was refused, `code` alone mid-stream. */
+interface SqlCheckFailure {
+  status?: number;
+  code?: number;
+  message?: string;
+  error_detail?: string;
+}
+
+// Latest check per form, keyed by its error-message ref, so a superseded check cannot overwrite a newer verdict.
+const latestSqlCheck = new WeakMap<object, number>();
+
+/** Resolves with the VRL error ("" when none); rejects with the server's refusal. */
+const oneShotSqlCheck = async (orgId: string, streamType: string, query: any): Promise<string> => {
+  try {
+    const res = await searchService.search({
+      org_identifier: orgId,
+      query,
+      page_type: streamType,
+      validate: true,
+    });
+    return res.data?.function_error || "";
+  } catch (caught: unknown) {
+    const response = (caught as SqlCheckError)?.response;
+    throw {
+      status: response?.status,
+      code: response?.data?.code,
+      message: response?.data?.message,
+      error_detail: response?.data?.error_detail,
+    } satisfies SqlCheckFailure;
+  }
+};
+
+const streamSqlCheck = (orgId: string, streamType: string, query: any): Promise<string> =>
+  new Promise((resolve, reject) => {
+    let functionError = "";
+    void useHttpStreaming().fetchQueryDataWithHttpStream(
+      {
+        queryReq: {
+          ...query,
+          query: { ...query.query, sql: b64EncodeUnicode(query.query.sql) },
+          encoding: "base64",
+        },
+        type: "search",
+        traceId: generateTraceContext().traceId,
+        org_id: orgId,
+        pageType: streamType,
+        searchType: "ui",
+      },
+      {
+        data: (_request: unknown, response: any) => {
+          if (response?.type === "search_response_metadata")
+            functionError = response.content?.results?.function_error || functionError;
+        },
+        error: (_request: unknown, response: any) => reject(response?.content ?? {}),
+        complete: () => resolve(functionError),
+      },
+    );
+  });
+
 export const validateSqlQuery = async (
   formData: AlertFormData,
   context: ValidationContext,
-): Promise<void> => {
+  purpose: SqlCheckPurpose = "save",
+): Promise<SqlCheckResult> => {
   const {
     store,
     t,
-    validateSqlQueryPromise,
     sqlQueryErrorMsg,
     sqlErrorRanges,
     vrlFunctionError,
     buildQueryPayload,
     getParser,
   } = context;
-  const clearRanges = () => {
+  const generation = (latestSqlCheck.get(sqlQueryErrorMsg) ?? 0) + 1;
+  latestSqlCheck.set(sqlQueryErrorMsg, generation);
+  const isLatest = () => latestSqlCheck.get(sqlQueryErrorMsg) === generation;
+  const showSqlError = (message: string) => {
+    if (!isLatest()) return;
+    sqlQueryErrorMsg.value = message;
     if (sqlErrorRanges) sqlErrorRanges.value = [];
   };
 
@@ -587,13 +662,12 @@ export const validateSqlQuery = async (
 
   // Skip validation if SQL query is empty or only whitespace
   if (!formData.query_condition.sql || formData.query_condition.sql.trim() === "") {
-    sqlQueryErrorMsg.value = "";
-    clearRanges();
-    return;
+    showSqlError("");
+    return "skipped";
   }
 
   if (!getParser(formData.query_condition.sql)) {
-    return;
+    return "skipped";
   }
 
   const query = buildQueryPayload(
@@ -614,56 +688,50 @@ export const validateSqlQuery = async (
   if (formData.query_condition.vrl_function)
     query.query.query_fn = b64EncodeUnicode(formData.query_condition.vrl_function);
 
-  validateSqlQueryPromise.value = new Promise((resolve, reject) => {
-    searchService
-      .search({
-        org_identifier: store.state.selectedOrganization.identifier,
-        query,
-        page_type: formData.stream_type,
-        validate: true,
-      })
-      .then((res: any) => {
-        sqlQueryErrorMsg.value = "";
-        clearRanges();
+  try {
+    const check = purpose === "save" ? oneShotSqlCheck : streamSqlCheck;
+    const functionError = await check(
+      store.state.selectedOrganization.identifier,
+      formData.stream_type,
+      query,
+    );
+    showSqlError("");
+    if (functionError) {
+      if (isLatest()) {
+        vrlFunctionError.value = functionError;
+        toast({
+          variant: "error",
+          message: t("alerts.validation.invalidVrlFunction"),
+        });
+      }
+      return "function_error";
+    }
+    if (isLatest()) vrlFunctionError.value = "";
+    return "valid";
+  } catch (caught: unknown) {
+    const failure = (caught ?? {}) as SqlCheckFailure;
+    const message = failure.message;
+    // The backend answers a bad query with 400 + message; anything else is the check failing, not the SQL.
+    if ((failure.status ?? failure.code) !== 400 || !message) {
+      showSqlError("");
+      return "request_failed";
+    }
+    showSqlError(message);
 
-        if (res.data?.function_error) {
-          vrlFunctionError.value = res.data.function_error;
-          toast({
-            variant: "error",
-            message: t("alerts.validation.invalidVrlFunction"),
-          });
-          reject("function_error");
-        } else vrlFunctionError.value = "";
-
-        resolve("");
-      })
-      .catch((err: any) => {
-        sqlQueryErrorMsg.value = err.response?.data?.message
-          ? err.response?.data?.message
-          : t("alerts.validation.invalidSqlQuery");
-
-        // Error message is displayed inline below the editor
-        // No need for toast notification as it's redundant
-
-        // Locate the offending token in the SQL and squiggle it in the editor.
-        if (sqlErrorRanges) {
-          rangesFromServerError({
-            code: err.response?.data?.code,
-            message: err.response?.data?.message,
-            errorDetail: err.response?.data?.error_detail,
-            sqlMode: true,
-            query: formData.query_condition.sql,
-            streamName: formData.stream_name,
-          }).then((ranges) => {
-            sqlErrorRanges.value = ranges;
-          });
-        }
-
-        reject("sql_error");
+    if (sqlErrorRanges) {
+      rangesFromServerError({
+        code: failure.code,
+        message: raw(message),
+        errorDetail: failure.error_detail,
+        sqlMode: true,
+        query: formData.query_condition.sql,
+        streamName: formData.stream_name,
+      }).then((ranges) => {
+        if (isLatest()) sqlErrorRanges.value = ranges;
       });
-  });
-  // Save awaits this later; until then a rejection would be reported as unhandled.
-  validateSqlQueryPromise.value.catch(() => {});
+    }
+    return "sql_error";
+  }
 };
 
 export const saveAlertJson = async (

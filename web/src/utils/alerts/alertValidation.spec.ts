@@ -16,6 +16,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
+const streamed = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({ fetchQueryDataWithHttpStream: streamed }),
+}));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/utils/query/sqlDiagnostics", () => ({
   rangesFromServerError: vi.fn().mockResolvedValue([]),
@@ -33,14 +37,13 @@ const formData = {
 const makeContext = (): ValidationContext => ({
   store: { state: { selectedOrganization: { identifier: "default" } } },
   t: ((key: string) => key) as ValidationContext["t"],
-  validateSqlQueryPromise: { value: undefined as Promise<unknown> | undefined },
   sqlQueryErrorMsg: { value: "" },
   vrlFunctionError: { value: "" },
   buildQueryPayload: () => ({ query: { start_time: 0, sql: "" }, aggs: {} }),
   getParser: () => true,
 });
 
-describe("validateSqlQuery rejection handling", () => {
+describe("validateSqlQuery verdicts", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
@@ -48,34 +51,84 @@ describe("validateSqlQuery rejection handling", () => {
 
   const runValidation = async (search: () => Promise<unknown>) => {
     vi.useFakeTimers();
-    vi.mocked(searchService.search).mockImplementation(search as any);
-    const unhandled = vi.fn();
-    process.on("unhandledRejection", unhandled);
+    vi.mocked(searchService.search).mockImplementation(search as typeof searchService.search);
     const context = makeContext();
     const done = validateSqlQuery(formData, context);
     await vi.advanceTimersByTimeAsync(300);
-    await done;
-    vi.useRealTimers();
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    process.off("unhandledRejection", unhandled);
-    return { context, unhandled };
+    return { context, verdict: await done };
   };
 
-  it("does not leave a rejected sql_error unhandled before save awaits it", async () => {
-    const { context, unhandled } = await runValidation(() =>
-      Promise.reject({ response: { data: { message: "bad sql" } } }),
+  it("reports a 400 with a message as a SQL error and shows it", async () => {
+    const { context, verdict } = await runValidation(() =>
+      Promise.reject({ response: { status: 400, data: { message: "bad sql" } } }),
     );
 
-    expect(unhandled).not.toHaveBeenCalled();
-    await expect(context.validateSqlQueryPromise.value).rejects.toBe("sql_error");
+    expect(verdict).toBe("sql_error");
+    expect(context.sqlQueryErrorMsg.value).toBe("bad sql");
   });
 
-  it("does not leave a rejected function_error unhandled before save awaits it", async () => {
-    const { context, unhandled } = await runValidation(() =>
+  it("reports a VRL failure as a function error", async () => {
+    const { context, verdict } = await runValidation(() =>
       Promise.resolve({ data: { function_error: "vrl failed" } }),
     );
 
-    expect(unhandled).not.toHaveBeenCalled();
-    await expect(context.validateSqlQueryPromise.value).rejects.toBe("function_error");
+    expect(verdict).toBe("function_error");
+    expect(context.vrlFunctionError.value).toBe("vrl failed");
+  });
+
+  it.each([
+    ["a 403", { response: { status: 403, data: { message: "Unauthorized Access" } } }],
+    ["a 500 without a message", { response: { status: 500, data: {} } }],
+    ["a network error", new Error("Network Error")],
+  ])("treats %s as a failed check, not a SQL error", async (_, failure) => {
+    const { context, verdict } = await runValidation(() => Promise.reject(failure));
+
+    expect(verdict).toBe("request_failed");
+    expect(context.sqlQueryErrorMsg.value).toBe("");
+  });
+
+  it("lets only the newest check write the inline error", async () => {
+    vi.useFakeTimers();
+    let failOlder: (reason: unknown) => void = () => {};
+    vi.mocked(searchService.search)
+      .mockImplementationOnce(() => new Promise((_, reject) => (failOlder = reject)) as never)
+      .mockImplementationOnce(() => Promise.resolve({ data: {} }) as never);
+    const context = makeContext();
+    const older = validateSqlQuery(formData, context);
+    await vi.advanceTimersByTimeAsync(100);
+    const newer = validateSqlQuery(formData, context);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(await newer).toBe("valid");
+
+    failOlder({ response: { status: 400, data: { message: "old sql" } } });
+
+    expect(await older).toBe("sql_error");
+    expect(context.sqlQueryErrorMsg.value).toBe("");
+  });
+
+  it.each([
+    ["a passing query", (h: any) => h.complete(), "valid", ""],
+    [
+      "a 400 mid-stream",
+      (h: any) => h.error({}, { content: { code: 400, message: "bad sql" } }),
+      "sql_error",
+      "bad sql",
+    ],
+  ])("checks %s while editing over the streaming search", async (_case, answer, verdict, shown) => {
+    vi.useFakeTimers();
+    streamed.mockImplementation((_req: unknown, handlers: any) => answer(handlers));
+    const context = makeContext();
+    const done = validateSqlQuery(formData, context, "edit");
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(await done).toBe(verdict);
+    expect(context.sqlQueryErrorMsg.value).toBe(shown);
+    expect(searchService.search).not.toHaveBeenCalled();
+  });
+
+  it("reports a passing query as valid", async () => {
+    const { verdict } = await runValidation(() => Promise.resolve({ data: {} }));
+
+    expect(verdict).toBe("valid");
   });
 });

@@ -100,9 +100,7 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.save();
 
       await expect(pm.anomalyDetectionPage.getNameErrorLocator()).toHaveText('Anomaly name is required.');
-      await expect(
-        pm.anomalyDetectionPage.getToastLocator(/fix the highlighted fields/i),
-      ).toBeVisible();
+      await pm.anomalyDetectionPage.expectSaveNamesIssues();
 
       await pm.anomalyDetectionPage.cancel();
     });
@@ -432,6 +430,7 @@ test.describe('Anomaly Detection', () => {
     test('the SQL preview is hidden in custom_sql mode', {
       tag: ['@anomaly', '@P2', '@functional', '@all'],
     }, async ({ page }) => {
+      await pm.anomalyDetectionPage.showAnomalyMoreOptions();
       await expect(pm.anomalyDetectionPage.getSqlPreviewLocator()).toBeVisible();
       await pm.anomalyDetectionPage.selectQueryMode('custom_sql');
       await expect(pm.anomalyDetectionPage.getSqlPreviewLocator()).toBeHidden();

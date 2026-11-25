@@ -11,6 +11,7 @@
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+import { openAlertFilterBuilder, openAlertSectionForTab } from './alertSectionHelpers.js';
 const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 const { holdGet } = require('../../playwright-tests/utils/route-hold.js');
@@ -38,6 +39,9 @@ export class AlertManagement {
         // Change the first condition's operator from Contains to = to verify update functionality.
         // Wait 15s: the edit page fetches the alert and renders the conditions asynchronously.
         const conditions = new FilterBuilderDriver(this.page, 'alert-conditions');
+        // Threshold and anomaly forms are both mounted, one hidden, and each has a filter sentence.
+        await expect(this.page.locator('[data-test="add-alert-filter-sentence"]:visible').first()).toBeVisible({ timeout: 15000 });
+        await openAlertFilterBuilder(this.page);
         await expect(conditions.chips.first()).toBeVisible({ timeout: 15000 });
         await conditions.changeOperator(0, '=');
         await conditions.expectOperator(0, '=');
@@ -262,7 +266,7 @@ export class AlertManagement {
         await expect(pauseButton).toBeVisible({ timeout: 5000 });
         await pauseButton.click();
 
-        // A confirmed pause has no toast: the same button turns into Resume.
+        // A confirmed pause turns the same button into Resume.
         await expect(pauseButton).toHaveAttribute('data-row-action', 'resume', { timeout: 10000 });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
@@ -833,13 +837,11 @@ export class AlertManagement {
     // =========================================================================
 
     /**
-     * Activate the Advanced tab in the AddAlert v3 wizard.
+     * Shows the old Advanced tab's settings: the sectioned form reveals them in "Who should hear about it?".
      */
     async openAdvancedTab() {
-        const advancedTab = this.page.locator(this.locators.addAlertTabAdvanced);
-        await expect(advancedTab).toBeVisible({ timeout: 10000 });
-        await advancedTab.click();
+        await openAlertSectionForTab(this.page, 'Advanced');
         await this.page.locator(this.locators.advancedTemplateOverrideSelect).waitFor({ state: 'visible', timeout: 10000 });
-        testLogger.info('Switched to Advanced tab');
+        testLogger.info('Advanced settings visible');
     }
 }

@@ -1,0 +1,82 @@
+{
+  "library": "unavailable",
+  "library_version": null,
+  "stream": {
+    "type": "traces",
+    "name": "default",
+    "schema_read": true
+  },
+  "counts": {
+    "fits": 0,
+    "likely": 0,
+    "already_set_up": 0,
+    "starters": 1,
+    "total": 0
+  },
+  "suggestions": [
+    {
+      "kind": "starter",
+      "id": "starter:percentile",
+      "title": null,
+      "sentence": null,
+      "severity": null,
+      "alert_type": "scheduled",
+      "query_type": "custom",
+      "fit": "fits",
+      "matched_fields": [],
+      "missing": [],
+      "stream_swap": null,
+      "already_set_up": [],
+      "enterprise": false,
+      "library": null,
+      "starter": {
+        "shape": "percentile",
+        "slots": [
+          {
+            "name": "measure",
+            "data_type": "number",
+            "candidates": ["duration", "http_response_body_size"],
+            "pointer": "/query_condition/aggregation/having/column"
+          }
+        ]
+      },
+      "prefill": {
+        "stream_type": "traces",
+        "stream_name": "default",
+        "is_real_time": false,
+        "query_condition": {
+          "type": "custom",
+          "conditions": {
+            "version": 2,
+            "conditions": {
+              "filterType": "group",
+              "logicalOperator": "AND",
+              "conditions": []
+            }
+          },
+          "sql": null,
+          "promql": null,
+          "aggregation": {
+            "group_by": [],
+            "function": "p95",
+            "having": {
+              "column": "",
+              "operator": ">",
+              "value": null
+            }
+          },
+          "vrl_function": null,
+          "multi_time_range": []
+        },
+        "trigger_condition": {
+          "period": 5,
+          "operator": ">=",
+          "threshold": 1,
+          "frequency": 5,
+          "frequency_type": "minutes",
+          "silence": 10
+        }
+      }
+    }
+  ]
+}

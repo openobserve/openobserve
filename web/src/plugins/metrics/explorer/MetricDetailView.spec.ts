@@ -985,21 +985,29 @@ describe("MetricDetailView", () => {
       expect(wrapper.find('[data-test="metrics-detail-more"]').exists()).toBe(false);
     });
 
-    it("prefills the bare metric name and says it came from the Explorer", async () => {
-      wrapper = mountView({
-        overview: {
-          queries: [{ expr: 'sum(rate({__name__="http_requests_total", job="api"}[4m]))' }],
-          chartType: "line",
-          unit: "",
-          bucketUnit: null,
-        },
-      });
-      await flushPromises();
-      await wrapper.find('[data-test="metrics-detail-create-alert"]').trigger("click");
-      const prefill = (openAlertCreation.mock.calls[0] as any[])[0];
-      expect(prefill.source).toBe("explorer");
-      expect(prefill.promql).toBe('sum(rate(http_requests_total{job="api"}[4m]))');
-    });
+    it.each([
+      [
+        'sum(rate({__name__="http_requests_total", job="api"}[4m]))',
+        'rate(http_requests_total{job="api"}[4m])',
+        true,
+      ],
+      ['avg(m{pod=~"a(1)"})', 'm{pod=~"a(1)"}', true],
+      ["avg by (pod) (m)", "avg by (pod) (m)", undefined],
+      ["sum(a) / sum(b)", "sum(a) / sum(b)", undefined],
+    ])(
+      "prefills %s per series when it folds every series into one",
+      async (expr, promql, multi) => {
+        wrapper = mountView({
+          overview: { queries: [{ expr }], chartType: "line", unit: "", bucketUnit: null },
+        });
+        await flushPromises();
+        await wrapper.find('[data-test="metrics-detail-create-alert"]').trigger("click");
+        const prefill = (openAlertCreation.mock.calls[0] as any[])[0];
+        expect(prefill.source).toBe("explorer");
+        expect(prefill.promql).toBe(promql);
+        expect(prefill.promqlMultiAlert).toBe(multi);
+      },
+    );
 
     it("opens the alert form on the overview query from the header", async () => {
       wrapper = mountView(

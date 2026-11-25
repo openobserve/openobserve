@@ -27,8 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   navigation identical from anywhere.
 -->
 <template>
-  <div class="flex items-start max-md:flex-col max-md:gap-1">
-    <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+  <component :is="settingRow ? OSettingRow : 'div'" v-bind="rootProps">
+    <div
+      v-if="!settingRow"
+      class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
+    >
       {{ labelText }}
       <template v-if="tooltipText">
         <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
@@ -50,46 +53,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :locked-workflow-names="lockedTargetNames"
         :placeholder="placeholder"
         :error="!!error"
+        :wrap="wrap"
+        :list="list"
+        :no-workflow-button="workflowLink"
+        :one-line="settingRow"
+        :describe="destinationDetails"
         @update:destinations="emit('update:destinations', $event)"
         @update:workflows="emit('update:workflows', $event)"
         @refresh="refreshTargets"
         @create-destination="routeToCreateDestination"
         @create-workflow="routeToCreateWorkflow"
       />
-      <!-- role="alert": focusOnFirstError finds stranded errors by this marker.
-           The data-test predates the extraction and is asserted by
-           AlertSettings.spec, so it keeps its historical name everywhere. -->
       <div
-        v-if="error"
-        class="text-red-8 text-2xs pt-1 leading-3"
-        data-test="alert-settings-destinations-error"
-        role="alert"
+        v-if="error || showStatus || workflowLink || settingRow"
+        class="flex items-start gap-x-3 pt-1"
+        :class="settingRow && 'flex-wrap gap-y-0.5'"
       >
-        {{ error }}
-      </div>
-      <!-- Always rendered when asked for, so picking or clearing a target only
-           swaps the text and nothing below moves. Styled as a field hint. -->
-      <p
-        v-else-if="showStatus"
-        class="text-input-help-text flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-1 text-xs"
-        :data-test="
-          notifiesNobody ? 'alert-settings-destinations-note' : 'alert-settings-destinations-status'
-        "
-      >
-        <span v-if="statusText">{{ statusText }}</span>
-        <template v-for="(lock, index) in statusLocks" :key="lock.feature">
-          <span v-if="index > 0">·</span>
-          <span
-            class="inline-flex items-center gap-1"
-            :data-test="`alert-settings-destinations-lock-${lock.feature}`"
+        <!-- role="alert": focusOnFirstError finds stranded errors by this marker.
+             The data-test predates the extraction and is asserted by
+             AlertSettings.spec, so it keeps its historical name everywhere. -->
+        <div
+          v-if="error"
+          class="text-red-8 text-2xs leading-3"
+          data-test="alert-settings-destinations-error"
+          role="alert"
+        >
+          {{ error }}
+        </div>
+        <!-- Always rendered when asked for, so picking or clearing a target only
+             swaps the text and nothing below moves. Styled as a field hint. -->
+        <p
+          v-else-if="showStatus"
+          class="text-input-help-text m-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs"
+          :class="settingRow && 'basis-full'"
+          :data-test="
+            notifiesNobody
+              ? 'alert-settings-destinations-note'
+              : 'alert-settings-destinations-status'
+          "
+        >
+          <span v-if="statusText">{{ statusText }}</span>
+          <template v-for="(lock, index) in statusLocks" :key="lock.feature">
+            <span v-if="index > 0">·</span>
+            <span
+              class="inline-flex items-center gap-1"
+              :data-test="`alert-settings-destinations-lock-${lock.feature}`"
+            >
+              <OIcon name="lock" size="xs" />
+              {{ lock.reason }}
+            </span>
+          </template>
+        </p>
+        <span v-if="settingRow" class="shrink-0 text-xs">
+          <OButton
+            data-test="alert-settings-create-destination-link"
+            variant="link"
+            @click="routeToCreateDestination"
           >
-            <OIcon name="lock" size="xs" />
-            {{ lock.reason }}
-          </span>
-        </template>
-      </p>
+            {{ t("alerts.alertSettings.addNewDestination") }}
+          </OButton>
+        </span>
+        <span v-if="workflowLink" class="shrink-0 text-xs" :class="!settingRow && 'ms-auto'">
+          <OTooltip v-if="workflowsLicenseLocked" :content="workflowsLicenseReason" />
+          <OButton
+            data-test="create-workflow-btn"
+            variant="link"
+            :icon-left="workflowsLocked ? 'lock' : undefined"
+            :disabled="workflowsLicenseLocked"
+            @click="workflowsEnabled ? routeToCreateWorkflow() : openUpgradeDialog()"
+          >
+            {{ t("workflow.create") }}
+          </OButton>
+        </span>
+        <ORefreshButton
+          v-if="settingRow"
+          class="-my-1"
+          layout="inline"
+          data-test="alert-settings-refresh-destinations-btn"
+          :tooltip="t('alerts.alertSettings.refreshDestinations')"
+          @click="refreshTargets"
+        />
+      </div>
     </div>
-  </div>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -100,11 +146,16 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 import { workflowsQuery } from "@/services/workflows.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useLicenseLock } from "@/composables/useFeatureLock";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import type { DestinationDescription } from "@/utils/alerts/destinationDescription";
 
 type RawOption = string | { label: I18nText; value: string };
 
@@ -135,8 +186,24 @@ const props = withDefaults(
      *  checks): the Workflows group and its fetch are skipped even on
      *  enterprise, so the picker cannot offer options that would not save. */
     supportsWorkflows?: boolean;
+    /** Let the controls wrap inside a column narrower than the row (opt-in). */
+    wrap?: boolean;
+    /** Show a short list of targets as checkboxes instead of a dropdown (opt-in). */
+    list?: boolean;
+    /** Render as an OSettingRow, for forms built from setting rows (opt-in). */
+    settingRow?: boolean;
+    /** Type and target per destination name, shown in the picker rows (opt-in). */
+    destinationDetails?: Record<string, DestinationDescription>;
   }>(),
-  { supportsWorkflows: true, notifiesNobody: false, showStatus: false, targetRequired: false },
+  {
+    supportsWorkflows: true,
+    notifiesNobody: false,
+    showStatus: false,
+    wrap: false,
+    list: false,
+    settingRow: false,
+    targetRequired: false,
+  },
 );
 
 const emit = defineEmits<{
@@ -156,6 +223,11 @@ const labelText = computed<I18nText>(() =>
 // `undefined` means "the default tooltip"; an explicit "" means "none".
 const tooltipText = computed<I18nText>(() =>
   props.tooltip === undefined ? t("alerts.alertSettings.destinationsTooltip") : raw(props.tooltip),
+);
+const rootProps = computed(() =>
+  props.settingRow
+    ? { label: labelText.value, info: tooltipText.value || undefined, fill: true, wide: true }
+    : { class: "flex items-start max-md:flex-col max-md:gap-1" },
 );
 
 // Edition entitlement and the backend /config runtime flag are separate
@@ -182,6 +254,11 @@ const workflowsLicenseLocked = computed(
 const workflowsLocked = computed(
   () => props.supportsWorkflows && (!workflowsAccess.value.allowed || workflowsLicenseDenied.value),
 );
+// A setting row offers New workflow as a link on the status line instead of a second button.
+const workflowLink = computed(
+  () => props.settingRow && (workflowsEnabled.value || workflowsLocked.value),
+);
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 const { locked: oncallLicenseLocked, lockedReason: oncallLicenseReason } = useLicenseLock("oncall");
 const hasOncallTeam = computed(() => !!props.oncallTeam?.trim());

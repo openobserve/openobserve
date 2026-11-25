@@ -67,6 +67,8 @@ export interface AlertPrefillConditionGroup {
 }
 
 export interface AlertPrefillAggregation {
+  /** One alert per returned row (SQL) or group; absent is one alert. */
+  multi_alert?: boolean;
   group_by: string[];
   function: string;
   having: {

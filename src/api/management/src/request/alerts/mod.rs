@@ -83,6 +83,7 @@ pub mod auto_investigate;
 pub mod chart_render;
 pub mod deduplication;
 pub mod destinations;
+pub mod evaluate;
 pub mod external_events;
 pub mod history;
 #[cfg(feature = "enterprise")]
@@ -90,6 +91,7 @@ pub mod history_summary;
 pub mod incident_integrations;
 pub mod incidents;
 pub mod leases;
+pub mod library;
 pub mod mute;
 #[cfg(feature = "cloud")]
 pub mod slack_oauth;

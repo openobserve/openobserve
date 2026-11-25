@@ -27,6 +27,14 @@ vi.mock("@/services/search", async (importOriginal) => {
   });
 });
 
+const streamFetch = vi.fn();
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: streamFetch,
+    cancelStreamQueryBasedOnRequestId: vi.fn(),
+  }),
+}));
+
 vi.mock("@/composables/useQuery", () => ({
   default: () => ({
     buildQueryPayload: vi.fn().mockReturnValue({
@@ -665,5 +673,77 @@ vi.mock("@/services/query_functions", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
     default: { list: vi.fn().mockResolvedValue({ data: { list: [] } }) },
+  });
+});
+
+describe("QueryEditorDialog - Run query over the streaming search", () => {
+  type Handlers = { data: Function; error: Function; complete: Function };
+  it.each([
+    [
+      "a refused query shows the server's reason",
+      (h: Handlers) => h.error({}, { content: { message: "Search field not found: lvl" } }),
+      {
+        state: "sql-status-bar--error",
+        error: "The query failed: Search field not found: lvl",
+        count: 0,
+      },
+    ],
+    [
+      "returned rows are counted",
+      (h: Handlers) => {
+        h.data({}, { type: "search_response_metadata", content: { results: { total: 42 } } });
+        h.data({}, { type: "search_response_hits", content: { results: { hits: [{ a: 1 }] } } });
+        h.complete({});
+      },
+      { state: "sql-status-bar--success", error: "", count: 42 },
+    ],
+  ])("%s", async (_name, respond, expected) => {
+    streamFetch.mockReset();
+    streamFetch.mockImplementation((_request: unknown, handlers: Handlers) => respond(handlers));
+    const wrapper = await mountComp({ sqlQuery: "SELECT lvl FROM t" });
+    const vm = wrapper.vm as any;
+    vm.tempRunQuery = true;
+    await vm.triggerQuery();
+    await flushPromises();
+    expect(streamFetch.mock.calls[0][0]).toMatchObject({ type: "search", pageType: "logs" });
+    expect(vm.sqlStatusState).toBe(expected.state);
+    expect(vm.localSqlQueryErrorMsg).toBe(expected.error);
+    expect(vm.queryHitCount).toBe(expected.count);
+  });
+
+  it.each([
+    [
+      "a refused PromQL query shows the server's reason",
+      (h: Handlers) => h.error({}, { content: { error: "unknown function: rat" } }),
+      {
+        state: "sql-status-bar--error",
+        error: "The query failed: unknown function: rat",
+        count: 0,
+      },
+    ],
+    [
+      "PromQL points are counted across every chunk",
+      (h: Handlers) => {
+        const series = (values: unknown[]) => ({
+          type: "promql_response",
+          content: { results: { resultType: "matrix", result: [{ metric: { a: "1" }, values }] } },
+        });
+        h.data({}, series([[1, "1"]]));
+        h.data({}, series([[2, "2"]]));
+        h.complete({});
+      },
+      { state: "sql-status-bar--success", error: "", count: 2 },
+    ],
+  ])("%s", async (_name, respond, expected) => {
+    streamFetch.mockReset();
+    streamFetch.mockImplementation((_request: unknown, handlers: Handlers) => respond(handlers));
+    const wrapper = await mountComp({ tab: "promql", promqlQuery: "rate(up[5m])" });
+    const vm = wrapper.vm as any;
+    await vm.runPromqlQuery();
+    await flushPromises();
+    expect(streamFetch.mock.calls[0][0]).toMatchObject({ type: "promql" });
+    expect(vm.sqlStatusState).toBe(expected.state);
+    expect(vm.runPromqlError).toBe(expected.error);
+    expect(vm.queryHitCount).toBe(expected.count);
   });
 });

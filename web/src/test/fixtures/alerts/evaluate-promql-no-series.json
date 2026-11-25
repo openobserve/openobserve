@@ -1,0 +1,90 @@
+{
+  "query_type": "promql",
+  "is_real_time": false,
+  "start": 1763459400000000,
+  "end": 1763460000000000,
+  "truncated": false,
+  "checks": [
+    {
+      "time": 1763459400000000,
+      "window_start": 1763459100000000,
+      "window_end": 1763459400000000,
+      "state": "quiet",
+      "fired": false,
+      "notified": false,
+      "held_by": null,
+      "level": null,
+      "value": null,
+      "value_is_lower_bound": false,
+      "operator": ">",
+      "threshold": 0.05,
+      "warning_threshold": null,
+      "matched": 0,
+      "groups": [],
+      "groups_total": 0,
+      "reason": "no_data",
+      "error": null
+    },
+    {
+      "time": 1763459700000000,
+      "window_start": 1763459400000000,
+      "window_end": 1763459700000000,
+      "state": "quiet",
+      "fired": false,
+      "notified": false,
+      "held_by": null,
+      "level": null,
+      "value": null,
+      "value_is_lower_bound": false,
+      "operator": ">",
+      "threshold": 0.05,
+      "warning_threshold": null,
+      "matched": 0,
+      "groups": [],
+      "groups_total": 0,
+      "reason": "no_data",
+      "error": null
+    },
+    {
+      "time": 1763460000000000,
+      "window_start": 1763459700000000,
+      "window_end": 1763460000000000,
+      "state": "quiet",
+      "fired": false,
+      "notified": false,
+      "held_by": null,
+      "level": null,
+      "value": null,
+      "value_is_lower_bound": false,
+      "operator": ">",
+      "threshold": 0.05,
+      "warning_threshold": null,
+      "matched": 0,
+      "groups": [],
+      "groups_total": 0,
+      "reason": "no_data",
+      "error": null
+    }
+  ],
+  "summary": {
+    "checks": 3,
+    "fired": 0,
+    "pending": 0,
+    "notifications": 0,
+    "held": 0,
+    "errors": 0,
+    "notified_at": [],
+    "first_fired_at": null,
+    "last_fired_at": null,
+    "groups_fired": [],
+    "groups_fired_total": 0
+  },
+  "diagnostics": {
+    "metrics": [
+      {
+        "name": "http_server_duration_count",
+        "series": 3
+      }
+    ]
+  }
+}

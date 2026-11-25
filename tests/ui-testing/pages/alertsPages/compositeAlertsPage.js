@@ -24,6 +24,7 @@
 import { expect } from '@playwright/test';
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 const { holdGet } = require('../../playwright-tests/utils/route-hold.js');
+const { expandAlertSettingGroups } = require('./alertSectionHelpers.js');
 
 const CANDIDATES_URL = /\/api\/v2\/[^/]+\/alerts\?.*alert_type=all/;
 
@@ -75,7 +76,7 @@ export class CompositeAlertsPage {
       expressionUnused: '[data-test="alerts-composite-expression-unused"]',
       operandTray: (id) => `[data-test="alerts-composite-operand-tray-${id}"]`,
       expressionError: '[data-test="alerts-composite-expression-error"]',
-      advancedToggle: '[data-test="alerts-composite-expression-advanced-toggle"]',
+      advancedToggle: '[data-test="add-alert-add-compositeExpression"]',
       advancedField: '[data-test="alerts-composite-expression-advanced-field"]',
 
       // ---- settings -----------------------------------------------------
@@ -373,7 +374,11 @@ export class CompositeAlertsPage {
     const popover = this.page.locator(`[data-test="${base}-popover"]`);
     const option = this.page.locator(`[data-test="${base}-option"][data-test-value="${value}"]`);
 
-    await this.page.locator(`[data-test="${base}-trigger"]`).click();
+    const trigger = this.page.locator(`[data-test="${base}-trigger"]`);
+    // OSelect closes when its scroll container moves, so let the snapping column settle before opening.
+    await trigger.scrollIntoViewIfNeeded();
+    await this.page.waitForTimeout(600);
+    await trigger.click();
     await expect(popover).toBeVisible();
 
     if (searchText) {
@@ -544,17 +549,24 @@ export class CompositeAlertsPage {
 
   // ===================== settings =====================
 
+  /** The stale policy is a More options setting of the condition section. */
+  async showStalePolicy() {
+    await expandAlertSettingGroups(this.page, ['condition']);
+  }
+
   stalePolicyHelp() {
     return this.page.locator(this.locators.stalePolicyHelp);
   }
 
   /** @param {'use_last_state'|'treat_as_false'|'treat_as_true'} value */
   async selectStalePolicy(value) {
+    await this.showStalePolicy();
     await this.selectOption(this.locators.stalePolicyBase, value);
     await expect.poll(() => this.stalePolicyValue()).toBe(value);
   }
 
   async stalePolicyValue() {
+    await this.showStalePolicy();
     return this.page
       .locator('[data-test="alerts-composite-stale-policy"]')
       .getAttribute('data-value');

@@ -137,7 +137,7 @@ describe("OSelect", () => {
     await flushPromises();
 
     const input = document.body.querySelector(
-      'input[placeholder="Search..."]',
+      'input[placeholder="Search…"]',
     ) as HTMLInputElement | null;
     expect(input).not.toBeNull();
 
@@ -166,7 +166,7 @@ describe("OSelect", () => {
     await flushPromises();
     expect(wrapper.emitted("open")).toHaveLength(1);
 
-    const input = document.body.querySelector('input[placeholder="Search..."]') as HTMLInputElement;
+    const input = document.body.querySelector('input[placeholder="Search…"]') as HTMLInputElement;
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await flushPromises();
 
@@ -224,7 +224,7 @@ describe("OSelect", () => {
     await wrapper.find("button").trigger("click");
     await flushPromises();
     const input = document.body.querySelector(
-      'input[placeholder="Search..."]',
+      'input[placeholder="Search…"]',
     ) as HTMLInputElement | null;
     expect(input).not.toBeNull();
     input!.value = "brand-new-term";
@@ -242,9 +242,7 @@ describe("OSelect", () => {
       });
       await wrapper.find("button").trigger("click");
       await flushPromises();
-      const input = document.body.querySelector(
-        'input[placeholder="Search..."]',
-      ) as HTMLInputElement;
+      const input = document.body.querySelector('input[placeholder="Search…"]') as HTMLInputElement;
       input.value = term;
       input.dispatchEvent(new Event("input", { bubbles: true }));
       await flushPromises();
@@ -397,7 +395,7 @@ describe("OSelect", () => {
 
       // Popover opened successfully (search input mounted) and nothing threw
       // while resolving/scrolling to the selected index.
-      const input = document.body.querySelector('input[placeholder="Search..."]');
+      const input = document.body.querySelector('input[placeholder="Search…"]');
       expect(input).not.toBeNull();
     });
 
@@ -409,7 +407,7 @@ describe("OSelect", () => {
       await wrapper.find("button").trigger("click");
       await flushPromises();
 
-      const input = document.body.querySelector('input[placeholder="Search..."]');
+      const input = document.body.querySelector('input[placeholder="Search…"]');
       expect(input).not.toBeNull();
     });
 
@@ -421,7 +419,7 @@ describe("OSelect", () => {
       await wrapper.find("button").trigger("click");
       await flushPromises();
 
-      const input = document.body.querySelector('input[placeholder="Search..."]');
+      const input = document.body.querySelector('input[placeholder="Search…"]');
       expect(input).not.toBeNull();
     });
 
@@ -438,9 +436,7 @@ describe("OSelect", () => {
       const scroller = document.body.querySelector<HTMLElement>(".overflow-auto.max-h-72")!;
       scroller.scrollTop = 600;
 
-      const input = document.body.querySelector<HTMLInputElement>(
-        'input[placeholder="Search..."]',
-      )!;
+      const input = document.body.querySelector<HTMLInputElement>('input[placeholder="Search…"]')!;
       input.value = "Option 1";
       input.dispatchEvent(new Event("input", { bubbles: true }));
       await flushPromises();
@@ -481,7 +477,7 @@ describe("OSelect", () => {
       await flushPromises();
 
       const input = document.body.querySelector(
-        'input[placeholder="Search..."]',
+        'input[placeholder="Search…"]',
       ) as HTMLInputElement | null;
       expect(input).not.toBeNull();
       expect(input!.value).toBe("s");
@@ -503,9 +499,7 @@ describe("OSelect", () => {
       // ListboxFilter's own autoFocus fires on a 1 ms timer.
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const input = document.body.querySelector(
-        'input[placeholder="Search..."]',
-      ) as HTMLInputElement;
+      const input = document.body.querySelector('input[placeholder="Search…"]') as HTMLInputElement;
       expect(document.activeElement).toBe(input);
       expect([input.selectionStart, input.selectionEnd]).toEqual([1, 1]);
     });
@@ -520,7 +514,7 @@ describe("OSelect", () => {
       });
       await wrapper.find("button").trigger("keydown", { key: "s", ctrlKey: true });
       await flushPromises();
-      expect(document.body.querySelector('input[placeholder="Search..."]')).toBeNull();
+      expect(document.body.querySelector('input[placeholder="Search…"]')).toBeNull();
     });
 
     // A caller driving the trigger programmatically (an empty state's "add"
@@ -536,7 +530,7 @@ describe("OSelect", () => {
       });
       (wrapper.vm as unknown as { focus: () => void }).focus();
       await flushPromises();
-      expect(document.body.querySelector('input[placeholder="Search..."]')).not.toBeNull();
+      expect(document.body.querySelector('input[placeholder="Search…"]')).not.toBeNull();
     });
 
     it("does not open a disabled select", async () => {
@@ -550,7 +544,7 @@ describe("OSelect", () => {
       });
       (wrapper.vm as unknown as { focus: () => void }).focus();
       await flushPromises();
-      expect(document.body.querySelector('input[placeholder="Search..."]')).toBeNull();
+      expect(document.body.querySelector('input[placeholder="Search…"]')).toBeNull();
     });
 
     it("should stop propagation of printable keys so page-level shortcuts never fire", async () => {

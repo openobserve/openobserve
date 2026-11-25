@@ -16,10 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-alert-conditions rounded-default bg-surface-overlay border-border-default mx-auto w-full border"
+    :class="[
+      'step-alert-conditions mx-auto w-full',
+      sectionTargets ? '' : 'rounded-default bg-surface-overlay border-border-default border',
+    ]"
   >
     <!-- Section header -->
-    <div class="border-border-default flex items-center border-b px-3 py-2.5">
+    <div
+      v-if="!sectionTargets"
+      class="border-border-default flex items-center border-b px-3 py-2.5"
+    >
       <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
       <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
         t("alerts.alertSettings.sectionTitle")
@@ -30,479 +36,497 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          FORM_CONTEXT_KEY. The OForm* fields below inject that form and bind by
          nested `name=` (trigger_condition.*, destinations, creates_incident); the
          composed schema in AddAlert.schema.ts validates them on save. -->
-    <div class="px-3 py-2">
+    <div :class="sectionTargets ? '' : 'px-3 py-2'">
       <div>
-        <!-- For Real-Time Alerts -->
-        <template v-if="isRealTime === 'true' || isRealTime === 'composite'">
-          <!-- Silence Notification (Cooldown) -->
-          <div class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
-            </div>
-            <div class="me-2 flex w-fit flex-col gap-1">
-              <div class="flex items-center">
-                <div class="w-21.75">
-                  <OFormInput
-                    :aria-label="t('alerts.silenceNotification')"
-                    name="trigger_condition.silence"
-                    type="number"
-                    min="0"
-                    data-test="alert-settings-silence-duration-input"
-                  >
-                    <!-- Message rendered below at pair width — see silenceError. -->
-                    <template #error />
-                  </OFormInput>
-                </div>
-                <div
-                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
-                >
-                  {{ t("alerts.minutes") }}
-                </div>
-              </div>
-              <div
-                v-if="silenceError"
-                class="text-input-error-text text-xs whitespace-nowrap"
-                data-test="alert-settings-silence-error"
-                role="alert"
-              >
-                {{ silenceError }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Pending period. Composite only — no per-alert frequency to warn
-               against (§2b), so no not-a-multiple hint here, unlike the
-               scheduled block below. Same field, label, and tooltip as the
-               scheduled version, intentionally no visual distinction — the
-               backend stores and evaluates it for composite alerts too
-               (handle_composite_alert_trigger). -->
-          <div
-            v-if="isRealTime === 'composite'"
-            class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1"
-          >
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.queryConfig.pendingPeriod") }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
-            </div>
-            <div class="me-2 flex w-fit flex-col gap-1">
-              <div class="flex items-center gap-2">
-                <div class="w-21.75">
-                  <OFormInput
-                    :aria-label="t('alerts.summary.pendingPeriod')"
-                    name="_ui.pendingPeriod"
-                    type="number"
-                    min="0"
-                    data-test="alert-settings-pending-period-input"
-                    @update:model-value="onPendingPeriodChange"
-                  >
-                    <template #error />
-                  </OFormInput>
-                </div>
-                <OSelect
-                  :aria-label="
-                    t('common.unitFor', { label: t('alerts.queryConfig.pendingPeriod') })
-                  "
-                  class="max-w-25 min-w-20"
-                  :model-value="pendingPeriodUnit"
-                  :options="pendingPeriodUnitOptions"
-                  labelKey="label"
-                  valueKey="value"
-                  :searchable="false"
-                  data-test="alert-settings-pending-period-unit"
-                  @update:model-value="onPendingPeriodUnitChange"
-                />
-              </div>
-              <div
-                v-if="pendingPeriodError"
-                class="text-input-error-text text-xs whitespace-nowrap"
-                data-test="alert-settings-pending-period-error"
-                role="alert"
-              >
-                {{ pendingPeriodError }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Destinations. Deliberately NOT name=-bound: one control writes two
-               form fields, so both go up through the parent's setFieldValue via
-               the events below. -->
-          <AlertDestinationsField
-            class="mb-4 pb-4"
-            :destinations="destinations"
-            :workflows="workflows"
-            :destination-options="formattedDestinations"
-            :error="destinationsError"
-            :notifies-nobody="notifiesNobody"
-            :oncall-team="formData?.oncall_team"
-            :locked-target-names="formData?._ui?.lockedTargetNames"
-            :target-required="destinationRequired"
-            show-status
-            :placeholder="t('alerts.summary.noDestination')"
-            @update:destinations="$emit('update:destinations', $event)"
-            @update:workflows="$emit('update:workflows', $event)"
-            @refresh="$emit('refresh:destinations')"
-          />
-        </template>
-
-        <!-- For Scheduled Alerts -->
-        <template v-else>
-          <!-- Period -->
-          <div
-            v-if="!isForecastMode"
-            ref="periodFieldRef"
-            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
-          >
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.period") + " *" }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.periodTooltip')" side="right" />
-            </div>
-            <div class="me-2 flex w-fit flex-col gap-1">
-              <div class="flex items-center">
-                <div class="w-21.75">
-                  <OFormInput
-                    :aria-label="t('alerts.period')"
-                    name="trigger_condition.period"
-                    type="number"
-                    min="1"
-                    :debounce="300"
-                    data-test="alert-settings-period-input"
-                    @update:model-value="handlePeriodChange"
-                  >
-                    <!-- Message rendered below at pair width — see periodError. -->
-                    <template #error />
-                  </OFormInput>
-                </div>
-                <div
-                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
-                >
-                  {{ t("alerts.minutes") }}
-                </div>
-              </div>
-              <div
-                v-if="periodError"
-                class="text-input-error-text text-xs whitespace-nowrap"
-                data-test="alert-settings-period-error"
-                role="alert"
-              >
-                {{ periodError }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div
-            ref="silenceFieldRef"
-            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
-          >
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
-            </div>
-            <div class="me-2 flex w-fit flex-col gap-1">
-              <div class="flex items-center">
-                <div class="w-21.75">
-                  <OFormInput
-                    :aria-label="t('alerts.silenceNotification')"
-                    name="trigger_condition.silence"
-                    type="number"
-                    min="0"
-                    :debounce="300"
-                    data-test="alert-settings-silence-duration-input"
-                  >
-                    <!-- Message rendered below at pair width — see silenceError. -->
-                    <template #error />
-                  </OFormInput>
-                </div>
-                <div
-                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
-                >
-                  {{ t("alerts.minutes") }}
-                </div>
-              </div>
-              <div
-                v-if="silenceError"
-                class="text-input-error-text text-xs whitespace-nowrap"
-                data-test="alert-settings-silence-error"
-                role="alert"
-              >
-                {{ silenceError }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Pending period for Scheduled Alerts. Moved here from
-               QueryConfig.vue's condition section — same field, label, and
-               tooltip as the composite version above, plus the
-               not-a-multiple-of-Check-every warning (composite has no
-               frequency to compare against, so it skips that row). -->
-          <div
-            ref="pendingPeriodFieldRef"
-            class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
-          >
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.queryConfig.pendingPeriod") }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
-            </div>
-            <div class="me-2 flex w-fit flex-col gap-1">
-              <div class="flex items-center gap-2">
-                <div class="w-21.75">
-                  <OFormInput
-                    :aria-label="t('alerts.summary.pendingPeriod')"
-                    name="_ui.pendingPeriod"
-                    type="number"
-                    min="0"
-                    data-test="alert-settings-pending-period-input"
-                    @update:model-value="onPendingPeriodChange"
-                  >
-                    <template #error />
-                  </OFormInput>
-                </div>
-                <OSelect
-                  :aria-label="
-                    t('common.unitFor', { label: t('alerts.queryConfig.pendingPeriod') })
-                  "
-                  class="max-w-25 min-w-20"
-                  :model-value="pendingPeriodUnit"
-                  :options="pendingPeriodUnitOptions"
-                  labelKey="label"
-                  valueKey="value"
-                  :searchable="false"
-                  data-test="alert-settings-pending-period-unit"
-                  @update:model-value="onPendingPeriodUnitChange"
-                />
-              </div>
-              <div
-                v-if="pendingPeriodError"
-                class="text-input-error-text text-xs whitespace-nowrap"
-                data-test="alert-settings-pending-period-error"
-                role="alert"
-              >
-                {{ pendingPeriodError }}
-              </div>
-              <div
-                v-if="!pendingPeriodError && pendingPeriodWarning"
-                class="text-status-warning-text text-xs whitespace-nowrap"
-                data-test="alert-settings-pending-period-warning"
-                role="alert"
-              >
-                {{ pendingPeriodWarning }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Destinations. Deliberately NOT name=-bound: one control writes two
-               form fields, so both go up through the parent's setFieldValue via
-               the events below. The focus manager resolves a component ref via
-               $el, so the ref moves onto the field unchanged. -->
-          <AlertDestinationsField
-            ref="destinationsFieldRef"
-            class="me-2 mb-4!"
-            :destinations="destinations"
-            :workflows="workflows"
-            :destination-options="formattedDestinations"
-            :error="destinationsError"
-            :notifies-nobody="notifiesNobody"
-            :oncall-team="formData?.oncall_team"
-            :locked-target-names="formData?._ui?.lockedTargetNames"
-            :target-required="destinationRequired"
-            show-status
-            :placeholder="t('alerts.summary.noDestination')"
-            @update:destinations="$emit('update:destinations', $event)"
-            @update:workflows="$emit('update:workflows', $event)"
-            @refresh="$emit('refresh:destinations')"
-          />
-        </template>
-
-        <!-- Creates Incident toggle — all alert types, enterprise/cloud with Incidents on -->
-        <div v-if="incidentsEnabled" class="mb-4! flex items-start max-md:gap-3">
-          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-            {{ t("alerts.alertSettings.createsIncident") }}
-            <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-            <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
-          </div>
-          <OFormSwitch
-            name="creates_incident"
-            :aria-label="t('alerts.alertSettings.createsIncident')"
-            data-test="alert-creates-incident-toggle"
-          />
-        </div>
-
-        <div
-          v-if="incidentsEnabled && formData?.creates_incident"
-          class="mb-4! flex items-start max-md:gap-3"
+        <Teleport
+          v-if="isScheduled || isComposite"
+          :to="sectionTargets?.settingsHold"
+          :disabled="!sectionTargets?.settingsHold"
         >
-          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-            {{ t("alerts.alertSettings.incidentTitleTemplate") }}
-            <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-            <OTooltip
-              :content="t('alerts.alertSettings.incidentTitleTemplateTooltip')"
-              side="right"
-            />
-          </div>
-          <div class="flex w-100 flex-col gap-1 max-md:w-full">
-            <OFormInput
-              name="incident_title_template"
-              :placeholder="t('alerts.alertSettings.incidentTitleTemplatePlaceholder')"
-              :debounce="300"
-              data-test="alert-incident-title-template-input"
-            />
-            <div
-              v-if="incidentTitlePreview.length"
-              class="text-xs break-words"
-              data-test="alert-incident-title-preview"
+          <AlertTierPlace id="holdFor">
+            <AlertSentenceRow
+              v-if="tierShows('holdFor')"
+              ref="pendingPeriodFieldRef"
+              :label="t('alerts.form.holdFor.label')"
+              :description="t('alerts.form.holdFor.help')"
+              data-test="add-alert-hold-for-row"
+              removable
+              @remove="removeHoldFor"
             >
-              <span class="text-text-secondary me-1"
-                >{{ t("alerts.alertSettings.incidentTitlePreview") }}:</span
-              ><template v-for="(s, i) in incidentTitlePreview" :key="i"
-                ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
-              >
-            </div>
-            <div v-if="incidentTitlePreview.length" class="text-text-secondary text-xs">
-              {{ t("alerts.alertSettings.incidentTitlePreviewHint") }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
-        <template v-if="isRealTime === 'false'">
-          <div class="mb-4! flex items-start max-md:gap-3">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.alertSettings.notifyOnRecovery") }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip
-                :content="
-                  notifiesNobody
-                    ? t('alerts.alertSettings.notifyOnRecoveryNeedsDestination')
-                    : t('alerts.alertSettings.notifyOnRecoveryTooltip')
-                "
-                side="right"
-              />
-            </div>
-            <div class="flex flex-col gap-1">
-              <!-- A recovery closes what a firing delivered; with no target nothing is
-                   delivered, so it cannot be turned on. It can still be turned off. -->
-              <OFormSwitch
-                name="notify_on_recovery"
-                :aria-label="t('alerts.alertSettings.notifyOnRecovery')"
-                :disabled="notifiesNobody && !formData?.notify_on_recovery"
-                data-test="alert-notify-on-recovery-toggle"
-              />
-              <template v-if="formData?.notify_on_recovery && !notifiesNobody">
-                <div
-                  v-for="row in recoveryPlan"
-                  :key="row.name"
-                  class="text-text-secondary text-xs"
-                  :data-test="`alert-notify-on-recovery-plan-${row.name}`"
-                >
-                  {{ row.name }} — {{ row.action }}
+              <div class="flex flex-col gap-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span>{{ t("alerts.form.holdFor.sentence") }}</span>
+                  <div class="flex min-w-0 items-center gap-2">
+                    <component :is="formField" v-if="formField" name="_ui.pendingPeriod">
+                      <template #default="{ field }">
+                        <OInput
+                          :aria-label="t('alerts.plain.forAtLeast')"
+                          type="number"
+                          min="0"
+                          fit-content
+                          :model-value="holdAmount(field.state.value)"
+                          :placeholder="t('common.off')"
+                          :error="fieldInvalid(field)"
+                          data-test="alert-settings-pending-period-input"
+                          @update:model-value="(v: unknown) => onHoldAmount(v, field)"
+                          @blur="field.handleBlur"
+                        />
+                      </template>
+                    </component>
+                    <OSelect
+                      :aria-label="t('common.unitFor', { label: t('alerts.plain.forAtLeast') })"
+                      class="w-32!"
+                      :model-value="pendingPeriodUnit"
+                      :options="pendingPeriodUnitOptions"
+                      labelKey="label"
+                      valueKey="value"
+                      :searchable="false"
+                      data-test="alert-settings-pending-period-unit"
+                      @update:model-value="onPendingPeriodUnitChange"
+                    />
+                  </div>
                 </div>
-                <div
-                  v-if="hasChatRecovery"
-                  class="text-text-secondary text-xs"
-                  data-test="alert-notify-on-recovery-hint"
-                >
-                  {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
-                </div>
-              </template>
-            </div>
-          </div>
-
-          <AlertDestinationsField
-            v-if="formData?.notify_on_recovery && !notifiesNobody"
-            class="me-2 mb-4!"
-            :destinations="recoveryDestinations"
-            :workflows="[]"
-            :destination-options="formattedDestinations"
-            :label="t('alerts.alertSettings.recoveryDestinations')"
-            :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
-            :supports-workflows="false"
-            @update:destinations="$emit('update:recoveryDestinations', $event)"
-            @refresh="$emit('refresh:destinations')"
-          />
-
-          <!-- The hold delays on-call and incident closure too, not only the message. -->
-          <div
-            ref="keepFiringForFieldRef"
-            class="mb-4! flex items-start max-md:flex-col max-md:gap-1"
-          >
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.alertSettings.keepFiringFor") }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.keepFiringForTooltip')" side="right" />
-            </div>
-            <div class="flex items-center">
-              <div class="w-21.75">
-                <OFormInput
-                  :aria-label="t('alerts.alertSettings.keepFiringFor')"
-                  name="keep_firing_for"
-                  type="number"
-                  min="0"
-                  :debounce="300"
-                  data-test="alert-settings-keep-firing-for-input"
+                <AlertMessageLine
+                  class="w-0 min-w-full"
+                  :error="pendingPeriodError"
+                  error-data-test="alert-settings-pending-period-error"
+                  :note="pendingPeriodWarning ?? holdWindowNote"
+                  data-test="alert-settings-pending-period-message"
                 />
               </div>
-              <div
-                class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
-              >
-                {{ t("alerts.seconds") }}
-              </div>
-            </div>
-          </div>
+            </AlertSentenceRow>
+          </AlertTierPlace>
+        </Teleport>
 
-          <div v-if="repeatSuppressionAvailable" class="mb-4! flex items-start max-md:gap-3">
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.alertSettings.suppressRepeats") }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.suppressRepeatsTooltip')" side="right" />
-            </div>
-            <OFormSwitch
-              name="suppress_repeats"
-              :aria-label="t('alerts.alertSettings.suppressRepeats')"
-              data-test="alert-suppress-repeats-toggle"
+        <Teleport :to="sectionTargets?.settingsNotify" :disabled="!sectionTargets?.settingsNotify">
+          <!-- Destinations. Deliberately NOT name=-bound: one control writes two
+             form fields, so both go up through the parent's setFieldValue via
+             the events below. -->
+          <!-- A new alert, or one opened with nobody to tell, gets the Who to tell line; its Pick holds this same field. -->
+          <OSettingRow
+            v-if="whoToTellLine"
+            ref="destinationsFieldRef"
+            :label="t('alertStarter.whoToTell.label')"
+            :error="whoToTellError"
+            fill
+            wide
+            data-test="alert-settings-who-to-tell-row"
+          >
+            <WhoToTell
+              bare
+              :model-value="destinations"
+              :workflows="workflows"
+              :oncall-team="formData?.oncall_team"
+              :stream-type="formData?.stream_type"
+              :stream-name="formData?.stream_name"
+              @update:model-value="$emit('update:destinations', $event)"
+              @update:workflows="$emit('update:workflows', $event)"
             />
-          </div>
-        </template>
+          </OSettingRow>
+          <AlertDestinationsField
+            v-else
+            :wrap="!!sectionTargets"
+            :setting-row="!!sectionTargets"
+            :list="!!sectionTargets"
+            ref="destinationsFieldRef"
+            :class="sectionTargets ? '' : isScheduled ? 'me-2 mb-4!' : 'mb-4 pb-4'"
+            :destinations="destinations"
+            :workflows="workflows"
+            :destination-options="formattedDestinations"
+            :error="destinationsError"
+            :notifies-nobody="notifiesNobody"
+            :oncall-team="formData?.oncall_team"
+            :locked-target-names="formData?._ui?.lockedTargetNames"
+            :target-required="destinationRequired"
+            show-status
+            tooltip=""
+            :placeholder="t('alerts.summary.noDestination')"
+            :destination-details="destinationDetails"
+            @update:destinations="$emit('update:destinations', $event)"
+            @update:workflows="$emit('update:workflows', $event)"
+            @refresh="refreshDestinations"
+          />
+
+          <OSettingRow
+            ref="silenceFieldRef"
+            :label="t('alerts.form.remind.label')"
+            :info="
+              isRealTime === 'true' ? t('alerts.form.remind.realtimeHelp') : notifyLines.remind
+            "
+            fill
+            wide
+            data-test="alert-settings-silence-row"
+          >
+            <!-- One sentence row; the message slot is held from first paint, so a warning never moves the rows below. -->
+            <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pe-2">
+              <div class="flex items-center gap-2">
+                <div class="min-w-0">
+                  <component :is="formField" v-if="formField" name="trigger_condition.silence">
+                    <template #default="{ field }">
+                      <OInput
+                        :aria-label="t('alerts.form.remind.label')"
+                        type="number"
+                        fit-content
+                        min="0"
+                        :debounce="isScheduled ? 300 : undefined"
+                        :model-value="silence.amount"
+                        :error="fieldInvalid(field)"
+                        data-test="alert-settings-silence-duration-input"
+                        @update:model-value="(v: unknown) => onSilenceAmount(v, field)"
+                        @blur="field.handleBlur"
+                      />
+                    </template>
+                  </component>
+                </div>
+                <OSelect
+                  :aria-label="t('common.unitFor', { label: t('alerts.form.remind.label') })"
+                  class="w-32!"
+                  :model-value="silence.unit"
+                  :options="silence.options"
+                  labelKey="label"
+                  valueKey="value"
+                  :searchable="false"
+                  data-test="alert-settings-silence-unit-select"
+                  @update:model-value="silence.onUnit"
+                />
+              </div>
+              <span
+                v-if="isRealTime !== 'true' && notifyLines.scope"
+                class="text-text-secondary text-sm"
+                data-test="alert-settings-silence-scope"
+                >{{ notifyLines.scope }}</span
+              >
+              <AlertMessageLine
+                class="w-0 min-w-full"
+                :error="silenceError"
+                error-data-test="alert-settings-silence-error"
+                :note="isScheduled ? silenceHint : null"
+                data-test="alert-settings-silence-message"
+              />
+            </div>
+          </OSettingRow>
+        </Teleport>
+
+        <Teleport
+          :to="sectionTargets?.settingsNotifyMore"
+          :disabled="!sectionTargets?.settingsNotifyMore"
+        >
+          <!-- Creates Incident — all alert types, enterprise/cloud with Incidents on -->
+          <AlertTierPlace id="createsIncident">
+            <template v-if="incidentsEnabled && tierShows('createsIncident')">
+              <AlertSentenceRow
+                v-if="createsIncident && !incidentSwitchOpen"
+                :label="t('alerts.form.incident.label')"
+                data-test="add-alert-incident-row"
+                changeable
+                removable
+                @change="incidentSwitchOpen = true"
+                @remove="removeIncident"
+              >
+                {{ t("alerts.form.incident.on") }}
+              </AlertSentenceRow>
+              <OSettingRow
+                v-else
+                :label="t('alerts.plain.openIncident')"
+                :description="t('alerts.alertSettings.createsIncidentHelp')"
+                fill
+              >
+                <OFormSwitch
+                  name="creates_incident"
+                  off-tone="neutral"
+                  state-text
+                  :aria-label="t('alerts.alertSettings.createsIncident')"
+                  data-test="alert-creates-incident-toggle"
+                />
+              </OSettingRow>
+
+              <template v-if="createsIncident">
+                <AlertSentenceRow
+                  v-if="!incidentTitleOpen"
+                  data-test="add-alert-incident-title-row"
+                  changeable
+                  @change="openIncidentTitle"
+                >
+                  {{ t("alerts.form.incident.titleLabel") }}{{ " "
+                  }}<strong class="text-text-heading font-semibold">{{
+                    incidentTitleTemplate || t("alerts.form.incident.titleDefault")
+                  }}</strong
+                  ><template v-if="!incidentTitleTemplate"
+                    >{{ " "
+                    }}<span class="text-text-secondary">{{
+                      t("alerts.form.incident.defaultTag")
+                    }}</span></template
+                  >
+                </AlertSentenceRow>
+                <OSettingRow
+                  v-else
+                  ref="incidentTitleRowRef"
+                  :label="t('alerts.alertSettings.incidentTitleTemplate')"
+                  :info="t('alerts.alertSettings.incidentTitleTemplateTooltip')"
+                  fill
+                >
+                  <div class="flex w-100 flex-col gap-1 max-md:w-full">
+                    <OFormInput
+                      name="incident_title_template"
+                      :placeholder="t('alerts.alertSettings.incidentTitleTemplatePlaceholder')"
+                      :debounce="300"
+                      data-test="alert-incident-title-template-input"
+                    />
+                    <div
+                      v-if="incidentTitlePreview.length"
+                      class="text-xs break-words"
+                      data-test="alert-incident-title-preview"
+                    >
+                      <span class="text-text-secondary me-1"
+                        >{{ t("alerts.alertSettings.incidentTitlePreview") }}:</span
+                      ><template v-for="(s, i) in incidentTitlePreview" :key="i"
+                        ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
+                      >
+                    </div>
+                    <div v-if="incidentTitlePreview.length" class="text-text-secondary text-xs">
+                      {{ t("alerts.alertSettings.incidentTitlePreviewHint") }}
+                    </div>
+                  </div>
+                </OSettingRow>
+              </template>
+            </template>
+          </AlertTierPlace>
+
+          <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
+          <template v-if="isScheduled">
+            <AlertTierPlace id="recovery">
+              <OSettingRow
+                v-if="tierShows('recovery')"
+                :label="t('alerts.plain.notifyOnRecovery')"
+                :description="
+                  notifiesNobody ? undefined : t('alerts.alertSettings.notifyOnRecoveryTooltip')
+                "
+                fill
+              >
+                <div class="flex flex-col gap-1">
+                  <!-- A recovery closes what a firing delivered; with no target nothing is
+                   delivered, so it cannot be turned on. It can still be turned off. -->
+                  <!-- The switch holds a control's height, so the lines it reveals never re-centre it. -->
+                  <div class="flex min-h-8.5 items-center">
+                    <OFormSwitch
+                      name="notify_on_recovery"
+                      off-tone="neutral"
+                      state-text
+                      :aria-label="t('alerts.alertSettings.notifyOnRecovery')"
+                      :disabled="notifiesNobody && !formData?.notify_on_recovery"
+                      data-test="alert-notify-on-recovery-toggle"
+                    />
+                  </div>
+                  <span
+                    v-if="notifiesNobody && !formData?.notify_on_recovery"
+                    class="text-text-secondary text-xs"
+                    data-test="alert-notify-on-recovery-disabled-reason"
+                  >
+                    {{ t("alerts.alertSettings.notifyOnRecoveryNeedsDestination") }}
+                  </span>
+                  <template v-if="formData?.notify_on_recovery && !notifiesNobody">
+                    <div
+                      v-for="row in recoveryPlan"
+                      :key="row.name"
+                      class="text-xs"
+                      :class="row.warn ? 'text-status-warning-text' : 'text-text-secondary'"
+                      :data-test="`alert-notify-on-recovery-plan-${row.name}`"
+                    >
+                      {{ row.name }} — {{ row.action }}
+                    </div>
+                    <div
+                      v-if="hasChatRecovery"
+                      class="text-text-secondary text-xs"
+                      data-test="alert-notify-on-recovery-hint"
+                    >
+                      {{ t("alerts.alertSettings.recoveryStatusHint") }}
+                    </div>
+                  </template>
+                </div>
+              </OSettingRow>
+            </AlertTierPlace>
+
+            <AlertTierPlace id="recovery">
+              <AlertDestinationsField
+                :wrap="!!sectionTargets"
+                :setting-row="!!sectionTargets"
+                v-if="formData?.notify_on_recovery && !notifiesNobody && tierShows('recovery')"
+                :class="sectionTargets ? '' : 'me-2 mb-4!'"
+                data-test="alert-settings-recovery-destinations"
+                :destinations="recoveryDestinations"
+                :workflows="[]"
+                :destination-options="formattedDestinations"
+                :label="t('alerts.alertSettings.recoveryDestinations')"
+                :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
+                :placeholder="t('alerts.alertSettings.recoverySameAsAlert')"
+                :supports-workflows="false"
+                :destination-details="destinationDetails"
+                @update:destinations="$emit('update:recoveryDestinations', $event)"
+                @refresh="refreshDestinations"
+              />
+            </AlertTierPlace>
+
+            <!-- The hold delays on-call and incident closure too, not only the message. -->
+            <AlertTierPlace id="keepFiring">
+              <OSettingRow
+                v-if="tierShows('keepFiring')"
+                ref="keepFiringForFieldRef"
+                :label="t('alerts.form.keepFiring.label')"
+                :description="t('alerts.form.keepFiring.help')"
+                fill
+              >
+                <div class="flex flex-col gap-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <div class="min-w-0">
+                      <component :is="formField" v-if="formField" name="keep_firing_for">
+                        <template #default="{ field }">
+                          <OInput
+                            :aria-label="t('alerts.alertSettings.keepFiringFor')"
+                            type="number"
+                            fit-content
+                            min="0"
+                            :debounce="300"
+                            :model-value="keepFiring.amount"
+                            :placeholder="t('common.off')"
+                            :error="fieldInvalid(field)"
+                            data-test="alert-settings-keep-firing-for-input"
+                            @update:model-value="(v: unknown) => keepFiring.onAmount(v, field)"
+                            @blur="field.handleBlur"
+                          />
+                        </template>
+                      </component>
+                    </div>
+                    <OSelect
+                      :aria-label="
+                        t('common.unitFor', { label: t('alerts.alertSettings.keepFiringFor') })
+                      "
+                      class="w-32!"
+                      :model-value="keepFiring.unit"
+                      :options="keepFiring.options"
+                      labelKey="label"
+                      valueKey="value"
+                      :searchable="false"
+                      data-test="alert-settings-keep-firing-unit-select"
+                      @update:model-value="keepFiring.onUnit"
+                    />
+                  </div>
+                  <div
+                    v-if="keepFiringError"
+                    class="text-input-error-text w-0 min-w-full text-xs"
+                    data-test="alert-settings-keep-firing-error"
+                    role="alert"
+                  >
+                    {{ keepFiringError }}
+                  </div>
+                </div>
+              </OSettingRow>
+            </AlertTierPlace>
+
+            <AlertTierPlace id="suppressRepeats">
+              <OSettingRow
+                v-if="repeatSuppressionAvailable && tierShows('suppressRepeats')"
+                :label="t('alerts.alertSettings.suppressRepeats')"
+                :description="notifyLines.suppress"
+                fill
+              >
+                <OFormSwitch
+                  name="suppress_repeats"
+                  off-tone="neutral"
+                  state-text
+                  :aria-label="t('alerts.alertSettings.suppressRepeats')"
+                  data-test="alert-suppress-repeats-toggle"
+                />
+              </OSettingRow>
+            </AlertTierPlace>
+          </template>
+        </Teleport>
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, inject, ref, type PropType } from "vue";
-import { useI18nTyped, type I18nKey } from "@/types/i18n";
+import {
+  computed,
+  defineComponent,
+  inject,
+  nextTick,
+  onBeforeUnmount,
+  reactive,
+  ref,
+  watch,
+  watchEffect,
+  type PropType,
+} from "vue";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
+import { useQuery } from "@tanstack/vue-query";
 import config from "@/aws-exports";
+import { templatesQuery } from "@/services/alert_templates.queries";
+import { destinationsQuery } from "@/services/alert_destination.queries";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
+import WhoToTell from "@/components/alerts/starter/WhoToTell.vue";
+import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
+import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
+import AlertMessageLine from "@/components/alerts/AlertMessageLine.vue";
+import { ALERT_FORM_CONTEXT_KEY, type AlertLineNote } from "@/components/alerts/alertFormContext";
+import { describeDestinations } from "@/utils/alerts/destinationDescription";
+import {
+  durationWords,
+  everyWords,
+  formatNumber,
+  notifiesPerGroup,
+  notifyHelp,
+} from "@/utils/alerts/alertCopy";
+import {
+  crossesOnlyWhenEverySampleDoes,
+  finerCheckMinutes,
+  missedBreachMinutes,
+} from "@/utils/alerts/checkCadence";
+import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useTierVisibility,
+} from "@/composables/alerts/useAlertSettingTiers";
+import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
+import { fromBase, pickUnit, toBase, type DurationUnit } from "@/utils/alerts/durationUnits";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { renderTemplate, segmentClass } from "@/composables/alerts/useTemplatePreview";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import { firstFieldError } from "@/lib/forms/Form/fieldError";
-import { convertMinutesToCron, getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
+import { visibleFieldError } from "@/lib/forms/Form/fieldError";
+import { shownFieldError } from "@/composables/alerts/shownFieldError";
+import { getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
+
+// Below this many groups firing at once, a repeat per group is not a flood.
+const MANY_GROUPS = 5;
 
 export default defineComponent({
   name: "Step3AlertConditions",
   components: {
     OFormInput,
+    OInput,
     OFormSwitch,
     OSelect,
-    OTooltip,
-    OIcon,
+    OSettingRow,
     AlertDestinationsField,
+    WhoToTell,
+    AlertSentenceRow,
+    AlertTierPlace,
+    AlertMessageLine,
   },
   props: {
+    // Opt-in: the sectioned alert editor renders each slice of these settings in its own section.
+    sectionTargets: {
+      type: Object as PropType<AlertSectionTargets | null>,
+      default: null,
+    },
     formData: {
       type: Object as PropType<any>,
       required: true,
@@ -566,6 +590,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
+    const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
 
     // Same gate as the Incidents menu: enterprise/cloud build AND the backend
     // /config flag. `=== true` keeps it hidden while /config is still loading.
@@ -579,7 +604,6 @@ export default defineComponent({
 
     // Field refs consumed by the parent's AlertFocusManager (registered off the
     // step ref). Scheduled-only.
-    const periodFieldRef = ref<any>(null);
     const silenceFieldRef = ref<any>(null);
     const destinationsFieldRef = ref<any>(null);
     const pendingPeriodFieldRef = ref<any>(null);
@@ -593,11 +617,7 @@ export default defineComponent({
     // full-width sibling below the pair. Reads the same R3-timed field errors
     // OFormInput would have surfaced — single source of truth, wider display.
     const form: any = inject(FORM_CONTEXT_KEY, null);
-    const fieldError = (path: string) =>
-      form
-        ? form.useStore((s: any) => firstFieldError(s.fieldMeta?.[path]?.errors ?? []))
-        : computed(() => undefined);
-    const periodError = fieldError("trigger_condition.period");
+    const fieldError = (path: string) => shownFieldError(form, path);
     const silenceError = fieldError("trigger_condition.silence");
     // AlertDestinationsField is not an OForm* wrapper, so it cannot render its own schema error.
     const destinationsError = fieldError("destinations");
@@ -609,6 +629,34 @@ export default defineComponent({
           oncall_team: props.formData?.oncall_team,
         }),
     );
+    // Decided once on open, so picking a destination in an edit never swaps the row under the user.
+    const openedWithoutDestinations =
+      !formContext?.isEditing?.value || (props.destinations ?? []).length === 0;
+    const whoToTellLine = computed(
+      () => !!props.sectionTargets && !props.destinationRequired && openedWithoutDestinations,
+    );
+    const whoToTellError = computed(() => raw(destinationsError.value) || undefined);
+    // The parent's list has no usage; this read adds how many alerts already send to each one.
+    const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
+    const destinationUsage = useQuery(() => ({
+      ...destinationsQuery(orgId.value, "alert", true),
+      enabled: !!orgId.value,
+    }));
+    const destinationDetails = computed(() => {
+      const uses = new Map(
+        (destinationUsage.data.value ?? []).map((d: any) => [d?.name, d?.uses ?? []]),
+      );
+      return describeDestinations(
+        props.destinationObjects.map((d: any) =>
+          uses.has(d?.name) ? { ...d, uses: uses.get(d.name) } : d,
+        ),
+        t,
+      );
+    });
+    const refreshDestinations = () => {
+      emit("refresh:destinations");
+      void destinationUsage.refetch();
+    };
     const pendingPeriodError = fieldError("_ui.pendingPeriod");
     // Forecast mode fixes the period and reads its own history window, so a period field would only compete with it.
     const isForecastMode = form
@@ -643,8 +691,8 @@ export default defineComponent({
     const pendingPeriodUnit = ref<"minutes" | "hours">(initialPendingPeriodUnit);
 
     const pendingPeriodUnitOptions = computed(() => [
-      { label: t("common.minutes"), value: "minutes" },
-      { label: t("common.hours"), value: "hours" },
+      { label: t("alerts.form.units.minutes"), value: "minutes" },
+      { label: t("alerts.form.units.hours"), value: "hours" },
     ]);
 
     /** Bridge DISPLAY → STORED MINUTES. The single writer of
@@ -663,12 +711,26 @@ export default defineComponent({
       const parsed = value === "" || value === null || value === undefined ? null : Number(value);
       setStoredPendingPeriod(parsed);
     };
+    // 0 means Must last is off: the field reads empty with an "Off" placeholder until typed into.
+    const holdDraft = ref<string | number | null>(null);
+    const holdAmount = (value: unknown): string | number => {
+      if (holdDraft.value !== null) return holdDraft.value;
+      return Number(value) === 0 || value === null || value === undefined
+        ? ""
+        : (value as string | number);
+    };
+    const onHoldAmount = (value: unknown, field: { handleChange: (v: unknown) => void }) => {
+      holdDraft.value = value as string | number;
+      field.handleChange(value);
+      onPendingPeriodChange(value);
+    };
 
     const onPendingPeriodUnitChange = (modelValue: SelectModelValue) => {
       const unit = typeof modelValue === "string" ? modelValue : "";
       const prevUnit = pendingPeriodUnit.value;
       pendingPeriodUnit.value = unit as "minutes" | "hours";
       if (unit === prevUnit) return;
+      holdDraft.value = null;
 
       const currentDisplay = Number(fv("_ui.pendingPeriod")) || 0;
       if (unit === "hours" && prevUnit === "minutes") {
@@ -687,76 +749,189 @@ export default defineComponent({
     // this relationship either (a non-multiple value just rounds up to the
     // next evaluation). Scheduled-only: composite has no per-alert frequency
     // to compare against (§2b), so it returns "" unconditionally.
-    const pendingPeriodWarning = computed<string>(() => {
-      if (props.isRealTime !== "false") return "";
-      const pendingMinutes = Number(fv("pending_period_sec"));
-      if (!Number.isFinite(pendingMinutes) || pendingMinutes <= 0) return "";
-
-      const frequencyType = fv("trigger_condition.frequency_type");
-      let freqMinutes: number;
-      if (frequencyType === "cron") {
-        const cronExpression = fv("trigger_condition.cron");
-        if (!cronExpression) return "";
-        try {
-          freqMinutes = getCronIntervalDifferenceInSeconds(cronExpression) / 60;
-        } catch {
-          return "";
-        }
-      } else {
-        freqMinutes = Number(fv("trigger_condition.frequency"));
+    const frequencyMinutes = (): number => {
+      if (fv("trigger_condition.frequency_type") !== "cron")
+        return Number(fv("trigger_condition.frequency"));
+      const cronExpression = fv("trigger_condition.cron");
+      if (!cronExpression) return NaN;
+      try {
+        return getCronIntervalDifferenceInSeconds(cronExpression) / 60;
+      } catch {
+        return NaN;
       }
-      if (!Number.isFinite(freqMinutes) || freqMinutes <= 0) return "";
+    };
+
+    const pendingPeriodWarning = computed<AlertLineNote | null>(() => {
+      if (props.isRealTime !== "false") return null;
+      const pendingMinutes = Number(fv("pending_period_sec"));
+      if (!Number.isFinite(pendingMinutes) || pendingMinutes <= 0) return null;
+
+      const freqMinutes = frequencyMinutes();
+      if (!Number.isFinite(freqMinutes) || freqMinutes <= 0) return null;
+      // The scheduler fires on the next check after Pending, so a span of one interval is never sampled in between.
+      if (pendingMinutes <= freqMinutes) {
+        const fix = isCron.value ? checkEveryFix(undefined) : checkEveryFix(pendingMinutes);
+        const every = everyWords(freqMinutes, t);
+        return {
+          text: fix
+            ? t("alerts.guard.mustLastOneCheckFix", { every })
+            : t("alerts.guard.mustLastOneCheck", { every }),
+          ...fix,
+          warning: true,
+          dataTest: "alert-settings-pending-period-warning",
+        };
+      }
 
       // Float-safe "is a multiple of" — see QueryConfig's original comment:
       // a cron interval can be fractional minutes, where exact `%` comparisons
       // can miss by floating-point dust at either edge of the wrap.
       const remainder = pendingMinutes % freqMinutes;
       const EPSILON = 1e-6;
-      if (remainder < EPSILON || freqMinutes - remainder < EPSILON) return "";
-      return t("alerts.validation.pendingPeriodNotMultiple", {
-        minutes: Math.round(freqMinutes * 100) / 100,
-      });
+      if (remainder < EPSILON || freqMinutes - remainder < EPSILON) return null;
+      return {
+        text: t("alerts.validation.pendingPeriodNotMultiple", {
+          minutes: Math.round(freqMinutes * 100) / 100,
+        }),
+        warning: true,
+        dataTest: "alert-settings-pending-period-warning",
+      };
     });
 
-    // ── Workflows (enterprise/cloud only) ────────────────────────────────────
-    const getBrowserTimezone = (): string => {
-      try {
-        return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-      } catch {
-        return "UTC";
-      }
-    };
-
-    // Period typed → cross-step CASCADE (period drives frequency / cron /
-    // timezone / silence). The ancestor AddAlert listens to @update:trigger
-    // (updateTriggerCondition → setFieldValue) and writes the whole
-    // trigger_condition into the ONE form, so the visible silence field
-    // auto-fills. The period field value itself is already written into the form
-    // by its own OFormInput binding; it rides on the emit so the parent write
-    // does not revert it.
-    const handlePeriodChange = (val: unknown) => {
-      const periodValue = Number(val);
-      // Spread the FRESH form value, not `props.formData.trigger_condition`.
-      // The prop is a `form.useStore` read-view that only refreshes on the next
-      // render, and the parent's @update:trigger handler is a WHOLE-OBJECT
-      // `setFieldValue("trigger_condition", …)` — so spreading the stale prop
-      // round-trips a pre-write snapshot and silently clobbers any field written
-      // earlier in the same tick.
-      const currentTrigger =
-        form?.getFieldValue?.("trigger_condition") ?? props.formData.trigger_condition;
-      const nextTrigger: Record<string, any> = {
-        ...currentTrigger,
-        period: val,
+    // A lowest (or highest) value must cross the threshold over a whole window, so a breach that
+    // straddles two non-overlapping checks is seen by neither.
+    const breachWarning = computed<AlertLineNote | null>(() => {
+      if (!isScheduled.value || isCron.value) return null;
+      const query = fv("query_condition") ?? {};
+      if ((query.type ?? "custom") !== "custom" || !query.aggregation) return null;
+      const period = Number(fv("trigger_condition.period"));
+      const missed = missedBreachMinutes({
+        fn: query.aggregation.function,
+        operator: query.aggregation.having?.operator,
+        period,
+        frequency: frequencyMinutes(),
+      });
+      if (missed === undefined) return null;
+      return {
+        text: t("alerts.guard.breachStraddles", { duration: durationWords(missed, t) }),
+        ...checkEveryFix(period),
+        warning: true,
+        dataTest: "alert-settings-breach-warning",
       };
-      if (periodValue && periodValue > 0) {
-        const minFrequency = Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
-        if (periodValue >= minFrequency) nextTrigger.frequency = periodValue;
-        nextTrigger.cron = convertMinutesToCron(periodValue);
-        if (!nextTrigger.timezone) nextTrigger.timezone = getBrowserTimezone();
-        nextTrigger.silence = periodValue;
-      }
-      emit("update:trigger", nextTrigger);
+    });
+
+    // "Stays above for N minutes" is one path: a lowest value over the window already says it, so
+    // Must last either is not needed or adds its own wait on top.
+    const holdWindow = computed(() => {
+      if (!isScheduled.value) return null;
+      const query = fv("query_condition") ?? {};
+      const aggregation = query.aggregation;
+      if ((query.type ?? "custom") !== "custom" || !aggregation) return null;
+      if (!crossesOnlyWhenEverySampleDoes(aggregation.function, aggregation.having?.operator))
+        return null;
+      const window = Number(fv("trigger_condition.period"));
+      if (!(window > 0)) return null;
+      return { fn: aggregation.function, window, pending: Number(fv("pending_period_sec")) || 0 };
+    });
+    const holdWindowNote = computed<AlertLineNote | null>(() =>
+      holdWindow.value
+        ? {
+            text: t("alerts.form.holdFor.windowCovers", {
+              fn: raw(holdWindow.value.fn),
+              window: durationWords(holdWindow.value.window, t),
+            }),
+            dataTest: "alert-settings-hold-window",
+          }
+        : null,
+    );
+    // Both read as facts about the condition, so they show in its message line, not down here.
+    const conditionNote = computed<AlertLineNote | null>(() => {
+      if (breachWarning.value) return breachWarning.value;
+      const hold = holdWindow.value;
+      if (!hold?.pending) return null;
+      return {
+        text: t("alerts.form.holdFor.windowStacks", {
+          total: durationWords(hold.window + hold.pending, t),
+        }),
+        action: t("alerts.form.holdFor.turnOff"),
+        warning: true,
+        run: () => setPendingPeriodMinutes(0),
+        dataTest: "alert-settings-hold-stacks",
+      };
+    });
+
+    // The schema's floor: none when the org sets no minimum refresh interval.
+    const minFrequency = () =>
+      Math.ceil(Number(store.state?.zoConfig?.min_auto_refresh_interval) / 60) || 1;
+    // Spread the FRESH form value, not `props.formData.trigger_condition`: the prop refreshes
+    // only on the next render, and the parent writes back the whole trigger object.
+    const currentTrigger = () => fv("trigger_condition") ?? props.formData?.trigger_condition ?? {};
+    // The look back is only the window: Check every and its cron schedule never follow it.
+    const handlePeriodChange = (value: unknown) => {
+      const next = { ...currentTrigger(), period: value };
+      if (Number(value) > 0 && !next.timezone)
+        next.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+      emit("update:trigger", next);
     };
+    // Checking more often never moves the look back, since that is the window the condition reads.
+    const checkEveryFix = (spanMinutes: number | undefined) => {
+      const minutes = spanMinutes ? finerCheckMinutes(spanMinutes, minFrequency()) : undefined;
+      if (!minutes) return { action: null, separated: false, run: () => {} };
+      return {
+        action: t("alerts.guard.checkEvery", { every: everyWords(minutes, t) }),
+        separated: false,
+        run: () => emit("update:trigger", { ...currentTrigger(), frequency: minutes }),
+      };
+    };
+    const notifyLines = computed(() => notifyHelp(fv("query_condition"), t));
+    // A wait shorter than the checks never holds a notification back, so it says so instead of moving it.
+    const silenceHint = computed<AlertLineNote | null>(() => {
+      const checkMinutes = frequencyMinutes();
+      const silenceMinutes = Number(fv("trigger_condition.silence"));
+      if (!(silenceMinutes > 0)) return null;
+      if (!(checkMinutes > silenceMinutes)) return manyGroupsHint.value;
+      const minutes = Math.ceil(checkMinutes);
+      return {
+        text: t("alerts.form.remind.noEffect", { every: everyWords(minutes, t) }),
+        action: t("alerts.form.remind.matchChecks", { duration: durationWords(minutes, t) }),
+        warning: true,
+        run: () => setFV("trigger_condition.silence", minutes),
+        dataTest: "alert-settings-silence-hint",
+      };
+    });
+
+    // Each group repeats on its own wait, so many groups over at once means that many messages per wait.
+    const manyGroupsHint = computed<AlertLineNote | null>(() => {
+      const status = formContext?.previewStatus?.value;
+      const count = Number(status?.count ?? 0);
+      const query = fv("query_condition");
+      if (!status?.wouldTrigger || count < MANY_GROUPS || !notifiesPerGroup(query)) return null;
+      if (fv("suppress_repeats") === true) return null;
+      const params = {
+        count: formatNumber(count),
+        wait: durationWords(Number(fv("trigger_condition.silence")), t),
+      };
+      const key: I18nKey =
+        query?.type === "promql"
+          ? status.atLeast
+            ? "alerts.form.remind.manySeriesAtLeast"
+            : "alerts.form.remind.manySeries"
+          : status.atLeast
+            ? "alerts.form.remind.manyGroupsAtLeast"
+            : "alerts.form.remind.manyGroups";
+      return {
+        text: t(key, params, count),
+        action:
+          repeatSuppressionAvailable && formContext?.openSetting
+            ? t("alerts.alertSettings.suppressRepeats")
+            : null,
+        warning: true,
+        run: () => {
+          setFV("suppress_repeats", true);
+          void formContext?.openSetting?.("suppressRepeats");
+        },
+        dataTest: "alert-settings-silence-many-groups",
+      };
+    });
 
     // ── Recovery ────────────────────────────────────────────────────────────
     // Platform destinations are resolved by the server itself (it closes the
@@ -787,6 +962,29 @@ export default defineComponent({
         ? "alerts.alertSettings.recoveryJiraComment"
         : "alerts.alertSettings.recoveryChatMessage";
 
+    // The alert's own template wins over the destination's (server choose_template); only one that
+    // prints the status tells a recovery apart from a new firing.
+    const templates = useQuery(() => ({
+      ...templatesQuery(store.state.selectedOrganization?.identifier ?? ""),
+      enabled: !!store.state.selectedOrganization?.identifier,
+    }));
+    const templateOf = (name: any) => {
+      const destination = props.destinationObjects.find((d: any) => d?.name === name);
+      const templateName = props.formData?.template || destination?.template;
+      return (templates.data.value ?? []).find((tp: any) => tp?.name === templateName) ?? null;
+    };
+    const messageRow = (name: any) => {
+      const template = isJira(name) ? null : templateOf(name);
+      const hides = !!template && !String(template.body ?? "").includes("alert_status");
+      return {
+        action: hides
+          ? t("alerts.alertSettings.recoveryLooksNew", { template: raw(template.name) })
+          : t(messageKeyFor(name)),
+        warn: hides,
+        known: !!template || isJira(name),
+      };
+    };
+
     // Ticket closes always go to the firing's own destinations; only the message can be
     // redirected, so an override lists both halves rather than replacing the first.
     const recoveryPlan = computed(() => {
@@ -798,7 +996,9 @@ export default defineComponent({
           return {
             name: String(name),
             isPlatform: !!platformKey || isJira(name),
-            action: t(platformKey ?? messageKeyFor(name)),
+            ...(platformKey
+              ? { action: t(platformKey), warn: false, known: true }
+              : messageRow(name)),
           };
         });
       if (!redirected) return rows;
@@ -806,11 +1006,11 @@ export default defineComponent({
         props.recoveryDestinations.map((name: any) => ({
           name: String(name),
           isPlatform: isJira(name),
-          action: t(messageKeyFor(name)),
+          ...messageRow(name),
         })),
       );
     });
-    const hasChatRecovery = computed(() => recoveryPlan.value.some((row) => !row.isPlatform));
+    const hasChatRecovery = computed(() => recoveryPlan.value.some((row) => !row.known));
 
     // Row and group-by values exist only at fire time, so their placeholders stay as chips.
     const incidentTitlePreview = computed(() => {
@@ -839,7 +1039,185 @@ export default defineComponent({
       return renderTemplate(template, { live, sample });
     });
 
+    const tierShows = useTierVisibility();
+    const tiers = inject(ALERT_SETTING_TIERS_KEY, null);
+    const suggestions = inject(ALERT_SUGGESTIONS_KEY, null);
+
+    const isScheduled = computed(() => props.isRealTime === "false");
+    const isComposite = computed(() => props.isRealTime === "composite");
+    const isCron = computed(() => fv("trigger_condition.frequency_type") === "cron");
+
+    // ── Typed interval + unit ───────────────────────────────────────────────
+    const formField = form?.Field ?? null;
+    const fieldInvalid = (field: any): boolean =>
+      form ? visibleFieldError(form, field).invalid : false;
+    const UNIT_LABEL: Record<DurationUnit, I18nKey> = {
+      seconds: "alerts.form.units.seconds",
+      min: "alerts.form.units.min",
+      h: "alerts.form.units.h",
+    };
+    const isNumber = (v: unknown) =>
+      v !== "" && v !== null && v !== undefined && Number.isFinite(Number(v));
+
+    // The unit only changes how the stored value reads; the field keeps its own unit.
+    // `offUnit`: 0 means the setting is off, so it reads as an empty "Off" field in that unit.
+    const useDurationField = (
+      name: string,
+      base: "seconds" | "min",
+      units: readonly DurationUnit[],
+      offUnit?: DurationUnit,
+    ) => {
+      const stored = computed(() => fv(name));
+      const isOff = (v: unknown) => offUnit !== undefined && !(Number(v) > 0) && !(Number(v) < 0);
+      const unitFor = (v: unknown) =>
+        isOff(v) ? offUnit! : pickUnit(isNumber(v) ? Number(v) : 0, base, units).unit;
+      const unit = ref<DurationUnit>(unitFor(stored.value));
+      const draft = ref<unknown>(null);
+      let written: unknown = stored.value;
+      // A value written from outside (a load, a suggestion, the period cascade) reads in its own best unit.
+      watch(stored, (next) => {
+        if (next === written) return;
+        written = next;
+        draft.value = null;
+        unit.value = unitFor(next);
+      });
+      const amount = computed(() => {
+        if (draft.value !== null) return draft.value;
+        if (isOff(stored.value)) return "";
+        return isNumber(stored.value)
+          ? fromBase(Number(stored.value), unit.value, base)
+          : stored.value;
+      });
+      const onAmount = (value: unknown, field: { handleChange: (v: unknown) => void }) => {
+        draft.value = value;
+        written = isNumber(value) ? toBase(Number(value), unit.value, base) : value;
+        field.handleChange(written);
+      };
+      const onUnit = (value: SelectModelValue) => {
+        const next = units.find((u) => u === value);
+        if (!next) return;
+        unit.value = next;
+        draft.value = null;
+      };
+      const options = computed(() => units.map((u) => ({ label: t(UNIT_LABEL[u]), value: u })));
+      return reactive({ unit, amount, onAmount, onUnit, options });
+    };
+    const silence = useDurationField("trigger_condition.silence", "min", ["min", "h"]);
+    // A wait nobody chose (not typed here, not saved) follows Check every up, and back down to
+    // where it started, so it never reads amber; a chosen one stays put and the amber line says why.
+    const silenceTyped = ref(false);
+    const silenceChosen = () => silenceTyped.value || !!fv("id");
+    const onSilenceAmount = (value: unknown, field: { handleChange: (v: unknown) => void }) => {
+      silenceTyped.value = true;
+      silence.onAmount(value, field);
+    };
+    let silenceFollow: { base: number; written: number } | null = null;
+    watch(
+      frequencyMinutes,
+      (minutes) => {
+        const current = Number(fv("trigger_condition.silence"));
+        if (!isScheduled.value || silenceChosen() || !(current > 0) || !(minutes > 0)) return;
+        const base = silenceFollow?.written === current ? silenceFollow.base : current;
+        const next = Math.max(base, Math.ceil(minutes));
+        silenceFollow = { base, written: next };
+        if (next !== current) setFV("trigger_condition.silence", next);
+      },
+      { immediate: true },
+    );
+    const keepFiring = useDurationField(
+      "keep_firing_for",
+      "seconds",
+      ["seconds", "min", "h"],
+      "min",
+    );
+    const keepFiringError = fieldError("keep_firing_for");
+
+    // ── Sentence rows ───────────────────────────────────────────────────────
+    const createsIncident = computed(() => fv("creates_incident") === true);
+    const incidentTitleTemplate = computed(() =>
+      String(fv("incident_title_template") ?? "").trim(),
+    );
+    const incidentSwitchOpen = ref(false);
+    const incidentTitleOpen = ref(false);
+    const incidentTitleRowRef = ref<any>(null);
+
+    const removeIncident = () => {
+      setFV("creates_incident", false);
+      incidentSwitchOpen.value = false;
+      incidentTitleOpen.value = false;
+      tiers?.conceal("createsIncident");
+    };
+    const openIncidentTitle = async () => {
+      incidentTitleOpen.value = true;
+      await nextTick();
+      const root: HTMLElement | undefined = incidentTitleRowRef.value?.$el;
+      root?.querySelector<HTMLElement>("input")?.focus();
+    };
+
+    const setPendingPeriodMinutes = (minutes: number) => {
+      holdDraft.value = null;
+      pendingPeriodUnit.value = "minutes";
+      setFV("_ui.pendingPeriod", minutes);
+      setFV("pending_period_sec", minutes);
+    };
+    const removeHoldFor = () => {
+      setPendingPeriodMinutes(0);
+      tiers?.conceal("holdFor");
+    };
+
+    const checkMinutes = () => {
+      const minutes = frequencyMinutes();
+      return Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
+    };
+    // Suggestions name two checks' worth of time, so their Add writes the same span.
+    const twoChecksMinutes = () => 2 * checkMinutes();
+    // An added row starts at one check: 0 would read as a value, yet it means the setting is off.
+    watch(
+      () => [tiers?.isRevealed("holdFor"), tiers?.isRevealed("keepFiring")] as const,
+      ([hold, keep], [heldBefore, keptBefore]) => {
+        if (hold && !heldBefore && !(Number(fv("pending_period_sec")) > 0))
+          setPendingPeriodMinutes(checkMinutes());
+        if (keep && !keptBefore && !(Number(fv("keep_firing_for")) > 0))
+          setFV("keep_firing_for", checkMinutes() * 60);
+      },
+    );
+    const unregister = suggestions
+      ? [
+          suggestions.onApply("recovery", () => setFV("notify_on_recovery", true)),
+          suggestions.onApply("keepFiring", () =>
+            setFV("keep_firing_for", twoChecksMinutes() * 60),
+          ),
+          suggestions.onApply("holdFor", () => setPendingPeriodMinutes(twoChecksMinutes())),
+        ]
+      : [];
+    onBeforeUnmount(() => unregister.forEach((off) => off()));
+    watchEffect(() => {
+      if (formContext?.conditionNote) formContext.conditionNote.value = conditionNote.value;
+    });
+    onBeforeUnmount(() => {
+      if (formContext?.conditionNote) formContext.conditionNote.value = null;
+    });
+
     return {
+      tierShows,
+      fv,
+      isScheduled,
+      isComposite,
+      isCron,
+      formField,
+      fieldInvalid,
+      silence,
+      onSilenceAmount,
+      keepFiring,
+      keepFiringError,
+      createsIncident,
+      incidentTitleTemplate,
+      incidentSwitchOpen,
+      incidentTitleOpen,
+      incidentTitleRowRef,
+      removeIncident,
+      openIncidentTitle,
+      removeHoldFor,
       incidentTitlePreview,
       segmentClass,
       recoveryPlan,
@@ -849,22 +1227,31 @@ export default defineComponent({
       incidentsEnabled,
       repeatSuppressionAvailable,
       handlePeriodChange,
+      silenceHint,
+      holdWindowNote,
+      setPendingPeriodMinutes,
+      notifyLines,
+      destinationDetails,
+      refreshDestinations,
       // Field refs for the parent focus manager
-      periodFieldRef,
       silenceFieldRef,
       destinationsFieldRef,
       pendingPeriodFieldRef,
       keepFiringForFieldRef,
-      periodError,
       isForecastMode,
       silenceError,
       destinationsError,
+      whoToTellLine,
+      whoToTellError,
       notifiesNobody,
       pendingPeriodError,
       pendingPeriodWarning,
+      breachWarning,
       pendingPeriodUnit,
       pendingPeriodUnitOptions,
       onPendingPeriodChange,
+      holdAmount,
+      onHoldAmount,
       onPendingPeriodUnitChange,
     };
   },

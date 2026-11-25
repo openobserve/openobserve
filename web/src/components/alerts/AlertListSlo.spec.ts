@@ -213,8 +213,6 @@ async function mountBare(rows: any[]) {
     },
   });
   await flushPromises();
-  // The list opens on the Firing tile; these rows never fire.
-  (wrapper.vm as any).stateFilters = [];
   return wrapper;
 }
 

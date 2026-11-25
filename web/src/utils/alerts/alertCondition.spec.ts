@@ -36,6 +36,17 @@ describe("alertConditionText", () => {
         },
       }),
     ).toBe("avg(latency) > 500");
+    // A SQL alert's query computes the column; the stored function is never applied.
+    const sql = {
+      type: "sql",
+      aggregation: {
+        function: "count",
+        having: { column: "p95_ms", operator: ">", value: 500 },
+        warning_value: 300,
+      },
+    };
+    expect(alertConditionText({ query_condition: sql })).toBe("p95_ms > 500");
+    expect(alertWarningConditionText({ query_condition: sql })).toBe("p95_ms > 300");
   });
 
   /// The single-alert GET calls it `query_condition`; the list calls the same

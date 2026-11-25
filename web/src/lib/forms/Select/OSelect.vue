@@ -1907,7 +1907,7 @@ const fieldWidthClass = computed(() => {
                               size="sm"
                               class="shrink-0"
                             />
-                            <span class="flex min-w-0 flex-1 items-center">
+                            <span class="flex w-full min-w-0 flex-1 items-center">
                               <slot name="option" :option="filteredOptions[vRow.index].source!" />
                             </span>
                           </template>

@@ -7,6 +7,14 @@ import { isNetworkFailure } from "@/utils/networkFailure";
 
 let contextHandler: any;
 
+/** The server's answer to a confirm call; `status` 0 means it never arrived. */
+export interface AiConfirmAnswer {
+  ok: boolean;
+  status: number;
+  /** The parsed response body, or null when it was not JSON. */
+  body: unknown;
+}
+
 const useAiChat = () => {
   const getContext = async () => {
     if (!contextHandler || typeof contextHandler !== "function") {
@@ -234,6 +242,28 @@ const useAiChat = () => {
     });
   };
 
+  /** Answers a paused tool call of a running turn; `extra` rides next to `approved` (e.g. an edited `destinations`). */
+  const confirmAiTool = async (
+    org_id: string,
+    sessionId: string,
+    approved: boolean,
+    extra: Record<string, unknown> = {},
+  ): Promise<AiConfirmAnswer> => {
+    const url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/confirm/${encodeURIComponent(sessionId)}`;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...extra, approved }),
+      });
+      const body = await response.json().catch(() => null);
+      return { ok: response.ok, status: response.status, body };
+    } catch {
+      return { ok: false, status: 0, body: null };
+    }
+  };
+
   const chatsUrl = (org_id: string, sessionId?: string) =>
     `${store.state.API_ENDPOINT}/api/${org_id}/ai/chats` +
     (sessionId ? `/${encodeURIComponent(sessionId)}` : "");
@@ -311,6 +341,7 @@ const useAiChat = () => {
   return {
     fetchAiChat,
     cancelAiChat,
+    confirmAiTool,
     chatHistoryServer,
     listServerChats,
     getServerChat,

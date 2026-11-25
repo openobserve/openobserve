@@ -20,6 +20,18 @@ import { CommonActions, showAllAlertStates } from '../commonActions';
 import { AlertCreationWizard } from './alertCreationWizard.js';
 import { openOSelectDropdown } from './oselectHelpers.js';
 import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
+import {
+    destinationsShowAsList,
+    expandAlertSettingGroups,
+    fillAlertName,
+    goToAlertSection,
+    openAlertFilterBuilder,
+    openAlertSectionForTab,
+    pickAlertDestination,
+    revealAlertSetting,
+    selectAlertStreamType,
+    settleIntoView,
+} from './alertSectionHelpers.js';
 import { AlertManagement } from './alertManagement.js';
 import { AlertBulkOperations } from './alertBulkOperations.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -63,21 +75,16 @@ export class AlertsPage {
 
             // Alert creation locators - Alerts 2.0 Wizard UI
             addAlertButton: '[data-test="alert-list-add-alert-btn"]',
-            alertNameInput: '[data-test="add-alert-name-input"]',
-            // Alert name is an inline-edited title (OFormInlineEdit): a display
-            // trigger swaps to an input on click. -trigger opens, -input edits.
-            alertNameTrigger: '[data-test="add-alert-name-input-trigger"]',
-            alertNameInputField: '[data-test="add-alert-name-input-input"]',
-            // Display-mode value of the inline-edit title (present when NOT editing).
-            alertNameValue: '[data-test="add-alert-name-input-value"]',
+            alertNameInput: '[data-test="add-alert-details-name-input"]',
+            // The name is typed in step 3; the header shows it as text with a pencil that jumps there.
+            alertNameInputField: '[data-test="add-alert-details-name-input-field"]',
+            alertNameValue: '[data-test="add-alert-header-title"]',
             alertSubmitButton: '[data-test="add-alert-submit-btn"]',
             alertBackButton: '[data-test="add-alert-back-btn"]',
 
             // Step 1: Alert Setup selectors (v3 UI)
             // OSelect: trigger wrapper + `${parent}-popover` + `${parent}-option` with `data-test-value="<value>"` (§4)
             streamTypeDropdown: '[data-test="add-alert-stream-type-select-dropdown"]',
-            streamTypePopover: '[data-test="add-alert-stream-type-select-dropdown-popover"]',
-            streamTypeOption: '[data-test="add-alert-stream-type-select-dropdown-option"]',
             streamNameDropdown: '[data-test="add-alert-stream-name-select-dropdown"]',
             queryEditorDialog: '[data-test="query-editor-dialog"]',
             queryResultLabel: 'Query Result',
@@ -118,12 +125,12 @@ export class AlertsPage {
             advancedTemplateOverrideSelect: '[data-test="advanced-template-override-select"]',
             // Alert destinations select (in AlertSettings.vue, condition tab)
             alertDestinationsSelect: '[data-test="alert-destinations-select"]',
-            // Alerts 4.0 (multi-alerts) — Simple/Multi toggle choice group
-            alertMultiToggleChoice: '[data-test="alerts-alertmultitoggle-choice"]',
+            // Per-group question: one alert for all groups, or one per group.
+            alertGroupQuestionOne: '[data-test="add-alert-group-question-one"]',
+            alertGroupQuestionEach: '[data-test="add-alert-group-question-each"]',
             // Alerts 4.0 — priority & tags (Feature 2)
             prioritySelect: '[data-test="alert-priority-select"]',
             tagsInput: '[data-test="alert-tags-input"]',
-            advancedTabBtn: '[data-test="add-alert-tab-advanced"]',
             // ODropdown content carries data-test="o-dropdown-content"
             visibleDropdownMenu: '[data-test="o-dropdown-content"]:visible',
 
@@ -168,7 +175,7 @@ export class AlertsPage {
             alertDetailsHistoryEmpty: '[data-test="alerts-alertevaluationhistory-empty"]',
 
             // Evaluation Status Indicator (v3 UI - rendered in AlertWizardRightColumn with data-test)
-            alertStatusIndicator: '[data-test="alert-status-indicator"]',
+            alertStatusIndicator: '[data-test="add-alert-rail-verdict"]',
 
             // Messages
             alertSuccessMessage: 'Alert saved successfully.',
@@ -325,9 +332,9 @@ export class AlertsPage {
             alertSectionTabAlertTemplates: '[data-test="alert-section-tab-alertTemplates"]',
             alertSectionTabAlertLibrary: '[data-test="alert-section-tab-alertLibrary"]',
 
-            // v3 AddAlert wizard tabs (OToggleGroupItem with data-test="add-alert-tab-{key}")
-            addAlertTabCondition: '[data-test="add-alert-tab-condition"]',
-            addAlertTabAdvanced: '[data-test="add-alert-tab-advanced"]',
+            // Sectioned AddAlert editor: section list items and section containers
+            alertSectionNavItem: (id) => `[data-test="o-section-nav-item-${id}"]`,
+            alertSection: (id) => `[data-test="add-alert-section-${id}"]`,
 
             // OToast (alerts module - success / error variants)
             oToastSuccess: '[data-test-variant="success"]',
@@ -434,13 +441,18 @@ export class AlertsPage {
     }
 
     /** Add Condition button (bare locator, no .first()). */
+    /** The condition filter builder stays folded behind its sentence until opened. */
+    async openFilterBuilder() {
+        await openAlertFilterBuilder(this.page);
+    }
+
     getAddConditionButtonLocator() {
         return this.page.locator(this.locators.addConditionButton);
     }
 
-    /** Advanced tab button (.first() — matches clickAdvancedTab). */
-    getAdvancedTabLocator() {
-        return this.page.locator(this.locators.advancedTabBtn).first();
+    /** Section-list item for an editor section (watch, condition, notify). */
+    getAlertSectionNavItemLocator(sectionId) {
+        return this.page.locator(this.locators.alertSectionNavItem(sectionId)).first();
     }
 
     /** Alert import button (bare locator). */
@@ -466,6 +478,11 @@ export class AlertsPage {
     /** Alert submit button (bare locator). */
     getAlertSubmitButtonLocator() {
         return this.page.locator(this.locators.alertSubmitButton);
+    }
+
+    /** Scrolls a form control into view and lets the editor column settle before it is clicked. */
+    async settleIntoView(locator) {
+        await settleIntoView(this.page, locator);
     }
 
     /** Alert destinations select (bare locator). */
@@ -536,7 +553,7 @@ export class AlertsPage {
 
     /** "Group by" label row (parent element via ..). */
     getGroupByRow() {
-        return this.page.locator('text=Group by').locator('..');
+        return this.page.locator(this.locators.alertGroupByRow).first();
     }
 
     /** First group-by select trigger. */
@@ -582,6 +599,11 @@ export class AlertsPage {
     }
 
     /** "Learn more" help trigger next to the Additional Variables field. */
+    /** Shows the Variables block through its "+ add" link, which also adds one empty key/value row. */
+    async revealAlertVariables() {
+        await revealAlertSetting(this.page, 'variables');
+    }
+
     getHelpDrawerVariablesInfoBtn() {
         return this.page.locator(this.locators.helpDrawerVariablesInfoBtn);
     }
@@ -998,7 +1020,7 @@ export class AlertsPage {
     }
 
     /**
-     * Expect the evaluation status indicator ("Would Trigger" / "Would Not Trigger") to be visible
+     * Expect the rail's preview verdict ("Would alert now: ..." / "Quiet now: ...") to be visible
      */
     async expectEvaluationStatusIndicatorVisible() {
         await expect(this.page.locator(this.locators.alertStatusIndicator)).toBeVisible({ timeout: 15000 });
@@ -1214,15 +1236,9 @@ export class AlertsPage {
         return (await this.page.locator(this.locators.alertNameInputField).inputValue()).trim();
     }
 
-    /**
-     * Click the Advanced tab in the alert creation form
-     */
+    /** Shows every setting the old Advanced tab held (tucked groups, template override) and scrolls to "Who should hear about it?". */
     async clickAdvancedTab() {
-        const tab = this.page.locator(this.locators.advancedTabBtn).first();
-        await tab.waitFor({ state: 'visible', timeout: 3000 });
-        await tab.click();
-        await this.page.waitForTimeout(500);
-        testLogger.info('Switched to Advanced tab');
+        await openAlertSectionForTab(this.page, 'Advanced');
     }
 
     /**
@@ -1261,16 +1277,13 @@ export class AlertsPage {
         testLogger.info('Alert visible on list', { name });
     }
 
-    /**
-     * Assert the Simple/Multi toggle has "Multi alert" (value "true") selected.
-     * Reka-ui renders options as <button role="radio" data-test-value> carrying
-     * aria-checked (NOT native input.checked).
-     */
+    /** Assert the per-group question answers "one alert per group" (the saved multi-alert). */
     async expectMultiAlertSelected() {
-        const choice = this.page.locator(this.locators.alertMultiToggleChoice);
-        await expect(choice).toBeVisible({ timeout: 15000 });
-        await expect(choice.locator('[role="radio"][data-test-value="true"]')).toHaveAttribute('aria-checked', 'true', { timeout: 10000 });
-        await expect(choice.locator('[role="radio"][data-test-value="false"]')).toHaveAttribute('aria-checked', 'false');
+        await goToAlertSection(this.page, 'condition');
+        const each = this.page.locator(this.locators.alertGroupQuestionEach).first();
+        await expect(each).toBeVisible({ timeout: 15000 });
+        await expect(each).toHaveAttribute('aria-checked', 'true', { timeout: 10000 });
+        await expect(this.page.locator(this.locators.alertGroupQuestionOne).first()).toHaveAttribute('aria-checked', 'false');
     }
 
     // ==================== ALERTS 4.0 (PRIORITY & TAGS) HELPERS ====================
@@ -1281,12 +1294,12 @@ export class AlertsPage {
      * `_switchToTab`, which can fire before a just-closed popover settles and miss the tab.
      */
     async openConditionTab() {
-        await this.page.locator(this.locators.addAlertTabCondition).click();
-        await this.page.waitForTimeout(300);
+        await goToAlertSection(this.page, 'watch');
     }
 
     /** Assert the Advanced-panel priority select and tag input are both present. */
     async expectPriorityAndTagControlsVisible() {
+        await expandAlertSettingGroups(this.page, ['notify']);
         await expect(this.page.locator(this.locators.prioritySelect)).toBeVisible({ timeout: 10000 });
         await expect(this.page.locator(this.locators.tagsInput)).toBeVisible({ timeout: 10000 });
     }
@@ -1303,6 +1316,7 @@ export class AlertsPage {
 
     /** Select a priority by its label (e.g. "P3"). */
     async selectPriority(label) {
+        await expandAlertSettingGroups(this.page, ['notify']);
         await openOSelectDropdown(this.page, this.page.locator(this.locators.prioritySelect));
         await this.page
             .locator('[data-test$="-popover"] [data-test$="-option"]')
@@ -1319,6 +1333,7 @@ export class AlertsPage {
 
     /** Type a tag into the tag input and commit it with Enter. */
     async addTag(value) {
+        await expandAlertSettingGroups(this.page, ['notify']);
         const input = this.page.locator(`${this.locators.tagsInput} input`).first();
         await input.fill(value);
         await input.press('Enter');
@@ -1330,7 +1345,9 @@ export class AlertsPage {
      * and value inputs share a data-test across rows, so `.last()` targets the newest.
      */
     async addAlertVariable(key, value) {
-        await this.page.locator(this.locators.contextAttributesAddButton).click();
+        if (!(await revealAlertSetting(this.page, 'variables'))) {
+            await this.page.locator(this.locators.contextAttributesAddButton).click();
+        }
         await this.page.locator(`${this.locators.contextAttributeKeyInput} input`).last().fill(key);
         await this.page.locator(`${this.locators.contextAttributeValueInput} input`).last().fill(value);
         testLogger.info('Added alert variable', { key });
@@ -1338,6 +1355,11 @@ export class AlertsPage {
 
     /** Open the destinations select and pick the first available option. */
     async selectFirstDestination() {
+        if (await destinationsShowAsList(this.page)) {
+            await this.page.locator('[data-test="alert-destinations-list-option"]').first().click();
+            testLogger.info('Selected first available destination');
+            return;
+        }
         const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
         await dropdown.waitFor({ state: 'visible', timeout: 10000 });
         await openOSelectDropdown(this.page, dropdown);
@@ -1354,16 +1376,7 @@ export class AlertsPage {
      * and deleted before save, which surfaces as a 404 "destination not found".
      */
     async selectDestinationByName(name) {
-        const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
-        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await openOSelectDropdown(this.page, dropdown);
-        const option = this.page
-            .locator('[data-test$="-popover"] [data-test$="-option"]')
-            .filter({ hasText: name })
-            .first();
-        await expect(option).toBeVisible({ timeout: 5000 });
-        await option.click();
-        await this.page.keyboard.press('Escape');
+        await pickAlertDestination(this.page, name);
         testLogger.info('Selected destination by name', { name });
     }
 
@@ -1856,9 +1869,8 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // v3 UI validates non-empty name — open the inline editor, clear it, then
-        // submit to trigger validation.
-        await this.page.locator(this.locators.alertNameTrigger).click();
+        // v3 UI validates non-empty name — clear step 3's Name field, then submit to trigger validation.
+        await goToAlertSection(this.page, 'notify');
         await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).clear();
 
@@ -1868,9 +1880,9 @@ export class AlertsPage {
 
         // An empty-name Save is rejected with a toast reading "Alert name is required."
         // (alerts.nameRequired); the name OFormInput may additionally surface an inline field
-        // error (add-alert-name-input-error). Assert whichever signal is present — both
+        // error (add-alert-details-name-input-error). Assert whichever signal is present — both
         // confirm the empty-name save was blocked, which is what this validation verifies.
-        const nameError = this.page.locator('[data-test="add-alert-name-input-error"]');
+        const nameError = this.page.locator('[data-test="add-alert-details-name-input-error"]');
         const nameRequiredToast = this.page
             .locator('[data-test="o-toast-message"]')
             .filter({ hasText: 'Alert name is required.' });
@@ -1886,7 +1898,7 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        await this.page.locator(this.locators.alertNameTrigger).click();
+        await goToAlertSection(this.page, 'notify');
         await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).fill('abc');
 
@@ -3226,41 +3238,26 @@ export class AlertsPage {
         testLogger.info('Clicked Add Alert button');
     }
 
-    /**
-     * Fill the alert name input
-     */
+    /** Fill the alert name (step 3, Who to tell). */
     async fillAlertName(alertName) {
-        // Inline-edit title: click the trigger to open the editor, then fill the input.
-        await this.page.locator(this.locators.alertNameTrigger).click();
-        await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
-        await this.page.locator(this.locators.alertNameInputField).fill(alertName);
-        testLogger.info('Filled alert name', { alertName });
+        await fillAlertName(this.page, alertName);
     }
 
-    /**
-     * Current alert name, read from the value element — OFormInlineEdit only mounts an <input> while editing.
-     * @returns {Promise<string>}
-     */
+    /** Current alert name as the header shows it. */
     async getAlertNameValue() {
-        const valueEl = this.page.locator('[data-test="add-alert-name-input-value"]').first();
+        const valueEl = this.getAlertNameValueLocator();
         await valueEl.waitFor({ state: 'visible', timeout: 30000 });
         return ((await valueEl.textContent()) ?? '').trim();
     }
 
-    /** Display-mode alert name value element (OFormInlineEdit span, not an <input>). */
+    /** Header alert name (plain text). */
     getAlertNameValueLocator() {
-        return this.page.locator('[data-test="add-alert-name-input-value"]').first();
+        return this.page.locator(this.locators.alertNameValue).first();
     }
 
-    /**
-     * Select stream type from dropdown
-     * OSelect popover pattern: open trigger, wait for popover, click option keyed by data-test-value (§4)
-     */
+    /** Select logs, metrics or traces in the stream-type dropdown. */
     async selectStreamType(streamType) {
-        await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="${streamType}"]`).click();
-        testLogger.info('Selected stream type', { streamType });
+        await selectAlertStreamType(this.page, streamType);
     }
 
     /**
@@ -3673,6 +3670,7 @@ export class AlertsPage {
      * and selecting the first available option from the new group-by OSelect.
      */
     async addFirstGroupByField() {
+        await expandAlertSettingGroups(this.page, ['condition']);
         const groupByRow = this.page.locator(this.locators.alertGroupByRow);
         await groupByRow.waitFor({ state: 'visible', timeout: 5000 });
         const addBtn = this.page.locator(this.locators.alertGroupByAddButton);
@@ -4569,8 +4567,11 @@ export class AlertsPage {
     async enableAggregation() {
         const toggle = this.getAggregationToggle();
         await toggle.waitFor({ state: 'visible', timeout: 30000 });
+        await settleIntoView(this.page, toggle);
         await toggle.click();
         await this._selectAggregationOption('count');
+        // Group by is a tucked setting of "When is it a problem?"; it renders once aggregating and expanded.
+        await expandAlertSettingGroups(this.page, ['condition']);
         testLogger.info('Aggregation enabled via count function');
     }
 
@@ -4581,6 +4582,7 @@ export class AlertsPage {
     async disableAggregation() {
         const toggle = this.getAggregationToggle();
         await toggle.waitFor({ state: 'visible', timeout: 5000 });
+        await settleIntoView(this.page, toggle);
         await toggle.click();
         await this._selectAggregationOption('total_events');
         testLogger.info('Aggregation disabled via total_events function');
@@ -4596,6 +4598,7 @@ export class AlertsPage {
     async selectAggregationFunction(functionValue) {
         const toggle = this.getAggregationToggle();
         await toggle.waitFor({ state: 'visible', timeout: 5000 });
+        await settleIntoView(this.page, toggle);
         await toggle.click();
         await this._selectAggregationOption(functionValue);
         testLogger.info('Selected aggregation function', { functionValue });

@@ -240,7 +240,7 @@ export function buildPanelAutoName(
 // with underscores, comparison symbols are spelled out, and everything is run
 // through `slugify` as a backstop — a generated name that the form would then
 // reject as invalid is worse than no name at all.
-const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/g;
+const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&/]+/g;
 
 /** Comparison symbols spelled out — `>=` is legal in a name but unreadable in one. */
 const OPERATOR_WORDS: Record<string, string> = {
@@ -275,10 +275,19 @@ interface AlertAutoNameInput {
   is_real_time?: string | boolean;
   query_condition?: {
     type?: string;
+    promql?: string | null;
     aggregation?: { function?: string | null; having?: { column?: string } | null } | null;
     conditions?: AlertCondition;
   } | null;
 }
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** `rate(stream[w])`, alone or summed by labels. */
+const isStreamRate = (promql: string, stream: string): boolean =>
+  new RegExp(
+    `^(?:sum(?: by \\([\\w, ]*\\))? \\()?rate\\(${escapeRegExp(stream)}\\[\\w+\\]\\)\\)?$`,
+  ).test(promql.trim());
 
 /** First leaf condition of a (possibly nested) condition group. */
 const firstLeafCondition = (group: AlertCondition | undefined): AlertCondition | null => {
@@ -301,6 +310,7 @@ const ALERT_NAME_PATTERN = {
   anomaly: (p: Record<string, string>) => `anomaly_${p.stream}`,
   realTime: (p: Record<string, string>) => `realtime_${p.stream}`,
   queryAlert: (p: Record<string, string>) => `${p.stream}_query_alert`,
+  rate: (p: Record<string, string>) => `${p.stream}_rate`,
   streamAlert: (p: Record<string, string>) => `${p.stream}_alert`,
   aggregation: (p: Record<string, string>) => `${p.stream}_${p.fn}_${p.field}`,
   condition: (p: Record<string, string>) => `${p.stream}_${p.column}_${p.operator}_${p.value}`,
@@ -332,6 +342,10 @@ export function buildAlertAutoName(
 
   // SQL/PromQL alerts are defined by a query the name can't summarise; the
   // stream plus the alert's nature is the most it can honestly say.
+  // A query that only reads the stream's rate says so, as a builder measure would.
+  if (queryCondition.type === "promql" && isStreamRate(queryCondition.promql ?? "", stream)) {
+    return name("rate", { stream });
+  }
   if (queryCondition.type === "sql" || queryCondition.type === "promql") {
     return name("queryAlert", { stream });
   }

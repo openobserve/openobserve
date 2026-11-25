@@ -49,7 +49,7 @@ describe("OSearchInput", () => {
 
   it("should use default placeholder when none is provided", () => {
     wrapper = mount(OSearchInput);
-    expect(wrapper.find("input").attributes("placeholder")).toBe("Search...");
+    expect(wrapper.find("input").attributes("placeholder")).toBe("Search…");
   });
 
   it("should show clear button by default when modelValue is non-empty", () => {

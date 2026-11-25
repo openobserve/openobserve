@@ -1,0 +1,55 @@
+{
+  "alert": {
+    "stream_type": "logs",
+    "stream_name": "app_logs",
+    "is_real_time": false,
+    "query_condition": {
+      "type": "custom",
+      "conditions": {
+        "version": 2,
+        "conditions": {
+          "filterType": "group",
+          "logicalOperator": "AND",
+          "conditions": [
+            {
+              "filterType": "condition",
+              "column": "level",
+              "operator": "=",
+              "value": "error",
+              "logicalOperator": "AND"
+            }
+          ]
+        }
+      },
+      "sql": null,
+      "promql": null,
+      "promql_condition": null,
+      "aggregation": {
+        "group_by": ["service_name"],
+        "function": "count",
+        "having": {
+          "column": "level",
+          "operator": ">=",
+          "value": 50
+        }
+      },
+      "vrl_function": null,
+      "multi_time_range": []
+    },
+    "trigger_condition": {
+      "period": 10,
+      "operator": ">=",
+      "threshold": 1,
+      "frequency": 10,
+      "frequency_type": "minutes",
+      "silence": 30
+    },
+    "pending_period_sec": 0,
+    "keep_firing_for": 0,
+    "suppress_repeats": false,
+    "destinations": []
+  },
+  "start": 1763457000000000,
+  "end": 1763460000000000,
+  "step": 600000000
+}

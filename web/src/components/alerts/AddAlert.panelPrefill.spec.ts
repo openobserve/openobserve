@@ -257,11 +257,11 @@ describe("AddAlert — a threshold right-clicked on a builder query", () => {
 
     expect(form.query_condition.type).toBe("sql");
     expect(form.query_condition.sql).not.toContain("HAVING");
-    expect(form.trigger_condition).toMatchObject({ operator: ">=", threshold: 3 });
+    expect(form.trigger_condition).toMatchObject({ operator: ">=", threshold: 1 });
 
     const saved = formOf(wrapper).getAlertPayload();
     expect(saved.query_condition.aggregation).toBeNull();
-    expect(saved.trigger_condition).toMatchObject({ operator: ">=", threshold: 3 });
+    expect(saved.trigger_condition).toMatchObject({ operator: ">=", threshold: 1 });
     expect(
       wrapper.find('[data-test="add-alert-prefill-warning-thresholdNotCarried"]').exists(),
     ).toBe(true);
@@ -319,9 +319,9 @@ describe("AddAlert — a threshold right-clicked on a builder query", () => {
         type: "sql",
         hasHaving: false,
         formAggregation: { column: "y_axis_1", operator: ">=", value: 1 },
-        formTrigger: expect.objectContaining({ operator: ">=", threshold: 3 }),
+        formTrigger: expect.objectContaining({ operator: ">=", threshold: 1 }),
         savedAggregation: null,
-        savedTrigger: expect.objectContaining({ operator: ">=", threshold: 3 }),
+        savedTrigger: expect.objectContaining({ operator: ">=", threshold: 1 }),
       });
       expect(states[1]).toEqual(states[0]);
       expect(states[2]).toEqual(states[0]);

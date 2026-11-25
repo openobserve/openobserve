@@ -20,22 +20,30 @@
 // composed schema still validates from the seeded form values + default `_meta`.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { nextTick } from "vue";
+import { computed, defineComponent, h, ref } from "vue";
+import { describe, it, expect, vi, afterEach, beforeEach, onTestFinished } from "vitest";
 import AddAlert from "@/components/alerts/AddAlert.vue";
+import AlertFormSection from "@/components/alerts/AlertFormSection.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import alertsService from "@/services/alerts";
+import searchService from "@/services/search";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 import { generateWhereClause } from "@/utils/alerts/alertQueryBuilder";
+import { buildEventFill } from "@/utils/alerts/alertIntents";
 
 // Shared so the SQL → stream-name sync tests can parse a FROM clause and fail a
 // stream lookup; the defaults match the old per-call mocks.
-const { getStreamMock, sqlParseMock } = vi.hoisted(() => ({
+const { getStreamMock, getStreamsMock, sqlParseMock, sqlAstifyMock } = vi.hoisted(() => ({
   getStreamMock: vi.fn(),
+  getStreamsMock: vi.fn(),
   sqlParseMock: vi.fn(),
+  sqlAstifyMock: vi.fn(() => ({ columns: [] as { expr: { column: string } }[] })),
 }));
 const STREAM_SCHEMA = {
   schema: [
@@ -44,11 +52,21 @@ const STREAM_SCHEMA = {
   ],
 };
 getStreamMock.mockResolvedValue(STREAM_SCHEMA);
+getStreamsMock.mockResolvedValue({ list: [] });
+
+// Desktop by default; a test sets it false to read the form as it renders below lg.
+const breakpoint = vi.hoisted(() => ({ lgUp: null as { value: boolean } | null }));
+vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/useBreakpoint")>();
+  const { ref } = await import("vue");
+  breakpoint.lgUp = ref(true);
+  return { ...actual, default: () => ({ ...actual.default(), lgUp: breakpoint.lgUp }) };
+});
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStream: getStreamMock,
-    getStreams: vi.fn().mockResolvedValue({ list: [] }),
+    getStreams: getStreamsMock,
   }),
 }));
 
@@ -64,7 +82,7 @@ vi.mock("@/services/search", async (importOriginal) => {
 vi.mock("@/composables/useParser", () => ({
   default: () => ({
     sqlParser: async () => ({
-      astify: vi.fn(() => ({ columns: [] })),
+      astify: sqlAstifyMock,
       parse: sqlParseMock,
       sqlify: vi.fn(),
     }),
@@ -112,6 +130,9 @@ vi.mock("@/services/alerts", async (importOriginal) => {
         }),
       ),
       listByFolderId: vi.fn(() => Promise.resolve({ data: { list: [] } })),
+      toggle_state_by_alert_id: vi.fn((_org: string, _id: string, enable: boolean) =>
+        Promise.resolve({ data: { enabled: enable } }),
+      ),
     },
   });
 });
@@ -184,13 +205,77 @@ const seedValidScheduled = (form: any) => {
   });
 };
 
+/** jsdom has no scrolling; the section jump calls one of these. */
+const stubScrolling = () => {
+  const saved = [
+    [HTMLElement.prototype, "scrollTo"],
+    [Element.prototype, "scrollIntoView"],
+  ] as const;
+  const originals = saved.map(([proto, key]) => Object.getOwnPropertyDescriptor(proto, key));
+  for (const [proto, key] of saved) {
+    Object.defineProperty(proto, key, { configurable: true, writable: true, value: vi.fn() });
+  }
+  return () =>
+    saved.forEach(([proto, key], i) => {
+      const original = originals[i];
+      if (original) Object.defineProperty(proto, key, original);
+      else delete (proto as unknown as Record<string, unknown>)[key];
+    });
+};
+
+const focusedTestId = () => document.activeElement?.getAttribute("data-test");
+
+/** A saved scheduled alert as the edit page loads it. */
+const savedAlert = (over: Record<string, any> = {}) => ({
+  id: "alert-1",
+  name: "errors_alert",
+  stream_type: "logs",
+  stream_name: "app_logs",
+  is_real_time: false,
+  pending_period_sec: 0,
+  query_condition: {
+    type: "custom",
+    conditions: null,
+    sql: "",
+    promql: "",
+    promql_condition: null,
+    aggregation: null,
+    vrl_function: "",
+    multi_time_range: [],
+  },
+  trigger_condition: {
+    period: 10,
+    operator: ">=",
+    frequency: 10,
+    threshold: 3,
+    silence: 10,
+    frequency_type: "minutes",
+    timezone: "UTC",
+  },
+  destinations: ["email"],
+  context_attributes: {},
+  description: "",
+  row_template: "",
+  row_template_type: "String",
+  enabled: true,
+  ...over,
+});
+
 describe("AddAlert (OForm owner)", () => {
   let wrapper: any;
+  let unstubScrolling: () => void;
+
+  beforeEach(() => {
+    unstubScrolling = stubScrolling();
+    vi.mocked(searchService.search).mockResolvedValue({ data: {} } as never);
+    sqlAstifyMock.mockReturnValue({ columns: [] });
+  });
 
   afterEach(() => {
     wrapper?.unmount();
     wrapper = null;
     vi.clearAllMocks();
+    unstubScrolling();
   });
 
   describe("schema-gated save (block-on-invalid)", () => {
@@ -223,18 +308,18 @@ describe("AddAlert (OForm owner)", () => {
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
     });
 
-    it("auto-names a cleared alert rather than blocking, once a stream is chosen", async () => {
-      // A create-mode alert can no longer reach save nameless: clearing the
-      // field re-arms the generator, which fills it from the stream. The schema
-      // rule above is the backstop for the case where it has nothing to offer.
+    it("auto-names a nameless alert on Save rather than blocking, once a stream is chosen", async () => {
+      // The schema rule above is the backstop for the case where the generator has nothing to offer.
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
       seedValidScheduled(form);
       form.setFieldValue("name", "");
+      await wrapper.vm.saveAlert();
       await flushPromises();
-
-      expect(form.state.values.name).toBe("_rundata_alert");
+      expect(JSON.stringify(vi.mocked(alertsService.create_by_alert_id).mock.calls)).toContain(
+        '"name":"_rundata_alert"',
+      );
     });
 
     it("blocks save when the name contains unsupported characters (§4 restore)", async () => {
@@ -271,6 +356,21 @@ describe("AddAlert (OForm owner)", () => {
         }),
       );
     });
+    // The host leaves after a save; a reset first would flash a blank alert of another type.
+    it("keeps the saved real-time alert on screen until the host leaves", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("is_real_time", "true");
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      expect(wrapper.emitted("update:list")).toBeTruthy();
+      expect(form.state.values).toMatchObject({ name: "test_alert", is_real_time: "true" });
+    });
   });
 
   // The pre-save gates that are NOT schema rules — re-homed from the old
@@ -278,37 +378,65 @@ describe("AddAlert (OForm owner)", () => {
   // the top of onSubmit, i.e. only after the composed schema passes). Same
   // toast messages as pre-migration.
   describe("imperative query-text gates (runImperativeQueryChecks)", () => {
-    it("blocks a SQL save when the SQL query is empty", async () => {
+    it("opens the SQL tab with the builder's alert SQL, and keeps a query of the user's own", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
       seedValidScheduled(form);
+      await flushPromises();
       form.setFieldValue("query_condition.type", "sql");
+      await vi.waitFor(() =>
+        expect(form.state.values.query_condition.sql).toBe("SELECT _timestamp FROM test"),
+      );
+
+      form.setFieldValue("query_condition.sql", "SELECT a FROM b");
+      form.setFieldValue("query_condition.type", "custom");
+      await flushPromises();
+      form.setFieldValue("query_condition.type", "sql");
+      await flushPromises();
+      expect(form.state.values.query_condition.sql).toBe("SELECT a FROM b");
+    });
+
+    it("blocks a SQL save when the SQL query is empty", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      vi.mocked(alertsService.generate_sql).mockRejectedValueOnce(new Error("no builder SQL"));
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.type", "sql");
+      form.setFieldValue("_meta.tab", "sql");
       form.setFieldValue("query_condition.sql", "");
 
       await form.handleSubmit();
       await flushPromises();
 
-      // The schema passes (query text is not a schema rule) …
-      expect(form.state.isValid).toBe(true);
-      // … but the imperative gate blocks the save with the same toast.
+      // With no other mode holding a query, an empty editor is a field error, not a toast.
+      expect(form.state.isValid).toBe(false);
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "SQL query cannot be empty." }),
+      expect(toast).not.toHaveBeenCalled();
+      const condition = wrapper.vm.sectionItems.find(
+        (item: { id: string }) => item.id === "condition",
       );
+      expect(condition.state).toBe("error");
     });
 
-    it("blocks a SQL save while a SQL validation error is present", async () => {
+    it("blocks a SQL save when the SQL check reports an error", async () => {
+      vi.mocked(searchService.search).mockRejectedValueOnce({
+        response: { status: 400, data: { message: "Invalid syntax" } },
+      });
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
       seedValidScheduled(form);
       form.setFieldValue("query_condition.type", "sql");
       form.setFieldValue("query_condition.sql", "SELECT * FROM logs");
-      wrapper.vm.sqlQueryErrorMsg = "Invalid syntax";
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
 
       await form.handleSubmit();
       await flushPromises();
+
+      expect(scrollToSection).toHaveBeenCalledWith("condition");
 
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
       expect(toast).toHaveBeenCalledWith(
@@ -316,6 +444,256 @@ describe("AddAlert (OForm owner)", () => {
           message: "Please fix the SQL error before saving.",
         }),
       );
+      const condition = wrapper.vm.sectionItems.find(
+        (item: { id: string }) => item.id === "condition",
+      );
+      expect(condition.state).toBe("error");
+    });
+
+    // The blur-triggered check has not run yet when Save is clicked straight from the editor.
+    describe("SQL validated at Save", () => {
+      type SeedableForm = { setFieldValue: (path: string, value: unknown) => void };
+      const seedSql = (form: SeedableForm, sql: string) => {
+        seedValidScheduled(form);
+        form.setFieldValue("is_real_time", "false");
+        form.setFieldValue("query_condition.type", "sql");
+        form.setFieldValue("query_condition.sql", sql);
+      };
+
+      const saveSettled = async () => {
+        await wrapper.vm.form.handleSubmit();
+        await flushPromises();
+      };
+
+      it("blocks an immediate save of invalid SQL and makes no save request", async () => {
+        vi.mocked(searchService.search).mockRejectedValueOnce({
+          response: { status: 400, data: { message: "SQL error: syntax error at FROM" } },
+        });
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, "SELECT FROM WHERE oops");
+        const scrollToSection = vi.fn();
+        wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+
+        await wrapper.vm.form.handleSubmit();
+        await vi.waitFor(() => expect(scrollToSection).toHaveBeenCalledWith("condition"), {
+          timeout: 2000,
+        });
+        await flushPromises();
+
+        expect(searchService.search).toHaveBeenCalledWith(
+          expect.objectContaining({ validate: true }),
+        );
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe("SQL error: syntax error at FROM");
+        expect(toast).toHaveBeenCalledWith(
+          expect.objectContaining({ message: "Please fix the SQL error before saving." }),
+        );
+        expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      });
+
+      it("saves valid SQL after checking that same SQL", async () => {
+        const sql = 'SELECT count(*) AS total FROM "_rundata"';
+        vi.mocked(searchService.search).mockResolvedValueOnce({ data: {} } as never);
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, sql);
+
+        await wrapper.vm.form.handleSubmit();
+        await vi.waitFor(() => expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1), {
+          timeout: 2000,
+        });
+
+        const [check] = vi.mocked(searchService.search).mock.calls[0];
+        expect(check).toEqual(expect.objectContaining({ validate: true }));
+        // The validator sends the SQL as typed; any base64 encoding happens later in the service.
+        expect(check.query.query.sql).toBe(sql);
+        const [, payload] = vi.mocked(alertsService.create_by_alert_id).mock.calls[0];
+        expect(payload.query_condition.sql).toBe(check.query.query.sql);
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe("");
+      });
+
+      it("runs the cheap save gates before the SQL check", async () => {
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT count(*) AS total FROM "_rundata"');
+        wrapper.vm.form.setFieldValue("trigger_condition.frequency_type", "cron");
+        wrapper.vm.form.setFieldValue("trigger_condition.cron", "not-a-cron");
+
+        await saveSettled();
+
+        expect(searchService.search).not.toHaveBeenCalled();
+        expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      });
+
+      it("saves once the fresh check clears an error left from an earlier query", async () => {
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT count(*) AS total FROM "_rundata"');
+        wrapper.vm.sqlQueryErrorMsg = "Search stream not found: where";
+
+        await wrapper.vm.form.handleSubmit();
+        await vi.waitFor(() => expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1), {
+          timeout: 2000,
+        });
+      });
+
+      it("blocks the save without a SQL error when the VRL function fails", async () => {
+        vi.mocked(searchService.search).mockResolvedValueOnce({
+          data: { function_error: "vrl failed" },
+        } as never);
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT count(*) AS total FROM "_rundata"');
+        const scrollToSection = vi.fn();
+        wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+
+        await saveSettled();
+
+        expect(scrollToSection).toHaveBeenCalledWith("condition");
+        expect(wrapper.vm.vrlFunctionError).toBe("vrl failed");
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe("");
+        expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ["a 500", { response: { status: 500, data: { message: "upstream down" } } }],
+        ["a network error", new Error("Network Error")],
+      ])("saves with a warning, not a SQL error, when the check hits %s", async (_, failure) => {
+        vi.mocked(searchService.search).mockRejectedValueOnce(failure);
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT count(*) AS total FROM "_rundata"');
+
+        await saveSettled();
+
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe("");
+        expect(toast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variant: "warning",
+            message: i18n.global.t("alerts.messages.sqlCheckUnavailable"),
+          }),
+        );
+        expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+        const variants = vi.mocked(toast).mock.calls.map(([options]) => options.variant);
+        expect(variants).toContain("success");
+        expect(variants.indexOf("warning")).toBeGreaterThan(variants.indexOf("success"));
+      });
+
+      it("does not claim an unchecked save when the save itself fails", async () => {
+        vi.mocked(searchService.search).mockRejectedValueOnce(new Error("Network Error"));
+        vi.mocked(alertsService.create_by_alert_id).mockRejectedValueOnce(new Error("save failed"));
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT count(*) AS total FROM "_rundata"');
+
+        await saveSettled();
+
+        expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+        expect(toast).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: i18n.global.t("alerts.messages.sqlCheckUnavailable"),
+          }),
+        );
+      });
+
+      it("shows the select-all message for a SELECT * query", async () => {
+        sqlAstifyMock.mockReturnValue({ columns: [{ expr: { column: "*" } }] });
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT * FROM "_rundata"');
+
+        await saveSettled();
+
+        expect(toast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: i18n.global.t("alerts.messages.selectAllColumnsNotAllowed"),
+          }),
+        );
+        expect(searchService.search).not.toHaveBeenCalled();
+        expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      });
+
+      it("skips the check when an edit keeps the stored SQL", async () => {
+        const sql = 'SELECT count(*) AS total FROM "app_logs"';
+        wrapper = mountAlert({
+          isUpdated: true,
+          modelValue: savedAlert({
+            query_condition: { ...savedAlert().query_condition, type: "sql", sql },
+          }),
+          destinations: [{ name: "email" }],
+        });
+        await flushPromises();
+        wrapper.vm.form.setFieldValue("query_condition.sql", `  ${sql}\n`);
+        wrapper.vm.sqlQueryErrorMsg = "Search stream not found: app_logs";
+
+        await saveSettled();
+
+        expect(searchService.search).not.toHaveBeenCalled();
+        expect(alertsService.update_by_alert_id).toHaveBeenCalledTimes(1);
+      });
+
+      it("checks the stored SQL again when an edit changes its VRL function", async () => {
+        const sql = 'SELECT count(*) AS total FROM "app_logs"';
+        wrapper = mountAlert({
+          isUpdated: true,
+          modelValue: savedAlert({
+            query_condition: { ...savedAlert().query_condition, type: "sql", sql },
+          }),
+          destinations: [{ name: "email" }],
+        });
+        await flushPromises();
+        wrapper.vm.form.setFieldValue("query_condition.vrl_function", ".a = 1");
+
+        await saveSettled();
+
+        expect(searchService.search).toHaveBeenCalledWith(
+          expect.objectContaining({ validate: true }),
+        );
+        expect(alertsService.update_by_alert_id).toHaveBeenCalledTimes(1);
+      });
+
+      it("checks the SQL when an edit changes it", async () => {
+        wrapper = mountAlert({
+          isUpdated: true,
+          modelValue: savedAlert({
+            query_condition: {
+              ...savedAlert().query_condition,
+              type: "sql",
+              sql: 'SELECT count(*) AS total FROM "app_logs"',
+            },
+          }),
+          destinations: [{ name: "email" }],
+        });
+        await flushPromises();
+        wrapper.vm.form.setFieldValue("query_condition.sql", 'SELECT count(*) FROM "app_logs"');
+
+        await saveSettled();
+
+        expect(searchService.search).toHaveBeenCalledWith(
+          expect.objectContaining({ validate: true }),
+        );
+        expect(alertsService.update_by_alert_id).toHaveBeenCalledTimes(1);
+      });
+
+      it("does not run the SQL check for a PromQL save", async () => {
+        wrapper = mountAlert();
+        await flushPromises();
+        const form = wrapper.vm.form;
+        seedValidScheduled(form);
+        form.setFieldValue("query_condition.type", "promql");
+        form.setFieldValue("query_condition.promql", "up");
+        form.setFieldValue("query_condition.promql_condition", {
+          column: "value",
+          operator: ">=",
+          value: 1,
+        });
+
+        await form.handleSubmit();
+        await flushPromises();
+
+        expect(searchService.search).not.toHaveBeenCalled();
+        expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      });
     });
 
     it("blocks a PromQL save when the PromQL query is empty", async () => {
@@ -325,14 +703,39 @@ describe("AddAlert (OForm owner)", () => {
       seedValidScheduled(form);
       form.setFieldValue("query_condition.type", "promql");
       form.setFieldValue("query_condition.promql", "");
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
 
       await form.handleSubmit();
       await flushPromises();
+
+      expect(scrollToSection).toHaveBeenCalledWith("condition");
 
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ message: "PromQL query cannot be empty." }),
       );
+    });
+
+    it("keeps the newer stream type's list when an older type's list arrives last", async () => {
+      const replies: Record<string, (value: unknown) => void> = {};
+      getStreamsMock.mockImplementation(
+        (type: string) => new Promise((resolve) => (replies[type] = resolve)),
+      );
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_type", "logs");
+      wrapper.vm.updateStreams();
+      wrapper.vm.form.setFieldValue("stream_type", "metrics");
+      wrapper.vm.updateStreams();
+
+      replies.metrics({ list: [{ name: "cpu_usage" }] });
+      await flushPromises();
+      replies.logs({ list: [{ name: "app_logs" }] });
+      await flushPromises();
+
+      expect(wrapper.vm.indexOptions).toEqual(["cpu_usage"]);
+      getStreamsMock.mockResolvedValue({ list: [] });
     });
 
     // The measure-column rule is SCHEMA-owned (QueryConfig.schema.ts), not an
@@ -435,62 +838,29 @@ describe("AddAlert (OForm owner)", () => {
       };
     };
 
-    it("blocks a cron save when the interval is below the org minimum", async () => {
-      const restore = withMinInterval(300); // 5 minutes
+    it.each([
+      ["below the org minimum", "0 * * * * *", "UTC"],
+      ["unparseable", "not-a-cron", "UTC"],
+      ["5 fields, not the 6 the server needs", "0 9 * * 1-5", "UTC"],
+      ["missing its timezone", "0 */10 * * * *", ""],
+    ])("blocks a cron save %s as an issue in When to alert", async (_, cron, timezone) => {
+      const restore = withMinInterval(300);
       try {
         wrapper = mountAlert();
         await flushPromises();
-        const form = wrapper.vm.form;
-        // Every minute = 60s < 300s.
-        seedCron(form, "0 * * * * *");
+        seedCron(wrapper.vm.form, cron, timezone);
 
-        await form.handleSubmit();
+        await wrapper.vm.handleSave();
         await flushPromises();
 
         expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-        // Verbatim pre-migration message (minInterval - 1).
-        expect(toast).toHaveBeenCalledWith(
-          expect.objectContaining({
-            message: "Frequency should be greater than 299 seconds.",
-          }),
+        expect(toast).not.toHaveBeenCalled();
+        expect(wrapper.get('[data-test="o-section-nav-item-condition"]').text()).toContain(
+          i18n.global.t("alerts.sections.needsFix", { count: 1 }, 1),
         );
-        expect(wrapper.vm.activeTab).toBe("condition");
       } finally {
         restore();
       }
-    });
-
-    it("blocks a cron save when the expression is invalid", async () => {
-      wrapper = mountAlert();
-      await flushPromises();
-      const form = wrapper.vm.form;
-      seedCron(form, "not-a-cron");
-
-      await form.handleSubmit();
-      await flushPromises();
-
-      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "Invalid cron expression" }),
-      );
-      expect(wrapper.vm.activeTab).toBe("condition");
-    });
-
-    it("blocks a cron save when the timezone is missing (inline-only, NO toast)", async () => {
-      wrapper = mountAlert();
-      await flushPromises();
-      const form = wrapper.vm.form;
-      seedCron(form, "0 */10 * * * *", "");
-
-      await form.handleSubmit();
-      await flushPromises();
-
-      // Pre-migration returned {valid:false, message:null} here and the
-      // orchestrator only toasted `if (message)` — so this case blocks + moves
-      // to the condition tab WITHOUT a toast (QueryConfig renders the inline
-      // "Cron expression and timezone are required").
-      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(wrapper.vm.activeTab).toBe("condition");
     });
 
     it("blocks a cron save when the expression is missing", async () => {
@@ -956,6 +1326,111 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.findComponent({ name: "PreviewAlert" }).exists()).toBe(true);
       expect(wrapper.findComponent({ name: "AnomalyDataPreview" }).exists()).toBe(false);
     });
+
+    it("drops builder SQL that lands after a switch to PromQL", async () => {
+      let answer: (v: unknown) => void = () => {};
+      vi.mocked(alertsService.generate_sql).mockImplementationOnce(
+        () => new Promise((resolve) => (answer = resolve)) as any,
+      );
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      form.setFieldValue("stream_type", "metrics");
+      form.setFieldValue("stream_name", "cpu");
+      form.setFieldValue("query_condition.type", "custom");
+      form.setFieldValue("query_condition.conditions", {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [{ filterType: "condition", column: "host", operator: "=", value: "a" }],
+      });
+      await vi.waitFor(() => expect(alertsService.generate_sql).toHaveBeenCalled(), {
+        timeout: 3000,
+      });
+
+      form.setFieldValue("query_condition.type", "promql");
+      await flushPromises();
+      answer({ data: { sql: 'SELECT avg("value") FROM "cpu"' } });
+      await flushPromises();
+
+      expect(wrapper.vm.previewQuery).toBe("");
+    });
+
+    it.each([
+      ["name", "cpu high"],
+      ["description", "why it fires"],
+      ["destinations", ["ops"]],
+      ["template", "tpl"],
+      ["row_template", "{host}"],
+      ["trigger_condition.threshold", 25],
+    ])("asks the server for no SQL when %s changes", async (field, value) => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      try {
+        wrapper = mountAlert();
+        const form = wrapper.vm.form;
+        form.setFieldValue("stream_name", "logs_a");
+        form.setFieldValue("query_condition.conditions", {
+          filterType: "group",
+          logicalOperator: "AND",
+          conditions: [{ filterType: "condition", column: "host", operator: "=", value: "a" }],
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await vi.waitFor(() => expect(alertsService.generate_sql).toHaveBeenCalled());
+        await flushPromises();
+        vi.mocked(alertsService.generate_sql).mockClear();
+
+        form.setFieldValue(field, value);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(alertsService.generate_sql).not.toHaveBeenCalled();
+
+        form.setFieldValue("query_condition.conditions.conditions.0.value", "b");
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(alertsService.generate_sql).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+    it.each([
+      ["the SQL check fails", true, false],
+      ["the preview run fails", false, true],
+    ])("says the query needs fixing and gives no verdict when %s", async (_, check, run) => {
+      const queryFailed = ref(false);
+      const PreviewAlert = defineComponent({
+        name: "PreviewAlert",
+        setup(_props, { expose }) {
+          // As the real preview, a failed run withdraws its own verdict.
+          const evaluationStatus = computed(() =>
+            queryFailed.value ? null : { wouldTrigger: true, reason: "", count: 1000 },
+          );
+          expose({ evaluationStatus, queryFailed });
+          return () => h("div");
+        },
+      });
+      wrapper = mountAlert(
+        {},
+        {
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: { ...stubs, PreviewAlert },
+          },
+        },
+      );
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
+      wrapper.vm.form.setFieldValue("query_condition.sql", 'SELECT nosuchcol FROM "app_logs"');
+      await flushPromises();
+      const verdict = () => wrapper.find('[data-test="add-alert-rail-verdict"]');
+      const navItem = () => wrapper.find('[data-test="o-section-nav-item-condition"]');
+      expect(verdict().exists()).toBe(true);
+
+      if (check) wrapper.vm.sqlQueryErrorMsg = "Search field not found";
+      queryFailed.value = run;
+      await flushPromises();
+
+      expect(verdict().exists()).toBe(false);
+      expect(navItem().text()).toContain(i18n.global.t("alerts.sections.condition.fixQuery"));
+    });
   });
 
   describe("anomaly save path", () => {
@@ -1047,6 +1522,7 @@ describe("AddAlert (OForm owner)", () => {
         form.setFieldValue("stream_name", "_rundata");
         await flushPromises();
         wrapper.vm.anomalyConfig.alert_enabled = false;
+        await wrapper.find('[data-test="anomaly-sensitivity-row-change"]').trigger("click");
         await wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').trigger("click");
         await wrapper.find('[data-test="anomaly-sensitivity-level"] input').setValue(String(draft));
         await flushPromises();
@@ -1132,15 +1608,1126 @@ describe("AddAlert (OForm owner)", () => {
     });
   });
 
-  // ── Cross-tab error focus ──────────────────────────────────────────────────
-  // Regression: leave a required field blank on the Alert Rules tab, switch to
-  // Advanced, hit Save → "Please fix the highlighted fields" fired while the
-  // highlighted field sat on a v-show'd-off tab the user could not see, and
-  // nothing steered them back. focusOnFirstError skips messages with a null
-  // offsetParent (correct on its own — focusing a display:none control no-ops),
-  // so every message on the inactive pane was filtered out and it focused
-  // nothing. It must bring the tab OWNING the error forward first.
-  describe("focusOnFirstError (cross-tab)", () => {
+  describe("sections layout", () => {
+    afterEach(() => {
+      breakpoint.lgUp!.value = true;
+    });
+
+    it.each([true, false])("the tiers are the same below lg and at lg (lg %s)", async (lg) => {
+      breakpoint.lgUp!.value = lg;
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-section-condition-more"]').exists()).toBe(true);
+      for (const section of ["condition", "notify"] as const) {
+        expect(wrapper.vm.tiers.view(section).expanded).toBe(false);
+      }
+      expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(false);
+    });
+
+    it("Show all on hides every More options line and opens every + link", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      await wrapper.get('[data-test="add-alert-show-all"] button').trigger("click");
+      await flushPromises();
+      // Show all is remembered per user, so later tests must not inherit it.
+      const { setShowAll } = wrapper.vm;
+      onTestFinished(() => setShowAll(false));
+      expect(wrapper.find('[data-test$="-more"][data-test^="add-alert-section-"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test^="add-alert-add-"]').exists()).toBe(false);
+      expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(true);
+      expect(wrapper.vm.tiers.isVisible("description")).toBe(true);
+    });
+
+    it("section 4's Check every row holds only the interval; the look back sits on the condition", async () => {
+      wrapper = mountAlert(
+        {},
+        {
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: { ...stubs, QueryConfig: false, AlertSettings: false },
+          },
+        },
+      );
+      await flushPromises();
+      const row = wrapper.get('[data-test="add-alert-schedule-row"]');
+      expect(row.find('[data-test="alert-check-every-input"]').exists()).toBe(true);
+      expect(row.find('[data-test="alert-settings-period-input"]').exists()).toBe(false);
+    });
+
+    it.each([
+      ["create", {}],
+      ["edit", { isUpdated: true, modelValue: savedAlert() }],
+    ])("%s puts the query before the limit", async (_mode, props) => {
+      wrapper = mountAlert(props);
+      await flushPromises();
+      const slot = wrapper.get('[data-test="add-alert-query-condition-slot"]').element;
+      const card = wrapper.get('[data-test="add-alert-query-card"]').element;
+      expect(card.compareDocumentPosition(slot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("section 3 puts what the message says before the incident rows", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const { advancedMessage, settingsNotifyMore } = wrapper.vm.sectionTargets;
+      expect(
+        advancedMessage.compareDocumentPosition(settingsNotifyMore) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("moves the preview under the condition step below lg and back beside it at lg", async () => {
+      breakpoint.lgUp!.value = false;
+      wrapper = mountAlert();
+      await flushPromises();
+      const inCondition = () =>
+        wrapper.find('[data-test="add-alert-narrow-preview"] [data-test="add-alert-rail-content"]');
+      expect(inCondition().exists()).toBe(true);
+      expect(wrapper.get('[data-test="add-alert-rail"]').classes()).toContain("hidden");
+
+      breakpoint.lgUp!.value = true;
+      await flushPromises();
+      expect(inCondition().exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="add-alert-rail"] [data-test="add-alert-rail-content"]').exists(),
+      ).toBe(true);
+    });
+
+    it("keeps Find a setting and fits the condition subtitle for anomaly and composite", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const help = () =>
+        wrapper
+          .findAllComponents(AlertFormSection)
+          .find((section) => section.props("id") === "condition")!
+          .props("help");
+      expect(help()).toContain("how many is a problem");
+
+      wrapper.vm.form.setFieldValue("is_real_time", "anomaly");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-find-setting"]').exists()).toBe(true);
+      expect(help()).toBe(
+        "Choose what to measure and how unusual a value must be before it alerts you.",
+      );
+      wrapper.vm.settingFind.query.value = "sensitivity";
+      await flushPromises();
+      expect(wrapper.vm.settingFind.items.value.map((i: { id: string }) => i.id)).toEqual([
+        "anomalySensitivity",
+      ]);
+
+      wrapper.vm.form.setFieldValue("is_real_time", "composite");
+      await flushPromises();
+      expect(help()).toBe("Pick the alerts to combine and how they must fire together.");
+    });
+
+    it("keeps Save the filled primary on every section", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const save = () => wrapper.findComponent('[data-test="add-alert-submit-btn"]');
+      for (const section of ["watch", "notify"]) {
+        wrapper.vm.activeSection = section;
+        await flushPromises();
+        expect(save().props("variant")).toBe("primary");
+        expect(save().text()).not.toContain("Next");
+      }
+    });
+
+    it.each([
+      ["step by step", ["condition", "notify"]],
+      ["by a jump that skips it", ["notify"]],
+    ])("ticks a section with a value once the user moves past it %s", async (_, path) => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const state = (id: string) =>
+        wrapper.vm.sectionItems.find((item: { id: string }) => item.id === id).state;
+      wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+      for (const section of path) {
+        wrapper.vm.activeSection = section;
+        await flushPromises();
+      }
+      expect(state("condition")).toBe("done");
+    });
+
+    it("renders the three sections in order beside the section list", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const ids = wrapper
+        .findAll("[data-snap-section]")
+        .map((el) => el.attributes("data-snap-section"));
+      expect(ids).toEqual(["watch", "condition", "notify"]);
+      expect(wrapper.findAll('[data-test^="o-section-nav-item-"]')).toHaveLength(3);
+      expect(wrapper.find('[data-test="add-alert-tab-condition"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="add-alert-tab-advanced"]').exists()).toBe(false);
+    });
+
+    it.each(["true", "composite"])(
+      "a %s alert keeps the three steps, its schedule one sentence in step 2",
+      async (type) => {
+        wrapper = mountAlert();
+        await flushPromises();
+        wrapper.vm.onAlertTypeChange(type);
+        await flushPromises();
+        const ids = wrapper
+          .findAll("[data-snap-section]")
+          .map((el) => el.attributes("data-snap-section"));
+        expect(ids).toEqual(["watch", "condition", "notify"]);
+        expect(wrapper.findAll('[data-test^="o-section-nav-item-"]')).toHaveLength(3);
+        const condition = wrapper.get('[data-test="add-alert-section-condition"]');
+        expect(condition.find('[data-test="add-alert-schedule-note"]').exists()).toBe(true);
+        const scrollToSection = vi.fn();
+        wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+        await wrapper.get('[data-test="add-alert-section-condition-next"]').trigger("click");
+        // A real-time alert says nothing about a schedule; a combined one says when it checks.
+        const line = type === "true" ? "condition" : "schedule";
+        await wrapper.get('[data-test="add-alert-review"] button').trigger("click");
+        await flushPromises();
+        await wrapper.get(`[data-test="add-alert-review-${line}"]`).trigger("click");
+        expect(scrollToSection.mock.calls).toEqual([["notify"], ["condition"]]);
+      },
+    );
+
+    it("asks the alert type first, because it decides the fields that follow", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const tabs = '[data-test="add-alert-type-tabs"]';
+      expect(wrapper.find(`[data-test="add-alert-section-watch"] ${tabs}`).exists()).toBe(true);
+      expect(wrapper.find(`[data-test="add-alert-section-condition"] ${tabs}`).exists()).toBe(
+        false,
+      );
+    });
+
+    it("steps from each section header: Next names the following step, the ends stay in place disabled", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const btn = (id: string, dir: string) => `[data-test="add-alert-section-${id}-${dir}"]`;
+      const firstBack = wrapper.find(btn("watch", "prev"));
+      expect(firstBack.attributes("disabled")).toBeDefined();
+      expect(firstBack.attributes("aria-label")).toBe("Previous step");
+      expect(wrapper.find(btn("watch", "next")).attributes("aria-label")).toBe(
+        "Next: When to alert",
+      );
+      expect(wrapper.find(btn("condition", "next")).attributes("aria-label")).toBe(
+        "Next: Who to tell",
+      );
+      const lastNext = wrapper.find(btn("notify", "next"));
+      expect(lastNext.attributes("disabled")).toBeDefined();
+      expect(lastNext.attributes("aria-label")).toBe("Next step");
+
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+      await wrapper.find(btn("condition", "next")).trigger("click");
+      expect(scrollToSection).toHaveBeenCalledWith("notify");
+      await wrapper.find(btn("notify", "prev")).trigger("click");
+      expect(scrollToSection).toHaveBeenCalledWith("condition");
+    });
+
+    it("a step's Next scrolls to the next section and focuses its first control", async () => {
+      const rects = vi
+        .spyOn(Element.prototype, "getClientRects")
+        .mockReturnValue([new DOMRect(0, 0, 10, 10)] as unknown as DOMRectList);
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+      wrapper.vm.activeSection = "condition";
+      await flushPromises();
+      await wrapper
+        .find('[data-test="add-alert-section-condition"] [data-test="add-alert-step-next"]')
+        .trigger("click");
+      await flushPromises();
+      expect(scrollToSection).toHaveBeenCalledWith("notify");
+      const notify = wrapper.get('[data-test="add-alert-section-notify-card"]').element;
+      // Focus waits for the glide to land, so a control scrolling itself into view cannot stop it.
+      expect(notify.contains(document.activeElement)).toBe(false);
+      await vi.waitFor(() => expect(notify.contains(document.activeElement)).toBe(true));
+      // Back to a section whose step 1 is folded skips the summary line's Change link.
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.activeSection = "watch";
+      await flushPromises();
+      wrapper.vm.activeSection = "condition";
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="add-alert-watch-summary"]').exists()).toBe(true),
+      );
+      wrapper.vm.activeSection = "notify";
+      await flushPromises();
+      await wrapper
+        .find('[data-test="add-alert-section-notify"] [data-test="add-alert-step-back"]')
+        .trigger("click");
+      await vi.waitFor(() =>
+        expect(
+          (document.activeElement?.closest("[data-snap-section]") as HTMLElement)?.dataset
+            .snapSection,
+        ).toBe("condition"),
+      );
+      expect(
+        wrapper
+          .get('[data-test="add-alert-section-condition-card"]')
+          .element.contains(document.activeElement),
+      ).toBe(true);
+      // The picked stream plus the focus moves count as edits, so a draft would greet the next test.
+      wrapper.vm.alertDraft.discard();
+      rects.mockRestore();
+    });
+
+    it.each([
+      ["false", "alerts.scheduled", "alerts.sections.typeHelp.scheduled"],
+      ["true", "alerts.realTime", "alerts.sections.typeHelp.realtime"],
+    ])(
+      "names alert type %s by its short name and says what it does in a tooltip",
+      async (id, label, help) => {
+        wrapper = mountAlert();
+        await flushPromises();
+        const item = wrapper
+          .findAllComponents(OToggleGroupItem)
+          .find((candidate) => candidate.props("value") === id)!;
+        expect(item.text()).toContain(i18n.global.t(label));
+        expect(item.props("tooltip")).toBe(i18n.global.t(help));
+      },
+    );
+
+    it.each([
+      ["false", "alerts.sections.condition.help"],
+      ["true", "alerts.sections.condition.helpRealtime"],
+      ["composite", "alerts.sections.condition.helpComposite"],
+    ])("step 2's help fits a %s alert, with no count for real time", async (mode, key) => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("is_real_time", mode);
+      await flushPromises();
+      expect(wrapper.vm.conditionHelp).toBe(i18n.global.t(key));
+    });
+
+    it("keeps the rail to the chart and verdict; the alert reads back in section 5 only", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-rail-sentence"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="add-alert-read-back"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alerts-alert-summary"]').exists()).toBe(false);
+    });
+
+    it("names the rare condition settings on one line that expands in place", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const more = () => wrapper.find('[data-test="add-alert-section-condition-more"]');
+      // No stream yet, so no generated SQL to list.
+      expect(wrapper.vm.tiers.view("condition").more.map((d: { id: string }) => d.id)).toEqual([
+        "holdFor",
+      ]);
+      expect(wrapper.find('[data-test="add-alert-section-condition-more-names"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(false);
+
+      await more().trigger("click");
+      expect(more().attributes("aria-expanded")).toBe("true");
+      expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(true);
+      expect(wrapper.vm.tiers.isVisible("warning")).toBe(false);
+
+      await more().trigger("click");
+      expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(false);
+    });
+
+    it("shows a rare setting that holds a value and drops it from the line", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("pending_period_sec", 5);
+      await flushPromises();
+      expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(true);
+      expect(wrapper.vm.tiers.view("condition").more).toEqual([]);
+    });
+
+    it("keeps the message settings one click away and names tags and priority on the line", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.vm.tiers.isVisible("template")).toBe(false);
+      await wrapper.find('[data-test="add-alert-add-template"]').trigger("click");
+      expect(wrapper.vm.tiers.isVisible("template")).toBe(true);
+      expect(wrapper.find('[data-test="add-alert-add-template"]').exists()).toBe(false);
+      await wrapper.find('[data-test="add-alert-add-variables"]').trigger("click");
+      expect(wrapper.vm.form.getFieldValue("context_attributes")).toHaveLength(1);
+      expect(wrapper.vm.tiers.isVisible("tags")).toBe(false);
+      expect(wrapper.vm.tiers.view("notify").more.map((d: { id: string }) => d.id)).toEqual(
+        expect.arrayContaining(["tags", "priority"]),
+      );
+    });
+
+    it("finds a setting by its old name and reveals just that setting when picked", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-find-setting"]').exists()).toBe(true);
+      wrapper.vm.settingFind.query.value = "flapping";
+      await flushPromises();
+      expect(wrapper.vm.settingFind.items.value[0]).toMatchObject({
+        id: "keepFiring",
+        label: "Keep firing for",
+      });
+      expect(wrapper.vm.tiers.isVisible("keepFiring")).toBe(false);
+      // jsdom has no layout: the stubbed step renders no control, so the jump falls back to the section.
+      const scrollTo = vi.fn();
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: scrollTo,
+      });
+      await wrapper.vm.settingFind.select("keepFiring");
+      await flushPromises();
+      delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
+      expect(wrapper.vm.tiers.isVisible("keepFiring")).toBe(true);
+      expect(scrollTo).toHaveBeenCalled();
+      expect(wrapper.vm.tiers.view("notify").more.map((d: { id: string }) => d.id)).not.toContain(
+        "keepFiring",
+      );
+    });
+
+    it("lists only the settings the alert type has", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const found = (q: string): string[] => {
+        wrapper.vm.settingFind.query.value = q;
+        return wrapper.vm.settingFind.items.value.map((i: { id: string }) => i.id);
+      };
+      expect(found("cron")).toContain("cron");
+      wrapper.vm.form.setFieldValue("is_real_time", "true");
+      await flushPromises();
+      expect(found("cron")).not.toContain("cron");
+      expect(found("flapping")).not.toContain("keepFiring");
+      expect(found("suppress")).not.toContain("suppressRepeats");
+      expect(found("cooldown")).toContain("cooldown");
+    });
+
+    it("names the alert in a text field in step 3, offering the suggestion back once renamed", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-details-name-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-alert-details-rename-btn"]').exists()).toBe(false);
+
+      wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+      wrapper.vm.activeSection = "notify";
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-details-name-auto"]').exists()).toBe(true);
+
+      const input = wrapper.get('[data-test="add-alert-details-name-input"] input');
+      const savedAs = () => wrapper.find('[data-test="add-alert-details-name-saved-as"]');
+      await input.setValue("checkout errors > 5%");
+      await flushPromises();
+      expect(wrapper.vm.formData.name).toBe("checkout errors > 5%");
+      expect(savedAs().text()).toBe(
+        i18n.global.t("alerts.form.names.savesAs", { name: "checkout_errors_>_5" }),
+      );
+      await input.trigger("blur");
+      await flushPromises();
+      expect(wrapper.vm.formData.name).toBe("checkout_errors_>_5");
+      expect(savedAs().exists()).toBe(false);
+      expect(wrapper.find('[data-test="add-alert-details-name-rewritten"]').exists()).toBe(true);
+      await input.trigger("input");
+      await flushPromises();
+      const suggest = wrapper.get('[data-test="add-alert-details-name-suggest"]');
+      await suggest.trigger("click");
+      await flushPromises();
+      expect(wrapper.vm.formData.name).toBe(wrapper.vm.alertNameSuggestion);
+
+      // Enter saves; a save the form blocks says what stopped it.
+      await input.setValue("");
+      await input.trigger("keydown.enter");
+      await flushPromises();
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: expect.stringContaining(i18n.global.t("alerts.sections.notify.nav")),
+        }),
+      );
+    });
+
+    it("suggests a name no alert in the folder already has", async () => {
+      vi.mocked(alertsService.listByFolderId).mockResolvedValue({
+        data: { list: [{ name: "k8s_logs_alert" }] },
+      } as any);
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+      wrapper.vm.activeSection = "notify";
+      await flushPromises();
+      expect(wrapper.vm.alertNameSuggestion).toBe("k8s_logs_alert_2");
+    });
+
+    it.each([
+      ["on Save", (w: any) => w.vm.saveAlert()],
+      [
+        "when the name field is left",
+        (w: any) => w.get('[data-test="add-alert-details-name-input"] input').trigger("focusout"),
+      ],
+    ])(
+      "re-reads the folder %s, so a name saved since the form opened is flagged",
+      async (_, act) => {
+        wrapper = mountAlert();
+        await flushPromises();
+        await wrapper.get('[data-test="add-alert-details-name-input"] input').setValue("cpu_high");
+        vi.mocked(alertsService.listByFolderId).mockResolvedValue({
+          data: { list: [{ name: "cpu_high", folder_name: "default" }] },
+        } as any);
+        await act(wrapper);
+        await flushPromises();
+        expect(wrapper.vm.nameFieldError).toBe(i18n.global.t("alerts.validation.nameTakenHere"));
+      },
+    );
+  });
+
+  describe("edit header and tucked settings", () => {
+    it("keeps a header Disable through the next Save and does not count it as unsaved", async () => {
+      wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert() });
+      await flushPromises();
+      document.dispatchEvent(new Event("pointerdown"));
+
+      await wrapper.vm.editHeader.toggleEnabled();
+      await flushPromises();
+
+      expect(alertsService.toggle_state_by_alert_id).toHaveBeenCalledWith(
+        expect.any(String),
+        "alert-1",
+        false,
+        expect.anything(),
+      );
+      expect(wrapper.vm.editHeader.enabled.value).toBe(false);
+      expect(wrapper.vm.editHeader.state.value).toEqual({ kind: "disabled" });
+      expect(wrapper.vm.form.state.values.enabled).toBe(false);
+      expect(wrapper.vm.getAlertPayload().enabled).toBe(false);
+      expect(wrapper.vm.unsavedChanges.map((c: { path: string }) => c.path)).not.toContain(
+        "enabled",
+      );
+    });
+
+    describe("measure switched to event count", () => {
+      const measureAlert = () =>
+        savedAlert({
+          stream_type: "metrics",
+          query_condition: {
+            ...savedAlert().query_condition,
+            aggregation: {
+              function: "avg",
+              group_by: [],
+              having: { column: "field2", operator: ">=", value: 90 },
+            },
+          },
+        });
+      const mountWithQuery = async () => {
+        wrapper = mountAlert(
+          { isUpdated: true, modelValue: measureAlert() },
+          {
+            attachTo: document.body,
+            global: {
+              provide: { store },
+              plugins: [i18n, router],
+              stubs: { ...stubs, QueryConfig: false },
+            },
+          },
+        );
+        await flushPromises();
+        document.dispatchEvent(new Event("pointerdown"));
+        await flushPromises();
+      };
+      const pickEventCount = async () => {
+        wrapper
+          .findComponent({ name: "Step2QueryConfig" })
+          .findAllComponents({ name: "OSelect" })
+          .find((c: any) => c.props("modelValue") === "avg")!
+          .vm.$emit("update:modelValue", "total_events");
+        await flushPromises();
+      };
+      const savedMeasure = { function: "avg", having: { column: "field2", value: 90 } };
+
+      it("counts the switch as an unsaved change", async () => {
+        await mountWithQuery();
+        await pickEventCount();
+        expect(wrapper.vm.getAlertPayload().query_condition.aggregation).toBeNull();
+        expect(wrapper.vm.unsavedChanges).toEqual([
+          { path: "aggregation_enabled", before: true, after: false },
+        ]);
+      });
+
+      it("Discard brings the saved measure back and drops the autosaved draft", async () => {
+        await mountWithQuery();
+        await pickEventCount();
+        const discardDraft = vi.spyOn(wrapper.vm.alertDraft, "discard");
+        await wrapper.vm.discardChanges();
+        expect(discardDraft).toHaveBeenCalledOnce();
+        await flushPromises();
+        expect(wrapper.vm.isAggregationEnabled).toBe(true);
+        expect(wrapper.vm.getAlertPayload().query_condition.aggregation).toMatchObject(
+          savedMeasure,
+        );
+        expect(wrapper.vm.unsavedChanges).toEqual([]);
+      });
+
+      it("a header Disable before Discard keeps the saved measure as the baseline", async () => {
+        await mountWithQuery();
+        await pickEventCount();
+        wrapper.vm.form.setFieldValue("description", "an unsaved edit");
+        await flushPromises();
+        await wrapper.vm.editHeader.toggleEnabled();
+        await flushPromises();
+        await wrapper.vm.discardChanges();
+        await flushPromises();
+        expect(wrapper.vm.form.state.values.enabled).toBe(false);
+        expect(wrapper.vm.getAlertPayload().query_condition.aggregation).toMatchObject(
+          savedMeasure,
+        );
+      });
+    });
+
+    it.each([
+      ["holdFor", { pending_period_sec: 300 }, ["pending_period_sec", 0]],
+      ["holdFor", { pending_period_sec: 300 }, ["pending_period_sec", -5]],
+      ["recovery", { notify_on_recovery: true }, ["notify_on_recovery", false]],
+      ["tags", { tags: ["payments"] }, ["tags", []]],
+    ] as const)(
+      "keeps %s on screen once its value is cleared",
+      async (id, loaded, [field, cleared]) => {
+        wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert(loaded) });
+        await flushPromises();
+        expect(wrapper.vm.tiers.isVisible(id)).toBe(true);
+
+        wrapper.vm.form.setFieldValue(field, cleared);
+        await flushPromises();
+
+        expect(wrapper.vm.tiers.isVisible(id)).toBe(true);
+      },
+    );
+
+    it("keeps a negative hold-for and its error on screen, and flags the section", async () => {
+      wrapper = mountAlert(
+        { isUpdated: true, modelValue: savedAlert({ pending_period_sec: 300 }) },
+        {
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: { ...stubs, AlertSettings: false },
+          },
+        },
+      );
+      await flushPromises();
+      const row = () => wrapper.find('[data-test="alert-settings-pending-period-input"]');
+      expect(row().exists()).toBe(true);
+
+      await row().find("input").setValue("-5");
+      await wrapper.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(row().exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-settings-pending-period-error"]').text()).not.toBe("");
+      expect(wrapper.find('[data-test="o-section-nav-item-condition"]').text()).toContain(
+        i18n.global.t("alerts.sections.needsFix", { count: 1 }, 1),
+      );
+      expect(alertsService.update_by_alert_id).not.toHaveBeenCalled();
+    });
+
+    it("can focus hold-for after it appears, and the look back on the Alert when line", async () => {
+      breakpoint.lgUp.value = false;
+      wrapper = mountAlert(
+        { isUpdated: true, modelValue: savedAlert({ pending_period_sec: 0 }) },
+        {
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: { ...stubs, AlertSettings: false },
+          },
+        },
+      );
+      await flushPromises();
+      expect(wrapper.find('[data-test="alert-settings-pending-period-input"]').exists()).toBe(
+        false,
+      );
+      wrapper.vm.form.setFieldValue("pending_period_sec", 300);
+      await flushPromises();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      wrapper.vm.focusManager.focusField("pending_period");
+      wrapper.vm.focusManager.focusField("period");
+
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("not registered"));
+      warn.mockRestore();
+      breakpoint.lgUp.value = true;
+    });
+
+    it("moves focus to the picked section's heading", async () => {
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      await wrapper.find('[data-test="o-section-nav-item-notify"]').trigger("click");
+      expect(focusedTestId()).toBe("add-alert-section-notify-title");
+    });
+
+    it("gives a real-time alert a plain note instead of a verdict", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.form.setFieldValue("is_real_time", "true");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-rail-verdict"]').text()).toBe(
+        "Fires on each matching event.",
+      );
+    });
+  });
+
+  describe("section 1: what to watch", () => {
+    afterEach(async () => {
+      store.state.zoConfig.custom_hide_menus = "";
+      await router.replace({ query: {} });
+    });
+
+    it("stream type is a dropdown that feeds the stream list", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-stream-type-cards"]').exists()).toBe(false);
+      const select = wrapper
+        .findAllComponents(OSelect)
+        .find((c: any) => c.attributes("data-test") === "add-alert-stream-type-select-dropdown");
+      getStreamsMock.mockClear();
+      select.vm.$emit("update:model-value", "metrics");
+      await flushPromises();
+      expect(wrapper.vm.form.state.values.stream_type).toBe("metrics");
+      expect(getStreamsMock).toHaveBeenCalledWith("metrics", false);
+    });
+
+    it.each([
+      ["create", {}, "", true],
+      ["edit", { isUpdated: true, modelValue: savedAlert() }, "", false],
+      ["create with the library hidden", {}, "alertLibrary", false],
+    ])("the Alert Library link on %s", async (_, props, hidden, shown) => {
+      store.state.zoConfig.custom_hide_menus = hidden;
+      const push = vi.spyOn(router, "push");
+      wrapper = mountAlert(props);
+      await flushPromises();
+      const link = wrapper.find('[data-test="add-alert-library-link"]');
+      expect(link.exists()).toBe(shown);
+      if (!shown) return;
+      await link.trigger("click");
+      expect(push).toHaveBeenCalledWith({
+        name: "alertLibrary",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    });
+
+    it("a ready-made alert saves with its pack tag, and starting from scratch takes it back off", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "k8s_events");
+      await flushPromises();
+      await wrapper.vm.applySuggestion({
+        kind: "library",
+        id: "k8s/oom-killed",
+        title: "OOM",
+        sentence: null,
+        severity: "high",
+        alert_type: "scheduled",
+        query_type: "sql",
+        fit: "fits",
+        matched_fields: [],
+        missing: [],
+        stream_swap: null,
+        already_set_up: [],
+        enterprise: false,
+        library: { pack: "k8s", path: "k8s/oom.json", content_hash: "h1", docs_url: null },
+        starter: null,
+        prefill: { stream_type: "logs", stream_name: "k8s_events" },
+      });
+      await flushPromises();
+      expect(wrapper.vm.form.getFieldValue("tags")).toEqual(["pack:k8s"]);
+      wrapper.vm.startFromScratch();
+      await flushPromises();
+      expect(wrapper.vm.form.getFieldValue("tags")).toEqual([]);
+    });
+
+    it("re-applying a starter keeps it applied throughout, so step 1's sentence never drops the field being typed in", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      const fill = buildEventFill("countWhere", {}, { stream: "app_logs", id: () => "g1" });
+      await wrapper.vm.applyIntent({ fill, label: "Count" });
+      const again = wrapper.vm.applyIntent({ fill, label: "Count" });
+      expect(wrapper.vm.appliedIntent?.fill?.intent).toBe("countWhere");
+      await again;
+    });
+
+    it.each([
+      ["a new alert", {}, {}, true, true],
+      ["a new alert on a phone", {}, {}, false, false],
+      ["an edit", { isUpdated: true, modelValue: savedAlert() }, {}, true, false],
+      ["a prefilled open", {}, { prefill: "logs" }, true, false],
+    ])("stream picker focus on %s", async (_, props, query, lg, focused) => {
+      await router.replace({ query });
+      breakpoint.lgUp!.value = lg;
+      onTestFinished(() => {
+        breakpoint.lgUp!.value = true;
+      });
+      wrapper = mountAlert(props, { attachTo: document.body });
+      await flushPromises();
+      const picker = document.querySelector('[data-test="add-alert-stream-name-select-dropdown"]');
+      expect(!!picker?.contains(document.activeElement)).toBe(focused);
+      if (!focused) return;
+      expect(wrapper.vm.form.state.values.is_real_time).toBe("false");
+      expect(wrapper.vm.form.state.values.stream_type).toBe("logs");
+    });
+  });
+
+  describe("section 1 folds to a summary line", () => {
+    it("edit opens on section 2, and the list, Back and leaving keep section 1 reachable and locked", async () => {
+      const rects = vi
+        .spyOn(Element.prototype, "getClientRects")
+        .mockReturnValue([new DOMRect(0, 0, 10, 10)] as unknown as DOMRectList);
+      onTestFinished(() => rects.mockRestore());
+      wrapper = mountAlert(
+        { isUpdated: true, modelValue: savedAlert() },
+        { attachTo: document.body },
+      );
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+      await flushPromises();
+      expect(wrapper.vm.activeSection).toBe("condition");
+      expect(scrollToSection.mock.calls).toEqual([["condition"]]);
+      const watch = () => wrapper.find('[data-test="add-alert-section-watch"]');
+      expect(watch().exists()).toBe(true);
+      expect(watch().find('[data-test="add-alert-watch-locked"]').exists()).toBe(true);
+      const trigger = watch().get('[data-test="add-alert-stream-name-select-dropdown-trigger"]');
+      expect(trigger.attributes()).toHaveProperty("disabled");
+      expect(wrapper.find('[data-test="add-alert-watch-summary"]').exists()).toBe(false);
+
+      await wrapper.get('[data-test="o-section-nav-item-watch"]').trigger("click");
+      expect(scrollToSection).toHaveBeenLastCalledWith("watch");
+      await wrapper
+        .get('[data-test="add-alert-section-condition"] [data-test="add-alert-step-back"]')
+        .trigger("click");
+      expect(scrollToSection).toHaveBeenLastCalledWith("watch");
+      await vi.waitFor(() => expect(watch().element.contains(document.activeElement)).toBe(true));
+
+      wrapper.vm.activeSection = "watch";
+      await flushPromises();
+      wrapper.vm.activeSection = "condition";
+      await flushPromises();
+      expect(watch().exists()).toBe(true);
+    });
+
+    it("create collapses section 1 after moving on, never on a scroll past it, and Change reopens it", async () => {
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      const next = wrapper.get('[data-test="add-alert-section-condition-next"]')
+        .element as HTMLElement;
+      const leaveWatch = async (focusOn: boolean) => {
+        wrapper.vm.activeSection = "watch";
+        await flushPromises();
+        if (focusOn) next.focus();
+        else next.blur();
+        wrapper.vm.activeSection = "condition";
+        await flushPromises();
+      };
+      const watchOpen = () => wrapper.find('[data-test="add-alert-section-watch"]').exists();
+      await leaveWatch(true);
+      expect(watchOpen()).toBe(true);
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      await leaveWatch(false);
+      expect(watchOpen()).toBe(true);
+      await leaveWatch(true);
+      expect(watchOpen()).toBe(false);
+      await wrapper.get('[data-test="add-alert-watch-summary-change"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-section-watch"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-alert-watch-summary"]').exists()).toBe(false);
+    });
+
+    it.each([
+      ["a jump from the section list", true],
+      ["a Tab into section 2", false],
+    ])("%s folds section 1 without moving the view or focus", async (_, jump) => {
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.activeSection = "watch";
+      await flushPromises();
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+      const control = wrapper.get('[data-test="add-alert-section-condition-next"]')
+        .element as HTMLElement;
+      if (jump) wrapper.vm.goToSection("notify");
+      else control.focus();
+      wrapper.vm.activeSection = "condition";
+      await flushPromises();
+      const watchOpen = () => wrapper.find('[data-test="add-alert-section-watch"]').exists();
+      expect(watchOpen()).toBe(jump);
+      if (jump) {
+        wrapper.vm.activeSection = "notify";
+        await vi.waitFor(() => expect(watchOpen()).toBe(false));
+      }
+      expect(scrollToSection.mock.calls).toEqual(jump ? [["notify"]] : []);
+      if (!jump) expect(document.activeElement).toBe(control);
+    });
+
+    it("a fold while the view rests on section 2 lands on its start, above its new summary line", async () => {
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.activeSection = "watch";
+      await flushPromises();
+      const scroller = wrapper.get('[data-test="add-alert-sections"]').element as HTMLElement;
+      scroller.style.overflowY = "auto";
+      let top = 638;
+      Object.defineProperty(scroller, "scrollTop", {
+        configurable: true,
+        get: () => top,
+        set: (value: number) => {
+          top = value;
+        },
+      });
+      const control = wrapper.get('[data-test="add-alert-section-condition-next"]').element;
+      const section = wrapper.get('[data-snap-section="condition"]').element;
+      // Folding removes 638 px above the view and adds a 36 px summary line atop section 2.
+      const rects = vi
+        .spyOn(Element.prototype, "getBoundingClientRect")
+        .mockImplementation(function (this: Element) {
+          const open = !!document.querySelector('[data-snap-section="watch"]');
+          const y =
+            this === section ? (open ? 0 : -638) : this === control ? (open ? 100 : -502) : 0;
+          return new DOMRect(0, y, 10, 10);
+        });
+      (control as HTMLElement).focus();
+      wrapper.vm.activeSection = "condition";
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-section-watch"]').exists()).toBe(false);
+      expect(top).toBe(0);
+      rects.mockRestore();
+    });
+
+    it("saving an untouched edit sends the loaded trigger values", async () => {
+      const trigger = {
+        period: 10,
+        operator: ">=",
+        frequency: 10,
+        threshold: 3,
+        silence: 90,
+        frequency_type: "cron",
+        cron: "0 0 9 * * 1-5",
+        timezone: "Europe/Berlin",
+      };
+      wrapper = mountAlert({
+        isUpdated: true,
+        modelValue: savedAlert({ trigger_condition: { ...trigger }, keep_firing_for: 45 }),
+        destinations: [{ name: "email" }],
+      });
+      await flushPromises();
+      await wrapper.vm.form.handleSubmit();
+      await flushPromises();
+      const payload = (alertsService.update_by_alert_id as any).mock.calls[0][1];
+      expect(payload.trigger_condition).toMatchObject(trigger);
+      expect(payload.keep_firing_for).toBe(45);
+    });
+  });
+
+  describe("condition presets", () => {
+    it.each([
+      ["a new alert", null, null, "any"],
+      ["a limit of 5", ">=", 5, "few"],
+      ["a limit no card fits", ">=", 3, "custom"],
+      ["a strict comparison", ">", 3, undefined],
+    ])("%s selects its card", async (_, operator, threshold, preset) => {
+      wrapper = mountAlert();
+      await flushPromises();
+      if (operator) wrapper.vm.form.setFieldValue("trigger_condition.operator", operator);
+      if (threshold) wrapper.vm.form.setFieldValue("trigger_condition.threshold", threshold);
+      await flushPromises();
+      expect(wrapper.vm.activeConditionPreset).toBe(preset);
+      if (!operator) expect(wrapper.vm.form.state.values.trigger_condition.threshold).toBe(1);
+      const custom = wrapper.vm.conditionPresetOptions.find((o: any) => o.value === "custom");
+      expect(custom?.description).toBe(
+        preset === "custom"
+          ? i18n.global.t("alerts.sections.presets.orMore", { count: threshold })
+          : undefined,
+      );
+    });
+  });
+
+  describe("name and folder live in step 3", () => {
+    const withHeader = (props: Record<string, any> = {}) =>
+      mountAlert(props, {
+        attachTo: document.body,
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+          stubs: { ...stubs, OPageHeader: false },
+        },
+      });
+
+    it("the name has one input and its error shows once", async () => {
+      wrapper = withHeader();
+      await flushPromises();
+      expect(wrapper.findComponent(OFormInlineEdit).exists()).toBe(false);
+      expect(wrapper.findAll('[data-test="add-alert-details-name-input"] input')).toHaveLength(1);
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.form.setFieldValue("name", "bad#name");
+      await wrapper.vm.handleSave();
+      await flushPromises();
+      const messages = wrapper
+        .findAll('[role="alert"]')
+        .filter((m: any) => m.text().includes(i18n.global.t("alerts.nameNoSpecialChars")));
+      expect(messages).toHaveLength(1);
+    });
+
+    it("the header renames in place: Enter keeps the step and saves nothing", async () => {
+      onTestFinished(() => localStorage.clear());
+      wrapper = withHeader();
+      await flushPromises();
+      const submit = vi.fn((e: Event) => e.preventDefault());
+      wrapper.get("form").element.addEventListener("submit", submit);
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+      await wrapper.get('[data-test="add-alert-header-title-trigger"]').trigger("click");
+      const input = wrapper.get('[data-test="add-alert-header-title-input"]');
+      await input.setValue("checkout errors");
+      await input.trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      expect(submit).not.toHaveBeenCalled();
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(scrollToSection).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="add-alert-header-title-input"]').exists()).toBe(false);
+      expect(wrapper.vm.formData.name).toBe("checkout_errors");
+      const field = wrapper.get('[data-test="add-alert-details-name-input"] input');
+      expect((field.element as HTMLInputElement).value).toBe("checkout_errors");
+    });
+
+    it.each([
+      ["create", {}, true],
+      ["edit", { isUpdated: true, modelValue: savedAlert() }, false],
+    ])(
+      "folder is chosen in step 3 on %s, on the name's row, and read-only in the header; Start another way is for create only",
+      async (_, props, pick) => {
+        wrapper = withHeader(props);
+        await flushPromises();
+        const details = wrapper.get(
+          '[data-test="add-alert-section-notify"] [data-test="add-alert-details-name-row"]',
+        );
+        expect(details.find('[data-test="add-alert-details-folder-row"]').exists()).toBe(true);
+        expect(details.find('[data-test="add-alert-details-name-input"]').exists()).toBe(pick);
+        expect(details.find('[data-test="add-alert-details-name-text"]').exists()).toBe(!pick);
+        expect(details.find('[data-test="add-alert-details-folder-select"]').exists()).toBe(pick);
+        if (pick) {
+          const picker = details.findComponent({ name: "InlineSelectFolderDropdown" });
+          expect(picker.props("variant")).toBe("inline");
+        }
+        expect(details.find('[data-test="add-alert-details-folder-name"]').exists()).toBe(!pick);
+        expect(wrapper.get('[data-test="add-alert-header-folder"]').text()).toBe("default");
+        expect(wrapper.findAllComponents({ name: "InlineSelectFolderDropdown" })).toHaveLength(
+          pick ? 1 : 0,
+        );
+        expect(wrapper.find('[data-test="add-alert-header-title-trigger"]').exists()).toBe(pick);
+        expect(wrapper.find('[data-test="alert-starter-another-way"]').exists()).toBe(pick);
+      },
+    );
+  });
+
+  it("reads the alert back in sentences, each with a Change link to its section", async () => {
+    wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert() });
+    await flushPromises();
+    const scrollToSection = vi.fn();
+    wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+    expect(wrapper.find('[data-test="add-alert-review-watch-text"]').exists()).toBe(false);
+    await wrapper.get('[data-test="add-alert-review"] button').trigger("click");
+    await flushPromises();
+    const watchLine = wrapper.get('[data-test="add-alert-review-watch-text"]');
+    expect(watchLine.text()).toBe("Watches Logs in app_logs, on a schedule.");
+    expect(watchLine.findAll("strong").map((b) => b.text())).toEqual(["Logs", "app_logs"]);
+    await wrapper.get('[data-test="add-alert-review-notify"]').trigger("click");
+    expect(scrollToSection).toHaveBeenCalledWith("notify");
+    await wrapper.get('[data-test="add-alert-review-schedule"]').trigger("click");
+    expect(scrollToSection).toHaveBeenLastCalledWith("condition");
+  });
+
+  describe("Save names the issues to fix", () => {
+    const submitText = () => wrapper.get('[data-test="add-alert-submit-btn"]').text();
+    const failField = (name: string) =>
+      wrapper.vm.form.setFieldMeta(name, (meta: object) => ({
+        ...meta,
+        isDirty: true,
+        isBlurred: true,
+        errorMap: { onSubmit: "invalid" },
+      }));
+
+    it.each([0, 1, 3])("%s issues", async (count) => {
+      wrapper = mountAlert();
+      await flushPromises();
+      ["name", "destinations", "description"].slice(0, count).forEach(failField);
+      await flushPromises();
+      expect(submitText()).toBe(
+        count
+          ? i18n.global.t("alerts.form.save.fixIssues", { count }, count)
+          : i18n.global.t("alerts.save"),
+      );
+    });
+
+    it("a composite not yet passed by the server says why beside Save, which saves nothing and goes there", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+      const form = wrapper.vm.form;
+      form.setFieldValue("is_real_time", "composite");
+      form.setFieldValue("name", "combined");
+      form.setFieldValue("trigger_condition", { silence: 15 });
+      form.setFieldValue("composite_condition", { expression: "{id-a} && {id-b}" });
+      form.setFieldValue("children", [
+        { alert_id: "id-a", name: "errors_high", accessible: true },
+        { alert_id: "id-b", name: "latency_high", accessible: true },
+      ]);
+      await flushPromises();
+      wrapper.vm.onCompositeValidation({ valid: false });
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-save-reason"]').exists()).toBe(true);
+      const save = wrapper.get('[data-test="add-alert-submit-btn"]');
+      expect(save.attributes("disabled")).toBeUndefined();
+      await save.trigger("click");
+      await flushPromises();
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      await vi.waitFor(() => expect(scrollToSection).toHaveBeenCalledWith("condition"));
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+    });
+
+    it("an edit with an unknown column reads Fix 1 issue after Save and focuses the error", async () => {
+      vi.mocked(searchService.search).mockRejectedValueOnce({
+        response: { status: 400, data: { message: "Schema error: No field named servce" } },
+      });
+      wrapper = mountAlert(
+        {
+          isUpdated: true,
+          modelValue: savedAlert({
+            query_condition: {
+              ...savedAlert().query_condition,
+              type: "sql",
+              sql: "SELECT service FROM app_logs",
+            },
+          }),
+        },
+        {
+          attachTo: document.body,
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: { ...stubs, QueryConfig: false },
+          },
+        },
+      );
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("query_condition.sql", "SELECT servce FROM app_logs");
+      await wrapper.vm.handleSave();
+      await vi.waitFor(() => expect(wrapper.vm.sqlQueryErrorMsg).toBeTruthy(), { timeout: 2000 });
+      await flushPromises();
+      expect(submitText()).toBe(i18n.global.t("alerts.form.save.fixIssues", { count: 1 }, 1));
+      const error = document.querySelector('[data-test="add-alert-sql-error"]');
+      expect(error?.contains(document.activeElement)).toBe(true);
+    });
+  });
+
+  // ── Error focus across sections ───────────────────────────────────────────
+  // focusOnFirstError skips messages with a null offsetParent, so a slice the
+  // current alert type hides is never focused into the void.
+  describe("focusOnFirstError (sections)", () => {
     let offsetParent: any;
 
     beforeEach(() => {
@@ -1165,60 +2752,100 @@ describe("AddAlert (OForm owner)", () => {
 
     /** Stand in for the error an OForm* field renders once the schema fails —
      *  the step children are stubbed here, so inject the same shape they emit
-     *  (a [role="alert"] message beside its control) into the real pane. */
-    const seedFieldError = (tab: string): HTMLInputElement => {
-      const pane = wrapper.find(`[data-tab-pane="${tab}"]`).element;
+     *  (a [role="alert"] message beside its control) into a section's body. */
+    const seedFieldError = (section: string, hidden = false): HTMLInputElement => {
+      const body = wrapper.find(`[data-test="add-alert-section-${section}"]`).element;
       const field = document.createElement("div");
+      if (hidden) field.style.display = "none";
       field.innerHTML = '<span role="alert">At least one destination is required.</span><input />';
-      pane.appendChild(field);
+      body.appendChild(field);
       return field.querySelector("input") as HTMLInputElement;
     };
 
-    it("brings the tab owning the error forward and focuses the field", async () => {
+    it("a field left invalid counts at once, and the line beside Save names its section and goes to it", async () => {
+      // Typing keeps an editor draft, which would greet the next mount with a restore dialog.
+      onTestFinished(() => localStorage.clear());
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-save-reason"]').exists()).toBe(false);
+      const input = wrapper.get('[data-test="add-alert-details-name-input"] input');
+      await input.setValue("///");
+      await flushPromises();
+      expect(wrapper.get('[data-test="add-alert-submit-btn"]').text()).toBe(
+        i18n.global.t("alerts.save"),
+      );
+      await input.trigger("blur");
+      await vi.waitFor(() =>
+        expect(wrapper.get('[data-test="add-alert-submit-btn"]').text()).toBe(
+          i18n.global.t("alerts.form.save.fixIssues", { count: 1 }, 1),
+        ),
+      );
+      const reason = wrapper.get('[data-test="add-alert-save-reason"]');
+      expect(reason.text()).toContain(i18n.global.t("alerts.sections.notify.nav"));
+      (document.activeElement as HTMLElement | null)?.blur();
+      await reason.get('[data-test="add-alert-save-reason-link"]').trigger("click");
+      await flushPromises();
+      expect(document.activeElement).toBe(input.element);
+    });
+
+    it("focuses an error in any section, since every section is always shown", async () => {
       // Attached: focusOnFirstError reaches for the live document (the real
       // <form> + focus()), which a detached wrapper has no place in.
       wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
-      const input = seedFieldError("condition");
-      wrapper.vm.activeTab = "advanced";
-      await nextTick();
+      const input = seedFieldError("notify");
+      const revealElement = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.revealElement = revealElement;
 
       wrapper.vm.focusOnFirstError();
       await flushPromises();
 
-      expect(wrapper.vm.activeTab).toBe("condition");
       expect(document.activeElement).toBe(input);
+      expect(revealElement).toHaveBeenCalledWith(input);
     });
 
-    it("stays put when the error is already on the visible tab", async () => {
+    it("focuses the earliest section's error when several sections have one", async () => {
       wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
-      const input = seedFieldError("condition");
-      wrapper.vm.activeTab = "condition";
-      await nextTick();
+      const later = seedFieldError("notify");
+      const earlier = seedFieldError("condition");
 
       wrapper.vm.focusOnFirstError();
       await flushPromises();
 
-      expect(wrapper.vm.activeTab).toBe("condition");
-      expect(document.activeElement).toBe(input);
+      expect(document.activeElement).toBe(earlier);
+      expect(document.activeElement).not.toBe(later);
     });
 
-    // Anomaly mode swaps the tab headers wholesale, but every pane stays in the
-    // DOM (v-show). Hopping onto a pane with no header would strand the user on
-    // a tab the toggle group cannot show or leave.
-    it("never hops to a tab that has no header in the current mode", async () => {
+    it("focuses the field a sentence's message reports on, not the slot ahead of it", async () => {
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      const body = wrapper.find('[data-test="add-alert-section-watch"]').element;
+      const sentence = document.createElement("div");
+      sentence.innerHTML =
+        '<button aria-haspopup="listbox">severity</button><span data-error-focus><input /></span>' +
+        '<div><span role="alert">Enter a threshold</span></div>';
+      body.appendChild(sentence);
+
+      wrapper.vm.focusOnFirstError();
+      await flushPromises();
+
+      expect(document.activeElement).toBe(sentence.querySelector("input"));
+    });
+
+    it("skips a stale message in a slice the current mode hides", async () => {
       wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
       wrapper.vm.form.setFieldValue("is_real_time", "anomaly");
       await flushPromises();
-      expect(wrapper.vm.activeTab).toBe("anomaly-config");
+      const hidden = seedFieldError("condition", true);
+      const visible = seedFieldError("notify");
 
-      seedFieldError("condition"); // stale message on the now-headerless pane
       wrapper.vm.focusOnFirstError();
       await flushPromises();
 
-      expect(wrapper.vm.activeTab).toBe("anomaly-config");
+      expect(document.activeElement).toBe(visible);
+      expect(document.activeElement).not.toBe(hidden);
     });
   });
 
@@ -1449,7 +3076,7 @@ describe("AddAlert (OForm owner)", () => {
         wrapper = mountAlert();
         await flushPromises();
         const anomaly = wrapper.vm.alertTypeOptions.find((o: any) => o.value === "anomaly");
-        expect(anomaly?.locked).toBe(true);
+        expect(anomaly?.disabled).toBe(true);
         const item = wrapper.find('[data-test="add-alert-type-tab-anomaly"]');
         expect(item.attributes("disabled")).toBeDefined();
         wrapper.vm.onAlertTypeChange("anomaly");
@@ -1585,14 +3212,14 @@ describe("AddAlert (OForm owner)", () => {
       await clickSave();
       expect(dialogEl("dialog")?.textContent).toContain("Choose Query Mode");
       expect(dialogEl("lead")?.textContent?.trim()).toBe(
-        "Builder is selected but empty. SQL is set up.",
+        "Filters is selected but empty. SQL is set up.",
       );
       expect(dialogEl("dialog")?.textContent).not.toContain("-line query");
       // The dialog opens on the mode selected in the form; only a click changes it.
       expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
-      expect(dialogButton("primary")?.textContent).toContain("Save with Builder Mode");
+      expect(dialogButton("primary")?.textContent).toContain("Save with Filters Mode");
       expect(dialogEl("warning")?.textContent).toContain("No filters, so every row in");
-      expect(noteText()).toBe("Only Builder mode runs. SQL mode is not used.");
+      expect(noteText()).toBe("Only Filters mode runs. SQL mode is not used.");
 
       dialogEl("option-sql")!.click();
       await flushPromises();
@@ -1638,7 +3265,7 @@ describe("AddAlert (OForm owner)", () => {
       await clickSave();
 
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(dialogEl("dialog")?.textContent).toContain("Builder and SQL are both set up.");
+      expect(dialogEl("dialog")?.textContent).toContain("Filters and SQL are both set up.");
       expect(dialogEl("option-sql")?.getAttribute("data-state")).toBe("on");
     });
 
@@ -1652,12 +3279,12 @@ describe("AddAlert (OForm owner)", () => {
       form.setFieldValue("query_condition.conditions", builderTree);
 
       await clickSave();
-      expect(noteText()).toBe("Only SQL mode runs. Builder mode is not used.");
+      expect(noteText()).toBe("Only SQL mode runs. Filters mode is not used.");
       dialogEl("option-custom")!.click();
       await flushPromises();
-      expect(noteText()).toBe("Only Builder mode runs. SQL mode is not used.");
+      expect(noteText()).toBe("Only Filters mode runs. SQL mode is not used.");
       expect(dialogEl("dialog")?.textContent).not.toContain("filter condition");
-      expect(dialogButton("primary")?.textContent).toContain("Save with Builder Mode");
+      expect(dialogButton("primary")?.textContent).toContain("Save with Filters Mode");
 
       await clickDialog("primary");
 
@@ -1695,7 +3322,7 @@ describe("AddAlert (OForm owner)", () => {
     });
 
     // The schema runs first: a form with field errors shows them, not the dialog.
-    it("shows the invalid-form toast and no dialog when the form has field errors", async () => {
+    it("counts the field errors on Save, with no toast and no dialog", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
@@ -1706,11 +3333,9 @@ describe("AddAlert (OForm owner)", () => {
 
       expect(dialogEl("dialog")).toBeNull();
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-          message: i18n.global.t("alerts.messages.fixHighlightedFields"),
-        }),
+      expect(wrapper.vm.issueCount).toBeGreaterThan(0);
+      expect(toast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ message: i18n.global.t("alerts.messages.fixHighlightedFields") }),
       );
     });
 
@@ -1730,7 +3355,7 @@ describe("AddAlert (OForm owner)", () => {
       await clickSave();
 
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(dialogEl("dialog")?.textContent).toContain("Builder and SQL are both set up.");
+      expect(dialogEl("dialog")?.textContent).toContain("Filters and SQL are both set up.");
       expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
     });
 
@@ -1749,7 +3374,7 @@ describe("AddAlert (OForm owner)", () => {
 
       await clickSave();
 
-      expect(dialogEl("lead")?.textContent?.trim()).toBe("Builder and SQL are both set up.");
+      expect(dialogEl("lead")?.textContent?.trim()).toBe("Filters and SQL are both set up.");
       expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
       expect(dialogEl("warning")).toBeNull();
     });
@@ -1757,6 +3382,7 @@ describe("AddAlert (OForm owner)", () => {
     it("warns that no query is written when the picked SQL holds only the starter query", async () => {
       wrapper = mountAlert();
       await flushPromises();
+      vi.mocked(alertsService.generate_sql).mockRejectedValueOnce(new Error("no builder SQL"));
       const form = wrapper.vm.form;
       seedValidScheduled(form);
       form.setFieldValue("query_condition.type", "sql");
@@ -1766,7 +3392,7 @@ describe("AddAlert (OForm owner)", () => {
       await clickSave();
 
       expect(dialogEl("lead")?.textContent?.trim()).toBe(
-        "SQL is selected but empty. Builder is set up.",
+        "SQL is selected but empty. Filters is set up.",
       );
       expect(dialogEl("option-sql")?.getAttribute("data-state")).toBe("on");
       expect(dialogEl("warning")?.textContent?.trim()).toBe("No query written yet");
@@ -1827,8 +3453,8 @@ describe("AddAlert (OForm owner)", () => {
       expect(dialogEl("option-custom")).not.toBeNull();
       expect(dialogEl("option-sql")).not.toBeNull();
       expect(dialogEl("option-promql")).not.toBeNull();
-      expect(dialogEl("dialog")?.textContent).toContain("Builder, SQL and PromQL are all set up.");
-      expect(noteText()).toBe("Only PromQL mode runs. Builder and SQL modes are not used.");
+      expect(dialogEl("dialog")?.textContent).toContain("Filters, SQL and PromQL are all set up.");
+      expect(noteText()).toBe("Only PromQL mode runs. Filters and SQL modes are not used.");
     });
 
     // The reported alert, as the GET returns it: Builder with no conditions
@@ -1923,6 +3549,7 @@ describe("AddAlert (OForm owner)", () => {
     it("says no query is written when the picked SQL mode is empty", async () => {
       wrapper = mountAlert();
       await flushPromises();
+      vi.mocked(alertsService.generate_sql).mockRejectedValueOnce(new Error("no builder SQL"));
       const form = wrapper.vm.form;
       seedValidScheduled(form);
       form.setFieldValue("query_condition.type", "sql");

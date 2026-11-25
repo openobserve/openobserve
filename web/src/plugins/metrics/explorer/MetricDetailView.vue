@@ -741,7 +741,7 @@ import { useLicenseLock, useLicenseLocks } from "@/composables/useFeatureLock";
 import { streamTypeFeature } from "@/utils/featureGate";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
-import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
+import { buildPrefillFromPanel, perSeriesPromql } from "@/utils/alerts/prefill/fromPanel";
 import { withBareMetricNames, withSourceStreams } from "@/utils/metrics/metricsHandoff";
 import { durationFormatter } from "@/utils/formatters";
 import { parseSearchError } from "@/utils/query/searchError";
@@ -1165,10 +1165,14 @@ export default defineComponent({
     const overviewQueries = computed(() =>
       props.card ? withSourceStreams(props.overview.queries, props.card.name) : [],
     );
-    /** The overview's queries as a panel's, with no threshold: the form defaults to `>= 1`. */
+    /** The overview's queries as a panel's, with no threshold: the form defaults to `>= 1`. An overview
+     * folding every series into one line alerts per series instead, as one pod or host is what breaches. */
     const buildOverviewAlertPrefill = (options: AlertBuildOptions = {}) => {
-      const queries = overviewQueries.value.map((query) => ({
-        query: withBareMetricNames(query.expr),
+      const perSeries = overviewQueries.value.map((query) =>
+        perSeriesPromql(withBareMetricNames(query.expr)),
+      );
+      const queries = overviewQueries.value.map((query, index) => ({
+        query: perSeries[index] ?? withBareMetricNames(query.expr),
         fields: { stream: query.stream, stream_type: "metrics" },
       }));
       const prefill = buildPrefillFromPanel({
@@ -1185,7 +1189,8 @@ export default defineComponent({
           end_time: new Date(props.timeRange.end_time / 1000),
         },
       });
-      return { ...prefill, source: "explorer" };
+      const promqlMultiAlert = perSeries[options.queryIndex ?? 0] ? { promqlMultiAlert: true } : {};
+      return { ...prefill, source: "explorer", ...promqlMultiAlert };
     };
     // The earlier period alone is still worth charting: it says what this window is missing.
     const overviewHasSamples = computed(

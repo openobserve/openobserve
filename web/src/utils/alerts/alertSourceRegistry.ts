@@ -148,6 +148,18 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     defaultThreshold: "count",
     showQueryPreview: true,
   },
+  assistant: {
+    id: "assistant",
+    labelKey: "alerts.prefill.sources.assistant.label",
+    toastKey: "alerts.prefill.sources.assistant.toast",
+    icon: "auto-awesome",
+    // The drafted query holds the condition and the trigger already says how many rows fire it.
+    defaultThreshold: "count",
+    showQueryPreview: true,
+    enterpriseOnly: true,
+    metaSettings: true,
+    conditionInQuery: true,
+  },
   rumfunnel: {
     id: "rumfunnel",
     labelKey: "alerts.prefill.sources.rumfunnel.label",

@@ -17,7 +17,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildCountChartQuery,
   cleanAggregationQuery,
+  groupColumns,
   withCompositeGroupLabel,
+  withHistogramMinutes,
+  withoutTimeBucket,
 } from "./aggregationPreviewQuery";
 
 /** Quote count must stay even, or the SQL parser hits "Unterminated string literal". */
@@ -26,6 +29,56 @@ const quotesBalanced = (sql: string) => (sql.match(/'/g) || []).length % 2 === 0
 /** Paren count must net to zero, or the rewrite cut the statement mid-expression. */
 const parensBalanced = (sql: string) =>
   [...sql].reduce((d, c) => d + (c === "(" ? 1 : c === ")" ? -1 : 0), 0) === 0;
+
+describe("withHistogramMinutes", () => {
+  it.each([
+    [
+      "an automatic bucket",
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "a" GROUP BY 1',
+      "SELECT histogram(_timestamp, '5 minute') AS zo_sql_key, count(*) AS zo_sql_num FROM \"a\" GROUP BY 1",
+    ],
+    [
+      "a bucket the query already names",
+      "SELECT histogram(_timestamp, '1 hour') AS zo_sql_key FROM \"a\"",
+      "SELECT histogram(_timestamp, '1 hour') AS zo_sql_key FROM \"a\"",
+    ],
+    [
+      "a filter value spelling histogram(x)",
+      "SELECT histogram(_timestamp) AS zo_sql_key FROM \"a\" WHERE m = 'histogram(x)'",
+      "SELECT histogram(_timestamp, '5 minute') AS zo_sql_key FROM \"a\" WHERE m = 'histogram(x)'",
+    ],
+  ])("buckets %s by the given minutes", (_case, query, expected) => {
+    expect(withHistogramMinutes(query, 5)).toBe(expected);
+  });
+});
+
+describe("withoutTimeBucket", () => {
+  it.each([
+    [
+      "a count",
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "a" WHERE x = 1 GROUP BY 1',
+      'SELECT count(*) AS zo_sql_num FROM "a" WHERE x = 1',
+    ],
+    [
+      "a grouped measure",
+      'SELECT histogram(_timestamp) AS zo_sql_key, approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY "d") AS zo_sql_num, "svc" FROM "t" GROUP BY 1, "svc"',
+      'SELECT approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY "d") AS zo_sql_num, "svc" FROM "t" GROUP BY "svc"',
+    ],
+    [
+      "a bucket grouped by its name",
+      "SELECT histogram(_timestamp) AS zo_sql_key, avg(x) AS zo_sql_num, host FROM logs GROUP BY zo_sql_key, host",
+      "SELECT avg(x) AS zo_sql_num, host FROM logs GROUP BY host",
+    ],
+    [
+      "a bucket that is not the first column",
+      "SELECT avg(x) AS zo_sql_num, histogram(_timestamp) AS zo_sql_key FROM logs GROUP BY 2",
+      null,
+    ],
+    ["a query without a bucket", "SELECT count(*) AS zo_sql_num FROM logs", null],
+  ])("turns %s into one row per group", (_case, query, expected) => {
+    expect(withoutTimeBucket(query)).toBe(expected);
+  });
+});
 
 describe("cleanAggregationQuery", () => {
   it("drops the HAVING clause on a plain query", () => {
@@ -129,6 +182,27 @@ describe("cleanAggregationQuery", () => {
     expect(cleaned).toContain("histogram(_timestamp) AS zo_sql_key");
     expect(cleaned).toMatch(/GROUP BY 1\b/);
     expect(cleaned).not.toMatch(/GROUP BY zo_sql_key\b/);
+  });
+
+  it("drops the per-group severity ORDER BY, whose quoted alias the rename cannot reach", () => {
+    const sql =
+      'SELECT "service_name", approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY "duration") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM "default" GROUP BY "service_name" ORDER BY CASE WHEN "alert_agg_value" > 500000 THEN 2 ELSE 0 END DESC, "service_name"';
+
+    const cleaned = cleanAggregationQuery(sql);
+
+    expect(cleaned).not.toContain("alert_agg_value");
+    expect(cleaned).toMatch(/GROUP BY 1, "service_name"$/);
+    expect(cleaned).toContain('WITHIN GROUP (ORDER BY "duration") AS zo_sql_num');
+    expect(parensBalanced(cleaned)).toBe(true);
+  });
+
+  it("moves an aggregate whose arguments hold a comma as one SELECT entry", () => {
+    const sql =
+      'SELECT histogram(_timestamp) AS zo_sql_key, approx_percentile_cont(duration, 0.95) as zo_sql_val , concat(service_name) as x_axis_2 FROM "default" GROUP BY zo_sql_key , x_axis_2 ORDER BY zo_sql_key ASC';
+
+    expect(cleanAggregationQuery(sql)).toBe(
+      'SELECT histogram(_timestamp) AS zo_sql_key, approx_percentile_cont(duration, 0.95) as zo_sql_num , concat(service_name) as x_axis_2 FROM "default" GROUP BY zo_sql_key , x_axis_2',
+    );
   });
 });
 
@@ -415,5 +489,30 @@ describe("withCompositeGroupLabel — rewrite safety", () => {
     expect(quotesBalanced(out)).toBe(true);
     expect(out).toContain("'alerts having errors'");
     expect(out).toContain("zo_group_label");
+  });
+});
+
+describe("groupColumns", () => {
+  it.each([
+    [
+      "joined into one alias",
+      `SELECT histogram(_timestamp) AS zo_sql_key, avg(value) as zo_sql_val , concat(host,' : ',pod) as x_axis_2 FROM "m" GROUP BY zo_sql_key , x_axis_2`,
+      ["host", "pod"],
+      ["x_axis_2"],
+    ],
+    [
+      "kept under their own names",
+      `SELECT histogram(_timestamp) AS zo_sql_key, avg(value) AS zo_sql_val, host FROM "m" GROUP BY zo_sql_key, host`,
+      ["host"],
+      ["host"],
+    ],
+    [
+      "named in a literal only",
+      `SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_val, host FROM "m" WHERE msg = 'x AS x_axis_2' GROUP BY zo_sql_key, host`,
+      ["host"],
+      ["host"],
+    ],
+  ])("reads the groups of a query %s", (_case, sql, groupBy, columns) => {
+    expect(groupColumns(sql, groupBy)).toEqual(columns);
   });
 });

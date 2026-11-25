@@ -54,10 +54,13 @@ export function alertConditionText(alert: any): string {
     return qc?.type === "custom"
       ? countConditionText(qc, alert?.trigger_condition)
       : qc?.sql || EMPTY;
-  const fn = agg.function || "";
-  const col = agg.having?.column || "";
-  const op = agg.having?.operator || "";
-  return `${fn}(${col}) ${op} ${agg.having?.value}`;
+  return `${measureOf(qc)} ${agg.having?.operator || ""} ${agg.having?.value}`;
+}
+
+// A SQL alert compares the column its query computes; only a Builder alert applies the function.
+function measureOf(qc: any): string {
+  const col = qc?.aggregation?.having?.column || "";
+  return qc?.type === "sql" ? col : `${qc?.aggregation?.function || ""}(${col})`;
 }
 
 /** A Builder rule with no aggregation fires on how many rows match: `body contains 'ERROR' · count >= 1`. */
@@ -97,7 +100,7 @@ export function alertWarningConditionText(alert: any): string {
   }
   const agg = qc?.aggregation;
   if (isBlank(agg?.warning_value)) return EMPTY;
-  return `${agg.function || ""}(${agg.having?.column || ""}) ${agg.having?.operator || ""} ${agg.warning_value}`;
+  return `${measureOf(qc)} ${agg.having?.operator || ""} ${agg.warning_value}`;
 }
 
 /** How long a window the rule evaluates, in minutes. `null` when unset. */

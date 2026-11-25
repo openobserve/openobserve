@@ -21,14 +21,29 @@
 // makeAlertSettingsShape / createAlertSettingsSchema.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
-import { defineComponent, nextTick } from "vue";
+import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
+import { computed, defineComponent, inject, nextTick, ref, type Ref } from "vue";
 import { createStore } from "vuex";
 import { z } from "zod";
 import i18n from "@/locales";
 import config from "@/aws-exports";
 import AlertSettings from "./AlertSettings.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { AlertSettingId } from "@/components/alerts/alertSettingTiers";
+import type { AlertSuggestionId } from "@/components/alerts/alertSuggestions";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
+import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
+import AlertMessageLine from "@/components/alerts/AlertMessageLine.vue";
+import { ALERT_FORM_CONTEXT_KEY } from "@/components/alerts/alertFormContext";
+import { durationWords, everyWords } from "@/utils/alerts/alertCopy";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import {
   makeAlertSettingsShape,
   makeSilenceSchema,
@@ -94,14 +109,25 @@ function makeFormData(overrides: Record<string, any> = {}) {
 // AddAlert.schema.ts reuses the same fragments via createAlertSettingsSchema).
 const parentSchema = z.object({ ...makeAlertSettingsShape(t) });
 
+// Stands in for the condition row, which shows what the step publishes about the condition.
+const ConditionLine = defineComponent({
+  components: { AlertMessageLine },
+  setup: () => ({ note: inject(ALERT_FORM_CONTEXT_KEY, null)?.conditionNote }),
+  template: `<AlertMessageLine :note="note" data-test="condition-line" />`,
+});
+const withConditionLine = () => ({
+  [ALERT_FORM_CONTEXT_KEY as symbol]: { conditionNote: ref(null) },
+});
+
 function makeDescendantHost(
   isRealTime = "true",
   defaultOverrides: Record<string, any> = {},
   formDataOverrides: Record<string, any> = {},
   destinations: string[] = [],
+  validateOn: "submit" | "leave" = "submit",
 ) {
   return defineComponent({
-    components: { OForm, AlertSettings },
+    components: { OForm, AlertSettings, ConditionLine },
     setup() {
       const schema = parentSchema;
       const defaultValues = {
@@ -111,16 +137,17 @@ function makeDescendantHost(
         ...defaultOverrides,
       };
       const formData = makeFormData(formDataOverrides);
-      return { schema, defaultValues, formData, isRealTime, destinations };
+      return { schema, defaultValues, formData, isRealTime, destinations, validateOn };
     },
     template: `
-      <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+      <OForm :validate-on="validateOn" :schema="schema" :default-values="defaultValues" @submit="() => {}">
         <AlertSettings
           :form-data="formData"
           :is-real-time="isRealTime"
           :destinations="destinations"
           :formatted-destinations="['dest-a','dest-b']"
         />
+        <ConditionLine />
       </OForm>
     `,
   });
@@ -132,7 +159,7 @@ function mountDescendant(
   formDataOverrides: Record<string, any> = {},
 ) {
   return mount(makeDescendantHost(isRealTime, defaultOverrides, formDataOverrides), {
-    global: { plugins: [makeStore(), i18n] },
+    global: { plugins: [makeStore(), i18n], provide: withConditionLine() },
   });
 }
 
@@ -155,7 +182,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     await host.find('[data-test="alert-settings-silence-duration-input"] input').setValue("7");
     await flushPromises();
 
-    expect(parentForm.state.values.trigger_condition.silence).toBe("7");
+    expect(parentForm.state.values.trigger_condition.silence).toBe(7);
   });
 
   it("the parent handleSubmit surfaces the step's field errors", async () => {
@@ -201,10 +228,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     }
   });
 
-  it("passes submit when valid — string number input coerces via the schema", async () => {
-    // Rewritten from the old standalone "emits silence/period as NUMBERS" test:
-    // the schema's z.coerce accepts the raw STRING the input holds; the payload
-    // coercion is owned by getAlertPayload (covered by AddAlert.spec.ts).
+  it("passes submit when valid — the remind row stores a number", async () => {
     const host = mountDescendant("true", { destinations: ["dest-a"] });
     const parentForm = hostForm(host);
 
@@ -215,8 +239,43 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     await flushPromises();
 
     expect(parentForm.state.isValid).toBe(true);
-    expect(parentForm.state.values.trigger_condition.silence).toBe("5");
+    expect(parentForm.state.values.trigger_condition.silence).toBe(5);
   });
+
+  it.each([
+    ["remind", "alert-settings-silence-duration-input", "alert-settings-silence-error", "-1", "5"],
+    [
+      "must last",
+      "alert-settings-pending-period-input",
+      "alert-settings-pending-period-error",
+      "-1",
+      "2",
+    ],
+    [
+      "keep firing",
+      "alert-settings-keep-firing-for-input",
+      "alert-settings-keep-firing-error",
+      "-1",
+      "5",
+    ],
+  ])(
+    "the %s field shows its error once left, then clears when fixed",
+    async (_, inputId, errorId, bad, good) => {
+      const host = mount(makeDescendantHost("false", {}, {}, [], "leave"), {
+        global: { plugins: [makeStore(), i18n] },
+      });
+      const input = () => host.find(`[data-test="${inputId}"] input`);
+      const error = () => host.find(`[data-test="${errorId}"]`);
+      await input().setValue(bad);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await flushPromises();
+      expect(error().exists()).toBe(false);
+      await input().trigger("blur");
+      await vi.waitFor(() => expect(error().exists()).toBe(true));
+      await input().setValue(good);
+      await vi.waitFor(() => expect(error().exists()).toBe(false), { timeout: 1500 });
+    },
+  );
 
   it("blocks submit when silence is negative (schema ≥ 0)", async () => {
     const host = mountDescendant("true", { destinations: ["dest-a"] });
@@ -231,40 +290,279 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(parentForm.state.isValid).toBe(false);
   });
 
-  it("requires period >= 1 in scheduled mode (schema, not a * gate)", async () => {
-    const host = mountDescendant("false", {
-      destinations: ["dest-a"],
-      trigger_condition: { silence: 10, period: 0 },
-    });
-    const parentForm = hostForm(host);
-
-    await parentForm.handleSubmit();
-    await flushPromises();
-    await nextTick();
-
-    expect(parentForm.state.isValid).toBe(false);
-    expect(host.text()).toContain("Period should be greater than 0");
-  });
-
-  it("period change CASCADES: emits update:trigger with synced silence/frequency/cron", () => {
-    // The pre-migration cross-step cascade (period drives frequency / cron /
-    // timezone / silence). The ancestor AddAlert listens to @update:trigger and
-    // writes the whole trigger_condition into the ONE form (setFieldValue), so
-    // the visible silence field auto-fills.
+  it("a look-back edit leaves Check every, its cron and Notify at most every alone", () => {
+    // AddAlert writes the emitted trigger_condition back into the ONE form (setFieldValue).
     const host = mountDescendant("false");
     const step = host.findComponent(AlertSettings);
 
     (step.vm as any).handlePeriodChange("15");
 
     const events = step.emitted("update:trigger") as any[];
-    expect(events).toBeTruthy();
     const trigger = events[events.length - 1][0];
-    expect(trigger.period).toBe("15");
-    expect(trigger.silence).toBe(15);
-    expect(trigger.frequency).toBe(15);
-    expect(typeof trigger.cron).toBe("string");
-    expect(trigger.cron.length).toBeGreaterThan(0);
+    expect(trigger).toMatchObject({ period: "15", silence: 10 });
+    expect(trigger.frequency).toBeUndefined();
+    expect(trigger.cron).toBeUndefined();
     expect(trigger.timezone).toBeTruthy();
+  });
+
+  describe("Check every, look back and Notify at most every", () => {
+    type TriggerValues = Record<string, unknown>;
+    interface LiveForm {
+      useStore: <T>(
+        selector: (state: { values: { trigger_condition: TriggerValues } }) => T,
+      ) => Ref<T>;
+      setFieldValue: (name: string, value: unknown) => void;
+      reset: (values: Record<string, unknown>) => void;
+      state: { values: { trigger_condition: TriggerValues } };
+    }
+
+    // Wires the step like AddAlert: formData is the live form read-view and update:trigger writes back into the form.
+    const LiveStep = defineComponent({
+      components: { AlertSettings },
+      setup() {
+        const form = inject(FORM_CONTEXT_KEY) as LiveForm;
+        const formData = form.useStore((state) => state.values);
+        const onTrigger = (trigger: TriggerValues) =>
+          form.setFieldValue("trigger_condition", trigger);
+        return { formData, onTrigger };
+      },
+      template: `
+        <AlertSettings
+          :form-data="formData"
+          is-real-time="false"
+          :destinations="[]"
+          :formatted-destinations="[]"
+          @update:trigger="onTrigger"
+        />
+      `,
+    });
+
+    const defaults = { period: 10, frequency: 10, silence: 10, frequency_type: "minutes" };
+
+    const mountLive = (
+      trigger: TriggerValues = defaults,
+      minAutoRefreshInterval = 60,
+      values: Record<string, unknown> = {},
+      context: Record<string, unknown> = {},
+    ) =>
+      mount(
+        defineComponent({
+          components: { OForm, LiveStep, ConditionLine },
+          setup: () => ({
+            schema: parentSchema,
+            defaultValues: { trigger_condition: { ...trigger }, destinations: [], ...values },
+          }),
+          template: `
+            <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+              <LiveStep />
+              <ConditionLine />
+            </OForm>
+          `,
+        }),
+        {
+          global: {
+            plugins: [makeStore({ min_auto_refresh_interval: minAutoRefreshInterval }), i18n],
+            provide: {
+              [ALERT_FORM_CONTEXT_KEY as symbol]: { conditionNote: ref(null), ...context },
+            },
+          },
+        },
+      );
+
+    const liveForm = (host: VueWrapper) =>
+      (host.findComponent({ name: "OForm" }).vm as unknown as { form: LiveForm }).form;
+
+    // Re-seeds the whole form, as an edit load, a prefill or the JSON editor does (resetForm).
+    const loadTrigger = async (host: VueWrapper, trigger: TriggerValues) => {
+      liveForm(host).reset({
+        trigger_condition: { ...trigger },
+        query_condition: {},
+        destinations: [],
+      });
+      await flushPromises();
+      return liveForm(host).state.values.trigger_condition;
+    };
+
+    // The look back's field sits on the condition line; it reaches the step as handlePeriodChange.
+    const typePeriod = async (host: VueWrapper, value: string) => {
+      (host.findComponent(AlertSettings).vm as any).handlePeriodChange(value);
+      await flushPromises();
+      return liveForm(host).state.values.trigger_condition;
+    };
+
+    // QueryConfig's Check every writes the stored minutes, then emits the whole trigger.
+    const typeCheckEvery = async (host: VueWrapper, minutes: number) => {
+      const form = liveForm(host);
+      form.setFieldValue("trigger_condition.frequency", minutes);
+      form.setFieldValue("trigger_condition", { ...form.state.values.trigger_condition });
+      await flushPromises();
+      return form.state.values.trigger_condition;
+    };
+
+    it("editing Check every leaves the look back alone", async () => {
+      const host = mountLive();
+
+      expect(await typeCheckEvery(host, 5)).toMatchObject({ period: 10, frequency: 5 });
+    });
+
+    const saved = { period: 15, frequency: 5, silence: 30, frequency_type: "minutes" };
+
+    it("keeps a hand-written cron schedule when only the period changes", async () => {
+      const host = mountLive();
+      await loadTrigger(host, {
+        ...saved,
+        frequency_type: "cron",
+        cron: "0 9 * * *",
+        timezone: "UTC",
+      });
+
+      const trigger = await typePeriod(host, "20");
+
+      expect(trigger.period).toBe("20");
+      expect(trigger.cron).toBe("0 9 * * *");
+    });
+
+    const note = (host: VueWrapper, dataTest: string) => host.find(`[data-test="${dataTest}"]`);
+    const click = async (host: VueWrapper, dataTest: string) => {
+      await note(host, `${dataTest}-action`).trigger("click");
+      await flushPromises();
+      return liveForm(host).state.values.trigger_condition;
+    };
+    it.each([
+      { name: "an untouched default follows them silently", warns: false },
+      { name: "a value the user typed stays and warns in amber", typed: "10", warns: true },
+      { name: "a saved alert's value stays and warns in amber", values: { id: "a1" }, warns: true },
+    ])("Notify at most every under the checks: $name", async (row) => {
+      const host = mountLive(defaults, 60, row.values);
+      if (row.typed) {
+        await host
+          .find('[data-test="alert-settings-silence-duration-input"] input')
+          .setValue(row.typed);
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+
+      const trigger = await typeCheckEvery(host, 60);
+
+      expect(trigger.silence).toBe(row.warns ? 10 : 60);
+      expect(note(host, "alert-settings-silence-hint").exists()).toBe(row.warns);
+    });
+
+    it.each([
+      { name: "80 groups firing per group", count: 80, multi: true, warns: true },
+      { name: "2 groups firing per group", count: 2, multi: true, warns: false },
+      { name: "80 groups in one alert", count: 80, multi: false, warns: false },
+      {
+        name: "80 groups with repeats suppressed",
+        count: 80,
+        multi: true,
+        suppress: true,
+        warns: false,
+      },
+    ])("Notify at most every warns about $name", (row) => {
+      const query_condition = {
+        type: "custom",
+        aggregation: { multi_alert: row.multi, group_by: ["pod"], having: {} },
+      };
+      const previewStatus = computed(() => ({
+        wouldTrigger: true,
+        grouped: true,
+        count: row.count,
+      }));
+      const host = mountLive(
+        defaults,
+        60,
+        { query_condition, suppress_repeats: !!row.suppress },
+        { previewStatus },
+      );
+      expect(note(host, "alert-settings-silence-many-groups").exists()).toBe(row.warns);
+    });
+
+    it("Notify at most every shorter than the checks: the amber line's action matches them", async () => {
+      const host = mountLive(defaults, 60, { id: "a1" });
+      const hint = () => note(host, "alert-settings-silence-hint");
+      expect(hint().exists()).toBe(false);
+
+      await typeCheckEvery(host, 60);
+      expect(note(host, "alert-settings-silence-hint-text").text()).toBe(
+        t("alerts.form.remind.noEffect", { every: everyWords(60, i18n.global.t as any) }),
+      );
+
+      expect(await click(host, "alert-settings-silence-hint")).toMatchObject({ silence: 60 });
+      expect(hint().exists()).toBe(false);
+    });
+
+    it.each([
+      {
+        name: "Must last over one check",
+        values: { pending_period_sec: 10, _ui: { pendingPeriod: 10 } },
+        line: "alert-settings-pending-period-warning",
+      },
+      {
+        name: "a lowest value over non-overlapping checks",
+        values: {
+          query_condition: {
+            type: "custom",
+            aggregation: { function: "min", having: { column: "v", operator: ">", value: 1 } },
+          },
+        },
+        line: "alert-settings-breach-warning",
+      },
+    ])(
+      "$name warns in amber; its action checks more often and keeps the look back",
+      async (row) => {
+        const host = mountLive(defaults, 60, row.values);
+        expect(note(host, `${row.line}-action`).text()).toBe(
+          t("alerts.guard.checkEvery", { every: everyWords(2, i18n.global.t as any) }),
+        );
+
+        expect(await click(host, row.line)).toMatchObject({ period: 10, frequency: 2 });
+        expect(note(host, row.line).exists()).toBe(false);
+      },
+    );
+  });
+
+  describe("a lowest or highest value over the window already means it stayed across", () => {
+    const query = (fn: string, operator: string) => ({
+      query_condition: {
+        type: "custom",
+        aggregation: { function: fn, having: { column: "v", operator, value: 1 } },
+      },
+    });
+    const holdLine = (host: VueWrapper) => host.find('[data-test="alert-settings-hold-window"]');
+
+    it.each([
+      ["min above", query("min", ">"), true],
+      ["max below", query("max", "<="), true],
+      ["avg above", query("avg", ">"), false],
+      ["min below", query("min", "<"), false],
+    ])("%s: Must last says whether it is needed", (_case, values, covered) => {
+      const host = mountDescendant("false", {
+        ...values,
+        trigger_condition: { silence: 10, period: 10 },
+      });
+      expect(holdLine(host).exists()).toBe(covered);
+      if (covered) expect(holdLine(host).classes()).not.toContain("text-status-warning-text");
+    });
+
+    it("Must last on top of it warns amber on the condition with the total wait, and turns off in one click", async () => {
+      const host = mountDescendant("false", {
+        ...query("min", ">"),
+        trigger_condition: { silence: 10, period: 10, frequency: 2 },
+        pending_period_sec: 20,
+        _ui: { pendingPeriod: 20 },
+      });
+      const stacks = host.find('[data-test="alert-settings-hold-stacks"]');
+      expect(holdLine(host).classes()).not.toContain("text-status-warning-text");
+      expect(stacks.classes()).toContain("text-status-warning-text");
+      expect(host.find('[data-test="alert-settings-hold-stacks-text"]').text()).toBe(
+        t("alerts.form.holdFor.windowStacks", { total: durationWords(30, i18n.global.t as any) }),
+      );
+
+      await host.find('[data-test="alert-settings-hold-stacks-action"]').trigger("click");
+      await flushPromises();
+      expect(hostForm(host).state.values.pending_period_sec).toBe(0);
+      expect(host.find('[data-test="alert-settings-hold-stacks"]').exists()).toBe(false);
+    });
   });
 
   it("period cleared: emits update:trigger without cascading", () => {
@@ -281,20 +579,9 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(trigger.silence).toBe(10);
   });
 
-  it("hides the period in Forecast mode, whose query reads its own history window", async () => {
-    const host = mountDescendant("false", {
-      _ui: { forecast: { U: "up", T: 1, direction: "rises", W: "2d", H: 7 } },
-    });
-    expect(host.find('[data-test="alert-settings-period-input"]').exists()).toBe(false);
-    hostForm(host).setFieldValue("_ui.forecast", null);
-    await flushPromises();
-    expect(host.find('[data-test="alert-settings-period-input"]').exists()).toBe(true);
-  });
-
   it("preserves every data-test (scheduled branch)", () => {
     const host = mountDescendant("false");
     for (const dt of [
-      "alert-settings-period-input",
       "alert-settings-silence-duration-input",
       "alert-destinations-select",
       "alert-settings-refresh-destinations-btn",
@@ -353,7 +640,7 @@ describe("AlertSettings — Notify on recovery with nowhere to send", () => {
 describe("AlertSettings — Notify on recovery summary for Jira", () => {
   const destinationObjects = [
     { name: "ops-jira", type: "http", destination_type_name: "jira" },
-    { name: "ops-slack", type: "http", destination_type_name: "slack" },
+    { name: "ops-slack", type: "http", destination_type_name: "slack", template: "ops-card" },
   ];
   const mountPlan = (destinations: string[], recoveryDestinations: string[] = []) =>
     mount(
@@ -398,6 +685,20 @@ describe("AlertSettings — Notify on recovery summary for Jira", () => {
 
   it("says the same when the recovery is redirected to Jira", () => {
     expect(planText(["ops-slack"], ["ops-jira"])).toEqual([`ops-jira — ${comment}`]);
+  });
+
+  it.each([
+    ["{alert_name} fired", true],
+    ["[{alert_status}] {alert_name}", false],
+  ])("reads the row from template body %j", (body, warns) => {
+    const looksNew = t("alerts.alertSettings.recoveryLooksNew", { template: "ops-card" });
+    queryClient.setQueryData(templatesQuery("test-org").queryKey, [{ name: "ops-card", body }]);
+    const host = mountPlan(["ops-slack"]);
+    expect(host.find('[data-test="alert-notify-on-recovery-plan-ops-slack"]').text()).toBe(
+      `ops-slack — ${warns ? looksNew : message}`,
+    );
+    expect(host.find('[data-test="alert-notify-on-recovery-hint"]').exists()).toBe(false);
+    queryClient.clear();
   });
 
   it("shows the template hint only when a destination renders the template", () => {
@@ -449,7 +750,7 @@ describe("AlertSettings — incident title preview", () => {
     config.isEnterprise = original;
   });
 
-  it("fills alert fields and keeps row placeholders as chips", () => {
+  it("fills alert fields and keeps row placeholders as chips", async () => {
     config.isEnterprise = "true";
     const host = mount(
       defineComponent({
@@ -475,6 +776,7 @@ describe("AlertSettings — incident title preview", () => {
       }),
       { global: { plugins: [makeStore({ incidents_enabled: true }), i18n] } },
     );
+    await host.find('[data-test="add-alert-incident-title-row-change"]').trigger("click");
     expect(host.find('[data-test="alert-incident-title-preview"]').text()).toContain(
       "HighErrors: {service} on {host}",
     );
@@ -624,6 +926,29 @@ describe("AlertSettings — combined destinations + workflows target control", (
     expect(targets.props("destinationOptions")).toEqual(["dest-a", "dest-b"]);
   });
 
+  it("describes each destination to the picker from the org's destination objects", () => {
+    const host = mount(
+      defineComponent({
+        components: { OForm, AlertSettings },
+        setup: () => ({ schema: parentSchema, formData: makeFormData() }),
+        template: `
+          <OForm :schema="schema" :default-values="{ trigger_condition: { silence: 10, period: 10 } }">
+            <AlertSettings :form-data="formData" is-real-time="false" :formatted-destinations="['ops']"
+              :destination-objects="[{ name: 'ops', type: 'email', emails: ['oncall@x.io'] }]" />
+          </OForm>
+        `,
+      }),
+      { global: { plugins: [makeStore(), i18n] } },
+    );
+    expect(findTargets(host).props("describe")).toEqual({
+      ops: {
+        type: t("components.badge.destinationType.email"),
+        target: "oncall@x.io",
+        usedBy: null,
+      },
+    });
+  });
+
   it("re-emits the child's update:workflows so the ancestor can setFieldValue", async () => {
     const host = mountDescendant();
     const step = host.findComponent(AlertSettings);
@@ -664,5 +989,265 @@ describe("AlertSettings — combined destinations + workflows target control", (
   it("shows the no-destination note under the control before any submit", () => {
     const host = mountDescendant("true");
     expect(host.text()).toContain(NO_DESTINATION_NOTE);
+  });
+});
+
+// ── Sectioned editor: tiers, sentence rows and units (phase 1) ───────────────
+describe("AlertSettings — notify and timing in their sections", () => {
+  const original = { isEnterprise: config.isEnterprise };
+  afterEach(() => {
+    config.isEnterprise = original.isEnterprise;
+    document.body.innerHTML = "";
+  });
+
+  const SLOTS = ["settingsNotify", "settingsNotifyMore", "settingsSchedule", "settingsHold"];
+  function mountSectioned(
+    isRealTime: string,
+    defaults: Record<string, any> = {},
+    opts: { reveal?: AlertSettingId[]; showAll?: boolean; destinations?: string[] } = {},
+  ) {
+    const targets = Object.fromEntries(
+      SLOTS.map((slot) => [slot, document.body.appendChild(document.createElement("div"))]),
+    );
+    const tiers = useAlertSettingTiers({
+      available: () => true,
+      isSet: () => false,
+      showAll: ref(opts.showAll ?? false),
+    });
+    (opts.reveal ?? []).forEach(tiers.reveal);
+    const applied: Partial<Record<AlertSuggestionId, () => void>> = {};
+    const suggestions = {
+      current: () => null,
+      add: vi.fn(),
+      notNow: vi.fn(),
+      onApply: (id: AlertSuggestionId, handler: () => void) => {
+        applied[id] = handler;
+        return () => {};
+      },
+    };
+    const host = mount(
+      defineComponent({
+        components: { OForm, AlertSettings },
+        setup: () => ({
+          schema: parentSchema,
+          defaultValues: {
+            trigger_condition: { silence: 10, period: 10, frequency: 5, frequency_type: "minutes" },
+            destinations: opts.destinations ?? [],
+            creates_incident: false,
+            ...defaults,
+          },
+          targets,
+          isRealTime,
+          destinations: opts.destinations ?? [],
+        }),
+        template: `
+          <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+            <AlertSettings :form-data="defaultValues" :is-real-time="isRealTime"
+              :destinations="destinations" :section-targets="targets" />
+          </OForm>
+        `,
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [makeStore({ incidents_enabled: true }), i18n],
+          provide: {
+            [ALERT_SETTING_TIERS_KEY as symbol]: tiers,
+            [ALERT_SUGGESTIONS_KEY as symbol]: suggestions,
+          },
+        },
+      },
+    );
+    const values = () => hostForm(host).state.values;
+    const inSlot = (slot: string, dataTest: string) =>
+      !!targets[slot].querySelector(`[data-test="${dataTest}"]`);
+    return { host, tiers, applied, values, inSlot, targets };
+  }
+  const unitSelect = (host: VueWrapper, dataTest: string) =>
+    host.findAllComponents(OSelect).find((s) => s.attributes("data-test") === dataTest)!;
+  const amountInput = (host: VueWrapper, dataTest: string) =>
+    host.findAllComponents(OInput).find((i) => i.attributes("data-test") === dataTest)!;
+
+  it.each(["false", "true", "composite"])(
+    "Remind at most every is in Who to tell (is_real_time %s)",
+    (kind) => {
+      const { inSlot } = mountSectioned(kind);
+      expect(inSlot("settingsNotify", "alert-settings-silence-duration-input")).toBe(true);
+      expect(inSlot("settingsSchedule", "alert-settings-silence-duration-input")).toBe(false);
+    },
+  );
+
+  it.each([
+    [90, "90", "min"],
+    [240, "4", "h"],
+  ])(
+    "an untouched remind row shows silence %d as %s %s and writes nothing",
+    (silence, amount, unit) => {
+      const { host, values } = mountSectioned("true", {
+        trigger_condition: { silence, period: 10, frequency: 5 },
+      });
+      expect(amountInput(host, "alert-settings-silence-duration-input").props("modelValue")).toBe(
+        Number(amount),
+      );
+      expect(unitSelect(host, "alert-settings-silence-unit-select").props("modelValue")).toBe(unit);
+      expect(values().trigger_condition.silence).toBe(silence);
+      expect(host.findComponent(AlertSettings).emitted("update:trigger")).toBeUndefined();
+    },
+  );
+
+  it("4 h saves silence 240", async () => {
+    const { host, values } = mountSectioned("true");
+    await unitSelect(host, "alert-settings-silence-unit-select").vm.$emit("update:modelValue", "h");
+    await amountInput(host, "alert-settings-silence-duration-input").vm.$emit(
+      "update:modelValue",
+      "4",
+    );
+    expect(values().trigger_condition.silence).toBe(240);
+  });
+
+  it("keep firing 90 s shows 90 seconds and 2 min saves 120", async () => {
+    const { host, values } = mountSectioned(
+      "false",
+      { keep_firing_for: 90 },
+      { reveal: ["keepFiring"] },
+    );
+    const input = () => amountInput(host, "alert-settings-keep-firing-for-input");
+    const unit = () => unitSelect(host, "alert-settings-keep-firing-unit-select");
+    expect([input().props("modelValue"), unit().props("modelValue")]).toEqual([90, "seconds"]);
+    await unit().vm.$emit("update:modelValue", "min");
+    expect(values().keep_firing_for).toBe(90);
+    await input().vm.$emit("update:modelValue", "2");
+    expect(values().keep_firing_for).toBe(120);
+  });
+
+  it.each([
+    ["alert-settings-pending-period-input", "pending_period_sec"],
+    ["alert-settings-keep-firing-for-input", "keep_firing_for"],
+  ])("with Show all on, an unset %s reads Off and writes nothing", (dataTest, field) => {
+    const unset = { pending_period_sec: 0, keep_firing_for: 0, _ui: { pendingPeriod: 0 } };
+    const { host, values } = mountSectioned("false", unset, { showAll: true });
+    const input = amountInput(host, dataTest);
+    expect([input.props("modelValue"), input.props("placeholder")]).toEqual(["", t("common.off")]);
+    expect(values()[field]).toBe(0);
+    host.unmount();
+  });
+
+  it("an incident reads as a sentence with its title row", async () => {
+    config.isEnterprise = "true";
+    const { host, values, inSlot } = mountSectioned(
+      "false",
+      { creates_incident: true },
+      {
+        reveal: ["createsIncident"],
+      },
+    );
+    expect(inSlot("settingsNotifyMore", "add-alert-incident-row")).toBe(true);
+    expect(inSlot("settingsNotifyMore", "add-alert-incident-title-row")).toBe(true);
+    expect(inSlot("settingsNotifyMore", "alert-creates-incident-toggle")).toBe(false);
+
+    (document.querySelector('[data-test="add-alert-incident-row-remove"]') as HTMLElement).click();
+    await flushPromises();
+    expect(values().creates_incident).toBe(false);
+    expect(inSlot("settingsNotifyMore", "add-alert-incident-title-row")).toBe(false);
+    expect(inSlot("settingsNotifyMore", "add-alert-incident-row")).toBe(false);
+    host.unmount();
+  });
+
+  it("recovery fields stay hidden while recovery is off, even with Show all", () => {
+    const { inSlot } = mountSectioned(
+      "false",
+      { notify_on_recovery: false },
+      {
+        showAll: true,
+        destinations: ["dest-a"],
+      },
+    );
+    expect(inSlot("settingsNotifyMore", "alert-notify-on-recovery-toggle")).toBe(true);
+    expect(inSlot("settingsNotifyMore", "alert-notify-on-recovery-plan-dest-a")).toBe(false);
+    expect(document.body.textContent).not.toContain(t("alerts.alertSettings.recoveryDestinations"));
+  });
+
+  it("the recovery, keep-firing and Must last suggestions apply their values", () => {
+    const { applied, values } = mountSectioned("false");
+    applied.recovery!();
+    applied.keepFiring!();
+    applied.holdFor!();
+    expect(values().notify_on_recovery).toBe(true);
+    expect(values().keep_firing_for).toBe(600);
+    expect(values().pending_period_sec).toBe(10);
+  });
+
+  it.each([
+    ["holdFor", "pending_period_sec", {}, 5],
+    ["keepFiring", "keep_firing_for", {}, 300],
+    ["holdFor", "pending_period_sec", { pending_period_sec: 7, _ui: { pendingPeriod: 7 } }, 7],
+  ] as const)("an added %s row starts at one check, never 0", async (id, field, set, expected) => {
+    const { tiers, values } = mountSectioned("false", set);
+    tiers.reveal(id);
+    await flushPromises();
+    expect(values()[field]).toBe(expected);
+  });
+
+  it("Must last shows as a sentence once set and Remove clears it", async () => {
+    const { tiers, values, inSlot } = mountSectioned(
+      "false",
+      {
+        pending_period_sec: 10,
+        _ui: { pendingPeriod: 10 },
+      },
+      { reveal: ["holdFor"] },
+    );
+    expect(inSlot("settingsHold", "add-alert-hold-for-row")).toBe(true);
+
+    (document.querySelector('[data-test="add-alert-hold-for-row-remove"]') as HTMLElement).click();
+    await flushPromises();
+    expect(values().pending_period_sec).toBe(0);
+    expect(inSlot("settingsHold", "add-alert-hold-for-row")).toBe(false);
+    expect(tiers.view("condition").more.map((d) => d.id)).toContain("holdFor");
+  });
+
+  it.each([
+    [10, 10, "alerts.guard.mustLastOneCheckFix"],
+    [10, 5, "alerts.guard.mustLastOneCheckFix"],
+    [10, 15, "alerts.validation.pendingPeriodNotMultiple"],
+    [1, 10, null],
+  ])("checks every %i min with Must last %i min warns %s", (frequency, pending, key) => {
+    const { targets } = mountSectioned(
+      "false",
+      {
+        trigger_condition: { silence: 10, period: 10, frequency, frequency_type: "minutes" },
+        pending_period_sec: pending,
+        _ui: { pendingPeriod: pending },
+      },
+      { reveal: ["holdFor"] },
+    );
+    const warning = targets.settingsHold.querySelector(
+      '[data-test="alert-settings-pending-period-warning-text"]',
+    );
+    const every = everyWords(frequency, i18n.global.t as any);
+    expect(warning?.textContent?.trim() ?? null).toBe(key && t(key, { every, minutes: frequency }));
+  });
+
+  const perSvc = { query_condition: { aggregation: { multi_alert: true, group_by: ["svc"] } } };
+  it.each([
+    ["true", {}, "alerts.form.remind.realtimeHelp", null],
+    ["false", {}, "alerts.form.remind.whileFiring", null],
+    ["false", perSvc, "alerts.form.remind.whileFiringEach", "per svc"],
+  ])("Notify at most every explains itself for is_real_time %s %j", (kind, values, key, scope) => {
+    const { targets } = mountSectioned(kind, values);
+    const info = targets.settingsNotify.querySelectorAll("[aria-label]");
+    expect([...info].map((el) => el.getAttribute("aria-label"))).toContain(
+      t(key, { labels: "svc" }),
+    );
+    const shown = targets.settingsNotify.querySelector(
+      '[data-test="alert-settings-silence-scope"]',
+    );
+    expect(shown?.textContent?.trim() ?? null).toBe(scope);
+  });
+
+  it("composite Must last lives in the condition section", () => {
+    const { inSlot } = mountSectioned("composite", {}, { reveal: ["holdFor"] });
+    expect(inSlot("settingsHold", "add-alert-hold-for-row")).toBe(true);
+    expect(inSlot("settingsSchedule", "alert-settings-pending-period-input")).toBe(false);
   });
 });

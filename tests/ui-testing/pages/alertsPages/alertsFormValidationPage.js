@@ -2,6 +2,7 @@
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { openNavFlyoutChild } = require('../commonActions.js');
+import { openAlertFilterBuilder, selectAlertStreamType } from './alertSectionHelpers.js';
 const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 export class AlertsFormValidationPage {
@@ -101,7 +102,6 @@ export class AlertsFormValidationPage {
     // Redesigned form uses OToggleGroup tabs (no Next button). The default
     // active tab is "condition", which already renders FilterCondition,
     // QueryConfig and AlertSettings content once a stream is selected.
-    this.alertTabCondition = '[data-test="add-alert-tab-condition"]';
 
     // ── AlertSettings (step 3 of alert wizard) ───────────────────────────────
     this.alertSettingsSilenceDuration = '[data-test="alert-settings-silence-duration-input-field"]';
@@ -121,7 +121,6 @@ export class AlertsFormValidationPage {
     this.wizardStreamTypeDropdown     = '[data-test="add-alert-stream-type-select-dropdown"]';
     this.wizardStreamNameDropdown     = '[data-test="add-alert-stream-name-select-dropdown"]';
     // OSelect popovers — options carry `data-test-value` for value-specific picks
-    this.wizardStreamTypePopover      = '[data-test="add-alert-stream-type-select-dropdown-popover"]';
     this.wizardStreamNamePopover      = '[data-test="add-alert-stream-name-select-dropdown-popover"]';
 
     // ── Condition builder (shared FilterBuilder, prefix "alert-conditions") ──
@@ -374,6 +373,7 @@ export class AlertsFormValidationPage {
   async addFilterCondition(position = 0, operator = '=', value = 'e2e') {
     testLogger.info('Adding a condition through the condition builder', { position, operator });
     // A text field: a number field refuses text such as 'e2e' for `=`.
+    await openAlertFilterBuilder(this.page);
     await this.conditions.addConditionOnListedField(position, operator, value, { type: 'Text' });
   }
 
@@ -398,11 +398,10 @@ export class AlertsFormValidationPage {
    * once a stream type + name are chosen. This method now simply ensures that
    * the condition tab is the active tab so the downstream assertions resolve.
    */
+  /** No wizard Next any more: goes to the condition section and unfolds its filter builder. */
   async clickWizardNext() {
-    testLogger.info('Ensuring condition tab is active (no wizard Next button)');
-    const conditionTab = this.page.locator(this.alertTabCondition);
-    await conditionTab.waitFor({ state: 'visible', timeout: 10000 });
-    await conditionTab.click();
+    testLogger.info('Opening the condition filter builder (no wizard Next button)');
+    await openAlertFilterBuilder(this.page);
   }
 
   /**
@@ -414,11 +413,6 @@ export class AlertsFormValidationPage {
   }
 
   // OSelect option factories — pick by `data-test-value` (§4) rather than text.
-  getWizardStreamTypeOption(value) {
-    return this.page.locator(
-      `[data-test="add-alert-stream-type-select-dropdown-option"][data-test-value="${value}"]`,
-    );
-  }
 
   getWizardStreamNameOption(value) {
     return this.page.locator(
@@ -430,15 +424,16 @@ export class AlertsFormValidationPage {
     testLogger.info('Selecting alert wizard stream type: ' + typeLabel);
     // streamTypes are the lowercase values logs/metrics/traces (AddAlert.vue)
     const value = typeLabel.trim().toLowerCase();
-    await this.page.locator(this.wizardStreamTypeDropdown).click();
-    await this.page.locator(this.wizardStreamTypePopover).waitFor({ state: 'visible', timeout: 10000 });
-    await this.getWizardStreamTypeOption(value).click();
+    await selectAlertStreamType(this.page, value);
   }
 
   async selectWizardStreamName(streamName) {
     testLogger.info('Selecting alert wizard stream name: ' + streamName);
     await this.page.locator(this.wizardStreamNameDropdown).click();
     await this.page.locator(this.wizardStreamNamePopover).waitFor({ state: 'visible', timeout: 10000 });
+    // The option list is virtual: a stream past the rendered window is not in the DOM until filtered.
+    const search = this.page.locator('[data-test="add-alert-stream-name-select-dropdown-search"]');
+    if (await search.count()) await search.fill(streamName);
     await this.getWizardStreamNameOption(streamName).click();
   }
 
@@ -447,6 +442,7 @@ export class AlertsFormValidationPage {
    */
   async openFilterConditionColumnPopover() {
     testLogger.info('Opening the condition builder field picker');
+    await openAlertFilterBuilder(this.page);
     await this.conditions.openNewCondition();
   }
 }

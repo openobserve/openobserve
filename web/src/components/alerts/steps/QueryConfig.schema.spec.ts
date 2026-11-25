@@ -25,12 +25,12 @@ const t = (key: string, named?: Record<string, unknown>): string =>
 const conditionsTreeSchema = makeConditionsTreeSchema(t);
 const queryConfigSchema = makeQueryConfigSchema(t);
 const CONDITION_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
-const THRESHOLD_REQUIRED_MESSAGE = t("alerts.validation.thresholdPositive");
+const THRESHOLD_REQUIRED_MESSAGE = t("alerts.validation.limitWholeNumber");
 const FREQUENCY_REQUIRED_MESSAGE = t("alerts.validation.frequencyPositive");
-const CONDITION_VALUE_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
+const CONDITION_VALUE_REQUIRED_MESSAGE = t("alerts.guard.thresholdRequired", { example: "90" });
 const AGGREGATION_COLUMN_REQUIRED_MESSAGE = t("alerts.validation.aggregationColumnRequired");
 const PROMQL_OPERATOR_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
-const PROMQL_VALUE_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
+const PROMQL_VALUE_REQUIRED_MESSAGE = t("alerts.guard.thresholdRequired", { example: "90" });
 
 // Builders matching the V2 shapes the condition builder writes.
 const leaf = (overrides: Record<string, unknown> = {}) => ({
@@ -200,8 +200,11 @@ describe("QueryConfig.schema — conditions tree", () => {
         conditions: group([]),
         aggregation: null,
         promql_condition: null,
+        sql: "SELECT 1",
+        promql: "up",
         ...(overrides.query_condition || {}),
       },
+      stream_type: overrides.stream_type ?? "logs",
       logGroupBy: overrides.logGroupBy ?? [],
       // DISPLAY value: equals the stored minutes in minutes mode, stored/60 in
       // hours mode.
@@ -232,9 +235,10 @@ describe("QueryConfig.schema — conditions tree", () => {
       expect(r.error!.issues[0].message).toBe(THRESHOLD_REQUIRED_MESSAGE);
     });
 
-    it("blocks threshold < 1 and threshold 0 (scheduled)", () => {
-      expect(parse({ trigger_condition: { threshold: 0 } }).success).toBe(false);
-      expect(parse({ trigger_condition: { threshold: "0" } }).success).toBe(false);
+    it.each([0, "0", -5, 2.5, "2.5"])("blocks threshold %s (scheduled)", (threshold) => {
+      const r = parse({ trigger_condition: { threshold } });
+      expect(paths(r)).toContain("trigger_condition.threshold");
+      expect(r.error!.issues[0].message).toBe(THRESHOLD_REQUIRED_MESSAGE);
     });
 
     it("coerces a numeric STRING threshold — '5' passes", () => {
@@ -260,12 +264,88 @@ describe("QueryConfig.schema — conditions tree", () => {
       );
     });
 
-    it("does NOT require frequency in cron mode (cronError owns it)", () => {
+    it("does NOT require frequency in cron mode (the cron rule owns it)", () => {
       const r = parse({
         _ui: { checkEvery: "" },
         _meta: { frequencyMode: "cron" },
       });
       expect(paths(r)).not.toContain("_ui.checkEvery");
+    });
+
+    const cron = (expression: string, timezone = "UTC") => ({
+      trigger_condition: { frequency_type: "cron", cron: expression, timezone },
+      _meta: { frequencyMode: "cron", minAutoRefreshInterval: 300 },
+    });
+    it.each([
+      ["a blank expression", cron(""), t("alerts.queryConfig.cronExpressionTimezoneRequired")],
+      [
+        "no timezone",
+        cron("0 */10 * * * *", ""),
+        t("alerts.queryConfig.cronExpressionTimezoneRequired"),
+      ],
+      ["five fields", cron("0 9 * * 1-5"), t("alerts.validation.cronSixFields")],
+      ["an unparseable one", cron("a b c d e f"), t("alerts.queryConfig.invalidCronExpression")],
+      [
+        "one below the org floor",
+        cron("0 * * * * *"),
+        t("alerts.queryConfig.frequencyGreaterThanSeconds", { seconds: 299 }),
+      ],
+      ["a valid one", cron("0 */10 * * * *"), undefined],
+    ])("checks a cron schedule with %s", (_, overrides, message) => {
+      const r = parse(overrides);
+      const issue = r.success
+        ? undefined
+        : r.error.issues.find((i: any) => i.path.join(".") === "trigger_condition.cron");
+      expect(issue?.message).toBe(message);
+    });
+
+    it.each([
+      ["SQL with nothing written", { tab: "sql" }, { sql: "", promql: "" }, "query_condition.sql"],
+      [
+        "PromQL with nothing written",
+        { tab: "promql" },
+        { sql: "", promql: "" },
+        "query_condition.promql",
+      ],
+      [
+        "SQL while filters hold the query",
+        { tab: "sql" },
+        { sql: "", conditions: group([leaf()]) },
+        null,
+      ],
+      ["SQL with a query", { tab: "sql" }, {}, null],
+    ])("asks for a query: %s", (_, metaOver, qcOver, path) => {
+      const r = parse({ stream_type: "metrics", query_condition: qcOver, _meta: metaOver });
+      const queryPaths = paths(r).filter((p: string) => /^query_condition\.(sql|promql)$/.test(p));
+      expect(queryPaths).toEqual(path ? [path] : []);
+    });
+
+    it("blocks save on a PromQL by-label the metric lacks, with the guard's own message", () => {
+      const issue = "instance isn't a label of node_cpu_seconds_total.";
+      const promql = { tab: "promql" as const, isEventBased: false, promqlLabelIssue: issue };
+      const query_condition = { promql_condition: { operator: ">", value: 90 } };
+      const found = (r: any) =>
+        r.success
+          ? undefined
+          : r.error.issues.find((i: any) => i.path.join(".") === "query_condition.promql");
+      expect(found(parse({ query_condition, _meta: promql }))?.message).toBe(issue);
+      expect(found(parse({ query_condition, _meta: { ...promql, tab: "sql" } }))).toBeUndefined();
+    });
+
+    it.each([
+      ["minutes", 525_600, false],
+      ["minutes", 525_601, true],
+      ["hours", 8_760, false],
+      ["hours", 8_761, true],
+      ["minutes", "1" + "0".repeat(60), true],
+    ])("caps Check every at one year (%s, %s)", (frequencyMode, checkEvery, blocked) => {
+      const r = parse({ _ui: { checkEvery }, _meta: { frequencyMode } });
+      const issue = r.error?.issues.find((i: any) => i.path.join(".") === "_ui.checkEvery");
+      expect(issue?.message).toBe(
+        blocked
+          ? `Check every must be between 1 and ${frequencyMode === "hours" ? "8,760" : "525,600"}`
+          : undefined,
+      );
     });
 
     // ── Org min-frequency floor (R5 RESTORE) ────────────────────────────────
@@ -636,6 +716,39 @@ describe("QueryConfig.schema — conditions tree", () => {
         expect(r.success).toBe(false);
         expect(paths(r)).toContain("trigger_condition.warning_threshold");
       });
+
+      it.each([
+        [">=", 250000000000, "alerts.validation.warnBeforeLower", { limit: "2,500,000,000" }],
+        [">", 2500000000, "alerts.validation.warnBeforeLower", { limit: "2,500,000,000" }],
+        ["<=", 2000000000, "alerts.validation.warnBeforeHigher", { limit: "2,500,000,000" }],
+        ["<", 2500000000, "alerts.validation.warnBeforeHigher", { limit: "2,500,000,000" }],
+        [
+          "=",
+          3,
+          "alerts.validation.warnNotWith",
+          { comparison: t("alerts.sections.operators.eq") },
+        ],
+        [
+          "!=",
+          3,
+          "alerts.validation.warnNotWith",
+          { comparison: t("alerts.sections.operators.ne") },
+        ],
+        [">=", -1, "alerts.validation.limitWholeNumber", {}],
+        ["<=", 2.5, "alerts.validation.limitWholeNumber", {}],
+      ])(
+        "a bad warning count for '%s' (%s) says how to fix it",
+        (operator, warning, key, named) => {
+          const r = parse({
+            _meta: { tab: "sql" },
+            trigger_condition: { operator, threshold: 2500000000, warning_threshold: warning },
+          });
+          const issue = issuesOf(r).find(
+            (i: any) => i.path.join(".") === "trigger_condition.warning_threshold",
+          );
+          expect(issue.message).toBe(t(key, named));
+        },
+      );
 
       it("count family: warning below critical passes (strings included)", () => {
         expect(

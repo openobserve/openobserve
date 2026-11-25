@@ -431,7 +431,7 @@ describe("AddAlert drafts", () => {
     );
     await wrapper!
       .findComponent(AddAlert)
-      .get('[data-test="alert-settings-period-input-field"]')
+      .get('[data-test="alert-settings-silence-duration-input-field"]')
       .setValue("15");
     await flushPromises();
     window.dispatchEvent(new Event("pointerdown"));
@@ -452,10 +452,9 @@ describe("AddAlert drafts", () => {
       true,
       { AlertSettings: false },
     );
-    await fillField("alert-settings-period-input-field", "25");
-    // The period field commits after its 300 ms debounce.
+    await fillField("alert-settings-silence-duration-input-field", "25");
     await vi.waitFor(() =>
-      expect(String((vm().formData.trigger_condition as { period: unknown }).period)).toBe("25"),
+      expect(String((vm().formData.trigger_condition as { silence: unknown }).silence)).toBe("25"),
     );
     window.dispatchEvent(new Event("pagehide"));
 
@@ -487,14 +486,34 @@ describe("AddAlert drafts", () => {
     expect(readEditorDraft(editScope)).toBeNull();
   });
 
+  it("does not count a pause from the header as an unsaved draft, and a continued draft keeps the current state", async () => {
+    await mountEditor("/alerts?action=update&alert_id=3HGifdlCfgrm1thif69NRJig9E5", {
+      modelValue: { ...savedAlert, enabled: true },
+      isUpdated: true,
+    });
+    window.dispatchEvent(new Event("pointerdown"));
+    vm().form.setFieldValue("enabled", false);
+    await flushPromises();
+    window.dispatchEvent(new Event("pagehide"));
+
+    expect(vm().alertDraft.hasUnsavedChanges()).toBe(false);
+    expect(readEditorDraft(editScope)).toBeNull();
+
+    await edit("description", "pages on-call");
+    window.dispatchEvent(new Event("pagehide"));
+    expect(readEditorDraft(editScope)?.data).not.toHaveProperty("values.enabled");
+  });
+
   it("does not take a hidden select's change during the load for an edit, so nothing autosaves", async () => {
     await mountEditor(
       "/alerts?action=update&alert_id=3HGifdlCfgrm1thif69NRJig9E5",
       { modelValue: { ...savedAlert }, isUpdated: true },
       false,
     );
-    const hidden = wrapper!.findComponent(AddAlert).get('select[aria-hidden="true"]');
-    hidden.element.dispatchEvent(new Event("change", { bubbles: true }));
+    const hidden = document.createElement("select");
+    hidden.setAttribute("aria-hidden", "true");
+    wrapper!.findComponent(AddAlert).get("form").element.appendChild(hidden);
+    hidden.dispatchEvent(new Event("change", { bubbles: true }));
     await flushPromises();
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     vm().form.setFieldValue("description", "set by a late load");
@@ -550,7 +569,7 @@ describe("AddAlert drafts", () => {
     );
     await wrapper!
       .findComponent(AddAlert)
-      .get('[data-test="alert-settings-period-input-field"]')
+      .get('[data-test="alert-settings-silence-duration-input-field"]')
       .trigger("keydown", { key: "s", metaKey: true });
     await flushPromises();
     window.dispatchEvent(new Event("pointerdown"));

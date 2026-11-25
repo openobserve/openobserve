@@ -48,6 +48,9 @@ const props = withDefaults(defineProps<QueryFilterBarProps>(), {
   issues: undefined,
   valueHint: undefined,
   valueLabel: undefined,
+  fieldDetail: undefined,
+  valueEmptyText: undefined,
+  valueNote: undefined,
   fieldsLoading: false,
   placeholder: undefined,
   disabled: false,
@@ -88,6 +91,7 @@ const editor = useFilterBarEditor({
   loadValues: toRef(props, "loadValues"),
   extraValues: toRef(props, "extraValueSuggestions"),
   valueLabel: toRef(props, "valueLabel"),
+  fieldDetail: toRef(props, "fieldDetail"),
   extraSuggestions: toRef(props, "extraSuggestions"),
   selectExtra: (key, event) => emit("extra-select", key, event),
   t,
@@ -135,7 +139,7 @@ const showAddOrGroup = computed(
 );
 provide(FILTER_BAR_CHIP_CONTEXT, {
   fieldLabel: (field) => props.fields.find((f) => f.name === field)?.label,
-  valueHint: (field, values) => props.valueHint?.(field, values),
+  valueHint: (field, values, operator) => props.valueHint?.(field, values, operator),
   valueLabel: (field, value) => props.valueLabel?.(field, value),
   issueMessage: (nodeId) => props.issues?.find((issue) => issue.nodeId === nodeId)?.message,
   operatorName: (id) => operatorName(id, dialect.value, t, config.value.operatorNames),
@@ -167,10 +171,11 @@ const showEmptyRow = computed(
     !newDraft.value,
 );
 // A vertical caret gets its own line where it stands; resting at the end of an idle filter it sits beside the add buttons.
+// Editing a chip searches inside the picker, so the caret takes no line then.
 const caretLine = computed(
   () =>
     vertical.value &&
-    (open.value ||
+    ((open.value && !editingId.value) ||
       Boolean(newDraft.value) ||
       Boolean(openGroupId.value) ||
       Boolean(caretBeforeId.value) ||
@@ -202,7 +207,8 @@ const emptyText = computed(() => {
   }
   if (step.value === "value") {
     if (valueHint.value) return valueHint.value;
-    return valuesLoading.value ? undefined : t("filterBar.noValues");
+    if (valuesLoading.value) return undefined;
+    return props.valueEmptyText?.(draft.value?.field ?? "") ?? t("filterBar.noValues");
   }
   return t("filterBar.noOperators");
 });
@@ -342,6 +348,10 @@ function clearAll() {
 
 // A vertical caret holds a line of its own, so Escape gives that line back instead of leaving it empty.
 function onEscape() {
+  if (config.value.keepDraftOnEscape && draft.value && !editingId.value) {
+    open.value = false;
+    return;
+  }
   if (vertical.value) close();
   else dismiss();
 }
@@ -404,6 +414,7 @@ const draftOperator = computed(() => {
     :size="size"
     :appearance="appearance"
     :max-rows="maxRows"
+    :row-tooltip-side="config.rowTooltipSide"
     :data-test="dataTest"
     @update:model-value="editor.onTextChange"
     @select="editor.select"
@@ -423,6 +434,7 @@ const draftOperator = computed(() => {
     <template #default="{ caret }">
       <div v-if="vertical" ref="rowsRef" class="flex w-full min-w-min flex-col gap-1.5">
         <FilterBarRows
+          :add-labels="addLabels"
           :items="modelValue.items"
           :group-id="modelValue.id"
           :connector-mode="config.connectors"
@@ -611,6 +623,13 @@ const draftOperator = computed(() => {
       />
     </template>
     <template v-if="multiStep" #footer>
+      <p
+        v-if="valueNote"
+        class="text-text-secondary m-0 mb-1.5 text-xs"
+        :data-test="`${dataTest}-value-note`"
+      >
+        {{ valueNote }}
+      </p>
       <div class="flex items-center gap-2">
         <span class="min-w-0 flex-1" :data-test="`${dataTest}-selected-count`">{{
           valuesAtLimit

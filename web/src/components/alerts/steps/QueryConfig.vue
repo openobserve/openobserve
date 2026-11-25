@@ -15,12 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-query-config mx-auto h-full w-full min-w-0 overflow-auto">
+  <div
+    :class="[
+      'step-query-config mx-auto w-full min-w-0',
+      sectionTargets ? '' : 'h-full overflow-auto',
+    ]"
+  >
     <div
-      class="step-content rounded-default bg-surface-overlay border-border-default box-border min-h-full w-full min-w-0 overflow-hidden border"
+      :class="[
+        'step-content box-border w-full min-w-0',
+        sectionTargets
+          ? ''
+          : 'rounded-default bg-surface-overlay border-border-default min-h-full overflow-hidden border',
+      ]"
     >
       <!-- Section header -->
       <div
+        v-if="!sectionTargets"
         class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
       >
         <div
@@ -36,9 +47,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            `name=` (trigger_condition.*, query_condition.*, logGroupBy[]) into that
            form; the composed schema in AddAlert.schema.ts validates them on save.
            Non-form widgets (tabs / editors / VRL / condition builder) are bridged. -->
-      <div class="box-border w-full min-w-0 px-3 py-2">
+      <div :class="['box-border w-full min-w-0', sectionTargets ? '' : 'px-3 py-2']">
         <!-- Query Mode Tabs (hidden for real-time alerts) -->
-        <div v-if="shouldShowTabs" class="mb-2 flex items-center justify-between">
+        <OSettingRow
+          v-if="sectionTargets && shouldShowTabs && !defineWithInline"
+          :label="t('alerts.sections.rows.whichEvents')"
+          data-test="add-alert-which-events"
+        >
+          <OToggleGroup
+            :model-value="localTab"
+            @update:model-value="updateTab($event as 'sql' | 'promql' | 'custom')"
+            data-test="step2-query-tabs"
+          >
+            <OToggleGroupItem
+              v-for="tab in tabOptions"
+              :key="tab.value"
+              :value="tab.value"
+              :data-test="`query-mode-${tab.value}`"
+              size="sm"
+            >
+              <template #icon-left>
+                <OIcon v-if="tab.value === 'custom'" name="filter-alt" size="sm" />
+                <OIcon v-else-if="tab.value === 'sql'" name="database" size="sm" />
+                <OIcon v-else-if="tab.value === 'promql'" name="show-chart" size="sm" />
+              </template>
+              {{ tab.label }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+        </OSettingRow>
+        <div
+          v-else-if="!sectionTargets && shouldShowTabs"
+          class="mb-2 flex items-center justify-between"
+        >
           <OToggleGroup
             :model-value="localTab"
             @update:model-value="updateTab($event as 'sql' | 'promql' | 'custom')"
@@ -78,1703 +118,1260 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <!-- Section 1: Alert condition sentence — scheduled only -->
             <div v-if="isRealTime === 'false'" class="flex flex-col gap-0">
-              <!-- LOGS/TRACES -->
-              <template v-if="isEventBased">
-                <!-- Alert if row -->
-                <div
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
-                  data-test="alert-if-row-logs"
-                >
-                  <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                    >{{ t("alerts.threshold") }}*</span
-                  >
-                  <div class="flex flex-col gap-1.5">
-                    <!-- Measurement sentence: WHAT to measure. Severity rows
-                         below say WHEN it fires (mock: multi-alert-form.html). -->
-                    <div class="flex flex-nowrap items-start gap-2">
-                      <div class="max-w-45 min-w-32.5">
-                        <OSelect
-                          v-model="selectedFunction"
-                          :aria-label="t('alerts.queryConfig.aggregationFunction')"
-                          :options="logFunctionOptions"
-                          labelKey="label"
-                          valueKey="value"
-                          @update:model-value="onLogFunctionChange"
-                        />
-                        <OTooltip
-                          :content="
-                            logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                              ?.tooltip || raw('')
-                          "
-                          :delay="400"
-                        />
-                      </div>
-                      <!-- "of [field]" shown for measure modes -->
-                      <template v-if="selectedFunction !== 'total_events'">
-                        <span
-                          class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                          >{{ t("alerts.conditionOf") }}</span
-                        >
-                        <OFormSelect
-                          :aria-label="t('alerts.column')"
-                          name="query_condition.aggregation.having.column"
-                          :options="numericColumns"
-                          searchable
-                          :placeholder="t('alerts.placeholders.selectColumn')"
-                          :class="['max-w-50 min-w-35']"
-                          @update:model-value="onLogMeasureColumnChange($event)"
-                        />
-                      </template>
-                      <span
-                        v-if="selectedFunction === 'total_events' && streamName"
-                        class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                        >{{
-                          t("alerts.matchingTypeFound", {
-                            type: streamType === "traces" ? "traces" : "logs",
-                          })
-                        }}</span
-                      >
-                    </div>
-
-                    <!-- COUNT mode severity rows -->
-                    <template v-if="selectedFunction === 'total_events'">
-                      <div class="flex items-start gap-2">
-                        <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                          >{{ t("alerts.criticalIf") }}</span
-                        >
-                        <OFormSelect
-                          :aria-label="t('common.operator')"
-                          name="trigger_condition.operator"
-                          :options="numericOperators"
-                          width="xs"
-                          data-test="alert-trigger-operator-select"
-                          :searchable="false"
-                          @update:model-value="onTriggerOperatorChange"
-                        />
-                        <!-- Message hangs under the threshold field it describes. -->
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('alerts.alertIfNoOfEvents')"
-                            name="trigger_condition.threshold"
-                            type="number"
-                            width="xs"
-                            data-test="alert-trigger-threshold-input"
-                            @blur="restoreDefaultThreshold"
-                            min="1"
-                            @update:model-value="onTriggerThresholdChange($event)"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="thresholdError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-if-row-logs-error"
-                            role="alert"
-                          >
-                            {{ thresholdError }}
-                          </div>
-                        </div>
-                      </div>
-                      <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
-                           critical's operator, so the row only echoes it. -->
-                      <div v-if="countWarningVisible" class="flex items-start gap-2">
-                        <span
-                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                          >{{ t("alerts.warningIf") }}</span
-                        >
-                        <span
-                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                          >{{ triggerOperator }}</span
-                        >
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('alerts.warningIf')"
-                            name="trigger_condition.warning_threshold"
-                            type="number"
-                            width="xs"
-                            data-test="alert-warning-threshold-input-136"
-                            :placeholder="t('alerts.optional')"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="warningThresholdError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-warning-threshold-error-136"
-                            role="alert"
-                          >
-                            {{ warningThresholdError }}
-                          </div>
-                        </div>
-                        <OButton
-                          variant="ghost"
-                          size="icon-circle-sm"
-                          class="text-icon-color hover:text-status-error-text self-center"
-                          :aria-label="t('alerts.removeWarning')"
-                          data-test="alert-remove-warning-button"
-                          @click="removeCountWarning"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
-                      </div>
-                      <div v-else>
-                        <OButton
-                          variant="ghost-primary"
-                          size="sm"
-                          data-test="alert-add-warning-button"
-                          @click="addCountWarning"
-                        >
-                          <OIcon name="add" size="sm" />
-                          {{ t("alerts.addWarning") }}
-                        </OButton>
-                      </div>
-                    </template>
-
-                    <!-- MEASURE mode severity rows -->
-                    <template v-else>
-                      <div class="flex items-start gap-2">
-                        <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                          >{{ t("alerts.criticalIf") }}</span
-                        >
-                        <OFormSelect
-                          :aria-label="t('common.operator')"
-                          name="query_condition.aggregation.having.operator"
-                          :options="numericOperators"
-                          :searchable="false"
-                          width="xs"
-                          data-test="alert-condition-operator-select"
-                          @update:model-value="onConditionOperatorChange"
-                        />
-                        <!-- Message hangs under the value field it describes. -->
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('common.value')"
-                            name="query_condition.aggregation.having.value"
-                            type="number"
-                            width="xs"
-                            :placeholder="t('alerts.placeholders.value')"
-                            @update:model-value="onConditionValueChange($event)"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="havingValueError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-if-row-logs-value-error"
-                            role="alert"
-                          >
-                            {{ havingValueError }}
-                          </div>
-                        </div>
-                      </div>
-                      <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
-                           critical's operator, so the row only echoes it. -->
-                      <div v-if="aggWarningVisible" class="flex items-start gap-2">
-                        <span
-                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                          >{{ t("alerts.warningIf") }}</span
-                        >
-                        <span
-                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                          >{{ conditionOperator }}</span
-                        >
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('alerts.warningIf')"
-                            name="query_condition.aggregation.warning_value"
-                            type="number"
-                            width="xs"
-                            data-test="alert-aggregation-warning-value-input-182"
-                            :placeholder="t('alerts.optional')"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="aggregationWarningError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-aggregation-warning-value-error-182"
-                            role="alert"
-                          >
-                            {{ aggregationWarningError }}
-                          </div>
-                        </div>
-                        <OButton
-                          variant="ghost"
-                          size="icon-circle-sm"
-                          class="text-icon-color hover:text-status-error-text self-center"
-                          :aria-label="t('alerts.removeWarning')"
-                          data-test="alert-remove-warning-button"
-                          @click="removeAggWarning"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
-                      </div>
-                      <div v-else>
-                        <OButton
-                          variant="ghost-primary"
-                          size="sm"
-                          data-test="alert-add-warning-button"
-                          @click="addAggWarning"
-                        >
-                          <OIcon name="add" size="sm" />
-                          {{ t("alerts.addWarning") }}
-                        </OButton>
-                      </div>
-                    </template>
-                  </div>
-                </div>
-
-                <!-- group by row (hidden for count mode) -->
-                <div
-                  v-if="selectedFunction !== 'total_events'"
-                  class="rounded-default text-compact flex items-center gap-3 px-3 py-2"
-                  data-test="alert-group-by-row"
-                >
-                  <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 font-bold whitespace-nowrap"
-                  >
-                    {{ t("alerts.groupBy") }}
-                    <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" side="top" />
-                  </span>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <template v-for="(group, index) in logGroupByRows" :key="index">
-                      <div class="flex items-center gap-1">
-                        <OFormSelect
-                          :aria-label="t('alerts.groupBy')"
-                          :name="`logGroupBy[${index}]`"
-                          :options="columns"
-                          searchable
-                          :placeholder="t('alerts.placeholders.selectColumn')"
-                          :data-test="`alert-group-by-select-${index}`"
-                          @update:model-value="onLogGroupByChange"
-                        />
-                        <OButton
-                          :aria-label="t('common.remove')"
-                          variant="ghost"
-                          size="icon-circle-sm"
-                          class="text-icon-color hover:text-status-error-text"
-                          @click="deleteLogGroupByColumn(index)"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
-                      </div>
-                    </template>
-                    <OButton
-                      variant="ghost-primary"
-                      size="icon-circle-sm"
-                      data-test="alert-group-by-add-btn"
-                      @click="addLogGroupByColumn"
-                    >
-                      <OIcon name="add" size="sm" />
-                      <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
-                    </OButton>
-                  </div>
-                </div>
-
-                <!-- Simple vs Multi alert (M-9) — only once a group-by exists -->
-                <AlertMultiToggle
-                  v-if="selectedFunction !== 'total_events' && hasLogGroupByFields"
-                  :enabled="isMultiAlert"
-                  @change="onMultiAlertChange"
-                />
-
-                <!-- no. of groups row — visible only when group-by fields are
-                     added, and NOT for a multi-alert: per-group evaluation
-                     fires on any breaching group, so a group-count rule has no
-                     meaning there and M-10 rejects it at save time. -->
-                <div
-                  v-if="selectedFunction !== 'total_events' && hasLogGroupByFields && !isMultiAlert"
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
-                  data-test="alert-having-groups-row"
-                >
-                  <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                  >
-                    {{ t("alerts.queryConfig.havingGroups") }}
-                    <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" side="top" />
-                  </span>
-                  <div class="flex flex-nowrap items-start gap-2">
-                    <OFormSelect
-                      :aria-label="t('common.operator')"
-                      name="trigger_condition.operator"
-                      :options="numericOperators"
-                      :searchable="false"
-                      class="max-w-30 min-w-17.5"
-                      @update:model-value="onTriggerOperatorChange"
-                    />
-                    <!-- Message hangs under the threshold field it describes. -->
-                    <div class="flex flex-col gap-1">
-                      <OFormInput
-                        :aria-label="t('alerts.alertIfNoOfEvents')"
-                        name="trigger_condition.threshold"
-                        type="number"
-                        width="xs"
-                        min="1"
-                        @update:model-value="onTriggerThresholdChange($event)"
-                        @blur="restoreDefaultThreshold"
-                      >
-                        <template #error />
-                      </OFormInput>
-                      <div
-                        v-if="thresholdError"
-                        class="text-input-error-text text-xs whitespace-nowrap"
-                        data-test="alert-having-groups-threshold-error"
-                        role="alert"
-                      >
-                        {{ thresholdError }}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </template>
-
-              <!-- METRICS -->
-              <template v-else>
-                <!-- Alert if row -->
-                <div
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
-                >
-                  <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                    >{{ t("alerts.threshold") }}*</span
-                  >
-                  <div class="flex flex-col gap-1.5">
-                    <!-- Measurement sentence: WHAT to measure. Severity rows
-                         below say WHEN it fires (mock: multi-alert-form.html). -->
-                    <div class="flex flex-nowrap items-start gap-2">
-                      <div class="max-w-45 min-w-32.5">
-                        <OSelect
-                          v-model="selectedFunction"
-                          :aria-label="t('alerts.queryConfig.aggregationFunction')"
-                          :options="logFunctionOptions"
-                          labelKey="label"
-                          valueKey="value"
-                          @update:model-value="onMetricFunctionChange"
-                        />
-                        <OTooltip
-                          :content="
-                            logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                              ?.tooltip || raw('')
-                          "
-                          :delay="400"
-                        />
-                      </div>
-
-                      <!-- "of [field]" hidden for count mode -->
-                      <template v-if="selectedFunction !== 'total_events'">
-                        <span
-                          class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                          >{{ t("alerts.conditionOf") }}</span
-                        >
-                        <div class="relative inline-flex">
-                          <OFormSelect
-                            name="query_condition.aggregation.having.column"
-                            :aria-label="t('alerts.column')"
-                            :options="columns"
-                            searchable
-                            :placeholder="t('alerts.placeholders.selectColumn')"
-                            :readonly="
-                              inputData.aggregation?.having?.column === 'value' &&
-                              columns.some(
-                                (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
-                              )
-                            "
-                            :disable="
-                              inputData.aggregation?.having?.column === 'value' &&
-                              columns.some(
-                                (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
-                              )
-                            "
-                            @update:model-value="onLogMeasureColumnChange($event)"
-                            class="max-w-50 min-w-35"
-                          />
-                          <OTooltip
-                            v-if="
-                              inputData.aggregation?.having?.column === 'value' &&
-                              columns.some(
-                                (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
-                              )
-                            "
-                            :content="t('alerts.metricsValueFieldTooltip')"
-                            side="bottom"
-                          />
-                        </div>
-                      </template>
-                      <span
-                        v-if="selectedFunction === 'total_events'"
-                        class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                        >{{ t("alerts.matchingMetricsFound") }}</span
-                      >
-                    </div>
-
-                    <!-- Count mode severity rows -->
-                    <template v-if="selectedFunction === 'total_events'">
-                      <div class="flex items-start gap-2">
-                        <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                          >{{ t("alerts.criticalIf") }}</span
-                        >
-                        <OFormSelect
-                          :aria-label="t('common.operator')"
-                          name="trigger_condition.operator"
-                          :options="numericOperators"
-                          :searchable="false"
-                          width="xs"
-                          @update:model-value="onTriggerOperatorChange"
-                        />
-                        <!-- Message hangs under the threshold field it describes. -->
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('alerts.alertIfNoOfEvents')"
-                            name="trigger_condition.threshold"
-                            type="number"
-                            width="xs"
-                            @update:model-value="onTriggerThresholdChange($event)"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="thresholdError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-if-row-metrics-error"
-                            role="alert"
-                          >
-                            {{ thresholdError }}
-                          </div>
-                        </div>
-                      </div>
-                      <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
-                           critical's operator, so the row only echoes it. -->
-                      <div v-if="countWarningVisible" class="flex items-start gap-2">
-                        <span
-                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                          >{{ t("alerts.warningIf") }}</span
-                        >
-                        <span
-                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                          >{{ triggerOperator }}</span
-                        >
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('alerts.warningIf')"
-                            name="trigger_condition.warning_threshold"
-                            type="number"
-                            width="xs"
-                            data-test="alert-warning-threshold-input-381"
-                            :placeholder="t('alerts.optional')"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="warningThresholdError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-warning-threshold-error-381"
-                            role="alert"
-                          >
-                            {{ warningThresholdError }}
-                          </div>
-                        </div>
-                        <OButton
-                          variant="ghost"
-                          size="icon-circle-sm"
-                          class="text-icon-color hover:text-status-error-text self-center"
-                          :aria-label="t('alerts.removeWarning')"
-                          data-test="alert-remove-warning-button"
-                          @click="removeCountWarning"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
-                      </div>
-                      <div v-else>
-                        <OButton
-                          variant="ghost-primary"
-                          size="sm"
-                          data-test="alert-add-warning-button"
-                          @click="addCountWarning"
-                        >
-                          <OIcon name="add" size="sm" />
-                          {{ t("alerts.addWarning") }}
-                        </OButton>
-                      </div>
-                    </template>
-
-                    <!-- Measure mode severity rows -->
-                    <template v-else>
-                      <div class="flex items-start gap-2">
-                        <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                          >{{ t("alerts.criticalIf") }}</span
-                        >
-                        <OFormSelect
-                          :aria-label="t('common.operator')"
-                          name="query_condition.aggregation.having.operator"
-                          :options="numericOperators"
-                          :searchable="false"
-                          width="xs"
-                          @update:model-value="onConditionOperatorChange"
-                        />
-                        <!-- Message hangs under the value field it describes. -->
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('common.value')"
-                            name="query_condition.aggregation.having.value"
-                            type="number"
-                            width="xs"
-                            :placeholder="t('alerts.placeholders.value')"
-                            @update:model-value="onConditionValueChange($event)"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="havingValueError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-if-row-metrics-value-error"
-                            role="alert"
-                          >
-                            {{ havingValueError }}
-                          </div>
-                        </div>
-                      </div>
-                      <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
-                           critical's operator, so the row only echoes it. -->
-                      <div v-if="aggWarningVisible" class="flex items-start gap-2">
-                        <span
-                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                          >{{ t("alerts.warningIf") }}</span
-                        >
-                        <span
-                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                          >{{ conditionOperator }}</span
-                        >
-                        <div class="flex flex-col gap-1">
-                          <OFormInput
-                            :aria-label="t('alerts.warningIf')"
-                            name="query_condition.aggregation.warning_value"
-                            type="number"
-                            width="xs"
-                            data-test="alert-aggregation-warning-value-input-413"
-                            :placeholder="t('alerts.optional')"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <div
-                            v-if="aggregationWarningError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
-                            data-test="alert-aggregation-warning-value-error-413"
-                            role="alert"
-                          >
-                            {{ aggregationWarningError }}
-                          </div>
-                        </div>
-                        <OButton
-                          variant="ghost"
-                          size="icon-circle-sm"
-                          class="text-icon-color hover:text-status-error-text self-center"
-                          :aria-label="t('alerts.removeWarning')"
-                          data-test="alert-remove-warning-button"
-                          @click="removeAggWarning"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
-                      </div>
-                      <div v-else>
-                        <OButton
-                          variant="ghost-primary"
-                          size="sm"
-                          data-test="alert-add-warning-button"
-                          @click="addAggWarning"
-                        >
-                          <OIcon name="add" size="sm" />
-                          {{ t("alerts.addWarning") }}
-                        </OButton>
-                      </div>
-                    </template>
-                  </div>
-                </div>
-
-                <!-- group by row — hidden for count mode -->
-                <div
-                  v-if="inputData.aggregation && selectedFunction !== 'total_events'"
-                  class="rounded-default text-compact flex items-center gap-3 px-3 py-2"
-                >
-                  <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 font-bold whitespace-nowrap"
-                  >
-                    {{ t("alerts.groupBy") }}
-                    <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" side="top" />
-                  </span>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <template v-for="(group, index) in metricGroupByRows" :key="index">
-                      <div class="flex items-center gap-1">
-                        <OFormSelect
-                          :aria-label="t('alerts.groupBy')"
-                          :name="`query_condition.aggregation.group_by[${index}]`"
-                          :options="columns"
-                          searchable
-                          :placeholder="t('alerts.placeholders.selectColumn')"
-                          class="max-w-45 min-w-30"
-                          @update:model-value="syncMetricGroupByToProps"
-                        />
-                        <OButton
-                          :aria-label="t('common.remove')"
-                          variant="ghost"
-                          size="icon-circle-sm"
-                          class="text-icon-color hover:text-status-error-text"
-                          @click="deleteGroupByColumn(index)"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
-                      </div>
-                    </template>
-                    <OButton
-                      variant="ghost-primary"
-                      size="icon-circle-sm"
-                      @click="addGroupByColumn"
-                    >
-                      <OIcon name="add" size="sm" />
-                      <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
-                    </OButton>
-                  </div>
-                </div>
-
-                <!-- Simple vs Multi alert (M-9) — only once a group-by exists -->
-                <AlertMultiToggle
-                  v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields"
-                  :enabled="isMultiAlert"
-                  @change="onMultiAlertChange"
-                />
-
-                <!-- no. of groups row — hidden for a multi-alert, see the log
-                     branch above for why. -->
-                <div
-                  v-if="
-                    selectedFunction !== 'total_events' && hasMetricGroupByFields && !isMultiAlert
-                  "
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
-                >
-                  <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                  >
-                    {{ t("alerts.queryConfig.havingGroups") }}
-                    <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" side="top" />
-                  </span>
-                  <div class="flex flex-nowrap items-start gap-2">
-                    <OFormSelect
-                      :aria-label="t('common.operator')"
-                      name="trigger_condition.operator"
-                      :options="numericOperators"
-                      :searchable="false"
-                      class="max-w-30 min-w-17.5"
-                      @update:model-value="onTriggerOperatorChange"
-                    />
-                    <!-- Message hangs under the threshold field it describes. -->
-                    <div class="flex flex-col gap-1">
-                      <OFormInput
-                        :aria-label="t('alerts.alertIfNoOfEvents')"
-                        name="trigger_condition.threshold"
-                        type="number"
-                        width="xs"
-                        min="1"
-                        @update:model-value="onTriggerThresholdChange($event)"
-                        @blur="restoreDefaultThreshold"
-                      >
-                        <template #error />
-                      </OFormInput>
-                      <div
-                        v-if="thresholdError"
-                        class="text-input-error-text text-xs whitespace-nowrap"
-                        data-test="alert-metric-having-groups-threshold-error"
-                        role="alert"
-                      >
-                        {{ thresholdError }}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </template>
-
-              <!-- Check every row -->
-              <div
-                class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
-              >
-                <span
-                  class="text-text-heading text-compact min-w-22.5 shrink-0 leading-7 font-bold whitespace-nowrap"
-                >
-                  {{ t("alerts.queryConfig.checkEvery") }} *
-                  <OTooltip :content="t('alerts.howOftenCheckTooltip')" side="top" />
-                </span>
-                <div class="flex flex-col gap-1">
-                  <div class="flex items-center gap-2 max-md:flex-wrap">
-                    <!-- Minutes/hours mode: number input -->
-                    <template v-if="frequencyMode !== 'cron'">
-                      <OFormInput
-                        :aria-label="t('alerts.queryConfig.checkEvery')"
-                        name="_ui.checkEvery"
-                        type="number"
-                        class="max-w-25 min-w-25"
-                        min="1"
-                        @update:model-value="onCheckEveryChange($event)"
-                        @blur="restoreDefaultFrequency"
-                      >
-                        <!-- Message rendered below at row width — see checkEveryError. -->
-                        <template #error />
-                      </OFormInput>
-                    </template>
-                    <!-- Cron mode: expression input + timezone (Rule ②: form-owned
-                       by `name=`, no v-model mirror). -->
-                    <template v-else>
-                      <OFormInput
-                        :aria-label="t('alerts.queryConfig.cron')"
-                        name="trigger_condition.cron"
-                        :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
-                        class="max-w-25 min-w-25"
-                        @update:model-value="onCronExpressionChange"
-                      />
-                    </template>
-
-                    <!-- Unit dropdown: minutes / hours / cron -->
-                    <OSelect
-                      :aria-label="
-                        t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })
+              <Teleport
+                :to="sectionTargets?.queryCondition"
+                :disabled="!sectionTargets?.queryCondition"
+                ><div class="flex flex-col gap-0">
+                  <!-- LOGS/TRACES -->
+                  <template v-if="isEventBased">
+                    <!-- Alert if row -->
+                    <OSettingRow
+                      data-test="alert-if-row-logs"
+                      wide
+                      :label="t('alerts.plain.notifyMeWhen')"
+                      :description="
+                        isSpanDuration
+                          ? t('alerts.units.storedAs', { unit: t('alerts.units.options.us') })
+                          : undefined
                       "
-                      class="max-w-25 min-w-20"
-                      :model-value="frequencyMode"
-                      :options="frequencyUnitOptions"
-                      labelKey="label"
-                      valueKey="value"
-                      :searchable="false"
-                      @update:model-value="onFrequencyUnitChange"
-                    />
-
-                    <!-- Timezone (only for cron, inline) -->
-                    <template v-if="frequencyMode === 'cron'">
-                      <span class="inline-block max-w-37.5 min-w-37.5">
-                        <OFormSelect
-                          :aria-label="t('alerts.downtimes.scheduleForm.timezone')"
-                          name="trigger_condition.timezone"
-                          :options="timezoneSelectOptions"
-                          searchable
-                          :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
-                          class="max-w-37.5 min-w-37.5"
-                          @update:model-value="onCronTimezoneChange"
-                        />
-                        <OTooltip v-if="cronTimezone" :content="raw(cronTimezone)" side="bottom" />
-                      </span>
-                    </template>
-
-                    <span
-                      class="text-text-secondary text-compact font-semibold whitespace-nowrap"
-                      >{{ t("alerts.queryConfig.onThese") }}</span
+                      fill
                     >
-                    <div
-                      class="filters-inline-toggle rounded-default bg-surface-panel hover:bg-tabs-hover-bg flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors select-none"
-                      @click="toggleFilters"
-                    >
-                      <OIcon
-                        name="filter-alt"
-                        size="xs"
-                        :class="filterCount > 0 ? 'text-theme-accent' : 'text-text-secondary'"
-                      />
-                      <span
-                        class="text-xs font-semibold"
-                        :class="filterCount > 0 ? 'text-theme-accent' : 'text-text-body'"
-                      >
-                        {{ t("alerts.queryConfig.filters") }}
-                      </span>
-                      <span
-                        v-if="filterCount > 0"
-                        class="text-2xs rounded-full px-1.5 py-0 leading-5 font-bold"
-                        :class="'bg-status-info-bg text-status-info-text'"
-                      >
-                        {{ filterCount }}
-                      </span>
-                      <OIcon
-                        :name="showFilters ? 'expand-more' : 'chevron-right'"
-                        size="sm"
-                        :class="'text-text-secondary'"
-                      />
-                      <!-- Review your SQL query hint -->
-                      <span
-                        v-if="generatedSqlQuery && !showFilters"
-                        class="ms-1 cursor-help text-xs whitespace-nowrap italic underline decoration-dotted underline-offset-2"
-                        :class="'text-text-secondary'"
-                      >
-                        {{ t("alerts.queryConfig.viewAlertQuery") }}
-                        <OTooltip :delay="200" side="bottom">
-                          <template #content>
-                            <AlertQueryPreview :query="generatedSqlQuery" />
+                      <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                        <div
+                          class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1.5"
+                          data-test="alert-condition-measure"
+                        >
+                          <div class="flex min-w-0 items-start gap-2">
+                            <div class="w-36 min-w-28 shrink">
+                              <OSelect
+                                v-model="selectedFunction"
+                                :aria-label="t('alerts.queryConfig.aggregationFunction')"
+                                :options="logFunctionOptions"
+                                labelKey="label"
+                                valueKey="value"
+                                @update:model-value="onLogFunctionChange"
+                              />
+                              <OTooltip
+                                :content="
+                                  logFunctionOptions.find((o: any) => o.value === selectedFunction)
+                                    ?.tooltip || raw('')
+                                "
+                                :delay="400"
+                              />
+                            </div>
+                            <!-- "of [field]" shown for measure modes -->
+                            <template v-if="selectedFunction !== 'total_events'">
+                              <span
+                                class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
+                                >{{ countsGroupField ? countedNoun : measureConnector }}</span
+                              >
+                              <span v-show="!countsGroupField" class="contents">
+                                <OFormSelect
+                                  :aria-label="t('alerts.form.names.field')"
+                                  name="query_condition.aggregation.having.column"
+                                  :options="numericColumns"
+                                  searchable
+                                  :placeholder="t('alerts.placeholders.selectColumn')"
+                                  class="w-50! min-w-28 shrink"
+                                  @update:model-value="onLogMeasureColumnChange($event)"
+                                />
+                              </span>
+                            </template>
+                          </div>
+                          <span
+                            v-if="leafFilterCount > 0"
+                            class="text-text-secondary text-compact leading-8.5 whitespace-nowrap"
+                            >{{
+                              t(
+                                "alerts.plain.whereFilters",
+                                { count: leafFilterCount },
+                                leafFilterCount,
+                              )
+                            }}</span
+                          >
+                          <AlertWindowPhrase
+                            ref="periodFieldRef"
+                            class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
+                            :minutes="periodMinutes"
+                            @update:minutes="emit('update:period', $event)"
+                          />
+                        </div>
+
+                        <AlertThresholdLevels
+                          v-if="selectedFunction === 'total_events'"
+                          operator-name="trigger_condition.operator"
+                          value-name="trigger_condition.threshold"
+                          :operators="plainOperators"
+                          :levels="warningOffered"
+                          warning-name="trigger_condition.warning_threshold"
+                          :warning-shown="countWarningVisible"
+                          :warning-operator="operatorLabel(triggerOperator)"
+                          value-min="1"
+                          operator-data-test="alert-trigger-operator-select"
+                          value-data-test="alert-trigger-threshold-input"
+                          warning-input-data-test="alert-warning-threshold-input-136"
+                          :error="thresholdError"
+                          error-data-test="alert-if-row-logs-error"
+                          :warning-error="warningThresholdError"
+                          warning-error-data-test="alert-warning-threshold-error-136"
+                          :window-error="periodError"
+                          :note="conditionNote"
+                          :help="conditionHelp"
+                          message-data-test="alert-condition-message"
+                          @operator="onTriggerOperatorChange"
+                          @value="onTriggerThresholdChange($event)"
+                          @value-blur="restoreDefaultThreshold"
+                          @add-warning="addCountWarning"
+                          @remove-warning="removeCountWarning"
+                        ></AlertThresholdLevels>
+                        <AlertThresholdLevels
+                          v-else
+                          operator-name="query_condition.aggregation.having.operator"
+                          value-name="query_condition.aggregation.having.value"
+                          :operators="plainOperators"
+                          :levels="warningOffered"
+                          warning-name="query_condition.aggregation.warning_value"
+                          :warning-shown="aggWarningVisible"
+                          :warning-operator="operatorLabel(conditionOperator)"
+                          operator-data-test="alert-condition-operator-select"
+                          warning-input-data-test="alert-aggregation-warning-value-input-182"
+                          :error="havingValueError"
+                          error-data-test="alert-if-row-logs-value-error"
+                          :warning-error="aggregationWarningError"
+                          warning-error-data-test="alert-aggregation-warning-value-error-182"
+                          :window-error="periodError"
+                          :note="conditionNote"
+                          :help="conditionHelp"
+                          message-data-test="alert-condition-message"
+                          @operator="onConditionOperatorChange"
+                          @value="onConditionValueChange($event)"
+                          @add-warning="addAggWarning"
+                          @remove-warning="removeAggWarning"
+                        >
+                          <template v-if="isSpanDuration" #value>
+                            <OFormInput
+                              :aria-label="t('alerts.alertIfNoOfEvents')"
+                              name="_ui.durationValue"
+                              type="number"
+                              fit-content
+                              :placeholder="t('alerts.placeholders.value')"
+                              data-test="alert-duration-value-input"
+                              @update:model-value="onDurationValueChange($event)"
+                              @blur="revealDurationError"
+                            >
+                              <template #error />
+                            </OFormInput>
+                            <OSelect
+                              :aria-label="
+                                t('common.unitFor', { label: t('alerts.alertIfNoOfEvents') })
+                              "
+                              class="w-20!"
+                              :model-value="durationUnit"
+                              :options="durationUnitOptions"
+                              labelKey="label"
+                              valueKey="value"
+                              :searchable="false"
+                              data-test="alert-duration-unit-select"
+                              @update:model-value="onDurationUnitChange"
+                            />
                           </template>
-                        </OTooltip>
-                      </span>
+                        </AlertThresholdLevels>
+                      </div>
+                    </OSettingRow>
+                  </template>
+
+                  <!-- METRICS -->
+                  <template v-else>
+                    <!-- Alert if row -->
+                    <OSettingRow :label="t('alerts.plain.notifyMeWhen')" fill wide>
+                      <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                        <div
+                          class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1.5"
+                          data-test="alert-condition-measure"
+                        >
+                          <div class="flex min-w-0 items-start gap-2">
+                            <div class="w-36 min-w-28 shrink">
+                              <OSelect
+                                v-model="selectedFunction"
+                                :aria-label="t('alerts.queryConfig.aggregationFunction')"
+                                :options="logFunctionOptions"
+                                labelKey="label"
+                                valueKey="value"
+                                @update:model-value="onMetricFunctionChange"
+                              />
+                              <OTooltip
+                                :content="
+                                  logFunctionOptions.find((o: any) => o.value === selectedFunction)
+                                    ?.tooltip || raw('')
+                                "
+                                :delay="400"
+                              />
+                            </div>
+
+                            <!-- "of [field]" hidden for count mode -->
+                            <template v-if="selectedFunction !== 'total_events'">
+                              <span
+                                class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
+                                >{{ measureConnector }}</span
+                              >
+                              <div class="relative inline-flex min-w-28 shrink">
+                                <OFormSelect
+                                  name="query_condition.aggregation.having.column"
+                                  :aria-label="t('alerts.form.names.field')"
+                                  :options="columns"
+                                  searchable
+                                  :placeholder="t('alerts.placeholders.selectColumn')"
+                                  :readonly="
+                                    inputData.aggregation?.having?.column === 'value' &&
+                                    columns.some(
+                                      (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
+                                    )
+                                  "
+                                  :disable="
+                                    inputData.aggregation?.having?.column === 'value' &&
+                                    columns.some(
+                                      (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
+                                    )
+                                  "
+                                  @update:model-value="onLogMeasureColumnChange($event)"
+                                  class="w-50 min-w-0"
+                                />
+                                <OTooltip
+                                  v-if="
+                                    inputData.aggregation?.having?.column === 'value' &&
+                                    columns.some(
+                                      (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
+                                    )
+                                  "
+                                  :content="t('alerts.metricsValueFieldTooltip')"
+                                  side="bottom"
+                                />
+                              </div>
+                            </template>
+                          </div>
+                          <span
+                            v-if="leafFilterCount > 0"
+                            class="text-text-secondary text-compact leading-8.5 whitespace-nowrap"
+                            >{{
+                              t(
+                                "alerts.plain.whereFilters",
+                                { count: leafFilterCount },
+                                leafFilterCount,
+                              )
+                            }}</span
+                          >
+                          <span
+                            v-if="selectedFunction === 'total_events'"
+                            class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
+                            >{{ t("alerts.matchingMetricsFound") }}</span
+                          >
+                          <AlertWindowPhrase
+                            ref="periodFieldRef"
+                            class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
+                            :minutes="periodMinutes"
+                            @update:minutes="emit('update:period', $event)"
+                          />
+                        </div>
+
+                        <AlertThresholdLevels
+                          v-if="selectedFunction === 'total_events'"
+                          operator-name="trigger_condition.operator"
+                          value-name="trigger_condition.threshold"
+                          :operators="plainOperators"
+                          :levels="warningOffered"
+                          warning-name="trigger_condition.warning_threshold"
+                          :warning-shown="countWarningVisible"
+                          :warning-operator="operatorLabel(triggerOperator)"
+                          warning-input-data-test="alert-warning-threshold-input-381"
+                          :error="thresholdError"
+                          error-data-test="alert-if-row-metrics-error"
+                          :warning-error="warningThresholdError"
+                          warning-error-data-test="alert-warning-threshold-error-381"
+                          :window-error="periodError"
+                          :note="conditionNote"
+                          :help="conditionHelp"
+                          message-data-test="alert-condition-message"
+                          @operator="onTriggerOperatorChange"
+                          @value="onTriggerThresholdChange($event)"
+                          @add-warning="addCountWarning"
+                          @remove-warning="removeCountWarning"
+                        ></AlertThresholdLevels>
+                        <AlertThresholdLevels
+                          v-else
+                          operator-name="query_condition.aggregation.having.operator"
+                          value-name="query_condition.aggregation.having.value"
+                          :operators="plainOperators"
+                          :levels="warningOffered"
+                          warning-name="query_condition.aggregation.warning_value"
+                          :warning-shown="aggWarningVisible"
+                          :warning-operator="operatorLabel(conditionOperator)"
+                          :unit="thresholdUnit || null"
+                          warning-input-data-test="alert-aggregation-warning-value-input-413"
+                          :error="havingValueError"
+                          error-data-test="alert-if-row-metrics-value-error"
+                          :warning-error="aggregationWarningError"
+                          warning-error-data-test="alert-aggregation-warning-value-error-413"
+                          :window-error="periodError"
+                          :note="conditionNote"
+                          :help="conditionHelp"
+                          message-data-test="alert-condition-message"
+                          @operator="onConditionOperatorChange"
+                          @value="onConditionValueChange($event)"
+                          @add-warning="addAggWarning"
+                          @remove-warning="removeAggWarning"
+                        ></AlertThresholdLevels>
+                      </div>
+                    </OSettingRow>
+                  </template>
+                  <OSettingRow
+                    v-if="isRealTime === 'false'"
+                    :label="t('alerts.tiers.names.groupBy')"
+                    :description="switchedToCountNote"
+                    fill
+                    data-test="add-alert-group-question-row"
+                    wide
+                  >
+                    <div class="flex min-w-0 flex-col gap-1.5">
+                      <div class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
+                        <OToggleGroup
+                          :model-value="builderGroupAnswer"
+                          :aria-label="t('alerts.tiers.names.groupBy')"
+                          class="self-center"
+                          data-test="add-alert-group-question"
+                          @update:model-value="onBuilderGroupAnswer"
+                        >
+                          <OToggleGroupItem
+                            value="one"
+                            size="sm"
+                            data-test="add-alert-group-question-one"
+                          >
+                            {{ t("alerts.form.group.one") }}
+                          </OToggleGroupItem>
+                          <OToggleGroupItem
+                            value="each"
+                            size="sm"
+                            data-test="add-alert-group-question-each"
+                          >
+                            {{ builderEachLabel }}
+                          </OToggleGroupItem>
+                        </OToggleGroup>
+                        <AlertGroupByPicker
+                          v-if="builderGroupAnswer === 'each' || countRuleOn"
+                          :model-value="groupByLabels"
+                          :options="groupByOptions"
+                          @update:model-value="setGroupBy"
+                        />
+                      </div>
+                      <!-- Both states share one grid cell, so turning the rule on or off never moves what follows. -->
+                      <div
+                        v-if="groupByLabels.length"
+                        class="text-text-body grid text-sm"
+                        data-test="add-alert-group-limit"
+                      >
+                        <div
+                          class="col-start-1 row-start-1 flex flex-wrap items-center gap-x-2 gap-y-1"
+                          :class="countRuleOn ? '' : 'invisible'"
+                          :inert="!countRuleOn || undefined"
+                          data-test="add-alert-group-limit-rule"
+                        >
+                          <span>{{ t("alerts.form.group.oneForAllWhen") }}</span>
+                          <OFormSelect
+                            :aria-label="t('alerts.form.names.comparison')"
+                            name="trigger_condition.operator"
+                            :options="countOperators"
+                            :searchable="false"
+                            class="w-32!"
+                            data-test="add-alert-group-limit-operator"
+                            @update:model-value="onTriggerOperatorChange"
+                          />
+                          <OFormInput
+                            :aria-label="t('alerts.form.group.countNameGroups')"
+                            name="trigger_condition.threshold"
+                            type="number"
+                            fit-content
+                            min="1"
+                            data-test="add-alert-group-limit-threshold"
+                            @update:model-value="onTriggerThresholdChange($event)"
+                            @blur="restoreDefaultThreshold"
+                          >
+                            <template #error />
+                          </OFormInput>
+                          <span class="inline-flex items-center gap-x-2">
+                            <span>{{ t("alerts.form.group.groupsMatch", thresholdPlural) }}</span>
+                            <OButton
+                              variant="ghost"
+                              size="icon-circle-sm"
+                              :aria-label="t('alerts.form.group.oneForAllOff')"
+                              data-test="add-alert-group-limit-off"
+                              @click="setCountRule(false)"
+                            >
+                              <OIcon name="close" size="sm" />
+                            </OButton>
+                          </span>
+                        </div>
+                        <div
+                          class="col-start-1 row-start-1 flex min-h-8.5 items-start"
+                          :class="countRuleOn ? 'invisible' : ''"
+                          :inert="countRuleOn || undefined"
+                        >
+                          <OButton
+                            variant="link"
+                            size="sm"
+                            class="h-8.5! p-0! text-start whitespace-normal!"
+                            data-test="add-alert-group-limit-on"
+                            @click="setCountRule(true)"
+                          >
+                            {{ t("alerts.form.group.oneForAll") }}
+                          </OButton>
+                        </div>
+                      </div>
+                      <AlertMessageLine
+                        v-show="groupByLabels.length || thresholdError"
+                        :error="thresholdError"
+                        :error-data-test="countErrorTest"
+                        data-test="alert-group-limit-message"
+                      />
                     </div>
-                  </div>
+                  </OSettingRow></div
+              ></Teleport>
+            </div>
 
-                  <!-- Cron description + error -->
+            <div
+              ref="filtersSectionRef"
+              class="flex flex-col"
+              :class="sectionTargets ? '' : 'mt-1 gap-2 px-3'"
+            >
+              <AlertFilterSentence
+                v-if="filtersFolded"
+                :label="sectionTargets ? t('alerts.form.filter.label') : undefined"
+                :group="filterSentenceGroup"
+                :stream-name="streamName"
+                :stream-type="streamType"
+                :dialect="filterDialect"
+                data-test="add-alert-filter-sentence"
+                @add="openFilters"
+                @change="openFilters"
+                @edit="openFilters"
+                @remove="removeFilters"
+                @toggle-connector="toggleFilterConnector"
+              >
+                <template v-if="defineWithInline" #trail>
+                  <OToggleGroup
+                    :model-value="localTab"
+                    :aria-label="t('alerts.sections.rows.whichEvents')"
+                    data-test="step2-query-tabs"
+                    @update:model-value="updateTab($event as 'sql' | 'promql' | 'custom')"
+                  >
+                    <OToggleGroupItem
+                      v-for="tab in tabOptions"
+                      :key="tab.value"
+                      :value="tab.value"
+                      :data-test="`query-mode-${tab.value}`"
+                      size="xs"
+                      :icon-left="QUERY_MODE_ICONS[tab.value as keyof typeof QUERY_MODE_ICONS]"
+                    >
+                      {{ tab.label }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
+                </template>
+              </AlertFilterSentence>
+              <!-- Mounted while folded too: its validity check is what gates Save. -->
+              <component
+                :is="sectionTargets ? 'OSettingRow' : 'div'"
+                v-show="!filtersFolded"
+                v-bind="sectionTargets ? { label: t('alerts.form.filter.label'), wide: true } : {}"
+              >
+                <div ref="customPreviewRef">
+                  <FilterBuilder
+                    ref="conditionsBuilderRef"
+                    profile="alert"
+                    :model-value="inputData.conditions"
+                    :fields="conditionFields"
+                    :load-values="conditionDiscovery.loadValues"
+                    :value-label="conditionDiscovery.valueLabel"
+                    :value-hint="conditionDiscovery.valueHint"
+                    :field-detail="conditionDiscovery.fieldDetail"
+                    :value-empty-text="conditionDiscovery.valueEmptyText"
+                    :value-note="t('alerts.intent.slots.valueHelpEvents', { noun: countedNoun })"
+                    :add-labels="{
+                      add: t('alerts.form.filter.add'),
+                      addBelow: t('alerts.form.filter.addBelow'),
+                    }"
+                    data-test="alert-conditions"
+                    @update:model-value="onConditionsChange"
+                    @update:valid="conditionsValid = $event"
+                  />
                   <div
-                    v-if="frequencyMode !== 'cron' && checkEveryError"
-                    class="text-input-error-text text-xs"
-                    data-test="alert-check-every-error"
+                    v-if="showConditionsError"
+                    class="text-input-error-text mt-1 text-xs"
                     role="alert"
+                    data-test="alert-conditions-error"
                   >
-                    {{ checkEveryError }}
-                  </div>
-                  <div
-                    v-if="frequencyMode === 'cron' && cronDescription && !cronError"
-                    class="text-2xs ms-0 italic"
-                    :class="'text-text-secondary'"
-                  >
-                    {{ cronDescription }}
-                  </div>
-                  <div
-                    v-if="frequencyMode === 'cron' && cronError"
-                    class="text-status-error-text text-2xs ms-0"
-                  >
-                    {{ cronError }}
+                    {{ t("filterBar.validation.incomplete") }}
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <!-- Filters section — scheduled -->
-            <div v-if="isRealTime === 'false'" ref="filtersSectionRef" class="mt-1 px-3">
-              <div v-show="showFilters" ref="customPreviewRef">
-                <FilterBuilder
-                  ref="conditionsBuilderRef"
-                  profile="alert"
-                  :model-value="inputData.conditions"
-                  :fields="conditionFields"
-                  :load-values="conditionValueLoader"
-                  data-test="alert-conditions"
-                  @update:model-value="onConditionsChange"
-                  @update:valid="conditionsValid = $event"
-                />
-                <div
-                  v-if="showConditionsError"
-                  class="text-input-error-text mt-1 text-xs"
-                  role="alert"
-                  data-test="alert-conditions-error"
+              </component>
+              <AlertTierPlace id="generatedSql">
+                <AlertSentenceRow
+                  v-if="showsGeneratedSql"
+                  :label="t('alerts.tiers.names.generatedSql')"
+                  data-test="add-alert-generated-sql"
+                  removable
+                  @remove="hideGeneratedSql"
                 >
-                  {{ t("filterBar.validation.incomplete") }}
-                </div>
-              </div>
-            </div>
-
-            <!-- Realtime — no threshold sentence, just filters always visible -->
-            <div v-else class="mb-1 px-3">
-              <div class="flex items-center gap-2 py-1">
-                <div
-                  class="filters-inline-toggle rounded-default bg-surface-panel hover:bg-tabs-hover-bg flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors select-none"
-                  @click="toggleFilters"
-                >
-                  <OIcon
-                    name="filter-alt"
-                    size="xs"
-                    :class="filterCount > 0 ? 'text-theme-accent' : 'text-text-secondary'"
-                  />
-                  <span
-                    class="text-xs font-semibold"
-                    :class="filterCount > 0 ? 'text-theme-accent' : 'text-text-body'"
+                  <AlertQueryPreview :query="generatedSqlQuery" />
+                  <p
+                    v-if="generatedSqlThreshold"
+                    class="text-text-secondary mt-1 text-xs"
+                    data-test="add-alert-generated-sql-threshold"
                   >
-                    {{ t("alerts.queryConfig.filters") }}
-                  </span>
-                  <span
-                    v-if="filterCount > 0"
-                    class="text-2xs rounded-full px-1.5 py-0 leading-5 font-bold"
-                    :class="'bg-status-info-bg text-status-info-text'"
-                  >
-                    {{ filterCount }}
-                  </span>
-                  <OIcon
-                    :name="showFilters ? 'expand-more' : 'chevron-right'"
-                    size="sm"
-                    :class="'text-text-secondary'"
-                  />
-                  <!-- Review your SQL query hint -->
-                  <span
-                    v-if="generatedSqlQuery && !showFilters"
-                    class="ms-1 cursor-help text-xs whitespace-nowrap italic underline decoration-dotted underline-offset-2"
-                    :class="'text-text-secondary'"
-                  >
-                    {{ t("alerts.queryConfig.viewAlertQuery") }}
-                    <OTooltip :delay="200" side="bottom">
-                      <template #content>
-                        <AlertQueryPreview :query="generatedSqlQuery" />
-                      </template>
-                    </OTooltip>
-                  </span>
-                </div>
-              </div>
-              <div v-show="showFilters" ref="customPreviewRef">
-                <FilterBuilder
-                  ref="conditionsBuilderRef"
-                  profile="alert"
-                  :model-value="inputData.conditions"
-                  :fields="conditionFields"
-                  :load-values="conditionValueLoader"
-                  data-test="alert-conditions"
-                  @update:model-value="onConditionsChange"
-                  @update:valid="conditionsValid = $event"
-                />
-                <div
-                  v-if="showConditionsError"
-                  class="text-input-error-text mt-1 text-xs"
-                  role="alert"
-                  data-test="alert-conditions-error"
-                >
-                  {{ t("filterBar.validation.incomplete") }}
-                </div>
-              </div>
+                    {{ generatedSqlThreshold }}
+                  </p>
+                </AlertSentenceRow>
+              </AlertTierPlace>
             </div>
           </div>
         </template>
 
         <!-- SQL/PromQL Inline Editor Mode -->
         <template v-else>
-          <div class="flex w-full flex-col gap-2 overflow-hidden">
-            <!-- Editor area — position:relative shell owns the size; inner absolute never leaks -->
-            <div ref="sqlPromqlPreviewRef" class="relative h-80">
-              <div class="absolute inset-0 flex overflow-hidden">
-                <!-- SQL/PromQL pane — with its own header -->
+          <component
+            :is="sectionTargets ? 'OSettingRow' : 'div'"
+            v-bind="
+              sectionTargets
+                ? {
+                    label: t('alerts.sections.rows.query'),
+                    wide: true,
+                    fill: true,
+                  }
+                : {}
+            "
+          >
+            <template v-if="sectionTargets" #description>
+              <span
+                v-if="promqlLabelIssue"
+                role="alert"
+                class="text-status-error-text flex items-start gap-1"
+                data-test="add-alert-query-label-guard"
+              >
+                <OIcon name="error-outline" size="xs" class="mt-0.5 shrink-0" />
+                <span class="min-w-0 wrap-anywhere">{{ promqlLabelIssue }}</span>
+              </span>
+              <span
+                v-else-if="sqlOneRowWarning"
+                role="status"
+                class="text-status-warning-text flex items-start gap-1"
+                data-test="add-alert-query-one-row-guard"
+              >
+                <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" />
+                <span class="min-w-0 wrap-anywhere">{{ sqlOneRowWarning }}</span>
+              </span>
+              <!-- A metric name has no spaces, so it breaks mid-word rather than run under the editor. -->
+              <span v-else class="block wrap-anywhere">{{ whichEventsHelp }}</span>
+              <OButton
+                data-test="step2-view-editor-btn"
+                variant="link"
+                size="sm"
+                class="h-auto! p-0! text-start"
+                @click="viewSqlEditor = true"
+              >
+                {{ t("alerts.queryConfig.openFullEditor") }}
+              </OButton>
+            </template>
+            <div class="flex w-full flex-col gap-2 overflow-hidden">
+              <!-- Editor area — position:relative shell owns the size; inner absolute never leaks -->
+              <!-- isolate keeps the editor's own z-index (its AI button) under the sticky section heading. -->
+              <div
+                ref="sqlPromqlPreviewRef"
+                class="relative isolate motion-safe:transition-[height]"
+                :class="editorShellClass"
+              >
+                <!-- The step's control column is too narrow for two panes side by side, so they stack. -->
                 <div
-                  class="flex shrink-0 flex-col overflow-hidden"
-                  :class="showVrl && localTab === 'sql' ? 'w-1/2' : 'w-full'"
+                  class="absolute inset-0 flex overflow-hidden"
+                  :class="sectionTargets && 'flex-col'"
                 >
+                  <!-- SQL/PromQL pane — with its own header -->
                   <div
-                    class="flex h-9 shrink-0 items-center justify-between px-2.5"
-                    :class="'bg-surface-subtle border-border-default border-b'"
+                    class="flex shrink-0 flex-col overflow-hidden"
+                    :class="
+                      showVrl && localTab === 'sql'
+                        ? sectionTargets
+                          ? 'h-1/2 w-full'
+                          : 'w-1/2'
+                        : 'h-full w-full'
+                    "
                   >
-                    <div class="flex items-center gap-2">
-                      <div class="rounded-default bg-theme-accent h-3.5 w-0.75 shrink-0" />
-                      <span class="text-xs font-semibold">{{
-                        localTab === "sql"
-                          ? t("alerts.sqlEditor")
-                          : isForecastMode
-                            ? t("alerts.forecast.expression")
-                            : t("alerts.promqlEditor")
-                      }}</span>
-                    </div>
-                    <!-- fx toggle shown here only when VRL is not yet enabled -->
-                    <OSwitch
-                      v-if="localTab === 'sql' && !showVrl"
-                      v-model="showVrl"
-                      :aria-label="t('alerts.queryConfig.showVrlEditor')"
-                    >
-                      <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" />
-                    </OSwitch>
-                    <OToggleGroup
-                      v-if="localTab === 'promql'"
-                      :model-value="isForecastMode ? 'forecast' : 'threshold'"
-                      type="single"
-                      data-test="alert-promql-mode"
-                      @update:model-value="onPromqlModeChange"
-                    >
-                      <OToggleGroupItem
-                        value="threshold"
-                        size="xs"
-                        data-test="alert-promql-mode-threshold"
-                      >
-                        {{ t("alerts.forecast.modeThreshold") }}
-                      </OToggleGroupItem>
-                      <OToggleGroupItem
-                        value="forecast"
-                        size="xs"
-                        data-test="alert-promql-mode-forecast"
-                      >
-                        {{ t("alerts.forecast.modeForecast") }}
-                      </OToggleGroupItem>
-                    </OToggleGroup>
-                  </div>
-                  <div class="relative min-h-0 flex-1">
-                    <div class="absolute inset-0">
-                      <UnifiedQueryEditor
-                        ref="inlineQueryEditorRef"
-                        data-test-prefix="alert-inline-sql"
-                        :languages="localTab === 'promql' ? ['promql'] : ['sql']"
-                        :default-language="localTab === 'promql' ? 'promql' : 'sql'"
-                        :query="localTab === 'sql' ? localSqlQuery : editorPromqlQuery"
-                        editor-height="100%"
-                        :disable-ai="!streamName"
-                        :keywords="effectiveKeywords"
-                        :suggestions="effectiveSuggestions"
-                        :field-value-resolver="resolveFieldValues"
-                        @focus="onQueryEditorFocus"
-                        @blur="onBlurInlineSqlEditor"
-                        @update:query="handleInlineQueryUpdate"
-                      />
-                    </div>
                     <div
-                      v-if="
-                        (localTab === 'sql' ? !localSqlQuery : !editorPromqlQuery) &&
-                        queryEditorPlaceholderFlag
-                      "
-                      class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
+                      class="flex h-9 shrink-0 items-center justify-between px-2.5"
+                      :class="'bg-surface-subtle border-border-default border-b'"
                     >
-                      <span class="query-editor-placeholder-typewriter">{{
-                        inlineEditorPlaceholder
-                      }}</span>
-                    </div>
-                  </div>
-
-                  <!-- Prewritten PromQL samples (metrics rule catalogue).
-                       Chips INSERT into an empty editor only; with content
-                       present they disable rather than silently replace. -->
-                  <div
-                    v-if="localTab === 'promql' && promqlSamples.length"
-                    class="border-border-default bg-surface-subtle flex shrink-0 flex-wrap items-center gap-1.5 border-t px-2.5 py-1.5"
-                    data-test="alert-promql-samples"
-                  >
-                    <span class="text-text-secondary text-2xs font-semibold whitespace-nowrap">{{
-                      t("alerts.promqlExamples")
-                    }}</span>
-                    <button
-                      v-for="sample in promqlSamples"
-                      :key="sample.id"
-                      type="button"
-                      class="disabled:opacity-45"
-                      :disabled="!canInsertPromqlSample"
-                      :data-test="`alert-promql-sample-${sample.id}`"
-                      @click="insertPromqlSample(sample)"
-                    >
-                      <OTag type="exampleChip" value="dim" :label="raw(sample.label)" />
-                      <OTooltip
-                        :content="
-                          canInsertPromqlSample
-                            ? raw(sample.query)
-                            : t('alerts.promqlSampleDisabled')
-                        "
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                <!-- VRL pane — with its own header, side-by-side with SQL pane -->
-                <div
-                  class="border-border-default flex w-1/2 shrink-0 flex-col overflow-hidden border-s"
-                  v-if="showVrl && localTab === 'sql'"
-                >
-                  <div
-                    class="flex h-9 shrink-0 items-center justify-between px-2.5"
-                    :class="'bg-surface-subtle border-border-default border-b'"
-                  >
-                    <div class="flex items-center gap-2">
-                      <div
-                        class="rounded-default bg-section-accent-secondary h-3.5 w-0.75 shrink-0"
-                      />
-                      <span class="text-xs font-semibold">{{
-                        t("alerts.queryConfig.vrlEditor")
-                      }}</span>
-                    </div>
-                    <div class="flex items-center gap-1">
-                      <OSelect
-                        class="w-32.5!"
-                        v-model="selectedSavedFunctionName"
-                        :aria-label="t('alerts.placeholders.savedFunctions')"
-                        :options="functionsList"
-                        labelKey="name"
-                        valueKey="name"
-                        clearable
-                        :placeholder="t('alerts.placeholders.savedFunctions')"
-                        @update:model-value="
-                          (name: any) => {
-                            const fn = functionsList.find((f: any) => f.name === name);
-                            if (fn) vrlFunctionContent = fn.function || fn.body || '';
-                          }
-                        "
-                      >
-                        <template #empty>
-                          <span>{{ t("alerts.queryConfig.noFunctions") }}</span>
-                        </template>
-                      </OSelect>
-                      <OSwitch
-                        v-model="showVrl"
-                        :aria-label="t('alerts.queryConfig.hideVrlEditor')"
-                      >
-                        <OTooltip :content="t('alerts.queryConfig.hideVrlEditor')" />
-                      </OSwitch>
-                    </div>
-                  </div>
-                  <div class="relative min-h-0 flex-1">
-                    <div class="absolute inset-0">
-                      <UnifiedQueryEditor
-                        data-test-prefix="alert-inline-vrl"
-                        :languages="['vrl']"
-                        default-language="vrl"
-                        :query="vrlFunctionContent"
-                        editor-height="100%"
-                        :disable-ai="false"
-                        :hide-nl-toggle="false"
-                        @focus="vrlEditorPlaceholderFlag = false"
-                        @blur="onBlurInlineVrlEditor"
-                        @update:query="
-                          (v) => {
-                            vrlFunctionContent = v;
-                            handleVrlFunctionUpdate(v);
-                          }
-                        "
-                      />
-                      <div
-                        v-if="!vrlFunctionContent && vrlEditorPlaceholderFlag"
-                        class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
-                      >
-                        <span class="query-editor-placeholder-typewriter">{{
-                          vrlPlaceholder
+                      <div class="flex items-center gap-2">
+                        <div class="rounded-default bg-theme-accent h-3.5 w-0.75 shrink-0" />
+                        <span class="text-xs font-semibold">{{
+                          localTab === "sql"
+                            ? t("alerts.form.editor.sql")
+                            : isForecastMode
+                              ? t("alerts.forecast.expression")
+                              : t("alerts.form.editor.promql")
                         }}</span>
                       </div>
+                      <div class="flex min-w-0 items-center gap-3">
+                        <span
+                          v-if="inlineEditorFocused"
+                          aria-hidden="true"
+                          class="text-text-secondary text-xs whitespace-nowrap max-md:hidden"
+                          data-test="alert-query-editor-tab-out-hint"
+                          >{{ t("alerts.form.editor.tabOutHint") }}</span
+                        >
+                        <AlertTierPlace
+                          v-if="localTab === 'sql' && !showVrl && tierShows('vrl')"
+                          id="vrl"
+                          :row-label="t('alerts.tiers.names.vrl')"
+                        >
+                          <template #default="{ below }">
+                            <OSwitch
+                              :model-value="false"
+                              :label="below ? undefined : t('alerts.queryConfig.vrlToggle')"
+                              :state-text="below"
+                              label-position="left"
+                              off-tone="neutral"
+                              :aria-label="t('alerts.queryConfig.showVrlEditor')"
+                              data-test="alert-vrl-toggle"
+                              @update:model-value="onVrlSwitch"
+                            >
+                              <OTooltip :content="t('alerts.form.editor.vrlHelp')" />
+                            </OSwitch>
+                          </template>
+                        </AlertTierPlace>
+                      </div>
+                    </div>
+                    <div class="relative min-h-0 flex-1">
+                      <div class="absolute inset-0">
+                        <UnifiedQueryEditor
+                          ref="inlineQueryEditorRef"
+                          data-test-prefix="alert-inline-sql"
+                          :languages="localTab === 'promql' ? ['promql'] : ['sql']"
+                          :default-language="localTab === 'promql' ? 'promql' : 'sql'"
+                          :query="localTab === 'sql' ? localSqlQuery : editorPromqlQuery"
+                          editor-height="100%"
+                          escape-then-tab
+                          :disable-ai="!streamName"
+                          :keywords="effectiveKeywords"
+                          :suggestions="effectiveSuggestions"
+                          :field-value-resolver="resolveFieldValues"
+                          @focus="onQueryEditorFocus"
+                          @blur="onBlurInlineSqlEditor"
+                          @update:query="handleInlineQueryUpdate"
+                        />
+                      </div>
+                      <div
+                        v-if="
+                          (localTab === 'sql' ? !localSqlQuery : !editorPromqlQuery) &&
+                          queryEditorPlaceholderFlag
+                        "
+                        class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
+                        data-test="alert-query-editor-placeholder"
+                      >
+                        <span class="query-editor-placeholder-typewriter">{{
+                          inlineEditorPlaceholder
+                        }}</span>
+                      </div>
+                      <div
+                        v-if="editorFolded"
+                        class="from-surface-base pointer-events-none absolute inset-x-0 bottom-0 z-2 flex h-12 items-end justify-end bg-linear-to-t from-40% to-transparent pe-2 pb-1.5"
+                      >
+                        <OButton
+                          variant="outline"
+                          size="xs"
+                          class="pointer-events-auto"
+                          data-test="add-alert-editor-fold"
+                          @click="unfoldEditor"
+                        >
+                          {{ t("alerts.form.editor.showAll", { count: foldedLines }) }}
+                        </OButton>
+                      </div>
+                    </div>
+
+                    <!-- Prewritten PromQL samples (metrics rule catalogue).
+                       Chips INSERT into an empty editor only; with content
+                       present they disable rather than silently replace. -->
+                    <div
+                      v-if="localTab === 'promql' && promqlSamples.length"
+                      class="border-border-default bg-surface-subtle flex shrink-0 flex-wrap items-center gap-1.5 border-t px-2.5 py-1.5"
+                      data-test="alert-promql-samples"
+                    >
+                      <span class="text-text-secondary text-2xs font-semibold whitespace-nowrap">{{
+                        t("alerts.promqlExamples")
+                      }}</span>
+                      <button
+                        v-for="sample in promqlSamples"
+                        :key="sample.id"
+                        type="button"
+                        class="disabled:opacity-45"
+                        :disabled="!canInsertPromqlSample"
+                        :data-test="`alert-promql-sample-${sample.id}`"
+                        @click="insertPromqlSample(sample)"
+                      >
+                        <OTag type="exampleChip" value="dim" :label="raw(sample.label)" />
+                        <OTooltip
+                          :content="
+                            canInsertPromqlSample
+                              ? raw(sample.query)
+                              : t('alerts.promqlSampleDisabled')
+                          "
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- VRL pane — with its own header, beside or under the SQL pane -->
+                  <div
+                    class="border-border-default flex shrink-0 flex-col overflow-hidden"
+                    :class="sectionTargets ? 'h-1/2 w-full border-t' : 'w-1/2 border-s'"
+                    v-if="showVrl && localTab === 'sql'"
+                    data-test="add-alert-vrl-pane"
+                  >
+                    <div
+                      class="flex h-9 shrink-0 items-center justify-between px-2.5"
+                      :class="'bg-surface-subtle border-border-default border-b'"
+                    >
+                      <div class="flex items-center gap-2">
+                        <div
+                          class="rounded-default bg-section-accent-secondary h-3.5 w-0.75 shrink-0"
+                        />
+                        <span class="text-xs font-semibold">{{ t("alerts.form.editor.vrl") }}</span>
+                      </div>
+                      <div class="flex items-center gap-1">
+                        <OSelect
+                          class="w-36!"
+                          v-model="selectedSavedFunctionName"
+                          :aria-label="t('alerts.form.editor.savedFunction')"
+                          :options="functionsList"
+                          labelKey="name"
+                          valueKey="name"
+                          clearable
+                          :placeholder="t('alerts.form.editor.savedFunction')"
+                          @update:model-value="
+                            (name: any) => {
+                              const fn = functionsList.find((f: any) => f.name === name);
+                              if (fn) vrlFunctionContent = fn.function || fn.body || '';
+                            }
+                          "
+                        >
+                          <template #empty>
+                            <span>{{ t("alerts.queryConfig.noFunctions") }}</span>
+                          </template>
+                        </OSelect>
+                        <OSwitch
+                          :model-value="showVrl"
+                          :label="t('alerts.queryConfig.vrlToggle')"
+                          label-position="left"
+                          off-tone="neutral"
+                          :aria-label="t('alerts.queryConfig.hideVrlEditor')"
+                          data-test="alert-vrl-toggle"
+                          @update:model-value="onVrlSwitch"
+                        >
+                          <OTooltip :content="t('alerts.form.editor.vrlHelp')" />
+                        </OSwitch>
+                      </div>
+                    </div>
+                    <div class="relative min-h-0 flex-1">
+                      <div class="absolute inset-0">
+                        <UnifiedQueryEditor
+                          data-test-prefix="alert-inline-vrl"
+                          :languages="['vrl']"
+                          default-language="vrl"
+                          :query="vrlFunctionContent"
+                          editor-height="100%"
+                          :disable-ai="false"
+                          :hide-nl-toggle="false"
+                          @focus="vrlEditorPlaceholderFlag = false"
+                          @blur="onBlurInlineVrlEditor"
+                          @update:query="
+                            (v) => {
+                              vrlFunctionContent = v;
+                              handleVrlFunctionUpdate(v);
+                            }
+                          "
+                        />
+                        <div
+                          v-if="!vrlFunctionContent && vrlEditorPlaceholderFlag"
+                          class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
+                        >
+                          <span class="query-editor-placeholder-typewriter">{{
+                            vrlPlaceholder
+                          }}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Status bar — outside overflow:hidden so borders render correctly -->
-            <div
-              v-if="localTab !== 'promql'"
-              class="text-compact border-border-default rounded-b-default relative h-5.5 shrink-0 border-x border-b font-medium"
-              :class="inlineStatusBarClass"
-            >
-              <div class="absolute inset-0 flex items-center gap-1.25 overflow-hidden px-2.5">
-                <template v-if="inlineStatusState === 'sql-status-bar--error'">
-                  <OIcon class="shrink-0" name="error-outline" size="xs" />
-                  <OTruncatedText class="flex-1">{{ sqlQueryErrorMsg }}</OTruncatedText>
-                </template>
-                <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
-                  <OIcon class="shrink-0 opacity-60" name="edit" size="xs" />
-                  <span>{{ t("alerts.queryConfig.writeQueryHint") }}</span>
-                </template>
-                <template v-else-if="inlineStatusState === 'sql-status-bar--idle'">
-                  <OIcon class="shrink-0 opacity-70" name="check-circle-outline" size="xs" />
-                  <span>{{ t("alerts.queryConfig.sqlEditorHint") }}</span>
-                </template>
-              </div>
-            </div>
-
-            <OBanner
-              v-if="localTab === 'sql' && isMultiAlert && sqlQueryHasHaving"
-              dense
-              variant="warning"
-              class="mt-2"
-              :content="t('alerts.queryConfig.sqlHavingClauseWarning')"
-              data-test="alert-sql-having-clause-warning"
-            />
-
-            <!-- SQL/PromQL condition rows (scheduled only): Check every + Alert if in one block -->
-            <div v-if="isRealTime === 'false'" class="mt-2 flex flex-col gap-0 px-1">
-              <!-- Check every -->
+              <!-- Status bar — outside overflow:hidden so borders render correctly -->
               <div
-                class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                v-if="localTab !== 'promql'"
+                class="text-compact border-border-default rounded-b-default relative h-5.5 shrink-0 border-x border-b font-medium"
+                :class="inlineStatusBarClass"
               >
-                <span
-                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-7 font-bold whitespace-nowrap"
-                >
-                  {{ t("alerts.queryConfig.checkEvery") }} *
-                  <OTooltip :content="t('alerts.howOftenCheckTooltip')" side="top" />
-                </span>
-                <div class="flex flex-col gap-1">
-                  <div class="flex items-center gap-2">
-                    <template v-if="frequencyMode !== 'cron'">
-                      <OFormInput
-                        :aria-label="t('alerts.queryConfig.checkEvery')"
-                        name="_ui.checkEvery"
-                        type="number"
-                        class="max-w-25 min-w-25"
-                        min="1"
-                        @update:model-value="onCheckEveryChange($event)"
-                        @blur="restoreDefaultFrequency"
-                      >
-                        <!-- Message rendered below at row width — see checkEveryError. -->
-                        <template #error />
-                      </OFormInput>
-                    </template>
-                    <template v-else>
-                      <OFormInput
-                        :aria-label="t('alerts.queryConfig.cron')"
-                        name="trigger_condition.cron"
-                        :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
-                        class="max-w-25 min-w-25"
-                        @update:model-value="onCronExpressionChange"
-                      />
-                    </template>
-                    <OSelect
-                      :aria-label="
-                        t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })
-                      "
-                      class="max-w-25 min-w-20"
-                      :model-value="frequencyMode"
-                      :options="frequencyUnitOptions"
-                      labelKey="label"
-                      valueKey="value"
-                      :searchable="false"
-                      @update:model-value="onFrequencyUnitChange"
-                    />
-                    <template v-if="frequencyMode === 'cron'">
-                      <span class="inline-block max-w-37.5 min-w-37.5">
-                        <OFormSelect
-                          :aria-label="t('alerts.downtimes.scheduleForm.timezone')"
-                          name="trigger_condition.timezone"
-                          :options="timezoneSelectOptions"
-                          searchable
-                          :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
-                          class="max-w-37.5 min-w-37.5"
-                          @update:model-value="onCronTimezoneChange"
-                        />
-                        <OTooltip v-if="cronTimezone" :content="raw(cronTimezone)" side="bottom" />
-                      </span>
-                    </template>
-                  </div>
-                  <div
-                    v-if="frequencyMode !== 'cron' && checkEveryError"
-                    class="text-input-error-text text-xs"
-                    data-test="alert-check-every-error"
+                <div class="absolute inset-0 flex items-center gap-1.25 overflow-hidden px-2.5">
+                  <span
+                    v-if="queryRequiredError"
                     role="alert"
+                    tabindex="-1"
+                    class="text-status-error-text flex min-w-0 items-center gap-1.25 outline-none"
+                    data-test="add-alert-query-required-error"
                   >
-                    {{ checkEveryError }}
-                  </div>
-                  <div
-                    v-if="frequencyMode === 'cron' && cronDescription && !cronError"
-                    class="text-2xs italic"
-                    :class="'text-text-secondary'"
-                  >
-                    {{ cronDescription }}
-                  </div>
-                  <div
-                    v-if="frequencyMode === 'cron' && cronError"
-                    class="text-status-error-text text-2xs"
-                  >
-                    {{ cronError }}
-                  </div>
+                    <OIcon class="shrink-0" name="error-outline" size="xs" />
+                    <span>{{ queryRequiredError }}</span>
+                  </span>
+                  <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
+                    <OIcon class="shrink-0 opacity-60" name="edit" size="xs" />
+                    <span>{{ t("alerts.queryConfig.writeQueryHint") }}</span>
+                  </template>
+                  <template v-else-if="inlineStatusState === 'sql-status-bar--idle'">
+                    <OIcon class="shrink-0 opacity-70" name="check-circle-outline" size="xs" />
+                    <span>{{ t("alerts.queryConfig.sqlEditorHint") }}</span>
+                  </template>
                 </div>
               </div>
 
-              <!-- SQL: Simple vs Multi alert choice — placed before the
-                   condition row so the row below reads as "pick a mode,
-                   then fill in its shape", not "fill in a row, then a
-                   switch silently repurposes it". -->
-              <AlertMultiToggle
-                v-if="!showVrl && localTab === 'sql'"
-                :enabled="isMultiAlert"
-                @change="onSqlMultiAlertChange"
+              <div
+                v-if="localTab === 'sql' && sqlErrorText"
+                role="alert"
+                tabindex="-1"
+                class="text-status-error-text flex flex-wrap items-center gap-x-2 gap-y-1 text-xs outline-none"
+                data-test="add-alert-sql-error"
+              >
+                <OIcon class="shrink-0" name="error-outline" size="xs" />
+                <span class="min-w-0 break-words">{{ sqlErrorText }}</span>
+                <OButton
+                  v-if="sqlColumnFix"
+                  variant="link"
+                  size="sm"
+                  data-test="add-alert-sql-error-fix"
+                  @click="applySqlColumnFix"
+                >
+                  {{ t("alerts.form.sqlError.use", { match: raw(sqlColumnFix.match) }) }}
+                </OButton>
+              </div>
+
+              <div
+                v-if="localTab === 'promql' && promqlEditorError"
+                role="alert"
+                tabindex="-1"
+                class="text-status-error-text flex items-center gap-2 text-xs outline-none"
+                data-test="add-alert-query-required-error"
+              >
+                <OIcon class="shrink-0" name="error-outline" size="xs" />
+                <span class="min-w-0 break-words">{{ promqlEditorError }}</span>
+              </div>
+
+              <OBanner
+                v-if="localTab === 'sql' && isMultiAlert && sqlQueryHasHaving"
+                dense
+                class="mt-2"
+                :content="t('alerts.queryConfig.sqlHavingRunsFirst')"
+                data-test="alert-sql-having-clause-warning"
               />
 
-              <!-- SQL Simple: Alert if No. of events -->
-              <div
-                v-if="localTab === 'sql' && !isMultiAlert"
-                class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
-              >
-                <span
-                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                  >{{ t("alerts.alertIfNoOfEvents") }} *</span
-                >
-                <div class="flex flex-col gap-1.5">
-                  <div class="flex items-start gap-2">
-                    <span
-                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                      >{{ t("alerts.criticalIf") }}</span
+              <div v-if="isRealTime === 'false'" class="mt-2 flex flex-col gap-0 px-1">
+                <Teleport
+                  :to="sectionTargets?.queryCondition"
+                  :disabled="!sectionTargets?.queryCondition"
+                  ><div class="flex flex-col gap-0">
+                    <AlertTierPlace id="ruleExpression">
+                      <OSettingRow
+                        v-if="
+                          localTab === 'promql' && !isForecastMode && tierShows('ruleExpression')
+                        "
+                        :label="t('alerts.tiers.names.queryComparison')"
+                        :description="keptThresholdText || t('alerts.form.ruleMode.help')"
+                        fill
+                        data-test="add-alert-rule-mode-row"
+                      >
+                        <OFormSwitch
+                          name="query_condition.promql_rule_mode"
+                          off-tone="neutral"
+                          state-text
+                          :aria-label="t('alerts.tiers.names.queryComparison')"
+                          data-test="alert-prom-rule-mode"
+                          @update:model-value="onPromRuleModeChange"
+                        />
+                      </OSettingRow>
+                    </AlertTierPlace>
+                    <OSettingRow
+                      v-if="
+                        sqlPlainLimit ||
+                        (groupQuestion.offered &&
+                          (localTab === 'sql' || promqlCondition || isPromRuleMode))
+                      "
+                      :label="sqlPlainLimit ? t('alerts.plain.queryReturns') : groupQuestionTitle"
+                      :info="groupQuestionHelp"
+                      fill
+                      data-test="add-alert-group-question-row"
+                      wide
                     >
-                    <OFormSelect
-                      :aria-label="t('common.operator')"
-                      name="trigger_condition.operator"
-                      :options="numericOperators"
-                      :searchable="false"
-                      width="xs"
-                      data-test="alert-trigger-operator-select"
-                      @update:model-value="onTriggerOperatorChange"
+                      <div class="flex min-w-0 flex-col gap-1.5">
+                        <AlertWindowPhrase
+                          ref="periodFieldRef"
+                          v-if="localTab === 'sql' || isPromRuleMode"
+                          keypath="alerts.form.window.queryReads"
+                          class="text-text-body text-sm leading-8.5"
+                          :minutes="periodMinutes"
+                          @update:minutes="emit('update:period', $event)"
+                        />
+                        <AlertThresholdLevels
+                          v-if="sqlPlainLimit"
+                          operator-name="trigger_condition.operator"
+                          value-name="trigger_condition.threshold"
+                          :operators="plainOperators"
+                          :levels="warningOffered"
+                          warning-name="trigger_condition.warning_threshold"
+                          :warning-shown="countWarningVisible"
+                          :warning-operator="operatorLabel(triggerOperator)"
+                          :tail="rowsNoun"
+                          value-min="1"
+                          operator-data-test="alert-trigger-operator-select"
+                          value-data-test="alert-trigger-threshold-input"
+                          warning-input-data-test="alert-warning-threshold-input-1020"
+                          :error="thresholdError"
+                          error-data-test="alert-trigger-threshold-error"
+                          :warning-error="warningThresholdError"
+                          warning-error-data-test="alert-warning-threshold-error-1020"
+                          :window-error="periodError"
+                          message-data-test="alert-condition-message"
+                          @operator="onTriggerOperatorChange"
+                          @value="onTriggerThresholdChange($event)"
+                          @value-blur="restoreDefaultThreshold"
+                          @add-warning="addCountWarning"
+                          @remove-warning="removeCountWarning"
+                        ></AlertThresholdLevels>
+                        <template v-else>
+                          <div class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
+                            <OToggleGroup
+                              :model-value="groupAnswer"
+                              :aria-label="groupQuestionTitle"
+                              :disabled="isRuleMultiRequired"
+                              class="self-center"
+                              data-test="add-alert-group-question"
+                              @update:model-value="onQueryGroupAnswer"
+                            >
+                              <OToggleGroupItem
+                                value="one"
+                                size="sm"
+                                data-test="add-alert-group-question-one"
+                              >
+                                {{ groupOneLabel }}
+                              </OToggleGroupItem>
+                              <OToggleGroupItem
+                                value="each"
+                                size="sm"
+                                data-test="add-alert-group-question-each"
+                              >
+                                {{ groupEachLabel }}
+                              </OToggleGroupItem>
+                            </OToggleGroup>
+                            <!-- Kept mounted at zero size while "One per" is picked: a value typed there lands, and no blank line is held. -->
+                            <div
+                              v-if="limitBesideOne"
+                              class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                              :class="
+                                groupAnswer === 'one' ? '' : 'invisible h-0 w-0 overflow-hidden'
+                              "
+                              :inert="groupAnswer !== 'one' || undefined"
+                              data-test="add-alert-group-limit"
+                            >
+                              <span class="leading-8.5">{{ t("alerts.form.group.when") }}</span>
+                              <OFormSelect
+                                :aria-label="t('alerts.form.names.comparison')"
+                                name="trigger_condition.operator"
+                                :options="countOperators"
+                                :searchable="false"
+                                class="w-32!"
+                                :data-test="countTestIds.operator"
+                                @update:model-value="onTriggerOperatorChange"
+                              />
+                              <OFormInput
+                                :aria-label="t('alerts.form.group.countNameSeries')"
+                                name="trigger_condition.threshold"
+                                type="number"
+                                fit-content
+                                min="1"
+                                :data-test="countTestIds.threshold"
+                                @update:model-value="onTriggerThresholdChange($event)"
+                                @blur="restoreDefaultThreshold"
+                              >
+                                <template #error />
+                              </OFormInput>
+                              <span class="leading-8.5">{{
+                                t("alerts.form.group.promqlOneTail", thresholdPlural)
+                              }}</span>
+                            </div>
+                          </div>
+                          <AlertMessageLine
+                            v-if="limitBesideOne"
+                            v-show="groupAnswer === 'one' || thresholdError"
+                            :error="thresholdError"
+                            :error-data-test="countErrorTest"
+                            data-test="alert-group-limit-message"
+                          />
+                          <template v-if="localTab === 'sql'">
+                            <AlertThresholdLevels
+                              v-if="groupAnswer === 'one'"
+                              operator-name="trigger_condition.operator"
+                              value-name="trigger_condition.threshold"
+                              :operators="plainOperators"
+                              :levels="warningOffered"
+                              warning-name="trigger_condition.warning_threshold"
+                              :warning-shown="countWarningVisible"
+                              :warning-operator="operatorLabel(triggerOperator)"
+                              :tail="rowsNoun"
+                              value-min="1"
+                              :operator-data-test="countTestIds.operator"
+                              :value-data-test="countTestIds.threshold"
+                              warning-input-data-test="alert-warning-threshold-input-1020"
+                              :error="thresholdError"
+                              :error-data-test="countErrorTest"
+                              :warning-error="warningThresholdError"
+                              warning-error-data-test="alert-warning-threshold-error-1020"
+                              :window-error="periodError"
+                              message-data-test="alert-group-limit-message"
+                              data-test="add-alert-group-limit"
+                              @operator="onTriggerOperatorChange"
+                              @value="onTriggerThresholdChange($event)"
+                              @value-blur="restoreDefaultThreshold"
+                              @add-warning="addCountWarning"
+                              @remove-warning="removeCountWarning"
+                            ></AlertThresholdLevels>
+                            <AlertThresholdLevels
+                              v-else
+                              operator-name="query_condition.aggregation.having.operator"
+                              value-name="query_condition.aggregation.having.value"
+                              :operators="plainOperators"
+                              :levels="warningOffered"
+                              warning-name="query_condition.aggregation.warning_value"
+                              :warning-shown="aggWarningVisible"
+                              :warning-operator="operatorLabel(conditionOperator)"
+                              :warning-subject="raw(havingColumn)"
+                              operator-data-test="alert-sql-agg-operator-select"
+                              value-data-test="alert-sql-agg-value-input"
+                              warning-input-data-test="alert-sql-agg-warning-value-input"
+                              :error="havingValueError"
+                              error-data-test="alert-sql-agg-value-error"
+                              :warning-error="aggregationWarningError"
+                              warning-error-data-test="alert-sql-agg-warning-value-error"
+                              :window-error="periodError"
+                              :note="conditionNote"
+                              :help="conditionHelp"
+                              message-data-test="alert-condition-message"
+                              data-test="add-alert-group-limit"
+                              @operator="onConditionOperatorChange"
+                              @value="onConditionValueChange($event)"
+                              @add-warning="addAggWarning"
+                              @remove-warning="removeAggWarning"
+                            >
+                              <template #subject>
+                                <OFormSelect
+                                  :aria-label="t('alerts.form.names.field')"
+                                  name="query_condition.aggregation.having.column"
+                                  :options="sqlAggColumnOptions"
+                                  searchable
+                                  class="w-50! min-w-0"
+                                  data-test="alert-sql-agg-column-select"
+                                  :placeholder="t('alerts.placeholders.selectColumn')"
+                                  @update:model-value="onLogMeasureColumnChange($event)"
+                                />
+                              </template>
+                            </AlertThresholdLevels>
+                          </template>
+                        </template>
+                        <p v-if="isRuleMultiRequired" class="text-text-secondary text-xs">
+                          {{ t("alerts.promRuleModePendingMulti") }}
+                        </p>
+                      </div>
+                    </OSettingRow>
+                    <ForecastAlertFields
+                      v-if="localTab === 'promql' && isForecastMode"
+                      @remove="onPromqlModeChange('threshold')"
                     />
-                    <!-- The message belongs to the threshold, so it hangs under the
-                       threshold — not at the row's left edge. The column is capped
-                       to the field's width and the message is nowrap, so it spills
-                       right into empty space instead of widening the row. -->
-                    <div class="flex flex-col gap-1">
-                      <OFormInput
-                        :aria-label="t('alerts.alertIfNoOfEvents')"
-                        name="trigger_condition.threshold"
-                        type="number"
-                        width="xs"
-                        data-test="alert-trigger-threshold-input"
-                        min="1"
-                        @update:model-value="onTriggerThresholdChange($event)"
-                        @blur="restoreDefaultThreshold"
-                      >
-                        <template #error />
-                      </OFormInput>
-                      <div
-                        v-if="thresholdError"
-                        class="text-input-error-text text-xs whitespace-nowrap"
-                        data-test="alert-trigger-threshold-error"
-                        role="alert"
-                      >
-                        {{ thresholdError }}
-                      </div>
-                    </div>
-                  </div>
-                  <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
-                       critical's operator, so the row only echoes it. -->
-                  <div v-if="countWarningVisible" class="flex items-start gap-2">
-                    <span
-                      class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                      >{{ t("alerts.warningIf") }}</span
-                    >
-                    <span
-                      class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                      >{{ triggerOperator }}</span
-                    >
-                    <div class="flex flex-col gap-1">
-                      <OFormInput
-                        :aria-label="t('alerts.warningIf')"
-                        name="trigger_condition.warning_threshold"
-                        type="number"
-                        width="xs"
-                        data-test="alert-warning-threshold-input-1020"
-                        :placeholder="t('alerts.optional')"
-                      >
-                        <template #error />
-                      </OFormInput>
-                      <div
-                        v-if="warningThresholdError"
-                        class="text-input-error-text text-xs whitespace-nowrap"
-                        data-test="alert-warning-threshold-error-1020"
-                        role="alert"
-                      >
-                        {{ warningThresholdError }}
-                      </div>
-                    </div>
-                    <OButton
-                      variant="ghost"
-                      size="icon-circle-sm"
-                      class="text-icon-color hover:text-status-error-text self-center"
-                      :aria-label="t('alerts.removeWarning')"
-                      data-test="alert-remove-warning-button"
-                      @click="removeCountWarning"
-                    >
-                      <OIcon name="close" size="sm" />
-                    </OButton>
-                  </div>
-                  <div v-else>
-                    <OButton
-                      variant="ghost-primary"
-                      size="sm"
-                      data-test="alert-add-warning-button"
-                      @click="addCountWarning"
-                    >
-                      <OIcon name="add" size="sm" />
-                      {{ t("alerts.addWarning") }}
-                    </OButton>
-                  </div>
-                </div>
-              </div>
 
-              <!-- SQL Multi: Alert if [column]. Reuses the exact
-                   having.operator/.value + warning_value fields Custom's
-                   Measure mode uses (this flow classifies the whole SQL
-                   result set as one aggregate value, the same value-based
-                   severity shape). The column itself is a dropdown sourced
-                   from the query's own resolved output columns (§11 of
-                   sql_simple_multi_alert_fe_prd.md) rather than a fixed
-                   literal — options are refreshed on the same validate-sql
-                   pass as the SQL editor's own validation. -->
-              <div
-                v-if="localTab === 'sql' && isMultiAlert"
-                class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
-              >
-                <span
-                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                  >{{ t("alerts.alertIfColumn") }} *</span
-                >
-                <div class="flex flex-col gap-1.5">
-                  <div class="flex items-start gap-2">
-                    <span
-                      class="text-text-secondary text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                      >{{ t("alerts.column") }}</span
+                    <!-- PromQL: Alert if the value is + Having series -->
+                    <template
+                      v-else-if="localTab === 'promql' && (promqlCondition || isPromRuleMode)"
                     >
-                    <!-- onLogMeasureColumnChange's body is generic (reads/writes
-                         aggregation.having.column via the form) despite its
-                         name — reused as-is rather than duplicating it. -->
-                    <OFormSelect
-                      :aria-label="t('alerts.column')"
-                      name="query_condition.aggregation.having.column"
-                      :options="sqlAggColumnOptions"
-                      searchable
-                      width="xs"
-                      data-test="alert-sql-agg-column-select"
-                      :placeholder="t('alerts.placeholders.selectColumn')"
-                      @update:model-value="onLogMeasureColumnChange($event)"
-                    />
-                  </div>
-                  <div class="flex items-start gap-2">
-                    <span
-                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                      >{{ t("alerts.criticalIf") }}</span
-                    >
-                    <OFormSelect
-                      :aria-label="t('common.operator')"
-                      name="query_condition.aggregation.having.operator"
-                      :options="numericOperators"
-                      :searchable="false"
-                      width="xs"
-                      data-test="alert-sql-agg-operator-select"
-                      @update:model-value="onConditionOperatorChange"
-                    />
-                    <!-- Message hangs under the value field it describes. -->
-                    <div class="flex flex-col gap-1">
-                      <OFormInput
-                        :aria-label="t('common.value')"
-                        name="query_condition.aggregation.having.value"
-                        type="number"
-                        width="xs"
-                        data-test="alert-sql-agg-value-input"
-                        :placeholder="t('alerts.placeholders.value')"
-                        @update:model-value="onConditionValueChange($event)"
+                      <OSettingRow
+                        v-if="!isPromRuleMode"
+                        :label="t('alerts.plain.valueIs')"
+                        wide
+                        :info="t('alerts.queryConfig.alertWhenTooltip')"
+                        fill
                       >
-                        <template #error />
-                      </OFormInput>
-                      <div
-                        v-if="havingValueError"
-                        class="text-input-error-text text-xs whitespace-nowrap"
-                        data-test="alert-sql-agg-value-error"
-                        role="alert"
-                      >
-                        {{ havingValueError }}
-                      </div>
-                    </div>
-                  </div>
-                  <!-- Optional WARNING level, same pattern as Custom's
-                       Measure mode. Shares critical's operator, so the row
-                       only echoes it. -->
-                  <div v-if="aggWarningVisible" class="flex items-start gap-2">
-                    <span
-                      class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                      >{{ t("alerts.warningIf") }}</span
-                    >
-                    <span
-                      class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                      >{{ conditionOperator }}</span
-                    >
-                    <div class="flex flex-col gap-1">
-                      <OFormInput
-                        :aria-label="t('alerts.warningIf')"
-                        name="query_condition.aggregation.warning_value"
-                        type="number"
-                        width="xs"
-                        data-test="alert-sql-agg-warning-value-input"
-                        :placeholder="t('alerts.optional')"
-                      >
-                        <template #error />
-                      </OFormInput>
-                      <div
-                        v-if="aggregationWarningError"
-                        class="text-input-error-text text-xs whitespace-nowrap"
-                        data-test="alert-sql-agg-warning-value-error"
-                        role="alert"
-                      >
-                        {{ aggregationWarningError }}
-                      </div>
-                    </div>
-                    <OButton
-                      variant="ghost"
-                      size="icon-circle-sm"
-                      class="text-icon-color hover:text-status-error-text self-center"
-                      :aria-label="t('alerts.removeWarning')"
-                      data-test="alert-remove-warning-button"
-                      @click="removeAggWarning"
-                    >
-                      <OIcon name="close" size="sm" />
-                    </OButton>
-                  </div>
-                  <div v-else>
-                    <OButton
-                      variant="ghost-primary"
-                      size="sm"
-                      data-test="alert-add-warning-button"
-                      @click="addAggWarning"
-                    >
-                      <OIcon name="add" size="sm" />
-                      {{ t("alerts.addWarning") }}
-                    </OButton>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                v-if="localTab === 'promql' && !isForecastMode"
-                class="flex flex-col gap-1 px-3 py-2"
-              >
-                <OFormSwitch
-                  name="query_condition.promql_rule_mode"
-                  :label="t('alerts.promRuleMode')"
-                  data-test="alert-prom-rule-mode"
-                  @update:model-value="onPromRuleModeChange"
-                />
-                <p class="text-text-secondary text-xs">{{ t("alerts.promRuleModeDescription") }}</p>
-              </div>
-              <ForecastAlertFields v-if="localTab === 'promql' && isForecastMode" />
-
-              <!-- PromQL: Alert if the value is + Having series -->
-              <template v-else-if="localTab === 'promql' && (promqlCondition || isPromRuleMode)">
-                <div
-                  v-if="!isPromRuleMode"
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
-                >
-                  <span
-                    class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                    >{{ t("alerts.alertIfValueIs") }} *
-                    <OTooltip :content="t('alerts.queryConfig.alertIfValueIsTooltip')" side="top" />
-                  </span>
-                  <div class="flex flex-col gap-1.5">
-                    <div class="flex items-start gap-2">
-                      <span
-                        class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                        >{{ t("alerts.criticalIf") }}</span
-                      >
-                      <OFormSelect
-                        :aria-label="t('alerts.alertIfValueIs')"
-                        name="query_condition.promql_condition.operator"
-                        :options="numericOperators"
-                        :searchable="false"
-                        data-test="alert-threshold-operator-select"
-                        width="xs"
-                        @update:model-value="onPromqlOperatorChange"
-                      />
-                      <!-- Message hangs under the value field it describes. -->
-                      <div class="flex flex-col gap-1">
-                        <OFormInput
-                          :aria-label="t('alerts.alertIfValueIs')"
-                          name="query_condition.promql_condition.value"
-                          type="number"
-                          width="xs"
-                          data-test="alert-threshold-value-input"
-                          :debounce="300"
-                          @update:model-value="onPromqlValueChange"
-                        >
-                          <template #error />
-                        </OFormInput>
-                        <div
-                          v-if="promqlValueError"
-                          class="text-input-error-text text-xs whitespace-nowrap"
-                          data-test="alert-threshold-value-error"
-                          role="alert"
-                        >
-                          {{ promqlValueError }}
+                        <template #description>
+                          <OButton
+                            variant="link"
+                            size="sm"
+                            class="h-auto! p-0! text-start whitespace-normal!"
+                            data-test="add-alert-add-forecast"
+                            @click="onPromqlModeChange('forecast')"
+                          >
+                            {{ t("alerts.tiers.add.forecast") }}
+                          </OButton>
+                        </template>
+                        <div class="flex flex-col gap-1.5">
+                          <AlertWindowPhrase
+                            ref="periodFieldRef"
+                            keypath="alerts.form.window.queryReads"
+                            class="text-text-body text-sm leading-8.5"
+                            :minutes="periodMinutes"
+                            @update:minutes="emit('update:period', $event)"
+                          />
+                          <AlertThresholdLevels
+                            operator-name="query_condition.promql_condition.operator"
+                            value-name="query_condition.promql_condition.value"
+                            :operators="plainOperators"
+                            :levels="warningOffered"
+                            warning-name="query_condition.promql_warning_value"
+                            :warning-shown="promqlWarningVisible"
+                            :warning-operator="operatorLabel(promqlOperatorEcho)"
+                            :unit="thresholdUnit || null"
+                            :value-debounce="300"
+                            :value-placeholder="t('alerts.placeholders.value')"
+                            operator-data-test="alert-threshold-operator-select"
+                            value-data-test="alert-threshold-value-input"
+                            warning-input-data-test="alert-promql-warning-value-input"
+                            :error="promqlValueError"
+                            error-data-test="alert-threshold-value-error"
+                            :warning-error="promqlWarningError"
+                            warning-error-data-test="alert-promql-warning-value-error"
+                            :window-error="periodError"
+                            :note="conditionNote"
+                            :help="conditionHelp"
+                            message-data-test="alert-condition-message"
+                            @operator="onPromqlOperatorChange"
+                            @value="onPromqlValueChange"
+                            @add-warning="addPromqlWarning"
+                            @remove-warning="removePromqlWarning"
+                          ></AlertThresholdLevels>
                         </div>
-                      </div>
-                    </div>
-                    <!-- Optional WARNING on the PromQL VALUE (alerts_2.md Feature 1).
-                         PromQL bakes the threshold into the query itself, so severity
-                         belongs here — not on the series-count row, which is coverage.
-                         Shares critical's operator, so the row only echoes it. -->
-                    <div v-if="promqlWarningVisible" class="flex items-start gap-2">
-                      <span
-                        class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
-                        >{{ t("alerts.warningIf") }}</span
-                      >
-                      <span
-                        class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                        >{{ promqlOperatorEcho }}</span
-                      >
-                      <div class="flex flex-col gap-1">
-                        <OFormInput
-                          :aria-label="t('alerts.warningIf')"
-                          name="query_condition.promql_warning_value"
-                          type="number"
-                          width="xs"
-                          data-test="alert-promql-warning-value-input"
-                          :placeholder="t('alerts.optional')"
-                          :debounce="300"
-                        >
-                          <template #error />
-                        </OFormInput>
-                        <div
-                          v-if="promqlWarningError"
-                          class="text-input-error-text text-xs whitespace-nowrap"
-                          data-test="alert-promql-warning-value-error"
-                          role="alert"
-                        >
-                          {{ promqlWarningError }}
-                        </div>
-                      </div>
-                      <OButton
-                        variant="ghost"
-                        size="icon-circle-sm"
-                        class="text-icon-color hover:text-status-error-text self-center"
-                        :aria-label="t('alerts.removeWarning')"
-                        data-test="alert-remove-warning-button"
-                        @click="removePromqlWarning"
-                      >
-                        <OIcon name="close" size="sm" />
-                      </OButton>
-                    </div>
-                    <div v-else>
-                      <OButton
-                        variant="ghost-primary"
-                        size="sm"
-                        data-test="alert-add-warning-button"
-                        @click="addPromqlWarning"
-                      >
-                        <OIcon name="add" size="sm" />
-                        {{ t("alerts.addWarning") }}
-                      </OButton>
-                    </div>
-                  </div>
-                </div>
-                <AlertMultiToggle
-                  :enabled="isPromqlMultiAlert"
-                  :disabled="isRuleMultiRequired"
-                  name="query_condition.promql_multi_alert"
-                  unit="series"
-                  @change="onPromqlMultiAlertChange"
-                />
-
-                <p v-if="isRuleMultiRequired" class="text-text-secondary px-3 text-xs">
-                  {{ t("alerts.promRuleModePendingMulti") }}
-                </p>
-
-                <!-- Rule expressions own matching, so an extra series-count gate would change their semantics. -->
-                <div
-                  v-if="!isPromqlMultiAlert && !isPromRuleMode"
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
-                >
-                  <span
-                    class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                    >{{ t("alerts.havingSeries") }} *
-                    <OTooltip :content="t('alerts.queryConfig.havingSeriesTooltip')" side="top" />
-                  </span>
-                  <div class="flex items-start gap-2">
-                    <OFormSelect
-                      :aria-label="t('common.operator')"
-                      name="trigger_condition.operator"
-                      :options="numericOperators"
-                      :searchable="false"
-                      @update:model-value="onTriggerOperatorChange"
-                    />
-                    <!-- Message hangs under the threshold field it describes. -->
-                    <div class="flex flex-col gap-1">
-                      <OFormInput
-                        :aria-label="t('alerts.alertIfNoOfEvents')"
-                        name="trigger_condition.threshold"
-                        type="number"
-                        width="xs"
-                        min="1"
-                        @update:model-value="onTriggerThresholdChange($event)"
-                        @blur="restoreDefaultThreshold"
-                      >
-                        <template #error />
-                      </OFormInput>
-                      <div
-                        v-if="thresholdError"
-                        class="text-input-error-text text-xs whitespace-nowrap"
-                        data-test="alert-having-series-threshold-error"
-                        role="alert"
-                      >
-                        {{ thresholdError }}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </template>
+                      </OSettingRow>
+                    </template></div
+                ></Teleport>
+              </div>
             </div>
-          </div>
+          </component>
         </template>
+
+        <!-- Section 4's row carries the "Check every" label, so the controls render bare. -->
+        <Teleport
+          v-if="isRealTime === 'false'"
+          :to="sectionTargets?.querySchedule"
+          :disabled="!sectionTargets?.querySchedule"
+        >
+          <template v-if="frequencyMode !== 'cron'">
+            <OFormInput
+              :aria-label="t('alerts.queryConfig.checkEvery')"
+              name="_ui.checkEvery"
+              data-test="alert-check-every-input"
+              type="number"
+              fit-content
+              min="1"
+              @update:model-value="onCheckEveryChange($event)"
+              @blur="restoreDefaultFrequency"
+            >
+              <template #error />
+            </OFormInput>
+            <OSelect
+              :aria-label="t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })"
+              class="w-28!"
+              :model-value="frequencyMode"
+              data-test="alert-check-every-unit-select"
+              :options="frequencyUnitOptions"
+              labelKey="label"
+              valueKey="value"
+              :searchable="false"
+              @update:model-value="onFrequencyUnitChange"
+            />
+            <AlertMessageLine
+              class="order-last w-0 min-w-full"
+              :error="checkEveryError"
+              error-data-test="alert-check-every-error"
+              :note="checkGap"
+              data-test="alert-check-every-message"
+            />
+            <OButton
+              variant="link"
+              size="xs"
+              icon-left="add"
+              class="order-1"
+              data-test="add-alert-add-cron"
+              @click="useCronSchedule"
+            >
+              {{ t("alerts.tiers.add.cron") }}
+            </OButton>
+          </template>
+          <OSettingRow
+            v-else
+            :label="t('alerts.form.schedule.cronRow')"
+            :info="t('alerts.form.schedule.cronHint')"
+            fill
+            data-test="add-alert-cron-row"
+          >
+            <div class="flex flex-col gap-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <OFormInput
+                  :aria-label="t('alerts.queryConfig.cron')"
+                  name="trigger_condition.cron"
+                  data-test="alert-cron-input"
+                  :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
+                  class="w-50"
+                  @update:model-value="onCronExpressionChange"
+                >
+                  <template #error />
+                </OFormInput>
+                <span class="inline-block">
+                  <OFormSelect
+                    :aria-label="t('alerts.downtimes.scheduleForm.timezone')"
+                    name="trigger_condition.timezone"
+                    data-test="alert-cron-timezone-select"
+                    :options="timezoneSelectOptions"
+                    searchable
+                    :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
+                    class="w-75!"
+                    @update:model-value="onCronTimezoneChange"
+                  />
+                  <OTooltip v-if="cronTimezone" :content="raw(cronTimezone)" side="bottom" />
+                </span>
+              </div>
+              <div
+                v-if="cronDescription && !cronError"
+                class="text-text-secondary text-xs"
+                data-test="alert-cron-description"
+              >
+                {{ cronDescription }}
+              </div>
+              <div
+                v-if="cronError"
+                class="text-status-error-text text-xs"
+                role="alert"
+                data-test="alert-cron-error"
+              >
+                {{ cronError }}
+              </div>
+            </div>
+            <template #actions>
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                data-test="add-alert-cron-row-remove"
+                @click="removeCronSchedule"
+              >
+                {{ t("common.remove") }}
+              </OButton>
+            </template>
+          </OSettingRow>
+        </Teleport>
       </div>
     </div>
 
@@ -1823,15 +1420,14 @@ import {
   nextTick,
   watch,
   inject,
+  onBeforeUnmount,
   type Ref,
 } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import {
   convertMinutesToCron,
-  getCronIntervalDifferenceInSeconds,
-  isAboveMinRefreshInterval,
   describeCron,
   getImageURL,
   resolveBrowserTimezone,
@@ -1843,12 +1439,23 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import { savedBrowserTimezone } from "@/utils/timezoneAliases";
-import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
-import { streamValuesLoader } from "@/components/filterBar/streamValues";
-import { toFilterFieldType, type FilterField } from "@/utils/query/filterBar";
+import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
+import AlertFilterSentence from "@/components/alerts/AlertFilterSentence.vue";
+import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
+import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
+import { useFilterDiscovery } from "@/composables/alerts/useStreamDiscovery";
+import {
+  findNode,
+  replaceNode,
+  toFilterFieldType,
+  type FilterField,
+  type FilterGroup,
+  type FilterNode,
+} from "@/utils/query/filterBar";
+import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1859,8 +1466,6 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import AlertMultiToggle from "@/components/alerts/AlertMultiToggle.vue";
 import ForecastAlertFields from "@/components/alerts/steps/ForecastAlertFields.vue";
 import {
   FORECAST_FREQUENCY_MINUTES,
@@ -1869,24 +1474,111 @@ import {
   parseForecastAlertPromql,
 } from "@/utils/alerts/forecastAlert";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import AlertThresholdLevels from "@/components/alerts/AlertThresholdLevels.vue";
+import AlertGroupByPicker from "@/components/alerts/AlertGroupByPicker.vue";
+import AlertWindowPhrase from "@/components/alerts/AlertWindowPhrase.vue";
+import AlertMessageLine from "@/components/alerts/AlertMessageLine.vue";
+import {
+  ALERT_FORM_CONTEXT_KEY,
+  type AlertLineNote,
+  type ThresholdGuide,
+} from "@/components/alerts/alertFormContext";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { revealFieldErrors } from "@/lib/forms/Form/useOForm";
+import { shownFieldError } from "@/composables/alerts/shownFieldError";
 import { type QueryConfigMeta } from "./QueryConfig.schema";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useTierVisibility,
+} from "@/composables/alerts/useAlertSettingTiers";
+import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
+import { localeFileMap } from "@/locales";
+import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
+import { countComparisonOptions } from "@/utils/alerts/countComparison";
+import { dataNoun, formatNumber, joinListMore, valueRangeText } from "@/utils/alerts/alertCopy";
+import { metricPromql } from "@/utils/alerts/alertIntents";
+import {
+  isSpanDurationMeasure,
+  SPAN_DURATION_FIELD,
+  UNIT_KEEPING_FUNCTIONS,
+} from "@/utils/alerts/alertReadBack";
+import {
+  alwaysOneRow,
+  oneRowMeetsLimit,
+  sqlConditionToHaving,
+  sqlHavingCondition,
+  sqlHavingToCondition,
+} from "@/utils/alerts/alertSqlUtils";
+import { missingByLabel, promqlMetricNames } from "@/utils/alerts/promqlLabels";
+import { promqlScaledToPercent, promqlWithMetric } from "@/utils/alerts/promqlMetrics";
+import { groupRanking } from "@/composables/alerts/groupRanking";
+import { ratioThresholdFix, type ValueRange } from "@/utils/alerts/ratioThreshold";
+import { checkGapNote } from "@/utils/alerts/scheduleOverlap";
+import { generatedSqlNote } from "@/utils/alerts/generatedSqlNote";
+import { promqlByLabels, sqlGroupByLabels } from "@/utils/alerts/queryGroupLabels";
+import { normalizeDeclaredUnit } from "@/utils/metrics/metricDefaults";
+import { groupByChoices } from "@/utils/alerts/alertQueryBuilder";
+
+/** Group labels as prose in the reader's language ("service, region and pod"). */
+function groupLabelsText(labels: string[], locale: string): string {
+  return new Intl.ListFormat(localeFileMap[locale] ?? locale, { type: "conjunction" }).format(
+    labels,
+  );
+}
+
+// The sentence reads only rows that name a field; the builder's own blank starter row is not a filter.
+const withoutBlankRows = (group: FilterGroup): FilterGroup => ({
+  ...group,
+  items: group.items.flatMap((item): FilterNode[] => {
+    if (item.kind === "group") {
+      const inner = withoutBlankRows(item);
+      return inner.items.length ? [inner] : [];
+    }
+    return item.kind === "condition" && !item.field ? [] : [item];
+  }),
+});
+
+const EDITOR_FOLD_LINES = 5;
+const QUERY_MODE_ICONS = { custom: "filter-alt", sql: "database", promql: "show-chart" } as const;
+
+// Span duration is microseconds by the traces contract, whatever unit the user types it in.
+const MICROS_PER: Record<string, number> = { ns: 0.001, us: 1, ms: 1000, s: 1_000_000 };
+// A PromQL query that rates, counts or does arithmetic no longer reads in its metric's unit.
+const PROMQL_UNIT_CHANGERS =
+  /\b(?:rate|irate|increase|delta|idelta|deriv|predict_linear|count|count_over_time|changes|resets|absent|absent_over_time|stddev|stdvar|histogram_quantile|time|timestamp|scalar|vector)\s*\(|[-*/+%^]/i;
+
+/** Where a promql_condition operator sits in PromQL, which spells equality "==". */
+const PROMQL_OPERATOR: Record<string, string> = { "=": "==" };
+
+/** True when the query already compares at its top level, so it filters series by itself. */
+function promqlCompares(query: string): boolean {
+  const bare = query
+    .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "")
+    .replace(/\{[^}]*\}/g, "")
+    .replace(/\[[^\]]*\]/g, "");
+  return /==|!=|>=|<=|>|</.test(bare);
+}
 
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
 
 export default defineComponent({
   name: "Step2QueryConfig",
   components: {
+    AlertMessageLine,
+    AlertThresholdLevels,
+    AlertGroupByPicker,
+    AlertWindowPhrase,
     OTag,
-    OTruncatedText,
-    AlertMultiToggle,
     ForecastAlertFields,
     AlertQueryPreview,
+    AlertFilterSentence,
+    AlertSentenceRow,
+    AlertTierPlace,
     FilterBuilder,
     QueryEditorDialog,
     CustomConfirmDialog,
@@ -1898,12 +1590,23 @@ export default defineComponent({
     OSwitch,
     OFormSwitch,
     OTooltip,
+    OSettingRow,
     OIcon,
     OFormInput,
     OFormSelect,
     OBanner,
   },
   props: {
+    // Opt-in: the sectioned alert editor renders the condition and schedule rows in its own sections.
+    sectionTargets: {
+      type: Object as PropType<AlertSectionTargets | null>,
+      default: null,
+    },
+    // What the preview drew, so a percent typed against 0-1 ratio values is caught in place.
+    previewValueRange: {
+      type: Object as PropType<ValueRange | null>,
+      default: null,
+    },
     tab: {
       type: String as PropType<"sql" | "promql" | "custom">,
       default: "custom",
@@ -1964,6 +1667,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Which metric the PromQL query reads, said in the query's help line. */
+    promqlStreamNote: {
+      type: String as PropType<I18nText | "">,
+      default: "",
+    },
     isAggregationEnabled: {
       type: Boolean,
       default: false,
@@ -2007,10 +1715,12 @@ export default defineComponent({
     "update:aggregation",
     "update:promqlCondition",
     "update:triggerCondition",
+    "update:period",
   ],
   setup(props, { emit }) {
-    const { t } = useI18nTyped();
+    const { t, locale } = useI18nTyped();
     const store = useStore();
+    const tiers = inject(ALERT_SETTING_TIERS_KEY, null);
 
     // Descendant step: the AddAlert orchestrator owns the ONE form and provides
     // FORM_CONTEXT_KEY. All field reads/writes below go through it; the composed
@@ -2084,7 +1794,9 @@ export default defineComponent({
     const pendingTab = ref<"sql" | "promql" | "custom" | null>(null);
 
     // Field refs for focus manager
-    const customPreviewRef = ref(null);
+    const customPreviewRef = ref<HTMLElement | null>(null);
+    // The look-back field the summary and Find land on; one Alert when line draws it at a time.
+    const periodFieldRef = ref<unknown>(null);
     const sqlPromqlPreviewRef = ref(null);
 
     // Local query values
@@ -2096,9 +1808,21 @@ export default defineComponent({
     // Aggregation state
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
 
-    // Expandable section toggles — auto-expand filters if editing an alert with existing conditions
-    const showFilters = ref(true);
+    // Revealing VRL only offers its switch; turning it off clears the function.
     const showVrl = ref(!!props.vrlFunction?.trim());
+    const onVrlSwitch = (on: unknown) => {
+      if (on) {
+        showVrl.value = true;
+        tiers?.reveal("vrl");
+        return;
+      }
+      showVrl.value = false;
+      tiers?.conceal("vrl");
+      if (vrlFunctionContent.value) {
+        vrlFunctionContent.value = "";
+        emit("update:vrlFunction", "");
+      }
+    };
     const filtersSectionRef = ref<HTMLElement | null>(null);
     const inlineQueryEditorRef = ref<any>(null);
 
@@ -2120,8 +1844,11 @@ export default defineComponent({
       externalErrors: alertSqlErrorRanges,
     });
 
+    const inlineEditorFocused = ref(false);
     const onQueryEditorFocus = () => {
+      inlineEditorFocused.value = true;
       queryEditorPlaceholderFlag.value = false;
+      if (foldedLines.value > EDITOR_FOLD_LINES) editorUnfolded.value = true;
       _sqlOnFocus();
     };
 
@@ -2159,6 +1886,7 @@ export default defineComponent({
     // the query and feeds autocomplete context (same pattern as QueryEditorDialog)
     const handleInlineQueryUpdate = (newQuery: string) => {
       _sqlOnQueryChange();
+      if (newQuery.split("\n").length > EDITOR_FOLD_LINES) editorUnfolded.value = true;
       if (localTab.value === "sql") {
         updateSqlQuery(newQuery);
       } else {
@@ -2173,27 +1901,46 @@ export default defineComponent({
       getSuggestions();
     };
 
-    // Inline editor status bar state
+    // Inline editor status bar state; an error reads on its own line under the editor instead.
     const inlineStatusState = computed(() => {
-      if (props.sqlQueryErrorMsg?.trim()) return "sql-status-bar--error";
       const query = localTab.value === "sql" ? localSqlQuery.value : editorPromqlQuery.value;
       if (!query?.trim()) return "sql-status-bar--hint";
       return "sql-status-bar--idle";
     });
 
-    // Status-bar color/cursor per state (was CSS .sql-status-bar--*).
-    const inlineStatusBarClass = computed(() =>
-      inlineStatusState.value === "sql-status-bar--error"
-        ? "bg-status-error-bg text-status-error-text cursor-pointer"
-        : "bg-surface-subtle text-text-secondary cursor-default",
+    const inlineStatusBarClass = "bg-surface-subtle text-text-body cursor-default";
+
+    const columnNames = computed(() =>
+      (props.columns as any[])
+        .map((c: any) => (typeof c === "string" ? c : String(c?.value ?? "")))
+        .filter(Boolean),
     );
+    const sqlColumnFix = computed(() =>
+      props.sqlQueryErrorMsg?.trim()
+        ? unknownColumnFix(props.sqlQueryErrorMsg, localSqlQuery.value ?? "", columnNames.value)
+        : null,
+    );
+    const sqlErrorText = computed(() => {
+      const fix = sqlColumnFix.value;
+      if (!fix) return raw(props.sqlQueryErrorMsg?.trim());
+      const named = { column: raw(fix.column), match: raw(fix.match), line: fix.line ?? 0 };
+      return fix.line
+        ? t("alerts.form.sqlError.unknownColumn", named)
+        : t("alerts.form.sqlError.unknownColumnNoLine", named);
+    });
+    const applySqlColumnFix = () => {
+      const fix = sqlColumnFix.value;
+      if (!fix) return;
+      updateSqlQuery(applyColumnFix(localSqlQuery.value ?? "", fix.column, fix.match));
+      emit("validate-sql");
+    };
 
     // Placeholder flags for inline editors (show image when empty + not focused)
     const queryEditorPlaceholderFlag = ref(true);
     const vrlEditorPlaceholderFlag = ref(true);
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
 
-    // ─── Typewriter placeholder for the inline query editor ──────────
+    // ─── Example placeholder for the inline query editor ──────────
     const streamFieldsForPlaceholder = computed(() =>
       (props.columns as any[]).map((c: any) => ({
         name: typeof c === "string" ? c : (c.value ?? c.label ?? ""),
@@ -2202,7 +1949,7 @@ export default defineComponent({
     );
     const noStreamForPlaceholder = computed(() => !props.streamName);
     const isSqlModeForPlaceholder = computed(() => localTab.value === "sql");
-    const { placeholder: sqlEditorPlaceholder } = useQueryPlaceholder(
+    const { examples: sqlExamples } = useQueryPlaceholder(
       streamFieldsForPlaceholder,
       ref({}),
       isSqlModeForPlaceholder,
@@ -2233,6 +1980,48 @@ export default defineComponent({
       },
       { immediate: true },
     );
+    // A counter only grows, so a new alert's first measure is its rate, never an average of the raw count.
+    let rateDefaultedFor = "";
+    let rateDefault = "";
+    watch(promqlMetricType, (type) => {
+      const stream = props.streamName;
+      if (!type || rateDefaultedFor === stream) return;
+      const ownDefault =
+        localTab.value === "promql" && !!rateDefault && props.promqlQuery === rateDefault;
+      const untouched =
+        ownDefault ||
+        (localTab.value === "custom" &&
+          selectedFunction.value === "avg" &&
+          [undefined, null, ""].includes(fv("query_condition.aggregation.having.value")));
+      if (type.toLowerCase() === "gauge") {
+        if (!ownDefault || props.beingUpdated || props.isSeeding) return;
+        rateDefault = "";
+        emit("update:promqlQuery", "");
+        updateTab("custom");
+        return;
+      }
+      rateDefaultedFor = stream;
+      if (props.beingUpdated || props.isSeeding || !untouched || ownDefault) return;
+      rateDefault = metricPromql(stream, {
+        counter: true,
+        windowMinutes: Number(props.triggerCondition?.period) || 10,
+      });
+      updateTab("promql");
+      emit("update:promqlQuery", rateDefault);
+    });
+    // A query that reads only the metric picked before reads the newly picked one.
+    watch(
+      () => props.streamName,
+      (stream, before) => {
+        if (props.streamType !== "metrics" || !stream || !before || localTab.value !== "promql")
+          return;
+        if (props.beingUpdated || props.isSeeding) return;
+        const moved = promqlWithMetric(props.promqlQuery ?? "", before, stream);
+        if (moved === undefined) return;
+        if (props.promqlQuery === rateDefault) rateDefault = moved;
+        emit("update:promqlQuery", moved);
+      },
+    );
     const promqlSamples = computed(() =>
       props.streamType === "metrics" && props.streamName
         ? alertPromqlSamples({
@@ -2245,13 +2034,17 @@ export default defineComponent({
           })
         : [],
     );
-    const promqlPlaceholderEnabled = computed(
-      () => localTab.value === "promql" && promqlSamples.value.length > 0,
-    );
-    const { placeholder: promqlEditorPlaceholder } = useTypewriterPlaceholder(
-      computed(() => promqlSamples.value.map((s) => s.query)),
-      { enabled: promqlPlaceholderEnabled },
-    );
+    // Static and labelled as an example: a typed-out query reads as one already written.
+    const promqlEditorPlaceholder = computed(() => {
+      const example = promqlSamples.value[0]?.query;
+      return example ? t("alerts.composite.expressionExample", { example: raw(example) }) : "";
+    });
+    // Static like PromQL's: a typed-out query reads as one already written.
+    const sqlEditorPlaceholder = computed(() => {
+      const example = sqlExamples.value[0];
+      if (!example || noStreamForPlaceholder.value) return example ?? "";
+      return t("alerts.composite.expressionExample", { example: raw(example) });
+    });
     const inlineEditorPlaceholder = computed(() =>
       localTab.value === "promql" && promqlSamples.value.length
         ? promqlEditorPlaceholder.value
@@ -2268,6 +2061,11 @@ export default defineComponent({
     };
 
     const onBlurInlineSqlEditor = async () => {
+      inlineEditorFocused.value = false;
+      // The editor is not a form field, so leaving it reveals its "write a query" error by hand.
+      if (form && localTab.value !== "custom") {
+        revealFieldErrors(form, [`query_condition.${localTab.value}`]);
+      }
       queryEditorPlaceholderFlag.value =
         localTab.value === "sql" ? localSqlQuery.value === "" : editorPromqlQuery.value === "";
       if (localTab.value === "sql") {
@@ -2277,10 +2075,6 @@ export default defineComponent({
     };
     const onBlurInlineVrlEditor = () => {
       vrlEditorPlaceholderFlag.value = vrlFunctionContent.value === "";
-    };
-
-    const toggleFilters = () => {
-      showFilters.value = !showFilters.value;
     };
 
     // Stream-type-driven: logs/traces are event-based, metrics are aggregation-based
@@ -2311,14 +2105,28 @@ export default defineComponent({
       localIsAggregationEnabled.value = false;
     }
 
+    const countedNoun = computed(() => dataNoun(props.streamType, "custom", 2, t));
+    // Every event of a group carries its group's field, so counting that field counts all its events.
+    const countsGroupField = computed(
+      () =>
+        selectedFunction.value === "count" &&
+        !!logMeasureColumn.value &&
+        logGroupBy.value.includes(logMeasureColumn.value),
+    );
+    // COUNT(field) counts the events carrying the field, so "count of service_name" would misread.
+    const measureConnector = computed(() =>
+      selectedFunction.value === "count"
+        ? t("alerts.conditionCountWith", { noun: countedNoun.value })
+        : t("alerts.conditionOf"),
+    );
     // Log function options — count (default) and measure functions.
     // computed() (not a module/setup const) so the labels + tooltips re-resolve
     // if the locale changes; the `value`s are payload identifiers and stay literal.
     const logFunctionOptions = computed(() => [
       {
-        label: t("alerts.queryConfig.functions.totalEvents"),
+        label: t("alerts.queryConfig.functions.totalEvents", { noun: countedNoun.value }),
         value: "total_events",
-        tooltip: t("alerts.queryConfig.functionTooltips.totalEvents"),
+        tooltip: t("alerts.queryConfig.functionTooltips.totalEvents", { noun: countedNoun.value }),
       },
       {
         label: t("alerts.queryConfig.functions.count"),
@@ -2333,12 +2141,12 @@ export default defineComponent({
       {
         label: t("alerts.queryConfig.functions.min"),
         value: "min",
-        tooltip: t("alerts.queryConfig.functionTooltips.min"),
+        tooltip: t("alerts.queryConfig.functionTooltips.minWindow"),
       },
       {
         label: t("alerts.queryConfig.functions.max"),
         value: "max",
-        tooltip: t("alerts.queryConfig.functionTooltips.max"),
+        tooltip: t("alerts.queryConfig.functionTooltips.maxWindow"),
       },
       {
         label: t("alerts.queryConfig.functions.sum"),
@@ -2377,8 +2185,16 @@ export default defineComponent({
       },
     ]);
 
-    // Numeric-only operators (no Contains/NotContains for thresholds)
-    const numericOperators = ["=", "!=", ">=", ">", "<=", "<"];
+    const plainOperators = computed(() => [
+      { label: t("alerts.sections.operators.gte"), value: ">=" },
+      { label: t("alerts.sections.operators.gt"), value: ">" },
+      { label: t("alerts.sections.operators.lte"), value: "<=" },
+      { label: t("alerts.sections.operators.lt"), value: "<" },
+      { label: t("alerts.sections.operators.eq"), value: "=" },
+      { label: t("alerts.sections.operators.ne"), value: "!=" },
+    ]);
+    const operatorLabel = (op: unknown) =>
+      plainOperators.value.find((option) => option.value === op)?.label ?? raw(String(op ?? ""));
 
     // Selected function — bare mode-discriminator (drives conditional rendering
     // + the aggregation payload). Stays a ref (bridged into `_meta` for the
@@ -2409,16 +2225,52 @@ export default defineComponent({
       set: (v) => setFV("query_condition.aggregation.having.value", v),
     });
 
-    // Pre-migration, `conditionValue` was a plain ref seeded ONCE at setup from
-    // trigger_condition.threshold for logs/traces (metrics seeded from having.value).
-    // That snapshot is why the measure row opens on the threshold default of 3 rather
-    // than having.value's own default of 1. having.value is form-owned now, so carry
-    // the seed explicitly. Snapshot the threshold HERE: onLogFunctionChange resets the
-    // live threshold to 1 before it writes having.value, so it can't be read at switch
-    // time. One-shot, and only when no saved aggregation is being loaded — a saved
-    // measure alert must keep its own having.value.
-    const initialThresholdSeed = fv("trigger_condition.threshold");
+    // A new alert's first measure opens with no value: the event-count default is no value threshold.
     let measureSeedPending = isEventBasedInit && !props.isAggregationEnabled;
+
+    const isSpanDuration = computed(() =>
+      isSpanDurationMeasure(props.streamType, selectedFunction.value, logMeasureColumn.value),
+    );
+    const durationUnit = ref("ms");
+    const durationUnitOptions = computed(() =>
+      (["ns", "us", "ms", "s"] as const).map((unit) => ({
+        label: t(`alerts.units.options.${unit}`),
+        value: unit,
+      })),
+    );
+    const storeDuration = (shown: unknown) => {
+      const n = shown === "" || shown === null || shown === undefined ? NaN : Number(shown);
+      conditionValue.value = Number.isFinite(n)
+        ? Math.round(n * MICROS_PER[durationUnit.value] * 1e6) / 1e6
+        : "";
+      emitAggregationUpdate();
+    };
+    const onDurationValueChange = (shown: unknown) => storeDuration(shown);
+    const onDurationUnitChange = (unit: SelectModelValue) => {
+      if (typeof unit !== "string" || !(unit in MICROS_PER)) return;
+      durationUnit.value = unit;
+      storeDuration(fv("_ui.durationValue"));
+    };
+    const revealDurationError = () => {
+      if (form) revealFieldErrors(form, ["query_condition.aggregation.having.value"]);
+    };
+    // A loaded value shows in the largest unit that keeps it whole.
+    watch(
+      isSpanDuration,
+      (on) => {
+        if (!on) return;
+        const stored = conditionValue.value;
+        const micros = stored === "" || stored === null ? NaN : Number(stored);
+        if (!Number.isFinite(micros)) {
+          setFV("_ui.durationValue", "");
+          return;
+        }
+        durationUnit.value =
+          micros % MICROS_PER.s === 0 ? "s" : micros % MICROS_PER.ms === 0 ? "ms" : "us";
+        setFV("_ui.durationValue", micros / MICROS_PER[durationUnit.value]);
+      },
+      { immediate: true },
+    );
 
     // Watch stream type changes to restore saved state or set new-alert defaults.
     // Fires when stream type prop changes (e.g. async load on edit, or user switching stream type).
@@ -2477,6 +2329,7 @@ export default defineComponent({
           emit("update:isAggregationEnabled", true);
           writeAggregation((agg) => {
             agg.function = "avg";
+            agg.having.value = "";
             if (!agg.having.column) {
               const hasValueField = props.columns.some(
                 (c: any) => (typeof c === "string" ? c : c.value) === "value",
@@ -2500,6 +2353,7 @@ export default defineComponent({
       get: () => fv("trigger_condition.threshold"),
       set: (v) => setFV("trigger_condition.threshold", v),
     });
+    const countOperators = computed(() => countComparisonOptions(t));
     // (Removed a mount-time `props.triggerCondition.threshold = 1` reset that
     // mutated the readonly form read-view — it silently failed (no-op) and only
     // logged a warning. The measure-mode "reset to >= 1 when group-by is empty"
@@ -2514,53 +2368,15 @@ export default defineComponent({
     // suppresses the built-in message and we render it in a full-width sibling
     // below the row. These read the same R3-timed field errors OFormInput would
     // have surfaced — single source of truth, just displayed at column width.
-    const thresholdError = form.useStore((s: any) =>
-      firstFieldError(s.fieldMeta?.["trigger_condition.threshold"]?.errors ?? []),
+    const thresholdError = shownFieldError(form, "trigger_condition.threshold");
+    // The schema owns the §4.5 warning matrix; each warning shows its error the way its field would.
+    const warningThresholdError = shownFieldError(form, "trigger_condition.warning_threshold");
+    const aggregationWarningError = shownFieldError(
+      form,
+      "query_condition.aggregation.warning_value",
     );
-    // Warning validation, §4.5 matrix. "Less severe" is OPERATOR-DEPENDENT —
-    // a plain `warning < critical` check is wrong for `<`/`<=`, and `=`/`!=`
-    // have no ordering so they reject a warning outright. Mirrors the backend
-    // `validate_thresholds` so the user is told before submit, not by a 400.
-    const matrixError = (w: any, c: any, op: any): string => {
-      if (w === null || w === undefined || w === "") return "";
-      const wn = Number(w);
-      const cn = Number(c);
-      if (Number.isNaN(wn) || Number.isNaN(cn)) return "";
-      if (op === "=" || op === "!=") {
-        return t("alerts.warnOperatorUnordered", { operator: op });
-      }
-      if ((op === ">" || op === ">=") && !(wn < cn)) {
-        return t("alerts.warnMustBeLower", { warning: wn, critical: cn, operator: op });
-      }
-      if ((op === "<" || op === "<=") && !(wn > cn)) {
-        return t("alerts.warnMustBeHigher", { warning: wn, critical: cn, operator: op });
-      }
-      return "";
-    };
-    // Count-based warning (trigger_condition), for modes where the threshold
-    // IS the row/series count.
-    const warningThresholdError = form.useStore((s: any) => {
-      const tc = s.values?.trigger_condition ?? {};
-      return matrixError(tc.warning_threshold, tc.threshold, tc.operator);
-    });
-    // Aggregate-VALUE warning (Aggregation.warning_value), read against
-    // `having.operator` — that is the comparison an aggregation alert makes.
-    const aggregationWarningError = form.useStore((s: any) => {
-      const agg = s.values?.query_condition?.aggregation ?? {};
-      return matrixError(agg.warning_value, agg.having?.value, agg.having?.operator);
-    });
-    // PromQL warning validated against `promql_condition.operator`.
-    const promqlWarningError = form.useStore((s: any) => {
-      const qc = s.values?.query_condition ?? {};
-      return matrixError(
-        qc.promql_warning_value,
-        qc.promql_condition?.value,
-        qc.promql_condition?.operator,
-      );
-    });
-    const promqlValueError = form.useStore((s: any) =>
-      firstFieldError(s.fieldMeta?.["query_condition.promql_condition.value"]?.errors ?? []),
-    );
+    const promqlWarningError = shownFieldError(form, "query_condition.promql_warning_value");
+    const promqlValueError = shownFieldError(form, "query_condition.promql_condition.value");
     // ── Severity rows ──────────────────────────────────────────────────────
     // Critical and Warning are stacked rows (mock: multi-alert-form.html), not
     // one long sentence. Warning shares Critical's operator, so its row only
@@ -2602,11 +2418,17 @@ export default defineComponent({
       setFV("query_condition.promql_warning_value", "");
       showPromqlWarningRow.value = false;
     };
-    const checkEveryError = form.useStore((s: any) =>
-      firstFieldError(s.fieldMeta?.["_ui.checkEvery"]?.errors ?? []),
+    const checkEveryError = shownFieldError(form, "_ui.checkEvery");
+    const havingValueError = shownFieldError(form, "query_condition.aggregation.having.value");
+    const periodError = shownFieldError(form, "trigger_condition.period");
+    const havingColumn = form.useStore((s: any) =>
+      String(s.values?.query_condition?.aggregation?.having?.column ?? ""),
     );
-    const havingValueError = form.useStore((s: any) =>
-      firstFieldError(s.fieldMeta?.["query_condition.aggregation.having.value"]?.errors ?? []),
+    const cronError = shownFieldError(form, "trigger_condition.cron");
+    const sqlRequiredError = shownFieldError(form, "query_condition.sql");
+    const promqlRequiredError = shownFieldError(form, "query_condition.promql");
+    const queryRequiredError = computed(() =>
+      localTab.value === "promql" ? promqlRequiredError.value : sqlRequiredError.value,
     );
 
     // Reactive views of the two group-by field arrays (form store) so the
@@ -2639,6 +2461,10 @@ export default defineComponent({
       (s: any) => !!s.values?.query_condition?.promql_rule_mode,
     );
     const isPromRuleMode = computed(() => promRuleModeStore.value);
+    // A PromQL one-alert limit sits beside "One alert"; SQL keeps its row below for the per-group condition.
+    const limitBesideOne = computed(
+      () => localTab.value !== "sql" && !(localTab.value === "promql" && isPromRuleMode.value),
+    );
     const pendingPeriodStore = form.useStore((s: any) => Number(s.values?.pending_period_sec ?? 0));
     const isRuleMultiRequired = computed(
       () => localTab.value === "promql" && isPromRuleMode.value && pendingPeriodStore.value > 0,
@@ -2650,8 +2476,41 @@ export default defineComponent({
       },
       { immediate: true },
     );
+    const suggestions = inject(ALERT_SUGGESTIONS_KEY, null);
+    const stopRuleSuggestion = suggestions?.onApply("ruleExpression", () => {
+      setFV("query_condition.promql_rule_mode", true);
+      onPromRuleModeChange(true);
+    });
+    onBeforeUnmount(() => stopRuleSuggestion?.());
+    // The threshold Rule mode moved into the query, so turning it off can move it back.
+    const keptThreshold = ref<{
+      query: string;
+      original: string;
+      expression: string;
+      condition: any;
+    } | null>(null);
+    const keptThresholdText = computed(() =>
+      keptThreshold.value
+        ? t("alerts.form.ruleMode.keptThreshold", {
+            expression: raw(keptThreshold.value.expression),
+          })
+        : "",
+    );
+    const keepThresholdInQuery = () => {
+      const pc = fv("query_condition.promql_condition");
+      const query = (localPromqlQuery.value ?? "").trim();
+      const value = pc?.value;
+      if (!query || value === "" || value == null || promqlCompares(query)) return;
+      const operator = PROMQL_OPERATOR[pc.operator] ?? pc.operator ?? ">=";
+      const base = /\b(?:and|or|unless)\b/i.test(query) ? `(${query})` : query;
+      const expression = `${operator} ${value}`;
+      const next = `${base} ${expression}`;
+      keptThreshold.value = { query: next, original: query, expression, condition: { ...pc } };
+      updatePromqlQuery(next);
+    };
     const onPromRuleModeChange = (enabled: unknown) => {
       if (enabled) {
+        keepThresholdInQuery();
         setFV("query_condition.promql_condition", null);
         setFV("query_condition.promql_warning_value", null);
         setFV("trigger_condition.warning_threshold", null);
@@ -2659,6 +2518,13 @@ export default defineComponent({
         setFV("trigger_condition.operator", ">=");
         setFV("trigger_condition.threshold", 1);
       } else {
+        const kept = keptThreshold.value;
+        keptThreshold.value = null;
+        if (kept && localPromqlQuery.value === kept.query) {
+          updatePromqlQuery(kept.original);
+          setFV("query_condition.promql_condition", kept.condition);
+          return;
+        }
         setFV("query_condition.promql_condition", { column: "value", operator: ">=", value: "" });
       }
     };
@@ -2672,6 +2538,191 @@ export default defineComponent({
     const editorPromqlQuery = computed(() =>
       isForecastMode.value ? forecastExpression.value : localPromqlQuery.value,
     );
+    // Labels and unit per metric the condition reads; null while loading or when the stream has no schema.
+    const metricInfo = ref<Record<string, { labels: string[]; unit: string; help: string } | null>>(
+      {},
+    );
+    const conditionMetrics = computed(() => {
+      if (props.streamType !== "metrics") return [];
+      const names =
+        localTab.value === "promql" ? promqlMetricNames(editorPromqlQuery.value ?? "") : [];
+      return [...new Set([props.streamName, ...names].filter(Boolean))].slice(0, 5);
+    });
+    watch(
+      () => conditionMetrics.value.join("\n"),
+      async () => {
+        for (const name of conditionMetrics.value) {
+          if (name in metricInfo.value) continue;
+          metricInfo.value = { ...metricInfo.value, [name]: null };
+          try {
+            const stream: any = await getStream(name, "metrics", true);
+            if (!stream?.schema?.length) continue;
+            metricInfo.value = {
+              ...metricInfo.value,
+              [name]: {
+                labels: stream.schema.map((f: any) => String(f.name)),
+                unit: stream.metrics_meta?.unit ?? "",
+                help: stream.metrics_meta?.help ?? "",
+              },
+            };
+          } catch {
+            // An unknown metric gets no label check; the preview says it matched nothing.
+          }
+        }
+      },
+      { immediate: true },
+    );
+    const promqlLabelIssue = computed(() => {
+      if (localTab.value !== "promql" || isForecastMode.value) return "";
+      const issue = missingByLabel(
+        editorPromqlQuery.value ?? "",
+        (metric) => metricInfo.value[metric]?.labels,
+      );
+      if (!issue) return "";
+      const names = { label: raw(issue.label), metric: raw(issue.metric) };
+      return issue.labels.length
+        ? t("alerts.guard.labelMissing", { ...names, labels: joinListMore(issue.labels, t) })
+        : t("alerts.guard.labelMissingNone", names);
+    });
+    // The section's help line already says the label guard, so the editor does not repeat it.
+    const promqlEditorError = computed(() =>
+      props.sectionTargets && queryRequiredError.value === promqlLabelIssue.value
+        ? ""
+        : queryRequiredError.value,
+    );
+    // A UCUM annotation such as {cpu} names what is counted, so it reads as that word.
+    const annotationUnit = (metric: string | undefined) =>
+      /^\{([^{}]+)\}$/.exec((metric && metricInfo.value[metric]?.unit) || "")?.[1].trim() ?? "";
+    const unitSuffix = (metric: string | undefined) => {
+      const unit = normalizeDeclaredUnit(metric ? metricInfo.value[metric]?.unit : undefined);
+      const suffixes: Record<string, I18nText> = {
+        percent: raw("%"),
+        seconds: t("alerts.units.options.s"),
+        milliseconds: t("alerts.units.options.ms"),
+        microseconds: t("alerts.units.options.us"),
+        nanoseconds: t("alerts.units.options.ns"),
+        bytes: raw("B"),
+      };
+      return (unit && suffixes[unit]) || raw(annotationUnit(metric));
+    };
+    // The builder's value and a bare PromQL selector read in the metric's own unit.
+    const unitMetric = computed((): string | undefined => {
+      if (props.streamType !== "metrics") return undefined;
+      if (localTab.value === "custom") {
+        return UNIT_KEEPING_FUNCTIONS.has(selectedFunction.value) &&
+          logMeasureColumn.value === "value"
+          ? props.streamName
+          : undefined;
+      }
+      if (localTab.value !== "promql") return undefined;
+      const query = editorPromqlQuery.value ?? "";
+      const bare = query
+        .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "")
+        .replace(/\{[^}]*\}/g, "")
+        .replace(/\[[^\]]*\]/g, "");
+      const metrics = promqlMetricNames(query);
+      return metrics.length === 1 && !PROMQL_UNIT_CHANGERS.test(bare) ? metrics[0] : undefined;
+    });
+    const promqlPercent = computed(
+      () => localTab.value === "promql" && promqlScaledToPercent(editorPromqlQuery.value ?? ""),
+    );
+    const thresholdUnit = computed(() =>
+      promqlPercent.value ? raw("%") : unitSuffix(unitMetric.value),
+    );
+    // A percent typed against 0-1 values never fires (90 vs 0.9), so the field offers the ratio.
+    const ratioHint = computed<AlertLineNote | null>(() => {
+      const realUnit = thresholdUnit.value && !annotationUnit(unitMetric.value);
+      if (props.streamType !== "metrics" || realUnit || promqlPercent.value) return null;
+      const field =
+        localTab.value === "promql"
+          ? "query_condition.promql_condition.value"
+          : localTab.value === "custom" && selectedFunction.value !== "total_events"
+            ? "query_condition.aggregation.having.value"
+            : null;
+      if (!field || (localTab.value === "promql" && isForecastMode.value)) return null;
+      const info = unitMetric.value ? metricInfo.value[unitMetric.value] : null;
+      const declaredRatio =
+        normalizeDeclaredUnit(info?.unit) === "percent-1" ||
+        /\b(ratio|fraction)\b/i.test(info?.help ?? "");
+      const typed = fv(field);
+      const range = props.previewValueRange;
+      const fix = ratioThresholdFix({ value: typed, declaredRatio, range });
+      if (fix === null) return null;
+      const shownFix = formatNumber(fix);
+      return {
+        text: valueRangeText(range, t, { typed, fix }),
+        action: t("alerts.guard.ratioUse", { fix: shownFix }),
+        warning: true,
+        run: () => {
+          setFV(field, fix);
+          if (localTab.value === "promql") onPromqlValueChange(fix);
+          else onConditionValueChange(fix);
+        },
+        dataTest: "alert-threshold-ratio-hint",
+      };
+    });
+    const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
+    const conditionNote = computed(() => ratioHint.value ?? formContext?.conditionNote?.value);
+    const conditionHelp = computed(() =>
+      valueRangeText(
+        props.previewValueRange,
+        t,
+        undefined,
+        isSpanDuration.value ? durationUnit.value : undefined,
+      ),
+    );
+    const thresholdHandlers: Record<string, (value: any) => void> = {
+      "trigger_condition.operator": (v) => onTriggerOperatorChange(v),
+      "trigger_condition.threshold": (v) => onTriggerThresholdChange(v),
+      "query_condition.aggregation.having.operator": (v) => onConditionOperatorChange(v),
+      "query_condition.aggregation.having.value": (v) => onConditionValueChange(v),
+      "query_condition.promql_condition.operator": (v) => onPromqlOperatorChange(v),
+      "query_condition.promql_condition.value": (v) => onPromqlValueChange(v),
+      "_ui.durationValue": (v) => onDurationValueChange(v),
+    };
+    const thresholdGuide: ThresholdGuide = {
+      unit: thresholdUnit,
+      note: conditionNote,
+      help: conditionHelp,
+      operators: plainOperators,
+      spanDuration: isSpanDuration,
+      durationUnit,
+      durationUnits: durationUnitOptions,
+      setDurationUnit: (unit) => onDurationUnitChange(unit),
+      change: (path, value) => thresholdHandlers[path]?.(value),
+    };
+    if (formContext?.thresholdGuide) formContext.thresholdGuide.value = thresholdGuide;
+    onBeforeUnmount(() => {
+      if (formContext?.thresholdGuide?.value === thresholdGuide)
+        formContext.thresholdGuide.value = null;
+    });
+
+    // A loaded query longer than the fold reads as its first lines; typing or focusing opens it.
+    const foldedLines = computed(
+      () =>
+        String(
+          (localTab.value === "sql" ? localSqlQuery.value : editorPromqlQuery.value) ?? "",
+        ).split("\n").length,
+    );
+    const editorUnfolded = ref(false);
+    const editorFolded = computed(
+      () =>
+        !!props.sectionTargets &&
+        foldedLines.value > EDITOR_FOLD_LINES &&
+        !editorUnfolded.value &&
+        !(showVrl.value && localTab.value === "sql"),
+    );
+    const unfoldEditor = () => {
+      editorUnfolded.value = true;
+    };
+    const editorShellClass = computed(() => {
+      const tall =
+        !props.sectionTargets ||
+        (showVrl.value && localTab.value === "sql") ||
+        (foldedLines.value > EDITOR_FOLD_LINES && !editorFolded.value);
+      if (tall) return "h-80";
+      return localTab.value === "promql" && promqlSamples.value.length ? "h-46" : "h-36";
+    });
     const onEditorPromqlUpdate = (query: string) => {
       if (isForecastMode.value) setFV("_ui.forecast.U", query);
       else updatePromqlQuery(query);
@@ -2780,14 +2831,41 @@ export default defineComponent({
      * so switching Multi on just clears any stale column and leaves the
      * dropdown to be filled in.
      */
+    // The one-alert limit stays as typed: the payload pins SQL multi-alert to >= 1 (M-10) on save.
+    // One alert has no per-row condition, so its threshold goes back into HAVING to fire on the same groups.
+    const conditionIntoSql = () => {
+      const having = fv("query_condition.aggregation.having");
+      const sql = having?.column ? sqlConditionToHaving(localSqlQuery.value ?? "", having) : null;
+      if (!sql) return;
+      updateSqlQuery(sql);
+      writeAggregation((agg) => {
+        agg.having = { ...agg.having, column: "", value: "" };
+      });
+    };
     const onSqlMultiAlertChange = (value: unknown) => {
-      onMultiAlertChange(value);
-      if (!value) return;
+      if (!value) return conditionIntoSql();
+      // The query's HAVING already states the per-row rule, so the condition starts from it.
+      const moved = sqlHavingToCondition(localSqlQuery.value ?? "");
+      let takeOut = false;
       writeAggregation((agg) => {
         agg.function = "count";
         agg.group_by = [];
-        agg.having.column = "";
+        if (!props.sqlAggColumnOptions.includes(agg.having.column)) agg.having.column = "";
+        const fromHaving = moved?.condition ?? sqlHavingCondition(localSqlQuery.value ?? "");
+        const known =
+          !props.sqlAggColumnOptions.length ||
+          props.sqlAggColumnOptions.includes(fromHaving?.column ?? "");
+        if (
+          fromHaving &&
+          known &&
+          !agg.having.column &&
+          ["", null, undefined].includes(agg.having.value)
+        ) {
+          agg.having = { ...agg.having, ...fromHaving };
+          takeOut = !!moved;
+        }
       });
+      if (takeOut) updateSqlQuery(moved!.sql);
     };
 
     /**
@@ -2817,6 +2895,287 @@ export default defineComponent({
     const hasMetricGroupByFields = computed(
       () => metricGroupByStore.value.filter((f: string) => f?.trim()).length > 0,
     );
+    // "1 group crosses", "2 groups cross": the sentence follows the count typed beside it.
+    const thresholdPlural = computed(() => (Number(triggerThreshold.value) === 1 ? 1 : 2));
+    const rowsNoun = computed(() =>
+      thresholdPlural.value === 1 ? t("alerts.form.group.row") : t("alerts.form.group.rows"),
+    );
+    const shownGroupLabels = (labels: string[]): string[] =>
+      labels.map((label) => (label === "__hash__" ? t("alerts.form.group.series") : label));
+    const groupByOptions = computed(() =>
+      groupByChoices(props.columns ?? [], {
+        streamType: props.streamType,
+        selected: [...(logGroupByStore.value ?? []), ...(metricGroupByStore.value ?? [])],
+        seriesLabel: t("alerts.form.group.seriesOption"),
+        timestamp: store.state.zoConfig?.timestamp_column || "_timestamp",
+        ranked: groupRanking({
+          org: store.state.selectedOrganization?.identifier ?? "",
+          streamType: props.streamType,
+          streamName: props.streamName,
+        }),
+      }),
+    );
+    const groupByLabels = computed(() =>
+      (isEventBased.value ? logGroupByStore.value : metricGroupByStore.value).filter((f: string) =>
+        f?.trim(),
+      ),
+    );
+    // A loaded group-by reads as a sentence; once the user edits it, the pickers stay open under the cursor.
+    const groupQuestion = computed<{
+      offered: boolean;
+      grouped: boolean;
+      labels: string[];
+      noun: "row" | "series" | "group";
+    }>(() => {
+      const scheduled = props.isRealTime === "false";
+      if (localTab.value === "sql") {
+        const labels = sqlGroupByLabels(localSqlQuery.value ?? "");
+        return {
+          offered: scheduled && (!showVrl.value || isMultiAlert.value),
+          grouped: !!labels.length,
+          labels,
+          noun: "row",
+        };
+      }
+      if (localTab.value === "promql") {
+        const labels = promqlByLabels(editorPromqlQuery.value ?? "");
+        return {
+          offered: scheduled && !isForecastMode.value,
+          grouped: !!labels.length,
+          labels,
+          noun: "series",
+        };
+      }
+      const labels = groupByLabels.value;
+      return {
+        offered: scheduled && selectedFunction.value !== "total_events" && !!labels.length,
+        grouped: true,
+        labels,
+        noun: "group",
+      };
+    });
+    // VRL output has no per-row answer, so its limit is the plain one-alert sentence.
+    const sqlPlainLimit = computed(
+      () =>
+        localTab.value === "sql" &&
+        props.isRealTime === "false" &&
+        showVrl.value &&
+        !isMultiAlert.value,
+    );
+    const groupQuestionTitle = computed(() => {
+      const q = groupQuestion.value;
+      if (!q.grouped) {
+        return q.noun === "series"
+          ? t("alerts.form.group.promqlUngrouped")
+          : t("alerts.form.group.sqlUngrouped");
+      }
+      return q.labels.length === 1
+        ? t("alerts.form.group.grouped", { label: raw(q.labels[0]) })
+        : t("alerts.form.group.groupedMany");
+    });
+    const groupQuestionHelp = computed(() =>
+      localTab.value === "promql" && !isPromRuleMode.value && !sqlPlainLimit.value
+        ? t("alerts.form.group.eachSeriesHelp")
+        : undefined,
+    );
+    const groupOneLabel = computed(() =>
+      localTab.value === "promql" && isPromRuleMode.value
+        ? t("alerts.multiAlert.simple")
+        : t("alerts.form.group.one"),
+    );
+    const groupEachLabel = computed(() => {
+      const q = groupQuestion.value;
+      const labels = q.grouped
+        ? raw(groupLabelsText(shownGroupLabels(q.labels), locale.value))
+        : q.noun === "series"
+          ? t("alerts.form.group.series")
+          : t("alerts.form.group.row");
+      return t("alerts.form.group.eachOfPlain", { labels });
+    });
+    const groupAnswer = computed(() =>
+      (localTab.value === "promql" ? isPromqlMultiAlert.value : isMultiAlert.value)
+        ? "each"
+        : "one",
+    );
+    // A function may drop the one row, so only a query without one is certain to fire every check.
+    const sqlOneRowWarning = computed(() =>
+      localTab.value === "sql" &&
+      props.isRealTime === "false" &&
+      !showVrl.value &&
+      groupAnswer.value === "one" &&
+      alwaysOneRow(localSqlQuery.value ?? "") &&
+      oneRowMeetsLimit(triggerOperator.value, triggerThreshold.value)
+        ? t("alerts.guard.alwaysOneRow")
+        : "",
+    );
+    const countTestIds = computed(() =>
+      localTab.value === "sql"
+        ? { operator: "alert-trigger-operator-select", threshold: "alert-trigger-threshold-input" }
+        : { operator: undefined, threshold: undefined },
+    );
+    const countErrorTest = computed(() =>
+      localTab.value === "sql"
+        ? "alert-trigger-threshold-error"
+        : localTab.value === "promql"
+          ? "alert-having-series-threshold-error"
+          : "alert-having-groups-threshold-error",
+    );
+    // Per-group forces the count gate to >= 1 (M-10); the one-alert answer gets its own limit back.
+    let oneAlertLimit: { operator: unknown; threshold: unknown } | null = null;
+    const onGroupAnswer = (answer: unknown) => {
+      const each = answer === "each";
+      if (localTab.value === "sql") {
+        writeAggregation((agg) => {
+          agg.multi_alert = each;
+        });
+        onSqlMultiAlertChange(each);
+        emitAggregationUpdate();
+        return;
+      }
+      if (each) {
+        oneAlertLimit = {
+          operator: fv("trigger_condition.operator"),
+          threshold: fv("trigger_condition.threshold"),
+        };
+      }
+      if (localTab.value === "promql") {
+        setFV("query_condition.promql_multi_alert", each);
+        onPromqlMultiAlertChange(each);
+      } else {
+        writeAggregation((agg) => {
+          agg.multi_alert = each;
+        });
+        onMultiAlertChange(each);
+        emitAggregationUpdate();
+      }
+      if (!each && oneAlertLimit) {
+        setFV("trigger_condition.operator", oneAlertLimit.operator);
+        setFV("trigger_condition.threshold", oneAlertLimit.threshold);
+        oneAlertLimit = null;
+      }
+      emitTriggerUpdate();
+    };
+
+    // The field a Group by pick switched "total events" to "count" for; its note says so.
+    const switchedToCount = ref("");
+    const switchedToCountNote = computed(() =>
+      switchedToCount.value && selectedFunction.value === "count"
+        ? t("alerts.form.group.switchedToCount", {
+            noun: countedNoun.value,
+            field: raw(switchedToCount.value),
+          })
+        : undefined,
+    );
+    // Grouping needs a measure, so a total becomes a count of the field per field, keeping its limit.
+    const groupTotalBy = (picked: SelectModelValue) => {
+      const field = typeof picked === "string" ? picked : "";
+      if (!field) return;
+      const operator = triggerOperator.value || ">=";
+      const limit = triggerThreshold.value;
+      selectedFunction.value = "count";
+      if (isEventBased.value) {
+        setFV("logGroupBy", [field]);
+        logMeasureColumn.value = field;
+        onLogFunctionChange("count");
+      } else {
+        onMetricFunctionChange("count");
+      }
+      writeAggregation((agg) => {
+        agg.having.column = field;
+        agg.having.operator = operator;
+        agg.having.value = limit;
+        agg.group_by = [field];
+      });
+      emitAggregationUpdate();
+      switchedToCount.value = field;
+    };
+    const clearGroupBy = () => {
+      // Removing a Group by that made the count goes back to the total it came from.
+      const back =
+        switchedToCount.value && selectedFunction.value === "count"
+          ? (fv("query_condition.aggregation.having") ?? {})
+          : null;
+      if (back) {
+        selectedFunction.value = "total_events";
+        if (isEventBased.value) onLogFunctionChange("total_events");
+        else onMetricFunctionChange("total_events");
+      }
+      if (isEventBased.value) setFV("logGroupBy", []);
+      if (fv("query_condition.aggregation")) {
+        writeAggregation((agg) => {
+          agg.group_by = [];
+          agg.multi_alert = false;
+        });
+        emitAggregationUpdate();
+      }
+      triggerThreshold.value = back ? back.value : 1;
+      triggerOperator.value = back?.operator || ">=";
+      tiers?.conceal("groupBy");
+    };
+
+    // A query that groups is the user's own grouping: it opens one alert per group until the toggle is set by hand.
+    let queryGroupSetByHand = false;
+    const onQueryGroupAnswer = (answer: unknown) => {
+      queryGroupSetByHand = true;
+      onGroupAnswer(answer);
+    };
+    watch(
+      () =>
+        localTab.value !== "custom" && groupQuestion.value.offered
+          ? groupQuestion.value.labels.join(",")
+          : null,
+      (key) => {
+        if (key === null || queryGroupSetByHand || props.beingUpdated || props.isSeeding) return;
+        const each = groupQuestion.value.labels.length > 0;
+        if ((groupAnswer.value === "each") !== each) onGroupAnswer(each ? "each" : "one");
+      },
+    );
+
+    // "One per" picked before any field: the picker opens, and the alert splits once a field is ticked.
+    const groupEachWanted = ref(false);
+    // Grouped without one alert per group is the count rule: one alert once N groups cross.
+    const countRuleOn = computed(() => groupByLabels.value.length > 0 && !isMultiAlert.value);
+    // The toggle names what is sent, so the count rule reads as One alert over the picked fields.
+    const builderGroupAnswer = computed(() =>
+      !countRuleOn.value && (groupEachWanted.value || groupByLabels.value.length) ? "each" : "one",
+    );
+    const setCountRule = (on: boolean) => {
+      onGroupAnswer(on ? "one" : "each");
+      if (on && !(Number(triggerThreshold.value) >= 1)) triggerThreshold.value = 1;
+    };
+    const builderEachLabel = computed(() =>
+      groupByLabels.value.length
+        ? t("alerts.form.group.eachOfPlain", {
+            labels: joinListMore(shownGroupLabels(groupByLabels.value), t),
+          })
+        : t("alerts.form.group.eachOfPlain", { labels: raw("…") }),
+    );
+    const onBuilderGroupAnswer = (answer: unknown) => {
+      if (answer === "each") {
+        groupEachWanted.value = true;
+        if (groupByLabels.value.length) onGroupAnswer("each");
+        return;
+      }
+      if (countRuleOn.value) return;
+      groupEachWanted.value = false;
+      if (groupByLabels.value.length || isMultiAlert.value) clearGroupBy();
+    };
+    // Unticking every field is "One alert"; a total becomes a count per the first field, as one pick did.
+    const setGroupBy = (labels: string[]) => {
+      const keepCountRule = countRuleOn.value;
+      if (!labels.length) {
+        groupEachWanted.value = false;
+        clearGroupBy();
+        return;
+      }
+      if (selectedFunction.value === "total_events") groupTotalBy(labels[0]);
+      if (isEventBased.value) setFV("logGroupBy", [...labels]);
+      writeAggregation((agg) => {
+        agg.group_by = [...labels];
+      });
+      emitAggregationUpdate();
+      if (groupEachWanted.value && !isMultiAlert.value && !keepCountRule) onGroupAnswer("each");
+    };
 
     // The choice only appears once a group-by exists, so normalise then —
     // that is the moment it becomes visible and needs a selected option.
@@ -2902,7 +3261,7 @@ export default defineComponent({
         triggerThreshold.value === undefined ||
         Number.isNaN(Number(triggerThreshold.value))
       ) {
-        triggerThreshold.value = 3;
+        triggerThreshold.value = 1;
         emitTriggerUpdate();
       }
     };
@@ -2950,7 +3309,7 @@ export default defineComponent({
     // Rule ②: `cron` + `timezone` are SAVED alert fields, so the ONE form owns
     // them — no local-ref mirror. The visible controls bind by `name=`; these
     // computeds are the read/write seam for the NON-control consumers
-    // (cronDescription, validateCron, onFrequencyUnitChange, the tooltips).
+    // (cronDescription, onFrequencyUnitChange, the tooltips).
     // Writing through the setter goes straight to the form, so there is exactly
     // one source of truth.
     const cronExpression = computed<string>({
@@ -2961,7 +3320,6 @@ export default defineComponent({
       get: () => fv("trigger_condition.timezone") ?? "",
       set: (v) => setFV("trigger_condition.timezone", v ?? ""),
     });
-    const cronError = ref("");
     const cronDescription = computed(() =>
       describeCron(t, cronExpression.value, cronTimezone.value),
     );
@@ -2977,35 +3335,12 @@ export default defineComponent({
       { browserEntry: true, current: cronTimezone },
     );
 
-    const validateCron = () => {
-      cronError.value = "";
-      if (frequencyMode.value !== "cron") return;
-      if (!cronExpression.value || !cronTimezone.value) {
-        cronError.value = t("alerts.queryConfig.cronExpressionTimezoneRequired");
-        return;
-      }
-      try {
-        const intervalInSecs = getCronIntervalDifferenceInSeconds(cronExpression.value);
-        if (
-          typeof intervalInSecs === "number" &&
-          !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
-        ) {
-          const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
-          cronError.value = t("alerts.queryConfig.frequencyGreaterThanSeconds", {
-            seconds: minInterval - 1,
-          });
-        }
-      } catch {
-        cronError.value = t("alerts.queryConfig.invalidCronExpression");
-      }
-    };
-
     // computed() so the labels re-resolve on a locale change; the `value`s are
     // the frequency-mode identifiers and stay literal.
+    // Cron is reached from its own "+ Use a cron schedule" link, not the unit list.
     const frequencyUnitOptions = computed(() => [
-      { label: t("common.minutes"), value: "minutes" },
-      { label: t("common.hours"), value: "hours" },
-      { label: t("alerts.queryConfig.cron"), value: "cron" },
+      { label: t("alerts.form.units.minutes"), value: "minutes" },
+      { label: t("alerts.form.units.hours"), value: "hours" },
     ]);
 
     const onFrequencyUnitChange = (modelValue: SelectModelValue) => {
@@ -3033,7 +3368,6 @@ export default defineComponent({
             cronTimezone.value = savedBrowserTimezone();
           }
         }
-        validateCron();
       } else {
         setFV("trigger_condition.frequency_type", "minutes");
         // Convert between minutes and hours. checkEveryFrequency is the DISPLAY
@@ -3063,16 +3397,30 @@ export default defineComponent({
       emitTriggerUpdate();
     };
 
+    let minutesBeforeCron: number | null = null;
+    const useCronSchedule = () => {
+      minutesBeforeCron = Number(fv("trigger_condition.frequency")) || null;
+      onFrequencyUnitChange("cron");
+    };
+    const removeCronSchedule = () => {
+      onFrequencyUnitChange("minutes");
+      if (minutesBeforeCron) {
+        checkEveryFrequency.value = minutesBeforeCron;
+        setStoredFrequency(minutesBeforeCron);
+        emitTriggerUpdate();
+      }
+      minutesBeforeCron = null;
+    };
+
     // The `name=` binding owns the write, but this handler runs BEFORE the
     // wrapper's own field.handleChange (merged listeners fire in declaration
-    // order — see R6), so write through the computed FIRST: validateCron() and
-    // emitTriggerUpdate() both re-read the form and would otherwise see the
+    // order — see R6), so write through the computed FIRST: emitTriggerUpdate()
+    // re-reads the form and would otherwise see the
     // STALE cron. Writing the same value twice targets the ONE form, so this is
     // ordering insurance — not a second source of truth.
     const onCronExpressionChange = (value: any) => {
       isUserTriggerChange.value = true;
       cronExpression.value = value;
-      validateCron();
       emitTriggerUpdate();
     };
 
@@ -3082,7 +3430,6 @@ export default defineComponent({
       // IANA zone so trigger_condition.timezone stays a value the backend can
       // parse (storing the raw label produces a NaN tz_offset).
       cronTimezone.value = resolveBrowserTimezone(value);
-      validateCron();
       emitTriggerUpdate();
     };
 
@@ -3094,6 +3441,26 @@ export default defineComponent({
       setStoredFrequency(parsed);
       emitTriggerUpdate();
     };
+
+    // Checks further apart than the look back never read the minutes between them.
+    const checkGap = computed<AlertLineNote | null>(() => {
+      const floor = Math.ceil(Number(store.state?.zoConfig?.min_auto_refresh_interval) / 60) || 1;
+      const frequency = Number(fv("trigger_condition.frequency"));
+      const note = checkGapNote(periodMinutes.value, frequency, floor, t);
+      if (!note) return null;
+      return {
+        text: note.text,
+        action: note.fix,
+        warning: true,
+        run: () => {
+          if (note.fixMinutes === null) return;
+          const hours = note.fixMinutes % 60 === 0;
+          frequencyMode.value = hours ? "hours" : "minutes";
+          onCheckEveryChange(hours ? note.fixMinutes / 60 : note.fixMinutes);
+        },
+        dataTest: "alert-check-every-gap",
+      };
+    });
 
     const restoreDefaultFrequency = () => {
       if (
@@ -3110,12 +3477,26 @@ export default defineComponent({
       }
     };
 
-    // Count of active filter conditions
-    const filterCount = computed(() => {
-      const conditions = props.inputData.conditions?.conditions;
-      if (!conditions || !Array.isArray(conditions)) return 0;
-      return conditions.filter((c: any) => c.filterType === "condition" && c.column).length;
-    });
+    const countLeafFilters = (items: unknown): number =>
+      Array.isArray(items)
+        ? (items as { filterType?: string; column?: string; conditions?: unknown }[]).reduce(
+            (sum: number, c) =>
+              sum +
+              (c?.filterType === "group"
+                ? countLeafFilters(c.conditions)
+                : c?.filterType === "condition" && c.column
+                  ? 1
+                  : 0),
+            0,
+          )
+        : 0;
+    const leafFilterCount = computed(() =>
+      countLeafFilters(props.inputData.conditions?.conditions),
+    );
+    const periodMinutes = computed(() => Number(props.triggerCondition?.period) || 0);
+    const tierShows = useTierVisibility();
+    // tierAvailable("warning"): every scheduled alert can carry a warning, so its link is never hidden.
+    const warningOffered = computed(() => !tiers || props.isRealTime === "false");
 
     // Ensure at least one empty filter condition exists on mount (filters are always visible now)
     // Empty condition is now provided by default form data in useAlertForm.ts
@@ -3168,37 +3549,44 @@ export default defineComponent({
         ];
       }
 
-      // For metrics, show all three tabs: Builder, SQL, PromQL
+      // The form opens on the builder, so it leads; writing a query is the choice to opt into.
       if (props.streamType === "metrics") {
         return [
-          {
-            label: t("alerts.queryBuilder"),
-            value: "custom",
-          },
-          {
-            label: raw("SQL"),
-            value: "sql",
-          },
-          {
-            label: raw("PromQL"),
-            value: "promql",
-          },
+          { label: t("alerts.sections.filtersMode"), value: "custom" },
+          { label: raw("SQL"), value: "sql" },
+          { label: raw("PromQL"), value: "promql" },
         ];
       }
 
-      // For logs and traces, show only Builder and SQL
       return [
-        {
-          label: t("alerts.queryBuilder"),
-          value: "custom",
-        },
-        {
-          label: raw("SQL"),
-          value: "sql",
-        },
+        { label: t("alerts.sections.filtersMode"), value: "custom" },
+        { label: raw("SQL"), value: "sql" },
       ];
     });
+    const whichEventsHelp = computed(() => {
+      if (localTab.value === "sql") {
+        const spans =
+          props.streamType === "traces" &&
+          new RegExp(`\\b${SPAN_DURATION_FIELD}\\b`, "i").test(localSqlQuery.value ?? "");
+        return spans
+          ? t("alerts.sections.rows.whichEventsSqlSpans")
+          : t("alerts.sections.rows.whichEventsSql");
+      }
+      if (localTab.value === "promql")
+        return props.promqlStreamNote || t("alerts.sections.rows.whichEventsPromql");
+      return leafFilterCount.value > 0
+        ? t("alerts.sections.rows.whichEventsFiltered")
+        : t("alerts.sections.rows.whichEventsAll");
+    });
     // Hide tabs completely for real-time alerts (only one option)
+    // With the filter sentence folded, the mode switch rides at the end of its line.
+    const defineWithInline = computed(
+      () =>
+        !!props.sectionTargets &&
+        shouldShowTabs.value &&
+        localTab.value === "custom" &&
+        filtersFolded.value,
+    );
     const shouldShowTabs = computed(() => {
       return props.isRealTime === "false";
     });
@@ -3291,13 +3679,12 @@ export default defineComponent({
         })),
     );
 
-    const conditionValueLoader = computed(() =>
-      streamValuesLoader({
-        org: store.state.selectedOrganization?.identifier,
-        streamType: props.streamType,
-        streamName: props.streamName,
-      }),
-    );
+    const conditionDiscovery = useFilterDiscovery(() => {
+      const org = store.state.selectedOrganization?.identifier;
+      return org && props.streamType && props.streamName
+        ? { org, streamType: props.streamType, streamName: props.streamName }
+        : null;
+    }, t);
 
     const onConditionsChange = (next: unknown) => {
       setFV("query_condition.conditions", next);
@@ -3310,6 +3697,106 @@ export default defineComponent({
       () => submissionAttempts.value > 0 && !conditionsValid.value,
     );
     watch(submissionAttempts, () => conditionsBuilderRef.value?.validate());
+
+    // The sectioned editor folds the builder behind its sentence until the user asks to edit.
+    const filtersOpen = ref(false);
+    const filtersFolded = computed(
+      () => !!props.sectionTargets && !filtersOpen.value && !showConditionsError.value,
+    );
+    // A failed Save opens the builder for good, so fixing the last chip does not fold it under the cursor.
+    watch(showConditionsError, (shown) => {
+      if (shown) filtersOpen.value = true;
+    });
+    const filterContext = computed(() => ({ fields: conditionFields.value }));
+    const filterTree = computed(() =>
+      FILTER_PROFILES.alert.codec.parse(props.inputData.conditions, filterContext.value),
+    );
+    const filterSentenceGroup = computed(() => withoutBlankRows(filterTree.value));
+    const filterDialect = FILTER_PROFILES.alert.dialect;
+    const openFilters = () => {
+      filtersOpen.value = true;
+      nextTick(() => conditionsBuilderRef.value?.focus());
+    };
+    const toggleFilterConnector = (id: string) => {
+      const node = findNode(filterTree.value, id);
+      if (!node) return;
+      const next = replaceNode(filterTree.value, id, {
+        ...node,
+        connector: node.connector === "AND" ? "OR" : "AND",
+      });
+      onConditionsChange(FILTER_PROFILES.alert.codec.serialize(next, filterContext.value));
+    };
+    // Builder pickers render in a portal, so a press inside one is not leaving the builder.
+    const foldFiltersOnLeave = (e: Event) => {
+      const target = e.target as Element | null;
+      if (!conditionsValid.value || !target || customPreviewRef.value?.contains(target)) return;
+      if (target.closest?.("[data-reka-popper-content-wrapper]")) return;
+      filtersOpen.value = false;
+    };
+    const leaveEvents = ["pointerdown", "focusin"] as const;
+    watch(filtersOpen, (open) =>
+      leaveEvents.forEach((type) =>
+        open
+          ? document.addEventListener(type, foldFiltersOnLeave, true)
+          : document.removeEventListener(type, foldFiltersOnLeave, true),
+      ),
+    );
+    onBeforeUnmount(() =>
+      leaveEvents.forEach((type) => document.removeEventListener(type, foldFiltersOnLeave, true)),
+    );
+    const removeFilters = () => {
+      const current = props.inputData.conditions;
+      const empty = current
+        ? { ...JSON.parse(JSON.stringify(current)), conditions: [] }
+        : { filterType: "group", logicalOperator: "AND", conditions: [] };
+      onConditionsChange(empty);
+      filtersOpen.value = false;
+    };
+
+    const showsGeneratedSql = computed(
+      () =>
+        !!props.sectionTargets &&
+        localTab.value === "custom" &&
+        (props.isRealTime === "false" || props.isRealTime === "true") &&
+        !!props.generatedSqlQuery &&
+        !!tiers?.isVisible("generatedSql"),
+    );
+    const hideGeneratedSql = () => tiers?.conceal("generatedSql");
+    const DURATION_UNIT_IDS: Record<string, string> = {
+      ns: "nanoseconds",
+      us: "microseconds",
+      ms: "milliseconds",
+      s: "seconds",
+    };
+    const numberOrNull = (v: unknown) =>
+      v === "" || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v);
+    // Readers look for the threshold in a HAVING the server never writes, so the row says where it applies.
+    const generatedSqlThreshold = computed(() => {
+      if (props.isRealTime === "true") return t("alerts.form.generatedSql.realtime");
+      const base = { sql: props.generatedSqlQuery ?? "", grouped: groupByLabels.value.length > 0 };
+      if (selectedFunction.value === "total_events")
+        return generatedSqlNote({ ...base, value: numberOrNull(triggerThreshold.value) }, t);
+      if (isSpanDuration.value)
+        return generatedSqlNote(
+          {
+            ...base,
+            value: numberOrNull(fv("_ui.durationValue")),
+            unit: DURATION_UNIT_IDS[durationUnit.value],
+            stored: numberOrNull(conditionValue.value) ?? undefined,
+            storedUnit: DURATION_UNIT_IDS.us,
+          },
+          t,
+        );
+      const unit = unitMetric.value ? metricInfo.value[unitMetric.value]?.unit : undefined;
+      return generatedSqlNote(
+        {
+          ...base,
+          value: numberOrNull(conditionValue.value),
+          unit: normalizeDeclaredUnit(unit) ?? undefined,
+        },
+        t,
+      );
+    });
 
     const sqlOrPromqlQuery = computed(() => {
       return localTab.value === "sql" ? props.sqlQuery : props.promqlQuery;
@@ -3359,6 +3846,7 @@ export default defineComponent({
     const onMetricFunctionChange = (modelValue: SelectModelValue) => {
       // Single-select of function names: value is a string at runtime.
       const value = typeof modelValue === "string" ? modelValue : "";
+      switchedToCount.value = "";
       if (value === "total_events") {
         // total_events (COUNT(*)) — no aggregation, trigger threshold shown inline
         localIsAggregationEnabled.value = false;
@@ -3391,17 +3879,24 @@ export default defineComponent({
     };
 
     // When log function mode changes (count / unique_count / avg / etc.)
+    // A fill written from outside (an intent, a ready-made alert) calls this so the measure picker follows.
+    const syncMeasureFromForm = () => {
+      const fn = fv("query_condition.aggregation")?.function;
+      selectedFunction.value = props.isAggregationEnabled && fn ? fn : "total_events";
+    };
+
     const onLogFunctionChange = (modelValue: SelectModelValue) => {
       // Single-select of function names: value is a string at runtime.
       const value = typeof modelValue === "string" ? modelValue : "";
+      switchedToCount.value = "";
       if (value === "total_events") {
         // total_events (COUNT(*)) — no aggregation, trigger threshold shown inline.
         // threshold/operator are form-backed computeds (also drive the name= inputs).
         localIsAggregationEnabled.value = false;
         emit("update:isAggregationEnabled", false);
         logMeasureColumn.value = "";
-        // Restore default threshold for count mode
-        triggerThreshold.value = 3;
+        // New alerts count "Any event (1+)", so count mode restores that default.
+        triggerThreshold.value = 1;
         triggerOperator.value = ">=";
       } else {
         // Measure mode — uses aggregation, always reset "having groups" to >= 1 on switch
@@ -3409,19 +3904,12 @@ export default defineComponent({
         triggerThreshold.value = 1;
         triggerOperator.value = ">=";
         emit("update:isAggregationEnabled", true);
-        // First entry into measure mode opens on the loaded threshold (3 for a new
-        // alert), matching the pre-migration setup seed; afterwards having.value
-        // holds real loaded/user state and wins.
-        const seedThisSwitch =
-          measureSeedPending &&
-          initialThresholdSeed !== undefined &&
-          initialThresholdSeed !== null &&
-          initialThresholdSeed !== "";
+        const firstMeasure = measureSeedPending;
         measureSeedPending = false;
         writeAggregation((agg) => {
           agg.function = value;
           agg.having.operator = conditionOperator.value || ">=";
-          agg.having.value = seedThisSwitch ? initialThresholdSeed : (conditionValue.value ?? "");
+          agg.having.value = firstMeasure ? "" : (conditionValue.value ?? "");
           agg.having.column = logMeasureColumn.value || "";
           agg.group_by = logGroupBy.value.length ? [...logGroupBy.value] : [];
         });
@@ -3447,48 +3935,6 @@ export default defineComponent({
           having: { ...(aggregation.having ?? {}), column: value },
         });
       }
-    };
-
-    // Log group-by management — form-owned field array (Rule ①, :key=index).
-    // add/remove via the form so the RENDERED inputs track the array; each change
-    // is bridged into props.inputData.aggregation.group_by (in place) + emitted,
-    // preserving the SQL-gen cadence.
-    const addLogGroupByColumn = () => {
-      form?.pushFieldValue?.("logGroupBy", "");
-    };
-    const deleteLogGroupByColumn = (index: number) => {
-      form?.removeFieldValue?.("logGroupBy", index);
-      onLogGroupByChange();
-      // Reset threshold to 1 when last group-by field is removed (form-backed
-      // computeds; no direct prop mutation / re-emit).
-      if (((fv("logGroupBy") as string[]) ?? []).filter((f: string) => f?.trim()).length === 0) {
-        triggerThreshold.value = 1;
-        triggerOperator.value = ">=";
-        // The Simple/Multi toggle only renders while a group-by exists, so with
-        // the last one gone the user can no longer turn multi-alert off — turn it
-        // off here or every Save 400s (M-10 requires ≥1 group_by for per-group).
-        setFV("query_condition.aggregation.multi_alert", false);
-      }
-    };
-    const onLogGroupByChange = () => {
-      if (!fv("query_condition.aggregation")) return;
-      // OFormSelect fires this consumer `@update:model-value` BEFORE its own
-      // internal `field.handleChange` commits the picked value into
-      // logGroupBy[index] — the two update:model-value listeners run in
-      // registration order, and the consumer's is registered first. Reading
-      // logGroupBy synchronously here therefore copies the STALE array into
-      // aggregation.group_by, dropping the column the user just picked (it
-      // persisted as [""]; pre-migration avoided this with a direct v-model into
-      // group_by[index]). Defer to nextTick so the copy reads the committed
-      // logGroupBy — logGroupBy is a stripped _meta field, so group_by is the
-      // only thing that survives to the payload and it MUST hold the real value.
-      nextTick(() => {
-        if (!fv("query_condition.aggregation")) return;
-        writeAggregation((agg) => {
-          agg.group_by = [...((fv("logGroupBy") as string[]) ?? [])];
-        });
-        emitAggregationUpdate();
-      });
     };
 
     // When condition operator changes. The name= binding OWNS the value
@@ -3540,51 +3986,6 @@ export default defineComponent({
     // Legacy toggle kept for compatibility — not used in new UI
     const toggleAggregation = () => {
       emit("update:isAggregationEnabled", localIsAggregationEnabled.value);
-    };
-
-    // Metric group-by field array (form-owned; name="query_condition.aggregation.
-    // group_by[i]"). form is the source; props.inputData.aggregation.group_by is
-    // the write-through copy that feeds SQL-gen.
-    const syncMetricGroupByToProps = () => {
-      // group_by is form-owned via the name= bindings; just refresh the preview.
-      // Deferred to nextTick for the same reason as onLogGroupByChange: this
-      // consumer @update:model-value runs BEFORE OFormSelect's internal
-      // field.handleChange commits group_by[index], so emitting synchronously
-      // would push a stale aggregation up to the parent's setF and clobber the
-      // just-picked value. nextTick reads the committed group_by.
-      nextTick(() => {
-        if (fv("query_condition.aggregation")) {
-          emitAggregationUpdate();
-        }
-      });
-    };
-
-    // Add group by column
-    const addGroupByColumn = () => {
-      if (fv("query_condition.aggregation")) {
-        form?.pushFieldValue?.("query_condition.aggregation.group_by", "");
-        syncMetricGroupByToProps();
-      }
-    };
-
-    // Delete group by column
-    const deleteGroupByColumn = (index: string | number) => {
-      const idx = typeof index === "string" ? parseInt(index) : index;
-      if (!fv("query_condition.aggregation")) return;
-      form?.removeFieldValue?.("query_condition.aggregation.group_by", idx);
-      syncMetricGroupByToProps();
-      // Reset threshold to 1 when last group-by field is removed (form-backed
-      // computeds; no direct prop mutation / re-emit).
-      const remaining = ((fv("query_condition.aggregation.group_by") as string[]) || []).filter(
-        (f: string) => f?.trim(),
-      ).length;
-      if (remaining === 0) {
-        triggerThreshold.value = 1;
-        triggerOperator.value = ">=";
-        // Same reason as the log branch: with no group-by left the toggle is
-        // hidden, so multi_alert must be cleared here or Save 400s (M-10).
-        setFV("query_condition.aggregation.multi_alert", false);
-      }
     };
 
     // Emit aggregation update — read the fresh value off the form (props.inputData
@@ -3774,7 +4175,9 @@ export default defineComponent({
           return;
         }
         // In measure mode with empty group-by, always reset to >= 1 (field is disabled, user can't edit it)
-        const inMeasureMode = selectedFunction.value !== "total_events";
+        // SQL and PromQL count rows and series with these fields, so only Filters resets them.
+        const inMeasureMode =
+          localTab.value === "custom" && selectedFunction.value !== "total_events";
         const groupByEmpty = isEventBased.value
           ? !hasLogGroupByFields.value
           : !hasMetricGroupByFields.value;
@@ -3847,6 +4250,7 @@ export default defineComponent({
         frequencyMode: frequencyMode.value,
         hasConditions: !!props.inputData.conditions?.conditions?.length,
         conditionsValid: conditionsValid.value,
+        promqlLabelIssue: promqlLabelIssue.value || undefined,
         hasGroupBy: isEventBased.value ? hasLogGroupByFields.value : hasMetricGroupByFields.value,
         aggregationEnabled: localIsAggregationEnabled.value,
         // SECONDS, raw from zoConfig — the schema derives ceil(secs/60) itself.
@@ -3863,6 +4267,7 @@ export default defineComponent({
         frequencyMode,
         () => props.inputData.conditions,
         conditionsValid,
+        promqlLabelIssue,
         localIsAggregationEnabled,
         hasLogGroupByFields,
         hasMetricGroupByFields,
@@ -3878,19 +4283,55 @@ export default defineComponent({
     // re-homed in useAlertForm.runImperativeQueryChecks (same messages).
 
     return {
+      emit,
+      syncMeasureFromForm,
+      thresholdPlural,
+      rowsNoun,
+      shownGroupLabels,
+      groupByOptions,
       raw,
       t,
       store,
       localTab,
       tabOptions,
+      whichEventsHelp,
+      promqlLabelIssue,
+      sqlOneRowWarning,
+      thresholdUnit,
+      ratioHint,
+      conditionNote,
+      conditionHelp,
+      keptThresholdText,
+      switchedToCountNote,
+      groupTotalBy,
+      countedNoun,
+      measureConnector,
+      countsGroupField,
+      isSpanDuration,
+      durationUnit,
+      durationUnitOptions,
+      onDurationValueChange,
+      onDurationUnitChange,
+      revealDurationError,
       shouldShowTabs,
+      defineWithInline,
+      QUERY_MODE_ICONS,
       updateTab,
       conditionsBuilderRef,
       conditionsValid,
       conditionFields,
-      conditionValueLoader,
+      conditionDiscovery,
       onConditionsChange,
       showConditionsError,
+      filtersFolded,
+      filterSentenceGroup,
+      filterDialect,
+      openFilters,
+      toggleFilterConnector,
+      removeFilters,
+      showsGeneratedSql,
+      hideGeneratedSql,
+      generatedSqlThreshold,
       sqlOrPromqlQuery,
       viewSqlEditor,
       localSqlQuery,
@@ -3909,6 +4350,7 @@ export default defineComponent({
       functionsList,
       // Field refs for focus manager
       customPreviewRef,
+      periodFieldRef,
       sqlPromqlPreviewRef,
       // Multi-window dialog
       showMultiWindowDialog,
@@ -3921,14 +4363,13 @@ export default defineComponent({
       triggerOperators,
       numericColumns,
       toggleAggregation,
-      addGroupByColumn,
-      deleteGroupByColumn,
       emitAggregationUpdate,
       emitPromqlConditionUpdate,
       // V3.1 inline condition
       isEventBased,
       logFunctionOptions,
-      numericOperators,
+      operatorLabel,
+      plainOperators,
       selectedFunction,
       conditionOperator,
       conditionValue,
@@ -3939,6 +4380,30 @@ export default defineComponent({
       restoreDefaultThreshold,
       hasLogGroupByFields,
       hasMetricGroupByFields,
+      groupByLabels,
+      groupQuestion,
+      groupQuestionTitle,
+      sqlPlainLimit,
+      warningOffered,
+      groupEachLabel,
+      limitBesideOne,
+      groupOneLabel,
+      groupQuestionHelp,
+      groupAnswer,
+      countErrorTest,
+      countTestIds,
+      countOperators,
+      countRuleOn,
+      setCountRule,
+      onGroupAnswer,
+      builderGroupAnswer,
+      builderEachLabel,
+      onBuilderGroupAnswer,
+      onQueryGroupAnswer,
+      setGroupBy,
+      clearGroupBy,
+      groupLabelsText,
+      locale,
       isMultiAlert,
       onMultiAlertChange,
       onSqlMultiAlertChange,
@@ -3954,6 +4419,8 @@ export default defineComponent({
       cronExpression,
       cronTimezone,
       cronError,
+      queryRequiredError,
+      promqlEditorError,
       cronDescription,
       thresholdError,
       warningThresholdError,
@@ -3971,10 +4438,15 @@ export default defineComponent({
       removePromqlWarning,
       promqlValueError,
       checkEveryError,
+      checkGap,
       havingValueError,
+      periodError,
+      havingColumn,
       filteredTimezones,
       timezoneSelectOptions,
       onFrequencyUnitChange,
+      useCronSchedule,
+      removeCronSchedule,
       frequencyUnitOptions,
       onCronExpressionChange,
       onCronTimezoneChange,
@@ -3984,19 +4456,22 @@ export default defineComponent({
       onMetricFunctionChange,
       onLogFunctionChange,
       onLogMeasureColumnChange,
-      addLogGroupByColumn,
-      deleteLogGroupByColumn,
-      onLogGroupByChange,
       onConditionOperatorChange,
       onConditionValueChange,
-      showFilters,
-      toggleFilters,
       filtersSectionRef,
       showVrl,
-      filterCount,
+      onVrlSwitch,
+      foldedLines,
+      editorFolded,
+      unfoldEditor,
+      editorShellClass,
+      leafFilterCount,
+      periodMinutes,
+      tierShows,
       emitTriggerUpdate,
       getImageURL,
       queryEditorPlaceholderFlag,
+      inlineEditorFocused,
       vrlEditorPlaceholderFlag,
       vrlPlaceholder,
       onQueryEditorFocus,
@@ -4004,6 +4479,9 @@ export default defineComponent({
       onBlurInlineVrlEditor,
       inlineStatusState,
       inlineStatusBarClass,
+      sqlColumnFix,
+      sqlErrorText,
+      applySqlColumnFix,
       inlineQueryEditorRef,
       autoCompleteKeywords,
       autoCompleteSuggestions,
@@ -4017,10 +4495,7 @@ export default defineComponent({
       insertPromqlSample,
       onPromqlOperatorChange,
       onPromqlValueChange,
-      syncMetricGroupByToProps,
       // Reactive views of the group-by field arrays (render source, Rule ①)
-      logGroupByRows: logGroupByStore,
-      metricGroupByRows: metricGroupByStore,
     };
   },
 });

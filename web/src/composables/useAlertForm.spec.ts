@@ -17,8 +17,12 @@ import { describe, expect, it } from "vitest";
 import {
   applyMetaSettings,
   applyPromqlPrefill,
+  canSeedSqlTab,
   defaultAlertValue,
   formForecastOf,
+  promqlQueryStream,
+  sqlTabSeed,
+  streamNamesUserFirst,
 } from "@/composables/useAlertForm";
 import { getAlertPayload } from "@/utils/alerts/alertPayload";
 import {
@@ -186,5 +190,75 @@ describe("saving in Forecast mode", () => {
   it("keeps it in Threshold mode", () => {
     const payload = getAlertPayload(withWarning(null), context);
     expect(payload.query_condition.promql_warning_value).toBe(14);
+  });
+});
+
+describe("streamNamesUserFirst", () => {
+  it("lists the user's streams before system ones, each group in server order", () => {
+    const names = streamNamesUserFirst([
+      { name: "_anomalies" },
+      { name: "app_logs" },
+      { name: "_o2_alert_calibration_digests" },
+      { name: "usage", is_internal: true },
+      { name: "k8s_events" },
+    ]);
+    expect(names).toEqual([
+      "app_logs",
+      "k8s_events",
+      "_anomalies",
+      "_o2_alert_calibration_digests",
+      "usage",
+    ]);
+  });
+});
+
+describe("defaultAlertValue", () => {
+  it("starts a value threshold empty, so nothing fires before one is typed, and a count at 1", () => {
+    const data = defaultAlertValue();
+    expect(data.query_condition.aggregation.having.value).toBe("");
+    expect(data.trigger_condition.threshold).toBe(1);
+  });
+});
+
+describe("the SQL tab seed from the builder", () => {
+  it.each([
+    [
+      "SELECT * FROM \"app\" WHERE level = 'error'",
+      "SELECT _timestamp FROM \"app\" WHERE level = 'error'",
+    ],
+    ['select *  from "app" ', 'SELECT _timestamp FROM "app"'],
+    ["SELECT * FROM app", "SELECT _timestamp FROM app"],
+    [
+      'SELECT * FROM "app"  WHERE ("level" = \'error\')',
+      'SELECT _timestamp FROM "app" WHERE ("level" = \'error\')',
+    ],
+    [
+      'SELECT "svc", AVG("d") AS alert_agg_value FROM "t" GROUP BY "svc" HAVING alert_agg_value > 5',
+      'SELECT "svc", AVG("d") AS alert_agg_value FROM "t" GROUP BY "svc" HAVING alert_agg_value > 5',
+    ],
+  ])("%s opens as %s", (builder, seeded) => {
+    expect(sqlTabSeed(builder, "_timestamp")).toBe(seeded);
+  });
+
+  it.each([
+    ["", "", true],
+    ['SELECT * FROM "app"', "", true],
+    ["SELECT a FROM b", "SELECT a FROM b", true],
+    ["SELECT a FROM b WHERE c = 1", "SELECT a FROM b", false],
+  ])("SQL %j after seed %j can be replaced: %s", (current, lastSeed, expected) => {
+    expect(canSeedSqlTab(current, lastSeed)).toBe(expected);
+  });
+});
+
+describe("promqlQueryStream", () => {
+  const streams = ["node_cpu_seconds_total", "http_server_duration_count"];
+  it.each([
+    ["rate(node_cpu_seconds_total[5m])", "node_cpu_seconds_total"],
+    ["sum(recorded:rule) / sum(http_server_duration_count)", "http_server_duration_count"],
+    ["sum(not_a_stream)", ""],
+    ["sum(rate(d_sum[5m])) / sum(rate(d_count[5m]))", "d_bucket", "d_bucket"],
+    ["sum(rate(http_server_duration_count[5m]))", "http_server_duration_count", "other_bucket"],
+  ])("%s reads %j", (promql, stream, current = "") => {
+    expect(promqlQueryStream(promql, [...streams, "d_sum", "d_count"], current)).toBe(stream);
   });
 });

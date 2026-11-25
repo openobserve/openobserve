@@ -23,10 +23,10 @@ import {
   nextTick,
   type Ref,
 } from "vue";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep, debounce, set } from "lodash-es";
+import { cloneDeep, debounce, get, set } from "lodash-es";
 import {
   alertConditionsPayload,
   loadAlertConditions,
@@ -42,6 +42,7 @@ import {
   triggerAnomalyTrainingMutation,
 } from "@/services/anomaly_detection.queries";
 import { useMutation, useQuery as useServerQuery } from "@tanstack/vue-query";
+import { alertsListQuery } from "@/services/alerts.queries";
 import { useOrgId } from "@/composables/query";
 import analytics from "@/services/product_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -63,12 +64,16 @@ import { convertDateToTimestamp } from "@/utils/date";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 import { modesWithContent } from "@/utils/alerts/alertCondition";
+import { promqlMetricNames } from "@/utils/alerts/promqlMetrics";
+import { joinListMore } from "@/utils/alerts/alertCopy";
 import {
   validateInputs as validateInputsUtil,
   validateSqlQuery as validateSqlQueryUtil,
   saveAlertJson as saveAlertJsonUtil,
   type ValidationContext,
   type JsonValidationContext,
+  type SqlCheckPurpose,
+  type SqlCheckResult,
 } from "@/utils/alerts/alertValidation";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
@@ -126,7 +131,11 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { anomalyWhereClause, toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import { invalidateSiemDetections } from "@/composables/security/useSiemDetections";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { shownFieldMeta } from "@/composables/alerts/shownFieldError";
+import { isIngestArtifact } from "@/composables/alerts/useStreamDiscovery";
+import { anomalySchedule } from "@/utils/alerts/alertIntents";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
+import type { AlertSectionId } from "@/components/alerts/alertFormSections";
 import {
   anomalyBandWidthPrefill,
   anomalyBudgetPerDay,
@@ -138,6 +147,9 @@ import {
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 
 // ─── Default Values ─────────────────────────────────────────────────────────
+
+/** The scheduler parses cron with seconds, so it rejects the usual 5-field form. */
+export const isSixFieldCron = (cron: string): boolean => cron.trim().split(/\s+/).length === 6;
 
 export const defaultAlertValue: any = () => {
   return {
@@ -167,7 +179,8 @@ export const defaultAlertValue: any = () => {
         having: {
           column: "",
           operator: ">=",
-          value: 1,
+          // A value threshold has no safe default: 1 fires at once on most measures.
+          value: "",
         },
       },
       promql_condition: null,
@@ -188,7 +201,7 @@ export const defaultAlertValue: any = () => {
       operator: ">=",
       frequency: 10,
       cron: "",
-      threshold: 3,
+      threshold: 1,
       silence: 10,
       frequency_type: "minutes",
       timezone: "UTC",
@@ -363,13 +376,8 @@ export const defaultAnomalyConfig = () => ({
   custom_sql: "",
   detection_function: "count",
   detection_function_field: "",
-  histogram_interval_value: 5,
-  histogram_interval_unit: "m" as AnomalyIntervalUnit,
-  schedule_interval_value: 1,
-  schedule_interval_unit: "h" as AnomalyIntervalUnit,
-  // 3h is the smallest round window meeting §4.3's recommendation (2×(1h+5m) + the absence allowance).
-  detection_window_value: 3,
-  detection_window_unit: "h" as AnomalyIntervalUnit,
+  // The starters' schedule, so an alert begun without one also waits at most one bucket.
+  ...anomalySchedule(),
   training_window_days: 28,
   retrain_interval_days: 7,
   threshold: 97,
@@ -408,6 +416,44 @@ export const formForecastOf = (alert: any): ForecastAlert | null =>
   alert?.query_condition?.type === "promql"
     ? parseForecastAlertPromql(alert.query_condition.promql, alert.query_condition.promql_condition)
     : null;
+
+/** Stream names for the picker: the user's streams first, then system ones (server-flagged or `_`-named). */
+export const streamNamesUserFirst = (list: { name: string; is_internal?: boolean }[]): string[] => {
+  const isSystem = (s: { name: string; is_internal?: boolean }) =>
+    s.is_internal === true || s.name.startsWith("_");
+  return [...list.filter((s) => !isSystem(s)), ...list.filter(isSystem)].map((s) => s.name);
+};
+
+/** The SQL tab opens with the builder's alert SQL; SQL alerts refuse `SELECT *`, so it names the timestamp instead (same rows). */
+export const sqlTabSeed = (builderSql: string, timestampColumn: string): string =>
+  builderSql
+    .trim()
+    .replace(/^SELECT\s+\*\s+FROM\s+("[^"]*"|\S+)\s*/i, `SELECT ${timestampColumn} FROM $1 `)
+    .trim();
+
+/** The SQL tab takes a new seed only while it holds no query of the user's own. */
+export const canSeedSqlTab = (current: string | undefined, lastSeed: string): boolean => {
+  const sql = (current ?? "").trim();
+  return !modesWithContent({ sql }).includes("sql") || sql === lastSeed.trim();
+};
+
+/** The stream a PromQL query reads: its first metric that is a stream of the org, or "" when none is. */
+// A histogram's buckets, sum and count are one metric: a query reading any of them keeps the picked one.
+const HISTOGRAM_PART = /_(?:bucket|sum|count)$/;
+export const promqlQueryStream = (
+  promql: string,
+  streamNames: readonly string[],
+  current = "",
+): string => {
+  const names = promqlMetricNames(promql);
+  const stem = (name: string) => name.replace(HISTOGRAM_PART, "");
+  if (
+    HISTOGRAM_PART.test(current) &&
+    names.some((n) => HISTOGRAM_PART.test(n) && stem(n) === stem(current))
+  )
+    return current;
+  return names.find((name) => streamNames.includes(name)) ?? "";
+};
 
 /** Copies a source's description and destinations from `meta`, since AlertPrefill has no field for either. */
 export const applyMetaSettings = (data: any, meta: AlertPrefill["meta"]): any => {
@@ -527,7 +573,21 @@ export type AlertFormValues = PayloadFormData & {
   _meta: Record<string, unknown>;
 } & Record<string, unknown>;
 
-export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
+/** What the host editor does on the form's behalf. */
+export interface AlertFormHooks {
+  /** Bring a section into view when a save gate stops on a field inside it. */
+  showSection?: (id: AlertSectionId) => void;
+  /** Scroll a focused error's control into view the host's way; without it the control is centred. */
+  revealControl?: (el: HTMLElement) => void;
+  /** A section whose own check, outside the schema, still holds Save there; undefined lets it save. */
+  heldSaveSection?: () => AlertSectionId | undefined;
+}
+
+export function useAlertForm(
+  props: AlertFormProps,
+  emit: AlertFormEmit,
+  hooks: AlertFormHooks = {},
+) {
   const store: any = useStore();
   const { t } = useI18nTyped();
   const router = useRouter();
@@ -639,14 +699,23 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   };
 
   // i18n-driven validation schema (messages resolve via `t` — see AddAlert.schema).
-  const addAlertSchema = makeAddAlertSchema(t);
+  const addAlertSchema = makeAddAlertSchema(t, { nameTakenIn: (name) => nameTakenIn(name) });
   const form = useOForm<AlertFormValues>({
     defaultValues: buildDefaultForm() as AlertFormValues,
     schema: addAlertSchema,
+    validateOn: "leave",
+    // A warning is judged against its critical value, so editing either re-checks both.
+    coupled: [
+      ["trigger_condition.threshold", "trigger_condition.warning_threshold"],
+      ["query_condition.aggregation.having.value", "query_condition.aggregation.warning_value"],
+      ["query_condition.promql_condition.value", "query_condition.promql_warning_value"],
+    ],
     onSubmit: async () => {
       await performSave();
     },
   });
+  // Section counts and the Save label follow what the fields show, not errors still held back.
+  const visibleFieldMeta = shownFieldMeta(form);
 
   // READ-VIEW of the single form. Reactive; replaced immutably on every change.
   const formData: any = form.useStore((s: any) => s.values);
@@ -657,7 +726,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   /** Reset the whole form (edit-prefill / post-save reset) to a complete alert
    *  object, re-seeding the form-only extras (logGroupBy / _meta). */
   const resetForm = (obj: any): void => form.reset(withFormExtras(obj));
-  const indexOptions = ref([]);
+  const indexOptions = ref<string[]>([]);
   const schemaList = ref([]);
   const streams: any = ref({});
   const editorRef: any = ref(null);
@@ -848,7 +917,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // Drives the QueryConfig warning that it runs before the Multi Alert's own
   // "Alert if [column]" condition.
   const sqlQueryHasHaving = ref(false);
-  const validateSqlQueryPromise = ref<Promise<unknown>>();
   const addAlertFormRef = ref(null);
   const viewSqlEditorDialog = ref(false);
   const plotChart: any = ref(null);
@@ -952,6 +1020,17 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     props.folderId || (Array.isArray(folderQuery) ? folderQuery[0] : folderQuery) || "default",
   );
   const alertType = ref(router.currentRoute.value.query.alert_type || "all");
+  // One name per folder, the rule the name suggestion and AutoObserve's duplicate check use.
+  const folderAlerts = useServerQuery(() => ({
+    ...alertsListQuery(store.state.selectedOrganization.identifier, activeFolderId.value),
+    enabled: !props.isUpdated,
+  }));
+  const checkingName = ref(false);
+  const nameTakenIn = (name: string): string | null => {
+    if (props.isUpdated) return null;
+    const hit = (folderAlerts.data.value ?? []).find((a: { name?: string }) => a.name === name);
+    return hit ? String(hit.folder_name || activeFolderId.value) : null;
+  };
 
   // ── Wizard State (kept for anomaly flow) ────────────────────────────────
 
@@ -1122,11 +1201,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     const streamsData: any = await getStream(stream_name, formData.value.stream_type, true);
 
     if (streamsData && Array.isArray(streamsData.schema)) {
-      streamCols = streamsData.schema.map((column: any) => ({
-        label: column.name,
-        value: column.name,
-        type: column.type,
-      }));
+      streamCols = streamsData.schema
+        .filter((column: any) => !isIngestArtifact(String(column?.name ?? "")))
+        .map((column: any) => ({
+          label: column.name,
+          value: column.name,
+          type: column.type,
+        }));
     }
 
     if (
@@ -1204,6 +1285,69 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     },
   );
 
+  // The stream names the alert, its read-back and its preview, so it follows the metric the query reads.
+  const debouncedSyncStreamFromPromql = debounce(async (promql: string) => {
+    if (beingUpdated.value || formData.value.stream_type !== "metrics") return;
+    const stream = promqlQueryStream(promql, indexOptions.value, formData.value.stream_name);
+    if (!stream || stream === formData.value.stream_name) return;
+    setF("stream_name", stream);
+    await updateStreamFields(stream).catch(() => undefined);
+  }, 600);
+
+  watch(
+    () => formData.value.query_condition.promql,
+    (promql) => {
+      if (formData.value.query_condition.type === "promql")
+        debouncedSyncStreamFromPromql(promql || "");
+    },
+  );
+
+  const promqlStreamNote = computed<I18nText | "">(() => {
+    const qc = formData.value.query_condition;
+    if (qc?.type !== "promql" || formData.value.stream_type !== "metrics") return "";
+    const metrics = promqlMetricNames(qc.promql || "").filter((m) =>
+      indexOptions.value.includes(m),
+    );
+    if (!metrics.length) return "";
+    return metrics.length === 1
+      ? t("alerts.form.promqlStream.fromQuery", { metric: raw(metrics[0]) })
+      : t("alerts.form.promqlStream.fromQueryMany", { metrics: joinListMore(metrics, t) });
+  });
+
+  // The value threshold the condition compares against; a count limit has none.
+  const valueThresholdPath = computed(() => {
+    const qc = formData.value.query_condition;
+    if (formData.value.is_real_time !== "false") return "";
+    if (qc?.type === "promql")
+      return qc.promql_rule_mode ? "" : "query_condition.promql_condition.value";
+    return qc?.type === "custom" && isAggregationEnabled.value
+      ? "query_condition.aggregation.having.value"
+      : "";
+  });
+  const valueThresholdAtPick = ref<{ path: string; value: unknown } | null>(null);
+  // A string key: formData is replaced on every edit, so an array source would re-snapshot each keystroke.
+  watch(
+    () => `${formData.value.stream_name}\u0000${valueThresholdPath.value}`,
+    async () => {
+      await nextTick();
+      const path = valueThresholdPath.value;
+      valueThresholdAtPick.value = path ? { path, value: get(formData.value, path) } : null;
+    },
+  );
+  /** The condition compares against a value threshold that is still empty. */
+  const valueThresholdMissing = computed(() => {
+    const path = valueThresholdPath.value;
+    const value = path ? get(formData.value, path) : 0;
+    return value === "" || value === null || value === undefined;
+  });
+  /** A value threshold the form filled in and nobody has changed since the stream was picked. */
+  const valueThresholdUntouched = computed(() => {
+    const pick = valueThresholdAtPick.value;
+    if (beingUpdated.value || !pick || pick.path !== valueThresholdPath.value) return false;
+    const value = get(formData.value, pick.path);
+    return value !== "" && value !== null && value !== undefined && value === pick.value;
+  });
+
   const updateStreams = (resetStream = true) => {
     if (resetStream) setF("stream_name", "");
     // Read the synchronous source of truth (not the reactive read-view, which
@@ -1212,9 +1356,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     const streamName = form.state.values.stream_name;
     if (streams.value[streamType]) {
       schemaList.value = streams.value[streamType];
-      indexOptions.value = streams.value[streamType].map((data: any) => {
-        return data.name;
-      });
+      indexOptions.value = streamNamesUserFirst(streams.value[streamType]);
       return;
     }
 
@@ -1224,10 +1366,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return getStreams(streamType, false)
       .then(async (res: any) => {
         streams.value[streamType] = res.list;
+        // A slower reply for a type the user already switched away from must not replace the current list.
+        if (form.state.values.stream_type !== streamType) return Promise.resolve();
         schemaList.value = res.list;
-        indexOptions.value = res.list.map((data: any) => {
-          return data.name;
-        });
+        indexOptions.value = streamNamesUserFirst(res.list);
 
         if (streamName) await updateStreamFields(streamName);
         return Promise.resolve();
@@ -1302,6 +1444,62 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return true;
   };
 
+  const builderSqlRequest = (): any => {
+    const payload: any = {
+      stream_name: formData.value.stream_name,
+      stream_type: formData.value.stream_type || "logs",
+      query_condition: {
+        type: "custom",
+        conditions: {
+          version: 2,
+          conditions: formData.value.query_condition.conditions,
+        },
+      },
+    };
+    if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+      const groupBy = formData.value.query_condition.aggregation.group_by || [];
+      payload.query_condition.aggregation = {
+        ...formData.value.query_condition.aggregation,
+        group_by: groupBy.filter((field: string) => field && field.trim() !== ""),
+      };
+    }
+    return payload;
+  };
+
+  // The SQL tab counts the rows its query returns, so per-group SQL keeps the HAVING that
+  // the one-per-group builder query leaves to the server.
+  const lastSeededSql = ref("");
+  const seedSqlTabFromBuilder = async () => {
+    const sqlAtSwitch = formData.value.query_condition?.sql ?? "";
+    if (!formData.value.stream_name || !canSeedSqlTab(sqlAtSwitch, lastSeededSql.value)) return;
+    const conditions = formData.value.query_condition?.conditions;
+    if (conditions && !allConditionsValid(conditions)) return;
+    if (!isAggregationValid()) return;
+    const request = builderSqlRequest();
+    if (request.query_condition.aggregation)
+      request.query_condition.aggregation.multi_alert = false;
+    try {
+      const response = await alertsService.generate_sql(
+        store.state.selectedOrganization.identifier,
+        request,
+      );
+      const seed = response?.data?.sql
+        ? sqlTabSeed(response.data.sql, store.state.zoConfig.timestamp_column || "_timestamp")
+        : "";
+      // A query typed while the seed was on its way is the user's and stays.
+      if (
+        !seed ||
+        formData.value.query_condition?.type !== "sql" ||
+        (formData.value.query_condition?.sql ?? "") !== sqlAtSwitch
+      )
+        return;
+      lastSeededSql.value = seed;
+      setF("query_condition.sql", seed);
+    } catch {
+      // Without the builder's SQL the tab opens as it always did, empty for the user to write.
+    }
+  };
+
   // Generation counter to discard stale async responses when the user switches
   // tabs (e.g. builder → SQL) before the API call completes.
   const generateRequestId = ref(0);
@@ -1337,30 +1535,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         return;
       }
 
-      const payload: any = {
-        stream_name: formData.value.stream_name,
-        stream_type: formData.value.stream_type || "logs",
-        query_condition: {
-          type: "custom",
-          conditions: {
-            version: 2,
-            conditions: formData.value.query_condition.conditions,
-          },
-        },
-      };
-
-      if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
-        const groupBy = formData.value.query_condition.aggregation.group_by || [];
-        const filteredGroupBy = groupBy.filter((field: string) => field && field.trim() !== "");
-        payload.query_condition.aggregation = {
-          ...formData.value.query_condition.aggregation,
-          group_by: filteredGroupBy,
-        };
-      }
-
       const response = await alertsService.generate_sql(
         store.state.selectedOrganization.identifier,
-        payload,
+        builderSqlRequest(),
       );
 
       // Discard if a newer request was started (e.g. user changed tabs or
@@ -1474,7 +1651,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     const validationContext: ValidationContext = {
       store,
       t,
-      validateSqlQueryPromise,
       sqlQueryErrorMsg,
       vrlFunctionError,
       buildQueryPayload,
@@ -1483,18 +1659,18 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return validateInputsUtil(input, validationContext, notify);
   };
 
-  const validateSqlQuery = async () => {
+  // The form's own checks stream; only Save runs the one-shot check that also validates fields.
+  const validateSqlQuery = async (purpose: SqlCheckPurpose = "edit"): Promise<SqlCheckResult> => {
     const validationContext: ValidationContext = {
       store,
       t,
-      validateSqlQueryPromise,
       sqlQueryErrorMsg,
       sqlErrorRanges,
       vrlFunctionError,
       buildQueryPayload,
       getParser,
     };
-    return validateSqlQueryUtil(formData.value, validationContext);
+    return validateSqlQueryUtil(formData.value, validationContext, purpose);
   };
 
   const validateConditionsAgainstUDS = () => {
@@ -1630,12 +1806,20 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         // [data-inline-edit-trigger] is OInlineEdit's display-mode button: an
         // inline-edited field has NO input in the DOM until it is opened, so
         // without this the header name field would never be reachable here.
-        const control = node.querySelector<HTMLElement>(
-          'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup], [data-inline-edit-trigger]',
-        );
+        // A sentence's message line sits under its other slots; it marks the field it reports on.
+        const control =
+          node.querySelector<HTMLElement>("[data-error-focus] input") ??
+          node.querySelector<HTMLElement>(
+            'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup], [data-inline-edit-trigger]',
+          );
         if (control) {
-          control.focus();
-          control.scrollIntoView({ behavior: "smooth", block: "center" });
+          if (hooks.revealControl) {
+            control.focus({ preventScroll: true });
+            hooks.revealControl(control);
+          } else {
+            control.focus();
+            control.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
           return true;
         }
         node = node.parentElement;
@@ -1644,62 +1828,37 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return false;
   };
 
+  // Every section is always rendered, so the first visible message is the one to focus.
   const focusOnFirstError = () => {
-    nextTick(async () => {
+    nextTick(() => {
       const form = document.querySelector("form");
-      if (!form) return;
-
-      // The offending field is on the tab the user is already looking at.
-      if (focusVisibleError(form)) return;
-
-      // Nothing VISIBLE is erroring, but the form is still invalid — so the
-      // offending field lives on a tab the user isn't looking at. That pane is
-      // v-show'd off, so every message inside it has a null offsetParent and the
-      // scan above skips it: the toast fires, points at nothing, and the user is
-      // told to fix a field they cannot see. Bring the owning tab forward first,
-      // then focus for real (this is what the pre-migration save gate did by
-      // hardcoding `activeTab = "condition"` before focusing).
-      // Only hop to a tab that is REACHABLE in the current mode. Every pane stays
-      // in the DOM in both modes (v-show, not v-if) while `alertTabs` swaps the
-      // headers wholesale between anomaly and alert — so a stale message on a
-      // pane whose header isn't rendered would strand the user on a tab the
-      // toggle group cannot show or leave.
-      const stranded = Array.from(form.querySelectorAll<HTMLElement>('[role="alert"]')).find(
-        (el) => {
-          if (!el.textContent?.trim()) return false;
-          const key = el.closest<HTMLElement>("[data-tab-pane]")?.dataset.tabPane;
-          return !!key && !!form.querySelector(`[data-test="add-alert-tab-${key}"]`);
-        },
-      );
-      const pane = stranded?.closest<HTMLElement>("[data-tab-pane]");
-      const tab = pane?.dataset.tabPane;
-      if (!tab || tab === activeTab.value) return;
-
-      activeTab.value = tab;
-      await nextTick();
-      // Re-scan with the visibility filter intact: now that the pane is shown,
-      // its messages have an offsetParent. Anything still hidden (a collapsed
-      // section) is correctly skipped rather than focused into the void.
-      focusVisibleError(form);
+      if (form) focusVisibleError(form);
     });
   };
 
-  // Focus a topbar select/input by its Vue component ref. A component that
-  // exposes its own focus() owns the decision (OInlineEdit has no input in the
-  // DOM until it opens, so "focus me" means "open the editor"); everything else
-  // falls back to the first input inside its root.
+  // A component exposing focus() owns the decision; otherwise the first input inside the
+  // element is focused. A component rendering a fragment has no element and is skipped.
   const focusTopbarField = (fieldRef: any) => {
     nextTick(() => {
-      const el = fieldRef?.value?.$el as HTMLElement | null;
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-      if (typeof fieldRef?.value?.focus === "function") {
-        fieldRef.value.focus();
+      const target = fieldRef?.value;
+      const el = (target instanceof HTMLElement ? target : target?.$el) as unknown;
+      if (!(el instanceof HTMLElement)) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (!(target instanceof HTMLElement) && typeof target?.focus === "function") {
+        target.focus();
         return;
       }
-      const input = el?.querySelector("input") as HTMLElement | null;
-      input?.focus();
+      el.querySelector<HTMLElement>("input")?.focus();
     });
   };
+
+  // The error line renders once the check's message lands, so focus waits a tick.
+  const focusSqlError = () =>
+    nextTick(() =>
+      document
+        .querySelector<HTMLElement>('[data-test="add-alert-sql-error"]')
+        ?.focus({ preventScroll: true }),
+    );
 
   // Schema-driven validity predicate (validation ONLY — never triggers the save;
   // the real save path is handleSave → form.handleSubmit). The ONE composed
@@ -1715,8 +1874,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           variant: "error",
           message: t("alerts.messages.anomalyDetectionNameRequired"),
         });
-        // One inline-edit control now serves both alert and anomaly names, so
-        // step1Ref is the anomaly name field too.
         focusTopbarField(step1Ref);
         return false;
       }
@@ -1825,7 +1982,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const updateFunctionVisibility = () => {
     if (!showVrlFunction.value && vrlFunctionError.value) {
-      validateSqlQueryPromise.value = Promise.resolve("");
       vrlFunctionError.value = "";
     }
   };
@@ -1943,7 +2099,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
    *  formData had none of them, so strip them to show the alert resource the
    *  user actually edits (Rule ④). cloneDeep first — formData is a readonly
    *  read-view and stripFormExtras mutates. */
-  const jsonEditorData = computed(() => stripFormExtras(cloneDeep(formData.value)));
+  // An aggregation the form does not use saves as null, so the JSON shows null, not its blank defaults.
+  const jsonEditorData = computed(() => {
+    const data = stripFormExtras(cloneDeep(formData.value));
+    const qc = data.query_condition;
+    const sqlMultiAlert = qc?.type === "sql" && !!qc.aggregation?.multi_alert;
+    if (qc && !sqlMultiAlert && (!isAggregationEnabled.value || qc.type !== "custom"))
+      qc.aggregation = null;
+    return data;
+  });
 
   const saveAlertJson = async (json: any) => {
     // Unparseable JSON falls through to the shared validation, which reports it.
@@ -2182,16 +2346,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return;
     }
 
-    // These two gates must move the user to the tab holding the offending field.
-    // They used to set `wizardStep`, which the V2 stepper navigated by — the V3
-    // single-pane layout navigates by `activeTab` and passes a hardcoded
-    // wizard-step to the summary, so setting it here steered nothing and Save &
-    // Train just appeared dead. Toast as well: the invalid field is on a tab the
-    // user isn't looking at, so the highlight alone is invisible.
+    // The invalid field may be in a section off-screen, so scroll to it as well as toasting.
     if (anomalyStep2Ref.value) {
       const step2Valid = await anomalyStep2Ref.value.validate();
       if (!step2Valid) {
         activeTab.value = "anomaly-config";
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.messages.fixHighlightedFields"),
@@ -2202,6 +2362,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     if (Object.values(anomalyWindowShareErrors(anomalyConfig.value)).some((e) => e !== null)) {
       activeTab.value = "anomaly-alerting";
+      hooks.showSection?.("notify");
       toast({
         variant: "error",
         message: t("alerts.messages.fixHighlightedFields"),
@@ -2327,15 +2488,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // SILENTLY: handleSubmit rejects, performSave never runs, and nothing tells the
   // user why. The anomaly branch's ONLY rule is the blank name, so this can only
   // fire for that.
+  // The Save label counts the issues, so a failed save only moves focus to the first one.
   const handleSave = async () => {
-    await form.handleSubmit();
-    if (!form.state.isValid) {
-      focusOnFirstError();
-      toast({
-        variant: "error",
-        message: t("alerts.messages.fixHighlightedFields"),
-      });
+    if (!props.isUpdated) {
+      // The folder list was read when the form opened; someone may have saved this name since.
+      checkingName.value = true;
+      await folderAlerts.refetch().finally(() => (checkingName.value = false));
     }
+    await form.handleSubmit();
+    if (!form.state.isValid) focusOnFirstError();
   };
 
   // ── Save-mode dialog ──────────────────────────────────────────────────────
@@ -2413,7 +2574,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // here with the SAME messages so save stays blocked (Rule ④). The field rules
   // (threshold / frequency / conditions / promql-condition / group_by / period /
   // silence / destinations / name / stream) are covered by the composed schema.
-  const runImperativeQueryChecks = (): boolean => {
+  const runImperativeQueryChecks = ({ freshSqlCheckFollows = false } = {}): boolean => {
     if (formData.value.is_real_time === "composite") return true;
     // ── Cron gate (R4 RESTORE) ───────────────────────────────────────────────
     // Pre-migration AlertSettings.validate() ran validateFrequency() first and
@@ -2432,6 +2593,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // inline "Cron expression and timezone are required". Parity: no toast.
       if (!tc.cron || !tc.timezone) {
         activeTab.value = "condition";
+        hooks.showSection?.("condition");
+        return false;
+      }
+      if (!isSixFieldCron(tc.cron)) {
+        activeTab.value = "condition";
+        hooks.showSection?.("condition");
+        toast({ variant: "error", message: t("alerts.queryConfig.invalidCronExpression") });
         return false;
       }
       try {
@@ -2442,6 +2610,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         ) {
           const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
           activeTab.value = "condition";
+          hooks.showSection?.("condition");
           toast({
             variant: "error",
             message: t("alerts.queryConfig.frequencyGreaterThanSeconds", {
@@ -2452,6 +2621,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         }
       } catch {
         activeTab.value = "condition";
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.queryConfig.invalidCronExpression"),
@@ -2465,14 +2635,18 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (tab === "sql") {
       if (!qc.sql || String(qc.sql).trim() === "") {
         activeTab.value = "condition";
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.messages.sqlQueryEmpty"),
         });
         return false;
       }
-      if (sqlQueryErrorMsg.value && sqlQueryErrorMsg.value.trim() !== "") {
+      const flagIsStale = freshSqlCheckFollows && formData.value.is_real_time === "false";
+      if (sqlQueryErrorMsg.value?.trim() && !flagIsStale && !sqlUnchangedSinceLoad()) {
         activeTab.value = "condition";
+        hooks.showSection?.("condition");
+        focusSqlError();
         toast({
           variant: "error",
           message: t("alerts.messages.fixSqlErrorBeforeSaving"),
@@ -2482,6 +2656,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     } else if (tab === "promql") {
       if (!qc.promql || String(qc.promql).trim() === "") {
         activeTab.value = "condition";
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.messages.promqlQueryEmpty"),
@@ -2498,6 +2673,50 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // blocked: a schema issue fails handleSubmit before onSubmit runs, so this
     // function is never even reached in that state.
     return true;
+  };
+
+  // Everything the SQL check sends, as the edited alert was loaded; null when creating.
+  let loadedSqlCheckInput: string | null = null;
+  const sqlCheckInput = () => {
+    const values = form.state.values;
+    return JSON.stringify([
+      String(values.query_condition?.sql ?? "").trim(),
+      values.query_condition?.vrl_function ?? "",
+      values.stream_type ?? "",
+      values.stream_name ?? "",
+    ]);
+  };
+  const sqlUnchangedSinceLoad = () =>
+    loadedSqlCheckInput !== null && sqlCheckInput() === loadedSqlCheckInput;
+
+  // Save must judge the SQL being saved, not the verdict of the last blur-triggered check.
+  const validateSqlBeforeSave = async (): Promise<"passed" | "blocked" | "unchecked"> => {
+    const qc = formData.value.query_condition;
+    if (formData.value.is_real_time !== "false" || qc?.type !== "sql") return "passed";
+    if (!String(qc.sql ?? "").trim()) return "passed";
+    const blockOnQuery = (message?: I18nText) => {
+      activeTab.value = "condition";
+      hooks.showSection?.("condition");
+      if (message) toast({ variant: "error", message });
+      return "blocked" as const;
+    };
+    if (!getParser(qc.sql)) return blockOnQuery(t("alerts.messages.selectAllColumnsNotAllowed"));
+    // An edit that kept the stored query must not be blocked by a check that cannot change it.
+    if (sqlUnchangedSinceLoad()) return "passed";
+    const verdict = await validateSqlQuery("save");
+    if (verdict === "sql_error") {
+      focusSqlError();
+      return blockOnQuery(t("alerts.messages.fixSqlErrorBeforeSaving"));
+    }
+    // The validator already toasted the VRL error.
+    if (verdict === "function_error") return blockOnQuery();
+    return verdict === "request_failed" ? "unchecked" : "passed";
+  };
+
+  const warnIfSqlUnchecked = (sqlCheck: string) => {
+    if (sqlCheck === "unchecked") {
+      toast({ variant: "warning", message: t("alerts.messages.sqlCheckUnavailable") });
+    }
   };
 
   let callAlert: Promise<{ data: any }>;
@@ -2519,21 +2738,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // reactive read-view and can lag by a tick after a just-written setF).
   const onSubmit = async () => {
     const target = saveTargetNow();
-    if (!runImperativeQueryChecks()) return false;
-
-    if (
-      formData.value.is_real_time == "false" &&
-      formData.value.query_condition.type == "sql" &&
-      !getParser(formData.value.query_condition.sql)
-    ) {
-      activeTab.value = "condition";
-      toast({
-        variant: "error",
-        message: t("alerts.messages.selectAllColumnsNotAllowed"),
-        timeout: 1500,
-      });
-      return false;
-    }
+    // The save-time SQL check below replaces the blur-time error flag.
+    if (!runImperativeQueryChecks({ freshSqlCheckFollows: true })) return false;
 
     if (
       formData.value.is_real_time == "false" &&
@@ -2599,11 +2805,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       });
 
       activeTab.value = "condition";
+      hooks.showSection?.("condition");
       return false;
     }
 
+    const sqlCheck = await validateSqlBeforeSave();
+    if (sqlCheck === "blocked") return false;
+
     const payload = getAlertPayload();
-    // Read before the save: resetForm in .then clears the form the payload came from.
     const sendsNowhere = !hasDeliveryTarget(payload);
 
     const dismiss = toast({
@@ -2611,21 +2820,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       message: t("common.pleaseWait"),
       timeout: 0,
     });
-
-    if (formData.value.is_real_time == "false" && formData.value.query_condition.type == "sql") {
-      try {
-        await validateSqlQueryPromise.value;
-      } catch (error) {
-        dismiss();
-        toast({
-          variant: "error",
-          message: t("alerts.messages.sqlValidationRequestFailed"),
-          timeout: 1500,
-        });
-        console.error("Error while validating sql query", error);
-        return false;
-      }
-    }
 
     if (formData.value.is_real_time !== "composite") {
       // VERSION HANDLING - wrap conditions with version field for backend
@@ -2648,7 +2842,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       const request = callAlert
         .then((res: { data: any }) => {
           invalidateSiemDetections();
-          resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
           dismiss();
@@ -2658,6 +2851,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ? t("alerts.messages.alertUpdatedNoDestination")
               : t("alerts.messages.alertUpdated"),
           });
+          warnIfSqlUnchecked(sqlCheck);
           showSaveWarnings(res);
         })
         .catch((err: any) => {
@@ -2689,7 +2883,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       const request = callAlert
         .then((res: { data: any }) => {
           invalidateSiemDetections();
-          resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
           dismiss();
@@ -2700,6 +2893,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               : t("alerts.messages.alertSaved"),
           });
           noteSavedDraft(target.org, savedDraft);
+          warnIfSqlUnchecked(sqlCheck);
           showSaveWarnings(res);
         })
         .catch((err: any) => {
@@ -2727,6 +2921,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // still reached in anomaly mode and delegates correctly.
   const performSave = async () => {
     if (blockSilentDraft(formData.value)) return;
+    const held = hooks.heldSaveSection?.();
+    if (held) {
+      hooks.showSection?.(held);
+      return;
+    }
     if (isAnomalyMode.value) {
       await saveAnomalyDetection();
       return;
@@ -2883,6 +3082,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     // Seed the ONE form (single source of truth) with the fully-transformed obj.
     resetForm(data);
+    loadedSqlCheckInput = props.isUpdated ? sqlCheckInput() : null;
 
     // Resolve the timezone from the stored offset (edit prefill) after the reset.
     if (pendingTimezoneOffset != null) {
@@ -2969,12 +3169,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // Watch for tab changes
   watch(
     () => formData.value.query_condition?.type,
-    (newType) => {
+    (newType, oldType) => {
+      // Builder SQL still in flight would land in the new mode's preview.
+      if (newType !== "custom") generateRequestId.value++;
       if (newType === "sql") {
         previewQuery.value = formData.value.query_condition?.sql
           ? formData.value.query_condition.sql.trim()
           : "";
         isUsingBackendSql.value = false;
+        if (oldType === "custom" && formData.value.is_real_time === "false")
+          void seedSqlTabFromBuilder();
       } else if (newType === "promql") {
         previewQuery.value = formData.value.query_condition?.promql
           ? formData.value.query_condition.promql.trim()
@@ -2987,7 +3191,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           setF("query_condition.promql_condition", {
             column: "value",
             operator: ">=",
-            value: 1,
+            value: "",
           });
         }
       } else if (newType === "custom") {
@@ -2998,20 +3202,20 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     },
   );
 
-  // Watch for condition/stream/aggregation changes to regenerate SQL
+  // Every edit replaces formData, so a deep watch here fired on each name keystroke; a string key compares by value.
   watch(
-    () => [
-      formData.value.query_condition?.conditions,
-      formData.value.stream_name,
-      formData.value.query_condition?.aggregation,
-      isAggregationEnabled.value,
-    ],
+    () =>
+      JSON.stringify([
+        formData.value.query_condition?.conditions,
+        formData.value.stream_name,
+        formData.value.query_condition?.aggregation,
+        isAggregationEnabled.value,
+      ]),
     () => {
       if (formData.value.query_condition?.type === "custom") {
         debouncedGenerateSql();
       }
     },
-    { deep: true },
   );
 
   // Watch for stream changes to update context provider
@@ -3035,18 +3239,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     (newVal) => {
       if (newVal) {
         nextTick(() => {
-          if ((newVal as any).periodFieldRef) {
-            focusManager.registerField("period", {
-              ref: (newVal as any).periodFieldRef,
-              onBeforeFocus: () => {
-                if (isAnomalyMode.value) {
-                  activeTab.value = "anomaly-alerting";
-                } else {
-                  activeTab.value = "condition";
-                }
-              },
-            });
-          }
           if ((newVal as any).thresholdFieldRef) {
             focusManager.registerField("threshold", {
               ref: (newVal as any).thresholdFieldRef,
@@ -3083,31 +3275,52 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               },
             });
           }
-          if ((newVal as any).pendingPeriodFieldRef) {
-            focusManager.registerField("pending_period", {
-              ref: (newVal as any).pendingPeriodFieldRef,
-              onBeforeFocus: () => {
-                if (isAnomalyMode.value) {
-                  activeTab.value = "anomaly-alerting";
-                } else {
-                  activeTab.value = "condition";
-                }
+          // Hold-for and keep-firing render only once shown, so resolve their element at focus time.
+          const settings = newVal as {
+            pendingPeriodFieldRef?: unknown;
+            keepFiringForFieldRef?: unknown;
+          };
+          focusManager.registerField("pending_period", {
+            ref: {
+              get value() {
+                return settings.pendingPeriodFieldRef;
               },
-            });
-          }
-          if ((newVal as any).keepFiringForFieldRef) {
-            focusManager.registerField("keep_firing_for", {
-              ref: (newVal as any).keepFiringForFieldRef,
-              onBeforeFocus: () => {
+            },
+            onBeforeFocus: () => {
+              if (isAnomalyMode.value) {
+                activeTab.value = "anomaly-alerting";
+              } else {
                 activeTab.value = "condition";
+              }
+            },
+          });
+          focusManager.registerField("keep_firing_for", {
+            ref: {
+              get value() {
+                return settings.keepFiringForFieldRef;
               },
-            });
-          }
+            },
+            onBeforeFocus: () => {
+              activeTab.value = "condition";
+            },
+          });
         });
       }
     },
     { immediate: true },
   );
+
+  // The look back sits on step 2's Alert when line, which mounts only once a stream is picked.
+  focusManager.registerField("period", {
+    ref: {
+      get value() {
+        return (step2Ref.value as { periodFieldRef?: unknown } | null)?.periodFieldRef ?? null;
+      },
+    },
+    onBeforeFocus: () => {
+      activeTab.value = "condition";
+    },
+  });
 
   // Watch for step2Ref to register query field
   watch(
@@ -3365,6 +3578,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   });
 
   onUnmounted(() => {
+    debouncedGenerateSql.cancel();
     contextRegistry.unregister("alerts");
     contextRegistry.setActive("");
     focusManager.clear();
@@ -3433,7 +3647,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     sqlErrorRanges,
     sqlAggColumnOptions,
     sqlQueryHasHaving,
-    validateSqlQueryPromise,
     addAlertFormRef,
     viewSqlEditorDialog,
     plotChart,
@@ -3485,9 +3698,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     getSelectedTab,
     getFormattedDestinations,
     generatedSqlQuery,
+    promqlStreamNote,
+    valueThresholdUntouched,
+    valueThresholdMissing,
 
     // Form (Rule ③ owner) + write helpers
     form,
+    visibleFieldMeta,
     setF,
     resetForm,
 
@@ -3546,6 +3763,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     applyAlertPrefill,
     applyFieldPatch,
     handleSave,
+    checkingName,
     destinationRequired,
     silentAutoObserveDraft,
     viaIncidentDraft,

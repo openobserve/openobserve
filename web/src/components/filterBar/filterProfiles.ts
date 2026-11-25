@@ -15,6 +15,7 @@
 
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import type { DimensionCondition } from "@/services/downtimes";
+import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
 import { SESSION_FIELDS } from "@/components/rum/productAnalytics/AppSettings.schema";
 import { conditionError } from "@/utils/downtimes/conditionRules";
 import {
@@ -122,6 +123,12 @@ export interface FilterEditorConfig {
   customFieldPattern?: RegExp;
   /** An empty filter shows a "Where · choose a field" line ready to click. */
   startWithEmptyRow: boolean;
+  /** After a new condition, open the field list for the next one; true unless a profile says otherwise. */
+  chainNext?: boolean;
+  /** Escape shuts the list but keeps a half-built condition, so a form never loses one silently. */
+  keepDraftOnEscape?: boolean;
+  /** Side for a cut value's tooltip, so it covers neither the condition above the list nor its counts. */
+  rowTooltipSide?: TooltipSide;
   limits: FilterLimits;
 }
 
@@ -476,7 +483,16 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
   traces: { ...horizontalSql, name: "traces" },
   metrics: { ...promql, name: "metrics", codec: metricsLabelsCodec() },
   "promql-builder": { ...promql, name: "promql-builder", codec: promqlLabelsCodec() },
-  alert: { ...engine, name: "alert", allowCustomFields: false, required: false },
+  // A form row, not a search bar: one condition is often the whole filter, so the list closes after it.
+  alert: {
+    ...engine,
+    name: "alert",
+    allowCustomFields: false,
+    required: false,
+    chainNext: false,
+    keepDraftOnEscape: true,
+    rowTooltipSide: "left",
+  },
   pipeline: { ...engine, name: "pipeline", allowCustomFields: true, required: true },
   workflow: { ...engine, name: "workflow", allowCustomFields: true, required: true },
   eval: { ...engine, name: "eval", allowCustomFields: true, required: false },
@@ -543,6 +559,9 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
   anomaly: {
     ...flat,
     name: "anomaly",
+    chainNext: false,
+    keepDraftOnEscape: true,
+    rowTooltipSide: "left",
     layout: "vertical",
     operators: forAll(DASHBOARD_LIST),
     codec: anomalyCodec(),

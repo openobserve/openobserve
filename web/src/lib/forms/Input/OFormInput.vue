@@ -49,6 +49,7 @@ if (import.meta.env.DEV && !form) {
         :id="props.id"
         :size="props.size"
         :width="props.width"
+        :fit-content="props.fitContent"
         :model-value="field.state.value"
         :error="shown(field).invalid"
         :error-message="

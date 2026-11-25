@@ -37,6 +37,8 @@ export const alertKeys = {
       : orgKey(org, "alerts", "list", folderId, alertType || "all"),
   /** Every folder's alerts with live state, read by the incident views. */
   firing: (org: string) => orgKey(org, "alerts", "firing"),
+  /** Every cached alert read; the prefix of `detail`. */
+  details: (org: string) => orgKey(org, "alerts", "detail"),
   detail: (org: string, id: string) => orgKey(org, "alerts", "detail", id),
   acks: (org: string, id: string) => orgKey(org, "alerts", "acks", id),
   /** Every folder's alerts with their destination/template refs — the dep graph. */

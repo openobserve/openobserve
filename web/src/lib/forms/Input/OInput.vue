@@ -73,6 +73,9 @@ const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
 const inputRef = ref<HTMLInputElement | HTMLTextAreaElement | null>(null);
 const debounceTimer = ref<ReturnType<typeof setTimeout> | null>(null);
+// A re-render while an emit waits would write the old model value over the typed text.
+const pendingText = ref<string | null>(null);
+const shownValue = computed(() => pendingText.value ?? String(props.modelValue ?? ""));
 
 function handleBlur(event: FocusEvent) {
   // Flush any pending debounced emit immediately on blur so that tabbing away
@@ -80,6 +83,7 @@ function handleBlur(event: FocusEvent) {
   if (debounceTimer.value) {
     clearTimeout(debounceTimer.value);
     debounceTimer.value = null;
+    pendingText.value = null;
     const target = event.target as HTMLInputElement | HTMLTextAreaElement;
     const normalized = normalizeByModifiers(target.value);
     emit("update:modelValue", normalized);
@@ -123,6 +127,8 @@ watch(canReveal, (allowed) => {
 
 // ── Width ──────────────────────────────────────────────────────────────────
 const fieldWidthClass = computed(() => {
+  // max-w-full caps the field at its container, so a long value grows the field instead of scrolling inside it.
+  if (props.fitContent && !isTextarea.value) return "w-fit min-w-16 max-w-full";
   switch (props.width) {
     case "xs":
       return "w-field-width-xs";
@@ -209,12 +215,14 @@ function handleInput(event: Event) {
   }
 
   const emitValue = () => {
+    pendingText.value = null;
     const normalized = normalizeByModifiers(val);
     emit("update:modelValue", normalized);
   };
 
   if ((props.debounce ?? 0) > 0) {
     if (debounceTimer.value) clearTimeout(debounceTimer.value);
+    pendingText.value = val;
     debounceTimer.value = setTimeout(emitValue, props.debounce);
     return;
   }
@@ -227,6 +235,7 @@ function handleInput(event: Event) {
 
 function handleClear() {
   if (debounceTimer.value) clearTimeout(debounceTimer.value);
+  pendingText.value = null;
   emit("update:modelValue", "");
   emit("clear");
   inputRef.value?.focus();
@@ -353,7 +362,7 @@ const wrapperClasses = computed(() => [
         :id="inputId"
         ref="inputRef"
         :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
-        :value="String(modelValue ?? '')"
+        :value="shownValue"
         :name="name"
         :placeholder="placeholder"
         :disabled="isDisabled"
@@ -396,7 +405,7 @@ const wrapperClasses = computed(() => [
         :id="inputId"
         ref="inputRef"
         :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
-        :value="String(modelValue ?? '')"
+        :value="shownValue"
         :type="effectiveType"
         :name="name"
         :placeholder="placeholder"
@@ -415,7 +424,13 @@ const wrapperClasses = computed(() => [
         v-bind="controlAttrs"
         :aria-describedby="describedBy"
         :class="[
-          'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
+          'min-w-0 rounded-[inherit] bg-transparent outline-none',
+          fitContent ? 'field-sizing-content flex-auto' : 'flex-1',
+          // A content-sized field has no room for spin buttons: they cover its text and catch a
+          // triple-click, which then steps the value instead of selecting it.
+          fitContent &&
+            type === 'number' &&
+            '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
           'text-input-text placeholder:text-input-placeholder',
           'disabled:text-input-disabled-text disabled:cursor-not-allowed',
           'h-full',

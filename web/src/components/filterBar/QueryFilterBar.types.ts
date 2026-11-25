@@ -35,6 +35,11 @@ import type {
 export type FilterBarExtraRow = Omit<ChipInputSuggestion, "section" | "selected">;
 
 /** A stored value's display name; the value itself is still what is saved and shown in the chip. */
+export interface FilterAddLabels {
+  add: I18nText;
+  addBelow: I18nText;
+}
+
 export interface FilterValueLabel {
   label: string;
   /** Secondary text on the value row's end edge. */
@@ -69,11 +74,23 @@ export interface QueryFilterBarProps {
   /** Problems to mark on their chips, from FilterBuilder's validation. */
   issues?: FilterIssue[];
   /** A soft warning for a chip's value, e.g. one not seen in recent data. */
-  valueHint?: (field: string, values: string[]) => I18nText | undefined;
+  valueHint?: (
+    field: string,
+    values: string[],
+    operator?: FilterOperatorId,
+  ) => I18nText | undefined;
+  /** Replaces a field row's type word in the field list, e.g. to say the field had no values lately. */
+  fieldDetail?: (field: string) => I18nText | undefined;
+  /** What the value list says for a field when it has nothing to offer. */
+  valueEmptyText?: (field: string) => I18nText | undefined;
+  /** A line under the value list, e.g. the range its counts cover. */
+  valueNote?: I18nText;
   /** A display name for a stored value: its value row reads as the label, and a vertical row shows it beside the chip. */
   valueLabel?: (field: string, value: string) => FilterValueLabel | undefined;
   fieldsLoading?: boolean;
   placeholder?: I18nText;
+  /** Replaces "Add condition" / "Add condition below" where a host calls a line something else. */
+  addLabels?: FilterAddLabels;
   disabled?: boolean;
   size?: "sm" | "md";
   /** `plain` blends the bar into the editor surface it replaces. */
@@ -145,6 +162,7 @@ export interface FilterBarRowsProps extends FilterBarNodesProps {
   nextConnector?: FilterConnector;
   /** Groups drawn as one summary line instead of their lines. */
   foldedIds?: Set<string>;
+  addLabels?: FilterAddLabels;
 }
 
 export interface FilterBarRowsEmits extends FilterBarNodesEmits {
@@ -164,7 +182,7 @@ export interface FilterBarCaretSlotProps {
 /** What a chip reads from the bar it sits in, without threading props through every nested group. */
 export interface FilterBarChipContext {
   fieldLabel: (field: string) => string | undefined;
-  valueHint: (field: string, values: string[]) => I18nText | undefined;
+  valueHint: (field: string, values: string[], operator?: FilterOperatorId) => I18nText | undefined;
   valueLabel?: (field: string, value: string) => FilterValueLabel | undefined;
   issueMessage: (nodeId: string) => I18nText | undefined;
   operatorName: (id: FilterOperatorId) => I18nText;

@@ -357,14 +357,9 @@ defineExpose({ focus: startEdit });
         @click="startEdit"
         @keydown="onDisplayKeydown"
       >
-        <!-- An empty field shows the placeholder in its normal muted colour even
-             in the error state — the red ring alone signals the error. A non-empty
-             value that is invalid still reads red. -->
+        <!-- The red ring alone signals an error, as in the input, so the value keeps its own colour. -->
         <OTruncatedText
-          :class="[
-            textClasses,
-            isEmpty ? 'text-text-placeholder' : error ? 'text-input-error-text' : valueToneClass,
-          ]"
+          :class="[textClasses, isEmpty ? 'text-text-placeholder' : valueToneClass]"
           :data-test="dataTest ? `${dataTest}-value` : undefined"
           >{{ displayValue || placeholder }}</OTruncatedText
         >

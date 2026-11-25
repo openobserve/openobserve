@@ -40,6 +40,7 @@ import { buildPrefillFromRumFunnel } from "./fromRumFunnel";
 import { buildPrefillFromTraces } from "./fromTraces";
 import { buildAiPrefill } from "./fromAi";
 import { noDataAlert, type AutoObserveAlertOptions } from "./fromAutoObserve";
+import { buildPrefillFromAssistant, type AlertProposal } from "./fromAssistant";
 import { raw } from "@/types/i18n";
 
 const autoObserveOptions: AutoObserveAlertOptions = {
@@ -260,6 +261,21 @@ const ADAPTERS: AdapterCase[] = [
         { service: "", cluster: null, namespace: null, stream: { type: "", name: "" } },
         autoObserveOptions,
       )!,
+  },
+  {
+    name: "assistant",
+    healthy: () =>
+      buildPrefillFromAssistant(
+        {
+          name: "nginx_5xx",
+          stream_type: "logs",
+          stream_name: "nginx",
+          query_condition: { type: "sql", sql: 'SELECT COUNT(*) AS c FROM "nginx" HAVING c > 5' },
+          trigger_condition: { period: 10, frequency: 5 },
+        },
+        "nginx 5xx",
+      ),
+    degenerate: () => buildPrefillFromAssistant({} as AlertProposal, "x"),
   },
 ];
 

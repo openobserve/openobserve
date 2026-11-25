@@ -7,10 +7,23 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { computed, reactive, ref } from "vue";
 
 import CompositeAlertForm from "./CompositeAlertForm.vue";
+import CompositeAlertPreview from "./CompositeAlertPreview.vue";
 import alertsService from "@/services/alerts";
 import i18n from "@/locales";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
+import {
+  alertTierContext,
+  tierAvailable,
+  tierIsSet,
+  type AlertSettingId,
+} from "@/components/alerts/alertSettingTiers";
 
 vi.mock("@/services/alerts", () => ({
   default: { validateComposite: vi.fn() },
@@ -130,6 +143,24 @@ describe("CompositeAlertForm", () => {
     );
   });
 
+  it("lays sub-alerts, expression and settings out as setting rows with the explainer behind an info icon", () => {
+    const wrapper = mountForm(draft());
+    const rows = wrapper.findAll("[data-o-setting-row]");
+
+    expect(rows.map((row) => row.attributes("data-test"))).toEqual([
+      "alerts-composite-sub-alerts-row",
+      "alerts-composite-expression-row",
+      "alerts-composite-warning-row",
+      "alerts-composite-stale-policy-row",
+    ]);
+    expect(rows[1].find('[data-test="alerts-composite-expression-builder"]').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="alerts-composite-expression-row-info"]').attributes("aria-label"),
+    ).toBe(i18n.global.t("alerts.composite.banner"));
+    expect(wrapper.text()).not.toContain(i18n.global.t("alerts.composite.banner"));
+    expect(rows[3].find('[data-test="alerts-composite-stale-policy-help"]').exists()).toBe(true);
+  });
+
   it("defaults Warning to firing and stale children to explicit use-last-state", () => {
     const wrapper = mountForm(draft());
 
@@ -141,9 +172,19 @@ describe("CompositeAlertForm", () => {
     expect(
       wrapper.find('[data-test="alerts-composite-stale-policy"]').attributes("data-value"),
     ).toBe("use_last_state");
-    expect(wrapper.find('[data-test="alerts-composite-stale-policy-help"]').text()).toMatch(
-      /last.*state/i,
+  });
+
+  it("the stale-policy help follows the picked option", () => {
+    const helps = ["use_last_state", "treat_as_false", "treat_as_true"].map((policy) =>
+      mountForm(
+        draft({
+          composite_condition: { ...draft().composite_condition, stale_child_policy: policy },
+        }),
+      )
+        .find('[data-test="alerts-composite-stale-policy-help"]')
+        .text(),
     );
+    expect(new Set(helps).size).toBe(3);
   });
 
   it("writes Warning and stale-policy control changes into the draft condition", async () => {
@@ -192,5 +233,92 @@ describe("CompositeAlertForm", () => {
     expect(slot.text()).not.toMatch(/critical|warning|ok|stale/i);
     await wrapper.find('[data-test="alerts-composite-child-remove-secret-id"]').trigger("click");
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+  });
+
+  it("ignores a slow server reply for an earlier expression once the expression turns invalid", async () => {
+    let resolvePending: (value: { data: typeof validPreview }) => void = () => undefined;
+    vi.mocked(alertsService.validateComposite).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePending = resolve;
+      }) as ReturnType<typeof alertsService.validateComposite>,
+    );
+    const wrapper = mountForm(draft());
+    await flushPromises();
+
+    await wrapper.setProps({
+      modelValue: draft({
+        composite_condition: {
+          expression: "{id-a} &&",
+          warning_counts_as_firing: true,
+          stale_child_policy: "use_last_state",
+        },
+      }),
+    });
+    await flushPromises();
+    resolvePending({ data: validPreview });
+    await flushPromises();
+
+    expect(wrapper.emitted("validation")?.at(-1)?.[0]).toEqual({ valid: false });
+    expect(wrapper.findComponent(CompositeAlertPreview).exists()).toBe(false);
+  });
+});
+
+describe("CompositeAlertForm in the sectioned editor", () => {
+  const ctx = alertTierContext({
+    isRealTime: "composite",
+    aggregate: false,
+    incidentsEnabled: false,
+    oncallEnabled: false,
+    suppressRepeatsEnabled: false,
+  });
+  const empty = () =>
+    draft({
+      children: [],
+      composite_condition: {
+        expression: "",
+        warning_counts_as_firing: true,
+        stale_child_policy: "use_last_state",
+      },
+    });
+
+  const mountSectioned = (modelValue: ReturnType<typeof draft>) => {
+    const formState = reactive({ submissionAttempts: 0 });
+    const form = {
+      useStore: (pick: (s: typeof formState) => unknown) => computed(() => pick(formState)),
+    };
+    const tiers = useAlertSettingTiers({
+      available: (id) => tierAvailable(id, ctx),
+      isSet: (id) => tierIsSet(id, { form: modelValue, anomaly: null }),
+      showAll: ref(false),
+    });
+    const wrapper = mount(CompositeAlertForm, {
+      props: { modelValue, folderId: "default", availableChildren: children },
+      global: {
+        plugins: [i18n],
+        provide: { [FORM_CONTEXT_KEY]: form, [ALERT_SETTING_TIERS_KEY]: tiers },
+      },
+    });
+    return { wrapper, formState, tiers };
+  };
+
+  it("shows no composite error before any input, and shows it once Save was tried", async () => {
+    const { wrapper, formState } = mountSectioned(empty());
+    await flushPromises();
+    const invalid = i18n.global.t("alerts.composite.invalidExpression");
+    expect(wrapper.text()).not.toContain(invalid);
+    formState.submissionAttempts = 1;
+    await flushPromises();
+    expect(wrapper.text()).toContain(invalid);
+  });
+
+  it.each<[AlertSettingId, string]>([
+    ["compositeWarningCounts", "alerts-composite-warning-row"],
+    ["compositeStalePolicy", "alerts-composite-stale-policy-row"],
+  ])("%s is hidden until added", async (id, row) => {
+    const { wrapper, tiers } = mountSectioned(draft());
+    expect(wrapper.find(`[data-test="${row}"]`).exists()).toBe(false);
+    tiers.reveal(id);
+    await flushPromises();
+    expect(wrapper.find(`[data-test="${row}"]`).exists()).toBe(true);
   });
 });

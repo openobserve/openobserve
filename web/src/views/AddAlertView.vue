@@ -16,8 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="h-full max-h-full overflow-hidden">
+    <AlertFormSkeleton v-if="isLoadingAlert" :bars="skeletonBars" @cancel="handleCancel" />
     <AddAlert
-      v-if="!isLoadingAlert && !loadFailed"
+      v-else-if="!loadFailed"
+      ref="addAlertRef"
+      :key="formKey"
       :modelValue="editedAlert"
       :isUpdated="isUpdated"
       :destinations="destinations"
@@ -37,16 +40,20 @@ import { fetchAlertRead } from "@/services/alerts.readFence";
 import { destinationKeys } from "@/services/alert_destination.querykeys";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { templatesQuery } from "@/services/alert_templates.queries";
-import { templateKeys } from "@/services/alert_templates.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
-import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
+import { defineComponent, ref, watch, onBeforeMount, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import AddAlert from "@/components/alerts/AddAlert.vue";
+import AlertFormSkeleton from "@/components/alerts/AlertFormSkeleton.vue";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
+import { MIN_SKELETON_MS } from "@/lib/styles/motion";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
+import { formPrefillRevision } from "@/composables/alerts/useAlertCreation";
 import { clearAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
+import { ALERT_LIST_SAVED_NEW } from "@/utils/alerts/alertListLanding";
 import {
   dropDraftOfMissingAlert,
   isNotFoundError,
@@ -57,6 +64,7 @@ export default defineComponent({
   name: "AddAlertView",
   components: {
     AddAlert,
+    AlertFormSkeleton,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -64,7 +72,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const destinations = ref([]);
-    const templates = ref<any[]>([]);
+    const templates = ref<unknown[]>([]);
     const isUpdated = ref(false);
 
     /**
@@ -79,6 +87,16 @@ export default defineComponent({
     const isLoadingAlert = ref(false);
     // Kept off screen while the view redirects, so an empty form never offers the new-alert draft.
     const loadFailed = ref(false);
+    // The outline paints at once; its bars wait out the loader delay, then hold so they never blink.
+    const skeletonBars = useDelayedFlag(isLoadingAlert);
+    let barsShownAt = 0;
+    watch(skeletonBars, (shown) => {
+      if (shown) barsShownAt = Date.now();
+    });
+    const holdSkeleton = async () => {
+      const left = barsShownAt ? MIN_SKELETON_MS - (Date.now() - barsShownAt) : 0;
+      if (left > 0) await new Promise((resolve) => setTimeout(resolve, left));
+    };
 
     /**
      * Fetch the alert being edited. The form takes its edit prefill from
@@ -125,6 +143,7 @@ export default defineComponent({
           },
         });
       } finally {
+        await holdSkeleton();
         isLoadingAlert.value = false;
       }
     };
@@ -151,14 +170,20 @@ export default defineComponent({
       await getDestinations();
     };
 
-    // The Advanced tab lists these as the template override options.
-    const getTemplates = async () => {
+    // The mount read stays cache-first; only the form's refresh button forces a server read.
+    const getTemplates = async (force = false) => {
+      const options = templatesQuery(store.state.selectedOrganization.identifier);
       try {
-        templates.value = await queryClient.fetchQuery(
-          templatesQuery(store.state.selectedOrganization.identifier),
-        );
-      } catch (error: any) {
-        if (error?.response?.status === 403) return;
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        templates.value = await queryClient.fetchQuery(options);
+      } catch (error: unknown) {
+        if ((error as { response?: { status?: number } })?.response?.status === 403) return;
         toast({
           variant: "error",
           message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
@@ -166,16 +191,10 @@ export default defineComponent({
       }
     };
 
-    const refreshTemplates = async () => {
-      await queryClient.invalidateQueries({
-        queryKey: templateKeys.list(store.state.selectedOrganization.identifier),
-        exact: true,
-      });
-      await getTemplates();
-    };
+    const refreshTemplates = () => getTemplates(true);
 
     // Unfiltered, so the alert just saved or edited is in view rather than hidden by the list's Firing default.
-    const openAlertList = (folder: string) =>
+    const openAlertList = (folder: string, saved?: string) =>
       router.push({
         name: "alertList",
         query: {
@@ -183,6 +202,7 @@ export default defineComponent({
           folder,
           tab: route.query.tab || "all",
           state: ALERT_LIST_ALL_STATES,
+          saved,
         },
       });
 
@@ -210,10 +230,19 @@ export default defineComponent({
       // The leave dialog's Save is already on its way somewhere else.
       if (options?.navigate === false) return;
 
-      openAlertList(resolvedFolder);
+      const editedId = route.params.alert_id || route.params.anomaly_id;
+      openAlertList(resolvedFolder, editedId ? String(editedId) : ALERT_LIST_SAVED_NEW);
     };
 
     const handleCancel = () => openAlertList((route.query.folder as string) || "default");
+
+    // A prefill picked from this form's own starter stays on this route, so the form is remade, after its leave question.
+    const formKey = ref(0);
+    const addAlertRef = ref<{ confirmLeave: () => Promise<boolean> } | null>(null);
+    watch(formPrefillRevision, async () => {
+      if (isUpdated.value || !addAlertRef.value) return;
+      if (await addAlertRef.value.confirmLeave()) formKey.value += 1;
+    });
 
     onBeforeMount(() => {
       // In parallel: the form needs destinations and templates either way, and edit mode
@@ -235,12 +264,15 @@ export default defineComponent({
       isUpdated,
       editedAlert,
       isLoadingAlert,
+      skeletonBars,
       loadFailed,
       getDestinations,
       refreshDestinations,
       refreshTemplates,
       handleUpdateList,
       handleCancel,
+      formKey,
+      addAlertRef,
     };
   },
 });

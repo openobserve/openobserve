@@ -1,13 +1,41 @@
 <script setup lang="ts">
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { CAPABILITY_CARDS } from "./welcomeContent";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { CAPABILITY_CARDS, type CapabilityCard } from "./welcomeContent";
 
 const { t } = useI18nTyped();
+const router = useRouter();
+const store = useStore();
+const { isLocked } = useLicenseLocks();
 
 const emit = defineEmits<{ (e: "select", prompt: string): void }>();
+
+const pageOf = (card: CapabilityCard) =>
+  card.page && !isLocked(card.page.feature) ? card.page : null;
+const titleOf = (card: CapabilityCard) => {
+  const page = pageOf(card);
+  return page ? t(page.titleKey) : t(`aiAssistant.capabilities.${card.id}.title`);
+};
+const descriptionOf = (card: CapabilityCard) => {
+  const page = pageOf(card);
+  return page ? t(page.descriptionKey) : t(`aiAssistant.capabilities.${card.id}.description`);
+};
+const choose = (card: CapabilityCard) => {
+  const page = pageOf(card);
+  if (!page) {
+    emit("select", t(`aiAssistant.capabilities.${card.id}.prompt`));
+    return;
+  }
+  router.push({
+    name: page.route,
+    query: { org_identifier: store.state.selectedOrganization?.identifier },
+  });
+};
 </script>
 
 <template>
@@ -26,9 +54,10 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
         '[--glow-color:var(--color-success-500)]': card.id === 'dashboard',
         '[--glow-color:var(--color-error-500)]': card.id === 'alert',
       }"
-      @click="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
-      @keydown.enter.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
-      @keydown.space.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
+      :data-test="`ai-welcome-capability-${card.id}`"
+      @click="choose(card)"
+      @keydown.enter.prevent="choose(card)"
+      @keydown.space.prevent="choose(card)"
     >
       <!-- eslint-disable local/no-hardcoded-px -- optical effect (blur radius), not layout — scaling it with text makes the glow bloom -->
       <span
@@ -46,12 +75,12 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
         as="div"
         class="capability-card__title text-typography-body relative z-1 m-0 text-sm leading-[1.3] font-semibold max-md:whitespace-normal"
       >
-        {{ t(`aiAssistant.capabilities.${card.id}.title`) }}
+        {{ titleOf(card) }}
       </OTruncatedText>
       <div
         class="capability-card__desc text-text-secondary relative z-1 mt-1.5 mb-0 text-xs leading-[1.45] max-md:hidden"
       >
-        {{ t(`aiAssistant.capabilities.${card.id}.description`) }}
+        {{ descriptionOf(card) }}
       </div>
       <span
         class="capability-card__chevron absolute top-3.5 right-3.5 z-1 inline-flex h-5.5 w-5.5 translate-x-[-0.25rem] translate-y-[0.25rem] items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--glow-color)_15%,transparent)] text-[color-mix(in_srgb,var(--glow-color)_100%,transparent)] opacity-0 transition-[opacity,translate] duration-200 ease-[ease] group-hover/card:translate-x-0 group-hover/card:translate-y-0 group-hover/card:opacity-100"

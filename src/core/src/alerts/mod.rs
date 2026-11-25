@@ -53,12 +53,14 @@ pub mod derived_streams;
 pub mod destination_usage;
 pub mod destinations;
 pub mod downtimes;
+pub mod dry_run;
 pub mod external_alerts;
 #[cfg(feature = "enterprise")]
 pub mod incident_title;
 #[cfg(feature = "enterprise")]
 pub mod incidents;
 pub mod leases;
+pub mod library;
 pub mod lifecycle;
 #[cfg(feature = "enterprise")]
 pub mod membership_provider;
@@ -289,7 +291,8 @@ impl QueryConditionExt for QueryCondition {
                     // `level_at`, silently clearing a prior Critical — an error
                     // must leave the level untouched.
                     Err(e) => {
-                        return Err(anyhow::anyhow!("PromQL search error for alert query: {e}"));
+                        let message = format!("PromQL search error for alert query: {e}");
+                        return Err(anyhow::Error::new(e).context(message));
                     }
                 };
                 let config::meta::promql::value::Value::Matrix(value) = resp else {
@@ -642,15 +645,14 @@ impl QueryConditionExt for QueryCondition {
                 complete_response(v)?
             }
             Err(e) => {
-                if let infra::errors::Error::ErrorCode(e) = e {
-                    return Err(anyhow::anyhow!(
-                        "{} {}",
-                        e.get_message(),
-                        e.get_inner_message()
-                    ));
-                } else {
-                    return Err(anyhow::anyhow!("{}", e));
-                }
+                let message = match &e {
+                    infra::errors::Error::ErrorCode(code) => {
+                        format!("{} {}", code.get_message(), code.get_inner_message())
+                    }
+                    e => e.to_string(),
+                };
+                // The search error stays the source, so the dry run can tell a user's error apart.
+                return Err(anyhow::Error::new(e).context(message));
             }
         };
         let mut records = vec![];

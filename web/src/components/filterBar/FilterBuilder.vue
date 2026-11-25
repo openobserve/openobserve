@@ -34,6 +34,9 @@ const props = withDefaults(defineProps<FilterBuilderProps>(), {
   extraValueSuggestions: undefined,
   valueHint: undefined,
   valueLabel: undefined,
+  fieldDetail: undefined,
+  valueEmptyText: undefined,
+  valueNote: undefined,
   layout: undefined,
   fieldsLoading: false,
   placeholder: undefined,
@@ -107,12 +110,16 @@ function focus() {
   barRef.value?.focus();
 }
 
+function activate() {
+  barRef.value?.activate();
+}
+
 function validate(): FilterIssue[] {
   showIssues.value = true;
   return issues.value;
 }
 
-defineExpose<FilterBuilderExpose>({ focus, validate });
+defineExpose<FilterBuilderExpose>({ focus, activate, validate });
 </script>
 
 <template>
@@ -127,9 +134,13 @@ defineExpose<FilterBuilderExpose>({ focus, validate });
       :extra-value-suggestions="extraValueSuggestions"
       :value-hint="valueHint"
       :value-label="valueLabel"
+      :field-detail="fieldDetail"
+      :value-empty-text="valueEmptyText"
+      :value-note="valueNote"
       :issues="shownIssues"
       :fields-loading="fieldsLoading"
       :placeholder="placeholder"
+      :add-labels="addLabels"
       :disabled="disabled"
       :size="size"
       :appearance="appearance"

@@ -64,6 +64,7 @@ const bar = inject(FILTER_BAR_CHIP_CONTEXT, null);
 const pathOf = (index: number) => (props.path ? `${props.path}-${index}` : String(index));
 const suffix = (path: string) => (path ? `-${path}` : "");
 const canAdd = computed(() => !props.disabled && !props.limitReason);
+const addBelowText = computed(() => props.addLabels?.addBelow ?? t("filterBar.addBelow"));
 // Revealed with its own line on hover or keyboard focus; touch screens have no hover, so it always shows there.
 const REVEAL_LINE =
   "opacity-0 group-hover/line:opacity-100 focus-visible:opacity-100 max-md:opacity-100";
@@ -145,12 +146,12 @@ const hasIssue = (group: FilterGroup) =>
             size="icon-xs-sq"
             icon-left="add"
             :class="REVEAL_GROUP"
-            :aria-label="t('filterBar.addBelow')"
+            :aria-label="addBelowText"
             :data-test="`${dataTest}-add-after-${pathOf(index)}`"
             @mousedown.prevent
             @click.stop="emit('add-after', item.id)"
           />
-          <OTooltip :content="t('filterBar.addBelow')" />
+          <OTooltip :content="addBelowText" />
         </span>
       </div>
       <div
@@ -211,12 +212,12 @@ const hasIssue = (group: FilterGroup) =>
             size="icon-xs-sq"
             icon-left="add"
             :class="REVEAL_LINE"
-            :aria-label="t('filterBar.addBelow')"
+            :aria-label="addBelowText"
             :data-test="`${dataTest}-add-after-${pathOf(index)}`"
             @mousedown.prevent
             @click.stop="emit('add-after', item.id)"
           />
-          <OTooltip :content="t('filterBar.addBelow')" />
+          <OTooltip :content="addBelowText" />
         </span>
       </div>
       <div
@@ -244,6 +245,7 @@ const hasIssue = (group: FilterGroup) =>
           :can-group-in="canGroupIn"
           :can-ungroup="canUngroup"
           :limit-reason="limitReason"
+          :add-labels="addLabels"
           :next-connector="nextConnector"
           :folded-ids="foldedIds"
           :data-test="dataTest"
@@ -292,12 +294,12 @@ const hasIssue = (group: FilterGroup) =>
             size="icon-xs-sq"
             icon-left="add"
             :class="REVEAL_LINE"
-            :aria-label="t('filterBar.addBelow')"
+            :aria-label="addBelowText"
             :data-test="`${dataTest}-add-after-${pathOf(index)}`"
             @mousedown.prevent
             @click.stop="emit('add-after', item.id)"
           />
-          <OTooltip :content="t('filterBar.addBelow')" />
+          <OTooltip :content="addBelowText" />
         </span>
       </div>
     </div>
@@ -316,7 +318,7 @@ const hasIssue = (group: FilterGroup) =>
           :data-test="`${dataTest}-add-condition${suffix(path)}`"
           @mousedown.prevent
           @click.stop="emit('add-condition', groupId)"
-          >{{ t("filterBar.addCondition") }}</OButton
+          >{{ addLabels?.add ?? t("filterBar.addCondition") }}</OButton
         >
         <OTooltip v-if="limitReason" :content="limitReason" />
       </span>

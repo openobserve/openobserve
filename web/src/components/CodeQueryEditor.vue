@@ -404,7 +404,7 @@ import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
 import { isAuthError } from "@/utils/authErrors";
 import { getFontMono } from "@/utils/fonts";
-import { escapeEditor } from "@/utils/focusNextControl";
+import { createTabOut, escapeEditor } from "@/utils/focusNextControl";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -525,6 +525,11 @@ export default defineComponent({
     valuesTimeRange: {
       type: Object as PropType<FieldValuesWindow | null>,
       default: null,
+    },
+    /** Escape then Tab (or Shift+Tab) leaves the editor, instead of Escape alone moving to the next control. */
+    escapeThenTab: {
+      type: Boolean,
+      default: false,
     },
     freeTextDecorations: {
       type: Object as PropType<{
@@ -988,7 +993,9 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query?.trim(),
         language: props.language,
-        ariaLabel: t("common.queryEditorAriaLabel"),
+        ariaLabel: props.escapeThenTab
+          ? t("common.queryEditorAriaLabelEscapeTab")
+          : t("common.queryEditorAriaLabel"),
         // Monaco paints its own text and ignores the CSS cascade — without this it
         // falls back to its built-in Menlo/Monaco/Courier New stack, which differs
         // per OS and from the rest of the app.
@@ -1074,13 +1081,15 @@ export default defineComponent({
         groupsHeaders(suggestMode.value),
       );
       valueQuoteKey = editorObj.createContextKey(VALUE_QUOTE_CONTEXT_KEY, false);
+      const tabOut = createTabOut(() => editorElement);
       editorObj.addAction?.({
         id: "o2.editor.escapeToNextControl",
         label: t("common.queryEditorEscapeAction"),
         keybindings: [monaco.KeyCode.Escape],
         precondition:
           "textInputFocus && !suggestWidgetVisible && !findWidgetVisible && !parameterHintsVisible && !editorHasSelection && !editorHasMultipleSelections && !inSnippetMode && !inlineSuggestionVisible && !renameInputVisible",
-        run: () => escapeEditor(editorElement as HTMLElement),
+        run: () =>
+          props.escapeThenTab ? tabOut.arm() : escapeEditor(editorElement as HTMLElement),
       });
       editorObj.addAction?.({
         id: "o2.suggest.closeValueQuote",
@@ -1171,6 +1180,11 @@ export default defineComponent({
       // Handled here rather than via addCommand: monaco's addCommand discards the
       // disposable it gets back, so its CommandsRegistry entry outlives the editor.
       editorObj.onKeyDown((e: any) => {
+        if (tabOut.onKey(e.browserEvent?.key ?? "", !!e.shiftKey)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
         if (e.keyCode === monaco.KeyCode.Escape) {
           escapeCount += 1;
           forgetMenu();
@@ -1197,6 +1211,7 @@ export default defineComponent({
       });
 
       editorObj.onDidBlurEditorWidget(() => {
+        tabOut.disarm();
         const model = editorObj?.getModel();
         const value = model?.getValue();
         const trimmedValue = value?.trim();

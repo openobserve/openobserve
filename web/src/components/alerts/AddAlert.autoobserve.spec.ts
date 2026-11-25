@@ -227,6 +227,10 @@ describe("AddAlert with an AutoObserve prefill", () => {
     sessionStorage.clear();
     queryClient.clear();
     vi.mocked(toast).mockClear();
+    // The folder list feeds the duplicate-name check on mount; a listed name left by an earlier test blocks Save.
+    vi.mocked(alertsService.listByFolderId)
+      .mockReset()
+      .mockResolvedValue({ data: { list: [] } } as any);
     vi.mocked(alertsService.get_by_alert_id).mockImplementation(
       async () => ({ data: structuredClone(savedAlert) }) as any,
     );
@@ -430,7 +434,7 @@ describe("AddAlert with an AutoObserve prefill", () => {
       await openNoDataPrefill("enterprise", silent);
       vi.mocked(toast).mockClear();
       vi.mocked(alertsService.create_by_alert_id).mockClear();
-      await vm().saveAlertJson(JSON.stringify({ ...vm().formData, destinations: [] }));
+      await vm().saveAlertJson(JSON.stringify({ ...vm().jsonEditorData, destinations: [] }));
       await flushPromises();
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
       expect(blockedToast()).toBeDefined();
@@ -502,7 +506,7 @@ describe("AddAlert with an AutoObserve prefill", () => {
         vi.mocked(alertsService.listByFolderId).mockResolvedValue({ data: { list: [] } } as any);
         vi.mocked(alertsService.create_by_alert_id).mockClear();
         // The JSON check only accepts destinations the form was handed; this draft pages on-call through its incident.
-        await vm().saveAlertJson(JSON.stringify({ ...vm().formData, destinations: [] }));
+        await vm().saveAlertJson(JSON.stringify({ ...vm().jsonEditorData, destinations: [] }));
         await flushPromises();
         await vi.waitFor(() => expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1));
         await flushPromises();
@@ -517,7 +521,7 @@ describe("AddAlert with an AutoObserve prefill", () => {
           listed(vm().formData.name) as any,
         );
         vi.mocked(alertsService.create_by_alert_id).mockClear();
-        await vm().saveAlertJson(JSON.stringify(vm().formData));
+        await vm().saveAlertJson(JSON.stringify(vm().jsonEditorData));
         await flushPromises();
         expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
         expect(toastMessages().some((m) => String(m).startsWith("Already added as"))).toBe(true);
@@ -587,7 +591,7 @@ describe("AddAlert with an AutoObserve prefill", () => {
           switchDuringCheck(() => {
             store.state.selectedOrganization.identifier = "elsewhere-org";
           });
-          await vm().saveAlertJson(JSON.stringify({ ...vm().formData, destinations: [] }));
+          await vm().saveAlertJson(JSON.stringify({ ...vm().jsonEditorData, destinations: [] }));
           await flushPromises();
           expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
           expect(toastMessages()).toContain("Could not save the alert.");

@@ -402,7 +402,7 @@ function forecastPhrase(forecast: any, kind: "summary" | "trigger", t: SummaryTr
 /**
  * Generate a plain English summary of the alert
  */
-function generatePlainEnglishSummary(
+export function generatePlainEnglishSummary(
   formData: any,
   destinations: any[],
   isRealTime: boolean,
@@ -434,16 +434,13 @@ function generatePlainEnglishSummary(
         "<": "alerts.summary.plainEnglish.conditionFewerThan",
         "!=": "alerts.summary.plainEnglish.conditionNot",
       };
+      const noun = t("alerts.verdict.events", {}, Number(threshold) === 1 ? 1 : 2);
       const conditionPhrase =
         operator === "="
-          ? t(
-              "alerts.summary.plainEnglish.conditionExactly",
-              { threshold },
-              threshold === 1 ? 1 : 2,
-            )
+          ? t("alerts.summary.plainEnglish.conditionExactly", { threshold, noun })
           : conditionKeys[operator]
-            ? t(conditionKeys[operator], { threshold })
-            : t("alerts.summary.plainEnglish.conditionOther", { threshold, operator });
+            ? t(conditionKeys[operator], { threshold, noun })
+            : t("alerts.summary.plainEnglish.conditionOther", { threshold, operator, noun });
 
       // The window is part of the sentence rather than a fragment glued into it:
       // "10-minute" is an English compound, so minutes and hours get a message each.

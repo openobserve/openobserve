@@ -16,6 +16,7 @@
 import type { Component } from "vue";
 import type { I18nText } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
+import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
 
 export interface ChipInputSuggestion {
   /** Stable identity; emitted by `select`. */
@@ -64,6 +65,8 @@ export interface ChipInputProps {
   inlineCaret?: boolean;
   /** Lines of chips shown before the field scrolls inside itself; it grows freely when unset. */
   maxRows?: number;
+  /** Side for a cut row's tooltip; a list under a field in a form keeps it off the field. */
+  rowTooltipSide?: TooltipSide;
   /** Prefix for `data-test`: `-input` caret input, `-search` popover search box, `-suggest` popover, `-suggest-item-{key}` rows, `-suggest-section` section headings. */
   dataTest?: string;
 }

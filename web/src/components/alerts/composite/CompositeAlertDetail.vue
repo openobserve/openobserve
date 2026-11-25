@@ -15,6 +15,7 @@ import type {
 } from "@/ts/interfaces/alert";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { letterFor, nameResolvedExpression } from "./expression";
+import { stalePolicyLabel } from "./stalePolicy";
 
 const props = defineProps<{
   alert: CompositeAlertDetail | Record<string, unknown>;
@@ -187,11 +188,7 @@ const childReason = (
           {{ t("alerts.composite.stalePolicy") }}
         </dt>
         <dd class="text-text-heading" data-test="alerts-composite-detail-stale-policy">
-          {{
-            value.composite_condition.stale_child_policy === "use_last_state"
-              ? t("alerts.composite.useLastState")
-              : raw(value.composite_condition.stale_child_policy)
-          }}
+          {{ stalePolicyLabel(value.composite_condition.stale_child_policy, t) }}
         </dd>
         <dt class="text-text-secondary whitespace-nowrap">
           {{ t("alerts.composite.levelWhenFiring") }}

@@ -55,6 +55,8 @@ export type ButtonVariant =
   | "banner-dismiss"
   // Text link inside running copy (a description, a help line); keeps the surrounding font size
   | "link"
+  // Words of a read-back sentence that are themselves an action: plain text until hover or focus
+  | "phrase"
   // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
   | "pricing-chip"
   | "section-chip"

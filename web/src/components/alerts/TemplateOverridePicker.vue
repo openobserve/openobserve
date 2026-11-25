@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex min-w-0 flex-col gap-1" :data-test="`template-override-${kind}`">
     <OButton
+      v-if="!helpOutside"
       variant="ghost-primary"
       size="xs"
       class="gap-1 self-start font-medium"
@@ -84,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :help-text="
         state === 'forbidden'
           ? t('alerts.templateOverride.forbidden')
-          : t('alerts.templateOverride.help', { kind: kindLabel })
+          : (helpText ?? t('alerts.templateOverride.help', { kind: kindLabel }))
       "
       :error="!!serverError"
       class="max-w-105"
@@ -168,7 +169,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import templateService from "@/services/alert_templates";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import { destinationsQuery } from "@/services/alert_destination.queries";
@@ -202,8 +203,12 @@ const props = withDefaults(
     destinations?: (string | FormDestination)[];
     /** The server's 400 message for this field, shown under the select. */
     serverError?: string | null;
+    /** Replaces the help line under the select (opt-in). */
+    helpText?: I18nText;
+    /** The caller opens the help from its own button via the exposed `openHelp` (opt-in). */
+    helpOutside?: boolean;
   }>(),
-  { disabled: false, destinations: () => [], serverError: null },
+  { disabled: false, destinations: () => [], serverError: null, helpText: undefined },
 );
 
 const emit = defineEmits<{ (e: "update:modelValue", value: string | null): void }>();
@@ -218,26 +223,33 @@ const helpOpen = ref(false);
 
 const kindLabel = computed(() => t(kindLabelKey(props.kind)));
 
-const suffix = (tpl: PickerTemplate) => {
-  if (tpl.kind === "content") return "";
-  if (tpl.type === "email") return ` ${t("alerts.templateOverride.emailOnly")}`;
-  if (tpl.type === "sns") return ` ${t("alerts.templateOverride.snsOnly")}`;
-  return ` ${t("alerts.templateOverride.webhookOnly")}`;
-};
+// Templates that only fit one destination kind sit under a heading that says so, not a per-row suffix.
+const TYPE_HEADINGS = {
+  webhook: "alerts.templateOverride.groupWebhook",
+  email: "alerts.templateOverride.groupEmail",
+  sns: "alerts.templateOverride.groupSns",
+} as const;
 
 const options = computed<SelectOption[]>(() => {
   const content = templates.value.filter((tpl) => tpl.kind === "content");
   const custom = templates.value.filter((tpl) => tpl.kind !== "content");
+  const typeOf = (tpl: PickerTemplate) =>
+    tpl.type === "email" || tpl.type === "sns" ? tpl.type : "webhook";
   const group = (label: string, list: PickerTemplate[]): SelectOption[] =>
     list.length
       ? [
           { label: raw(label), value: `__header_${label}`, header: true },
-          ...list.map((tpl) => ({ label: raw(`${tpl.name}${suffix(tpl)}`), value: tpl.name })),
+          ...list.map((tpl) => ({ label: raw(tpl.name), value: tpl.name })),
         ]
       : [];
   return [
     ...group(t("alerts.templateOverride.groupContent"), content),
-    ...group(t("alerts.templateOverride.groupCustom"), custom),
+    ...(Object.keys(TYPE_HEADINGS) as (keyof typeof TYPE_HEADINGS)[]).flatMap((type) =>
+      group(
+        t(TYPE_HEADINGS[type]),
+        custom.filter((tpl) => typeOf(tpl) === type),
+      ),
+    ),
   ];
 });
 
@@ -406,5 +418,5 @@ onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", onReturn);
 });
 
-defineExpose({ load });
+defineExpose({ load, openHelp: () => (helpOpen.value = true) });
 </script>

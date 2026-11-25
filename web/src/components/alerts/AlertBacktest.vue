@@ -1,0 +1,605 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<script setup lang="ts">
+import {
+  computed,
+  inject,
+  nextTick,
+  onBeforeUnmount,
+  ref,
+  shallowRef,
+  watch,
+  watchEffect,
+  type ComponentPublicInstance,
+} from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
+import AlertLinkNote from "./AlertLinkNote.vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { isCountLimit } from "@/utils/alerts/alertReadBack";
+import { durationWords, formatNumber } from "@/utils/alerts/alertCopy";
+import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
+import {
+  ALERT_BACKTEST_SIGNAL_KEY,
+  ALERT_SUGGESTIONS_KEY,
+} from "@/composables/alerts/useAlertSuggestions";
+import { ALERT_TEST_RUN_KEY } from "@/composables/alerts/useAlertTestRun";
+import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
+import { checkTimeText, testRunDay } from "@/utils/alerts/alertTestRun";
+import type { EvaluateAlertResponse } from "@/utils/alerts/alertEvaluate.types";
+import store from "@/stores";
+import {
+  backtestBucketMinutes,
+  backtestHintKey,
+  backtestWindows,
+  cronCheckTimes,
+  dailyVolume,
+  emptyDayHintKey,
+  realtimeDay,
+  windowedCountSql,
+} from "@/utils/alerts/alertBacktest";
+
+const props = defineProps<{
+  /** The builder's count-per-bucket SQL; its histogram is re-bucketed to fit every check window. */
+  query: string;
+  streamType: string;
+  /** Look-back in minutes. */
+  period: number;
+  operator: string;
+  threshold: number;
+  /** The alert's schedule; read by the replay of real check times. */
+  triggerCondition?: {
+    frequency: number;
+    frequency_type?: string;
+    cron?: string;
+    timezone?: string;
+    silence: number;
+  };
+  /** Real time: every matching event notifies, so the day is counted by the hour. */
+  realTime?: boolean;
+  /** Compares with past windows, which fire on any match while they hold no data. */
+  compares?: boolean;
+  /** Test it's panel passes the answer it shows; the day is then drawn from it alone, without a row. */
+  tested?: EvaluateAlertResponse | null;
+  /** Keep firing for, in seconds; once set, flapping advice has nothing to offer. */
+  keepFiringFor?: number;
+  /** The past window a comparison reads, when it holds no data. */
+  baselineEmpty?: I18nText | null;
+  /** The function (min or max) whose look back already makes the condition last. */
+  sustainedFn?: string | null;
+}>();
+
+/** The advice under the day; its action opens a setting by name, or else the element it targets. */
+interface DayHint {
+  text: I18nText | null;
+  action: I18nText | null;
+  setting?: string;
+  target?: string;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const HOURS = 24;
+const SAID_BY_TEST_IT: string[] = [
+  "alerts.sections.backtest.heldByMustLast",
+  emptyDayHintKey(true),
+  emptyDayHintKey(false),
+];
+const SUSTAINED_KEYS: string[] = [
+  "alerts.sections.backtest.noisySustained",
+  "alerts.sections.backtest.noisySustainedLower",
+];
+const REALTIME_BUCKET_MINUTES = 60;
+// Typing in a filter re-runs the query, so wait for a pause.
+const DEBOUNCE_MS = 700;
+// A day of a busy stream can scan for minutes; past this the answer is no longer worth the wait.
+const TIMEOUT_MS = 30_000;
+
+const { t } = useI18nTyped();
+const search = useAlertStreamQuery();
+
+const signal = inject(ALERT_BACKTEST_SIGNAL_KEY, null);
+const suggestions = inject(ALERT_SUGGESTIONS_KEY, null);
+const inPanel = computed(() => props.tested !== undefined);
+// The form shows the verdict line; the day strip and its notes open on request.
+const detailsOpen = ref(false);
+const showsDetails = computed(() => inPanel.value || detailsOpen.value);
+// Once Test it has run the alert as it stands, the day is the server's answer, for any query.
+const testRun = inject(ALERT_TEST_RUN_KEY, null);
+// A real-time row counts its own events: the dry run's counts stop at a cap per check.
+const server = computed(() => {
+  if (inPanel.value) return props.tested ?? null;
+  return props.realTime ? null : (testRun?.fresh.value ?? null);
+});
+const serverDay = computed(() => (server.value ? testRunDay(server.value) : null));
+
+const isCron = computed(() => props.triggerCondition?.frequency_type === "cron");
+// Without a schedule the alert checks once per look-back.
+const frequency = computed(() => Number(props.triggerCondition?.frequency) || props.period);
+const cronTimes = (endMs: number) =>
+  cronCheckTimes(
+    props.triggerCondition?.cron ?? "",
+    props.triggerCondition?.timezone,
+    endMs - DAY_MS,
+    endMs,
+  );
+
+const sql = computed(() => {
+  if (inPanel.value) return null;
+  if (props.realTime) return windowedCountSql(props.query, REALTIME_BUCKET_MINUTES);
+  if (isCron.value && !cronTimes(Date.now())?.length) return null;
+  const bucket = backtestBucketMinutes({
+    period: props.period,
+    frequency: frequency.value,
+    checkTimesMs: isCron.value ? [] : undefined,
+  });
+  return windowedCountSql(props.query, bucket);
+});
+const runKey = computed(() => (sql.value ? `${props.streamType}\u0000${sql.value}` : null));
+
+const rowRef = ref<ComponentPublicInstance | null>(null);
+// Without an observer (tests, old browsers) the row counts as on screen.
+const onScreen = ref(typeof IntersectionObserver === "undefined");
+const ranKey = ref<string | null>(null);
+const timedOut = ref(false);
+
+let startMs = Date.now() - DAY_MS;
+const checkTimesMs = shallowRef<number[] | undefined>();
+let debounce: ReturnType<typeof setTimeout> | undefined;
+let deadline: ReturnType<typeof setTimeout> | undefined;
+
+const stop = () => {
+  clearTimeout(deadline);
+  search.cancel();
+  ranKey.value = null;
+};
+
+const start = () => {
+  clearTimeout(debounce);
+  clearTimeout(deadline);
+  if (!sql.value) return;
+  const endMs = Date.now();
+  startMs = endMs - DAY_MS;
+  checkTimesMs.value = isCron.value && !props.realTime ? (cronTimes(endMs) ?? []) : undefined;
+  // The oldest check looks back one period before the day starts.
+  const queryStartMs = props.realTime ? startMs : startMs - props.period * 60_000;
+  const bucketMs =
+    (props.realTime
+      ? REALTIME_BUCKET_MINUTES
+      : backtestBucketMinutes({
+          period: props.period,
+          frequency: frequency.value,
+          checkTimesMs: checkTimesMs.value,
+        })) * 60_000;
+  timedOut.value = false;
+  ranKey.value = runKey.value;
+  search.run({
+    sql: sql.value,
+    streamType: props.streamType,
+    startTime: queryStartMs * 1000,
+    endTime: endMs * 1000,
+    // An explicit size, since -1 stops at the server's default of 1000 rows.
+    size: Math.ceil((endMs - queryStartMs) / bucketMs) + 1,
+  });
+  deadline = setTimeout(() => {
+    if (search.state.value !== "loading") return;
+    search.cancel();
+    timedOut.value = true;
+  }, TIMEOUT_MS);
+};
+
+watch(
+  [runKey, onScreen],
+  () => {
+    clearTimeout(debounce);
+    if (runKey.value === ranKey.value) return;
+    // A superseded day scan keeps loading the cluster, so stop it now rather than when the next one starts.
+    if (ranKey.value !== null) stop();
+    timedOut.value = false;
+    if (runKey.value && onScreen.value) debounce = setTimeout(start, DEBOUNCE_MS);
+  },
+  { immediate: true },
+);
+
+const observer =
+  typeof IntersectionObserver === "undefined"
+    ? null
+    : new IntersectionObserver((entries) => {
+        onScreen.value = entries.some((entry) => entry.isIntersecting);
+      });
+
+watch(
+  () => rowRef.value?.$el as Element | undefined,
+  (el, prev) => {
+    if (prev instanceof Element) observer?.unobserve(prev);
+    if (el instanceof Element) observer?.observe(el);
+  },
+);
+
+onBeforeUnmount(() => {
+  if (signal && !inPanel.value) signal.value = null;
+  if (testRun && !inPanel.value) testRun.eventDay.value = null;
+  clearTimeout(debounce);
+  clearTimeout(deadline);
+  observer?.disconnect();
+});
+
+const status = computed<"fixLimit" | "loading" | "slow" | "failed" | "ready">(() => {
+  if (server.value) return "ready";
+  if (!props.realTime && !isCountLimit(props.threshold)) return "fixLimit";
+  if (runKey.value !== ranKey.value) return "loading";
+  if (timedOut.value) return "slow";
+  if (search.state.value === "failed") return "failed";
+  return search.state.value === "ready" ? "ready" : "loading";
+});
+
+const result = computed(() =>
+  backtestWindows(search.hits.value, {
+    startMs,
+    hours: HOURS,
+    period: props.period,
+    frequency: frequency.value,
+    silence: Number(props.triggerCondition?.silence) || 0,
+    checkTimesMs: checkTimesMs.value,
+    operator: props.operator,
+    threshold: props.threshold,
+  }),
+);
+
+// The smallest gap stands in for "one check" of an irregular cron.
+const frequencyMinutes = computed(() => {
+  const times = checkTimesMs.value;
+  if (!times) return frequency.value;
+  const gaps = times.slice(1).map((at, i) => (at - times[i]) / 60_000);
+  return gaps.length ? Math.round(Math.min(...gaps)) : 24 * 60;
+});
+
+watchEffect(() => {
+  if (!signal || inPanel.value) return;
+  // Once Test it has answered, its checks are the day, so a replay never contradicts it.
+  const r = serverDay.value ?? result.value;
+  signal.value =
+    (sql.value || server.value) && status.value === "ready" && !props.realTime
+      ? {
+          checks: r.total,
+          alerts: r.alerts,
+          singleCheckSpikes: r.singleCheckSpikes,
+          refires: r.refires,
+          frequencyMinutes: frequencyMinutes.value,
+        }
+      : null;
+});
+
+// Test it states a real-time day from these counts, so its numbers and this row's are one.
+watchEffect(() => {
+  if (!testRun || inPanel.value || !props.realTime) return;
+  const ready = status.value === "ready" && !!sql.value;
+  const own = ready ? realtimeDay(search.hits.value, { startMs, hours: HOURS }) : null;
+  testRun.eventDay.value = own ? { events: own.events, windows: own.windows, startMs } : null;
+});
+
+// Without a WHERE, an empty day means the stream itself was quiet, not the filters.
+const filtered = computed(() => /\bWHERE\b/i.test(props.query));
+
+const day = computed(() => {
+  if (serverDay.value) return serverDay.value;
+  return props.realTime ? realtimeDay(search.hits.value, { startMs, hours: HOURS }) : result.value;
+});
+// The server and the replay give the same three counts; only the source differs.
+const counts = computed(() => serverDay.value ?? result.value);
+const silence = computed(() => Number(props.triggerCondition?.silence) || 0);
+const volume = computed(() => {
+  if (props.realTime) {
+    const own = realtimeDay(search.hits.value, { startMs, hours: HOURS });
+    return dailyVolume(
+      { events: own.events, fired: 0, alerts: 0, windows: own.windows },
+      true,
+      silence.value,
+    );
+  }
+  return dailyVolume({ ...counts.value, events: counts.value.events ?? 0 }, false);
+});
+const plural = (key: "matchingEvents" | "notifications", count: number) =>
+  t(`alerts.sections.backtest.${key}`, { count: formatNumber(count) }, count);
+// Step 2 comes before the wait's own row, so the line says what the wait does instead of naming it.
+const volumeText = computed(() => {
+  const v = volume.value;
+  if (!v) return null;
+  if (!props.realTime)
+    return t("alerts.sections.backtest.firingChecks", { count: formatNumber(v.count) }, v.count);
+  const notifications = plural("notifications", v.notifications ?? v.count);
+  return silence.value > 0
+    ? t("alerts.sections.backtest.realtimeWait", {
+        events: plural("matchingEvents", v.count),
+        wait: durationWords(silence.value, t),
+        notifications,
+      })
+    : t("alerts.sections.backtest.realtimeEach", { notifications });
+});
+const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
+const waitAction = computed(() =>
+  formContext && volume.value
+    ? t(
+        silence.value > 0
+          ? "alerts.sections.backtest.changeWait"
+          : "alerts.sections.backtest.addWait",
+      )
+    : null,
+);
+// A noisy day puts its fix on the verdict line, so the folded strip still says what to do.
+const waitInline = computed(() => !!waitAction.value && (props.realTime || !!volume.value?.noisy));
+const openWait = () =>
+  formContext?.openSetting
+    ? formContext.openSetting("cooldown")
+    : formContext?.goToSection("notify");
+
+const resultText = computed(() => {
+  if (props.realTime) return volumeText.value ?? t(emptyDayHintKey(filtered.value));
+  return isCron.value
+    ? t("alerts.sections.backtest.cronResult", {
+        count: counts.value.alerts,
+        total: counts.value.total,
+      })
+    : t("alerts.sections.backtest.result", {
+        count: counts.value.alerts,
+        total: counts.value.total,
+        frequency: frequency.value,
+      });
+});
+
+const hintKey = computed(() => {
+  if (props.realTime) return null;
+  // A value or PromQL alert compares with its own operator, not the count gate's.
+  const operator = server.value?.checks[0]?.operator ?? props.operator;
+  return backtestHintKey(counts.value.alerts, counts.value.total, operator, {
+    events: counts.value.events,
+    filtered: filtered.value,
+    pending: serverDay.value?.pending,
+    compares: props.compares,
+    baselineEmpty: !!props.baselineEmpty,
+    sustained: !!props.sustainedFn,
+  });
+});
+const hint = computed<DayHint | null>(() => {
+  const key = hintKey.value;
+  if (!key) return null;
+  // Test it's own lines already say the day matched nothing or Must last held it; its action stays.
+  if (inPanel.value && SAID_BY_TEST_IT.includes(key)) {
+    return key === "alerts.sections.backtest.heldByMustLast"
+      ? { text: null, action: t("alerts.sections.backtest.changeMustLast"), setting: "holdFor" }
+      : null;
+  }
+  if (key === "alerts.sections.backtest.neverNoBaseline")
+    return { text: t(key, { offset: props.baselineEmpty ?? "" }), action: null };
+  if (
+    key === "alerts.sections.backtest.noisyCompare" ||
+    key === "alerts.sections.backtest.neverCompare"
+  )
+    return {
+      text: t(key),
+      action: t("alerts.sections.backtest.changeCompare"),
+      target: "add-alert-compare-needs-baseline",
+    };
+  if (SUSTAINED_KEYS.includes(key))
+    return {
+      text: t(key, { fn: raw(props.sustainedFn ?? "") }),
+      action: t("alerts.sections.backtest.changeThreshold"),
+    };
+  const mustLast = [
+    "alerts.sections.backtest.heldByMustLast",
+    "alerts.sections.backtest.noisyMustLast",
+    "alerts.sections.backtest.noisyMustLastLower",
+  ].includes(key);
+  return {
+    text: t(key),
+    action: mustLast ? t("alerts.sections.backtest.changeMustLast") : null,
+    setting: "holdFor",
+  };
+});
+// In the form the advice's action rides on the verdict line and its words open with Show.
+const hintInline = computed(() => !inPanel.value && !!hint.value?.action);
+const noisyDay = computed(
+  () => !!volume.value?.noisy || !!hintKey.value?.startsWith("alerts.sections.backtest.noisy"),
+);
+// With no 24-hour row in the form, no step 3 card can say it, so the panel offers Keep firing for itself.
+const flapHint = computed(() => {
+  const refires = serverDay.value?.refires ?? 0;
+  if (
+    !inPanel.value ||
+    props.realTime ||
+    signal?.value ||
+    !refires ||
+    (props.keepFiringFor ?? 0) > 0
+  )
+    return null;
+  return {
+    text: t(
+      "alerts.form.suggest.keepFiring",
+      { count: formatNumber(refires), minutes: formatNumber(2 * frequencyMinutes.value) },
+      refires,
+    ),
+    action: suggestions ? t("alerts.sections.backtest.changeKeepFiring") : null,
+  };
+});
+// Step 3's own suggestion writes the span this advice names, so both say one value.
+const openKeepFiring = () => suggestions?.add("keepFiring");
+const openHintTarget = async () => {
+  const setting = hint.value?.setting;
+  // Must last can sit under More options, which only the setting search opens.
+  if (setting && formContext?.openSetting) return formContext.openSetting(setting);
+  formContext?.goToSection("condition");
+  await nextTick();
+  const row = document.querySelector<HTMLElement>(`[data-test="${hint.value?.target}"]`);
+  if (row) formContext?.reveal(row);
+};
+
+// A run cut short never reached the day's first hours, so they read as untested, not quiet.
+const untestedHours = computed(() => serverDay.value?.untestedHours ?? 0);
+const HOUR_KEYS = {
+  fired: "alerts.sections.backtest.hourFired",
+  quiet: "alerts.sections.backtest.hourQuiet",
+  untested: "alerts.sections.backtest.hourUntested",
+} as const;
+const hourState = (hour: number, fired: boolean) =>
+  fired ? "fired" : hour < untestedHours.value ? "untested" : "quiet";
+// Each hour of the strip says when it is, so a firing hour can be placed on the clock.
+const hourTitle = (hour: number, fired: boolean) => {
+  const dayStartMs = server.value ? server.value.end / 1000 - DAY_MS : startMs;
+  const at = (ms: number) => checkTimeText(ms * 1000, store.state.timezone, Date.now());
+  const from = dayStartMs + hour * 3_600_000;
+  const span = { from: at(from), to: at(from + 3_600_000) };
+  const tally = serverDay.value?.hourTallies[hour];
+  if (fired && tally && server.value?.is_real_time)
+    return t(
+      "alerts.sections.backtest.hourEvents",
+      { ...span, count: formatNumber(tally.events) },
+      tally.events,
+    );
+  if (fired && tally?.checks)
+    return t("alerts.sections.backtest.hourFiredShare", {
+      ...span,
+      count: formatNumber(tally.fired),
+      total: formatNumber(tally.checks),
+    });
+  return t(HOUR_KEYS[hourState(hour, fired)], span);
+};
+// A firing hour fills by how much of it fired, so a day that fired every hour still shows its busy ones.
+const FILL_CLASSES = ["h-1/4", "h-2/4", "h-3/4", "h-full"];
+const hourFill = (hour: number) => {
+  const share = serverDay.value?.hourShares[hour] ?? 1;
+  return FILL_CLASSES[Math.min(3, Math.max(0, Math.ceil(share * 4) - 1))];
+};
+</script>
+
+<template>
+  <component
+    :is="inPanel ? 'div' : OSettingRow"
+    v-if="inPanel ? server : sql || server"
+    ref="rowRef"
+    v-bind="inPanel ? {} : { label: t('alerts.sections.backtest.label'), fill: true, wide: true }"
+    :data-test="inPanel ? 'alert-test-run-day' : 'add-alert-backtest'"
+  >
+    <p
+      v-if="status !== 'ready'"
+      class="text-text-secondary m-0 pt-2 text-xs"
+      data-test="add-alert-backtest-status"
+    >
+      {{
+        status === "fixLimit"
+          ? t("alerts.sections.condition.fixLimit")
+          : status === "slow"
+            ? t("alerts.sections.backtest.slow")
+            : status === "failed"
+              ? t("alerts.sections.backtest.failed")
+              : t("alerts.sections.backtest.loading")
+      }}
+      <OButton
+        v-if="status === 'slow' || status === 'failed'"
+        variant="link"
+        data-test="add-alert-backtest-retry"
+        @click="start"
+      >
+        {{ t("common.retry") }}
+      </OButton>
+    </p>
+    <template v-else>
+      <p
+        v-if="!inPanel"
+        class="m-0 text-sm"
+        :class="noisyDay ? 'text-status-warning-text' : 'text-text-body'"
+        data-test="add-alert-backtest-result"
+      >
+        <span data-test="add-alert-backtest-result-text">{{ resultText }}</span>
+        <OButton
+          v-if="waitInline"
+          variant="link"
+          class="ms-1"
+          data-test="add-alert-backtest-wait-action"
+          @click="openWait"
+        >
+          {{ waitAction }}
+        </OButton>
+        <OButton
+          v-if="hintInline"
+          variant="link"
+          class="ms-1"
+          data-test="add-alert-backtest-hint-action"
+          @click="openHintTarget"
+        >
+          {{ hint?.action }}
+        </OButton>
+        <OButton
+          variant="link"
+          class="ms-1"
+          :aria-expanded="detailsOpen"
+          data-test="add-alert-backtest-toggle"
+          @click="detailsOpen = !detailsOpen"
+        >
+          {{ detailsOpen ? t("common.hide") : t("common.show") }}
+        </OButton>
+      </p>
+      <div
+        v-if="showsDetails"
+        class="grid grid-cols-24 gap-0.5"
+        :class="inPanel ? '' : 'mt-2'"
+        aria-hidden="true"
+      >
+        <span
+          v-for="(fired, hour) in day.hours"
+          :key="hour"
+          class="rounded-default flex h-4 items-end overflow-hidden"
+          :class="{
+            'bg-surface-subtle': hourState(hour, fired) !== 'untested',
+            'border-border-default border border-dashed': hourState(hour, fired) === 'untested',
+          }"
+          :title="hourTitle(hour, fired)"
+          :data-test="fired ? 'add-alert-backtest-hour-fired' : 'add-alert-backtest-hour'"
+        >
+          <span v-if="fired" class="bg-accent w-full" :class="hourFill(hour)" />
+        </span>
+      </div>
+      <div v-if="showsDetails" class="text-text-secondary mt-1 flex justify-between text-xs">
+        <span>{{ t("alerts.sections.backtest.dayAgo") }}</span>
+        <span>{{ t("alerts.sections.backtest.lastHour") }}</span>
+      </div>
+      <AlertLinkNote
+        v-if="!inPanel && !realTime && volumeText && detailsOpen"
+        class="mt-2"
+        :text="volumeText"
+        :action="waitInline ? null : waitAction"
+        :warning="volume?.noisy"
+        data-test="add-alert-backtest-volume"
+        @action="openWait"
+      />
+      <AlertLinkNote
+        v-if="hint && (!hintInline || detailsOpen)"
+        class="mt-2"
+        :text="hint.text"
+        :action="hintInline ? null : hint.action"
+        data-test="add-alert-backtest-hint"
+        @action="openHintTarget"
+      />
+      <AlertLinkNote
+        v-if="flapHint && showsDetails"
+        class="mt-2"
+        :text="flapHint.text"
+        :action="flapHint.action"
+        data-test="add-alert-backtest-flap"
+        @action="openKeepFiring"
+      />
+    </template>
+  </component>
+</template>

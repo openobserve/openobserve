@@ -28,7 +28,15 @@ import AlertTargetsSelect from "./AlertTargetsSelect.vue";
 
 const OSelectStub = {
   name: "OSelect",
-  props: ["modelValue", "options", "multiple", "error", "collapsibleGroups", "pinSelectedInGroups"],
+  props: [
+    "modelValue",
+    "options",
+    "multiple",
+    "error",
+    "collapsibleGroups",
+    "pinSelectedInGroups",
+    "dropdownStyle",
+  ],
   emits: ["update:modelValue"],
   template: `<div class="o-select" :data-error="String(error)" :data-multiple="String(multiple)">
     <span class="o-select-empty"><slot name="empty" /></span>
@@ -141,6 +149,33 @@ describe("AlertTargetsSelect", () => {
       });
       expect(select(wrapper).props("options")).toEqual([
         { label: "Slack #ops", value: "dest:slack" },
+      ]);
+    });
+
+    it("describe names each destination's type and target in its row and search, not its chip", () => {
+      const describe = {
+        pager: { type: "PagerDuty", target: "events.pagerduty.com" },
+        chat: { type: "Slack webhook", target: null, usedBy: 3 },
+      };
+      const options = ["pager", "chat"];
+      const rows = select(createWrapper({ destinationOptions: options, describe })).props(
+        "options",
+      );
+      expect(rows.map((o: any) => [o.label, o.listLabel, o.searchText])).toEqual([
+        ["pager", "pager · PagerDuty · events.pagerduty.com", "PagerDuty events.pagerduty.com"],
+        ["chat", "chat · Slack webhook", "Slack webhook"],
+      ]);
+      expect(
+        select(createWrapper({ destinationOptions: options, describe })).props("dropdownStyle"),
+      ).toBeTruthy();
+      expect(select(createWrapper({ destinationOptions: options })).props("dropdownStyle")).toBe(
+        undefined,
+      );
+      const list = createWrapper({ destinationOptions: options, describe, list: true });
+      const meta = list.findAll('[data-test="alert-destinations-list-option-meta"]');
+      expect(meta.map((m) => m.text())).toEqual([
+        "PagerDuty · events.pagerduty.com",
+        `Slack webhook · ${i18n.global.t("alerts.form.destination.usedBy", { count: 3 }, 3)}`,
       ]);
     });
 
@@ -330,6 +365,14 @@ describe("AlertTargetsSelect", () => {
       expect(wrapper.emitted("refresh")).toHaveLength(1);
     });
 
+    it("oneLine leaves refresh and New destination to the caller, so the picker has the line", () => {
+      const wrapper = createWrapper({ oneLine: true });
+      expect(wrapper.find('[data-test="alert-settings-refresh-destinations-btn"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="create-destination-btn"]').exists()).toBe(false);
+    });
+
     it("emits create-destination", async () => {
       const wrapper = createWrapper();
       await wrapper.find('[data-test="create-destination-btn"]').trigger("click");
@@ -339,6 +382,16 @@ describe("AlertTargetsSelect", () => {
     it("hides the Create Workflow button in OSS", () => {
       const wrapper = createWrapper({ workflowsEnabled: false });
       expect(wrapper.find('[data-test="create-workflow-btn"]').exists()).toBe(false);
+    });
+
+    it.each([
+      { workflowsEnabled: true },
+      { workflowsEnabled: false, workflowsLocked: true },
+      { workflowsEnabled: false, workflowsLocked: true, workflowsLicenseLocked: true },
+    ])("draws no workflow button when the parent offers it (%o)", (state) => {
+      const wrapper = createWrapper({ ...state, noWorkflowButton: true });
+      expect(wrapper.find('[data-test="create-workflow-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="create-destination-btn"]').exists()).toBe(true);
     });
 
     it("shows and emits create-workflow in enterprise", async () => {
@@ -518,5 +571,48 @@ describe("AlertTargetsSelect", () => {
       expect(wrapper.emitted("update:destinations")!.at(-1)).toEqual([["slack"]]);
       expect(wrapper.emitted("update:workflows")!.at(-1)).toEqual([["wf-1"]]);
     });
+  });
+});
+
+describe("AlertTargetsSelect — checkbox list", () => {
+  const list = (wrapper: any) => wrapper.find('[data-test="alert-destinations-list"]');
+
+  it("shows a short plain destination list as checkboxes", () => {
+    const wrapper = createWrapper({ list: true, destinationOptions: ["slack", "email"] });
+    expect(list(wrapper).exists()).toBe(true);
+  });
+
+  it("names the checkbox group for screen readers", () => {
+    const wrapper = createWrapper({ list: true, destinationOptions: ["slack"] });
+    expect(list(wrapper).find('[role="group"]').attributes("aria-label")).toBe("Destination");
+  });
+
+  it("keeps the dropdown when a selected destination is missing, so its Missing badge stays visible", () => {
+    const wrapper = createWrapper({
+      list: true,
+      destinations: ["deleted-dest"],
+      destinationOptions: ["slack"],
+    });
+    expect(list(wrapper).exists()).toBe(false);
+    expect(select(wrapper).exists()).toBe(true);
+  });
+
+  it("keeps the checkboxes when workflows are locked and none is selected", () => {
+    const wrapper = createWrapper({
+      list: true,
+      workflowsLocked: true,
+      destinationOptions: ["slack", "email"],
+    });
+    expect(list(wrapper).exists()).toBe(true);
+  });
+
+  it("keeps the dropdown when workflows add group headers", () => {
+    const wrapper = createWrapper({
+      list: true,
+      workflowsEnabled: true,
+      destinationOptions: ["slack"],
+      workflowOptions: [{ label: "Escalate", value: "wf-1" }],
+    });
+    expect(list(wrapper).exists()).toBe(false);
   });
 });

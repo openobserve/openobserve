@@ -55,7 +55,7 @@ vi.mock("vue-i18n", async (importOriginal) => {
   return {
     ...actual,
     // Delegate to the real catalogue instead of echoing the key, so assertions
-    // on rendered copy (e.g. the row count -> "1-3 of 3") test real messages.
+    // on rendered copy (e.g. the row count -> "1–3 of 3") test real messages.
     useI18n: () => ({ t: (...args: any[]) => (i18n.global.t as any)(...args) }),
     createI18n: () => ({ install: vi.fn() }),
   };
@@ -922,7 +922,7 @@ describe("TableRenderer", () => {
       wrapper = createWrapper({ showPagination: false });
       const paginationDiv = wrapper.find('[data-test="dashboard-table-pagination"]');
       expect(paginationDiv.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-table-row-count"]').text()).toBe("1-3 of 3");
+      expect(wrapper.find('[data-test="dashboard-table-row-count"]').text()).toBe("1–3 of 3");
     });
 
     it("should drop the pagination bar chrome when showPagination is false", () => {

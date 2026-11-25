@@ -29,10 +29,11 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { computed, nextTick, reactive, ref } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import streamService from "@/services/stream";
 
@@ -70,16 +71,25 @@ import AnomalyDetectionConfig from "./AnomalyDetectionConfig.vue";
 import {
   anomalyDetectionConfigDefaults,
   anomalyBandGrouping,
+  anomalyTrainingFact,
   anomalyBandWidthPrefill,
   anomalyExpectedGroupingKey,
   anomalyNoticeBadgeKeys,
   isAnomalyDataReadinessStatus,
   anomalyCanCheckDataNow,
   anomalySensitivityModel,
+  anomalyWindowCounts,
+  anomalyWindowPct,
   anomalyWindowShareErrors,
   lookBackWindowFloorSeconds,
 } from "./AnomalyDetectionConfig.schema";
 import enLocale from "@/locales/languages/en-US.json";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
+import { alertTierContext, tierAvailable, tierIsSet } from "@/components/alerts/alertSettingTiers";
+import { ALERT_FORM_CONTEXT_KEY } from "@/components/alerts/alertFormContext";
 import { anomalyBandPayload, defaultAnomalyConfig } from "@/composables/useAlertForm";
 
 // ---------------------------------------------------------------------------
@@ -170,6 +180,20 @@ const sensitivityHintText = (w: VueWrapper): string | undefined => {
   const hint = w.find('[data-test="anomaly-sensitivity-hint"]');
   return hint.exists() ? hint.text() : undefined;
 };
+
+// The filter sentence folds the builder away; Change (or "+ Add filter" when empty) opens it.
+async function openFilters(w: VueWrapper) {
+  const change = w.find('[data-test="add-alert-filter-sentence-change"]');
+  await (change.exists() ? change : w.find('[data-test="add-alert-add-filters"]')).trigger("click");
+  await flushPromises();
+}
+
+// Sensitivity reads "Auto" with Change until opened; the tiers and level live inside after Change.
+async function openSensitivity(w: VueWrapper) {
+  const change = w.find('[data-test="anomaly-sensitivity-row-change"]');
+  if (change.exists()) await change.trigger("click");
+  await flushPromises();
+}
 
 // A valid custom SQL query (aliases time_bucket, NOT the timestamp column).
 const VALID_CUSTOM_SQL =
@@ -555,6 +579,7 @@ describe("AnomalyDetectionConfig", () => {
     it("offers Auto, then maps Conservative, Balanced and Aggressive to 4, 3 and 2.5", async () => {
       wrapper = mountConfig();
       await flushPromises();
+      await openSensitivity(wrapper);
 
       expect(
         SENSITIVITY_TIERS.map((value) =>
@@ -571,6 +596,7 @@ describe("AnomalyDetectionConfig", () => {
     it("a new config defaults to Auto, with no band width", async () => {
       wrapper = mountConfig();
       await flushPromises();
+      await openSensitivity(wrapper);
 
       expect(getForm(wrapper).state.values.band_width).toBeNull();
       expect(tierStates(wrapper)).toEqual(["on", "off", "off", "off"]);
@@ -610,6 +636,7 @@ describe("AnomalyDetectionConfig", () => {
     ])("renders an honest Auto lifecycle readout for %j", async (model, value, label) => {
       wrapper = mountConfig({ band_width: null, ...model });
       await flushPromises();
+      await openSensitivity(wrapper);
       expect(wrapper.find('[data-test="anomaly-sensitivity-tier-auto"]').text()).toBe("Auto");
       expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').text()).toBe(
         `${label}${value}`,
@@ -626,6 +653,7 @@ describe("AnomalyDetectionConfig", () => {
         band_k: 4.23,
       });
       await flushPromises();
+      await openSensitivity(wrapper);
       getForm(wrapper).setFieldValue("detection_function", "sum");
       await flushPromises();
       expect(wrapper.find('[data-test="anomaly-sensitivity-auto-level"]').text()).not.toContain(
@@ -678,6 +706,7 @@ describe("AnomalyDetectionConfig", () => {
       const { wrapper: w, config } = mountReturning();
       wrapper = w;
       await flushPromises();
+      await openSensitivity(wrapper);
 
       await wrapper.find('[data-test="anomaly-sensitivity-tier-2.5"]').trigger("click");
       await flushPromises();
@@ -820,6 +849,7 @@ describe("AnomalyDetectionConfig", () => {
       const { wrapper: w, config } = mountReturning({ threshold: 97 });
       wrapper = w;
       await flushPromises();
+      await openSensitivity(wrapper);
 
       await wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').trigger("click");
       await flushPromises();
@@ -832,6 +862,7 @@ describe("AnomalyDetectionConfig", () => {
     it("tier labels re-resolve when the locale changes", async () => {
       wrapper = mountConfig();
       await flushPromises();
+      await openSensitivity(wrapper);
       const before = wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').text();
 
       const previous = i18n.global.locale.value;
@@ -991,19 +1022,22 @@ describe("AnomalyDetectionConfig", () => {
   describe("training window — days suffix and one hint line", () => {
     const floorHint = (w: VueWrapper) => w.find('[data-test="anomaly-training-window-floor-hint"]');
 
-    it.each([7, 28])("%s days states the 21-day training floor", async (days) => {
+    it.each([
+      [7, 21],
+      [28, 28],
+    ])("%s days says training reads the last %s days", async (days, reads) => {
       wrapper = mountConfig({ training_window_days: days });
       await flushPromises();
       expect(floorHint(wrapper).text()).toBe(
-        i18n.global.t("alerts.anomaly.trainingWindowFloorHint", { days: 21 }),
+        i18n.global.t("alerts.form.anomaly.trainingReads", { days: reads }),
       );
     });
 
-    it("shows days as the input's own unit and keeps the grouping out of the form", async () => {
+    it("names days beside the number and keeps the grouping out of the form", async () => {
       wrapper = mountConfig();
       await flushPromises();
-      const field = wrapper.find('[data-test="anomaly-training-window"]');
-      expect(field.text()).toContain(i18n.global.t("alerts.anomaly.daysUnit"));
+      const row = wrapper.find('[data-test="anomaly-training-window-row"]');
+      expect(row.text()).toContain(i18n.global.t("alerts.form.units.days"));
       expect(wrapper.text()).not.toContain(
         i18n.global.t("alerts.anomaly.bandGroupingWeekendHourIfData"),
       );
@@ -1011,6 +1045,32 @@ describe("AnomalyDetectionConfig", () => {
 
     it("defaults a new config to 28 days", () => {
       expect(anomalyDetectionConfigDefaults(undefined).training_window_days).toBe(28);
+    });
+  });
+
+  describe("Measure and Learn from sentences — each part writes its saved field", () => {
+    it.each([
+      ["anomaly-measure-row", "anomaly-detection-function", "detection_function", "sum"],
+      [
+        "anomaly-measure-row",
+        "anomaly-detection-function-field",
+        "detection_function_field",
+        "took",
+      ],
+      ["anomaly-measure-row", "anomaly-histogram-interval-value", "histogram_interval_value", 15],
+      ["anomaly-measure-row", "anomaly-histogram-interval-unit", "histogram_interval_unit", "h"],
+      ["anomaly-training-window-row", "anomaly-training-window", "training_window_days", 14],
+    ])("%s: %s writes %s", async (row, part, field, value) => {
+      const { wrapper: w, config } = mountReturning({ detection_function: "avg" });
+      wrapper = w;
+      await flushPromises();
+      const control = wrapper.find(`[data-test="${row}"] [data-test="${part}"]`);
+
+      if (typeof value === "number") await control.find("input").setValue(String(value));
+      else control.findComponent(OSelect).vm.$emit("update:modelValue", value);
+      await flushPromises();
+
+      expect((config as Record<string, unknown>)[field]).toBe(value);
     });
   });
 
@@ -1059,7 +1119,7 @@ describe("AnomalyDetectionConfig", () => {
       wrapper = mountConfig();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("SQL Preview");
+      expect(wrapper.text()).toContain(i18n.global.t("alerts.tiers.names.generatedSql"));
       expect(wrapper.text()).not.toContain("Anomaly Score Range");
     });
 
@@ -1067,6 +1127,7 @@ describe("AnomalyDetectionConfig", () => {
     it("collapses the tier group to a dropdown on narrow screens", async () => {
       wrapper = mountConfig();
       await flushPromises();
+      await openSensitivity(wrapper);
       const group = wrapper
         .findAllComponents(OToggleGroup)
         .find((c) => c.vm.$attrs["data-test"] === "anomaly-sensitivity-tier");
@@ -1076,6 +1137,7 @@ describe("AnomalyDetectionConfig", () => {
     it("gives the tier group an accessible name", async () => {
       wrapper = mountConfig();
       await flushPromises();
+      await openSensitivity(wrapper);
 
       // The row's "Sensitivity" text is a plain div bound to neither control,
       // so aria-label is the group's only accessible name.
@@ -1095,18 +1157,14 @@ describe("AnomalyDetectionConfig", () => {
         label("anomaly-schedule-interval-unit"),
         label("anomaly-detection-window-unit"),
       ];
-      expect(units).toEqual([
-        "Detection Resolution unit",
-        "Check Every unit",
-        "Look Back Window unit",
-      ]);
+      expect(units).toEqual(["Bucket size unit", "Check every unit", "Look back over unit"]);
       expect(new Set(units).size).toBe(units.length);
 
-      expect(label("anomaly-detection-function")).toBe("Detection Function");
-      expect(label("anomaly-histogram-interval-value")).toBe("Detection Resolution");
-      expect(label("anomaly-schedule-interval-value")).toBe("Check Every");
-      expect(label("anomaly-detection-window-value")).toBe("Look Back Window");
-      expect(label("anomaly-training-window")).toBe("Training Window");
+      expect(label("anomaly-detection-function")).toBe("Measure");
+      expect(label("anomaly-histogram-interval-value")).toBe("Bucket size");
+      expect(label("anomaly-schedule-interval-value")).toBe("Check every");
+      expect(label("anomaly-detection-window-value")).toBe("Look back over");
+      expect(label("anomaly-training-window")).toBe("Learn from");
     });
 
     it("names the custom-SQL detection resolution unit after its row", async () => {
@@ -1117,7 +1175,7 @@ describe("AnomalyDetectionConfig", () => {
           .find('[data-test="anomaly-histogram-interval-unit"]')
           .find("[aria-label]")
           .attributes("aria-label"),
-      ).toBe("Detection Resolution unit");
+      ).toBe("Bucket size unit");
     });
 
     it("exposes no mark-line or series-max machinery", async () => {
@@ -1139,9 +1197,32 @@ describe("AnomalyDetectionConfig", () => {
       { field: "gamma", operator: "Is Not Null", value: "" },
     ];
 
+    it("reads the rows as one sentence until Change opens the builder", async () => {
+      wrapper = mountConfig({ filters: saved.map((f) => ({ ...f })) });
+      await flushPromises();
+      const sentence = wrapper.find('[data-test="add-alert-filter-sentence"]');
+      expect(sentence.findAll('[data-test^="add-alert-filter-sentence-condition-"]')).toHaveLength(
+        3,
+      );
+      expect(wrapper.findComponent({ name: "FilterBuilder" }).exists()).toBe(false);
+      await openFilters(wrapper);
+      expect(wrapper.find('[data-test="add-alert-filter-sentence"]').exists()).toBe(false);
+      expect(renderedFilterFields(wrapper)).toEqual(["alpha", "beta", "gamma"]);
+    });
+
+    it("Remove on the sentence clears every row", async () => {
+      const { wrapper: w, config } = mountReturning({ filters: saved.map((f) => ({ ...f })) });
+      wrapper = w;
+      await flushPromises();
+      await wrapper.find('[data-test="add-alert-filter-sentence-remove"]').trigger("click");
+      await flushPromises();
+      expect(config.filters).toEqual([]);
+    });
+
     it("draws one chip per saved row, in order", async () => {
       wrapper = mountConfig({ filters: saved.map((f) => ({ ...f })) });
       await flushPromises();
+      await openFilters(wrapper);
       const builder = wrapper.findComponent({ name: "FilterBuilder" });
       expect(builder.props("profile")).toBe("anomaly");
       expect(renderedFilterFields(wrapper)).toEqual(["alpha", "beta", "gamma"]);
@@ -1151,6 +1232,7 @@ describe("AnomalyDetectionConfig", () => {
       const { wrapper: w, config } = mountReturning({ filters: saved.map((f) => ({ ...f })) });
       wrapper = w;
       await flushPromises();
+      await openFilters(wrapper);
 
       await wrapper.find('[data-test="anomaly-filter-builder-chip-beta-remove"]').trigger("click");
       await flushPromises();
@@ -1164,6 +1246,7 @@ describe("AnomalyDetectionConfig", () => {
     it("writes a builder edit back in the flat row format", async () => {
       wrapper = mountConfig({ filters: [] });
       await flushPromises();
+      await openFilters(wrapper);
       wrapper
         .findComponent({ name: "FilterBuilder" })
         .vm.$emit("update:modelValue", [{ field: "level", operator: "<>", value: "debug" }]);
@@ -1350,9 +1433,9 @@ describe("AnomalyDetectionConfig", () => {
 
       const hint = wrapper.find('[data-test="anomaly-detection-window-hint"]');
       expect(hint.exists()).toBe(true);
-      expect(hint.text()).toContain("1h 5m");
+      expect(hint.text()).toContain("1 hour 5 minutes");
       // Twice the floor plus the 10-minute absence allowance.
-      expect(hint.text()).toContain("2h 20m");
+      expect(hint.text()).toContain("2 hours 20 minutes");
     });
   });
 
@@ -1475,7 +1558,7 @@ describe("AnomalyDetectionConfig", () => {
 
       const warning = wrapper.find('[data-test="anomaly-detection-window-legacy-warning"]');
       expect(warning.exists()).toBe(true);
-      expect(warning.text()).toContain("1h 5m");
+      expect(warning.text()).toContain("1 hour 5 minutes");
     });
 
     it("clears the legacy warning once the triple is edited", async () => {
@@ -1487,6 +1570,110 @@ describe("AnomalyDetectionConfig", () => {
         false,
       );
     });
+  });
+});
+
+describe("AnomalyDetectionConfig — section 2 in the sectioned editor (E1)", () => {
+  const anomalyCtx = alertTierContext({
+    isRealTime: "anomaly",
+    incidentsEnabled: false,
+    oncallEnabled: false,
+    suppressRepeatsEnabled: false,
+  });
+
+  function mountSectioned(overrides: Record<string, unknown> = {}) {
+    const config = reactive(buildConfig(overrides));
+    const tiers = useAlertSettingTiers({
+      available: (id) => tierAvailable(id, anomalyCtx),
+      isSet: (id) => tierIsSet(id, { form: {}, anomaly: config }),
+      showAll: ref(false),
+    });
+    const goToSection = vi.fn();
+    const w = mount(AnomalyDetectionConfig, {
+      global: {
+        ...mountOptions.global,
+        provide: {
+          [ALERT_SETTING_TIERS_KEY]: tiers,
+          [ALERT_FORM_CONTEXT_KEY]: {
+            isEditing: computed(() => false),
+            showAll: ref(false),
+            goToSection,
+            reveal: vi.fn(),
+          },
+        },
+      },
+      props: { config },
+    });
+    return { w, config, tiers, goToSection };
+  }
+
+  it("shows Sensitivity as Auto with Change, and no tier or level until Change", async () => {
+    const { w } = mountSectioned();
+    await flushPromises();
+    const row = w.find('[data-test="anomaly-sensitivity-row"]');
+    expect(row.text()).toContain(i18n.global.t("alerts.form.anomaly.sensitivityAuto"));
+    expect(w.find('[data-test="anomaly-sensitivity-tier"]').exists()).toBe(false);
+    await openSensitivity(w);
+    expect(w.find('[data-test="anomaly-sensitivity-tier"]').exists()).toBe(true);
+    expect(levelInput(w).exists()).toBe(false);
+    await w.find('[data-test="anomaly-sensitivity-tier-2.5"]').trigger("click");
+    await flushPromises();
+    expect(levelInput(w).exists()).toBe(true);
+  });
+
+  it("opens Sensitivity on load for a stored level", async () => {
+    const { w } = mountSectioned({ band_width: 3.5 });
+    await flushPromises();
+    expect(levelInput(w).exists()).toBe(true);
+  });
+
+  it.each([
+    [1, "h", "Checks every hour, so a spike can wait up to 1 hour to alert."],
+    [10, "m", ""],
+  ])(
+    "states the schedule once: a check every %s %s notes how long a spike can wait: %j",
+    async (value, unit, note) => {
+      const { w } = mountSectioned({
+        schedule_interval_value: value,
+        schedule_interval_unit: unit,
+      });
+      await flushPromises();
+      expect(w.find('[data-test="anomaly-schedule-line"]').exists()).toBe(false);
+      const delay = w.find(
+        '[data-test="anomaly-check-every-row"] [data-test="anomaly-schedule-delay-note"]',
+      );
+      expect(delay.exists() ? delay.text() : "").toBe(note);
+    },
+  );
+
+  it("offers the Builder / SQL toggle from the start, and SQL switches to custom SQL", async () => {
+    const { w, config } = mountSectioned();
+    await flushPromises();
+    await w.find('[data-test="anomaly-query-tab-custom_sql"]').trigger("click");
+    await flushPromises();
+    expect(config.query_mode).toBe("custom_sql");
+  });
+
+  it.each<[string, string]>([["add-alert-add-anomalyRetrain", "anomaly-retrain-every-row"]])(
+    "%s adds its row in place",
+    async (link, row) => {
+      const { w } = mountSectioned();
+      await flushPromises();
+      expect(w.find(`[data-test="${row}"]`).exists()).toBe(false);
+      await w.find(`[data-test="${link}"]`).trigger("click");
+      await flushPromises();
+      expect(w.find(`[data-test="${row}"]`).exists()).toBe(true);
+      expect(w.find(`[data-test="${link}"]`).exists()).toBe(false);
+    },
+  );
+
+  it("keeps the generated SQL behind More options", async () => {
+    const { w, tiers } = mountSectioned();
+    await flushPromises();
+    expect(w.find('[data-test="anomaly-sql-preview-row"]').exists()).toBe(false);
+    tiers.reveal("anomalySqlPreview");
+    await flushPromises();
+    expect(w.find('[data-test="anomaly-sql-preview-row"]').exists()).toBe(true);
   });
 });
 
@@ -1582,7 +1769,7 @@ describe("anomalyWindowShareErrors", () => {
   });
 
   it.each([0, -5, 100.1])("rejects a fire share of %s", (n) => {
-    expect(errors({ alert_window_fire_pct: n }).fire).toBe("alerts.anomaly.windowFireRange");
+    expect(errors({ alert_window_fire_pct: n }).fire).toBe("alerts.anomaly.windowFireCountRange");
   });
 
   it("rejects a window longer than 24h of buckets", () => {
@@ -1609,13 +1796,53 @@ describe("anomalyWindowShareErrors", () => {
 
   it("rejects a recover share above fire, or of zero", () => {
     expect(errors({ alert_window_fire_pct: 50, alert_window_recover_pct: 60 }).recover).toBe(
-      "alerts.anomaly.windowRecoverRange",
+      "alerts.anomaly.windowRecoverCountRange",
     );
     expect(errors({ alert_window_recover_pct: 0 }).recover).toBe(
-      "alerts.anomaly.windowRecoverRange",
+      "alerts.anomaly.windowRecoverCountRange",
     );
     // A blank fire share is 100, so recover may go up to it.
     expect(errors({ alert_window_recover_pct: 100 }).recover).toBeNull();
+  });
+});
+
+// The server fires at count × 100 / buckets >= fire %, so the form's counts round-trip exactly.
+describe("anomalyWindowCounts", () => {
+  it.each([
+    [1, 1],
+    [1, 3],
+    [2, 3],
+    [3, 7],
+    [4, 5],
+  ])("%s of the last %s survives the stored percent", (count, buckets) => {
+    const pct = anomalyWindowPct(count, buckets);
+    const cfg = { alert_window_buckets: buckets, alert_window_fire_pct: pct };
+    expect(anomalyWindowCounts(cfg).fire).toBe(count);
+  });
+
+  it("reads a stored share as the count the server needs: 80% of 3 is 3, recovery below 40% is 2", () => {
+    expect(
+      anomalyWindowCounts({
+        alert_window_buckets: 3,
+        alert_window_fire_pct: 80,
+        alert_window_recover_pct: 40,
+      }),
+    ).toEqual({ buckets: 3, fire: 3, recover: 2 });
+  });
+});
+
+// Mirrors trainer.rs: it reads max(window, 21) days, trains on what the stream has, and needs 100 measures.
+describe("anomalyTrainingFact", () => {
+  it.each([
+    [7, undefined, 300, { kind: "reads", days: 21 }],
+    [28, 40, 300, { kind: "reads", days: 28 }],
+    [15, 15, 300, { kind: "has", days: 15 }],
+    [28, 2, 300, { kind: "flat", days: 2 }],
+    [28, 2, 7200, { kind: "has", days: 2 }],
+    [28, 0, 300, { kind: "waits", measures: 100, minutes: 540 }],
+    [28, 0, 30, { kind: "waits", measures: 100, minutes: 50 }],
+  ])("window %s, stream %s days, %ss measures", (window, days, measure, fact) => {
+    expect(anomalyTrainingFact(window, days, measure)).toEqual(fact);
   });
 });
 

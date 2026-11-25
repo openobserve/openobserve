@@ -15,7 +15,9 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildPrefillFromLibrary } from "./fromLibrary";
+import { buildPrefillFromLibrary, buildPrefillFromSuggestion } from "./fromLibrary";
+import suggestionsLogs from "@/test/fixtures/alerts/suggestions-logs.json";
+import type { LibrarySuggestion } from "../librarySuggest.types";
 import { ALERT_PREFILL_VERSION } from "@/ts/interfaces/alertPrefill";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 
@@ -87,6 +89,21 @@ describe("buildPrefillFromLibrary", () => {
     expect(prefill.sql).toBeUndefined();
   });
 
+  it.each([
+    ['1 - (avg without (cpu) (rate(x{mode="idle"}[5m])))', 1, true],
+    ["sum by (host) (rate(x[5m])) > 3", 1, true],
+    ["sum(rate(x[5m])) by (host)", 1, true],
+    ["rate(x[5m])", 1, true],
+    ["avg without (cpu) (x)", 3, undefined],
+    ["sum(rate(x[5m])) / sum(rate(y[5m]))", 1, undefined],
+    ["histogram_quantile(0.95, sum by (le) (rate(x_bucket[5m])))", 1, undefined],
+  ])("%s at %s series: opens one per series %s", (promql, threshold, perSeries) => {
+    const file = promqlFile();
+    (file.query_condition as any).promql = promql;
+    file.trigger_condition = { ...file.trigger_condition, threshold };
+    expect(buildPrefillFromLibrary({ entry: entry(), file }).promqlMultiAlert).toBe(perSeries);
+  });
+
   it("carries the SQL query and leaves promqlCondition unset", () => {
     const prefill = buildPrefillFromLibrary({
       entry: entry({ query_type: "sql", stream_type: "logs" }),
@@ -97,10 +114,29 @@ describe("buildPrefillFromLibrary", () => {
     expect(prefill.promqlCondition).toBeNull();
   });
 
-  it("keeps the query byte-for-byte — this path exists BECAUSE nothing is substituted", () => {
-    const file = sqlFile();
+  const P95 = `SELECT service_name, approx_percentile_cont(duration, 0.95) / 1000.0 AS p95_ms FROM "default" GROUP BY service_name`;
+  const perGroup = {
+    multi_alert: true,
+    function: "count",
+    group_by: [],
+    having: { column: "p95_ms", operator: ">", value: 2000 },
+  };
+  it.each([
+    ["no GROUP BY", sqlFile().query_condition.sql, 1, null, null],
+    [
+      "grouped HAVING",
+      `${P95} HAVING COUNT(*) >= 50 AND approx_percentile_cont(duration, 0.95) > 2000000`,
+      1,
+      `${P95} HAVING COUNT(*) >= 50 ORDER BY p95_ms DESC`,
+      perGroup,
+    ],
+    ["grouped, fires on 3 rows", `${P95} HAVING COUNT(*) >= 50`, 3, null, null],
+  ])("%s: the query opens as written or per group", (_, sql, threshold, perGroupSql, agg) => {
+    const file = { ...sqlFile(), trigger_condition: { operator: ">=", threshold } };
+    (file.query_condition as any).sql = sql;
     const prefill = buildPrefillFromLibrary({ entry: entry({ query_type: "sql" }), file });
-    expect(prefill.sql).toBe((file.query_condition as any).sql);
+    expect(prefill.sql).toBe(perGroupSql ?? sql);
+    expect(prefill.aggregation ?? null).toEqual(agg);
   });
 
   it("maps the stream from the file, which is what the query actually reads", () => {
@@ -180,5 +216,21 @@ describe("buildPrefillFromLibrary", () => {
   it("is pure — the same input yields an equal, independent object", () => {
     const input = { entry: entry(), file: promqlFile() };
     expect(buildPrefillFromLibrary(input)).toEqual(buildPrefillFromLibrary(input));
+  });
+
+  it("seeds a suggestion from its server-swapped query, with the entry's provenance", () => {
+    const suggestion = suggestionsLogs.suggestions[0] as unknown as LibrarySuggestion;
+    const prefill = buildPrefillFromSuggestion(suggestion);
+    expect(prefill).toMatchObject({
+      source: "library",
+      sourceLabel: "OOM killing events",
+      name: "oom_killing_events",
+      streamName: "app_logs",
+      queryType: "sql",
+      sql: suggestion.prefill.query_condition?.sql,
+      periodMinutes: 5,
+      silenceMinutes: 30,
+      meta: { libraryId: "k8s/oom_killing_events", contentHash: "3f2a9c1d", pack: "k8s" },
+    });
   });
 });

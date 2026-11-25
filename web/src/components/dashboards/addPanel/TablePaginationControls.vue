@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { getIntlLocale } from "@/locales";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only as a param type in a template inline handler, which eslint-plugin-vue cannot see; vue-tsc keeps it honest
@@ -134,18 +135,24 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const countDisplay = computed(() => {
       const { showPagination, pagination, totalRows } = props;
-      if (totalRows === 0) return t("dashboard.dashboards.paginationEmpty");
+      // An empty table says so in its body; "0 of 0" under it adds nothing.
+      if (totalRows === 0) return raw("");
+      const n = (value: number) => new Intl.NumberFormat(getIntlLocale()).format(value);
       if (!showPagination || pagination.rowsPerPage === 0) {
         return t("dashboard.dashboards.paginationRange", {
-          start: 1,
-          end: totalRows,
-          total: totalRows,
+          start: n(1),
+          end: n(totalRows),
+          total: n(totalRows),
         });
       }
 
       const start = (pagination.page - 1) * pagination.rowsPerPage + 1;
       const end = Math.min(pagination.page * pagination.rowsPerPage, totalRows);
-      return t("dashboard.dashboards.paginationRange", { start, end, total: totalRows });
+      return t("dashboard.dashboards.paginationRange", {
+        start: n(start),
+        end: n(end),
+        total: n(totalRows),
+      });
     });
 
     const formattedPaginationOptions = computed(() => {

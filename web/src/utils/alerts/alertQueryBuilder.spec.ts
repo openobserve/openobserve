@@ -13,7 +13,8 @@
 // limitations under the License.
 
 import { describe, it, expect } from "vitest";
-import { getFormattedCondition, generateSqlQuery } from "./alertQueryBuilder";
+import { getFormattedCondition, generateSqlQuery, groupByChoices } from "./alertQueryBuilder";
+import { raw } from "@/types/i18n";
 
 describe("alertQueryBuilder", () => {
   describe("getFormattedCondition", () => {
@@ -83,5 +84,33 @@ describe("alertQueryBuilder", () => {
       expect(query).toContain("avg(response_time)");
       expect(query).toContain("zo_sql_val");
     });
+  });
+});
+
+describe("groupByChoices", () => {
+  const cols = ["_timestamp", "__name__", "pod", "__hash__", "le"].map((value) => ({
+    label: value,
+    value,
+  }));
+  const choose = (streamType: string, selected: string[] = [], ranked: string[] = []) =>
+    groupByChoices(cols, {
+      streamType,
+      selected,
+      seriesLabel: raw("Series"),
+      timestamp: "_timestamp",
+      ranked,
+    }).map((c) => `${c.value}:${c.label}`);
+  it.each([
+    ["metrics", [], [], ["__hash__:Series", "pod:pod"]],
+    ["logs", [], [], ["__name__:__name__", "pod:pod", "__hash__:__hash__", "le:le"]],
+    ["metrics", ["__name__"], [], ["__hash__:Series", "__name__:__name__", "pod:pod"]],
+    [
+      "logs",
+      [],
+      ["__hash__", "gone", "pod"],
+      ["__hash__:__hash__", "pod:pod", "__name__:__name__", "le:le"],
+    ],
+  ])("offers a %s stream (saved %j, ranked %j) %j", (streamType, selected, ranked, shown) => {
+    expect(choose(streamType, selected, ranked)).toEqual(shown);
   });
 });

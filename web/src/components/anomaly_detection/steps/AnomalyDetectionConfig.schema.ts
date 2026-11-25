@@ -159,6 +159,38 @@ export const ANOMALY_BAND_GROUPING_KEYS: Record<string, string> = {
 /** The trainer fetches at least this many days of history, whatever the configured window. */
 export const ANOMALY_MIN_TRAINING_DAYS = 21;
 
+/** Closed measures training needs before it fits (`O2_ANOMALY_MIN_TRAINING_DATA_POINTS` default). */
+export const ANOMALY_MIN_TRAINING_MEASURES = 100;
+
+/** Days of data before the normal level follows the hour of day. */
+export const ANOMALY_HOURLY_PATTERN_DAYS = 3;
+
+/** What training will learn from, given the stream's whole days of data (undefined while unknown). */
+export type AnomalyTrainingFact =
+  | { kind: "reads"; days: number }
+  | { kind: "has"; days: number }
+  | { kind: "flat"; days: number }
+  | { kind: "waits"; measures: number; minutes: number };
+
+export function anomalyTrainingFact(
+  windowDays: number,
+  streamDays: number | undefined,
+  measureSeconds: number | null,
+): AnomalyTrainingFact {
+  const reads = Math.max(Number(windowDays) || 1, ANOMALY_MIN_TRAINING_DAYS);
+  if (streamDays === undefined || streamDays >= reads) return { kind: "reads", days: reads };
+  const hourly = anomalyBandGrouping(measureSeconds) === "weekend_hour";
+  if (streamDays >= ANOMALY_HOURLY_PATTERN_DAYS || (streamDays >= 1 && !hourly))
+    return { kind: "has", days: streamDays };
+  if (streamDays >= 1) return { kind: "flat", days: streamDays };
+  const minutes = (ANOMALY_MIN_TRAINING_MEASURES * (measureSeconds || 300)) / 60;
+  return {
+    kind: "waits",
+    measures: ANOMALY_MIN_TRAINING_MEASURES,
+    minutes: minutes > 60 ? Math.ceil(minutes / 60) * 60 : Math.ceil(minutes),
+  };
+}
+
 /** The grouping the trainer picks (absence.rs `slot_resolution_for`): weekday/weekend × hour, unless a bucket is coarser than 1h. */
 export const anomalyBandGrouping = (intervalSeconds: number | null): AnomalyBandGrouping =>
   intervalSeconds !== null && intervalSeconds > 3600 ? "global" : "weekend_hour";
@@ -512,6 +544,19 @@ export const anomalyWindowShareEffective = (
   };
 };
 
+/** The window share as whole counts of the last N measures: the server fires at count × 100 / N ≥ fire %. */
+export const anomalyWindowCounts = (
+  cfg: Record<string, any> | null | undefined,
+): { buckets: number; fire: number; recover: number } => {
+  const { buckets, fire, recover } = anomalyWindowShareEffective(cfg);
+  // The epsilon absorbs float drift: 1 × 100 / 3 × 3 / 100 is a hair above 1.
+  const count = (pct: number) => Math.ceil((pct * buckets) / 100 - 1e-9);
+  return { buckets, fire: count(fire), recover: count(recover) };
+};
+
+/** The percent stored for "count of the last N", computed as the server computes its share. */
+export const anomalyWindowPct = (count: number, buckets: number): number => (count * 100) / buckets;
+
 /** Locale keys for the window-share inputs that break the server's rules; null where the value is valid. */
 export const anomalyWindowShareErrors = (
   cfg: Record<string, any> | null | undefined,
@@ -544,8 +589,8 @@ export const anomalyWindowShareErrors = (
       : spanOk
         ? null
         : "alerts.anomaly.windowBucketsSpan",
-    fire: fireOk ? null : "alerts.anomaly.windowFireRange",
-    recover: recoverOk ? null : "alerts.anomaly.windowRecoverRange",
+    fire: fireOk ? null : "alerts.anomaly.windowFireCountRange",
+    recover: recoverOk ? null : "alerts.anomaly.windowRecoverCountRange",
   };
 };
 

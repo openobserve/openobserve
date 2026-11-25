@@ -15,16 +15,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="chartPanelRef" class="border-border-default relative flex h-full flex-col border">
-    <!-- Chart -->
-    <div data-test="alert-preview-chart" class="preview-alert-chart min-h-0 flex-1 p-4">
+  <div
+    ref="chartPanelRef"
+    class="relative flex h-full flex-col"
+    :class="rangeTarget === undefined && 'border-border-default border'"
+  >
+    <Teleport v-if="rangeTarget !== null" :to="rangeTarget ?? 'body'" :disabled="!rangeTarget">
+      <div :class="rangeTarget ? 'contents' : 'flex shrink-0 justify-end px-2 pt-2'">
+        <OToggleGroup
+          :model-value="shownRange"
+          :aria-label="t('alerts.form.preview.range')"
+          data-test="alert-preview-range"
+          @update:model-value="onRangePick"
+        >
+          <OToggleGroupItem
+            v-for="option in previewRangeOptions"
+            :key="option.value"
+            :value="option.value"
+            size="xs"
+            :tooltip="option.tooltip"
+            :aria-label="option.tooltip"
+            :data-test="`alert-preview-range-${option.value}`"
+          >
+            {{ option.label }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </div>
+    </Teleport>
+    <OTruncatedText
+      v-if="showChartKey && chartCaption && !testOpen"
+      :lines="3"
+      class="text-text-secondary shrink-0 px-4 pt-1 text-xs wrap-anywhere"
+      data-test="alert-preview-caption"
+      >{{ chartCaption }}</OTruncatedText
+    >
+    <!-- Under Test it the chart stays mounted, out of the flow: a PromQL preview runs only from its watchers. -->
+    <div
+      data-test="alert-preview-chart"
+      class="preview-alert-chart isolate min-h-0 flex-1 px-4"
+      :class="[
+        showChartKey ? 'pb-1' : 'pb-4',
+        testOpen ? 'invisible absolute inset-0' : 'relative',
+      ]"
+      :aria-hidden="testOpen || undefined"
+    >
       <!-- Empty query placeholder -->
-      <div
-        v-if="!query && (selectedTab === 'sql' || selectedTab === 'promql')"
-        class="flex h-full flex-col items-center justify-center gap-2"
-      >
+      <div v-if="awaitsQuery" class="flex h-full flex-col items-center justify-center gap-2">
         <OIcon name="edit" size="xl" class="opacity-20" />
-        <span class="text-text-secondary text-sm">{{ t("alerts.writeQueryToSeePreview") }}</span>
+        <span class="text-text-secondary text-sm">{{ awaitsQueryText }}</span>
       </div>
       <PanelSchemaRenderer
         ref="panelRendererRef"
@@ -37,9 +75,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :searchType="searchTypeForPanel"
         :is_ui_histogram="shouldUseHistogram"
         @result-metadata-update="handleChartDataUpdate"
-        @series-data-update="handleSeriesDataUpdate"
+        @series-data-update="onSeriesData"
+        @error="onPreviewError"
+        @loading-state-change="onPreviewLoading"
       />
+      <OEmptyState
+        v-if="!awaitsQuery && !shownChartError && emptyChartText"
+        class="bg-surface-base absolute! inset-0 h-full min-h-0! w-full"
+        size="inline"
+        icon="bar-chart"
+        :title="t('panel.noData')"
+        :description="emptyChartText"
+        :backdrop="false"
+        data-test="alert-preview-no-series"
+      />
+      <QueryErrorState
+        v-if="!awaitsQuery && shownChartError"
+        class="bg-surface-base absolute inset-0 overflow-y-auto"
+        size="block"
+        :error-msg="shownChartError.message"
+        :title="shownChartError.title"
+        :query="query"
+      >
+        <template #actions />
+      </QueryErrorState>
     </div>
+    <div
+      v-if="showChartKey && !testOpen"
+      class="text-text-secondary flex min-h-5 shrink-0 flex-wrap items-center gap-x-3 gap-y-0.5 px-4 pb-1 text-xs"
+      data-test="alert-preview-key"
+    >
+      <span
+        v-for="limit in limitKeys"
+        :key="limit.level"
+        class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap"
+        :data-test="
+          limit.level === 'critical' ? 'alert-preview-limit-key' : 'alert-preview-warning-key'
+        "
+      >
+        <span
+          aria-hidden="true"
+          class="w-4 border-t-2 border-dashed"
+          :class="
+            limit.level === 'critical' ? 'border-status-error-text' : 'border-status-warning-text'
+          "
+        />
+        {{ limit.label }}
+      </span>
+      <span class="ms-auto flex min-w-0 items-center gap-3">
+        <OTruncatedText
+          v-if="seriesCountText"
+          class="min-w-0"
+          data-test="alert-preview-series-count"
+        >
+          {{ seriesCountText }}
+        </OTruncatedText>
+        <span
+          v-if="testable && testGapText"
+          :id="testGapId"
+          class="shrink-0"
+          data-test="alert-preview-test-it-reason"
+          >{{ testGapText }}</span
+        >
+        <OButton
+          v-if="testable"
+          ref="testItButton"
+          variant="link"
+          size="xs"
+          class="shrink-0"
+          :disabled="!!testGap"
+          :focusable-unavailable="!!testGap"
+          :description-id="testGapId"
+          :loading="testRun.state.value === 'running'"
+          data-test="alert-preview-test-it"
+          @click="testOpen = true"
+        >
+          {{ t("alerts.testRun.action") }}
+        </OButton>
+      </span>
+    </div>
+    <AlertTestRun
+      v-if="testOpen && testable"
+      :body="testBody"
+      :blocked-reason="testGapText"
+      :baseline-empty="baselineEmptyText"
+      :preview-peak="previewPeak"
+      :folder="testFolder"
+      :destinations="formData.destinations ?? []"
+      :template="formData.template || null"
+      @close="closeTest"
+    />
   </div>
 </template>
 
@@ -47,19 +172,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   ref,
   watch,
+  inject,
   onMounted,
   computed,
   nextTick,
   reactive,
   onBeforeMount,
   onBeforeUnmount,
+  useId,
+  type PropType,
 } from "vue";
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
+import { seriesValueRange, type ValueRange } from "@/utils/alerts/ratioThreshold";
+import { keyToMs } from "@/utils/alerts/alertBacktest";
+import { previewCaption } from "@/utils/alerts/previewCaption";
 import {
+  CONDITION_GAP_KEYS,
+  conditionGap,
+  isCountLimit,
+  isSpanDurationMeasure,
+  previewCountText,
+} from "@/utils/alerts/alertReadBack";
+import { durationText, durationWords, formatNumber, thresholdSide } from "@/utils/alerts/alertCopy";
+import { filterNotSeenText } from "@/composables/alerts/useStreamDiscovery";
+import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
+import {
+  evaluateAlertBody,
+  promqlPreviewStepSeconds,
+  seriesPeak,
+  testRunKey,
+  testValueText,
+  type PreviewPeak,
+} from "@/utils/alerts/alertTestRun";
+import { useAlertTestRun } from "@/composables/alerts/useAlertTestRun";
+import AlertTestRun from "./AlertTestRun.vue";
+import {
+  chartUnit,
+  gaugeValueUnit,
+  promqlValueUnit,
+  type MetricMeta,
+} from "@/utils/alerts/alertValueUnit";
+import { noSeriesReason, noSeriesSentence, selectorsOf } from "@/utils/alerts/promqlNoSeries";
+import { promqlDaySeriesQuery, promqlParseTreeQuery } from "@/services/alert_preview.queries";
+import useStreams from "@/composables/useStreams";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import {
+  buildCountChartQuery,
   cleanAggregationQuery,
   getDefaultDashboardPanelData,
+  groupColumns,
+  withHistogramMinutes,
+  withoutTimeBucket,
 } from "@/utils/alerts/aggregationPreviewQuery";
+import { comparisonOffsetText, comparisonWindows } from "@/utils/alerts/previewCompare";
+import { compareRule } from "@/utils/alerts/alertIntents";
+import { getIntlLocale } from "@/locales";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
 import { cloneDeep, debounce } from "lodash-es";
 import { useStore } from "vuex";
@@ -67,8 +236,14 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import searchService from "@/services/search";
 import { promRulePreviewQuery } from "@/services/alerts.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { b64EncodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
+import { b64EncodeUnicode, generateTraceContext, smartDecodeVrlFunction } from "@/utils/zincutils";
+import useHttpStreaming from "@/composables/useStreamingSearch";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import QueryErrorState from "@/components/common/QueryErrorState.vue";
+import { routeLocationKey } from "vue-router";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
 let dashboardPanelData: any = null;
 
@@ -97,6 +272,16 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Opt-in: names the limit lines in a key under the chart.
+  labelledLimit: {
+    type: Boolean,
+    default: false,
+  },
+  // Where the range buttons go: unset keeps them above the chart, null waits for the host's element.
+  rangeTarget: {
+    type: Object as PropType<HTMLElement | null>,
+    default: undefined,
+  },
 });
 
 // SQL tab's Multi Alert value-column dropdown (sql_simple_multi_alert_fe_prd.md
@@ -105,6 +290,8 @@ const props = defineProps({
 // lockstep with "the preview query firing", not on a different cadence.
 const emit = defineEmits<{
   (e: "schema-updated", payload: { projections: string[]; hasHaving: boolean }): void;
+  (e: "value-range", range: ValueRange | null): void;
+  (e: "test-open", open: boolean): void;
 }>();
 
 // Strip axis labels from field config so ECharts doesn't render axis titles
@@ -116,6 +303,39 @@ const clearFieldLabels = (data: any) => {
   data.queries[0].fields.y.forEach((f: any) => {
     f.label = "";
   });
+};
+
+const hasLimitValue = (v: unknown): boolean => v !== undefined && v !== null && v !== "";
+// 0 stays a gate the backend honours (`<= 0` fires on no series); the form still asks for 1 or more.
+const isPreviewCountLimit = (v: unknown): boolean =>
+  isCountLimit(v) ||
+  ((typeof v === "number" || typeof v === "string") && String(v).trim() !== "" && Number(v) === 0);
+
+// "One per <column>" on SQL: each row is a group, judged on one of its columns, not on the row count.
+const sqlPerGroup = (): boolean =>
+  props.selectedTab === "sql" &&
+  !!props.formData.query_condition?.aggregation?.multi_alert &&
+  hasLimitValue(props.formData.query_condition?.aggregation?.having?.column);
+
+/** The limits the current mode draws; a count limit that needs fixing draws none. */
+// Warning comes from the critical's family (aggregate value or count), or it lands on the wrong scale.
+const currentLimits = (): [unknown, unknown] => {
+  // A real-time alert fires per event, so it has no count to draw a limit for.
+  if (props.formData.is_real_time === "true") return [undefined, undefined];
+  const qc = props.formData.query_condition;
+  const tc = props.formData.trigger_condition;
+  if (props.selectedTab === "promql") {
+    return [qc?.promql_condition?.value, qc?.promql_warning_value];
+  }
+  const aggregation = qc?.aggregation;
+  // A value alert compares the measure, never the count, so a blank value draws no line.
+  if (props.selectedTab === "custom" && props.isAggregationEnabled) {
+    return hasLimitValue(aggregation?.having?.value)
+      ? [aggregation.having.value, aggregation.warning_value]
+      : [undefined, undefined];
+  }
+  if (sqlPerGroup()) return [aggregation.having.value, aggregation.warning_value];
+  return [isPreviewCountLimit(tc?.threshold) ? tc.threshold : undefined, tc?.warning_threshold];
 };
 
 /**
@@ -133,9 +353,27 @@ const clearFieldLabels = (data: any) => {
  * drop the headroom it asked for, or the chart keeps scaling to a line it is no
  * longer drawing.
  */
-const applyThresholds = (critical: unknown, warning: unknown): void => {
-  const markLines = buildThresholdMarkLines(critical, warning);
+const applyThresholds = (): void => {
+  const [critical, warning] = currentLimits();
+  drawnLimits.value = [
+    ...(hasLimitValue(critical) ? [{ level: "critical" as const, value: critical }] : []),
+    ...(hasLimitValue(warning) ? [{ level: "warning" as const, value: warning }] : []),
+  ];
+  // A label on the line sits over the series it crosses; the key under the chart names it instead.
+  const markLines = buildThresholdMarkLines(critical, warning, {
+    critical: t("alerts.plain.limitLine"),
+    warning: t("alerts.plain.warnLine"),
+  }).map((line) => ({ ...line, show_label: false }));
   const bounds = thresholdAxisBounds(markLines);
+  const unit = chartUnit(valueUnit.value);
+  dashboardPanelData.data.config.unit = unit.unit;
+  dashboardPanelData.data.config.unit_custom = unit.unitCustom;
+  // Counted events are whole numbers; an axis of "180.00" reads as a measurement.
+  const counts =
+    !props.isAggregationEnabled ||
+    ["count", "total_events"].includes(props.formData.query_condition?.aggregation?.function);
+  dashboardPanelData.data.config.decimals =
+    props.selectedTab === "custom" && counts ? 0 : undefined;
   dashboardPanelData.data.config.mark_line = markLines;
   dashboardPanelData.data.config.y_axis_min = bounds.y_axis_min;
   dashboardPanelData.data.config.y_axis_max = bounds.y_axis_max;
@@ -143,7 +381,8 @@ const applyThresholds = (critical: unknown, warning: unknown): void => {
 
 // Helper function to get decoded VRL function
 const getDecodedVrlFunction = (): string | null => {
-  if (!props.formData.query_condition?.vrl_function) {
+  // A compare alert's function reads the past windows' rows, which the preview's one search lacks.
+  if (!props.formData.query_condition?.vrl_function || comparisons.value.length) {
     return null;
   }
   // Use smart decoder to handle both single and double-encoded VRL
@@ -163,22 +402,379 @@ onBeforeMount(() => {
     props.selectedTab === "sql" && props.formData.query_condition?.vrl_function ? true : false;
   // Give y-axis labels enough room so they don't collide with the chart
   dashboardPanelData.data.config.unit = "numbers";
+  // At the panel's width a legend pages from three series; the key counts them, the tooltip names them.
+  dashboardPanelData.data.config.show_legends = false;
   dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
   dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
   dashboardPanelData.data.queries[0].customQuery = true;
+  // The preview draws its own error state; the renderer's is the dashboards' neutral one.
+  dashboardPanelData.data.error_config = { custom_error_handeling: true };
 });
 
 const chartPanelRef = ref(null);
 const panelRendererRef = ref(null);
-const chartData = ref({});
+const chartData = ref<Record<string, any> | null>({});
 const selectedTimeObj = ref({});
 const evaluationStatus = ref<{
   wouldTrigger: boolean;
   reason: string;
+  count?: number;
+  atLeast?: boolean;
+  label?: string;
+  grouped?: boolean;
+  total?: number;
+  value?: number;
+  windowMinutes?: number;
+  /** The preview cannot judge this alert, so the reason is said as it is, in this tone. */
+  note?: "note" | "warn";
 } | null>(null);
 const { t } = useI18nTyped();
+// The renderer's last run outcome; an empty message means it answered. Results it emits after
+// an error are not this query's, so the handlers skip them.
+const previewError = ref<{ message?: string; code?: string | number } | null>(null);
+// The wide-range verdict search fails on its own; its error withdraws the verdict the same way.
+const verdictSearchError = ref<{ message?: string; code?: string | number } | null>(null);
+watch([previewError, verdictSearchError], (errors) => {
+  if (errors.some((error) => error?.message)) evaluationStatus.value = null;
+});
+// A run clears the renderer's error as it starts; the summary keeps it until that run answers.
+const settledPreviewError = ref<{ message?: string; code?: string | number } | null>(null);
+let previewLoading = false;
+const onPreviewError = (error: { message?: string; code?: string | number } | null) => {
+  previewError.value = error;
+  if (error?.message || !previewLoading) settledPreviewError.value = error;
+};
+// A streamed result arrives in parts; its counts and verdict are written once, from the settled part.
+let unsettledSeries: unknown = null;
+const onSeriesData = (seriesData: unknown) => {
+  if (previewLoading) {
+    unsettledSeries = seriesData;
+    return;
+  }
+  unsettledSeries = null;
+  handleSeriesDataUpdate(seriesData);
+};
+// Set once a builder run settles on the renderer's own "No Data", so the chart can say why.
+const filterDrewNothing = ref(false);
+const onPreviewLoading = (loading: boolean) => {
+  previewLoading = loading;
+  if (!loading && unsettledSeries) {
+    const settled = unsettledSeries;
+    unsettledSeries = null;
+    handleSeriesDataUpdate(settled);
+  }
+  if (!loading) settledPreviewError.value = previewError.value;
+  filterDrewNothing.value =
+    !loading &&
+    props.selectedTab === "custom" &&
+    (panelRendererRef.value as { noData?: string } | null)?.noData === "No Data";
+};
+// Only a 4xx message is about the query; anything else says the data could not be loaded.
+const shownChartError = computed(() => {
+  const error = settledPreviewError.value;
+  if (!error?.message) return null;
+  return String(error.code ?? "").startsWith("4")
+    ? { message: error.message, title: undefined }
+    : { message: "", title: t("common.errorLoadingData") };
+});
 
 const store = useStore();
+
+const { getStream } = useStreams(t);
+const metricMeta = ref<MetricMeta | null>(null);
+watch(
+  () => [props.formData.stream_name, props.formData.stream_type] as const,
+  async ([name, type]) => {
+    metricMeta.value = null;
+    if (type !== "metrics" || !name) return;
+    try {
+      const stream = await getStream(name, "metrics", false);
+      if (props.formData.stream_name !== name) return;
+      const meta = stream?.metrics_meta ?? {};
+      metricMeta.value = { name, type: meta.metric_type, unit: meta.unit };
+    } catch {
+      // Without the stream's metadata the axis stays unitless.
+    }
+  },
+  { immediate: true },
+);
+// A forecast or a rule draws other numbers than the metric's values.
+const valueUnit = computed((): string | null => {
+  const qc = props.formData.query_condition;
+  if (
+    props.selectedTab === "custom" &&
+    props.isAggregationEnabled &&
+    isSpanDurationMeasure(
+      props.formData.stream_type,
+      qc?.aggregation?.function,
+      qc?.aggregation?.having?.column,
+    )
+  )
+    return "microseconds";
+  const agg = qc?.aggregation;
+  if (
+    props.selectedTab === "custom" &&
+    props.isAggregationEnabled &&
+    metricMeta.value &&
+    agg?.having?.column === "value" &&
+    !["count", "total_events"].includes(agg.function)
+  )
+    return gaugeValueUnit(metricMeta.value);
+  if (props.selectedTab !== "promql" || !metricMeta.value || qc?.promql_rule_mode) return null;
+  if (props.formData._ui?.forecast) return null;
+  return promqlValueUnit(props.query, metricMeta.value);
+});
+
+// Test it: the dry run of the alert as it stands; anomaly, composite and SLO alerts can't be run yet.
+const testRun = useAlertTestRun();
+const route = inject(routeLocationKey, null);
+const testFolder = computed(() => {
+  const folder = route?.query?.folder;
+  return typeof folder === "string" && folder ? folder : "default";
+});
+const testable = computed(
+  () =>
+    !!props.formData.stream_name &&
+    props.selectedTab !== "slo" &&
+    props.formData.is_real_time !== "composite" &&
+    !["anomaly_detection", "composite"].includes(props.formData.alert_type),
+);
+// Test it judges a rule, so an unfinished condition holds it with the step's own reason.
+const testGap = computed(() =>
+  props.formData.is_real_time === "true"
+    ? null
+    : conditionGap(props.formData as any, { aggregationEnabled: props.isAggregationEnabled }),
+);
+const testGapText = computed(() => (testGap.value ? t(CONDITION_GAP_KEYS[testGap.value]) : null));
+const testGapId = `${useId()}-test-reason`;
+const testBody = computed(() => {
+  if (!testable.value || testGap.value) return null;
+  try {
+    return evaluateAlertBody(props.formData as any, {
+      store,
+      isAggregationEnabled: { value: props.isAggregationEnabled },
+      getSelectedTab: { value: props.selectedTab },
+    });
+  } catch {
+    // A form still loading has no body to test.
+    return null;
+  }
+});
+watch(
+  testBody,
+  (body) => {
+    testRun.currentKey.value = body ? testRunKey(body) : null;
+  },
+  { immediate: true },
+);
+// Once the preview is gone (anomaly, composite), no answer stands for the alert any more.
+onBeforeUnmount(() => {
+  testRun.currentKey.value = null;
+});
+const testOpen = ref(false);
+// Test it's answer takes the chart's place and can be taller, so the host lets the box grow.
+watch(testOpen, (open) => emit("test-open", open));
+const testItButton = ref<{ $el: HTMLElement } | null>(null);
+// The panel covers Test it, so closing it hands focus back to the button that opened it.
+const closeTest = async () => {
+  testOpen.value = false;
+  await nextTick();
+  testItButton.value?.$el?.focus();
+};
+
+type PreviewRange = "checks" | "12h" | "24h";
+const PREVIEW_RANGE_KEY = "o2_alert_preview_range";
+const PREVIEW_RANGE_MINUTES: Record<Exclude<PreviewRange, "checks">, number> = {
+  "12h": 720,
+  "24h": 1440,
+};
+const readPreviewRange = (): PreviewRange => {
+  try {
+    const saved = sessionStorage.getItem(PREVIEW_RANGE_KEY);
+    return saved === "12h" || saved === "24h" ? saved : "checks";
+  } catch {
+    return "checks";
+  }
+};
+// The range only changes what the preview shows; it is never part of the alert.
+const previewRange = ref<PreviewRange>(readPreviewRange());
+watch(previewRange, (range) => {
+  try {
+    sessionStorage.setItem(PREVIEW_RANGE_KEY, range);
+  } catch {
+    // Private windows refuse storage; the choice then lasts as long as the page.
+  }
+});
+// An org-wide preview range set by the admin replaces "the last 3 checks".
+const orgPreviewMinutes = (): number =>
+  Number(store.state.zoConfig?.alert_preview_timerange_minutes) || 0;
+const alertWindowMinutes = (): number => Number(props.formData.trigger_condition?.period) || 0;
+// Over a whole range a per-group query is one row per group, filtered by its HAVING, so the chart
+// draws each group's value per look-back window instead, with nothing filtered out.
+const sqlGroupChartQuery = computed((): string | null => {
+  if (!sqlPerGroup() || !props.query) return null;
+  if (comparisonWindows(props.formData.query_condition?.multi_time_range).length) return null;
+  if (props.formData.query_condition?.vrl_function || alertWindowMinutes() <= 0) return null;
+  if (/\bhistogram\(/i.test(props.query)) return null;
+  return withHistogramMinutes(cleanAggregationQuery(props.query), alertWindowMinutes());
+});
+// A SQL verdict counts the rows the query returns, which only one window can give; a builder
+// chart draws one point per window, so it shows a dozen of them, never more than a day.
+const previewChecks = computed(() => {
+  if (props.selectedTab === "sql" && !sqlGroupChartQuery.value) return 1;
+  if (props.selectedTab !== "custom" || props.formData.is_real_time === "true") return 3;
+  return Math.min(12, Math.max(3, Math.floor(1440 / Math.max(alertWindowMinutes(), 1))));
+});
+const previewMinutesFor = (range: PreviewRange): number => {
+  if (range !== "checks") return PREVIEW_RANGE_MINUTES[range];
+  if (orgPreviewMinutes() > 0) return orgPreviewMinutes();
+  return Math.max(previewChecks.value * alertWindowMinutes(), 5);
+};
+const previewMinutes = (): number => previewMinutesFor(shownRange.value);
+// The chart's buckets never line up with the latest window (SQL counts rows, a builder point is one
+// clock-aligned window), so the verdict comes from one extra search over that window alone.
+const verdictNeedsOwnSearch = (): boolean => {
+  if (props.formData.is_real_time === "true" || props.selectedTab === "promql") return false;
+  if (alertWindowMinutes() <= 0) return false;
+  if (props.selectedTab === "sql") return previewMinutes() > alertWindowMinutes();
+  return props.selectedTab === "custom";
+};
+// Any other bucket puts the chart on another scale than the threshold: a point is what one check sees.
+const chartBucketMinutes = (): number =>
+  props.selectedTab === "custom" && verdictNeedsOwnSearch() ? alertWindowMinutes() : 0;
+// A count chart the server would bucket itself is rewritten into one that names its bucket.
+const windowCountQuery = (): string | null => {
+  const minutes = chartBucketMinutes();
+  if (!minutes || props.isAggregationEnabled) return null;
+  const count = /\bhistogram\(/i.test(props.query)
+    ? props.query
+    : buildCountChartQuery(props.query);
+  return count ? withHistogramMinutes(count, minutes) : null;
+};
+const selfBucketed = ref(false);
+// Hours, never days, so the default reads on the same scale as 12h and 24h.
+const compactDuration = (minutes: number): I18nText => {
+  if (minutes % 60 === 0) return t("alerts.form.preview.hrCompact", { count: minutes / 60 });
+  return t("alerts.form.preview.minCompact", { count: minutes });
+};
+// "Last 3 checks" is true only when back-to-back checks tile the range: on a schedule, Check every = Look back.
+const checksTileRange = (): boolean => {
+  const tc = props.formData.trigger_condition ?? {};
+  return (
+    String(props.formData.is_real_time ?? "false") === "false" &&
+    tc.frequency_type !== "cron" &&
+    Number(tc.frequency) === alertWindowMinutes()
+  );
+};
+const defaultRangeTooltip = (minutes: number): I18nText => {
+  const checks = previewChecks.value;
+  if (orgPreviewMinutes() > 0 || !checksTileRange() || checks * alertWindowMinutes() !== minutes)
+    return t("alerts.form.preview.lastMinutes", { minutes });
+  return t("alerts.form.preview.checksSpan", { count: checks, minutes }, checks);
+};
+// A fixed range as long as the default would repeat it as a second button, so it is left out.
+const previewRangeOptions = computed(() => {
+  const defaultMinutes = previewMinutesFor("checks");
+  return [
+    {
+      value: "checks" as PreviewRange,
+      label: compactDuration(defaultMinutes),
+      tooltip: defaultRangeTooltip(defaultMinutes),
+    },
+    {
+      value: "12h" as PreviewRange,
+      label: compactDuration(720),
+      tooltip: t("alerts.form.preview.hours12"),
+    },
+    {
+      value: "24h" as PreviewRange,
+      label: compactDuration(1440),
+      tooltip: t("alerts.form.preview.hours24"),
+    },
+  ].filter(
+    (option) =>
+      option.value === "checks" ||
+      PREVIEW_RANGE_MINUTES[option.value as "12h" | "24h"] !== defaultMinutes,
+  );
+});
+const shownRange = computed<PreviewRange>(() =>
+  previewRangeOptions.value.some((option) => option.value === previewRange.value)
+    ? previewRange.value
+    : "checks",
+);
+const onRangePick = (value: unknown) => {
+  if (value === "checks" || value === "12h" || value === "24h") previewRange.value = value;
+};
+
+const drawnSeries = ref<{ shown: number; total: number } | null>(null);
+const seriesCountText = computed((): I18nText | null => {
+  const drawn = drawnSeries.value;
+  // Lines on the chart with no verdict count say the series are there and none crossed.
+  if (
+    props.selectedTab === "promql" &&
+    drawn &&
+    drawn.shown > 0 &&
+    evaluationStatus.value?.count === 0
+  )
+    return t(
+      "alerts.form.preview.seriesNoneCross",
+      { count: formatNumber(drawn.total) },
+      drawn.total,
+    );
+  if (!drawn || drawn.total <= 1) return null;
+  if (drawn.total > drawn.shown)
+    return t("alerts.form.preview.seriesShown", {
+      shown: drawn.shown.toLocaleString(),
+      total: drawn.total.toLocaleString(),
+    });
+  return t("alerts.sections.condition.series", { count: drawn.shown.toLocaleString() });
+});
+const showChartKey = computed(
+  () => !!chartData.value && !awaitsQuery.value && !shownChartError.value,
+);
+const drawnLimits = ref<{ level: "critical" | "warning"; value: unknown }[]>([]);
+const limitKeys = computed(() =>
+  props.labelledLimit
+    ? drawnLimits.value.map(({ level, value }) => {
+        const shown = !Number.isFinite(Number(value))
+          ? String(value)
+          : valueUnit.value
+            ? testValueText(Number(value), valueUnit.value, t)
+            : Number(value).toLocaleString();
+        return {
+          level,
+          label:
+            level === "critical"
+              ? t("alerts.form.preview.limitKey", { value: shown })
+              : t("alerts.form.preview.warningKey", { value: shown }),
+        };
+      })
+    : [],
+);
+
+const writesOwnQuery = computed(
+  () => props.selectedTab === "sql" || props.selectedTab === "promql",
+);
+// The renderer remounts after the prompt, so a chart kept from the last query would run that query first.
+watch(
+  () => writesOwnQuery.value && !props.query,
+  (empty) => {
+    if (!empty) return;
+    chartData.value = null;
+    previewError.value = null;
+    settledPreviewError.value = null;
+  },
+);
+const awaitsQuery = computed(() => writesOwnQuery.value && (!props.query || !chartData.value));
+// A forecast's query stays empty until its threshold is a number, so the prompt asks for that.
+const awaitsQueryText = computed((): I18nText => {
+  const forecast = props.formData._ui?.forecast;
+  const thresholdMissing =
+    forecast && String(forecast.U ?? "").trim() && !Number.isFinite(Number(forecast.T ?? NaN));
+  return thresholdMissing || (forecast && forecast.T === "")
+    ? t("alerts.forecast.previewNeedsThreshold")
+    : t("alerts.writeQueryToSeePreview");
+});
 
 // Computed property to determine if histogram should be used
 // For SQL/custom with aggregations (GROUP BY), we should use histogram
@@ -190,7 +786,7 @@ const shouldUseHistogram = computed(() => {
   }
 
   // For other modes (PromQL, custom without agg), use the prop value
-  return props.isUsingBackendSql;
+  return props.isUsingBackendSql && !selfBucketed.value;
 });
 
 // When aggregation is enabled use "dashboards" search type so the panel does not
@@ -345,7 +941,10 @@ const fetchQuerySchema = async () => {
     // We clean the query, rename zo_sql_val→zo_sql_num, and wire the fields
     // directly so we get a multi-series line chart with a threshold mark-line.
     if (props.selectedTab === "custom" && props.isAggregationEnabled) {
-      const queryForPreview = cleanAggregationQuery(props.query);
+      const cleaned = cleanAggregationQuery(props.query);
+      const queryForPreview = chartBucketMinutes()
+        ? withHistogramMinutes(cleaned, chartBucketMinutes())
+        : cleaned;
 
       // Build breakdown from aggregation group_by fields.
       // Backend uses the original field names (e.g. status, service) in the SELECT and GROUP BY.
@@ -353,27 +952,12 @@ const fetchQuerySchema = async () => {
         props.formData.query_condition?.aggregation?.group_by || []
       ).filter((f: string) => f && f.trim() !== "");
 
-      const breakdown = groupByFields.map((field: string) => ({
+      const breakdown = groupColumns(queryForPreview, groupByFields).map((field: string) => ({
         alias: field,
         column: field,
         color: null,
         label: field,
       }));
-
-      const aggregationCfg = props.formData.query_condition?.aggregation;
-      const hasHavingValue =
-        aggregationCfg?.having?.value !== undefined &&
-        aggregationCfg?.having?.value !== null &&
-        aggregationCfg?.having?.value !== "";
-      const thresholdValue = hasHavingValue
-        ? aggregationCfg.having.value
-        : props.formData.trigger_condition?.threshold;
-      // Warning must come from the same threshold family as the critical value
-      // (aggregate value vs row count) — mixing the two would draw a line on
-      // the wrong scale.
-      const warningValue = hasHavingValue
-        ? aggregationCfg?.warning_value
-        : props.formData.trigger_condition?.warning_threshold;
 
       dashboardPanelData.data.type = "line";
       dashboardPanelData.data.queryType = "sql";
@@ -409,7 +993,7 @@ const fetchQuerySchema = async () => {
       ];
       dashboardPanelData.data.queries[0].fields.z = [];
       dashboardPanelData.data.queries[0].fields.breakdown = breakdown;
-      applyThresholds(thresholdValue, warningValue);
+      applyThresholds();
 
       if (
         !dashboardPanelData.data.queries[0].fields.filter ||
@@ -429,6 +1013,7 @@ const fetchQuerySchema = async () => {
     }
     // ── Non-aggregation SQL path (result_schema) ──────────────────────────────
 
+    const groupChart = sqlGroupChartQuery.value;
     const schemaRes = await searchService.result_schema(
       {
         org_identifier: store.state.selectedOrganization.identifier,
@@ -470,15 +1055,26 @@ const fetchQuerySchema = async () => {
       hasHaving: !!extractedFields.having,
     });
 
-    const chartType = determineChartType(extractedFields);
+    // A per-group chart draws the one column the alert judges per window, on the threshold's scale.
+    const judged = String(props.formData.query_condition?.aggregation?.having?.column ?? "");
+    const chartType = groupChart ? "line" : determineChartType(extractedFields);
     dashboardPanelData.data.type = chartType;
 
     // Convert schema to fields
-    const fields = convertSchemaToFields(extractedFields, chartType);
+    const fields = groupChart
+      ? convertSchemaToFields(
+          {
+            ...extractedFields,
+            projections: ["zo_sql_key", ...extractedFields.group_by, judged],
+            timeseries_field: "zo_sql_key",
+          },
+          chartType,
+        )
+      : convertSchemaToFields(extractedFields, chartType);
 
     // Set up the query
     dashboardPanelData.data.queries[0].customQuery = true;
-    dashboardPanelData.data.queries[0].query = props.query;
+    dashboardPanelData.data.queries[0].query = groupChart ?? props.query;
     dashboardPanelData.data.queries[0].vrlFunctionQuery = getDecodedVrlFunction();
     // Enable dynamic columns when VRL function is present
     dashboardPanelData.data.config.table_dynamic_columns = props.formData.query_condition
@@ -490,10 +1086,7 @@ const fetchQuerySchema = async () => {
     dashboardPanelData.data.queryType = "sql";
     // Critical + optional Warning marklines (alerts_2.md Feature 1). Both are
     // drawn so the two bands are visible on the preview, matching the mock.
-    applyThresholds(
-      props.formData.trigger_condition?.threshold,
-      props.formData.trigger_condition?.warning_threshold,
-    );
+    applyThresholds();
 
     // Set the fields from schema
     dashboardPanelData.data.queries[0].fields.x = fields.x;
@@ -564,6 +1157,7 @@ const fetchQuerySchema = async () => {
 // Handle chart data updates from PanelSchemaRenderer
 // This receives the resultMetaData which contains the streaming response metadata
 const handleChartDataUpdate = (resultMetaData: any) => {
+  if (previewError.value?.message) return;
   // Safety check: ensure trigger_condition exists
   if (!props.formData.trigger_condition) {
     console.warn("[PreviewAlert] No trigger_condition found, skipping evaluation");
@@ -577,14 +1171,34 @@ const handleChartDataUpdate = (resultMetaData: any) => {
   // refresh. Keyed on the tab, not on query_condition.type: the form keeps a
   // stale promql_condition around after the user switches modes.
   // (This makes the `selectedTab === "promql"` arm of the chain below dead code.)
-  if (props.selectedTab === "promql") return;
+  if (props.selectedTab === "promql" || verdictNeedsOwnSearch()) return;
+  if (!isRealTimeAlert() && bucketsCoarserThanWindow(resultMetaData)) {
+    evaluationStatus.value = null;
+    return;
+  }
+  evaluateResultMetadata(resultMetaData, inVerdictWindow);
+};
 
+// The server stops each partition at its default row limit without flagging it, so a full one may hold more.
+const stoppedAtRowCap = (rows: number): boolean => {
+  const cap = Number(store.state.zoConfig?.query_default_limit) || 0;
+  return cap > 0 && rows === cap;
+};
+
+/** Counts a run's frames into the verdict; `inWindow` keeps the hits of the latest window. */
+const evaluateResultMetadata = (resultMetaData: any, windowFilter: (hit: any) => boolean) => {
+  // A real-time alert counts every matching event the chart shows, not one window.
+  const realTime = isRealTimeAlert();
+  const inWindow = realTime ? () => true : windowFilter;
   // resultMetaData structure from usePanelDataLoader:
   // resultMetaData[queryIndex] is an array of metadata objects from streaming partitions
   // Each metadata object has structure: {...content, ...content.results}
   // Which includes: hits, total, took, etc.
 
   let resultCount = 0;
+  let atLeast = false;
+  let measured: number | undefined;
+  let groupsSeen: number | undefined;
 
   try {
     if (Array.isArray(resultMetaData) && resultMetaData.length > 0) {
@@ -609,9 +1223,12 @@ const handleChartDataUpdate = (resultMetaData: any) => {
             props.formData.query_condition?.aggregation?.group_by || []
           ).filter((f: string) => f && f.trim() !== "");
           const numHaving = havingValue != null && havingValue !== "" ? Number(havingValue) : null;
+          if (numHaving === null) {
+            evaluationStatus.value = null;
+            return;
+          }
 
           const passesHaving = (val: number): boolean => {
-            if (numHaving === null) return true;
             switch (havingOperator) {
               case ">=":
                 return val >= numHaving;
@@ -635,20 +1252,28 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           const allHits: any[] = [];
           for (const partition of firstQueryMetadata) {
             if (Array.isArray(partition?.hits)) {
-              allHits.push(...partition.hits);
+              allHits.push(...partition.hits.filter(inWindow));
             }
           }
+          // A partition stopped at the row cap may hold more groups than it returned.
+          atLeast =
+            groupByFields.length > 0 &&
+            firstQueryMetadata.some(
+              (p: any) => Array.isArray(p?.hits) && stoppedAtRowCap(p.hits.length),
+            );
 
           if (allHits.length > 0 && groupByFields.length > 0) {
             // Group hits by the user's group_by field combination (strip time bucket dimension)
             const groupMap = new Map<string, number[]>();
+            const columns = groupColumns(props.query, groupByFields);
             for (const hit of allHits) {
-              const key = groupByFields.map((f: string) => String(hit[f] ?? "")).join("\x00");
+              const key = columns.map((f: string) => String(hit[f] ?? "")).join("\x00");
               if (!groupMap.has(key)) groupMap.set(key, []);
               groupMap.get(key)!.push(Number(hit.zo_sql_num ?? hit.alert_agg_value ?? 0));
             }
 
             // Re-apply the aggregation function across time buckets per group, then check having
+            groupsSeen = groupMap.size;
             for (const values of groupMap.values()) {
               let aggVal: number;
               switch (aggFunction) {
@@ -690,6 +1315,7 @@ const handleChartDataUpdate = (resultMetaData: any) => {
                 break;
             }
             if (passesHaving(aggVal)) resultCount = 1;
+            measured = aggVal;
           }
 
           // Fallback: if no hits available, use total row count
@@ -720,7 +1346,23 @@ const handleChartDataUpdate = (resultMetaData: any) => {
         // The backend meanwhile evaluates the alert with a single non-streaming
         // search (`streaming_output: false`, src/core/src/alerts/mod.rs:584) and
         // counts `records.len()` once (:831).
-        else if (props.selectedTab === "sql") {
+        else if (sqlPerGroup()) {
+          // Each row is a group; the ones past the judged column's threshold would fire.
+          const having = props.formData.query_condition.aggregation.having;
+          const limit = Number(having.value);
+          const rows = firstQueryMetadata.flatMap((p: any) =>
+            Array.isArray(p?.hits) ? p.hits.filter(inWindow) : [],
+          );
+          groupsSeen = rows.length;
+          resultCount = Number.isFinite(limit)
+            ? rows.filter((row: any) =>
+                promqlSampleMatches(Number(row?.[having.column]), having.operator, limit),
+              ).length
+            : 0;
+          atLeast = firstQueryMetadata.some(
+            (p: any) => Array.isArray(p?.hits) && stoppedAtRowCap(p.hits.length),
+          );
+        } else if (props.selectedTab === "sql") {
           // `total: 0` is a SETTLED ANSWER, not a missing field: a shrinking HAVING
           // (`< N`, `!= N`) legitimately ends at zero rows. Testing truthiness here
           // instead of `!== undefined` silently resurrects the previous frame's count.
@@ -738,6 +1380,7 @@ const handleChartDataUpdate = (resultMetaData: any) => {
                 (sum: number, p: any) => sum + (Number(p?.total) || 0),
                 0,
               );
+              atLeast = framesWithTotal.some((p: any) => stoppedAtRowCap(Number(p?.total)));
             } else {
               // Last-wins, matching the server's own collector (collect.rs:165).
               // Skip range-capped frames: send_partial_search_resp emits a
@@ -755,9 +1398,11 @@ const handleChartDataUpdate = (resultMetaData: any) => {
                 if (frame?.is_partial !== true) settled = frame;
               }
               resultCount = settled !== undefined ? Number(settled.total) || 0 : maxTotal;
+              atLeast = stoppedAtRowCap(resultCount);
             }
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
+            atLeast = stoppedAtRowCap(resultCount);
           }
         }
         // PromQL mode: count time series or data points
@@ -786,9 +1431,8 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           for (const partition of firstQueryMetadata) {
             if (Array.isArray(partition?.hits)) {
               for (const hit of partition.hits) {
-                if (hit.zo_sql_num !== undefined) {
-                  resultCount += hit.zo_sql_num;
-                }
+                const value = hit.zo_sql_num ?? hit.zo_sql_val;
+                if (value !== undefined && inWindow(hit)) resultCount += Number(value) || 0;
               }
             }
           }
@@ -830,7 +1474,7 @@ const handleChartDataUpdate = (resultMetaData: any) => {
         //
         // A derived count of ZERO is still a verdict and is still written — the
         // guard is on the payload being usable, never on the count being nonzero.
-        evaluateAndSetStatus(resultCount);
+        evaluateAndSetStatus(resultCount, atLeast, measured, groupsSeen);
       }
     }
   } catch (error) {
@@ -890,6 +1534,57 @@ const classifiableSample = (data: unknown): number | null => {
     return Number.isFinite(value) ? value : null;
   }
   return null;
+};
+
+// The converter writes zoned dates or UTC strings; either way the gaps between points are true.
+const pointMs = (point: unknown): number | null => {
+  const x = Array.isArray(point) ? point[0] : null;
+  const ms =
+    x instanceof Date ? x.getTime() : typeof x === "string" ? Date.parse(x) : Number(x ?? NaN);
+  return Number.isFinite(ms) ? ms : null;
+};
+
+/** One alert queries `(expr) op threshold` over the look-back, so a series counts by its last sample past it there. */
+const windowedSample = (
+  data: unknown,
+  fromMs: number,
+  passes: (value: number) => boolean,
+): number | null => {
+  if (!Array.isArray(data)) return null;
+  for (let i = data.length - 1; i >= 0; i--) {
+    const at = pointMs(data[i]);
+    if (at !== null && at < fromMs) return null;
+    const rawValue = Array.isArray(data[i]) ? data[i][1] : data[i];
+    if (rawValue === null || rawValue === undefined || rawValue === "") continue;
+    const value = Number(rawValue);
+    if (Number.isFinite(value) && passes(value)) return value;
+  }
+  return null;
+};
+
+/** The backend queries one alert at the less severe band, so the warning series come back too. */
+const widenedPromqlThreshold = (
+  operator: string | undefined,
+  critical: number,
+  warning: number | null,
+) => {
+  if (warning === null) return critical;
+  const side = thresholdSide(operator);
+  if (side === "above") return Math.min(critical, warning);
+  return side === "below" ? Math.max(critical, warning) : critical;
+};
+
+/** The end of the newest sample on the chart, which the look-back counts back from. */
+const latestSampleMs = (dataSeries: any[]): number => {
+  let latest = -Infinity;
+  for (const series of dataSeries) {
+    for (const point of Array.isArray(series?.data) ? series.data : []) {
+      const value = Array.isArray(point) ? point[1] : point;
+      if (value === null || value === undefined || value === "") continue;
+      latest = Math.max(latest, pointMs(point) ?? -Infinity);
+    }
+  }
+  return latest;
 };
 
 /** One sample against one threshold — mirrors `compare` (config/meta/alerts/level.rs:209). */
@@ -996,6 +1691,11 @@ const resultLabelFor = (resultCount: number): I18nText => {
       : t("alerts.previewEvaluation.matchingSeries");
   }
 
+  // The SQL limit counts the rows the query returns, whatever chart draws them.
+  if (props.selectedTab === "sql") {
+    return plural ? t("alerts.previewEvaluation.rows") : t("alerts.previewEvaluation.row");
+  }
+
   const chartType = dashboardPanelData.data.type;
   const hasGroupBy =
     dashboardPanelData.data.queries[0]?.fields?.breakdown?.length > 0 ||
@@ -1022,12 +1722,14 @@ const resultLabelFor = (resultCount: number): I18nText => {
  * there is no verdict to compute. Checked by every entry point BEFORE it counts
  * anything, so nothing is evaluated only to be thrown away.
  */
-const writeRealTimeStatus = (): boolean => {
-  const isRealTime = props.formData.is_real_time === "true" || props.formData.is_real_time === true;
-  if (!isRealTime) return false;
+const isRealTimeAlert = (): boolean =>
+  props.formData.is_real_time === "true" || props.formData.is_real_time === true;
+const writeRealTimeStatus = (count?: number): boolean => {
+  if (!isRealTimeAlert()) return false;
   evaluationStatus.value = {
     wouldTrigger: true,
     reason: t("alerts.previewEvaluation.realTimeReason"),
+    ...(count === undefined ? {} : { count, windowMinutes: previewMinutes() }),
   };
   return true;
 };
@@ -1039,12 +1741,15 @@ const writeRealTimeStatus = (): boolean => {
  */
 const setEvaluationStatus = (verdict: {
   count: number;
+  atLeast?: boolean;
   wouldTrigger: boolean;
   comparison: string;
   level?: PreviewLevel | null;
+  value?: number;
+  total?: number;
 }) => {
   const args = {
-    count: verdict.count,
+    count: previewCountText(verdict.count, verdict.atLeast, t),
     label: resultLabelFor(verdict.count),
     comparison: verdict.comparison,
   };
@@ -1052,8 +1757,19 @@ const setEvaluationStatus = (verdict: {
     ? t("alerts.previewEvaluation.reasonMatch", args)
     : t("alerts.previewEvaluation.reasonNoMatch", args);
 
+  const groupBy: string[] = props.formData.query_condition?.aggregation?.group_by ?? [];
   evaluationStatus.value = {
     wouldTrigger: verdict.wouldTrigger,
+    count: verdict.count,
+    atLeast: verdict.atLeast,
+    label: args.label,
+    ...(verdict.value === undefined ? {} : { value: verdict.value }),
+    ...(verdict.total === undefined ? {} : { total: verdict.total }),
+    grouped:
+      sqlPerGroup() ||
+      (props.selectedTab === "custom" &&
+        props.isAggregationEnabled &&
+        groupBy.some((f) => !!f && f.trim() !== "")),
     reason: verdict.level
       ? t("alerts.previewEvaluation.reasonLevel", {
           reason: sentence,
@@ -1068,14 +1784,43 @@ const setEvaluationStatus = (verdict: {
 
 // Evaluate and set status based on a result count already gated on value
 // (rows, groups, data points). PromQL goes through evaluatePromqlSeries instead.
-const evaluateAndSetStatus = (resultCount: number) => {
-  if (writeRealTimeStatus()) return;
+const evaluateAndSetStatus = (
+  resultCount: number,
+  atLeast = false,
+  value?: number,
+  total?: number,
+) => {
+  if (writeRealTimeStatus(resultCount)) return;
+  // Any one group past its threshold fires; the saved row-count gate is always "at least 1".
+  if (sqlPerGroup()) {
+    setEvaluationStatus({
+      count: resultCount,
+      atLeast,
+      wouldTrigger: resultCount > 0,
+      comparison: "",
+      total,
+    });
+    return;
+  }
 
+  // A lower bound decides only when every count from it up gets the same answer.
+  const threshold = Number(props.formData.trigger_condition?.threshold || 0);
+  const operator = props.formData.trigger_condition?.operator || ">=";
+  if (
+    atLeast &&
+    !(resultCount > threshold || (resultCount === threshold && [">=", "<"].includes(operator)))
+  ) {
+    evaluationStatus.value = null;
+    return;
+  }
   const gate = evaluateCountGate(resultCount);
   setEvaluationStatus({
     count: resultCount,
+    atLeast,
     wouldTrigger: gate.passes,
     comparison: gate.comparison,
+    value,
+    total,
   });
 };
 
@@ -1083,7 +1828,7 @@ const evaluateAndSetStatus = (resultCount: number) => {
  * The PromQL verdict, mirroring `evaluate_level_over_items`
  * (config/meta/alerts/aggregation_level.rs:146):
  *
- *  1. classify each series by its last sample — critical first, most severe wins
+ *  1. classify each series by its sample — critical first, most severe wins
  *  2. gate `criticalCount`; a pass fires CRITICAL and the warning count is never
  *     consulted
  *  3. otherwise gate `firingCount` (warning-or-worse, so a critical series counts
@@ -1094,11 +1839,8 @@ const evaluateAndSetStatus = (resultCount: number) => {
  * backend's `warning_threshold.unwrap_or(threshold)` collapses to `threshold`.
  * `widened_threshold` only ever widens the backend's QUERY, never the counts.
  *
- * Last sample, not "ever crossed": that matches multi-alert mode exactly. In
- * single-alert mode the backend pre-filters the query, so a series that crossed
- * and came back down still counts there while the preview says it does not —
- * the safe direction for a preview, which never claims an alert would fire on a
- * series that is currently healthy.
+ * One per series runs the raw query and reads the last sample. One alert filters the query
+ * at the threshold over the look-back, so a series that crossed and came back still counts.
  */
 const evaluatePromqlSeries = (dataSeries: any[]) => {
   if (writeRealTimeStatus()) return;
@@ -1150,8 +1892,14 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
   let criticalCount = 0;
   let firingCount = 0; // warning-or-worse
 
+  const single = !props.formData.query_condition?.promql_multi_alert;
+  const widened = widenedPromqlThreshold(operator, critical, warning);
+  const periodMs = (Number(props.formData.trigger_condition?.period) || 0) * 60_000;
+  const fromMs = latestSampleMs(dataSeries) - periodMs;
   for (const series of dataSeries) {
-    const value = classifiableSample(series?.data);
+    const value = single
+      ? windowedSample(series?.data, fromMs, (v) => promqlSampleMatches(v, operator, widened))
+      : classifiableSample(series?.data);
     if (value === null) continue;
     if (promqlSampleMatches(value, operator, critical)) {
       criticalCount++;
@@ -1161,7 +1909,21 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
     }
   }
 
-  const hasWarningBand = warning !== null;
+  const drawn = drawnSeries.value;
+  const sampled = !!drawn && drawn.total > drawn.shown;
+  seriesCountGeneration++;
+  // The sample's lower bound is written only if the full count fails, so the verdict changes once.
+  const fromSample = () => writePromqlVerdict(criticalCount, firingCount, sampled);
+  if (sampled && !props.formData._ui?.forecast)
+    void countAllSeries(critical, warning, operator, fromSample);
+  else fromSample();
+};
+
+/** The verdict from the series past each band; `atLeast` when they were counted from a sample. */
+const writePromqlVerdict = (criticalCount: number, firingCount: number, atLeast: boolean) => {
+  const critical = finiteThreshold(props.formData.query_condition?.promql_condition?.value);
+  const hasWarningBand =
+    finiteThreshold(props.formData.query_condition?.promql_warning_value) !== null;
 
   const criticalGate = evaluateCountGate(criticalCount);
   const forecast = props.formData._ui?.forecast;
@@ -1184,6 +1946,7 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
   if (criticalGate.passes) {
     setEvaluationStatus({
       count: criticalCount,
+      atLeast,
       wouldTrigger: true,
       comparison: criticalGate.comparison,
       level: hasWarningBand ? "critical" : null,
@@ -1196,17 +1959,90 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
   // never consults the second gate at all — hence `hasWarningBand &&`.
   const firingGate = evaluateCountGate(firingCount);
   const firesWarning = hasWarningBand && firingGate.passes;
+  // A quiet count from a sample says nothing about the series not drawn.
+  if (atLeast && !firesWarning) {
+    evaluationStatus.value = null;
+    return;
+  }
   setEvaluationStatus({
     count: firingCount,
+    atLeast,
     wouldTrigger: firesWarning,
     comparison: firingGate.comparison,
     level: firesWarning ? "warning" : null,
   });
 };
 
-// Handle series data update event (PromQL only — every other mode is evaluated
-// from partition metadata in handleChartDataUpdate)
+const PROMQL_OPERATORS: Record<string, string> = {
+  ">": ">",
+  ">=": ">=",
+  "<": "<",
+  "<=": "<=",
+  "=": "==",
+  "==": "==",
+  "!=": "!=",
+};
+let promqlEndSeconds = 0;
+let seriesCountGeneration = 0;
+// The chart draws only some series, so the server counts all of them past each band at the chart's end.
+const countAllSeries = async (
+  critical: number,
+  warning: number | null,
+  operator: string | undefined,
+  fromSample: () => void,
+) => {
+  const generation = ++seriesCountGeneration;
+  const op = PROMQL_OPERATORS[operator ?? ""];
+  if (!op) return fromSample();
+  const query = props.query;
+  const org = store.state.selectedOrganization.identifier;
+  const period = Number(props.formData.trigger_condition?.period) || 0;
+  // One alert counts a series that crossed anywhere in the look-back, as its filtered query does.
+  const series =
+    props.formData.query_condition?.promql_multi_alert || period <= 0
+      ? `(${query})`
+      : `last_over_time(((${query}) ${op} ${widenedPromqlThreshold(operator, critical, warning)})[${period}m:])`;
+  const past = (limit: number) =>
+    queryClient.fetchQuery(promRulePreviewQuery(org, `${series} ${op} ${limit}`, promqlEndSeconds));
+  try {
+    const [criticalCount, firingCount] = await Promise.all([
+      past(critical),
+      warning === null ? null : past(warning),
+    ]);
+    if (generation !== seriesCountGeneration || query !== props.query) return;
+    writePromqlVerdict(criticalCount, firingCount ?? criticalCount, false);
+  } catch {
+    if (generation === seriesCountGeneration && query === props.query) fromSample();
+  }
+};
+
+// The chart's drawn extreme when it samples finer than the checks; Test it says when no check saw it.
+const previewPeak = ref<PreviewPeak | null>(null);
+let chartStepSeconds = 0;
+
+const chartDataSeries = (seriesData: any): any[] =>
+  (Array.isArray(seriesData?.options?.series) ? seriesData.options.series : []).filter((s: any) => {
+    const hasData = Array.isArray(s?.data);
+    const hasMultiplePoints = hasData && s.data.length > 1;
+    const hasName = s?.name !== undefined && s?.name !== null;
+    return (hasName || hasMultiplePoints) && hasData;
+  });
+
+// Counts the drawn series in every mode; judges the verdict for PromQL only (every other mode is
+// evaluated from partition metadata in handleChartDataUpdate).
 const handleSeriesDataUpdate = (seriesData: any) => {
+  previewPeak.value = null;
+  if (previewError.value?.message) return emit("value-range", null);
+  emit("value-range", seriesValueRange(chartDataSeries(seriesData)));
+  const side = thresholdSide(props.formData.query_condition?.promql_condition?.operator);
+  if (props.selectedTab === "promql" && side && !chartStepSeconds)
+    previewPeak.value = seriesPeak(chartDataSeries(seriesData), side);
+  const named = chartDataSeries(seriesData).length;
+  const limit = seriesData?.extras?.seriesLimit;
+  drawnSeries.value = { shown: named, total: Math.max(Number(limit?.total) || 0, named) };
+  if (props.selectedTab === "promql" && named === 0 && props.query)
+    void explainNoSeries(props.query);
+  else clearNoSeries();
   if (!props.formData.trigger_condition) return;
   if (props.selectedTab !== "promql") return;
 
@@ -1218,9 +2054,6 @@ const handleSeriesDataUpdate = (seriesData: any) => {
     // makes: on a zero-result completion with a chart already on screen it
     // returns without reassigning panelData (:1204), so the deep watch never
     // fires and this handler is not called at all.)
-    const emittedSeries: any[] = Array.isArray(seriesData?.options?.series)
-      ? seriesData.options.series
-      : [];
 
     // Drop entries that carry no data. DEFENCE IN DEPTH, not load-bearing:
     // besides the markLine attached to each data series
@@ -1232,16 +2065,52 @@ const handleSeriesDataUpdate = (seriesData: any) => {
     // verdict against either producer today. It is kept as the cheaper barrier,
     // and because it does not depend on that point staying null: a nameless
     // one-point series carrying a real NUMBER would be classified without it.
-    const dataSeries = emittedSeries.filter((s: any) => {
-      const hasData = Array.isArray(s?.data);
-      const hasMultiplePoints = hasData && s.data.length > 1;
-      const hasName = s?.name !== undefined && s?.name !== null;
-      return (hasName || hasMultiplePoints) && hasData;
-    });
-
-    evaluatePromqlSeries(dataSeries);
+    evaluatePromqlSeries(chartDataSeries(seriesData));
   } catch (error) {
     console.error("[PreviewAlert] Error processing series data:", error);
+  }
+};
+
+// "No Data" alone can't tell a filter that matched nothing from a quiet metric, so the chart says which.
+const noSeriesText = ref<I18nText | null>(null);
+// The builder says it the same way, over the counts of the range the chart shows.
+const filterNotSeen = computed((): I18nText | null => {
+  if (props.selectedTab !== "custom" || !filterDrewNothing.value) return null;
+  const minutes = previewMinutes();
+  const tree = FILTER_PROFILES.alert.codec.parse(props.formData.query_condition?.conditions, {
+    fields: [],
+  });
+  const ctx = {
+    org: store.state.selectedOrganization.identifier,
+    streamType: props.formData.stream_type,
+    streamName: props.formData.stream_name,
+    windowUs: minutes >= 24 * 60 ? undefined : minutes * 60_000_000,
+  };
+  return filterNotSeenText(ctx, tree, durationWords(minutes, t), t) ?? null;
+});
+const emptyChartText = computed(() =>
+  props.selectedTab === "promql" ? noSeriesText.value : filterNotSeen.value,
+);
+let noSeriesGeneration = 0;
+const clearNoSeries = () => {
+  noSeriesGeneration++;
+  noSeriesText.value = null;
+};
+const explainNoSeries = async (query: string) => {
+  const generation = ++noSeriesGeneration;
+  const org = store.state.selectedOrganization.identifier;
+  try {
+    const selectors = selectorsOf(await queryClient.fetchQuery(promqlParseTreeQuery(org, query)));
+    const names = [...new Set(selectors.map((selector) => selector.name))];
+    const endMicros = Date.now() * 1000;
+    const series = await Promise.all(
+      names.map((name) => queryClient.fetchQuery(promqlDaySeriesQuery(org, name, endMicros))),
+    );
+    if (generation !== noSeriesGeneration || query !== props.query) return;
+    const reason = noSeriesReason(selectors, (name) => series[names.indexOf(name)] ?? []);
+    noSeriesText.value = reason ? noSeriesSentence(reason, t) : null;
+  } catch {
+    if (generation === noSeriesGeneration) noSeriesText.value = null;
   }
 };
 
@@ -1260,13 +2129,53 @@ const refreshRulePreview = async (at: number) => {
       !props.formData.query_condition?.promql_rule_mode
     )
       return;
+    const holdSec = Number(props.formData.pending_period_sec) || 0;
     evaluationStatus.value = {
       wouldTrigger: count > 0,
-      reason: t("alerts.promRulePreview", { count }),
+      reason:
+        holdSec > 0
+          ? t(
+              "alerts.form.preview.ruleMatch",
+              { count: formatNumber(count), duration: durationText(holdSec, t) },
+              count,
+            )
+          : t("alerts.form.preview.ruleMatchNow", { count: formatNumber(count) }, count),
     };
   } catch {
     if (generation === rulePreviewGeneration) evaluationStatus.value = null;
   }
+};
+
+// The wide views sample at check times, so they draw what the checks read; see promqlPreviewStepSeconds.
+const promqlCheckStepSeconds = (rangeMinutes: number): number => {
+  const tc = props.formData.trigger_condition ?? {};
+  if (tc.frequency_type === "cron") return 0;
+  return promqlPreviewStepSeconds(
+    rangeMinutes,
+    Number(tc.frequency) || 0,
+    shownRange.value !== "checks",
+  );
+};
+
+let lastRunKey = "";
+// The chart may cover several checks, but the verdict judges the latest window only.
+let verdictWindowStartMs = 0;
+// A wide range draws wide buckets; one wider than the window cannot say what the latest window held.
+const bucketsCoarserThanWindow = (resultMetaData: any): boolean => {
+  const times = (Array.isArray(resultMetaData?.[0]) ? resultMetaData[0] : [])
+    .flatMap((partition: any) => (Array.isArray(partition?.hits) ? partition.hits : []))
+    .map((hit: any) => keyToMs(hit?.zo_sql_key))
+    .filter((at: number | null): at is number => at !== null)
+    .sort((a: number, b: number) => a - b);
+  let bucketMs = Infinity;
+  for (let i = 1; i < times.length; i++) {
+    if (times[i] > times[i - 1]) bucketMs = Math.min(bucketMs, times[i] - times[i - 1]);
+  }
+  return Number.isFinite(bucketMs) && bucketMs > alertWindowMinutes() * 60_000;
+};
+const inVerdictWindow = (hit: { zo_sql_key?: unknown }): boolean => {
+  const at = keyToMs(hit?.zo_sql_key);
+  return at === null || at >= verdictWindowStartMs;
 };
 
 const refreshData = () => {
@@ -1282,28 +2191,49 @@ const refreshData = () => {
     return;
   }
 
-  const relativeTime = props.formData.trigger_condition.period;
+  const new_relative_time = previewMinutes();
+  const windowCount = windowCountQuery();
+  selfBucketed.value = !!windowCount;
+  // Every input the preview request depends on; asking again with the same ones fetches nothing new.
+  const runKey = JSON.stringify([
+    props.query,
+    props.selectedTab,
+    props.isAggregationEnabled,
+    props.isUsingBackendSql,
+    props.formData.stream_name,
+    props.formData.stream_type,
+    props.formData.query_condition?.vrl_function,
+    props.formData.query_condition?.promql_rule_mode,
+    props.formData.query_condition?.promql_condition,
+    props.formData.query_condition?.aggregation,
+    props.formData.trigger_condition?.threshold,
+    props.formData.trigger_condition?.operator,
+    props.formData._ui?.forecast,
+    new_relative_time,
+    verdictNeedsOwnSearch() && alertWindowMinutes(),
+    props.selectedTab === "promql" && promqlCheckStepSeconds(new_relative_time),
+  ]);
+  if (runKey === lastRunKey) return;
+  lastRunKey = runKey;
 
-  const endTime = new Date().getTime() * 1000;
+  // A sample per check keeps the peaks a check sees; aligned, the samples fall on the check times.
+  const stepSeconds =
+    props.selectedTab === "promql" ? promqlCheckStepSeconds(new_relative_time) : 0;
+  chartStepSeconds = stepSeconds;
+  const stepMicros = stepSeconds * 1_000_000;
+  const now = new Date().getTime() * 1000;
+  const endTime = stepMicros ? Math.floor(now / stepMicros) * stepMicros : now;
+  promqlEndSeconds = endTime / 1_000_000;
+  dashboardPanelData.data.config.step_value = stepSeconds ? `${stepSeconds}s` : "0";
+  runVerdictSearch(endTime);
+  void checkBaselines(endTime);
   if (props.selectedTab === "promql" && props.formData.query_condition?.promql_rule_mode)
     void refreshRulePreview(endTime / 1_000_000);
   else rulePreviewGeneration++;
 
-  // Priority order for time range:
-  // 1. Use env variable ZO_ALERT_PREVIEW_TIMERANGE_MINUTES if set and > 0
-  // 2. Fall back to alert period
-  const previewTimerangeMinutes = store.state.zoConfig.alert_preview_timerange_minutes || 0;
-  let new_relative_time;
-
-  if (previewTimerangeMinutes > 0) {
-    // Use the configured preview timerange from env variable
-    new_relative_time = previewTimerangeMinutes;
-  } else {
-    // Fall back to using the alert period
-    new_relative_time = relativeTime;
-  }
-
   const startTime = endTime - new_relative_time * 60 * 1000000;
+  verdictWindowStartMs =
+    endTime / 1000 - (Number(props.formData.trigger_condition?.period) || 0) * 60_000;
 
   dashboardPanelData.meta.dateTime = {
     start_time: new Date(startTime),
@@ -1368,10 +2298,7 @@ const refreshData = () => {
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
 
     // Add threshold mark line from promql_condition
-    applyThresholds(
-      props.formData.query_condition?.promql_condition?.value,
-      props.formData.query_condition?.promql_warning_value,
-    );
+    applyThresholds();
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
@@ -1412,17 +2339,14 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].fields.z = [];
     dashboardPanelData.data.queries[0].fields.breakdown = [];
     dashboardPanelData.data.queries[0].customQuery = true;
-    dashboardPanelData.data.queries[0].query = props.query;
+    dashboardPanelData.data.queries[0].query = windowCount ?? props.query;
     dashboardPanelData.data.queries[0].vrlFunctionQuery = null; // VRL not supported in custom mode
     dashboardPanelData.data.config.table_dynamic_columns = false; // VRL not supported in custom mode
     dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
     dashboardPanelData.data.type = "line"; // Line chart for histogram
-    applyThresholds(
-      props.formData.trigger_condition?.threshold,
-      props.formData.trigger_condition?.warning_threshold,
-    );
+    applyThresholds();
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
@@ -1465,6 +2389,242 @@ const refreshData = () => {
   // Note: Alert status evaluation now happens via handleChartDataUpdate event from PanelSchemaRenderer
 };
 
+const streaming = useHttpStreaming();
+let verdictTraceId = "";
+const cancelVerdictSearch = () => {
+  if (!verdictTraceId) return;
+  streaming.cancelStreamQueryBasedOnRequestId({
+    trace_id: verdictTraceId,
+    org_id: store.state.selectedOrganization?.identifier,
+  });
+  verdictTraceId = "";
+};
+
+// A builder verdict is one row per group over the whole window, as the check computes it;
+// re-adding bucket values would average a percentile or drop a bucket that straddles the window.
+const verdictQuery = (): string | null => {
+  if (props.selectedTab !== "custom") return props.query;
+  const bucketed = props.isAggregationEnabled
+    ? cleanAggregationQuery(props.query)
+    : /\bhistogram\(/i.test(props.query)
+      ? props.query
+      : buildCountChartQuery(props.query);
+  return bucketed ? (withoutTimeBucket(bucketed) ?? bucketed) : null;
+};
+// The latest window's answer, kept so a new threshold is judged at once against the same rows.
+let verdictFrames: any[] | null = null;
+const judgeVerdictFrames = () => {
+  if (verdictFrames && !previewError.value?.message)
+    evaluateResultMetadata([verdictFrames], () => true);
+};
+
+/** The alert's own query over its latest window alone, for a range the chart cannot judge. */
+const runVerdictSearch = (endMicros: number) => {
+  cancelVerdictSearch();
+  verdictFrames = null;
+  const { stream_name, stream_type } = props.formData;
+  const sql = verdictNeedsOwnSearch() ? verdictQuery() : null;
+  if (!sql || !stream_name || !stream_type) {
+    verdictSearchError.value = null;
+    return;
+  }
+  const vrl = props.selectedTab === "sql" ? getDecodedVrlFunction() : null;
+  const traceId = generateTraceContext().traceId;
+  verdictTraceId = traceId;
+  const frames: any[] = [];
+  streaming.fetchQueryDataWithHttpStream(
+    {
+      queryReq: {
+        query: {
+          sql: b64EncodeUnicode(sql),
+          ...(vrl ? { query_fn: b64EncodeUnicode(vrl) } : {}),
+          start_time: endMicros - alertWindowMinutes() * 60_000_000,
+          end_time: endMicros,
+          size: -1,
+        },
+        encoding: "base64",
+      },
+      type: "search",
+      traceId,
+      org_id: store.state.selectedOrganization?.identifier,
+      pageType: stream_type,
+      searchType: searchTypeForPanel.value,
+      meta:
+        props.selectedTab === "custom"
+          ? {}
+          : shouldUseHistogram.value
+            ? { is_ui_histogram: true, fallback_order_by_col: "zo_sql_key" }
+            : {},
+    },
+    {
+      data: (_request: unknown, response: any) => {
+        if (traceId !== verdictTraceId) return;
+        const content = response?.content ?? {};
+        if (response?.type === "search_response_metadata") {
+          frames.push({ ...content, ...content.results });
+        } else if (response?.type === "search_response_hits") {
+          if (!frames.length) frames.push({});
+          frames[frames.length - 1].hits = content.results?.hits ?? [];
+        }
+      },
+      error: (_request: unknown, response: any) => {
+        if (traceId !== verdictTraceId) return;
+        verdictTraceId = "";
+        const content = response?.content ?? {};
+        verdictSearchError.value = {
+          message: content.message || content.error_detail || t("search.unknownError"),
+          code: content.code ?? content.status ?? "",
+        };
+      },
+      complete: () => {
+        if (traceId !== verdictTraceId) return;
+        verdictTraceId = "";
+        verdictSearchError.value = null;
+        // A streaming aggregate's every frame is the whole answer so far, so only the last one counts.
+        const cumulative = frames.some((frame) => frame?.streaming_aggs === true);
+        verdictFrames =
+          cumulative && props.selectedTab === "custom"
+            ? frames.filter((frame) => Array.isArray(frame?.hits)).slice(-1)
+            : frames;
+        judgeVerdictFrames();
+      },
+    },
+  );
+};
+
+// A compare alert's rows depend on its past windows, which the preview's one search never reads.
+const comparisons = computed(() =>
+  props.selectedTab === "sql"
+    ? comparisonWindows(props.formData.query_condition?.multi_time_range)
+    : [],
+);
+// What the past windows held: null until searched; `empty` names those with no rows.
+const baselines = ref<{ all: string; empty: string | null } | null>(null);
+// Waiting for the past is a choice in the function, so ticking it changes the words, not the search.
+const compareWaits = computed(
+  () =>
+    compareRule(smartDecodeVrlFunction(props.formData.query_condition?.vrl_function ?? ""))
+      ?.needsBaseline === true,
+);
+const compareStatus = computed((): NonNullable<typeof evaluationStatus.value> | null => {
+  const b = baselines.value;
+  if (!b) return null;
+  if (!b.empty)
+    return {
+      wouldTrigger: false,
+      reason: t("alerts.form.preview.compareNote", { offset: b.all }),
+      note: "note",
+    };
+  return compareWaits.value
+    ? {
+        wouldTrigger: false,
+        reason: t("alerts.form.preview.compareWaitsForBaseline", { offset: b.empty }),
+        note: "note",
+      }
+    : {
+        wouldTrigger: false,
+        reason: t("alerts.form.preview.compareNoBaseline", { offset: b.empty }),
+        note: "warn",
+      };
+});
+const chartCaption = computed(() =>
+  previewCaption(
+    {
+      tab: props.selectedTab,
+      streamType: props.formData.stream_type,
+      query: props.query,
+      measured: !!props.isAggregationEnabled,
+      aggregation: props.formData.query_condition?.aggregation,
+      sqlColumn: sqlPerGroup() ? props.formData.query_condition.aggregation.having.column : null,
+    },
+    t,
+  ),
+);
+const baselineEmptyText = computed(() =>
+  baselines.value?.empty ? raw(baselines.value.empty) : null,
+);
+let compareGeneration = 0;
+let compareTraceIds: string[] = [];
+const cancelBaselineSearches = () => {
+  compareGeneration++;
+  for (const trace_id of compareTraceIds)
+    streaming.cancelStreamQueryBasedOnRequestId({
+      trace_id,
+      org_id: store.state.selectedOrganization?.identifier,
+    });
+  compareTraceIds = [];
+};
+/** Rows the query matches between the two times, or null when the search fails. */
+const countRows = (sql: string, startMicros: number, endMicros: number) =>
+  new Promise<number | null>((resolve) => {
+    const traceId = generateTraceContext().traceId;
+    compareTraceIds.push(traceId);
+    let total = 0;
+    streaming.fetchQueryDataWithHttpStream(
+      {
+        queryReq: {
+          query: {
+            sql: b64EncodeUnicode(sql),
+            start_time: startMicros,
+            end_time: endMicros,
+            size: -1,
+          },
+          encoding: "base64",
+        },
+        type: "search",
+        traceId,
+        org_id: store.state.selectedOrganization?.identifier,
+        pageType: props.formData.stream_type,
+        searchType: "UI",
+        meta: {},
+      },
+      {
+        data: (_request: unknown, response: any) => {
+          if (response?.type !== "search_response_hits") return;
+          for (const hit of response?.content?.results?.hits ?? [])
+            total += Number(hit?.zo_sql_num) || 0;
+        },
+        error: () => resolve(null),
+        complete: () => resolve(total),
+      },
+    );
+  });
+const checkBaselines = async (endMicros: number) => {
+  cancelBaselineSearches();
+  const mine = compareGeneration;
+  baselines.value = null;
+  const windows = comparisons.value;
+  if (!windows.length || !props.query) return;
+  const period = alertWindowMinutes();
+  const offset = (shown: typeof windows) => comparisonOffsetText(shown, getIntlLocale());
+  const count = buildCountChartQuery(props.query);
+  if (!count || period <= 0) {
+    baselines.value = { all: offset(windows), empty: null };
+    return;
+  }
+  const sql = withHistogramMinutes(count, period);
+  const totals = await Promise.all(
+    windows.map((window) =>
+      countRows(
+        sql,
+        endMicros - (window.minutes + period) * 60_000_000,
+        endMicros - window.minutes * 60_000_000,
+      ),
+    ),
+  );
+  if (mine !== compareGeneration) return;
+  compareTraceIds = [];
+  const empty = windows.filter((_, i) => totals[i] === 0);
+  baselines.value = { all: offset(windows), empty: empty.length ? offset(empty) : null };
+};
+watch(
+  () => JSON.stringify(comparisons.value),
+  () => {
+    lastRunKey = "";
+    refreshFromProps();
+  },
+);
+
 let lastRefreshTime = 0;
 
 const refreshDataOnce = () => {
@@ -1488,8 +2648,12 @@ const refreshFromProps = () => {
     return;
   }
 
-  // Check if aggregation is enabled but required fields are missing
-  if (props.isAggregationEnabled && props.formData.query_condition?.aggregation) {
+  // A builder value alert waits for its value; the SQL and PromQL tabs keep the builder's flag but not its query.
+  if (
+    props.selectedTab === "custom" &&
+    props.isAggregationEnabled &&
+    props.formData.query_condition?.aggregation
+  ) {
     const hasColumn =
       props.formData.query_condition.aggregation.having?.column &&
       props.formData.query_condition.aggregation.having.column.trim() !== "";
@@ -1499,6 +2663,7 @@ const refreshFromProps = () => {
       props.formData.query_condition.aggregation.having.value !== "";
 
     if (!hasColumn || !hasValue) {
+      evaluationStatus.value = null;
       return;
     }
   }
@@ -1512,33 +2677,80 @@ const refreshFromProps = () => {
 // Typing a query fires this on every keystroke; each refresh is a result_schema call.
 const debouncedRefreshFromProps = debounce(refreshFromProps, 800);
 
-// Watch for changes to props and refresh chart data automatically
+// Query, look-back and limits are typed: one edit is one run after the pause, not one per keystroke.
+const TYPED_INPUTS = new Set([0, 3, 4, 6]);
+// One getter per input: formData is a new object on every edit, so a deep watch fired on each name keystroke.
 watch(
-  () => [
-    props.query,
-    props.formData.stream_name,
-    props.formData.stream_type,
-    props.formData.trigger_condition?.period,
-    props.formData.trigger_condition?.threshold,
-    props.formData.trigger_condition?.operator,
-    props.formData.query_condition?.promql_condition?.value,
-    props.formData.query_condition?.promql_rule_mode,
-    props.selectedTab,
-    props.isUsingBackendSql,
+  [
+    () => props.query,
+    () => props.formData.stream_name,
+    () => props.formData.stream_type,
+    () => props.formData.trigger_condition?.period,
+    () => props.formData.trigger_condition?.threshold,
+    () => props.formData.trigger_condition?.operator,
+    () => props.formData.query_condition?.promql_condition?.value,
+    () => props.formData.query_condition?.promql_rule_mode,
+    () => props.selectedTab,
+    () => props.isUsingBackendSql,
   ],
   (next, prev) => {
+    // A query that fails to run emits no new result, so the old verdict would linger.
     if (next[0] !== prev?.[0]) {
+      evaluationStatus.value = null;
+      clearNoSeries();
+      filterDrewNothing.value = false;
+      cancelVerdictSearch();
+      // The verdict is gone, so even a query typed back to the last run's must run again.
+      lastRunKey = "";
+    }
+    if (next.some((value, index) => TYPED_INPUTS.has(index) && value !== prev?.[index])) {
       debouncedRefreshFromProps();
       return;
     }
-    // Only typing needs the debounce; a stream, tab or threshold change must not show stale results.
+    // A stream, tab or operator pick must not show stale results.
     debouncedRefreshFromProps.cancel();
     refreshFromProps();
   },
-  { deep: true },
 );
 
-onBeforeUnmount(() => debouncedRefreshFromProps.cancel());
+onBeforeUnmount(() => {
+  debouncedRefreshFromProps.cancel();
+  cancelVerdictSearch();
+  cancelBaselineSearches();
+});
+
+// A range pick is the user's own request, so the 200 ms echo guard must not swallow it.
+watch(previewRange, () => {
+  lastRefreshTime = 0;
+  refreshFromProps();
+});
+
+// The lines follow the limit at once; the re-query a limit change starts may be throttled or slow.
+watch(
+  () => JSON.stringify([currentLimits(), valueUnit.value]),
+  () => {
+    const config = (chartData.value as any)?.config;
+    if (!dashboardPanelData || !config) return;
+    applyThresholds();
+    const { mark_line, y_axis_min, y_axis_max, unit, unit_custom, decimals } =
+      dashboardPanelData.data.config;
+    chartData.value = {
+      ...chartData.value,
+      config: { ...config, mark_line, y_axis_min, y_axis_max, unit, unit_custom, decimals },
+    };
+  },
+);
+
+// The query never carries the limit, so a new limit is judged against the window already fetched.
+watch(
+  () =>
+    JSON.stringify([
+      props.formData.query_condition?.aggregation?.having,
+      props.formData.trigger_condition?.threshold,
+      props.formData.trigger_condition?.operator,
+    ]),
+  judgeVerdictFrames,
+);
 
 // Refresh data on mount if we already have a query
 onMounted(() => {
@@ -1570,5 +2782,26 @@ const refreshDataFromParent = () => {
   refreshData();
 };
 
-defineExpose({ refreshData: refreshDataFromParent, resizeChart, evaluationStatus });
+// Every verdict is counted against the limit, so a limit that needs fixing has none to give.
+const shownEvaluationStatus = computed(() => {
+  const threshold = props.formData.trigger_condition?.threshold;
+  if (comparisons.value.length) return compareStatus.value;
+  return threshold !== undefined && !isPreviewCountLimit(threshold) ? null : evaluationStatus.value;
+});
+
+// Only a 4xx is the query's fault; a server or network failure says nothing about it.
+const queryFailed = computed(
+  () =>
+    !!props.query &&
+    [settledPreviewError.value, verdictSearchError.value].some(
+      (error) => !!error?.message && String(error.code ?? "").startsWith("4"),
+    ),
+);
+
+defineExpose({
+  refreshData: refreshDataFromParent,
+  resizeChart,
+  evaluationStatus: shownEvaluationStatus,
+  queryFailed,
+});
 </script>

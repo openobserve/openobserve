@@ -92,6 +92,7 @@
         :read-only="readOnly"
         :text-preview="textPreview"
         :release-wheel-to-page="releaseWheelToPage"
+        :escape-then-tab="escapeThenTab"
         :show-auto-complete="showAutoComplete"
         :keywords="keywords"
         :suggestions="suggestions"
@@ -122,13 +123,14 @@
         variant="ghost"
         size="icon-toolbar"
         :disabled="props.disableAi"
+        :aria-label="t('nlMode.toggle')"
         @click="onAiToggleClick"
         class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-1 z-100 h-7! min-h-7! w-7! min-w-7! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img
           :src="nlpIcon"
-          :alt="t('search.aiModeIconAlt')"
+          alt=""
           class="h-4.5 w-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
         />
         <span
@@ -139,7 +141,6 @@
           <OIcon name="lock" size="xs" class="text-icon-locked size-2.5!" />
         </span>
         <OTooltip
-          v-if="aiAccess.allowed"
           :content="
             props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')
           "
@@ -186,6 +187,7 @@ interface Props {
   textPreview?: boolean; // Draw the query as plain text until Monaco has painted
   showAutoComplete?: boolean;
   releaseWheelToPage?: boolean; // default true: let the page scroll when editor has nothing left to scroll
+  escapeThenTab?: boolean; // Escape then Tab leaves the editor, instead of Escape alone
 
   // Editor autocomplete (forwarded to CodeQueryEditor)
   keywords?: any[]; // Autocomplete keywords for Monaco
@@ -224,6 +226,7 @@ const props = withDefaults(defineProps<Props>(), {
   showAutoComplete: true,
   releaseWheelToPage: true,
   fullTextSearch: true,
+  escapeThenTab: false,
   keywords: () => [],
   suggestions: () => [],
   debounceTime: 500,

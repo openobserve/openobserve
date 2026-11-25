@@ -1,4 +1,5 @@
 import type { I18nText } from "@/types/i18n";
+import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
 
 /** How many lines show before the text is cut with "…". */
 export type TruncatedTextLines = 1 | 2 | 3 | 4 | 5 | 6;
@@ -12,6 +13,8 @@ export interface TruncatedTextProps {
   tooltip?: I18nText | false;
   /** Classes for the tooltip bubble, e.g. `whitespace-pre-wrap` to keep the text's line breaks. */
   tooltipClass?: string;
+  /** Side for the tooltip, for a cut row in a list whose neighbours a tooltip on top would cover. */
+  tooltipSide?: TooltipSide;
 }
 
 export interface TruncatedTextSlots {

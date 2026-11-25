@@ -231,6 +231,13 @@ export const saveAlertMutation = (org: string, isUpdate: () => boolean) =>
     meta: { invalidates: [alertKeys.all(org)], silentError: true },
   });
 
+/** The assistant creates the alert once its proposal is approved; `approve` resolves when it reports back. */
+export const approveProposedAlertMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (approve: () => Promise<void>) => approve(),
+    meta: { invalidates: [alertKeys.all(org)], silentError: true },
+  });
+
 /** An anomaly clone also lands in the anomaly configs Overview reads from its own scope. */
 export const cloneAnomalyAlertMutation = (org: string) =>
   mutationOptions({
@@ -249,13 +256,13 @@ export const retrainAnomalyMutation = (org: string) =>
     meta: { invalidates: [anomalyKeys.all(org)], silentError: true },
   });
 
-/** Only the org-wide firing read drops: the caller patches the list row, since refetching the whole folder for one cell would take the scroll with it. */
+/** The list rows are patched by the caller, since refetching a folder for one cell loses the scroll; a stale alert read would re-save the old state. */
 export const toggleAlertStateMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { alertId: string; enabled: boolean; folderId?: string }) =>
       alerts.toggle_state_by_alert_id(org, vars.alertId, vars.enabled, vars.folderId),
     // No `silentError`: the list's toggle chain renders no failure of its own, so the central toast is the report.
-    meta: { invalidates: [alertKeys.firing(org)] },
+    meta: { invalidates: [alertKeys.firing(org), alertKeys.details(org)] },
   });
 
 /** Same write for an anomaly row, which Overview also renders from its own scope. */
@@ -263,7 +270,7 @@ export const toggleAnomalyAlertStateMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { alertId: string; enabled: boolean; folderId?: string }) =>
       alerts.toggle_state_by_alert_id(org, vars.alertId, vars.enabled, vars.folderId),
-    meta: { invalidates: [anomalyKeys.all(org), alertKeys.firing(org)] },
+    meta: { invalidates: [anomalyKeys.all(org), alertKeys.firing(org), alertKeys.details(org)] },
   });
 
 /** An ack changes the list tile, the detail header and the groups tab, all under the alert scope. */

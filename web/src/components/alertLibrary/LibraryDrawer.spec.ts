@@ -54,7 +54,7 @@ vi.mock("@/components/alerts/PreviewAlert.vue", async () => {
       setup(_props, { expose }) {
         expose({
           refreshData: mocks.refreshData,
-          evaluationStatus: ref({ wouldTrigger: true, reason: "4 rows match (4 >= 1)" }),
+          evaluationStatus: ref({ wouldTrigger: true, reason: "4 rows match (4 >= 1)", count: 4 }),
         });
         return () => h("div", { "data-test": "preview-alert" });
       },
@@ -242,9 +242,9 @@ describe("LibraryDrawer", () => {
   it("reports the verdict beside the chart", async () => {
     const wrapper = await mountDrawer();
     expect(wrapper.find('[data-test="alert-library-drawer-evaluation"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alert-library-drawer-preview"]').text()).toContain(
-      "4 rows match",
-    );
+    const verdict = wrapper.find('[data-test="alert-library-drawer-preview"]').text();
+    expect(verdict).toContain("Would alert now: 4");
+    expect(verdict).not.toContain("4 >= 1");
   });
 
   it("says there is nothing to evaluate rather than drawing an empty chart", async () => {
@@ -303,6 +303,16 @@ describe("LibraryDrawer", () => {
     };
     expect(payload.entry.id).toBe("k8s/go_gc_pause_high");
     expect(payload.file.name).toBe("go_gc_pause_high");
+  });
+
+  it("in the alert form, fills the form from the file and closes, offering no install", async () => {
+    const wrapper = await mountDrawer({ mode: "form" });
+    expect(wrapper.find('[data-test="alert-library-drawer-install"]').exists()).toBe(false);
+    await wrapper.find('[data-test="alert-library-drawer-use"]').trigger("click");
+
+    const payload = wrapper.emitted("use")?.[0]?.[0] as { file: AlertLibraryFile };
+    expect(payload.file.name).toBe("go_gc_pause_high");
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
   });
 
   // A published file may carry zeros, or no trigger_condition at all —
@@ -364,7 +374,7 @@ describe("LibraryDrawer", () => {
     const wrapper = await mountDrawer({ dataState: "fresh" });
 
     expect(wrapper.find('[data-test="alert-library-drawer-availability"]').text()).toContain(
-      "Data available",
+      "Receiving data",
     );
     expect(wrapper.find('[data-test="alert-library-drawer-needs-data"]').exists()).toBe(false);
   });
@@ -427,7 +437,7 @@ describe("LibraryDrawer", () => {
       const wrapper = await mountDrawer({ entry: anomalyEntry });
       expect(wrapper.findComponent(AlertQueryPreview).props("query")).toContain("histogram");
       expect(wrapper.find('[data-test="alert-library-drawer-detection"]').text()).toBe(
-        "avg(error_ratio) · 5m · Above only",
+        "avg(error_ratio) · 5m · Spikes only",
       );
       expect(wrapper.find('[data-test="alert-library-drawer-threshold"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="preview-alert"]').exists()).toBe(false);

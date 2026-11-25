@@ -48,7 +48,14 @@ vi.mock("@/services/workflows", async (importOriginal) => {
 
 const TargetsStub = defineComponent({
   name: "AlertTargetsSelect",
-  props: ["workflowOptions", "workflowsEnabled", "placeholder", "lockedWorkflowNames"],
+  props: [
+    "workflowOptions",
+    "workflowsEnabled",
+    "placeholder",
+    "lockedWorkflowNames",
+    "noWorkflowButton",
+    "oneLine",
+  ],
   emits: ["refresh"],
   template: "<div />",
 });
@@ -114,6 +121,53 @@ describe("AlertDestinationsField workflows", () => {
     expect(listWorkflowsMock).toHaveBeenCalledTimes(2);
     expect(wrapper.emitted("refresh")).toHaveLength(1);
   });
+
+  it("as a setting row, puts refresh beside New destination on the links line", async () => {
+    wrapper = mountField({ settingRow: true });
+    await flushPromises();
+    expect(wrapper.findComponent(TargetsStub).props("oneLine")).toBe(true);
+    expect(wrapper.find("[data-o-setting-row-actions]").exists()).toBe(false);
+    await wrapper.find('[data-test="alert-settings-refresh-destinations-btn"]').trigger("click");
+    await flushPromises();
+    expect(listWorkflowsMock).toHaveBeenCalledTimes(2);
+    expect(wrapper.emitted("refresh")).toHaveLength(1);
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await wrapper.find('[data-test="alert-settings-create-destination-link"]').trigger("click");
+    expect(open).toHaveBeenCalledTimes(1);
+    open.mockRestore();
+  });
+});
+
+describe("AlertDestinationsField New workflow link", () => {
+  const LINK = '[data-test="create-workflow-btn"]';
+  const lockedEdition = {
+    workflows_enabled: true,
+    features: { workflows: "locked" },
+    feature_names: { workflows: "Workflows" },
+  };
+
+  it("sits on a setting row's status line, in place of the picker's button", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const wrapper = mountField({ settingRow: true, showStatus: true, destinations: ["ops"] });
+    expect(wrapper.findComponent(TargetsStub).props("noWorkflowButton")).toBe(true);
+    await wrapper.find(LINK).trigger("click");
+    expect(open).toHaveBeenCalledTimes(1);
+    open.mockRestore();
+  });
+
+  it("is disabled while the license locks workflows", () => {
+    const wrapper = mountField({ settingRow: true, showStatus: true }, lockedEdition);
+    expect(wrapper.find(LINK).attributes("disabled")).toBeDefined();
+  });
+
+  it.each([
+    ["outside a setting row", { showStatus: true }],
+    ["on the recovery field", { settingRow: true, supportsWorkflows: false }],
+  ])("leaves the workflow button to the picker %s", (_where, props) => {
+    const wrapper = mountField(props);
+    expect(wrapper.find(LINK).exists()).toBe(false);
+    expect(wrapper.findComponent(TargetsStub).props("noWorkflowButton")).toBeFalsy();
+  });
 });
 
 describe("AlertDestinationsField status line", () => {
@@ -124,6 +178,19 @@ describe("AlertDestinationsField status line", () => {
 
   it("is not marked required", () => {
     expect(mountField().text()).not.toContain("*");
+  });
+
+  it("renders as a setting row when asked, keeping its label and status line", () => {
+    const wrapper = mountField({ settingRow: true, notifiesNobody: true, showStatus: true });
+    const row = wrapper.findComponent({ name: "OSettingRow" });
+    expect(row.exists()).toBe(true);
+    expect(row.props("label")).toBe(t("alerts.destination"));
+    expect(row.props("fill")).toBe(true);
+    expect(wrapper.find(NOTE).exists()).toBe(true);
+  });
+
+  it("keeps its own side label when not a setting row", () => {
+    expect(mountField().findComponent({ name: "OSettingRow" }).exists()).toBe(false);
   });
 
   it("says no destination is notified when the alert has nowhere to send", () => {

@@ -13,11 +13,18 @@
 import { z } from "zod";
 
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import { isCountLimit } from "@/utils/alerts/alertReadBack";
+import { modesWithContent } from "@/utils/alerts/alertCondition";
+import { getCronIntervalDifferenceInSeconds } from "@/utils/queryUtils";
+import { getIntlLocale } from "@/locales";
 import {
   FORECAST_MAX_DAYS,
   FORECAST_MIN_DAYS,
   isForecastHorizonValid,
 } from "@/utils/alerts/forecastAlert";
+
+// Past a year a schedule is no longer useful, and a huge value cannot be stored as the backend's integer minutes.
+const MAX_FREQUENCY_MINUTES = 365 * 24 * 60;
 
 /** i18n translator injected by the component: `(key, namedParams?) => string`.
  *  Every user-facing validation message resolves through this against the
@@ -172,13 +179,14 @@ export type ConditionsTree = z.infer<typeof conditionGroupNodeSchema>;
 
 // ── Validation messages are i18n-driven (`alerts.validation.*` locale keys),
 //    resolved via the injected `t` inside `makeQueryConfigSchema`:
-//      threshold ≥ 1   → alerts.validation.thresholdPositive
+//      threshold whole ≥ 1 → alerts.validation.limitWholeNumber
 //      frequency ≥ 1   → alerts.validation.frequencyPositive
 //      org min-freq    → alerts.validation.minimumFrequency ({minutes} = the
 //                        ceil(min_auto_refresh_interval / 60) floor)
-//      "value is"      → alerts.validation.fieldRequired
+//      "value is"      → alerts.guard.thresholdRequired
 //      promql operator → alerts.validation.fieldRequired
-//      promql value    → alerts.validation.fieldRequired
+//      promql value    → alerts.guard.thresholdRequired
+//      promql by-label → the label guard's own message (_meta.promqlLabelIssue)
 //      blank group-by  → alerts.validation.fieldRequired (per offending row;
 //                        an EMPTY group_by is VALID)
 
@@ -195,6 +203,8 @@ export interface QueryConfigMeta {
   hasConditions: boolean;
   /** The condition builder's own verdict, which also covers rules the tree walker cannot see (list sizes). */
   conditionsValid?: boolean;
+  /** Why the PromQL query groups by a label its metric lacks; the label list loads async, so the component judges it. */
+  promqlLabelIssue?: string;
   hasGroupBy: boolean;
   aggregationEnabled: boolean;
   /** Org floor for the evaluation frequency, in SECONDS — raw
@@ -204,9 +214,32 @@ export interface QueryConfigMeta {
   minAutoRefreshInterval: number;
 }
 
+// Value thresholds open empty, so their message shows a typical one.
+const THRESHOLD_EXAMPLE = "90";
+
 /** True when the RAW input value is empty (unset). Shared by the number checks
  *  so "" / null / undefined always count as "not provided". */
 const isBlank = (v: unknown): boolean => v === undefined || v === null || v === "";
+
+/** Why a cron schedule cannot run, or null; the server parses six fields and enforces the org floor. */
+const cronIssue = (
+  t: Translator,
+  tc: Record<string, unknown>,
+  minIntervalSecs: number,
+): string | null => {
+  const cron = String(tc.cron ?? "").trim();
+  if (!cron || isBlank(tc.timezone)) return t("alerts.queryConfig.cronExpressionTimezoneRequired");
+  if (cron.split(/\s+/).length !== 6) return t("alerts.validation.cronSixFields");
+  try {
+    const seconds = getCronIntervalDifferenceInSeconds(cron);
+    if (typeof seconds === "number" && seconds < minIntervalSecs) {
+      return t("alerts.queryConfig.frequencyGreaterThanSeconds", { seconds: minIntervalSecs - 1 });
+    }
+  } catch {
+    return t("alerts.queryConfig.invalidCronExpression");
+  }
+  return null;
+};
 
 /** A number field that must be present AND ≥ 1. Empty OR NaN OR < 1 → invalid.
  *  Operates on the raw (possibly string) value so 0 fails but "" is caught as
@@ -348,28 +381,41 @@ export const makeQueryConfigSchema = (t: Translator) =>
       // Shown+required in every scheduled branch: custom (count OR the measure
       // "having groups" — forced to 1 when no group-by, so ≥1 always holds), SQL
       // ("no. of events"), PromQL ("having series"). One rule covers them all.
-      if (isBelowOne(tc.threshold)) {
+      if (!isCountLimit(tc.threshold)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["trigger_condition", "threshold"],
-          message: t("alerts.validation.thresholdPositive"),
+          message: t("alerts.validation.limitWholeNumber"),
         });
       }
 
       // ── Frequency ≥ 1 ────────────────────────────────────────────────────────
-      // Only when NOT in cron mode (cron is validated separately — the component
-      // renders `cronError`, useAlertForm.runImperativeQueryChecks gates save).
+      // Only when NOT in cron mode (cron has its own rule below, on `trigger_condition.cron`).
       // Keyed on the DISPLAY value (`_ui.checkEvery`) because that is the path the
       // visible "Check every" input binds, so the message renders inline. Display
       // ≥ 1 ⇔ stored ≥ 1 in both modes (hours multiplies by 60).
       const ui = (val._ui ?? {}) as Record<string, unknown>;
       const display = ui.checkEvery;
       if (meta.frequencyMode !== "cron") {
+        const displayMinutes =
+          meta.frequencyMode === "hours" ? Number(display) * 60 : Number(display);
         if (isBelowOne(display)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["_ui", "checkEvery"],
             message: t("alerts.validation.frequencyPositive"),
+          });
+        } else if (displayMinutes > MAX_FREQUENCY_MINUTES) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["_ui", "checkEvery"],
+            message: t("dashboard.utils.configValueOutOfRange", {
+              setting: t("alerts.queryConfig.checkEvery"),
+              min: 1,
+              max: new Intl.NumberFormat(getIntlLocale()).format(
+                meta.frequencyMode === "hours" ? MAX_FREQUENCY_MINUTES / 60 : MAX_FREQUENCY_MINUTES,
+              ),
+            }),
           });
         } else {
           // ── Org min-frequency floor ─────────────────────────────────────────
@@ -378,10 +424,8 @@ export const makeQueryConfigSchema = (t: Translator) =>
           // Skipped entirely when the org sets no floor.
           const floorSecs = Number(meta.minAutoRefreshInterval) || 0;
           if (floorSecs > 0) {
-            const freqMins =
-              meta.frequencyMode === "hours" ? Number(display) * 60 : Number(display);
             const floorMins = Math.ceil(floorSecs / 60);
-            if (freqMins < floorMins) {
+            if (displayMinutes < floorMins) {
               ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["_ui", "checkEvery"],
@@ -392,6 +436,38 @@ export const makeQueryConfigSchema = (t: Translator) =>
             }
           }
         }
+      }
+
+      if (tc.frequency_type === "cron") {
+        const cronMessage = cronIssue(t, tc, Number(meta.minAutoRefreshInterval) || 1);
+        if (cronMessage) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["trigger_condition", "cron"],
+            message: cronMessage,
+          });
+        }
+      }
+
+      // An empty editor is fine while another mode holds the query: Save then asks which one runs.
+      const otherQuery = modesWithContent({
+        sql: qc.sql,
+        promql: qc.promql,
+        conditions: qc.conditions,
+        streamType: String((val as Record<string, unknown>).stream_type ?? ""),
+      });
+      if ((isSql || isPromql) && !String(qc[meta.tab] ?? "").trim() && !otherQuery.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["query_condition", meta.tab],
+          message: t(isSql ? "alerts.messages.sqlQueryEmpty" : "alerts.messages.promqlQueryEmpty"),
+        });
+      } else if (isPromql && meta.promqlLabelIssue) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["query_condition", "promql"],
+          message: meta.promqlLabelIssue,
+        });
       }
 
       // ── Warning/critical matrix (alerts_2.md §4.5) ──────────────────────────
@@ -407,19 +483,27 @@ export const makeQueryConfigSchema = (t: Translator) =>
         const cn = Number(c);
         if (Number.isNaN(wn) || Number.isNaN(cn)) return null;
         if (op === "=" || op === "!=") {
-          return t("alerts.warnOperatorUnordered", { operator: op });
+          const comparison = t(`alerts.sections.operators.${op === "=" ? "eq" : "ne"}`);
+          return t("alerts.validation.warnNotWith", { comparison });
         }
+        const limit = new Intl.NumberFormat(getIntlLocale(), { maximumFractionDigits: 20 }).format(
+          cn,
+        );
         if ((op === ">" || op === ">=") && !(wn < cn)) {
-          return t("alerts.warnMustBeLower", { warning: wn, critical: cn, operator: op });
+          return t("alerts.validation.warnBeforeLower", { limit });
         }
         if ((op === "<" || op === "<=") && !(wn > cn)) {
-          return t("alerts.warnMustBeHigher", { warning: wn, critical: cn, operator: op });
+          return t("alerts.validation.warnBeforeHigher", { limit });
         }
         return null;
       };
       // Count family: SQL tab, or builder count mode.
       if (isSql || (isCustom && !isMeasure)) {
-        const msg = matrixIssue(tc.warning_threshold, tc.threshold, tc.operator);
+        // A warning count follows the same whole-number rule as the count it warns before.
+        const msg =
+          !isBlank(tc.warning_threshold) && !isCountLimit(tc.warning_threshold)
+            ? t("alerts.validation.limitWholeNumber")
+            : matrixIssue(tc.warning_threshold, tc.threshold, tc.operator);
         if (msg) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -468,7 +552,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["query_condition", "promql_rule_mode"],
-            message: t("alerts.promRuleModeConflict"),
+            message: t("alerts.form.ruleMode.conflict"),
           });
         }
       }
@@ -486,7 +570,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["query_condition", "promql_condition", "value"],
-            message: t("alerts.validation.fieldRequired"),
+            message: t("alerts.guard.thresholdRequired", { example: THRESHOLD_EXAMPLE }),
           });
         }
         refineForecast(ctx, (val._ui as Record<string, any> | undefined)?.forecast, t);
@@ -526,7 +610,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["query_condition", "aggregation", "having", "value"],
-            message: t("alerts.validation.fieldRequired"),
+            message: t("alerts.guard.thresholdRequired", { example: THRESHOLD_EXAMPLE }),
           });
         }
         // Group-by rows — PARITY with pre-migration AlertSettings.validate()

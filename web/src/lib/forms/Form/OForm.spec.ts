@@ -2,7 +2,7 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { h } from "vue";
+import { defineComponent, h, ref, shallowRef } from "vue";
 import OForm from "./OForm.vue";
 import OFormInput from "../Input/OFormInput.vue";
 import { z } from "zod";
@@ -35,6 +35,35 @@ describe("OForm", () => {
     });
     await wrapper.find("form").trigger("submit");
     expect(wrapper.exists()).toBe(true);
+  });
+
+  // Vue skips mounted for a field removed in the flush that created it, yet still runs its unmounted hook.
+  it("a field created and replaced in one render flush unmounts without an error", async () => {
+    const Row = defineComponent({
+      components: { OFormInput },
+      props: { show: Boolean, target: { type: Object, default: null } },
+      template: `<component :is="target ? 'div' : 'section'" v-if="show"><OFormInput name="period" /></component>`,
+    });
+    const Host = defineComponent({
+      components: { OForm, Row },
+      setup() {
+        const show = ref(false);
+        const target = shallowRef<HTMLElement | null>(null);
+        const setTarget = (el: unknown) => {
+          target.value = el instanceof HTMLElement ? el : null;
+        };
+        return { show, target, setTarget };
+      },
+      template: `<OForm :default-values="{ period: 10 }"><Row :show="show" :target="target" /><p v-if="show" :ref="setTarget" /></OForm>`,
+    });
+    const errors: unknown[] = [];
+    wrapper = mount(Host, {
+      global: { config: { errorHandler: (err: unknown) => errors.push(err) } },
+    });
+    (wrapper.vm as unknown as { show: boolean }).show = true;
+    await flushPromises();
+    expect(errors).toEqual([]);
+    expect(wrapper.find("div input").exists()).toBe(true);
   });
 
   describe("legacy-compatibility ref methods", () => {

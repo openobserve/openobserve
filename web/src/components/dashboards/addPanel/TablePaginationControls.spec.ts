@@ -28,7 +28,6 @@ const mockI18n = createI18n({
       dashboard: {
         rowsPerPage: "Rows per page",
         dashboards: {
-          paginationEmpty: "0 of 0",
           paginationRange: "{start}-{end} of {total}",
         },
       },
@@ -245,7 +244,7 @@ describe("TablePaginationControls", () => {
         totalRows: 0,
       });
 
-      expect(wrapper.text()).toContain("0 of 0");
+      expect(wrapper.text()).not.toContain(" of ");
     });
 
     it("should handle single page with fewer rows than rowsPerPage", () => {
@@ -434,7 +433,7 @@ describe("TablePaginationControls", () => {
         pagesNumber: 100,
       });
 
-      expect(wrapper.text()).toContain("1-100 of 10000");
+      expect(wrapper.text()).toContain("1-100 of 10,000");
     });
 
     it("should handle page number larger than 1 with rowsPerPage 0", () => {

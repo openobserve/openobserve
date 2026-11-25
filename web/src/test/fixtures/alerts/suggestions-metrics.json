@@ -1,0 +1,118 @@
+{
+  "library": "ready",
+  "library_version": "e13f27fa44282df9fdc81c56a532d7fb",
+  "stream": {
+    "type": "metrics",
+    "name": "http_server_duration_count",
+    "schema_read": true
+  },
+  "counts": {
+    "fits": 1,
+    "likely": 1,
+    "already_set_up": 0,
+    "starters": 0,
+    "total": 2
+  },
+  "suggestions": [
+    {
+      "kind": "library",
+      "severity": "critical",
+      "alert_type": "scheduled",
+      "fit": "fits",
+      "missing": [],
+      "stream_swap": null,
+      "already_set_up": [],
+      "enterprise": false,
+      "starter": null,
+      "id": "observability/http_5xx_error_rate",
+      "title": "HTTP 5xx error rate",
+      "sentence": "Fires when more than 5% of requests to a service fail with a 5xx status.",
+      "query_type": "promql",
+      "matched_fields": ["http_server_duration_count", "http_response_status_code", "service_name"],
+      "library": {
+        "pack": "observability",
+        "path": "packs/observability/alerts/http_5xx_error_rate.json",
+        "content_hash": "5e5e0b7c",
+        "docs_url": "https://samber.github.io/awesome-prometheus-alerts/rules"
+      },
+      "prefill": {
+        "stream_type": "metrics",
+        "stream_name": "http_server_duration_count",
+        "is_real_time": false,
+        "query_condition": {
+          "type": "promql",
+          "sql": null,
+          "conditions": null,
+          "aggregation": null,
+          "vrl_function": null,
+          "multi_time_range": [],
+          "promql": "sum by (service_name) (rate(http_server_duration_count{http_response_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_server_duration_count[5m]))",
+          "promql_condition": {
+            "column": "value",
+            "operator": ">",
+            "value": 0.05
+          },
+          "promql_multi_alert": true
+        },
+        "trigger_condition": {
+          "period": 5,
+          "operator": ">=",
+          "threshold": 1,
+          "frequency": 5,
+          "frequency_type": "minutes",
+          "silence": 30
+        }
+      }
+    },
+    {
+      "kind": "library",
+      "severity": "warning",
+      "alert_type": "scheduled",
+      "fit": "likely",
+      "missing": ["instance"],
+      "stream_swap": null,
+      "already_set_up": [],
+      "enterprise": false,
+      "starter": null,
+      "id": "observability/http_latency_p95_high",
+      "title": "HTTP p95 latency high",
+      "sentence": "Fires when the 95th percentile request latency stays high.",
+      "query_type": "promql",
+      "matched_fields": ["http_server_duration_bucket"],
+      "library": {
+        "pack": "observability",
+        "path": "packs/observability/alerts/http_latency_p95_high.json",
+        "content_hash": "77aa10b3",
+        "docs_url": null
+      },
+      "prefill": {
+        "stream_type": "metrics",
+        "stream_name": "http_server_duration_bucket",
+        "is_real_time": false,
+        "query_condition": {
+          "type": "promql",
+          "sql": null,
+          "conditions": null,
+          "aggregation": null,
+          "vrl_function": null,
+          "multi_time_range": [],
+          "promql": "histogram_quantile(0.95, sum by (le, instance) (rate(http_server_duration_bucket[5m])))",
+          "promql_condition": {
+            "column": "value",
+            "operator": ">",
+            "value": 0.5
+          },
+          "promql_multi_alert": true
+        },
+        "trigger_condition": {
+          "period": 5,
+          "operator": ">=",
+          "threshold": 1,
+          "frequency": 5,
+          "frequency_type": "minutes",
+          "silence": 30
+        }
+      }
+    }
+  ]
+}

@@ -59,7 +59,7 @@ export class AlertLibraryPage {
       done: '[data-test="alert-library-install-done"]',
       cancel: '[data-test="alert-library-install-cancel"]',
       // alert editor (the Customize hand-off target)
-      editorAlertName: '[data-test="add-alert-name-input-value"]',
+      editorAlertName: '[data-test="add-alert-header-title"]',
       // Rendered only when the manifest ships anomaly alerts.
       alertType: '[data-test="alert-library-alert-type"]',
       cardAnomalyTag: '[data-test="alert-library-card-anomaly"]',

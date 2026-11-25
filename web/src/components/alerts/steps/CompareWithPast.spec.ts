@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { defineComponent } from "vue";
 import { z } from "zod";
+import { compareFunction } from "@/utils/alerts/alertIntents";
 import CompareWithPast from "./CompareWithPast.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -27,16 +28,6 @@ vi.mock("@/utils/zincutils", () => ({
   getUUID: vi.fn(() => "mock-uuid-" + Math.random()),
   b64EncodeUnicode: vi.fn((str: string) => btoa(str)),
   b64DecodeUnicode: vi.fn((str: string) => atob(str)),
-}));
-
-// Mock CustomDateTimePicker component
-vi.mock("@/components/CustomDateTimePicker.vue", () => ({
-  default: {
-    name: "CustomDateTimePicker",
-    template: "<div data-test='mock-custom-date-time-picker'></div>",
-    props: ["modelValue", "picker", "isFirstEntry", "changeStyle"],
-    emits: ["update:model-value"],
-  },
 }));
 
 const createMockStore = (overrides = {}) => ({
@@ -169,7 +160,7 @@ describe("CompareWithPast.vue", () => {
     it("should add a new time shift", async () => {
       await wrapper.vm.addTimeShift();
       expect(wrapper.vm.localMultiTimeRange.length).toBe(1);
-      expect(wrapper.vm.localMultiTimeRange[0]).toHaveProperty("offSet", "15m");
+      expect(wrapper.vm.localMultiTimeRange[0]).toHaveProperty("offSet", "1d");
       expect(wrapper.vm.localMultiTimeRange[0]).toHaveProperty("uuid");
     });
 
@@ -226,89 +217,6 @@ describe("CompareWithPast.vue", () => {
       await wrapper.vm.removeTimeShift(1);
       expect(wrapper.vm.localMultiTimeRange.length).toBe(1);
       expect(wrapper.vm.localMultiTimeRange[0].uuid).toBe("uuid-1");
-    });
-  });
-
-  describe("Update Date Time Picker", () => {
-    it("should emit update:multiTimeRange", () => {
-      wrapper.vm.updateDateTimePicker();
-      expect(wrapper.emitted("update:multiTimeRange")).toBeTruthy();
-    });
-
-    it("should emit current localMultiTimeRange value", () => {
-      wrapper.vm.localMultiTimeRange = [{ offSet: "1h", uuid: "test-uuid" }];
-      wrapper.vm.updateDateTimePicker();
-      const emitted = wrapper.emitted("update:multiTimeRange");
-      expect(emitted![0]).toEqual([[{ offSet: "1h", uuid: "test-uuid" }]]);
-    });
-  });
-
-  describe("Get Display Value", () => {
-    it("should convert seconds correctly", () => {
-      expect(wrapper.vm.getDisplayValue("30s")).toBe("30 Seconds");
-      expect(wrapper.vm.getDisplayValue("1s")).toBe("1 Second");
-    });
-
-    it("should convert minutes correctly", () => {
-      expect(wrapper.vm.getDisplayValue("15m")).toBe("15 Minutes");
-      expect(wrapper.vm.getDisplayValue("1m")).toBe("1 Minute");
-    });
-
-    it("should convert hours correctly", () => {
-      expect(wrapper.vm.getDisplayValue("2h")).toBe("2 Hours");
-      expect(wrapper.vm.getDisplayValue("24h")).toBe("24 Hours");
-    });
-
-    it("should convert days correctly", () => {
-      expect(wrapper.vm.getDisplayValue("7d")).toBe("7 Days");
-      expect(wrapper.vm.getDisplayValue("1d")).toBe("1 Day");
-    });
-
-    it("should convert weeks correctly", () => {
-      expect(wrapper.vm.getDisplayValue("2w")).toBe("2 Weeks");
-    });
-
-    it("should convert months correctly", () => {
-      expect(wrapper.vm.getDisplayValue("3M")).toBe("3 Months");
-    });
-
-    it("should return original value for invalid format", () => {
-      expect(wrapper.vm.getDisplayValue("invalid")).toBe("invalid");
-      expect(wrapper.vm.getDisplayValue("15")).toBe("15");
-    });
-
-    it("should handle non-string values", () => {
-      expect(wrapper.vm.getDisplayValue(123 as any)).toBe(123);
-    });
-  });
-
-  describe("Convert Minutes To Display Value", () => {
-    it("should convert minutes correctly (< 60)", () => {
-      expect(wrapper.vm.convertMinutesToDisplayValue(1)).toBe("1 Minute");
-      expect(wrapper.vm.convertMinutesToDisplayValue(30)).toBe("30 Minutes");
-      expect(wrapper.vm.convertMinutesToDisplayValue(59)).toBe("59 Minutes");
-    });
-
-    it("should convert hours correctly (60 - 1439)", () => {
-      expect(wrapper.vm.convertMinutesToDisplayValue(60)).toBe("1 Hour");
-      expect(wrapper.vm.convertMinutesToDisplayValue(120)).toBe("2 Hours");
-      expect(wrapper.vm.convertMinutesToDisplayValue(1439)).toBe("23 Hours");
-    });
-
-    it("should convert days correctly (1440 - 10079)", () => {
-      expect(wrapper.vm.convertMinutesToDisplayValue(1440)).toBe("1 Day");
-      expect(wrapper.vm.convertMinutesToDisplayValue(2880)).toBe("2 Days");
-      expect(wrapper.vm.convertMinutesToDisplayValue(10079)).toBe("6 Days");
-    });
-
-    it("should convert weeks correctly (10080 - 43199)", () => {
-      expect(wrapper.vm.convertMinutesToDisplayValue(10080)).toBe("1 Week");
-      expect(wrapper.vm.convertMinutesToDisplayValue(20160)).toBe("2 Weeks");
-    });
-
-    it("should convert months correctly (>= 43200)", () => {
-      expect(wrapper.vm.convertMinutesToDisplayValue(43200)).toBe("1 Month");
-      expect(wrapper.vm.convertMinutesToDisplayValue(86400)).toBe("2 Months");
     });
   });
 
@@ -379,78 +287,44 @@ describe("CompareWithPast.vue", () => {
   });
 
   describe("UI Rendering", () => {
-    it("should render Current window text", () => {
-      // The current window section renders its translated label
-      expect(wrapper.text()).toContain("Current window");
-    });
-
-    it("should render Cycle text", () => {
-      // Check for info icon (OIcon component) which accompanies the cycle text
-      const icons = wrapper.findAllComponents({ name: "OIcon" });
-      expect(icons.some((i) => /^info/.test(i.props("name") ?? ""))).toBe(true);
-    });
-
-    it("should render running text with period and frequency", () => {
-      // Test the conversion functions directly
-      expect(wrapper.vm.convertMinutesToDisplayValue(10)).toBe("10 Minutes");
-      expect(wrapper.vm.convertMinutesToDisplayValue(1)).toBe("1 Minute");
-    });
-
-    it("should render add comparison button", () => {
-      const addBtn = wrapper.find('[data-test="multi-time-range-alerts-add-btn"]');
-      expect(addBtn.exists()).toBe(true);
-    });
-
-    it("should render Comparing with section when windows exist", async () => {
+    it("a window reads as an amount and a unit, whatever type the look-back arrives as", async () => {
       await wrapper.setProps({
-        multiTimeRange: [{ offSet: "15m", uuid: "uuid-1" }],
+        period: "30" as unknown as number,
+        frequency: "30" as unknown as number,
+        multiTimeRange: [{ offSet: "1d", uuid: "uuid-1" }],
       });
       await flushPromises();
-      // Check that reference window container is rendered
-      const html = wrapper.html();
-      expect(html).toContain("reference-window-container");
+      const row = wrapper.find('[data-test="add-alert-compare-window"]');
+      expect(row.text()).toContain("earlier");
+      expect(row.text()).not.toMatch(/Minute|Running/);
+      const amount = row.find('[data-test="multi-time-range-offset-input"] input');
+      expect((amount.element as HTMLInputElement).value).toBe("1");
+      await amount.setValue("2");
+      expect(wrapper.emitted("update:multiTimeRange")?.at(-1)?.[0]).toEqual([
+        { offSet: "2d", uuid: "uuid-1" },
+      ]);
     });
 
-    it("should not render Comparing with section when no windows", () => {
-      // When no windows exist, the v-if should hide the "Comparing with" div
-      // Check that localMultiTimeRange is empty
-      expect(wrapper.vm.localMultiTimeRange.length).toBe(0);
-    });
-
-    it("should render reference windows", async () => {
+    it("a set comparison reads as one row per past window with an add link and Remove", async () => {
       await wrapper.setProps({
         multiTimeRange: [
           { offSet: "15m", uuid: "uuid-1" },
-          { offSet: "30m", uuid: "uuid-2" },
+          { offSet: "1d", uuid: "uuid-2" },
         ],
       });
       await flushPromises();
-      // Check that the correct number of reference windows are rendered
-      const deleteBtns = wrapper.findAll('[data-test="multi-time-range-alerts-delete-btn"]');
-      expect(deleteBtns.length).toBe(2);
-    });
-
-    it("should render delete buttons for each window", async () => {
-      await wrapper.setProps({
-        multiTimeRange: [
-          { offSet: "15m", uuid: "uuid-1" },
-          { offSet: "30m", uuid: "uuid-2" },
-        ],
-      });
-      await flushPromises();
-      const deleteBtns = wrapper.findAll('[data-test="multi-time-range-alerts-delete-btn"]');
-      expect(deleteBtns.length).toBe(2);
+      expect(wrapper.findAll('[data-test="add-alert-compare-window"]')).toHaveLength(2);
+      expect(wrapper.find('[data-test="multi-time-range-alerts-add-btn"]').exists()).toBe(true);
+      await wrapper.findAll('[data-test="multi-time-range-alerts-delete-btn"]')[1].trigger("click");
+      expect(wrapper.emitted("update:multiTimeRange")?.at(-1)?.[0]).toEqual([
+        { offSet: "15m", uuid: "uuid-1" },
+      ]);
     });
   });
 
   describe("Edge Cases", () => {
     it("should handle empty multiTimeRange", () => {
       expect(wrapper.vm.localMultiTimeRange).toEqual([]);
-    });
-
-    it("should handle very large time values", () => {
-      expect(wrapper.vm.getDisplayValue("999d")).toBe("999 Days");
-      expect(wrapper.vm.convertMinutesToDisplayValue(999999)).toBe("23 Months");
     });
 
     it("should handle removal of last window", async () => {
@@ -484,11 +358,6 @@ describe("CompareWithPast.vue", () => {
     it("should have proper structure for form inputs", () => {
       expect(wrapper.exists()).toBe(true);
     });
-
-    it("should have info icons with tooltips", () => {
-      const icons = wrapper.findAllComponents({ name: "OIcon" });
-      expect(icons.some((i) => /^info/.test(i.props("name") ?? ""))).toBe(true);
-    });
   });
 
   describe("Boundary Conditions", () => {
@@ -505,26 +374,9 @@ describe("CompareWithPast.vue", () => {
       await flushPromises();
       expect(wrapper.vm.localMultiTimeRange.length).toBe(10);
     });
-
-    it("should handle minimum period (1 minute)", async () => {
-      await wrapper.setProps({ period: 1 });
-      // Test the conversion function directly
-      expect(wrapper.vm.convertMinutesToDisplayValue(1)).toBe("1 Minute");
-    });
-
-    it("should handle large period values", async () => {
-      await wrapper.setProps({ period: 100000 });
-      const display = wrapper.vm.convertMinutesToDisplayValue(100000);
-      expect(display).toContain("Month");
-    });
   });
 
   describe("Negative Cases", () => {
-    it("should handle invalid time format gracefully", () => {
-      expect(wrapper.vm.getDisplayValue("xyz")).toBe("xyz");
-      expect(wrapper.vm.getDisplayValue("")).toBe("");
-    });
-
     it("should handle removing non-existent index", async () => {
       await wrapper.setProps({
         multiTimeRange: [{ offSet: "15m", uuid: "uuid-1" }],
@@ -582,11 +434,6 @@ describe("CompareWithPast.vue", () => {
       expect(wrapper.emitted("update:multiTimeRange")).toBeTruthy();
     });
 
-    it("should emit update:multiTimeRange when updating picker", () => {
-      wrapper.vm.updateDateTimePicker();
-      expect(wrapper.emitted("update:multiTimeRange")).toBeTruthy();
-    });
-
     it("should emit correct data structure", async () => {
       await wrapper.vm.addTimeShift();
       const emitted = wrapper.emitted("update:multiTimeRange");
@@ -610,13 +457,13 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
     commit: vi.fn(),
   });
 
-  function makeHost(initialRows: any[] = []) {
+  function makeHost(initialRows: any[] = [], vrl: string | null = null) {
     return defineComponent({
       components: { OForm, CompareWithPast },
       setup() {
         const form = useOForm({
           defaultValues: {
-            query_condition: { multi_time_range: initialRows },
+            query_condition: { multi_time_range: initialRows, vrl_function: vrl },
           },
           schema: z.looseObject({
             query_condition: z.looseObject({}).optional(),
@@ -641,8 +488,8 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
     });
   }
 
-  function mountHost(initialRows: any[] = []) {
-    return mount(makeHost(initialRows), {
+  function mountHost(initialRows: any[] = [], vrl: string | null = null) {
+    return mount(makeHost(initialRows, vrl), {
       global: {
         mocks: { $store: dtStore() },
         provide: { store: dtStore() },
@@ -660,9 +507,35 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
     await flushPromises();
 
     expect(parentForm.state.values.query_condition.multi_time_range.length).toBe(1);
-    expect(parentForm.state.values.query_condition.multi_time_range[0].offSet).toBe("15m");
+    expect(parentForm.state.values.query_condition.multi_time_range[0].offSet).toBe("1d");
     // form-owned in descendant mode → the bare-mode emit does NOT fire
     expect(host.findComponent(CompareWithPast).emitted("update:multiTimeRange")).toBeFalsy();
+  });
+
+  it("a generated comparison's factor edits in the row and rewrites its function", async () => {
+    vi.useFakeTimers();
+    try {
+      const host = mountHost([{ offSet: "1w", uuid: "u1" }], compareFunction(2));
+      const input = host.find('[data-test="add-alert-compare-factor-input"] input');
+      expect((input.element as HTMLInputElement).value).toBe("2");
+      await input.setValue("3");
+      vi.advanceTimersByTime(300);
+      expect((host.vm as any).form.state.values.query_condition.vrl_function).toBe(
+        compareFunction(3),
+      );
+      // Holding it until the past has data keeps the factor, and a factor edit keeps the hold.
+      await host.find('[data-test="add-alert-compare-needs-baseline"] button').trigger("click");
+      await input.setValue("4");
+      vi.advanceTimersByTime(300);
+      expect((host.vm as any).form.state.values.query_condition.vrl_function).toBe(
+        compareFunction(4, true),
+      );
+      const typed = mountHost([{ offSet: "1w", uuid: "u1" }], ".x = 1");
+      expect(typed.find('[data-test="add-alert-compare-factor"]').exists()).toBe(false);
+      expect(typed.find('[data-test="add-alert-compare-needs-baseline"]').exists()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("deleting a NON-last window leaves the PARENT form + rendered pickers correct", async () => {
@@ -675,10 +548,10 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
 
     const renderedOffsets = () =>
       host
-        .findAllComponents({ name: "CustomDateTimePicker" })
-        .map((c: any) => c.props("picker").offSet);
+        .findAll('[data-test="multi-time-range-offset-input"] input')
+        .map((i) => (i.element as HTMLInputElement).value);
 
-    expect(renderedOffsets()).toEqual(["15m", "30m", "45m"]);
+    expect(renderedOffsets()).toEqual(["15", "30", "45"]);
 
     // delete the MIDDLE window
     host.findComponent(CompareWithPast).vm.removeTimeShift(1);
@@ -687,6 +560,26 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
     expect(
       parentForm.state.values.query_condition.multi_time_range.map((r: any) => r.offSet),
     ).toEqual(["15m", "45m"]);
-    expect(renderedOffsets()).toEqual(["15m", "45m"]);
+    expect(renderedOffsets()).toEqual(["15", "45"]);
   });
+
+  it.each([
+    ["30s", "30", "m", ["minutes", "hours", "days", "weeks", "months"]],
+    ["1d", "1", "d", ["minute", "hour", "day", "week", "month"]],
+  ])(
+    "shows a saved %s as %s %s, in units that follow the number",
+    async (offSet, n, unit, labels) => {
+      const wrapper: VueWrapper<any> = mount(CompareWithPast, {
+        global: { plugins: [i18n] },
+        props: { multiTimeRange: [{ offSet, uuid: "u1" }], selectedTab: "sql" },
+      });
+      expect(
+        wrapper.find('[data-test="multi-time-range-offset-input"] input').element,
+      ).toHaveProperty("value", n);
+      expect(wrapper.vm.parseOffset(offSet).unit).toBe(unit);
+      expect(wrapper.vm.unitOptionsFor(Number(n)).map((o: { label: string }) => o.label)).toEqual(
+        labels,
+      );
+    },
+  );
 });

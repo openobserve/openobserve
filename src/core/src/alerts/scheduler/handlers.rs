@@ -3294,7 +3294,7 @@ async fn correlate_repeated_incident(
 }
 
 /// Whether a matched single-series run is still inside its pending period.
-fn holds_pending(
+pub(crate) fn holds_pending(
     alert: &config::meta::alerts::alert::Alert,
     last: Option<&config::meta::alerts::state::AlertState>,
     rows: Option<&[config::utils::json::Map<String, config::utils::json::Value>]>,
@@ -3410,7 +3410,7 @@ async fn single_row_ack(
 }
 
 /// D6: only a delivered firing opens the silence, so the run after a downtime delivers.
-fn starts_silence_window(
+pub(crate) fn starts_silence_window(
     condition_matched: bool,
     suppressed_by_downtime: bool,
     silence_minutes: i64,
@@ -3443,7 +3443,7 @@ fn records_delivery_state(alert_level_delivery: bool, delivery: &DeliveryDecisio
 }
 
 /// Whether a single-row firing at `level` repeats what its open recovery episode already sent.
-fn single_row_repeats(
+pub(crate) fn single_row_repeats(
     alert: &config::meta::alerts::alert::Alert,
     level: Option<config::meta::alerts::level::AlertLevel>,
     rollup: Option<&config::meta::alerts::state::AlertState>,

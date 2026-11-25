@@ -11,6 +11,7 @@ import { fenceAlertWrite } from "@/services/alerts.readFence";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
+import { ALERT_LIST_SAVED_NEW } from "@/utils/alerts/alertListLanding";
 import {
   readEditorDraft,
   writeEditorDraft,
@@ -201,38 +202,39 @@ describe("AddAlertView.vue", () => {
     expect(wrapper.vm.destinations).toEqual([]);
   });
 
-  it.each(["update:list", "cancel:hideform"])(
-    "opens the unfiltered alert list on %s, so the alert is in view",
-    async (event) => {
-      vi.mocked(destinationService.list).mockResolvedValue({
-        data: [{ id: 1, name: "Destination 1" }],
-      } as any);
+  it.each([
+    ["update:list", ALERT_LIST_SAVED_NEW],
+    ["cancel:hideform", undefined],
+  ])("opens the unfiltered alert list on %s, so the alert is in view", async (event, saved) => {
+    vi.mocked(destinationService.list).mockResolvedValue({
+      data: [{ id: 1, name: "Destination 1" }],
+    } as any);
 
-      const pushSpy = vi.spyOn(router, "push");
+    const pushSpy = vi.spyOn(router, "push");
 
-      const wrapper = mount(AddAlertView, {
-        global: {
-          plugins: [store, router],
-          stubs: { AddAlert: { name: "AddAlert", template: '<div class="add-alert-stub"></div>' } },
-        },
-      });
+    const wrapper = mount(AddAlertView, {
+      global: {
+        plugins: [store, router],
+        stubs: { AddAlert: { name: "AddAlert", template: '<div class="add-alert-stub"></div>' } },
+      },
+    });
 
-      await flushPromises();
+    await flushPromises();
 
-      wrapper.findComponent({ name: "AddAlert" }).vm.$emit(event);
-      await flushPromises();
+    wrapper.findComponent({ name: "AddAlert" }).vm.$emit(event);
+    await flushPromises();
 
-      expect(pushSpy).toHaveBeenCalledWith({
-        name: "alertList",
-        query: {
-          org_identifier: "test-org",
-          folder: "default",
-          tab: "all",
-          state: ALERT_LIST_ALL_STATES,
-        },
-      });
-    },
-  );
+    expect(pushSpy).toHaveBeenCalledWith({
+      name: "alertList",
+      query: {
+        org_identifier: "test-org",
+        folder: "default",
+        tab: "all",
+        state: ALERT_LIST_ALL_STATES,
+        saved,
+      },
+    });
+  });
 
   it("should refresh destinations when event is emitted", async () => {
     vi.mocked(destinationService.list).mockResolvedValue({
@@ -291,6 +293,49 @@ describe("AddAlertView.vue", () => {
     const addAlert = wrapper.findComponent({ name: "AddAlert" });
     expect(addAlert.props("destinations")).toEqual(mockDestinations);
     expect(addAlert.props("isUpdated")).toBe(false);
+  });
+
+  describe("templates", () => {
+    const TemplatesStub = {
+      name: "AddAlert",
+      props: ["templates"],
+      emits: ["refresh:templates"],
+      template: '<div class="add-alert-stub"></div>',
+    };
+    const mountWithTemplates = async () => {
+      vi.mocked(destinationService.list).mockResolvedValue({ data: [] } as any);
+      const wrapper = mount(AddAlertView, {
+        global: { plugins: [store, router], stubs: { AddAlert: TemplatesStub } },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    beforeEach(() => queryClient.clear());
+
+    it("hands the org's templates to the form so Template Override has options", async () => {
+      vi.mocked(templateService.list).mockResolvedValue({
+        data: [{ name: "pagerduty_default" }],
+      } as any);
+      const wrapper = await mountWithTemplates();
+
+      expect(wrapper.findComponent({ name: "AddAlert" }).props("templates")).toEqual([
+        { name: "pagerduty_default" },
+      ]);
+    });
+
+    it("reads the templates from the server again when the form asks for a refresh", async () => {
+      vi.mocked(templateService.list).mockResolvedValue({ data: [{ name: "a" }] } as any);
+      const wrapper = await mountWithTemplates();
+      vi.mocked(templateService.list).mockResolvedValue({
+        data: [{ name: "a" }, { name: "b" }],
+      } as any);
+
+      wrapper.findComponent({ name: "AddAlert" }).vm.$emit("refresh:templates");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "AddAlert" }).props("templates")).toHaveLength(2);
+    });
   });
 
   describe("edit mode", () => {
@@ -361,12 +406,17 @@ describe("AddAlertView.vue", () => {
       });
       await flushPromises();
 
-      // Rendering the form early would flash an empty create-form first.
+      // Rendering the form early would flash an empty create-form first; a static outline stands in, Save off.
       expect(wrapper.find(".add-alert-stub").exists()).toBe(false);
+      const skeleton = () => wrapper.find('[data-test="add-alert-skeleton"]');
+      expect(skeleton().exists()).toBe(true);
+      expect(skeleton().get('[data-test="add-alert-skeleton-save"]').attributes()).toHaveProperty(
+        "disabled",
+      );
 
       resolveAlert({ data: { name: "my-alert" } });
-      await flushPromises();
-      expect(wrapper.find(".add-alert-stub").exists()).toBe(true);
+      await vi.waitFor(() => expect(wrapper.find(".add-alert-stub").exists()).toBe(true));
+      expect(skeleton().exists()).toBe(false);
     });
 
     it("an alert read answered after an AutoObserve Apply or Undo is read again, so the form gets the new values (F2)", async () => {

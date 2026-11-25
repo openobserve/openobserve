@@ -5,10 +5,10 @@
  *
  * Tests run in PARALLEL.
  *
- * Note: The v3 alert creation UI is a single-page layout with two tabs
- * (Alert Rules, Advanced), NOT a multi-step wizard. Template Override
- * is in the Advanced tab; the preview chart appears automatically in
- * the right panel when stream type + name are selected.
+ * Note: The alert editor is one scrolling column of five sections, NOT a
+ * multi-step wizard. Template Override is a "+ add" link in "Who should
+ * hear about it?"; the preview chart appears automatically in the right
+ * rail when stream type + name are selected.
  */
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
@@ -200,18 +200,18 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     testLogger.info('✓ Selected stream: e2e_automate');
 
     // Add a condition
+    await pm.alertsPage.openFilterBuilder();
     const addConditionBtn = pm.alertsPage.getAddConditionButtonLocator();
     if (await addConditionBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await addConditionBtn.click();
       testLogger.info('✓ Added condition');
     }
 
-    // Switch to the Advanced tab
-    await expect(pm.alertsPage.getAdvancedTabLocator(), 'Advanced tab should be visible').toBeVisible({ timeout: 3000 });
+    // Template Override sits in the "Who should hear about it?" section, behind its "+ add" link
+    await expect(pm.alertsPage.getAlertSectionNavItemLocator('notify'), 'Notify section should be listed').toBeVisible({ timeout: 3000 });
     await pm.alertsPage.clickAdvancedTab();
-    testLogger.info('✓ Switched to Advanced tab');
+    testLogger.info('✓ Opened the notify section settings');
 
-    // Template Override in Advanced tab
     const templateOverrideSelect = pm.alertsPage.getAdvancedTemplateOverrideSelect();
     await expect(templateOverrideSelect, 'Template override select should be visible').toBeVisible({ timeout: 3000 });
     testLogger.info('✓ Template override field found');
@@ -348,6 +348,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     testLogger.info('Selected stream: logs / e2e_automate');
 
     // Add a condition so the inline query editor renders
+    await pm.alertsPage.openFilterBuilder();
     const addConditionBtn = pm.alertsPage.getAddConditionButtonLocator();
     await expect(addConditionBtn, 'Add Condition button should be visible').toBeVisible({ timeout: 5000 });
     await addConditionBtn.click();

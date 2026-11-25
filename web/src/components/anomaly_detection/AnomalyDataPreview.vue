@@ -162,8 +162,15 @@ const loadPreview = () => {
   const requestKey = `${sql}|${windowValue}${windowUnit}|${props.config.stream_type}`;
   if (previewActive.value && requestKey === lastRequestKey.value) return;
   lastRequestKey.value = requestKey;
+  // The bucket still filling reads as a sudden drop, so the chart ends at the last whole one.
+  const unitMs: Record<string, number> = { s: 1000, m: 60000, h: 3600000, d: 86400000 };
+  const bucketMs =
+    positiveOr(props.config.histogram_interval_value, 5) *
+    (unitMs[props.config.histogram_interval_unit ?? "m"] ?? 60000);
+  const endMs =
+    props.config.query_mode === "custom_sql" ? Date.now() : Date.now() - (Date.now() % bucketMs);
   // usePanelDataLoader reads .getTime() off these, so the Date must carry MICROseconds, not ms
-  const endMicros = new Date().getTime() * 1000;
+  const endMicros = endMs * 1000;
   const startMicros = endMicros - windowMs * 1000;
 
   previewTimeObj.value = {
@@ -182,6 +189,8 @@ const loadPreview = () => {
       legends_position: "bottom",
       unit: "short",
       unit_custom: "",
+      // A count is a whole number; "210000.00" reads as a measurement.
+      decimals: (props.config.detection_function || "count") === "count" ? 0 : undefined,
       promql_legend: "",
       axis_border_show: false,
       connect_nulls: true,

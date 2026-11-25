@@ -164,6 +164,20 @@ describe("AnomalyDataPreview", () => {
     });
   });
 
+  it.each([
+    ["count", 0],
+    ["avg", undefined],
+  ])(
+    "ends a %s chart at the last whole bucket, so the latest point is not a partial dip",
+    async (fn, decimals) => {
+      wrapper = mountPreview({ detection_function: fn, detection_function_field: "x" });
+      await getSqlFromPreview(wrapper);
+      const vm = wrapper.vm as any;
+      expect(vm.previewTimeObj.end_time.getTime() % (5 * 60_000_000)).toBe(0);
+      expect(vm.previewPanelSchema.config.decimals).toBe(decimals);
+    },
+  );
+
   // =========================================================================
   describe("filters mode — histogram interval", () => {
     it("should embed 15m interval when histogram_interval_value is 15 and unit is m", async () => {
@@ -573,10 +587,9 @@ describe("AnomalyDataPreview", () => {
 
       const caption = wrapper.find('[data-test="anomaly-data-preview-caption"]');
       expect(caption.exists()).toBe(true);
-      // The caption must send the reader somewhere real for anomalies, since none
-      // are drawn here — "Detection results" is the tab that actually shows them.
+      // No anomaly is drawn here, so the caption says when they appear.
       expect(caption.text()).toContain("watch");
-      expect(caption.text()).toContain("Detection results");
+      expect(caption.text()).toContain("after training");
     });
 
     it("hides the caption while the empty state is showing", async () => {

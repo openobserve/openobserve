@@ -40,6 +40,12 @@ import {
 /** Catalogue metadata the create body has no field for. */
 const ANOMALY_LIBRARY_ONLY_KEYS = ["title", "severity", "source"] as const;
 
+/** Provenance keys an install stamps into context attributes; not variables the user wrote. */
+export const LIBRARY_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set(["library_id", "library_hash"]);
+
+export const isLibraryAttribute = (key: unknown): boolean =>
+  LIBRARY_ATTRIBUTE_KEYS.has(String(key ?? ""));
+
 /** The batch-shared pair the wizard's Tune step edits, for every alert at once. */
 export interface InstallOverrides {
   /** Evaluation interval, minutes. */
@@ -149,7 +155,7 @@ const stringValuedOnly = (record: Record<string, unknown>): Record<string, strin
   return kept;
 };
 
-const withPackTag = (tags: unknown, pack: string): unknown[] => {
+export const withPackTag = (tags: unknown, pack: string): unknown[] => {
   const packTag = `pack:${pack}`;
   const list = Array.isArray(tags) ? (tags as unknown[]) : [];
   return list.includes(packTag) ? list : [...list, packTag];

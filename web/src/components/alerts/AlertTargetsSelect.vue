@@ -32,8 +32,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   in the parent (AlertSettings) so the two alert-type layouts keep their chrome.
 -->
 <template>
-  <div class="flex items-center max-md:flex-wrap max-md:gap-y-2">
+  <div
+    :class="['flex items-center max-md:flex-wrap max-md:gap-y-2', wrap ? 'flex-wrap gap-y-2' : '']"
+  >
+    <div v-if="showsList" class="w-full" data-test="alert-destinations-list">
+      <OCheckboxGroup
+        v-if="listOptions.length"
+        :model-value="model"
+        :aria-label="t('alerts.destination')"
+        @update:model-value="onUpdate"
+      >
+        <!-- Two columns wrap each name over its meta, so they only pay off for a long list. -->
+        <div
+          class="grid gap-x-4 gap-y-1"
+          :class="
+            listOptions.length > 8
+              ? 'grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]'
+              : 'grid-cols-1'
+          "
+        >
+          <OCheckbox
+            v-for="option in listOptions"
+            :key="option.value"
+            :value="option.value"
+            :label="option.listLabel ?? option.label"
+            class="py-0.5"
+            data-test="alert-destinations-list-option"
+          >
+            <template v-if="option.listMeta" #label>
+              <span class="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+                <span class="text-text-body text-sm break-words">{{ option.label }}</span>
+                <span
+                  class="text-text-secondary text-xs break-words"
+                  data-test="alert-destinations-list-option-meta"
+                  >{{ option.listMeta }}</span
+                >
+              </span>
+            </template>
+          </OCheckbox>
+        </div>
+      </OCheckboxGroup>
+      <p v-else class="text-text-secondary m-0 text-sm" data-test="alert-destinations-list-empty">
+        {{ t("alerts.sections.noDestinationsYet") }}
+      </p>
+    </div>
     <OSelect
+      v-else
       :model-value="model"
       :aria-label="t('alerts.destination')"
       :options="options"
@@ -42,7 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :error="error"
       :collapsible-groups="workflowsEnabled"
       pin-selected-in-groups
+      :dropdown-style="describe ? DESCRIBED_MENU : undefined"
       class="max-w-[18.75rem] min-w-[11.25rem] max-md:max-w-none max-md:min-w-0 max-md:flex-1 max-md:basis-[calc(100%-2rem)]"
+      :class="[wrap && 'flex-1', oneLine && 'min-w-0!']"
       data-test="alert-destinations-select"
       @update:model-value="onUpdate"
     >
@@ -54,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OSelect>
 
     <OButton
+      v-if="!oneLine"
       data-test="alert-settings-refresh-destinations-btn"
       class="ms-1"
       variant="ghost"
@@ -64,16 +111,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="refresh" size="sm" />
     </OButton>
     <OButton
+      v-if="!oneLine"
       data-test="create-destination-btn"
       variant="outline"
       size="sm"
+      icon-left="add"
       class="ms-2 max-md:ms-0"
       @click="emit('create-destination')"
     >
       {{ t("alerts.alertSettings.addNewDestination") }}
     </OButton>
     <OButton
-      v-if="workflowsEnabled"
+      v-if="workflowsEnabled && !noWorkflowButton"
       data-test="create-workflow-btn"
       variant="outline"
       size="sm"
@@ -85,7 +134,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Locked (not hidden): the family supports workflow routing, but this
          edition doesn't unlock it — kept as the discovery point since the
          dropdown's own "Workflows" header has no icon/tooltip slot to attach. -->
-    <OTooltip v-else-if="workflowsLicenseLocked" :content="workflowsLockMessage">
+    <OTooltip
+      v-else-if="workflowsLicenseLocked && !noWorkflowButton"
+      :content="workflowsLockMessage"
+    >
       <span class="ms-2 inline-flex">
         <OButton
           data-test="create-workflow-btn"
@@ -98,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </span>
     </OTooltip>
-    <template v-else-if="workflowsLocked">
+    <template v-else-if="workflowsLocked && !noWorkflowButton">
       <OButton
         data-test="create-workflow-btn"
         variant="outline"
@@ -117,16 +169,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckboxGroup from "@/lib/forms/Checkbox/OCheckboxGroup.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import type { DestinationDescription } from "@/utils/alerts/destinationDescription";
 
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 interface Option {
   label: I18nText;
   value: string;
+  listLabel?: I18nText;
+  /** What the destination is, who it reaches and how many alerts already use it. */
+  listMeta?: I18nText;
+  searchText?: string;
 }
 // Option lists may be plain strings (destinations = `getFormattedDestinations`
 // returns names) or `{label,value}` objects (workflows). Normalized below.
@@ -145,6 +204,16 @@ const props = defineProps<{
   lockedWorkflowNames?: Record<string, string>;
   error?: boolean;
   placeholder?: I18nText;
+  /** Let the buttons drop to a second line when the row is narrower than the controls. */
+  wrap?: boolean;
+  /** Show the targets as checkboxes while there are few enough to scan. */
+  list?: boolean;
+  /** The parent offers New workflow itself, so the row draws no workflow button. */
+  noWorkflowButton?: boolean;
+  /** The picker has the line to itself; the caller draws refresh and New destination (opt-in). */
+  oneLine?: boolean;
+  /** Type and target per destination name, so each row says where it delivers (opt-in). */
+  describe?: Record<string, DestinationDescription>;
 }>();
 
 const emit = defineEmits<{
@@ -157,7 +226,10 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
+// Rows that also name the type and target need more room than a bare name.
+const DESCRIBED_MENU = { width: "min(32rem, calc(100vw - 1.5rem))" };
 const DEST = "dest:";
+const LIST_MAX = 8;
 const WF = "wf:";
 
 // Every list below is API-backed, so a failed or partially-loaded fetch can hand
@@ -204,11 +276,33 @@ const norm = (o: RawOption): { name: string; label: I18nText } | null => {
   return { name: value, label: (o as Option).label ?? raw(value) };
 };
 
+// The chip keeps the bare name; the row and the search also carry type and target.
+const described = (name: string, label: I18nText): Partial<Option> => {
+  const detail = props.describe?.[name];
+  if (!detail) return {};
+  const params = { name: label, type: detail.type, target: detail.target };
+  const facts = [detail.type, detail.target].filter((fact): fact is I18nText => !!fact);
+  if (typeof detail.usedBy === "number") {
+    facts.push(t("alerts.form.destination.usedBy", { count: detail.usedBy }, detail.usedBy));
+  }
+  return {
+    listLabel: detail.target
+      ? t("alerts.form.destination.row", params)
+      : t("alerts.form.destination.rowNoTarget", params),
+    listMeta: raw(facts.join(" · ")),
+    searchText: [detail.type, detail.target].filter(Boolean).join(" "),
+  };
+};
+
 const toTagged = (list: RawOption[] | undefined, tag: string) =>
   (list || [])
     .map(norm)
     .filter(isFilled)
-    .map(({ name, label }) => ({ label, value: `${tag}${name}` }));
+    .map(({ name, label }) => ({
+      label,
+      value: `${tag}${name}`,
+      ...(tag === DEST ? described(name, label) : {}),
+    }));
 
 // A selected name absent from its options list — flagged, not dropped, so it stays until removed.
 const missingOptions = (
@@ -271,6 +365,17 @@ const options = computed(() => {
     ...missingWfs,
   ];
 });
+
+const listOptions = computed(() =>
+  options.value.filter((option): option is Option => !("header" in option)),
+);
+// Workflow groups and missing/locked badges only render in the dropdown, so the list is for plain destinations.
+const showsList = computed(
+  () =>
+    props.list &&
+    listOptions.value.length <= LIST_MAX &&
+    listOptions.value.every((option) => !("badge" in option) && option.value.startsWith(DEST)),
+);
 
 // Split the tagged selection back into the two backend fields. Keep the control's
 // own order in `model` so the chips don't jump when props round-trip back.

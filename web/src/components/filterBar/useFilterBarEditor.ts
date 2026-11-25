@@ -80,6 +80,8 @@ export interface FilterBarEditorOptions {
   /** Values offered before the loaded ones for every field, e.g. dashboard `$variables`. */
   extraValues?: Ref<((field: string) => string[]) | undefined>;
   valueLabel?: Ref<((field: string, value: string) => FilterValueLabel | undefined) | undefined>;
+  /** Replaces a field row's type word, e.g. to say the field had no values lately. */
+  fieldDetail?: Ref<((field: string) => I18nText | undefined) | undefined>;
   /** Host rows listed above the fields while the bar is empty and nothing is typed. */
   extraSuggestions?: Ref<FilterBarExtraSection | undefined>;
   selectExtra?: (key: string, event: MouseEvent | KeyboardEvent) => void;
@@ -326,7 +328,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       rows.push({
         key: name,
         label: raw(fieldMap.value.get(name)!.label ?? name),
-        detail: t(`filterBar.types.${type}`),
+        detail: options.fieldDetail?.value?.(name) ?? t(`filterBar.types.${type}`),
         icon: TYPE_ICONS[type],
         selected: editPart.value === "field" && editedNode.value?.field === name,
       });
@@ -558,7 +560,10 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     pendingConnector.value = "AND";
     reset();
     options.commit(next);
-    open.value = !wasEditing;
+    const chain = config.value.chainNext !== false;
+    open.value = !wasEditing && chain;
+    // Not chaining, a line opened between chips is done once its condition lands; an open group stays open.
+    if (!wasEditing && !chain && caretBeforeId.value) moveCaretTo(openGroupId.value, null);
   }
 
   // A new condition keeps the chip's value when it still takes one.

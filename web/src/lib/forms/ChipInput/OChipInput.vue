@@ -55,6 +55,7 @@ const props = withDefaults(defineProps<ChipInputProps>(), {
   inlineCaret: false,
   resting: false,
   maxRows: undefined,
+  rowTooltipSide: undefined,
   dataTest: undefined,
 });
 const emit = defineEmits<ChipInputEmits>();
@@ -672,9 +673,11 @@ function onFieldFocusOut() {
                   size="xs"
                   class="text-text-secondary shrink-0"
                 />
-                <OTruncatedText :class="['min-w-0 flex-1', suggestion.mono ? 'font-mono' : '']">{{
-                  suggestion.label
-                }}</OTruncatedText>
+                <OTruncatedText
+                  :class="['min-w-0 flex-1', suggestion.mono ? 'font-mono' : '']"
+                  :tooltip-side="rowTooltipSide"
+                  >{{ suggestion.label }}</OTruncatedText
+                >
                 <span v-if="suggestion.detail" class="text-text-secondary ms-3 shrink-0">{{
                   suggestion.detail
                 }}</span>

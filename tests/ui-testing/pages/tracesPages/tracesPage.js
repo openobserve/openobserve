@@ -3594,13 +3594,14 @@ export class TracesPage {
     await expect(this.page).toHaveURL(/prefill=traces/, { timeout: 30000 });
     await expect(
       this.page.locator('[data-test="add-alert-stream-type-select-dropdown"]').first()
-    ).toContainText('traces', { timeout: 30000 });
+    ).toContainText(/traces/i, { timeout: 30000 });
     await expect(
       this.page.locator('[data-test="alert-trigger-threshold-input-field"]').first()
     ).toHaveValue('1');
+    // The operator shows as words ("at least"), so check the stored value, not the label.
     await expect(
-      this.page.locator('[data-test="alert-trigger-operator-select"]').first()
-    ).toContainText('>=');
+      this.page.locator('[data-test="alert-trigger-operator-select"] select').first()
+    ).toHaveValue('>=');
   }
 
   /** Open the explorer for `streamName` on `tab`; the `stream` param makes the page search on load. */

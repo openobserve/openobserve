@@ -141,6 +141,18 @@ describe("QueryFilterBar", () => {
     expect(rowKeys()).toContain("status");
   });
 
+  it("leaves the field list closed after a chip when the profile does not chain conditions", async () => {
+    const state = mountBar({ profile: "alert" });
+    await openBar();
+    await type("lev");
+    await press("Enter");
+    await press("Enter");
+    await vi.waitFor(() => expect(rowKeys()).toContain("error"));
+    await press("Enter");
+    expect(sql(state)).toBe("level = 'error'");
+    expect(rowKeys()).toEqual([]);
+  });
+
   it("opens the picker when the user types at the caret", async () => {
     mountBar();
     await type("s");
@@ -212,6 +224,19 @@ describe("QueryFilterBar", () => {
     expect(sql(state)).toBe("");
     await press("Enter");
     expect(sql(state)).toBe("level IN ('error', 'warn')");
+  });
+
+  it.each([
+    ["Counts cover the last day", "Counts cover the last day"],
+    [undefined, null],
+  ])("a value note %s shows above the value footer as %s", async (valueNote, shown) => {
+    mountBar({ valueNote });
+    await openBar();
+    await clickRow("level");
+    await clickRow("in");
+    await vi.waitFor(() => expect(rowKeys()).toContain("warn"));
+    const note = document.body.querySelector('[data-test="query-filter-bar-value-note"]');
+    expect(note?.textContent?.trim() ?? null).toBe(shown);
   });
 
   it("ticks several values for is any of and applies them from the footer", async () => {
@@ -350,6 +375,19 @@ describe("QueryFilterBar", () => {
       await press("Escape");
       expect(document.body.querySelector('[data-test="query-filter-bar-search"]')).toBeNull();
       expect(sql(state)).toBe("level = 'error' AND status = 1");
+    });
+
+    it.each([
+      ["drops", undefined, false],
+      ["keeps", "alert", true],
+    ])("%s a half-built condition on Escape (profile %s)", async (_, profile, kept) => {
+      mountBar({ profile });
+      await openBar();
+      await clickRow("level");
+      await clickRow("eq");
+      await press("Escape");
+      expect(rows()).toHaveLength(0);
+      expect(wrapper!.find('[data-test="query-filter-bar-draft"]').exists()).toBe(kept);
     });
 
     it("marks the part being edited", async () => {
@@ -610,6 +648,17 @@ describe("QueryFilterBar", () => {
     expect(onChange).not.toHaveBeenCalled();
     await wrapper!.setProps({ layout: "horizontal" });
     expect(wrapper!.find('[data-test^="query-filter-bar-summary-"]').exists()).toBe(false);
+  });
+
+  it("gives the vertical caret its own line for a new chip, never while a chip is edited", async () => {
+    mountBar({ modelValue: parseSqlFilter("level = 'error'")!, layout: "vertical" });
+    const draftRow = () => wrapper!.find('[data-test="query-filter-bar-draft-row"]').exists();
+    await editPart("level", "value");
+    expect(draftRow()).toBe(false);
+    await press("Escape");
+    await wrapper!.find('[data-test="query-filter-bar-add-condition"]').trigger("click");
+    await flushPromises();
+    expect(draftRow()).toBe(true);
   });
 
   it("moves focus to the redrawn fold toggle even when the group id holds a quote", async () => {

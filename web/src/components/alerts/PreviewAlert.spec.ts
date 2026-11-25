@@ -33,7 +33,7 @@ vi.mock("../dashboards/PanelSchemaRenderer.vue", () => ({
       "searchType",
       "is_ui_histogram",
     ],
-    emits: ["result-metadata-update", "series-data-update"],
+    emits: ["result-metadata-update", "series-data-update", "error", "loading-state-change"],
   },
 }));
 
@@ -52,8 +52,31 @@ vi.mock("@/services/search", async (importOriginal) => {
   });
 });
 
+const streaming = vi.hoisted(() => ({ calls: [] as any[], cancel: vi.fn() }));
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: (data: any, handlers: any) =>
+      streaming.calls.push({ data, handlers }),
+    cancelStreamQueryBasedOnRequestId: streaming.cancel,
+  }),
+}));
+
+const metricsApi = vi.hoisted(() => ({
+  parsePromqlQuery: vi.fn().mockResolvedValue({ data: { data: null } }),
+  get_promql_series: vi.fn().mockResolvedValue({ data: { data: [] } }),
+}));
+vi.mock("@/services/metrics", () => ({ default: metricsApi }));
+
+const streamMeta = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: async () => ({ metrics_meta: streamMeta.value }) }),
+}));
+
 // Imported after the mock above so it resolves to the mocked module.
 import searchService from "@/services/search";
+import { compareFunction } from "@/utils/alerts/alertIntents";
+import alertsService from "@/services/alerts";
+import { queryClient } from "@/composables/query/queryClient";
 
 const baseFormData = () => ({
   stream_name: "test-stream",
@@ -171,6 +194,24 @@ const emitResultMetadata = async (w: VueWrapper<any>, payload: any) => {
   await nextTick();
 };
 
+/** Answer the latest verdict search: a builder alert is judged from its own window, not the chart. */
+const answerVerdict = async (frames: Record<string, any>[]) => {
+  const call = streaming.calls[streaming.calls.length - 1];
+  for (const { hits, total, ...flags } of frames) {
+    call.handlers.data(call.data, {
+      type: "search_response_metadata",
+      content: { ...flags, results: { total } },
+    });
+    if (hits)
+      call.handlers.data(call.data, {
+        type: "search_response_hits",
+        content: { results: { hits } },
+      });
+  }
+  call.handlers.complete(call.data, {});
+  await nextTick();
+};
+
 describe("PreviewAlert - rendering", () => {
   let wrapper: VueWrapper<any>;
 
@@ -273,21 +314,6 @@ describe("PreviewAlert - PanelSchemaRenderer integration", () => {
     await nextTick();
     const renderer = w.findComponent({ name: "PanelSchemaRenderer" });
     expect(renderer.props("variablesData")).toEqual({});
-    w.unmount();
-  });
-
-  it("passes is_ui_histogram=true when isUsingBackendSql=true and custom+noAgg", async () => {
-    const w = await mountComp({
-      query: "SELECT * FROM logs",
-      isUsingBackendSql: true,
-      selectedTab: "custom",
-      isAggregationEnabled: false,
-    });
-    w.vm.chartData = { type: "line" };
-    await nextTick();
-    const renderer = w.findComponent({ name: "PanelSchemaRenderer" });
-    // shouldUseHistogram = isUsingBackendSql when tab=custom and !aggregation
-    expect(renderer.props("is_ui_histogram")).toBe(true);
     w.unmount();
   });
 
@@ -408,24 +434,54 @@ describe("PreviewAlert - refreshData method", () => {
     await nextTick();
 
     const config = w.vm.chartData.config;
-    expect(config.mark_line).toEqual([expect.objectContaining({ name: "Critical", value: "5" })]);
+    expect(config.mark_line).toEqual([expect.objectContaining({ value: "5" })]);
     expect(config.y_axis_max).toBeGreaterThan(5);
-    expect(config.y_axis_min).toBeLessThan(5);
     w.unmount();
   });
 
-  it("widens the y-axis for the PromQL threshold too", async () => {
+  it.each([
+    ["a new limit", { threshold: 8 }, {}, [expect.objectContaining({ value: "8" })]],
+    ["a limit that needs fixing", { threshold: -5 }, {}, []],
+    ["a real-time alert", {}, { is_real_time: "true" }, []],
+  ])("redraws the limit line at once for %s", async (_, tc, top, lines) => {
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: "custom" });
+    await flushPromises();
+    const next = baseFormData();
+    await w.setProps({
+      formData: { ...next, ...top, trigger_condition: { ...next.trigger_condition, ...tc } },
+    });
+    await nextTick();
+    expect(w.vm.chartData.config.mark_line).toEqual(lines);
+    w.unmount();
+  });
+
+  it("withdraws the verdict while the limit needs fixing", async () => {
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: "custom" });
+    (w.vm as any).evaluateAndSetStatus(3);
+    const next = baseFormData();
+    await w.setProps({
+      formData: { ...next, trigger_condition: { ...next.trigger_condition, threshold: -5 } },
+    });
+    expect((w.vm.$.exposed as any).evaluationStatus.value).toBeNull();
+    w.unmount();
+  });
+
+  // The renderer takes min(y_axis_min, data min), so a floor above 0 would start the axis at the data.
+  it.each([
+    [2, undefined],
+    [-2, -2.2],
+  ])("keeps a PromQL limit of %s on screen with the axis floor at %s", async (limit, floor) => {
     const formData = baseFormData() as any;
-    formData.query_condition.promql_condition = { column: "value", operator: "=", value: 2 };
+    formData.query_condition.promql_condition = { column: "value", operator: "=", value: limit };
     const w = await mountComp({ query: "up", selectedTab: "promql", formData });
 
     w.vm.refreshData();
     await nextTick();
 
     const config = w.vm.chartData.config;
-    expect(config.mark_line).toEqual([expect.objectContaining({ name: "Critical", value: "2" })]);
-    expect(config.y_axis_max).toBeGreaterThan(2);
-    expect(config.y_axis_min).toBeLessThan(2);
+    expect(config.mark_line).toEqual([expect.objectContaining({ value: String(limit) })]);
+    expect(config.y_axis_max).toBeGreaterThan(limit);
+    expect(config.y_axis_min).toBe(floor);
     w.unmount();
   });
 
@@ -634,6 +690,94 @@ describe("PreviewAlert - watcher behavior", () => {
     w.unmount();
   });
 
+  it("drops the verdict when the SQL changes until the new query returns a result", async () => {
+    const w = await mountComp({
+      query: `SELECT count(*) AS zo_sql_num FROM "logs"`,
+      selectedTab: "sql",
+      formData: {
+        ...baseFormData(),
+        is_real_time: false,
+        trigger_condition: { period: 10, threshold: 5, operator: ">=" },
+      },
+    });
+    await flushPromises();
+    await emitResultMetadata(w, [[{ total: 4001 }]]);
+    expect(w.vm.evaluationStatus?.wouldTrigger).toBe(true);
+
+    await w.setProps({ query: "SELECT FROM WHERE oops" });
+    expect(w.vm.evaluationStatus).toBeNull();
+
+    await w.setProps({ query: `SELECT count(*) AS zo_sql_num FROM "logs" WHERE a=1` });
+    await emitResultMetadata(w, [[{ total: 2 }]]);
+    expect(w.vm.evaluationStatus?.wouldTrigger).toBe(false);
+    w.unmount();
+  });
+
+  it("shows no verdict while the query fails, even a stale one emitted after the error", async () => {
+    const w = await mountComp({
+      query: `SELECT count(*) AS zo_sql_num FROM "logs"`,
+      selectedTab: "sql",
+      formData: { ...baseFormData(), is_real_time: false },
+    });
+    await flushPromises();
+    const exposed = w.vm.$.exposed as any;
+    const renderer = w.findComponent({ name: "PanelSchemaRenderer" });
+    await emitResultMetadata(w, [[{ total: 1000 }]]);
+    expect(exposed.evaluationStatus.value?.wouldTrigger).toBe(true);
+
+    renderer.vm.$emit("error", { message: "Search field not found", code: 400 });
+    await nextTick();
+    await emitResultMetadata(w, [[{ total: 1000 }]]);
+    expect(exposed.evaluationStatus.value).toBeNull();
+    expect(exposed.queryFailed.value).toBe(true);
+
+    // The next run clears the error as it starts; the summary keeps it until that run answers.
+    renderer.vm.$emit("loading-state-change", true);
+    renderer.vm.$emit("error", { message: "", code: "" });
+    await nextTick();
+    expect(exposed.evaluationStatus.value).toBeNull();
+    expect(exposed.queryFailed.value).toBe(true);
+    await emitResultMetadata(w, [[{ total: 2 }]]);
+    renderer.vm.$emit("loading-state-change", false);
+    await nextTick();
+    expect(exposed.evaluationStatus.value?.wouldTrigger).toBe(false);
+    expect(exposed.queryFailed.value).toBe(false);
+    w.unmount();
+  });
+
+  it("blames the query only for a 4xx, not for a server or network failure", async () => {
+    const w = await mountComp({ query: "up", selectedTab: "promql" });
+    const renderer = w.findComponent({ name: "PanelSchemaRenderer" });
+    renderer.vm.$emit("error", { message: "boom", code: 503 });
+    await nextTick();
+    expect((w.vm.$.exposed as any).queryFailed.value).toBe(false);
+    renderer.vm.$emit("error", { message: "parse error", code: "400" });
+    await nextTick();
+    expect((w.vm.$.exposed as any).queryFailed.value).toBe(true);
+    w.unmount();
+  });
+
+  it.each([
+    [400, "Search field not found: nosuchcol", true],
+    [503, "upstream connect error", false],
+  ])(
+    "a %s from the chart shows the error state, naming the server message only for a 4xx",
+    async (code, message, named) => {
+      const w = await mountComp({ query: "SELECT nosuchcol FROM logs", selectedTab: "sql" });
+      await flushPromises();
+      const renderer = w.findComponent({ name: "PanelSchemaRenderer" });
+      expect(renderer.props("panelSchema").error_config?.custom_error_handeling).toBe(true);
+      expect(w.find('[data-test="query-error-state"]').exists()).toBe(false);
+
+      renderer.vm.$emit("error", { message, code });
+      await nextTick();
+      const shown = w.find('[data-test="query-error-state"]');
+      expect(shown.exists()).toBe(true);
+      expect(shown.text().includes("nosuchcol") || shown.text().includes(message)).toBe(named);
+      w.unmount();
+    },
+  );
+
   it("chartData is defined after prop update", async () => {
     const w = await mountComp({
       query: "SELECT * FROM logs",
@@ -781,7 +925,8 @@ describe("PreviewAlert - PromQL verdict", () => {
             ? { column: "value", operator: ">=", value: 80 }
             : opts.condition,
         promql_warning_value: opts.warningValue,
-        promql_multi_alert: opts.multiAlert ?? false,
+        // One per series classifies the last sample, which is what most cases below pin.
+        promql_multi_alert: opts.multiAlert ?? true,
       },
     };
     return mountComp({ query: "k8s_node_memory_usage", selectedTab: "promql", formData });
@@ -801,6 +946,19 @@ describe("PreviewAlert - PromQL verdict", () => {
     await emitSeries(w, threeNodes());
 
     // One of three nodes is over 80, and the count gate wants >= 1.
+    expectVerdict(w, { matched: 1, gate: "1 >= 1", trigger: true });
+    w.unmount();
+  });
+
+  it("writes the verdict once, from the settled part of a streamed result", async () => {
+    const w = await mountPromql();
+    const renderer = w.findComponent({ name: "PanelSchemaRenderer" });
+    renderer.vm.$emit("loading-state-change", true);
+    await emitSeries(w, seriesPayload(series("node-a", ["90"]), series("node-b", ["95"])));
+    await emitSeries(w, threeNodes());
+    expect(w.vm.evaluationStatus).toBeNull();
+    renderer.vm.$emit("loading-state-change", false);
+    await nextTick();
     expectVerdict(w, { matched: 1, gate: "1 >= 1", trigger: true });
     w.unmount();
   });
@@ -829,13 +987,45 @@ describe("PreviewAlert - PromQL verdict", () => {
     w.unmount();
   });
 
-  it("judges a series by its LAST sample, not by whether it ever crossed", async () => {
-    const w = await mountPromql({ condition: { column: "value", operator: ">=", value: 80 } });
+  // One per series reads the last sample; one alert filters at the threshold over the 10-minute look-back.
+  it.each([
+    [
+      "one per series, by its last sample",
+      true,
+      [
+        [0, "85"],
+        [1, "40"],
+      ],
+      0,
+    ],
+    [
+      "one alert, by a crossing inside the look-back",
+      false,
+      [
+        [0, "85"],
+        [1, "40"],
+      ],
+      1,
+    ],
+    [
+      "one alert, not by a crossing before the look-back",
+      false,
+      [
+        [0, "85"],
+        [44, "40"],
+      ],
+      0,
+    ],
+  ])("judges a spike that came back down: %s", async (_case, multiAlert, points, matched) => {
+    const w = await mountPromql({
+      condition: { column: "value", operator: ">=", value: 80 },
+      multiAlert: multiAlert as boolean,
+    });
+    const data = (points as [number, string][]).map(([step, v]) => [T0 + step * 15000, v]);
 
-    // Spiked to 85, now back down to 40 — not currently over the line.
-    await emitSeries(w, seriesPayload(series("node-a", ["85", "40"])));
+    await emitSeries(w, seriesPayload({ name: "node-a", data }));
 
-    expectVerdict(w, { matched: 0, gate: "0 >= 1", trigger: false });
+    expectVerdict(w, { matched: matched as number, gate: `${matched} >= 1`, trigger: !!matched });
     w.unmount();
   });
 
@@ -1425,7 +1615,7 @@ describe("PreviewAlert - PromQL verdict", () => {
     });
     await flushPromises();
 
-    await emitResultMetadata(w, [[{ hits: [{ zo_sql_num: 7 }] }]]);
+    await answerVerdict([{ hits: [{ zo_sql_num: 7 }] }]);
 
     expectVerdict(w, { matched: 7, gate: "7 >= 5", trigger: true, label: "dataPoints" });
     w.unmount();
@@ -1465,9 +1655,7 @@ describe("PreviewAlert - PromQL verdict", () => {
   });
 
   it("gives the same verdict whether or not promql_multi_alert is set", async () => {
-    // The flag changes which QUERY the backend runs (raw expression per series vs
-    // one pre-filtered query); the preview always charts the raw expression and
-    // filters in JS, so the badge must not move.
+    // Series that stay on one side of the line get the same answer from both queries.
     const payload = () =>
       seriesPayload(series("node-b", ["82", "85"]), series("node-c", ["12", "10"]));
 
@@ -1737,15 +1925,13 @@ describe("PreviewAlert - PromQL verdict", () => {
     });
     await flushPromises();
 
-    await emitResultMetadata(w, [
-      [
-        {
-          hits: [
-            { k8s_node: "a", zo_sql_num: 12 },
-            { k8s_node: "b", zo_sql_num: 3 },
-          ],
-        },
-      ],
+    await answerVerdict([
+      {
+        hits: [
+          { k8s_node: "a", zo_sql_num: 12 },
+          { k8s_node: "b", zo_sql_num: 3 },
+        ],
+      },
     ]);
 
     // Only group "a" clears HAVING >= 10, and the count gate wants >= 1.
@@ -1771,6 +1957,27 @@ describe("PreviewAlert - PromQL verdict", () => {
     await emitResultMetadata(w, [[{ total: 7 }]]);
 
     expectVerdict(w, { matched: 7, gate: "7 >= 5", trigger: true, label: "rows" });
+    w.unmount();
+  });
+
+  it("counts a grouped SQL query in rows, as the SQL limit does", async () => {
+    vi.mocked(searchService.result_schema).mockResolvedValueOnce({
+      data: { group_by: ["service_name"], projections: [], timeseries_field: null },
+    } as any);
+    const w = await mountComp({
+      query: "SELECT service_name, count(*) AS errors FROM logs GROUP BY service_name",
+      selectedTab: "sql",
+      formData: {
+        ...baseFormData(),
+        is_real_time: false,
+        trigger_condition: { period: 10, threshold: 5, operator: ">=" },
+      },
+    });
+    await flushPromises();
+
+    await emitResultMetadata(w, [[{ total: 0 }]]);
+
+    expectVerdict(w, { matched: 0, gate: "0 >= 5", trigger: false, label: "rows" });
     w.unmount();
   });
 
@@ -2055,7 +2262,7 @@ describe("PreviewAlert - SQL verdict under streaming aggregates", () => {
     await flushPromises();
 
     // No hits anywhere, so the branch reaches its Σ total fallback.
-    await emitResultMetadata(w, [[plain(4), plain(3)]]);
+    await answerVerdict([plain(4), plain(3)]);
 
     expectVerdict(w, { matched: 7, gate: "7 >= 7", trigger: true, label: "groups" });
   });
@@ -2550,6 +2757,49 @@ describe("PreviewAlert - SQL verdict under streaming aggregates", () => {
 
     expectVerdict(w, { matched: 2, gate: "2 >= 2", trigger: true, label: LABEL });
   });
+
+  // ── the server's row cap ──────────────────────────────────────────────────
+
+  it.each([
+    // [frames, operator, limit, verdict: true fires / false quiet / null none, count]
+    [[1000, 1000], ">=", 1, true, 2000],
+    [[1000], "<", 1000, false, 1000],
+    [[1000], "==", 999, false, 1000],
+    [[1000], ">=", 5000, null, 0],
+    [[1000], "<=", 1000, null, 0],
+  ])(
+    "a partition stopped at the server's row cap makes %j a lower bound (%s %s)",
+    async (totals, operator, threshold, fires, count) => {
+      store.state.zoConfig.query_default_limit = 1000;
+      try {
+        w = await mountSql({ threshold, operator });
+        await emitResultMetadata(w, [totals.map((total) => plain(total))]);
+        if (fires === null) {
+          expect(w.vm.evaluationStatus).toBeNull();
+        } else {
+          expect(w.vm.evaluationStatus).toMatchObject({
+            wouldTrigger: fires,
+            count,
+            atLeast: true,
+          });
+        }
+      } finally {
+        delete store.state.zoConfig.query_default_limit;
+      }
+    },
+  );
+
+  it("counts a partition under the row cap exactly", async () => {
+    store.state.zoConfig.query_default_limit = 1000;
+    try {
+      w = await mountSql({ threshold: 5 });
+      await emitResultMetadata(w, [[plain(999), plain(3)]]);
+      expect(w.vm.evaluationStatus).toMatchObject({ wouldTrigger: true, count: 1002 });
+      expect(w.vm.evaluationStatus.atLeast).toBeFalsy();
+    } finally {
+      delete store.state.zoConfig.query_default_limit;
+    }
+  });
 });
 
 describe("PreviewAlert - Forecast mode", () => {
@@ -2649,6 +2899,7 @@ describe("PromQL rule preview", () => {
       formData: {
         stream_name: "",
         stream_type: "metrics",
+        pending_period_sec: 600,
         trigger_condition: { period: 5, threshold: 1, operator: ">=" },
         query_condition: {
           promql_rule_mode: true,
@@ -2660,7 +2911,9 @@ describe("PromQL rule preview", () => {
     await flushPromises();
     expect(searchService.metrics_query).toHaveBeenCalled();
     expect(w.vm.evaluationStatus?.wouldTrigger).toBe(true);
-    expect(w.vm.evaluationStatus?.reason).toContain("2 returned series");
+    expect(w.vm.evaluationStatus?.reason).toBe(
+      i18n.global.t("alerts.form.preview.ruleMatch", { count: 2, duration: "10 minutes" }, 2),
+    );
     w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
       options: { series: [] },
     });
@@ -2737,6 +2990,32 @@ describe("PreviewAlert - debounced props refresh", () => {
     w.unmount();
   });
 
+  it("refreshes once for a limit typed digit by digit, after the pause", async () => {
+    const w = await mountSqlSettled();
+
+    for (const threshold of [2, 25, 250]) {
+      await w.setProps({
+        formData: {
+          ...baseFormData(),
+          trigger_condition: { period: 10, threshold, operator: ">=" },
+        },
+      });
+      await vi.advanceTimersByTimeAsync(300);
+    }
+    await w.setProps({
+      formData: {
+        ...baseFormData(),
+        name: "cpu",
+        trigger_condition: { period: 10, threshold: 250, operator: ">=" },
+      },
+    });
+    expect(searchService.result_schema).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(800);
+    expect(searchService.result_schema).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
   it("refreshes a stream switch at once instead of waiting for the debounce", async () => {
     const w = await mountSqlSettled();
 
@@ -2768,6 +3047,25 @@ describe("PreviewAlert - debounced props refresh", () => {
     await vi.advanceTimersByTimeAsync(800);
 
     expect(searchService.result_schema).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("draws a first query typed into an empty editor once, never the last mode's chart", async () => {
+    const builder =
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "logs"';
+    const w = await mountComp({ query: builder });
+    await vi.advanceTimersByTimeAsync(2000);
+    await w.setProps({ selectedTab: "sql", query: "" });
+    await w.setProps({ query: "SELECT a FROM logs" });
+    const drawn = () =>
+      w.findComponent({ name: "PanelSchemaRenderer" }).exists()
+        ? w.findComponent({ name: "PanelSchemaRenderer" }).props("panelSchema")?.queries?.[0]?.query
+        : null;
+    expect(drawn()).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(800);
+    await flushPromises();
+    expect(drawn()).toBe("SELECT a FROM logs");
     w.unmount();
   });
 
@@ -2805,5 +3103,701 @@ describe("PreviewAlert - schema fetch failure logging", () => {
     const { warn, err } = await failSchema({ response: { status: 500 } });
     expect(err).toHaveBeenCalledWith("Failed to fetch query schema:", expect.anything());
     expect(warn).not.toHaveBeenCalledWith("Failed to fetch query schema:", expect.anything());
+  });
+});
+
+describe("PreviewAlert - one run per real change, over a chosen range", () => {
+  const timeOf = (w: VueWrapper<any>) =>
+    w.findComponent({ name: "PanelSchemaRenderer" }).props("selectedTimeObj");
+  const spanMinutes = (w: VueWrapper<any>) => {
+    const { start_time, end_time } = timeOf(w);
+    // The dashboard time object carries microseconds in its Date fields.
+    return Math.round((end_time.getTime() - start_time.getTime()) / 60_000_000);
+  };
+  afterEach(() => sessionStorage.clear());
+
+  it("asks again only when an input changed, never for a repeat request", async () => {
+    const w = await mountComp({ query: "SELECT * FROM logs", formData: baseFormData() });
+    w.vm.refreshData();
+    await flushPromises();
+    const first = timeOf(w);
+    w.vm.refreshData();
+    await flushPromises();
+    expect(timeOf(w)).toBe(first);
+    await w.setProps({ query: "SELECT * FROM logs WHERE level = 'error'" });
+    w.vm.refreshData();
+    await flushPromises();
+    expect(timeOf(w)).not.toBe(first);
+    w.unmount();
+  });
+
+  it.each([
+    ["custom", 10, "checks", 120],
+    ["custom", 1, "checks", 12],
+    ["custom", 240, "checks", 1440],
+    ["sql", 10, "checks", 10],
+    ["custom", 10, "12h", 720],
+    ["custom", 10, "24h", 1440],
+  ])("a %s alert checking %s min over %s previews %s min", async (tab, period, range, minutes) => {
+    const formData = baseFormData();
+    formData.trigger_condition.period = period;
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: tab, formData });
+    w.vm.previewRange = range;
+    w.vm.refreshData();
+    await flushPromises();
+    expect(spanMinutes(w)).toBe(minutes);
+    w.unmount();
+  });
+
+  it("counts every matching event a real-time chart shows, over its whole range", async () => {
+    const formData = { ...baseFormData(), is_real_time: "true" };
+    const w = await mountComp({
+      query: "SELECT * FROM logs",
+      selectedTab: "custom",
+      isAggregationEnabled: false,
+      formData,
+    });
+    w.vm.refreshData();
+    await flushPromises();
+    const at = (minutesAgo: number) => (Date.now() - minutesAgo * 60_000) * 1000;
+    await emitResultMetadata(w, [
+      [
+        {
+          hits: [
+            { zo_sql_key: at(25), zo_sql_num: 90 },
+            { zo_sql_key: at(4), zo_sql_num: 3 },
+          ],
+        },
+      ],
+    ]);
+    expect(w.vm.evaluationStatus).toMatchObject({ count: 93, windowMinutes: 30 });
+    w.unmount();
+  });
+
+  it("keeps a group count stopped at the row cap as a lower bound", async () => {
+    store.state.zoConfig.query_default_limit = 2;
+    try {
+      const formData = baseFormData();
+      formData.query_condition.aggregation.group_by = ["host"];
+      formData.trigger_condition.threshold = 1;
+      const w = await mountComp({
+        query: "SELECT * FROM logs",
+        selectedTab: "custom",
+        isAggregationEnabled: true,
+        formData,
+      });
+      await answerVerdict([
+        {
+          hits: [
+            { host: "a", zo_sql_num: 3 },
+            { host: "b", zo_sql_num: 4 },
+          ],
+        },
+      ]);
+      expect(w.vm.evaluationStatus).toMatchObject({ grouped: true, count: 2, atLeast: true });
+      w.unmount();
+    } finally {
+      delete store.state.zoConfig.query_default_limit;
+    }
+  });
+
+  it.each([
+    ["custom", 10, "2 h"],
+    ["custom", 60, "12 h"],
+    ["custom", 1, "12 min"],
+    ["sql", 10, "10 min"],
+  ])("names a %s alert's default range from its %s min window", async (tab, period, label) => {
+    const formData = baseFormData();
+    formData.trigger_condition.period = period;
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: tab, formData });
+    expect(w.find('[data-test="alert-preview-range-checks"]').text()).toBe(label);
+    w.unmount();
+  });
+
+  it.each([
+    ["checks back to back", { period: 10, frequency: 10 }, "false", "Last 12 checks (120 minutes)"],
+    ["checks with gaps", { period: 5, frequency: 30 }, "false", "Last 60 minutes"],
+    [
+      "a cron schedule",
+      { period: 10, frequency: 10, frequency_type: "cron" },
+      "false",
+      "Last 120 minutes",
+    ],
+    ["a real-time alert", { period: 10, frequency: 10 }, "true", "Last 30 minutes"],
+  ])("names the default range of %s by what it covers", async (_, trigger, realTime, tooltip) => {
+    const formData = { ...baseFormData(), is_real_time: realTime };
+    formData.trigger_condition = { ...formData.trigger_condition, ...trigger };
+    const w = await mountComp({ query: "SELECT * FROM logs", formData });
+    expect(w.vm.previewRangeOptions[0].tooltip).toBe(tooltip);
+    w.unmount();
+  });
+
+  it("asks a forecast for its threshold before it can draw", async () => {
+    const formData = { ...baseFormData(), _ui: { forecast: { U: "up", T: "", H: 7, W: "1d" } } };
+    const w = await mountComp({ query: "", selectedTab: "promql", formData });
+    expect(w.find('[data-test="alert-preview-chart"]').text()).toBe(
+      "Enter a threshold to see the forecast.",
+    );
+    w.unmount();
+  });
+
+  it("remembers the range for the session, not in the alert", async () => {
+    const formData = baseFormData();
+    const w = await mountComp({ query: "SELECT * FROM logs", formData });
+    w.vm.previewRange = "24h";
+    await flushPromises();
+    w.unmount();
+    const again = await mountComp({ query: "SELECT * FROM logs", formData });
+    expect(again.vm.previewRange).toBe("24h");
+    expect(formData).toEqual(baseFormData());
+    again.unmount();
+  });
+});
+
+describe("PreviewAlert - a wide range asks the latest window alone for the verdict", () => {
+  beforeEach(() => {
+    streaming.calls.length = 0;
+    streaming.cancel.mockClear();
+  });
+  afterEach(() => sessionStorage.clear());
+
+  const mountRange = async (tab: string, range: string) => {
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: tab });
+    w.vm.previewRange = range;
+    w.vm.refreshData();
+    await flushPromises();
+    return w;
+  };
+  const answer = (call: any, frames: { total?: number; hits?: any[] }[]) => {
+    for (const { total, hits } of frames) {
+      call.handlers.data(call.data, {
+        type: "search_response_metadata",
+        content: { results: { total }, streaming_aggs: false },
+      });
+      if (hits)
+        call.handlers.data(call.data, {
+          type: "search_response_hits",
+          content: { results: { hits } },
+        });
+    }
+    call.handlers.complete(call.data, {});
+  };
+
+  it.each([
+    ["builder", "custom", "checks", 1],
+    ["SQL", "sql", "checks", 0],
+    ["builder", "custom", "24h", 2],
+    ["SQL", "sql", "12h", 1],
+  ])("a %s alert (%s tab) shown over %s has run %s verdict searches", async (_, tab, range, n) => {
+    const w = await mountRange(tab, range);
+    expect(streaming.calls).toHaveLength(n);
+    w.unmount();
+  });
+
+  const AGG_SQL =
+    "SELECT histogram(_timestamp) AS zo_sql_key, avg(x) AS zo_sql_val FROM logs GROUP BY zo_sql_key";
+  it.each([
+    ["an aggregation", "checks", true, AGG_SQL, "10 minute"],
+    ["an aggregation", "24h", true, AGG_SQL, "10 minute"],
+    ["a count", "24h", false, "SELECT * FROM logs WHERE level = 'error'", "10 minute"],
+  ])(
+    "a builder chart of %s over %s draws one point per alert window",
+    async (_, range, aggregated, query, bucket) => {
+      const w = await mountComp({ query, selectedTab: "custom", isAggregationEnabled: aggregated });
+      w.vm.previewRange = range;
+      w.vm.refreshData();
+      await flushPromises();
+      const panel = w.findComponent({ name: "PanelSchemaRenderer" });
+      expect(panel.props("panelSchema").queries[0].query.includes(`'${bucket}'`)).toBe(!!bucket);
+      if (bucket) expect(panel.props("is_ui_histogram")).toBe(false);
+      w.unmount();
+    },
+  );
+
+  it("a click on 12h draws 12 hours and adds the one verdict search", async () => {
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: "custom" });
+    await flushPromises();
+    streaming.calls.length = 0;
+    await w.find('[data-test="alert-preview-range-12h"]').trigger("click");
+    await flushPromises();
+    const { start_time, end_time } = w
+      .findComponent({ name: "PanelSchemaRenderer" })
+      .props("selectedTimeObj");
+    expect((end_time.getTime() - start_time.getTime()) / 60_000_000).toBe(720);
+    expect(streaming.calls).toHaveLength(1);
+    w.unmount();
+  });
+
+  it.each([
+    ["builder", "custom", "checks", [{ hits: [{ zo_sql_num: 4 }, { zo_sql_num: 3 }] }], 7, true],
+    ["builder", "custom", "24h", [{ hits: [{ zo_sql_num: 4 }, { zo_sql_num: 3 }] }], 7, true],
+    ["SQL", "sql", "24h", [{ total: 2 }], 2, false],
+  ])(
+    "judges a %s alert (%s tab, %s) from that window, not the chart",
+    async (_, tab, range, frames, count, fires) => {
+      const w = await mountRange(tab, range);
+      const call = streaming.calls[streaming.calls.length - 1];
+      const { start_time, end_time, sql } = call.data.queryReq.query;
+      expect(end_time - start_time).toBe(10 * 60_000_000);
+      // One row per group over the whole window, as the check computes it.
+      expect(atob(sql)).not.toMatch(/histogram/i);
+      await emitResultMetadata(w, [[{ total: 99, hits: [{ zo_sql_num: 99 }] }]]);
+      expect(w.vm.evaluationStatus).toBeNull();
+
+      answer(call, frames);
+      expect(w.vm.evaluationStatus).toMatchObject({ count, wouldTrigger: fires });
+      w.unmount();
+    },
+  );
+
+  it("judges a new threshold against the window already fetched, before any new search", async () => {
+    const formData: any = baseFormData();
+    formData.trigger_condition.threshold = 1;
+    formData.query_condition.aggregation = {
+      function: "count",
+      group_by: ["svc"],
+      having: { column: "svc", operator: ">", value: 50 },
+    };
+    const w = await mountComp({
+      query: 'SELECT count(svc) AS zo_sql_val, svc FROM "a" GROUP BY svc',
+      selectedTab: "custom",
+      isAggregationEnabled: true,
+      formData,
+    });
+    await flushPromises();
+    answer(streaming.calls[streaming.calls.length - 1], [
+      {
+        hits: [
+          { svc: "a", zo_sql_num: 60 },
+          { svc: "b", zo_sql_num: 3 },
+        ],
+      },
+    ]);
+    expect(w.vm.evaluationStatus).toMatchObject({ count: 1, wouldTrigger: true });
+    const calls = streaming.calls.length;
+    await w.setProps({
+      formData: {
+        ...formData,
+        query_condition: {
+          aggregation: {
+            ...formData.query_condition.aggregation,
+            having: { column: "svc", operator: ">", value: 1 },
+          },
+        },
+      },
+    });
+    expect(w.vm.evaluationStatus).toMatchObject({ count: 2, wouldTrigger: true });
+    expect(streaming.calls).toHaveLength(calls);
+    w.unmount();
+  });
+
+  it.each([
+    ["has no data", [], "#ResultArray#\n.", "warn"],
+    ["has data", [{ zo_sql_num: 3 }], "#ResultArray#\n.", "note"],
+    ["has no data, and the alert waits for it", [], compareFunction(2, true), "note"],
+  ])(
+    "a compare alert whose past window %s says so instead of judging this window alone",
+    async (_, hits, vrl, note) => {
+      const formData: any = baseFormData();
+      formData.query_condition.multi_time_range = [{ offSet: "1w" }];
+      formData.query_condition.vrl_function = btoa(vrl);
+      const w = await mountComp({
+        query: "SELECT count(*) AS events FROM logs WHERE level = 'error'",
+        selectedTab: "sql",
+        formData,
+      });
+      w.vm.refreshData();
+      await flushPromises();
+      const [call] = streaming.calls;
+      const { start_time, end_time } = call.data.queryReq.query;
+      const weekMicros = 7 * 24 * 60 * 60_000_000;
+      expect(Date.now() * 1000 - end_time).toBeGreaterThanOrEqual(weekMicros);
+      expect(end_time - start_time).toBe(10 * 60_000_000);
+      await emitResultMetadata(w, [[{ total: 0, hits: [] }]]);
+      answer(call, [{ hits }]);
+      await flushPromises();
+      expect(w.vm.evaluationStatus).toMatchObject({ note });
+      if (!hits.length) {
+        const calls = streaming.calls.length;
+        const other = btoa(
+          vrl === compareFunction(2, true) ? compareFunction(2) : compareFunction(2, true),
+        );
+        await w.setProps({
+          formData: {
+            ...formData,
+            query_condition: { ...formData.query_condition, vrl_function: other },
+          },
+        });
+        expect(w.vm.evaluationStatus).toMatchObject({ note: note === "warn" ? "note" : "warn" });
+        expect(streaming.calls).toHaveLength(calls);
+      }
+      // Its function reads rows of the past windows, which the chart's one search has not got.
+      const panel = w.findComponent({ name: "PanelSchemaRenderer" });
+      expect(panel.props("panelSchema").queries[0].vrlFunctionQuery).toBeNull();
+      w.unmount();
+    },
+  );
+
+  it("drops a superseded answer, and the verdict when the search fails", async () => {
+    const w = await mountRange("sql", "24h");
+    const [stale] = streaming.calls;
+    await w.setProps({ query: "SELECT nosuchcol FROM logs" });
+    expect(streaming.cancel).toHaveBeenCalled();
+    answer(stale, [{ total: 50 }]);
+    expect(w.vm.evaluationStatus).toBeNull();
+
+    w.vm.refreshData();
+    await flushPromises();
+    const call = streaming.calls[1];
+    call.handlers.error(call.data, { content: { message: "no field nosuchcol", code: 400 } });
+    await nextTick();
+    expect(w.vm.evaluationStatus).toBeNull();
+    expect((w.vm.$.exposed as any).queryFailed.value).toBe(true);
+    w.unmount();
+  });
+});
+
+describe("PreviewAlert - a chart with many series", () => {
+  const series = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      name: `pod-${i}`,
+      data: [
+        [1, i],
+        [2, i],
+      ],
+    }));
+
+  it.each([
+    [1, undefined, null],
+    [3, undefined, "3"],
+    [100, { shown: 100, total: 1064 }, "1,064"],
+  ])("%s series (cap %o) draw no legend and count line %s", async (n, seriesLimit, note) => {
+    const w = await mountComp({ query: "SELECT * FROM logs" });
+    w.vm.refreshData();
+    await flushPromises();
+    w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
+      options: { series: [...series(n), { data: [[1, null]] }] },
+      extras: { seriesLimit },
+    });
+    await nextTick();
+    expect(w.vm.chartData.config.show_legends).toBe(false);
+    const line = w.find('[data-test="alert-preview-series-count"]');
+    expect(line.exists() ? line.text() : null).toEqual(note ? expect.stringContaining(note) : null);
+    w.unmount();
+  });
+
+  it("falls back to the sample's floor when the full count fails", async () => {
+    vi.mocked(searchService.metrics_query).mockRejectedValue(new Error("boom"));
+    const formData: any = {
+      stream_name: "mem",
+      stream_type: "metrics",
+      trigger_condition: { period: 10, threshold: 1, operator: ">=" },
+      query_condition: { promql_condition: { column: "value", operator: ">", value: 0.85 } },
+    };
+    const w = await mountComp({ query: "mem", selectedTab: "promql", formData });
+    w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
+      options: { series: [{ name: "a", data: [[1, "0.9"]] }] },
+      extras: { seriesLimit: { shown: 1, total: 574 } },
+    });
+    await flushPromises();
+    expect(w.vm.evaluationStatus).toMatchObject({ count: 1, atLeast: true });
+    vi.mocked(searchService.metrics_query).mockReset();
+    w.unmount();
+  });
+
+  it("counts every series past the threshold on the server when the chart draws only some", async () => {
+    vi.mocked(searchService.metrics_query).mockImplementation(async ({ query }: any) => ({
+      data: {
+        status: "success",
+        data: {
+          resultType: "vector",
+          result: Array.from({ length: decodeURIComponent(query).includes("> 0.85") ? 85 : 0 }),
+        },
+      },
+    }));
+    const formData: any = {
+      stream_name: "mem",
+      stream_type: "metrics",
+      trigger_condition: { period: 10, threshold: 1, operator: ">=" },
+      query_condition: { promql_condition: { column: "value", operator: ">", value: 0.85 } },
+    };
+    const w = await mountComp({ query: "mem", selectedTab: "promql", formData });
+    w.vm.refreshData();
+    await flushPromises();
+    w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
+      options: {
+        series: [
+          { name: "a", data: [[1, "0.9"]] },
+          { name: "b", data: [[1, "0.1"]] },
+        ],
+      },
+      extras: { seriesLimit: { shown: 2, total: 574 } },
+    });
+    await nextTick();
+    // The sample's floor is not shown on the way to the full count, so the verdict changes once.
+    expect(w.vm.evaluationStatus).toBeNull();
+    await flushPromises();
+    expect(w.vm.evaluationStatus).toMatchObject({ count: 85, wouldTrigger: true });
+    expect(w.vm.evaluationStatus.atLeast).toBeFalsy();
+    // One alert counts the series that crossed anywhere in the look-back, like its filtered query.
+    const sent = vi.mocked(searchService.metrics_query).mock.calls.map((c: any) => c[0].query);
+    expect(decodeURIComponent(sent.at(-1))).toBe("last_over_time(((mem) > 0.85)[10m:]) > 0.85");
+    vi.mocked(searchService.metrics_query).mockReset();
+    w.unmount();
+  });
+
+  it.each([
+    ["a day checked every minute", "24h", 1, "60s"],
+    ["a day checked every 10 minutes", "24h", 10, "600s"],
+    ["the default range", "checks", 1, "0"],
+  ])(
+    "samples a PromQL chart of %s once per check in the 12 and 24 hour views",
+    async (_, range, frequency, step) => {
+      const formData: any = {
+        stream_name: "cpu",
+        stream_type: "metrics",
+        trigger_condition: { period: 5, threshold: 1, operator: ">=", frequency },
+        query_condition: { promql_condition: { column: "value", operator: ">", value: 90 } },
+      };
+      const w = await mountComp({ query: "cpu", selectedTab: "promql", formData });
+      w.vm.previewRange = range;
+      w.vm.refreshData();
+      await flushPromises();
+      const panel = w.findComponent({ name: "PanelSchemaRenderer" });
+      expect(panel.props("panelSchema").config.step_value ?? "0").toBe(step);
+      if (step !== "0")
+        expect(panel.props("selectedTimeObj").end_time.getTime() % (60 * 1_000_000)).toBe(0);
+      w.unmount();
+    },
+  );
+
+  it("names the limit under the chart instead of on its line", async () => {
+    const w = await mountComp({ query: "SELECT * FROM logs", labelledLimit: true });
+    w.vm.refreshData();
+    await flushPromises();
+    expect(w.vm.chartData.config.mark_line.map((l: any) => l.show_label)).toEqual([false]);
+    expect(w.find('[data-test="alert-preview-limit-key"]').text()).toContain("5");
+    w.unmount();
+  });
+});
+
+describe("PreviewAlert - a PromQL chart says why it is empty and what unit it is in", () => {
+  const MEM = "container_memory_working_set_bytes";
+  const mountMetric = (query: string) =>
+    mountComp({
+      query,
+      selectedTab: "promql",
+      labelledLimit: true,
+      formData: {
+        stream_name: MEM,
+        stream_type: "metrics",
+        trigger_condition: { period: 10, threshold: 1, operator: ">=" },
+        query_condition: { promql_condition: { column: "value", operator: ">=", value: 80 } },
+      },
+    });
+  const emitSeries = async (w: VueWrapper<any>, series: any[]) => {
+    w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
+      options: { series },
+    });
+    await flushPromises();
+  };
+
+  beforeEach(() => {
+    queryClient.clear();
+    streamMeta.value = { metric_type: "gauge", unit: "By" };
+  });
+
+  it("names the filter value no series carried in 24 hours", async () => {
+    metricsApi.parsePromqlQuery.mockResolvedValueOnce({
+      data: {
+        data: {
+          type: "aggregate",
+          expr: {
+            type: "selector",
+            name: MEM,
+            matchers: [{ label: "pod", op: "=", value: "oom" }],
+          },
+        },
+      },
+    });
+    metricsApi.get_promql_series.mockResolvedValueOnce({
+      data: {
+        data: [
+          { __name__: MEM, pod: "api" },
+          { __name__: MEM, pod: "web" },
+        ],
+      },
+    });
+    const w = await mountMetric(`max(${MEM}{pod="oom"})`);
+    w.vm.refreshData();
+    await emitSeries(w, []);
+    expect(w.find('[data-test="alert-preview-no-series"]').text()).toContain(
+      'pod="oom" hasn\'t appeared in the last 24 hours. Seen: api (1) and web (1).',
+    );
+
+    await emitSeries(w, [
+      {
+        name: "api",
+        data: [
+          [1, "10"],
+          [2, "20"],
+        ],
+      },
+    ]);
+    expect(w.find('[data-test="alert-preview-no-series"]').exists()).toBe(false);
+    expect(w.find('[data-test="alert-preview-series-count"]').text()).toBe(
+      i18n.global.t("alerts.form.preview.seriesNoneCross", { count: "1" }, 1),
+    );
+    w.unmount();
+  });
+
+  it("draws the axis and the limit in the metric's unit", async () => {
+    const w = await mountMetric(`avg(${MEM})`);
+    await flushPromises();
+    w.vm.refreshData();
+    await flushPromises();
+    expect(w.vm.chartData.config).toMatchObject({ unit: "bytes", decimals: undefined });
+    expect(w.find('[data-test="alert-preview-limit-key"]').text()).toContain("80 B");
+    w.unmount();
+  });
+
+  it.each([
+    ["counted events", false, "count", 0],
+    ["a count per group", true, "count", 0],
+    ["an average per group", true, "avg", undefined],
+  ])("draws %s on the right axis", async (_, aggregated, fn, decimals) => {
+    const formData = baseFormData() as any;
+    formData.query_condition.aggregation.function = fn;
+    formData.query_condition.aggregation.having = { column: "x", operator: ">=", value: 5 };
+    const w = await mountComp({
+      query:
+        "SELECT histogram(_timestamp) AS zo_sql_key, count(x) AS zo_sql_val FROM logs GROUP BY zo_sql_key",
+      isAggregationEnabled: aggregated,
+      formData,
+    });
+    w.vm.refreshData();
+    await flushPromises();
+    expect(w.vm.chartData.config.decimals).toBe(decimals);
+    w.unmount();
+  });
+});
+
+describe("PreviewAlert - value alerts without a value, span durations and Test it", () => {
+  const valueAlert = (having: Record<string, unknown>, streamType = "logs") => {
+    const formData = baseFormData() as any;
+    formData.stream_type = streamType;
+    formData.query_condition.aggregation = {
+      function: "p95",
+      group_by: [],
+      having: { column: "duration", operator: ">=", ...having },
+    };
+    return formData;
+  };
+
+  it("draws no line and gives no verdict while the value threshold is blank", async () => {
+    const w = await mountComp({
+      query: "SELECT 1",
+      isAggregationEnabled: true,
+      formData: valueAlert({ value: "" }),
+    });
+    w.vm.refreshData();
+    await flushPromises();
+    await emitResultMetadata(w, [[{ hits: [{ zo_sql_num: 900 }], total: 1 }]]);
+    expect(w.vm.chartData.config.mark_line).toEqual([]);
+    expect(w.vm.evaluationStatus).toBeNull();
+    w.unmount();
+  });
+
+  it("draws a typed PromQL query with one run while the builder's value threshold is blank", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const w = await mountComp({
+      query: "",
+      selectedTab: "promql",
+      isAggregationEnabled: true,
+      formData: valueAlert({ value: "" }),
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+    const runs: string[] = [];
+    w.vm.$watch(
+      () => w.vm.chartData,
+      (data: any) => data?.queries?.[0]?.query && runs.push(data.queries[0].query),
+      { flush: "sync" },
+    );
+    for (const query of ["s", "sum(", "sum(up)"]) {
+      await w.setProps({ query });
+      await vi.advanceTimersByTimeAsync(100);
+    }
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(runs).toEqual(["sum(up)"]);
+    w.unmount();
+    vi.useRealTimers();
+  });
+
+  it("reads a span duration threshold in ms and draws the axis from microseconds", async () => {
+    const w = await mountComp({
+      query: "SELECT 1",
+      isAggregationEnabled: true,
+      labelledLimit: true,
+      formData: valueAlert({ value: 500000 }, "traces"),
+    });
+    w.vm.refreshData();
+    await flushPromises();
+    expect(w.vm.chartData.config.unit).toBe("microseconds");
+    expect(w.find('[data-test="alert-preview-limit-key"]').text()).toContain("500 ms");
+    w.unmount();
+  });
+
+  it.each([
+    ["custom", true],
+    ["sql", true],
+    ["slo", false],
+  ])("offers Test it on the %s tab: %s", async (selectedTab, offered) => {
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab });
+    w.vm.refreshData();
+    await flushPromises();
+    expect(w.find('[data-test="alert-preview-test-it"]').exists()).toBe(offered);
+    w.unmount();
+  });
+
+  it.each([
+    ["", true],
+    [90, false],
+  ])("holds Test it with its reason while the value threshold is %j: %s", async (value, held) => {
+    const w = await mountComp({
+      query: "SELECT 1",
+      isAggregationEnabled: true,
+      formData: valueAlert({ value }),
+    });
+    await flushPromises();
+    const button = w.find('[data-test="alert-preview-test-it"]');
+    expect(button.attributes("aria-disabled") === "true").toBe(held);
+    expect(w.find('[data-test="alert-preview-test-it-reason"]').exists()).toBe(held);
+    w.unmount();
+  });
+
+  it("covers Test it with its panel and hands focus back to it on close", async () => {
+    vi.spyOn(alertsService, "evaluate").mockReturnValue(new Promise(() => {}));
+    const w = mount(PreviewAlert, {
+      attachTo: document.body,
+      global: { plugins: [i18n, store] },
+      props: {
+        query: "SELECT * FROM logs",
+        formData: baseFormData(),
+        isAggregationEnabled: false,
+        selectedTab: "sql",
+        isUsingBackendSql: false,
+        isEditorOpen: false,
+      },
+    });
+    await flushPromises();
+    await w.find('[data-test="alert-preview-test-it"]').trigger("click");
+    expect(w.find('[data-test="alert-test-run"]').exists()).toBe(true);
+    expect(w.find('[data-test="alert-preview-test-it"]').exists()).toBe(false);
+
+    await w.find('[data-test="alert-test-run-close"]').trigger("click");
+    await flushPromises();
+    expect(document.activeElement).toBe(w.find('[data-test="alert-preview-test-it"]').element);
+    w.unmount();
+    vi.restoreAllMocks();
   });
 });

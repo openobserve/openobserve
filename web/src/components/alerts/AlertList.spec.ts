@@ -89,6 +89,7 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
   });
 });
 
+import { justAddedAlerts, markJustAdded } from "@/utils/alerts/justAddedAlerts";
 import AlertList from "@/components/alerts/AlertList.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import config from "@/aws-exports";
@@ -880,7 +881,7 @@ describe("AlertList - row actions", () => {
       .filter((tip) =>
         [
           i18n.global.t("alerts.pause"),
-          i18n.global.t("alerts.start"),
+          i18n.global.t("alerts.resume"),
           i18n.global.t("alerts.edit"),
           i18n.global.t("alerts.clone"),
         ].includes(tip.props("content")),
@@ -936,8 +937,8 @@ describe("AlertList - row actions", () => {
           return { data: { code: 200 } };
         });
       const wrapper: any = await mountAlertList({ renderTable: false });
+      wrapper.vm.stateFilters = ["firing"];
       await flushPromises();
-      expect(wrapper.vm.stateFilters).toEqual(["firing"]);
       if (allFolders) {
         wrapper.vm.searchAcrossFolders = true;
         await flushPromises();
@@ -1426,6 +1427,26 @@ describe("AlertList - pagination restoration", () => {
     expect(wrapper.vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
   });
 
+  it("a save hand-off opens on the saved alert's page and marks its row", async () => {
+    (store.state as any).organizationData.allAlertsListByFolderId = {};
+    alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
+    Object.assign(useListViewState("alerts", {}), { perPage: 5, currentPage: 1 });
+    router.currentRoute.value.query = { state: ALERT_LIST_ALL_STATES, saved: "alert-12" };
+    const replace = vi.spyOn(router, "replace");
+    const wrapper: any = await mountAlertList({ keepRoute: true });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+
+    const table = wrapper.vm.oTableRef.table;
+    const rows = table.getPrePaginationRowModel().rows;
+    const at = rows.findIndex((r: any) => r.original.alert_id === "alert-12");
+    expect(table.getState().pagination.pageIndex).toBe(Math.floor(at / 5));
+    expect(wrapper.vm.landedRowIndex).toBe(rows[at].index);
+    expect(replace).toHaveBeenCalledWith({ query: { state: ALERT_LIST_ALL_STATES } });
+    replace.mockRestore();
+  });
+
   it("resets the persisted page on a folder switch so it is not restored onto the new folder", async () => {
     (store.state as any).organizationData.allAlertsListByFolderId = {};
     alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
@@ -1459,6 +1480,10 @@ describe("AlertList - row actions keep the view", () => {
     wrapper.find(`[data-test="alert-list-${name}-pause-start-alert"]`);
   const errorToasts = () =>
     (toast as any).mock.calls.filter(([opts]: any[]) => opts?.variant === "error");
+  const successToasts = () =>
+    (toast as any).mock.calls
+      .map(([opts]: any[]) => opts)
+      .filter((opts: any) => opts?.variant === "success");
 
   // 25 active alerts, five a page, opened on page 2 under the Active tile.
   const mountOnPageTwo = async (stateFilter: string | null = "active") => {
@@ -1505,56 +1530,51 @@ describe("AlertList - row actions keep the view", () => {
     expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7"]);
     expect(toggleBtn(wrapper, "Alert 6").attributes("aria-busy")).toBeUndefined();
     expect(toggleBtn(wrapper, "Alert 6").attributes("data-row-action")).toBe("resume");
-    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
   });
 
-  it("announces a row leaving the filter once, politely, with no toast", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      const wrapper = await mountOnPageTwo();
+  it.each([
+    ["active", false, "Alert 6 paused. No longer matches filter"],
+    ["paused", true, "Alert 6 resumed. No longer matches filter"],
+    [null, false, "Alert 6 paused"],
+  ])(
+    "confirms one row's write once, in a toast with Undo (filter %s)",
+    async (filter, enabled, message) => {
+      const wrapper = await mountOnPageTwo(enabled ? "active" : filter);
+      if (enabled) {
+        await toggleBtn(wrapper, "Alert 6").trigger("click");
+        await flushPromises();
+        wrapper.vm.stateFilters = [filter];
+        await flushPromises();
+      }
       vi.mocked(announcePolite).mockClear();
       (toast as any).mockClear();
 
       await toggleBtn(wrapper, "Alert 6").trigger("click");
       await flushPromises();
-      vi.advanceTimersByTime(100);
+      expect(successToasts()).toEqual([
+        expect.objectContaining({ message, action: expect.objectContaining({ label: "Undo" }) }),
+      ]);
+      expect(announcePolite).not.toHaveBeenCalled();
+    },
+  );
 
-      expect(announcePolite).toHaveBeenCalledTimes(1);
-      expect(announcePolite).toHaveBeenCalledWith("Alert 6 paused. No longer matches filter");
-      expect(document.querySelector('[data-test="region-announcer"]')?.textContent).toBe(
-        "Alert 6 paused. No longer matches filter",
-      );
-      expect(
-        document.querySelector('[data-test="region-announcer"]')?.getAttribute("aria-live"),
-      ).toBe("polite");
-      expect(toast).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("names the resume when a resumed row leaves the Paused tile", async () => {
-    const wrapper = await mountOnPageTwo();
-    await toggleBtn(wrapper, "Alert 6").trigger("click");
-    await flushPromises();
-    wrapper.vm.stateFilters = ["paused"];
-    await flushPromises();
-    vi.mocked(announcePolite).mockClear();
-    alertsSvc.toggle_state_by_alert_id.mockResolvedValueOnce({ data: { enabled: true } });
-
-    await toggleBtn(wrapper, "Alert 6").trigger("click");
-    await flushPromises();
-    expect(announcePolite).toHaveBeenCalledTimes(1);
-    expect(announcePolite).toHaveBeenCalledWith("Alert 6 resumed. No longer matches filter");
-  });
-
-  it("says nothing when the toggled row still matches the filter", async () => {
+  it("Undo writes the previous state back and offers no second Undo", async () => {
     const wrapper = await mountOnPageTwo(null);
-    vi.mocked(announcePolite).mockClear();
+    expect(toggleBtn(wrapper, "Alert 6").attributes("aria-label")).toBeTruthy();
     await toggleBtn(wrapper, "Alert 6").trigger("click");
     await flushPromises();
-    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
-    expect(announcePolite).not.toHaveBeenCalled();
+    const undo = successToasts()[0].action.handler;
+    (toast as any).mockClear();
+    alertsSvc.toggle_state_by_alert_id.mockClear();
+
+    undo();
+    await flushPromises();
+    expect(alertsSvc.toggle_state_by_alert_id.mock.calls.map((c: any[]) => c.slice(1, 3))).toEqual([
+      ["alert-6", true],
+    ]);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+    expect(successToasts()).toEqual([expect.objectContaining({ message: "Alert 6 resumed" })]);
+    expect(successToasts()[0].action).toBeUndefined();
   });
 
   it("announces a bulk write once, naming one row and counting many", async () => {
@@ -2307,8 +2327,8 @@ describe("AlertList - filters from the Overview links", () => {
     expect(wrapper.vm.stateFilters).toEqual([state]);
   });
 
-  it("opens on the Firing tile unless ?state picks the tiles, the all-states value meaning none", async () => {
-    expect((await withQuery({})).vm.stateFilters).toEqual(["firing"]);
+  it("opens on every alert unless ?state picks the tiles, the all-states value meaning none", async () => {
+    expect((await withQuery({})).vm.stateFilters).toEqual([]);
     expect((await withQuery({ state: "paused,error" })).vm.stateFilters).toEqual([
       "paused",
       "error",
@@ -2431,7 +2451,7 @@ describe("AlertList - filters from the Overview links", () => {
       alertsSvc.listByFolderId.mockResolvedValue({
         data: { list: [makeAlert(93)], status_unavailable: true },
       });
-      const wrapper = await withQuery({});
+      const wrapper = await withQuery({ state: "firing" });
       expect(wrapper.find('[data-test="alert-list-create-template-text"]').exists()).toBe(false);
       const errorState = wrapper
         .findAllComponents({ name: "OEmptyState" })
@@ -2470,7 +2490,7 @@ describe("AlertList - filters from the Overview links", () => {
     alertsSvc.listByFolderId.mockImplementation(async (...args: any[]) => ({
       data: { list: alertsDB.filter((a) => !args[6] || a.folder_id === args[6]) },
     }));
-    const wrapper = await withQuery({});
+    const wrapper = await withQuery({ state: "firing" });
     expect(wrapper.find('[data-test="alert-list-empty-no-firing"]').exists()).toBe(true);
 
     alertsSvc.listByFolderId.mockRejectedValueOnce({ response: { status: 500 } });
@@ -2649,7 +2669,7 @@ describe("AlertList - view state restoration", () => {
     const wrapper: any = await mountAlertList();
     await flushPromises();
 
-    expect(wrapper.vm.stateFilters).toEqual(["firing"]);
+    expect(wrapper.vm.stateFilters).toEqual([]);
     expect(wrapper.vm.sortBy).toBe("name");
     expect(wrapper.vm.sortOrder).toBe("desc");
     expect(wrapper.vm.pageSize).toBe(50);
@@ -4480,20 +4500,6 @@ describe("AlertList - first run and the alert library", () => {
       .findAllComponents({ name: "OEmptyState" })
       .find((c: any) => c.props("preset") === "no-alerts");
 
-  it("puts an Alert library button in the header that opens the library", async () => {
-    const wrapper: any = await mountList();
-    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
-
-    const button = wrapper.find('[data-test="alert-list-alert-library-btn"]');
-    expect(button.text()).toContain("Alert library");
-    await button.trigger("click");
-
-    expect(push).toHaveBeenCalledWith({
-      name: "alertLibrary",
-      query: { org_identifier: store.state.selectedOrganization.identifier },
-    });
-  });
-
   it("shows the first-run empty state at block size with New alert, Alert library and Import", async () => {
     const wrapper = await mountEmpty();
     const state = emptyState(wrapper);
@@ -4533,17 +4539,53 @@ describe("AlertList - first run and the alert library", () => {
     ]);
   });
 
-  it("starts a new alert from the empty state, as the header's New alert does", async () => {
+  it("opens the starter from the empty state's New alert, as the header's does", async () => {
     const wrapper = await mountEmpty();
     const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
     await wrapper.find('[data-test="alert-list-empty-new-alert"]').trigger("click");
     await flushPromises();
-    expect(push).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: "alertList",
-        query: expect.objectContaining({ action: "add" }),
-      }),
-    );
+    expect(push).not.toHaveBeenCalled();
+    expect(document.body.querySelector('[data-test="create-starter-menu"]')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it("The form in New alert's menu opens the add-alert form the way New alert did before", async () => {
+    const wrapper = await mountList();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-add-alert-btn"]').trigger("click");
+    await flushPromises();
+    document.body.querySelector<HTMLElement>('[data-test="create-starter-use-form"]')!.click();
+    await flushPromises();
+    expect(push).toHaveBeenCalledWith({
+      name: "alertList",
+      query: {
+        ...wrapper.vm.router.currentRoute.value.query,
+        action: "add",
+        org_identifier: store.state.selectedOrganization.identifier,
+        folder: "default",
+        alert_type: wrapper.vm.activeTab,
+      },
+    });
+    wrapper.unmount();
+  });
+
+  it("lands a starter's new alerts in their folder and marks only their rows", async () => {
+    const wrapper = await mountList();
+    vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    const name = alertsDB[1].name;
+    markJustAdded({ folderId: "default", names: [name] });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    await flushPromises();
+    const marked = wrapper
+      .findAll('[data-test="alert-list-table"] tbody tr')
+      .filter((tr: any) => tr.classes().includes("outline-accent"));
+    expect([marked.length, marked[0]?.text().includes(name), justAddedAlerts.value]).toEqual([
+      1,
+      true,
+      null,
+    ]);
+    wrapper.unmount();
   });
 
   it("opens the library from the empty state", async () => {
@@ -4586,7 +4628,8 @@ describe("AlertList - first run and the alert library", () => {
   it("names an empty Firing tile by scope, shows all alerts from it, and keeps first run for an empty folder", async () => {
     router.currentRoute.value.query = {};
     const wrapper = await mountList();
-    expect(wrapper.vm.stateFilters).toEqual(["firing"]);
+    wrapper.vm.stateFilters = ["firing"];
+    await flushPromises();
     expect(emptyState(wrapper).attributes("data-test")).toBe("alert-list-empty-no-firing");
     expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(false);
     const folderTitle = emptyState(wrapper).props("title");
@@ -4618,6 +4661,7 @@ describe("AlertList - first run and the alert library", () => {
       data: { list: alertsDB.filter((a: any) => args[8] !== "scheduled" || !a.is_real_time) },
     }));
     const wrapper: any = await mountAlertList({ renderTable: false });
+    wrapper.vm.stateFilters = ["firing"];
     await flushPromises();
     expect(wrapper.vm.displayedAlerts.map((r: any) => r.alert_id)).toEqual(["alert-2"]);
 

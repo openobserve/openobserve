@@ -14,219 +14,151 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!-- One row per past window, each with its own Remove; the add link sits under the last one. -->
 <template>
   <div
     ref="multiWindowContainerRef"
-    class="step-compare-with-past mx-auto flex h-full w-full flex-col"
+    class="step-compare-with-past flex w-full flex-col"
+    data-test="add-alert-compare"
   >
-    <div
-      class="step-content rounded-default bg-surface-overlay border-border-default min-h-0 flex-1 overflow-auto border"
+    <OSettingRow
+      v-for="(picker, index) in localMultiTimeRange"
+      :key="picker.uuid"
+      :label="index === 0 ? t('alerts.plain.compareTitle') : noLabel"
+      :description="index === 0 ? t('alerts.form.compare.help') : undefined"
+      fill
+      data-test="add-alert-compare-window"
     >
-      <div
-        class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
+      <i18n-t
+        keypath="alerts.compareWithPast.comparingText"
+        tag="div"
+        scope="global"
+        class="text-text-body flex flex-wrap items-center gap-2 text-sm"
       >
-        <div
-          class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
-        />
-        <span class="section-header-title text-compact text-text-heading font-semibold">{{
-          t("alerts.steps.compareWithPast")
-        }}</span>
-      </div>
-      <div class="px-3 pb-2">
-        <!-- Alert set for header -->
-        <div
-          class="multi-window-text text-text-body mt-3 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
-        >
-          <span>{{ t("alerts.compareWithPast.alertSetFor") }}</span>
-          <div class="border-line h-px flex-1"></div>
-        </div>
-
-        <!-- Current Window -->
-        <div
-          class="bg-card-glass-bg border-border-default flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
-        >
-          <div
-            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
-          >
-            {{ t("alerts.compareWithPast.currentWindow") }}
-          </div>
-
-          <div class="flex flex-col items-start gap-2">
-            <div
-              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
-            >
-              {{ t("alerts.compareWithPast.cycle") }}
-              <span class="cursor-pointer">
-                <OIcon
-                  name="info"
-                  size="sm"
-                  class="ms-1 cursor-pointer"
-                  :class="'text-text-secondary'"
-                />
-                <OTooltip
-                  :content="t('alerts.compareWithPast.cycleTooltip')"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                />
-              </span>
-            </div>
-            <div class="flex items-start justify-between gap-4">
-              <div class="w-75 text-sm leading-5 font-normal">
-                {{
-                  t("alerts.compareWithPast.runningFor", {
-                    period: convertMinutesToDisplayValue(period),
-                    frequency: convertMinutesToDisplayValue(frequency),
-                  })
-                }}
-              </div>
-              <div>
-                <span class="inline-block">
-                  <OButton
-                    aria-hidden="true"
-                    tabindex="-1"
-                    class="pointer-events-none min-w-auto opacity-30"
-                    variant="ghost"
-                    size="icon-circle-sm"
-                    disable
-                  >
-                    <OIcon name="delete-outline" size="sm" />
-                  </OButton>
-                  <OTooltip
-                    :content="t('alerts.compareWithPast.currentWindowCannotBeDeleted')"
-                    side="top"
-                    align="center"
-                    :sideOffset="8"
-                  />
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Comparing with header -->
-        <div
-          v-if="localMultiTimeRange.length > 0"
-          class="multi-window-text text-text-body mt-2 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
-        >
-          <span>{{ t("alerts.compareWithPast.comparingWith") }}</span>
-          <div class="border-line h-px flex-1"></div>
-        </div>
-
-        <!-- Reference Windows List -->
-        <!-- `:key` is the row UUID (NOT the array index) because the only per-row
-           control is CustomDateTimePicker — a non-form widget bound by object
-           reference (`v-model="picker.offSet"`), not by an index-based OForm*
-           `name=`. The multi_time_range array is bridged into the form via
-           setFieldValue (descendant) / emit (bare) — see commit(). -->
-        <div
-          v-for="(picker, index) in localMultiTimeRange"
-          :key="picker.uuid"
-          class="reference-window-container bg-card-glass-bg border-border-default mt-2 flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
-        >
-          <div
-            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
-          >
-            {{ t("alerts.compareWithPast.referenceWindow") }} {{ index + 1 }}
-          </div>
-
-          <!-- Time Frame -->
-          <div class="flex flex-col items-start gap-2">
-            <div class="flex items-center">
-              <span class="me-1"><OIcon name="schedule" size="sm" /></span>
-              {{ t("alerts.compareWithPast.timeFrame") }}
-              <span class="ms-2 cursor-pointer">
-                <OIcon
-                  name="info"
-                  size="sm"
-                  class="ms-1 cursor-pointer"
-                  :class="'text-text-secondary'"
-                />
-                <OTooltip
-                  :content="t('alerts.compareWithPast.timeFrameTooltip')"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                />
-              </span>
-            </div>
-            <div class="datetime-picker-wrapper rounded-default !border-border-default mt-2 border">
-              <CustomDateTimePicker
-                v-model="picker.offSet"
-                :picker="picker"
-                :isFirstEntry="false"
-                @update:model-value="updateDateTimePicker"
-                :changeStyle="true"
-              />
-            </div>
-          </div>
-
-          <!-- Cycle Info -->
-          <div class="flex flex-col items-start gap-2">
-            <div
-              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
-            >
-              {{ t("alerts.compareWithPast.cycle") }}
-              <span class="cursor-pointer">
-                <OIcon
-                  name="info"
-                  size="sm"
-                  class="ms-1 cursor-pointer"
-                  :class="'text-text-secondary'"
-                />
-                <OTooltip
-                  :content="t('alerts.compareWithPast.cycleTooltip')"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                />
-              </span>
-            </div>
-            <div class="flex items-start justify-between gap-4">
-              <div class="w-75 text-sm font-normal">
-                {{
-                  t("alerts.compareWithPast.comparingText", {
-                    offset: getDisplayValue(picker.offSet),
-                  })
-                }}
-              </div>
-              <div>
-                <OButton
-                  :aria-label="t('common.delete')"
-                  data-test="multi-time-range-alerts-delete-btn"
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  @click="removeTimeShift(index)"
-                >
-                  <OIcon name="delete-outline" size="sm" />
-                </OButton>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Action Buttons Section -->
-        <div class="mt-2 flex w-full items-center justify-center gap-3">
-          <OButton
-            data-test="multi-time-range-alerts-add-btn"
-            variant="outline"
-            size="sm"
-            :disabled="isComparisonDisabled"
-            @click="addTimeShift"
-          >
-            {{ t("alerts.compareWithPast.addComparisonWindow") }}
-            <OTooltip
-              v-if="isComparisonDisabled"
-              :content="raw(comparisonDisabledTooltip)"
-              side="top"
-              align="center"
-              :sideOffset="8"
+        <template #offset>
+          <span class="flex min-w-0 items-center gap-2">
+            <OInput
+              type="number"
+              min="1"
+              fit-content
+              :model-value="parseOffset(picker.offSet).amount"
+              :aria-label="t('alerts.plain.compareTitle')"
+              data-test="multi-time-range-offset-input"
+              @update:model-value="setOffset(index, $event, parseOffset(picker.offSet).unit)"
             />
-          </OButton>
-        </div>
-      </div>
-      <!-- end px-3 py-2 -->
-    </div>
+            <OSelect
+              class="w-30"
+              :model-value="parseOffset(picker.offSet).unit"
+              :options="unitOptionsFor(parseOffset(picker.offSet).amount)"
+              labelKey="label"
+              valueKey="value"
+              :searchable="false"
+              :aria-label="t('common.unitFor', { label: t('alerts.plain.compareTitle') })"
+              data-test="multi-time-range-offset-unit"
+              @update:model-value="
+                setOffset(index, parseOffset(picker.offSet).amount, String($event))
+              "
+            />
+          </span>
+        </template>
+      </i18n-t>
+      <i18n-t
+        v-if="index === 0 && factor"
+        keypath="alerts.form.compare.factorLine"
+        tag="p"
+        scope="global"
+        class="text-text-body m-0 mt-2 text-sm leading-8.5"
+        data-test="add-alert-compare-factor"
+      >
+        <template #factor>
+          <span class="mx-1 inline-flex align-middle">
+            <OInput
+              type="number"
+              min="1"
+              fit-content
+              :model-value="factor"
+              :debounce="300"
+              :aria-label="t('alerts.form.compare.factor')"
+              data-test="add-alert-compare-factor-input"
+              @update:model-value="setFactor"
+            />
+          </span>
+        </template>
+      </i18n-t>
+      <OCheckbox
+        v-if="index === 0 && factor"
+        class="mt-2"
+        :model-value="needsBaseline"
+        :label="t('alerts.form.compare.needsBaseline')"
+        data-test="add-alert-compare-needs-baseline"
+        @update:model-value="setNeedsBaseline"
+      />
+      <!-- Both answers lose something (a rise from zero, or a quiet start), so each states its cost. -->
+      <p
+        v-if="index === 0 && factor"
+        class="text-text-secondary m-0 ms-6 text-xs"
+        data-test="add-alert-compare-needs-baseline-help"
+      >
+        {{
+          needsBaseline
+            ? t("alerts.form.compare.needsHistoryOn")
+            : t("alerts.form.compare.needsBaselineOff")
+        }}
+      </p>
+      <p
+        v-if="index === 0 && !hasFunction"
+        class="text-status-warning-text m-0 mt-1 text-xs"
+        data-test="add-alert-compare-no-function"
+      >
+        {{ t("alerts.form.compare.noFunction") }}
+      </p>
+      <OButton
+        v-if="index === localMultiTimeRange.length - 1"
+        class="-ms-3.5 mt-2 self-start max-[85.5rem]:-ms-3"
+        data-test="multi-time-range-alerts-add-btn"
+        variant="ghost-primary"
+        size="sm"
+        icon-left="add"
+        @click="addTimeShift"
+      >
+        {{ t("alerts.form.compare.addWindow") }}
+      </OButton>
+      <template #actions>
+        <OButton
+          data-test="multi-time-range-alerts-delete-btn"
+          variant="ghost-primary"
+          size="sm"
+          @click="removeTimeShift(index)"
+        >
+          {{ t("common.remove") }}
+        </OButton>
+      </template>
+    </OSettingRow>
+    <OSettingRow
+      v-if="!localMultiTimeRange.length"
+      :label="t('alerts.plain.compareTitle')"
+      fill
+      data-test="add-alert-compare-empty"
+    >
+      <OButton
+        class="-ms-3.5 self-start max-[85.5rem]:-ms-3"
+        data-test="multi-time-range-alerts-add-btn"
+        variant="ghost-primary"
+        size="sm"
+        icon-left="add"
+        :disabled="isComparisonDisabled"
+        @click="addTimeShift"
+      >
+        {{ t("alerts.plain.compareAddWindow") }}
+        <OTooltip
+          v-if="isComparisonDisabled"
+          :content="raw(comparisonDisabledTooltip)"
+          side="top"
+          align="center"
+          :sideOffset="8"
+        />
+      </OButton>
+    </OSettingRow>
   </div>
 </template>
 
@@ -235,11 +167,14 @@ import { defineComponent, ref, watch, computed, inject, type PropType } from "vu
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
-import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import { compareFunction, compareRule } from "@/utils/alerts/alertIntents";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 interface TimeShiftPicker {
   offSet: string;
@@ -249,9 +184,11 @@ interface TimeShiftPicker {
 export default defineComponent({
   name: "Step4CompareWithPast",
   components: {
-    CustomDateTimePicker,
     OButton,
-    OIcon,
+    OCheckbox,
+    OInput,
+    OSelect,
+    OSettingRow,
     OTooltip,
   },
   props: {
@@ -278,6 +215,11 @@ export default defineComponent({
     selectedTab: {
       type: String,
       default: "custom",
+    },
+    /** Past rows are only compared by a function; without one they add to the count. */
+    hasFunction: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["update:multiTimeRange"],
@@ -337,7 +279,7 @@ export default defineComponent({
 
     const addTimeShift = () => {
       const newTimeShift: TimeShiftPicker = {
-        offSet: "15m",
+        offSet: "1d",
         uuid: getUUID(),
       };
       localMultiTimeRange.value.push(newTimeShift);
@@ -349,65 +291,65 @@ export default defineComponent({
       commit();
     };
 
-    const updateDateTimePicker = () => {
+    // The server parses only h, d, w and M; anything else runs as minutes, so seconds are not offered.
+    const UNIT_KEYS: Record<string, I18nKey> = {
+      m: "alerts.form.compare.units.m",
+      h: "alerts.form.compare.units.h",
+      d: "alerts.form.compare.units.d",
+      w: "alerts.form.compare.units.w",
+      M: "alerts.form.compare.units.M",
+    };
+    const unitOptionsFor = (amount: number) =>
+      Object.entries(UNIT_KEYS).map(([value, key]) => ({ label: t(key, amount), value }));
+    const noLabel = raw("");
+
+    // An offset is stored as a code such as "15m" or "1d".
+    const parseOffset = (code: string) => {
+      const match = String(code ?? "").match(/^(\d+)([smhdwM])$/);
+      if (!match) return { amount: 1, unit: "d" };
+      return { amount: Number(match[1]), unit: match[2] === "s" ? "m" : match[2] };
+    };
+    const setOffset = (index: number, amount: unknown, unit: string) => {
+      const n = Math.max(1, Math.floor(Number(amount)) || 1);
+      localMultiTimeRange.value[index].offSet = `${n}${unit}`;
       commit();
     };
 
-    // Offset code ("15m") → counted noun. Shares the *Count plural keys with
-    // convertMinutesToDisplayValue so "1m" reads "1 Minute", not "1 Minutes".
-    const UNIT_COUNT_KEYS: Record<string, I18nKey> = {
-      s: "alerts.compareWithPast.secondCount",
-      m: "alerts.compareWithPast.minuteCount",
-      h: "alerts.compareWithPast.hourCount",
-      d: "alerts.compareWithPast.dayCount",
-      w: "alerts.compareWithPast.weekCount",
-      M: "alerts.compareWithPast.monthCount",
+    // A comparison function the intent wrote keeps its factor editable here, without reading VRL.
+    const vrlStore = injectedForm?.useStore?.(
+      (state: { values?: { query_condition?: { vrl_function?: string | null } } }) =>
+        state.values?.query_condition?.vrl_function,
+    );
+    const rule = computed(() => compareRule(vrlStore?.value));
+    const factor = computed(() => rule.value?.factor);
+    // An empty past window makes any match "more than N times" it, so this holds the alert until it has data.
+    const needsBaseline = computed(() => rule.value?.needsBaseline ?? false);
+    const writeRule = (n: number, baseline: boolean) =>
+      injectedForm?.setFieldValue("query_condition.vrl_function", compareFunction(n, baseline));
+    const setFactor = (value: unknown) => {
+      const n = Number(value);
+      if (n > 0) writeRule(n, needsBaseline.value);
     };
-
-    const getDisplayValue = (value: string) => {
-      if (typeof value !== "string") return value;
-
-      const match = value.match(/^(\d+)([smhdwM])$/);
-      if (!match) return value;
-
-      const [, numberPart, unitPart] = match;
-      const countKey = UNIT_COUNT_KEYS[unitPart];
-
-      if (countKey) {
-        return t(countKey, Number(numberPart));
-      }
-
-      return value;
-    };
-
-    // Counted nouns → vue-i18n plural forms ("{n} Minute | {n} Minutes"),
-    // called as t(key, n). vue-i18n picks the singular form only for n === 1
-    // (n === 0 → "0 Minutes").
-    const convertMinutesToDisplayValue = (minutes: number) => {
-      if (minutes < 60) {
-        return t("alerts.compareWithPast.minuteCount", minutes);
-      } else if (minutes < 1440) {
-        return t("alerts.compareWithPast.hourCount", Math.floor(minutes / 60));
-      } else if (minutes < 10080) {
-        return t("alerts.compareWithPast.dayCount", Math.floor(minutes / 1440));
-      } else if (minutes < 43200) {
-        return t("alerts.compareWithPast.weekCount", Math.floor(minutes / 10080));
-      } else {
-        return t("alerts.compareWithPast.monthCount", Math.floor(minutes / 43200));
-      }
+    const setNeedsBaseline = (value: unknown) => {
+      if (factor.value) writeRule(factor.value, value === true);
     };
 
     return {
       raw,
       t,
       store,
+      factor,
+      setFactor,
+      needsBaseline,
+      setNeedsBaseline,
       multiWindowContainerRef,
       localMultiTimeRange,
       addTimeShift,
       removeTimeShift,
-      updateDateTimePicker,
-      getDisplayValue,
-      convertMinutesToDisplayValue,
+      unitOptionsFor,
+      noLabel,
+      parseOffset,
+      setOffset,
       isComparisonDisabled,
       comparisonDisabledTooltip,
     };

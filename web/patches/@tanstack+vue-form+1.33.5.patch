@@ -1,0 +1,104 @@
+diff --git a/node_modules/@tanstack/vue-form/dist/cjs/useField.cjs b/node_modules/@tanstack/vue-form/dist/cjs/useField.cjs
+index fd6cf9b..2ce290a 100644
+--- a/node_modules/@tanstack/vue-form/dist/cjs/useField.cjs
++++ b/node_modules/@tanstack/vue-form/dist/cjs/useField.cjs
+@@ -76,7 +76,8 @@ function useField(opts) {
+     cleanup = fieldApi.mount();
+   });
+   Vue.onUnmounted(() => {
+-    cleanup();
++    if (typeof cleanup === "function") cleanup();
++    cleanup = void 0;
+   });
+   Vue.watch(
+     () => opts,
+diff --git a/node_modules/@tanstack/vue-form/dist/cjs/useForm.cjs b/node_modules/@tanstack/vue-form/dist/cjs/useForm.cjs
+index 2a47f52..d6a2c12 100644
+--- a/node_modules/@tanstack/vue-form/dist/cjs/useForm.cjs
++++ b/node_modules/@tanstack/vue-form/dist/cjs/useForm.cjs
+@@ -54,7 +54,14 @@ function useForm(opts) {
+     );
+     return extendedApi;
+   })();
+-  Vue.onMounted(formApi.mount);
++  let __o2MountCleanup;
++  Vue.onMounted(() => {
++    __o2MountCleanup = formApi.mount();
++  });
++  Vue.onUnmounted(() => {
++    if (typeof __o2MountCleanup === "function") __o2MountCleanup();
++    __o2MountCleanup = void 0;
++  });
+   formApi.update(opts);
+   return formApi;
+ }
+diff --git a/node_modules/@tanstack/vue-form/dist/cjs/useFormGroup.cjs b/node_modules/@tanstack/vue-form/dist/cjs/useFormGroup.cjs
+index b98f3ab..442eb4b 100644
+--- a/node_modules/@tanstack/vue-form/dist/cjs/useFormGroup.cjs
++++ b/node_modules/@tanstack/vue-form/dist/cjs/useFormGroup.cjs
+@@ -16,7 +16,8 @@ function useFormGroup(opts) {
+     cleanup = formGroupApi.mount();
+   });
+   Vue.onUnmounted(() => {
+-    cleanup();
++    if (typeof cleanup === "function") cleanup();
++    cleanup = void 0;
+   });
+   Vue.watch(
+     () => opts,
+diff --git a/node_modules/@tanstack/vue-form/dist/esm/useField.js b/node_modules/@tanstack/vue-form/dist/esm/useField.js
+index 57ae8d9..383764e 100644
+--- a/node_modules/@tanstack/vue-form/dist/esm/useField.js
++++ b/node_modules/@tanstack/vue-form/dist/esm/useField.js
+@@ -74,7 +74,8 @@ function useField(opts) {
+     cleanup = fieldApi.mount();
+   });
+   onUnmounted(() => {
+-    cleanup();
++    if (typeof cleanup === "function") cleanup();
++    cleanup = void 0;
+   });
+   watch(
+     () => opts,
+diff --git a/node_modules/@tanstack/vue-form/dist/esm/useForm.js b/node_modules/@tanstack/vue-form/dist/esm/useForm.js
+index 0c98053..0fe7a6b 100644
+--- a/node_modules/@tanstack/vue-form/dist/esm/useForm.js
++++ b/node_modules/@tanstack/vue-form/dist/esm/useForm.js
+@@ -1,6 +1,6 @@
+ import { FormApi } from "@tanstack/form-core";
+ import { useSelector } from "@tanstack/vue-store";
+-import { defineComponent, h, onMounted } from "vue";
++import { defineComponent, h, onMounted, onUnmounted } from "vue";
+ import { Field } from "./useField.js";
+ import { FormGroup } from "./useFormGroup.js";
+ import { useFormId } from "./useFormId.js";
+@@ -52,7 +52,14 @@ function useForm(opts) {
+     );
+     return extendedApi;
+   })();
+-  onMounted(formApi.mount);
++  let __o2MountCleanup;
++  onMounted(() => {
++    __o2MountCleanup = formApi.mount();
++  });
++  onUnmounted(() => {
++    if (typeof __o2MountCleanup === "function") __o2MountCleanup();
++    __o2MountCleanup = void 0;
++  });
+   formApi.update(opts);
+   return formApi;
+ }
+diff --git a/node_modules/@tanstack/vue-form/dist/esm/useFormGroup.js b/node_modules/@tanstack/vue-form/dist/esm/useFormGroup.js
+index 77186b8..146de12 100644
+--- a/node_modules/@tanstack/vue-form/dist/esm/useFormGroup.js
++++ b/node_modules/@tanstack/vue-form/dist/esm/useFormGroup.js
+@@ -14,7 +14,8 @@ function useFormGroup(opts) {
+     cleanup = formGroupApi.mount();
+   });
+   onUnmounted(() => {
+-    cleanup();
++    if (typeof cleanup === "function") cleanup();
++    cleanup = void 0;
+   });
+   watch(
+     () => opts,

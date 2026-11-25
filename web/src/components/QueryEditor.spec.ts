@@ -129,6 +129,15 @@ describe("QueryEditor", () => {
       wrapper = mountQueryEditor();
       expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
     });
+
+    it("names the AI toggle with the words its tooltip shows", () => {
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+      wrapper = mountQueryEditor();
+      const toggle = wrapper.get('[data-test="query-editor-ai-toggle-btn"]');
+      expect(toggle.attributes("aria-label")).toBeTruthy();
+      expect(toggle.get("img").attributes("alt")).toBe("");
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false });
+    });
   });
 
   describe("isAIMode — internal control", () => {

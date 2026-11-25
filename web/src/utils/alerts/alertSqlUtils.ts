@@ -251,3 +251,236 @@ function fallbackHavingInsertion(
   // If no ORDER BY, LIMIT, or OFFSET found, append at the end
   return `${sqlQuery.trim()} ${havingClause}`;
 }
+
+const AGGREGATE_CALL =
+  /\b(?:count|sum|avg|min|max|median|mean|approx_\w+|stddev\w*|var(?:iance|_\w+)?|array_agg|string_agg|bool_and|bool_or|first_value|last_value|percentile_\w+)\s*\(/i;
+
+/** The query's outermost level: literals, comments and everything inside parentheses blanked to "()". */
+function outermostSql(sql: string): string {
+  const flat = sql
+    .replace(/--[^\n]*/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/'(?:[^']|'')*'/g, "''")
+    .replace(/"(?:[^"]|"")*"/g, '""');
+  let depth = 0;
+  let out = "";
+  for (const ch of flat) {
+    if (ch === "(") {
+      if (depth === 0) out += "(";
+      depth++;
+    } else if (ch === ")") {
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) out += ")";
+    } else if (depth === 0) out += ch;
+  }
+  return out;
+}
+
+/** True when the query aggregates without GROUP BY or HAVING, so every run returns exactly one row. */
+export function alwaysOneRow(sql: string): boolean {
+  const top = outermostSql(sql ?? "");
+  if ((top.match(/\bselect\b/gi) ?? []).length !== 1) return false;
+  if (/\b(?:union|intersect|except|group\s+by|having|over)\b/i.test(top)) return false;
+  const list = /\bselect\b([\s\S]*?)(?:\bfrom\b|$)/i.exec(top)?.[1] ?? "";
+  return AGGREGATE_CALL.test(list);
+}
+
+/** Whether a result of one row meets the "query returns [operator] [threshold] rows" limit. */
+export function oneRowMeetsLimit(operator: unknown, threshold: unknown): boolean {
+  const n = Number(threshold);
+  if (threshold === "" || threshold === null || !Number.isFinite(n)) return false;
+  switch (operator) {
+    case ">=":
+      return 1 >= n;
+    case ">":
+      return 1 > n;
+    case "<=":
+      return 1 <= n;
+    case "<":
+      return 1 < n;
+    case "=":
+      return n === 1;
+    case "!=":
+      return n !== 1;
+    default:
+      return false;
+  }
+}
+
+/** The SQL with quoted text and everything inside parentheses blanked, so offsets still line up. */
+function maskNested(sql: string): string {
+  let out = "";
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+    if (quote) {
+      out += " ";
+      if (ch === quote && sql[i + 1] === quote) {
+        out += " ";
+        i++;
+      } else if (ch === quote) quote = null;
+    } else if (ch === "'" || ch === '"' || ch === "`") {
+      quote = ch;
+      out += " ";
+    } else if (ch === "(" || ch === ")") {
+      depth = Math.max(0, depth + (ch === "(" ? 1 : -1));
+      out += " ";
+    } else out += depth > 0 ? " " : ch;
+  }
+  return out;
+}
+
+const clauseOf = (sql: string, start: RegExp, end: RegExp): string | null => {
+  const masked = maskNested(sql);
+  const head = start.exec(masked);
+  if (!head) return null;
+  const from = head.index + head[0].length;
+  const stop = end.exec(masked.slice(from));
+  return sql.slice(from, stop ? from + stop.index : sql.length).trim() || null;
+};
+
+const splitTop = (text: string, separator: RegExp): string[] => {
+  const parts: string[] = [];
+  let last = 0;
+  for (const match of maskNested(text).matchAll(separator)) {
+    parts.push(text.slice(last, match.index));
+    last = (match.index ?? 0) + match[0].length;
+  }
+  parts.push(text.slice(last));
+  return parts.map((part) => part.trim()).filter(Boolean);
+};
+
+const squash = (text: string) => text.replace(/["`\s]/g, "").toLowerCase();
+const CLAUSE_END = /\b(?:group\s+by|having|order\s+by|limit|qualify|union|window)\b|;/i;
+const COMPARISON = /^([\s\S]+?)\s*(>=|<=|!=|<>|>|<|=)\s*(-?\d+(?:\.\d+)?(?:e[-+]?\d+)?)$/i;
+
+/** The outer query's WHERE clause as written, else the condition of the select list's one
+ * `FILTER (WHERE …)` (a comparison counts its matches that way); null when it has neither. */
+export function sqlWhereText(sql: string): string | null {
+  return clauseOf(sql ?? "", /\bwhere\b/i, CLAUSE_END) ?? filterWhereText(sql ?? "");
+}
+
+function filterWhereText(sql: string): string | null {
+  const quoted = sql.replace(/'(?:[^']|'')*'|"(?:[^"]|"")*"/g, (m) => " ".repeat(m.length));
+  const heads = [...quoted.matchAll(/\bfilter\s*\(\s*where\b/gi)];
+  if (heads.length !== 1) return null;
+  const from = (heads[0].index ?? 0) + heads[0][0].length;
+  let depth = 1;
+  for (let i = from; i < quoted.length; i++) {
+    if (quoted[i] === "(") depth++;
+    else if (quoted[i] === ")" && --depth === 0) return sql.slice(from, i).trim() || null;
+  }
+  return null;
+}
+
+type HavingCondition = { column: string; operator: string; value: number };
+const HAVING_END = /\b(?:order\s+by|limit|qualify|union|window)\b|;/i;
+
+function havingThreshold(sql: string) {
+  const masked = maskNested(sql);
+  const head = /\bhaving\b/i.exec(masked);
+  if (!head) return null;
+  const from = head.index + head[0].length;
+  const stop = HAVING_END.exec(masked.slice(from));
+  const to = stop ? from + stop.index : sql.length;
+  const having = sql.slice(from, to).trim();
+  if (!having || /\bor\b/i.test(maskNested(having))) return null;
+  const list = clauseOf(sql, /^\s*select\b(?:\s+distinct\b)?/i, /\bfrom\b/i) ?? "";
+  const columns = splitTop(list, /,/g).map((item) => {
+    const named = /^([\s\S]+?)\s+as\s+([\w"`]+)$/i.exec(item);
+    return named
+      ? { expr: squash(named[1]), name: named[2].replace(/["`]/g, "") }
+      : { expr: squash(item), name: item.replace(/["`]/g, "") };
+  });
+  const parts = splitTop(having, /\band\b/gi);
+  let found: HavingCondition | null = null;
+  let term = -1;
+  // The last comparison wins: a minimum-volume guard is written before the threshold it guards.
+  for (const [index, part] of parts.entries()) {
+    const comparison = COMPARISON.exec(part);
+    if (!comparison) continue;
+    const lhs = squash(comparison[1]);
+    const operator = comparison[2] === "<>" ? "!=" : comparison[2];
+    const value = Number(comparison[3]);
+    for (const column of columns) {
+      const scaled = /^(.+)([/*])(\d+(?:\.\d+)?)$/.exec(column.expr);
+      const factor = scaled && scaled[1] === lhs ? Number(scaled[3]) : 0;
+      if (column.expr === lhs || squash(column.name) === lhs) {
+        found = { column: column.name, operator, value };
+      } else if (factor > 0) {
+        const restated = scaled![2] === "/" ? value / factor : value * factor;
+        found = { column: column.name, operator, value: Number(restated.toPrecision(12)) };
+      } else continue;
+      term = index;
+      break;
+    }
+  }
+  return found ? { condition: found, parts, term, head: head.index, from, to } : null;
+}
+
+/** A HAVING comparison restated on a column the query returns, for a per-row condition. A column
+ * that scales the compared expression (`expr / 1000.0 AS p95_ms`) gets the value scaled with it. */
+export function sqlHavingCondition(sql: string): HavingCondition | null {
+  return havingThreshold(sql ?? "")?.condition ?? null;
+}
+
+/** A grouped query whose HAVING ends the statement, split into the SQL without its threshold term
+ * (sorted worst first) and that threshold as a per-group condition on a named column. */
+export function sqlHavingToCondition(
+  sql: string,
+): { sql: string; condition: HavingCondition } | null {
+  const text = (sql ?? "").trim();
+  const match = havingThreshold(text);
+  const { condition } = match ?? {};
+  if (!match || !condition || match.to !== text.length) return null;
+  if (!/\bgroup\s+by\b/i.test(maskNested(text.slice(0, match.head)))) return null;
+  if (![">", ">=", "<", "<="].includes(condition.operator) || !/^\w+$/.test(condition.column))
+    return null;
+  const rest = match.parts.filter((_, index) => index !== match.term);
+  const kept = rest.length
+    ? `${text.slice(0, match.from)} ${rest.join(" AND ")}`
+    : text.slice(0, match.head).trimEnd();
+  // The alert reads a bounded page of rows, so the groups past the threshold must come first.
+  const order = condition.operator.startsWith(">") ? "DESC" : "ASC";
+  return { sql: `${kept} ORDER BY ${condition.column} ${order}`, condition };
+}
+
+const SQL_OPERATORS = new Set([">", ">=", "<", "<=", "=", "!="]);
+
+/** The per-group condition put back into the grouped query's HAVING, so one alert fires on the same
+ * groups; drops the sort `sqlHavingToCondition` added, so the two round-trip. */
+export function sqlConditionToHaving(
+  sql: string,
+  condition: { column?: string; operator?: string; value?: unknown },
+): string | null {
+  const { column = "", operator = "" } = condition;
+  const value = Number(condition.value);
+  if (condition.value === "" || condition.value === null || !Number.isFinite(value)) return null;
+  if (!column || !SQL_OPERATORS.has(operator)) return null;
+  const text = (sql ?? "").trim();
+  if (!/\bgroup\s+by\b/i.test(maskNested(text))) return null;
+  const list = clauseOf(text, /^\s*select\b(?:\s+distinct\b)?/i, /\bfrom\b/i) ?? "";
+  const expr = splitTop(list, /,/g)
+    .map((item) => /^([\s\S]+?)\s+as\s+([\w"`]+)$/i.exec(item) ?? [item, item, item])
+    .find((match) => squash(match[2]) === squash(column))?.[1]
+    .trim();
+  if (!expr) return null;
+  const name = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sort = new RegExp(`\\s+order\\s+by\\s+["\`]?${name}["\`]?\\s+(?:asc|desc)$`, "i");
+  const body = text.replace(sort, "");
+  const masked = maskNested(body);
+  const having = /\bhaving\b/i.exec(masked);
+  const from = having ? having.index + having[0].length : /\bgroup\s+by\b/i.exec(masked)!.index;
+  const stop = HAVING_END.exec(masked.slice(from));
+  const at = stop ? from + stop.index : body.length;
+  const tail = body.slice(at).trim();
+  const term = `${expr} ${operator} ${value}`;
+  const kept = body.slice(from, at).trim();
+  // AND binds tighter than OR, so an existing OR keeps its own parentheses.
+  const guarded = /\bor\b/i.test(maskNested(kept)) ? `(${kept})` : kept;
+  const head = having
+    ? `${body.slice(0, from).trimEnd()} ${guarded} AND ${term}`
+    : `${body.slice(0, at).trimEnd()} HAVING ${term}`;
+  return tail ? `${head} ${tail}` : head;
+}

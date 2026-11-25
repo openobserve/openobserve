@@ -30,6 +30,11 @@ import type {
   StreamsByType,
   StreamDataState,
 } from "@/types/alertLibrary";
+import type {
+  LibrarySuggestion,
+  LibrarySuggestResponse,
+  SuggestionFit,
+} from "@/utils/alerts/librarySuggest.types";
 
 // Reads the curated alert library from S3: one GET for the manifest (which
 // renders the entire gallery) and one GET per alert file, on drawer-open or
@@ -325,6 +330,40 @@ export function streamDataState(
     state: worst,
     lastIngestedMicros: worst === "stale" || worst === "fresh" ? oldest : null,
   };
+}
+
+export type SuggestionAreaState =
+  "absent" | "loading" | "failed" | "unavailable" | "none" | "ready";
+
+/** Cards the form shows for one stream: library matches only, since its intent chips are the starters. */
+export const SUGGESTION_CARDS = 4;
+
+/** What the form's ready-made area shows; a server without the endpoint (404) shows nothing, with no browser fallback. */
+export function suggestionArea(
+  input: { pending: boolean; error: unknown; data: LibrarySuggestResponse | undefined },
+  access: AnomalyLibraryAccess,
+  cap = SUGGESTION_CARDS,
+): { state: SuggestionAreaState; cards: LibrarySuggestion[]; total: number } {
+  const status = (input.error as { response?: { status?: number } } | null)?.response?.status;
+  if (input.error) return { state: status === 404 ? "absent" : "failed", cards: [], total: 0 };
+  if (input.pending || !input.data) return { state: "loading", cards: [], total: 0 };
+  if (input.data.library !== "ready") return { state: "unavailable", cards: [], total: 0 };
+  const shown = input.data.suggestions.filter(
+    (s) => s.kind === "library" && (!s.enterprise || access === "enabled"),
+  );
+  const cards = shown.slice(0, cap);
+  const total = Math.max(input.data.counts.total, shown.length);
+  return { state: cards.length ? "ready" : "none", cards, total };
+}
+
+/** What a card may claim on the picked stream: it fits only when every field it uses is there. An
+ * unread schema (empty set) leaves the server's word standing. */
+export function cardFit(
+  suggestion: Pick<LibrarySuggestion, "fit" | "matched_fields">,
+  onStream: ReadonlySet<string>,
+): { fit: SuggestionFit; absent: string[] } {
+  const absent = onStream.size ? suggestion.matched_fields.filter((f) => !onStream.has(f)) : [];
+  return { fit: absent.length ? "likely" : suggestion.fit, absent };
 }
 
 /** The UI is the only guard: an OSS backend stores an anomaly body as a broken scheduled alert. */

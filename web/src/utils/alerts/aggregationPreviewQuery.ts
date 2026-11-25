@@ -114,13 +114,19 @@ const maskForKeywordSearch = (sql: string): string => maskParens(maskStringLiter
  * at the matched positions. Masking preserves length, so positions line up
  * between the two.
  */
-const replaceOutsideLiterals = (sql: string, pattern: RegExp, replacement: string): string => {
+const replaceOutsideLiterals = (
+  sql: string,
+  pattern: RegExp,
+  replacement: string | ((group: string) => string),
+): string => {
   const masked = maskStringLiterals(sql);
   let out = "";
   let lastIndex = 0;
   for (const match of masked.matchAll(pattern)) {
     const index = match.index as number;
-    out += sql.slice(lastIndex, index) + replacement;
+    out +=
+      sql.slice(lastIndex, index) +
+      (typeof replacement === "string" ? replacement : replacement(match[1]));
     lastIndex = index + match[0].length;
   }
   return out + sql.slice(lastIndex);
@@ -158,6 +164,12 @@ export const cleanAggregationQuery = (query: string): string => {
   const havingMatch = maskForKeywordSearch(cleaned).match(/\s+HAVING\s+/i);
   if (havingMatch && havingMatch.index !== undefined) {
     cleaned = cleaned.slice(0, havingMatch.index);
+  }
+  // A per-group query's severity ORDER BY names the quoted "alert_agg_value",
+  // which the alias rename below skips; a chart has no use for that order.
+  const orderByMatch = maskForKeywordSearch(cleaned).match(/\s+ORDER\s+BY\s+/i);
+  if (orderByMatch && orderByMatch.index !== undefined) {
+    cleaned = cleaned.slice(0, orderByMatch.index);
   }
   // Remove zo_sql_min_time and zo_sql_max_time from SELECT list
   cleaned = cleaned.replace(/,\s*[^,\n]*?\s+[aA][sS]\s+zo_sql_min_time/g, "");
@@ -205,18 +217,53 @@ export const cleanAggregationQuery = (query: string): string => {
       }
     }
   }
-  // Move zo_sql_num field to sit right after zo_sql_key in the SELECT list.
-  // Pattern: remove ", <expr> AS zo_sql_num" from wherever it is, then
-  // re-insert it immediately after the zo_sql_key field expression.
-  const numFieldMatch = cleaned.match(/,\s*([^,]+?\s+[aA][sS]\s+zo_sql_num)/);
-  if (numFieldMatch) {
-    const numExpr = numFieldMatch[1].trim();
+  // Move zo_sql_num to sit right after zo_sql_key, matched on the masked copy so
+  // a comma inside the aggregate's call (percentile(x, 0.95)) can't split the entry.
+  const numFieldMatch = maskForKeywordSearch(cleaned).match(/,\s*[^,]+?\s+[aA][sS]\s+zo_sql_num\b/);
+  if (numFieldMatch && numFieldMatch.index !== undefined) {
+    const start = numFieldMatch.index;
+    const end = start + numFieldMatch[0].length;
+    const numExpr = cleaned.slice(start, end).replace(/^,/, "").trim();
     // Remove the original occurrence (with its leading comma)
-    cleaned = cleaned.replace(numFieldMatch[0], "");
+    cleaned = cleaned.slice(0, start) + cleaned.slice(end);
     // Insert right after zo_sql_key field (before the next comma or FROM)
     cleaned = cleaned.replace(/(\bzo_sql_key\b(?:\s*\))?)/i, `$1, ${numExpr}`);
   }
   return cleaned.trim();
+};
+
+/** Buckets the chart's automatic time histogram by `minutes`, so each point holds what one alert window holds. */
+export const withHistogramMinutes = (query: string, minutes: number): string =>
+  replaceOutsideLiterals(
+    query,
+    /\bhistogram\(\s*([A-Za-z_][\w]*)\s*\)/g,
+    (column) => `histogram(${column}, '${Math.max(1, Math.floor(minutes))} minute')`,
+  );
+
+/** A chart query whose first column is its time bucket, as one row per group over its whole range; null for any other shape. */
+export const withoutTimeBucket = (query: string): string | null => {
+  const bucket = /^\s*SELECT\s+histogram\([^()]*\)\s+AS\s+zo_sql_key\s*,\s*/i.exec(
+    maskStringLiterals(query),
+  );
+  if (!bucket) return null;
+  const unbucketed = `SELECT ${query.slice(bucket[0].length)}`;
+  const groupBy = /\s*\bGROUP\s+BY\s+(?:1|zo_sql_key)\b(\s*,\s*)?/i.exec(
+    maskForKeywordSearch(unbucketed),
+  );
+  if (!groupBy) return null;
+  const rest = unbucketed.slice(groupBy.index + groupBy[0].length);
+  const out = groupBy[1]
+    ? `${unbucketed.slice(0, groupBy.index)} GROUP BY ${rest}`
+    : `${unbucketed.slice(0, groupBy.index)}${rest ? ` ${rest}` : ""}`;
+  return /\bzo_sql_key\b/i.test(maskStringLiterals(out)) ? null : out.trim();
+};
+
+/** The result columns a grouped query names its groups by: its x_axis aliases when it renames them. */
+export const groupColumns = (query: string, groupBy: string[]): string[] => {
+  const aliases = [...maskStringLiterals(query).matchAll(/\bAS\s+(x_axis_\d+)\b/gi)].map(
+    (match) => match[1],
+  );
+  return groupBy.length && aliases.length ? aliases : groupBy;
 };
 
 export default cleanAggregationQuery;

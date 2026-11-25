@@ -5,11 +5,16 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { describe, expect, it, vi } from "vitest";
 
 import CompositeExpressionBuilder from "./CompositeExpressionBuilder.vue";
 import i18n from "@/locales";
+import { ref } from "vue";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
 
 type SelectedChild = {
   alert_id: string;
@@ -38,6 +43,18 @@ describe("CompositeExpressionBuilder", () => {
     expect(wrapper.find('[data-test="alerts-composite-expression-live"]').exists()).toBe(true);
   });
 
+  it("shows no live render for an empty expression and names the input without a visible label", () => {
+    const wrapper = mountBuilder("", selectedChildren.slice(0, 1));
+
+    expect(wrapper.find('[data-test="alerts-composite-expression-live"]').exists()).toBe(false);
+    expect(wrapper.find("label").exists()).toBe(false);
+    expect(
+      wrapper
+        .find('[data-test="alerts-composite-expression-input-field"]')
+        .attributes("aria-label"),
+    ).toBe(i18n.global.t("alerts.composite.expression"));
+  });
+
   it("renders a live pill per operand without leaking IDs or child names", () => {
     const wrapper = mountBuilder("{id-a} || ({id-b} && !{id-c})");
     const live = wrapper.find('[data-test="alerts-composite-expression-live"]');
@@ -47,6 +64,27 @@ describe("CompositeExpressionBuilder", () => {
     expect(live.text()).toContain("C");
     expect(live.text()).not.toContain("id-a");
     expect(live.text()).not.toContain("High error rate");
+  });
+
+  it("reads and inserts operators as words while storing symbols, and keeps typed text", async () => {
+    const wrapper = mountBuilder("{id-a}", selectedChildren.slice(0, 2));
+    const input = wrapper.find('[data-test="alerts-composite-expression-input-field"]');
+
+    expect(wrapper.find('[data-test="alerts-composite-expression-live"]').text()).toBe("A");
+    await wrapper.find('[data-test="alerts-composite-expression-and"]').trigger("click");
+    expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toBe("{id-a} &&");
+
+    await wrapper.setProps({ modelValue: "{id-a} &&" });
+    await input.setValue("A AND ");
+    await wrapper.setProps({ modelValue: "{id-a} && " });
+    expect((input.element as HTMLInputElement).value).toBe("A AND ");
+
+    await input.setValue("A&&!B");
+    const emits = wrapper.emitted("update:modelValue")?.length;
+    await input.trigger("blur");
+    expect((input.element as HTMLInputElement).value).toBe("A AND NOT B");
+    expect(wrapper.emitted("update:modelValue")).toHaveLength(emits ?? 0);
+    expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toBe("{id-a}&&!{id-b}");
   });
 
   it("places an operand via its letter chip without disturbing a custom expression", async () => {
@@ -94,5 +132,37 @@ describe("CompositeExpressionBuilder", () => {
       expect(control.attributes("aria-label")).toBeTruthy();
       expect(control.attributes("tabindex") ?? "0").not.toBe("-1");
     }
+  });
+
+  it("waits to show the expression error while the caller says there was no input yet", () => {
+    const wrapper = mount(CompositeExpressionBuilder, {
+      props: { modelValue: "", selectedChildren: [], showErrors: false },
+      global: { plugins: [i18n] },
+    });
+    expect(wrapper.find('[data-test="alerts-composite-expression-error"]').exists()).toBe(false);
+  });
+
+  it("opens the raw expression in place from its Write the expression yourself link", async () => {
+    const tiers = useAlertSettingTiers({
+      available: (id) => id === "compositeExpression",
+      isSet: () => false,
+      showAll: ref(false),
+    });
+    const wrapper = mount(CompositeExpressionBuilder, {
+      props: { modelValue: "{id-a} && {id-b}", selectedChildren: selectedChildren.slice(0, 2) },
+      global: { plugins: [i18n], provide: { [ALERT_SETTING_TIERS_KEY]: tiers } },
+    });
+    const raw = () => wrapper.find('[data-test="alerts-composite-expression-advanced"]');
+    expect(raw().exists()).toBe(false);
+    await wrapper.find('[data-test="add-alert-add-compositeExpression"]').trigger("click");
+    expect(raw().exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-alert-add-compositeExpression"]').exists()).toBe(false);
+    // A focused textarea below the scroller's edge brings itself back into view.
+    const field = raw().find("textarea");
+    const reveal = vi.fn();
+    (field.element as HTMLElement).scrollIntoView = reveal;
+    await field.trigger("focusin");
+    await flushPromises();
+    expect(reveal).toHaveBeenCalledWith({ block: "nearest" });
   });
 });

@@ -152,3 +152,33 @@ export const generateSqlQuery = (
 
   return query;
 };
+
+/** Group-by choices: never the time column; a metrics stream's series id first, named in words, not
+ * `__name__`; a saved choice stays listed; `ranked` names (step 1's group ranking) lead in their order. */
+export const groupByChoices = <T extends { label?: unknown; value: string }>(
+  columns: readonly T[],
+  opts: {
+    streamType?: string;
+    selected: readonly string[];
+    seriesLabel: I18nText;
+    timestamp: string;
+    ranked?: readonly string[];
+  },
+): T[] => {
+  // A histogram's bucket bound is how the value is measured, never what an alert is split by.
+  const dropped = new Set([
+    opts.timestamp,
+    ...(opts.streamType === "metrics" ? ["__name__", "le"] : []),
+  ]);
+  const rank = new Map((opts.ranked ?? []).map((name, i) => [name, i]));
+  const kept = columns
+    .filter((c) => !dropped.has(c.value) || opts.selected.includes(c.value))
+    .map((c, i) => ({ c, at: rank.get(c.value) ?? rank.size + i }))
+    .sort((a, b) => a.at - b.at)
+    .map(({ c }) => c);
+  if (opts.streamType !== "metrics") return kept;
+  const series = kept
+    .filter((c) => c.value === "__hash__")
+    .map((c) => ({ ...c, label: opts.seriesLabel }));
+  return [...series, ...kept.filter((c) => c.value !== "__hash__")];
+};

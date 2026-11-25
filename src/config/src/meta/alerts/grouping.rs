@@ -1119,7 +1119,8 @@ pub fn plan_group_updates(
 
     let rollup_outcome = if pending_period_sec > 0 {
         match prev.get(ROLLUP_GROUP_KEY) {
-            None => RunOutcome::Pending,
+            None if is_firing => RunOutcome::Pending,
+            None => base_outcome,
             Some(state) => match (state.last_outcome.as_ref(), state.since.as_ref()) {
                 (None, _) | (Some(RunOutcome::Normal), _) if is_firing => RunOutcome::Pending,
                 (Some(RunOutcome::Pending), Some(last)) => {
@@ -2424,25 +2425,68 @@ mod tests {
     }
 
     #[test]
-    fn test_rollup_is_normal_when_every_group_is_healthy() {
+    fn test_rollup_is_pending_only_while_a_matching_group_waits_out_must_last() {
         let c = tc(Operator::GreaterThan, 100, None);
-        let classification = classify_groups(
-            vec![
-                GroupObservation::new(labels(&[("host", "a")]), 1.0),
-                GroupObservation::new(labels(&[("host", "b")]), 2.0),
-            ],
-            &c,
-            500,
-        );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
-        let updates = plan.updates;
-        let rollup = update_for(&updates, ROLLUP_GROUP_KEY).unwrap();
-
-        assert_eq!(
-            rollup.state.as_ref().unwrap().last_outcome,
-            Some(RunOutcome::Normal)
-        );
-        assert_eq!(rollup.state.as_ref().unwrap().level, Some(AlertLevel::Ok));
+        let cases = [
+            (
+                "all healthy",
+                &[1.0, 2.0][..],
+                0,
+                &[100][..],
+                RunOutcome::Normal,
+            ),
+            (
+                "all healthy, first check with Must last",
+                &[1.0, 2.0][..],
+                300,
+                &[100][..],
+                RunOutcome::Normal,
+            ),
+            (
+                "one matching inside Must last",
+                &[150.0, 2.0][..],
+                300,
+                &[100][..],
+                RunOutcome::Pending,
+            ),
+            (
+                "one matching past Must last",
+                &[150.0, 2.0][..],
+                300,
+                &[100, 301 * SEC][..],
+                RunOutcome::Firing,
+            ),
+            (
+                "one matching, no Must last",
+                &[150.0, 2.0][..],
+                0,
+                &[100][..],
+                RunOutcome::Firing,
+            ),
+        ];
+        for (case, values, pending_sec, checks, want) in cases {
+            let observations: Vec<_> = values
+                .iter()
+                .enumerate()
+                .map(|(i, v)| GroupObservation::new(labels(&[("host", &i.to_string())]), *v))
+                .collect();
+            let mut db = HashMap::new();
+            for &at in checks {
+                let classification = classify_groups(observations.clone(), &c, 500);
+                let plan = plan_group_updates("alert-1", &classification, &db, at, pending_sec, 0);
+                for state in plan.updates.into_iter().filter_map(|u| u.state) {
+                    db.insert(state.group_key.clone(), state);
+                }
+            }
+            let rollup = &db[ROLLUP_GROUP_KEY];
+            let level = if want == RunOutcome::Normal {
+                AlertLevel::Ok
+            } else {
+                AlertLevel::Critical
+            };
+            assert_eq!(rollup.level, Some(level), "{case}");
+            assert_eq!(rollup.last_outcome, Some(want), "{case}");
+        }
     }
 
     #[test]

@@ -22,32 +22,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   alert library's detail drawer.
 -->
 <template>
-  <pre
-    class="hljs rounded-default m-0 p-2 font-mono text-xs whitespace-pre-wrap"
-    v-html="highlighted"
+  <OCodeBlock
+    :code="query"
+    :lang="language"
+    wrap
+    padded
+    class="my-0!"
+    data-test="alert-query-preview"
   />
 </template>
 
 <script setup lang="ts">
-import hljs from "highlight.js/lib/core";
-import sql from "highlight.js/lib/languages/sql";
-import { computed } from "vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 
-hljs.registerLanguage("sql", sql);
-
-const props = withDefaults(defineProps<{ query?: string; language?: string }>(), {
+withDefaults(defineProps<{ query?: string; language?: string }>(), {
   query: "",
   language: "sql",
-});
-
-// hljs escapes its own output, so it is safe to v-html. An unknown grammar
-// (PromQL has none) falls back to escaped text rather than highlightAuto, which
-// guesses a language and mislabels operators.
-const highlighted = computed(() => {
-  if (!props.query) return "";
-  if (hljs.getLanguage(props.language)) {
-    return hljs.highlight(props.query, { language: props.language }).value;
-  }
-  return props.query.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 });
 </script>

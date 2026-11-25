@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   childOptionsFrom,
   letteredToRaw,
+  operatorsToWords,
   rawToLettered,
   removeExpressionOperand,
 } from "./expression";
@@ -54,12 +55,25 @@ describe("removeExpressionOperand", () => {
 describe("lettered <-> raw expression", () => {
   const children = [{ alert_id: "id-a" }, { alert_id: "id-b" }, { alert_id: "id-c" }];
 
-  it("renders the stored form as letters", () => {
-    expect(rawToLettered("{id-a} && {id-b}", children)).toBe("A && B");
+  it("renders the stored form as letters joined by words", () => {
+    expect(rawToLettered("{id-a} || ({id-b} && !{id-c})", children)).toBe("A OR ( B AND NOT C )");
   });
 
-  it("translates letters back to the stored form", () => {
-    expect(letteredToRaw("A || (B && !C)", children)).toBe("{id-a} || ({id-b} && !{id-c})");
+  it.each([
+    ["A OR ( B AND NOT C )", "{id-a} || ( {id-b} && ! {id-c} )"],
+    ["a and not b", "a && ! b"],
+    ["A || (B && !C)", "{id-a} || ({id-b} && !{id-c})"],
+    ["{id-c} AND B", "{id-c} && {id-b}"],
+  ])("translates %s back to the stored form", (lettered, stored) => {
+    expect(letteredToRaw(lettered, children)).toBe(stored);
+  });
+
+  it.each([
+    ["A && (B || C)", "A AND (B OR C)"],
+    ["A&&!B", "A AND NOT B"],
+    ["(!A) || B AND C", "(NOT A) OR B AND C"],
+  ])("shows typed symbols in %s as words", (typed, words) => {
+    expect(operatorsToWords(typed)).toBe(words);
   });
 
   it("leaves unknown letters untouched for validation to reject", () => {

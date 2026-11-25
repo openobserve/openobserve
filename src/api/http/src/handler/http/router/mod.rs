@@ -1623,6 +1623,7 @@ fn service_route_table() -> Router {
         .route("/{org_id}/alerts/templates/preview", post(alerts::templates::preview_template))
         .route("/{org_id}/alerts/templates/{template_name}", get(alerts::templates::get_template).put(alerts::templates::update_template).delete(alerts::templates::delete_template))
         .route("/{org_id}/alerts/templates/bulk", delete(alerts::templates::delete_template_bulk))
+        .route("/{org_id}/alerts/library/suggestions", get(alerts::library::get_suggestions))
 
         // Alert destinations
         .route("/{org_id}/alerts/destinations", get(alerts::destinations::list_destinations).post(alerts::destinations::save_destination))
@@ -2487,6 +2488,7 @@ fn search_routes_with(llm_eval: bool) -> Router {
         .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
         // A manual trigger of an anomaly alert runs detection now, and a retrain trains now.
         .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
+        .route("/v2/{org_id}/alerts/evaluate", post(alerts::evaluate::evaluate_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
 
         // Both builds register these so OSS answers 403, not 404; OFGA keys on this path segment.

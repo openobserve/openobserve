@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { addHavingClauseToQuery } from "./alertSqlUtils";
+import {
+  addHavingClauseToQuery,
+  alwaysOneRow,
+  oneRowMeetsLimit,
+  sqlHavingCondition,
+  sqlHavingToCondition,
+  sqlConditionToHaving,
+  sqlWhereText,
+} from "./alertSqlUtils";
 
 describe("alertSqlUtils", () => {
   let parser: any;
@@ -319,5 +327,130 @@ describe("alertSqlUtils", () => {
       expect(result.toLowerCase()).toMatch(/(cnt|"cnt")\s+>=\s+5/);
       expect(result.toLowerCase()).toContain("having");
     });
+  });
+
+  it.each([
+    ["SELECT count(*) AS errors FROM \"default\" WHERE body LIKE '% ERROR %'", true],
+    ["select avg(duration) from t", true],
+    ["SELECT approx_percentile_cont(duration, 0.95) FROM t", true],
+    ["SELECT count(*) FROM (SELECT a FROM t GROUP BY a)", true],
+    ["SELECT service, count(*) FROM t GROUP BY service", false],
+    ["SELECT count(*) AS c FROM t HAVING c > 5", false],
+    ["SELECT a FROM t WHERE x = 'count(*)'", false],
+    ["SELECT count(*) OVER (PARTITION BY a) FROM t", false],
+    ["SELECT count(*) FROM a UNION ALL SELECT count(*) FROM b", false],
+    ["", false],
+  ])("alwaysOneRow(%s) is %s", (sql, expected) => {
+    expect(alwaysOneRow(sql)).toBe(expected);
+  });
+
+  it.each([
+    [">=", 1, true],
+    [">", 0, true],
+    [">=", 2, false],
+    ["<=", 5, true],
+    ["=", 1, true],
+    [">=", "", false],
+  ])("one row meets %s %s: %s", (operator, threshold, expected) => {
+    expect(oneRowMeetsLimit(operator, threshold)).toBe(expected);
+  });
+
+  const P95 = `SELECT service_name, COUNT(*) AS requests, approx_percentile_cont(duration, 0.95) / 1000.0 AS p95_ms FROM "default" WHERE span_kind IN ('2', '5') GROUP BY service_name`;
+  it.each([
+    [
+      `${P95} HAVING approx_percentile_cont(duration, 0.95) > 500000`,
+      { column: "p95_ms", operator: ">", value: 500 },
+    ],
+    [
+      `${P95} HAVING COUNT(*) >= 50 AND approx_percentile_cont(duration, 0.95) > 2000000`,
+      { column: "p95_ms", operator: ">", value: 2000 },
+    ],
+    [`${P95} HAVING COUNT(*) <> 3`, { column: "requests", operator: "!=", value: 3 }],
+    [
+      "SELECT k, avg(x) * 100 AS pct FROM t GROUP BY k HAVING avg(x) > 0.5",
+      { column: "pct", operator: ">", value: 50 },
+    ],
+    [`${P95} HAVING COUNT(*) > 5 OR COUNT(*) < 1`, null],
+    [`${P95} HAVING max(duration) > 5`, null],
+    [P95, null],
+  ])("sqlHavingCondition(%s)", (sql, expected) => {
+    expect(sqlHavingCondition(sql)).toEqual(expected);
+  });
+
+  it.each([
+    [
+      `${P95} HAVING COUNT(*) >= 50 AND approx_percentile_cont(duration, 0.95) > 2000000`,
+      {
+        sql: `${P95} HAVING COUNT(*) >= 50 ORDER BY p95_ms DESC`,
+        condition: { column: "p95_ms", operator: ">", value: 2000 },
+      },
+    ],
+    [
+      "SELECT k, avg(x) AS a FROM t GROUP BY k HAVING avg(x) <= 5",
+      {
+        sql: "SELECT k, avg(x) AS a FROM t GROUP BY k ORDER BY a ASC",
+        condition: { column: "a", operator: "<=", value: 5 },
+      },
+    ],
+    ['SELECT count(*) AS n FROM "k8s_events" HAVING n > 0', null],
+    [`${P95} HAVING COUNT(*) > 5 ORDER BY requests`, null],
+    [`${P95} HAVING COUNT(*) <> 3`, null],
+  ])("sqlHavingToCondition(%s)", (sql, expected) => {
+    expect(sqlHavingToCondition(sql)).toEqual(expected);
+  });
+
+  // A row whose SQL came from sqlHavingToCondition must take the same condition back out (round trip).
+  it.each([
+    [
+      `${P95} HAVING COUNT(*) >= 50 ORDER BY p95_ms DESC`,
+      { column: "p95_ms", operator: ">", value: 500 },
+      `${P95} HAVING COUNT(*) >= 50 AND approx_percentile_cont(duration, 0.95) / 1000.0 > 500`,
+      true,
+    ],
+    [
+      "SELECT k, avg(x) AS a FROM t GROUP BY k ORDER BY a ASC",
+      { column: "a", operator: "<=", value: "5" },
+      "SELECT k, avg(x) AS a FROM t GROUP BY k HAVING avg(x) <= 5",
+      true,
+    ],
+    [
+      "SELECT k, count(*) AS n FROM t GROUP BY k HAVING n > 1 OR k = 'a' LIMIT 10",
+      { column: "n", operator: ">=", value: 3 },
+      "SELECT k, count(*) AS n FROM t GROUP BY k HAVING (n > 1 OR k = 'a') AND count(*) >= 3 LIMIT 10",
+      false,
+    ],
+    [
+      "SELECT k, count(*) AS n FROM t GROUP BY k",
+      { column: "x", operator: ">", value: 1 },
+      null,
+      false,
+    ],
+    [
+      "SELECT k, count(*) AS n FROM t GROUP BY k",
+      { column: "n", operator: ">", value: "" },
+      null,
+      false,
+    ],
+    ["SELECT * FROM t", { column: "n", operator: ">", value: 1 }, null, false],
+  ])("sqlConditionToHaving(%s, %o)", (sql, condition, expected, roundTrip) => {
+    expect(sqlConditionToHaving(sql, condition)).toBe(expected);
+    if (roundTrip) {
+      expect(sqlHavingToCondition(expected!)).toEqual({
+        sql,
+        condition: { ...condition, value: Number(condition.value) },
+      });
+    }
+  });
+
+  it.each([
+    [`${P95} HAVING COUNT(*) > 1`, "span_kind IN ('2', '5')"],
+    ["SELECT count(*) FROM (SELECT * FROM t WHERE a = 1) WHERE b = 'x y' LIMIT 5", "b = 'x y'"],
+    ["SELECT count(*) FROM t", null],
+    [
+      `SELECT count(*) FILTER (WHERE "s" IN ('a)', 'b')) AS e, count(*) AS n FROM t`,
+      `"s" IN ('a)', 'b')`,
+    ],
+  ])("sqlWhereText(%s)", (sql, expected) => {
+    expect(sqlWhereText(sql)).toBe(expected);
   });
 });
