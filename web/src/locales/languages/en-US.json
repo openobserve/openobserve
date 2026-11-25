@@ -34584,7 +34584,15 @@
     "offline": "You are offline. Recent visits are still available.",
     "sourceUnavailable": "This resource type is currently unavailable",
     "emptyHelp": "Enter a name or ID to search resources",
-    "globalShortcut": "Open global search"
+    "globalShortcut": "Open global search",
+    "trigger": "Search or jump to…",
+    "allTypes": "All",
+    "capped": "Showing the first match. Refine the search to see more. | Showing the first {count} matches. Refine the search to see more.",
+    "hintNavigate": "Navigate",
+    "hintOpen": "Open",
+    "hintNewTab": "Open in new tab",
+    "hintTypes": "Filter by type",
+    "hintClose": "Close"
   },
   "timeRangeInput": {
     "label": "Type a time range",
