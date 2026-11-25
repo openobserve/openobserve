@@ -1104,7 +1104,6 @@ async fn with_suggestion_source(
 
 #[cfg(test)]
 mod tests {
-    use arrow_schema::{DataType, Field, Schema};
     use axum::{
         body::Bytes,
         extract::{Path, Query},
@@ -1160,6 +1159,7 @@ mod tests {
     #[cfg(not(feature = "cloud"))]
     #[tokio::test]
     async fn values_stream_refuses_the_digest_with_403_before_streaming() {
+        use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
         let schema = Schema::new(vec![
