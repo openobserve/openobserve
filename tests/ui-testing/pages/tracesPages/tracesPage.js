@@ -3322,6 +3322,14 @@ export class TracesPage {
       .toHaveAttribute('data-state', 'on', { timeout: 10000 });
   }
 
+  // The switch runs a search, and its count query goes out only after the list answers.
+  async switchToTracesModeAndSettle() {
+    await this.switchToTracesMode();
+    const badge = this.page.locator(this.tracesCountBadge);
+    await expect(badge).toHaveText(/[1-9][\d.,]*\s*[KMB]?\s+traces?/i, { timeout: 30000 });
+    await expect(badge).not.toHaveAttribute('aria-busy', 'true');
+  }
+
   async expectGenericQueryError() {
     const errorState = this.page.locator(this.errorMessage);
     await expect(errorState).toBeVisible({ timeout: 15000 });
@@ -4022,9 +4030,23 @@ export class TracesPage {
       await pinned.click();
       return;
     }
+    const sqlSwitch = this.page.locator('[data-test="traces-search-bar-sql-mode-toggle-btn"]');
     await this.page.locator('[data-test="traces-search-bar-more-menu-btn"]').click();
-    await this.page.locator('[data-test="traces-search-bar-sql-mode-toggle-btn"]').click();
-    await this.page.keyboard.press('Escape');
+    const wasOn = (await sqlSwitch.getAttribute('aria-checked')) === 'true';
+    await sqlSwitch.click();
+    await expect(sqlSwitch).toHaveAttribute('aria-checked', String(!wasOn), { timeout: 10000 });
+    await this.closeMoreMenu();
+  }
+
+  // Escape would also close every open toast; a view move closes the menu itself, so a click that reopened it is retried.
+  async closeMoreMenu() {
+    const sqlSwitch = this.page.locator('[data-test="traces-search-bar-sql-mode-toggle-btn"]');
+    await expect(async () => {
+      if (await sqlSwitch.isVisible()) {
+        await this.page.locator('[data-test="traces-search-bar-more-menu-btn"]').click();
+      }
+      await expect(sqlSwitch).toBeHidden({ timeout: 1000 });
+    }).toPass({ timeout: 10000 });
   }
 
   async expectSqlMode(on) {
@@ -4039,7 +4061,7 @@ export class TracesPage {
     await expect(
       this.page.locator('[data-test="traces-search-bar-sql-mode-toggle-btn"]'),
     ).toHaveAttribute('aria-checked', String(on), { timeout: 10000 });
-    await this.page.keyboard.press('Escape');
+    await this.closeMoreMenu();
   }
 
   // Monaco auto-closes quotes and brackets on typed input, so SQL is set through its API.
@@ -4116,11 +4138,12 @@ export class TracesPage {
     return dataTest.replace(`logs-search-subfield-add-${field}-`, '');
   }
 
-  // Counts _search_stream requests sent while `action` runs, until `settled` sees the page at rest and 1.5 s after.
+  // Counts search requests sent while `action` runs, until `settled` sees the page at rest and 1.5 s after.
   async countSearchStreams(action, settled) {
     let searches = 0;
     const onRequest = (request) => {
-      if (request.url().includes('_search_stream')) searches++;
+      // The Traces view lists through latest_stream; its count and every other search use _search_stream.
+      if (/_search_stream|\/traces\/latest_stream/.test(request.url())) searches++;
     };
     this.page.on('request', onRequest);
     try {
