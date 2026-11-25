@@ -40,9 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <OButton
                 data-test="logs-view-mode-dropdown-btn"
+                class="toolbar-btn-rest"
                 size="sm-toolbar"
-                variant="outline"
-                icon-right="arrow-drop-down"
+                variant="ghost"
+                icon-right="expand-more"
               >
                 <OIcon :name="currentToggleOption.icon" size="sm" class="shrink-0" />
                 {{ currentToggleOption.label }}
@@ -620,6 +621,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="order-1 max-md:me-auto">
           <DateTime
             ref="dateTimeRef"
+            variant="ghost"
             auto-apply
             menu-align="end"
             :default-type="searchObj.data.datetime.type"
@@ -650,9 +652,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <span class="inline-flex">
                 <OButton
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  class="region-dropdown-btn px-1"
+                  class="region-dropdown-btn toolbar-btn-rest px-1"
                   disabled
                   data-test="logs-search-bar-region-btn"
                 >
@@ -669,7 +671,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </OTooltip>
             <OButtonGroup
-              class="border-card-glass-border border p-0"
+              class="p-0"
               v-else-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -679,13 +681,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="start" data-test="logs-search-bar-region-btn">
                 <template #trigger>
                   <OButton
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    class="region-dropdown-btn px-1"
+                    class="region-dropdown-btn toolbar-btn-rest px-1"
                     :title="t('search.regionTitle')"
                   >
                     {{ t("search.region") }}
-                    <OIcon name="arrow-drop-down" size="sm" class="ms-1" />
+                    <OIcon name="expand-more" size="xs" class="ms-1" />
                   </OButton>
                 </template>
                 <div class="min-w-60 p-2" data-test="logs-search-bar-region-menu">

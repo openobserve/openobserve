@@ -689,6 +689,16 @@
     var(--color-border-control)
   );
 }
+/* Logs packs about fifteen controls in one row, so edges there read as noise: a borderless tonal fill instead. */
+:root .logs-search-bar-component {
+  --toolbar-btn-rest-bg: var(--color-surface-band);
+  --toolbar-btn-rest-edge: transparent;
+}
+:root
+  .logs-search-bar-component
+  #date-time-button:not(:hover):not([aria-expanded="true"]):not([data-state="open"]) {
+  background-color: var(--toolbar-btn-rest-bg);
+}
 /* Their icons stay secondary grey (as in the reference apps) but get a thin currentColor stroke, lifting the 300-weight outlines to about the 400 weight (≈1.3px at 16px). */
 :root :is(.toolbar-btn-rest, .row-actions button, #date-time-button) svg path[fill="currentColor"] {
   stroke: currentColor;

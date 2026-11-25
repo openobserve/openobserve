@@ -77,7 +77,7 @@ describe("SearchBar — pinned saved views", () => {
       .find((b) => b.attributes("data-test") === "logs-search-bar-saved-views-pinned-list-btn")!;
     expect(trigger.props("size")).toBe("sm-toolbar");
     const icons = trigger.findAllComponents({ name: "OIcon" }).map((c) => c.props("name"));
-    expect(icons).toEqual(["saved-search", "arrow-drop-down"]);
+    expect(icons).toEqual(["saved-search", "expand-more"]);
   });
 
   it("divides the list trigger from the save button with a vertical separator", async () => {
@@ -93,11 +93,11 @@ describe("SearchBar — pinned saved views", () => {
     ).toBe(true);
   });
 
-  it("is as tall as the 28px toolbar buttons: a hairline border around 1.75rem children", async () => {
+  it("is as tall as the 28px toolbar buttons, with no border of its own", async () => {
     wrapper = mountSearchBar(1600);
     await flushPromises();
 
-    expect(group().classes()).toContain("border");
+    expect(group().classes()).not.toContain("border");
     expect(group().classes()).toContain("p-0");
     expect(
       group().find('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').classes(),
