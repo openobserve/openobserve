@@ -227,7 +227,7 @@ pub(crate) async fn around(
         req_stats,
         org_id,
         stream_name,
-        StreamType::Logs,
+        stream_type,
         UsageType::SearchAround,
         num_fn,
         started_at,
@@ -252,6 +252,8 @@ fn merge_around(
     resp.size = around_size;
     resp.scan_size = resp_forward.scan_size + resp_backward.scan_size;
     resp.took = resp_forward.took + resp_backward.took;
+    resp.took_detail = resp_forward.took_detail.clone();
+    resp.took_detail.add(&resp_backward.took_detail);
     resp.cached_ratio = (resp_forward.cached_ratio + resp_backward.cached_ratio) / 2;
     resp
 }
@@ -333,6 +335,20 @@ mod tests {
         assert_eq!(order, [5, 4, 3, 2]);
         assert_eq!(resp.total, 4);
         assert_eq!(resp.size, 4);
+    }
+
+    #[test]
+    fn test_merge_around_fills_took_detail_like_took() {
+        let half = |took: usize, wait: usize| {
+            let mut r = config::meta::search::Response::default();
+            r.set_took(took);
+            r.set_wait_in_queue(wait);
+            r
+        };
+        let resp = merge_around((&half(300, 10), &half(100, 5)), 4);
+        assert_eq!(resp.took, 400);
+        assert_eq!(resp.took_detail.total, 400);
+        assert_eq!(resp.took_detail.wait_in_queue, 15);
     }
 
     #[test]

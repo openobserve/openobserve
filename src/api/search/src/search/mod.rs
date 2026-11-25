@@ -1217,12 +1217,14 @@ async fn values_inner(
                 .unwrap_or(0.0)
                 .max(ret.peak_memory_usage.unwrap_or(0.0)),
         );
+        // fields run one after another, so their took details add up
+        resp.took_detail.add(&ret.took_detail);
         work_group_set.push(ret.work_group);
     }
     resp.total = fields.len();
     resp.hits = hit_values;
     resp.size = size;
-    resp.took = start.elapsed().as_millis() as usize;
+    resp.set_took(start.elapsed().as_millis() as usize);
 
     let time = start.elapsed().as_secs_f64();
     http_report_metrics(start, org_id, stream_type, "200", "_values/v1", "", "");

@@ -285,7 +285,16 @@ pub async fn search(
                         );
                     }
 
-                    SearchService::search(&trace_id, &org_id, stream_type, user_id, &req).await
+                    // The merged response below writes the one Search usage row.
+                    SearchService::search_with_usage(
+                        &trace_id,
+                        &org_id,
+                        stream_type,
+                        user_id,
+                        &req,
+                        SearchService::UsageReport::Never,
+                    )
+                    .await
                 })
                 .instrument(enter_span),
             );
@@ -379,7 +388,7 @@ pub async fn search(
     );
 
     res.set_trace_id(trace_id.to_string());
-    res.set_took(took_time as usize);
+    res.set_took(start.elapsed().as_millis() as usize);
     res.set_cache_took(cache_took);
 
     if is_complex_query
@@ -770,11 +779,18 @@ pub fn merge_response(
     cache_took: usize,
     order_by: Vec<(String, OrderBy)>,
 ) -> config::meta::search::Response {
+    // Deltas with no hits are dropped below, but their scan and queue wait still count.
+    let delta_scan_size: usize = search_responses.iter().map(|res| res.scan_size).sum();
+    let delta_took = parallel_took_detail(&search_responses);
     cached_responses.retain(|res| !res.hits.is_empty());
     search_responses.retain(|res| !res.hits.is_empty());
 
     if cached_responses.is_empty() && search_responses.is_empty() {
-        return config::meta::search::Response::default();
+        return config::meta::search::Response {
+            scan_size: delta_scan_size,
+            took_detail: delta_took,
+            ..Default::default()
+        };
     }
     let mut fn_error = vec![];
 
@@ -814,16 +830,15 @@ pub fn merge_response(
             fn_error.extend(res.function_error);
         }
         cache_response.function_error = fn_error;
+        cache_response.took_detail = delta_took;
         return cache_response;
     }
     let cached_hits_len = cache_response.hits.len();
 
-    cache_response.scan_size = 0;
+    cache_response.scan_size = delta_scan_size;
 
     let mut files_cache_ratio = 0;
     let mut search_hits_len = 0;
-
-    let mut res_took = ResponseTook::default();
 
     let search_responses_len = search_responses.len();
     let (first_order_by, first_order_by_metadata, first_is_histogram_eligible) = search_responses
@@ -838,7 +853,6 @@ pub fn merge_response(
         .unwrap_or_default();
     for res in search_responses {
         cache_response.total += res.total;
-        cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
         files_cache_ratio += res.cached_ratio;
         cache_response.histogram_interval = res.histogram_interval;
@@ -848,13 +862,6 @@ pub fn merge_response(
         if res.hits.is_empty() {
             continue;
         }
-        // here the searches in paralles, so we use the max value of the took_detail
-        res_took.idx_took = std::cmp::max(res_took.idx_took, res.took_detail.idx_took);
-        res_took.wait_in_queue =
-            std::cmp::max(res_took.wait_in_queue, res.took_detail.wait_in_queue);
-        res_took.search_took = std::cmp::max(res_took.search_took, res.took_detail.search_took);
-        res_took.file_list_took =
-            std::cmp::max(res_took.file_list_took, res.took_detail.file_list_took);
         fn_error.extend(res.function_error);
 
         cache_response.peak_memory_usage = Some(
@@ -905,7 +912,7 @@ pub fn merge_response(
         )
     );
 
-    cache_response.took_detail = res_took;
+    cache_response.took_detail = delta_took;
     cache_response.order_by = first_order_by;
     cache_response.order_by_metadata = first_order_by_metadata;
     cache_response.result_cache_ratio = (((cached_hits_len as f64) * 100_f64)
@@ -917,6 +924,19 @@ pub fn merge_response(
     }
     cache_response.is_histogram_eligible = first_is_histogram_eligible;
     cache_response
+}
+
+/// The deltas run in parallel, so each part of the merged took detail is the max.
+fn parallel_took_detail(responses: &[config::meta::search::Response]) -> ResponseTook {
+    let mut took = ResponseTook::default();
+    for res in responses {
+        let d = &res.took_detail;
+        took.idx_took = took.idx_took.max(d.idx_took);
+        took.wait_in_queue = took.wait_in_queue.max(d.wait_in_queue);
+        took.search_took = took.search_took.max(d.search_took);
+        took.file_list_took = took.file_list_took.max(d.file_list_took);
+    }
+    took
 }
 
 fn sort_response(
@@ -2137,6 +2157,40 @@ mod tests {
         let merged = merge_response("t", vec![], vec![empty], "_timestamp", 10, true, 0, vec![]);
         assert!(merged.hits.is_empty());
         assert_eq!(merged.total, 0);
+    }
+
+    #[test]
+    fn test_merge_response_keeps_scan_and_queue_wait_of_empty_delta() {
+        let mut empty_delta = response_with_ts(&[]);
+        empty_delta.scan_size = 100;
+        empty_delta.took_detail.wait_in_queue = 2000;
+        let mut delta = response_with_ts(&[30]);
+        delta.took_detail.wait_in_queue = 5;
+        let merged = merge_response(
+            "t",
+            vec![response_with_ts(&[10, 20])],
+            vec![empty_delta.clone(), delta],
+            "_timestamp",
+            10,
+            true,
+            0,
+            vec![],
+        );
+        assert_eq!(merged.scan_size, 101);
+        assert_eq!(merged.took_detail.wait_in_queue, 2000);
+
+        let only_empty = merge_response(
+            "t",
+            vec![],
+            vec![empty_delta],
+            "_timestamp",
+            10,
+            true,
+            0,
+            vec![],
+        );
+        assert_eq!(only_empty.scan_size, 100);
+        assert_eq!(only_empty.took_detail.wait_in_queue, 2000);
     }
 
     #[test]

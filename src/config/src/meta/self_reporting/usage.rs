@@ -703,23 +703,25 @@ impl UsageData {
 /// The bucket key `ingest_usages` (openobserve-core `self_reporting::ingestion`)
 /// aggregates `UsageData` rows by, per org/hour/event.
 ///
-/// On a bucket collision only three fields are touched, and only two truly sum:
+/// On a bucket collision only these fields are touched:
 ///
 /// | field | behaviour |
 /// |---|---|
 /// | `size` | **sums** — the only reliable summation channel |
 /// | `num_records` | **sums** |
+/// | `dropped_records` | **sums** |
 /// | `response_time` | summed then divided by `count` ⇒ an AVERAGE, not a sum |
+/// | `took_wait_in_queue` | summed then divided by `count` ⇒ an AVERAGE |
 ///
 /// Every other field — `request_body` included — is taken from the FIRST row
-/// inserted into the bucket and the rest are discarded. `dropped_records` is
-/// likewise not summed: it keeps the first row's value and so under-counts
-/// (pre-existing behaviour, left alone deliberately).
+/// inserted into the bucket and the rest are discarded.
 #[derive(Hash, PartialEq, Eq)]
 pub struct GroupKey {
     pub stream_name: String,
     pub org_id: String,
     pub stream_type: StreamType,
+    pub year: i32,
+    pub month: u32,
     pub day: u32,
     pub hour: u32,
     pub event: UsageEvent,
@@ -2452,6 +2454,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -2463,6 +2467,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -2474,6 +2480,8 @@ mod tests {
             stream_name: "stream2".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -2495,6 +2503,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -2509,6 +2519,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -2994,6 +3006,8 @@ mod tests {
             stream_name: "synthetics".to_string(),
             org_id: "org_a".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 25,
             hour: 13,
             event,
