@@ -804,6 +804,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             :patterns="patternsState?.patterns?.patterns || []"
             :loading="patternsState?.loading"
+            :error="patternsState?.error"
+            :error-status="patternsState?.errorStatus"
             :totalLogsAnalyzed="patternsState?.patterns?.statistics?.total_logs_analyzed"
             :wrap="searchObj.meta.toggleSourceWrap"
             :scroll-target="scrollContainerRef"

@@ -84,4 +84,26 @@ describe("usePatterns partial warning", () => {
     rejecters[1]({ name: "CanceledError" });
     await second;
   });
+
+  it("stores a permission message and the status for a 403", async () => {
+    vi.mocked(patternsService.extractPatterns).mockRejectedValue({
+      response: { status: 403, data: { message: "Unauthorized Access" } },
+    });
+    await expect(
+      usePatterns(((k: string) => k) as never).extractPatterns("org", "s", {} as never),
+    ).rejects.toBeDefined();
+    expect(patternsState.value.errorStatus).toBe(403);
+    expect(patternsState.value.error).toBe("search.patternsNoReadPermission");
+  });
+
+  it("keeps the server message and status for other failures", async () => {
+    vi.mocked(patternsService.extractPatterns).mockRejectedValue({
+      response: { status: 400, data: { message: "Search stream not found" } },
+    });
+    await expect(
+      usePatterns(((k: string) => k) as never).extractPatterns("org", "s", {} as never),
+    ).rejects.toBeDefined();
+    expect(patternsState.value.errorStatus).toBe(400);
+    expect(patternsState.value.error).toBe("Search stream not found");
+  });
 });

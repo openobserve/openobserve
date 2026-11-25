@@ -54,6 +54,7 @@ export const patternsState = ref<{
   patterns: PatternsResult | null;
   loading: boolean;
   error: string | null;
+  errorStatus: number | null;
   lastQuery: SearchRequestPayload | null;
   // Configurable pattern-extraction scan size; may be absent until set by UI
   scanSize?: number;
@@ -61,6 +62,7 @@ export const patternsState = ref<{
   patterns: null,
   loading: false,
   error: null as string | null,
+  errorStatus: null as number | null,
   lastQuery: null as SearchRequestPayload | null,
 });
 
@@ -95,6 +97,7 @@ export default function usePatterns(t: TranslateFn) {
     try {
       patternsState.value.loading = true;
       patternsState.value.error = null;
+      patternsState.value.errorStatus = null;
       patternsState.value.lastQuery = queryReq;
 
       // console.log("[Patterns] Extracting patterns for stream:", stream_name);
@@ -165,8 +168,11 @@ export default function usePatterns(t: TranslateFn) {
       // stale data (e.g. from an earlier single-stream query) once this run
       // has failed.
       patternsState.value.patterns = null;
+      patternsState.value.errorStatus = error?.response?.status ?? null;
       patternsState.value.error =
-        error?.response?.data?.message || t("search.errorExtractingPatterns");
+        error?.response?.status === 403
+          ? t("search.patternsNoReadPermission")
+          : error?.response?.data?.message || t("search.errorExtractingPatterns");
       throw error;
     } finally {
       if (isLatest()) {
@@ -194,6 +200,7 @@ export default function usePatterns(t: TranslateFn) {
   const clearPatterns = () => {
     patternsState.value.patterns = null;
     patternsState.value.error = null;
+    patternsState.value.errorStatus = null;
     patternsState.value.lastQuery = null;
     // console.log("[Patterns] Cleared patterns state");
   };

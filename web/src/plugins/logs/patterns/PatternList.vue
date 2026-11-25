@@ -163,6 +163,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- Error State: a failed extraction is not "no patterns" -->
+    <div
+      v-else-if="error"
+      class="flex flex-1 items-center justify-center"
+      data-test="log-patterns-error-state"
+    >
+      <OEmptyState
+        size="hero"
+        :preset="errorStatus === 403 ? 'no-access' : 'load-error'"
+        :description="raw(error)"
+        :actions="[]"
+      />
+    </div>
+
     <!-- Empty State -->
     <div v-else class="flex flex-1 items-center justify-center">
       <OEmptyState size="hero" preset="no-patterns" data-test="log-patterns-empty-state">
@@ -251,6 +265,9 @@ const props = defineProps<{
   patterns: any[];
   loading: boolean;
   totalLogsAnalyzed?: number;
+  /** Message of a failed extraction; replaces the empty state. */
+  error?: string | null;
+  errorStatus?: number | null;
   wrap?: boolean;
   /** External scroll container passed to the virtual scroller's scroll-target. */
   scrollTarget?: HTMLElement | null;
