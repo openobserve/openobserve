@@ -35,7 +35,6 @@ pub const ORG_INGESTION_TOKEN_PREFIX: &str = "o2oi_";
 pub const WRITER_TOKEN_PREFIX: &str = "_o2_";
 /// The `created_by` of every row a feature writer makes; no user has it.
 pub const WRITER_TOKEN_CREATOR: &str = "system";
-const TOKEN_FINGERPRINT_LEN: usize = 16;
 
 /// `org_id` → its default enabled ingest token, with the time it was loaded.
 ///
@@ -152,7 +151,6 @@ pub struct SplunkHecTokenEntry {
 
 #[derive(Debug, FromQueryResult)]
 pub struct OrgIngestionTokenListRecord {
-    pub id: String,
     pub name: String,
     pub token: String,
     pub description: String,
@@ -186,13 +184,6 @@ pub fn may_authenticate(name: &str, created_by: &str) -> bool {
 pub fn generate_token() -> String {
     let random_part = config::utils::rand::generate_random_string(32);
     format!("{}{}", ORG_INGESTION_TOKEN_PREFIX, random_part)
-}
-
-/// Non-reversible stand-in for a token value, safe to put in coordinator keys and logs.
-pub fn token_fingerprint(token: &str) -> String {
-    let mut digest = sha256::digest(token);
-    digest.truncate(TOKEN_FINGERPRINT_LEN);
-    digest
 }
 
 /// Generate a Splunk HEC token: a lowercase hyphenated GUID from 16 random bytes.
@@ -423,23 +414,6 @@ pub async fn find_token_any_state(
     Ok(record.map(OrgIngestionTokenRecord::from))
 }
 
-/// Find a token by org_id and row id, regardless of its `enabled` state.
-pub async fn find_by_id(
-    org_id: &str,
-    id: &str,
-) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
-    // Read-WRITE: the coordinator watcher decides from this row whether to keep a token cached.
-    let client = get_orm_client_rw().await;
-    let record = Entity::find()
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Id.eq(id))
-        .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    Ok(record.map(OrgIngestionTokenRecord::from))
-}
-
 /// List all tokens for an org (token values masked).
 pub async fn list_by_org(org_id: &str) -> Result<Vec<OrgIngestionTokenListRecord>, errors::Error> {
     let client = get_orm_client_ro().await;
@@ -448,7 +422,6 @@ pub async fn list_by_org(org_id: &str) -> Result<Vec<OrgIngestionTokenListRecord
         .order_by(Column::IsDefault, Order::Desc)
         .order_by(Column::CreatedAt, Order::Desc)
         .select_only()
-        .column(Column::Id)
         .column(Column::Name)
         .column(Column::Token)
         .column(Column::Description)
@@ -520,14 +493,11 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, errors::Er
     Ok(new_token)
 }
 
-/// Delete all tokens for an org (cascade on org deletion), returning (id, token, splunk_token).
-pub async fn delete_by_org(
-    org_id: &str,
-) -> Result<Vec<(String, String, Option<String>)>, errors::Error> {
+/// Delete all tokens for an org (cascade on org deletion).
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, Option<String>)>, errors::Error> {
     let client = get_orm_client_rw().await;
     let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
-    let cols = [Column::Id, Column::Token, Column::SplunkToken];
-    let removed = super::delete_returning(client, delete, &cols)
+    let removed = super::delete_returning(client, delete, &[Column::Token, Column::SplunkToken])
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     invalidate_default_cache(org_id);
@@ -794,15 +764,7 @@ mod tests {
             add(&row).await.unwrap();
         }
 
-        let mut removed: Vec<_> = delete_by_org(&org)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|(id, token, splunk)| {
-                assert!(!id.is_empty(), "the delete must name each row's id");
-                (token, splunk)
-            })
-            .collect();
+        let mut removed = delete_by_org(&org).await.unwrap();
         removed.sort();
         let left = list_by_org(&org).await.unwrap();
         let kept = delete_by_org(&other).await.unwrap();
