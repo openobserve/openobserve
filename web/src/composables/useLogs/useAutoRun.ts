@@ -1160,7 +1160,7 @@ export function createAutoRun(deps: AutoRunDeps) {
   function isPatternsStale(): boolean {
     const executed = meta.executedPatterns;
     if (!executed) return false;
-    return !!meta.editorDirty || !sameSignature(deps.readSignature(), executed.signature);
+    return !sameSignature(deps.readSignature(), executed.signature);
   }
 
   function staleReason(): string | null {

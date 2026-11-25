@@ -1760,6 +1760,14 @@ describe("canPersistOrShare (G1 matrix)", () => {
     expect(h.engine.isPatternsStale()).toBe(true);
   });
 
+  it("Patterns: typing in the editor alone does not hide the results", () => {
+    const h = makeHarness({ mode: "patterns" });
+    h.engine.requestRun("run");
+    h.engine.recordPatternsComplete(h.engine.currentGeneration("patterns")?.id as number);
+    h.engine.markEditorDirty();
+    expect(h.engine.isPatternsStale()).toBe(false);
+  });
+
   it("Patterns: a failed extraction leaves it disabled", () => {
     const h = makeHarness({ mode: "patterns" });
     h.engine.requestRun("run");
