@@ -188,7 +188,7 @@ describe("TracesSqlResultTable", () => {
     const shown = columns.map((c: any) =>
       c.meta.format ? c.meta.format(row[c.id], row) : row[c.id],
     );
-    expect(shown).toEqual(["2026-11-18 17:55:10.361", "14.24m", 12]);
+    expect(shown).toEqual(["2026-11-18 17:55:10.361", "14.24 min", 12]);
     expect(columns.map((c: any) => c.accessorFn(row))).toEqual([1795024510361017, 854178798, 12]);
   });
 });

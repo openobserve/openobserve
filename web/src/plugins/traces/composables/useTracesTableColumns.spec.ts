@@ -664,8 +664,8 @@ describe("useTracesTableColumns", () => {
   describe("resultColumnFormat — typed SQL cell display", () => {
     it("shows µs durations with a unit for duration and percentile names", () => {
       for (const key of ["duration", "trace_duration", "p95", "p99_duration"])
-        expect(resultColumnFormat(key, "UTC")?.(854178798)).toBe("14.24m");
-      expect(resultColumnFormat("p95", "UTC")?.(2500)).toBe("2.50ms");
+        expect(resultColumnFormat(key, "UTC")?.(854178798)).toBe("14.24 min");
+      expect(resultColumnFormat("p95", "UTC")?.(2500)).toBe("2.50 ms");
     });
 
     it("shows µs epoch timestamps as a date in the given timezone", () => {

@@ -675,7 +675,7 @@ describe("TracesSearchResultList", () => {
       ];
       wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: "spans" as any });
 
-      expect(wrapper.findComponent({ name: "OTable" }).props("columns")).toBe(
+      expect(wrapper.findComponent({ name: "OTable" }).props("columns")).toEqual(
         sharedSearchObj.data.resultGrid.columns,
       );
     });

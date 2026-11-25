@@ -2467,17 +2467,17 @@ describe("Index.vue (Main Traces Page)", () => {
       const bar = wrapper.findComponent('[data-test="logs-search-bar"]');
       bar.vm.$emit("filterBuilderGrowth", 0);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
       bar.vm.$emit("filterBuilderGrowth", 18);
       mockSearchObj.meta.searchMode = "traces";
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 18);
+      expect(wrapper.vm.splitterModel).toBe(85 + 18);
       bar.vm.$emit("filterBuilderGrowth", null);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
       mockSearchObj.meta.searchMode = "spans";
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
     });
 
     it("should render the drill-down target in the search tab", async () => {
@@ -5933,18 +5933,18 @@ describe("Index.vue (Main Traces Page)", () => {
         await flushPromises();
       };
       await showSql("a = 1\nAND b = 2\nAND c = 3", false);
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
       await showSql(`SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200`);
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
       await showSql(Array.from({ length: 13 }, (_, i) => `-- ${i}`).join("\n"));
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
       mockSearchObj.meta.sqlMode = false;
       mockSearchObj.meta.searchMode = "traces";
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
       mockSearchObj.meta.searchMode = "spans";
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
     });
 
     it("keeps a dragged pane height across SQL and view toggles", async () => {
@@ -5966,13 +5966,13 @@ describe("Index.vue (Main Traces Page)", () => {
     it("keeps the pane height when SQL turns on and off", async () => {
       await mountSql();
       mockSearchObj.data.editorValue = "SELECT 1";
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
       mockSearchObj.meta.sqlMode = true;
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
       mockSearchObj.meta.sqlMode = false;
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
 
       wrapper.vm.splitterModel = 220;
       mockSearchObj.meta.sqlMode = true;

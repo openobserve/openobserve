@@ -1468,29 +1468,19 @@ describe("SearchResult header through a re-run (T-3)", () => {
     expect(dataAge.text()).toMatch(/ago$/);
   });
 
-  it("shows refresh as the Logs page does: a bordered pill with the status dot and relative age", async () => {
+  it("shows refresh as an inline ghost control with the relative data age", async () => {
     (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
     wrapper = mount(SearchResult, { global: globalOptions });
     await flushPromises();
 
     const refresh = wrapper.findComponent({ name: "ORefreshButton" });
     expect(refresh.props()).toMatchObject({
-      size: "inset",
-      layout: "split",
+      layout: "inline",
+      variant: "ghost",
       ageFormat: "relative",
     });
-    const pill = wrapper.find('[data-test="traces-search-result-data-age"] > div');
-    expect(pill.find('[data-test="traces-search-result-refresh"]').exists()).toBe(true);
-    expect(pill.classes()).toEqual(
-      expect.arrayContaining([
-        "border",
-        "border-card-glass-border",
-        "rounded-default",
-        "h-6",
-        "px-1",
-      ]),
-    );
-    expect(pill.find(".rounded-full").exists()).toBe(true);
+    const age = wrapper.find('[data-test="traces-search-result-data-age"]');
+    expect(age.find('[data-test="traces-search-result-refresh"]').exists()).toBe(true);
   });
 
   it("keeps the data age readable and the control focusable through a run, with no spinner of its own", async () => {

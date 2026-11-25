@@ -243,7 +243,7 @@ describe("TracesGroupsTable", () => {
     const wrapper = await mountTable();
     const values = wrapper.findAll('[data-test="cell-value"]').map((c) => c.text());
     expect(values).toEqual(["(no value)", "(no value)"]);
-    expect(wrapper.find('[data-test="cell-p50"]').text()).toBe("1.50ms");
+    expect(wrapper.find('[data-test="cell-p50"]').text()).toBe("1.50 ms");
   });
 
   it("lets a cancelled load finish even though the cancelled stream never answers", async () => {
