@@ -8393,6 +8393,7 @@ dependencies = [
  "stream",
  "strum 0.28.0",
  "svix-ksuid",
+ "syn 2.0.119",
  "thiserror 2.0.21",
  "tiktoken-rs",
  "tikv-jemalloc-ctl",
