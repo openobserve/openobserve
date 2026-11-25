@@ -34,15 +34,6 @@ enterprise = [
     "enrichment-data/enterprise",
     "usage_reporting/enterprise",
 ]
-vectorscan = [
-    "openobserve-api-http/vectorscan",
-    "openobserve-api-grpc/vectorscan",
-    "openobserve-core/vectorscan",
-    "openobserve-jobs/vectorscan",
-    "super_cluster_queue?/vectorscan",
-    "search_service/vectorscan",
-    "enrichment-data/vectorscan",
-]
 cloud = [
     "openobserve-api-http/cloud",
     "openobserve-api-grpc/cloud",

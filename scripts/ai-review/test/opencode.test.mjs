@@ -2,19 +2,22 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 
-import { readFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { tmpdir } from "node:os";
 
 import {
   BUILTIN_TOOL_IDS,
   OPENCODE_CONFIGS,
   OpencodeClient,
+  OpencodeServer,
   buildServerEnv,
   ciFullProblems,
   createSseParser,
   externalDirectoryProblem,
   httpRequest,
+  deriveSelectedConfig,
   isTransientError,
   modelVariantIds,
   resolveOpencodeConfig,
@@ -32,7 +35,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const AGENT_RUN_MS = 1500;
 const HEADERS_TIMEOUT_MS = 1000;
 
-function fakeOpencode({ idleAfterMs = AGENT_RUN_MS, finalEvent = "session.execution.succeeded", error = null, errorBeforeAck = null, eventStream = true, wrapUpAfterMs = null, interruptEventDelayMs = 50 } = {}) {
+function fakeOpencode({ idleAfterMs = AGENT_RUN_MS, finalEvent = "session.execution.succeeded", error = null, errorBeforeAck = null, eventStream = true, wrapUpAfterMs = null, interruptEventDelayMs = 50, stepEndedAfterMs = null, sessionTotals = true, lastTokens = null } = {}) {
   const calls = [];
   let prompts = 0;
   const streams = new Set();
@@ -80,6 +83,10 @@ function fakeOpencode({ idleAfterMs = AGENT_RUN_MS, finalEvent = "session.execut
         }
         prompts += 1;
         send(200, { data: { id: `msg_u${prompts}` } });
+        // The first model response of the run completes (twice, to show only the first counts) well before the session itself ends.
+        if (stepEndedAfterMs !== null && prompts === 1) {
+          for (const delay of [stepEndedAfterMs, stepEndedAfterMs + 30]) setTimeout(() => emit("session.step.ended", { sessionID: "ses_1", finish: "tool-calls", tokens: { input: 10, output: 5, reasoning: 0, cache: { read: 0, write: 7 } } }), delay);
+        }
         // The second prompt is the wrap-up: it answers, where the first ran on until interrupted.
         if (wrapUpAfterMs !== null && prompts > 1) {
           setTimeout(finishRun, wrapUpAfterMs);
@@ -103,12 +110,13 @@ function fakeOpencode({ idleAfterMs = AGENT_RUN_MS, finalEvent = "session.execut
             time: { created: 1, completed: 2 },
             content: [{ type: "reasoning", text: "thinking" }, { type: "text", text: "<no-issues/>" }],
             finish: "stop",
+            ...(lastTokens ? { tokens: lastTokens } : {}),
             ...(error && finalEvent === "session.execution.succeeded" ? { error } : {}),
           }],
         });
       }
       if (req.method === "GET" && req.url === "/api/session/ses_1/message?type=idle&order=desc&limit=1") return send(200, { data: idle ? [idle] : [] });
-      if (req.method === "GET" && req.url === "/api/session/ses_1") return send(200, { data: { id: "ses_1", tokens: { input: 2000, output: 200, reasoning: 0, cache: { read: 0, write: 0 } } } });
+      if (req.method === "GET" && req.url === "/api/session/ses_1") return sessionTotals ? send(200, { data: { id: "ses_1", tokens: { input: 2000, output: 200, reasoning: 0, cache: { read: 0, write: 0 } } } }) : send(500, { message: "totals unavailable" });
       if (req.method === "POST" && req.url === "/api/session/ses_1/permission/per_1/reply") {
         res.writeHead(204);
         res.end();
@@ -577,4 +585,226 @@ test("SSE parser handles split frames, CRLF and multi-line data", () => {
   parse("data: not json\n\n");
   parse('data: {"type":\ndata: "c"}\n\n');
   assert.deepEqual(events.map(e => e.type), ["a", "b", "c"]);
+});
+
+test("the first completed model response reaches the caller once, before the session itself ends", async () => {
+  const fake = await fakeOpencode({ idleAfterMs: 700, stepEndedAfterMs: 100 });
+  try {
+    const client = new OpencodeClient({ baseUrl: fake.baseUrl, password: "pw" });
+    const t0 = Date.now();
+    const fired = [];
+    const result = await client.prompt({ ...PROMPT, timeoutMs: 10_000, onFirstResponse: () => fired.push(Date.now() - t0) });
+    const ended = Date.now() - t0;
+    client.close();
+    assert.equal(result.text, "<no-issues/>");
+    assert.equal(fired.length, 1, "two step.ended events, one signal");
+    assert.ok(fired[0] >= 90 && fired[0] < 400, `signalled at ${fired[0]} ms`);
+    assert.ok(ended - fired[0] > 300, `the session ended ${ended - fired[0]} ms after the signal, not with it`);
+  } finally {
+    await fake.close();
+  }
+});
+
+test("the session's own total is kept apart from the last message's counts, which stay only as the telemetry fallback", async () => {
+  const last = { input: 7, output: 3, reasoning: 0, cache: { read: 1, write: 2 } };
+  const ok = await fakeOpencode({ idleAfterMs: 100, lastTokens: last });
+  try {
+    const client = new OpencodeClient({ baseUrl: ok.baseUrl, password: "pw" });
+    const result = await client.prompt({ ...PROMPT, timeoutMs: 5000 });
+    client.close();
+    assert.equal(result.info.tokens.input, 2000);
+    assert.deepEqual(result.info.sessionTokens, result.info.tokens, "the session total, as before");
+  } finally {
+    await ok.close();
+  }
+  // The totals request fails: only the final message's counts remain, which cover one step of a multi-step session.
+  const broken = await fakeOpencode({ idleAfterMs: 100, lastTokens: last, sessionTotals: false });
+  try {
+    const client = new OpencodeClient({ baseUrl: broken.baseUrl, password: "pw" });
+    const result = await client.prompt({ ...PROMPT, timeoutMs: 5000 });
+    client.close();
+    assert.deepEqual(result.info.tokens, last, "the span still gets the fallback it always had");
+    assert.equal(result.info.sessionTokens, undefined, "accounting does not");
+  } finally {
+    await broken.close();
+  }
+});
+
+test("a run with no completed model response never signals, and a hook that throws does not end the session", async () => {
+  const quiet = await fakeOpencode({ idleAfterMs: 200 });
+  try {
+    const client = new OpencodeClient({ baseUrl: quiet.baseUrl, password: "pw" });
+    let calls = 0;
+    await client.prompt({ ...PROMPT, timeoutMs: 5000, onFirstResponse: () => { calls += 1; } });
+    client.close();
+    assert.equal(calls, 0);
+  } finally {
+    await quiet.close();
+  }
+  const loud = await fakeOpencode({ idleAfterMs: 400, stepEndedAfterMs: 50 });
+  try {
+    const client = new OpencodeClient({ baseUrl: loud.baseUrl, password: "pw" });
+    const result = await client.prompt({ ...PROMPT, timeoutMs: 5000, onFirstResponse: () => { throw new Error("hook bug"); } });
+    client.close();
+    assert.equal(result.text, "<no-issues/>");
+  } finally {
+    await loud.close();
+  }
+});
+
+const loadConfig = file => JSON.parse(stripJsonc(readFileSync(join(REPO_ROOT, file), "utf-8")));
+const OPENROUTER = { providerId: "openrouter-review", modelId: "anthropic/claude-sonnet-5.5", keyEnv: "OPENROUTER_REVIEW_API_KEY" };
+
+test("both configs register openrouter-review for anthropic/claude-sonnet-5.5 on Anthropic Messages with the same five efforts, and neither policy allows it", () => {
+  for (const file of [OPENCODE_CONFIGS.default.file, OPENCODE_CONFIGS["ci-full"].file]) {
+    const config = loadConfig(file);
+    const provider = config.providers["openrouter-review"];
+    assert.equal(provider.package, "@opencode/ai/providers/anthropic", file);
+    assert.deepEqual(provider.env, ["OPENROUTER_REVIEW_API_KEY"], file);
+    assert.deepEqual(provider.settings, { baseURL: "https://openrouter.ai/api/v1" }, file);
+    assert.deepEqual(provider.body, { provider: { order: ["anthropic"], allow_fallbacks: false } }, `${file}: pinned to one upstream so reviewers share its cache`);
+    assert.equal(config.providers["anthropic-review"].body, undefined, `${file}: production provider untouched`);
+    assert.deepEqual(Object.keys(provider.models), ["anthropic/claude-sonnet-5.5"], file);
+    assert.deepEqual(modelVariantIds(config, "openrouter-review", "anthropic/claude-sonnet-5.5"), ["low", "medium", "high", "xhigh", "max"], file);
+    assert.deepEqual(provider.models["anthropic/claude-sonnet-5.5"].variants, config.providers["anthropic-review"].models["claude-sonnet-5-5"].variants, file);
+    assert.deepEqual(config.policies.filter(p => p.effect === "allow").map(p => p.resource), ["anthropic-review"], `${file}: production may not select it`);
+    assert.equal(config.model, "anthropic-review/claude-sonnet-5-5", `${file}: the production default is unchanged`);
+  }
+});
+
+test("a dry run's private config names the one selected provider, denies every other, and leaves the agents' permissions as trusted", () => {
+  for (const file of [OPENCODE_CONFIGS.default.file, OPENCODE_CONFIGS["ci-full"].file]) {
+    const trusted = loadConfig(file);
+    const before = JSON.stringify(trusted);
+    const derived = deriveSelectedConfig(trusted, OPENROUTER);
+    assert.equal(JSON.stringify(trusted), before, "the trusted config is not modified");
+    assert.deepEqual(Object.keys(derived.providers), ["openrouter-review"], file);
+    assert.deepEqual(derived.policies, [
+      { action: "provider.use", resource: "*", effect: "deny" },
+      { action: "provider.use", resource: "openrouter-review", effect: "allow" },
+    ]);
+    assert.equal(derived.model, "openrouter-review/anthropic/claude-sonnet-5.5");
+    for (const [name, agent] of Object.entries(derived.agents)) {
+      assert.equal(agent.model, derived.model, name);
+      assert.deepEqual(agent.permissions, trusted.agents[name].permissions, `${name}: permissions are the trusted ones`);
+    }
+    assert.deepEqual(Object.keys(derived.agents), Object.keys(trusted.agents));
+    for (const key of ["update", "share", "snapshots", "lsp", "formatter"]) assert.equal(derived[key], trusted[key], key);
+  }
+  // The Anthropic leg can be selected too, still alone.
+  const anthropic = deriveSelectedConfig(loadConfig("opencode.jsonc"), { providerId: "anthropic-review", modelId: "claude-sonnet-5-5", keyEnv: "ANTHROPIC_REVIEW_API_KEY" });
+  assert.deepEqual(Object.keys(anthropic.providers), ["anthropic-review"]);
+});
+
+test("the selection is validated: an unknown provider or model, or another provider's key variable, is refused", () => {
+  const trusted = loadConfig("opencode.jsonc");
+  assert.throws(() => deriveSelectedConfig(trusted, { ...OPENROUTER, providerId: "nope-review" }), /provider "nope-review" is not registered/);
+  assert.throws(() => deriveSelectedConfig(trusted, { ...OPENROUTER, modelId: "claude-sonnet-5-5" }), /model "claude-sonnet-5-5" is not registered for provider "openrouter-review"/);
+  assert.throws(() => deriveSelectedConfig(trusted, { ...OPENROUTER, keyEnv: "ANTHROPIC_REVIEW_API_KEY" }), /reads its key from OPENROUTER_REVIEW_API_KEY, not ANTHROPIC_REVIEW_API_KEY/);
+  assert.throws(() => deriveSelectedConfig(trusted, { providerId: "anthropic-review", modelId: "claude-sonnet-5-5", keyEnv: "OPENROUTER_REVIEW_API_KEY" }), /not OPENROUTER_REVIEW_API_KEY/);
+});
+
+test("only the selected provider's key reaches opencode; the OpenObserve and trace credentials never do", () => {
+  const env = buildServerEnv({
+    parentEnv: {
+      PATH: "/usr/bin",
+      OPENROUTER_REVIEW_API_KEY: "sk-or-selected",
+      ANTHROPIC_REVIEW_API_KEY: "sk-ant-other",
+      OPENOBSERVE_AUTH_TOKEN: "Basic api-token",
+      O2_TRACE_AUTH: "Basic trace-token",
+      GH_TOKEN: "ghs_read",
+      GIT_ASKPASS: "/x",
+      HOME: "/home/dev",
+    },
+    home: "/tmp/fresh",
+    configPath: "/tmp/fresh/review-opencode.json",
+    password: "pw",
+    providerKeyVars: ["OPENROUTER_REVIEW_API_KEY"],
+  });
+  assert.equal(env.OPENROUTER_REVIEW_API_KEY, "sk-or-selected");
+  for (const name of ["ANTHROPIC_REVIEW_API_KEY", "OPENOBSERVE_AUTH_TOKEN", "O2_TRACE_AUTH", "GH_TOKEN", "GIT_ASKPASS"]) assert.equal(env[name], undefined, name);
+  assert.equal(env.HOME, "/tmp/fresh", "a fresh HOME, not the developer's");
+  assert.equal(env.XDG_CONFIG_HOME, "/tmp/fresh/.config");
+});
+
+// A stand-in binary that records what opencode would be started with, then waits like the real server.
+function fakeBinary(dir) {
+  const path = join(dir, "fake-opencode");
+  writeFileSync(path, [
+    "#!/usr/bin/env node",
+    'const fs = require("node:fs");',
+    "const config = process.env.OPENCODE_CONFIG;",
+    'fs.writeFileSync("probe.json", JSON.stringify({ config, home: process.env.HOME, env: Object.keys(process.env), mode: fs.statSync(config).mode & 0o777, body: JSON.parse(fs.readFileSync(config, "utf-8")) }));',
+    'console.log("server listening on http://127.0.0.1:9");',
+    "setInterval(() => {}, 1000);",
+  ].join("\n"));
+  chmodSync(path, 0o755);
+  return path;
+}
+
+test("a dry run serves a private config from the fresh HOME and removes it with the server", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ai-review-fake-"));
+  try {
+    const server = new OpencodeServer({
+      binary: fakeBinary(dir),
+      cwd: dir,
+      configPath: join(REPO_ROOT, "opencode.jsonc"),
+      providerKeyVars: [OPENROUTER.keyEnv],
+      parentEnv: { PATH: process.env.PATH, OPENROUTER_REVIEW_API_KEY: "sk-or-selected", ANTHROPIC_REVIEW_API_KEY: "sk-ant-other", OPENOBSERVE_AUTH_TOKEN: "Basic api-token" },
+      selection: OPENROUTER,
+    });
+    await server.ensureStarted();
+    const probe = JSON.parse(readFileSync(join(dir, "probe.json"), "utf-8"));
+    server.stop();
+    assert.notEqual(probe.config, join(REPO_ROOT, "opencode.jsonc"), "the trusted file is not the one served");
+    assert.ok(probe.config.startsWith(probe.home), "the private config lives in the fresh HOME");
+    assert.equal(probe.mode, 0o600);
+    assert.deepEqual(Object.keys(probe.body.providers), ["openrouter-review"]);
+    assert.equal(probe.body.model, "openrouter-review/anthropic/claude-sonnet-5.5");
+    assert.ok(probe.env.includes("OPENROUTER_REVIEW_API_KEY"));
+    for (const name of ["ANTHROPIC_REVIEW_API_KEY", "OPENOBSERVE_AUTH_TOKEN"]) assert.equal(probe.env.includes(name), false, name);
+    assert.equal(existsSync(probe.config), false, "removed on exit");
+    assert.equal(existsSync(probe.home), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a refused selection stops the server before it starts, and leaves nothing behind", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ai-review-fake-"));
+  try {
+    const server = new OpencodeServer({
+      binary: fakeBinary(dir),
+      cwd: dir,
+      configPath: join(REPO_ROOT, "opencode.jsonc"),
+      providerKeyVars: ["OPENROUTER_REVIEW_API_KEY"],
+      parentEnv: { PATH: process.env.PATH },
+      selection: { ...OPENROUTER, providerId: "unregistered-review" },
+    });
+    await assert.rejects(server.ensureStarted(), /provider "unregistered-review" is not registered/);
+    const home = server.home;
+    server.stop();
+    assert.equal(existsSync(join(dir, "probe.json")), false, "the binary never ran");
+    assert.equal(existsSync(home), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the installer pins both Linux assets at 2.2.0 by digest, takes arm64 only on Linux aarch64, and keeps its checksum and version checks", () => {
+  const read = name => readFileSync(join(REPO_ROOT, "scripts/ai-review", name), "utf-8");
+  const pin = Object.fromEntries(read("opencode-pin.env").split("\n").filter(l => /^[A-Z0-9_]+=/.test(l)).map(l => l.split("=")));
+  assert.deepEqual(pin, {
+    OPENCODE_VERSION: "2.2.0",
+    OPENCODE_SHA256: "6d597970a8cc448f1b9a9f645532584b339dd3ab9583bb5f063f13d83e54768f",
+    OPENCODE_SHA256_ARM64: "1f1ce0fc07b9245a815ffa9d652dbb80e6b0f07e5bf74ea87d2b1c0339fbac52",
+  });
+  const script = read("install-opencode.sh");
+  assert.match(script, /asset="opencode-linux-x64\.tar\.gz"\nsha256="\$OPENCODE_SHA256"/, "x64 stays the default asset and digest");
+  assert.match(script, /\[ "\$\(uname -s\)" = "Linux" \] && \{ \[ "\$\(uname -m\)" = "aarch64" \] \|\| \[ "\$\(uname -m\)" = "arm64" \]; \}/);
+  assert.match(script, /asset="opencode-linux-arm64\.tar\.gz"\n  sha256="\$OPENCODE_SHA256_ARM64"/);
+  assert.match(script, /releases\/download\/v\$\{OPENCODE_VERSION\}\/\$\{asset\}/);
+  assert.match(script, /sha256sum --check --strict -/);
+  assert.match(script, /"\$installed" != "\$OPENCODE_VERSION"/);
+  assert.doesNotMatch(script, /curl[^\n]*\|\s*(ba)?sh/, "never pipes a script to a shell");
 });

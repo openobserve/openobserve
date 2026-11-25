@@ -8441,6 +8441,7 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "transform",
+ "unicode-normalization",
  "url",
  "usage_reporting",
  "utoipa",

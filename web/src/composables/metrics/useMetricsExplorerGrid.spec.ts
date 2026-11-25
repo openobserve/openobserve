@@ -128,6 +128,15 @@ vi.mock("vuex", () => ({
 }));
 
 // Hoisted so a test can hand it a different org (see the query-storm tests).
+const { captureMetricVisitScope, recordMetricVisit } = vi.hoisted(() => ({
+  captureMetricVisitScope: vi.fn(() => ({ key: "deployment/alice/org1", epoch: 1, org: "org1" })),
+  recordMetricVisit: vi.fn(),
+}));
+vi.mock("@/components/commandPalette/useRecentlyViewed", () => ({
+  captureRecentVisitScope: captureMetricVisitScope,
+  recordLoadedStream: recordMetricVisit,
+}));
+
 const { getStreamsMock } = vi.hoisted(() => ({ getStreamsMock: vi.fn() }));
 
 vi.mock("@/composables/useStreams", () => ({
@@ -3197,6 +3206,50 @@ describe("useMetricsExplorerGrid", () => {
   });
 
   describe("the detail view loads only its own metric's schema (M-5)", () => {
+    it("records a successfully loaded metric using its pre-request identity scope", async () => {
+      recordMetricVisit.mockClear();
+      const scope = { key: "deployment/alice/org1", epoch: 1, org: "org1" };
+      captureMetricVisitScope.mockReturnValue(scope);
+      const grid = await setup();
+      let complete!: (_value: { data: { schema: { name: string }[] } }) => void;
+      const schema = vi.fn(
+        () =>
+          new Promise<{ data: { schema: { name: string }[] } }>((resolve) => {
+            complete = resolve;
+          }),
+      );
+      StreamService.schema = schema;
+      const pending = grid.ensureStreamSchemas(["http_requests_total"]);
+      captureMetricVisitScope.mockReturnValue({
+        key: "deployment/bob/org1",
+        epoch: 2,
+        org: "org1",
+      });
+      complete({ data: { schema: [{ name: "method" }] } });
+      await pending;
+      expect(recordMetricVisit).toHaveBeenCalledWith(scope, "metrics", "http_requests_total");
+      recordMetricVisit.mockClear();
+      schema.mockRejectedValue(new Error("not found"));
+      await grid.ensureStreamSchemas(["cpu_temperature"]);
+      expect(recordMetricVisit).not.toHaveBeenCalled();
+    });
+    it("does not record a schema response from an abandoned organization", async () => {
+      recordMetricVisit.mockClear();
+      const grid = await setup();
+      let complete!: (_value: { data: { schema: { name: string }[] } }) => void;
+      StreamService.schema = vi.fn(
+        () =>
+          new Promise((resolve) => {
+            complete = resolve;
+          }),
+      );
+      const pending = grid.ensureStreamSchemas(["http_requests_total"]);
+      grid.onOrgChange();
+      complete({ data: { schema: [{ name: "method" }] } });
+      await pending;
+      expect(recordMetricVisit).not.toHaveBeenCalled();
+    });
+
     it("asks each named stream's schema once, merges its labels, and skips the org-wide list", async () => {
       const grid = await setup();
       (StreamService.nameList as any).mockClear();

@@ -69,6 +69,7 @@ pub mod providers;
 pub mod public_dashboards;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
+pub mod resources;
 pub mod rum_pa;
 pub mod sample_data;
 #[cfg(feature = "enterprise")]

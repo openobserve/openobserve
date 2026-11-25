@@ -1246,10 +1246,14 @@ export default defineComponent({
     let stopHistoryRestore: (() => void) | undefined;
     onMounted(() => {
       registerBeforeAppReload();
-      stopHistoryRestore = useLogsHistoryRestore(router, () => {
-        replaceNextLogsWrite();
-        requestLogsReapply(true, "url");
-      });
+      stopHistoryRestore = useLogsHistoryRestore(
+        router,
+        () => {
+          replaceNextLogsWrite();
+          requestLogsReapply(true, "url");
+        },
+        () => searchObj.data.stream.selectedStream.join(","),
+      );
     });
 
     onActivated(() => {
@@ -1309,7 +1313,7 @@ export default defineComponent({
               router.currentRoute.value.query.to,
             );
             searchObj.data.datetime.type = "absolute";
-          } else {
+          } else if (router.currentRoute.value.query.period) {
             // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
             searchBarRef.value.dateTimeRef.setRelativeTime(router.currentRoute.value.query.period);
             searchObj.data.datetime.type = "relative";

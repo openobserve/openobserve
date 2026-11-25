@@ -840,7 +840,7 @@ pub async fn handle_otlp_request(
         ));
     }
     // Refused before the pipelines run: a remote-stream destination writes inside them.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
         org_id,
         StreamType::Traces,
@@ -1308,7 +1308,7 @@ pub async fn handle_otlp_request(
         );
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         let streams: Vec<(&str, u64)> = json_data_by_stream
             .iter()
@@ -1332,7 +1332,7 @@ pub async fn handle_otlp_request(
     // Span attributes are flattened to top-level string fields (see
     // finalize_and_buffer_trace_span), so the same field-level pattern engine used for logs
     // applies directly here.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
             Ok(pattern_manager) => {
@@ -1675,7 +1675,7 @@ pub async fn ingest_json(
         );
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         let streams: Vec<(&str, u64)> = json_data_by_stream
             .iter()
@@ -1698,7 +1698,7 @@ pub async fn ingest_json(
     // Span attributes are flattened to top-level string fields (see
     // finalize_and_buffer_trace_span), so the same field-level pattern engine used for logs
     // applies directly here.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
             Ok(pattern_manager) => {
