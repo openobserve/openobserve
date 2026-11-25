@@ -92,13 +92,16 @@ const cloud = (c: ShortcutCapabilities) => c.isCloud;
 const enterpriseOrCloud = (c: ShortcutCapabilities) => c.isEnterprise || c.isCloud;
 const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.incidentsEnabled;
 const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
-const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
+const modelPricing = (c: ShortcutCapabilities) => c.modelPricingEnabled;
 const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
 const aiChat = (c: ShortcutCapabilities) => c.isEnterprise && c.aiEnabled;
 const downtimes = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.downtimesEnabled;
 // Cluster-scoped admin surfaces only render inside the _meta org.
 const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
 const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
+// Nodes is self-hosted, not enterprise-only: OSS clusters too (see the `nodes` feature gate).
+const selfHostedMetaAdmin = (c: ShortcutCapabilities) =>
+  (c.isEnterprise || !c.isCloud) && c.isMetaOrg;
 
 /**
  * Groups the flat SHORTCUT_REGISTRY into modules for the cheatsheet. Each module
@@ -183,6 +186,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.llmProviders",
       "shortcuts.pages.aiToolsets",
       "shortcuts.pages.orgManagement",
+      "shortcuts.pages.userManagement",
     ],
   },
   {
@@ -239,6 +243,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     shortcuts: [
       { id: "openCheatsheet", key: "shift+?", descriptionKey: "shortcuts.actions.openCheatsheet" },
       { id: "closeDialog", key: "escape", descriptionKey: "shortcuts.actions.closeDialog" },
+      { id: "openOrgSwitcher", key: "g o", descriptionKey: "shortcuts.actions.openOrgSwitcher" },
+      { id: "timeRangeOpen", key: "t", descriptionKey: "shortcuts.actions.timeRangeOpen" },
       {
         id: "aiChatToggle",
         keyForWindows: "ctrl+b",
@@ -1092,7 +1098,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.nodes",
     scope: "nodes",
-    visible: metaAdmin,
+    visible: selfHostedMetaAdmin,
     shortcuts: [{ id: "nodesRefresh", key: "r", descriptionKey: "shortcuts.actions.nodesRefresh" }],
   },
 
@@ -1248,6 +1254,20 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "orgManagementRefresh",
         key: "r",
         descriptionKey: "shortcuts.actions.orgManagementRefresh",
+      },
+    ],
+  },
+
+  // ── User Management ─────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.userManagement",
+    scope: "user-management",
+    visible: cloudMetaAdmin,
+    shortcuts: [
+      {
+        id: "userManagementRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.userManagementRefresh",
       },
     ],
   },

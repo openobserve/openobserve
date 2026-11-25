@@ -133,159 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
 
-          <!-- CLI fields -->
-          <template v-if="selectedKind === 'cli'">
-            <div class="mb-4 flex items-center gap-3">
-              <div class="text-base font-medium font-semibold">
-                {{ t("aiToolset.cliConfig") }}
-              </div>
-              <div class="flex items-center gap-1">
-                <span class="text-text-muted text-xs">{{ t("aiToolset.presets") }}:</span>
-                <OTag
-                  v-for="preset in CLI_PRESETS"
-                  :key="preset.id"
-                  type="cliPreset"
-                  :value="preset.id"
-                  clickable
-                  class="cursor-pointer"
-                  :data-test="`cli-preset-${preset.id}`"
-                  @click="applyPreset(preset)"
-                >
-                  {{ preset.label }}
-                </OTag>
-              </div>
-            </div>
-            <div class="o2-input mb-4">
-              <OFormInput
-                :placeholder="raw('kubectl')"
-                data-test="ai-toolset-cli-command"
-                name="cli.command"
-                :label="t('aiToolset.cliCommand')"
-                required
-                class="showLabelOnTop w-full"
-              />
-            </div>
-            <div class="o2-input mb-4">
-              <OFormInput
-                :placeholder="raw('get, describe, logs')"
-                name="cli.allowed_subcommands_raw"
-                :label="t('aiToolset.allowedSubcommands')"
-                :helpText="t('aiToolset.subcommandsHint')"
-                class="showLabelOnTop w-full"
-              />
-            </div>
-            <div class="mb-4 flex gap-4">
-              <div class="o2-input flex-1">
-                <OFormInput
-                  name="cli.timeout_seconds"
-                  :label="t('aiToolset.timeoutSeconds')"
-                  class="showLabelOnTop w-full"
-                  type="number"
-                  min="1"
-                />
-              </div>
-              <div class="o2-input flex-1">
-                <OFormInput
-                  name="cli.max_output_bytes"
-                  :label="t('aiToolset.maxOutputBytes')"
-                  class="showLabelOnTop w-full"
-                  type="number"
-                  min="1"
-                />
-              </div>
-            </div>
-            <div class="mb-4">
-              <OFormSwitch
-                name="cli.requires_confirmation"
-                :label="t('aiToolset.requiresConfirmation')"
-              />
-            </div>
-            <!-- Env vars — form-owned dynamic array-field (cli.env[i].*) -->
-            <div class="mb-2 text-sm font-medium">{{ t("aiToolset.envVars") }}</div>
-            <div
-              v-for="(env, idx) in cliEnvVars"
-              :key="'env-' + idx"
-              class="mb-2 flex items-end gap-2"
-            >
-              <OFormInput
-                :name="`cli.env[${idx}].key`"
-                :label="t('aiToolset.envKey')"
-                class="o2-input flex-1"
-              />
-              <OFormInput
-                :name="`cli.env[${idx}].value`"
-                :label="t('aiToolset.envValue')"
-                class="o2-input flex-1"
-                :type="env.visible ? 'text' : 'password'"
-              >
-                <template #icon-right>
-                  <OIcon
-                    :name="env.visible ? 'visibility-off' : 'visibility'"
-                    size="sm"
-                    class="cursor-pointer"
-                    @click="toggleEnvVisible(idx)"
-                  />
-                </template>
-              </OFormInput>
-              <OButton
-                :aria-label="t('common.delete')"
-                variant="ghost-destructive"
-                size="icon-xs-sq"
-                @click="removeEnvVar(idx)"
-              >
-                <OIcon name="delete" size="xs" />
-              </OButton>
-            </div>
-            <OButton variant="outline" size="sm" class="mb-4" @click="addEnvVar" icon-left="add">
-              {{ t("aiToolset.addEnvVar") }}
-            </OButton>
-
-            <!-- Credential files — form-owned array-field. `key` is an OFormInput
-                 (cli.credFiles[i].key); `value` is a Monaco editor (no OForm*
-                 equivalent) bridged into the form via setCredValue. -->
-            <div class="mb-2 text-sm font-medium">
-              {{ t("aiToolset.credentialFiles") }}
-            </div>
-            <div v-for="(cred, idx) in cliCredFiles" :key="'cred-' + idx" class="mb-4">
-              <div class="mb-1 flex items-center gap-2">
-                <OFormInput
-                  :name="`cli.credFiles[${idx}].key`"
-                  :label="t('aiToolset.credEnvVar')"
-                  :helpText="t('aiToolset.credEnvVarHint', { example: 'KUBECONFIG' })"
-                  class="o2-input w-48"
-                />
-                <OButton
-                  variant="ghost-destructive"
-                  size="icon-xs-sq"
-                  :title="t('common.delete')"
-                  @click="removeCredFile(idx)"
-                >
-                  <OIcon name="delete" size="xs" />
-                </OButton>
-              </div>
-              <div class="text-text-secondary mb-1 text-xs">
-                {{ t("aiToolset.credContentHint") }}
-              </div>
-              <QueryEditor
-                :editor-id="`cred-file-editor-${idx}`"
-                class="rounded-default border-card-glass-border min-h-50! w-full resize-y overflow-auto border"
-                language="yaml"
-                :query="cred.value"
-                @update:query="(v: string) => setCredValue(idx, v)"
-              />
-              <div
-                v-if="pendingCredFileRows.has(idx)"
-                class="text-status-error-text mt-1 text-xs"
-                :data-test="`ai-toolset-cred-file-reenter-${idx}`"
-              >
-                {{ t("common.editorDraft.reenterField") }}
-              </div>
-            </div>
-            <OButton variant="outline" size="sm" class="mb-4" @click="addCredFile" icon-left="add">
-              {{ t("aiToolset.addCredFile") }}
-            </OButton>
-          </template>
-
           <!-- Skill fields — the Monaco editor (no OForm* equivalent) is bridged
                into the form (skill.content); its required rule lives in the
                schema and the error shows after the first submit (R3). -->
@@ -354,12 +201,10 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import type { ToolsetKind } from "@/services/ai_toolsets";
@@ -376,33 +221,21 @@ import {
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 type SecretPair = { key: string; value: string };
-type SecretRow = { key?: string; value?: string };
-type SecretList = "headers" | "env" | "credFiles";
-type SecretRowsSource = {
-  mcp?: { headers?: SecretRow[] };
-  cli?: { env?: SecretRow[]; credFiles?: SecretRow[] };
-};
 
-interface AiToolsetDraftData extends Omit<AddAiToolsetForm, "mcp" | "cli"> {
+interface AiToolsetDraftData extends Omit<AddAiToolsetForm, "mcp"> {
   mcp: Omit<AddAiToolsetForm["mcp"], "headers"> & { headers: SecretPair[] };
-  cli: Omit<AddAiToolsetForm["cli"], "env" | "credFiles"> & {
-    env: SecretPair[];
-    credFiles: SecretPair[];
-  };
 }
 
 export default defineComponent({
   name: "AddAiToolset",
   components: {
     OPageLayout,
-    OTag,
     OButton,
     OIcon,
     OForm,
     OFormInput,
     OFormTextarea,
     OFormSelect,
-    OFormSwitch,
     QueryEditor,
     EditorDraftDialogs,
   },
@@ -420,7 +253,6 @@ export default defineComponent({
 
     const kindOptions = [
       { label: t("aiToolset.kindMcp"), value: "mcp" },
-      { label: t("aiToolset.kindCli"), value: "cli" },
       { label: t("aiToolset.kindSkill"), value: "skill" },
     ];
 
@@ -441,33 +273,6 @@ export default defineComponent({
           url: value.mcp.url ?? "",
           headers,
           timeout_seconds: Number(value.mcp.timeout_seconds),
-        };
-      }
-      if (kind === "cli") {
-        const allowed = (value.cli.allowed_subcommands_raw ?? "")
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        const env: Record<string, string> = {};
-        (value.cli.env ?? [])
-          .filter((e) => (e.key ?? "").trim())
-          .forEach((e) => {
-            env[(e.key ?? "").trim()] = e.value ?? "";
-          });
-        const credential_files: Record<string, string> = {};
-        (value.cli.credFiles ?? [])
-          .filter((c) => (c.key ?? "").trim())
-          .forEach((c) => {
-            credential_files[(c.key ?? "").trim()] = c.value ?? "";
-          });
-        return {
-          command: value.cli.command ?? "",
-          ...(allowed.length ? { allowed_subcommands: allowed } : {}),
-          timeout_seconds: Number(value.cli.timeout_seconds),
-          max_output_bytes: Number(value.cli.max_output_bytes),
-          requires_confirmation: value.cli.requires_confirmation ?? false,
-          env,
-          credential_files,
         };
       }
       if (kind === "skill") {
@@ -543,12 +348,6 @@ export default defineComponent({
     const mcpHeaders = form.useStore(
       (s: any): AddAiToolsetForm["mcp"]["headers"] => s.values.mcp?.headers ?? [],
     );
-    const cliEnvVars = form.useStore(
-      (s: any): AddAiToolsetForm["cli"]["env"] => s.values.cli?.env ?? [],
-    );
-    const cliCredFiles = form.useStore(
-      (s: any): AddAiToolsetForm["cli"]["credFiles"] => s.values.cli?.credFiles ?? [],
-    );
     const skillContent = form.useStore((s: any) => s.values.skill?.content ?? "");
     const submitted = form.useStore((s: any) => (s.submissionAttempts ?? 0) > 0);
 
@@ -560,45 +359,7 @@ export default defineComponent({
     );
 
     // -----------------------------------------------------------------------
-    // Built-in CLI presets
-    // -----------------------------------------------------------------------
-    const CLI_PRESETS = [
-      {
-        id: "kubectl",
-        label: "kubectl",
-        command: "kubectl",
-        allowed_subcommands: "get, describe, logs, top",
-        env: [] as Array<{ key: string; value: string; visible: boolean }>,
-        credential_files: [{ key: "KUBECONFIG", value: "" }],
-      },
-      {
-        id: "gh",
-        label: "gh",
-        command: "gh",
-        allowed_subcommands: "*",
-        env: [{ key: "GH_TOKEN", value: "", visible: false }],
-        credential_files: [] as Array<{ key: string; value: string }>,
-      },
-    ];
-
-    const applyPreset = (preset: (typeof CLI_PRESETS)[number]) => {
-      // Cross-field edits driven by a user action → setFieldValue (sanctioned).
-      form.setFieldValue("cli.command", preset.command);
-      form.setFieldValue("cli.allowed_subcommands_raw", preset.allowed_subcommands);
-      // Replace the form-owned env and cred arrays — keep empty placeholders so
-      // the user can see exactly which fields to fill in.
-      form.setFieldValue(
-        "cli.env",
-        preset.env.map((e) => ({ ...e })),
-      );
-      form.setFieldValue(
-        "cli.credFiles",
-        preset.credential_files.map((c) => ({ key: c.key, value: c.value })),
-      );
-    };
-
-    // -----------------------------------------------------------------------
-    // Dynamic array-fields — FORM-OWNED (mcp.headers / cli.env / cli.credFiles).
+    // Dynamic array-fields — FORM-OWNED (mcp.headers).
     // The form is the single source of truth; add/remove/toggle mutate it via
     // the form API directly, and the `form.useStore` reads above re-render the
     // v-for rows (playbook §2).
@@ -614,25 +375,6 @@ export default defineComponent({
         dontUpdateMeta: true,
       });
     };
-
-    // CLI env vars
-    const addEnvVar = () => form.pushFieldValue("cli.env", { key: "", value: "", visible: false });
-    const removeEnvVar = (i: number) => form.removeFieldValue("cli.env", i);
-    const toggleEnvVisible = (i: number) => {
-      const cur = !!(form.state.values as AddAiToolsetForm).cli?.env?.[i]?.visible;
-      form.setFieldValue(`cli.env[${i}].visible`, !cur, {
-        dontUpdateMeta: true,
-      });
-    };
-
-    // CLI credential files — `key` is an OFormInput; `value` is a Monaco editor
-    // bridged into the form (no OForm* equivalent).
-    const addCredFile = () => form.pushFieldValue("cli.credFiles", { key: "", value: "" });
-    const removeCredFile = (i: number) => form.removeFieldValue("cli.credFiles", i);
-    const setCredValue = (i: number, value: string) =>
-      form.setFieldValue(`cli.credFiles[${i}].value`, value, {
-        dontUpdateMeta: true,
-      });
 
     // Skill content (Monaco editor — no OForm* equivalent) bridged into the form.
     const setSkillContent = (value: string) =>
@@ -666,23 +408,6 @@ export default defineComponent({
               key: k,
               value: v as string,
               visible: false,
-            })),
-          };
-        } else if (toolset.kind === "cli") {
-          record.cli = {
-            command: data.command || "",
-            allowed_subcommands_raw: (data.allowed_subcommands || []).join(", "),
-            timeout_seconds: data.timeout_seconds ?? 30,
-            max_output_bytes: data.max_output_bytes ?? 100000,
-            requires_confirmation: data.requires_confirmation ?? false,
-            env: Object.entries(data.env || {}).map(([k, v]) => ({
-              key: k,
-              value: v as string,
-              visible: false,
-            })),
-            credFiles: Object.entries(data.credential_files || {}).map(([k, v]) => ({
-              key: k,
-              value: v as string,
             })),
           };
         } else if (toolset.kind === "skill") {
@@ -722,28 +447,14 @@ export default defineComponent({
       return {
         ...values,
         mcp: { ...values.mcp, headers: pairs(values.mcp?.headers) },
-        cli: {
-          ...values.cli,
-          env: pairs(values.cli?.env),
-          credFiles: pairs(values.cli?.credFiles),
-        },
         skill: { ...values.skill },
       };
     };
 
-    const SECRET_SECTION: Record<SecretList, "mcp" | "cli"> = {
-      headers: "mcp",
-      env: "cli",
-      credFiles: "cli",
-    };
-    const SECRET_PATH = /^\/(?:mcp|cli)\/(headers|env|credFiles)\/(\d+)\/value$/;
-
-    const secretRows = (data: SecretRowsSource, list: SecretList): SecretRow[] =>
-      (list === "headers" ? data.mcp?.headers : data.cli?.[list]) ?? [];
-
+    const SECRET_PATH = /^\/mcp\/headers\/(\d+)\/value$/;
     const MCP_URL_PATH = "/mcp/url";
 
-    // Header and env values carry auth, credential files are kubeconfigs and a URL can embed a token, so none is drafted.
+    // Header values carry auth and a URL can embed a token, so neither is drafted.
     const redactToolsetDraft = (data: AiToolsetDraftData) => {
       const copy = JSON.parse(JSON.stringify(data)) as AiToolsetDraftData;
       const paths: string[] = [];
@@ -751,63 +462,42 @@ export default defineComponent({
         copy.mcp.url = "";
         paths.push(MCP_URL_PATH);
       }
-      for (const list of Object.keys(SECRET_SECTION) as SecretList[]) {
-        secretRows(copy, list).forEach((row, index) => {
-          if (!row.value) return;
-          row.value = "";
-          paths.push(`/${SECRET_SECTION[list]}/${list}/${index}/value`);
-        });
-      }
+      (copy.mcp?.headers ?? []).forEach((row, index) => {
+        if (!row.value) return;
+        row.value = "";
+        paths.push(`/mcp/headers/${index}/value`);
+      });
       return { data: copy, paths };
     };
 
-    const rowOf = (path: string, data: AiToolsetDraftData) => {
+    const headerKeyOf = (path: string, data: AiToolsetDraftData): string | null => {
       const match = SECRET_PATH.exec(path);
-      if (!match) return null;
-      const list = match[1] as SecretList;
-      return { list, key: secretRows(data, list)[Number(match[2])]?.key ?? "" };
+      return match ? (data.mcp?.headers?.[Number(match[1])]?.key ?? "") : null;
     };
 
     const describeRedactedToolset = (paths: string[], data: AiToolsetDraftData): I18nText[] => {
       const fields = paths.flatMap((path): I18nText[] => {
         if (path === MCP_URL_PATH) return [t("aiToolset.mcpUrl")];
-        const row = rowOf(path, data);
-        if (!row) return [];
-        if (row.list === "headers") {
-          return [
-            row.key
-              ? t("common.editorDraft.headerField", { name: row.key })
-              : t("common.editorDraft.headersField"),
-          ];
-        }
-        if (!row.key) {
-          return [row.list === "env" ? t("aiToolset.envVars") : t("aiToolset.credentialFiles")];
-        }
+        const key = headerKeyOf(path, data);
+        if (key === null) return [];
         return [
-          row.list === "env"
-            ? t("common.editorDraft.envVarField", { name: row.key })
-            : t("common.editorDraft.credentialFileField", { name: row.key }),
+          key
+            ? t("common.editorDraft.headerField", { name: key })
+            : t("common.editorDraft.headersField"),
         ];
       });
       return [...new Set(fields)];
     };
 
-    // A not-kept row is found again by its key, since rows may have moved since the draft was written.
-    const notKeptRows = shallowRef(new Map<string, { list: SecretList; key: string }>());
-
-    const currentRowIndex = (path: string): number => {
-      const row = notKeptRows.value.get(path);
-      return row ? secretRows(formValues.value, row.list).findIndex((r) => r.key === row.key) : -1;
-    };
+    // A not-kept header is found again by its key, since rows may have moved since the draft was written.
+    const notKeptRows = shallowRef(new Map<string, string>());
 
     const fieldNameFor = (path: string): FormFieldPath<AddAiToolsetForm> | null => {
       if (path === MCP_URL_PATH) return "mcp.url";
-      const row = notKeptRows.value.get(path);
-      if (!row) return null;
-      const index = currentRowIndex(path);
-      return index < 0
-        ? null
-        : (`${SECRET_SECTION[row.list]}.${row.list}[${index}].value` as FormFieldPath<AddAiToolsetForm>);
+      const key = notKeptRows.value.get(path);
+      if (key === undefined) return null;
+      const index = (formValues.value.mcp?.headers ?? []).findIndex((r) => r.key === key);
+      return index < 0 ? null : (`mcp.headers[${index}].value` as FormFieldPath<AddAiToolsetForm>);
     };
 
     const flagReentries = (paths: string[]) => {
@@ -828,17 +518,6 @@ export default defineComponent({
         .pendingReentries()
         .filter((path) => path.startsWith(`/${String(selectedKind.value)}/`));
 
-    // The credential file editors are not form fields, so their re-entry note is drawn by hand.
-    const pendingCredFileRows = computed(
-      () =>
-        new Set(
-          activePendingReentries()
-            .filter((path) => notKeptRows.value.get(path)?.list === "credFiles")
-            .map(currentRowIndex)
-            .filter((index) => index >= 0),
-        ),
-    );
-
     /** A changed secret the draft could not keep must be typed again before saving. */
     const blockOnPendingReentries = (): boolean => {
       const pending = activePendingReentries();
@@ -853,7 +532,14 @@ export default defineComponent({
       entityLabel: () => t("common.editorDraft.entities.ai_toolset"),
       entityId: editId,
       snapshot: toolsetSnapshot,
-      apply: async (data, { notKeptPaths }) => {
+      apply: async (draft, { notKeptPaths: draftNotKeptPaths }) => {
+        // A draft saved while the CLI kind existed restores as the default kind, without its CLI fields.
+        const data = { ...draft } as AiToolsetDraftData & { cli?: unknown };
+        delete data.cli;
+        if (!kindOptions.some((option) => option.value === data.kind)) {
+          data.kind = addAiToolsetDefaults().kind;
+        }
+        const notKeptPaths = draftNotKeptPaths.filter((path) => !path.startsWith("/cli/"));
         const withHidden = (rows: SecretPair[]) => rows.map((row) => ({ ...row, visible: false }));
         // A saved toolset's name and kind are locked, so the draft can never change them.
         const locked = isEditing.value
@@ -863,12 +549,11 @@ export default defineComponent({
           ...data,
           ...locked,
           mcp: { ...data.mcp, headers: withHidden(data.mcp.headers) },
-          cli: { ...data.cli, env: withHidden(data.cli.env), credFiles: data.cli.credFiles },
         } as AddAiToolsetForm);
         notKeptRows.value = new Map(
           notKeptPaths.flatMap((path) => {
-            const row = rowOf(path, data);
-            return row ? [[path, row] as const] : [];
+            const key = headerKeyOf(path, data);
+            return key === null ? [] : [[path, key] as const];
           }),
         );
         // After the form's own error sweep, which runs on the reset values.
@@ -924,24 +609,12 @@ export default defineComponent({
       addHeader,
       removeHeader,
       toggleHeaderVisible,
-      // CLI env vars + credential files (form-owned array-fields)
-      cliEnvVars,
-      cliCredFiles,
-      addEnvVar,
-      removeEnvVar,
-      toggleEnvVisible,
-      addCredFile,
-      removeCredFile,
-      setCredValue,
-      CLI_PRESETS,
-      applyPreset,
       // Skill (Monaco content bridged into the form)
       skillContent,
       setSkillContent,
       skillContentError,
       toolsetDraft,
       closeEditor,
-      pendingCredFileRows,
     };
   },
 });

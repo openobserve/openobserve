@@ -19,6 +19,7 @@ import { defineComponent, nextTick } from "vue";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { usePanelDrilldown } from "./usePanelDrilldown";
+import { NULL_BREAKDOWN_VALUE, OTHERS_BREAKDOWN_VALUE } from "@/utils/dashboard/sqlProcessData";
 
 const resultSchemaMock = vi.fn();
 
@@ -45,6 +46,17 @@ vi.mock("@/services/search", async (importOriginal) => {
     },
   });
 });
+
+const commonsMock = vi.hoisted(() => ({
+  getFoldersList: vi.fn(),
+  getAllDashboardsByFolderId: vi.fn(),
+  getDashboard: vi.fn(),
+}));
+
+vi.mock("@/utils/commons", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/commons")>()),
+  ...commonsMock,
+}));
 
 vi.mock("@/utils/zincutils", () => ({
   b64EncodeUnicode: (v: string) => `b64(${v})`,
@@ -535,6 +547,33 @@ describe("usePanelDrilldown", () => {
     expect(url.searchParams.get("v")).toBe("88");
   });
 
+  it("a funnel stage standing in for a missing name drills down with the blank, not (null)", async () => {
+    const deps = makeDeps();
+    deps.panelSchema.value.type = "funnel";
+    deps.panelSchema.value.config.drilldown = [
+      {
+        name: "Stage",
+        type: "byUrl",
+        data: { url: "https://example.com/?stage=${series.__name}&value=${series.__value}" },
+      },
+    ];
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const api = usePanelDrilldown(deps as any);
+    await api.onChartClick({
+      componentType: "series",
+      event: { offsetX: 1, offsetY: 1 },
+      seriesName: "series",
+      name: "(null)",
+      value: 14746,
+      data: { name: "(null)", rawName: null, value: 14746 },
+    });
+    await api.openDrilldown(0);
+    const url = new URL(String(openSpy.mock.calls[0]?.[0]));
+    openSpy.mockRestore();
+    expect(url.searchParams.get("stage")).toBe("");
+    expect(url.searchParams.get("value")).toBe("14746");
+  });
+
   describe("heatmap drilldown", () => {
     const heatmapDeps = (options: any, extras: any = {}) => {
       const deps = makeDeps();
@@ -893,6 +932,8 @@ describe("usePanelDrilldown", () => {
       deps.panelSchema.value.config.drilldown = [
         { name: "Logs", type: "logs", targetBlank: false, data: { logsMode: "auto" } },
       ] as any;
+      deps.metadata.value.queries[0].query =
+        'SELECT _timestamp AS "x_axis_1", gpu AS "breakdown_1", state AS "y_axis_1" FROM "default"';
       const api = usePanelDrilldown(deps as any);
 
       await api.onChartClick(segmentClick);
@@ -909,6 +950,176 @@ describe("usePanelDrilldown", () => {
           }),
         ),
       );
+    });
+
+    it("filters a blank entity by both empty and NULL, which the timeline folds together", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      Object.assign(deps.panelSchema.value.queries[0].fields, {
+        breakdown: [{ alias: "breakdown_1", args: [{ type: "field", value: { field: "gpu" } }] }],
+      });
+      Object.assign(deps.panelSchema.value.config, {
+        drilldown: [{ name: "Logs", type: "logs", targetBlank: false, data: { logsMode: "auto" } }],
+      });
+      deps.metadata.value.queries[0].query =
+        'SELECT _timestamp AS "x_axis_1", gpu AS "breakdown_1", state AS "y_axis_1" FROM "default"';
+      const api = usePanelDrilldown(deps);
+
+      await api.onChartClick({ ...segmentClick, data: { ...segmentClick.data, name: "" } });
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() => expect(deps.router.push).toHaveBeenCalled());
+      expect(deps.router.push.mock.calls[0][0].query.query).toContain(
+        "WHERE (gpu = '' OR gpu IS NULL)",
+      );
+    });
+  });
+
+  describe("Go To Logs from a breakdown series", () => {
+    const svcField = { alias: "breakdown_1", args: [{ type: "field", value: { field: "svc" } }] };
+    const panelSql = (breakdown: string, stream = "default") =>
+      `SELECT histogram(_timestamp) AS "x_axis_1", count(_timestamp) AS "y_axis_1", ${breakdown} FROM "${stream}" GROUP BY x_axis_1, breakdown_1`;
+    const logsDrilldown = [
+      { name: "Logs", type: "logs", targetBlank: false, data: { logsMode: "auto" } },
+    ];
+
+    const openLogs = async (
+      breakdownSeries: {
+        name: string;
+        originalSeriesName: string;
+        _queryIndex?: number;
+        _panelQueryIndex?: number;
+      },
+      setup: (deps: ReturnType<typeof makeDeps>) => void = () => {},
+    ) => {
+      const deps = makeDeps();
+      Object.assign(deps.panelSchema.value.queries[0].fields, { breakdown: [svcField] });
+      Object.assign(deps.panelSchema.value.config, { drilldown: logsDrilldown });
+      Object.assign(deps.panelData.value.options, {
+        series: [{ name: "other", originalSeriesName: "other" }, breakdownSeries],
+      });
+      deps.metadata.value.queries[0].query = panelSql(`svc AS "breakdown_1"`);
+      setup(deps);
+      const api = usePanelDrilldown(deps);
+
+      await api.onChartClick({
+        componentType: "series",
+        seriesIndex: 1,
+        seriesName: breakdownSeries.name,
+        event: { offsetX: 40, offsetY: 50 },
+        value: ["x", 1],
+      });
+      await api.openDrilldown(0);
+      await vi.waitFor(() => expect(deps.router.push).toHaveBeenCalled());
+      return deps.router.push.mock.calls[0][0].query;
+    };
+
+    it.each([
+      ["a named series", "alpha", "svc = 'alpha'"],
+      ["the empty series", "", "svc = ''"],
+      ["the NULL series", NULL_BREAKDOWN_VALUE, "svc IS NULL"],
+    ])("filters on the v8 breakdown field for %s", async (_name, value, condition) => {
+      const { query } = await openLogs({ name: "picked", originalSeriesName: value });
+      expect(query).toBe(`b64(SELECT * FROM "default"  WHERE ${condition})`);
+    });
+
+    it.each([
+      ["a histogram", `histogram(_timestamp) AS "breakdown_1"`],
+      ["lower()", `lower(svc) AS "breakdown_1"`],
+      ["missing from the query", `svc AS "breakdown_2"`],
+    ])("adds no breakdown filter when the breakdown is %s", async (_name, breakdown) => {
+      const { query } = await openLogs({ name: "picked", originalSeriesName: "alpha" }, (deps) => {
+        deps.metadata.value.queries[0].query = panelSql(breakdown);
+      });
+      expect(query).toBe(`b64(SELECT * FROM "default" )`);
+    });
+
+    it("adds no breakdown filter for a custom SQL alias over a function", async () => {
+      const { query } = await openLogs({ name: "picked", originalSeriesName: "alpha" }, (deps) => {
+        Object.assign(deps.panelSchema.value.queries[0].fields, { breakdown: [{ alias: "s" }] });
+        deps.metadata.value.queries[0].query =
+          'SELECT lower(svc) AS s, count(*) AS c FROM "default" GROUP BY s';
+      });
+      expect(query).toBe(`b64(SELECT * FROM "default" )`);
+    });
+
+    it("filters a custom SQL alias over a plain column on that column", async () => {
+      const { query } = await openLogs({ name: "picked", originalSeriesName: "alpha" }, (deps) => {
+        Object.assign(deps.panelSchema.value.queries[0].fields, { breakdown: [{ alias: "s" }] });
+        deps.metadata.value.queries[0].query =
+          'SELECT svc AS s, count(*) AS c FROM "default" GROUP BY s';
+      });
+      expect(query).toBe(`b64(SELECT * FROM "default"  WHERE svc = 'alpha')`);
+    });
+
+    it("adds no breakdown filter for a VRL-derived breakdown field", async () => {
+      const { query } = await openLogs({ name: "picked", originalSeriesName: "gold" }, (deps) => {
+        Object.assign(deps.panelSchema.value.queries[0].fields, {
+          breakdown: [{ alias: "vrl_tier", isDerived: true }],
+        });
+        deps.metadata.value.queries[0].query =
+          'SELECT vrl_tier, count(*) AS c FROM "default" GROUP BY vrl_tier';
+      });
+      expect(query).toBe(`b64(SELECT * FROM "default" )`);
+    });
+
+    it("adds no breakdown filter for the others bucket", async () => {
+      const { query } = await openLogs({
+        name: "others",
+        originalSeriesName: OTHERS_BREAKDOWN_VALUE,
+      });
+      expect(query).toBe(`b64(SELECT * FROM "default" )`);
+    });
+
+    it("filters a real value named others like any other value", async () => {
+      const { query } = await openLogs({ name: "others", originalSeriesName: "others" }, (deps) => {
+        Object.assign(deps.panelSchema.value.config, { top_results_others: true });
+      });
+      expect(query).toBe(`b64(SELECT * FROM "default"  WHERE svc = 'others')`);
+    });
+
+    const addSecondQuery = (deps: ReturnType<typeof makeDeps>, hostField: object[]) => {
+      deps.panelSchema.value.queries.push({
+        ...deps.panelSchema.value.queries[0],
+        fields: {
+          ...deps.panelSchema.value.queries[0].fields,
+          stream: "hosts",
+          breakdown: hostField,
+        },
+        query: 'select * from "hosts"',
+      });
+      deps.metadata.value.queries.push({
+        query: panelSql(`host AS "breakdown_1"`, "hosts"),
+        panelQueryIndex: 1,
+      });
+    };
+    const hostField = { ...svcField, args: [{ type: "field", value: { field: "host" } }] };
+
+    it("adds no breakdown filter for a series of a query without a breakdown", async () => {
+      const { query, stream } = await openLogs(
+        { name: "count", originalSeriesName: "", _queryIndex: 1, _panelQueryIndex: 1 },
+        (deps) => addSecondQuery(deps, []),
+      );
+      expect(stream).toBe("hosts");
+      expect(query).toBe(`b64(SELECT * FROM "hosts" )`);
+    });
+
+    it("takes the stream, query and breakdown of a second query's series from that query", async () => {
+      const { query, stream } = await openLogs(
+        { name: "picked", originalSeriesName: "h1", _queryIndex: 1, _panelQueryIndex: 1 },
+        (deps) => addSecondQuery(deps, [hostField]),
+      );
+      expect(stream).toBe("hosts");
+      expect(query).toBe(`b64(SELECT * FROM "hosts"  WHERE host = 'h1')`);
+    });
+
+    it("adds no breakdown filter when a series' run and query disagree", async () => {
+      const { query, stream } = await openLogs(
+        { name: "picked", originalSeriesName: "h1", _queryIndex: 0, _panelQueryIndex: 1 },
+        (deps) => addSecondQuery(deps, [hostField]),
+      );
+      expect(stream).toBe("default");
+      expect(query).toBe(`b64(SELECT * FROM "default" )`);
     });
   });
 
@@ -1426,6 +1637,173 @@ describe("usePanelDrilldown", () => {
       "noopener,noreferrer",
     );
     openSpy.mockRestore();
+  });
+
+  describe("treemap tile drilldowns", () => {
+    const treemapDeps = (drilldown: Record<string, unknown>) => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "treemap";
+      Object.assign(deps.panelSchema.value.config, { drilldown: [drilldown] });
+      return {
+        ...deps,
+        panelData: { value: { options: { xAxis: [{ data: [] }], series: [{ type: "treemap" }] } } },
+      };
+    };
+    const emptyTile = {
+      componentType: "series",
+      seriesIndex: 0,
+      name: "(empty)",
+      value: 4,
+      data: {
+        name: "(empty)",
+        rawName: "",
+        value: 4,
+        path: ["us east", "a/b", "(empty)"],
+        rawPath: ["us east", "a/b", ""],
+      },
+      event: { offsetX: 1, offsetY: 1 },
+    };
+    const nullTile = {
+      componentType: "series",
+      seriesIndex: 0,
+      name: "(null)",
+      value: 2,
+      data: { name: "(null)", rawName: null, value: 2, path: ["(null)"], rawPath: [null] },
+      event: { offsetX: 1, offsetY: 1 },
+    };
+
+    it("hands a URL drilldown the blank behind an empty tile and its path encoded per segment", async () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const api = usePanelDrilldown(
+        treemapDeps({
+          name: "Link",
+          type: "byUrl",
+          targetBlank: true,
+          data: { url: "https://example.com/?n=${series.__name}&p=${series.__path}" },
+        }),
+      );
+
+      await api.onChartClick(emptyTile);
+      await api.openDrilldown(0);
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/?n=&p=us%20east/a%2Fb/",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+
+    it("hands a dashboard drilldown the raw tile path", async () => {
+      commonsMock.getFoldersList.mockResolvedValue(undefined);
+      commonsMock.getAllDashboardsByFolderId.mockResolvedValue([
+        { title: "Target", dashboardId: "d-1" },
+      ]);
+      commonsMock.getDashboard.mockResolvedValue({
+        dashboardId: "d-1",
+        tabs: [{ name: "Main", tabId: "t-1" }],
+      });
+      const deps = treemapDeps({
+        name: "Dash",
+        type: "byDashboard",
+        targetBlank: false,
+        data: {
+          folder: "default",
+          dashboard: "Target",
+          tab: "Main",
+          passAllVariables: false,
+          variables: [{ name: "p", value: "${series.__path}" }],
+        },
+      });
+      Object.assign(deps.store.state, {
+        organizationData: { folders: [{ name: "default", folderId: "f-1" }] },
+      });
+      const api = usePanelDrilldown(deps);
+
+      await api.onChartClick(emptyTile);
+      await api.openDrilldown(0);
+
+      expect(deps.router.push).toHaveBeenCalledWith({
+        path: "/dashboards/view",
+        query: expect.objectContaining({ "var-p": "us east/a/b/" }),
+      });
+    });
+
+    it.each([
+      ["path", "${series.__path}", emptyTile, "'us east/a/b/'"],
+      ["axis value of a null tile", "${series.__axisValue}", nullTile, "''"],
+    ])("hands a logs drilldown the raw %s", async (_label, placeholder, tile, expected) => {
+      const deps = treemapDeps({
+        name: "Logs",
+        type: "logs",
+        targetBlank: false,
+        data: { logsMode: "custom", logsQuery: `SELECT * FROM "default" WHERE p = ${placeholder}` },
+      });
+      const api = usePanelDrilldown(deps);
+
+      await api.onChartClick(tile);
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              query: `b64(SELECT * FROM "default" WHERE p = ${expected})`,
+            }),
+          }),
+        ),
+      );
+    });
+
+    it.each([
+      ["empty", emptyTile, "2"],
+      ["null", nullTile, "3"],
+    ])("opens a cross-link with the row behind the %s tile", async (_label, tile, expected) => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      resultSchemaMock.mockResolvedValue({
+        data: {
+          cross_links: {
+            stream_links: [
+              {
+                name: "Link",
+                url: "https://x.example/${field.__value}",
+                fields: [{ name: "f", alias: "f" }],
+              },
+            ],
+            org_links: [],
+          },
+        },
+      });
+      const deps = treemapDeps({
+        name: "None",
+        type: "byUrl",
+        data: { url: "https://example.com" },
+      });
+      deps.panelSchema.value.config.drilldown = [];
+      Object.assign(deps.panelSchema.value.queries[0].fields, { x: [{ alias: "x" }] });
+      Object.assign(deps.data, {
+        value: [
+          {
+            result: [
+              { x: "a", f: "1" },
+              { x: "", f: "2" },
+              { x: null, f: "3" },
+            ],
+          },
+        ],
+      });
+      const api = usePanelDrilldown(deps);
+
+      await api.onChartClick(tile);
+      await api.openDrilldown(0);
+
+      expect(openSpy).toHaveBeenCalledWith(
+        `https://x.example/${expected}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
   });
 
   describe("sankey return nodes", () => {

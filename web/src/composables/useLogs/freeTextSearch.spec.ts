@@ -25,7 +25,6 @@ import {
   isFilterHeld,
   loadPendingFreeTextSchemas,
   noFtsStreams,
-  allowsMatchAll,
   noFtsRecoveryTerm,
   noFtsRecoveryStreams,
   rewrittenFilter,
@@ -347,21 +346,16 @@ describe("freeTextWhereByStream and filterForParsing", () => {
       "match_all('timeout') and level='error'",
     );
   });
-});
 
-describe("allowsMatchAll", () => {
-  it("allows it while any selected stream has a full-text field", () => {
-    expect(allowsMatchAll(makeSearchObj("", [fts("app")]), zoConfig)).toBe(true);
-    expect(allowsMatchAll(makeSearchObj("", [noFts("raw"), fts("app")]), zoConfig)).toBe(true);
-  });
-
-  it("refuses it once every selected stream's schema has none", () => {
-    expect(allowsMatchAll(makeSearchObj("", [noFts("raw"), zeroText("m")]), zoConfig)).toBe(false);
-  });
-
-  it("keeps allowing it while no stream is picked or a schema has not loaded", () => {
-    expect(allowsMatchAll(makeSearchObj("", []), zoConfig)).toBe(true);
-    expect(allowsMatchAll(makeSearchObj("", [{ name: "pending" }]), zoConfig)).toBe(true);
+  it.each([
+    ["(order = 'o1') AND msg = 'A'", `("order" = 'o1') AND msg = 'A'`],
+    ["group != 'g' or msg = 'A'", `"group" != 'g' or msg = 'A'`],
+    ["str_match(order, 'x')", `str_match("order", 'x')`],
+    [`"order" = 'o1'`, `"order" = 'o1'`],
+    ["msg = 'order by group'", "msg = 'order by group'"],
+    ["limit = 1", "limit = 1"],
+  ])("quotes a field the parser reserves, and nothing else: %s", (filter, parsed) => {
+    expect(filterForParsing(filter, new Set(["order", "group", "msg"]))).toBe(parsed);
   });
 });
 

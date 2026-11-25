@@ -687,6 +687,7 @@ mod enterprise {
             alert_name: name.clone(),
             stream: stream.clone(),
             dimensions: (!dimensions.is_empty()).then_some(serde_json::Value::Object(dimensions)),
+            evidence: None,
         };
         (
             context,

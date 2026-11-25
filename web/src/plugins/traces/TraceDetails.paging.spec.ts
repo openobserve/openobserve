@@ -125,10 +125,11 @@ const LOAD_MORE = '[data-test="trace-details-load-more-btn"]';
 // A ref, so a route change reaches computeds that read the current route, as navigation would.
 const currentRoute = ref<any>(null);
 
-function setRoute(traceId: string) {
+function setRoute(traceId: string, spanId?: string) {
   currentRoute.value = {
     query: {
       trace_id: traceId,
+      ...(spanId ? { span_id: spanId } : {}),
       from: "1755853740000000",
       to: "1755853750000000",
       stream: "test-stream",
@@ -251,9 +252,7 @@ describe("TraceDetails - keyset paging", () => {
     await mountDetails();
 
     await wrapper.find(LOAD_MORE).trigger("click");
-    // Opening a trace link resets the shared trace state and loads the new trace.
     setRoute("trace-b");
-    await wrapper.vm.openTraceLink();
     await flushPromises();
     expect(mocks.getTraceDetails.mock.calls.at(-1)[0].trace_id).toBe("trace-b");
     expect(spanIds(wrapper)).toEqual(["b1", "b2"]);
@@ -263,6 +262,122 @@ describe("TraceDetails - keyset paging", () => {
 
     expect(spanIds(wrapper)).toEqual(["b1", "b2"]);
     expect(wrapper.vm.traceTree.map((s: any) => s.spanId)).toEqual(["b1"]);
+  });
+
+  it("loads the route's new trace and selects its span when trace_id changes", async () => {
+    mocks.getTraceDetails.mockImplementation((args: any) =>
+      Promise.resolve(
+        args.trace_id === "trace-a"
+          ? page([span("r", "", 0), span("a", "r", 10)], false)
+          : page([span("b1", "", 0, "svc-b"), span("b2", "b1", 10, "svc-b")], false),
+      ),
+    );
+    await mountDetails();
+    expect(mocks.getTraceDetails).toHaveBeenCalledTimes(1);
+
+    setRoute("trace-b", "b2");
+    await flushPromises();
+
+    expect(mocks.getTraceDetails).toHaveBeenCalledTimes(2);
+    expect(mocks.getTraceDetails.mock.calls[1][0].trace_id).toBe("trace-b");
+    expect(spanIds(wrapper)).toEqual(["b1", "b2"]);
+    expect(wrapper.vm.selectedSpanId).toBe("b2");
+    expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(true);
+  });
+
+  it("does not reload when only the route's span_id changes", async () => {
+    mocks.getTraceDetails.mockResolvedValue(page([span("r", "", 0), span("a", "r", 10)], false));
+    await mountDetails();
+
+    setRoute("trace-a", "a");
+    await flushPromises();
+
+    expect(mocks.getTraceDetails).toHaveBeenCalledTimes(1);
+    expect(spanIds(wrapper)).toEqual(["a", "r"]);
+  });
+
+  it("ignores a route trace_id change when embedded", async () => {
+    mocks.getTraceDetails.mockResolvedValue(page([span("r", "", 0), span("a", "r", 10)], false));
+    wrapper = mount(TraceDetails, {
+      attachTo: "#app",
+      props: {
+        mode: "embedded",
+        traceIdProp: "trace-a",
+        streamNameProp: "test-stream",
+        startTimeProp: 1755853740000000,
+        endTimeProp: 1755853750000000,
+      },
+      global: { plugins: [i18n, router], provide: { store }, stubs: STUBS },
+    });
+    await flushPromises();
+    await vi.waitFor(() => expect(wrapper.vm.spanList.length).toBeGreaterThan(0));
+    expect(mocks.getTraceDetails).toHaveBeenCalledTimes(1);
+
+    setRoute("trace-b", "b2");
+    await flushPromises();
+
+    expect(mocks.getTraceDetails).toHaveBeenCalledTimes(1);
+    expect(spanIds(wrapper)).toEqual(["a", "r"]);
+  });
+
+  it("ignores a route trace_id change on another route", async () => {
+    mocks.getTraceDetails.mockResolvedValue(page([span("r", "", 0), span("a", "r", 10)], false));
+    await mountDetails();
+
+    currentRoute.value = {
+      ...currentRoute.value,
+      name: "traces",
+      query: { ...currentRoute.value.query, trace_id: "trace-b" },
+    };
+    await flushPromises();
+
+    expect(mocks.getTraceDetails).toHaveBeenCalledTimes(1);
+    expect(spanIds(wrapper)).toEqual(["a", "r"]);
+  });
+
+  it("never shows a slow first page of trace A after the route moved to trace B", async () => {
+    const slowA = deferred<any>();
+    mocks.getTraceDetails.mockImplementation((args: any) =>
+      args.trace_id === "trace-a"
+        ? slowA.promise
+        : Promise.resolve(page([span("b1", "", 0, "svc-b"), span("b2", "b1", 10, "svc-b")], false)),
+    );
+    wrapper = mount(TraceDetails, {
+      attachTo: "#app",
+      props: { traceId: "trace-a" },
+      global: { plugins: [i18n, router], provide: { store }, stubs: STUBS },
+    });
+    await vi.waitFor(() => expect(mocks.getTraceDetails).toHaveBeenCalledTimes(1));
+
+    setRoute("trace-b");
+    await flushPromises();
+    await vi.waitFor(() => expect(spanIds(wrapper)).toEqual(["b1", "b2"]));
+
+    slowA.resolve(page([span("r", "", 0), span("a", "r", 10)], false));
+    await flushPromises();
+
+    expect(spanIds(wrapper)).toEqual(["b1", "b2"]);
+    expect(wrapper.vm.traceTree.map((s: any) => s.spanId)).toEqual(["b1"]);
+    expect(mocks.notifyError).not.toHaveBeenCalled();
+  });
+
+  it("keeps no span selected when the new trace_id comes without a span_id", async () => {
+    mocks.getTraceDetails.mockImplementation((args: any) =>
+      Promise.resolve(
+        args.trace_id === "trace-a"
+          ? page([span("r", "", 0), span("a", "r", 10)], false)
+          : page([span("b1", "", 0, "svc-b"), span("a", "b1", 10, "svc-b")], false),
+      ),
+    );
+    setRoute("trace-a", "a");
+    await mountDetails();
+    expect(wrapper.vm.selectedSpanId).toBe("a");
+
+    setRoute("trace-b");
+    await flushPromises();
+
+    expect(spanIds(wrapper)).toEqual(["a", "b1"]);
+    expect(wrapper.vm.selectedSpanId).toBeFalsy();
   });
 
   it("drops a late page of trace A once its view unmounts and trace B mounts", async () => {

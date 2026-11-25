@@ -68,6 +68,7 @@ where
     let txn = conn.begin().await?;
     let saved = insert_in(&txn, definition, children).await?;
     txn.commit().await?;
+    publish_put(&saved.definition.org, &id).await;
     Ok(saved)
 }
 
@@ -93,6 +94,7 @@ where
         .ok_or_else(|| sea_orm::DbErr::Custom("evaluation generation overflow".into()))?;
     let saved = replace_in(&txn, replacement, evaluation_generation, children).await?;
     txn.commit().await?;
+    publish_put(&org, &id).await;
     Ok(saved)
 }
 
@@ -136,6 +138,7 @@ where
         .map(IntoActiveModel::into_active_model)
         .collect::<Vec<_>>();
     validate_child_ownership(&children, &definition.id)?;
+    let (org, id) = (definition.org.clone(), definition.id.clone());
 
     let txn = conn.begin().await?;
     let current = lock_current(&txn, &definition.org, &definition.id).await?;
@@ -155,6 +158,9 @@ where
         ReplicaWrite::Skip => {}
     }
     txn.commit().await?;
+    if write != ReplicaWrite::Skip {
+        publish_put(&org, &id).await;
+    }
     Ok(write)
 }
 
@@ -276,6 +282,9 @@ where
         get_by_id(&txn, org, id).await?
     };
     txn.commit().await?;
+    if saved.is_some() {
+        publish_put(org, id).await;
+    }
     Ok(saved)
 }
 
@@ -312,6 +321,19 @@ async fn children_for<C: ConnectionTrait>(
         .order_by_asc(alert_composite_children::Column::DisplayOrder)
         .all(conn)
         .await
+}
+
+/// Sent after commit so watchers re-read the write; a failure is logged because it committed.
+async fn publish_put(org: &str, id: &str) {
+    if let Err(e) = crate::coordinator::alert_composites::emit_put_event(org, id).await {
+        log::error!("[COMPOSITE_ALERT] put event failed for {org}/{id}: {e}");
+    }
+}
+
+async fn publish_delete(org: &str, id: &str) {
+    if let Err(e) = crate::coordinator::alert_composites::emit_delete_event(org, id).await {
+        log::error!("[COMPOSITE_ALERT] delete event failed for {org}/{id}: {e}");
+    }
 }
 
 pub async fn get_by_id<C: ConnectionTrait>(
@@ -565,6 +587,7 @@ where
         .exec(&txn)
         .await?;
     txn.commit().await?;
+    publish_delete(org, id).await;
     Ok(())
 }
 
@@ -574,25 +597,37 @@ pub async fn delete_by_org<C>(conn: &C, org: &str) -> Result<(), sea_orm::DbErr>
 where
     C: ConnectionTrait + TransactionTrait,
 {
-    let txn = conn.begin().await?;
-    let ids = alert_composites::Entity::find()
+    // Events go first: a failed one leaves the rows, so the teardown retry finds them again.
+    let listed = alert_composites::Entity::find()
         .select_only()
         .column(alert_composites::Column::Id)
         .filter(alert_composites::Column::Org.eq(org))
         .into_tuple::<String>()
-        .all(&txn)
+        .all(conn)
         .await?;
-    if !ids.is_empty() {
-        alert_composite_children::Entity::delete_many()
-            .filter(alert_composite_children::Column::CompositeId.is_in(ids))
-            .exec(&txn)
-            .await?;
+    for id in &listed {
+        crate::coordinator::alert_composites::emit_delete_event(org, id)
+            .await
+            .map_err(|e| sea_orm::DbErr::Custom(e.to_string()))?;
     }
-    alert_composites::Entity::delete_many()
-        .filter(alert_composites::Column::Org.eq(org))
+    let txn = conn.begin().await?;
+    let org_ids = sea_orm::sea_query::Query::select()
+        .column(alert_composites::Column::Id)
+        .from(alert_composites::Entity)
+        .and_where(alert_composites::Column::Org.eq(org))
+        .to_owned();
+    alert_composite_children::Entity::delete_many()
+        .filter(alert_composite_children::Column::CompositeId.in_subquery(org_ids))
         .exec(&txn)
         .await?;
+    let delete =
+        alert_composites::Entity::delete_many().filter(alert_composites::Column::Org.eq(org));
+    let deleted: Vec<String> =
+        super::delete_returning(&txn, delete, &[alert_composites::Column::Id]).await?;
     txn.commit().await?;
+    for id in &deleted {
+        publish_delete(org, id).await;
+    }
     Ok(())
 }
 

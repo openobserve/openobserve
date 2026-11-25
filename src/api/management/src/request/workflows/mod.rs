@@ -1581,6 +1581,8 @@ fn parse_workflow_history_key(key: &str) -> Option<(WorkflowTriggerType, String,
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
+
     use super::*;
 
     #[test]
@@ -1897,8 +1899,6 @@ mod tests {
 
     #[test]
     fn the_history_query_selects_only_the_optional_columns_the_stream_has() {
-        use arrow_schema::{DataType, Field, Schema};
-
         let select = |schema: &Schema| {
             let sql = history_sql("org1", "wf1", 1, 2, schema);
             sql.split(" FROM ").next().unwrap().to_string()

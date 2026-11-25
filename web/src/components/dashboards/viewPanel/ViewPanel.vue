@@ -107,7 +107,7 @@
               <OButton
                 :variant="refreshOptionsVariant"
                 size="icon-toolbar"
-                class="w-5!"
+                class="w-6!"
                 :disabled="disable"
                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                 data-test="dashboard-viewpanel-refresh-options-btn"
@@ -234,6 +234,8 @@
                     @series-limit-update="handleSeriesLimitUpdate"
                     @region-join-update="handleRegionJoinUpdate"
                     @sankey-notice-update="handleSankeyNoticeUpdate"
+                    @treemap-notice-update="handleTreemapNoticeUpdate"
+                    @funnel-notice-update="handleFunnelNoticeUpdate"
                     @limit-number-of-series-warning-message-update="
                       handleLimitNumberOfSeriesWarningMessage
                     "
@@ -501,6 +503,8 @@ export default defineComponent({
       handleSeriesLimitUpdate,
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
+      handleTreemapNoticeUpdate,
+      handleFunnelNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
     const limitNumberOfSeriesWarningMessage = ref("");
     const sparklineWarning = ref("");
@@ -1087,6 +1091,8 @@ export default defineComponent({
       handleSeriesLimitUpdate,
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
+      handleTreemapNoticeUpdate,
+      handleFunnelNoticeUpdate,
       canEditFromNotice,
       onNoticeEditPanel,
       limitNumberOfSeriesWarningMessage,

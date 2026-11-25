@@ -808,6 +808,7 @@ async fn run_search(
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
     use svix_ksuid::KsuidLike;
 
     use super::*;
@@ -938,8 +939,6 @@ mod tests {
 
     #[test]
     fn a_stream_without_trigger_source_reads_every_run_as_scheduled() {
-        use arrow_schema::{DataType, Field, Schema};
-
         let mut scheduled = HistoryFilter {
             trigger_source: Some(TRIGGER_SOURCE_SCHEDULED),
             ..filter()

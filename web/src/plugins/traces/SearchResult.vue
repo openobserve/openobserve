@@ -19,10 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="traces-search-result" class="h-full overflow-hidden">
     <div class="bg-card-glass-bg @container/results flex h-full flex-col overflow-hidden">
+      <!-- Scope and Group by need about 64rem on one row, so the bar splits into two rows sooner while they show. -->
       <div
         v-if="showHeader"
         data-test="traces-section-header"
-        class="border-border-default relative flex h-9 shrink-0 items-center border-b px-[0.4rem]! max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5 @max-[58rem]/results:h-auto @max-[58rem]/results:min-h-9 @max-[58rem]/results:flex-wrap @max-[58rem]/results:gap-y-1 @max-[58rem]/results:py-0.5"
+        class="border-border-default relative flex h-9 shrink-0 items-center border-b px-[0.4rem]! max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
+        :class="
+          spanControlsShown
+            ? '@max-[64rem]/results:h-auto @max-[64rem]/results:min-h-9 @max-[64rem]/results:flex-wrap @max-[64rem]/results:gap-y-1 @max-[64rem]/results:py-0.5'
+            : '@max-[58rem]/results:h-auto @max-[58rem]/results:min-h-9 @max-[58rem]/results:flex-wrap @max-[58rem]/results:gap-y-1 @max-[58rem]/results:py-0.5'
+        "
       >
         <!-- Field panel toggle — same style as logs page -->
         <OButton
@@ -56,6 +62,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Left: count chips -->
         <OTag
+          v-if="sqlRowsOnly"
+          data-test="traces-sql-rows-count"
+          type="logsResultChip"
+          value="neutral"
+          class="me-2.5 tabular-nums"
+          :aria-busy="countState.loading ? 'true' : undefined"
+        >
+          <span class="transition-opacity" :class="{ 'opacity-60': headerDimmed }">
+            {{ sqlRowsLabel }}
+          </span>
+        </OTag>
+        <OTag
+          v-else
           data-test="traces-count-badge"
           type="logsResultChip"
           value="neutral"
@@ -82,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-error-count-badge"
           type="logsResultChip"
           value="error"
-          :clickable="true"
+          :clickable="!searchObj.meta.sqlMode"
           class="tabular-nums transition-opacity"
           :class="[
             showErrorOnly
@@ -91,26 +110,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             { 'opacity-60': headerDimmed },
           ]"
           :aria-disabled="regionBusy ? 'true' : undefined"
-          @click="toggleErrorOnly"
+          @click="!searchObj.meta.sqlMode && toggleErrorOnly()"
         >
           {{
             `${formatLargeNumber(shownErrorCount)} ${searchObj.meta.searchMode === "traces" ? t("traces.errorTraces") : t("traces.errorSpans")}`
           }}
           <OTooltip
-            :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
+            :content="
+              searchObj.meta.sqlMode
+                ? t('traces.sqlMode.putConditionInWhere')
+                : showErrorOnly
+                  ? t('traces.clearErrorFilter')
+                  : t('traces.filterByErrors')
+            "
             side="bottom"
           />
-          <template #trailing>
+          <template v-if="!searchObj.meta.sqlMode" #trailing>
             <OIcon name="filter-alt" size="xs" class="shrink-0" />
           </template>
         </OTag>
+        <span
+          v-if="sqlInfo && searchObj.data.queryResults?.is_partial === true"
+          class="text-warning ms-1 inline-flex shrink-0 cursor-help"
+          tabindex="0"
+          data-test="traces-sql-partial-icon"
+        >
+          <OIcon name="warning" size="sm" />
+          <OTooltip :content="t('traces.sqlMode.partialResults')" side="top" align="center" />
+        </span>
+        <div
+          v-if="spanControlsShown"
+          class="flex shrink-0 items-center gap-2"
+          data-test="traces-search-result-span-controls"
+        >
+          <span class="ms-2.5 flex h-4 items-center" aria-hidden="true">
+            <OSeparator vertical />
+          </span>
+          <TracesScopeSelect
+            :model-value="searchObj.meta.scope"
+            :has-parent-column="!!searchObj.data.stream.hasParentColumn"
+            @update:model-value="(scope) => $emit('update:scope', scope)"
+          />
+          <TracesGroupBySelect
+            :model-value="searchObj.meta.groupBy"
+            :fields="groupByFields"
+            :count="groupsShown ? groupsCount : null"
+            @update:model-value="(field) => $emit('update:groupBy', field)"
+          />
+        </div>
 
         <div
-          class="hidden basis-full @max-[58rem]/results:block"
+          class="hidden basis-full"
+          :class="spanControlsShown ? '@max-[64rem]/results:block' : '@max-[58rem]/results:block'"
           aria-hidden="true"
           data-test="traces-search-result-header-break"
         />
-        <div class="flex min-w-0 flex-1 items-center px-2 @max-[58rem]/results:flex-none">
+        <div
+          class="flex min-w-0 flex-1 items-center px-2"
+          :class="
+            spanControlsShown ? '@max-[64rem]/results:flex-none' : '@max-[58rem]/results:flex-none'
+          "
+        >
           <ORegionStatus
             :noun="regionNoun"
             :elapsed-seconds="region.elapsedSeconds.value"
@@ -119,19 +179,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="me-1 flex min-w-0 items-center @max-[58rem]/results:flex-1 @max-[58rem]/results:justify-end @min-[58rem]/results:min-w-33"
+          class="me-1 flex min-w-0 items-center justify-end"
+          :class="
+            spanControlsShown
+              ? '@max-[64rem]/results:flex-1 @min-[64rem]/results:min-w-33'
+              : '@max-[58rem]/results:flex-1 @min-[58rem]/results:min-w-33'
+          "
           data-test="traces-search-result-data-age"
         >
-          <ORefreshButton
-            layout="inline"
-            age-format="clock"
-            :last-run-at="searchObj.meta.lastRunAt"
-            :failed-at="searchObj.meta.refreshFailedAt"
-            :loading="regionBusy"
-            :spinner="false"
-            data-test="traces-search-result-refresh"
-            @click="$emit('run-query')"
-          />
+          <div
+            class="border-card-glass-border rounded-default inline-flex h-6 min-w-0 items-center border px-1"
+          >
+            <ORefreshButton
+              size="inset"
+              :last-run-at="searchObj.meta.lastRunAt"
+              :failed-at="searchObj.meta.refreshFailedAt"
+              :loading="regionBusy"
+              :spinner="false"
+              data-test="traces-search-result-refresh"
+              @click="$emit('run-query')"
+            />
+          </div>
         </div>
         <!-- Same affordance as the logs table: a long operation name is often
              the widest thing on a row, and clipping it hides the part that
@@ -147,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.messageWrapContent')" />
         </OButton>
         <div
-          v-if="pagerShown"
+          v-if="pagerShown && !groupsShown"
           class="flex items-center transition-opacity"
           :class="{ 'opacity-60': pagerInert }"
           :aria-disabled="regionBusy ? 'true' : undefined"
@@ -194,7 +262,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             endTime: searchObj.data.datetime.endTime,
           }"
           :filter="searchObj.data.editorValue"
-          :streamFields="searchObj.data.stream.selectedStreamFields"
           :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
           :ai-enabled="aiEnabled"
           @time-range-selected="onMetricsTimeRangeSelected"
@@ -204,7 +271,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <TracesMetricsPlaceholder v-else-if="pending && searchObj.meta.showHistogram" />
 
+        <OBanner
+          v-if="histogramLoss"
+          variant="warning"
+          dense
+          class="mx-1 my-1"
+          data-test="traces-sql-histogram-loss-warning"
+        >
+          {{ t("traces.sqlMode.histogramLossWarning") }}
+        </OBanner>
+        <OEmptyState
+          v-if="matchAllFix"
+          illustration="trace"
+          size="hero"
+          :hide-action="true"
+          data-test="traces-sql-match-all-empty"
+        >
+          <template #title>{{ t("traces.sqlMode.matchAllEmpty.title") }}</template>
+          <template #description>{{ t("traces.sqlMode.matchAllEmpty.description") }}</template>
+          <template #actions>
+            <EmptyStateActionCard
+              icon="search"
+              :label="t('traces.sqlMode.matchAllEmpty.searchOneField')"
+              :sublabel="
+                t('traces.sqlMode.matchAllEmpty.searchOneFieldDesc', { call: matchAllFix.call })
+              "
+              data-test="traces-sql-match-all-fix-card"
+              @click="$emit('run-sql', matchAllFix.sql)"
+            />
+          </template>
+          <template v-if="aiEnabled" #extra>
+            <div class="flex justify-center">
+              <OButton
+                variant="ghost"
+                size="sm"
+                data-test="traces-sql-match-all-ask-ai-btn"
+                @click="$emit('ask-ai')"
+              >
+                {{ t("queryError.askAi") }}
+              </OButton>
+            </div>
+          </template>
+        </OEmptyState>
+        <TracesSqlResultTable
+          v-else-if="sqlShape !== 'spans'"
+          :hits="hits"
+          :columns="sqlColumns"
+          :shape="sqlShape"
+          :loading="searchObj.loading"
+          :wrap="searchObj.meta.resultGrid.wrapCells"
+          :scroll-el="scrollContainerRef"
+          :offer-add-trace-id="offerAddTraceId"
+          :trace-href="traceByIdHref"
+          :cap-note="sqlCapNote"
+          :opening-trace-id="openingTraceId"
+          @open-trace="openTraceById"
+          @locate-trace="locateTrace"
+          @add-trace-id="$emit('add-trace-id')"
+        />
+        <TracesGroupsTable
+          v-else-if="groupsShown"
+          :request="searchObj.data.groupsRequest!"
+          :sort="searchObj.meta.groupsSort"
+          :columns="groupsColumns"
+          :wrap="searchObj.meta.resultGrid.wrapCells"
+          @update:sort="(sort) => (searchObj.meta.groupsSort = sort)"
+          @open-group="(term: string) => $emit('open-group', term)"
+          @update:count="(count: number | null) => (groupsCount = count)"
+        />
         <TracesSearchResultList
+          v-else
           ref="searchResultListRef"
           :hits="hits"
           :wrap="searchObj.meta.resultGrid.wrapCells"
@@ -247,6 +383,7 @@ import {
   defineComponent,
   nextTick,
   onActivated,
+  onBeforeUnmount,
   onDeactivated,
   onMounted,
   ref,
@@ -254,12 +391,31 @@ import {
   type PropType,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import useTraces from "../../composables/useTraces";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useRouter } from "vue-router";
 import TracesSearchResultList from "./components/TracesSearchResultList.vue";
+import TracesSqlResultTable from "./components/TracesSqlResultTable.vue";
+import TracesGroupsTable from "./components/TracesGroupsTable.vue";
+import TracesScopeSelect from "./components/TracesScopeSelect.vue";
+import TracesGroupBySelect from "./components/TracesGroupBySelect.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { buildGroupsColumns } from "./composables/tracesGroupsColumns";
+import { buildResultColumns, fillLastColumn } from "./composables/useTracesTableColumns";
+import {
+  analyzeTracesSql,
+  canAddTraceId,
+  groupsByTraceIdOnly,
+  histogramLosesSpans,
+  isRowQuery,
+  matchAllToStrMatch,
+  MATCH_ALL_FALLBACK_FIELD,
+  resultKeys,
+  resultShape,
+  type TracesSqlShape,
+} from "@/utils/traces/tracesSql";
 import { formatLargeNumber } from "../../utils/zincutils";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -270,6 +426,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import TracesMetricsPlaceholder from "./metrics/TracesMetricsPlaceholder.vue";
 import ORegionStatus from "@/lib/feedback/RegionStatus/ORegionStatus.vue";
@@ -277,6 +434,12 @@ import { useRegionLoading } from "@/lib/feedback/RegionStatus/useRegionLoading";
 import { resultText, type RegionNoun } from "@/lib/feedback/RegionStatus/regionText";
 import { useSettledValue } from "@/composables/useSettledValue";
 import { formatRefreshFailed } from "@/utils/formatters";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import { allNullColumns } from "@/utils/traces/tracesSqlErrors";
+import { useExemplarTraceLookup } from "@/composables/dashboard/useExemplarTraceLookup";
+import type { TraceVerdict } from "@/ts/interfaces/exemplars";
+import { traceQueryWindow } from "@/utils/rum/traceWindow";
 
 export default defineComponent({
   name: "SearchResult",
@@ -287,9 +450,17 @@ export default defineComponent({
     OSelect,
     OPagination,
     OTag,
+    OBanner,
     OSkeleton,
     ORegionStatus,
     TracesSearchResultList,
+    TracesSqlResultTable,
+    TracesGroupsTable,
+    TracesScopeSelect,
+    TracesGroupBySelect,
+    OSeparator,
+    OEmptyState,
+    EmptyStateActionCard,
     TracesMetricsPlaceholder,
     TracesMetricsDashboard: defineAsyncComponent({
       // Its charts load as chunks of their own, so they load with it and the placeholder stays until they can draw.
@@ -343,6 +514,11 @@ export default defineComponent({
     "ask-ai",
     "send-to-ai-chat",
     "open-mobile-fields",
+    "add-trace-id",
+    "run-sql",
+    "open-group",
+    "update:scope",
+    "update:groupBy",
   ],
   methods: {
     toggleErrorOnly() {
@@ -371,7 +547,7 @@ export default defineComponent({
     const router = useRouter();
     const { isMobile } = useBreakpoint();
 
-    const { searchObj, updatedLocalLogFilterField, patchUrlViewState } = useTraces();
+    const { searchObj, updatedLocalLogFilterField, patchUrlViewState, tracesParser } = useTraces();
 
     const metricsDashboardRef: any = ref(null);
 
@@ -422,7 +598,14 @@ export default defineComponent({
       },
     );
 
+    const pageTimeRange = () => ({
+      from: searchObj.data.datetime.startTime,
+      to: searchObj.data.datetime.endTime,
+    });
+
     const traceTimeRange = (props: any) => {
+      // Typed SQL may leave the span times out, so the trace is looked up in the page's range.
+      if (searchObj.meta.searchMode === "spans" && !props.start_time) return pageTimeRange();
       if (searchObj.meta.searchMode === "spans") {
         // start_time / end_time are nanoseconds in raw span rows — convert to µs
         const spanStart = Math.floor((props.start_time || 0) / 1000);
@@ -447,6 +630,69 @@ export default defineComponent({
     const traceDetailsHref = (row: any) => {
       const { from, to } = traceTimeRange(row);
       return router.resolve(traceDetailsLocation(row, from, to)).href;
+    };
+
+    const traceByIdLocation = (row: any, from: number, to: number) => {
+      return {
+        name: "traceDetails",
+        query: {
+          stream: router.currentRoute.value.query.stream,
+          trace_id: row.trace_id,
+          from,
+          to,
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      };
+    };
+
+    const traceLookup = useExemplarTraceLookup();
+    onBeforeUnmount(traceLookup.dispose);
+
+    // A trace can run past the page range, so a located trace opens where it ran; anything else opens the page range.
+    const windowFromVerdict = (verdict: TraceVerdict | undefined) => {
+      const page = pageTimeRange();
+      if (
+        verdict?.state !== "found" ||
+        verdict.stream !== searchObj.data.stream.selectedStream?.value
+      )
+        return page;
+      const window = traceQueryWindow(
+        { start_time: verdict.startUs, end_time: verdict.endUs },
+        page.from,
+        page.to,
+      );
+      return { from: window.startTime, to: window.endTime };
+    };
+
+    const traceRowWindow = async (row: any): Promise<{ from: number; to: number }> => {
+      const firstSeenUs = Number(row?.first_seen);
+      if (!row?.trace_id || !Number.isFinite(firstSeenUs) || firstSeenUs <= 0)
+        return pageTimeRange();
+      return windowFromVerdict(await traceLookup.lookup(String(row.trace_id), firstSeenUs / 1000));
+    };
+
+    // The href is read on render, so a lookup started on hover moves a new-tab open to the located window.
+    const traceByIdHref = (row: any) => {
+      const { from, to } = windowFromVerdict(traceLookup.peek(String(row?.trace_id ?? "")));
+      return router.resolve(traceByIdLocation(row, from, to)).href;
+    };
+
+    const locateTrace = (row: any) => {
+      void traceRowWindow(row);
+    };
+
+    const openingTraceId = ref("");
+    const openTraceById = async (row: any) => {
+      if (openingTraceId.value) return;
+      openingTraceId.value = String(row?.trace_id ?? "");
+      try {
+        const { from, to } = await traceRowWindow(row);
+        // The URL write is debounced; Back restores what this entry holds, so it must land before leaving.
+        await patchUrlViewState();
+        router.push(traceByIdLocation(row, from, to));
+      } finally {
+        openingTraceId.value = "";
+      }
     };
 
     const openTraceInNewTab = (row: any) => {
@@ -493,9 +739,67 @@ export default defineComponent({
       Number(searchObj.data.queryResults?.total ?? hits.value.length),
     );
 
+    // Results carry the SQL they ran, so a staged edit never reshapes the table; only the Spans view runs SQL.
+    const sqlInfo = computed(() => {
+      const sql = searchObj.data.queryResults?.sql;
+      if (searchObj.meta.searchMode !== "spans") return null;
+      return typeof sql === "string" && sql ? analyzeTracesSql(sql, tracesParser.value) : null;
+    });
+    const histogramLoss = computed(
+      () => !!sqlInfo.value && histogramLosesSpans(searchObj.data.queryResults?.sql ?? ""),
+    );
+    const sqlRowsOnly = computed(() => !!sqlInfo.value && !isRowQuery(sqlInfo.value));
+    const sqlKeys = computed(() =>
+      sqlInfo.value
+        ? resultKeys(hits.value, sqlInfo.value.selectNames, sqlInfo.value.selectExplicit)
+        : [],
+    );
+    const sqlShape = computed<TracesSqlShape>(() =>
+      sqlInfo.value && hits.value.length ? resultShape(sqlKeys.value) : "spans",
+    );
+    const sqlColumns = computed(() => {
+      const hint = t("traces.sqlMode.maybeInAll", {
+        column: store.state.zoConfig?.all_fields_name || "_all",
+      });
+      const hints = Object.fromEntries(
+        allNullColumns(hits.value, sqlKeys.value).map((key) => [key, hint]),
+      );
+      return buildResultColumns(sqlKeys.value, hints);
+    });
+    const offerAddTraceId = computed(
+      () => sqlShape.value === "rows" && !!sqlInfo.value && canAddTraceId(sqlInfo.value),
+    );
+    // A result that fills its LIMIT is cut there; the note counts traces only when each row is one trace.
+    const sqlCapNote = computed(() => {
+      const limit = sqlInfo.value?.limit ?? null;
+      if (limit === null || limit <= 0 || searchObj.loading || hits.value.length < limit) return "";
+      const perTrace =
+        sqlShape.value === "traces" && groupsByTraceIdOnly(searchObj.data.queryResults?.sql ?? "");
+      return t(
+        perTrace ? "traces.sqlMode.firstTraces" : "traces.sqlMode.firstRows",
+        { count: formatLargeNumber(limit) },
+        limit,
+      );
+    });
+    const sqlRowsLabel = computed(() =>
+      t(
+        "traces.sqlMode.rowsCount",
+        { count: formatLargeNumber(hits.value.length) },
+        hits.value.length,
+      ),
+    );
+
     const searchPerformed = computed(() =>
       Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "total"),
     );
+    // match_all searches only full-text fields, so an empty result offers one field instead.
+    const matchAllFix = computed(() => {
+      const sql = searchObj.data.queryResults?.sql;
+      if (!sqlInfo.value || searchObj.loading || hits.value.length || !searchPerformed.value) {
+        return null;
+      }
+      return matchAllToStrMatch(String(sql), MATCH_ALL_FALLBACK_FIELD);
+    });
 
     const rowsPerPageOptions = [10, 25, 50, 100];
 
@@ -509,6 +813,37 @@ export default defineComponent({
         ),
     );
 
+    // The Groups table stands for the list until the next run, which is what clears the request.
+    const groupsShown = computed(
+      () =>
+        !!searchObj.data.groupsRequest &&
+        searchObj.meta.searchMode === "spans" &&
+        !searchObj.meta.sqlMode,
+    );
+
+    // Scope and Group by narrow the filter's span list, so SQL mode and the Traces view have neither.
+    const spanControlsShown = computed(
+      () => searchObj.meta.searchMode === "spans" && !searchObj.meta.sqlMode,
+    );
+
+    // Field grouping adds header rows (label: true) between the fields; they name no column.
+    const groupByFields = computed(() => [
+      ...new Set(
+        (searchObj.data.stream.selectedStreamFields ?? [])
+          .filter((field: any) => !field.label && field.name)
+          .map((field: any) => String(field.name)),
+      ),
+    ]);
+
+    const groupsCount = ref<number | null>(null);
+
+    const groupsColumns = computed(() => {
+      if (!groupsShown.value) return [];
+      const cols = buildGroupsColumns(searchObj.data.groupsRequest?.key ?? "", t);
+      fillLastColumn(cols, "");
+      return cols;
+    });
+
     // The count runs after the rows, so until it answers there is no total to show.
     const countPending = computed(() => searchObj.data.queryResults?.countPending === true);
     const regionBusy = computed(() => props.pending || searchObj.loading || countPending.value);
@@ -517,13 +852,17 @@ export default defineComponent({
     );
 
     // Another stream or mode is another count, so its previous value is never kept.
-    const countSettled = useSettledValue<{ total: number; errorCount: number }>(() => {
+    // A failed count with nothing kept has no total; the page size is not one.
+    const countSettled = useSettledValue<{ total: number | null; errorCount: number }>(() => {
       const results = searchObj.data.queryResults;
       const busy = regionBusy.value;
       return {
         value: busy
           ? null
-          : { total: resultTotal.value, errorCount: Number(results?.errorCount ?? 0) },
+          : {
+              total: results?.countFailed ? null : resultTotal.value,
+              errorCount: Number(results?.errorCount ?? 0),
+            },
         busy,
         key: `${searchObj.data.stream.selectedStream.value}|${searchObj.meta.searchMode}`,
       };
@@ -534,7 +873,10 @@ export default defineComponent({
       () => searchObj.meta.resultGrid.showPagination || countState.value.loading,
     );
     const pagerInert = computed(() => headerDimmed.value || countState.value.loading);
-    const shownTotal = computed(() => countState.value.value?.total ?? resultTotal.value);
+    const shownTotal = computed(() => {
+      const settled = countState.value.value;
+      return settled ? settled.total : resultTotal.value;
+    });
     const shownErrorCount = computed(() => countState.value.value?.errorCount ?? 0);
 
     const countText = (count: string, plural: number) =>
@@ -542,7 +884,9 @@ export default defineComponent({
         ? `${count} ${t("traces.spansFound")}`
         : t("traces.results.tracesWithMatchingSpan", { count }, plural);
     const countLabel = computed(() =>
-      countText(formatLargeNumber(shownTotal.value), shownTotal.value),
+      shownTotal.value === null
+        ? countText(raw("—"), 2)
+        : countText(formatLargeNumber(shownTotal.value), shownTotal.value),
     );
     // A blank count would be replaced by the plural number, so a space stands in and is trimmed.
     const countNoun = computed(() => countText(" ", 2).trim());
@@ -646,6 +990,19 @@ export default defineComponent({
       scrollContainerRef,
       expandRowDetail,
       traceDetailsHref,
+      traceByIdHref,
+      openTraceById,
+      locateTrace,
+      openingTraceId,
+      histogramLoss,
+      sqlInfo,
+      sqlRowsOnly,
+      sqlShape,
+      sqlColumns,
+      matchAllFix,
+      offerAddTraceId,
+      sqlCapNote,
+      sqlRowsLabel,
       openTraceInNewTab,
       onMetricsTimeRangeSelected,
       onMetricsEditorFilterSet,
@@ -670,6 +1027,11 @@ export default defineComponent({
       changeRowsPerPage,
       changeSortBy,
       rowsPerPageOptions,
+      groupsShown,
+      spanControlsShown,
+      groupByFields,
+      groupsCount,
+      groupsColumns,
       totalPages,
       openComparison,
       toggleWrapCells,

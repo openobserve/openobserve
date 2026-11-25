@@ -70,6 +70,8 @@ describe("usePanelNotices", () => {
       seriesLimit: { shown: 100, total: 1000, cap: 100 },
       regionJoin: null,
       sankeyNotice: { returnLinks: 2, skippedRows: 1 },
+      treemapNotice: null,
+      funnelNotice: null,
       serverPartial: true,
       rowsCapped: true,
       serverPartialReasons: ["Warn: results are capped to meet default limit"],
@@ -80,6 +82,24 @@ describe("usePanelNotices", () => {
     expect(notices.noticeProps.value.functionErrors).toEqual([]);
     expect(notices.noticeProps.value.sankeyNotice).toBeNull();
     expect(notices.maxQueryRangeWarning.value).toBe("");
+  });
+
+  it("passes the treemap's skipped rows to PanelErrorButtons and clears them on reset", () => {
+    const notices = usePanelNotices(() => "UTC");
+    notices.handleTreemapNoticeUpdate({ skippedRows: 2, ignoredQueries: 0 });
+    expect(notices.noticeProps.value.treemapNotice).toEqual({ skippedRows: 2, ignoredQueries: 0 });
+
+    notices.resetNotices();
+    expect(notices.noticeProps.value.treemapNotice).toBeNull();
+  });
+
+  it("passes the funnel's skipped rows to PanelErrorButtons and clears them on reset", () => {
+    const notices = usePanelNotices(() => "UTC");
+    notices.handleFunnelNoticeUpdate({ skippedRows: 6, ignoredQueries: 1 });
+    expect(notices.noticeProps.value.funnelNotice).toEqual({ skippedRows: 6, ignoredQueries: 1 });
+
+    notices.resetNotices();
+    expect(notices.noticeProps.value.funnelNotice).toBeNull();
   });
 
   it("passes the maps region join to PanelErrorButtons and clears it on reset", () => {

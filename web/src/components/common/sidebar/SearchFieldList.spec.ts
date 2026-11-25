@@ -674,6 +674,16 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       expect(vm.buildExpression("brand", "null", "exclude")).toBe("brand IS NOT NULL");
     });
 
+    it.each([
+      ["", "brand=''"],
+      ["NULL", "brand='NULL'"],
+    ])("quotes %j like any other value; only the null row's key is a null check", (v, expr) => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+
+      expect(vm.buildExpression("brand", v, "include")).toBe(expr);
+    });
+
     it("parses IS NULL back to the 'null' key for include filters", () => {
       wrapper = createWrapper({ query: "brand IS NULL" });
       const vm = wrapper.vm as any;

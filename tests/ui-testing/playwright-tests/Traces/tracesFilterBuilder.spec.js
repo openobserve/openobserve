@@ -48,7 +48,7 @@ test.describe('Traces filter builder', () => {
     test('a typed word is offered as a search function, which then asks for the field', {
         tag: ['@all', '@traces', '@filterBuilder', '@P1'],
     }, async ({ page }) => {
-        // Trace streams have no full-text field, so the word fills the field functions instead of match_all.
+        // Traces offer no match_all, so the word fills the field functions instead.
         await builder.barInput.click();
         await builder.barInput.pressSequentially(VALUE);
         const contains = page.locator(`[data-test^="${PREFIX}-bar-suggest-item-"][data-test$="fn:contains"]`);

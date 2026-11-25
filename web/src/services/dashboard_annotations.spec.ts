@@ -387,6 +387,22 @@ describe("dashboard_annotations service", () => {
       expect(callArgs[1].params.panels).toBe("only-panel");
     });
 
+    it.each([
+      ["no panels", undefined],
+      ["an empty panel list", []],
+    ])("should leave out the panels param for %s", async (_label, panels) => {
+      mockHttpInstance.get.mockResolvedValue({ data: [] });
+
+      await annotationService.get_timed_annotations("org", "dash", {
+        panels,
+        start_time: 1,
+        end_time: 2,
+      });
+
+      const callArgs = mockHttpInstance.get.mock.calls[0];
+      expect(callArgs[1].params).toEqual({ start_time: 1, end_time: 2 });
+    });
+
     it("should include correct start_time and end_time in query params", async () => {
       const org_id = "prod-org";
       const dashboard_id = "operations-dash";

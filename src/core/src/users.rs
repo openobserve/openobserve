@@ -57,6 +57,13 @@ use crate::{
     organization,
 };
 
+#[cfg(feature = "cloud")]
+const MEMBER_ROLE_REFUSED: &str = "A member's role can be Admin, Editor, Viewer or User. Service accounts are managed under Service Accounts";
+#[cfg(feature = "cloud")]
+const NEW_SERVICE_ACCOUNT_DOMAIN: &str = "@sa.internal";
+#[cfg(feature = "cloud")]
+const SYSTEM_IDENTITY_DOMAIN: &str = "openobserve.internal";
+
 /// The account kind a removal endpoint acts on; any other membership answers as not found.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RemovalTarget {
@@ -75,11 +82,33 @@ impl RemovalTarget {
     }
 }
 
+/// An account that already exists, as the cloud service-account check sees it.
+#[cfg(feature = "cloud")]
+struct ExistingAccount {
+    is_sso: bool,
+    memberships: Vec<(String, UserRole)>,
+}
+
 /// True when `requested` is not the same set of custom roles as `current`.
 #[cfg(feature = "enterprise")]
 fn custom_roles_differ(requested: &[String], current: &[String]) -> bool {
     let requested: std::collections::HashSet<&String> = requested.iter().collect();
     requested != current.iter().collect()
+}
+
+/// The OpenFGA org relations (old, new) for a base-role change, or None when OpenFGA sees no
+/// change. [pure]
+#[cfg(feature = "enterprise")]
+fn openfga_role_swap(old: &UserRole, new: &UserRole) -> Option<(String, String)> {
+    let relation = |role: &UserRole| {
+        if role.eq(&UserRole::User) || role.is_service_account() {
+            "allowed_user".to_string()
+        } else {
+            role.to_string()
+        }
+    };
+    let (old, new) = (relation(old), relation(new));
+    (old != new).then_some((old, new))
 }
 
 fn redact_token(token: &str) -> String {
@@ -497,6 +526,10 @@ pub async fn update_user(
     // Admins Role can still be mutable.
     {
         let new_org_role = UserOrgRole::from(&role);
+        #[cfg(feature = "cloud")]
+        if !is_allowed_role_change(&local_user.role, &new_org_role.base_role) {
+            return Ok(MetaHttpResponse::bad_request(MEMBER_ROLE_REFUSED));
+        }
         old_role = Some(new_user.role);
         new_user.role = new_org_role.base_role;
         new_role = Some(new_user.role.clone());
@@ -596,8 +629,27 @@ pub async fn update_user(
 
     // Update the organization membership
     if is_org_updated {
-        if db::org_users::get(org_id, email).await.is_ok() {
-            if let Err(e) = db::org_users::update(
+        // OpenFGA first: a failed write must leave the stored role, which the UI shows, unchanged.
+        #[cfg(feature = "enterprise")]
+        let role_swap = match (&old_role, &new_role) {
+            (Some(old), Some(new)) if get_openfga_config().enabled => openfga_role_swap(old, new),
+            _ => None,
+        };
+        #[cfg(feature = "enterprise")]
+        if let Some((old, new)) = &role_swap {
+            log::debug!("updating openfga role for {email} from {old} to {new}");
+            if let Err(e) =
+                o2_openfga::authorizer::authz::update_user_role(old, new, email, org_id).await
+            {
+                log::error!("Error updating openfga role for {email} in {org_id} org : {e}");
+                return Ok(MetaHttpResponse::internal_error(
+                    "Failed to update user role",
+                ));
+            }
+        }
+
+        let membership_written = if db::org_users::get(org_id, email).await.is_ok() {
+            db::org_users::update(
                 org_id,
                 email,
                 new_user.role,
@@ -605,79 +657,72 @@ pub async fn update_user(
                 new_user.rum_token,
             )
             .await
-            {
+            .map_err(|e| {
                 log::error!("Error updating org user relation: {e}");
-                return Ok(MetaHttpResponse::internal_error(
-                    "Failed to update organization membership for user",
-                ));
+                "Failed to update organization membership for user"
+            })
+        } else {
+            db::org_users::add(
+                org_id,
+                email,
+                new_user.role,
+                &new_user.token,
+                new_user.rum_token,
+            )
+            .await
+            .map_err(|e| {
+                log::error!("Error adding org user relation: {e}");
+                "Failed to add organization membership for user"
+            })
+        };
+        if let Err(msg) = membership_written {
+            #[cfg(feature = "enterprise")]
+            if let Some((old, new)) = &role_swap
+                && let Err(e) =
+                    o2_openfga::authorizer::authz::update_user_role(new, old, email, org_id).await
+            {
+                log::error!(
+                    "Error undoing openfga role change for {email} in {org_id} org from {old} to {new}: {e}"
+                );
             }
-        } else if let Err(e) = db::org_users::add(
-            org_id,
-            email,
-            new_user.role,
-            &new_user.token,
-            new_user.rum_token,
-        )
-        .await
-        {
-            log::error!("Error adding org user relation: {e}");
-            return Ok(MetaHttpResponse::internal_error(
-                "Failed to add organization membership for user",
-            ));
+            return Ok(MetaHttpResponse::internal_error(msg));
         }
 
         #[cfg(feature = "enterprise")]
         {
             use o2_openfga::authorizer::{
-                authz::{get_user_crole_tuple, update_tuples, update_user_role},
+                authz::{get_user_crole_tuple, update_tuples},
                 roles::{get_role_key, get_user_crole_removal_tuples},
             };
 
             if get_openfga_config().enabled
-                && let Some(old) = old_role
-                && let Some(new) = new_role
+                && old_role.is_some()
+                && new_role.is_some()
+                && custom_roles_need_change
             {
-                if !old.eq(&new) {
-                    let mut old_str = old.to_string();
-                    let mut new_str = new.to_string();
-                    if old.eq(&UserRole::User) || old.is_service_account() {
-                        old_str = "allowed_user".to_string();
+                let mut write_tuples = vec![];
+                let mut delete_tuples = vec![];
+                custom_roles.iter().for_each(|crole| {
+                    if !existing_roles.contains(crole) {
+                        write_tuples.push(get_user_crole_tuple(org_id, crole, email));
                     }
-                    if new.eq(&UserRole::User) || new.is_service_account() {
-                        new_str = "allowed_user".to_string();
-                    }
-                    if old_str != new_str {
-                        log::debug!(
-                            "updating openfga role for {email} from {old_str} to {new_str}"
+                });
+                existing_roles.iter().for_each(|crole| {
+                    if !custom_roles.contains(crole) {
+                        get_user_crole_removal_tuples(
+                            email,
+                            &get_role_key(org_id, crole),
+                            &mut delete_tuples,
                         );
-                        update_user_role(&old_str, &new_str, email, org_id).await;
                     }
-                }
-                if custom_roles_need_change {
-                    let mut write_tuples = vec![];
-                    let mut delete_tuples = vec![];
-                    custom_roles.iter().for_each(|crole| {
-                        if !existing_roles.contains(crole) {
-                            write_tuples.push(get_user_crole_tuple(org_id, crole, email));
-                        }
-                    });
-                    existing_roles.iter().for_each(|crole| {
-                        if !custom_roles.contains(crole) {
-                            get_user_crole_removal_tuples(
-                                email,
-                                &get_role_key(org_id, crole),
-                                &mut delete_tuples,
-                            );
-                        }
-                    });
-                    if let Err(e) = update_tuples(write_tuples, delete_tuples).await {
-                        log::error!(
-                            "Error updating custom roles for user {email} in {org_id} org : {e}"
-                        );
-                        return Ok(MetaHttpResponse::internal_error(
-                            "Failed to update custom roles for user",
-                        ));
-                    }
+                });
+                if let Err(e) = update_tuples(write_tuples, delete_tuples).await {
+                    log::error!(
+                        "Error updating custom roles for user {email} in {org_id} org : {e}"
+                    );
+                    return Ok(MetaHttpResponse::internal_error(
+                        "Failed to update custom roles for user",
+                    ));
                 }
             }
         }
@@ -862,6 +907,14 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
         Some(loc_user) => Some(loc_user),
         None => db::user::get(Some(org_id), name).await.ok().flatten(),
     }
+}
+
+/// True for the instance root and for an admin of `org_id`.
+pub async fn is_org_admin(org_id: &str, user_id: &str) -> bool {
+    is_root_user(user_id)
+        || get_user(Some(org_id), user_id)
+            .await
+            .is_some_and(|u| matches!(u.role, UserRole::Root | UserRole::Admin))
 }
 
 /// One member of `org_id`, shaped exactly as `list_users` reports them.
@@ -1527,6 +1580,43 @@ fn fga_member_role(role: &UserRole) -> String {
     }
 }
 
+// Resending the current role is not a change: the edit dialog sends it back for any member.
+#[cfg(feature = "cloud")]
+fn is_allowed_role_change(current: &UserRole, requested: &UserRole) -> bool {
+    requested == current || requested.is_member_role()
+}
+
+/// An existing account is reused only if it is purely a service account the caller controls;
+/// a new one must be in the reserved domain, so no person's email can be registered.
+#[cfg(feature = "cloud")]
+fn service_account_refusal(
+    email: &str,
+    existing: Option<&ExistingAccount>,
+    caller_controls: impl Fn(&str) -> bool,
+) -> Option<String> {
+    let Some(account) = existing else {
+        return (!email.ends_with(NEW_SERVICE_ACCOUNT_DOMAIN)).then(|| {
+            format!(
+                "On OpenObserve Cloud, a new service account's email must end in {NEW_SERVICE_ACCOUNT_DOMAIN}"
+            )
+        });
+    };
+    let only_service_account = !account.memberships.is_empty()
+        && account
+            .memberships
+            .iter()
+            .all(|(_, role)| *role == UserRole::ServiceAccount);
+    let caller_owns = account
+        .memberships
+        .iter()
+        .any(|(org, _)| caller_controls(org));
+    let reusable = only_service_account
+        && !account.is_sso
+        && !email.ends_with(SYSTEM_IDENTITY_DOMAIN)
+        && caller_owns;
+    (!reusable).then(|| format!("{email} belongs to another account. Use a new name."))
+}
+
 #[cfg(feature = "cloud")]
 async fn delete_cloud_invites(org_id: &str, email_id: &str) -> Option<Response> {
     use o2_enterprise::enterprise::cloud::org_invites;
@@ -1604,6 +1694,39 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
     Ok(())
 }
 
+/// Why `caller` may not add `email` as a service account on cloud, or None when it may.
+/// `email` must already be trimmed and lowercased.
+#[cfg(feature = "cloud")]
+pub async fn cloud_service_account_refusal(
+    email: &str,
+    caller: &str,
+) -> Result<Option<String>, anyhow::Error> {
+    if infra::table::users::get_id_by_email(email).await?.is_none() {
+        return Ok(service_account_refusal(email, None, |_| false));
+    }
+    let account = ExistingAccount {
+        is_sso: db::user::get_user_record(email)
+            .await?
+            .user_type
+            .is_external(),
+        memberships: db::org_users::list_orgs_by_user(email)
+            .await?
+            .into_iter()
+            .map(|m| (m.org_id, m.role))
+            .collect(),
+    };
+    let caller_is_root = is_root_user(caller);
+    let caller_admin_of: hashbrown::HashSet<String> = db::org_users::list_orgs_by_user(caller)
+        .await?
+        .into_iter()
+        .filter(|m| matches!(m.role, UserRole::Admin | UserRole::Root))
+        .map(|m| m.org_id)
+        .collect();
+    Ok(service_account_refusal(email, Some(&account), |org| {
+        caller_is_root || caller_admin_of.contains(org)
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use common::infra::config::USERS;
@@ -1633,6 +1756,35 @@ mod tests {
         assert!(custom_roles_differ(&["a".into()], &current));
         assert!(custom_roles_differ(&["c".into()], &[]));
         assert!(!custom_roles_differ(&[], &[]));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn openfga_role_swap_writes_only_when_the_openfga_relation_changes() {
+        let swap = |old: &str, new: &str| Some((old.to_string(), new.to_string()));
+        let cases = [
+            (UserRole::Viewer, UserRole::Editor, swap("viewer", "editor")),
+            (
+                UserRole::Admin,
+                UserRole::User,
+                swap("admin", "allowed_user"),
+            ),
+            (
+                UserRole::ServiceAccount,
+                UserRole::Viewer,
+                swap("allowed_user", "viewer"),
+            ),
+            (UserRole::User, UserRole::ServiceAccount, None),
+            (UserRole::SreAgent, UserRole::User, None),
+            (UserRole::Editor, UserRole::Editor, None),
+        ];
+        for (old, new, expected) in cases {
+            assert_eq!(
+                openfga_role_swap(&old, &new),
+                expected,
+                "{old:?} -> {new:?}"
+            );
+        }
     }
 
     #[test]
@@ -2958,6 +3110,75 @@ mod tests {
                 .collect();
 
             assert_eq!(visible, vec!["active-org"]);
+        }
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn cloud_role_change_allows_member_roles_and_the_current_role_only() {
+        use UserRole::*;
+
+        use super::is_allowed_role_change;
+        for (current, requested, allowed) in [
+            (Viewer, Editor, true),
+            (Editor, Admin, true),
+            (Admin, User, true),
+            (ServiceAccount, Viewer, true),
+            (ServiceAccount, ServiceAccount, true),
+            (Viewer, ServiceAccount, false),
+            (Admin, Root, false),
+            (Viewer, SreAgent, false),
+        ] {
+            assert_eq!(
+                is_allowed_role_change(&current, &requested),
+                allowed,
+                "{current:?} -> {requested:?}"
+            );
+        }
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn cloud_service_account_reuse_and_creation_rules() {
+        use super::{ExistingAccount, service_account_refusal};
+        let account = |is_sso: bool, memberships: &[(&str, UserRole)]| ExistingAccount {
+            is_sso,
+            memberships: memberships
+                .iter()
+                .map(|(org, role)| (org.to_string(), role.clone()))
+                .collect(),
+        };
+        let sa = UserRole::ServiceAccount;
+        let owned = account(false, &[("mine", sa.clone())]);
+        let elsewhere = account(false, &[("theirs", sa.clone())]);
+        let person = account(false, &[("mine", UserRole::Viewer), ("other", sa.clone())]);
+        let converted_sso = account(true, &[("mine", sa.clone())]);
+        let sre_agent = account(false, &[("mine", UserRole::SreAgent)]);
+        let orphan = account(false, &[]);
+        let controls = |org: &str| org == "mine";
+        let cases: [(&str, Option<&ExistingAccount>, bool); 10] = [
+            ("ci.acme@sa.internal", None, true),
+            ("bot@company.com", None, false),
+            ("x@openobserve.internal", None, false),
+            ("ci.acme@sa.internal", Some(&owned), true),
+            ("ci.other@sa.internal", Some(&elsewhere), false),
+            ("jane@company.com", Some(&person), false),
+            ("jane@company.com", Some(&converted_sso), false),
+            (
+                "o2-sre-agent.org-mine@openobserve.internal",
+                Some(&sre_agent),
+                false,
+            ),
+            (
+                "o2-sre-agent.org-mine@openobserve.internal",
+                Some(&owned),
+                false,
+            ),
+            ("old@sa.internal", Some(&orphan), false),
+        ];
+        for (email, existing, allowed) in cases {
+            let refusal = service_account_refusal(email, existing, controls);
+            assert_eq!(refusal.is_none(), allowed, "{email}: {refusal:?}");
         }
     }
 }

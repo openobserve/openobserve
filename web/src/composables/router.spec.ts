@@ -117,6 +117,9 @@ describe("useOSRoutes", () => {
       "aiSessions",
       "aiUsers",
       "aiBudgets",
+      "modelPricing",
+      "modelPricingGaps",
+      "modelPricingEditor",
     ]);
     for (const child of aiRoute.children) {
       if (ungated.has(child.name)) continue;

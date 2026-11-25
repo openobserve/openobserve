@@ -31,6 +31,7 @@ import {
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { isLeavingRoute } from "@/utils/pendingNavigation";
+import { copyAnomalyLinkParams } from "@/utils/alerts/anomalyLinkParams";
 import {
   DEFAULT_TRACE_SEARCH_MODE,
   type MetricsRangeFilter,
@@ -42,6 +43,20 @@ import {
   encodeTracesListState,
   TRACES_LIST_URL_KEYS,
 } from "@/plugins/traces/tracesUrlState";
+import type { TracesScope } from "@/utils/traces/tracesScope";
+import { createTracesSqlTexts } from "@/utils/traces/tracesSqlTexts";
+import {
+  DEFAULT_GROUPS_SORT,
+  type GroupsSort,
+  type GroupsQueryInput,
+} from "@/utils/traces/tracesGroups";
+
+/** What the last Run handed the Groups table; null while the span list is shown. */
+export interface TracesGroupsRequest extends GroupsQueryInput {
+  startTime: number;
+  endTime: number;
+  runId: number;
+}
 
 // Mirrors the backend's is_internal_stream(); other `_`-prefixed streams are user data.
 const INTERNAL_LOG_STREAMS = new Set([
@@ -137,6 +152,9 @@ const defaultObject = {
     showDetailTab: false,
     showTraceDetails: false,
     sqlMode: false,
+    scope: "all" as TracesScope,
+    groupBy: "",
+    groupsSort: { ...DEFAULT_GROUPS_SORT } as GroupsSort,
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
@@ -195,11 +213,19 @@ const defaultObject = {
       streamLists: [],
       selectedStream: { label: "", value: "" },
       selectedStreamFields: [],
-      /** Null until the stream's settings load; match_all is refused on a stream without these fields. */
-      hasFullTextFields: null as boolean | null,
       selectedFields: <string[]>[],
+      hasParentColumn: false,
+      /** Fields the server packs into the _all column, with their type. */
+      fieldsInAll: {} as Record<string, string>,
       filterField: "",
       addToFilter: "",
+      /** A sidebar value tick in SQL mode: the field's ticked values, for the search bar to write. */
+      sqlFieldFilter: null as { field: string; values: string[]; exclude: boolean } | null,
+      /** The condition each field's sidebar ticks wrote into the SQL, recognised again only by its exact text. */
+      sqlFieldConditions: {} as Record<
+        string,
+        { text: string; values: string[]; exclude: boolean }
+      >,
       removeFilterField: "",
       functions: [],
       filters: [] as any[],
@@ -225,6 +251,7 @@ const defaultObject = {
     queryPayload: <any>{},
     transforms: <any>[],
     queryResults: <any>[],
+    groupsRequest: null as TracesGroupsRequest | null,
     sortedQueryResults: <any>[],
     streamResults: <any>[],
     histogram: <any>{},
@@ -296,6 +323,9 @@ const loadTracesParser = async (): Promise<void> => {
   await _loadTracesParserPromise;
 };
 
+// The Spans SQL text and the shared filter live beside searchObj for the whole tab.
+const tracesSqlTexts = createTracesSqlTexts(searchObj, tracesParser);
+
 const useTraces = () => {
   const store = useStore();
   const router = useRouter();
@@ -310,7 +340,7 @@ const useTraces = () => {
     searchObj.data.stream.streamLists = [];
     searchObj.data.stream.selectedStream = { label: "", value: "" };
     searchObj.data.stream.selectedStreamFields = [];
-    searchObj.data.stream.hasFullTextFields = null;
+    searchObj.data.stream.hasParentColumn = false;
     searchObj.data.queryResults = {};
     searchObj.data.sortedQueryResults = [];
     searchObj.data.histogram = {
@@ -325,6 +355,12 @@ const useTraces = () => {
     searchObj.data.query = "";
     searchObj.data.editorValue = "";
     searchObj.meta.sqlMode = false;
+    tracesSqlTexts.reset();
+    searchObj.data.stream.sqlFieldConditions = {};
+    searchObj.meta.scope = "all";
+    searchObj.meta.groupBy = "";
+    searchObj.meta.groupsSort = { ...DEFAULT_GROUPS_SORT };
+    searchObj.data.groupsRequest = null;
     searchObj.meta.lastRunSignature = null;
     searchObj.meta.refreshFailedAt = null;
     searchObj.meta.chartRefreshFailed = false;
@@ -393,9 +429,12 @@ const useTraces = () => {
 
     query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
 
+    Object.assign(query, sqlModeUrlState());
+
     query["org_identifier"] = store.state.selectedOrganization.identifier;
 
-    query["trace_id"] = router.currentRoute.value.query.trace_id;
+    if (router.currentRoute.value.query.trace_id)
+      query["trace_id"] = router.currentRoute.value.query.trace_id;
 
     query["tab"] = searchObj.meta.searchMode;
 
@@ -403,8 +442,18 @@ const useTraces = () => {
       query["span_id"] = router.currentRoute.value.query.span_id;
 
     Object.assign(query, listUrlState());
+    copyAnomalyLinkParams(router.currentRoute.value.query, query);
 
     return query;
+  }
+
+  // A non-empty SQL query outside the Traces view is worth reopening in SQL mode; graph and catalog keep it for Spans.
+  function sqlModeUrlState(): { sql_mode?: "true" } {
+    return searchObj.meta.sqlMode &&
+      searchObj.meta.searchMode !== "traces" &&
+      searchObj.data.editorValue?.trim()
+      ? { sql_mode: "true" }
+      : {};
   }
 
   function listUrlState() {
@@ -416,6 +465,9 @@ const useTraces = () => {
       rowsPerPage: Number(searchObj.meta.resultGrid.rowsPerPage),
       currentPage: searchObj.data.resultGrid.currentPage,
       showHistogram: searchObj.meta.showHistogram,
+      scope: mode === "spans" ? searchObj.meta.scope : "all",
+      groupBy: mode === "spans" && !searchObj.meta.sqlMode ? searchObj.meta.groupBy : "",
+      groupsSort: searchObj.meta.groupsSort,
     });
   }
 
@@ -424,6 +476,9 @@ const useTraces = () => {
     const decoded = decodeTracesListState(query);
     if (decoded.rowsPerPage !== null) searchObj.meta.resultGrid.rowsPerPage = decoded.rowsPerPage;
     if (decoded.showHistogram !== null) searchObj.meta.showHistogram = decoded.showHistogram;
+    searchObj.meta.scope = decoded.scope ?? "all";
+    searchObj.meta.groupBy = decoded.groupBy ?? "";
+    searchObj.meta.groupsSort = decoded.groupsSort ?? { ...DEFAULT_GROUPS_SORT };
     urlColumns = decoded.columns
       ? {
           mode: searchObj.meta.searchMode,
@@ -443,7 +498,10 @@ const useTraces = () => {
     // run-query is one-shot; kept in the entry, Back to it would run whatever edit was staged there.
     delete query["run-query"];
     for (const key of TRACES_LIST_URL_KEYS) delete query[key];
-    Object.assign(query, listUrlState(), { query: b64EncodeUnicode(searchObj.data.editorValue) });
+    delete query.sql_mode;
+    Object.assign(query, listUrlState(), sqlModeUrlState(), {
+      query: b64EncodeUnicode(searchObj.data.editorValue),
+    });
     // Columns belong to the URL's stream, which only a run moves to the selected one.
     if (route.query.stream !== searchObj.data.stream.selectedStream.value) {
       if (route.query.columns === undefined) delete query.columns;
@@ -462,10 +520,14 @@ const useTraces = () => {
     const stop = watch(
       () => [
         searchObj.data.editorValue,
+        searchObj.meta.sqlMode,
         searchObj.meta.resultGrid.rowsPerPage,
         searchObj.data.resultGrid.currentPage,
         searchObj.meta.showHistogram,
         searchObj.meta.searchMode,
+        searchObj.meta.scope,
+        searchObj.meta.groupBy,
+        searchObj.meta.groupsSort,
         searchObj.data.stream.selectedFields.join("\u0000"),
       ],
       write,
@@ -794,6 +856,15 @@ const useTraces = () => {
     getOrSetServiceColor,
     tracesParser,
     loadTracesParser,
+    sqlTexts: tracesSqlTexts.sqlTexts,
+    noteFilterText: tracesSqlTexts.noteFilterText,
+    clearSqlText: tracesSqlTexts.clearSqlText,
+    deleteSqlText: tracesSqlTexts.deleteSqlText,
+    resetSqlTexts: tracesSqlTexts.reset,
+    leaveSql: tracesSqlTexts.leaveSql,
+    turnSqlOn: tracesSqlTexts.turnSqlOn,
+    takeTypedSql: tracesSqlTexts.takeTypedSql,
+    normalizeTracesView: tracesSqlTexts.normalizeTracesView,
   };
 };
 

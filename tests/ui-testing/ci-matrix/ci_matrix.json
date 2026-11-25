@@ -25,7 +25,8 @@
       "alerts-from-panel.spec.js",
       "alertCalibration.spec.js",
       "alertCalibrationDismiss.spec.js",
-      "alerts-content-templates.spec.js"
+      "alerts-content-templates.spec.js",
+      "alert-leases.spec.js"
     ],
     "disabled": [
       {
@@ -79,10 +80,14 @@
       "dashboard-config-heatmap.spec.js",
       "dashboard-config-state-timeline.spec.js",
       "dashboard-config-distribution.spec.js",
+      "dashboard-config-sunburst.spec.js",
+      "dashboard-config-funnel.spec.js",
+      "dashboard-config-boxplot.spec.js",
       "dashboard-config-legends.spec.js",
       "dashboard-config-line-style.spec.js",
       "dashboard-config-panel-time.spec.js",
       "dashboard-config-table.spec.js",
+      "dashboard-table-timezone.spec.js",
       "dashboard-config-trellis.spec.js",
       "dashboard-config-promql.spec.js",
       "dashboard-config-markline.spec.js",
@@ -237,6 +242,19 @@
     "disabled": []
   },
   {
+    "testfolder": "Dashboards-Variables-Query",
+    "actual_folder": "Dashboards",
+    "browser": "chrome",
+    "run_files": [
+      "dashboard-variables-query-compat.spec.js",
+      "dashboard-variables-filter-groups.spec.js",
+      "dashboard-variables-promql.spec.js",
+      "dashboard-variables-custom-sql.spec.js",
+      "dashboard-variables-query-runtime.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "Dashboards-Visualize",
     "actual_folder": "Dashboards",
     "browser": "chrome",
@@ -278,6 +296,7 @@
       "sanity.spec.js",
       "landingPage.spec.js",
       "datetime-picker-copy-paste.spec.js",
+      "datetime-typed-bar.spec.js",
       "dateTime.spec.js",
       "dateTimeCustomRange.spec.js",
       "otableSelectCell.spec.js",
@@ -285,6 +304,8 @@
       "ai-toolsets-form-validation.spec.js",
       "annotationQueueInputPreview.spec.js",
       "login-form-validation.spec.js",
+      "stale-build-toast.spec.js",
+      "oselect-search-scroll-reset.spec.js",
       "runningQueriesCancel.spec.js",
       "navRailHeaderKeyboard.spec.js"
     ],
@@ -633,6 +654,18 @@
       "first-event.spec.js",
       "legacy-pages.spec.js",
       "token-picker.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "_comment": "Own shard because these specs skip unless the server runs with ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA=true, which is read once at process start. The workflow also creates the empty org onboarding_test for this shard only; nothing here may ingest into it.",
+    "testfolder": "Onboarding-Empty-Data",
+    "actual_folder": "Onboarding",
+    "browser": "chrome",
+    "restricted_routes_on_empty_data": "true",
+    "run_files": [
+      "home-first-data.spec.js",
+      "empty-pages.spec.js"
     ],
     "disabled": []
   },

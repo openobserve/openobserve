@@ -129,8 +129,14 @@ const mockSearchObj = reactive({
   organizationIdentifier: "test-org",
 });
 
-const { mockPatchUrlViewState } = vi.hoisted(() => ({
+const { mockPatchUrlViewState, mockTracesParser, mockTraceTimeRanges } = vi.hoisted(() => ({
   mockPatchUrlViewState: vi.fn(() => Promise.resolve()),
+  mockTracesParser: { value: null as unknown },
+  mockTraceTimeRanges: vi.fn(),
+}));
+
+vi.mock("@/services/search", () => ({
+  default: { get_trace_time_ranges: mockTraceTimeRanges },
 }));
 
 vi.mock("@/composables/useTraces", () => ({
@@ -138,6 +144,7 @@ vi.mock("@/composables/useTraces", () => ({
     searchObj: mockSearchObj,
     updatedLocalLogFilterField: vi.fn(),
     patchUrlViewState: mockPatchUrlViewState,
+    tracesParser: mockTracesParser,
   }),
 }));
 
@@ -163,6 +170,40 @@ const globalOptions = {
       template: '<div data-test="traces-search-result-list" class="search-list w-full"></div>',
       props: ["hits", "loading", "searchPerformed", "showHeader", "wrap", "showPagination"],
       emits: ["row-click", "load-more"],
+    },
+    TracesGroupsTable: {
+      name: "TracesGroupsTable",
+      template: '<div data-test="traces-groups-stub"></div>',
+      props: ["request", "sort", "columns", "wrap"],
+      emits: ["update:sort", "update:count"],
+    },
+    TracesScopeSelect: {
+      name: "TracesScopeSelect",
+      template: '<div data-test="traces-scope-stub"></div>',
+      props: ["modelValue", "hasParentColumn"],
+      emits: ["update:modelValue"],
+    },
+    TracesGroupBySelect: {
+      name: "TracesGroupBySelect",
+      template: '<div data-test="traces-group-by-stub"></div>',
+      props: ["modelValue", "fields", "count"],
+      emits: ["update:modelValue"],
+    },
+    TracesSqlResultTable: {
+      name: "TracesSqlResultTable",
+      template: '<div data-test="traces-sql-result"></div>',
+      props: [
+        "hits",
+        "columns",
+        "shape",
+        "loading",
+        "wrap",
+        "offerAddTraceId",
+        "traceHref",
+        "capNote",
+        "openingTraceId",
+      ],
+      emits: ["open-trace", "add-trace-id", "locate-trace"],
     },
     TracesMetricsDashboard: {
       template: '<div data-test="traces-metrics-dashboard"></div>',
@@ -211,6 +252,219 @@ describe("SearchResult", () => {
     vi.clearAllMocks();
   });
 
+  describe("Column visibility", () => {
+    const seedVisibility = (tableId: string, visibility: Record<string, boolean>) =>
+      localStorage.setItem(
+        "o2-tables-column-state-v1",
+        JSON.stringify({ [tableId]: { visibility } }),
+      );
+
+    beforeEach(() => {
+      localStorage.clear();
+      mockSearchObj.meta.searchMode = "spans";
+    });
+
+    afterEach(() => {
+      mockSearchObj.meta.searchMode = undefined;
+      localStorage.clear();
+    });
+
+    it("has no Columns button in the results toolbar", async () => {
+      wrapper.unmount();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OTableColumnToggle" }).exists()).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-column-toggle-btn"]').exists()).toBe(false);
+    });
+
+    it("shows every column, ignoring hidden columns saved before, and leaves them saved", async () => {
+      seedVisibility("traces-spans-list", { service_name: false });
+      wrapper.unmount();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+      expect(
+        wrapper.findComponent({ name: "TracesSearchResultList" }).attributes("column-visibility"),
+      ).toBeUndefined();
+      expect(localStorage.getItem("o2-tables-column-state-v1")).toContain("service_name");
+    });
+  });
+
+  describe("Groups view", () => {
+    const request = {
+      stream: "default",
+      key: "service_name",
+      filter: "",
+      scope: "",
+      startTime: 1,
+      endTime: 2,
+      runId: 1,
+    };
+    const groups = () => wrapper.findComponent({ name: "TracesGroupsTable" });
+
+    beforeEach(async () => {
+      localStorage.clear();
+      mockSearchObj.meta.searchMode = "spans";
+      (mockSearchObj.meta as any).groupsSort = { by: "errors", order: "desc" };
+      (mockSearchObj.meta.resultGrid as any).showPagination = true;
+      (mockSearchObj.data as any).groupsRequest = request;
+      wrapper.unmount();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      mockSearchObj.meta.searchMode = undefined;
+      (mockSearchObj.data as any).groupsRequest = null;
+      delete (mockSearchObj.meta.resultGrid as any).showPagination;
+      localStorage.clear();
+    });
+
+    it("shows the Groups table in place of the span list, below the RED charts", () => {
+      expect(groups().exists()).toBe(true);
+      expect(groups().props("request")).toEqual(request);
+      expect(wrapper.findComponent({ name: "TracesSearchResultList" }).exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-metrics-dashboard"]').exists()).toBe(true);
+    });
+
+    it("hides the page-size select and the pager", () => {
+      expect(wrapper.find('[data-test="traces-search-result-records-per-page"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.findComponent({ name: "OPagination" }).exists()).toBe(false);
+    });
+
+    it("passes the Groups columns with every one shown, even with hidden columns saved before", async () => {
+      localStorage.setItem(
+        "o2-tables-column-state-v1",
+        JSON.stringify({ "traces-groups-list": { visibility: { p50: false, rate: false } } }),
+      );
+      wrapper.unmount();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+      expect(
+        groups()
+          .props("columns")
+          .map((c: any) => c.id),
+      ).toEqual(["value", "spans", "errors", "error_pct", "p50", "p95", "p99", "rate"]);
+      expect(groups().attributes("column-visibility")).toBeUndefined();
+    });
+
+    it("lets the last Groups column take the leftover width, as the span list does", () => {
+      const fill = groups()
+        .props("columns")
+        .filter((c: any) => c.meta?.autoWidth && c.meta?.fillRemaining)
+        .map((c: any) => c.id);
+      expect(fill).toEqual(["rate"]);
+    });
+
+    it("keeps the picked sort for the next run and the URL", async () => {
+      groups().vm.$emit("update:sort", { by: "p95", order: "asc" });
+      await flushPromises();
+      expect((mockSearchObj.meta as any).groupsSort).toEqual({ by: "p95", order: "asc" });
+      expect(groups().props("sort")).toEqual({ by: "p95", order: "asc" });
+    });
+
+    it("shows the span list in SQL mode even before the next run", async () => {
+      (mockSearchObj.meta as any).sqlMode = true;
+      await flushPromises();
+      expect(groups().exists()).toBe(false);
+      (mockSearchObj.meta as any).sqlMode = false;
+    });
+  });
+
+  describe("Scope and Group by in the results bar", () => {
+    const scope = () => wrapper.findComponent({ name: "TracesScopeSelect" });
+    const groupBy = () => wrapper.findComponent({ name: "TracesGroupBySelect" });
+    const remount = async () => {
+      wrapper.unmount();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+    };
+
+    beforeEach(async () => {
+      mockSearchObj.meta.searchMode = "spans";
+      (mockSearchObj.meta as any).scope = "root";
+      (mockSearchObj.meta as any).groupBy = "";
+      (mockSearchObj.data.stream as any).hasParentColumn = true;
+      (mockSearchObj.data.stream as any).selectedStreamFields = [
+        { name: "Common", label: true },
+        { name: "service_name" },
+        { name: "http_method" },
+        { name: "service_name" },
+      ];
+      await remount();
+    });
+
+    afterEach(() => {
+      mockSearchObj.meta.searchMode = undefined;
+      (mockSearchObj.meta as any).sqlMode = false;
+      delete (mockSearchObj.meta as any).scope;
+      delete (mockSearchObj.meta as any).groupBy;
+      delete (mockSearchObj.data.stream as any).hasParentColumn;
+      delete (mockSearchObj.data.stream as any).selectedStreamFields;
+      (mockSearchObj.data as any).groupsRequest = null;
+    });
+
+    it("sit after the count chips in the Spans view, with the scope and the stream's fields", () => {
+      const header = wrapper.get('[data-test="traces-section-header"]');
+      const controls = wrapper.get('[data-test="traces-search-result-span-controls"]');
+      expect(header.element.contains(controls.element)).toBe(true);
+      const count = wrapper.get('[data-test="traces-count-badge"]').element;
+      expect(
+        count.compareDocumentPosition(controls.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(scope().props()).toMatchObject({ modelValue: "root", hasParentColumn: true });
+      expect(groupBy().props()).toMatchObject({
+        modelValue: "",
+        fields: ["service_name", "http_method"],
+        count: null,
+      });
+    });
+
+    it("are hidden in SQL mode and in the Traces view", async () => {
+      (mockSearchObj.meta as any).sqlMode = true;
+      await flushPromises();
+      expect(scope().exists()).toBe(false);
+      expect(groupBy().exists()).toBe(false);
+      (mockSearchObj.meta as any).sqlMode = false;
+      mockSearchObj.meta.searchMode = "traces";
+      await flushPromises();
+      expect(wrapper.find('[data-test="traces-search-result-span-controls"]').exists()).toBe(false);
+    });
+
+    it("split the header into two rows from a wider results pane while they show", async () => {
+      const header = () => wrapper.get('[data-test="traces-section-header"]');
+      const rowBreak = () => wrapper.get('[data-test="traces-search-result-header-break"]');
+      expect(header().classes()).toContain("@max-[64rem]/results:flex-wrap");
+      expect(rowBreak().classes()).toContain("@max-[64rem]/results:block");
+      (mockSearchObj.meta as any).sqlMode = true;
+      await flushPromises();
+      expect(header().classes()).toContain("@max-[58rem]/results:flex-wrap");
+      expect(header().classes()).not.toContain("@max-[64rem]/results:flex-wrap");
+      expect(rowBreak().classes()).toContain("@max-[58rem]/results:block");
+    });
+
+    it("ask the page to apply a picked scope or Group by", () => {
+      scope().vm.$emit("update:modelValue", "entrypoint");
+      groupBy().vm.$emit("update:modelValue", "http_method");
+      groupBy().vm.$emit("update:modelValue", "");
+      expect(wrapper.emitted("update:scope")).toEqual([["entrypoint"]]);
+      expect(wrapper.emitted("update:groupBy")).toEqual([["http_method"], [""]]);
+    });
+
+    it("pass the Groups table's count to the chip while the groups are shown", async () => {
+      (mockSearchObj.meta as any).groupBy = "service_name";
+      (mockSearchObj.data as any).groupsRequest = { key: "service_name", runId: 1 };
+      await flushPromises();
+      wrapper.findComponent({ name: "TracesGroupsTable" }).vm.$emit("update:count", 7);
+      await flushPromises();
+      expect(groupBy().props("count")).toBe(7);
+      (mockSearchObj.data as any).groupsRequest = null;
+      await flushPromises();
+      expect(groupBy().props("count")).toBe(null);
+    });
+  });
+
   describe("result count header", () => {
     const countText = () => wrapper.find('[data-test="traces-count-badge"]').text();
 
@@ -233,6 +487,15 @@ describe("SearchResult", () => {
       (mockSearchObj.meta as any).searchMode = "spans";
       await flushPromises();
       expect(countText()).toContain("Spans Found");
+    });
+
+    it("shows no number, not the page size, when the count failed with none kept", async () => {
+      (mockSearchObj.meta as any).searchMode = "spans";
+      mockSearchObj.data.queryResults.total = null;
+      (mockSearchObj.data.queryResults as any).countFailed = true;
+      await flushPromises();
+      expect(countText()).toBe("— Spans Found");
+      delete (mockSearchObj.data.queryResults as any).countFailed;
     });
   });
 
@@ -519,6 +782,11 @@ describe("SearchResult", () => {
         "ask-ai",
         "send-to-ai-chat",
         "open-mobile-fields",
+        "add-trace-id",
+        "run-sql",
+        "open-group",
+        "update:scope",
+        "update:groupBy",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
@@ -696,6 +964,368 @@ describe("SearchResult in a kept-alive page", () => {
     raf.mockRestore();
     parent.unmount();
   });
+
+  describe("SQL mode results", () => {
+    let wrapper: any;
+    const original = mockSearchObj.data.queryResults;
+
+    beforeEach(async () => {
+      const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
+      mockTracesParser.value = new mod.default.Parser();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+    });
+    const sqlTable = () => wrapper.findComponent({ name: "TracesSqlResultTable" });
+    const redIcon = () => wrapper.find('[data-test="traces-red-unavailable-icon"]');
+    const lossWarning = () => wrapper.find('[data-test="traces-sql-histogram-loss-warning"]');
+    const dashboard = () => wrapper.find('[data-test="traces-metrics-dashboard"]');
+    const showResults = async (sql: string, hits: any[], extra: Record<string, unknown> = {}) => {
+      (mockSearchObj.meta as any).sqlMode = true;
+      (mockSearchObj.meta as any).searchMode = "spans";
+      (mockSearchObj.data as any).queryResults = {
+        hits,
+        total: hits.length,
+        from: 0,
+        sql,
+        ...extra,
+      };
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      wrapper.unmount();
+      (mockSearchObj.meta as any).sqlMode = false;
+      (mockSearchObj.meta as any).searchMode = undefined;
+      (mockSearchObj.data as any).queryResults = original;
+    });
+
+    it("offers no Columns button over a SQL result table", async () => {
+      await showResults(`SELECT service_name, count(*) AS n FROM "default" GROUP BY service_name`, [
+        { service_name: "a", n: 1 },
+      ]);
+      expect(sqlTable().exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-column-toggle-btn"]').exists()).toBe(false);
+    });
+
+    it("keeps the RED charts and counts the rows for a GROUP BY", async () => {
+      await showResults(`SELECT service_name, count(*) AS n FROM "default" GROUP BY service_name`, [
+        { n: 4, service_name: "api" },
+        { n: 2, service_name: "db" },
+      ]);
+      expect(dashboard().exists()).toBe(true);
+      expect(redIcon().exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-sql-rows-count"]').text()).toBe("2 rows");
+      expect(wrapper.find('[data-test="traces-count-badge"]').exists()).toBe(false);
+      expect(sqlTable().props("shape")).toBe("rows");
+      expect(
+        sqlTable()
+          .props("columns")
+          .map((c: any) => c.id),
+      ).toEqual(["service_name", "n"]);
+      expect(sqlTable().props("offerAddTraceId")).toBe(false);
+    });
+
+    it("keeps the RED charts and the span table for a plain query", async () => {
+      await showResults(`SELECT * FROM "default" WHERE a = 1`, [{ trace_id: "t", span_id: "s" }]);
+      expect(dashboard().exists()).toBe(true);
+      expect(sqlTable().exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "TracesSearchResultList" }).exists()).toBe(true);
+    });
+
+    it.each([
+      `SELECT * FROM "default" LIMIT 10`,
+      `SELECT a FROM "default" UNION SELECT a FROM "default"`,
+      `SELECT * FROM "default" p JOIN "default" c ON p.trace_id = c.trace_id`,
+      `WITH t AS (SELECT * FROM "default") SELECT * FROM t`,
+      `SELECT DISTINCT a FROM "default"`,
+    ])("never unmounts the RED charts for %s", async (sql) => {
+      await showResults(sql, [{ a: 1 }]);
+      expect(dashboard().exists()).toBe(true);
+    });
+
+    it("keeps the RED charts when the server says the query is not histogram eligible", async () => {
+      await showResults(`SELECT * FROM "default"`, [{ trace_id: "t", span_id: "s" }], {
+        is_histogram_eligible: false,
+      });
+      expect(dashboard().exists()).toBe(true);
+    });
+
+    it("warns that histogram() over a subquery or CTE can lose spans", async () => {
+      await showResults(
+        `SELECT histogram(_timestamp) AS t, count(*) AS n FROM "default" WHERE trace_id IN (SELECT trace_id FROM "default") GROUP BY t`,
+        [{ t: "2026-01-01T00:00:00", n: 1 }],
+      );
+      expect(lossWarning().exists()).toBe(true);
+      expect(lossWarning().text()).toBe("This query shape can lose spans across time partitions");
+    });
+
+    it("does not warn for histogram() over a JOIN", async () => {
+      await showResults(
+        `SELECT histogram(p._timestamp) AS t, count(*) AS n FROM "default" p JOIN "default" c ON p.trace_id = c.trace_id GROUP BY t`,
+        [{ t: "2026-01-01T00:00:00", n: 1 }],
+      );
+      expect(lossWarning().exists()).toBe(false);
+    });
+
+    const BIG_TRACES = `SELECT trace_id, min(_timestamp) AS first_seen, count(*) AS spans FROM "default" GROUP BY trace_id ORDER BY spans DESC LIMIT 2`;
+
+    it("opens a trace row where the trace ran, located from first_seen, after saving the list state", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      mockPatchUrlViewState.mockClear();
+      mockTraceTimeRanges.mockResolvedValue({
+        data: {
+          results: [
+            {
+              trace_id: "t-1",
+              status: "found",
+              stream: "default",
+              range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_005_000_000 },
+            },
+          ],
+          partial_coverage: false,
+        },
+      });
+      await showResults(BIG_TRACES, [
+        { trace_id: "t-1", first_seen: 1_700_000_000_123_000, spans: 9 },
+      ]);
+      expect(sqlTable().props("shape")).toBe("traces");
+
+      await sqlTable().vm.$emit("open-trace", {
+        trace_id: "t-1",
+        first_seen: 1_700_000_000_123_000,
+      });
+      await flushPromises();
+
+      expect(mockTraceTimeRanges).toHaveBeenCalledWith(
+        expect.objectContaining({ trace_ids: ["t-1"], hint_ts: 1_700_000_000_123_000 }),
+      );
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "traceDetails",
+          query: expect.objectContaining({
+            trace_id: "t-1",
+            from: 1_700_000_000_000_000 - 60_000_000,
+            to: 1_700_000_005_000_000 + 60_000_000,
+          }),
+        }),
+      );
+      expect(push.mock.calls[0][0]).not.toHaveProperty("query.span_id");
+      expect(mockPatchUrlViewState.mock.invocationCallOrder[0]).toBeLessThan(
+        push.mock.invocationCallOrder[0],
+      );
+      push.mockRestore();
+      mockTraceTimeRanges.mockReset();
+    });
+
+    it.each([
+      ["the lookup finds nothing", () => ({ data: { results: [], partial_coverage: false } })],
+      [
+        "the trace sits in another stream",
+        () => ({
+          data: {
+            results: [
+              {
+                trace_id: "t-2",
+                status: "found",
+                stream: "other",
+                range: { start_time: 5, end_time: 6 },
+              },
+            ],
+            partial_coverage: false,
+          },
+        }),
+      ],
+    ])("falls back to the page range when %s", async (_, answer) => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      mockTraceTimeRanges.mockResolvedValue(answer());
+      await showResults(BIG_TRACES, [{ trace_id: "t-2", first_seen: 1_000_000_100, spans: 1 }]);
+      await sqlTable().vm.$emit("open-trace", { trace_id: "t-2", first_seen: 1_000_000_100 });
+      await flushPromises();
+      expect(push.mock.calls[0][0]).toMatchObject({
+        query: {
+          trace_id: "t-2",
+          from: mockSearchObj.data.datetime.startTime,
+          to: mockSearchObj.data.datetime.endTime,
+        },
+      });
+      push.mockRestore();
+      mockTraceTimeRanges.mockReset();
+    });
+
+    it("locates a trace when its link is hovered, so a new-tab open lands where the trace ran", async () => {
+      mockTraceTimeRanges.mockResolvedValue({
+        data: {
+          results: [
+            {
+              trace_id: "t-1",
+              status: "found",
+              stream: "default",
+              range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_005_000_000 },
+            },
+          ],
+          partial_coverage: false,
+        },
+      });
+      const row = { trace_id: "t-1", first_seen: 1_700_000_000_123_000, spans: 9 };
+      await showResults(BIG_TRACES, [row]);
+      const hrefFrom = () =>
+        new URL(sqlTable().props("traceHref")(row), "http://o2.test").searchParams.get("from");
+      expect(hrefFrom()).toBe(String(mockSearchObj.data.datetime.startTime));
+
+      await sqlTable().vm.$emit("locate-trace", row);
+      await flushPromises();
+
+      expect(mockTraceTimeRanges).toHaveBeenCalledWith(
+        expect.objectContaining({ trace_ids: ["t-1"], hint_ts: 1_700_000_000_123_000 }),
+      );
+      expect(hrefFrom()).toBe(String(1_700_000_000_000_000 - 60_000_000));
+      mockTraceTimeRanges.mockReset();
+    });
+
+    it("marks the trace row as opening while its lookup runs", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      let answer: (value: unknown) => void = () => {};
+      mockTraceTimeRanges.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+      const row = { trace_id: "t-1", first_seen: 1_700_000_000_123_000, spans: 9 };
+      await showResults(BIG_TRACES, [row]);
+
+      await sqlTable().vm.$emit("open-trace", row);
+      await flushPromises();
+      expect(sqlTable().props("openingTraceId")).toBe("t-1");
+      expect(push).not.toHaveBeenCalled();
+
+      answer({ data: { results: [], partial_coverage: false } });
+      await flushPromises();
+      expect(push).toHaveBeenCalledTimes(1);
+      expect(sqlTable().props("openingTraceId")).toBe("");
+      push.mockRestore();
+      mockTraceTimeRanges.mockReset();
+    });
+
+    it("opens in the page range without a lookup when the row has no first_seen", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      await showResults(`SELECT trace_id, max(duration) AS d FROM "default" GROUP BY trace_id`, [
+        { trace_id: "t-1", d: 3 },
+      ]);
+      await sqlTable().vm.$emit("open-trace", { trace_id: "t-1", d: 3 });
+      await flushPromises();
+      expect(mockTraceTimeRanges).not.toHaveBeenCalled();
+      expect(push.mock.calls[0][0]).toMatchObject({
+        query: {
+          trace_id: "t-1",
+          from: mockSearchObj.data.datetime.startTime,
+          to: mockSearchObj.data.datetime.endTime,
+        },
+      });
+      push.mockRestore();
+    });
+
+    it("says First N traces when a per-trace query reaches its LIMIT", async () => {
+      await showResults(BIG_TRACES, [
+        { trace_id: "a", first_seen: 1, spans: 2 },
+        { trace_id: "b", first_seen: 1, spans: 1 },
+      ]);
+      expect(sqlTable().props("capNote")).toBe("First 2 traces");
+    });
+
+    it("says First N rows when the rows are per parent, as in N+1", async () => {
+      await showResults(
+        `SELECT trace_id, count(*) AS spans FROM "default" WHERE span_kind = '3' GROUP BY trace_id, reference_parent_span_id LIMIT 1`,
+        [{ trace_id: "a", spans: 60 }],
+      );
+      expect(sqlTable().props("capNote")).toBe("First 1 row");
+    });
+
+    it("states no cap below the LIMIT, without one, or while loading", async () => {
+      await showResults(BIG_TRACES, [{ trace_id: "a", first_seen: 1, spans: 2 }]);
+      expect(sqlTable().props("capNote")).toBe("");
+      await showResults(`SELECT trace_id, count(*) AS n FROM "default" GROUP BY trace_id`, [
+        { trace_id: "a", n: 1 },
+      ]);
+      expect(sqlTable().props("capNote")).toBe("");
+    });
+
+    it("offers Add trace_id for plain rows without GROUP BY and relays it", async () => {
+      await showResults(`SELECT service_name FROM "default"`, [{ service_name: "api" }]);
+      expect(sqlTable().props("offerAddTraceId")).toBe(true);
+      await sqlTable().vm.$emit("add-trace-id");
+      expect(wrapper.emitted("add-trace-id")).toHaveLength(1);
+    });
+
+    it("warns next to the count when the server cut the result", async () => {
+      await showResults(`SELECT span_id, count(*) AS n FROM "default" GROUP BY span_id`, [
+        { span_id: "a", n: 1 },
+      ]);
+      expect(wrapper.find('[data-test="traces-sql-partial-icon"]').exists()).toBe(false);
+      mockSearchObj.data.queryResults.is_partial = true;
+      await flushPromises();
+      expect(wrapper.find('[data-test="traces-sql-partial-icon"]').exists()).toBe(true);
+    });
+
+    it("offers str_match after a match_all query returns no rows, and runs the rewrite", async () => {
+      await showResults(`SELECT * FROM "default"\nWHERE match_all('PlaceOrder')`, []);
+      const empty = wrapper.find('[data-test="traces-sql-match-all-empty"]');
+      expect(empty.exists()).toBe(true);
+      expect(empty.text()).toContain("no populated full-text fields");
+      const card = wrapper.find('[data-test="traces-sql-match-all-fix-card"]');
+      expect(card.text()).toContain("Runs str_match(operation_name, 'PlaceOrder')");
+      await card.trigger("click");
+      expect(wrapper.emitted("run-sql")?.[0]).toEqual([
+        `SELECT * FROM "default"\nWHERE str_match(operation_name, 'PlaceOrder')`,
+      ]);
+    });
+
+    it("keeps the usual empty state for a query without match_all", async () => {
+      await showResults(`SELECT * FROM "default" WHERE a = 1`, []);
+      expect(wrapper.find('[data-test="traces-sql-match-all-empty"]').exists()).toBe(false);
+    });
+
+    it("marks a result column that is null in every row as maybe stored in _all", async () => {
+      await showResults(
+        `SELECT service_name, http_status_code, count(*) AS n FROM "default" GROUP BY 1, 2`,
+        [
+          { service_name: "api", http_status_code: null, n: 2 },
+          { service_name: "db", n: 1 },
+        ],
+      );
+      const columns = sqlTable().props("columns");
+      const hinted = columns.filter((c: any) => c.meta?.headerTooltip);
+      expect(hinted.map((c: any) => c.id)).toEqual(["http_status_code"]);
+      expect(String(hinted[0].meta.headerTooltip)).toBe("This field may be stored in _all");
+    });
+
+    it("shows a selected column the server left out of every row, and not its added _timestamp", async () => {
+      await showResults(
+        `SELECT service_name, http_status_code FROM "default" WHERE service_name = 'redis' LIMIT 20`,
+        [
+          { _timestamp: 1, service_name: "redis" },
+          { _timestamp: 2, service_name: "redis" },
+        ],
+      );
+      const columns = sqlTable().props("columns");
+      expect(columns.map((c: any) => c.id)).toEqual(["service_name", "http_status_code"]);
+      expect(columns.find((c: any) => c.id === "http_status_code").meta.headerTooltip).toBe(
+        "This field may be stored in _all",
+      );
+    });
+
+    it("opens a span row without span times inside the page time range", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      await showResults(`SELECT trace_id, span_id FROM "default"`, [
+        { trace_id: "t", span_id: "s" },
+      ]);
+      await wrapper.vm.expandRowDetail({ trace_id: "t", span_id: "s" });
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            from: mockSearchObj.data.datetime.startTime,
+            to: mockSearchObj.data.datetime.endTime,
+          }),
+        }),
+      );
+      push.mockRestore();
+    });
+  });
 });
 
 describe("SearchResult announcements from a kept-alive page", () => {
@@ -835,7 +1465,32 @@ describe("SearchResult header through a re-run (T-3)", () => {
     const dataAge = wrapper.find('[data-test="traces-search-result-data-age"]');
     expect(dataAge.exists()).toBe(true);
     expect(dataAge.find('[data-test="traces-search-result-refresh"]').exists()).toBe(true);
-    expect(dataAge.text()).toContain("Updated");
+    expect(dataAge.text()).toMatch(/ago$/);
+  });
+
+  it("shows refresh as the Logs page does: a bordered pill with the status dot and relative age", async () => {
+    (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+
+    const refresh = wrapper.findComponent({ name: "ORefreshButton" });
+    expect(refresh.props()).toMatchObject({
+      size: "inset",
+      layout: "split",
+      ageFormat: "relative",
+    });
+    const pill = wrapper.find('[data-test="traces-search-result-data-age"] > div');
+    expect(pill.find('[data-test="traces-search-result-refresh"]').exists()).toBe(true);
+    expect(pill.classes()).toEqual(
+      expect.arrayContaining([
+        "border",
+        "border-card-glass-border",
+        "rounded-default",
+        "h-6",
+        "px-1",
+      ]),
+    );
+    expect(pill.find(".rounded-full").exists()).toBe(true);
   });
 
   it("keeps the data age readable and the control focusable through a run, with no spinner of its own", async () => {
@@ -853,7 +1508,7 @@ describe("SearchResult header through a re-run (T-3)", () => {
     expect(document.activeElement).toBe(control().element);
     expect(control().find(".animate-spin").exists()).toBe(false);
     expect(control().find(".text-transparent").exists()).toBe(false);
-    expect(wrapper.find('[data-test="traces-search-result-data-age"]').text()).toContain("Updated");
+    expect(wrapper.find('[data-test="traces-search-result-data-age"]').text()).toMatch(/ago$/);
   });
 
   it("dims the kept values with the auto-run toggle on, as the rows do", async () => {
@@ -882,15 +1537,15 @@ describe("SearchResult header through a re-run (T-3)", () => {
     const dataAge = wrapper.find('[data-test="traces-search-result-data-age"]');
 
     expect(header.element.parentElement?.classList).toContain("@container/results");
-    expect(header.classes()).toContain("@max-[58rem]/results:flex-wrap");
+    expect(header.classes()).toContain("@max-[64rem]/results:flex-wrap");
     expect(rowBreak.classes()).toEqual(
-      expect.arrayContaining(["hidden", "basis-full", "@max-[58rem]/results:block"]),
+      expect.arrayContaining(["hidden", "basis-full", "@max-[64rem]/results:block"]),
     );
     expect(rowBreak.element.nextElementSibling?.classList).toContain(
-      "@max-[58rem]/results:flex-none",
+      "@max-[64rem]/results:flex-none",
     );
     expect(dataAge.classes()).toEqual(
-      expect.arrayContaining(["min-w-0", "@max-[58rem]/results:flex-1"]),
+      expect.arrayContaining(["min-w-0", "@max-[64rem]/results:flex-1"]),
     );
 
     (mockSearchObj.meta as any).refreshFailedAt = Date.UTC(2026, 10, 1, 10, 47);

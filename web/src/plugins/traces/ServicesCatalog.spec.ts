@@ -1503,6 +1503,73 @@ describe("ServicesCatalog", () => {
   // -----------------------------------------------------------------------
   // loadServicesCatalog
   // -----------------------------------------------------------------------
+  describe("refresh (driven by the traces toolbar)", () => {
+    it("has no refresh button of its own", async () => {
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-refresh-btn"]').exists()).toBe(false);
+    });
+
+    it("reloads the rows and the version registry", async () => {
+      config.isEnterprise = "true";
+      const registry = vi.spyOn(serviceVersionsService, "services").mockResolvedValue({
+        data: { services: [], envs: [], verdict_status: "ok", registry_status: "ok" },
+      } as any);
+      try {
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        registry.mockClear();
+
+        await wrapper.vm.refresh();
+        await flushPromises();
+
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+        expect(registry).toHaveBeenCalledTimes(1);
+      } finally {
+        registry.mockRestore();
+        config.isEnterprise = "false";
+      }
+    });
+
+    it("keeps the last successful run time when a reload fails", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.complete(null, {});
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const lastGood = wrapper.vm.lastRunAt;
+      expect(lastGood).toEqual(expect.any(Number));
+
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.error(null, { type: "error", content: { message: "boom" } });
+      });
+      const now = vi.spyOn(Date, "now").mockReturnValue(lastGood + 60_000);
+      try {
+        await wrapper.vm.refresh();
+        await flushPromises();
+        expect(wrapper.vm.loadError).toBeTruthy();
+        expect(wrapper.vm.lastRunAt).toBe(lastGood);
+      } finally {
+        now.mockRestore();
+      }
+    });
+
+    it("reports loading while a reload runs behind rows already on screen", async () => {
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      wrapper.vm.isLoading = false;
+      wrapper.vm.isSearching = true;
+      await flushPromises();
+      expect(wrapper.vm.loading).toBe(true);
+
+      wrapper.vm.isSearching = false;
+      await flushPromises();
+      expect(wrapper.vm.loading).toBe(false);
+    });
+  });
+
   describe("loadServicesCatalog", () => {
     it("should call fetch with default stream when both selectedStream and localStorage are empty", async () => {
       localStorage.removeItem("servicesCatalog_streamFilter");
@@ -3486,41 +3553,90 @@ describe("ServicesCatalog", () => {
       });
     };
 
-    it("resolves a relative range against the time the panel opens", async () => {
+    const fifteenMinutesEndingAt = (ms: number) => ({
+      startTime: (ms - 15 * 60 * 1000) * 1000,
+      endTime: ms * 1000,
+    });
+    const panelRange = () =>
+      wrapper.findComponent('[data-test="services-catalog-node-side-panel"]').props("timeRange");
+
+    it("gives the panel the window the rows were loaded with, even after time has passed", async () => {
       mockOneService();
+      const loadedAt = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(loadedAt);
       wrapper = mountServicesCatalog();
       await flushPromises();
-      const openedAt = Date.UTC(2026, 0, 1, 12);
-      vi.setSystemTime(openedAt);
 
+      vi.setSystemTime(loadedAt + 10 * 60 * 1000);
       wrapper.vm.handleRowClick(wrapper.vm.services[0]);
       await flushPromises();
 
-      const panel = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
-      expect(panel.props("timeRange")).toEqual({
-        startTime: (openedAt - 15 * 60 * 1000) * 1000,
-        endTime: openedAt * 1000,
+      expect(panelRange()).toEqual(fifteenMinutesEndingAt(loadedAt));
+    });
+
+    it("moves the open panel with the rows on a refresh", async () => {
+      mockOneService();
+      const loadedAt = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(loadedAt);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      await flushPromises();
+
+      const refreshedAt = loadedAt + 10 * 60 * 1000;
+      vi.setSystemTime(refreshedAt);
+      await wrapper.vm.refresh();
+      await flushPromises();
+
+      expect(panelRange()).toEqual(fifteenMinutesEndingAt(refreshedAt));
+    });
+
+    it("moves the open panel with the rows on a range change", async () => {
+      mockOneService();
+      const loadedAt = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(loadedAt);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      await flushPromises();
+
+      const changedAt = loadedAt + 10 * 60 * 1000;
+      vi.setSystemTime(changedAt);
+      mockSearchObj.data.datetime.relativeTimePeriod = "1h";
+      await flushPromises();
+
+      expect(panelRange()).toEqual({
+        startTime: (changedAt - 60 * 60 * 1000) * 1000,
+        endTime: changedAt * 1000,
       });
     });
 
-    it("re-resolves when the panel opens again later", async () => {
+    it("keeps the last loaded window when a reload fails", async () => {
       mockOneService();
+      const loadedAt = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(loadedAt);
       wrapper = mountServicesCatalog();
       await flushPromises();
-      const firstOpen = Date.UTC(2026, 0, 1, 12);
-      vi.setSystemTime(firstOpen);
-      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
-      await flushPromises();
-      wrapper.vm.handleCloseSidePanel();
+
+      mockFetchQueryDataWithHttpStream.mockImplementationOnce((_req: any, callbacks: any) => {
+        callbacks?.error?.(null, { message: "boom" });
+      });
+      vi.setSystemTime(loadedAt + 10 * 60 * 1000);
+      await wrapper.vm.refresh();
       await flushPromises();
 
-      const secondOpen = firstOpen + 10 * 60 * 1000;
-      vi.setSystemTime(secondOpen);
-      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      expect(wrapper.vm.loadError).toBeTruthy();
+      expect(wrapper.vm.timeRange).toEqual(fifteenMinutesEndingAt(loadedAt));
+    });
+
+    it("reports when the rows last loaded to the toolbar refresh control", async () => {
+      mockOneService();
+      const loadedAt = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(loadedAt);
+      wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const panel = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
-      expect(panel.props("timeRange").endTime).toBe(secondOpen * 1000);
+      expect(wrapper.vm.lastRunAt).toBe(loadedAt);
     });
   });
 

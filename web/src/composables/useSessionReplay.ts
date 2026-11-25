@@ -97,6 +97,7 @@ const defaultObject = {
       type: "",
       time_spent: 0,
       source: "",
+      application_id: "",
       // Server receive-time bounds of the replay rows, in µs; later queries search between them.
       min_ts: 0,
       max_ts: 0,

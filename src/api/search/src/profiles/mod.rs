@@ -524,6 +524,7 @@ pub(crate) async fn run_profiles_sql(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     };
 
     match SearchService::cache::search(
@@ -625,6 +626,8 @@ fn queryable_field_names(schema: &Schema) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field};
+
     use super::*;
 
     #[test]
@@ -855,7 +858,6 @@ mod tests {
 
     #[test]
     fn queryable_field_names_follow_the_user_defined_schema() {
-        use arrow_schema::{DataType, Field};
         use config::meta::stream::StreamSettings;
 
         let fields = [
@@ -900,7 +902,6 @@ mod tests {
 
     #[test]
     fn queryable_field_names_include_required_columns_missing_from_saved_list() {
-        use arrow_schema::{DataType, Field};
         use config::meta::stream::StreamSettings;
 
         let fields = [TIMESTAMP_COL_NAME, "service_name", "trace_id", "span_id"]

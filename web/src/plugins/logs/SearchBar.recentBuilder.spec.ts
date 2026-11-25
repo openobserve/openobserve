@@ -57,10 +57,17 @@ describe("logs recent searches with the filter builder on", () => {
       },
     });
     const vm = wrapper.vm as unknown as {
-      searchObj: { data: { query: string; editorValue: string } };
+      searchObj: {
+        data: {
+          query: string;
+          editorValue: string;
+          stream: { selectedStreamFields: { name: string; dataType: string }[] };
+        };
+      };
     };
     vm.searchObj.data.query = "";
     vm.searchObj.data.editorValue = "";
+    vm.searchObj.data.stream.selectedStreamFields = [{ name: "level", dataType: "Utf8" }];
     await flushPromises();
     return vm;
   };

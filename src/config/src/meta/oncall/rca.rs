@@ -21,6 +21,9 @@ use serde::{Deserialize, Serialize};
 use super::subject::SubjectType;
 use crate::meta::alerts::priority::AlertPriority;
 
+pub const MAX_BUNDLE_ITEMS: usize = 12;
+pub const MAX_OFFERED_ACTIONS: usize = 6;
+
 /// What the RCA agent is told about the thing it is investigating.
 ///
 /// A field it has nothing to say about is omitted from the wire, never sent as `null` — `o2-ai`
@@ -45,6 +48,50 @@ pub struct RcaContext {
     pub stream: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dimensions: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<EvidenceBundle>,
+}
+
+/// The engine's findings for the issue behind an incident; the model starts from them.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceBundle {
+    pub version: u32,
+    pub issue: String,
+    /// At most [MAX_BUNDLE_ITEMS].
+    pub items: Vec<BundleItem>,
+    /// At most [MAX_OFFERED_ACTIONS]; the model may name only these.
+    pub actions: Vec<OfferedAction>,
+    pub not_checked: Vec<String>,
+    pub settled: bool,
+}
+
+/// Ids are `B1`, `B2`, ... so they never read as the ledger's `e3` evidence ids.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BundleItem {
+    pub id: String,
+    pub role: BundleRole,
+    pub text: String,
+    /// Microseconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grade: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BundleRole {
+    Cause,
+    Impact,
+}
+
+/// A link or reviewed insight the step may point at; `from` names the items that offer it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OfferedAction {
+    pub id: String,
+    pub label: String,
+    pub target: String,
+    pub from: Vec<String>,
 }
 
 #[cfg(test)]
@@ -63,6 +110,7 @@ mod tests {
             alert_name: None,
             stream: None,
             dimensions: None,
+            evidence: None,
         }
     }
 
@@ -102,7 +150,7 @@ mod tests {
         let bare = base(SubjectType::Alert, None);
         let json = serde_json::to_value(&bare).unwrap();
         let keys = json.as_object().unwrap();
-        for key in ["alert_name", "stream", "dimensions", "severity"] {
+        for key in ["alert_name", "stream", "dimensions", "severity", "evidence"] {
             assert!(
                 !keys.contains_key(key),
                 "{key} must be omitted, not null: {json}"
@@ -126,5 +174,37 @@ mod tests {
         );
         // A bare int, not "P2" — `format_severity` in `o2-ai` renders the scale.
         assert_eq!(json["severity"], serde_json::json!(2));
+
+        full.evidence = Some(EvidenceBundle {
+            version: 1,
+            issue: "Logs stream k8s-prod stopped".to_string(),
+            items: vec![BundleItem {
+                id: "B1".to_string(),
+                role: BundleRole::Cause,
+                text: "Pipeline mask-pii started failing".to_string(),
+                at: Some(1_700_000_000_000_000),
+                grade: None,
+            }],
+            actions: vec![OfferedAction {
+                id: "A1".to_string(),
+                label: "Open pipeline".to_string(),
+                target: "/pipelines/mask-pii".to_string(),
+                from: vec!["B1".to_string()],
+            }],
+            not_checked: Vec::new(),
+            settled: false,
+        });
+        let json = serde_json::to_value(&full).unwrap();
+        assert_eq!(json["evidence"]["items"][0]["role"], "cause");
+        assert!(
+            !json["evidence"]["items"][0]
+                .as_object()
+                .unwrap()
+                .contains_key("grade")
+        );
+        assert_eq!(
+            json["evidence"]["actions"][0]["from"],
+            serde_json::json!(["B1"])
+        );
     }
 }

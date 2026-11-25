@@ -19,6 +19,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { nextTick } from "vue";
+import { applyFilterTerm } from "@/utils/traces/filterUtils";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -178,6 +179,7 @@ const mockSearchObj: any = {
       ],
       filterField: "",
       addToFilter: "",
+      sqlFieldFilter: null as { field: string; values: string[]; exclude: boolean } | null,
       fieldValues: mockFieldValues,
     },
     editorValue: "",
@@ -250,6 +252,7 @@ function mountIndexList(props: Record<string, unknown> = {}) {
               name="field-row"
               :row="row"
             />
+            <slot name="before-list" />
             <slot name="after-list" :currentPage="1" :totalPages="1" :isFirstPage="true" :isLastPage="true" />
             <slot name="loading" />
           </div>`,
@@ -265,6 +268,7 @@ function mountIndexList(props: Record<string, unknown> = {}) {
         },
         // FieldRow stub exposes the expansion slot so FieldExpansion renders
         FieldRow: {
+          name: "FieldRow",
           template: '<div class="field_list"><slot name="expansion" :field="field" /></div>',
           props: [
             "field",
@@ -273,10 +277,15 @@ function mountIndexList(props: Record<string, unknown> = {}) {
             "theme",
             "showQuickMode",
             "showVisibilityToggle",
+            "showGroupBy",
+            "grouped",
           ],
+          emits: ["group-by"],
         },
         FieldExpansion: {
-          template: '<div data-test="field-expansion">Field Expansion<slot name="caption" /></div>',
+          name: "FieldExpansion",
+          template:
+            '<div data-test="field-expansion">Field Expansion<slot name="caption" /><slot name="body" /></div>',
           methods: { reset: fieldExpansionReset },
           props: [
             "field",
@@ -286,9 +295,13 @@ function mountIndexList(props: Record<string, unknown> = {}) {
             "selectedFields",
             "showVisibilityToggle",
             "showFilterIcon",
+            "showMultiSelect",
             "showQuickMode",
             "valueMapper",
+            "showGroupBy",
+            "grouped",
           ],
+          emits: ["group-by"],
         },
         OTable: {
           template: `<div data-test-stub='o-table' :data-test='$attrs["data-test"]'>
@@ -322,6 +335,7 @@ describe("IndexList Component", () => {
     mockSearchObj.data.editorValue = "";
     mockSearchObj.data.resultGrid.currentPage = 0;
     mockSearchObj.data.stream.addToFilter = "";
+    mockSearchObj.data.stream.sqlFieldFilter = null;
     mockSearchObj.loadingStream = false;
 
     // Setup mock stream service
@@ -832,6 +846,63 @@ describe("IndexList Component", () => {
 
   // ─── handleAddSearchTerm / handleAddMultipleSearchTerms quote escaping ────
 
+  describe("duration percentile filters", () => {
+    it("filters on the exact microseconds while the label stays rounded", async () => {
+      wrapper.unmount();
+      wrapper = mountIndexList({
+        fieldList: [{ name: "duration", label: "Duration", showValues: true, ftsKey: false }],
+      });
+      await flushPromises();
+      (wrapper.vm as any).durationPercentiles = {
+        p25: 1000,
+        p50: 2000,
+        p75: 3000,
+        p95: 4000,
+        p99: 5000,
+        max: 1234567,
+      };
+      await flushPromises();
+
+      const atMost = wrapper
+        .findAll("button")
+        .find((b) => b.attributes("title") === "duration <= 1.23s");
+      expect(atMost, "the Max row's ≤ button keeps its rounded label").toBeTruthy();
+      await atMost!.trigger("click");
+      expect((wrapper.vm as any).searchObj.data.stream.addToFilter).toBe("duration<=1234567");
+
+      const atLeast = wrapper
+        .findAll("button")
+        .find((b) => b.attributes("title") === "duration >= 5.00ms");
+      await atLeast!.trigger("click");
+      expect((wrapper.vm as any).searchObj.data.stream.addToFilter).toBe("duration>=5000");
+    });
+
+    it("offers no filter for a percentile the server did not return", async () => {
+      wrapper.unmount();
+      wrapper = mountIndexList({
+        fieldList: [{ name: "duration", label: "Duration", showValues: true, ftsKey: false }],
+      });
+      await flushPromises();
+      (wrapper.vm as any).durationPercentiles = {
+        p25: null,
+        p50: 2000,
+        p75: 3000,
+        p95: 4000,
+        p99: 5000,
+        max: 6000,
+      };
+      await flushPromises();
+
+      for (const button of wrapper.findAll("button")) await button.trigger("click");
+      const written = (wrapper.vm as any).searchObj.data.stream.addToFilter;
+      expect(wrapper.text()).not.toContain("P25");
+      expect(wrapper.findAll("button").map((b) => b.attributes("title"))).not.toContain(
+        "duration >= ",
+      );
+      expect(written).not.toContain("null");
+    });
+  });
+
   describe("handleAddSearchTerm value escaping", () => {
     it("escapes an embedded single quote when including a value", () => {
       wrapper.vm.handleAddSearchTerm("service_name", "notificationHandling's", "include");
@@ -860,6 +931,23 @@ describe("IndexList Component", () => {
         "(service_name='o''brien' or service_name='plain')",
       );
     });
+
+    it.each([
+      ["include", "(code is null or code='200')"],
+      ["exclude", "(code is not null and code!='200')"],
+    ])("checks the null row for missing values next to another value (%s)", (action, expr) => {
+      wrapper.vm.handleAddMultipleSearchTerms("code", ["null", "200"], action);
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(expr);
+    });
+
+    it("replaces the null row's group when a third value is ticked", () => {
+      wrapper.vm.handleAddMultipleSearchTerms("code", ["null", "200"], "include");
+      const first = applyFilterTerm(wrapper.vm.searchObj.data.stream.addToFilter, "x='1'");
+      wrapper.vm.handleAddMultipleSearchTerms("code", ["null", "200", "500"], "include");
+      expect(applyFilterTerm(wrapper.vm.searchObj.data.stream.addToFilter, first)).toBe(
+        "x='1' and (code is null or code='200' or code='500')",
+      );
+    });
   });
 
   describe("field-values where clause with AND inside a quoted value (issue 11966)", () => {
@@ -882,6 +970,261 @@ describe("IndexList Component", () => {
       expect(await valuesSql(clause, "service_name")).toBe(
         `SELECT * FROM "test_stream" WHERE status = '1'`,
       );
+    });
+  });
+
+  describe("field-values where clause with brackets", () => {
+    const valuesSql = async (editorValue: string, field: string) => {
+      mockSearchObj.data.editorValue = editorValue;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: field });
+      await flushPromises();
+      return atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql);
+    };
+    const clause = "(service_name='a' AND span_status='ERROR') OR duration > 1000";
+
+    it.each([
+      ["service_name", "(span_status='ERROR') OR duration > 1000"],
+      ["span_status", "(service_name='a') OR duration > 1000"],
+      ["http_status_code", clause],
+    ])("keeps the brackets balanced when the values of %s load", async (field, where) => {
+      expect(await valuesSql(clause, field)).toBe(`SELECT * FROM "test_stream" WHERE ${where}`);
+    });
+
+    it.each([
+      "(code is null or code='200') and service_name='a'",
+      "(code is not null and code!='200') and service_name='a'",
+      "code is null and service_name='a'",
+    ])("drops the field's own null check from %s when its values load", async (editor) => {
+      expect(await valuesSql(editor, "code")).toBe(
+        `SELECT * FROM "test_stream" WHERE service_name='a'`,
+      );
+    });
+  });
+
+  describe("value include/exclude in SQL mode", () => {
+    afterEach(() => {
+      mockSearchObj.meta.sqlMode = false;
+    });
+
+    it("offers the value include/exclude checkboxes without the put-it-in-WHERE hint", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      const w = mountIndexList();
+      await flushPromises();
+      const expansion = w.findComponent({ name: "FieldExpansion" });
+      expect(expansion.props("showMultiSelect")).not.toBe(false);
+      expect(w.find('[data-test="traces-field-values-sql-hint"]').exists()).toBe(false);
+      w.unmount();
+    });
+
+    it("hands the ticked values to the search bar, which owns the condition it writes", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      const w = mountIndexList({ activeIncludeFieldValues: { service_name: ["api"] } });
+      await flushPromises();
+      (w.vm as any).handleAddMultipleSearchTerms("service_name", ["api", "o'k"], "include");
+      expect(mockSearchObj.data.stream.sqlFieldFilter).toEqual({
+        field: "service_name",
+        values: ["api", "o'k"],
+        exclude: false,
+      });
+      (w.vm as any).handleAddMultipleSearchTerms("service_name", ["a"], "exclude");
+      expect(mockSearchObj.data.stream.sqlFieldFilter).toEqual({
+        field: "service_name",
+        values: ["a"],
+        exclude: true,
+      });
+      expect(mockSearchObj.data.stream.addToFilter).toBe("");
+      w.unmount();
+    });
+  });
+
+  describe("fields stored in _all", () => {
+    const note = (w: any) => w.find('[data-test="traces-sql-all-fields-note"]');
+
+    afterEach(() => {
+      mockSearchObj.meta.sqlMode = false;
+    });
+
+    it("notes _all in SQL mode when the stream stores extra fields there", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      const w = mountIndexList({ storesExtraFieldsInAll: true });
+      await flushPromises();
+      expect(note(w).text()).toBe(
+        "Fields outside the stream schema are stored in _all. Use json_get_str(_all, 'field').",
+      );
+      w.unmount();
+    });
+
+    it("has no note in filter mode or for a stream without a schema limit", async () => {
+      const filterMode = mountIndexList({ storesExtraFieldsInAll: true });
+      await flushPromises();
+      expect(note(filterMode).exists()).toBe(false);
+      filterMode.unmount();
+      mockSearchObj.meta.sqlMode = true;
+      const noUds = mountIndexList({ storesExtraFieldsInAll: false });
+      await flushPromises();
+      expect(note(noUds).exists()).toBe(false);
+      noUds.unmount();
+    });
+  });
+
+  describe("field-values query in SQL mode", () => {
+    afterEach(() => {
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.data.editorValue = "";
+    });
+
+    it("keeps the typed FROM alias so the typed WHERE resolves", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "test_stream" d WHERE d.status = '1' ORDER BY d.start_time`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream" d WHERE d.status = '1'`,
+      );
+    });
+
+    it("drops the opened field's own condition when it is written with the alias", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "test_stream" d WHERE d.status = '1' AND "d"."service_name" = 'a' AND (d.status = '2' OR d.status = '3')`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "status" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream" d WHERE "d"."service_name" = 'a'`,
+      );
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream" d WHERE d.status = '1' AND (d.status = '2' OR d.status = '3')`,
+      );
+    });
+
+    it("drops the IN list a sidebar tick wrote for the opened field, so its other values still show", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "test_stream" WHERE a = 1 AND service_name IN ('x','y') AND service_name IS NOT NULL`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream" WHERE a = 1`,
+      );
+    });
+
+    it("reads the stream alone for a CTE, as the values API drops the WHERE of a WITH query", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `WITH slow AS (SELECT * FROM "test_stream" WHERE duration > 5) SELECT * FROM slow WHERE status = '1' ORDER BY start_time`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream"`,
+      );
+    });
+
+    it("reads the stream alone for the duration percentiles of a CTE", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `WITH slow AS (SELECT * FROM "test_stream" WHERE duration > 5) SELECT * FROM slow WHERE status = '1'`;
+      fieldValuesApi.fetchPercentiles.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "duration" });
+      await flushPromises();
+      expect(fieldValuesApi.fetchPercentiles.mock.calls[0][0].whereClause).toBe("");
+    });
+
+    it("reads the stream alone for a JOIN, as its names could belong to either side", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT a.trace_id FROM "test_stream" a JOIN "test_stream" b ON a.trace_id = b.trace_id WHERE status = '1'`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream"`,
+      );
+    });
+
+    it("keeps the opened field's IN condition in filter mode, dropping only its null check", async () => {
+      mockSearchObj.data.editorValue = `a = 1 AND service_name IN ('x','y') AND service_name IS NOT NULL`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream" WHERE a = 1 AND service_name IN ('x','y')`,
+      );
+    });
+
+    it("keeps a qualified condition in filter mode, as before", async () => {
+      mockSearchObj.data.editorValue = `d.status = '1' AND service_name = 'a'`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "status" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream" WHERE d.status = '1' AND service_name = 'a'`,
+      );
+    });
+  });
+
+  describe("field-values query follows the Spans view scope", () => {
+    const ENTRY =
+      "(CAST(span_kind AS VARCHAR) IN ('2','5') OR (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))";
+
+    const valuesSql = async (field: string) => {
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: field });
+      await flushPromises();
+      return atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql);
+    };
+
+    beforeEach(() => {
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.meta.scope = "entrypoint";
+      mockSearchObj.data.stream.hasParentColumn = true;
+      mockSearchObj.data.editorValue = "span_kind = 'Server' AND service_name = 'a'";
+    });
+
+    afterEach(() => {
+      mockSearchObj.meta.searchMode = "traces";
+      mockSearchObj.meta.scope = "all";
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.data.stream.hasParentColumn = false;
+      mockSearchObj.data.editorValue = "";
+    });
+
+    it("adds the scope after the span_kind rewrite and the opened field's removal", async () => {
+      expect(await valuesSql("service_name")).toBe(
+        `SELECT * FROM "test_stream" WHERE (span_kind='2') AND ${ENTRY}`,
+      );
+    });
+
+    it("keeps the scope when the opened field is span_kind", async () => {
+      expect(await valuesSql("span_kind")).toBe(
+        `SELECT * FROM "test_stream" WHERE (service_name = 'a') AND ${ENTRY}`,
+      );
+    });
+
+    it("is the scope alone when the filter is empty", async () => {
+      mockSearchObj.data.editorValue = "";
+      expect(await valuesSql("service_name")).toBe(`SELECT * FROM "test_stream" WHERE ${ENTRY}`);
+    });
+
+    it("passes the scope to the duration percentiles", async () => {
+      mockSearchObj.data.editorValue = "";
+      fieldValuesApi.fetchPercentiles.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "duration" });
+      await flushPromises();
+      expect(fieldValuesApi.fetchPercentiles.mock.calls[0][0].whereClause).toBe(ENTRY);
+    });
+
+    it("adds no scope in the Traces view or in SQL mode", async () => {
+      mockSearchObj.meta.searchMode = "traces";
+      expect(await valuesSql("service_name")).toBe(
+        `SELECT * FROM "test_stream" WHERE span_kind='2'`,
+      );
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "test_stream" WHERE a = 1`;
+      expect(await valuesSql("service_name")).toBe(`SELECT * FROM "test_stream" WHERE a = 1`);
     });
   });
 
@@ -1047,6 +1390,84 @@ describe("IndexList Component", () => {
 
     it("input.max default should be 100000", () => {
       expect(wrapper.vm.duration.input.max).toBe(100000);
+    });
+  });
+
+  describe("Group by shortcut", () => {
+    const fieldList = [
+      { name: "Common", label: true },
+      { name: "_timestamp", showValues: false },
+      { name: "service_name", showValues: true },
+      { name: "http_method", showValues: false },
+    ];
+    const rowProps = (w: VueWrapper) =>
+      Object.fromEntries(
+        w
+          .findAllComponents({ name: "FieldRow" })
+          .map((row) => [
+            row.props("field").name,
+            [row.props("showGroupBy"), row.props("grouped")],
+          ]),
+      );
+
+    afterEach(() => {
+      mockSearchObj.meta.searchMode = "traces";
+      delete (mockSearchObj.meta as any).sqlMode;
+      delete (mockSearchObj.meta as any).groupBy;
+    });
+
+    it("is offered on field rows in the Spans view, but not on header rows or the timestamp", () => {
+      mockSearchObj.meta.searchMode = "spans";
+      (mockSearchObj.meta as any).groupBy = "service_name";
+      wrapper.unmount();
+      wrapper = mountIndexList({ fieldList });
+      expect(rowProps(wrapper)).toEqual({
+        Common: [false, false],
+        _timestamp: [false, false],
+        service_name: [true, true],
+        http_method: [true, false],
+      });
+      const expansions = Object.fromEntries(
+        wrapper
+          .findAllComponents({ name: "FieldExpansion" })
+          .map((e) => [e.props("field").name, [e.props("showGroupBy"), e.props("grouped")]]),
+      );
+      expect(expansions.service_name).toEqual([true, true]);
+      expect(expansions.Common).toEqual([false, false]);
+    });
+
+    it("is not offered in SQL mode or in the Traces view", () => {
+      mockSearchObj.meta.searchMode = "spans";
+      (mockSearchObj.meta as any).sqlMode = true;
+      wrapper.unmount();
+      wrapper = mountIndexList({ fieldList });
+      expect(Object.values(rowProps(wrapper)).every(([shown]) => !shown)).toBe(true);
+      (mockSearchObj.meta as any).sqlMode = false;
+      mockSearchObj.meta.searchMode = "traces";
+      wrapper.unmount();
+      wrapper = mountIndexList({ fieldList });
+      expect(Object.values(rowProps(wrapper)).every(([shown]) => !shown)).toBe(true);
+    });
+
+    it("passes a picked field up from a row and from a field with values", () => {
+      mockSearchObj.meta.searchMode = "spans";
+      wrapper.unmount();
+      wrapper = mountIndexList({ fieldList });
+      wrapper.findAllComponents({ name: "FieldRow" })[3].vm.$emit("group-by", "http_method");
+      wrapper.findAllComponents({ name: "FieldExpansion" })[2].vm.$emit("group-by", "service_name");
+      expect(wrapper.emitted("group-by")).toEqual([["http_method"], ["service_name"]]);
+    });
+
+    it("does nothing when the field already grouped is picked again", () => {
+      mockSearchObj.meta.searchMode = "spans";
+      (mockSearchObj.meta as any).groupBy = "service_name";
+      wrapper.unmount();
+      wrapper = mountIndexList({ fieldList });
+      wrapper.findAllComponents({ name: "FieldExpansion" })[2].vm.$emit("group-by", "service_name");
+      wrapper.findAllComponents({ name: "FieldRow" })[2].vm.$emit("group-by", "service_name");
+      expect(wrapper.emitted("group-by")).toBeUndefined();
+      wrapper.findAllComponents({ name: "FieldRow" })[3].vm.$emit("group-by", "http_method");
+      expect(wrapper.emitted("group-by")).toEqual([["http_method"]]);
     });
   });
 });

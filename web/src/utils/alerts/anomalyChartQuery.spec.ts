@@ -27,6 +27,7 @@ const ALL_KINDS: AnomalyKindColumns = {
   isPartialDrop: true,
   expectedValue: true,
   expectedBounds: true,
+  judgedEnd: false,
 };
 
 // The order every scored column must share, so one bucket's columns all come from one row.
@@ -151,6 +152,7 @@ describe("buildAnomalyDeviationQuery", () => {
       isPartialDrop: false,
       expectedValue: false,
       expectedBounds: false,
+      judgedEnd: false,
     }) as string;
     expect(sql).toContain(
       "last_value(deviation_percent ORDER BY CASE WHEN is_absence IS NOT TRUE THEN 1 ELSE 0 END, " +
@@ -261,5 +263,27 @@ describe("bucket aggregation", () => {
     ]) {
       expect(sql).toContain("GROUP BY zo_sql_key ORDER BY zo_sql_key");
     }
+  });
+});
+
+describe("latest judgment order", () => {
+  it("ranks by the judged query end before completion time when the stream has the column", () => {
+    const sql = buildAnomalyMetricQuery("cfg1", "5m", { ...ALL_KINDS, judgedEnd: true }) as string;
+    expect(sql).toContain(
+      `last_value(actual_value ORDER BY ${SCORED_RANK}, judged_end_us ASC NULLS FIRST, created_at)`,
+    );
+  });
+
+  it("keeps created_at alone on an older stream without judged_end_us", () => {
+    const sql = buildAnomalyMetricQuery("cfg1", "5m") as string;
+    expect(sql).not.toContain("judged_end_us");
+    expect(sql).toContain("last_value(actual_value ORDER BY created_at)");
+  });
+});
+
+describe("model version per bucket", () => {
+  it("projects the model of the latest reading, so a popover can tell an older model apart", () => {
+    const sql = buildAnomalyMetricQuery("cfg1", "5m", ALL_KINDS) as string;
+    expect(sql).toContain(`${latest("model_version")} AS model_version`);
   });
 });

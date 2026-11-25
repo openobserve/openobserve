@@ -54,6 +54,9 @@ fn rendered(format: ChannelFormat, ctx: &NotificationContext, links: &[(&str, &s
         .collect();
     let content = resolve_content(&spec, ctx, format.channel_family());
     match render(format, &content, ctx).unwrap() {
+        RenderedMessage::Http { body } if format == ChannelFormat::Slack => {
+            super::slack::flat_blocks(&serde_json::from_str(&body).unwrap())
+        }
         RenderedMessage::Http { body } => serde_json::from_str(&body).unwrap(),
         RenderedMessage::Email {
             subject,
@@ -262,14 +265,16 @@ fn single_button_kinds_show_one_system_button_with_their_label() {
     let spec = compiled_default_content();
     let content = resolve_content(&spec, &anomaly, "slack");
     let slack = match render(ChannelFormat::Slack, &content, &anomaly).unwrap() {
-        RenderedMessage::Http { body } => serde_json::from_str::<Value>(&body).unwrap(),
+        RenderedMessage::Http { body } => {
+            super::slack::flat_blocks(&serde_json::from_str::<Value>(&body).unwrap())
+        }
         other => panic!("{other:?}"),
     };
     let labels: Vec<String> = slack_buttons(&slack).into_iter().map(|b| b.0).collect();
     assert_eq!(
         labels,
-        vec!["View data around the window", "Open detector"],
-        "the explore link keeps its own label"
+        vec!["View logs", "Open anomaly"],
+        "the explore link is the data button and its authored copy drops"
     );
 }
 

@@ -414,6 +414,24 @@ describe("logsUtils", () => {
       expect(utils.isLimitQuery(parsedSQL as any)).toBe(true);
     });
 
+    it("should return false for an OFFSET with no LIMIT", () => {
+      const parsedSQL = { limit: { seperator: "offset", value: [{ type: "number", value: 5 }] } };
+      expect(utils.isLimitQuery(parsedSQL as any)).toBe(false);
+    });
+
+    it("should return true for LIMIT with OFFSET", () => {
+      const parsedSQL = {
+        limit: {
+          seperator: "offset",
+          value: [
+            { type: "number", value: 10 },
+            { type: "number", value: 5 },
+          ],
+        },
+      };
+      expect(utils.isLimitQuery(parsedSQL as any)).toBe(true);
+    });
+
     it("should return false when LIMIT is not present", () => {
       const parsedSQL = { limit: null };
       expect(utils.isLimitQuery(parsedSQL as any)).toBe(false);
@@ -739,6 +757,25 @@ describe("logsUtils", () => {
       mockSearchObj.meta.logsVisualizeToggle = "logs";
     });
 
+    it("keeps the anomaly banner parameters, so a search or a refresh does not drop the banner", () => {
+      mockCurrentRoute.value = {
+        query: {
+          from_anomaly: "a1",
+          anomaly_filter_applied: "0",
+          anomaly_actual: "208",
+          type: "search_scheduler",
+        },
+      } as any;
+      try {
+        const query = utils.generateURLQuery();
+        expect(query.from_anomaly).toBe("a1");
+        expect(query.anomaly_filter_applied).toBe("0");
+        expect(query.anomaly_actual).toBe("208");
+      } finally {
+        mockCurrentRoute.value = { query: {} };
+      }
+    });
+
     it("should generate query params with stream info", () => {
       const query = utils.generateURLQuery();
       expect(query.stream_type).toBe("logs");
@@ -805,6 +842,20 @@ describe("logsUtils", () => {
       mockSearchObj.meta.logsVisualizeToggle = "visualize";
       const query = utils.generateURLQuery();
       expect(query.logs_visualize_toggle).toBe("visualize");
+    });
+
+    it("writes the picked Drill down dimensions only in the drilldown view", () => {
+      mockSearchObj.meta.drillDownDimensions = ["level", "k8s_namespace_name"];
+      mockSearchObj.meta.logsVisualizeToggle = "drilldown";
+      expect(utils.generateURLQuery().drilldown_dims).toBe("level,k8s_namespace_name");
+
+      mockSearchObj.meta.logsVisualizeToggle = "logs";
+      expect(utils.generateURLQuery().drilldown_dims).toBeUndefined();
+
+      mockSearchObj.meta.logsVisualizeToggle = "drilldown";
+      mockSearchObj.meta.drillDownDimensions = null;
+      expect(utils.generateURLQuery().drilldown_dims).toBeUndefined();
+      delete mockSearchObj.meta.drillDownDimensions;
     });
 
     it("should handle stream as object with value property", () => {

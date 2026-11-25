@@ -465,17 +465,18 @@ pub async fn list_ids_by_status(status: &str) -> Result<Vec<String>, errors::Err
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
-/// `list_ids_by_status` with each org's `deleted_at`.
-pub async fn list_ids_and_deleted_at_by_status(
+/// `list_ids_by_status` with each org's `deleted_at` and `updated_at`.
+pub async fn list_ids_and_times_by_status(
     status: &str,
-) -> Result<Vec<(String, Option<i64>)>, errors::Error> {
+) -> Result<Vec<(String, Option<i64>, i64)>, errors::Error> {
     let client = get_orm_client_ro().await;
     Entity::find()
         .select_only()
         .column(Column::Identifier)
         .column(Column::DeletedAt)
+        .column(Column::UpdatedAt)
         .filter(Column::Status.eq(status))
-        .into_tuple::<(String, Option<i64>)>()
+        .into_tuple::<(String, Option<i64>, i64)>()
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
@@ -513,6 +514,11 @@ pub async fn remove_tombstone_at(org_id: &str, updated_at: i64) -> Result<bool, 
 /// The row's status read from the database, bypassing the cache; `None` when no row exists.
 pub async fn get_status_uncached(org_id: &str) -> Result<Option<String>, errors::Error> {
     status_in(get_orm_client_ro().await, org_id).await
+}
+
+/// `get_status_uncached` on the writer, for a check that must see a flip that just committed.
+pub async fn get_status_on_writer(org_id: &str) -> Result<Option<String>, errors::Error> {
+    status_in(get_orm_client_rw().await, org_id).await
 }
 
 /// Flips a pending org to `deleting` only once its `deleted_at` is at or before `deleted_before`.

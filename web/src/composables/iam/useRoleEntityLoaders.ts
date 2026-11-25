@@ -155,6 +155,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       prompt: getPrompts,
       logs_pattern: getLogsPatternStreams,
       logs_insights: getLogsInsightsStreams,
+      logs_unredacted: getLogsUnredactedStreams,
       logs_cache: getLogsCacheStreams,
     };
 
@@ -551,6 +552,16 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     });
   };
 
+  const getLogsUnredactedStreams = async () => {
+    const logs: any = await getStreams("logs", false);
+
+    updateResourceEntities("logs_unredacted", ["name"], logs.list);
+
+    return new Promise((resolve) => {
+      resolve(true);
+    });
+  };
+
   const getLogsCacheStreams = async () => {
     const logs: any = await getStreams("logs", false);
 
@@ -837,6 +848,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     getLogs,
     getLogsPatternStreams,
     getLogsInsightsStreams,
+    getLogsUnredactedStreams,
     getLogsCacheStreams,
     getIndexStreams,
     getMetrics,

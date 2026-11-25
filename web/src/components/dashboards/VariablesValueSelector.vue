@@ -44,6 +44,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             })
           }}
         </div>
+        <div
+          v-else-if="isQueryVariableAllCapped(item) && !item.queryError"
+          class="text-text-secondary text-xs"
+          :data-test="`variable-query-all-capped-${item.name}`"
+        >
+          {{ t("dashboard.queryVariable.cappedAllHint") }}
+        </div>
+        <div
+          v-else-if="usesQueryVariableLoader(item) && item.queryCapped && !item.queryError"
+          class="text-text-secondary text-xs"
+          :data-test="`variable-query-capped-${item.name}`"
+        >
+          {{ t("dashboard.queryVariable.cappedHint", { count: getQueryVariableMaxRecords(item) }) }}
+        </div>
+        <div
+          v-if="usesQueryVariableLoader(item) && item.queryError"
+          class="text-status-error-text me-4 flex w-0 min-w-full items-center gap-1 text-xs"
+          :data-test="`variable-query-error-${item.name}`"
+        >
+          <OIcon name="error-outline" size="xs" class="shrink-0" />
+          <OTruncatedText class="min-w-0 flex-1">{{
+            t("dashboard.queryVariable.loadFailedReason", { reason: item.queryError })
+          }}</OTruncatedText>
+        </div>
       </div>
       <div v-else-if="item.type == 'constant'" class="max-w-[40rem] min-w-37.5">
         <OInput
@@ -129,15 +153,18 @@ import {
   reactive,
 } from "vue";
 import { useStore } from "vuex";
+import { isEqual } from "lodash-es";
 import { useI18nTyped } from "@/types/i18n";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODate from "@/lib/forms/Date/ODate.vue";
 import { isInvalidDate } from "@/utils/date";
-import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
+import { addLabelGroupToSQlQuery, addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { b64EncodeUnicode, escapeSingleQuotes, generateTraceContext } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import {
@@ -145,13 +172,48 @@ import {
   replaceVariablePlaceholders,
   formatDateVariable,
 } from "@/utils/dashboard/variables/variablesUtils";
+import {
+  expandMultiValueFilter,
+  getQueryVariableLanguage,
+  getQueryVariableMaxRecords,
+  isExplicitQuerySelection,
+  getQueryVariableQuery,
+  isCustomQueryVariable,
+  isQueryVariableAllCapped,
+  reconcileQueryVariableValue,
+  resolveQueryVariableValue,
+  resolveSqlOptionColumns,
+  substituteQueryVariables,
+  toSqlLabelGroup,
+  usesQueryVariableLoader,
+  type QueryVariableOption,
+  type VariableFilterRow,
+} from "@/utils/dashboard/variables/queryVariableUtils";
+import {
+  getQueryVariableErrorMessage,
+  loadQueryVariableValues,
+  QueryVariableCancelledError,
+  runSqlVariableQueryOnStream,
+  type SqlVariableQueryRequest,
+  type SqlVariableQueryRunner,
+} from "@/utils/dashboard/variables/queryVariableLoader";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
   getVariableKey,
   LIVE_COMMIT_DEBOUNCE_MS,
+  type VariableRuntimeState,
 } from "@/composables/dashboard/useVariablesManager";
 import { useVariablesWatcher, variableLog } from "@/composables/dashboard/useVariableDebugger";
+
+// Loaded options carry data labels, not i18n text; the query* fields are the loader's own state.
+interface QueryVariableRuntime extends Omit<VariableRuntimeState, "options"> {
+  options?: QueryVariableOption[];
+  queryError?: string;
+  queryCapped?: boolean;
+  querySearchColumn?: string;
+  querySearch?: { text: string; options: QueryVariableOption[] };
+}
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -206,6 +268,8 @@ export default defineComponent({
     VariableCustomValueSelector,
     OButton,
     OInput,
+    OIcon,
+    OTruncatedText,
     ODate,
   },
   setup(props: any, { emit }) {
@@ -779,6 +843,335 @@ export default defineComponent({
 
     // ------------- End WebSocket Implementation -------------
 
+    // Latest load per query variable; a response that lands after a newer request is dropped.
+    const queryVariableRequestIds: Record<string, number> = {};
+    // A newer load or closing the selector aborts the PromQL requests a load still has open.
+    const queryVariableAborts: Record<string, AbortController> = {};
+    // Variables whose latest load is a time-range reload, which a newer range must restart.
+    const timeRangeReloads = new Set<string>();
+
+    const getVariablesForSubstitution = () =>
+      useManager && manager
+        ? manager.getAllVisibleVariables(props.tabId, props.panelId) || variablesData.values
+        : variablesData.values;
+
+    const runSqlForVariable =
+      (variableObject: QueryVariableRuntime) => (request: SqlVariableQueryRequest) => {
+        const { traceId } = generateTraceContext();
+        addTraceId(variableObject.name, traceId);
+        return runSqlVariableQueryOnStream(fetchQueryDataWithHttpStream, {
+          ...request,
+          orgId: store.state.selectedOrganization.identifier,
+          traceId,
+        }).finally(() => removeTraceId(variableObject.name, traceId));
+      };
+
+    const queryVariableLoadParams = (
+      variableObject: QueryVariableRuntime,
+      startTime: number,
+      endTime: number,
+      runSql: SqlVariableQueryRunner,
+    ) => {
+      const language = getQueryVariableLanguage(variableObject);
+      return {
+        query: substituteQueryVariables(
+          getQueryVariableQuery(variableObject),
+          getVariablesForSubstitution(),
+          language,
+        ),
+        language,
+        streamType: variableObject.query_data?.stream_type,
+        valueField: variableObject.query_data?.value_field,
+        labelField: variableObject.query_data?.label_field,
+        maxRecords: getQueryVariableMaxRecords(variableObject),
+        startTime,
+        endTime,
+        orgId: store.state.selectedOrganization.identifier,
+        runSql,
+      };
+    };
+
+    // The user's own pick per query variable, kept while a time range drops some of it so a later range can restore it.
+    const pinnedQuerySelections: Record<string, unknown> = {};
+
+    const reconcileForTimeRange = (
+      variableObject: QueryVariableRuntime,
+      options: QueryVariableOption[],
+    ) => {
+      const { name } = variableObject;
+      const intended = pinnedQuerySelections[name] ?? variableObject.value;
+      const reconciled = reconcileQueryVariableValue(
+        { ...variableObject, value: intended },
+        options,
+      );
+      if (isExplicitQuerySelection(intended) && !isEqual(reconciled, intended))
+        pinnedQuerySelections[name] = intended;
+      else delete pinnedQuerySelections[name];
+      return reconciled;
+    };
+
+    const applyQueryVariableOptions = (
+      variableObject: QueryVariableRuntime,
+      options: QueryVariableOption[],
+      pruneStale: boolean,
+    ) => {
+      const newOptions = options.map((option) => ({ ...option }));
+      const originalValue = JSON.parse(JSON.stringify(variableObject.value ?? null));
+      const originalResolved = resolveQueryVariableValue(variableObject);
+      // A custom pick that arrives before any options (URL, reload) is checked like a time-range change, so both paths agree.
+      const reconciles =
+        isCustomQueryVariable(variableObject) &&
+        (pruneStale ||
+          (!variableObject.options?.length && isExplicitQuerySelection(variableObject.value)));
+      if (reconciles) {
+        variableObject.options = newOptions;
+        variableObject.value = reconcileForTimeRange(variableObject, newOptions);
+      } else {
+        delete pinnedQuerySelections[variableObject.name];
+        const selected = Array.isArray(variableObject.value)
+          ? variableObject.value
+          : variableObject.value !== null && variableObject.value !== undefined
+            ? [variableObject.value]
+            : [];
+        selected.forEach((value: string) => {
+          if (value === SELECT_ALL_VALUE || newOptions.some((option) => option.value === value))
+            return;
+          newOptions.push({ label: value, value });
+        });
+        variableObject.options = newOptions;
+        selectQueryValuesValue(variableObject);
+      }
+      const hasValueChanged =
+        JSON.stringify(originalValue) !== JSON.stringify(variableObject.value ?? null);
+
+      variableObject.isVariablePartialLoaded = true;
+      if (useManager && manager) {
+        if (hasValueChanged) oldVariablesData[variableObject.name] = variableObject.value;
+        manager.onVariablePartiallyLoaded(
+          getVariableKey(
+            variableObject.name,
+            variableObject.scope || "global",
+            variableObject.tabId,
+            variableObject.panelId,
+          ),
+        );
+      } else {
+        void finalizePartialVariableLoading(variableObject, true, hasValueChanged);
+      }
+      finalizeVariableLoading(variableObject, true);
+      // Panels may already have run with the old value, so a dropped value or a new "All" list has to reach them too.
+      const hasResolvedChanged =
+        hasValueChanged || !isEqual(originalResolved, resolveQueryVariableValue(variableObject));
+      if (reconciles && hasResolvedChanged && useManager && manager?.commitWhenSettled) {
+        manager.commitWhenSettled([
+          getVariableKey(
+            variableObject.name,
+            variableObject.scope || "global",
+            variableObject.tabId,
+            variableObject.panelId,
+          ),
+        ]);
+      }
+      emitVariablesData();
+    };
+
+    // A failed load keeps the last good options and still counts as finished, so panels are never held.
+    const endFailedQueryVariableLoad = (variableObject: QueryVariableRuntime) => {
+      currentlyExecutingPromises[variableObject.name] = null;
+      variableObject.isLoading = false;
+      variableObject.isVariableLoadingPending = false;
+      if (!variableObject.isVariablePartialLoaded) {
+        variableObject.isVariablePartialLoaded = true;
+        if (useManager && manager) {
+          manager.onVariablePartiallyLoaded(
+            getVariableKey(
+              variableObject.name,
+              variableObject.scope || "global",
+              variableObject.tabId,
+              variableObject.panelId,
+            ),
+          );
+        }
+      }
+      emitVariablesData();
+    };
+
+    const fetchQueryVariableOptions = async (
+      variableObject: QueryVariableRuntime,
+      { pruneStale = false, onSettled }: { pruneStale?: boolean; onSettled?: () => void } = {},
+    ) => {
+      const { name } = variableObject;
+      const startTime = props.selectedTimeDate?.start_time?.getTime();
+      const endTime = props.selectedTimeDate?.end_time?.getTime();
+      if (!startTime || !endTime || (!pruneStale && currentlyExecutingPromises[name] === null)) {
+        markLoadEnded(variableObject);
+        onSettled?.();
+        return;
+      }
+
+      const requestId = (queryVariableRequestIds[name] ?? 0) + 1;
+      queryVariableRequestIds[name] = requestId;
+      queryVariableAborts[name]?.abort();
+      const controller = new AbortController();
+      queryVariableAborts[name] = controller;
+      const isStale = () => isUnmounted || queryVariableRequestIds[name] !== requestId;
+      if (pruneStale) timeRangeReloads.add(name);
+      else timeRangeReloads.delete(name);
+      variableObject.isLoading = true;
+      variableObject.isVariableLoadingPending = true;
+
+      try {
+        const params = {
+          ...queryVariableLoadParams(
+            variableObject,
+            startTime,
+            endTime,
+            runSqlForVariable(variableObject),
+          ),
+          signal: controller.signal,
+        };
+        const result = await loadQueryVariableValues(params);
+        if (isStale()) return;
+        timeRangeReloads.delete(name);
+        variableObject.queryError = undefined;
+        variableObject.queryCapped = result.capped;
+        variableObject.querySearchColumn = resolveSqlOptionColumns(
+          result.columns,
+          params.valueField,
+          params.labelField,
+        )?.labelColumn;
+        applyQueryVariableOptions(variableObject, result.options, pruneStale);
+        onSettled?.();
+      } catch (error) {
+        if (isStale()) return;
+        timeRangeReloads.delete(name);
+        if (!(error instanceof QueryVariableCancelledError)) {
+          variableObject.queryError = getQueryVariableErrorMessage(error);
+          variableLog(name, `Query variable failed: ${variableObject.queryError}`);
+        }
+        endFailedQueryVariableLoad(variableObject);
+        onSettled?.();
+      }
+    };
+
+    // Search streams are tracked apart from loads, so typing never cancels a reload.
+    const querySearchTraces: Record<string, string> = {};
+    const querySearchIds: Record<string, number> = {};
+    const querySearchAborts: Record<string, AbortController> = {};
+
+    const cancelQuerySearch = (name: string) => {
+      querySearchAborts[name]?.abort();
+      delete querySearchAborts[name];
+      const traceId = querySearchTraces[name];
+      if (!traceId) return;
+      delete querySearchTraces[name];
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: traceId,
+        org_id: store.state.selectedOrganization.identifier,
+      });
+    };
+
+    const runSqlForSearch = (name: string) => (request: SqlVariableQueryRequest) => {
+      const { traceId } = generateTraceContext();
+      querySearchTraces[name] = traceId;
+      return runSqlVariableQueryOnStream(fetchQueryDataWithHttpStream, {
+        ...request,
+        orgId: store.state.selectedOrganization.identifier,
+        traceId,
+      }).finally(() => {
+        if (querySearchTraces[name] === traceId) delete querySearchTraces[name];
+      });
+    };
+
+    onUnmounted(() => {
+      new Set([...Object.keys(querySearchTraces), ...Object.keys(querySearchAborts)]).forEach(
+        cancelQuerySearch,
+      );
+      Object.values(queryVariableAborts).forEach((controller) => controller.abort());
+    });
+
+    // Typed text asks the server as a Query Values search does; the answer only feeds the open list.
+    const searchQueryVariableOptions = async (
+      variableObject: QueryVariableRuntime,
+      text: string,
+    ) => {
+      const { name } = variableObject;
+      cancelQuerySearch(name);
+      const searchId = (querySearchIds[name] ?? 0) + 1;
+      querySearchIds[name] = searchId;
+      const startTime = props.selectedTimeDate?.start_time?.getTime();
+      const endTime = props.selectedTimeDate?.end_time?.getTime();
+      if (!text || !startTime || !endTime) {
+        delete variableObject.querySearch;
+        return;
+      }
+      const controller = new AbortController();
+      querySearchAborts[name] = controller;
+      try {
+        const result = await loadQueryVariableValues({
+          ...queryVariableLoadParams(variableObject, startTime, endTime, runSqlForSearch(name)),
+          search: text,
+          searchColumn: variableObject.querySearchColumn,
+          signal: controller.signal,
+        });
+        if (isUnmounted || querySearchIds[name] !== searchId) return;
+        // Picked options stay in the list so their chips keep their labels while searching.
+        const found = new Set(result.options.map((option) => option.value));
+        const picked = new Set([variableObject.value].flat());
+        const kept = (variableObject.options ?? []).filter(
+          (option) => picked.has(option.value) && !found.has(option.value),
+        );
+        variableObject.querySearch = { text, options: [...result.options, ...kept] };
+      } catch {
+        // A failed search leaves the loaded list in place.
+      }
+    };
+
+    // A new time range reloads custom query variables like a fresh load, parents before the children that read them.
+    const reloadQueryVariablesForTimeRange = () => {
+      if (!useManager || !manager || isUnmounted) return;
+      const isReloading = (v: QueryVariableRuntime) => timeRangeReloads.has(v.name);
+      const inFlight: QueryVariableRuntime[] = variablesData.values.filter(
+        (v: QueryVariableRuntime) => isCustomQueryVariable(v) && v.isLoading && !isReloading(v),
+      );
+      inFlight.forEach((v) => void fetchQueryVariableOptions(v));
+
+      const targets: QueryVariableRuntime[] = variablesData.values.filter(
+        (v: QueryVariableRuntime) =>
+          isCustomQueryVariable(v) &&
+          v.isVariablePartialLoaded &&
+          (!v.isVariableLoadingPending || isReloading(v)),
+      );
+      const pending = new Set<string>(targets.map((v) => v.name));
+      const parentsOf = (v: QueryVariableRuntime): string[] =>
+        variablesDependencyGraph[v.name]?.parentVariables ?? [];
+      const startReady = () => {
+        targets.forEach((v) => {
+          if (!pending.has(v.name) || parentsOf(v).some((parent) => pending.has(parent))) return;
+          pending.delete(v.name);
+          // The manager already reloads a child whose parent value changed.
+          if ((v.isVariableLoadingPending && !isReloading(v)) || !v.isVariablePartialLoaded) {
+            startReady();
+            return;
+          }
+          void fetchQueryVariableOptions(v, { pruneStale: true, onSettled: startReady });
+        });
+      };
+      startReady();
+    };
+
+    watch(
+      () => [
+        props.selectedTimeDate?.start_time?.getTime?.(),
+        props.selectedTimeDate?.end_time?.getTime?.(),
+      ],
+      ([start, end], [prevStart, prevEnd]) => {
+        if (!start || !end || !prevStart || !prevEnd) return;
+        if (start === prevStart && end === prevEnd) return;
+        reloadQueryVariablesForTimeRange();
+      },
+    );
+
     // reset variables data
     // it will executed once on mount
     const resetVariablesData = () => {
@@ -827,8 +1220,8 @@ export default defineComponent({
           // if parent variable is not loaded or it's value is changed, isVariableLoadingPending will be true
           isVariableLoadingPending: false,
           isVariablePartialLoaded: true,
-          // Initialize options array for all variables
-          options: item.options || [],
+          // Initialize options array for all variables; a custom query variable's come only from its query
+          options: isCustomQueryVariable(item) ? [] : item.options || [],
         };
 
         variableLog(
@@ -1761,7 +2154,10 @@ export default defineComponent({
               `Initial load check for variable: ${variableObject.name}, hasCustomOrAllDefault: ${hasCustomOrAllDefault}, value: ${JSON.stringify(variableObject.value)}`,
             );
 
-            if (hasCustomOrAllDefault) {
+            const allNeedsOptions =
+              isCustomQueryVariable(variableObject) &&
+              variableObject.selectAllValueForMultiSelect === "all";
+            if (hasCustomOrAllDefault && !allNeedsOptions) {
               variableLog(
                 variableObject.name,
                 `Variable has custom or "all" default - skipping API call on initial load`,
@@ -1813,6 +2209,11 @@ export default defineComponent({
               return true;
             }
             // If has value but no options (e.g., from URL), continue to load options below
+          }
+
+          if (usesQueryVariableLoader(variableObject)) {
+            void fetchQueryVariableOptions(variableObject);
+            return true;
           }
 
           try {
@@ -1917,18 +2318,6 @@ export default defineComponent({
         dummyQuery = `SELECT ${timestamp_column} FROM "${resolvedStream}"`;
       }
 
-      // Construct the filter from the query data
-      const constructedFilter = (variableObject.query_data?.filter || []).map((condition: any) => ({
-        name: condition.name,
-        operator: condition.operator,
-        value: condition.value,
-      }));
-
-      // Add labels to the dummy query
-      let queryContext = constructedFilter.length
-        ? await addLabelsToSQlQuery(dummyQuery, constructedFilter)
-        : dummyQuery;
-
       // Replace variable placeholders with actual values
       // When using manager, get all visible variables (global + tab + panel)
       // Otherwise, use local variablesData.values (legacy mode)
@@ -1940,9 +2329,6 @@ export default defineComponent({
           manager.getAllVisibleVariables(props.tabId, props.panelId) || variablesData.values;
       }
 
-      // Normalize spaces inside variable syntax before replacement
-      queryContext = normalizeVariableSyntax(queryContext);
-
       const variablesByName = new Map<string, any>();
       for (const variable of variablesToResolve) {
         // dynamic_filters values are arrays of objects, never placeholder values
@@ -1953,6 +2339,39 @@ export default defineComponent({
         }
       }
 
+      // "All" on a custom parent stands for its listed options here too, as it does for panels.
+      const expandFilter = <T extends { operator?: string | null; value?: unknown }>(filter: T) =>
+        expandMultiValueFilter(filter, (name) => {
+          const parent = variablesByName.get(name);
+          return (
+            !!parent?.isVariablePartialLoaded && Array.isArray(resolveQueryVariableValue(parent))
+          );
+        });
+      const filterGroup = variableObject.query_data?.filter_group;
+
+      let queryContext: string;
+      if (!filterGroup) {
+        const constructedFilter = (variableObject.query_data?.filter || []).map(
+          (condition: VariableFilterRow) =>
+            expandFilter({
+              name: condition.name,
+              operator: condition.operator,
+              value: condition.value,
+            }),
+        );
+        queryContext = constructedFilter.length
+          ? await addLabelsToSQlQuery(dummyQuery, constructedFilter)
+          : dummyQuery;
+      } else {
+        queryContext = await addLabelGroupToSQlQuery(
+          dummyQuery,
+          toSqlLabelGroup(filterGroup, expandFilter),
+        );
+      }
+
+      // Normalize spaces inside variable syntax before replacement
+      queryContext = normalizeVariableSyntax(queryContext);
+
       queryContext = replaceVariablePlaceholders(
         queryContext,
         variablesByName.keys(),
@@ -1961,16 +2380,17 @@ export default defineComponent({
           // an unloaded variable keeps its placeholder rather than resolving as a shorter name
           if (!variable.isVariablePartialLoaded) return undefined;
 
-          if (Array.isArray(variable.value)) {
-            const values = variable.value.map((value: any) => escapeSingleQuotes(value));
+          const resolved = resolveQueryVariableValue(variable);
+          if (Array.isArray(resolved)) {
+            const values = resolved.map((value: string) => escapeSingleQuotes(value));
             // '$name' already supplies the outer quotes: '$name' -> 'a', 'b'
             return quoted
               ? values.join("', '")
               : values.map((value: any) => `'${value}'`).join(", ");
           }
-          if (variable.value === null || variable.value === undefined) return undefined;
+          if (resolved === null || resolved === undefined) return undefined;
           // a date variable passes its effective format, like a scalar value
-          return `${escapeSingleQuotes(formatDateVariable(variable, format) ?? variable.value)}`;
+          return `${escapeSingleQuotes(formatDateVariable(variable, format) ?? resolved)}`;
         },
       );
 
@@ -2202,6 +2622,7 @@ export default defineComponent({
       if (useManager && manager) {
         try {
           oldVariablesData[currentVariable.name] = currentVariable.value;
+          delete pinnedQuerySelections[currentVariable.name];
           await manager.updateVariableValue(
             currentVariable.name,
             currentVariable.scope || "global",
@@ -2337,6 +2758,14 @@ export default defineComponent({
       if (typeof index !== "number" || !variableItem || variableItem.type !== "query_values")
         return;
 
+      if (usesQueryVariableLoader(variableItem)) {
+        await searchQueryVariableOptions(
+          variableItem,
+          typeof filterText === "string" ? filterText.trim() : "",
+        );
+        return;
+      }
+
       const variableName = variableItem.name;
 
       // For both search (non-empty filterText) and clear (empty filterText) events,
@@ -2419,6 +2848,9 @@ export default defineComponent({
       t,
       props,
       textboxDebounce,
+      usesQueryVariableLoader,
+      getQueryVariableMaxRecords,
+      isQueryVariableAllCapped,
       isVariableCapped,
       isVariableOmitted,
       isVariableOffTab,

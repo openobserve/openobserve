@@ -28,7 +28,6 @@ import { useFilterHint } from "@/composables/metrics/useFilterHint";
 import { labelFilterKey, type LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 import {
   emptyFilterGroup,
-  escapePromRegexLiteral,
   operatorOfPromMatcher,
   promMatcherFor,
   splitPromRegexLiterals,
@@ -37,6 +36,7 @@ import {
   type FilterGroup,
   type FilterOperatorId,
 } from "@/utils/query/filterBar";
+import { escapeRegExp } from "@/utils/query/promQLUtils";
 
 defineOptions({ name: "LabelFilterBar" });
 
@@ -157,7 +157,7 @@ const toLabelFilter = (condition: FilterCondition): LabelFilter | null => {
   if (!LABEL_NAME_RE.test(condition.field)) return null;
   const label = raw(condition.field);
   const [first = ""] = condition.values;
-  const shaped = promMatcherFor(condition.operator, escapePromRegexLiteral(first));
+  const shaped = promMatcherFor(condition.operator, escapeRegExp(first));
   if (shaped) return { label, operator: shaped.op, value: shaped.value };
   switch (condition.operator) {
     case "neq":
@@ -171,7 +171,7 @@ const toLabelFilter = (condition: FilterCondition): LabelFilter | null => {
       return {
         label,
         operator: condition.operator === "in" ? "=~" : "!~",
-        value: condition.values.map(escapePromRegexLiteral).join("|"),
+        value: condition.values.map(escapeRegExp).join("|"),
       };
     default:
       return { label, operator: "=", value: first };

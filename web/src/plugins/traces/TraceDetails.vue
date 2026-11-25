@@ -742,6 +742,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :search-query="searchQuery"
                         :spanList="spanList"
                         :selectedSpanId="selectedSpanId"
+                        :cacheUses="cacheUses"
                         :hoveredSpanId="hoveredSpanId"
                         :isSidebarOpen="!!(isSidebarOpen && (selectedSpanId || showTraceDetails))"
                         :showCriticalPath="showCriticalPath"
@@ -803,7 +804,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
-                  @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
                   @update:activeTab="onSidebarTabChange($event as string)"
@@ -871,7 +871,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
-                  @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
                   @update:activeTab="onSidebarTabChange($event as string)"
@@ -901,7 +900,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select-span="updateSelectedSpan"
                 @add-filter="addFilterFromSidebar"
                 @apply-filter-immediately="applyFilterImmediately"
-                @open-trace="openTraceLink"
               />
             </div>
 
@@ -925,6 +923,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ThreadView
                   :spans="effectiveSpanList"
                   :selected-span-id="selectedSpanId"
+                  :warm-cache-models="warmCacheModels"
                   @span-selected="updateSelectedSpan"
                 />
               </div>
@@ -956,7 +955,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
-                  @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
                   @update:activeTab="onSidebarTabChange($event as string)"
@@ -1200,7 +1198,8 @@ import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
-import { hasLLMPayload, spanTimeBounds } from "./threadView.utils";
+import { classify, classifyCacheUse, hasLLMPayload, spanTimeBounds } from "./threadView.utils";
+import { useWarmCacheModels } from "./composables/useWarmCacheModels";
 import {
   attributeSteps,
   headlineSteps,
@@ -1860,6 +1859,16 @@ export default defineComponent({
       );
     });
 
+    const warmCacheModels = useWarmCacheModels(currentTraceStreamName, spanList);
+    const cacheUses = computed(() =>
+      Object.fromEntries(
+        classifyCacheUse(
+          (spanList.value || []).filter((s: any) => classify(s) === "llm_turn"),
+          warmCacheModels.value,
+        ),
+      ),
+    );
+
     // Check if service streams feature is enabled
     const serviceStreamsEnabled = computed(() => {
       return store.state.zoConfig.service_streams_enabled !== false;
@@ -2313,6 +2322,18 @@ export default defineComponent({
         } else {
           searchObj.meta.redirectedFromLogs = false;
         }
+      },
+    );
+
+    // A span link, Back and Forward change the URL's trace without remounting this page.
+    watch(
+      () => router.currentRoute.value.query.trace_id,
+      (newTraceId) => {
+        const route = router.currentRoute.value;
+        if (props.mode !== "standalone" || route.name !== "traceDetails" || !newTraceId) return;
+        resetTraceDetails();
+        setupTraceDetails();
+        if (route.query.span_id) updateSelectedSpan(route.query.span_id as string);
       },
     );
 
@@ -3686,11 +3707,6 @@ export default defineComponent({
       backToTracesList();
     };
 
-    const openTraceLink = async () => {
-      resetTraceDetails();
-      await setupTraceDetails();
-    };
-
     // ── Keyboard shortcuts — span navigation ─────────────────────────────
     const spanNavAnnouncement = ref("");
     const announceSpanNav = (message: string) => announceInto(spanNavAnnouncement, message);
@@ -3807,6 +3823,8 @@ export default defineComponent({
       copyToClipboard,
       copyTraceId,
       sessionId,
+      warmCacheModels,
+      cacheUses,
       copySessionId,
       traceDetailsShareURL,
       info: "info",
@@ -3834,7 +3852,6 @@ export default defineComponent({
       focusedEventIndex,
       routeToTracesList,
       handleExpandToFullView,
-      openTraceLink,
       convertTimeFromNsToMs,
       searchQuery,
       handleSearchQueryChange,

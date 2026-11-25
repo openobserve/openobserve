@@ -36,9 +36,10 @@ import {
 import {
   anomalyCodec,
   dashboardFilterCodec,
-  dashboardVariableCodec,
+  dashboardVariableFilterCodec,
   downtimeCodec,
   engineCodec,
+  isFlatAnd,
   leafConditions,
   metricsLabelsCodec,
   modelPricingCodec,
@@ -77,6 +78,7 @@ export type FilterProfileName =
   | "downtime"
   | "dashboard-panel"
   | "dashboard-variable"
+  | "dashboard-variable-promql"
   | "anomaly"
   | "profiles"
   | "rum-funnel"
@@ -267,6 +269,13 @@ const PROMQL_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
   not_in: "filterBar.hints.promql.notIn",
   is_empty: "filterBar.hints.promql.isEmpty",
   is_not_empty: "filterBar.hints.promql.isNotEmpty",
+};
+
+// A PromQL variable writes Is Null as `label=""`, the blank check.
+const PROMQL_VARIABLE_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
+  ...PROMQL_HINTS,
+  is_null: "filterBar.hints.promql.isEmpty",
+  is_not_null: "filterBar.hints.promql.isNotEmpty",
 };
 
 const PROFILES_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
@@ -656,6 +665,30 @@ const modelPricingIssues = (
   return issues;
 };
 
+const PROMQL_VARIABLE_OPERATORS: FilterOperatorId[] = [
+  "eq",
+  "neq",
+  "regex",
+  "not_regex",
+  "in",
+  "not_in",
+  "is_null",
+  "is_not_null",
+];
+
+// A filter written under SQL can hold OR, groups or an operator no label matcher expresses; it is shown, never rewritten.
+const promqlVariableIssues = (tree: FilterGroup, { t }: FilterValidationContext): FilterIssue[] => {
+  const issues: FilterIssue[] = leafConditions(tree)
+    .filter((node) => !PROMQL_VARIABLE_OPERATORS.includes(node.operator))
+    .map((node) => ({
+      nodeId: node.id,
+      message: t("dashboard.queryVariable.promqlOperatorUnsupported"),
+    }));
+  if (!isFlatAnd(tree))
+    issues.push({ nodeId: null, message: t("dashboard.queryVariable.promqlFiltersAndOnly") });
+  return issues;
+};
+
 /** Every page's filter rules, by name; a page passes the name and its own saved value. */
 export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
   logs: { ...horizontalSql, name: "logs" },
@@ -715,8 +748,22 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
     layout: "vertical",
     operators: QUOTED_SQL_OPERATORS,
     operatorHints: QUOTED_SQL_HINTS,
-    codec: dashboardVariableCodec(),
+    maxDepth: null,
+    connectors: "per-item",
+    codec: dashboardVariableFilterCodec(),
     validation: "requireComplete",
+  },
+  // An auto PromQL variable turns each filter into one label matcher of a selector, which has no OR.
+  "dashboard-variable-promql": {
+    ...flat,
+    name: "dashboard-variable-promql",
+    layout: "vertical",
+    dialect: "promql",
+    operators: forAll(PROMQL_VARIABLE_OPERATORS),
+    operatorHints: PROMQL_VARIABLE_HINTS,
+    codec: dashboardVariableFilterCodec(),
+    validation: "requireComplete",
+    validate: promqlVariableIssues,
   },
   anomaly: {
     ...flat,

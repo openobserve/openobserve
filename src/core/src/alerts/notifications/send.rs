@@ -20,7 +20,8 @@ use std::time::Duration;
 use config::meta::destinations::{DestinationType, Email, Template, TemplateKind, TemplateType};
 
 use super::{
-    NotificationContext, RenderedMessage, apply_custom_template, derive_channel_format,
+    NotificationContext, RenderedMessage, apply_custom_template, apply_template_body,
+    derive_channel_format,
     format::ChannelFormat,
     jira,
     platform::{self, platform_of},
@@ -131,7 +132,7 @@ pub async fn send_to_destination(
     match template.kind {
         TemplateKind::Custom => {
             // Unchanged legacy path — byte-identical output.
-            let msg = apply_custom_template(&template.body, ctx, is_email);
+            let msg = apply_template_body(template, ctx, is_email);
             let msg = stamp_platform_key(dest_type, ctx, msg);
             let title = custom_title(template, ctx, is_email);
             let (email_subject, sns_subject) = custom_subjects(subject, title);

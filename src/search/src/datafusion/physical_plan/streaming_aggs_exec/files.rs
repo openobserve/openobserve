@@ -504,9 +504,11 @@ pub fn get_cache_file_path(file_path: &str, file_name: &str) -> String {
     format!("{STREAMING_AGGS_CACHE_DIR}/{file_path}/{file_name}")
 }
 
+/// `redaction_digest` changes with the search-time patterns, since cached results are redacted.
 pub fn get_aggregation_cache_key_from_request(
     req: &SearchPartitionRequest,
     histogram_interval: Option<i64>,
+    redaction_digest: Option<&str>,
 ) -> u64 {
     // Keep UTC entries separate from caches written before timezone eligibility was enforced.
     let mut hash_body = vec!["aggregation-v2".to_string(), req.sql.clone()];
@@ -523,12 +525,19 @@ pub fn get_aggregation_cache_key_from_request(
     if !req.clusters.is_empty() {
         hash_body.extend(req.clusters.clone());
     }
+    if let Some(digest) = redaction_digest {
+        hash_body.push(digest.to_string());
+    }
     config::utils::hash::sum64(&hash_body.join(","))
 }
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::StringArray;
+    use arrow::{
+        array::{BinaryArray, Int32Array, ListArray, StringArray, StructArray},
+        buffer::OffsetBuffer,
+        datatypes::{Fields, Schema},
+    };
 
     use super::*;
 
@@ -540,8 +549,11 @@ mod tests {
             "end_time": 2,
         }))
         .unwrap();
-        let utc = get_aggregation_cache_key_from_request(&req, None);
-        assert_eq!(utc, get_aggregation_cache_key_from_request(&req, None));
+        let utc = get_aggregation_cache_key_from_request(&req, None, None);
+        assert_eq!(
+            utc,
+            get_aggregation_cache_key_from_request(&req, None, None)
+        );
         assert_ne!(
             utc,
             config::utils::hash::sum64(&req.sql),
@@ -557,25 +569,40 @@ mod tests {
             "end_time": 2,
         }))
         .unwrap();
-        let minute = get_aggregation_cache_key_from_request(&req, Some(60));
+        let minute = get_aggregation_cache_key_from_request(&req, Some(60), None);
         assert_eq!(
             minute,
-            get_aggregation_cache_key_from_request(&req, Some(60))
+            get_aggregation_cache_key_from_request(&req, Some(60), None)
         );
         assert_ne!(
             minute,
-            get_aggregation_cache_key_from_request(&req, Some(30))
+            get_aggregation_cache_key_from_request(&req, Some(30), None)
         );
-        assert_ne!(minute, get_aggregation_cache_key_from_request(&req, None));
+        assert_ne!(
+            minute,
+            get_aggregation_cache_key_from_request(&req, None, None)
+        );
+    }
+
+    #[test]
+    fn aggregation_cache_key_separates_redaction_digests() {
+        let req: SearchPartitionRequest = serde_json::from_value(serde_json::json!({
+            "sql": "SELECT count(*) AS c FROM t",
+            "start_time": 1,
+            "end_time": 2,
+        }))
+        .unwrap();
+        let plain = get_aggregation_cache_key_from_request(&req, None, None);
+        let first = get_aggregation_cache_key_from_request(&req, None, Some("sdr=a"));
+        assert_ne!(plain, first);
+        assert_ne!(
+            first,
+            get_aggregation_cache_key_from_request(&req, None, Some("sdr=b"))
+        );
     }
 
     #[test]
     fn test_get_record_batches_rejects_invalid_ipc() {
-        use arrow::{
-            array::{Array, BinaryArray},
-            datatypes::Schema,
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
         let binary = BinaryArray::from_iter_values([b"ok".as_slice(), &[0xff, 0xfe, 0xfd]]);
         // SAFETY: deliberately invalid UTF-8 to exercise the reader's validation
@@ -601,8 +628,6 @@ mod tests {
 
     #[test]
     fn test_cast_array_recursive_string_types() {
-        use arrow::array::StringArray;
-
         // Test Utf8 to Utf8View
         let array: ArrayRef = Arc::new(StringArray::from(vec!["hello", "world"]));
         let result = cast_array_recursive(&array, &DataType::Utf8, &DataType::Utf8View);
@@ -623,8 +648,6 @@ mod tests {
 
     #[test]
     fn test_cast_array_recursive_identical_types() {
-        use arrow::array::Int32Array;
-
         // Test that identical types return None (no cast needed)
         let array: ArrayRef = Arc::new(Int32Array::from(vec![1, 2, 3]));
         let result = cast_array_recursive(&array, &DataType::Int32, &DataType::Int32);
@@ -638,11 +661,9 @@ mod tests {
 
     #[test]
     fn test_cast_array_recursive_list_with_string() {
-        use arrow::array::{ListArray, StringArray};
-
         // Create a List<Utf8> array
         let values = StringArray::from(vec!["a", "b", "c", "d"]);
-        let offsets = arrow::buffer::OffsetBuffer::new(vec![0, 2, 4].into());
+        let offsets = OffsetBuffer::new(vec![0, 2, 4].into());
         let field = Arc::new(Field::new("item", DataType::Utf8, true));
         let list_array = ListArray::new(field.clone(), offsets, Arc::new(values), None);
         let array: ArrayRef = Arc::new(list_array);
@@ -664,11 +685,9 @@ mod tests {
 
     #[test]
     fn test_cast_array_recursive_nested_list() {
-        use arrow::array::{ListArray, StringArray};
-
         // Create a List<List<Utf8>> structure
         let inner_values = StringArray::from(vec!["x", "y"]);
-        let inner_offsets = arrow::buffer::OffsetBuffer::new(vec![0, 1, 2].into());
+        let inner_offsets = OffsetBuffer::new(vec![0, 1, 2].into());
         let inner_field = Arc::new(Field::new("item", DataType::Utf8, true));
         let inner_list = ListArray::new(
             inner_field.clone(),
@@ -677,7 +696,7 @@ mod tests {
             None,
         );
 
-        let outer_offsets = arrow::buffer::OffsetBuffer::new(vec![0, 2].into());
+        let outer_offsets = OffsetBuffer::new(vec![0, 2].into());
         let outer_field = Arc::new(Field::new(
             "item",
             DataType::List(inner_field.clone()),
@@ -704,11 +723,6 @@ mod tests {
 
     #[test]
     fn test_cast_array_recursive_struct_with_string() {
-        use arrow::{
-            array::{Int32Array, StringArray, StructArray},
-            datatypes::Fields,
-        };
-
         // Create a Struct with (name: Utf8, age: Int32)
         let name_array = Arc::new(StringArray::from(vec!["Alice", "Bob"]));
         let age_array = Arc::new(Int32Array::from(vec![30, 25]));
@@ -772,8 +786,6 @@ mod tests {
 
     #[test]
     fn test_needs_recursive_cast_struct_types() {
-        use arrow::datatypes::Fields;
-
         // Struct with different field types
         let from_fields = Fields::from(vec![Field::new("name", DataType::Utf8, false)]);
         let to_fields = Fields::from(vec![Field::new("name", DataType::Utf8View, false)]);
@@ -789,8 +801,6 @@ mod tests {
 
     #[test]
     fn test_cast_array_recursive_incompatible_types() {
-        use arrow::array::{Int32Array, StringArray};
-
         // Test that incompatible types return None
         let array: ArrayRef = Arc::new(Int32Array::from(vec![1, 2, 3]));
         let result = cast_array_recursive(&array, &DataType::Int32, &DataType::Float64);

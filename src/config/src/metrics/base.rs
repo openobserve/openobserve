@@ -981,6 +981,19 @@ pub static QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::
     )
     .expect("Metric created")
 });
+pub static QUERY_PARQUET_METADATA_CACHE_REREAD_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_parquet_metadata_cache_reread_miss_total",
+            "Querier parquet metadata cache misses on keys this cache evicted earlier.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
 pub static QUERY_PARQUET_METADATA_CACHE_GC_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -1364,11 +1377,8 @@ pub static META_NUM_ALERTS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// Alert notification chart events. Single low-cardinality `event` label —
-// deliberately NO organization/alert labels: signature failures carry
-// attacker-controlled request data, which must never become label values.
-// Events: rendered_fetch, cache_hit, rendered_send, bad_signature, expired,
-// malformed, over_capacity, send_rate_capped.
+// One `event` label only: signature failures carry attacker-controlled request data,
+// which must never become a label value.
 pub static ALERT_CHART_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -1378,6 +1388,20 @@ pub static ALERT_CHART_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &["event"],
+    )
+    .expect("Metric created")
+});
+
+/// `op` is the sidecar call; `outcome` is `failed_run` or `tolerated` (the fourth-run fallback).
+pub static ANOMALY_SIDECAR_FAILURES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "anomaly_sidecar_failures_total",
+            "Anomaly detection sidecar read or delete failures, by operation and outcome",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["op", "outcome"],
     )
     .expect("Metric created")
 });
@@ -1859,6 +1883,19 @@ pub static TANTIVY_RESULT_CACHE_HITS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static TANTIVY_RESULT_CACHE_REREAD_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "tantivy_result_cache_reread_miss_total",
+            "Total number of misses of tantivy result cache on keys it evicted earlier",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
 pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -1946,6 +1983,19 @@ pub static BYTES_CACHE_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
         Opts::new(
             "bytes_cache_miss_total",
             "Total number of misses of a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
+pub static BYTES_CACHE_REREAD_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bytes_cache_reread_miss_total",
+            "Total number of misses of a bytes cache on keys it evicted earlier",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -2980,6 +3030,31 @@ pub static RCA_LIVE_STREAMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+// AutoObserve's own health, set by the enterprise engine: the path that works when Slack does not.
+pub static AUTOOBSERVE_FEED_FAILING: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "autoobserve_feed_failing",
+            "1 while the org's AutoObserve Slack feed fails to post, else 0",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AUTOOBSERVE_HEARTBEAT_AGE_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "autoobserve_heartbeat_age_seconds",
+            "Seconds since the region's AutoObserve engine last finished a good pass",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["region"],
+    )
+    .expect("Metric created")
+});
 // Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
 pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -3380,6 +3455,11 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(
+            QUERY_PARQUET_METADATA_CACHE_REREAD_MISS_TOTAL.clone(),
+        ))
+        .expect("Metric registered");
+    registry
         .register(Box::new(QUERY_PARQUET_METADATA_CACHE_GC_COUNT.clone()))
         .expect("Metric registered");
     registry
@@ -3511,6 +3591,9 @@ pub(crate) fn register(registry: &Registry) {
     registry
         .register(Box::new(ALERT_CHART_EVENTS_TOTAL.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(ANOMALY_SIDECAR_FAILURES_TOTAL.clone()))
+        .expect("Metric registered");
 
     registry
         .register(Box::new(ALERT_RUNS_SUPPRESSED_TOTAL.clone()))
@@ -3622,6 +3705,9 @@ pub(crate) fn register(registry: &Registry) {
     registry
         .register(Box::new(TANTIVY_RESULT_CACHE_HITS_TOTAL.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(TANTIVY_RESULT_CACHE_REREAD_MISS_TOTAL.clone()))
+        .expect("Metric registered");
 
     // metrics for generic bytes cache
     registry
@@ -3641,6 +3727,9 @@ pub(crate) fn register(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(BYTES_CACHE_MISS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BYTES_CACHE_REREAD_MISS_TOTAL.clone()))
         .expect("Metric registered");
 
     // tokio runtime metrics
@@ -3816,6 +3905,8 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(RCA_ANSWER_WAIT_SECONDS.clone()),
         Box::new(RCA_RESUME_TOTAL.clone()),
         Box::new(RCA_LIVE_STREAMS.clone()),
+        Box::new(AUTOOBSERVE_FEED_FAILING.clone()),
+        Box::new(AUTOOBSERVE_HEARTBEAT_AGE_SECONDS.clone()),
         Box::new(PUBLIC_DASHBOARD_READS_TOTAL.clone()),
         Box::new(PUBLIC_DASHBOARD_BUILDS_TOTAL.clone()),
         Box::new(PUBLIC_DASHBOARD_BUILD_SECONDS.clone()),
@@ -3955,6 +4046,7 @@ mod tests {
         let _ = QUERY_PARQUET_METADATA_CACHE_USED_BYTES.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_HITS_TOTAL.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL.clone();
+        let _ = QUERY_PARQUET_METADATA_CACHE_REREAD_MISS_TOTAL.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_GC_COUNT.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_GC_TIME.clone();
         let _ = QUERY_DISK_CACHE_HIT_COUNT.clone();
@@ -4007,6 +4099,9 @@ mod tests {
     fn test_statics_alert_chart_and_suppression() {
         let _ = ALERT_CHART_EVENTS_TOTAL.clone();
         let _ = ALERT_RUNS_SUPPRESSED_TOTAL.clone();
+        ANOMALY_SIDECAR_FAILURES_TOTAL
+            .with_label_values(&["anchor_read", "failed_run"])
+            .inc();
     }
 
     #[test]
@@ -4055,12 +4150,14 @@ mod tests {
         let _ = TANTIVY_RESULT_CACHE_GC_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_REQUESTS_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_HITS_TOTAL.clone();
+        let _ = TANTIVY_RESULT_CACHE_REREAD_MISS_TOTAL.clone();
         let _ = BYTES_CACHE_MEMORY_SIZE.clone();
         let _ = BYTES_CACHE_ENTRY_COUNT.clone();
         let _ = BYTES_CACHE_GC_TIME.clone();
         let _ = BYTES_CACHE_GC_COUNT.clone();
         let _ = BYTES_CACHE_HITS_TOTAL.clone();
         let _ = BYTES_CACHE_MISS_TOTAL.clone();
+        let _ = BYTES_CACHE_REREAD_MISS_TOTAL.clone();
         let _ = TOKIO_RUNTIME_TASKS.clone();
         let _ = TOKIO_RUNTIME_TASKS_TOTAL.clone();
         let _ = TOKIO_RUNTIME_WORKER_METRICS.clone();

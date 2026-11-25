@@ -12,6 +12,8 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const MonacoEditorHelper = require('../utils/MonacoEditorHelper.js');
+const { ingestTraces } = require('../utils/trace-ingestion.js');
+const { EDITOR_HOSTS, seedEditor, waitForMenu, openTracesStream } = require('../utils/suggest-menu-helpers.js');
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -394,5 +396,23 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
         }
 
         testLogger.info('Isolation test completed');
+    });
+});
+
+test.describe("Traces editor suggestions for a typed word", () => {
+    test("a typed word offers no match_all row, since trace streams have no full-text fields", {
+        tag: ['@all', '@autosuggestions', '@traces', '@bug-16941', '@P1']
+    }, async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        await ingestTraces(page, 2);
+        await openTracesStream(page, process.env['ORGNAME'] || 'default');
+
+        await seedEditor(page, EDITOR_HOSTS.traces, '');
+        await page.keyboard.type('alp', { delay: 60 });
+        const menu = await waitForMenu(page, 10000);
+        testLogger.info(`Menu rows for "alp": ${menu.rows.join(' | ')}`);
+
+        expect(menu.rows.filter((row) => /match_all/i.test(row))).toEqual([]);
     });
 });

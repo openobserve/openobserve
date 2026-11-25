@@ -52,11 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :to="linkOf(lane)!"
                 class="text-accent min-w-0 text-sm font-medium hover:underline"
                 data-test="incident-overview-lane-name"
-                ><OTruncatedText>{{ lane.name }}</OTruncatedText></router-link
+                ><OTruncatedText :lines="2" class="wrap-anywhere">{{
+                  lane.name
+                }}</OTruncatedText></router-link
               >
               <OTruncatedText
                 v-else
-                class="text-text-heading min-w-0 text-sm font-medium"
+                :lines="2"
+                class="text-text-heading min-w-0 text-sm font-medium wrap-anywhere"
                 data-test="incident-overview-lane-name"
                 >{{ lane.name }}</OTruncatedText
               >
@@ -71,13 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-xs">{{ factsOf(lane) }}</span>
             </div>
           </div>
-          <div class="border-border-default relative flex flex-col justify-end border-b py-3">
-            <span
-              v-if="peakBox"
-              class="border-accent rounded-default pointer-events-none absolute inset-y-1 border"
-              :style="peakBox"
-              aria-hidden="true"
-            />
+          <div class="border-border-default flex flex-col justify-end border-b py-3">
             <div
               class="text-text-secondary text-2xs grid tabular-nums"
               :style="columns"
@@ -102,17 +99,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             v-for="tick in model.ticks"
             :key="tick.index"
-            class="text-text-secondary flex justify-center text-xs whitespace-nowrap tabular-nums"
+            class="text-text-secondary flex text-xs whitespace-nowrap tabular-nums"
+            :class="tickAlign(tick.index)"
             :style="{ gridColumnStart: tick.index + 1 }"
           >
-            <OTag
-              v-if="tick.peak"
-              variant="primary-soft"
-              size="sm"
-              :label="t('alerts.incidents.overview.peak')"
-              data-test="incident-overview-peak"
-            />
-            <template v-else-if="tick.soFar">{{
+            <template v-if="tick.soFar">{{
               t("alerts.incidents.overview.soFar", { time: tick.label })
             }}</template>
             <template v-else>{{ tick.label }}</template>
@@ -143,7 +134,6 @@ import { useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import { seriesSwatch } from "@/lib/data/SegmentedBar/OSegmentedBar.types";
@@ -186,11 +176,11 @@ const hiddenCount = computed(() =>
 const columns = computed(() => ({
   gridTemplateColumns: `repeat(${model.value?.buckets ?? 1}, minmax(0, 1fr))`,
 }));
-const peakBox = computed(() => {
-  const n = model.value?.buckets ?? 1;
-  const peak = model.value?.peak ?? null;
-  return peak === null ? null : { left: `${(peak / n) * 100}%`, width: `${100 / n}%` };
-});
+// Edge labels grow inward so the card never clips them.
+const tickAlign = (index: number) => {
+  if (index === 0) return "justify-start";
+  return index === (model.value?.buckets ?? 1) - 1 ? "justify-end" : "justify-center";
+};
 const slotOf = (index: number) => (index % SERIES_SLOTS) + 1;
 
 const caption = computed(() => {

@@ -112,6 +112,28 @@ describe("SearchBar — adding a filter term to the query", () => {
     expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("");
   });
 
+  describe("two streams joined in SQL mode", () => {
+    const base = `SELECT * FROM "a" JOIN "b" ON "a".k = "b".k WHERE "a".x = 1`;
+
+    beforeEach(() => {
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.data.stream.selectedStream = ["a", "b"];
+    });
+
+    afterEach(() => {
+      wrapper.vm.searchObj.data.stream.selectedStream = [];
+    });
+
+    it.each([
+      ["k = 'v'", `"a".k = 'v'`],
+      ["(k is null OR k = '')", `("a".k is null OR "a".k = '')`],
+      ["(k = 'x' OR k = 'y')", `("a".k = 'x' OR "a".k = 'y')`],
+    ])("qualifies every condition of %s with the first stream", async (filter, qualified) => {
+      wrapper.vm.searchObj.data.query = base;
+      expect(await addFilterTerm(filter)).toBe(`${base} AND ${qualified}`);
+    });
+  });
+
   describe("a field whose name ends another field's name", () => {
     const base = `SELECT * FROM "qa" WHERE db_operation_name = 'SELECT'`;
 
@@ -169,6 +191,122 @@ describe("SearchBar — adding a filter term to the query", () => {
     });
   });
 
+  describe("SQL mode outer WHERE handling", () => {
+    beforeEach(() => {
+      wrapper.vm.searchObj.meta.sqlMode = true;
+    });
+
+    const run = async (query: string, filter: string) => {
+      wrapper.vm.searchObj.data.query = query;
+      return addFilterTerm(filter);
+    };
+
+    it("keeps UNION ALL on its own line after a branch ending in a line comment", async () => {
+      const query = [
+        "SELECT id FROM t WHERE a = 1 -- first branch",
+        "UNION ALL",
+        "SELECT id FROM t WHERE b = 2",
+      ].join("\n");
+
+      expect(await run(query, "c = 2")).toBe(
+        [
+          "SELECT id FROM t WHERE a = 1 AND c = 2 -- first branch",
+          " UNION ALL ",
+          "SELECT id FROM t WHERE b = 2 AND c = 2",
+        ].join("\n"),
+      );
+    });
+
+    it("does not replace a field that only occurs in a subquery", async () => {
+      const query =
+        "SELECT id FROM t\nWHERE level = 'error'\n   OR id IN (SELECT id FROM t WHERE svc_name = 'beta')";
+
+      expect(await run(query, "svc_name = 'alpha'")).toBe(
+        "SELECT id FROM t\nWHERE (level = 'error'\n   OR id IN (SELECT id FROM t WHERE svc_name = 'beta')) AND svc_name = 'alpha'",
+      );
+    });
+
+    it("replaces only the outer condition when the field is also in a subquery", async () => {
+      const query =
+        "SELECT id FROM t WHERE svc_name = 'x' AND id IN (SELECT id FROM t WHERE svc_name = 'beta')";
+
+      expect(await run(query, "svc_name = 'alpha'")).toBe(
+        "SELECT id FROM t WHERE svc_name = 'alpha' AND id IN (SELECT id FROM t WHERE svc_name = 'beta')",
+      );
+    });
+
+    it("still replaces a multi-value group in the outer WHERE", async () => {
+      expect(
+        await run(
+          "SELECT id FROM t WHERE (svc_name = 'x' OR svc_name = 'y') ORDER BY id",
+          "svc_name = 'alpha'",
+        ),
+      ).toBe("SELECT id FROM t WHERE svc_name = 'alpha' ORDER BY id");
+    });
+
+    it("adds the filter to the WHERE of a query with a quoted field named limit", async () => {
+      expect(await run('SELECT * FROM "qb_logs" WHERE "limit" > 5', "svc_name = 'alpha'")).toBe(
+        `SELECT * FROM "qb_logs" WHERE "limit" > 5 AND svc_name = 'alpha'`,
+      );
+    });
+
+    it("adds a WHERE when the only limit is a quoted column", async () => {
+      expect(await run('SELECT "limit", "order by" FROM "qb_logs"', "svc_name = 'alpha'")).toBe(
+        `SELECT "limit", "order by" FROM "qb_logs" where svc_name = 'alpha'`,
+      );
+    });
+
+    it.each([
+      "order by date",
+      "sort by name, order by date",
+      "group by team",
+      "having x",
+      "limit 5",
+    ])("keeps the clause words in the value '%s' inside the quotes", async (value) => {
+      expect(
+        await run(`SELECT * FROM "qb_logs" WHERE note = '${value}'`, "svc_name = 'alpha'"),
+      ).toBe(`SELECT * FROM "qb_logs" WHERE note = '${value}' AND svc_name = 'alpha'`);
+    });
+
+    it("puts the filter before the real clauses when a value also contains them", async () => {
+      expect(
+        await run(
+          `SELECT svc_name, count(*) FROM "qb_logs" WHERE note = 'order by date' GROUP BY svc_name HAVING count(*) > 1 ORDER BY 2 LIMIT 10`,
+          "svc_name = 'alpha'",
+        ),
+      ).toBe(
+        `SELECT svc_name, count(*) FROM "qb_logs" WHERE note = 'order by date' AND svc_name = 'alpha' GROUP BY svc_name HAVING count(*) > 1 ORDER BY 2 LIMIT 10`,
+      );
+    });
+
+    it("keeps each branch's own UNION or UNION ALL and filters every branch", async () => {
+      const query = await run(
+        'SELECT id FROM "a" UNION SELECT id FROM "b" UNION ALL SELECT id FROM "c"',
+        "svc_name = 'alpha'",
+      );
+
+      expect(query.match(/UNION( ALL)?/g)).toEqual(["UNION", "UNION ALL"]);
+      expect(query.match(/svc_name = 'alpha'/g)).toHaveLength(3);
+    });
+
+    it("does not split a query at a UNION that is only text in a value", async () => {
+      expect(
+        await run(`SELECT * FROM "qb_logs" WHERE note = 'a union b'`, "svc_name = 'alpha'"),
+      ).toBe(`SELECT * FROM "qb_logs" WHERE note = 'a union b' AND svc_name = 'alpha'`);
+    });
+
+    it("ignores a where inside a string literal and handles each UNION branch alone", async () => {
+      expect(
+        await run(
+          "SELECT id FROM t WHERE svc_name = 'x' UNION SELECT id FROM u WHERE msg = 'where svc_name = ''z'''",
+          "svc_name = 'alpha'",
+        ),
+      ).toBe(
+        "SELECT id FROM t WHERE svc_name = 'alpha'  UNION  SELECT id FROM u WHERE msg = 'where svc_name = ''z''' AND svc_name = 'alpha'",
+      );
+    });
+  });
+
   describe("free text (item 1 AC6.9)", () => {
     const stream = (name: string, fts: boolean) => ({
       name,
@@ -197,6 +335,15 @@ describe("SearchBar — adding a filter term to the query", () => {
       const query = await addFilterTerm("level='error'");
 
       expect(query).toBe("(\nmatch_all('timeout') OR match_all('refused')\n) AND level='error'");
+    });
+
+    it("adds the facet without brackets when the filter has no top-level OR", async () => {
+      select(stream("fts_a", true));
+      wrapper.vm.searchObj.data.query = "match_all('x')";
+
+      const query = await addFilterTerm("activity_name = 'Update'");
+
+      expect(query).toBe("match_all('x') AND activity_name = 'Update'");
     });
 
     it("keeps today's plain append when a selected stream cannot search text", async () => {

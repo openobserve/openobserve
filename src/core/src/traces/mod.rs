@@ -840,7 +840,7 @@ pub async fn handle_otlp_request(
         ));
     }
     // Refused before the pipelines run: a remote-stream destination writes inside them.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
         org_id,
         StreamType::Traces,
@@ -1308,7 +1308,7 @@ pub async fn handle_otlp_request(
         );
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         let streams: Vec<(&str, u64)> = json_data_by_stream
             .iter()
@@ -1332,7 +1332,7 @@ pub async fn handle_otlp_request(
     // Span attributes are flattened to top-level string fields (see
     // finalize_and_buffer_trace_span), so the same field-level pattern engine used for logs
     // applies directly here.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
             Ok(pattern_manager) => {
@@ -1675,7 +1675,7 @@ pub async fn ingest_json(
         );
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         let streams: Vec<(&str, u64)> = json_data_by_stream
             .iter()
@@ -1698,7 +1698,7 @@ pub async fn ingest_json(
     // Span attributes are flattened to top-level string fields (see
     // finalize_and_buffer_trace_span), so the same field-level pattern engine used for logs
     // applies directly here.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
             Ok(pattern_manager) => {
@@ -2143,6 +2143,11 @@ fn detect_llm_stream(contains_key: impl Fn(&str) -> bool) -> bool {
 mod tests {
     use std::collections::{HashMap, HashSet};
 
+    use arrow::{
+        array::{Array, StringArray},
+        compute::cast,
+        datatypes::DataType,
+    };
     use config::utils::json::{self, json};
     use opentelemetry_proto::tonic::trace::v1::{Status, status::StatusCode};
 
@@ -3972,8 +3977,6 @@ mod tests {
         stream: &str,
         resources: Vec<ResourceInput<'_>>,
     ) -> Vec<String> {
-        use arrow::{array::StringArray, compute::cast, datatypes::DataType};
-
         let org_id = "test_service_name_scope_org";
         infra::db::create_table().await.unwrap();
         let resp = super::handle_otlp_request(
@@ -4071,11 +4074,7 @@ mod tests {
     #[cfg(not(feature = "cloud"))]
     #[tokio::test]
     async fn test_handle_otlp_request_llm_processing_sees_span_name_and_error_status() {
-        use arrow::{
-            array::{Array, StringArray},
-            compute::cast,
-            datatypes::DataType,
-        };
+        use arrow::array::ArrayRef;
         use opentelemetry_proto::tonic::{
             collector::trace::v1::ExportTraceServiceRequest,
             common::v1::InstrumentationScope,
@@ -4171,7 +4170,7 @@ mod tests {
                     .column_by_name(name)
                     .map(|c| cast(c, &DataType::Utf8).unwrap())
             };
-            let value = |col: &Option<arrow::array::ArrayRef>, row: usize| {
+            let value = |col: &Option<ArrayRef>, row: usize| {
                 col.as_ref().and_then(|c| {
                     let c = c.as_any().downcast_ref::<StringArray>().unwrap();
                     (!c.is_null(row)).then(|| c.value(row).to_string())
@@ -4368,12 +4367,6 @@ mod tests {
         org_id: &str,
         stream: &str,
     ) -> std::collections::BTreeMap<String, HashMap<String, String>> {
-        use arrow::{
-            array::{Array, StringArray},
-            compute::cast,
-            datatypes::DataType,
-        };
-
         let (_, batches) = ingester::read_from_memtable(
             org_id,
             config::meta::stream::StreamType::Traces.as_str(),

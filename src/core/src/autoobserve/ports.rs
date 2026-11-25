@@ -113,22 +113,20 @@ impl SearchPort for SearchAdapter {
         size: i64,
         timeout: Duration,
     ) -> anyhow::Result<SearchPage> {
-        let trace_id = ider::generate_trace_id();
-        let mut guard = CancelOnDrop {
-            org: org.to_string(),
-            trace_id: trace_id.clone(),
-            armed: true,
-        };
-        let read = search_streamed(&trace_id, org, sql, range, size, timeout);
-        let read = tokio::time::timeout(timeout, read).await;
-        guard.armed = read.is_err();
-        match read {
-            Err(_) => anyhow::bail!("streamed search timed out after {timeout:?}"),
-            Ok(Err(InfraError::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(_)))) => {
-                Ok(SearchPage::default())
-            }
-            Ok(other) => other.map_err(rejected_or_failed),
-        }
+        streamed_within(org, StreamType::Logs, sql, range, size, timeout).await
+    }
+
+    async fn sql_streamed_on(
+        &self,
+        org: &str,
+        stream_type: &str,
+        sql: &str,
+        range: (i64, i64),
+        size: i64,
+        timeout: Duration,
+    ) -> anyhow::Result<SearchPage> {
+        let stream_type = stream_type_of(stream_type)?;
+        streamed_within(org, stream_type, sql, range, size, timeout).await
     }
 
     async fn sql_on(
@@ -414,15 +412,28 @@ impl StreamStatsPort for StreamStatsAdapter {
 /// Each org's engine streams, by type then name.
 type OrgIndex = HashMap<String, Vec<(StreamType, String)>>;
 
-/// No reason text is generated until AI metering is wired to the engine, so every ask is refused.
-pub struct NoAiUsage;
+/// The engine's only AI is the incident's own analysis, so its gates decide; the run charges
+/// itself when it starts, so asking here never deducts.
+pub struct IncidentAiUsage;
 
 #[async_trait]
-impl AiUsagePort for NoAiUsage {
-    async fn authorize(&self, _org: &str) -> anyhow::Result<AiPermit> {
-        Ok(AiPermit::Refused(
-            "AI usage metering is not connected to the engine".to_string(),
-        ))
+impl AiUsagePort for IncidentAiUsage {
+    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
+    async fn authorize(&self, org: &str) -> anyhow::Result<AiPermit> {
+        if let Some(off) = crate::alerts::incidents::rca_not_run_reason() {
+            return Ok(AiPermit::Refused(off.to_string()));
+        }
+        #[cfg(feature = "cloud")]
+        if let Err(e) = crate::trial_quota::precheck_ai_usage(
+            org,
+            crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+            crate::alerts::incidents::SYSTEM_USER_EMAIL,
+        )
+        .await
+        {
+            return Ok(AiPermit::Refused(e.to_string()));
+        }
+        Ok(AiPermit::Allowed)
     }
 }
 
@@ -535,7 +546,7 @@ pub fn ports() -> Ports {
         sink: Arc::new(MetaSink),
         kv: Arc::new(KvAdapter),
         stream_stats: Arc::new(StreamStatsAdapter::default()),
-        ai_usage: Arc::new(NoAiUsage),
+        ai_usage: Arc::new(IncidentAiUsage),
         investigation: Some(Arc::new(super::incidents::IncidentInvestigation)),
         triggers: Arc::new(EngineTrigger),
         context: Arc::new(ContextReads),
@@ -564,10 +575,37 @@ async fn search(
     })
 }
 
+async fn streamed_within(
+    org: &str,
+    stream_type: StreamType,
+    sql: &str,
+    range: (i64, i64),
+    size: i64,
+    timeout: Duration,
+) -> anyhow::Result<SearchPage> {
+    let trace_id = ider::generate_trace_id();
+    let mut guard = CancelOnDrop {
+        org: org.to_string(),
+        trace_id: trace_id.clone(),
+        armed: true,
+    };
+    let read = search_streamed(&trace_id, org, stream_type, sql, range, size, timeout);
+    let read = tokio::time::timeout(timeout, read).await;
+    guard.armed = read.is_err();
+    match read {
+        Err(_) => anyhow::bail!("streamed search timed out after {timeout:?}"),
+        Ok(Err(InfraError::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(_)))) => {
+            Ok(SearchPage::default())
+        }
+        Ok(other) => other.map_err(rejected_or_failed),
+    }
+}
+
 /// The partitioned streaming search folded into one answer; a clamped range or cut answer fails.
 async fn search_streamed(
     trace_id: &str,
     org: &str,
+    stream_type: StreamType,
     sql: &str,
     range: (i64, i64),
     size: i64,
@@ -582,7 +620,7 @@ async fn search_streamed(
         org,
         "",
         &mut req,
-        StreamType::Logs,
+        stream_type,
         streams,
         None,
         String::new(),
@@ -1140,10 +1178,18 @@ mod tests {
         assert_eq!((week.doc_num, empty.doc_num), (Some(700), None));
     }
 
+    /// Tests run without an agent target, so the incident's analysis is off and so is the port.
     #[tokio::test]
-    async fn ai_is_refused_until_metering_is_connected() {
-        let permit = NoAiUsage.authorize("default").await.unwrap();
-        assert!(matches!(permit, AiPermit::Refused(_)));
+    async fn ai_usage_follows_the_incident_analysis_and_never_deducts() {
+        let off = crate::alerts::incidents::rca_not_run_reason().expect("no agent in tests");
+        #[cfg(feature = "cloud")]
+        let pool = crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis.pool();
+        #[cfg(feature = "cloud")]
+        let used = crate::trial_quota::get_used_for_pool("default", pool);
+        let permit = IncidentAiUsage.authorize("default").await.unwrap();
+        assert_eq!(permit, AiPermit::Refused(off.to_string()));
+        #[cfg(feature = "cloud")]
+        assert_eq!(crate::trial_quota::get_used_for_pool("default", pool), used);
     }
 
     #[tokio::test]

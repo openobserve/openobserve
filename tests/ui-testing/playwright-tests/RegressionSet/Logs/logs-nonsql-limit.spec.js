@@ -1,4 +1,4 @@
-const { test, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 
@@ -40,5 +40,68 @@ test.describe("Logs non-SQL LIMIT handling", () => {
     await pm.logsPage.expectSqlErrorStateNotVisible();
 
     testLogger.info('✓ PASSED: a LIMIT-free non-SQL filter still runs (Bug #6915)');
+  });
+});
+
+test.describe("Logs non-SQL not-equal operator", () => {
+  test.describe.configure({ mode: 'serial' });
+  const orgId = process.env.ORGNAME || 'default';
+  const stream = `e2e_nonsql_ne_${Date.now().toString(36)}`;
+  const rows = [
+    ...Array.from({ length: 4 }, (_, i) => ({ level: 'error', seq: i })),
+    ...Array.from({ length: 6 }, (_, i) => ({ level: 'info', seq: 10 + i })),
+  ];
+  const NOT_ERROR_TOTAL = 6;
+  let pm;
+
+  test.beforeAll(async ({ browser }) => {
+    const page = await browser.newPage();
+    try {
+      const seed = new PageManager(page);
+      await seed.logsPage.ingestLogs(orgId, stream, rows);
+      await seed.logsPage.waitForStreamRowCount(orgId, stream, rows.length);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    await navigateToBase(page);
+    pm = new PageManager(page);
+    await pm.logsPage.selectStream(stream);
+    await pm.logsPage.disableSqlModeIfNeeded();
+  });
+
+  test.afterAll(async ({ browser }) => {
+    const page = await browser.newPage();
+    try {
+      await new PageManager(page).logsPage.deleteStream(stream);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test("a <> filter in non-SQL mode runs as written and returns the same rows as !=", {
+    tag: ['@bug-16949', '@P2', '@regression', '@logsRegression']
+  }, async ({ page }) => {
+    const sentSql = [];
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && req.url().includes('/_search') && !req.url().includes('is_ui_histogram')) {
+        const body = req.postDataJSON() || {};
+        const sql = body.query?.sql;
+        if (sql) sentSql.push(body.encoding === 'base64' ? Buffer.from(sql, 'base64').toString('utf8') : sql);
+      }
+    });
+
+    await pm.logsPage.clearAndFillQueryEditor("level <> 'error'");
+    await pm.logsPage.runQueryAndWaitForResults();
+    await pm.logsPage.expectSqlErrorStateNotVisible();
+    expect(await pm.logsPage.getResultHitsCount()).toBe(NOT_ERROR_TOTAL);
+    expect(sentSql.some((sql) => sql.includes("level <> 'error'")), `searched SQL: ${sentSql.join(' | ')}`).toBe(true);
+
+    await pm.logsPage.clearAndFillQueryEditor("level != 'error'");
+    await pm.logsPage.runQueryAndWaitForResults();
+    expect(await pm.logsPage.getResultHitsCount()).toBe(NOT_ERROR_TOTAL);
   });
 });

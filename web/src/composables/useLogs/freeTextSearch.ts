@@ -23,6 +23,7 @@ import {
   type PlanNode,
   planFilter,
   quoteFreeTextPhrase,
+  quoteReservedFieldNames,
   renderPlan,
   streamTextTarget,
   suggestRecovery,
@@ -269,8 +270,11 @@ export function freeTextWhereByStream(
 
 export function filterForParsing(raw: string, fieldNames: ReadonlySet<string>): string {
   const plan = planFilter(raw, fieldNames);
-  if (plan.kind !== "freeText") return plan.filter;
-  return renderPlan(plan, { mode: "fts", fields: ["_"] }, new Set()) ?? raw;
+  const filter =
+    plan.kind === "freeText"
+      ? (renderPlan(plan, { mode: "fts", fields: ["_"] }, new Set()) ?? raw)
+      : plan.filter;
+  return quoteReservedFieldNames(filter, fieldNames);
 }
 
 export function freeTextDecorations(
@@ -296,16 +300,6 @@ export function freeTextDecorations(
   });
   const hover = t("search.freeTextPreview", { fields: fields.join(", "), sql: rendered });
   return ranges.length ? { ranges, hover } : null;
-}
-
-/** False only once every selected stream's schema shows no full-text field, where match_all is refused. */
-export function allowsMatchAll(
-  searchObj: FreeTextSearchObj,
-  zoConfig: FreeTextZoConfig | null | undefined,
-): boolean {
-  const ctx = buildFilterContext(searchObj, zoConfig, { ignoreFailures: true });
-  const targets = Object.values(ctx.targets);
-  return !ctx.textEnabled || !targets.length || targets.some((target) => target.mode === "fts");
 }
 
 export function noFtsStreams(

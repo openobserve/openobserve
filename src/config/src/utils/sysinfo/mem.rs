@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, RefreshKind};
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate};
 
 pub struct MemoryStats {
     pub total_memory: usize,
@@ -38,10 +38,13 @@ pub fn get_process_memory_usage() -> usize {
     let Ok(pid) = sysinfo::get_current_pid() else {
         return 0;
     };
-    let mut system = sysinfo::System::new_with_specifics(
-        RefreshKind::nothing().with_processes(ProcessRefreshKind::nothing().with_memory()),
+    // Only this PID: new_with_specifics() with processes refreshes every process on the host.
+    let mut system = sysinfo::System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&[pid]),
+        false,
+        ProcessRefreshKind::nothing().with_memory(),
     );
-    system.refresh_processes(ProcessesToUpdate::Some(&[pid]), false);
     system
         .process(pid)
         .map(|p| p.memory() as usize)

@@ -444,6 +444,11 @@ export default class DashboardDrilldownPage {
       .getByRole("tab", { selected: true });
   }
 
+  // Named entry in the drilldown menu that opens when a chart point is clicked.
+  drilldownMenuItem(name) {
+    return this.page.locator(`[data-test="drilldown-menu-item-${name}"]`);
+  }
+
   /**
    * Returns locator for the drilldown item at the given index in the config list.
    */
@@ -456,5 +461,21 @@ export default class DashboardDrilldownPage {
    */
   removeButtonAt(index) {
     return this.page.locator(`[data-test="dashboard-addpanel-config-drilldown-remove-${index}"]`);
+  }
+
+  // Answers every request to an external drilldown host locally, so a test never leaves the test network.
+  async stubDrilldownHost(host) {
+    await this.page.context().route(`${host}/**`, (route) =>
+      route.fulfill({ status: 200, contentType: "text/html", body: "<html><body>drilldown</body></html>" })
+    );
+  }
+
+  /** Click a drilldown menu entry set to open in a new tab; returns that tab once its URL matches `urlPattern`. */
+  async openDrilldownInNewTab(name, urlPattern) {
+    const popupPromise = this.page.context().waitForEvent("page");
+    await this.drilldownMenuItem(name).click();
+    const popup = await popupPromise;
+    await popup.waitForURL(urlPattern, { timeout: 15000 });
+    return popup;
   }
 }

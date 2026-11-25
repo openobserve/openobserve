@@ -25,6 +25,8 @@ pub mod utils;
 
 use std::{collections::HashMap, sync::Arc};
 
+#[cfg(feature = "enterprise")]
+use config::meta::sql::TableReferenceExt;
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, datafusion::request::Request};
 use datafusion::{
     common::{Result, TableReference},
@@ -76,6 +78,8 @@ use infra::schema::get_stream_setting_index_fields;
 
 #[cfg(feature = "enterprise")]
 use crate::datafusion::optimizer::cipher::{RewriteCipherCall, RewriteCipherKey};
+#[cfg(feature = "enterprise")]
+use crate::datafusion::physical_optimizer::sdr_redact::protected_columns;
 use crate::{
     datafusion::{
         optimizer::{
@@ -324,6 +328,21 @@ fn stream_index_fields(sql: &Sql) -> HashMap<TableReference, HashSet<String>> {
             .into_iter()
             .filter(|index_field| schema.contains_field(index_field))
             .collect::<HashSet<_>>();
+        // Keeps leader planning in line with the scan: the follower never indexes a redacted field.
+        #[cfg(feature = "enterprise")]
+        let idx_fields = {
+            let stream_type = stream_name.get_stream_type(sql.stream_type);
+            let name = stream_name.stream_name();
+            let protected = if sql.raw_streams.contains(stream_type, &name) {
+                Default::default()
+            } else {
+                protected_columns(&sql.org_id, stream_type, &name)
+            };
+            idx_fields
+                .into_iter()
+                .filter(|field| !protected.contains(field))
+                .collect::<HashSet<_>>()
+        };
         index_fields.insert(stream_name.clone(), idx_fields);
     }
     index_fields
@@ -332,7 +351,7 @@ fn stream_index_fields(sql: &Sql) -> HashMap<TableReference, HashSet<String>> {
 #[cfg(test)]
 mod tests {
     use arrow::{
-        array::{ArrayRef, Int64Array, RecordBatch, StringArray, StructArray},
+        array::{ArrayRef, Int64Array, RecordBatch, StringArray, StringViewArray, StructArray},
         util::pretty::pretty_format_batches,
     };
     use arrow_schema::{DataType, Field, Fields, Schema};
@@ -422,6 +441,7 @@ mod tests {
             histogram_offset: Some(0),
             sorted_by_time: false,
             sampling_config: None,
+            raw_streams: Default::default(),
         }
     }
 
@@ -722,7 +742,7 @@ mod tests {
             Arc::new(schema),
             vec![
                 Arc::new(Int64Array::from(vec![1, 2, 3])) as ArrayRef,
-                Arc::new(arrow::array::StringViewArray::from_iter([
+                Arc::new(StringViewArray::from_iter([
                     Some("auth-gw"),
                     Some("billing"),
                     None,

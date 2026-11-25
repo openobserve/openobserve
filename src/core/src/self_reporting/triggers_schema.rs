@@ -250,6 +250,8 @@ async fn initialize_triggers_stream_schema(org_id: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field};
+
     use super::*;
 
     #[test]
@@ -342,8 +344,6 @@ mod tests {
 
     #[test]
     fn present_columns_leaves_out_only_the_optional_columns_the_stream_lacks() {
-        use arrow_schema::{DataType, Field};
-
         let schema = Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("error", DataType::Utf8, true),
@@ -357,8 +357,6 @@ mod tests {
 
     #[test]
     fn sortable_column_falls_back_only_for_a_missing_optional_column() {
-        use arrow_schema::{DataType, Field};
-
         let schema = Schema::new(vec![Field::new("query_took", DataType::Int64, true)]);
         assert_eq!(sortable_column("source_node", &schema), "_timestamp");
         assert_eq!(sortable_column("query_took", &schema), "query_took");

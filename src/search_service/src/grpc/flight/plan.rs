@@ -36,13 +36,19 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::errors::{Error, ErrorCodes};
 
-use super::scan::{PrecomputedAggregates, collect_stats};
+use super::{
+    redaction::ScanRedaction,
+    scan::{PrecomputedAggregates, collect_stats},
+};
 use crate::{
     datafusion::{
         datasource::{enrich_table::EnrichTable, uniontable::NewUnionTable},
         distributed::codec::get_physical_extension_codec,
         exec::{DataFusionContextBuilder, register_udf},
-        physical_optimizer::index_optimizer::index_aggregate_rewrite::aggregate_optimize_rewrite,
+        physical_optimizer::{
+            index_optimizer::index_aggregate_rewrite::aggregate_optimize_rewrite,
+            sdr_redact::{LiftRedaction, scan_filters, wrap_with_redaction},
+        },
         physical_plan::empty_exec::{NewEmptyExecVisitor, ReplaceTableScanExec},
         sort_order::FileSortOrder,
     },
@@ -129,6 +135,7 @@ pub(super) async fn replace_table_scan(
     ctx: &SessionContext,
     physical_plan: Arc<dyn ExecutionPlan>,
     mut tables: Vec<Arc<dyn TableProvider>>,
+    redaction: &ScanRedaction,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
     let trace_id = query.trace_id.as_str();
 
@@ -168,14 +175,22 @@ pub(super) async fn replace_table_scan(
     );
 
     let scan_start = std::time::Instant::now();
+    let filters = scan_filters(empty_exec.filters(), &redaction.redacted_columns());
     let union_exec = union_table
         .scan(
             &ctx.state(),
             empty_exec.projection(),
-            empty_exec.filters(),
+            &filters,
             empty_exec.limit(),
         )
         .await?;
+    // Every operator above, query functions on the leader included, sees only redacted values.
+    let union_exec = if redaction.is_protected() {
+        let options = Arc::new(ctx.state().config_options().as_ref().clone());
+        wrap_with_redaction(union_exec, redaction.udfs(), options)?
+    } else {
+        union_exec
+    };
     log::info!(
         "{}",
         search_inspector_fields(
@@ -214,6 +229,7 @@ pub(super) fn apply_pushdown_rules(
     trace_id: &str,
     ctx: &SessionContext,
     mut physical_plan: Arc<dyn ExecutionPlan>,
+    redaction: &ScanRedaction,
     aggregates: PrecomputedAggregates,
     scan_stats: &mut ScanStats,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
@@ -222,6 +238,11 @@ pub(super) fn apply_pushdown_rules(
         index_aggregate,
     } = aggregates;
     let cfg = get_config();
+
+    // Before the other pushdown rules: ProjectionPushdown folds the projection into the scan.
+    if redaction.is_protected() {
+        physical_plan = LiftRedaction.optimize(physical_plan, ctx.state().config_options())?;
+    }
 
     let pushdown_filter = FilterPushdown::new();
     physical_plan = pushdown_filter
@@ -294,6 +315,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{datasource::empty::EmptyTable, physical_plan::collect};
 
     use super::*;
     use crate::datafusion::{
@@ -316,11 +338,7 @@ mod tests {
             let empty_exec = plan.downcast_ref::<NewEmptyExec>().unwrap();
             for table_count in [0, 1, 2] {
                 let tables = (0..table_count)
-                    .map(|_| {
-                        Arc::new(datafusion::datasource::empty::EmptyTable::new(
-                            schema.clone(),
-                        )) as Arc<dyn TableProvider>
-                    })
+                    .map(|_| Arc::new(EmptyTable::new(schema.clone())) as Arc<dyn TableProvider>)
                     .collect();
                 let union_table = NewUnionTable::new(empty_exec.full_schema(), tables);
                 let scan = union_table
@@ -332,7 +350,7 @@ mod tests {
                     )
                     .await?;
                 assert_eq!(scan.schema(), empty_exec.schema());
-                let batches = datafusion::physical_plan::collect(scan, ctx.task_ctx()).await?;
+                let batches = collect(scan, ctx.task_ctx()).await?;
                 assert!(batches.iter().all(|batch| batch.num_rows() == 0));
             }
         }

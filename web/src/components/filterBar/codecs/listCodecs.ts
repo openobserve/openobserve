@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import {
-  escapePromRegexLiteral,
   OPERATORS,
   operatorOfPromMatcher,
   promMatcherFor,
@@ -22,6 +21,7 @@ import {
   unescapePromRegexLiteral,
   type FilterOperatorId,
 } from "@/utils/query/filterBar";
+import { escapeRegExp } from "@/utils/query/promQLUtils";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import {
   DASHBOARD_SPELLINGS,
@@ -119,9 +119,8 @@ const PROM_OPERATORS: Record<string, FilterOperatorId> = {
 
 const PROM_LIST: Record<string, FilterOperatorId> = { "=~": "in", "!~": "not_in" };
 
-// Dashboard `$variables` are substituted before the query runs, so they sit in an IN alternation unescaped.
-const promListItem = (value: string) =>
-  hasVariable(value) ? value : escapePromRegexLiteral(value);
+// Dashboard `$variables` stay as written; substitution regex-escapes data-picked values and keeps custom ones as regex.
+const promListItem = (value: string) => (hasVariable(value) ? value : escapeRegExp(value));
 
 const splitPromListText = (text: string): string[] | null => {
   if (!hasVariable(text)) return splitPromRegexLiterals(text);

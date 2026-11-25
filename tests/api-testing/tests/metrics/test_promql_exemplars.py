@@ -98,3 +98,60 @@ def test_exemplars_survive_a_warm_range_query_cache(client):
     for _ in range(2):
         assert len(_query_exemplars(client, name)) == POINTS
     assert client.get("healthz", prefix="").status_code == 200
+
+
+def _histogram_point(series: str, t_nanos: int, exemplar_nanos: list[int]) -> dict:
+    return {
+        "timeUnixNano": str(t_nanos),
+        "startTimeUnixNano": str(t_nanos - 60 * 1_000_000_000),
+        "count": "3",
+        "sum": 6.0,
+        "bucketCounts": ["1", "2", "0"],
+        "explicitBounds": [1.0, 5.0],
+        "attributes": [string_attr("svc", series)],
+        "exemplars": [
+            {"timeUnixNano": str(e), "asDouble": 2.0, "traceId": TRACE_ID, "spanId": SPAN_ID}
+            for e in exemplar_nanos
+        ],
+    }
+
+
+def test_exemplars_are_grouped_per_series_and_bounded_by_start(client):
+    """ENT#2739: one `data` element per series with its own labels, and no exemplar older than `start`."""
+    name = f"ovn_b_exh_{uuid.uuid4().hex[:10]}"
+    sec = 1_000_000_000
+    now = now_unix_nano()
+    start_s = now // sec - 300
+    points = []
+    for series in ("alpha", "beta"):
+        # Inside the window, but also carrying an exemplar stamped 25 min before `start`.
+        points.append(_histogram_point(series, now - 60 * sec, [now - 60 * sec, (start_s - 1500) * sec]))
+        # Before `start` yet inside the 5m lookback of an instant evaluation at `start`.
+        points.append(_histogram_point(series, (start_s - 120) * sec, [(start_s - 120) * sec]))
+    payload = metrics_request([{"name": name, "histogram": {"aggregationTemporality": 2, "dataPoints": points}}])
+    resp = client.post("v1/metrics", json=payload)
+    assert resp.status_code == 200, resp.text
+
+    end_s = int(time.time()) + 60
+
+    def _series():
+        r = client.get(
+            "prometheus/api/v1/query_exemplars",
+            params={"query": f"{name}_bucket", "start": start_s, "end": end_s},
+        )
+        assert r.status_code == 200, r.text
+        return r.json()["data"]
+
+    try:
+        data = wait_until(lambda: [s for s in _series() if s.get("exemplars")], timeout=120, interval=3, msg=f"exemplars for {name}")
+        by_svc = {s["seriesLabels"].get("svc"): s for s in data}
+        assert sorted(by_svc) == ["alpha", "beta"], f"expected one data element per series, got {[s['seriesLabels'] for s in data]}"
+        for svc, s in by_svc.items():
+            assert s["seriesLabels"].get("__name__") == name, s["seriesLabels"]
+            stamps = [ex["timestamp"] for ex in s["exemplars"]]
+            assert stamps, f"{svc}: no exemplars"
+            assert all(start_s <= ts <= end_s for ts in stamps), f"{svc}: exemplar outside [{start_s}, {end_s}]: {stamps}"
+            assert len(stamps) == 1, f"{svc}: only the in-window exemplar belongs here, got {stamps}"
+    finally:
+        for suffix in ("", "_bucket", "_count", "_sum", "_exemplars"):
+            client.delete(f"streams/{name}{suffix}?type=metrics")

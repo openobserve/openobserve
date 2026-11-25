@@ -1,0 +1,2 @@
+{"text":"error rate on web-logs firing 12 web-1 {chart_url} {anomaly_headline} https://o2.acme.com/web/logs?stream=web-logs&org_identifier=acme"}
+error rate on web-logs {chart_url} 10

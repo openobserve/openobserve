@@ -130,17 +130,11 @@ pub async fn process_search_stream_request(
         let o2_config = get_o2_config();
         let zo_config = config::get_config();
 
-        // Determine max_logs - same logic for both sampling and non-sampling modes
-        // Prioritize: 1) user's size, 2) O2 config, 3) OpenObserve default
-        let max_logs = if req.query.size > 0 && req.query.size < 10_000_000 {
-            req.query.size as usize
-        } else if o2_config.log_patterns.max_logs_for_extraction > 0 {
-            // Use O2 config value if set (default is 10K for consistent pattern quality)
-            o2_config.log_patterns.max_logs_for_extraction
-        } else {
-            // Fall back to OpenObserve's query_default_limit
-            zo_config.limit.query_default_limit as usize
-        };
+        let max_logs = extraction_size(
+            req.query.size,
+            o2_config.log_patterns.max_logs_for_extraction,
+            zo_config.limit.query_default_limit,
+        ) as usize;
 
         log::info!(
             "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction config: max_logs={}, sampling_ratio={:?}, min_cluster={}, threshold={}, min_field_len={}",
@@ -256,6 +250,8 @@ pub async fn process_search_stream_request(
     }
 
     req.query.query_fn = query_fn.clone();
+    crate::raw_streams::resolve_request(&trace_id, &org_id, stream_type, Some(&user_id), &mut req)
+        .await;
 
     let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await;
 
@@ -806,7 +802,11 @@ pub async fn process_search_stream_request(
                 Ok(patterns_response) => {
                     // Convert to JSON and send
                     match config::utils::json::to_value(&patterns_response) {
-                        Ok(patterns_json) => {
+                        Ok(mut patterns_json) => {
+                            execution::tag_partial_extraction(
+                                &mut patterns_json,
+                                &accumulated_results,
+                            );
                             log::info!(
                                 "[HTTP2_STREAM trace_id {trace_id}] Sending {} patterns",
                                 patterns_response.patterns.len()
@@ -1181,6 +1181,21 @@ pub async fn process_search_stream_request_multi(
     }
 }
 
+/// Logs to mine: the caller's size capped at `max_logs` (0 = query default). [pure]
+#[cfg(feature = "enterprise")]
+pub fn extraction_size(requested: i64, max_logs: usize, query_default_limit: i64) -> i64 {
+    let max = if max_logs > 0 {
+        max_logs as i64
+    } else {
+        query_default_limit
+    };
+    if requested <= 0 {
+        max
+    } else {
+        requested.min(max)
+    }
+}
+
 /// Synchronous VRL compilation and execution for multi-stream results.
 ///
 /// This is extracted as a non-async function because `VRLRuntimeConfig` is `!Send` and
@@ -1257,9 +1272,16 @@ fn compute_vrl_responses(
 
     log::debug!("[trace_id {trace_id}] VRL compiled successfully, applying to results...");
 
+    let mut query_errors: Vec<transform::VrlRunErrors> = (0..total_queries)
+        .map(|_| transform::VrlRunErrors::default())
+        .collect();
     let transformed_hits: Vec<json::Value> = if apply_over_hits {
         // Apply VRL on the entire 2D array at once
-        let (ret_val, err) = transform::apply_vrl_fn(
+        let row_count: usize = multi_hits
+            .iter()
+            .map(|v| v.as_array().map_or(0, |a| a.len()))
+            .sum();
+        let (ret_val, err) = transform::apply_vrl_fn_checked(
             &mut runtime,
             &VRLResultResolver {
                 program: program.program.clone(),
@@ -1269,9 +1291,10 @@ fn compute_vrl_responses(
             org_id,
             std::slice::from_ref(&vrl_stream_name),
         );
-        if let Some(e) = err {
-            log::error!("[trace_id {trace_id}] Error applying vrl function in multi_stream: {e}");
-        }
+        // A whole-array call fails every query's rows together.
+        let mut whole = transform::VrlRunErrors::default();
+        whole.record_rows(row_count, err);
+        query_errors = vec![whole];
 
         match ret_val.as_array() {
             None => {
@@ -1286,7 +1309,8 @@ fn compute_vrl_responses(
         // Apply VRL per-hit within each query's array
         multi_hits
             .into_iter()
-            .map(|query_hits_val| {
+            .enumerate()
+            .map(|(qi, query_hits_val)| {
                 let query_hits = match query_hits_val.as_array() {
                     Some(arr) => arr.clone(),
                     None => vec![],
@@ -1294,7 +1318,7 @@ fn compute_vrl_responses(
                 let transformed: Vec<json::Value> = query_hits
                     .into_iter()
                     .filter_map(|hit| {
-                        let (ret_val, err) = transform::apply_vrl_fn(
+                        let (ret_val, err) = transform::apply_vrl_fn_checked(
                             &mut runtime,
                             &VRLResultResolver {
                                 program: program.program.clone(),
@@ -1304,8 +1328,8 @@ fn compute_vrl_responses(
                             org_id,
                             std::slice::from_ref(&vrl_stream_name),
                         );
-                        if let Some(e) = err {
-                            log::error!("[trace_id {trace_id}] Error applying vrl function: {e}");
+                        if let Some(errors) = query_errors.get_mut(qi) {
+                            errors.record(err);
                         }
                         if !ret_val.is_null() && ret_val.is_object() {
                             flatten::flatten(ret_val).ok()
@@ -1318,6 +1342,11 @@ fn compute_vrl_responses(
             })
             .collect()
     };
+
+    let query_msgs: Vec<Option<String>> = query_errors.iter().map(|e| e.message()).collect();
+    for msg in query_msgs.iter().flatten() {
+        log::error!("[trace_id {trace_id}] Error applying vrl function in multi_stream: {msg}");
+    }
 
     log::debug!(
         "[trace_id {trace_id}] VRL execution complete, output has {} arrays (sizes: [{}])",
@@ -1365,6 +1394,15 @@ fn compute_vrl_responses(
 
             resp.hits = hits_for_query;
             resp.query_index = Some(qi);
+            // The whole-array path has one shared message at index 0.
+            let msg = if apply_over_hits {
+                query_msgs.first()
+            } else {
+                query_msgs.get(qi)
+            };
+            if let Some(Some(msg)) = msg {
+                resp.function_error.push(msg.clone());
+            }
             resp
         })
         .collect()
@@ -1554,6 +1592,61 @@ for_each(result) -> |_idx, query_hits| {
         assert_eq!(responses[1].query_index, Some(1));
     }
 
+    #[tokio::test]
+    async fn test_apply_vrl_runtime_error_sets_function_error_only_on_failing_query() {
+        let vrl_fn = ".x = parse_json!(.m)";
+        let (tx, rx) = mpsc::channel(100);
+        let mut buffered = vec![
+            (
+                0,
+                vec![json::json!({"m": "{\"a\":1}"})],
+                Some(Response::new(0, 10)),
+            ),
+            (
+                1,
+                vec![json::json!({"m": "not json"})],
+                Some(Response::new(0, 10)),
+            ),
+        ];
+
+        apply_vrl_to_multi_results("test-trace", "", vrl_fn, &mut buffered, 2, &tx).await;
+        drop(tx);
+
+        let responses = collect_responses(rx).await;
+        assert_eq!(responses.len(), 2);
+        assert!(responses[0].function_error.is_empty());
+        assert_eq!(responses[1].function_error.len(), 1);
+        assert!(
+            responses[1].function_error[0].starts_with("Query function failed on 1 of 1 rows: "),
+            "{:?}",
+            responses[1].function_error
+        );
+    }
+
+    #[tokio::test]
+    async fn test_apply_vrl_result_array_runtime_error_counts_all_rows() {
+        let vrl_fn = "#ResultArray# \n. = parse_json!(\"not json\")";
+        let (tx, rx) = mpsc::channel(100);
+        let mut buffered = vec![
+            (
+                0,
+                vec![json::json!({"a": 1}), json::json!({"a": 2})],
+                Some(Response::new(0, 10)),
+            ),
+            (1, vec![json::json!({"a": 3})], Some(Response::new(0, 10))),
+        ];
+
+        apply_vrl_to_multi_results("test-trace", "", vrl_fn, &mut buffered, 2, &tx).await;
+        drop(tx);
+
+        let responses = collect_responses(rx).await;
+        assert!(
+            responses[0].function_error[0].starts_with("Query function failed on 3 of 3 rows: "),
+            "{:?}",
+            responses[0].function_error
+        );
+    }
+
     /// Test that buffered results arriving out of order (e.g. query 1 finishes before
     /// query 0) are sorted correctly before VRL application and output.
     #[tokio::test]
@@ -1673,5 +1766,26 @@ for_each(result) -> |_idx, query_hits| {
 
         assert!(futures::poll!(fut.as_mut()).is_pending());
         assert!(tracing::Span::current().is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extraction_size_caps_caller_size() {
+        // (requested, max_logs, query_default_limit, expected)
+        let cases = [
+            (-1, 10_000, 1_000, 10_000),
+            (0, 10_000, 1_000, 10_000),
+            (500, 10_000, 1_000, 500),
+            (9_999_999, 10_000, 1_000, 10_000),
+            (-1, 0, 1_000, 1_000),
+            (9_999_999, 0, 1_000, 1_000),
+        ];
+        for (requested, max_logs, default_limit, expected) in cases {
+            assert_eq!(
+                super::extraction_size(requested, max_logs, default_limit),
+                expected,
+                "requested={requested} max_logs={max_logs}"
+            );
+        }
     }
 }

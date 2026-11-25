@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="
           volumeCount !== null
             ? t('logs.patternList.exactCountTooltip', { count: volumeCount.toLocaleString() })
-            : undefined
+            : volumeUnavailableTitle
         "
       >
         {{ countLabel }}
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -164,10 +164,12 @@ import {
   patternTrendBadge,
   levelColorClass,
   compactCount,
+  FILTER_BLOCKED_MESSAGE,
   LEVEL_KEYWORD_PATTERN,
   PATTERN_BADGES,
   type PatternSeverityKey,
 } from "./patternUtils";
+import { PATTERN_VOLUME_CACHE, type PatternVolumeCache } from "./usePatternVolume";
 import useWildcardHover from "./useWildcardHover";
 
 const props = defineProps<{
@@ -183,6 +185,7 @@ defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const volumeCache = inject<PatternVolumeCache | null>(PATTERN_VOLUME_CACHE, null);
 const { onMouseEnter, onMouseLeave } = useWildcardHover();
 
 const templateTokens = computed(() =>
@@ -207,11 +210,20 @@ const onVolume = (volume: { total: number; buckets: number[] } | null) => {
   volumeBuckets.value = volume?.buckets ?? null;
 };
 
-const countLabel = computed(() =>
-  volumeCount.value !== null
-    ? `~${compactCount(volumeCount.value)}`
-    : (props.pattern.frequency ?? 0).toLocaleString(),
+// No filter selects only this pattern, so its sample count would be shown as if it were its volume.
+const volumeUnavailableReason = computed(() =>
+  volumeCount.value === null ? volumeCache?.get(props.pattern)?.unavailableReason : undefined,
 );
+const volumeUnavailableTitle = computed(() =>
+  volumeUnavailableReason.value
+    ? t(FILTER_BLOCKED_MESSAGE[volumeUnavailableReason.value])
+    : undefined,
+);
+
+const countLabel = computed(() => {
+  if (volumeCount.value !== null) return `~${compactCount(volumeCount.value)}`;
+  return volumeUnavailableReason.value ? "—" : (props.pattern.frequency ?? 0).toLocaleString();
+});
 
 // Share of the analyzed sample — a clean partition (every analyzed log belongs
 // to exactly one pattern), so these percentages sum to ~100%.

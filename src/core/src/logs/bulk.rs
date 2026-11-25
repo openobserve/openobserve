@@ -42,6 +42,7 @@ pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
 pub const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
+pub const STREAM_BEING_DELETED: &str = "stream_being_deleted";
 pub const ACTION_PARSE_FAILED: &str = "action_parse_failed";
 
 /// Request positions of one stream's `_bulk` actions, kept beside its records.
@@ -340,7 +341,7 @@ async fn ingest_with_blocked_streams(
     }
 
     // Checked up front, pipeline destinations included: a whole-request 503 is retried safely.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         let streams: Vec<(&str, u64)> = streams_data
             .iter()
@@ -358,7 +359,7 @@ async fn ingest_with_blocked_streams(
     }
 
     // process data by stream
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     let mut written_any = false;
     for (stream_name, records) in streams_data {
         // Every buffered row initialized its stream plan before parsing.
@@ -376,7 +377,7 @@ async fn ingest_with_blocked_streams(
         .await
         {
             Ok(v) => {
-                #[cfg(feature = "vectorscan")]
+                #[cfg(feature = "enterprise")]
                 {
                     written_any = true;
                 }
@@ -393,7 +394,7 @@ async fn ingest_with_blocked_streams(
             Err(e) => {
                 log::error!("[LOGS:BULK] stream {org_id}/logs/{stream_name}: Ingestion error: {e}");
                 // Once a group is written, a whole-request retry would duplicate it: 503 per item.
-                #[cfg(feature = "vectorscan")]
+                #[cfg(feature = "enterprise")]
                 if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
                     if !written_any {
                         return Err(e);
@@ -799,7 +800,7 @@ mod tests {
             ingest(0, org, Bytes::from(warm), user.clone())
                 .await
                 .unwrap();
-            #[cfg(not(feature = "vectorscan"))]
+            #[cfg(not(feature = "enterprise"))]
             assert!(
                 super::super::ingest::plan_bulk_columnar(org, &allowed, (0, i64::MAX))
                     .await
@@ -923,6 +924,84 @@ mod tests {
             infra::schema::exists("test_org_id", StreamType::Logs, &long_name).await,
             !bounded
         );
+    }
+
+    fn numbered_fields(prefix: &str, count: usize) -> json::Value {
+        json::Value::Object(
+            (0..count)
+                .map(|i| (format!("{prefix}_{i}"), json::json!(i)))
+                .collect(),
+        )
+    }
+
+    async fn ingest_bulk_rows(rows: &[(&str, &str, json::Value)]) -> BulkResponse {
+        let body: String = rows
+            .iter()
+            .map(|(index, id, record)| {
+                format!(
+                    "{}\n{record}\n",
+                    json::json!({"index": {"_index": index, "_id": id}})
+                )
+            })
+            .collect();
+        ingest(
+            1,
+            "test_org_id",
+            Bytes::from(body),
+            IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap()
+    }
+
+    fn schema_conformance_failures(resp: &BulkResponse) -> Vec<&str> {
+        resp.items
+            .iter()
+            .flat_map(|item| item.values())
+            .filter(|item| {
+                item.error
+                    .as_ref()
+                    .is_some_and(|e| e.err_type == SCHEMA_CONFORMANCE_FAILED)
+            })
+            .map(|item| item._id.as_str())
+            .collect()
+    }
+
+    // cloud builds reject the unknown test org at the trial check before the columns check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_fails_every_row_of_the_stream_over_the_columns_limit() {
+        let half = get_config().limit.req_cols_per_record_limit / 2 + 1;
+        let resp = ingest_bulk_rows(&[
+            ("test_bulk_cols_ok", "1", json::json!({"message": "a"})),
+            ("test_bulk_cols_wide", "2", numbered_fields("a", half)),
+            ("test_bulk_cols_wide", "3", numbered_fields("b", half)),
+        ])
+        .await;
+
+        assert!(resp.errors);
+        assert_eq!(schema_conformance_failures(&resp), ["2", "3"]);
+        assert!(infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_cols_ok").await);
+        assert!(
+            !infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_cols_wide").await
+        );
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_drops_only_the_bulk_row_over_the_columns_limit() {
+        let limit = get_config().limit.req_cols_per_record_limit;
+        let resp = ingest_bulk_rows(&[
+            ("test_bulk_cols_row", "1", json::json!({"message": "a"})),
+            ("test_bulk_cols_row", "2", numbered_fields("f", limit + 1)),
+            ("test_bulk_cols_row", "3", json::json!({"message": "b"})),
+        ])
+        .await;
+
+        assert!(resp.errors);
+        assert_eq!(schema_conformance_failures(&resp), ["2"]);
+        assert_eq!(resp.items.len(), 3);
+        assert!(infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_cols_row").await);
     }
 
     #[test]

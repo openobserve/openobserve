@@ -37,11 +37,6 @@ export class AiToolsetsFormValidationPage {
         this.kindSelectPopover = '[data-test="ai-toolset-kind-select-popover"]';
         this.kindSelectOption  = '[data-test="ai-toolset-kind-select-option"]';
 
-        // CLI command — shown when kind === 'cli'
-        // OInput data-test="ai-toolset-cli-command" → -field / -error
-        this.cliCommandInput = '[data-test="ai-toolset-cli-command-field"]';
-        this.cliCommandError = '[data-test="ai-toolset-cli-command-error"]';
-
         // Action buttons (plain OButton — not dialog built-ins)
         this.saveBtn        = '[data-test="ai-toolset-save-btn"]';
         this.cancelBtn      = '[data-test="ai-toolset-cancel-btn"]';
@@ -134,16 +129,11 @@ export class AiToolsetsFormValidationPage {
 
     async selectKind(label) {
         testLogger.debug('Selecting toolset kind', { label });
-        const labelToValue = { 'MCP Server': 'mcp', 'CLI Tool': 'cli', 'Skill': 'skill' };
+        const labelToValue = { 'MCP Server': 'mcp', 'Skill': 'skill' };
         const value = labelToValue[label] || label;
         await this.page.locator(this.kindSelect).click();
         await this.page.locator(this.kindSelectPopover).waitFor({ state: 'visible', timeout: 8000 });
         await this.getKindOptionLocator(value).click();
-    }
-
-    async fillCliCommand(command) {
-        testLogger.debug('Filling CLI command', { command });
-        await this.page.locator(this.cliCommandInput).fill(command);
     }
 
     async clickSave() {
@@ -164,8 +154,6 @@ export class AiToolsetsFormValidationPage {
     getKindErrorLocator()    { return this.page.locator(this.kindError); }
     getMcpUrlInputLocator()      { return this.page.locator(this.mcpUrlInput); }
     getMcpUrlErrorLocator()      { return this.page.locator(this.mcpUrlError); }
-    getCliCommandInputLocator()  { return this.page.locator(this.cliCommandInput); }
-    getCliCommandErrorLocator()  { return this.page.locator(this.cliCommandError); }
     getSaveBtnLocator()      { return this.page.locator(this.saveBtn); }
     getCancelBtnLocator()    { return this.page.locator(this.cancelBtn); }
     getAddToolsetBtnLocator(){ return this.page.locator(this.addToolsetBtn); }

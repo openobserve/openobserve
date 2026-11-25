@@ -30,6 +30,7 @@ const router = {
 };
 const store = {
   state: {
+    timezone: "Asia/Tokyo",
     selectedOrganization: { identifier: "default" },
     zoConfig: { timestamp_column: "_timestamp", super_cluster_enabled: false },
   },
@@ -178,6 +179,61 @@ describe("logsUtils URL registry (4c C7, C7b)", () => {
       expect(utils.generateURLQuery().period).toBe("15m");
     });
 
+    describe("share link with auto refresh", () => {
+      it("relative period + refresh 60: share carries the period, not bounds", () => {
+        recordGrid(1, { time: { type: "relative", period: "12h" } });
+        searchObj.meta.refreshInterval = 60;
+        const share = utils.generateURLQuery(true);
+        expect(share.period).toBe("12h");
+        expect(share.from).toBeUndefined();
+        expect(share.to).toBeUndefined();
+        expect(share.refresh).toBe(60);
+      });
+
+      it("absolute range + refresh 60: share keeps from/to and turns refresh off", () => {
+        recordGrid(1, { time: { type: "absolute", startUs: 5000, endUs: 6000 } });
+        searchObj.meta.refreshInterval = 60;
+        const share = utils.generateURLQuery(true);
+        expect([share.from, share.to]).toEqual([1000, 2000]);
+        expect(share.refresh).toBe(0);
+      });
+
+      it("refresh off: share carries bounds as before", () => {
+        recordGrid(1, { time: { type: "relative", period: "12h" } });
+        const share = utils.generateURLQuery(true);
+        expect([share.from, share.to]).toEqual([1000, 2000]);
+        expect(share.period).toBeUndefined();
+        expect(share.refresh).toBe(0);
+      });
+
+      it("a frozen share (log-line link) keeps the executed bounds and refresh 0", () => {
+        recordGrid(1, { time: { type: "relative", period: "12h" } });
+        searchObj.meta.refreshInterval = 60;
+        const share = utils.generateURLQuery(true, null, null, false);
+        expect([share.from, share.to]).toEqual([1000, 2000]);
+        expect(share.period).toBeUndefined();
+        expect(share.refresh).toBe(0);
+        expect(share.timezone).toBeUndefined();
+      });
+
+      it("a live calendar share carries the sender's timezone", () => {
+        recordGrid(1, { time: { type: "relative", period: "calendar:day:0" } });
+        searchObj.meta.refreshInterval = 60;
+        const share = utils.generateURLQuery(true);
+        expect(share.period).toBe("calendar:day:0");
+        expect(share.timezone).toBe("Asia/Tokyo");
+        expect(utils.generateURLQuery().timezone).toBeUndefined();
+      });
+
+      it("address bar URL is unchanged by refresh", () => {
+        recordGrid(1, { time: { type: "relative", period: "12h" } });
+        searchObj.meta.refreshInterval = 60;
+        const url = utils.generateURLQuery();
+        expect(url.period).toBe("12h");
+        expect(url.refresh).toBe(60);
+      });
+    });
+
     it("Patterns writes its own record; a surface that never ran falls back to the grid's", () => {
       recordGrid(1);
       searchObj.meta.logsVisualizeToggle = "patterns";
@@ -278,6 +334,49 @@ describe("logsUtils URL registry (4c C7, C7b)", () => {
       expect(route.value.query.stream).toBe("app");
       expect(route.value.query.refresh).toBe(10);
       expect(route.value.query.timezone).toBeUndefined();
+    });
+
+    it("a view-state patch issued while a search push is still pending keeps the pushed window", async () => {
+      route.value = { name: "logs", query: { stream: "app", period: "1m" } };
+      let commit: () => void = () => {};
+      let superseded = false;
+      router.push.mockImplementationOnce(
+        (to: any) =>
+          new Promise<void>((resolve) => {
+            commit = () => {
+              if (!superseded) route.value = { name: "logs", query: to.query };
+              resolve();
+            };
+          }),
+      );
+      router.replace.mockImplementationOnce(async (to: any) => {
+        superseded = true;
+        route.value = { name: "logs", query: to.query };
+      });
+      searchObj.data.datetime = { type: "absolute", startTime: 5000, endTime: 9000 };
+      recordGrid(1, { time: { type: "absolute", startUs: 5000, endUs: 9000 } });
+      const pushed = utils.updateUrlQueryParams();
+      searchObj.data.stream.selectedFields = ["level"];
+      const patched = utils.patchUrlViewState();
+      commit();
+      await Promise.all([pushed, patched]);
+      expect(route.value.query.period).toBeUndefined();
+      expect(route.value.query.from).toBe(5000);
+      expect(route.value.query.to).toBe(9000);
+    });
+
+    it("writes a Drill down dimension that holds a comma as one encoded item", () => {
+      searchObj.meta.logsVisualizeToggle = "drilldown";
+      searchObj.meta.drillDownDimensions = ["a,b", "level"];
+      expect(utils.generateURLQuery().drilldown_dims).toBe("a%2Cb,level");
+    });
+
+    it("writes an emptied Drill down pick list as an empty param so a refresh keeps it empty", () => {
+      searchObj.meta.logsVisualizeToggle = "drilldown";
+      searchObj.meta.drillDownDimensions = [];
+      expect(utils.generateURLQuery().drilldown_dims).toBe("");
+      searchObj.meta.drillDownDimensions = null;
+      expect(utils.generateURLQuery()).not.toHaveProperty("drilldown_dims");
     });
 
     it("drops the RCA evidence handoff type so a later reload does not re-run the handoff", async () => {

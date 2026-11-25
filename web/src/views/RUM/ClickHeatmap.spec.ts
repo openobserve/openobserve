@@ -1755,7 +1755,7 @@ describe("ClickHeatmap", () => {
       const canvas = () => wrapper.find('[data-test="rum-heatmap-canvas"]');
       const slider = () => wrapper.findComponent(OSlider);
       expect(slider().props("modelValue")).toBe(100);
-      expect(slider().attributes("aria-label")).toBe("Heat opacity");
+      expect(slider().find("input").attributes("aria-label")).toBe("Heat opacity");
       expect(canvas().attributes("style")).toContain("opacity: 1");
 
       slider().vm.$emit("update:modelValue", 40);

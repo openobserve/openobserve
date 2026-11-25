@@ -121,7 +121,7 @@ jobs:
         if: env.REVIEW_RUN == 'true' && vars.OO_REVIEWER_APP_ID != ''
         continue-on-error: true
         # Pinned to a full commit SHA because this action receives the app's signing private key.
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           app-id: ${{ vars.OO_REVIEWER_APP_ID }}
           private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
@@ -131,7 +131,7 @@ jobs:
         id: ent_token
         if: env.REVIEW_RUN == 'true' && vars.OO_REVIEWER_APP_ID != '' && !inputs.ignore_paired
         continue-on-error: true
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           app-id: ${{ vars.OO_REVIEWER_APP_ID }}
           private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}

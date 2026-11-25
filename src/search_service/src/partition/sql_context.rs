@@ -20,7 +20,7 @@ use config::{
     },
     utils::{
         base64,
-        sql::{is_complex_query, is_eligible_for_histogram, is_explain_query},
+        sql::{is_complex_query, is_eligible_for_histogram, is_explain_query, is_time_splittable},
     },
 };
 use infra::errors::Error;
@@ -82,6 +82,7 @@ impl PartitionSqlContext {
         // Non-UTC aggregates cannot share the persistent state that merges partition results.
         // Time slices are concatenated, so a non-time ranking needs one slice or the agg cache.
         let use_single_partition = is_explain
+            || !is_time_splittable(&req.sql).unwrap_or(false)
             || (is_streaming_agg && sql.histogram_offset != Some(0))
             || ((ts_column.is_none() || apply_over_hits || is_ranked_by_non_ts)
                 && !(req.streaming_output && is_streaming_agg));
@@ -119,6 +120,7 @@ impl PartitionSqlContext {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
     use config::meta::stream::StreamType;
 
     use super::*;
@@ -134,7 +136,6 @@ mod tests {
         timezone: Option<&str>,
         streaming_output: bool,
     ) -> PartitionSqlContext {
-        use arrow_schema::{DataType, Field, Schema};
         let schema = Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("service", DataType::Utf8, true),
@@ -163,6 +164,7 @@ mod tests {
             sampling_ratio: None,
             search_type: None,
             timezone: timezone.map(str::to_string),
+            raw_streams: None,
         };
         PartitionSqlContext::new(&req, "ranked_hist_test", StreamType::Logs)
             .await
@@ -197,6 +199,22 @@ mod tests {
         ] {
             let ctx = ctx_for(sql, None).await;
             assert!(ctx.use_single_partition, "{sql}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cross_slice_query_uses_single_partition() {
+        for sql in [
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" WHERE service IN (SELECT service FROM "default" WHERE duration > 10) GROUP BY ts ORDER BY ts"#,
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, sum(count(*)) OVER (ORDER BY histogram(_timestamp, '1 day')) AS cum FROM "default" GROUP BY ts ORDER BY ts"#,
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) * 100 / sum(count(*)) OVER () AS pct FROM "default" GROUP BY ts ORDER BY ts"#,
+            r#"SELECT histogram(a._timestamp, '1 day') AS ts, count(*) AS c FROM "default" a JOIN "default" b ON a.service = b.service GROUP BY ts ORDER BY ts"#,
+            r#"SELECT * FROM "default" ORDER BY _timestamp DESC LIMIT 10 OFFSET 5"#,
+        ] {
+            for streaming_output in [true, false] {
+                let ctx = ctx_with_output(sql, None, streaming_output).await;
+                assert!(ctx.use_single_partition, "{sql}");
+            }
         }
     }
 
@@ -287,11 +305,18 @@ mod tests {
             sampling_ratio: None,
             search_type: None,
             timezone: Some("Asia/Kolkata".to_string()),
+            raw_streams: None,
         };
         let (streaming_aggs, streaming_id, strategy) =
-            crate::partition::aggregate::prepare_streaming_aggregate("t", &req, &ctx, true)
-                .await
-                .unwrap();
+            crate::partition::aggregate::prepare_streaming_aggregate(
+                "t",
+                &req,
+                &ctx,
+                &Default::default(),
+                true,
+            )
+            .await
+            .unwrap();
         assert!(!streaming_aggs);
         assert!(streaming_id.is_none());
         assert!(strategy.is_none());

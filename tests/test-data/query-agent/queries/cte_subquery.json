@@ -4240,10 +4240,7 @@
             "430.0"
           ]
         ],
-        "results_mode": "rowsort",
-        "skip_sqllogictest": true,
-        "skip_row_count": true,
-        "skip_column_check": true
+        "results_mode": "rowsort"
       }
     },
     {

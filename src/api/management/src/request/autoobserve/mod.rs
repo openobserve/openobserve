@@ -16,6 +16,7 @@
 //! AutoObserve engine routes: coverage, suggestions, and the marks the alert gate reads.
 
 pub mod decisions;
+pub mod fix_ports;
 pub mod incidents;
 pub mod paging;
 pub mod review;
@@ -880,42 +881,27 @@ async fn readable_subjects(org_id: &str, user_id: &str, subjects: Vec<EntityRef>
     readable_mask(&LiveAuthority { org_id, user_id }, &subjects).await
 }
 
-/// Each stream needs the read right a search of it needs; one org-wide check per type comes first.
+/// Each stream needs the read right a search of it needs, decided by `readable_org_streams`.
 async fn readable_streams(org_id: &str, user_id: &str, ids: Vec<(String, String)>) -> Vec<bool> {
-    if !rbac_enforced().await {
-        return vec![true; ids.len()];
+    use config::meta::stream::StreamType;
+
+    // An unknown type name is refused, never read as the default type `from` falls back to.
+    let typed: Vec<Option<(StreamType, String)>> = ids
+        .into_iter()
+        .map(|(stream_type, name)| {
+            let parsed = StreamType::from(stream_type.as_str());
+            let known = parsed != StreamType::default() || stream_type.eq_ignore_ascii_case("logs");
+            known.then_some((parsed, name))
+        })
+        .collect();
+    let wanted = typed.iter().flatten().cloned().collect();
+    match openobserve_core::authz::readable_org_streams(user_id, org_id, wanted).await {
+        None => vec![true; typed.len()],
+        Some(readable) => typed
+            .iter()
+            .map(|stream| stream.as_ref().is_some_and(|s| readable.contains(s)))
+            .collect(),
     }
-    let mut org_wide: HashMap<&str, bool> = HashMap::new();
-    let mut out = Vec::with_capacity(ids.len());
-    for (stream_type, name) in &ids {
-        let wide = match org_wide.get(stream_type.as_str()) {
-            Some(wide) => *wide,
-            None => {
-                let wide = org_wide_allows(org_id, user_id, stream_type, "GET").await;
-                org_wide.insert(stream_type, wide);
-                wide
-            }
-        };
-        if wide {
-            out.push(true);
-            continue;
-        }
-        out.push(
-            check_permissions(
-                &config::utils::str::into_ofga_supported_format(name),
-                org_id,
-                user_id,
-                stream_type,
-                "GET",
-                None,
-                false,
-                true,
-                false,
-            )
-            .await,
-        );
-    }
-    out
 }
 
 /// One org-wide check per resource, then one grant listing and one folder read for the alerts left.
@@ -982,7 +968,7 @@ async fn folder_writes<W: FolderWrites>(
         .await)
 }
 
-/// A mark whose alert is gone has no per-alert grant left, so it needs alerts PUT org-wide.
+/// A mark whose alert is gone has no per-alert grant left, so it needs a grant over every alert.
 async fn may_change_mark(org_id: &str, user_id: &str, entity_type: &str, entity_id: &str) -> bool {
     #[cfg(test)]
     if let Some(allowed) = tests::MAY_CHANGE.with(std::cell::Cell::get) {
@@ -996,7 +982,17 @@ async fn may_change_mark(org_id: &str, user_id: &str, entity_type: &str, entity_
     {
         return allowed;
     }
-    org_wide_allows(org_id, user_id, "alerts", "PUT").await
+    changes_every_mark(|resource, method| org_wide_allows(org_id, user_id, resource, method)).await
+}
+
+/// Alerts PUT org-wide, or PUT on every alert folder: `alert:_all_{org}` has no folder parent,
+/// so a role granting all folders reaches every alert only through the folder check.
+async fn changes_every_mark<F, Fut>(allows: F) -> bool
+where
+    F: Fn(&'static str, &'static str) -> Fut,
+    Fut: Future<Output = bool>,
+{
+    allows("alerts", "PUT").await || allows("alert_folders", "PUT").await
 }
 
 /// The per-alert check the alert handlers make; `None` when no alert has this id.
@@ -1035,6 +1031,45 @@ mod tests {
 
     use super::*;
     use crate::request::alert_grants::tests::CountingAuthority;
+
+    // o2-enterprise#3642: an org-wide grant costs one question; single grants check each stream.
+    #[tokio::test]
+    async fn readable_streams_asks_org_wide_once_and_refuses_unknown_types() {
+        use config::meta::stream::StreamType;
+        use openobserve_core::authz::{TypedStream, fake_checker};
+
+        let checker = fake_checker();
+        let org = format!("ao_{}", config::ider::uuid());
+        let wide = format!("wide_{}", config::ider::uuid());
+        checker.grant_read_all(&wide, &org, StreamType::Logs);
+        let ids: Vec<(String, String)> = (0..20)
+            .map(|i| ("logs".to_string(), format!("s{i}")))
+            .chain([
+                ("nonsense".to_string(), "s0".to_string()),
+                ("LOGS".to_string(), "s1".to_string()),
+            ])
+            .collect();
+        let mut expected = vec![true; 20];
+        expected.extend([false, true]);
+        assert_eq!(readable_streams(&org, &wide, ids.clone()).await, expected);
+        let calls = checker.calls(&wide);
+        assert_eq!(calls.streams, 0);
+        assert_eq!(calls.org_wide, vec![vec![StreamType::Logs]]);
+
+        let single = format!("single_{}", config::ider::uuid());
+        checker.grant_read(
+            &single,
+            &TypedStream {
+                org_id: org.clone(),
+                stream_type: StreamType::Logs,
+                name: "s3".to_string(),
+            },
+        );
+        let got = readable_streams(&org, &single, ids).await;
+        assert_eq!(got.iter().filter(|r| **r).count(), 1);
+        assert!(got[3]);
+        assert_eq!(checker.calls(&single).streams, 20);
+    }
 
     thread_local! {
         /// The deployment switch as this test's thread sees it; None reads the config.
@@ -1367,6 +1402,36 @@ mod tests {
         assert_eq!(readable_mask(&org_reader, &[subject]).await, [true]);
     }
 
+    #[tokio::test]
+    async fn a_grant_on_every_alert_folder_changes_every_mark() {
+        let every = &[
+            ("alerts", "GET"),
+            ("alerts", "PUT"),
+            ("alert_folders", "GET"),
+            ("alert_folders", "PUT"),
+        ][..];
+        let folder_admin = &[("alert_folders", "GET"), ("alert_folders", "PUT")][..];
+        for (who, grants, want) in [
+            ("root", every, true),
+            ("base-role admin", every, true),
+            (
+                "custom-role admin with All on every folder",
+                folder_admin,
+                true,
+            ),
+            (
+                "reader of every folder",
+                &[("alert_folders", "GET")][..],
+                false,
+            ),
+            ("plain user", &[][..], false),
+        ] {
+            let allows =
+                |resource, method| std::future::ready(grants.contains(&(resource, method)));
+            assert_eq!(changes_every_mark(allows).await, want, "{who}");
+        }
+    }
+
     /// Answers the create check per folder from `allowed`; `None` stands for RBAC switched off.
     struct Writes {
         every_folder: bool,
@@ -1518,6 +1583,8 @@ mod tests {
     #[tokio::test]
     async fn without_the_engine_a_valid_request_is_a_503_and_a_bad_one_a_400() {
         ENGINE_ON.with(|on| on.set(Some(true)));
+        // RBAC is on for the whole process once any test installs the fake checker.
+        MAY_CHANGE.with(|may| may.set(Some(true)));
         let mark = "/v2/o/autoobserve/marks/protected/alert/a1";
         for (method, uri, body) in [
             ("GET", "/v2/o/autoobserve/coverage", ""),

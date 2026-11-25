@@ -23,6 +23,8 @@ use common::meta::{
     http::HttpResponse as MetaHttpResponse,
     stream::{FieldUpdate, Stream, StreamCreate},
 };
+#[cfg(feature = "enterprise")]
+use config::meta::stream::{PatternAssociation, UpdateSettingsWrapper};
 use config::{
     META_ORG_ID, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
@@ -44,10 +46,12 @@ use config::{
         util::{get_distinct_stream_name, get_trace_time_index_stream_name},
     },
 };
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use db::re_pattern::process_association_changes;
 use db::{self, distinct_values, enrichment_table};
 use hashbrown::HashMap;
+#[cfg(feature = "enterprise")]
+use infra::table::re_pattern_stream_map::search_association_changes_conflict;
 use infra::{
     cache::stats,
     schema::{
@@ -57,8 +61,8 @@ use infra::{
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
-#[cfg(feature = "vectorscan")]
-use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::re_patterns::{PATTERN_MANAGER, get_pattern_manager};
 
 const LOCAL: &str = "disk";
 const S3: &str = "s3";
@@ -204,12 +208,12 @@ pub fn stream_res(
         ));
     }
 
-    #[cfg(not(feature = "vectorscan"))]
+    #[cfg(not(feature = "enterprise"))]
     let pattern_associations = vec![];
     // because this fn cannot be async, we cannot await on initializing the pattern
     // manager. So instead we do it in best-effort-way, where if it is already initialized,
     // we get the patterns, otherwise report them as empty
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     let pattern_associations = match PATTERN_MANAGER.get() {
         Some(m) => m.get_associations(org_id, stream_type, stream_name),
         None => vec![],
@@ -551,6 +555,14 @@ pub async fn update_stream_settings(
         settings.security = v;
     }
 
+    #[cfg(feature = "enterprise")]
+    let added_partition_keys: Vec<String> = new_settings
+        .partition_keys
+        .add
+        .iter()
+        .filter(|p| !p.disabled)
+        .map(|p| p.field.clone())
+        .collect();
     // partition_keys: remove-then-add, dedup (by `field`) deferred to normalize.
     if !new_settings.partition_keys.remove.is_empty() {
         settings.partition_keys.retain(|p| {
@@ -762,7 +774,21 @@ pub async fn update_stream_settings(
         // Enforce max limit
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
+    if let Some(conflict) = search_pattern_conflict(
+        org_id,
+        stream_name,
+        stream_type,
+        &settings,
+        &added_partition_keys,
+        &new_settings.pattern_associations,
+    )
+    .await
+    {
+        return Ok(MetaHttpResponse::bad_request(conflict));
+    }
+
+    #[cfg(feature = "enterprise")]
     {
         if let Err(e) = process_association_changes(
             org_id,
@@ -784,6 +810,52 @@ pub async fn update_stream_settings(
     }
 
     save_stream_settings(org_id, stream_name, stream_type, settings).await
+}
+
+/// Refuses a change that would leave a search-time pattern unable to protect its field.
+#[cfg(feature = "enterprise")]
+async fn search_pattern_conflict(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    settings: &StreamSettings,
+    added_partition_keys: &[String],
+    update: &UpdateSettingsWrapper<PatternAssociation>,
+) -> Option<String> {
+    if added_partition_keys.is_empty() && update.add.is_empty() {
+        return None;
+    }
+    let schema = infra::schema::get(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_else(|_| Schema::empty());
+    let existing = get_pattern_manager()
+        .await
+        .map(|mgr| mgr.get_associations(org_id, stream_type, stream_name))
+        .unwrap_or_default();
+    let associations: Vec<_> = existing
+        .into_iter()
+        .filter(|a| {
+            !update
+                .remove
+                .iter()
+                .any(|r| r.field == a.field && r.pattern_id == a.pattern_id)
+        })
+        .chain(update.add.iter().cloned())
+        .collect();
+    let partition_keys: Vec<&str> = settings
+        .partition_keys
+        .iter()
+        .filter(|p| !p.disabled)
+        .map(|p| p.field.as_str())
+        .collect();
+    let added: Vec<&str> = added_partition_keys.iter().map(String::as_str).collect();
+    search_association_changes_conflict(
+        &schema,
+        &partition_keys,
+        &added,
+        &associations,
+        &update.add,
+    )
 }
 
 #[tracing::instrument(skip(cleanup_related_resources, cleanup_enrichment_table_resources))]
@@ -946,7 +1018,7 @@ pub async fn stream_delete_inner(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         use db::re_pattern::remove_stream_associations_after_deletion;
         remove_stream_associations_after_deletion(org_id, stream_name, stream_type).await?;

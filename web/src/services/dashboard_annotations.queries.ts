@@ -16,14 +16,45 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { annotationService } from "./dashboard_annotations";
 import { annotationKeys } from "./dashboard_annotations.querykeys";
-import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+import { EMPTY_LIST_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+import { queryClient } from "@/composables/query/queryClient";
 
-export const dashboardAnnotationsQuery = (org: string, dashboardId: string, params: unknown) =>
+// Moved by each write, so the reload after a write gets a new key and never
+// joins a shared read that another panel started before the write.
+const revisions = new Map<string, number>();
+const revisionKey = (org: string, dashboardId: string) => `${org}/${dashboardId}`;
+const revisionOf = (org: string, dashboardId: string) =>
+  revisions.get(revisionKey(org, dashboardId)) ?? 0;
+// Older revisions can never be read again, so the idle ones leave the cache
+// now. A read still in flight stays, because a panel waits on it.
+const bumpRevision = (org: string, dashboardId: string) => {
+  revisions.set(revisionKey(org, dashboardId), revisionOf(org, dashboardId) + 1);
+  const cache = queryClient.getQueryCache();
+  for (const query of cache.findAll({ queryKey: annotationKeys.dashboard(org, dashboardId) })) {
+    if (query.state.fetchStatus === "idle") cache.remove(query);
+  }
+};
+
+export const dashboardAnnotationsQuery = (org: string, dashboardId: string, params: object) =>
   queryOptions({
-    queryKey: annotationKeys.list(org, dashboardId, params),
-    queryFn: async () =>
-      (await annotationService.get_timed_annotations(org, dashboardId, params as any)).data ?? null,
-    staleTime: NORMAL_STALE_TIME,
+    queryKey: annotationKeys.list(org, dashboardId, {
+      ...params,
+      revision: revisionOf(org, dashboardId),
+    }),
+    queryFn: async () => {
+      try {
+        return (
+          (await annotationService.get_timed_annotations(org, dashboardId, params as any)).data ??
+          null
+        );
+      } catch (err: any) {
+        // Annotations are optional: on a 503 (overload, no node) draw without them,
+        // with no retry, and keep the empty answer briefly so other panels do not ask.
+        if (err?.response?.status === 503) return null;
+        throw err;
+      }
+    },
+    staleTime: (query) => (query.state.data === null ? EMPTY_LIST_STALE_TIME : NORMAL_STALE_TIME),
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────
@@ -32,6 +63,9 @@ export const createAnnotationMutation = (org: string, dashboardId: string) =>
   mutationOptions({
     mutationFn: (annotations: Record<string, unknown>[]) =>
       annotationService.create_timed_annotations(org, dashboardId, annotations),
+    onSuccess: () => {
+      bumpRevision(org, dashboardId);
+    },
     meta: { invalidates: [annotationKeys.dashboard(org, dashboardId)], silentError: true },
   });
 
@@ -44,6 +78,9 @@ export const updateAnnotationMutation = (org: string, dashboardId: string) =>
         vars.annotationId,
         vars.annotation,
       ),
+    onSuccess: () => {
+      bumpRevision(org, dashboardId);
+    },
     meta: { invalidates: [annotationKeys.dashboard(org, dashboardId)], silentError: true },
   });
 
@@ -51,5 +88,8 @@ export const deleteAnnotationMutation = (org: string, dashboardId: string) =>
   mutationOptions({
     mutationFn: (annotationIds: string[]) =>
       annotationService.delete_timed_annotations(org, dashboardId, annotationIds),
+    onSuccess: () => {
+      bumpRevision(org, dashboardId);
+    },
     meta: { invalidates: [annotationKeys.dashboard(org, dashboardId)], silentError: true },
   });

@@ -31,6 +31,8 @@ pub async fn run(ui_routes: fn(&str) -> axum::Router) -> Result<(), anyhow::Erro
     o2_enterprise::enterprise::slack::insights::feed::register(
         openobserve_api_management::request::autoobserve::slack_feed::hooks(),
     );
+    #[cfg(feature = "enterprise")]
+    openobserve_api_management::request::autoobserve::fix_ports::install();
     let haddr = server_addr()?;
     log::info!(
         "Starting {} server at: {haddr}",

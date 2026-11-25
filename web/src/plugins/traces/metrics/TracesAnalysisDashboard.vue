@@ -150,7 +150,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <li
                       v-for="dimension in filteredDimensions"
                       :key="dimension.value"
-                      class="dimension-list-item hover:bg-interactive-hover-bg flex items-center gap-2 border-none! px-3 py-1"
+                      class="dimension-list-item hover:bg-interactive-hover-bg flex cursor-pointer items-center gap-2 border-none! px-3 py-1"
+                      :data-test="`dimension-row-${dimension.value}`"
+                      @click="toggleDimension(dimension.value)"
                     >
                       <div class="flex shrink-0 items-center">
                         <OCheckbox
@@ -251,8 +253,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OEmptyState
                   v-else-if="selectedDimensions.length === 0"
                   size="hero"
-                  icon="bar-chart"
+                  illustration="wave-bars"
                   :title="t('latencyInsights.noDimensionsSelected')"
+                  :description="t('latencyInsights.noDimensionsSelectedDesc')"
                   data-test="traces-analysis-dashboard-no-dimensions"
                 />
 
@@ -267,7 +270,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :allowAlertCreation="false"
                   :simplifiedPanelView="true"
                   :hideAddPanel="true"
-                  :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
+                  :searchType="
+                    props.embedded || props.streamType === 'logs' ? 'insights' : 'dashboards'
+                  "
                   @onDeletePanel="handlePanelDelete"
                   class="trace-analysis-dashboards p-[0.4rem]"
                 />
@@ -342,12 +347,14 @@ interface Props {
   streamFields?: any[]; // Stream schema fields for smart dimension selection
   logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
   embedded?: boolean; // Render as a page in place instead of a drawer
+  initialDimensions?: string[] | null; // Picks handed back after a remount
 }
 
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
   (e: "close"): void;
+  (e: "update:dimensions", dimensions: string[]): void;
 }>();
 
 // Page shell for `embedded`: lays out the drawer's slots in place, without drawer-only attrs.
@@ -418,6 +425,13 @@ const activeAnalysisType = ref<"duration" | "volume" | "error">(props.analysisTy
  * - For traces: Uses OpenTelemetry semantic conventions
  */
 const getInitialDimensions = () => {
+  const restored = props.initialDimensions;
+  if (restored) {
+    if (restored.length === 0) return [];
+    const known = new Set((props.streamFields || []).map((f: any) => f.name || f));
+    const kept = restored.filter((d) => known.has(d));
+    if (kept.length > 0) return kept;
+  }
   const streamType = props.streamType || "traces";
   const schemaFields = (props.streamFields || []).map((f: any) => ({
     name: f.name || f,
@@ -428,7 +442,11 @@ const getInitialDimensions = () => {
   }));
 
   // For LOGS: Use sample-based analysis if we have log data
-  if (streamType === "logs" && props.logSamples && props.logSamples.length >= 10) {
+  if (
+    (streamType === "logs" || props.embedded) &&
+    props.logSamples &&
+    props.logSamples.length >= 10
+  ) {
     return selectDimensionsFromData(props.logSamples, schemaFields, 6);
   }
 
@@ -438,6 +456,7 @@ const getInitialDimensions = () => {
 
 // Selected dimensions (user can modify)
 const selectedDimensions = ref<string[]>(getInitialDimensions());
+watch(selectedDimensions, (dimensions) => emit("update:dimensions", dimensions));
 
 // Available dimensions for dropdown (all stream fields)
 const availableDimensions = computed(() => {

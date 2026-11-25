@@ -583,7 +583,7 @@ pub fn get_ts_col_order_by(
         {
             let mut ts_col = String::new();
             for (original, alias) in &parsed_sql.aliases {
-                if original == _ts_col || original.contains("histogram") {
+                if original == _ts_col || is_histogram_call(original) {
                     ts_col = alias.clone();
                 }
             }
@@ -817,6 +817,13 @@ pub async fn delete_cache(
 
     disk::remove_result_cache_metas(&remove_files).await;
     Ok(true)
+}
+
+/// Only a `histogram(...)` call itself names a time bucket, not an expression containing one.
+#[cfg(not(feature = "enterprise"))]
+fn is_histogram_call(expr: &str) -> bool {
+    expr.get(..10)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("histogram("))
 }
 
 fn calculate_deltas_multi(
@@ -1077,6 +1084,7 @@ mod tests {
             histogram_offset: Some(0),
             sorted_by_time: true,
             sampling_config: None,
+            raw_streams: Default::default(),
         };
 
         let result = get_ts_col_order_by(&sql, "_timestamp", false);
@@ -1125,6 +1133,7 @@ mod tests {
             histogram_offset: Some(0),
             sorted_by_time: true,
             sampling_config: None,
+            raw_streams: Default::default(),
         };
 
         let (ts_col, is_descending) = get_ts_col_order_by(&sql, "_timestamp", false).unwrap();
@@ -1366,6 +1375,7 @@ mod tests {
             clear_cache: false,
             local_mode: None,
             agent_options: None,
+            raw_streams: None,
         };
         let file_path = "test_org/logs/test_stream".to_string();
         let is_aggregate = false;

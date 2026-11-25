@@ -27,9 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     variant="primary-outline"
     :size="size"
     class="font-semibold tracking-wide uppercase"
-    data-test="beta-badge"
+    :data-test="`${stage}-badge`"
   >
-    {{ t("common.beta") }}
+    {{ stage === "alpha" ? t("common.alpha") : t("common.beta") }}
   </OBadge>
 </template>
 
@@ -38,7 +38,10 @@ import { useI18nTyped } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeProps } from "@/lib/core/Badge/OBadge.types";
 
-withDefaults(defineProps<{ size?: BadgeProps["size"] }>(), { size: "sm" });
+withDefaults(defineProps<{ size?: BadgeProps["size"]; stage?: "alpha" | "beta" }>(), {
+  size: "sm",
+  stage: "beta",
+});
 
 const { t } = useI18nTyped();
 </script>

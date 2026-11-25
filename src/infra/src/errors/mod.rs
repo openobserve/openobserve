@@ -15,8 +15,10 @@
 
 use std::str::FromStr;
 
+use arrow::error::ArrowError;
 use async_nats::{error::Error as NatsError, jetstream};
 use config::{meta::feature::Feature, utils::json};
+use parquet::errors::ParquetError;
 use thiserror::Error as ThisError;
 pub mod grpc;
 
@@ -36,9 +38,9 @@ pub enum Error {
     #[error("SerdeJsonError# {0}")]
     SerdeJsonError(#[from] json::Error),
     #[error("ArrowError# {0}")]
-    ArrowError(#[from] arrow::error::ArrowError),
+    ArrowError(#[from] ArrowError),
     #[error("ParquetError# {0}")]
-    ParquetError(#[from] parquet::errors::ParquetError),
+    ParquetError(#[from] ParquetError),
     #[error("ObjectStoreError# {0}")]
     ObjectStoreError(#[from] object_store::Error),
     #[error("WatchError# watcher is exists {0}")]
@@ -142,8 +144,24 @@ pub enum QueueError {
 /// Admission refusals that callers map to a status of their own instead of a generic 4xx/5xx.
 #[derive(ThisError, Debug)]
 pub enum IngestionError {
-    #[error("Organization [{0}] is deleted")]
-    OrgBlocked(String),
+    #[error("Organization [{0}] is {1}")]
+    OrgBlocked(String, OrgBlockKind),
+}
+
+/// Why every gate refuses the org; callers map both kinds alike, only the text differs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OrgBlockKind {
+    Blocked,
+    Deleted,
+}
+
+impl std::fmt::Display for OrgBlockKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Blocked => "blocked",
+            Self::Deleted => "deleted",
+        })
+    }
 }
 
 #[derive(ThisError, Debug)]
@@ -202,6 +220,10 @@ pub enum PutDashboardError {
     MissingOwner,
     #[error("error putting dashboard with missing inner data for version {0}")]
     MissingInnerData(i32),
+    #[error("error updating dashboard that does not exist in the folder")]
+    NotFound,
+    #[error("error putting dashboard changed by a concurrent write")]
+    Conflict,
 }
 
 #[derive(ThisError, Debug)]
@@ -340,7 +362,7 @@ impl Error {
         match self {
             Error::ErrorCode(code) => code.http_status(),
             Error::ResourceError(_) => 503,
-            Error::Ingestion(IngestionError::OrgBlocked(_)) => 403,
+            Error::Ingestion(IngestionError::OrgBlocked(..)) => 403,
             // A JSON deserialization failure means the client sent a malformed
             // request body, so surface it as 400 rather than a 500 server error.
             _ => 400,
@@ -840,10 +862,15 @@ mod tests {
     }
 
     #[test]
-    fn test_org_blocked_is_forbidden() {
-        let e = Error::from(IngestionError::OrgBlocked("t1".into()));
-        assert_eq!(e.http_status(), 403);
-        assert_eq!(e.to_string(), "Organization [t1] is deleted");
+    fn test_a_blocked_or_deleted_org_is_forbidden_and_named_by_its_kind() {
+        for (kind, text) in [
+            (OrgBlockKind::Blocked, "Organization [t1] is blocked"),
+            (OrgBlockKind::Deleted, "Organization [t1] is deleted"),
+        ] {
+            let e = Error::from(IngestionError::OrgBlocked("t1".into(), kind));
+            assert_eq!(e.http_status(), 403, "{kind}");
+            assert_eq!(e.to_string(), text);
+        }
     }
 
     #[derive(Debug)]

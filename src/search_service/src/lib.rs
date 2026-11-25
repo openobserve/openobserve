@@ -77,6 +77,7 @@ pub mod grpc_search;
 pub mod grpc_server;
 pub mod partition;
 pub mod query_range;
+pub mod raw_streams;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
 pub mod searcher;
@@ -171,9 +172,34 @@ pub async fn search(
     request.set_use_cache(in_req.use_cache);
     request.set_use_index(in_req.use_index);
     request.set_analyze_profile(in_req.query.analyze_profile);
+    let raw_streams = match &in_req.raw_streams {
+        Some(raw_streams) => raw_streams.clone(),
+        None => {
+            crate::raw_streams::resolve_and_audit(
+                &trace_id,
+                org_id,
+                stream_type,
+                user_id.as_deref(),
+                &in_req.query.sql,
+            )
+            .await
+        }
+    };
+    request.set_raw_streams(raw_streams);
+    partition::aggregate::check_streaming_owner(
+        request.streaming_id.as_deref(),
+        user_id.as_deref(),
+    )?;
     // Before the query is planned again in spawned tasks (cluster::http).
     request.mark_protected_reader();
     let meta = Sql::new_from_req(&request, &query).await?;
+    partition::aggregate::check_streaming_redaction(
+        org_id,
+        stream_type,
+        request.streaming_id.as_deref(),
+        &meta.stream_names,
+        &request.raw_streams,
+    )?;
 
     // callers may share one trace_id across concurrent requests, e.g. Grafana via traceparent
     let registration = SEARCH_SERVER.register_leader(
@@ -326,6 +352,7 @@ pub async fn search_multi(
     org_id: &str,
     stream_type: StreamType,
     user_id: Option<String>,
+    raw_streams: Option<search::RawStreams>,
     multi_req: &search::MultiStreamRequest,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
@@ -388,6 +415,7 @@ pub async fn search_multi(
             }
         }
 
+        req.raw_streams = raw_streams.clone();
         let res = search(&trace_id, org_id, stream_type, user_id.clone(), &req).await;
 
         match res {
@@ -419,6 +447,7 @@ pub async fn search_multi(
                 } else {
                     multi_res.hits.extend(res.hits);
                 }
+                merge_function_errors(&mut multi_res.function_error, res.function_error);
             }
             Err(e) => {
                 log::error!("search_multi: search error: {e:?}");
@@ -465,8 +494,18 @@ pub async fn search_multi(
         match program {
             Some(program) => {
                 report_function_usage = true;
-                if apply_over_hits {
-                    let (ret_val, err) = transform::apply_vrl_fn(
+                let mut vrl_errors = transform::VrlRunErrors::default();
+                let out: Vec<serde_json::Value> = if apply_over_hits {
+                    let row_count = if per_query_resp {
+                        multi_res
+                            .hits
+                            .iter()
+                            .map(|v| v.as_array().map_or(1, |a| a.len()))
+                            .sum()
+                    } else {
+                        multi_res.hits.len()
+                    };
+                    let (ret_val, err) = transform::apply_vrl_fn_checked(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -476,36 +515,15 @@ pub async fn search_multi(
                         org_id,
                         &stream_names,
                     );
-                    if let Some(e) = err {
-                        log::error!("[trace_id {trace_id}] Error applying vrl function: {e}");
-                    }
-                    ret_val
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .filter_map(|v| {
-                            if per_query_resp {
-                                let flattened_array = v
-                                    .as_array()
-                                    .unwrap()
-                                    .iter()
-                                    .map(|item| {
-                                        config::utils::flatten::flatten(item.clone()).unwrap()
-                                    })
-                                    .collect::<Vec<_>>();
-                                Some(serde_json::Value::Array(flattened_array))
-                            } else {
-                                flatten_vrl_result(v.clone())
-                            }
-                        })
-                        .collect()
+                    vrl_errors.record_rows(row_count, err);
+                    flatten_result_array(&ret_val, per_query_resp)?
                 } else {
-                    let mut error = "".to_string();
-                    let res = multi_res
+                    multi_res
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = transform::apply_vrl_fn(
+                            let rows = hit.as_array().map_or(1, |a| a.len());
+                            let (ret_val, err) = transform::apply_vrl_fn_checked(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
@@ -515,17 +533,16 @@ pub async fn search_multi(
                                 org_id,
                                 &stream_names,
                             );
-                            if let Some(e) = err {
-                                error = e;
-                            }
+                            vrl_errors.record_rows(rows, err);
                             flatten_vrl_result(ret_val)
                         })
-                        .collect();
-                    if !error.is_empty() {
-                        log::error!("[trace_id {trace_id}] Error applying vrl function: {error}");
-                    }
-                    res
+                        .collect()
+                };
+                if let Some(msg) = vrl_errors.message() {
+                    log::error!("[trace_id {trace_id}] Error applying vrl function: {msg}");
+                    multi_res.function_error.push(msg);
                 }
+                out
             }
             None => multi_res.hits,
         }
@@ -591,6 +608,10 @@ pub async fn search_partition(
     let role_group = req.search_type.map(RoleGroup::from);
 
     let ctx = PartitionSqlContext::new(req, org_id, stream_type).await?;
+    let raw_streams = match &req.raw_streams {
+        Some(raw_streams) => raw_streams.clone(),
+        None => crate::raw_streams::resolve(org_id, stream_type, &req.sql, user_id).await,
+    };
 
     let stream_files = collect_stream_files(trace_id, user_id, &ctx).await?;
 
@@ -626,7 +647,10 @@ pub async fn search_partition(
     }
 
     let (streaming_aggs, streaming_id, cache_strategy) =
-        prepare_streaming_aggregate(trace_id, req, &ctx, use_cache).await?;
+        prepare_streaming_aggregate(trace_id, req, &ctx, &raw_streams, use_cache).await?;
+    if let Some(id) = streaming_id.as_deref() {
+        streaming_aggs_exec::registry::set_owner(id, user_id.map(str::to_string));
+    }
     resp.streaming_output = streaming_aggs;
     resp.streaming_aggs = streaming_aggs;
     resp.streaming_id = streaming_id;
@@ -963,6 +987,16 @@ pub async fn match_source(
     true
 }
 
+/// Child warnings (e.g. a failing query function) must reach the caller even when the child
+/// is not partial.
+pub fn merge_function_errors(acc: &mut Vec<String>, child: Vec<String>) {
+    for err in child {
+        if !acc.contains(&err) {
+            acc.push(err);
+        }
+    }
+}
+
 pub fn server_internal_error(error: impl ToString) -> Error {
     Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
 }
@@ -997,6 +1031,7 @@ pub async fn search_partition_multi(
                 sampling_ratio: None,
                 search_type: None,
                 timezone: None,
+                raw_streams: None,
             },
             false,
             false, // disable aggs cache
@@ -1149,14 +1184,68 @@ fn flatten_vrl_result(value: json::Value) -> Option<json::Value> {
     (!value.is_null()).then(|| config::utils::flatten::flatten(value).unwrap())
 }
 
+/// Flattens a `#ResultArray#` function's output, one array per query when `per_query_resp`. [pure]
+fn flatten_result_array(
+    ret_val: &json::Value,
+    per_query_resp: bool,
+) -> Result<Vec<json::Value>, Error> {
+    let expected_array = || Error::Message("Expected array".to_string());
+    let mut out = Vec::new();
+    for v in ret_val.as_array().ok_or_else(expected_array)? {
+        if per_query_resp {
+            let flattened_array = v
+                .as_array()
+                .ok_or_else(expected_array)?
+                .iter()
+                .map(|item| config::utils::flatten::flatten(item.clone()).unwrap())
+                .collect::<Vec<_>>();
+            out.push(json::Value::Array(flattened_array));
+        } else if let Some(flattened) = flatten_vrl_result(v.clone()) {
+            out.push(flattened);
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_merge_function_errors_keeps_non_partial_child_error_once() {
+        let msg = "Query function failed on 1 of 2 rows: boom".to_string();
+        let mut acc = vec![];
+        merge_function_errors(&mut acc, vec![msg.clone()]);
+        merge_function_errors(&mut acc, vec![msg.clone(), "other".to_string()]);
+        merge_function_errors(&mut acc, vec![]);
+        assert_eq!(acc, vec![msg, "other".to_string()]);
+    }
+
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
     use hashbrown::HashMap;
 
     use super::*;
+
+    #[test]
+    fn test_result_array_output_that_is_not_an_array_is_an_error() {
+        let rows = json::json!([{"a": {"b": 1}}, null]);
+        assert_eq!(
+            flatten_result_array(&rows, false).unwrap(),
+            vec![json::json!({"a_b": 1})]
+        );
+        assert_eq!(
+            flatten_result_array(&json::json!([[{"a": {"b": 1}}]]), true).unwrap(),
+            vec![json::json!([{"a_b": 1}])]
+        );
+        for (ret_val, per_query_resp) in [
+            (json::json!({"a": 1}), false),
+            (json::json!({"a": 1}), true),
+            (json::json!([{"a": 1}]), true),
+        ] {
+            let err = flatten_result_array(&ret_val, per_query_resp).unwrap_err();
+            assert!(err.to_string().contains("Expected array"), "{err}");
+        }
+    }
 
     #[test]
     fn test_flatten_vrl_result_filters_null_and_preserves_nested_records() {

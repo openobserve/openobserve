@@ -166,13 +166,13 @@ impl ObjectStore for FS {
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use object_store::{GetOptions, PutOptions, PutPayload};
+    use object_store::{GetOptions, PutOptions, PutPayload, memory::InMemory};
 
     use super::*;
 
     #[derive(Debug)]
     struct RangeTrackingStore {
-        inner: object_store::memory::InMemory,
+        inner: InMemory,
         range_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
         option_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     }
@@ -407,7 +407,7 @@ mod tests {
     ) {
         let id = config::ider::uuid();
         let key = Path::from(format!("files/{id}/logs/range_fixture"));
-        let inner = object_store::memory::InMemory::new();
+        let inner = InMemory::new();
         inner
             .put_opts(
                 &key,

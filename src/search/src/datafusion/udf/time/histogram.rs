@@ -19,7 +19,9 @@ use arrow::datatypes::{DataType, DataType::Timestamp, TimeUnit::Microsecond};
 use datafusion::{
     common::Result,
     error::DataFusionError,
-    logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, Volatility},
+    logical_expr::{
+        ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, Volatility,
+    },
 };
 
 pub const HISTOGRAM_UDF_NAME: &str = "histogram";
@@ -52,10 +54,7 @@ impl ScalarUDFImpl for HistogramUdf {
         Ok(Timestamp(Microsecond, None))
     }
 
-    fn invoke_with_args(
-        &self,
-        _args: datafusion::logical_expr::ScalarFunctionArgs,
-    ) -> Result<ColumnarValue> {
+    fn invoke_with_args(&self, _args: ScalarFunctionArgs) -> Result<ColumnarValue> {
         Err(DataFusionError::Internal(
             "histogram function don't support sql with multiple streams".to_string(),
         ))
@@ -67,7 +66,9 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::datatypes::{DataType, Field, TimeUnit};
-    use datafusion::{common::config::ConfigOptions, physical_plan::ColumnarValue};
+    use datafusion::{
+        common::config::ConfigOptions, physical_plan::ColumnarValue, scalar::ScalarValue,
+    };
 
     use super::*;
 
@@ -96,10 +97,8 @@ mod tests {
     #[test]
     fn test_invoke_with_args_errors_instead_of_panicking() {
         let udf = HistogramUdf::new();
-        let args = datafusion::logical_expr::ScalarFunctionArgs {
-            args: vec![ColumnarValue::Scalar(
-                datafusion::scalar::ScalarValue::Int64(Some(1)),
-            )],
+        let args = ScalarFunctionArgs {
+            args: vec![ColumnarValue::Scalar(ScalarValue::Int64(Some(1)))],
             arg_fields: vec![Arc::new(Field::new("f", DataType::Int64, true))],
             number_rows: 1,
             return_field: Arc::new(Field::new(

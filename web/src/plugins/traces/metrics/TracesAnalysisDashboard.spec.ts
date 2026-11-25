@@ -634,6 +634,17 @@ describe("TracesAnalysisDashboard", () => {
       );
     });
 
+    it("explains how to proceed in the no-dimensions state, with an illustration", async () => {
+      wrapper.vm.handlePanelDelete("panel-service");
+      await flushPromises();
+      wrapper.vm.handlePanelDelete("panel-status");
+      await flushPromises();
+
+      const empty = wrapper.find('[data-test="traces-analysis-dashboard-no-dimensions"]');
+      expect(empty.text()).toContain("Tick a dimension on the left to compare its values");
+      expect(empty.find("svg").exists()).toBe(true);
+    });
+
     it("brings the dashboard back when a dimension is ticked after removing them all", async () => {
       wrapper.vm.handlePanelDelete("panel-service");
       await flushPromises();
@@ -713,10 +724,64 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
     expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
   });
 
+  it("keeps insights search type for a non-logs stream in the drill down page", async () => {
+    wrapper.unmount();
+    wrapper = mountComponent({ embedded: true, streamType: "traces", analysisType: "volume" });
+    await flushPromises();
+
+    expect(wrapper.findComponent('[data-test="render-dashboard-charts"]').props("searchType")).toBe(
+      "insights",
+    );
+  });
+
   it("does not leak drawer-only attributes onto the page root", () => {
     const page = wrapper.find('[data-test="traces-analysis-dashboard-page"]');
     expect(page.attributes("width")).toBeUndefined();
     expect(page.attributes("title")).toBeUndefined();
+  });
+
+  describe("dimension row click", () => {
+    const remountWithFields = async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({
+        embedded: true,
+        streamType: "logs",
+        streamName: "app_logs",
+        analysisType: "volume",
+        streamFields: [{ name: "service_name" }, { name: "span_status" }],
+      });
+      await flushPromises();
+      wrapper.vm.selectedDimensions = ["service_name"];
+      await flushPromises();
+    };
+
+    it("selects a dimension when its name is clicked", async () => {
+      await remountWithFields();
+
+      await wrapper
+        .find('[data-test="dimension-row-span_status"] .dimension-label')
+        .trigger("click");
+
+      expect(wrapper.vm.selectedDimensions).toContain("span_status");
+    });
+
+    it("deselects a selected dimension when its row is clicked", async () => {
+      await remountWithFields();
+
+      await wrapper.find('[data-test="dimension-row-service_name"]').trigger("click");
+
+      expect(wrapper.vm.selectedDimensions).not.toContain("service_name");
+    });
+
+    it("toggles once, not twice, when the checkbox itself is clicked", async () => {
+      await remountWithFields();
+
+      await wrapper.find('[data-test="dimension-checkbox-span_status"]').trigger("click");
+
+      expect(wrapper.vm.selectedDimensions.filter((d: string) => d === "span_status")).toHaveLength(
+        1,
+      );
+    });
   });
 
   describe("dimension value counts", () => {
@@ -814,6 +879,57 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
       wrapper = mountComponent({ streamFields: fields });
       await flushPromises();
       expect(mockSearch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("restoring the picked dimensions", () => {
+    const fields = [
+      { name: "service_name" },
+      { name: "span_status" },
+      { name: "level" },
+      { name: "k8s_namespace_name" },
+    ];
+    const mountWith = async (initialDimensions: string[] | null) => {
+      wrapper.unmount();
+      wrapper = mountComponent({ streamFields: fields, initialDimensions });
+      await flushPromises();
+    };
+
+    it("starts from the dimensions handed back after a remount", async () => {
+      await mountWith(["service_name", "level", "k8s_namespace_name"]);
+      expect(wrapper.vm.selectedDimensions).toEqual([
+        "service_name",
+        "level",
+        "k8s_namespace_name",
+      ]);
+    });
+
+    it("drops a restored dimension the stream no longer has", async () => {
+      await mountWith(["level", "gone"]);
+      expect(wrapper.vm.selectedDimensions).toEqual(["level"]);
+    });
+
+    it("falls back to the defaults when none of the restored dimensions exist", async () => {
+      await mountWith(["gone"]);
+      expect(wrapper.vm.selectedDimensions).toEqual(["service_name", "span_status"]);
+    });
+
+    it("keeps an empty pick empty", async () => {
+      await mountWith([]);
+      expect(wrapper.vm.selectedDimensions).toEqual([]);
+    });
+
+    it("uses the defaults when nothing was picked before", async () => {
+      await mountWith(null);
+      expect(wrapper.vm.selectedDimensions).toEqual(["service_name", "span_status"]);
+    });
+
+    it("reports a changed pick but not the initial one", async () => {
+      await mountWith(["service_name"]);
+      expect(wrapper.emitted("update:dimensions")).toBeUndefined();
+      wrapper.vm.toggleDimension("level");
+      await flushPromises();
+      expect(wrapper.emitted("update:dimensions")?.at(-1)).toEqual([["service_name", "level"]]);
     });
   });
 });

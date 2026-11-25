@@ -264,8 +264,10 @@ export interface AutoRunDeps {
   pickNarrowPreset?: (signature: LogsSignature, estimate: ScanEstimate) => NarrowCandidate | null;
   getRefreshInterval?: () => number;
   resetLoading?: () => void;
+  resetHistogramLoading?: () => void;
   clearResults?: () => void;
   rearmRefresh?: () => void;
+  onResetScope?: () => void;
   readPanelConfigSignature?: (surface: "visualize" | "build") => string | null;
   getFreeTextFlags?: () => FreeTextGateFlags;
   t?: (key: string) => I18nText;
@@ -706,7 +708,11 @@ export function createAutoRun(deps: AutoRunDeps) {
     const keep = new Set(options.keep ?? []);
     const targets = gen ? [gen] : [current.grid, current.patterns];
     targets.forEach((target) => target && cancelOne(target, keep));
-    if (cause === "replace") return;
+    if (cause === "replace") {
+      // An aborted histogram never reports back, so its busy flag would keep the next run from requesting one.
+      if (keep.size === 0) deps.resetHistogramLoading?.();
+      return;
+    }
     if (cause !== "block") {
       clearAllPending();
       deferredRefresh = false;
@@ -1425,6 +1431,10 @@ export function createAutoRun(deps: AutoRunDeps) {
     setOutcome("logs", "invalidated");
   }
 
+  function clearSearchAroundInvalidation(): void {
+    if (invalidation === "search-around") invalidation = null;
+  }
+
   function resetScope(cause: "saved-view" | "url" | "reapply" | "job" | "org"): void {
     meta.lastRunAttempt = null;
     cancelGeneration(null, { cause: cause === "org" ? "org" : "reset" });
@@ -1440,6 +1450,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     missedTick = false;
     invalidation = null;
     if (cause === "saved-view" || cause === "url" || cause === "reapply") meta.editorDirty = false;
+    deps.onResetScope?.();
   }
 
   function registerRefreshPause(predicate: () => boolean): () => void {
@@ -1531,6 +1542,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     recordPanelComplete,
     recordPanelFailure,
     invalidateExecuted,
+    clearSearchAroundInvalidation,
     resetScope,
     registerRefreshPause,
     onRefreshTick,

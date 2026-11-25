@@ -149,7 +149,7 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
             {
                 alert_incidents::resolve_firings_fired_by(&moved, alert, onset, resolved_at)
                     .await?;
-                alert_incidents::resolve_if_recovered(&org_id, &moved).await?;
+                alert_incidents::resolve_if_recovered(&org_id, &moved, false).await?;
             }
         }
     }

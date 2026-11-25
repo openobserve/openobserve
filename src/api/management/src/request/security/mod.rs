@@ -258,20 +258,33 @@ pub async fn unreadable_streams<'a>(
     user_id: &str,
     streams: impl IntoIterator<Item = &'a str>,
 ) -> HashSet<String> {
-    use openobserve_core::authz::{Denial, QuerySource, authorize_query_sources};
+    use config::meta::stream::StreamType;
+    use openobserve_core::authz::{Denial, StreamAccessDenied, TypedStream, readable_org_streams};
 
-    let sources: Vec<QuerySource> = streams
+    let wanted: HashSet<(StreamType, String)> = streams
         .into_iter()
-        .map(|name| QuerySource::Stream {
-            org_id: org_id.to_string(),
-            stream_type: config::meta::stream::StreamType::Logs,
-            name: name.to_string(),
+        .map(|name| (StreamType::Logs, name.to_string()))
+        .collect();
+    let Some(readable) = readable_org_streams(user_id, org_id, wanted.clone()).await else {
+        return HashSet::new();
+    };
+    let denials: Vec<Denial> = wanted
+        .into_iter()
+        .filter(|stream| !readable.contains(stream))
+        .map(|(stream_type, name)| {
+            Denial::Stream(TypedStream {
+                org_id: org_id.to_string(),
+                stream_type,
+                name,
+            })
         })
         .collect();
-    let admitted = match authorize_query_sources(user_id, &sources).await {
-        Ok(()) => Ok(()),
-        Err(denied) => openobserve_core::security::admit_security_sources(user_id, denied).await,
-    };
+    if denials.is_empty() {
+        return HashSet::new();
+    }
+    let admitted =
+        openobserve_core::security::admit_security_sources(user_id, StreamAccessDenied { denials })
+            .await;
     match admitted {
         Ok(()) => HashSet::new(),
         Err(denied) => denied
@@ -549,7 +562,6 @@ pub(crate) mod tests {
     }
 
     /// The migrated SQLite meta store, set up once per test process.
-    #[cfg(feature = "enterprise")]
     pub(crate) async fn meta_store() {
         static READY: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
         READY
@@ -1053,6 +1065,26 @@ pub(crate) mod tests {
                     .await
                     .is_empty()
             );
+        }
+
+        // o2-enterprise#3642: a logs read-all grant costs one org-wide question, no Check.
+        #[tokio::test]
+        async fn test_unreadable_streams_asks_once_with_an_org_wide_grant() {
+            use config::meta::stream::StreamType;
+
+            let checker = openobserve_core::authz::fake_checker();
+            let org = format!("gate_{}", config::ider::uuid());
+            let Headers(user) = stranger();
+            checker.grant_read_all(&user.user_id, &org, StreamType::Logs);
+            let names: Vec<String> = (0..50).map(|i| format!("s{i}")).collect();
+            assert!(
+                unreadable_streams(&org, &user.user_id, names.iter().map(String::as_str))
+                    .await
+                    .is_empty()
+            );
+            let calls = checker.calls(&user.user_id);
+            assert_eq!(calls.streams, 0, "no per-stream Check");
+            assert_eq!(calls.org_wide, vec![vec![StreamType::Logs]]);
         }
 
         // A converted detection's old incident holds only ops firings, so only the marker decides.

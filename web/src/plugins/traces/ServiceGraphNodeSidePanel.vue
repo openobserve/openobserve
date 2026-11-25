@@ -504,7 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         rowClick: (row: any) =>
                           navigateToTraces({
                             operationName: row.operation,
-                            callerService: isInferred ? row.caller : undefined,
+                            callerService: operationRowCaller(row),
                           }),
                       }
                 "
@@ -563,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.stop="
                       navigateToTraces({
                         operationName: row.operation,
-                        callerService: isInferred ? row.caller : undefined,
+                        callerService: operationRowCaller(row),
                         errorsOnly: column.id === 'errors',
                         minDurationMicros: isDurationColumn(column.id)
                           ? (row as Record<string, any>)[column.id]
@@ -2968,6 +2968,17 @@ export default defineComponent({
       },
     );
 
+    const isGenAiNode = computed(() =>
+      ["agent", "tool", "model"].includes(props.selectedNode?.service_type),
+    );
+
+    // A tool or model row's caller is usually an agent name,
+    // which no service_name filter matches.
+    const operationRowCaller = (row: { caller?: string }): string | undefined => {
+      const st = props.selectedNode?.service_type;
+      return st && st !== "tool" && st !== "model" ? row.caller : undefined;
+    };
+
     // Navigate to traces explore page with contextual filters
     const navigateToTraces = (params: {
       operationName?: string;
@@ -2991,6 +3002,7 @@ export default defineComponent({
         serviceName:
           props.selectedNode?.name || props.selectedNode?.label || props.selectedNode?.id,
         serviceType: props.selectedNode?.service_type,
+        ...(isGenAiNode.value ? { identityExpr: serviceNameField.value } : {}),
         ...(props.selectedNode?.service_names?.length && !props.selectedNode?.service_type
           ? { serviceNames: spanServiceNames() }
           : {}),
@@ -3247,6 +3259,7 @@ export default defineComponent({
       operationsTableColumns,
       operationsTableRows,
       navigateToTraces,
+      operationRowCaller,
       // Dynamic resource tabs (OTEL platforms)
       availableResourceTabConfigs,
       resourceTabsSettled,

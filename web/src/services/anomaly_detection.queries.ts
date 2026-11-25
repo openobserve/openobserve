@@ -17,6 +17,7 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import anomaly_detection from "./anomaly_detection";
 import { anomalyKeys } from "./anomaly_detection.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
+import type { AnomalyExploreQuery, AnomalyExploreResponse } from "@/types/anomalyExplore";
 
 export const anomalyConfigsQuery = (org: string) =>
   queryOptions({
@@ -37,6 +38,25 @@ export const anomalyHistoryQuery = (org: string, limit: number) =>
     queryKey: anomalyKeys.history(org, limit),
     queryFn: async () => (await anomaly_detection.getAllHistory(org, limit)).data,
     staleTime: LIVE_STALE_TIME,
+  });
+
+/** The key carries the window and model, so a point link is its own entry beside the summary. */
+export const anomalyExploreQuery = (
+  org: string,
+  id: string,
+  query: AnomalyExploreQuery = {},
+  options: { silentForbidden?: boolean } = {},
+) =>
+  queryOptions({
+    queryKey: anomalyKeys.explore(org, id, query),
+    queryFn: async (): Promise<AnomalyExploreResponse> =>
+      (await anomaly_detection.explore(org, id, query, options)).data,
+    staleTime: LIVE_STALE_TIME,
+    // Every 4xx is final; a 409 is a stale page, which the caller answers with one reload.
+    retry: (failureCount: number, err: unknown) => {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      return status !== undefined && status < 500 ? false : failureCount < 2;
+    },
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

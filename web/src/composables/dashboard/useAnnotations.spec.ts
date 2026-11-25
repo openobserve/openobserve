@@ -1,6 +1,14 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { useAnnotations } from "./useAnnotations";
 import { annotationService } from "../../services/dashboard_annotations";
+import { queryClient } from "@/composables/query/queryClient";
+import {
+  createAnnotationMutation,
+  deleteAnnotationMutation,
+  updateAnnotationMutation,
+} from "@/services/dashboard_annotations.queries";
+import { EMPTY_LIST_STALE_TIME } from "@/composables/query/cachePolicy";
+import { annotationKeys } from "@/services/dashboard_annotations.querykeys";
 
 // Mock the annotation service
 vi.mock("../../services/dashboard_annotations", async (importOriginal) => {
@@ -19,6 +27,8 @@ describe("useAnnotations", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The cache key has no panel id, so an entry from one test would answer the next.
+    queryClient.clear();
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -62,7 +72,6 @@ describe("useAnnotations", () => {
         "test-org",
         "test-dashboard",
         {
-          panels: ["test-panel"],
           start_time: 1000,
           end_time: 2000,
         },
@@ -117,7 +126,6 @@ describe("useAnnotations", () => {
         "different-org",
         "test-dashboard",
         {
-          panels: ["test-panel"],
           start_time: 1000,
           end_time: 2000,
         },
@@ -135,7 +143,6 @@ describe("useAnnotations", () => {
         "test-org",
         "another-dashboard",
         {
-          panels: ["test-panel"],
           start_time: 1000,
           end_time: 2000,
         },
@@ -153,7 +160,6 @@ describe("useAnnotations", () => {
         "test-org",
         "test-dashboard",
         {
-          panels: ["different-panel"],
           start_time: 1000,
           end_time: 2000,
         },
@@ -171,7 +177,6 @@ describe("useAnnotations", () => {
         "test-org",
         "test-dashboard",
         {
-          panels: ["test-panel"],
           start_time: 5000,
           end_time: 10000,
         },
@@ -189,7 +194,6 @@ describe("useAnnotations", () => {
         "test-org",
         "test-dashboard",
         {
-          panels: ["test-panel"],
           start_time: 0,
           end_time: 0,
         },
@@ -207,7 +211,6 @@ describe("useAnnotations", () => {
         "test-org",
         "test-dashboard",
         {
-          panels: ["test-panel"],
           start_time: -1000,
           end_time: -500,
         },
@@ -309,13 +312,161 @@ describe("useAnnotations", () => {
       1,
       "org1",
       "dash1",
-      { panels: ["panel1"], start_time: 1000, end_time: 2000 },
+      { start_time: 1000, end_time: 2000 },
     );
     expect(mockAnnotationService.get_timed_annotations).toHaveBeenNthCalledWith(
       2,
       "org2",
       "dash2",
-      { panels: ["panel2"], start_time: 3000, end_time: 4000 },
+      { start_time: 3000, end_time: 4000 },
     );
   });
+});
+
+describe("useAnnotations: one request per dashboard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryClient.clear();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    queryClient.setQueryDefaults(annotationKeys.all("org"), {});
+  });
+
+  // The test setup turns retries off for every query. Turn the app's retry
+  // back on, with no delay, so that a 503 test fails if the code retries.
+  const allowRetries = () =>
+    queryClient.setQueryDefaults(annotationKeys.all("org"), { retry: 2, retryDelay: 0 });
+
+  const rows = [
+    { annotation_id: "a", panels: ["p1"] },
+    { annotation_id: "b", panels: ["p2"] },
+    { annotation_id: "c", panels: ["p1", "p2"] },
+    { annotation_id: "d", panels: [] },
+  ];
+
+  it("sends one request for many panels and gives each panel its own rows", async () => {
+    mockAnnotationService.get_timed_annotations.mockResolvedValue({ data: rows } as any);
+
+    const [r1, r2, r3] = await Promise.all(
+      ["p1", "p2", "p3"].map((p) => useAnnotations("org", "dash", p).refreshAnnotations(1, 2)),
+    );
+
+    expect(mockAnnotationService.get_timed_annotations).toHaveBeenCalledTimes(1);
+    expect(mockAnnotationService.get_timed_annotations).toHaveBeenCalledWith("org", "dash", {
+      start_time: 1,
+      end_time: 2,
+    });
+    expect(r1.map((a: any) => a.annotation_id)).toEqual(["a", "c", "d"]);
+    expect(r2.map((a: any) => a.annotation_id)).toEqual(["b", "c", "d"]);
+    expect(r3.map((a: any) => a.annotation_id)).toEqual(["d"]);
+  });
+
+  it("sends a new request for a different window", async () => {
+    mockAnnotationService.get_timed_annotations.mockResolvedValue({ data: rows } as any);
+
+    await useAnnotations("org", "dash", "p1").refreshAnnotations(1, 2);
+    await useAnnotations("org", "dash", "p2").refreshAnnotations(1, 3);
+
+    expect(mockAnnotationService.get_timed_annotations).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry a 503 and draws the panel without annotations", async () => {
+    allowRetries();
+    mockAnnotationService.get_timed_annotations.mockRejectedValue({
+      response: { status: 503 },
+    });
+
+    const result = await useAnnotations("org", "dash", "p1").refreshAnnotations(1, 2);
+
+    expect(result).toBeNull();
+    expect(mockAnnotationService.get_timed_annotations).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries other server errors", async () => {
+    allowRetries();
+    mockAnnotationService.get_timed_annotations.mockRejectedValue({
+      response: { status: 500 },
+    });
+
+    await useAnnotations("org", "dash", "p1").refreshAnnotations(1, 2);
+
+    expect(mockAnnotationService.get_timed_annotations).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps a 503 answer for a short time only", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    mockAnnotationService.get_timed_annotations
+      .mockRejectedValueOnce({ response: { status: 503 } })
+      .mockResolvedValueOnce({ data: rows } as any);
+
+    await useAnnotations("org", "dash", "p1").refreshAnnotations(1, 2);
+    const later = await useAnnotations("org", "dash", "p2").refreshAnnotations(1, 2);
+    expect(later).toBeNull();
+    expect(mockAnnotationService.get_timed_annotations).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(Date.now() + EMPTY_LIST_STALE_TIME + 1);
+    const recovered = await useAnnotations("org", "dash", "p2").refreshAnnotations(1, 2);
+
+    expect(mockAnnotationService.get_timed_annotations).toHaveBeenCalledTimes(2);
+    expect(recovered.map((a: any) => a.annotation_id)).toEqual(["b", "c", "d"]);
+  });
+
+  it("drops the idle lists of older revisions after a write", async () => {
+    mockAnnotationService.get_timed_annotations.mockResolvedValue({ data: [] } as any);
+    vi.spyOn(annotationService, "create_timed_annotations").mockResolvedValue({ data: {} } as any);
+    const lists = () =>
+      queryClient.getQueryCache().findAll({ queryKey: annotationKeys.dashboard("org", "dash") });
+
+    for (let i = 0; i < 3; i++) {
+      await useAnnotations("org", "dash", "p1").refreshAnnotations(1, 2);
+      await queryClient
+        .getMutationCache()
+        .build(queryClient, createAnnotationMutation("org", "dash"))
+        .execute([{ title: `edit ${i}` }]);
+    }
+    await useAnnotations("org", "dash", "p1").refreshAnnotations(1, 2);
+
+    expect(lists()).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      "create",
+      "create_timed_annotations",
+      () => createAnnotationMutation("org", "dash"),
+      [{ title: "new" }],
+    ],
+    [
+      "update",
+      "update_timed_annotations",
+      () => updateAnnotationMutation("org", "dash"),
+      { annotationId: "a", annotation: { title: "new" } },
+    ],
+    ["delete", "delete_timed_annotations", () => deleteAnnotationMutation("org", "dash"), ["a"]],
+  ] as const)(
+    "does not let the reload after a %s join a read that started before it",
+    async (_label, method, build, variables) => {
+      let finishOldRead: (value: unknown) => void = () => {};
+      mockAnnotationService.get_timed_annotations
+        .mockImplementationOnce(() => new Promise((resolve) => (finishOldRead = resolve)) as any)
+        .mockResolvedValueOnce({ data: [{ annotation_id: "new", panels: ["p1"] }] } as any);
+      vi.spyOn(annotationService, method).mockResolvedValue({ data: {} } as any);
+
+      const oldRead = useAnnotations("org", "dash", "p2").refreshAnnotations(1, 2);
+      await queryClient
+        .getMutationCache()
+        .build(queryClient, build() as any)
+        .execute(variables as any);
+      const reload = await useAnnotations("org", "dash", "p1").refreshAnnotations(1, 2);
+      finishOldRead({ data: [] });
+      await oldRead;
+
+      expect(mockAnnotationService.get_timed_annotations).toHaveBeenCalledTimes(2);
+      expect(reload.map((a: any) => a.annotation_id)).toEqual(["new"]);
+    },
+  );
 });

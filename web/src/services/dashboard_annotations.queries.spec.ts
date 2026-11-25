@@ -63,7 +63,9 @@ describe("annotation mutations", () => {
   ])("%s drops only the edited dashboard's annotations", async (_label, build, variables) => {
     await run(build(), variables);
 
-    expect(isInvalidated(annotationKeys.list(ORG, "dash-a", params))).toBe(true);
+    // The write removes the edited dashboard's idle lists, or at least marks them stale.
+    const edited = queryClient.getQueryState(annotationKeys.list(ORG, "dash-a", params));
+    expect(edited === undefined || edited.isInvalidated).toBe(true);
     expect(isInvalidated(annotationKeys.list(ORG, "dash-b", params))).toBe(false);
     expect(isInvalidated(dashboardKeys.byFolder(ORG, "default"))).toBe(false);
   });

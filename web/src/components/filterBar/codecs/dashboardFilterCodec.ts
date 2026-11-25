@@ -37,6 +37,7 @@ import {
   stamp,
   toConnector,
   valueStrings,
+  withAndRunGroups,
   type CodecContext,
   type FilterCodec,
 } from "./types";
@@ -106,7 +107,7 @@ const LIST_ITEM = /\s*(?:'([^']*)'|"([^"]*)"|([^,()]+))/y;
 const SQL_LIST_ITEM = /\s*(?:'((?:[^']|'')*)'|"([^"]*)"|([^,()]+))/y;
 
 // A whole value that the variable substitution replaces; anything else holding `$` is a literal.
-const PLACEHOLDER =
+export const PLACEHOLDER =
   /^(\{\{\s*[\w-]+\s*(:\s*[a-zA-Z]+\s*)?\}\}|\$\{\s*[\w-]+\s*(:\s*[a-zA-Z]+\s*)?\}|\$[\w-]+)$/;
 
 const QUOTED_PLACEHOLDER = new RegExp(`^'${PLACEHOLDER.source.slice(1, -1)}'$`);
@@ -227,7 +228,7 @@ function parseGroup(group: Record<string, unknown>, id?: string): FilterGroup {
     if (isPlainObject(item)) return parseLeaf(item);
     return stamp(makeRawNode(JSON.stringify(item)), item);
   });
-  return stamp(makeGroup(items, toConnector(group.logicalOperator), id), group);
+  return stamp(makeGroup(withAndRunGroups(items), toConnector(group.logicalOperator), id), group);
 }
 
 function columnOf(

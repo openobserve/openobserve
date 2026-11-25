@@ -128,6 +128,15 @@ export function tracesSearchRunSignature(searchObj: {
   });
 }
 
+/** True when nothing ran yet or the search state differs from the last Run, so the results are not its. */
+export function tracesQueryNotRun(
+  searchObj: Parameters<typeof tracesSearchRunSignature>[0] & {
+    meta: { lastRunSignature?: string | null };
+  },
+): boolean {
+  return searchObj.meta.lastRunSignature !== tracesSearchRunSignature(searchObj);
+}
+
 /** True when auto-run is off and the search state differs from the last Run, so the edit waits for Run. */
 export function tracesRunIsStaged(
   searchObj: Parameters<typeof tracesSearchRunSignature>[0] & {
@@ -138,6 +147,15 @@ export function tracesRunIsStaged(
   const autoRunOn = !!autoQueryEnabled && !!searchObj.meta.liveMode;
   const lastRun = searchObj.meta.lastRunSignature;
   return !autoRunOn && !!lastRun && tracesSearchRunSignature(searchObj) !== lastRun;
+}
+
+/** True when the editor holds an edit since the last applied query; whitespace at either end is not an edit. */
+export function tracesEditorIsStaged(searchObj: {
+  data: { editorValue?: string | null; appliedEditorValue?: unknown };
+}): boolean {
+  const applied = searchObj.data.appliedEditorValue;
+  if (typeof applied !== "string") return false;
+  return String(searchObj.data.editorValue ?? "").trim() !== applied.trim();
 }
 
 export type TracesToolbarStage = "full" | "compactButtons" | "iconToggle" | "resetInMenu";
@@ -151,6 +169,7 @@ export const TRACES_TOOLBAR_WIDTHS = {
   reset: { text: 72, icon: 36 },
   more: 70,
   metricsPinned: 78,
+  sqlModePinned: 78,
   savedViewsPinned: 93,
 };
 

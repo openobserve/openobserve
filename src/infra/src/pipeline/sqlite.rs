@@ -271,10 +271,10 @@ UPDATE pipeline
 
     async fn get_by_stream(&self, stream_params: &StreamParams) -> Result<Vec<Pipeline>> {
         let pool = CLIENT_RO.clone();
-        let query = r#"
-SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 AND stream_name = $4 AND stream_type = $5 ORDER BY kind ASC, id ASC;
-        "#;
-        let rows = sqlx::query(query)
+        let query = select_pipelines(
+            "WHERE org = $1 AND source_type = $2 AND stream_org = $3 AND stream_name = $4 AND stream_type = $5 ORDER BY kind ASC, id ASC",
+        );
+        let rows = sqlx::query(&query)
             .bind(stream_params.org_id.as_str())
             .bind("realtime")
             .bind(stream_params.org_id.as_str())
@@ -287,8 +287,8 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 A
 
     async fn get_by_id(&self, pipeline_id: &str) -> Result<super::Decoded> {
         let pool = CLIENT_RO.clone();
-        let query = "SELECT * FROM pipeline WHERE id = $1;";
-        let row = sqlx::query(query)
+        let query = select_pipelines("WHERE id = $1");
+        let row = sqlx::query(&query)
             .bind(pipeline_id)
             .fetch_optional(&pool)
             .await
@@ -300,13 +300,9 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 A
         let pool = CLIENT_RO.clone();
         let similar_pipelines = match &pipeline.source {
             PipelineSource::Realtime(stream_params) => {
-                let rows = sqlx::query(
-                    r#"
-SELECT * FROM pipeline 
-    WHERE source_type = $1 AND stream_org = $2 AND stream_name = $3 AND stream_type = $4
-    ORDER BY kind ASC, id ASC;
-                "#,
-                )
+                let rows = sqlx::query(&select_pipelines(
+                    "WHERE source_type = $1 AND stream_org = $2 AND stream_name = $3 AND stream_type = $4 ORDER BY kind ASC, id ASC",
+                ))
                 .bind("realtime")
                 .bind(stream_params.org_id.as_str())
                 .bind(stream_params.stream_name.as_str())
@@ -326,8 +322,8 @@ SELECT * FROM pipeline
 
     async fn list(&self) -> Result<super::DecodedPipelines> {
         let client = CLIENT_RO.clone();
-        let query = "SELECT * FROM pipeline ORDER BY id;";
-        match sqlx::query(query).fetch_all(&client).await {
+        let query = select_pipelines("ORDER BY id");
+        match sqlx::query(&query).fetch_all(&client).await {
             Ok(rows) => Ok(super::decode_all_rows(rows)),
             Err(e) => {
                 log::debug!("[SQLITE] list all pipelines error: {e}");
@@ -338,8 +334,8 @@ SELECT * FROM pipeline
 
     async fn list_by_org(&self, org: &str) -> Result<super::DecodedPipelines> {
         let client = CLIENT_RO.clone();
-        let query = "SELECT * FROM pipeline WHERE org = $1 ORDER BY id;";
-        match sqlx::query(query).bind(org).fetch_all(&client).await {
+        let query = select_pipelines("WHERE org = $1 ORDER BY id");
+        match sqlx::query(&query).bind(org).fetch_all(&client).await {
             Ok(rows) => Ok(super::decode_all_rows(rows)),
             Err(e) => {
                 log::error!("[SQLITE] list pipeline by org error: {e}");
@@ -360,10 +356,8 @@ SELECT * FROM pipeline
 
     async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>> {
         let client = CLIENT_RO.clone();
-        let query = r#"
-SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
-        "#;
-        match sqlx::query(query)
+        let query = select_pipelines("WHERE org = $1 AND source_type = $2 ORDER BY id");
+        match sqlx::query(&query)
             .bind(org)
             .bind("realtime")
             .fetch_all(&client)
@@ -381,7 +375,7 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
         let client = CLIENT_RW.clone();
         let mut tx = client.begin().await?;
 
-        let pipeline = sqlx::query_as::<_, Pipeline>("SELECT * FROM pipeline WHERE id = $1;")
+        let pipeline = sqlx::query_as::<_, Pipeline>(&select_pipelines("WHERE id = $1"))
             .bind(pipeline_id)
             .fetch_one(&mut *tx)
             .await?;
@@ -400,6 +394,14 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
         drop(client);
         Ok(pipeline)
     }
+}
+
+/// Named columns, not `*`: a reader prepared on a pre-migration schema re-prepares, not panics.
+fn select_pipelines(tail: &str) -> String {
+    format!(
+        "SELECT id, version, enabled, name, description, org, source_type, stream_org, \
+         stream_name, stream_type, derived_stream, kind, nodes, edges FROM pipeline {tail};"
+    )
 }
 
 #[cfg(test)]
@@ -478,6 +480,57 @@ mod tests {
             .unwrap();
         }
         pool
+    }
+
+    /// A reader that loaded the schema before a migration added `kind`, as `cache_indices` does.
+    #[tokio::test]
+    async fn test_a_reader_older_than_the_kind_column_reads_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let opts = sqlx::sqlite::SqliteConnectOptions::new()
+            .filename(dir.path().join("meta.sqlite"))
+            .create_if_missing(true);
+        let pool = |opts| {
+            sqlx::sqlite::SqlitePoolOptions::new()
+                .max_connections(1)
+                .connect_with(opts)
+        };
+        let writer = pool(opts.clone()).await.unwrap();
+        let reader = pool(opts.read_only(true)).await.unwrap();
+        sqlx::query(
+            "CREATE TABLE pipeline (id TEXT PRIMARY KEY, version INT, enabled BOOLEAN, name TEXT,
+             description TEXT, org TEXT, source_type TEXT, stream_org TEXT, stream_name TEXT,
+             stream_type TEXT, derived_stream TEXT, nodes TEXT, edges TEXT);",
+        )
+        .execute(&writer)
+        .await
+        .unwrap();
+        sqlx::query("SELECT name FROM sqlite_master;")
+            .fetch_all(&reader)
+            .await
+            .unwrap();
+        sqlx::query("ALTER TABLE pipeline ADD COLUMN kind TEXT NOT NULL DEFAULT 'user';")
+            .execute(&writer)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO pipeline VALUES ('p1', 1, true, 'p1', '', 'o', 'realtime', 'o', 's',
+             'logs', NULL, $1, '[]', 'evaluation');",
+        )
+        .bind(json::json!([stream_node()]).to_string())
+        .execute(&writer)
+        .await
+        .unwrap();
+
+        let read = sqlx::query_as::<_, Pipeline>(&select_pipelines("WHERE id = $1"))
+            .bind("p1")
+            .fetch_one(&reader)
+            .await;
+
+        let kind = read.map(|p| p.kind);
+        assert!(
+            matches!(kind, Ok(config::meta::pipeline::PipelineKind::Evaluation)),
+            "{kind:?}"
+        );
     }
 
     #[tokio::test]

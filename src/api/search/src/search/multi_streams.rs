@@ -264,6 +264,23 @@ pub async fn search_multi(
 
     let per_query_resp = multi_req.per_query_response;
 
+    #[cfg(feature = "enterprise")]
+    {
+        let query_fns = multi_req
+            .query_fn
+            .as_deref()
+            .into_iter()
+            .chain(
+                queries
+                    .iter()
+                    .filter_map(|req| req.query.query_fn.as_deref()),
+            )
+            .collect::<Vec<_>>();
+        if let Some(res) = super::check_query_fn_permissions(&org_id, user_id, &query_fns).await {
+            return res;
+        }
+    }
+
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
         if let Err(e) = req.decode() {
@@ -458,15 +475,15 @@ pub async fn search_multi(
 
                 if res.is_partial {
                     multi_res.is_partial = true;
-                    multi_res.function_error = if res.function_error.is_empty() {
-                        vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()]
-                    } else {
-                        vec![
-                            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
-                            res.function_error.join(", "),
-                        ]
-                    };
+                    SearchService::merge_function_errors(
+                        &mut multi_res.function_error,
+                        vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()],
+                    );
                 }
+                SearchService::merge_function_errors(
+                    &mut multi_res.function_error,
+                    res.function_error,
+                );
                 if multi_res.histogram_interval.is_none() && res.histogram_interval.is_some() {
                     multi_res.histogram_interval = res.histogram_interval;
                 }
@@ -537,8 +554,14 @@ pub async fn search_multi(
         match program {
             Some(program) => {
                 report_function_usage = true;
-                if apply_over_hits {
-                    let (ret_val, err) = transform::apply_vrl_fn(
+                let mut vrl_errors = transform::VrlRunErrors::default();
+                let out = if apply_over_hits {
+                    let row_count: usize = multi_res
+                        .hits
+                        .iter()
+                        .map(|v| v.as_array().map_or(1, |a| a.len()))
+                        .sum();
+                    let (ret_val, err) = transform::apply_vrl_fn_checked(
                         &mut runtime,
                         &VRLResultResolver {
                             program: program.program.clone(),
@@ -548,9 +571,7 @@ pub async fn search_multi(
                         &org_id,
                         &[vrl_stream_name.clone()],
                     );
-                    if let Some(e) = err {
-                        log::error!("[trace_id {trace_id}] Error applying vrl function: {e}");
-                    }
+                    vrl_errors.record_rows(row_count, err);
                     // Use as_array() safely: if VRL execution failed and returned a
                     // non-array value (or a flat array when per_query_resp expects an
                     // array-of-arrays), fall back to an empty result instead of
@@ -596,12 +617,12 @@ pub async fn search_multi(
                             .collect(),
                     }
                 } else {
-                    let mut error: Option<String> = None;
-                    let res = multi_res
+                    multi_res
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = transform::apply_vrl_fn(
+                            let rows = hit.as_array().map_or(1, |a| a.len());
+                            let (ret_val, err) = transform::apply_vrl_fn_checked(
                                 &mut runtime,
                                 &VRLResultResolver {
                                     program: program.program.clone(),
@@ -611,16 +632,17 @@ pub async fn search_multi(
                                 &org_id,
                                 &[vrl_stream_name.clone()],
                             );
-                            error = err;
+                            vrl_errors.record_rows(rows, err);
 
                             config::utils::flatten::flatten(ret_val).ok()
                         })
-                        .collect();
-                    if let Some(error) = error {
-                        log::error!("[trace_id {trace_id}] Error applying vrl function: {error}");
-                    }
-                    res
+                        .collect()
+                };
+                if let Some(msg) = vrl_errors.message() {
+                    log::error!("[trace_id {trace_id}] Error applying vrl function: {msg}");
+                    multi_res.function_error.push(msg);
                 }
+                out
             }
             None => multi_res.hits,
         }
@@ -813,6 +835,13 @@ pub async fn _search_partition_multi(
             return res;
         }
     }
+    #[cfg(feature = "enterprise")]
+    if let Some(res) =
+        super::check_query_fn_permissions(&org_id, user_id, req.query_fn.as_deref().as_slice())
+            .await
+    {
+        return res;
+    }
 
     let search_fut =
         SearchService::search_partition_multi(&trace_id, &org_id, user_id, stream_type, &req);
@@ -985,6 +1014,16 @@ pub async fn around_multi(
             return res;
         }
         resolved_streams.push(stream_name);
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = super::check_query_fn_permissions(
+        &org_id,
+        &user_email.user_id,
+        query.get("query_fn").map(String::as_str).as_slice(),
+    )
+    .await
+    {
+        return res;
     }
 
     let mut multi_resp = search::Response {
@@ -1276,6 +1315,8 @@ pub async fn search_multi_stream(
     let search_event_context = search_type
         .as_ref()
         .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
+    // Per-query stream tasks expect a search type, like the single-stream handler.
+    let search_type = search_type.or(Some(search::SearchEventType::Other));
 
     let fallback_order_by_col = get_fallback_order_by_col_from_request(&query);
 
@@ -1351,6 +1392,39 @@ pub async fn search_multi_stream(
     let needs_post_vrl = per_query_resp && is_result_array_vrl;
 
     let mut queries = multi_req.to_query_req();
+
+    #[cfg(feature = "enterprise")]
+    {
+        let query_fns = multi_req
+            .query_fn
+            .as_deref()
+            .into_iter()
+            .chain(
+                queries
+                    .iter()
+                    .filter_map(|req| req.query.query_fn.as_deref()),
+            )
+            .collect::<Vec<_>>();
+        if let Some(res) = super::check_query_fn_permissions(&org_id, &user_id, &query_fns).await {
+            report_to_audit(
+                user_id.clone(),
+                org_id.clone(),
+                trace_id.clone(),
+                res.status().into(),
+                Some("Unauthorized Access".to_string()),
+                "POST".to_string(),
+                format!("/api/{}/_search_multi_stream", org_id),
+                query
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join("&"),
+                body_bytes.clone(),
+            )
+            .await;
+            return res;
+        }
+    }
 
     // Set each of the sql queries with use_cache from query params
     let clear_cache = get_clear_cache_from_request(&query);
@@ -1552,19 +1626,15 @@ pub async fn search_multi_stream(
                                 let error_detail = code.get_error_detail();
                                 let http_response = map_error_to_http_response(&err, None);
 
-                                StreamResponses::Error {
-                                    code: http_response.status().into(),
+                                StreamResponses::error(
+                                    http_response.status().into(),
                                     message,
-                                    error_detail: Some(error_detail),
-                                }
+                                    Some(error_detail),
+                                )
                             }
                         }
                     }
-                    _ => StreamResponses::Error {
-                        code: 500,
-                        message: err.to_string(),
-                        error_detail: None,
-                    },
+                    _ => StreamResponses::error(500, err.to_string(), None),
                 };
                 err_res.to_chunks()
             }
@@ -1627,6 +1697,7 @@ pub async fn report_to_audit(
 #[cfg(test)]
 mod tests {
 
+    use arrow_schema::{DataType, Field, Schema};
     use axum::{
         extract::{Path, Query},
         http::{HeaderMap, StatusCode},
@@ -2380,7 +2451,6 @@ mod tests {
         })
         .await;
         {
-            use arrow_schema::{DataType, Field, Schema};
             use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
             let schema = Schema::new(vec![

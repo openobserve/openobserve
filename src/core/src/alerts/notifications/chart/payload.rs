@@ -31,7 +31,10 @@
 //!    or log content. It is readable by anyone holding the URL, the same exposure class as the
 //!    notification body.
 
-use std::io::{Read, Write};
+use std::{
+    collections::BTreeSet,
+    io::{Read, Write},
+};
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use hmac::{Hmac, Mac};
@@ -51,9 +54,18 @@ pub const MAX_POINTS: usize = 120;
 /// URL that could not be delivered.
 pub const MAX_URL_CHARS: usize = 2900;
 
+/// Three series of 120 points overflow [`MAX_URL_CHARS`], so a payload with a band stops here.
+pub const MAX_BAND_POINTS: usize = 60;
+
+/// Anomalous entries kept ahead of the uniform fill, so an isolated anomaly is never skipped.
+pub const MAX_RESERVED_POINTS: usize = 10;
+
 /// Domain-separation label for deriving the signing key from the instance
 /// secret. Versioned so a future payload format can rotate keys.
 const KEY_DERIVATION_LABEL: &[u8] = b"o2-alert-chart-sign-v1";
+
+/// 128-bit truncated HMAC-SHA256 tag: standard truncation, keeps the URL short.
+const TAG_LEN: usize = 16;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChartPayload {
@@ -71,6 +83,19 @@ pub struct ChartPayload {
     pub warn: Option<f64>,
     /// Evaluation timestamp (unix seconds) that fired this notification.
     pub trigger_ts: u64,
+    /// Anomaly charts only: (lower, upper) per entry of `points`, None where the bucket has none.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub band: Option<Vec<Option<(f64, f64)>>>,
+    /// Anomaly charts only: red dots as (unix_seconds, value); with marks no trigger dot is drawn.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub marks: Vec<(u64, f64)>,
+}
+
+impl ChartPayload {
+    /// An anomaly chart draws only its marks, never the trigger dot.
+    pub fn is_anomaly(&self) -> bool {
+        self.band.is_some() || !self.marks.is_empty()
+    }
 }
 
 /// Callers must fail closed on empty IKM: the public legacy salt alone must not produce a key.
@@ -88,8 +113,7 @@ fn signature(key: &[u8], org_id: &str, d: &str) -> Vec<u8> {
     mac.update(org_id.as_bytes());
     mac.update(b"\0");
     mac.update(d.as_bytes());
-    // 128-bit truncated tag: standard for HMAC-SHA256, keeps the URL short.
-    mac.finalize().into_bytes()[..16].to_vec()
+    mac.finalize().into_bytes()[..TAG_LEN].to_vec()
 }
 
 /// Encode + sign. Returns the two query components `(d, s)`.
@@ -114,8 +138,7 @@ pub fn encode(payload: &ChartPayload, key: &[u8], org_id: &str) -> Option<(Strin
 pub enum DecodeError {
     /// Signature missing/invalid — indistinguishable 404 to callers.
     BadSignature,
-    /// Payload malformed (encoding/inflate/JSON) — only reachable with a
-    /// valid signature, i.e. never attacker-controlled.
+    /// Payload malformed (encoding/inflate/JSON) — only reachable with a valid signature.
     Malformed,
     Expired,
 }
@@ -132,6 +155,10 @@ pub fn decode(
     let provided = URL_SAFE_NO_PAD
         .decode(s)
         .map_err(|_| DecodeError::BadSignature)?;
+    // verify_truncated_left accepts any length from 1 byte, so a short tag would be guessable.
+    if provided.len() != TAG_LEN {
+        return Err(DecodeError::BadSignature);
+    }
     let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("HMAC accepts any key length");
     mac.update(org_id.as_bytes());
     mac.update(b"\0");
@@ -159,7 +186,7 @@ pub fn decode(
 /// Quantize to 6 significant digits. Chart pixels can't show more, long
 /// float reprs bloat the encoded URL, and short decimals round-trip serde's
 /// default (non-`float_roundtrip`) parser deterministically.
-fn quantize(v: f64) -> f64 {
+pub fn quantize(v: f64) -> f64 {
     // NaN/inf can't be plotted or JSON-serialized; collapse to 0.
     if v == 0.0 || !v.is_finite() {
         return 0.0;
@@ -187,6 +214,35 @@ pub fn downsample(points: &[(u64, f64)]) -> Vec<(u64, f64)> {
     out
 }
 
+/// At most `max` sorted indices of `0..len`: the first `MAX_RESERVED_POINTS` of `reserved`
+/// (callers pass them worst first), then a uniform fill that keeps both ends when it can.
+pub fn pick_indices(len: usize, max: usize, reserved: &[usize]) -> Vec<usize> {
+    if len <= max {
+        return (0..len).collect();
+    }
+    let mut chosen: BTreeSet<usize> = reserved
+        .iter()
+        .copied()
+        .filter(|&i| i < len)
+        .take(MAX_RESERVED_POINTS.min(max))
+        .collect();
+    let last = len - 1;
+    let slots = max.saturating_sub(chosen.len()).max(2);
+    for k in 0..slots {
+        if chosen.len() >= max {
+            break;
+        }
+        chosen.insert(k * last / (slots - 1));
+    }
+    // Uniform picks that hit a reserved index leave slots; fill them left to right.
+    let mut i = 0;
+    while chosen.len() < max && i < len {
+        chosen.insert(i);
+        i += 1;
+    }
+    chosen.into_iter().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -205,6 +261,8 @@ mod tests {
             crit: Some(5.0),
             warn: Some(3.0),
             trigger_ts: 1_700_000_000 + n as u64 * 60,
+            band: None,
+            marks: Vec::new(),
         }
     }
 
@@ -260,6 +318,28 @@ mod tests {
     }
 
     #[test]
+    fn truncated_or_extended_tag_is_rejected() {
+        let key = derive_signing_key(KEY_SECRET, "salt");
+        let (d, s) = encode(&sample(10), &key, "default").unwrap();
+        let tag = URL_SAFE_NO_PAD.decode(&s).unwrap();
+        for short in [&tag[..1], &tag[..8], &tag[..TAG_LEN - 1]] {
+            let s = URL_SAFE_NO_PAD.encode(short);
+            assert_eq!(
+                decode(&d, &s, &key, "default", 0).unwrap_err(),
+                DecodeError::BadSignature
+            );
+        }
+        let mut full = Hmac::<Sha256>::new_from_slice(&key).unwrap();
+        full.update(b"default\0");
+        full.update(d.as_bytes());
+        let long = URL_SAFE_NO_PAD.encode(full.finalize().into_bytes());
+        assert_eq!(
+            decode(&d, &long, &key, "default", 0).unwrap_err(),
+            DecodeError::BadSignature
+        );
+    }
+
+    #[test]
     fn expired_payload_is_rejected() {
         let key = derive_signing_key(KEY_SECRET, "salt");
         let p = sample(10); // exp = 2_000_000_000
@@ -296,5 +376,67 @@ mod tests {
         assert_eq!(out.last(), Some(&(999, 999.0)));
         let short: Vec<(u64, f64)> = (0..50u64).map(|i| (i, i as f64)).collect();
         assert_eq!(downsample(&short).len(), 50);
+    }
+
+    #[test]
+    fn band_payload_at_band_cap_fits_slack_url_budget() {
+        let key = derive_signing_key(KEY_SECRET, "salt");
+        let mut p = sample(MAX_BAND_POINTS);
+        let mut band = Vec::with_capacity(MAX_BAND_POINTS);
+        for (i, pt) in p.points.iter_mut().enumerate() {
+            let v = quantize((i as f64 * 1234.567).sin() * 98765.4321);
+            pt.1 = v;
+            band.push(Some((
+                quantize(v - 1234.5678 - i as f64),
+                quantize(v + 2345.6789 + i as f64),
+            )));
+        }
+        p.marks = p.points.iter().step_by(6).copied().collect();
+        p.band = Some(band);
+        assert!(p.marks.len() >= MAX_RESERVED_POINTS);
+        let (d, s) = encode(&p, &key, "default").expect("band payload must fit the URL cap");
+        assert!(
+            d.len() + s.len() <= MAX_URL_CHARS,
+            "len={}",
+            d.len() + s.len()
+        );
+        let back = decode(&d, &s, &key, "default", 1_900_000_000).unwrap();
+        assert_eq!(back.band, p.band);
+        assert_eq!(back.marks, p.marks);
+    }
+
+    #[test]
+    fn v1_payload_without_band_and_marks_still_decodes() {
+        let json = r#"{"v":1,"exp":2000000000,"title":"t","points":[[1700000000,1.5],[1700000060,2.0]],"crit":5.0,"trigger_ts":1700000060}"#;
+        let p: ChartPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(p.band, None);
+        assert!(p.marks.is_empty());
+        assert!(!p.is_anomaly());
+        let key = derive_signing_key(KEY_SECRET, "salt");
+        let (d, s) = encode(&p, &key, "default").unwrap();
+        assert_eq!(decode(&d, &s, &key, "default", 0).unwrap(), p);
+    }
+
+    #[test]
+    fn pick_indices_keeps_an_isolated_anomaly_between_uniform_positions() {
+        let uniform = pick_indices(1000, MAX_BAND_POINTS, &[]);
+        assert!(!uniform.contains(&7));
+        let picked = pick_indices(1000, MAX_BAND_POINTS, &[7]);
+        assert!(picked.contains(&7));
+        assert_eq!(picked.len(), MAX_BAND_POINTS);
+        assert_eq!(picked.first(), Some(&0));
+        assert_eq!(picked.last(), Some(&999));
+        assert!(picked.windows(2).all(|w| w[0] < w[1]));
+    }
+
+    #[test]
+    fn pick_indices_reserves_at_most_ten_worst_first() {
+        let reserved: Vec<usize> = (0..20).map(|i| 101 + i * 7).collect();
+        let picked = pick_indices(1000, MAX_BAND_POINTS, &reserved);
+        assert_eq!(picked.len(), MAX_BAND_POINTS);
+        for i in &reserved[..MAX_RESERVED_POINTS] {
+            assert!(picked.contains(i), "{i}");
+        }
+        assert_eq!(pick_indices(5, MAX_BAND_POINTS, &[3]), vec![0, 1, 2, 3, 4]);
     }
 }

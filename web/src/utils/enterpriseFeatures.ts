@@ -36,7 +36,6 @@ export type FeatureKey =
   | "nodes"
   | "license"
   | "correlationSettings"
-  | "modelPricing"
   | "llmProviders"
   | "genAiAgentMapping"
   | "incidents"
@@ -179,16 +178,18 @@ const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
     labelKey: "settings.queryManagement",
     cloudOffers: false,
   },
-  nodes: { predicate: (c) => c.isEnterprise, labelKey: "settings.nodes", cloudOffers: false },
+  // Not enterprise-only: OSS clusters too and its node list API answers; pure Cloud hides it via
+  // `cloudOffers`.
+  nodes: {
+    predicate: (c) => c.isEnterprise || !c.isCloud,
+    labelKey: "settings.nodes",
+    cloudOffers: false,
+  },
   license: { predicate: (c) => c.isEnterprise, labelKey: "settings.license", cloudOffers: false },
   correlationSettings: {
     predicate: (c) => c.isEnterprise,
     labelKey: "settings.correlationSettings",
     cloudOffers: false,
-  },
-  modelPricing: {
-    predicate: (c) => c.isEnterprise || c.isCloud,
-    labelKey: "settings.llmModelPricing",
   },
   llmProviders: {
     predicate: (c) => c.isEnterprise || c.isCloud,

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </OCardSection>
     <OCardSection role="body" dense class="flex flex-col gap-4">
-      <ol class="relative grid grid-cols-3 gap-x-6">
+      <ol class="relative grid gap-x-6" :class="steps.length === 3 ? 'grid-cols-3' : 'grid-cols-2'">
         <span
           class="border-border-default absolute inset-x-0 top-1.25 border-t"
           aria-hidden="true"
@@ -86,7 +86,12 @@ import {
   incidentTime,
   unfoldDuration,
 } from "@/utils/incidents/incidentUnfold";
-import { firingRate, incidentMoment, peakWindow } from "@/utils/incidents/incidentOverview";
+import {
+  firingRate,
+  incidentMoment,
+  overviewLanes,
+  overviewPeak,
+} from "@/utils/incidents/incidentOverview";
 
 const props = defineProps<{
   incident: Pick<
@@ -105,9 +110,18 @@ const { t } = useI18nTyped();
 const age = (us: number) => raw(incidentAge(us, props.now));
 const clock = (us: number | undefined) => (us ? raw(incidentTime(props.zone, us)) : raw("—"));
 
+// Built from the Alerts chart's own bars, so the summary's peak always matches the chart.
+const peak = computed(() =>
+  overviewPeak(
+    overviewLanes(props.triggers, props.zone, props.now, props.incident.status !== "resolved"),
+  ),
+);
+
 const steps = computed(() => {
-  const peak = peakWindow(props.triggers);
   const { first_alert_at: first, last_alert_at: last, status } = props.incident;
+  const top = peak.value;
+  // The first bar starts on a boundary before the first firing; never show a peak earlier than it.
+  const peakAt = Math.max(top?.at ?? 0, first ?? 0);
   return [
     {
       key: "first",
@@ -116,17 +130,15 @@ const steps = computed(() => {
       note: first ? age(first) : raw(""),
       dot: "bg-timeline-dot-success",
     },
-    {
+    top && {
       key: "peak",
       label: t("alerts.incidents.overview.peak"),
-      time: clock(peak?.at),
-      note: peak
-        ? t(
-            "alerts.incidents.overview.peakWindow",
-            { count: peak.count, window: unfoldDuration(t, peak.windowUs), age: age(peak.at) },
-            peak.count,
-          )
-        : raw(""),
+      time: clock(peakAt),
+      note: t(
+        "alerts.incidents.overview.peakWindow",
+        { count: top.count, window: unfoldDuration(t, top.bucketUs), age: age(peakAt) },
+        top.count,
+      ),
       dot: "bg-status-warning-text",
     },
     {
@@ -136,7 +148,7 @@ const steps = computed(() => {
       note: last ? age(last) : raw(""),
       dot: status === "resolved" ? "bg-timeline-dot-success" : "bg-timeline-dot-destructive",
     },
-  ];
+  ].filter((step) => !!step);
 });
 
 const facts = computed(() => {

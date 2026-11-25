@@ -3011,10 +3011,11 @@ mod tests {
         );
     }
 
-    /// The global SQLite meta store with the run and chat tables.
+    /// The global SQLite meta store with the run, chat and incident tables; the case guard reads
+    /// the last.
     #[cfg(feature = "enterprise")]
     async fn thread_tables() -> &'static sea_orm::DatabaseConnection {
-        use infra::table::entity::{ai_chat_sessions, rca_runs};
+        use infra::table::entity::{ai_chat_sessions, alert_incidents, rca_runs};
         use sea_orm::{ConnectionTrait, Schema};
 
         let cfg = config::get_config();
@@ -3030,6 +3031,7 @@ mod tests {
         for mut table in [
             schema.create_table_from_entity(rca_runs::Entity),
             schema.create_table_from_entity(ai_chat_sessions::Entity),
+            schema.create_table_from_entity(alert_incidents::Entity),
         ] {
             conn.execute(backend.build(table.if_not_exists()))
                 .await

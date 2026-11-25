@@ -335,7 +335,9 @@ mod tests {
         let RenderedMessage::Http { body } = rendered else {
             panic!("expected Http rendered message for a Slack destination");
         };
-        let value: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let value = crate::alerts::notifications::render::slack::flat_blocks(
+            &serde_json::from_str(&body).unwrap(),
+        );
         // The title block is a mrkdwn link `*<url|label>*`, so the marker leads the label.
         let title = value
             .get("blocks")
@@ -358,7 +360,9 @@ mod tests {
         else {
             panic!("expected Http rendered message for a Slack destination");
         };
-        let value: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let value = crate::alerts::notifications::render::slack::flat_blocks(
+            &serde_json::from_str(&body).unwrap(),
+        );
         let title = value["blocks"][0]["text"]["text"].as_str().unwrap();
         assert!(
             title.ends_with("|[TEST] 🔴 Sample CPU alert firing>*"),

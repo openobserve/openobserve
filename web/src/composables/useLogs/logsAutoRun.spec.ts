@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { reactive } from "vue";
+import { computed, reactive } from "vue";
 import config from "@/aws-exports";
 import {
   estimateSignature,
@@ -393,6 +393,17 @@ describe("transport binding (AC4.1, P2 records)", () => {
     });
   });
 
+  it("a replacing run clears the histogram loading the replaced run left behind", () => {
+    openGrid();
+    fakeSearchObj.value.loadingHistogram = true;
+    fakeSearchObj.value.loadingHistogramProgressPercentage = 40;
+
+    openGrid();
+
+    expect(fakeSearchObj.value.loadingHistogram).toBe(false);
+    expect(fakeSearchObj.value.loadingHistogramProgressPercentage).toBe(0);
+  });
+
   it("sends nothing for a follow-up of a replaced generation", () => {
     const connection = useSearchConnection((key: string) => key as any);
     const old = openGrid();
@@ -612,6 +623,41 @@ describe("refinement de-duplication and search-around", () => {
     expect(run().searchAroundActive()).toBe(false);
   });
 
+  it("leaves search-around when a normal grid run starts, even without a bound search payload", () => {
+    const sa = (fakeSearchObj.value.data.searchAround ??= {});
+    sa.indexTimestamp = 123;
+    sa.histogramHide = true;
+    fakeSearchObj.value.meta.showHistogram = false;
+    run().setExecutors({ logs: () => "dispatched" as any });
+    run().invalidateExecuted("search-around");
+    expect(run().searchAroundActive()).toBe(true);
+    run().request("run");
+    expect(run().searchAroundActive()).toBe(false);
+    expect(sa.indexTimestamp).toBe(-1);
+    expect(sa.histogramHide).toBe(false);
+    expect(fakeSearchObj.value.meta.showHistogram).toBe(true);
+  });
+
+  it("leaves search-around on a search payload that has no generation id", () => {
+    const sa = (fakeSearchObj.value.data.searchAround ??= {});
+    sa.indexTimestamp = 123;
+    run().invalidateExecuted("search-around");
+    run().bindPayload({ traceId: "t", type: "search", generationId: null, queryReq: {} });
+    expect(run().searchAroundActive()).toBe(false);
+    expect(sa.indexTimestamp).toBe(-1);
+  });
+
+  it("stops reporting search-around to the share check once a normal run starts, before any chunk lands", () => {
+    run().setExecutors({ logs: () => "dispatched" as any });
+    run().invalidateExecuted("search-around");
+    expect(run().engine.canPersistOrShare("logs", "share-link")).toMatchObject({
+      code: "search-around",
+    });
+    run().request("run");
+    const decision = run().engine.canPersistOrShare("logs", "share-link");
+    expect(decision).toMatchObject({ ok: false, code: "needs-run" });
+  });
+
   it("keeps the shown rows when search-around invalidates the record", () => {
     fakeSearchObj.value.data.queryResults = { hits: [{ a: 1 }] };
     run().invalidateExecuted("search-around");
@@ -648,6 +694,185 @@ describe("refinement de-duplication and search-around", () => {
 });
 
 describe("panel records for Visualize and Build (J7)", () => {
+  it("keeps a computed staleness in step with the scope the chart was handed", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    const stale = computed(() => run().isPanelScopeStale());
+    expect(stale.value).toBe(false);
+    run().notePanelScopeApplied();
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(stale.value).toBe(true);
+    run().notePanelScopeApplied();
+    run().panelLoadingChanged(true, false);
+    expect(stale.value).toBe(true);
+    run().panelLoadingChanged(false, false);
+    expect(stale.value).toBe(false);
+  });
+
+  it.each(["visualize", "build"])(
+    "%s: a chart-type reload after a time change still shows the old window, so Run stays amber",
+    (mode) => {
+      run().setPanelConfigReader(() => ({ type: "bar" }));
+      fakeSearchObj.value.meta.logsVisualizeToggle = mode;
+      fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+      run().markPanelDispatched(run().openPanelRun());
+      run().endPanelRun(true);
+      fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+      expect(run().isPanelScopeStale()).toBe(true);
+      run().setPanelConfigReader(() => ({ type: "line" }));
+      run().panelLoadingChanged(true, false);
+      run().panelLoadingChanged(false, false);
+      expect(run().isPanelScopeStale()).toBe(true);
+    },
+  );
+
+  it("a load outside a run with no scope handed to the chart records nothing", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(run().isPanelScopeStale()).toBe(false);
+  });
+
+  it("a cancelled load outside a run does not record the scope it was handed", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    run().notePanelScopeApplied();
+    run().panelLoadingChanged(true, false);
+    run().cancelPanelLoad();
+    run().panelLoadingChanged(false, false);
+    expect(run().isPanelScopeStale()).toBe(true);
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    expect(run().isPanelScopeStale()).toBe(false);
+  });
+
+  it("Build ignores the search bar's wording and SQL mode but not a time move", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "build";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    fakeSearchObj.value.data.query = 'SELECT count(*) FROM "logs"';
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.meta.sqlMode = !fakeSearchObj.value.meta.sqlMode;
+    fakeSearchObj.value.data.query = "level = 'error'";
+    expect(run().isPanelScopeStale()).toBe(false);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(run().isPanelScopeStale()).toBe(true);
+  });
+
+  it("a cancelled panel run keeps the scope the chart last showed", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().panelLoadingChanged(true, false);
+    run().cancelPanelLoad();
+    run().panelLoadingChanged(false, false);
+    expect(run().isPanelScopeStale()).toBe(true);
+  });
+
+  it("a dispatched panel run notes its scope even when its loading is not reported to the logs page", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "build";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(run().isPanelScopeStale()).toBe(true);
+    run().markPanelDispatched(run().openPanelRun());
+    expect(run().isPanelScopeStale()).toBe(true);
+    run().endPanelRun(true);
+    expect(run().isPanelScopeStale()).toBe(false);
+  });
+
+  it("a cancelled or failed load keeps the scope the chart last showed", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "build";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().panelLoadingChanged(true, false);
+    run().engine.cancelGeneration(null, { cause: "user" });
+    run().panelLoadingChanged(false, false);
+    expect(run().isPanelScopeStale()).toBe(true);
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, true);
+    expect(run().isPanelScopeStale()).toBe(true);
+  });
+
+  it("a panel run that ends without loading keeps the scope the chart last loaded", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "build";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    run().openPanelRun();
+    run().endPanelRun(false);
+    expect(run().isPanelScopeStale()).toBe(true);
+  });
+
+  it("a scope reset forgets the scope every chart last loaded", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().notePanelScopeApplied();
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(run().isPanelScopeStale()).toBe(true);
+    run().engine.resetScope("org");
+    expect(run().isPanelScopeStale()).toBe(false);
+  });
+
+  it("Logs results are reusable by Visualize only while the time selection matches the run that produced them", () => {
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    expect(run().executedTimeMatches()).toBe(false);
+    fakeSearchObj.value.meta.executed = { signature: run().readSignature(), complete: true };
+    expect(run().executedTimeMatches()).toBe(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(run().executedTimeMatches()).toBe(false);
+  });
+
+  it.each(["visualize", "build"])(
+    "%s: a scope change after the chart loaded is stale, a chart-only edit is not",
+    (mode) => {
+      run().setPanelConfigReader(() => ({ type: "bar" }));
+      fakeSearchObj.value.meta.logsVisualizeToggle = mode;
+      fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+      expect(run().isPanelScopeStale()).toBe(false);
+      run().notePanelScopeApplied();
+      run().panelLoadingChanged(true, false);
+      run().panelLoadingChanged(false, false);
+      run().setPanelConfigReader(() => ({ type: "line" }));
+      expect(run().isPanelScopeStale()).toBe(false);
+      fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+      expect(run().isPanelScopeStale()).toBe(true);
+      fakeSearchObj.value.meta.logsVisualizeToggle = "patterns";
+      expect(run().isPanelScopeStale()).toBe(false);
+      fakeSearchObj.value.meta.logsVisualizeToggle = mode;
+      run().notePanelScopeApplied();
+      run().panelLoadingChanged(true, false);
+      run().panelLoadingChanged(false, false);
+      expect(run().isPanelScopeStale()).toBe(false);
+    },
+  );
+
   it("publishes a panel record only after the panel's load starts and ends without errors", () => {
     run().setPanelConfigReader(() => ({ type: "bar" }));
     fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
@@ -732,6 +957,112 @@ describe("panel records for Visualize and Build (J7)", () => {
     expect(run().persistReason("visualize", "add-to-dashboard")).toBeNull();
     type = "line";
     expect(run().persistReason("visualize", "add-to-dashboard")).toBeTruthy();
+  });
+
+  it("a Visualize toggle that reuses the Logs results opens no panel run", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const before = run().engine.currentGeneration("grid")?.id;
+    expect(run().openToggleChartRun(true)).toBeNull();
+    expect(run().engine.currentGeneration("grid")?.id).toBe(before);
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    expect(fakeSearchObj.value.meta.executedPanel).toBeUndefined();
+  });
+
+  it("a Visualize toggle that loads the chart records the live query once the load ends", () => {
+    const events: any[] = [];
+    run().engine.onExecutedRecorded((event) => events.push(event));
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.query = "level = 'warn'";
+    const id = run().openToggleChartRun(false);
+    expect(id).toEqual(expect.any(Number));
+    expect(run().hasPanelRun(id as number)).toBe(true);
+    expect(run().engine.currentGeneration("grid")?.id).toBe(id);
+    run().markPanelDispatched(id as number);
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    expect(run().hasPanelRun(id as number)).toBe(false);
+    const recorded = events.filter((e) => e.surface === "visualize");
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0].generation).toBe(id);
+    expect(recorded[0].signature.query).toBe("level = 'warn'");
+  });
+
+  it("a Visualize toggle keeps a panel run already open for the live grid generation", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const open = run().openPanelRun();
+    expect(run().openToggleChartRun(false)).toBeNull();
+    expect(run().hasPanelRun(open)).toBe(true);
+    expect(run().engine.currentGeneration("grid")?.id).toBe(open);
+    run().engine.cancelGeneration(null, { cause: "user" });
+    const reopened = run().openToggleChartRun(false);
+    expect(reopened).toEqual(expect.any(Number));
+    expect(reopened).not.toBe(open);
+    expect(run().hasPanelRun(reopened as number)).toBe(true);
+  });
+
+  it("leaving the chart cancels a panel run whose load never started, but not one in flight", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const parked = run().openToggleChartRun(false) as number;
+    run().cancelUnstartedPanelRun();
+    expect(run().hasPanelRun(parked)).toBe(false);
+    expect(run().engine.currentGeneration("grid")?.settled).toBe(true);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("cancelled");
+
+    const loading = run().openPanelRun();
+    run().panelLoadingChanged(true, false);
+    run().cancelUnstartedPanelRun();
+    expect(run().hasPanelRun(loading)).toBe(true);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("running");
+  });
+
+  it("a handed chart load that ends without querying closes the run: a shown result records, nothing cancels", () => {
+    let type = "bar";
+    run().setPanelConfigReader(() => ({ type }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const empty = run().openToggleChartRun(false) as number;
+    run().markPanelDispatched(empty);
+    run().panelLoadEndedWithoutFetch(false);
+    expect(run().hasPanelRun(empty)).toBe(false);
+    expect(run().engine.currentGeneration("grid")?.settled).toBe(true);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("cancelled");
+    expect(fakeSearchObj.value.meta.executedPanel).toBeNull();
+
+    const restored = run().openToggleChartRun(false) as number;
+    run().markPanelDispatched(restored);
+    const handed = run().panelSignature("visualize");
+    type = "line";
+    run().panelLoadEndedWithoutFetch(true);
+    expect(run().hasPanelRun(restored)).toBe(false);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("complete");
+    expect(fakeSearchObj.value.meta.executedPanel).toMatchObject({
+      generation: restored,
+      configSignature: handed,
+    });
+  });
+
+  it("a no-fetch end leaves open a run not yet handed its config, or one whose load is in flight", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const unhanded = run().openToggleChartRun(false) as number;
+    run().panelLoadEndedWithoutFetch(false);
+    expect(run().hasPanelRun(unhanded)).toBe(true);
+
+    run().panelLoadingChanged(true, false);
+    run().panelLoadEndedWithoutFetch(true);
+    expect(run().hasPanelRun(unhanded)).toBe(true);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("running");
+  });
+
+  it("a Visualize toggle that resolves after the user left Visualize opens no panel run", () => {
+    fakeSearchObj.value.meta.logsVisualizeToggle = "logs";
+    const before = run().engine.currentGeneration("grid")?.id;
+    expect(run().openToggleChartRun(false)).toBeNull();
+    expect(run().engine.currentGeneration("grid")?.id).toBe(before);
   });
 });
 

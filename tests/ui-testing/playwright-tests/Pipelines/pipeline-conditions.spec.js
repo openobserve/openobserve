@@ -214,10 +214,10 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     // Verify 3 conditions exist
     await pageManager.pipelinesPage.verifyConditionCount(3);
 
-    // Verify BOTH join operators unconditionally: A OR B AND C. The first join
-    // (B) is OR, the second (C) is AND — no `count() >= 2` guard, both must hold.
-    await pageManager.pipelinesPage.verifyOperatorLabel("OR", 0);
-    await pageManager.pipelinesPage.verifyOperatorLabel("AND", 1);
+    // Adding C with AND groups A OR B first, so the builder shows (A OR B) AND C,
+    // the order the condition runs: OR inside the group, AND at the root.
+    await pageManager.pipelinesPage.verifyConnectorAt("0-1", "OR");
+    await pageManager.pipelinesPage.verifyConnectorAt("1", "AND");
 
     await pageManager.pipelinesPage.saveConditionAndCompletePipeline(pipelineName);
 

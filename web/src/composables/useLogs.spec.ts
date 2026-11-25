@@ -417,6 +417,53 @@ describe("Use Logs Composable", () => {
       expect(wrapper.vm.searchObj.meta.freeTextScan).toEqual({});
     });
 
+    it("restores the picked Drill down dimensions and clears them when the link has none", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        drilldown_dims: "level,k8s_namespace_name",
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.drillDownDimensions).toEqual([
+        "level",
+        "k8s_namespace_name",
+      ]);
+
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.drillDownDimensions).toBeNull();
+    });
+
+    it("restores an emptied Drill down pick list as empty, not as the defaults", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        drilldown_dims: "",
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.drillDownDimensions).toEqual([]);
+    });
+
+    it("restores a Drill down dimension whose name holds a comma", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        drilldown_dims: `${encodeURIComponent("a,b")},level,%E0%A4`,
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.drillDownDimensions).toEqual(["a,b", "level", "%E0%A4"]);
+    });
+
     it("should restore stream and datetime parameters", async () => {
       wrapper.vm.router.currentRoute.value.query = {
         stream: "stream1,stream2",
@@ -1396,6 +1443,36 @@ describe("Use Logs Composable", () => {
       expect(
         wrapper.vm.getFilterExpressionByFieldType("op", "notificationHandling's", "exclude"),
       ).toBe("op != 'notificationHandling''s'");
+    });
+
+    it.each([
+      ["", "include", "k = ''"],
+      ["", "exclude", "k != ''"],
+      ["null", "include", "k = 'null'"],
+      ["null", "exclude", "k != 'null'"],
+      [null, "include", "k is null"],
+      [undefined, "exclude", "k is not null"],
+    ])("only a real null becomes a null check: %j %s", (value, action, expression) => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("k", "Utf8");
+
+      expect(wrapper.vm.getFilterExpressionByFieldType("k", value, action)).toBe(expression);
+    });
+
+    it.each([
+      ["Int64", "include", "code is null"],
+      ["Int64", "exclude", "code is not null"],
+      ["Boolean", "include", "code is null"],
+      ["Boolean", "exclude", "code is not null"],
+    ])("an empty value on a %s field can only be missing (%s)", (type, action, expression) => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.stream.selectedStream = ["a", "b"];
+      wrapper.vm.searchObj.data.streamResults.list = [
+        { name: "a", schema: [{ name: "code", type: "Utf8" }] },
+        { name: "b", schema: [{ name: "code", type }] },
+      ];
+
+      expect(wrapper.vm.getFilterExpressionByFieldType("code", "", action)).toBe(expression);
     });
   });
 });

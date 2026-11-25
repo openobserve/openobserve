@@ -24,6 +24,10 @@ import type {
   AutoObserveCoverageRow,
   AutoObserveLearning,
   AutoObserveStatedEvidence,
+  AutoObserveCauseLine,
+  AutoObserveDeepLink,
+  AutoObserveIssueContext,
+  AutoObserveProviderCheck,
   AutoObserveSuggestion,
   AutoObserveSuggestionList,
 } from "@/services/autoobserve";
@@ -891,3 +895,66 @@ export const toSuggestionRows = (
       detail: parts.body,
     };
   });
+
+export const CAUSES_SHOWN = 3;
+
+export interface CauseFold {
+  shown: AutoObserveCauseLine[];
+  folded: AutoObserveCauseLine[];
+  // Ranked below the served rows, so counted but never listed.
+  unlisted: number;
+}
+
+export interface CheckGroups {
+  ok: string[];
+  failed: string[];
+  off: string[];
+  partial: string[];
+  notRecorded: string[];
+}
+
+/** The issue context a drawer's item carries; null while the server sends none. */
+export const issueContextOf = (
+  item: { context?: AutoObserveIssueContext } | null | undefined,
+): AutoObserveIssueContext | null => item?.context ?? null;
+
+/** The Next step box shows while the context loads, then only when the asked context carries a step. */
+export const showsNextStep = (cx: AutoObserveIssueContext | null): boolean =>
+  !cx || cx.asked_at === null || cx.next_step !== null;
+
+/** A served page link as a route in this org; the server's own org_identifier wins. */
+export const deepLinkRoute = (
+  link: AutoObserveDeepLink,
+  org: string,
+): { path: string; query: Record<string, string> } => ({
+  path: `/${link.path.replace(/^\/+/, "")}`,
+  query: { org_identifier: org, ...link.query },
+});
+
+/** Rows the step used fill the slots first, so none is folded away while an unused one shows (R9). */
+export const foldCauses = (
+  causes: AutoObserveIssueContext["causes"],
+  shown = CAUSES_SHOWN,
+): CauseFold => {
+  const used = causes.top.filter((c) => c.used);
+  const rest = causes.top.filter((c) => !c.used);
+  const keep = new Set([...used, ...rest].slice(0, shown));
+  return {
+    shown: causes.top.filter((c) => keep.has(c)),
+    folded: causes.top.filter((c) => !keep.has(c)),
+    unlisted: causes.more,
+  };
+};
+
+export const checkGroups = (checks: AutoObserveProviderCheck[]): CheckGroups => {
+  const groups: CheckGroups = { ok: [], failed: [], off: [], partial: [], notRecorded: [] };
+  const into: Record<AutoObserveProviderCheck["state"]["kind"], keyof CheckGroups> = {
+    ok: "ok",
+    failed: "failed",
+    off: "off",
+    partial: "partial",
+    not_recorded: "notRecorded",
+  };
+  for (const check of checks) groups[into[check.state.kind]].push(check.label);
+  return groups;
+};

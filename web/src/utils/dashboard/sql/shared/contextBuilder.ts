@@ -38,7 +38,7 @@ import {
   dataZoomBrushStyle,
 } from "@/utils/chartTheme";
 import { getPropsByChartTypeForSeries } from "../../sqlChartSeriesProps";
-import { processData } from "../../sqlProcessData";
+import { breakdownValueLabel, processData } from "../../sqlProcessData";
 import { fillMissingValues } from "../../sqlMissingValueFiller";
 import { buildDataLookupMap, createSeriesBuilders } from "./seriesBuilder";
 import { createTrellisHelpers } from "./trellisConfig";
@@ -419,6 +419,25 @@ export function buildSQLContext(
   const axisWidthSet = axisWidth !== null && axisWidth !== undefined;
   const reserveYLabelLeft = !isHorizontalChart && !hasYAxisName && !axisWidthSet;
 
+  // Without containLabel the tick-label band only covers one unrotated line, so a rotated
+  // label's extra height is reserved here or it runs into a bottom legend.
+  const rotatedLabelExtraSpace =
+    reserveYLabelLeft && !hasXAxisName && labelRotation !== 0 && xAxisKeys.length > 0
+      ? (() => {
+          const rotationInRadians = (Math.abs(labelRotation) * Math.PI) / 180;
+          // eslint-disable-next-line local/no-hardcoded-px -- must match `labelFontSize`, which ECharts paints axis labels at as a literal CSS px
+          const labelFont = "12px";
+          const measured = calculateWidthText(
+            largestLabel(getAxisDataFromKey(xAxisKeys[0])),
+            labelFont,
+          );
+          const rotatedHeight =
+            Math.min(labelWidth, measured, 120) * Math.sin(rotationInRadians) +
+            labelFontSize * Math.cos(rotationInRadians);
+          return Math.max(0, Math.ceil(rotatedHeight - labelFontSize));
+        })()
+      : 0;
+
   const horizontalCategoryLabelWidth = isHorizontalChart
     ? Math.min(calculateWidthText(largestLabel(getAxisDataFromKey(xAxisKeys?.[0]))), 120)
     : 0;
@@ -475,7 +494,7 @@ export function buildSQLContext(
                     : breakDownKeys.length > 0
                       ? 25
                       : 0;
-              return baseBottom + additionalBottomSpace;
+              return baseBottom + additionalBottomSpace + rotatedLabelExtraSpace;
             })()) + (reserveYLabelLeft || reserveHorizontalYName ? X_AXIS_TICK_LABEL_BAND : 0),
     },
     tooltip: {
@@ -618,7 +637,10 @@ export function buildSQLContext(
       },
     },
     xAxis: [...xAxisKeys, ...breakDownKeys]?.map((key: any, index: number) => {
-      const data = getAxisDataFromKey(key);
+      const data =
+        index < xAxisKeys.length
+          ? getAxisDataFromKey(key)
+          : getAxisDataFromKey(key).map(breakdownValueLabel);
 
       //unique value index array
       const arr: any = [];
@@ -643,7 +665,7 @@ export function buildSQLContext(
       const labelRotation =
         hasTimestampField || isHorizontalChart ? 0 : panelSchema.config?.axis_label_rotate || 0;
       const labelWidth = isHorizontalChart
-        ? Math.min(calculateWidthText(largestLabel(getAxisDataFromKey(key))) + 2, 120)
+        ? Math.min(calculateWidthText(largestLabel(data)) + 2, 120)
         : hasTimestampField
           ? 120
           : panelSchema.config?.axis_label_truncate_width || 120;

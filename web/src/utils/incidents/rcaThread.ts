@@ -48,6 +48,8 @@ export function rcaTriggerLabel(trigger: RcaTrigger, startedBy: string): I18nTex
   switch (trigger) {
     case "auto_new_incident":
       return gt("alerts.incidents.rcaRun.trigger.autoNewIncident");
+    case "evidence_settled":
+      return gt("alerts.incidents.rcaRun.trigger.evidenceSettled");
     case "auto_new_alert_type":
       return gt("alerts.incidents.rcaRun.trigger.autoNewAlertType");
     case "auto_reopen":

@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { filterTreeToSql, type FilterCondition, type FilterField } from "./filterBar";
+import {
+  filterTreeToSql,
+  type FilterCondition,
+  type FilterField,
+  type FilterGroup,
+} from "./filterBar";
 import { parseShorthand, parseSqlFilter, parseSqlFilterLocking } from "./filterBarParser";
 
 const fields: FilterField[] = [
@@ -40,6 +45,7 @@ describe("parseSqlFilter", () => {
     const samples = [
       "level = 'error' AND status >= 500 AND ok = false",
       `"k8s-pod" = 'o''brien'`,
+      "level = ('o''' || '''brien')",
       "str_match(level, 'x')",
       "level NOT LIKE '%x%'",
       "level LIKE 'x%'",
@@ -66,7 +72,7 @@ describe("parseSqlFilter", () => {
 
   it("accepts hand-typed lowercase keywords and <> / ==", () => {
     expect(roundTrip("level='error' and status<>200 or ok==true")).toBe(
-      "level = 'error' AND status != 200 OR ok = true",
+      "(level = 'error' AND status != 200) OR ok = true",
     );
   });
 
@@ -117,6 +123,23 @@ describe("parseSqlFilter", () => {
     expect(tree.items.map((item) => item.connector)).toEqual(["AND", "OR"]);
   });
 
+  it("draws SQL's AND-before-OR as groups, so the chips read the way the query runs", () => {
+    const tree = parseSqlFilter("level = 'a' OR level = 'b' AND status = 1")!;
+    expect(tree.items.map((item) => [item.kind, item.connector])).toEqual([
+      ["condition", "AND"],
+      ["group", "OR"],
+    ]);
+    expect(roundTrip("level = 'a' OR level = 'b' AND status = 1")).toBe(
+      "level = 'a' OR (level = 'b' AND status = 1)",
+    );
+    expect(roundTrip("level = 'a' AND status = 1 OR ok = true AND level = 'b'")).toBe(
+      "(level = 'a' AND status = 1) OR (ok = true AND level = 'b')",
+    );
+    expect(roundTrip("(level = 'a' OR level = 'b' AND ok = true) AND status = 1")).toBe(
+      "(level = 'a' OR (level = 'b' AND ok = true)) AND status = 1",
+    );
+  });
+
   it("reads backslash-escaped LIKE wildcards back as the literal value", () => {
     const value = "50%_o'k\\";
     for (const operator of ["starts_with", "ends_with", "not_contains"] as const) {
@@ -140,6 +163,45 @@ describe("parseSqlFilter", () => {
       );
       const node = parseSqlFilter(sql)!.items[0] as FilterCondition;
       expect(node).toMatchObject({ field: "level", operator, values: [value] });
+      expect(roundTrip(sql)).toBe(sql);
+    }
+  });
+
+  it("reads the `||`-joined literal written for a backslash before a quote as one value", () => {
+    expect(parseSqlFilter("level != ('x\\' || '''y')")!.items[0]).toMatchObject({
+      operator: "neq",
+      values: ["x\\'y"],
+    });
+    const value = "a\\'b''c";
+    const operators = [
+      "eq",
+      "neq",
+      "in",
+      "not_in",
+      "contains",
+      "contains_ci",
+      "not_contains",
+      "starts_with",
+      "ends_with",
+      "regex",
+      "not_regex",
+      "match_all",
+    ] as const;
+    for (const operator of operators) {
+      const field = operator === "match_all" ? "" : "level";
+      const values = operator === "in" || operator === "not_in" ? [value, "z"] : [value];
+      const sql = filterTreeToSql(
+        {
+          kind: "group",
+          id: "root",
+          connector: "AND",
+          items: [{ kind: "condition", id: "c", connector: "AND", field, operator, values }],
+        },
+        fields,
+      );
+      expect(sql, operator).toContain("||");
+      const node = parseSqlFilter(sql)?.items[0];
+      expect(node, sql).toMatchObject({ field, operator, values });
       expect(roundTrip(sql)).toBe(sql);
     }
   });
@@ -196,20 +258,23 @@ describe("parseSqlFilter", () => {
 });
 
 describe("parseSqlFilterLocking", () => {
-  const shape = (sql: string) =>
-    parseSqlFilterLocking(sql).items.map((item) =>
+  const shapeOf = (group: FilterGroup): string[] =>
+    group.items.map((item) =>
       item.kind === "raw"
         ? `${item.connector} [${item.sql}]`
         : item.kind === "condition"
           ? `${item.connector} ${item.field} ${item.operator} ${item.values.join(",")}`
           : `${item.connector} group(${item.items.length})`,
     );
+  const shape = (sql: string) => shapeOf(parseSqlFilterLocking(sql));
 
   it("draws what it can and locks only the parts it cannot, as typed", () => {
-    expect(shape("level = 'error' AND lower(host) = 'x' OR status > 500")).toEqual([
+    // AND binds tighter than OR, so the AND run around the locked part is drawn as one group.
+    const tree = parseSqlFilterLocking("level = 'error' AND lower(host) = 'x' OR status > 500");
+    expect(shapeOf(tree)).toEqual(["AND group(2)", "OR status gt 500"]);
+    expect(shapeOf(tree.items[0] as FilterGroup)).toEqual([
       "AND level eq error",
       "AND [lower(host) = 'x']",
-      "OR status gt 500",
     ]);
   });
 
@@ -276,5 +341,33 @@ describe("parseShorthand", () => {
   it("ignores plain words", () => {
     expect(parseShorthand("timeout")).toBeNull();
     expect(parseShorthand("level=")).toBeNull();
+  });
+});
+
+describe("parseShorthand quoted values", () => {
+  const valueOf = (text: string) => parseShorthand(text)?.value;
+
+  it("unescapes a quote and a backslash inside double quotes", () => {
+    expect(valueOf(String.raw`client="a\"b"`)).toBe('a"b');
+    expect(valueOf(String.raw`client="a\\b"`)).toBe(String.raw`a\b`);
+  });
+
+  it("keeps other backslashes, so a regex or a path reads as typed", () => {
+    expect(valueOf(String.raw`path=~"\d+\.x"`)).toBe(String.raw`\d+\.x`);
+    expect(valueOf(String.raw`dir="C:\temp"`)).toBe(String.raw`C:\temp`);
+  });
+
+  it("strips the outer quotes when the inner quotes are not escaped", () => {
+    expect(valueOf('title="say "hi""')).toBe('say "hi"');
+    expect(valueOf(String.raw`client="a\"`)).toBe("a\\");
+  });
+
+  it("keeps a value that only opens a double quote", () => {
+    expect(valueOf('client="abc')).toBe('"abc');
+  });
+
+  it("leaves single-quoted SQL values as before", () => {
+    expect(valueOf("name='it''s'")).toBe("it''s");
+    expect(valueOf(String.raw`name='a\'`)).toBe("a\\");
   });
 });

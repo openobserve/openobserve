@@ -206,11 +206,12 @@ describe("chip bar keyboard: one Tab stop, the arrows walk parts and gaps", () =
 
 describe("chip bar keyboard: AND/OR and groups", () => {
   it("( on an AND/OR brackets the two conditions it joins and keeps focus on it", async () => {
-    const state = mountBar("a = 1 AND b = 'x' OR c = 'z'");
+    // A level never mixes AND and OR (a parsed `a AND b OR c` already reads `(a AND b) OR c`), so one AND/OR runs through.
+    const state = mountBar("a = 1 AND b = 'x' AND c = 'z'");
     await start();
     await walkTo("connector-2");
     await key("(");
-    expect(sql(state)).toBe("a = 1 AND (b = 'x' OR c = 'z')");
+    expect(sql(state)).toBe("a = 1 AND (b = 'x' AND c = 'z')");
     expect(active().dataset.join).toBeTruthy();
   });
 
@@ -228,12 +229,14 @@ describe("chip bar keyboard: AND/OR and groups", () => {
     await walkTo("ungroup-1");
     await key("ArrowLeft");
     expect(caretPlace()).toBe("group");
+    // With OR the group stays one level, so its ungroup button stays.
+    await type("or ");
     await type("b");
     await key("Enter");
     await key("Enter");
     await type("y");
     await key("Enter");
-    expect(sql(state)).toBe("a = 1 OR (b = 'x' OR c = 'z' AND b = 'y')");
+    expect(sql(state)).toBe("a = 1 OR (b = 'x' OR c = 'z' OR b = 'y')");
 
     await key("Escape");
     await walkTo("ungroup-1", false);

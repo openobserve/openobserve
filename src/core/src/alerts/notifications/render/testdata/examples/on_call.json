@@ -1,113 +1,133 @@
 {
   "slack_firing": {
-    "blocks": [
+    "attachments": [
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme|🟠 [P2] High error rate on web-logs — checkout paged>*"
-        }
-      },
-      {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "P2 · High error rate on web-logs\n\npaged by policy checkout-escalation for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\nAcknowledge: https://o2.acme.com/api/acme/oncall/ack/resp_31"
-        }
-      },
-      {
-        "type": "section",
-        "fields": [
+        "color": "#F2952F",
+        "blocks": [
           {
-            "type": "mrkdwn",
-            "text": "*Level*\nP2"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme|🟠 [P2] High error rate on web-logs — checkout paged>*"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Event*\nPaged"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "P2 · High error rate on web-logs\n\npaged by policy checkout-escalation for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\nAcknowledge: https://o2.acme.com/api/acme/oncall/ack/resp_31"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Team*\ncheckout"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Reason*\npaged by policy checkout-escalation"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Time*\n2026-11-02 10:05:00 UTC"
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Level*\nP2"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nPaged"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Team*\ncheckout"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Reason*\npaged by policy checkout-escalation"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Time*\n2026-11-02 10:05:00 UTC"
+              }
+            ]
           }
         ]
       },
       {
-        "type": "actions",
-        "elements": [
+        "color": "#F2952F",
+        "blocks": [
           {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open page"
-            },
-            "url": "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme",
-            "style": "primary"
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open page"
+                },
+                "url": "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme",
+                "style": "primary"
+              }
+            ]
           }
         ]
       }
     ]
   },
   "slack_resolved": {
-    "blocks": [
+    "attachments": [
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme|🟢 [P2] High error rate on web-logs — checkout acknowledged>*"
-        }
-      },
-      {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "P2 · High error rate on web-logs\n\nthe incident was resolved for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\n\nAcknowledge from the incident page (no link available)."
-        }
-      },
-      {
-        "type": "section",
-        "fields": [
+        "color": "#2EB67D",
+        "blocks": [
           {
-            "type": "mrkdwn",
-            "text": "*Level*\nP2"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme|🟢 [P2] High error rate on web-logs — checkout acknowledged>*"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Event*\nAcknowledged"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "P2 · High error rate on web-logs\n\nthe incident was resolved for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme\n\nAcknowledge from the incident page (no link available)."
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Team*\ncheckout"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Reason*\nthe incident was resolved"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Time*\n2026-11-02 10:40:00 UTC"
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Level*\nP2"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nAcknowledged"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Team*\ncheckout"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Reason*\nthe incident was resolved"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Time*\n2026-11-02 10:40:00 UTC"
+              }
+            ]
           }
         ]
       },
       {
-        "type": "actions",
-        "elements": [
+        "color": "#2EB67D",
+        "blocks": [
           {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open page"
-            },
-            "url": "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme",
-            "style": "primary"
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open page"
+                },
+                "url": "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme",
+                "style": "primary"
+              }
+            ]
           }
         ]
       }

@@ -175,6 +175,20 @@ export function wireframesAt(records: MobileRecord[], t: number): Wireframe[] {
   return order;
 }
 
+export function imageResourceIds(records: MobileRecord[]): string[] {
+  const ids = new Set<string>();
+  const take = (w: any) => {
+    if (typeof w?.resourceId === "string" && w.resourceId) ids.add(w.resourceId);
+  };
+  for (const r of records) {
+    if (r.type === REC_FULL_SNAPSHOT) r.data?.wireframes?.forEach(take);
+    if (r.type !== REC_INCREMENTAL) continue;
+    r.data?.adds?.forEach((add: any) => take(add?.wireframe));
+    r.data?.updates?.forEach(take);
+  }
+  return [...ids];
+}
+
 /** Whether a session's source is a mobile SDK (→ use the wireframe player). */
 export function isMobileReplaySource(source: string | undefined | null): boolean {
   return (

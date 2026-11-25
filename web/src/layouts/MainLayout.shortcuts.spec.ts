@@ -89,6 +89,21 @@ describe("MainLayout — AI chat shortcut gate", () => {
     expect(ctrlB()).toBeUndefined();
   });
 
+  it.each(["false", "true"])(
+    "should bind t to the time range picker once on every build (isEnterprise=%s)",
+    async (isEnterprise) => {
+      config.isEnterprise = isEnterprise;
+
+      wrapper = mountMainLayout();
+      await flushPromises();
+
+      const entries = getManager()!
+        .getAll()
+        .filter((s) => s.key === "t");
+      expect(entries.map((s) => s.id)).toEqual(["timeRangeOpen"]);
+    },
+  );
+
   it("should register ctrl+b on enterprise builds", async () => {
     config.isEnterprise = "true";
 

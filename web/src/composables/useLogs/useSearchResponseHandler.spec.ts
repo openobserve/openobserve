@@ -651,6 +651,54 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.loadingHistogram).toBe(false);
       expect(mockLogsUtils.showCancelSearchNotification).toHaveBeenCalled();
     });
+
+    describe("paging request whose page arrives in several hit chunks", () => {
+      const pagePayload = {
+        type: "search",
+        traceId: "trace-page",
+        isPagination: true,
+        queryReq: { query: { from: 100, size: 100 } },
+      };
+      const hitsResponse = (hits: { id: number }[]) => ({
+        type: "search_response_hits",
+        content: { results: { hits } },
+      });
+
+      beforeEach(() => {
+        mockState.searchObj.data.queryResults.hits = [{ id: -1 }, { id: -2 }] as any;
+        responseHandler.handleSearchResponse(
+          pagePayload as any,
+          { type: "search_response_metadata", content: { results: { total: 300 } } } as any,
+        );
+      });
+
+      it("first chunk replaces the previous page's hits", () => {
+        responseHandler.handleSearchResponse(
+          pagePayload as any,
+          hitsResponse([{ id: 1 }, { id: 2 }]) as any,
+        );
+
+        expect(mockState.searchObj.data.queryResults.hits).toEqual([{ id: 1 }, { id: 2 }]);
+      });
+
+      it("later chunks of partition 1 append to the first chunk", () => {
+        responseHandler.handleSearchResponse(
+          pagePayload as any,
+          hitsResponse([{ id: 1 }, { id: 2 }]) as any,
+        );
+        responseHandler.handleSearchResponse(
+          pagePayload as any,
+          hitsResponse([{ id: 3 }, { id: 4 }]) as any,
+        );
+
+        expect(mockState.searchObj.data.queryResults.hits).toEqual([
+          { id: 1 },
+          { id: 2 },
+          { id: 3 },
+          { id: 4 },
+        ]);
+      });
+    });
   });
 
   describe("handleFunctionError", () => {
@@ -751,6 +799,62 @@ describe("useSearchResponseHandler", () => {
       responseHandler.handleAggregation(queryReq as any, response);
 
       expect(mockState.searchAggData.total).toBe(1000);
+    });
+  });
+
+  describe("page count for a query with an OFFSET", () => {
+    const countHits = (meta?: Record<string, unknown>) => {
+      mockState.searchObj.data.queryResults.aggs = [];
+      responseHandler.handleSearchResponse(
+        { type: "pageCount", traceId: "c", queryReq: { query: {} }, meta } as any,
+        {
+          type: "search_response_hits",
+          content: { results: { hits: [{ zo_sql_num: 600 }] } },
+        } as any,
+      );
+      return mockState.searchObj.data.queryResults.aggs;
+    };
+
+    it("takes the rows skipped by the OFFSET off the total", () => {
+      expect(countHits({ rowOffset: 5 })).toEqual([{ zo_sql_num: 595 }]);
+    });
+
+    it("never reports a negative total", () => {
+      mockState.searchObj.data.queryResults.aggs = [];
+      responseHandler.handleSearchResponse(
+        { type: "pageCount", traceId: "c", queryReq: { query: {} }, meta: { rowOffset: 5 } } as any,
+        {
+          type: "search_response_hits",
+          content: { results: { hits: [{ zo_sql_num: 2 }] } },
+        } as any,
+      );
+      expect(mockState.searchObj.data.queryResults.aggs).toEqual([{ zo_sql_num: 0 }]);
+    });
+
+    it("takes the OFFSET off once when several partitions add up, not once per partition", () => {
+      mockState.searchObj.data.queryResults.aggs = [];
+      for (const rows of [3, 600]) {
+        responseHandler.handleSearchResponse(
+          {
+            type: "pageCount",
+            traceId: "c",
+            queryReq: { query: {} },
+            meta: { rowOffset: 5 },
+          } as any,
+          {
+            type: "search_response_hits",
+            content: { results: { hits: [{ zo_sql_num: rows }] } },
+          } as any,
+        );
+      }
+      expect(mockState.searchObj.data.queryResults.aggs).toEqual([
+        { zo_sql_num: 0 },
+        { zo_sql_num: 598 },
+      ]);
+    });
+
+    it("keeps the count as is without an OFFSET", () => {
+      expect(countHits()).toEqual([{ zo_sql_num: 600 }]);
     });
   });
 

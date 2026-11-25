@@ -112,6 +112,7 @@ export default defineComponent({
       aiToolsets: "ai_toolsets",
       license: "license",
       orgnizationManagement: "organization_management",
+      userManagement: "user_management",
       regexPatterns: "regex_patterns",
       syntheticsLocations: "synthetics_locations",
       correlationSettings: "correlation_settings",
@@ -156,18 +157,23 @@ export default defineComponent({
           query: { org_identifier: store.state.selectedOrganization?.identifier },
         });
       };
-      // Nodes, License, Password policy, Query Management and Announcements are enterprise-only meta-org pages.
+      // License, Password policy, Query Management and Announcements are enterprise-only meta-org pages.
       const notMeta =
         store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
       if (
-        (name === "nodes" ||
-          name === "license" ||
+        (name === "license" ||
           name === "passwordPolicy" ||
           name === "query_management" ||
           name === "announcementBanners" ||
           name === "announcementBannerEditor") &&
         notMeta
       ) {
+        toGeneral();
+        return;
+      }
+      // Nodes is meta-org-only but NOT enterprise-only: OSS clusters too, and the
+      // node list API serves the _meta org in every edition.
+      if (name === "nodes" && store.state.zoConfig.meta_org && !isMetaOrg.value) {
         toGeneral();
         return;
       }
@@ -491,6 +497,16 @@ export default defineComponent({
           to: { name: "orgnizationManagement", query: { org_identifier: org } },
           visible: isCloud && meta,
           dataTest: "organization-management-tab",
+          group: "Account",
+        },
+        {
+          key: "user_management",
+          label: t("settings.userManagement"),
+          description: t("settings.userManagementDesc"),
+          icon: "manage-accounts",
+          to: { name: "userManagement", query: { org_identifier: org } },
+          visible: isCloud && meta,
+          dataTest: "user-management-tab",
           group: "Account",
         },
       ];

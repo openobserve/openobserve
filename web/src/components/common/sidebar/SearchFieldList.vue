@@ -13,6 +13,7 @@
         :page-size-options="[50]"
         :expanded-ids="expandedIds"
         :loading="loading"
+        keyboard
         @update:current-page="currentPage = $event"
         @update:expanded-ids="onExpandedIdsChange"
         @update:search="searchTerm = $event"
@@ -663,8 +664,8 @@ watch(
   },
 );
 
-const isNullValue = (v: string) =>
-  v === null || v === undefined || v === "" || v.toLowerCase() === "null";
+// useFieldValuesStream keys the null row "null"; any other key is a value a row holds.
+const isNullValue = (v: string | null | undefined) => v === null || v === undefined || v === "null";
 
 const buildExpression = (fieldName: string, v: string, action: string) =>
   isNullValue(v)

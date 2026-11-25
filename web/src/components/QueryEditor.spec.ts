@@ -67,6 +67,7 @@ const codeQueryEditorStub = {
     "showAutoComplete",
     "editorId",
     "valuesTimeRange",
+    "fullTextSearch",
     "textPreview",
     "transformGeneratedQuery",
   ],
@@ -615,6 +616,18 @@ describe("QueryEditor", () => {
     it("forwards null when no range is given", () => {
       wrapper = mountQueryEditor();
       expect(wrapper.findComponent(codeQueryEditorStub).props("valuesTimeRange")).toBeNull();
+    });
+  });
+
+  describe("full-text search", () => {
+    it("tells the code editor the streams have full-text fields unless the page says not", () => {
+      wrapper = mountQueryEditor();
+      expect(wrapper.findComponent(codeQueryEditorStub).props("fullTextSearch")).toBe(true);
+    });
+
+    it("forwards a page's streams without full-text fields", () => {
+      wrapper = mountQueryEditor({ fullTextSearch: false });
+      expect(wrapper.findComponent(codeQueryEditorStub).props("fullTextSearch")).toBe(false);
     });
   });
 });

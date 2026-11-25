@@ -1798,6 +1798,11 @@ export class PipelinesPage {
         await this.conditions.expectConnector(String(index + 1), text);
     }
 
+    /** A connector by its builder path: `1` is the root's second item, `0-1` the second item of the group at root index 0. */
+    async verifyConnectorAt(path, text) {
+        await this.conditions.expectConnector(path, text);
+    }
+
     async verifyNoteContainer() {
         await expect(this.noteContainer).toBeVisible();
         await expect(this.noteHeading).toContainText("Condition value Guidelines");

@@ -1,58 +1,68 @@
 {
-  "blocks": [
+  "attachments": [
     {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "*<https://o2.example/short/abc|CPU \"high\" &amp; &lt;fire&gt; on web-1>*"
-      }
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "Value *92.5* exceeded `80` — see <https://rb.example/x|runbook>\n\n&lt;script&gt;alert(1)&lt;/script&gt;"
-      }
-    },
-    {
-      "type": "section",
-      "fields": [
+      "color": "#E01E5A",
+      "blocks": [
         {
-          "type": "mrkdwn",
-          "text": "*host*\nweb-1 &amp; web-2"
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": "*<https://o2.example/short/abc|CPU \"high\" &amp; &lt;fire&gt; on web-1>*"
+          }
         },
         {
-          "type": "mrkdwn",
-          "text": "*cpu*\n92.5"
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": "Value *92.5* exceeded `80` — see <https://rb.example/x|runbook>\n\n&lt;script&gt;alert(1)&lt;/script&gt;"
+          }
+        },
+        {
+          "type": "section",
+          "fields": [
+            {
+              "type": "mrkdwn",
+              "text": "*host*\nweb-1 &amp; web-2"
+            },
+            {
+              "type": "mrkdwn",
+              "text": "*cpu*\n92.5"
+            }
+          ]
+        },
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": "`host` web-1 · `cpu` 92.5"
+          }
         }
       ]
     },
     {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "`host` web-1 · `cpu` 92.5"
-      }
-    },
-    {
-      "type": "actions",
-      "elements": [
+      "color": "#E01E5A",
+      "blocks": [
         {
-          "type": "button",
-          "text": {
-            "type": "plain_text",
-            "text": "Runbook"
-          },
-          "url": "https://rb.example/x"
-        },
-        {
-          "type": "button",
-          "text": {
-            "type": "plain_text",
-            "text": "View in OpenObserve"
-          },
-          "url": "https://o2.example/short/abc",
-          "style": "primary"
+          "type": "actions",
+          "elements": [
+            {
+              "type": "button",
+              "text": {
+                "type": "plain_text",
+                "text": "Runbook"
+              },
+              "url": "https://rb.example/x"
+            },
+            {
+              "type": "button",
+              "text": {
+                "type": "plain_text",
+                "text": "View in OpenObserve"
+              },
+              "url": "https://o2.example/short/abc",
+              "style": "primary"
+            }
+          ]
         }
       ]
     }

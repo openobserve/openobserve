@@ -13,12 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ref } from "vue";
+
+const { mockSearch } = vi.hoisted(() => ({ mockSearch: vi.fn() }));
+vi.mock("@/services/search", () => ({ default: { search: mockSearch } }));
+
 import {
   bucketizeHistogram,
   buildPatternVolumeContext,
+  fetchPatternVolume,
   parseBucketKey,
   resolveBaseFilter,
+  usePatternVolumeCache,
 } from "./usePatternVolume";
 
 const usFor = (iso: string) => Date.parse(iso) * 1000;
@@ -245,5 +252,84 @@ describe("buildPatternVolumeContext", () => {
       regions: ["r1"],
       clusters: ["c1"],
     });
+  });
+});
+
+describe("fetchPatternVolume", () => {
+  const A = "core event seq=<:NUM> info from <*> status 500";
+  const B = "core event seq=<:NUM> warn from <*> status 404";
+  const SHARED = "core event seq=<:NUM> info from <*>";
+  const ctx = (allTemplates?: string[]) => ({
+    orgId: "o",
+    streamName: "logs",
+    startUs: 0,
+    endUs: 1_000_000 * 3600,
+    allTemplates,
+  });
+
+  beforeEach(() => {
+    mockSearch.mockReset();
+    mockSearch.mockResolvedValue({ data: { hits: [] } });
+  });
+
+  it("counts by every distinguishing term when the long constants are shared", async () => {
+    await fetchPatternVolume({ template: A }, ctx([A, B]));
+    const sql: string = mockSearch.mock.calls[0][0].query.query.sql;
+    expect(sql).toContain(
+      `WHERE match_all('core event seq=') AND match_all('info from') AND match_all('status 500') GROUP BY`,
+    );
+  });
+
+  it("keeps the long-constants filter without a template list", async () => {
+    await fetchPatternVolume({ template: A }, ctx());
+    const sql: string = mockSearch.mock.calls[0][0].query.query.sql;
+    expect(sql).toContain(`WHERE match_all('core event seq=') GROUP BY`);
+  });
+
+  it("reports no volume, without querying, when nothing separates the pattern", async () => {
+    expect(await fetchPatternVolume({ template: SHARED }, ctx([SHARED, A]))).toBeNull();
+    expect(mockSearch).not.toHaveBeenCalled();
+  });
+
+  it("carries the template list on the context", () => {
+    const c = buildPatternVolumeContext({
+      orgId: "o",
+      streamName: "logs",
+      window: { start: 1, end: 2 },
+      allTemplates: [A, B],
+    });
+    expect(c?.allTemplates).toEqual([A, B]);
+  });
+});
+
+describe("usePatternVolumeCache unavailable reason", () => {
+  const A = "core event seq=<:NUM> info from <*> status 500";
+  const SHARED = "core event seq=<:NUM> info from <*>";
+  const ctx = {
+    orgId: "o",
+    streamName: "logs",
+    startUs: 0,
+    endUs: 1_000_000 * 3600,
+    allTemplates: [A, SHARED],
+  };
+
+  it("records why a pattern with no distinct filter has no volume", async () => {
+    const cache = usePatternVolumeCache(ref(ctx));
+    await cache.request({ template: SHARED });
+    expect(cache.get({ template: SHARED })).toEqual({
+      buckets: null,
+      total: null,
+      intervalSecs: null,
+      loading: false,
+      unavailableReason: "shared",
+    });
+  });
+
+  it("records no reason for a pattern that has a volume", async () => {
+    mockSearch.mockReset();
+    mockSearch.mockResolvedValue({ data: { hits: [] } });
+    const cache = usePatternVolumeCache(ref(ctx));
+    await cache.request({ template: A });
+    expect(cache.get({ template: A })?.unavailableReason).toBeUndefined();
   });
 });

@@ -394,6 +394,11 @@ export const anomalyNoticeBadgeKeys = (
         labelKey: "alerts.anomaly.noticeRetrain",
         tooltipKeys: ["alerts.anomaly.noticeRetrainTooltip"],
       };
+    case "duplicate_rows":
+      return {
+        labelKey: "alerts.anomaly.noticeDuplicateRows",
+        tooltipKeys: ["alerts.anomaly.noticeDuplicateRowsTooltip"],
+      };
     default:
       return null;
   }

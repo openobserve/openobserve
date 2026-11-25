@@ -17,7 +17,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import config from "@/aws-exports";
 import "@/locales";
 import { gt } from "@/types/i18n";
-import type { AutoObserveIncidentItem, AutoObserveIncidentList } from "@/services/autoobserve";
+import type {
+  AutoObserveIncidentItem,
+  AutoObserveIncidentList,
+  AutoObserveIssueContext,
+  AutoObserveStepView,
+} from "@/services/autoobserve";
 import type { Incident, RcaSummary } from "@/services/incidents";
 import { rcaCellModel } from "@/utils/incidents/rcaCell";
 import fixture from "./__fixtures__/autoobserveIncidents.json";
@@ -25,11 +30,13 @@ import {
   analysisLine,
   sharedAnalysis,
   analysisLink,
-  anyLive,
+  CONTEXT_GRACE_MS,
   failedDetail,
   findingLogs,
   findingSentence,
   incidentLink,
+  itemPolls,
+  listPolls,
   newFindingsText,
   openedText,
   moreText,
@@ -274,12 +281,88 @@ describe("row text", () => {
     expect(newFindingsText(gt, "en-US", 3)).toBe("3 new findings");
     expect(moreText(gt, "en-US")).toBe("Showing the 3 newest");
   });
+});
 
-  it("polls only while a listed run is live", () => {
-    expect(anyLive(FIXTURE)).toBe(true);
-    expect(anyLive({ ...FIXTURE, items: FIXTURE.items.slice(1) })).toBe(false);
-    expect(anyLive({ ...FIXTURE, items: [withRun(1, { state: "waiting_input" })] })).toBe(true);
-    expect(anyLive(undefined)).toBe(false);
+describe("polling", () => {
+  const AT = 1_794_309_300_000_000;
+  const NOW = AT / 1000 + 5 * 60_000;
+  const MIN = 60_000;
+  const us = (ms: number) => ms * 1000;
+  const working = (untilMs: number) => ({ working: { since: AT, until: us(untilMs) } });
+  const view = (state: AutoObserveStepView["state"], runId: string | null = null) =>
+    ({ step: { run_id: runId }, state }) as AutoObserveStepView;
+  const cx = (over: Partial<AutoObserveIssueContext>) =>
+    ({
+      asked_at: AT,
+      settled: true,
+      next_step: view("engine_only"),
+      ...over,
+    }) as AutoObserveIssueContext;
+  const owed = (
+    over: Partial<AutoObserveIssueContext> | null,
+    run: Partial<AutoObserveIncidentItem["investigation"]> = {},
+  ): AutoObserveIncidentItem => ({
+    ...withRun(1, run),
+    incident: { ...item(1).incident, created_at: AT },
+    context: over ? cx(over) : undefined,
+  });
+
+  it.each<[string, AutoObserveIncidentItem, number, boolean]>([
+    ["a live run", item(0), NOW, true],
+    ["a run waiting for input", withRun(1, { state: "waiting_input" }), NOW, true],
+    ["no run and no context", item(1), NOW, false],
+    ["a context that owes nothing", owed({}), NOW, false],
+    [
+      "the first ask due a minute ago",
+      owed({ asked_at: null, recheck_at: us(NOW - MIN) }),
+      NOW,
+      true,
+    ],
+    [
+      "the first ask due past the grace",
+      owed({ asked_at: null, recheck_at: us(NOW - 3 * MIN) }),
+      NOW,
+      false,
+    ],
+    ["the recheck ahead", owed({ settled: false, recheck_at: us(NOW + 5 * MIN) }), NOW, true],
+    [
+      "the recheck overdue",
+      owed({ settled: false, recheck_at: us(NOW + 5 * MIN) }),
+      NOW + 8 * MIN,
+      false,
+    ],
+    ["no recheck served", owed({ settled: false }), NOW, false],
+    ["the AI working on a step", owed({ next_step: view(working(NOW + MIN)) }), NOW, true],
+    ["the AI past its until", owed({ next_step: view(working(NOW + MIN)) }), NOW + 2 * MIN, false],
+    [
+      "the AI working, no until served",
+      owed({ next_step: view({ working: { since: AT } }) }),
+      NOW,
+      false,
+    ],
+    ["a failed run owes no step", owed({}, { run_id: "r-failed", state: "failed" }), NOW, false],
+    [
+      "a re-analysis ended while the last run's step is still shown",
+      owed({ next_step: view("ready", "r-old") }, { run_id: "r-new", state: "completed" }),
+      NOW,
+      true,
+    ],
+    [
+      "an ended run whose step is shown",
+      owed({ next_step: view("ready", "r-shown") }, { run_id: "r-shown", state: "completed" }),
+      NOW,
+      false,
+    ],
+  ])("%s", (_name, row, nowMs, polls) => {
+    expect(itemPolls(row, nowMs)).toBe(polls);
+  });
+
+  it("keeps polling a short while after a run ends before its step attaches", () => {
+    const ended = owed({}, { run_id: "r-ended", state: "completed" });
+    expect(listPolls({ ...FIXTURE, items: [ended] }, NOW)).toBe(true);
+    expect(listPolls({ ...FIXTURE, items: [ended] }, NOW + CONTEXT_GRACE_MS - 1)).toBe(true);
+    expect(listPolls({ ...FIXTURE, items: [ended] }, NOW + CONTEXT_GRACE_MS)).toBe(false);
+    expect(listPolls(undefined, NOW)).toBe(false);
   });
 });
 

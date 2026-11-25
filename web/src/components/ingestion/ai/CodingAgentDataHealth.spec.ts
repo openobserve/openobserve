@@ -12,7 +12,7 @@ vi.mock("@/services/gen-ai-data-health.service", () => ({
   getDataHealth: (...args: unknown[]) => getDataHealth(...args),
 }));
 
-// Model Pricing and GenAI Agent Mapping are enterprise/cloud settings; OSS locks them.
+// GenAI Agent Mapping is an enterprise/cloud setting; OSS locks it.
 let mockIsEnterprise = "true";
 vi.mock("@/aws-exports", () => ({
   default: {
@@ -175,7 +175,7 @@ describe("CodingAgentDataHealth", () => {
     });
   });
 
-  it("offers no fix for a setting OSS locks, and keeps the docs fix", async () => {
+  it("offers no fix for a setting OSS locks, and keeps the pricing and docs fixes", async () => {
     mockIsEnterprise = "false";
     getDataHealth.mockResolvedValue({
       data: {
@@ -191,9 +191,8 @@ describe("CodingAgentDataHealth", () => {
     mountHealth();
     await flushPromises();
     expect(q("llm-data-health-card-unpriced_models").attributes("data-status")).toBe("error");
-    expect(q("llm-data-health-fix-unpriced_models").exists()).toBe(false);
+    expect(q("llm-data-health-fix-unpriced_models").exists()).toBe(true);
     expect(q("llm-data-health-fix-missing_agent_identity").exists()).toBe(false);
-    expect(wrapper.text()).not.toContain("Copy link for an admin");
     expect(q("llm-data-health-fix-missing_session_id").exists()).toBe(true);
   });
 

@@ -32,7 +32,7 @@ use db::{
     alerts::templates::TemplateError,
     authz::{remove_ownership, set_ownership},
 };
-use infra::table::templates::NAME_MAX_CHARS;
+use infra::table::templates::{BODY_MAX_BYTES, NAME_MAX_CHARS};
 
 use crate::{
     alerts::notifications::default_template::{
@@ -74,6 +74,45 @@ pub(crate) fn write_org(
 /// The org a saved template's ownership tuple names, which org deletion looks up.
 pub(crate) fn ownership_of(saved: &Template) -> (&str, Authz) {
     (&saved.org_id, Authz::new(&saved.name))
+}
+
+/// Holds a saved body to [`BODY_MAX_BYTES`]. An unchanged body, or a content body that parses to
+/// the stored spec, keeps the stored bytes, so an old large row keeps saving but cannot grow.
+pub(crate) fn limit_body(
+    body: String,
+    existing: Option<&str>,
+    content: bool,
+) -> Result<String, TemplateError> {
+    if body.len() <= BODY_MAX_BYTES || existing == Some(body.as_str()) {
+        return Ok(body);
+    }
+    if let Some(stored) = existing
+        && content
+        && same_spec(stored, &body)
+    {
+        return Ok(stored.to_string());
+    }
+    Err(TemplateError::BodyTooLarge {
+        size: body.len(),
+        max: BODY_MAX_BYTES,
+    })
+}
+
+/// Both bodies parse to the same content spec. The editor trims the body text on save, so that
+/// trim does not count as a change.
+fn same_spec(a: &str, b: &str) -> bool {
+    let value = |body: &str| {
+        let mut spec = ContentSpec::parse(body).ok()?;
+        spec.body = editor_trim(&spec.body).to_string();
+        serde_json::to_value(spec).ok()
+    };
+    matches!((value(a), value(b)), (Some(a), Some(b)) if a == b)
+}
+
+/// The body text as the editor saves it. JavaScript `trim` removes Rust's whitespace except
+/// U+0085, and also removes U+FEFF.
+fn editor_trim(body: &str) -> &str {
+    body.trim_matches(|c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}')
 }
 
 pub async fn save(
@@ -135,6 +174,12 @@ pub async fn save(
 
     let existing_kind = existing.as_ref().map(|e| e.kind);
     template.kind = resolve_kind(requested_kind, existing_kind, create);
+    // Before the content parse below, so an oversized new draft is not parsed.
+    template.body = limit_body(
+        std::mem::take(&mut template.body),
+        existing.as_ref().map(|e| e.body.as_str()),
+        template.kind == TemplateKind::Content,
+    )?;
     template.applies_to = match &existing {
         // Reserved rows are read only; root edits keep the stored list.
         Some(e) if is_reserved_template_name(&e.name) => e.applies_to.clone(),
@@ -627,8 +672,14 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
                 // body/title) so existing installs pick up the correction —
                 // but only when the reseed gate says to (revision-gated, see
                 // `should_apply_prebuilt`).
-                let drifted = existing.body != template.body
-                    || existing.template_type != template.template_type;
+                // A ticketing or webhook row that still holds the old fallback body keeps it:
+                // the shipped body adds fields that change what the receiving system creates.
+                let drifted = (existing.body != template.body
+                    || existing.template_type != template.template_type)
+                    && !config::prebuilt_loader::is_kept_legacy_body(
+                        &template.name,
+                        &existing.body,
+                    );
                 if should_apply_prebuilt(shipped_rev, applied_rev, drifted) && drifted {
                     // Preserve the stored id so this is an update, not an insert.
                     template.id = existing.id;
@@ -1421,5 +1472,177 @@ mod tests {
         assert_eq!(resolve_kind(Some(Content), None, true), Content); // explicit create
         assert_eq!(resolve_kind(None, Some(Content), false), Content); // sticky update
         assert_eq!(resolve_kind(Some(Custom), Some(Content), false), Custom); // explicit downgrade
+    }
+
+    #[test]
+    fn a_body_over_the_limit_is_refused_unless_it_is_the_stored_body() {
+        let limit = |body: &str, existing: Option<&str>, content: bool| {
+            limit_body(body.to_string(), existing, content)
+        };
+        let at_limit = "a".repeat(BODY_MAX_BYTES);
+        let over = "a".repeat(BODY_MAX_BYTES + 1);
+        // Create: no stored row.
+        assert_eq!(limit(&at_limit, None, false).unwrap(), at_limit);
+        let err = limit(&over, None, false).unwrap_err();
+        assert!(
+            matches!(err, TemplateError::BodyTooLarge { size, max }
+                if size == BODY_MAX_BYTES + 1 && max == BODY_MAX_BYTES),
+            "{err}"
+        );
+        assert!(err.to_string().contains("5242880"), "{err}");
+        // A changed body over the limit is refused, even when the stored row is also large.
+        let old_large = "b".repeat(BODY_MAX_BYTES + 10);
+        assert!(limit(&over, Some(&old_large), false).is_err());
+        assert!(limit(&over, Some("small"), false).is_err());
+        // An unchanged old large body keeps saving.
+        assert_eq!(
+            limit(&old_large, Some(&old_large), false).unwrap(),
+            old_large
+        );
+        // Multi-byte text counts bytes, not characters.
+        let wide = "\u{e9}".repeat(BODY_MAX_BYTES / 2 + 1);
+        assert!(limit(&wide, None, false).is_err());
+    }
+
+    #[test]
+    fn a_reformatted_content_body_over_the_limit_keeps_the_stored_bytes() {
+        let limit = |body: &str, existing: &str, content: bool| {
+            limit_body(body.to_string(), Some(existing), content)
+        };
+        let spec = ContentSpec {
+            title: "t".into(),
+            body: "b".repeat(BODY_MAX_BYTES),
+            ..Default::default()
+        };
+        let compact = serde_json::to_string(&spec).unwrap();
+        // The editor saves `JSON.stringify(spec, null, 2)`; the stored bytes are kept.
+        let pretty = serde_json::to_string_pretty(&spec).unwrap();
+        assert_ne!(compact, pretty);
+        assert_eq!(limit(&pretty, &compact, true).unwrap(), compact);
+        // A custom body is compared byte for byte.
+        assert!(limit(&pretty, &compact, false).is_err());
+        // A real content change is refused.
+        let edited = serde_json::to_string_pretty(&ContentSpec {
+            title: "changed".into(),
+            ..spec.clone()
+        })
+        .unwrap();
+        assert!(limit(&edited, &compact, true).is_err());
+        // Unknown fields, which the parse drops, are not stored: the row cannot grow.
+        let padded = format!(
+            "{}, \"junk\": \"{}\"}}",
+            pretty.trim_end_matches('}').trim_end(),
+            "j".repeat(BODY_MAX_BYTES)
+        );
+        assert!(ContentSpec::parse(&padded).is_ok());
+        assert_eq!(limit(&padded, &compact, true).unwrap(), compact);
+        let small = r#"{"title":"t","body":"b"}"#;
+        let padded_small = format!(
+            r#"{{"title":"t","body":"b","junk":"{}"}}"#,
+            "j".repeat(2 * BODY_MAX_BYTES)
+        );
+        assert_eq!(limit(&padded_small, small, true).unwrap(), small);
+
+        // The editor trims the body text and fills default keys: still unchanged.
+        let legacy = format!(
+            "{{\"title\":\"t\",\"body\":\"\\n{}\",\"future\":true}}",
+            "b".repeat(BODY_MAX_BYTES)
+        );
+        assert!(ContentSpec::parse(&legacy).unwrap().body.starts_with('\n'));
+        let mut resaved = serde_json::to_value(&spec).unwrap();
+        resaved["future"] = serde_json::Value::Bool(true);
+        let resaved = serde_json::to_string_pretty(&resaved).unwrap();
+        assert_eq!(limit(&resaved, &legacy, true).unwrap(), legacy);
+        // JavaScript `trim` also removes a leading U+FEFF.
+        let bom = format!(
+            "{{\"title\":\"t\",\"body\":\"\u{feff}{}\"}}",
+            "b".repeat(BODY_MAX_BYTES)
+        );
+        assert_eq!(limit(&pretty, &bom, true).unwrap(), bom);
+    }
+
+    #[test]
+    fn editor_trim_matches_javascript_trim() {
+        // JavaScript `trim` keeps U+0085 and removes U+FEFF.
+        assert_eq!(editor_trim("\u{85}b\u{feff} \n"), "\u{85}b");
+    }
+
+    /// Save refuses a new or changed large body, and keeps saving an old large row whose body is
+    /// unchanged.
+    #[tokio::test]
+    async fn test_save_enforces_the_body_limit_on_new_and_changed_bodies_only() {
+        use config::meta::destinations::TemplateType;
+
+        if !meta_store().await {
+            return;
+        }
+        let suffix = config::utils::time::now_micros();
+        let org = format!("t_body_org_{suffix}");
+        let over = "x".repeat(BODY_MAX_BYTES + 1);
+        let template = |name: &str, body: &str, title: &str| Template {
+            org_id: org.clone(),
+            name: name.to_string(),
+            body: body.to_string(),
+            template_type: TemplateType::Email {
+                title: title.to_string(),
+            },
+            ..Default::default()
+        };
+
+        // Create over the limit.
+        let created = save(
+            "",
+            template(&format!("t_body_new_{suffix}"), &over, "t"),
+            None,
+            None,
+            true,
+            false,
+        )
+        .await;
+        assert!(
+            matches!(created, Err(TemplateError::BodyTooLarge { .. })),
+            "{created:?}"
+        );
+
+        // An old row over the limit, written before the limit existed.
+        let old = format!("t_body_old_{suffix}");
+        infra::table::templates::put(template(&old, &over, "old title"))
+            .await
+            .unwrap();
+        // Unchanged body, changed title: saves.
+        let renamed = save(
+            &old,
+            template(&old, &over, "new title"),
+            None,
+            None,
+            false,
+            false,
+        )
+        .await
+        .unwrap();
+        assert!(
+            matches!(&renamed.template_type, TemplateType::Email { title } if title == "new title")
+        );
+        // Changed body still over the limit: refused.
+        let changed = format!("{over}y");
+        let refused = save(
+            &old,
+            template(&old, &changed, "t"),
+            None,
+            None,
+            false,
+            false,
+        )
+        .await;
+        assert!(
+            matches!(refused, Err(TemplateError::BodyTooLarge { .. })),
+            "{refused:?}"
+        );
+        // Changed body under the limit: saves.
+        assert!(
+            save(&old, template(&old, "small", "t"), None, None, false, false)
+                .await
+                .is_ok()
+        );
     }
 }

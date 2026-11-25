@@ -1,6 +1,9 @@
-import { test } from "../baseFixtures.js";
+import { test, expect } from "../baseFixtures.js";
 import PageManager from "../../pages/page-manager.js";
 const testLogger = require('../utils/test-logger.js');
+// The SQL-pagination tests reuse the global-setup session instead of the login form.
+const sessionFixtures = require('../utils/enhanced-baseFixtures.js');
+const sessionTest = sessionFixtures.test;
 // (duplicate import removed)
 
 // Function to generate a random 9-character alphabetic name
@@ -198,5 +201,73 @@ test.describe("Pagination for logs", () => {
     
     test.afterEach(async ({ page }) => {
         // await pageManager.commonActions.flipStreaming();
+    });
+});
+
+sessionTest.describe("Pagination for SQL that sets its own row count", () => {
+    // Serial: every test reads the same two seeded streams.
+    sessionTest.describe.configure({ mode: 'serial' });
+    const orgId = process.env.ORGNAME || "default";
+    const suffix = Date.now().toString(36);
+    const streamA = `e2e_sqlpage_a_${suffix}`;
+    const streamB = `e2e_sqlpage_b_${suffix}`;
+    let pageManager;
+
+    sessionTest.beforeAll(async ({ browser }) => {
+        const page = await browser.newPage();
+        try {
+            const seed = new PageManager(page);
+            const now = Date.now() * 1000;
+            for (const [stream, offset] of [[streamA, 0], [streamB, 500]]) {
+                const rows = Array.from({ length: 60 }, (_, i) => ({ _timestamp: now - i * 1e6 - offset, seq: i, msg: `msg_${i % 36}` }));
+                await seed.logsPage.ingestLogs(orgId, stream, rows);
+                await seed.logsPage.waitForStreamRowCount(orgId, stream, 60);
+            }
+        } finally {
+            await page.close();
+        }
+    });
+
+    sessionTest.beforeEach(async ({ page }) => {
+        await sessionFixtures.navigateToBase(page);
+        pageManager = new PageManager(page);
+        await pageManager.logsPage.selectStream(streamA);
+        await pageManager.logsPage.waitForPickedStreamSettled(streamA);
+    });
+
+    sessionTest.afterAll(async ({ browser }) => {
+        const page = await browser.newPage();
+        try {
+            const cleanup = new PageManager(page);
+            for (const stream of [streamA, streamB]) {
+                await cleanup.logsPage.deleteStream(stream).catch((e) => testLogger.warn(`cleanup ${stream}: ${e.message}`));
+            }
+        } finally {
+            await page.close();
+        }
+    });
+
+    sessionTest("UNION ALL with an outer LIMIT 100 requests 100 rows and shows them on one page", { tag: ['@pagination', '@functional', '@P1'] }, async () => {
+        // Only this query names streamB, so an auto-run of the picked streamA is never counted.
+        const sizes = pageManager.logsPage.recordRequestedSizes(streamB);
+        await pageManager.logsPage.fillSqlQueryAndWaitForSqlMode(`SELECT seq, msg FROM "${streamA}" UNION ALL SELECT seq, msg FROM "${streamB}" ORDER BY seq LIMIT 100`);
+        await pageManager.logsPage.runQueryAndWaitForSearchEnd(streamB);
+        await pageManager.logsPage.expectResultsGridSettledWithRows();
+
+        await expect.poll(() => pageManager.logsPage.getVisibleResultTitleText(), { timeout: 30000 }).toMatch(/^1 to 100 out of 100 events/);
+        expect(sizes).toEqual([100]);
+        await pageManager.logsPage.expectNoResultPage(2);
+        await pageManager.logsPage.pageNotVisible();
+    });
+
+    sessionTest("approx_distinct without GROUP BY is one aggregate row with the exact value", { tag: ['@pagination', '@functional', '@P1'] }, async () => {
+        await pageManager.logsPage.fillSqlQueryAndWaitForSqlMode(`SELECT approx_distinct(msg) AS d FROM "${streamA}"`);
+        await pageManager.logsPage.runQueryAndWaitForSearchEnd(streamA);
+        await pageManager.logsPage.expectResultsGridSettledWithRows();
+
+        await expect.poll(() => pageManager.logsPage.getVisibleResultTitleText(), { timeout: 30000 }).toMatch(/^1 to 1 out of 1 events/);
+        await pageManager.logsPage.expectLogsTableRowCount(1);
+        expect((await pageManager.logsPage.getResultRowTexts())[0]).toMatch(/\b36\b/);
+        await pageManager.logsPage.pageNotVisible();
     });
 });

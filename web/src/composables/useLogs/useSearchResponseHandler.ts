@@ -179,10 +179,10 @@ export const useSearchResponseHandler = () => {
   ) => {
     const hits = response.content?.results?.hits || [];
 
-    if ((isPagination && searchPartitionMap[payload.traceId].partition === 1) || !appendResult) {
+    if (!appendResult) {
       clearCache();
       searchObj.data.queryResults.hits = hits;
-    } else if (appendResult) {
+    } else {
       searchObj.data.queryResults.hits.push(...hits);
     }
 
@@ -473,10 +473,22 @@ export const useSearchResponseHandler = () => {
       regeratePaginationFlag = true;
     }
 
-    if (response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs) {
-      searchObj.data.queryResults.aggs = response.content.results.hits;
+    const isReplace =
+      response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs;
+    const startsCount = isReplace || !searchObj.data.queryResults.aggs?.length;
+    const queryResults = searchObj.data.queryResults;
+    if (startsCount) queryResults.offsetLeft = Number(payload.meta?.rowOffset ?? 0);
+    const countHits = response.content.results.hits.map((hit: any) => {
+      if (hit.zo_sql_num == null || !(queryResults.offsetLeft > 0)) return hit;
+      const skipped = Math.min(queryResults.offsetLeft, hit.zo_sql_num);
+      queryResults.offsetLeft -= skipped;
+      return { ...hit, zo_sql_num: hit.zo_sql_num - skipped };
+    });
+
+    if (isReplace) {
+      searchObj.data.queryResults.aggs = countHits;
     } else {
-      searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+      searchObj.data.queryResults.aggs.push(...countHits);
     }
 
     refreshPagination(regeratePaginationFlag);

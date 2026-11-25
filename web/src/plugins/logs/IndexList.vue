@@ -294,6 +294,7 @@ import {
   generateTraceContext,
   addSpacesToOperators,
 } from "../../utils/zincutils";
+import { quoteFieldNames } from "@/utils/query/quoteFieldNames";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -325,6 +326,7 @@ import { saveLogsStreamType } from "@/utils/streamPersist";
 import { bumpSelectionToken, currentSelectionToken } from "@/composables/useLogs/useSearchBar";
 import { compareStreamsByLatest } from "@/utils/logs/estimateScanMb";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { emptyValueConditions, emptyValueFieldType } from "@/utils/logs/breakdownFilter";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   filterForParsing,
@@ -1139,17 +1141,10 @@ export default defineComponent({
           if (whereClause.trim() != "") {
             whereClause = addSpacesToOperators(whereClause);
 
-            const parsedSQL = whereClause.split(" ");
-            searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-              parsedSQL.forEach((node: any, index: any) => {
-                if (node == field.name) {
-                  node = node.replaceAll('"', "");
-                  parsedSQL[index] = '"' + node + '"';
-                }
-              });
-            });
-
-            whereClause = parsedSQL.join(" ");
+            whereClause = quoteFieldNames(
+              whereClause,
+              searchObj.data.stream.selectedStreamFields.map((field: any) => field.name),
+            );
 
             // query_context = query_context.replace(
             //   "[WHERE_CLAUSE]",
@@ -1300,12 +1295,31 @@ export default defineComponent({
       }
     };
 
+    // The values API returns a missing field as "", so the blank row holds missing and empty values.
+    const valueConditions = (field: string, value: string, action: string): string[] => {
+      if (value !== "") return [getFilterExpressionByFieldType(field, value, action)];
+      const quote = (f: string) =>
+        searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(f) : f;
+      const fieldType = emptyValueFieldType(
+        field,
+        searchObj.data.stream.selectedStreamFields.find(
+          (f: { name: string; dataType?: string }) => f.name === field,
+        )?.dataType,
+        searchObj.data.streamResults?.list ?? [],
+        searchObj.data.stream.selectedStream,
+      );
+      return emptyValueConditions(
+        field,
+        action === "include" ? "include" : "exclude",
+        quote,
+        fieldType,
+      );
+    };
+
     const addMultipleSearchTerms = (field: string, values: string[], action: string) => {
       if (!values.length) return;
 
-      const expressions = values
-        .map((v) => getFilterExpressionByFieldType(field, v, action))
-        .filter(Boolean);
+      const expressions = values.flatMap((v) => valueConditions(field, v, action)).filter(Boolean);
 
       if (!expressions.length) {
         toast({

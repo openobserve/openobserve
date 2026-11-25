@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { isOffsetOnlyLimit } from "@/utils/logs/sqlOffset";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { b64EncodeUnicode, useLocalLogFilterField } from "@/utils/zincutils";
@@ -43,6 +44,7 @@ import {
   DEFAULT_ROWS_PER_PAGE,
   VIEW_STATE_PARAMS,
   bindLogsUrlRouter,
+  currentLogsQuery,
   encodeColumns,
   shownEntryFor,
   shownSearch,
@@ -54,6 +56,7 @@ import {
 } from "@/composables/useLogs/useLogsUrl";
 import { activePermalink, columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
+import { copyAnomalyLinkParams } from "@/utils/alerts/anomalyLinkParams";
 
 interface SQLColumn {
   expr?: {
@@ -317,7 +320,10 @@ export const logsUtils = () => {
    */
   const isLimitQuery = (parsedSQL: ExtendedParsedSQLResult | null = null): boolean => {
     const limit = getOuterLimit(parsedSQL);
-    return Boolean(limit?.value && Array.isArray(limit.value) && limit.value.length > 0);
+    return (
+      Boolean(limit?.value && Array.isArray(limit.value) && limit.value.length > 0) &&
+      !isOffsetOnlyLimit(limit)
+    );
   };
 
   /**
@@ -476,20 +482,28 @@ export const logsUtils = () => {
     freeTextScan: searchObj.meta.freeTextScan,
   });
 
-  const writeShownTime = (query: any, shown: ShownEntry | null, isShareLink: boolean) => {
+  const isAutoRefreshOn = () => Number(searchObj.meta.refreshInterval ?? 0) > 0;
+
+  const writeShownTime = (
+    query: any,
+    shown: ShownEntry | null,
+    isShareLink: boolean,
+    livePeriod: boolean,
+  ) => {
     const date = searchObj.data.datetime;
     if (!shown) {
-      if (date.type === "relative" && !isShareLink) query["period"] = date.relativeTimePeriod;
+      if (date.type === "relative" && (!isShareLink || livePeriod))
+        query["period"] = date.relativeTimePeriod;
       else if (date.type === "relative" || date.type === "absolute") {
         query["from"] = date.startTime;
         query["to"] = date.endTime;
       }
       return;
     }
-    if (isShareLink && shown.bounds) {
+    if (isShareLink && shown.bounds && !(livePeriod && shown.period.type === "relative")) {
       query["from"] = shown.bounds.start_time;
       query["to"] = shown.bounds.end_time;
-    } else if (shown.period.type === "relative" && !isShareLink) {
+    } else if (shown.period.type === "relative" && (!isShareLink || livePeriod)) {
       query["period"] = shown.period.period;
     } else if (shown.period.type === "absolute") {
       query["from"] = shown.period.startUs;
@@ -527,8 +541,12 @@ export const logsUtils = () => {
     isShareLink: boolean = false,
     dashboardPanelData: any = null,
     buildPanelData: any = null,
+    // false pins a share to the executed bounds (log-line links), even with auto refresh on.
+    liveShare: boolean = true,
   ) => {
     const query: any = {};
+    // A live share carries the relative period; a frozen window never gets new data.
+    const livePeriod = isShareLink && liveShare && isAutoRefreshOn();
     const shown = shownEntryFor(activeUrlSurface());
     const inputs = shown?.inputs ?? liveInputs();
 
@@ -537,9 +555,17 @@ export const logsUtils = () => {
     }
     query["stream"] = inputs.streams.join(",");
 
-    writeShownTime(query, shown, isShareLink);
+    writeShownTime(query, shown, isShareLink, livePeriod);
+    // A calendar period resolves to a different day in another timezone.
+    if (isShareLink && query["period"] && livePeriod && store.state.timezone)
+      query["timezone"] = store.state.timezone;
 
-    query["refresh"] = searchObj.meta.refreshInterval;
+    const shownType = shown ? shown.period.type : searchObj.data.datetime.type;
+    // A fixed range shared with refresh on would re-run the same past window forever.
+    query["refresh"] =
+      isShareLink && isAutoRefreshOn() && (shownType !== "relative" || !liveShare)
+        ? 0
+        : searchObj.meta.refreshInterval;
 
     if (inputs.query) {
       query["sql_mode"] = inputs.sqlMode;
@@ -579,6 +605,15 @@ export const logsUtils = () => {
 
     if (searchObj.meta.logsVisualizeToggle) {
       query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
+    }
+
+    if (
+      searchObj.meta.logsVisualizeToggle === "drilldown" &&
+      Array.isArray(searchObj.meta.drillDownDimensions)
+    ) {
+      query["drilldown_dims"] = searchObj.meta.drillDownDimensions
+        .map(encodeURIComponent)
+        .join(",");
     }
 
     // Preserve visualization data in URL
@@ -621,6 +656,7 @@ export const logsUtils = () => {
 
     writeGridViewState(query, inputs);
     if (!isShareLink) writeLineLinkState(query);
+    copyAnomalyLinkParams(router.currentRoute.value?.query, query);
 
     return query;
   };
@@ -645,14 +681,14 @@ export const logsUtils = () => {
     if (!isLogsRoute()) return;
     const query = generateURLQuery(false, dashboardPanelData, buildPanelData);
     dropTransientType(query);
-    const writeMode = mode === "auto" ? urlWriteMode(router.currentRoute.value.query, query) : mode;
+    const writeMode = mode === "auto" ? urlWriteMode(currentLogsQuery(), query) : mode;
     return writeLogsUrl(writeMode, query);
   };
 
   const patchUrlViewState = (dashboardPanelData: any = null, buildPanelData: any = null) => {
     if (!isLogsRoute()) return;
     const next = generateURLQuery(false, dashboardPanelData, buildPanelData);
-    const query: any = { ...router.currentRoute.value.query };
+    const query: any = { ...currentLogsQuery() };
     dropTransientType(query);
     for (const key of VIEW_STATE_PARAMS) {
       if (key in next) query[key] = next[key];

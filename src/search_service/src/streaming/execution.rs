@@ -290,18 +290,6 @@ pub async fn do_partitioned_search(
             let duration = instant.elapsed();
             log::debug!("Top k values for partition {idx} took {duration:?}");
         }
-        #[cfg(feature = "vectorscan")]
-        crate::cache::apply_regex_to_response(
-            &req,
-            org_id,
-            stream_name,
-            stream_type,
-            &mut search_res,
-            &trace_id,
-            "partitioned_search",
-        )
-        .await?;
-
         if is_result_array_skip_vrl {
             search_res.hits = crate::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
@@ -426,6 +414,7 @@ async fn fetch_extraction_sample(
     let user_id_owned = user_id.to_string();
     let mut responses: Vec<Response> = Vec::with_capacity(slices);
     let mut last_error: Option<infra::errors::Error> = None;
+    let mut failed_slices = 0usize;
 
     for (chunk_idx, chunk) in ranges.chunks(EXTRACTION_FETCH_CONCURRENCY).enumerate() {
         let mut handles = Vec::with_capacity(chunk.len());
@@ -463,6 +452,7 @@ async fn fetch_extraction_sample(
                     log::warn!(
                         "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: slice failed, continuing: {e}"
                     );
+                    failed_slices += 1;
                     last_error = Some(e);
                 }
                 // A panicked task is still a failed slice: record it, or a run
@@ -472,6 +462,7 @@ async fn fetch_extraction_sample(
                     log::warn!(
                         "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: slice task panicked: {e}"
                     );
+                    failed_slices += 1;
                     last_error = Some(infra::errors::Error::Message(format!(
                         "pattern extraction slice task failed: {e}"
                     )));
@@ -497,6 +488,7 @@ async fn fetch_extraction_sample(
     // earliest time slices — and they never reach the clustering. Staying
     // within the cap keeps every slice represented.
     trim_slices_to_budget(&mut responses, req_size as usize);
+    mark_partial_slices(&mut responses, failed_slices, slices);
 
     let fetched: usize = responses.iter().map(|r| r.hits.len()).sum();
     for res in responses {
@@ -543,6 +535,46 @@ fn trim_slices_to_budget(responses: &mut [Response], budget: usize) {
     }
 }
 
+fn mark_partial_slices(responses: &mut [Response], failed: usize, total: usize) {
+    if failed == 0 {
+        return;
+    }
+    if let Some(first) = responses.first_mut() {
+        first.set_partial(
+            true,
+            format!(
+                "Patterns built from {} of {total} time slices",
+                total - failed
+            ),
+        );
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub(super) fn tag_partial_extraction(
+    patterns: &mut config::utils::json::Value,
+    results: &[SearchResultType],
+) {
+    let mut reasons: Vec<String> = Vec::new();
+    let mut partial = false;
+    for result in results {
+        let (SearchResultType::Search(r) | SearchResultType::Cached(r)) = result;
+        partial |= r.is_partial;
+        for reason in &r.function_error {
+            if !reasons.contains(reason) {
+                reasons.push(reason.clone());
+            }
+        }
+    }
+    if !partial {
+        return;
+    }
+    if let Some(obj) = patterns.as_object_mut() {
+        obj.insert("is_partial".to_string(), true.into());
+        obj.insert("function_error".to_string(), reasons.into());
+    }
+}
+
 /// Get partitions for search
 pub async fn get_partitions(
     trace_id: &str,
@@ -565,6 +597,7 @@ pub async fn get_partitions(
         sampling_ratio: req.query.sampling_ratio,
         search_type: req.search_type,
         timezone: req.query.timezone.clone(),
+        raw_streams: req.raw_streams.clone(),
     };
 
     let res = SearchService::search_partition(
@@ -787,18 +820,6 @@ pub async fn process_delta(
             search_res.total = hit_count as usize;
             search_res.hits = top_k_values;
         }
-        #[cfg(feature = "vectorscan")]
-        crate::cache::apply_regex_to_response(
-            &req,
-            org_id,
-            stream_name,
-            stream_type,
-            &mut search_res,
-            &trace_id,
-            "process_delta",
-        )
-        .await?;
-
         if is_result_array_skip_vrl {
             search_res.hits = crate::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
@@ -855,7 +876,6 @@ pub async fn process_delta(
                 org_id,
                 stream_name,
                 stream_type,
-                &req,
             )
             .await;
             break;
@@ -931,7 +951,6 @@ async fn send_partial_search_resp(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    _req: &config::meta::search::Request,
 ) -> Result<(), infra::errors::Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
@@ -948,17 +967,6 @@ async fn send_partial_search_resp(
         trace_id: trace_id.to_string(),
         ..Default::default()
     };
-    #[cfg(feature = "vectorscan")]
-    crate::cache::apply_regex_to_response(
-        _req,
-        org_id,
-        stream_name,
-        stream_type,
-        &mut s_resp,
-        trace_id,
-        "partial_search_resp",
-    )
-    .await?;
     if is_result_array_skip_vrl {
         s_resp.hits = crate::cache::apply_vrl_to_response(
             backup_query_fn.clone(),
@@ -1159,7 +1167,6 @@ mod tests {
             "test-org",
             "test-stream",
             StreamType::Logs,
-            &config::meta::search::Request::default(),
         )
         .await;
 
@@ -1198,7 +1205,6 @@ mod tests {
             "test-org",
             "test-stream",
             StreamType::Logs,
-            &config::meta::search::Request::default(),
         )
         .await;
 
@@ -1236,7 +1242,6 @@ mod tests {
             "test-org",
             "test-stream",
             StreamType::Logs,
-            &config::meta::search::Request::default(),
         )
         .await;
 

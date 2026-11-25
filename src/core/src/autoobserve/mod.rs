@@ -17,6 +17,7 @@
 
 pub mod causes;
 pub mod incidents;
+pub mod next_step;
 pub mod ports;
 
 use config::{cluster::LOCAL_NODE, utils::time::now_micros};

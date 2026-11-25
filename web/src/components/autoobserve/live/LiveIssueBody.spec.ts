@@ -279,6 +279,81 @@ describe("LiveIssueBody", () => {
       expect(w.get(sel("autoobserve-issue-tab-analysis")).attributes("autofocus")).toBeUndefined();
     });
 
+    it.each([
+      ["context off: the older content only", false, true, null, [null, false, "below", "below"]],
+      [
+        "Next step off: the block, and What to check below it",
+        true,
+        false,
+        null,
+        ["list", false, "below", "below"],
+      ],
+      ["both on, while the step is asked: its box", true, true, null, ["list", true, null, null]],
+      [
+        "both on, asked without a step: What to check and the meter in its box",
+        true,
+        true,
+        US,
+        ["list", false, "slot", "slot"],
+      ],
+      [
+        "both on, no context yet: the block held, What to check and the meter in its box",
+        true,
+        true,
+        "absent",
+        ["held", false, "slot", "slot"],
+      ],
+      [
+        "Next step off, no context yet: the block held, What to check below it",
+        true,
+        false,
+        "absent",
+        ["held", false, "below", "below"],
+      ],
+    ] as const)("the /config flags, %s", async (_name, context, step, askedAt, want) => {
+      store.commit("setConfig", {
+        ...originalConfig,
+        autoobserve_context_enabled: context,
+        autoobserve_next_step_enabled: step,
+      });
+      get.mockResolvedValue(
+        detail({ rca: { run_id: "r1", state: "completed", confidence: "medium" } }) as never,
+      );
+      const ctx =
+        askedAt === "absent"
+          ? undefined
+          : {
+              causes: { top: [], more: 0 },
+              impact: [],
+              classes: [],
+              window: [US, US],
+              asked_at: askedAt,
+              settled: askedAt !== null,
+              checks: [],
+              hidden: 0,
+              region_only: false,
+              next_step: null,
+            };
+      const w = await mountBody(item({ context: ctx } as never));
+      const where = (el: string) =>
+        !w.find(el).exists()
+          ? null
+          : w.find(`${sel("autoobserve-live-issue-check-slot")} ${el}`).exists()
+            ? "slot"
+            : "below";
+      const block = w.find(sel("autoobserve-cause-list")).exists()
+        ? "list"
+        : w.find(sel("autoobserve-live-issue-context-held")).exists()
+          ? "held"
+          : null;
+      expect([
+        block,
+        w.find(sel("autoobserve-next-step-line")).exists(),
+        where(sel("autoobserve-live-issue-likely")),
+        where('[role="meter"]'),
+      ]).toEqual(want);
+    });
+
     it("nobody paged is a warning and offers routing setup", async () => {
       const w = await mountBody(
         item({ page: { outcome: "unrouted", team_id: null, team_name: null } }),

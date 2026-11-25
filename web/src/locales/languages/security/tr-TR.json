@@ -302,7 +302,7 @@
       "source": "Kaynak",
       "matchedRules": "{n} algılama eşleşti | {n} algılama eşleşti",
       "openCase": "Vaka aç",
-      "openCaseHint": "Bu olay için başlığı, önceliği ve varlıkları doldurulmuş bir vaka açın",
+      "openCaseHint": "Başlığı, önceliği ve varlıkları doldurulmuş olarak bu olay için bir vaka açın",
       "addToCase": "Vakaya ekle",
       "pickCase": "Açık bir vakaya ekle",
       "caseOpened": "Vaka açıldı: {title}",
@@ -920,8 +920,8 @@
       "correlationWindow": "Korelasyonun zaman aralığına göre belirlenir",
       "createForbidden": "Algılama oluşturmak için Güvenlik izni gerekir",
       "preview": {
-        "run": "Geçmiş üzerinde önizle",
-        "hint": "Kuralı seçilen aralıkta zamanlayıcının yaptığı gibi çalıştırır ve neyin tetikleneceğini gösterir",
+        "run": "Geçmişte önizle",
+        "hint": "Kuralı, zamanlayıcının yaptığı gibi seçilen aralıkta çalıştırır ve neyin tetikleneceğini söyler",
         "failed": "Sorgu başarısız oldu: {reason}",
         "time": "Zaman",
         "range": {
@@ -1093,7 +1093,7 @@
       "stat": {
         "ready": "Kuruluma hazır",
         "installed": "Kurulu",
-        "applies": "Kaynaklarınızla eşleşen",
+        "applies": "Kaynaklarınızla eşleşme",
         "readyHint": "Akışlarınızdan en az birinde çalışan ve henüz yüklenmemiş kurallar",
         "appliesHint": "Sahip olduğunuz bir günlük kaynağı için kurallar, yüklü olsun ya da olmasın; yüklenmeye hazır her kuralı içerir",
         "allRules": "Tüm kurallar",
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Değişiklik günlüğü",
-      "hint": "Denetim kaydı tutulduğu sürece algılamaları, kaynakları, vakaları ve Security rol yetkilerini kimin değiştirdiği",
+      "hint": "Denetim kaydı saklandığı sürece tespitleri, kaynakları, vakaları ve Güvenlik rolü atamalarını kimin değiştirdiğini gösterir",
       "includeReads": "Okumaları dahil et",
       "when": "Zaman",
       "who": "Değiştiren",

@@ -356,6 +356,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @series-limit-update="handleSeriesLimitUpdate"
                         @region-join-update="handleRegionJoinUpdate"
                         @sankey-notice-update="handleSankeyNoticeUpdate"
+                        @treemap-notice-update="handleTreemapNoticeUpdate"
+                        @funnel-notice-update="handleFunnelNoticeUpdate"
                         @limit-number-of-series-warning-message-update="
                           handleLimitNumberOfSeriesWarningMessage
                         "
@@ -368,6 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @show-legends="showLegendsDialog = true"
                         @is-partial-data-update="handleIsPartialDataUpdate"
                         @loading-state-change="handleLoadingStateChange"
+                        @load-ended-without-fetch="emit('loadEndedWithoutFetch', $event)"
                         @is-cached-data-differ-with-current-time-range-update="
                           handleIsCachedDataDifferWithCurrentTimeRangeUpdate
                         "
@@ -719,6 +722,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @series-limit-update="handleSeriesLimitUpdate"
                           @region-join-update="handleRegionJoinUpdate"
                           @sankey-notice-update="handleSankeyNoticeUpdate"
+                          @treemap-notice-update="handleTreemapNoticeUpdate"
+                          @funnel-notice-update="handleFunnelNoticeUpdate"
                           @limit-number-of-series-warning-message-update="
                             handleLimitNumberOfSeriesWarningMessage
                           "
@@ -1015,6 +1020,8 @@ const {
   handleSeriesLimitUpdate,
   handleRegionJoinUpdate,
   handleSankeyNoticeUpdate,
+  handleTreemapNoticeUpdate,
+  handleFunnelNoticeUpdate,
   metaDataValue,
   seriesDataUpdate,
   collapseFieldList: baseCollapseFieldList,

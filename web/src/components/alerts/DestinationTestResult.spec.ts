@@ -19,19 +19,6 @@ import i18n from "@/locales";
 
 import DestinationTestResult from "@/components/alerts/DestinationTestResult.vue";
 
-// Stub OCollapsible to avoid complex portal behavior
-const OCollapsibleStub = {
-  name: "OCollapsible",
-  props: ["modelValue"],
-  emits: ["update:modelValue"],
-  template: `
-    <div data-test="test-failure-details-expansion">
-      <slot name="trigger" />
-      <slot />
-    </div>
-  `,
-};
-
 let wrapper: ReturnType<typeof mount> | null = null;
 
 afterEach(() => {
@@ -44,7 +31,6 @@ const makeResult = (overrides: Record<string, any> = {}) => ({
   statusCode: 200,
   responseTime: 120,
   error: undefined,
-  responseBody: undefined,
   ...overrides,
 });
 
@@ -53,7 +39,6 @@ async function mountComp(props: Record<string, any> = {}) {
     props,
     global: {
       plugins: [i18n],
-      stubs: { OCollapsible: OCollapsibleStub },
     },
   });
 }
@@ -123,27 +108,10 @@ describe("DestinationTestResult - success state", () => {
     expect(wrapper.find('[data-test="test-result-idle"]').exists()).toBe(false);
   });
 
-  it("shows Slack's observed success response body only when opted in", async () => {
-    wrapper = await mountComp({
-      result: makeResult({ success: true, statusCode: 200, responseBody: "ok" }),
-      showSuccessResponseBody: true,
-    });
+  it("shows the status code on success", async () => {
+    wrapper = await mountComp({ result: makeResult({ success: true, statusCode: 200 }) });
 
-    const response = wrapper.find('[data-test="test-success-response-body"]');
-    expect(response.exists()).toBe(true);
-    expect(response.text()).toBe("ok");
-    expect(wrapper.find('[data-test="test-result-success"]').text()).toContain("200");
-    expect(wrapper.find('[data-test="test-result-success"]').text()).not.toMatch(
-      /workspace|channel/i,
-    );
-  });
-
-  it("keeps successful response bodies hidden by default", async () => {
-    wrapper = await mountComp({
-      result: makeResult({ success: true, statusCode: 200, responseBody: "ok" }),
-    });
-
-    expect(wrapper.find('[data-test="test-success-response-body"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="test-success-timestamp"]').text()).toContain("200");
   });
 });
 
@@ -181,23 +149,6 @@ describe("DestinationTestResult - failure state", () => {
 
     expect(wrapper.emitted("retry")).toBeTruthy();
     expect(wrapper.emitted("retry")!.length).toBe(1);
-  });
-
-  it("shows collapsible expansion when error detail is present", async () => {
-    wrapper = await mountComp({
-      result: makeResult({ success: false, error: "detail error" }),
-    });
-
-    expect(wrapper.find('[data-test="test-failure-details-expansion"]').exists()).toBe(true);
-  });
-
-  it("does not show collapsible expansion when there is no error or responseBody", async () => {
-    wrapper = await mountComp({
-      result: makeResult({ success: false, statusCode: 400 }),
-    });
-
-    // OCollapsible is rendered only when result.error || result.responseBody
-    expect(wrapper.find('[data-test="test-failure-details-expansion"]').exists()).toBe(false);
   });
 
   it("does not show success or idle when failure", async () => {
@@ -247,35 +198,21 @@ describe("DestinationTestResult - getFailureMessage logic", () => {
     expect(msg).toContain("Some random error");
   });
 
-  it("parses JSON responseBody to extract error field", async () => {
-    wrapper = await mountComp({
-      result: makeResult({
-        success: false,
-        responseBody: JSON.stringify({ error: "Invalid token" }),
-      }),
-    });
+  it.each([
+    { statusCode: 400, key: "alerts.testErrorClientError" },
+    { statusCode: 500, key: "alerts.testErrorServerError" },
+  ])(
+    "prefers the translated status message to the error for $statusCode",
+    async ({ statusCode, key }) => {
+      wrapper = await mountComp({
+        result: makeResult({ success: false, statusCode, error: "backend-error" }),
+      });
 
-    const msg = wrapper.find('[data-test="test-failure-message"]').text();
-    expect(msg).toContain("Invalid token");
-  });
-
-  it("falls back to status-code message for 4xx without error field", async () => {
-    wrapper = await mountComp({
-      result: makeResult({ success: false, statusCode: 400 }),
-    });
-
-    const msg = wrapper.find('[data-test="test-failure-message"]').text();
-    expect(msg.length).toBeGreaterThan(0);
-  });
-
-  it("falls back to status-code message for 5xx without error field", async () => {
-    wrapper = await mountComp({
-      result: makeResult({ success: false, statusCode: 500 }),
-    });
-
-    const msg = wrapper.find('[data-test="test-failure-message"]').text();
-    expect(msg.length).toBeGreaterThan(0);
-  });
+      const msg = wrapper.find('[data-test="test-failure-message"]').text();
+      expect(msg).toBe(i18n.global.t(key));
+      expect(wrapper.text()).not.toContain("backend-error");
+    },
+  );
 });
 
 describe("DestinationTestResult - getSuggestedFix", () => {
@@ -293,42 +230,6 @@ describe("DestinationTestResult - getSuggestedFix", () => {
 
     const fix = (wrapper.vm as any).getSuggestedFix({ statusCode: 401 });
     expect(fix).toBeTruthy();
-  });
-});
-
-describe("DestinationTestResult - formatResponseBody", () => {
-  it("pretty-prints valid JSON", async () => {
-    wrapper = await mountComp();
-
-    const result = (wrapper.vm as any).formatResponseBody('{"key":"value"}');
-    expect(result).toContain('"key"');
-  });
-
-  it("returns raw string for non-JSON body", async () => {
-    wrapper = await mountComp();
-
-    const result = (wrapper.vm as any).formatResponseBody("plain text");
-    expect(result).toBe("plain text");
-  });
-});
-
-describe("DestinationTestResult - getStatusText", () => {
-  it("returns OK for 200", async () => {
-    wrapper = await mountComp();
-
-    expect((wrapper.vm as any).getStatusText(200)).toBe("OK");
-  });
-
-  it("returns Unauthorized for 401", async () => {
-    wrapper = await mountComp();
-
-    expect((wrapper.vm as any).getStatusText(401)).toBe("Unauthorized");
-  });
-
-  it("returns Unknown for unrecognised code", async () => {
-    wrapper = await mountComp();
-
-    expect((wrapper.vm as any).getStatusText(999)).toBe("Unknown");
   });
 });
 

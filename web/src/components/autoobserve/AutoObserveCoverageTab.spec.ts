@@ -66,6 +66,8 @@ const coverage = (rows: unknown[], passAt: number | null = Date.now() * 1000) =>
   }) as unknown as AutoObserveCoverage;
 
 const READY: SourceState = { status: "ready", retry: () => undefined };
+// The at-scale tests mount 200-1,200 real table rows; a loaded CI shard can run past the 5s default.
+const AT_SCALE = { timeout: 20_000 };
 
 const live = (data?: AutoObserveCoverage, state: Partial<SourceState> = {}): CoverageSource =>
   toCoverageSource(gt, data, { ...READY, ...state }, "en-US");
@@ -482,7 +484,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
     });
   });
 
-  describe("at scale: needs action first, busiest first, grouped by itself", () => {
+  describe("at scale: needs action first, busiest first, grouped by itself", AT_SCALE, () => {
     const busy = (name: string, errors: string, traffic: number | null, cluster = "prod-eu") => ({
       ...row(name, errors),
       service_id: `${cluster}/${name}`,

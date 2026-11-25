@@ -52,3 +52,33 @@ describe("SearchBar — column types for server type errors", () => {
     expect(locateNotACondition(ERROR, QUERY)?.field).toBe("body");
   });
 });
+
+describe("SearchBar — filter builder field types across streams", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => wrapper?.unmount());
+
+  const builderTypes = (selected: string[]) => {
+    wrapper = mount(SearchBar, {
+      global: { provide: { store }, plugins: [i18n, router], stubs: { QueryEditor: true } },
+    });
+    const data = wrapper.vm.searchObj.data;
+    data.streamResults = {
+      list: [
+        { name: "aa_logs", schema: [{ name: "code", type: "Utf8" }] },
+        { name: "app_logs", schema: [{ name: "code", type: "Int64" }] },
+      ],
+    };
+    data.stream.selectedStream = selected;
+    data.stream.selectedStreamFields = [{ name: "code", dataType: "Int64" }];
+    return wrapper.vm.filterBuilderFields.map((f: { name: string; type: string }) => f.type);
+  };
+
+  it("treats a field the selected streams type differently as text", () => {
+    expect(builderTypes(["aa_logs", "app_logs"])).toEqual(["string"]);
+  });
+
+  it("keeps the field's own type with one stream selected", () => {
+    expect(builderTypes(["app_logs"])).toEqual(["number"]);
+  });
+});
