@@ -34,10 +34,12 @@
  *   buildColumns(showLlmColumns, searchMode, selectedFields)
  */
 
-import { ref } from "vue";
+import { h, ref } from "vue";
 import { useStore } from "vuex";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
-import { raw, useI18nTyped, type I18nKey, type TranslateFn } from "@/types/i18n";
+import { formatTimeWithSuffix } from "@/utils/formatters";
+import { raw, useI18nTyped, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
@@ -51,6 +53,10 @@ export const LLM_COLUMN_IDS = new Set(["input_tokens", "output_tokens", "cost"])
 
 /** IDs of the Spans-view columns derived per row — never stored in selectedFields. */
 export const SPAN_DERIVED_COLUMN_IDS = new Set([SPAN_ERROR_COLUMN_ID, SPAN_EVENTS_COLUMN_ID]);
+
+// Typed-SQL columns formatted by name; kept explicit so a user's own column is not reformatted by accident.
+const RESULT_TIME_COLUMNS = new Set(["_timestamp", "first_seen", "last_seen"]);
+const RESULT_DURATION_COLUMN = /^(duration|trace_duration|p(50|75|90|95|99)(_duration)?)$/;
 
 /**
  * Known column metadata. Any field name NOT in this map gets a generic
@@ -193,10 +199,7 @@ function spanDerivedColumns(
 }
 
 /** Marks the last non-timestamp column to absorb leftover width, which clamps every other column to its size. */
-export function fillLastColumn(
-  cols: OTableColumnDef<Record<string, any>>[],
-  timestampCol: string,
-): void {
+export function fillLastColumn<TRow>(cols: OTableColumnDef<TRow>[], timestampCol: string): void {
   for (const col of cols) {
     if (!(col.meta as Record<string, unknown> | undefined)?.fillRemaining) continue;
     const {
@@ -211,6 +214,51 @@ export function fillLastColumn(
   if (!last || last.id === timestampCol) return;
   last.minSize = last.size;
   last.meta = { ...last.meta, autoWidth: true, fillRemaining: true };
+}
+
+/** One column per field typed SQL returned, headed by its name or alias; hinted columns get an info icon and tooltip. */
+export function buildResultColumns(
+  keys: string[],
+  hints: Record<string, I18nText> = {},
+): OTableColumnDef<Record<string, any>>[] {
+  const cols: OTableColumnDef<Record<string, any>>[] = keys.map((key) => ({
+    id: key,
+    header: hints[key]
+      ? () =>
+          h("span", { class: "inline-flex items-center gap-1" }, [
+            key,
+            h(OIcon, {
+              name: "info-outline",
+              size: "xs",
+              class: "text-text-secondary shrink-0",
+              "data-test": "traces-sql-column-hint",
+            }),
+          ])
+      : raw(key),
+    size: 160,
+    meta: hints[key] ? { headerTooltip: hints[key] } : {},
+    accessorFn: (row: any) => {
+      const value = row?.[key];
+      return value !== null && typeof value === "object" ? JSON.stringify(value) : value;
+    },
+  }));
+  fillLastColumn(cols, "");
+  return cols;
+}
+
+/** Display formatter for a typed-SQL result column, by name: µs durations and µs epoch timestamps; numbers only. */
+export function resultColumnFormat(
+  key: string,
+  timezone: string,
+): ((value: unknown) => unknown) | undefined {
+  if (RESULT_TIME_COLUMNS.has(key))
+    return (value) =>
+      typeof value === "number"
+        ? timestampToTimezoneDate(value / 1000, timezone, "yyyy-MM-dd HH:mm:ss.SSS")
+        : value;
+  if (RESULT_DURATION_COLUMN.test(key))
+    return (value) => (typeof value === "number" ? formatTimeWithSuffix(value) : value);
+  return undefined;
 }
 
 export function useTracesTableColumns() {
@@ -282,6 +330,11 @@ export function useTracesTableColumns() {
       if (statusIdx === -1) cols.push(...derived);
       else cols.splice(statusIdx + 1, 0, ...derived);
     }
+
+    // The pinned timestamp column anchors the row, so only the others can be hidden.
+    cols.forEach((col) => {
+      if (col.id !== timestampCol) col.hideable = true;
+    });
 
     fillLastColumn(cols, timestampCol);
 

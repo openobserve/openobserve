@@ -17,7 +17,7 @@ test.describe('Dashboard import folder lock (ENT#2120)', { tag: ['@dashboards', 
     const title = `ovn_c_2120_${stamp}`;
     let folderId = null;
     try {
-      folderId = await createDashboardFolder(`ovn_c_2120_${stamp}`, 'ent2120');
+      folderId = await createDashboardFolder(page, `ovn_c_2120_${stamp}`, 'ent2120');
 
       await navigateToBase(page);
       const pm = new PageManager(page);
@@ -60,12 +60,12 @@ test.describe('Dashboard import folder lock (ENT#2120)', { tag: ['@dashboards', 
 
       release();
       expect(posts).toEqual([folderId]);
-      await expect.poll(async () => (await dashboardsInFolder(folderId)).some((d) => d.title === title), { timeout: 20000 }).toBe(true);
+      await expect.poll(async () => (await dashboardsInFolder(page, folderId)).some((d) => d.title === title), { timeout: 20000 }).toBe(true);
       await page.unrouteAll({ behavior: 'ignoreErrors' });
     } finally {
       if (folderId) {
-        await deleteDashboardsTitled(folderId, title);
-        await deleteDashboardFolder(folderId);
+        await deleteDashboardsTitled(page, folderId, title);
+        await deleteDashboardFolder(page, folderId);
       }
     }
   });

@@ -33,13 +33,6 @@ cloud = [
     "openobserve-synthetics/cloud",
     "stream/cloud",
 ]
-vectorscan = [
-    "enrichment-data/vectorscan",
-    "openobserve-core/vectorscan",
-    "promql-service/vectorscan",
-    "search_service/vectorscan",
-    "stream/vectorscan",
-]
 cpu-profiling = ["openobserve-core/cpu-profiling"]
 profiling = ["cpu-profiling", "openobserve-core/profiling"]
 

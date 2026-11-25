@@ -426,6 +426,9 @@ import {
   forecastPointOf,
   usePanelAlertCreation,
   usePanelDownload,
+  TABLE_EXPORT_ROW_LIMIT,
+  shownQueriesCapped,
+  type TableExport,
 } from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
 import { alertableQueryIndexes } from "@/utils/alerts/prefill/fromPanel";
@@ -459,6 +462,7 @@ import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
 import type { TreemapNotice } from "@/utils/dashboard/convertTreemapData";
+import type { FunnelNotice } from "@/utils/dashboard/convertFunnelData";
 
 interface CustomChartVariable {
   name: string;
@@ -715,11 +719,13 @@ export default defineComponent({
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
     "loading-state-change",
+    "load-ended-without-fetch",
     "limit-number-of-series-warning-message-update",
     "series-limit-update",
     "region-join-update",
     "sankey-notice-update",
     "treemap-notice-update",
+    "funnel-notice-update",
     "panel-diagnostics-update",
     "sparkline-warning-update",
     "is-partial-data-update",
@@ -795,6 +801,7 @@ export default defineComponent({
     const regionJoin = shallowRef<RegionJoinInfo | null>(null);
     const sankeyNotice = ref<SankeyNotice | null>(null);
     const treemapNotice = ref<TreemapNotice | null>(null);
+    const funnelNotice = ref<FunnelNotice | null>(null);
 
     const chartPanelStyle = ref({
       height: "100%",
@@ -951,6 +958,7 @@ export default defineComponent({
       panelDiagnostics,
       isFirstLoadSettled,
       reloadAnnotations,
+      fetchExportRows,
     } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
@@ -972,6 +980,7 @@ export default defineComponent({
       regionClusterParams,
       allowAnnotationsAPI,
       injectedPromqlData,
+      (shown: boolean) => emit("load-ended-without-fetch", shown),
     );
 
     // Html, markdown and the alert list render without a query, so they never wait on one.
@@ -1738,6 +1747,7 @@ export default defineComponent({
           regionJoin.value = panelData.value?.extras?.regionJoin ?? null;
           sankeyNotice.value = panelData.value?.extras?.sankeyNotice ?? null;
           treemapNotice.value = panelData.value?.extras?.treemapNotice ?? null;
+          funnelNotice.value = panelData.value?.extras?.funnelNotice ?? null;
 
           // A new run reports its own outcome; with no run left there is nothing to report it.
           if (!showsCustomChartError.value || !customChartRun.value) {
@@ -1755,6 +1765,7 @@ export default defineComponent({
           regionJoin.value = null;
           sankeyNotice.value = null;
           treemapNotice.value = null;
+          funnelNotice.value = null;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
@@ -1764,6 +1775,7 @@ export default defineComponent({
         regionJoin.value = null;
         sankeyNotice.value = null;
         treemapNotice.value = null;
+        funnelNotice.value = null;
         // if no data is available, then show the default data
         // if there is an error config in the panel schema, then show the default data on error
         // if no default data on error is set, then show the custom error message
@@ -2151,6 +2163,13 @@ export default defineComponent({
       },
       { immediate: true },
     );
+    watch(
+      funnelNotice,
+      (value) => {
+        emit("funnel-notice-update", value);
+      },
+      { immediate: true },
+    );
 
     watch(
       () => panelDiagnostics?.value,
@@ -2434,7 +2453,12 @@ export default defineComponent({
       emit("error", errorDetail.value);
     });
 
-    const { showErrorNotification, showPositiveNotification } = useNotifications();
+    const {
+      showErrorNotification,
+      showPositiveNotification,
+      showWarningNotification,
+      showInfoNotification,
+    } = useNotifications();
 
     const onFormatColumn = (field: string) => emit("format-column", field);
 
@@ -2510,6 +2534,42 @@ export default defineComponent({
       });
     };
 
+    // Builds the table again from a bounded re-fetch, through the same converter the panel renders with.
+    const fetchFullTable = async (): Promise<TableExport> => {
+      const kept = keptDataIndexes.value;
+      const {
+        data: rows,
+        capped,
+        partial,
+        heldIndexes,
+        rowLimit,
+      } = await fetchExportRows(
+        metadata.value?.queries ?? [],
+        data.value ?? [],
+        TABLE_EXPORT_ROW_LIMIT,
+        kept,
+      );
+      const table = await convertPanelData(
+        filteredPanelSchema.value,
+        kept === null ? rows : kept.map((index: number) => rows[index]),
+        store,
+        chartPanelRef,
+        hoveredSeriesState,
+        filteredResultMetaData,
+        filteredMetadata.value,
+        chartPanelStyle.value,
+        panelAnnotations,
+      );
+      // A capped query with no stored request kept its on-screen rows, so the file is short.
+      return {
+        columns: table?.columns ?? [],
+        rows: table?.rows ?? [],
+        capped,
+        partial: partial || shownQueriesCapped(panelDiagnostics?.value, heldIndexes),
+        rowLimit,
+      };
+    };
+
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
       data,
@@ -2517,6 +2577,24 @@ export default defineComponent({
       tableRendererRef,
       showErrorNotification,
       showPositiveNotification,
+      showWarningNotification,
+      showInfoNotification,
+      isPanelLoading: () => !!loading.value,
+      isTableCapped: () =>
+        panelSchema.value?.queryType !== "promql" &&
+        shownQueriesCapped(panelDiagnostics?.value, keptDataIndexes.value),
+      exportKey: () =>
+        JSON.stringify({
+          queries: (metadata.value?.queries ?? []).map(
+            (q: { query?: string; startTime?: number; endTime?: number } | undefined) => [
+              q?.query,
+              q?.startTime,
+              q?.endTime,
+            ],
+          ),
+          kept: keptDataIndexes.value,
+        }),
+      fetchFullTable,
       t,
     });
 

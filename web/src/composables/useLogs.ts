@@ -59,6 +59,14 @@ import {
 } from "@/composables/useLogs/useLogsUrl";
 import { columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 
+const safeDecode = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
 const useLogs = (t: TranslateFn) => {
   const store = useStore();
 
@@ -437,21 +445,21 @@ const useLogs = (t: TranslateFn) => {
       return;
     }
 
-    const date = {
-      startTime: Number(queryParams.from),
-      endTime: Number(queryParams.to),
-      relativeTimePeriod: queryParams.period || null,
-      type: queryParams.period ? "relative" : "absolute",
-    };
+    // A link that names only a stream (Command K) keeps the range in force instead of a NaN one.
+    if (queryParams.period || (queryParams.from && queryParams.to)) {
+      const date = {
+        startTime: Number(queryParams.from),
+        endTime: Number(queryParams.to),
+        relativeTimePeriod: queryParams.period || null,
+        type: queryParams.period ? "relative" : "absolute",
+      };
 
-    if (date.type === "relative") {
-      queryParams.period = date.relativeTimePeriod;
-    } else {
-      queryParams.from = date.startTime;
-      queryParams.to = date.endTime;
-    }
-
-    if (date) {
+      if (date.type === "relative") {
+        queryParams.period = date.relativeTimePeriod;
+      } else {
+        queryParams.from = date.startTime;
+        queryParams.to = date.endTime;
+      }
       searchObj.data.datetime = date;
     }
 
@@ -555,6 +563,14 @@ const useLogs = (t: TranslateFn) => {
         queryParams.stream_type,
       );
     }
+
+    searchObj.meta.drillDownDimensions =
+      queryParams.drilldown_dims !== undefined
+        ? String(queryParams.drilldown_dims ?? "")
+            .split(",")
+            .filter(Boolean)
+            .map(safeDecode)
+        : null;
 
     //here we restore the fn editor state from the url query params
     if (queryParams.fn_editor) {

@@ -96,6 +96,7 @@ mod tests {
     use datafusion::{
         arrow::datatypes::{DataType, Field, Schema},
         common::TableReference,
+        prelude::SessionContext,
     };
     use datafusion_proto::bytes::{
         physical_plan_from_bytes_with_extension_codec, physical_plan_to_bytes_with_extension_codec,
@@ -123,7 +124,7 @@ mod tests {
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
         let plan2 =
             physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.downcast_ref::<NewEmptyExec>().unwrap();
@@ -153,7 +154,7 @@ mod tests {
             false,
         )]));
         let proto = super::super::get_physical_extension_codec();
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
         for order in [FileSortOrder::None, FileSortOrder::TimestampDesc] {
             let plan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
                 "test",

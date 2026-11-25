@@ -22,6 +22,7 @@ use arrow::{
         NullBuilder, RecordBatchOptions, StringArray, StringBuilder, StringViewArray,
         StringViewBuilder, UInt64Array, UInt64Builder, new_null_array,
     },
+    compute::{SortOptions, concat, sort_to_indices, take},
     record_batch::RecordBatch,
 };
 use arrow_schema::{ArrowError, DataType, Schema};
@@ -808,7 +809,7 @@ pub fn concat_batches(
     let field_num = schema.fields().len();
     let mut arrays = Vec::with_capacity(field_num);
     for i in 0..field_num {
-        let array = arrow::compute::concat(
+        let array = concat(
             &batches
                 .iter()
                 .map(|batch| batch.column(i).as_ref())
@@ -876,13 +877,13 @@ pub fn sort_record_batch_by_column(
     }
 
     // Create sort options
-    let sort_options = arrow::compute::SortOptions {
+    let sort_options = SortOptions {
         descending,
         nulls_first: false,
     };
 
     // Get sorted indices
-    let indices = arrow::compute::sort_to_indices(
+    let indices = sort_to_indices(
         batch.column_by_name(column_name).ok_or_else(|| {
             DataFusionError::Execution(format!(
                 "No {column_name} column found in sort record batch",
@@ -896,7 +897,7 @@ pub fn sort_record_batch_by_column(
     let sorted_columns: Result<Vec<_>, _> = batch
         .columns()
         .iter()
-        .map(|col| arrow::compute::take(col, &indices, None))
+        .map(|col| take(col, &indices, None))
         .collect();
 
     // Create new RecordBatch with sorted data
@@ -1239,7 +1240,7 @@ fn append_null_optimized(builder: &mut Box<dyn ArrayBuilder>, data_type: &DataTy
 #[cfg(test)]
 mod test {
     use arrow::{
-        array::{Array, StringViewArray},
+        array::{Array, BinaryArray, StringViewArray},
         util::pretty::pretty_format_batches,
     };
     use arrow_schema::Field;
@@ -1934,7 +1935,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_utf8view_to_utf8() {
-        use arrow::array::StringViewArray;
         let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
         let src_schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8View, true)]));
         let arr: ArrayRef = Arc::new(StringViewArray::from(vec!["hello", "world"]));
@@ -1951,7 +1951,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_large_utf8_to_utf8() {
-        use arrow::array::LargeStringArray;
         let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
         let src_schema = Arc::new(Schema::new(vec![Field::new(
             "s",
@@ -2274,7 +2273,6 @@ mod test {
             Arc::new(serde_json::json!({"msg": [1, 2]})), // array → ""
         ];
         let batch = convert_json_to_record_batch(&schema, &data).unwrap();
-        use arrow::array::LargeStringArray;
         let col = batch
             .column(0)
             .as_any()
@@ -2376,7 +2374,6 @@ mod test {
         // "deadbeef" is a valid hex string
         let data = vec![Arc::new(serde_json::json!({"data": "deadbeef"}))];
         let batch = convert_json_to_record_batch(&schema, &data).unwrap();
-        use arrow::array::BinaryArray;
         let col = batch
             .column(0)
             .as_any()
@@ -2580,7 +2577,6 @@ mod test {
             DataType::LargeUtf8,
             true,
         )]));
-        use arrow::array::LargeStringArray;
         let data = vec![
             vrl::value::Value::Object(
                 [("s".into(), vrl::value::Value::from("world"))]
@@ -2825,7 +2821,6 @@ mod test {
                 .unwrap()
                 .is_null(0)
         );
-        use arrow::array::LargeStringArray;
         assert!(
             batch
                 .column(2)
@@ -2850,7 +2845,6 @@ mod test {
                 .unwrap()
                 .is_null(0)
         );
-        use arrow::array::BinaryArray;
         assert!(
             batch
                 .column(5)
@@ -2897,7 +2891,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_large_utf8_to_utf8view() {
-        use arrow::array::LargeStringArray;
         let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8View, true)]));
         let src_schema = Arc::new(Schema::new(vec![Field::new(
             "s",
@@ -2948,7 +2941,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_utf8_to_large_utf8() {
-        use arrow::array::LargeStringArray;
         let target = Arc::new(Schema::new(vec![Field::new(
             "s",
             DataType::LargeUtf8,
@@ -2968,7 +2960,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_utf8view_to_large_utf8() {
-        use arrow::array::LargeStringArray;
         let target = Arc::new(Schema::new(vec![Field::new(
             "s",
             DataType::LargeUtf8,
@@ -2988,7 +2979,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_int64_to_large_utf8() {
-        use arrow::array::LargeStringArray;
         let target = Arc::new(Schema::new(vec![Field::new(
             "n",
             DataType::LargeUtf8,
@@ -3023,7 +3013,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_large_utf8_to_int64() {
-        use arrow::array::LargeStringArray;
         let target = Arc::new(Schema::new(vec![Field::new("n", DataType::Int64, true)]));
         let src_schema = Arc::new(Schema::new(vec![Field::new(
             "n",
@@ -3170,7 +3159,7 @@ mod test {
         // Source column is Null type → Null arm fills builder with nulls
         let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
         let src_schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Null, true)]));
-        let arr: ArrayRef = arrow::array::new_null_array(&DataType::Null, 2);
+        let arr: ArrayRef = new_null_array(&DataType::Null, 2);
         let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
         let result = format_recordbatch_by_schema(target, batch);
         let col = result

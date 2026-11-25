@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use datafusion::{
     common::{Result, internal_err},
+    error::DataFusionError,
     execution::TaskContext,
     physical_plan::{ExecutionPlan, expressions::Column},
 };
@@ -58,9 +59,7 @@ pub(super) fn try_decode(
 
 pub(super) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
     let exec = node.downcast_ref::<DeduplicationExec>().ok_or_else(|| {
-        datafusion::error::DataFusionError::Internal(
-            "Failed to downcast to DeduplicationExec".to_string(),
-        )
+        DataFusionError::Internal("Failed to downcast to DeduplicationExec".to_string())
     })?;
 
     // Encode deduplication columns as PhysicalExprNodes
@@ -90,9 +89,6 @@ pub(super) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Res
     };
 
     proto.encode(buf).map_err(|e| {
-        datafusion::error::DataFusionError::Internal(format!(
-            "Failed to encode DeduplicationExec: {}",
-            e
-        ))
+        DataFusionError::Internal(format!("Failed to encode DeduplicationExec: {}", e))
     })
 }

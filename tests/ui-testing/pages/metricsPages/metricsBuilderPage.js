@@ -394,7 +394,7 @@ export class MetricsBuilderPage {
      * @param {string} metricName
      */
     async selectMetric(metricName) {
-        if (!await this.streamSelectorInput.isVisible({ timeout: 5000 })) {
+        if (!await this.streamSelectorInput.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false)) {
             return false;
         }
 
@@ -403,7 +403,7 @@ export class MetricsBuilderPage {
         await this.streamPopover.waitFor({ state: 'visible', timeout: 5000 });
 
         // OSelect popover search: Ctrl+A → Backspace → fill (via the ListboxFilter input)
-        if (await this.streamSearchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+        if (await this.streamSearchInput.waitFor({ state: 'visible', timeout: 2000 }).then(() => true).catch(() => false)) {
             await this.streamSearchInput.press('ControlOrMeta+a').catch(() => {});
             await this.streamSearchInput.press('Backspace').catch(() => {});
             await this.streamSearchInput.fill(metricName);
@@ -411,7 +411,7 @@ export class MetricsBuilderPage {
 
         // Select from dropdown options
         const option = this.page.locator(`[data-test="index-dropdown-stream-option"][data-test-value="${metricName}"]`).first();
-        if (await option.isVisible({ timeout: 5000 }).catch(() => false)) {
+        if (await option.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false)) {
             await option.click();
             await this.streamPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
@@ -497,11 +497,18 @@ export class MetricsBuilderPage {
 
     // The key of the first option in the open list; the option's text also carries its type.
     async firstOptionKey() {
-        const first = this.labelFilterOptions.first();
-        await first.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-        if (!(await first.isVisible().catch(() => false))) return '';
-        const testId = await first.getAttribute('data-test');
-        return testId ? testId.slice(`${LABEL_BUILDER}-suggest-item-`.length) : '';
+        const prefix = `${LABEL_BUILDER}-suggest-item-`;
+        let key = '';
+        // Built-in rows (e.g. "Start a group") use NUL-prefixed keys and render before the labels load.
+        await expect.poll(async () => {
+            const keys = await this.labelFilterOptions.evaluateAll(
+                (els, p) => els.map(el => (el.getAttribute('data-test') || '').slice(p.length)),
+                prefix
+            );
+            key = keys.find(k => k && !k.startsWith('\u0000')) || '';
+            return key;
+        }, { timeout: 15000 }).not.toBe('').catch(() => {});
+        return key;
     }
 
     /**
@@ -537,28 +544,35 @@ export class MetricsBuilderPage {
         return true;
     }
 
-    /** Pick the first loaded value of the open value list; returns it, or '' when the label has none. */
-    async selectFirstLabelValue() {
+    /** Pick the first loaded value of the open value list; throws when the label has none. */
+    async selectFirstLabelValue(label) {
         const value = await this.firstOptionKey();
-        if (!value) return '';
+        if (!value) {
+            throw new Error(`no values for label "${label}" of metric "${await this.getStreamSelectedValue()}"`);
+        }
         await this.getLabelFilterOption(value).click();
         return value;
     }
 
+    // The picker keeps offering the previous metric's labels until the new metric's schema arrives.
+    async waitForLabelsListed(labels) {
+        await this.clickAddLabelFilter();
+        for (const label of labels) {
+            await expect(this.getLabelFilterOption(label)).toBeVisible({ timeout: 15000 });
+        }
+        await this.labelBuilder.close();
+    }
+
     /**
-     * Add `<first label> <operator> <first value>`; returns the label and value picked ('' when none loaded)
+     * Add `<label> <operator> <first value>`; returns the label and value picked
+     * @param {string} label
      * @param {string} operator
      */
-    async addFirstLabelFilter(operator = '=') {
+    async addLabelFilterWithFirstValue(label, operator = '=') {
         await this.clickAddLabelFilter();
-        const label = await this.firstOptionKey();
-        if (!label) {
-            await this.labelBuilder.close();
-            return { label: '', value: '' };
-        }
         await this.getLabelFilterOption(label).click();
         await this.selectOperator(operator);
-        const value = await this.selectFirstLabelValue();
+        const value = await this.selectFirstLabelValue(label);
         await this.labelBuilder.close();
         return { label, value };
     }

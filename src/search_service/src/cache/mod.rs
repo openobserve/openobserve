@@ -52,6 +52,8 @@ use tracing::Instrument;
 use transform::{get_all_transform_keys, init_vrl_runtime};
 use usage_reporting::{http_report_metrics, report_request_usage_stats};
 
+#[cfg(feature = "enterprise")]
+use crate::datafusion::physical_optimizer::sdr_redact::redaction_digest;
 use crate::{
     self as SearchService,
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
@@ -592,8 +594,8 @@ pub async fn prepare_cache_response(
     }
     // An unresolved request is pinned to redaction, so its search matches this key.
     req.raw_streams.get_or_insert_with(Default::default);
-    #[cfg(feature = "vectorscan")]
-    if let Some(digest) = crate::datafusion::physical_optimizer::sdr_redact::redaction_digest(
+    #[cfg(feature = "enterprise")]
+    if let Some(digest) = redaction_digest(
         org_id,
         stream_type,
         &sql.stream_names,
@@ -1236,12 +1238,17 @@ pub fn apply_vrl_to_response(
                         &[stream_name.to_string()],
                     );
                     vrl_errors.record_rows(row_count, err);
-                    ret_val
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .filter_map(|v| super::flatten_vrl_result(v.clone()))
-                        .collect()
+                    match ret_val.as_array() {
+                        Some(rows) => rows
+                            .iter()
+                            .filter_map(|v| super::flatten_vrl_result(v.clone()))
+                            .collect(),
+                        None => {
+                            res.function_error
+                                .push("the function must return an array".to_string());
+                            local_res.hits.clone()
+                        }
+                    }
                 } else {
                     local_res
                         .hits
@@ -1319,11 +1326,12 @@ fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::sea
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
+
     use super::*;
 
     #[tokio::test]
     async fn test_prepare_histogram_response_ordering() {
-        use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
         let org_id = "histogram_response_ordering";
@@ -1414,7 +1422,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_prepare_skips_queries_not_ordered_by_time() {
-        use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
         let org_id = "ranked_order_eligibility";
@@ -1503,7 +1510,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_prepare_needs_time_column_and_time_splittable_sql() {
-        use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
         let org_id = "time_split_eligibility";
@@ -1554,6 +1560,16 @@ mod tests {
             (
                 "SELECT histogram(_timestamp, '1 hour') AS ts, sum(count(*)) OVER (ORDER BY histogram(_timestamp, '1 hour')) AS cum FROM t GROUP BY ts ORDER BY ts",
                 "ts",
+                false,
+            ),
+            (
+                "SELECT histogram(_timestamp + 28800000000, '1 day') AS ts, count(DISTINCT k) AS c FROM t GROUP BY ts ORDER BY ts",
+                // Enterprise names no time column for a histogram over a shifted _timestamp.
+                if cfg!(feature = "enterprise") {
+                    ""
+                } else {
+                    "ts"
+                },
                 false,
             ),
             (
@@ -1625,7 +1641,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_prepare_writes_only_when_mode_and_query_allow_it() {
-        use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
         let org_id = "cache_mode_write_gate";
@@ -1893,6 +1908,26 @@ mod tests {
         );
         assert_eq!(hits, vec![json::json!({"x": 1})]);
         assert!(response.function_error.is_empty());
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_result_array_non_array_keeps_hits() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"a": 1}), json::json!({"a": 2})],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some("#ResultArray#SkipVRL#\n.plain = 1".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"a": 1}), json::json!({"a": 2})]);
+        assert_eq!(
+            response.function_error,
+            vec!["the function must return an array".to_string()]
+        );
     }
 
     #[test]

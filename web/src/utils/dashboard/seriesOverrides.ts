@@ -305,57 +305,13 @@ const formatValueLabels = (series: any, lookup: SeriesOverrideLookup) => {
   };
 };
 
-const sharePercent = (value: unknown, total: number): number => {
-  const numeric = Number(value);
-  return total > 0 && Number.isFinite(numeric) ? (numeric / total) * 100 : 0;
-};
-
-const applyPieOverrides = (
-  series: any,
-  lookup: SeriesOverrideLookup,
-  options: { legend?: { selected?: Record<string, boolean> } },
-) => {
+// Slice labels resolve an override's decimals themselves, through the percent text they share with the legend.
+const applyPieOverrides = (series: any, lookup: SeriesOverrideLookup) => {
   if (!Array.isArray(series?.data)) return;
-  // A label reads the lookup itself and only needs the exact share.
-  const customLabel = typeof series.label?.formatter === "function" ? series.label.formatter : null;
-  const items = series.data;
-  // Like the legend, the share is of the slices still shown; ChartRenderer replaces legend.selected on each toggle.
-  let totalFor: { selected: unknown } | null = null;
-  let total = 0;
-  const visibleTotal = () => {
-    const selected = options.legend?.selected;
-    if (totalFor && totalFor.selected === selected) return total;
-    totalFor = { selected };
-    total = items.reduce((sum: number, item: { name?: string; value?: unknown } | null) => {
-      const numeric = Number(item?.value);
-      const shown = selected?.[item?.name ?? ""] !== false;
-      return shown && Number.isFinite(numeric) && numeric > 0 ? sum + numeric : sum;
-    }, 0);
-    return total;
-  };
-  let labelOverridden = false;
-  series.data = items.map((item: any) => {
-    const resolved = lookup.get(item?.name);
-    if (!resolved) return item;
-    let next = item;
-    if (resolved.color) next = { ...next, itemStyle: { ...next.itemStyle, color: resolved.color } };
-    const decimals = resolved.decimals;
-    if (customLabel && decimals !== undefined) {
-      labelOverridden = true;
-      const share = () => sharePercent(item.value, visibleTotal());
-      next = {
-        ...next,
-        label: {
-          ...next.label,
-          formatter: (params: Record<string, unknown>) =>
-            customLabel({ ...params, percent: share() }),
-        },
-      };
-    }
-    return next;
+  series.data = series.data.map((item: any) => {
+    const color = lookup.get(item?.name)?.color;
+    return color ? { ...item, itemStyle: { ...item.itemStyle, color } } : item;
   });
-  // A selection map is what makes ChartRenderer track legend clicks on a pie.
-  if (labelOverridden && options.legend && !options.legend.selected) options.legend.selected = {};
 };
 
 // A silent gauge drawn on top that shows only the title, so the real data item keeps its original name.
@@ -635,7 +591,7 @@ export const applySeriesOverrides = (options: any, panelSchema: any, theme: stri
   const displayNames = new Map<string, string>();
   for (const series of options.series) {
     if (panelType === "pie" || panelType === "donut") {
-      applyPieOverrides(series, lookup, options);
+      applyPieOverrides(series, lookup);
       continue;
     }
     if (!isNamedSeries(series)) continue;

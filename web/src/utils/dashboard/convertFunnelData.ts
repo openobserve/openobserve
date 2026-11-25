@@ -17,13 +17,15 @@ import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { getDataValue } from "./aliasUtils";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
-import { paintByPalette } from "./categoryNodes";
+import { groupName, isStandIn, paintByPalette } from "./categoryNodes";
+import { undrawnQueryCount } from "./chartTypeGroups";
 import { labelColorOn } from "./chartLabelContrast";
 
 export const FUNNEL_SORTS = ["descending", "ascending", "none"] as const;
 export const FUNNEL_ORIENTS = ["vertical", "horizontal"] as const;
 export const DEFAULT_FUNNEL_SORT = "descending";
 export const DEFAULT_FUNNEL_ORIENT = "vertical";
+const FUNNEL_CONFIG_KEYS = ["funnel_sort", "funnel_orient", "funnel_show_percent"] as const;
 const LABEL_CHAR_WIDTH = 7;
 const LABEL_LINE_HEIGHT = 16;
 const LABEL_LINE_LENGTH = 20;
@@ -36,12 +38,20 @@ const FALLBACK_PANEL = { width: 800, height: 400 };
 /** One funnel stage; `percent` is its share of the largest stage. */
 export interface FunnelStage {
   name: string;
+  /** The stage's own x value when the shown name stands in for a missing (null) or empty one. */
+  rawName?: string | null;
   value: number;
   percent: number;
   itemStyle?: { color: string };
   label?: Record<string, any>;
   labelLine?: { show: boolean };
   labelInside?: boolean;
+}
+
+/** What the funnel left out: rows whose value is missing, not a number or negative, and visible queries after the first. */
+export interface FunnelNotice {
+  skippedRows: number;
+  ignoredQueries: number;
 }
 
 const toNumber = (value: unknown): number | null => {
@@ -55,29 +65,48 @@ const toNumber = (value: unknown): number | null => {
 const choice = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T =>
   allowed.includes(value as T) ? (value as T) : fallback;
 
-/** Sums the y field per x value in query order; percents are of the largest stage, which sorted funnels start or end with. */
-export const buildFunnelStages = (panelSchema: any, data: any[]): FunnelStage[] => {
-  const totals = new Map<string, number>();
-  (panelSchema?.queries ?? []).forEach((query: any, index: number) => {
-    const rows = data?.[index];
-    const stage = query?.fields?.x?.[0];
-    const value = query?.fields?.y?.[0];
-    if (!Array.isArray(rows) || !stage || !value || query?.config?.hide) return;
-    rows.forEach((row: any) => {
-      const amount = toNumber(getDataValue(row, value.alias));
-      if (amount === null || amount < 0) return;
-      const name = String(getDataValue(row, stage.alias) ?? "");
-      totals.set(name, (totals.get(name) ?? 0) + amount);
-    });
+/** Funnel settings mean nothing to another type, and would ride along in its saved panel and exports. */
+export const dropFunnelConfig = (panel: { type?: string; config?: Record<string, unknown> }) => {
+  if (!panel?.config || panel.type === "funnel") return;
+  for (const key of FUNNEL_CONFIG_KEYS) delete panel.config[key];
+};
+
+/** Sums the y field per x value of the first visible query, in query order, counting the rows left out; percents are of the largest stage. */
+export const buildFunnelStages = (
+  panelSchema: any,
+  data: any[],
+): { stages: FunnelStage[]; skippedRows: number } => {
+  // Each stage is one measure, so a saved panel with more queries draws only its first visible one.
+  const queries: any[] = panelSchema?.queries ?? [];
+  const drawn = queries.findIndex((query) => !query?.config?.hide);
+  const rows = data?.[drawn];
+  const stage = queries[drawn]?.fields?.x?.[0];
+  const value = queries[drawn]?.fields?.y?.[0];
+  if (!Array.isArray(rows) || !stage || !value) return { stages: [], skippedRows: 0 };
+  const byKey = new Map<string | null, FunnelStage>();
+  let skippedRows = 0;
+  rows.forEach((row: any) => {
+    const amount = toNumber(getDataValue(row, value.alias));
+    if (amount === null || amount < 0) {
+      skippedRows++;
+      return;
+    }
+    const raw = getDataValue(row, stage.alias);
+    const key = raw === null || raw === undefined ? null : String(raw);
+    const found = byKey.get(key);
+    if (found) found.value += amount;
+    else {
+      const rawName = isStandIn(key) ? { rawName: key } : {};
+      byKey.set(key, { name: groupName(key), ...rawName, value: amount, percent: 0 });
+    }
   });
-  const stages = [...totals].map(([name, value]) => ({ name, value, percent: 0 }));
-  if (!stages.length) return stages;
+  const stages = [...byKey.values()];
   // In query order the first row can be any stage, and a percent above 100 reads as an error.
-  const base = Math.max(...stages.map((stage) => stage.value));
-  stages.forEach((stage) => {
-    stage.percent = base > 0 ? (stage.value / base) * 100 : 0;
+  const base = Math.max(...stages.map((item) => item.value), 0);
+  stages.forEach((item) => {
+    item.percent = base > 0 ? (item.value / base) * 100 : 0;
   });
-  return stages;
+  return { stages, skippedRows };
 };
 
 const sortedForDisplay = (stages: FunnelStage[], sort: string) =>
@@ -173,8 +202,13 @@ const formatPercent = (percent: number) => `${Math.round(percent * 10) / 10}%`;
 /** Converts SQL rows into a funnel: one stage per x value, sized by the y value. */
 export const convertFunnelData = (panelSchema: any, data: any, store: any, chartPanelRef?: any) => {
   const config = panelSchema?.config ?? {};
-  const stages = buildFunnelStages(panelSchema, Array.isArray(data) ? data : []);
-  if (!stages.length) return { options: { series: [] }, extras: { panelId: panelSchema?.id } };
+  const { stages, skippedRows } = buildFunnelStages(panelSchema, Array.isArray(data) ? data : []);
+  const funnelNotice: FunnelNotice = {
+    skippedRows,
+    ignoredQueries: undrawnQueryCount(panelSchema?.queries),
+  };
+  const extras = { panelId: panelSchema?.id, funnelNotice };
+  if (!stages.length) return { options: { series: [] }, extras };
 
   paintByPalette(stages, config, store?.state?.theme);
   const format = (value: unknown) =>
@@ -222,6 +256,8 @@ export const convertFunnelData = (panelSchema: any, data: any, store: any, chart
         left: `${PLOT_SIDE_SHARE * 100}%`,
         width: `${(1 - 2 * PLOT_SIDE_SHARE) * 100}%`,
         minSize: "2%",
+        // With every stage at 0 ECharts' value range collapses and it draws each stage half wide.
+        max: Math.max(...stages.map((stage) => stage.value)) || 1,
         gap: STAGE_GAP,
         itemStyle: { borderColor: chartColor("--color-surface-base"), borderWidth: 1 },
         label: {
@@ -245,5 +281,5 @@ export const convertFunnelData = (panelSchema: any, data: any, store: any, chart
       },
     ],
   };
-  return { options, extras: { panelId: panelSchema?.id } };
+  return { options, extras };
 };

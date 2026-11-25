@@ -56,6 +56,7 @@ const MCP_OPT_OUT_CATEGORIES: [&str; 2] = ["authorization", "users"];
 #[openapi(
     paths(
         status::healthz,
+        openobserve_api_management::request::resources::search,
         openobserve_api_management::request::users::list,
         openobserve_api_management::request::users::save,
         openobserve_api_management::request::users::update,

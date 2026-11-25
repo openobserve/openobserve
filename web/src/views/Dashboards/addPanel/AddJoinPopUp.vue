@@ -114,7 +114,7 @@
         <div class="min-h-0 flex-1 overflow-y-auto" data-test="dashboard-join-clause-list">
           <div
             v-for="(arg, argIndex) in modelValue.conditions"
-            :key="argIndex + JSON.stringify(arg)"
+            :key="argIndex"
             class="rounded-default border-border-default bg-surface-panel mb-2 border p-2.5"
           >
             <div class="text-2xs text-text-secondary mb-1.5 font-semibold tracking-wider uppercase">

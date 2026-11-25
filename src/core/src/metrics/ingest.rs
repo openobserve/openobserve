@@ -19,7 +19,7 @@ use std::{
     time::Instant,
 };
 
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use config::TIMESTAMP_COL_NAME;
 use config::{
     get_config,
@@ -39,16 +39,16 @@ use config::{
 use datafusion::arrow::datatypes::{DataType, Schema};
 use infra::{errors::Result, schema::SchemaCache};
 use ingestion_common::IngestUser;
-use schema::{check_for_schema, check_request_columns_limit};
+use schema::check_for_schema;
 
 use super::columnar::ColumnarStream;
 use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
     ingestion::{
-        PartitionMemo, TriggerAlertData, evaluate_trigger, get_stream_partition_keys,
-        get_thread_id, inferred_column_type, newly_enabled_uds_fields, refactor_map,
-        repack_records, schema_records_to_entries, write_entries,
+        PartitionMemo, TriggerAlertData, check_record_columns_limit, evaluate_trigger,
+        get_stream_partition_keys, get_thread_id, inferred_column_type, newly_enabled_uds_fields,
+        refactor_map, repack_records, schema_records_to_entries, write_entries,
     },
     pipeline::batch_execution::ExecutablePipeline,
 };
@@ -307,7 +307,7 @@ pub(super) async fn resolve_batch_schema<T>(
 }
 
 /// Redacts one stream's records; callers must run this before the series hash is computed.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub(super) async fn apply_redaction<T>(
     org_id: &str,
     stream_name: &str,
@@ -621,15 +621,7 @@ fn check_columns_per_record(
 ) -> Result<()> {
     let limit = get_config().limit.req_cols_per_record_limit;
     for record in records {
-        // a column count never exceeds the entry count, so the cheap bound settles most records
-        if record.len() <= limit {
-            continue;
-        }
-        let columns = record
-            .iter()
-            .filter(|(key, value)| inferred_column_type(key, value).is_some())
-            .count();
-        check_request_columns_limit(org_id, StreamType::Metrics, stream_name, columns)?;
+        check_record_columns_limit(org_id, StreamType::Metrics, stream_name, record, limit)?;
     }
     Ok(())
 }
@@ -736,6 +728,7 @@ mod tests {
         TIMESTAMP_COL_NAME,
         meta::promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
     };
+    use datafusion::arrow::datatypes::Field;
 
     use super::*;
     use crate::ingestion::get_write_partition_key;
@@ -749,7 +742,6 @@ mod tests {
     }
 
     fn value_schema(value_type: Option<DataType>) -> SchemaCache {
-        use datafusion::arrow::datatypes::Field;
         let mut fields = vec![Field::new(NAME_LABEL, DataType::Utf8, true)];
         if let Some(value_type) = value_type {
             fields.push(Field::new(VALUE_LABEL, value_type, true));

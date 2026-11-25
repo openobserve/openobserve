@@ -120,6 +120,7 @@ impl PartitionSqlContext {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
     use config::meta::stream::StreamType;
 
     use super::*;
@@ -135,7 +136,6 @@ mod tests {
         timezone: Option<&str>,
         streaming_output: bool,
     ) -> PartitionSqlContext {
-        use arrow_schema::{DataType, Field, Schema};
         let schema = Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("service", DataType::Utf8, true),

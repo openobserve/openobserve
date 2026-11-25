@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { number as echartsNumber } from "echarts/core";
 import {
   getChartDimensions,
   getLegendPosition,
@@ -31,6 +30,8 @@ import {
   applyPieDonutChartAlignment,
   applyPieDonutCenterAdjustment,
   applyLegendConfiguration,
+  applyPieDonutLegendLayout,
+  createPieSlicePercent,
 } from "./legendConfiguration";
 import { calculateWidthText } from "./chartDimensionUtils";
 
@@ -1184,7 +1185,7 @@ describe("pie and donut legend values", () => {
     expect(valueOnly.legend.formatter("db")).toBe("{b|db}  10");
   });
 
-  it("rounds every slice's percent exactly as ECharts' largest-remainder seats do", () => {
+  it("rounds every slice's percent on its own, as its slice label does", () => {
     const many = Array.from({ length: 37 }, (_, i) => ({
       name: `s${i}`,
       value: ((i * 7919) % 97) + 0.3,
@@ -1196,9 +1197,11 @@ describe("pie and donut legend values", () => {
       hovered(),
       options,
     );
-    const values = many.map((slice) => slice.value);
-    many.forEach((slice, index) => {
-      const expected = echartsNumber.getPercentWithPrecision(values, index, 1).toFixed(1);
+    const total = many.reduce((sum, slice) => sum + slice.value, 0);
+    const label = createPieSlicePercent(pieSchema({ decimals: 1 }).config);
+    many.forEach((slice) => {
+      const expected = ((slice.value / total) * 100).toFixed(1);
+      expect(label(options.series[0], slice)).toBe(expected);
       expect(options.legend.formatter(slice.name)).toBe(`{b|${slice.name}}  ${expected}%`);
     });
   });
@@ -1268,7 +1271,7 @@ describe("pie and donut legend values", () => {
     expect(calculateWidthText).toHaveBeenCalled();
   });
 
-  it("gives a name the sum of its drawn slices' rounded percents", () => {
+  it("gives a name the share of its drawn slices' sum", () => {
     const options: any = pieOptions([
       { name: "A", value: 1 },
       { name: "B", value: 1 },
@@ -1282,11 +1285,9 @@ describe("pie and donut legend values", () => {
       hovered(),
       options,
     );
-    const drawn = [1, 1, 3, 1];
-    const seat = (index: number) => echartsNumber.getPercentWithPrecision(drawn, index, 0);
-    expect(options.legend.formatter("A")).toBe(`{b|A}  ${seat(0) + seat(2)}%`);
-    expect(options.legend.formatter("B")).toBe(`{b|B}  ${seat(1)}%`);
-    expect(options.legend.formatter("C")).toBe(`{b|C}  ${seat(3)}%`);
+    expect(options.legend.formatter("A")).toBe("{b|A}  67%");
+    expect(options.legend.formatter("B")).toBe("{b|B}  17%");
+    expect(options.legend.formatter("C")).toBe("{b|C}  17%");
   });
 
   it("leaves a negative same-name slice out of an override-decimals percent", () => {
@@ -1344,7 +1345,7 @@ describe("pie and donut legend values", () => {
     expect(options.legend.formatter("api")).toBe("{b|api}  30  100%");
   });
 
-  it("gives an explicit right legend width to the names instead of the values cap", () => {
+  it("gives an explicit right legend width to the names, capped at half the panel", () => {
     const longName = "ziox-querier-595748494c-2vlk5";
     const options: any = pieOptions([
       { name: longName, value: 30 },
@@ -1361,11 +1362,12 @@ describe("pie and donut legend values", () => {
       hovered(),
       options,
     );
-    expect(options.legend.textStyle.width).toBe(390);
+    expect(options.legend.textStyle.width).toBe(340);
+    expect(options.legend.left).toBe(400);
     expect(options.legend.formatter(longName)).toBe(`{b|${longName}}  30  75%`);
   });
 
-  it("keeps an explicit width inside a narrower panel", () => {
+  it("caps an explicit width in a narrower panel, keeping the values and a few letters", () => {
     const options: any = pieOptions(slices);
     applyLegendConfiguration(
       pieSchema({
@@ -1377,7 +1379,9 @@ describe("pie and donut legend values", () => {
       hovered(),
       options,
     );
-    expect(options.legend.textStyle.width).toBe(240);
+    // Chrome 60 + "  30.00  75.00%" 120 + the whole short name 24.
+    expect(options.legend.textStyle.width).toBe(144);
+    expect(options.legend.left).toBe(96);
   });
 
   it("keeps room for names on a very small explicit width", () => {
@@ -1396,7 +1400,7 @@ describe("pie and donut legend values", () => {
     const options: any = pieOptions([{ name: longName, value: 30 }]);
     applyLegendConfiguration(
       pieSchema({
-        legend_values: ["value", "percent"],
+        legend_values: ["value"],
         legends_position: "right",
         legends_type: "scroll",
       }),
@@ -1462,7 +1466,7 @@ describe("pie and donut legend values", () => {
     expect(options.legend.formatter("x".repeat(40))).toBe(`{b|${"x".repeat(14)}...}  75%`);
   });
 
-  it("rounds percents the way the slice labels do, so they add up to 100", () => {
+  it("rounds each percent on its own, as the slice labels do", () => {
     const options: any = pieOptions([
       { name: "a", value: 1 },
       { name: "b", value: 1 },
@@ -1477,8 +1481,7 @@ describe("pie and donut legend values", () => {
     const percents = ["a", "b", "c"].map((name) =>
       Number(options.legend.formatter(name).split("  ")[1].replace("%", "")),
     );
-    expect(percents.reduce((sum, value) => sum + value, 0)).toBe(100);
-    expect([...percents].sort((a, b) => a - b)).toEqual([33, 33, 34]);
+    expect(percents).toEqual([33, 33, 33]);
   });
 
   it("finishes on slices whose negative values cancel the total", () => {
@@ -1588,8 +1591,8 @@ describe("pie and donut legend values", () => {
     );
     const reserved = 300 - options.legend.left;
     expect(options.legend.textStyle.width).toBe(reserved - 60);
-    const text = options.legend.formatter("a-long-service-name");
-    expect(text).toBe("30  75%");
+    // The name keeps its floor of six characters, head and tail, beside the values.
+    expect(options.legend.formatter("a-long-service-name")).toBe("{b|a-l…ame}  30  75%");
   });
 
   it("lets a right scroll legend with values take up to half the chart", () => {
@@ -1687,7 +1690,7 @@ describe("pie and donut legend values", () => {
     expect(highPrecision.legend.formatter("loss")).toBe(`{b|loss}  ${(0).toFixed(13)}%`);
   });
 
-  it("matches ECharts' seats on tied and zero remainders", () => {
+  it("prints each share at the panel decimals on tied and zero remainders", () => {
     const cases = [
       [1, 1, 1, 1, 1, 1, 1],
       [0, 5, 5, 0, 5, 3],
@@ -1703,7 +1706,8 @@ describe("pie and donut legend values", () => {
         options,
       );
       data.forEach((slice, index) => {
-        const expected = echartsNumber.getPercentWithPrecision(values, index, 2).toFixed(2);
+        const total = values.reduce((sum, value) => sum + value, 0);
+        const expected = ((values[index] / total) * 100).toFixed(2);
         expect(options.legend.formatter(slice.name)).toBe(`{b|${slice.name}}  ${expected}%`);
       });
     }
@@ -1763,9 +1767,9 @@ describe("pie and donut legend values", () => {
   });
 
   it.each([
-    [300, "{b|tra...}  75%"],
-    [255, "75%"],
-  ])("keeps a cut name only while it fits beside the values (panel %i)", (width, expected) => {
+    [300, "{b|tra…ice}  75%"],
+    [255, "{b|tra…ice}  75%"],
+  ])("keeps the name floor beside the values in a narrow panel (%i)", (width, expected) => {
     const options: any = pieOptions([
       { name: "transcoding-service", value: 30 },
       { name: "db", value: 10 },
@@ -1860,5 +1864,312 @@ describe("pie outside labels beside a right legend", () => {
       applyLegendConfiguration(panelSchema, panel, hovered, options);
       expect(options.series[0].right).toBeUndefined();
     }
+  });
+});
+
+describe("pie right legend fitting", () => {
+  const hovered = () => ({ value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } });
+  const panel = (width: number, height = 300) => ({
+    value: { offsetWidth: width, offsetHeight: height },
+  });
+  const schema = (config: Record<string, any>, type = "pie") => ({
+    type,
+    config: { show_legends: true, legends_position: "right", legends_type: "scroll", ...config },
+  });
+  const pods = ["ab12x", "cd34y", "ef56z"].map((tail) => `ziox-querier-595748494c-${tail}`);
+  const podSlices = () => pods.map((name, i) => ({ name, value: 30 - i * 5 }));
+  const pieOf = (data: any[], radius: unknown = "80%") => ({
+    series: [{ type: "pie", data, radius, center: ["50%", "50%"], label: { position: "inside" } }],
+  });
+  const pixels = (value: unknown, base: number) =>
+    String(value).endsWith("%") ? (parseFloat(String(value)) / 100) * base : Number(value);
+  // Outside labels end the series box at the legend, and ECharts resolves the pie against that box.
+  const pieRightEdge = (options: any, width: number, height: number) => {
+    const series = options.series[0];
+    const box = width - (series.right ?? 0);
+    const radius = Array.isArray(series.radius) ? series.radius[1] : series.radius;
+    return pixels(series.center[0], box) + pixels(radius, Math.min(box, height) / 2);
+  };
+  const outerPixels = (options: any, width: number, height: number) => {
+    const series = options.series[0];
+    const box = width - (series.right ?? 0);
+    const radius = Array.isArray(series.radius) ? series.radius[1] : series.radius;
+    return pixels(radius, Math.min(box, height) / 2);
+  };
+  const run = (config: Record<string, any>, data: any[], width: number, radius?: unknown) => {
+    const options: any = pieOf(data, radius);
+    applyLegendConfiguration(schema(config), panel(width), hovered(), options);
+    return options;
+  };
+
+  it("cuts right legend names in the middle so pods that differ at the end stay apart", () => {
+    const options = run({ legend_values: ["value", "percent"], decimals: 0 }, podSlices(), 380);
+    const names = pods.map((name) => options.legend.formatter(name).match(/\{b\|([^}]*)\}/)[1]);
+    expect(new Set(names).size).toBe(3);
+    names.forEach((name, i) => {
+      expect(name).toContain("…");
+      expect(pods[i].endsWith(name.split("…")[1])).toBe(true);
+    });
+  });
+
+  it("keeps cutting bottom legend names at the end", () => {
+    const options: any = pieOf(podSlices());
+    applyLegendConfiguration(
+      schema({ legends_position: "bottom", legend_values: ["value", "percent"], decimals: 0 }),
+      panel(380),
+      hovered(),
+      options,
+    );
+    expect(options.legend.formatter(pods[0])).toMatch(/^\{b\|ziox-[^}…]*\.\.\.\}/);
+  });
+
+  it("shows the full name in the legend tooltip", () => {
+    const options = run({ legend_values: ["value", "percent"] }, podSlices(), 380);
+    expect(options.legend.tooltip.formatter({ name: pods[1] })).toBe(pods[1]);
+  });
+
+  it.each(["scroll", "plain"])(
+    "shrinks the pie off a %s right legend in a narrow panel",
+    (type) => {
+      const options = run(
+        { legends_type: type, legend_values: ["value", "percent"] },
+        podSlices(),
+        380,
+      );
+      expect(pieRightEdge(options, 380, 300)).toBeLessThanOrEqual(options.legend.left);
+      expect(outerPixels(options, 380, 300)).toBeGreaterThanOrEqual(40);
+    },
+  );
+
+  it("shrinks both donut radii by the same share", () => {
+    const options = run({ legend_values: ["value", "percent"] }, podSlices(), 380, ["40%", "80%"]);
+    const [inner, outer] = options.series[0].radius.map((value: string) => parseFloat(value));
+    expect(outerPixels(options, 380, 300)).toBeLessThan(0.8 * 150);
+    expect(inner / outer).toBeCloseTo(0.5, 2);
+  });
+
+  it("caps a Legend Width wider than the panel and keeps a pie beside it", () => {
+    const options = run(
+      { legend_values: ["value", "percent"], legend_width: { value: 450, unit: "px" } },
+      podSlices(),
+      380,
+    );
+    // Values are never dropped: chrome 60 + "  30.00  40.00%" 120 + the floor "zio…12x" 56.
+    expect(options.legend.left).toBe(380 - 236);
+    expect(pieRightEdge(options, 380, 300)).toBeLessThanOrEqual(options.legend.left);
+    expect(parseFloat(options.series[0].radius)).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ["scroll with values", { legend_values: ["value", "percent"] }],
+    ["scroll without values", {}],
+    ["plain without values", { legends_type: "plain" }],
+  ])("leaves a %s legend and its pie alone in a wide panel", (_label, config) => {
+    const slices = [
+      { name: "api", value: 3 },
+      { name: "db", value: 1 },
+    ];
+    const options = run(config, slices, 1200, "50%");
+    const reference: any = pieOf(slices, "50%");
+    reference.legend = createBaseLegendConfig(schema(config), hovered());
+    applyPieDonutLegendPositioning(schema(config), reference, panel(1200));
+    applyPieDonutChartAlignment(schema(config), reference, 1200, 300);
+    expect(options.series[0].radius).toBe("50%");
+    expect(options.series[0].center).toEqual(reference.series[0].center);
+    expect(options.legend.left).toBe(reference.legend.left);
+    expect(options.legend.type).toBe(reference.legend.type);
+  });
+
+  const many = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({ name: `service-${i}`, value: i + 1 }));
+
+  it("scrolls a plain right legend whose second column would leave the panel", () => {
+    const options = run({ legends_type: "plain" }, many(18), 700);
+    expect(options.legend.type).toBe("scroll");
+    // One column: padding 30 + icon 30 + the 120px text box.
+    expect(options.legend.left).toBe(700 - 180);
+  });
+
+  it("keeps a plain right legend whose entries fit in one column", () => {
+    const options = run({ legends_type: "plain" }, many(5), 700);
+    expect(options.legend.type).toBe("plain");
+  });
+
+  it("keeps a plain bottom legend plain however many entries it has", () => {
+    const options: any = pieOf(many(18));
+    applyLegendConfiguration(
+      schema({ legends_type: "plain", legends_position: "bottom" }),
+      panel(700),
+      hovered(),
+      options,
+    );
+    expect(options.legend.type).toBe("plain");
+  });
+
+  it("gives the slice label the legend's percent, also after a slice is hidden", () => {
+    const data = [2, 2, 5, 291].map((value, i) => ({ name: `s${i}`, value }));
+    const config = { legend_values: ["percent"], decimals: 2 };
+    const options = run(config, data, 800);
+    const label = createPieSlicePercent(schema(config).config);
+    const legendPercent = (name: string) => options.legend.formatter(name).split("  ")[1];
+    for (const slice of data) {
+      expect(`${label(options.series[0], slice)}%`).toBe(legendPercent(slice.name));
+    }
+    expect(legendPercent("s1")).toBe("0.67%");
+    options.legend.selected = { s3: false };
+    expect(`${label(options.series[0], data[2])}%`).toBe(legendPercent("s2"));
+    expect(legendPercent("s2")).toBe("55.56%");
+    expect(legendPercent("s3")).toBe("-");
+  });
+});
+
+describe("pie right legend floors", () => {
+  const hovered = () => ({ value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } });
+  const panel = (width: number, height = 300) => ({
+    value: { offsetWidth: width, offsetHeight: height },
+  });
+  const schema = (config: Record<string, any>) => ({
+    type: "pie",
+    config: { show_legends: true, legends_position: "right", legends_type: "scroll", ...config },
+  });
+  const services = [
+    "api-gateway-production-eu-west-1",
+    "auth-service-production-eu-west-1",
+    "notification-dispatcher-production",
+    "ziox-querier-595748494c-ab12x",
+    "ziox-querier-595748494c-cd34y",
+  ];
+  const slices = (names: string[]) => names.map((name, i) => ({ name, value: 45 - i * 4 }));
+  const run = (config: Record<string, any>, data: any[], width: number, height = 300) => {
+    const options: any = {
+      series: [
+        { type: "pie", data, radius: "80%", center: ["50%", "50%"], label: { position: "inside" } },
+      ],
+    };
+    applyLegendConfiguration(schema(config), panel(width, height), hovered(), options);
+    return options;
+  };
+  const shownName = (options: any, name: string) =>
+    options.legend.formatter(name).match(/\{[ab]\|([^}]*)\}/)?.[1] ?? "";
+  // Bold glyphs measure wider, as the hovered entry is painted.
+  const boldWider = () =>
+    vi
+      .mocked(calculateWidthText)
+      .mockImplementation(
+        (text: string, _size?: string, weight?: string) =>
+          (text?.length || 0) * (weight === "bold" ? 9 : 8),
+      );
+
+  afterEach(() => {
+    vi.mocked(calculateWidthText).mockImplementation((text: string) => (text?.length || 0) * 8);
+  });
+
+  it.each([390, 440])(
+    "keeps six name characters, head and tail, in a %ipx half-width panel",
+    (width) => {
+      const options = run({ legend_values: ["value", "percent"] }, slices(services), width);
+      const names = services.map((name) => shownName(options, name));
+      names.forEach((name) => expect(name.replace("…", "").length).toBeGreaterThanOrEqual(6));
+      expect(new Set(names).size).toBe(services.length);
+      const radius = (parseFloat(options.series[0].radius) / 100) * 150;
+      expect(radius).toBeGreaterThanOrEqual(40);
+    },
+  );
+
+  it("keeps the pie's floor radius when the name floor does not fit as well", () => {
+    const options = run({ legend_values: ["value", "percent"] }, slices(services), 200);
+    // The legend stops where a 40px pie and its gaps still fit.
+    expect(options.legend.left).toBe(2 * (40 + 8));
+  });
+
+  it("measures names bold so a hovered entry still shows its percent", () => {
+    boldWider();
+    const options = run({ legend_values: ["value", "percent"] }, slices(services), 390);
+    const width = options.legend.textStyle.width;
+    for (const name of services) {
+      const text = options.legend.formatter(name);
+      const [, shown, values] = text.match(/^\{b\|([^}]*)\}(.*)$/);
+      expect(shown.length * 9 + values.length * 8).toBeLessThanOrEqual(width);
+    }
+  });
+
+  it("never cuts short names in a wide panel, bold included", () => {
+    boldWider();
+    const names = ["pt-frontend", "pt-payments", "pt-checkout"];
+    const options = run({ legend_values: ["value", "percent"] }, slices(names), 1400);
+    names.forEach((name) => expect(shownName(options, name)).toBe(name));
+  });
+
+  it("sizes a scroll legend from its widest entry, not its longest", () => {
+    vi.mocked(calculateWidthText).mockImplementation((text: string) =>
+      [...(text ?? "")].reduce((sum, char) => sum + (char === "m" ? 14 : 6), 0),
+    );
+    const options = run({}, slices(["mmmmmmmm", "abcdefghijk"]), 1200);
+    // The widest name, "mmmmmmmm" (112), plus 60 for the icon and scroll chrome.
+    expect(1200 - options.legend.left).toBe(172);
+  });
+
+  const many = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({ name: `service-${i}`, value: i + 1 }));
+
+  it("gives a legend switched to scroll a page height of whole rows", () => {
+    const options = run(
+      { legends_type: "plain", legend_width: { value: 300, unit: "px" } },
+      many(18),
+      1200,
+      93,
+    );
+    expect(options.legend.type).toBe("scroll");
+    // Two 22px rows less the trailing 8px gap, plus the 15px pager and its 8px gap.
+    expect(options.legend.height).toBe(59);
+  });
+
+  it("leaves the page height of a legend chosen as scroll to ECharts", () => {
+    const options = run({}, many(18), 1200, 93);
+    expect(options.legend.height).toBeUndefined();
+  });
+  it("never squeezes the text below its minimum when capping a Legend Width in a narrow panel", () => {
+    const options = run(
+      { legend_values: ["value", "percent"], legend_width: { value: 450, unit: "px" } },
+      slices(services),
+      150,
+    );
+    expect(options.legend.textStyle.width).toBeGreaterThanOrEqual(60);
+  });
+
+  it("centres the pie in the room a capped legend leaves", () => {
+    const options = run(
+      { legend_values: ["value", "percent"], legend_width: { value: 450, unit: "px" } },
+      slices(services),
+      600,
+    );
+    const centerX = (parseFloat(options.series[0].center[0]) / 100) * 600;
+    expect(centerX).toBeCloseTo(options.legend.left / 2, 0);
+  });
+
+  it("sizes a legend without values by the renamed names it shows", () => {
+    const short = ["api-", "auth", "noti"];
+    const renamed = {
+      override_config: [
+        {
+          field: { matchBy: "series", value: "api-" },
+          config: [{ type: "display_name", value: "renamed-api-gateway-production" }],
+        },
+      ],
+    };
+    const plain = run({}, slices(short), 800);
+    const withRename = run(renamed, slices(short), 800);
+    expect(800 - withRename.legend.left).toBeGreaterThan(800 - plain.legend.left);
+  });
+
+  it("re-sizes a switched legend as one column when merged multi-query slices are laid out again", () => {
+    const config = { legends_type: "plain", legend_values: ["value", "percent"] };
+    const options = run(config, many(18), 1200, 150);
+    expect(options.legend.type).toBe("scroll");
+    options.series[0].data = many(22);
+    applyPieDonutLegendLayout(schema(config), options, panel(1200, 150));
+    const fresh = run(config, many(22), 1200, 150);
+    expect(options.legend.type).toBe("scroll");
+    expect(options.legend.left).toBe(fresh.legend.left);
   });
 });

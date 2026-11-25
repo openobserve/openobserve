@@ -881,4 +881,55 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
       expect(mockSearch).not.toHaveBeenCalled();
     });
   });
+
+  describe("restoring the picked dimensions", () => {
+    const fields = [
+      { name: "service_name" },
+      { name: "span_status" },
+      { name: "level" },
+      { name: "k8s_namespace_name" },
+    ];
+    const mountWith = async (initialDimensions: string[] | null) => {
+      wrapper.unmount();
+      wrapper = mountComponent({ streamFields: fields, initialDimensions });
+      await flushPromises();
+    };
+
+    it("starts from the dimensions handed back after a remount", async () => {
+      await mountWith(["service_name", "level", "k8s_namespace_name"]);
+      expect(wrapper.vm.selectedDimensions).toEqual([
+        "service_name",
+        "level",
+        "k8s_namespace_name",
+      ]);
+    });
+
+    it("drops a restored dimension the stream no longer has", async () => {
+      await mountWith(["level", "gone"]);
+      expect(wrapper.vm.selectedDimensions).toEqual(["level"]);
+    });
+
+    it("falls back to the defaults when none of the restored dimensions exist", async () => {
+      await mountWith(["gone"]);
+      expect(wrapper.vm.selectedDimensions).toEqual(["service_name", "span_status"]);
+    });
+
+    it("keeps an empty pick empty", async () => {
+      await mountWith([]);
+      expect(wrapper.vm.selectedDimensions).toEqual([]);
+    });
+
+    it("uses the defaults when nothing was picked before", async () => {
+      await mountWith(null);
+      expect(wrapper.vm.selectedDimensions).toEqual(["service_name", "span_status"]);
+    });
+
+    it("reports a changed pick but not the initial one", async () => {
+      await mountWith(["service_name"]);
+      expect(wrapper.emitted("update:dimensions")).toBeUndefined();
+      wrapper.vm.toggleDimension("level");
+      await flushPromises();
+      expect(wrapper.emitted("update:dimensions")?.at(-1)).toEqual([["service_name", "level"]]);
+    });
+  });
 });

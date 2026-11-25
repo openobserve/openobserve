@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { splitTrailingOffset } from "@/utils/logs/sqlOffset";
+import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { isExplainQuery } from "@/utils/query/sqlUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import type { TranslateFn } from "@/types/i18n";
@@ -169,6 +171,19 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
     }
   };
 
+  // The server skips the single count row when the SQL has an OFFSET, so the offset is applied to the total instead.
+  const dropOffsetFromRequest = (queryReq: any): number => {
+    if (typeof queryReq.query.sql !== "string") return 0;
+    const base64 = queryReq.encoding === "base64";
+    const split = splitTrailingOffset(
+      base64 ? b64DecodeUnicode(queryReq.query.sql) : queryReq.query.sql,
+    );
+    if (split.offset > 0) {
+      queryReq.query.sql = base64 ? b64EncodeUnicode(split.sql) : split.sql;
+    }
+    return split.offset;
+  };
+
   const getPageCountThroughSocket = async (
     queryReq: any,
     buildWebSocketPayload: Function,
@@ -188,6 +203,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
     // The caller already set loadingHistogram, so a throw here must clear it or the status row stays busy.
     try {
       searchObj.data.countErrorMsg = "";
+      const rowOffset = dropOffsetFromRequest(queryReq);
       queryReq.query.size = 0;
       delete queryReq.query.from;
       delete queryReq.query.quick_mode;
@@ -204,6 +220,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
       }
 
       const payload = buildWebSocketPayload(queryReq, false, "pageCount");
+      if (rowOffset > 0) payload.meta = { ...payload.meta, rowOffset };
       if (generationId !== null && generationId !== undefined) payload.generationId = generationId;
 
       if (callbacks) {

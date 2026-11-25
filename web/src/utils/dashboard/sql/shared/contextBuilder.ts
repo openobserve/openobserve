@@ -38,7 +38,7 @@ import {
   dataZoomBrushStyle,
 } from "@/utils/chartTheme";
 import { getPropsByChartTypeForSeries } from "../../sqlChartSeriesProps";
-import { processData } from "../../sqlProcessData";
+import { breakdownValueLabel, processData } from "../../sqlProcessData";
 import { fillMissingValues } from "../../sqlMissingValueFiller";
 import { buildDataLookupMap, createSeriesBuilders } from "./seriesBuilder";
 import { createTrellisHelpers } from "./trellisConfig";
@@ -637,7 +637,10 @@ export function buildSQLContext(
       },
     },
     xAxis: [...xAxisKeys, ...breakDownKeys]?.map((key: any, index: number) => {
-      const data = getAxisDataFromKey(key);
+      const data =
+        index < xAxisKeys.length
+          ? getAxisDataFromKey(key)
+          : getAxisDataFromKey(key).map(breakdownValueLabel);
 
       //unique value index array
       const arr: any = [];
@@ -662,7 +665,7 @@ export function buildSQLContext(
       const labelRotation =
         hasTimestampField || isHorizontalChart ? 0 : panelSchema.config?.axis_label_rotate || 0;
       const labelWidth = isHorizontalChart
-        ? Math.min(calculateWidthText(largestLabel(getAxisDataFromKey(key))) + 2, 120)
+        ? Math.min(calculateWidthText(largestLabel(data)) + 2, 120)
         : hasTimestampField
           ? 120
           : panelSchema.config?.axis_label_truncate_width || 120;

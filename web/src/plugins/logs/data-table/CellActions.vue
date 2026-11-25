@@ -109,7 +109,7 @@ const props = defineProps({
   /** Rendered cell value, for columns with nothing under `row[column.id]` (logs' `source`). */
   value: {
     type: null as unknown as PropType<unknown>,
-    default: undefined,
+    required: false,
   },
   /** The page a field door describes; defaults to the Logs search (correlated logs pass their own). */
   doorContext: {

@@ -133,7 +133,6 @@ mod tests {
         ];
         let result = time_range_expr_impl(&args).unwrap();
         if let ColumnarValue::Array(out) = result {
-            use arrow::array::BooleanArray;
             let out = out.as_any().downcast_ref::<BooleanArray>().unwrap();
             assert!(out.value(0));
         } else {
@@ -154,7 +153,6 @@ mod tests {
         ];
         let result = time_range_expr_impl(&args).unwrap();
         if let ColumnarValue::Array(out) = result {
-            use arrow::array::BooleanArray;
             let out = out.as_any().downcast_ref::<BooleanArray>().unwrap();
             assert!(!out.value(0));
         } else {

@@ -16,7 +16,7 @@ export interface ToastAction {
   handler: () => void;
   /** When provided, temporarily replaces the button label after click (e.g. "Copied!"). */
   successLabel?: I18nText;
-  /** Overrides the button's `data-test`, for a caller whose action has its own id. */
+  /** Overrides the button's `data-test` id; defaults to `o-toast-action-btn`. */
   dataTest?: string;
 }
 

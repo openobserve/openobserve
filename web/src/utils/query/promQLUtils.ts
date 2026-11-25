@@ -1,3 +1,36 @@
+export const promqlEscape = (value: string, quote: '"' | "'" = '"'): string =>
+  value.replace(/\\/g, "\\\\").replaceAll(quote, `\\${quote}`).replace(/\n/g, "\\n");
+
+export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export interface PromqlStringContext {
+  quote: string | null;
+  inRegexMatcher: boolean;
+}
+
+/** The PromQL string a placeholder sits in, and whether that string is a =~ or !~ matcher's pattern. */
+export const promqlStringContextAt = (text: string, offset: number): PromqlStringContext => {
+  let quote: string | null = null;
+  let opening = -1;
+  for (let i = 0; i < offset; i++) {
+    const char = text[i];
+    if (quote === null) {
+      if (char === '"' || char === "'" || char === "`") {
+        [quote, opening] = [char, i];
+      } else if (char === "#") {
+        const lineEnd = text.indexOf("\n", i);
+        i = lineEnd === -1 ? offset : lineEnd;
+      }
+    } else if (char === "\\" && quote !== "`") {
+      i++;
+    } else if (char === quote) {
+      quote = null;
+    }
+  }
+  if (quote === null) return { quote, inRegexMatcher: false };
+  return { quote, inRegexMatcher: /[=!]~\s*$/.test(text.slice(0, opening)) };
+};
+
 export const parsePromQlQuery = (query: string) => {
   const meta = {
     metricName: "" as string | null,

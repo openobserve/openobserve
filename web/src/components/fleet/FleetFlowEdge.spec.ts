@@ -38,42 +38,41 @@ const mountEdge = (data: FleetFlowEdgeData) =>
 const line = (w: ReturnType<typeof mountEdge>) => w.find('[data-test="fleet-flow-edge-e1"]');
 
 describe("FleetFlowEdge", () => {
-  it("colours a line by its signal and sizes it by the given width", () => {
-    const wrapper = mountEdge({ signal: "traces", width: 6 });
-    expect(line(wrapper).classes()).toContain("stroke-signal-traces");
+  it("draws every line in one colour and sizes it by the given width", () => {
+    const wrapper = mountEdge({ width: 6 });
+    expect(line(wrapper).classes()).toContain("stroke-accent");
     expect(line(wrapper).attributes("stroke-width")).toBe("6");
     expect(line(wrapper).attributes("stroke-dasharray")).toBeUndefined();
     wrapper.unmount();
   });
 
-  it("draws a failure branch dashed in the danger colour, never in the signal colour", () => {
+  it("draws a failure branch dashed in the danger colour, never in the line colour", () => {
     const wrapper = mountEdge({
-      signal: "logs",
       width: 3,
       branch: true,
       label: raw("Send failed 18%"),
     });
     expect(line(wrapper).classes()).toContain("stroke-status-error-text");
-    expect(line(wrapper).classes()).not.toContain("stroke-signal-logs");
+    expect(line(wrapper).classes()).not.toContain("stroke-accent");
     expect(line(wrapper).attributes("stroke-dasharray")).toBe("6 4");
     expect(wrapper.find('[data-test="fleet-flow-edge-e1-label"]').text()).toBe("Send failed 18%");
     wrapper.unmount();
   });
 
   it("thickens a highlighted line and fades a dimmed or unmeasured one", () => {
-    let wrapper = mountEdge({ signal: "logs", width: 2, highlighted: true });
+    let wrapper = mountEdge({ width: 2, highlighted: true });
     expect(line(wrapper).attributes("stroke-width")).toBe("3.5");
     wrapper.unmount();
-    wrapper = mountEdge({ signal: "logs", width: 2, dimmed: true });
+    wrapper = mountEdge({ width: 2, dimmed: true });
     expect(line(wrapper).classes()).toContain("opacity-15");
     wrapper.unmount();
-    wrapper = mountEdge({ signal: "logs", width: 1.5, noData: true });
+    wrapper = mountEdge({ width: 1.5, noData: true });
     expect(line(wrapper).classes()).toContain("opacity-40");
     wrapper.unmount();
   });
 
   it("opens the edge from a label click, through the edge's own click target", async () => {
-    const wrapper = mountEdge({ signal: "logs", width: 2, branch: true, label: raw("Dropped 2%") });
+    const wrapper = mountEdge({ width: 2, branch: true, label: raw("Dropped 2%") });
     const clicks: { x: number; y: number }[] = [];
     wrapper
       .find('[data-test="fleet-flow-edge-e1-hit"]')

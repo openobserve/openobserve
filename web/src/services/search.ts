@@ -331,13 +331,15 @@ const search = {
     org_identifier,
     query,
     end_time,
+    signal,
   }: {
     org_identifier: string;
     query: string;
     end_time: number;
+    signal?: AbortSignal;
   }) => {
     const url = `/api/${org_identifier}/prometheus/api/v1/query?time=${end_time}&query=${query}`;
-    return http().get(url);
+    return signal ? http().get(url, { signal }) : http().get(url);
   },
   get_promql_series: ({
     org_identifier,

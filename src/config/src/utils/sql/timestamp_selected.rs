@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sqlparser::{dialect::GenericDialect, parser::Parser};
+use sqlparser::{
+    dialect::GenericDialect,
+    parser::{Parser, ParserError},
+};
 
 use super::visitors::has_timestamp;
 
-pub fn is_timestamp_selected(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
+pub fn is_timestamp_selected(query: &str) -> Result<bool, ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
         if has_timestamp(statement) {
@@ -32,7 +35,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_timestamp_selection() -> Result<(), sqlparser::parser::ParserError> {
+    fn test_timestamp_selection() -> Result<(), ParserError> {
         let test_cases = vec![
             (
                 "SELECT _timestamp FROM table1",

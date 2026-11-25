@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
         @open-shortcuts="openShortcutsList"
+        @open-command-palette="commandPaletteOpen = true"
         @toggle-mobile-nav="mobileNavOpen = !mobileNavOpen"
         @signout="signout"
       />
@@ -215,6 +216,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite v-if="!focusMode" />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
+    <CommandPalette
+      v-model:open="commandPaletteOpen"
+      :links="navLinks"
+      :flat="store.state.solutionMode === 'security'"
+    />
     <VersionCompareDrawerHost />
     <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
     <DashboardSaveConflictDialog
@@ -240,6 +246,9 @@ import {
 } from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
+import CommandPalette from "@/components/commandPalette/CommandPalette.vue";
+import { useRecentlyViewed } from "@/components/commandPalette/useRecentlyViewed";
+import { usePageVisitHistory } from "@/components/commandPalette/usePageVisitHistory";
 import OAccessBoundary from "@/components/access/OAccessBoundary.vue";
 import { resetAccess } from "@/composables/useAccessStore";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -253,6 +262,8 @@ import { isPaywalledDestination } from "@/utils/auth";
 import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { notifyTrialBlocked } from "@/utils/trialPaywallNotice";
 import { runBeforeAppReloadHooks } from "@/utils/beforeAppReload";
+import { flushPendingLanding, noteLanding, prune } from "@/composables/useOrgSwitcherPrefs";
+import { applyDocumentTitle } from "@/router";
 
 import {
   ref,
@@ -341,12 +352,15 @@ import {
   markFullConfigLoaded,
   registerFullConfigLoader,
 } from "@/composables/useFullConfigLoad";
-import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import { openPrimaryTimeRangePicker } from "@/utils/timeRangeShortcut";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { isAutoObserveEnabled } from "@/components/autoobserve/autoObserveGate";
 
 // Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
 const KEPT_ALIVE_VIEWS = ["AppAnalytics", "AppTraces"];
+const MODAL_OVERLAY =
+  '[data-test="o-dialog-overlay"][data-state="open"], [data-test="o-drawer-overlay"][data-state="open"]';
 
 // The assistant's sheet and floating card write their footprint here, so Tab never lands under them (`95` §6).
 const ASSISTANT_INSET_CLASSES = [
@@ -368,6 +382,7 @@ export default defineComponent({
   mixins: [mainLayoutMixin],
   components: {
     AppHeader,
+    CommandPalette,
     WebinarBanner,
     AnnouncementBanner,
     PasswordExpiryBanner,
@@ -1849,12 +1864,31 @@ export default defineComponent({
     // Path, not the full route: a query-only change (time range, filters) stays on the same page.
     watch(() => router.currentRoute.value.path, clearLicenseDenials);
 
+    const commandPaletteOpen = ref(false);
+    useRecentlyViewed({
+      deployment: computed(() => store.state.API_ENDPOINT || window.location.origin),
+      subject: computed(() => store.state.userInfo?.email || ""),
+      org: computed(() => store.state.selectedOrganization?.identifier || ""),
+    });
+    usePageVisitHistory();
+    useShortcuts([
+      {
+        id: "commandPalette",
+        handler: () => {
+          // Only a modal owns the keyboard; non-modal drawers and panels render no overlay.
+          if (!commandPaletteOpen.value && document.querySelector(MODAL_OVERLAY)) return;
+          commandPaletteOpen.value = !commandPaletteOpen.value;
+        },
+      },
+    ]);
     const showShortcuts = ref(false);
     const openShortcutsList = () => {
       showShortcuts.value = true;
     };
 
+    useShortcuts([{ id: "timeRangeOpen", handler: openPrimaryTimeRangePicker }]);
     return {
+      commandPaletteOpen,
       signOutDraftsOpen,
       signOutDraftCount,
       ASSISTANT_INSET_CLASSES,
@@ -1942,8 +1976,27 @@ export default defineComponent({
         if (snapshot === this.orgListSnapshot.value) return;
         this.orgListSnapshot.value = snapshot;
         this.setSelectedOrganization();
+        const list = Array.isArray(orgs) ? orgs : [];
+        const ids = list.map((o: { identifier: string }) => o.identifier);
+        flushPendingLanding(ids);
+        prune(ids);
+        applyDocumentTitle(this.router.currentRoute.value, list);
       },
       deep: true,
+      immediate: true,
+    },
+    // A login lands on `/` with no org in the URL, so the router never sees it; the first resolved org is that landing.
+    // With an org in the URL the router already noted it, and the store's first value is the stale localStorage org.
+    "store.state.selectedOrganization.identifier": {
+      handler(identifier: string | undefined, previous: string | undefined) {
+        if (!identifier || previous) return;
+        if (typeof this.router.currentRoute.value.query?.org_identifier === "string") return;
+        const orgs = this.store?.state?.organizations;
+        noteLanding(
+          identifier,
+          (Array.isArray(orgs) ? orgs : []).map((o: { identifier: string }) => o.identifier),
+        );
+      },
       immediate: true,
     },
     async changeOrganizationIdentifier(_next: string, previous: string) {
