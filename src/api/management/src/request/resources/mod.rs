@@ -34,7 +34,7 @@ use serde::Serialize;
 
 use crate::models::resources::SearchParams;
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct SearchFailure {
     code: &'static str,
     message: String,
@@ -50,18 +50,18 @@ struct SearchFailure {
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("q" = Option<String>, Query, description = "Name or stable identity, at most 256 normalized Unicode characters"),
-        ("types" = Option<String>, Query, description = "Comma-separated resource types"),
+        ("q" = Option<String>, Query, description = "Name or stable identity, at most 256 normalized Unicode characters. Required when `types` is absent"),
+        ("types" = Option<String>, Query, description = "Comma-separated resource types: stream, dashboard, alert, function, pipeline, synthetic, user, service_account. Absent means all types"),
         ("limit" = Option<usize>, Query, description = "Per-type limit, default 20, maximum 100"),
         ("offset" = Option<usize>, Query, description = "Hits to skip, for one explicit resource type, at most 10000")
     ),
     responses(
         (status = 200, description = "Resource summaries and per-source completeness", body = config::meta::resources::SearchResponse),
-        (status = 400, description = "Invalid search parameters"),
+        (status = 400, description = "Invalid search parameters", body = SearchFailure),
         (status = 401, description = "Authentication required"),
-        (status = 403, description = "Organization access denied"),
-        (status = 429, description = "Search capacity exhausted"),
-        (status = 503, description = "Search unavailable")
+        (status = 403, description = "Organization access denied", body = SearchFailure),
+        (status = 429, description = "Search capacity exhausted", body = SearchFailure),
+        (status = 503, description = "Search unavailable", body = SearchFailure)
     ),
     extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Resources", "operation": "list"}))),
 )]

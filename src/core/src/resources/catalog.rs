@@ -26,7 +26,7 @@ use hashbrown::HashMap;
 use parking_lot::Mutex;
 use tokio::sync::{Notify, Semaphore};
 
-use super::{SearchError, matching::IndexedRecord};
+use super::matching::IndexedRecord;
 
 const COLD_WAIT: Duration = Duration::from_millis(300);
 const BUILD_TIMEOUT: Duration = Duration::from_secs(30);
@@ -113,12 +113,8 @@ impl Catalog {
     }
 
     /// Starts the builds `kinds` are due for and waits briefly for the ones with no snapshot yet.
-    pub async fn ensure(
-        self: &Arc<Self>,
-        org: &str,
-        kinds: &[ResourceKind],
-    ) -> Result<(), SearchError> {
-        for key in self.start(org, kinds)? {
+    pub async fn ensure(self: &Arc<Self>, org: &str, kinds: &[ResourceKind]) {
+        for key in self.start(org, kinds) {
             tokio::spawn(self.clone().build(key));
         }
         let cold = || {
@@ -136,7 +132,7 @@ impl Catalog {
             tokio::pin!(built);
             built.as_mut().enable();
             if !cold() || tokio::time::timeout_at(deadline, built).await.is_err() {
-                return Ok(());
+                return;
             }
         }
     }
@@ -170,7 +166,7 @@ impl Catalog {
         }
     }
 
-    fn start(&self, org: &str, kinds: &[ResourceKind]) -> Result<Vec<Key>, SearchError> {
+    fn start(&self, org: &str, kinds: &[ResourceKind]) -> Vec<Key> {
         let now = Instant::now();
         let mut state = self.state.lock();
         state
@@ -182,24 +178,24 @@ impl Catalog {
             }
         }
         let mut due = Vec::new();
-        let mut cold = false;
         for &kind in kinds {
             let entry = state
                 .entries
                 .entry(Key::new(org, kind))
                 .or_insert_with(|| Entry::new(now));
             if entry.due(now) {
-                cold |= entry.rows.is_none();
                 due.push(Key::new(org, kind));
             }
         }
         if state.pending + due.len() > self.max_pending {
-            // A stale snapshot can still answer; only a missing one makes the search fail.
-            return if cold {
-                Err(SearchError::Overloaded)
-            } else {
-                Ok(Vec::new())
-            };
+            // Stale snapshots still answer and kinds with none report busy, so other kinds stay
+            // usable.
+            for key in &due {
+                if let Some(entry) = state.entries.get_mut(key).filter(|e| e.rows.is_none()) {
+                    entry.failure = Some(SourceReason::ResourceExhausted);
+                }
+            }
+            return Vec::new();
         }
         for key in &due {
             if let Some(entry) = state.entries.get_mut(key) {
@@ -209,7 +205,7 @@ impl Catalog {
             }
         }
         state.pending += due.len();
-        Ok(due)
+        due
     }
 
     async fn build(self: Arc<Self>, key: Key) {
@@ -554,10 +550,7 @@ mod tests {
     }
 
     async fn ensure(catalog: &Arc<Catalog>, org: &str) {
-        catalog
-            .ensure(org, &[ResourceKind::Function])
-            .await
-            .unwrap();
+        catalog.ensure(org, &[ResourceKind::Function]).await;
     }
 
     #[tokio::test]
@@ -646,12 +639,10 @@ mod tests {
     async fn concurrent_cold_searches_share_one_build() {
         let x = fixture(vec![row("f1", "Old")]);
         let (a, b) = (x.catalog.clone(), x.catalog.clone());
-        let (first, second) = tokio::join!(
+        tokio::join!(
             a.ensure("org", &[ResourceKind::Function]),
             b.ensure("org", &[ResourceKind::Function])
         );
-        first.unwrap();
-        second.unwrap();
         assert_eq!(x.reads(), 1);
         assert_eq!(x.names("org"), ["Old"]);
     }
@@ -726,11 +717,12 @@ mod tests {
             Some(SourceReason::ResourceExhausted)
         );
 
-        let full = fixture_with(Vec::new(), limits(entry, 0));
-        assert!(matches!(
-            full.catalog.ensure("org", &[ResourceKind::Function]).await,
-            Err(SearchError::Overloaded)
-        ));
+        let full = fixture_with(vec![row("f1", "Old")], limits(entry, 0));
+        full.catalog.ensure("org", &[ResourceKind::Function]).await;
+        assert_eq!(
+            search(&full.catalog, "Old").sources[0].reason,
+            Some(SourceReason::ResourceExhausted)
+        );
     }
 
     #[tokio::test(start_paused = true)]

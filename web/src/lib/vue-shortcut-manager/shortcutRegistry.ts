@@ -713,7 +713,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     shortcuts: [
       {
         id: "k8sPalette",
-        keyForWindows: "ctrl+shift+k",
+        // Ctrl+Shift+K opens Firefox's Web Console on Windows and Linux.
+        keyForWindows: "ctrl+alt+k",
         keyForMac: "meta+shift+k",
         descriptionKey: "shortcuts.actions.k8sPalette",
         allowInInput: true,

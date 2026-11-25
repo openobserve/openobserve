@@ -144,9 +144,10 @@ describe("MainLayout — global resource search shortcut", () => {
     wrapper?.unmount();
     wrapper = undefined;
     resetManager();
-    document.querySelector('[data-test="other-dialog"]')?.remove();
+    document.querySelector('[data-test="other-panel"]')?.remove();
+    document.querySelector('[data-test="o-dialog-overlay"]')?.remove();
   });
-  it("registers global Command K, toggles it from an editor and skips composition or modals", async () => {
+  it("registers global Command K, toggles it from an editor and skips composition or open modals", async () => {
     resetManager();
     wrapper = mountMainLayout();
     await flushPromises();
@@ -172,11 +173,20 @@ describe("MainLayout — global resource search shortcut", () => {
     editor.remove();
     await press({ isComposing: true });
     expect(palette()).toBe(false);
-    const dialog = document.createElement("div");
-    dialog.role = "dialog";
-    dialog.dataset.test = "other-dialog";
-    document.body.append(dialog);
+    const panel = document.createElement("div");
+    panel.role = "dialog";
+    panel.dataset.test = "other-panel";
+    document.body.append(panel);
+    await press();
+    expect(palette()).toBe(true);
+    await press();
+    panel.remove();
+    const overlay = document.createElement("div");
+    overlay.dataset.test = "o-dialog-overlay";
+    overlay.dataset.state = "open";
+    document.body.append(overlay);
     await press();
     expect(palette()).toBe(false);
+    overlay.remove();
   });
 });

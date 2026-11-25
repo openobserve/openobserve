@@ -15,7 +15,7 @@
 
 use std::str::FromStr;
 
-use config::meta::resources::{MAX_SEARCH_OFFSET, ResourceKind, SearchQuery};
+use config::meta::resources::{MAX_QUERY_CHARS, MAX_SEARCH_OFFSET, ResourceKind, SearchQuery};
 use serde::Deserialize;
 
 #[derive(Debug, Default, Deserialize)]
@@ -45,6 +45,9 @@ impl SearchParams {
                 parsed
             }
         };
+        if normalized.chars().count() > MAX_QUERY_CHARS {
+            return Err("q exceeds 256 normalized characters");
+        }
         if normalized.is_empty() && !explicit {
             return Err("an empty query requires an explicit resource type");
         }
@@ -88,7 +91,9 @@ mod tests {
 
     #[test]
     fn query_validation_rejects_bad_input_and_keeps_case() {
+        let long = "支".repeat(MAX_QUERY_CHARS + 1);
         for invalid in [
+            params(Some(&long), None, None, None),
             params(None, None, None, None),
             params(Some(" "), None, None, None),
             params(Some("x"), Some("dashboard,unknown"), None, None),
@@ -111,5 +116,11 @@ mod tests {
             .into_query()
             .unwrap();
         assert_eq!(query.q, "MixedID");
+        let longest = "支".repeat(MAX_QUERY_CHARS);
+        assert!(
+            params(Some(&longest), None, None, None)
+                .into_query()
+                .is_ok()
+        );
     }
 }

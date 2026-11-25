@@ -84,7 +84,14 @@ onScopeDispose(() => {
   window.removeEventListener("pointermove", onTypeDrag);
   window.removeEventListener("pointerup", endTypeDrag);
 });
-const search = useResourceSearch({ open: toRef(props, "open"), org, subject, query, type });
+const search = useResourceSearch({
+  open: toRef(props, "open"),
+  org,
+  subject,
+  query,
+  type,
+  kinds: peerKinds,
+});
 const pages = computed(() =>
   palettePages(
     props.links,
@@ -150,24 +157,26 @@ const recentEntries = computed<Entry[]>(() =>
     : [],
 );
 const groups = computed(() =>
-  RESOURCE_KINDS.map((kind) => {
-    const all = search.data.value?.hits.filter((hit) => hit.type === kind) ?? [];
-    const source = search.data.value?.sources.find((s) => s.type === kind);
-    const entries: Entry[] = all.slice(0, type.value === "all" ? 3 : undefined).flatMap((hit) => {
-      const route = resourceRoute(hit, org.value);
-      return route
-        ? [
-            {
-              id: `${kind}:${hit.id}`,
-              name: raw(hit.name),
-              route,
-              sub: hit.folder_name || hit.id,
-            },
-          ]
-        : [];
-    });
-    return { kind, entries, source };
-  }).filter((g) => g.entries.length || (!!g.source && retryable(g.source))),
+  peerKinds.value
+    .map((kind) => {
+      const all = search.data.value?.hits.filter((hit) => hit.type === kind) ?? [];
+      const source = search.data.value?.sources.find((s) => s.type === kind);
+      const entries: Entry[] = all.slice(0, type.value === "all" ? 3 : undefined).flatMap((hit) => {
+        const route = resourceRoute(hit, org.value);
+        return route
+          ? [
+              {
+                id: `${kind}:${hit.id}`,
+                name: raw(hit.name),
+                route,
+                sub: hit.folder_name || hit.id,
+              },
+            ]
+          : [];
+      });
+      return { kind, entries, source };
+    })
+    .filter((g) => g.entries.length || (!!g.source && retryable(g.source))),
 );
 const entries = computed(() => [
   ...recentEntries.value,

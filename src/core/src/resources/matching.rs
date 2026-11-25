@@ -15,7 +15,7 @@
 
 use std::mem::size_of;
 
-use config::meta::resources::{MatchTier, ResourceRoute, ResourceSummary};
+use config::meta::resources::{MAX_QUERY_CHARS, MatchTier, ResourceRoute, ResourceSummary};
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
 use super::SearchError;
@@ -64,7 +64,7 @@ pub(super) struct PreparedQuery {
 impl PreparedQuery {
     pub fn new(value: &str) -> Result<Self, SearchError> {
         let normalized = normalize(value);
-        if normalized.chars().count() > 256 {
+        if normalized.chars().count() > MAX_QUERY_CHARS {
             return Err(SearchError::InvalidQuery(
                 "q exceeds 256 normalized characters".into(),
             ));

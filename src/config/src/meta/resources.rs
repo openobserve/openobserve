@@ -23,6 +23,7 @@ use crate::meta::folder::FolderType;
 
 /// The largest `offset` a search accepts, so a pager must stop before it.
 pub const MAX_SEARCH_OFFSET: usize = 10_000;
+pub const MAX_QUERY_CHARS: usize = 256;
 
 #[derive(
     Debug,

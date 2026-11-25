@@ -12,18 +12,22 @@ afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
 });
-function setup(initialType: ResourceKind | "all" = "all") {
+function setup(
+  initialType: ResourceKind | "all" = "all",
+  visible: ResourceKind[] = ["function", "dashboard"],
+) {
   const open = ref(true),
     org = ref("acme"),
     subject = ref("alice"),
     query = ref(""),
-    type = ref<ResourceKind | "all">(initialType);
+    type = ref<ResourceKind | "all">(initialType),
+    kinds = ref<ResourceKind[]>(visible);
   let search!: ReturnType<typeof useResourceSearch>;
   wrappers.push(
     mount(
       defineComponent({
         setup() {
-          search = useResourceSearch({ open, org, subject, query, type });
+          search = useResourceSearch({ open, org, subject, query, type, kinds });
           return () => h("div");
         },
       }),
@@ -52,6 +56,15 @@ const partial: ResourceSearchResponse = {
   took_ms: 0,
 };
 describe("Command K search lifecycle", () => {
+  it("searches only the visible kinds, and nothing when none are visible", async () => {
+    vi.useFakeTimers();
+    vi.mocked(resources.search).mockResolvedValue(empty);
+    await typeQuery(setup(), "pay");
+    expect(vi.mocked(resources.search).mock.calls[0][1].types).toEqual(["function", "dashboard"]);
+    vi.clearAllMocks();
+    await typeQuery(setup("all", []), "pay");
+    expect(resources.search).not.toHaveBeenCalled();
+  });
   it("makes no resource request for empty All and debounces typing", async () => {
     vi.useFakeTimers();
     vi.mocked(resources.search).mockResolvedValue(empty);

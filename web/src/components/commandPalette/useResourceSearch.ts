@@ -23,6 +23,8 @@ export function useResourceSearch(input: {
   subject: Ref<string>;
   query: Ref<string>;
   type: Ref<ResourceKind | "all">;
+  /** The kinds this user's navigation shows; "all" searches only these. */
+  kinds: Ref<ResourceKind[]>;
 }) {
   const scope = ++scopeSequence;
   const client = useQueryClient();
@@ -40,7 +42,7 @@ export function useResourceSearch(input: {
       input.open.value &&
       !!input.org.value &&
       !!input.subject.value &&
-      (!!input.query.value.trim() || input.type.value !== "all"),
+      (input.type.value !== "all" || (!!input.query.value.trim() && input.kinds.value.length > 0)),
   );
   const query = useQuery(() => ({
     ...resourcesQuery(input.org.value, input.subject.value, params.value, scope),
@@ -53,7 +55,7 @@ export function useResourceSearch(input: {
     client.removeQueries({ queryKey: previousScope });
   };
   watch(
-    [input.open, input.org, input.subject, input.query, input.type],
+    [input.open, input.org, input.subject, input.query, input.type, input.kinds],
     () => {
       sequence += 1;
       debouncing.value = eligible.value;
@@ -66,7 +68,7 @@ export function useResourceSearch(input: {
       timer = setTimeout(() => {
         params.value = {
           q: input.query.value.trim(),
-          types: input.type.value === "all" ? undefined : [input.type.value],
+          types: input.type.value === "all" ? input.kinds.value : [input.type.value],
           limit: 20,
         };
         debouncing.value = false;

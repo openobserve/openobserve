@@ -99,7 +99,7 @@ pub async fn search(
         })
         .await?
         .clone();
-    catalog.ensure(org, &enabled).await?;
+    catalog.ensure(org, &enabled).await;
     let permit = catalog
         .scans
         .clone()

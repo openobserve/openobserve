@@ -1177,8 +1177,11 @@ export default defineComponent({
       }, 100);
     };
 
+    // `addRoutePush` opens the editor itself, so the URL it writes must not open it a second time.
+    let openedEditLink = "";
     const addRoutePush = (row: any) => {
       if (row?.email) {
+        openedEditLink = row.email;
         router.push({
           name: "users",
           query: {
@@ -1200,13 +1203,19 @@ export default defineComponent({
       }
     };
     watch(
-      () => [router.currentRoute.value.query.action, router.currentRoute.value.query.email],
+      [() => router.currentRoute.value.query.action, () => router.currentRoute.value.query.email],
       ([action, email]) => {
-        if (action !== "update" || typeof email !== "string") return;
+        if (action !== "update" || typeof email !== "string") {
+          openedEditLink = "";
+          return;
+        }
+        if (email === openedEditLink) return;
         const row = usersState.users.find(
           (user: { rawEmail?: string; email: string }) => (user.rawEmail ?? user.email) === email,
         );
-        if (row) addUser({ row }, true);
+        if (!row) return;
+        openedEditLink = email;
+        addUser({ row }, true);
       },
     );
 

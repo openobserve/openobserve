@@ -162,7 +162,16 @@ describe("Command K palette", () => {
     await flushPromises();
     await vi.advanceTimersByTimeAsync(200);
     await flushPromises();
-    expect(vi.mocked(resources.search).mock.calls.at(-1)?.[1].types).toBeUndefined();
+    expect(vi.mocked(resources.search).mock.calls.at(-1)?.[1].types).toEqual([
+      "stream",
+      "dashboard",
+      "alert",
+      "pipeline",
+      "function",
+      "synthetic",
+      "user",
+      "service_account",
+    ]);
   });
   it("preserves the selected resource identity when a preceding group arrives", async () => {
     vi.mocked(resources.search)

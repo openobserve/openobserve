@@ -409,6 +409,8 @@ import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 // Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
 const KEPT_ALIVE_VIEWS = ["AppAnalytics", "AppTraces"];
+const MODAL_OVERLAY =
+  '[data-test="o-dialog-overlay"][data-state="open"], [data-test="o-drawer-overlay"][data-state="open"]';
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -1986,7 +1988,8 @@ export default defineComponent({
       {
         id: "commandPalette",
         handler: () => {
-          if (!commandPaletteOpen.value && document.querySelector('[role="dialog"]')) return;
+          // Only a modal owns the keyboard; non-modal drawers and panels render no overlay.
+          if (!commandPaletteOpen.value && document.querySelector(MODAL_OVERLAY)) return;
           commandPaletteOpen.value = !commandPaletteOpen.value;
         },
       },

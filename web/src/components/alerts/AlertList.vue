@@ -3486,11 +3486,10 @@ export default defineComponent({
     let consumedAlertIntent = "";
     let consumingAlertIntent = false;
     watch(
-      () =>
-        [
-          router.currentRoute.value.query.action,
-          router.currentRoute.value.query.palette_intent,
-        ] as const,
+      [
+        () => router.currentRoute.value.query.action,
+        () => router.currentRoute.value.query.palette_intent,
+      ],
       async ([action, intent]) => {
         if (consumingAlertIntent) return;
         if (typeof intent !== "string" || action !== "add") {
