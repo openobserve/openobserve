@@ -367,7 +367,9 @@ describe("SlackSelfHostedWizard Step 2", () => {
       expect(slack.createInstallation).toHaveBeenCalledWith("acme", {
         mode: "socket",
         config_refresh_token: "xoxe-1-sample",
+        app_name: "OpenObserve",
         channel_history: true,
+        command: "/o2",
       }),
     );
     await flushPromises();
@@ -414,7 +416,9 @@ describe("SlackSelfHostedWizard Step 2", () => {
     expect(w.find('[data-test="slack-wizard-app-token"]').exists()).toBe(true);
     expect(slack.getManifest).toHaveBeenCalledWith("acme", {
       mode: "socket",
+      name: "OpenObserve",
       channel_history: true,
+      command: "/o2",
     });
     expect(w.find('[data-test="slack-wizard-open-manifest"]').attributes("href")).toMatch(
       /^https:\/\/api\.slack\.com\/apps\?new_app=1&manifest_json=/,
@@ -428,8 +432,105 @@ describe("SlackSelfHostedWizard Step 2", () => {
         mode: "socket",
         client_id: "1.2",
         client_secret: "sec",
+        app_name: "OpenObserve",
+        channel_history: true,
+        command: "/o2",
       }),
     );
+  });
+
+  it("issue 3608: the slash command follows the app name until the user types one, and both reach Slack", async () => {
+    const w = await toStep2();
+    const name = w.find('[data-test="slack-wizard-app-name"] input');
+    const command = () =>
+      (w.find('[data-test="slack-wizard-command"] input').element as HTMLInputElement).value;
+    expect(command()).toBe("/o2");
+    expect(w.find('[data-test="slack-wizard-command-warning"]').text()).toContain(
+      "If another app in this workspace already uses /o2, /o2 stops working for that app",
+    );
+    await name.setValue("Main Dev App");
+    await flushPromises();
+    expect(command()).toBe("/main-dev-app");
+    expect(w.find('[data-test="slack-wizard-command-warning"]').text()).toContain("/main-dev-app");
+    await w.find('[data-test="slack-wizard-command"] input').setValue("/o2-dev");
+    await name.setValue("O2 Dev");
+    await flushPromises();
+    expect(command()).toBe("/o2-dev");
+    // A typed command that equals a name's default still stays the user's own.
+    await name.setValue("O2 Dev Staging");
+    await flushPromises();
+    expect(command()).toBe("/o2-dev");
+    await name.setValue("Staging");
+    await flushPromises();
+    expect(command()).toBe("/o2-dev");
+    // Typing a default back by hand still counts as the user's own command.
+    await w.find('[data-test="slack-wizard-command"] input').setValue("/staging");
+    await name.setValue("Production");
+    await flushPromises();
+    expect(command()).toBe("/staging");
+
+    await w.find('[data-test="slack-wizard-config-token"] input').setValue("xoxe-1-sample");
+    await w.find('[data-test="slack-wizard-create-form"]').trigger("submit");
+    await vi.waitFor(() =>
+      expect(slack.createInstallation).toHaveBeenCalledWith("acme", {
+        mode: "socket",
+        config_refresh_token: "xoxe-1-sample",
+        app_name: "Production",
+        channel_history: true,
+        command: "/staging",
+      }),
+    );
+  });
+
+  it("issue 3608: refuses an app name with Slack markup before Slack is called", async () => {
+    const w = await toStep2();
+    await w.find('[data-test="slack-wizard-config-token"] input').setValue("xoxe-1-sample");
+    await w.find('[data-test="slack-wizard-app-name"] input').setValue("Ops <!here>");
+    await w.find('[data-test="slack-wizard-command"] input').setValue("/ops");
+    await w.find('[data-test="slack-wizard-create-form"]').trigger("submit");
+    await vi.waitFor(() => expect(w.text()).toContain("The app name must not contain <, > or &"));
+    expect(slack.createInstallation).not.toHaveBeenCalled();
+  });
+
+  it("issue 3608: refuses a slash command Slack would refuse before Slack is called", async () => {
+    const w = await toStep2();
+    await w.find('[data-test="slack-wizard-config-token"] input').setValue("xoxe-1-sample");
+    for (const bad of ["o2", "/O2", "/o2 dev", `/${"a".repeat(32)}`]) {
+      await w.find('[data-test="slack-wizard-command"] input').setValue(bad);
+      await w.find('[data-test="slack-wizard-create-form"]').trigger("submit");
+      await vi.waitFor(() =>
+        expect(w.text()).toContain("Start with / and use at most 32 characters"),
+      );
+    }
+    expect(slack.createInstallation).not.toHaveBeenCalled();
+  });
+
+  it("issue 3608: the manual manifest carries the chosen name and command, and waits for a valid command", async () => {
+    const w = await toStep2();
+    await w.find('[data-test="slack-wizard-manual"]').trigger("click");
+    await flushPromises();
+    vi.mocked(slack.getManifest).mockClear();
+    await w.find('[data-test="slack-wizard-command"] input').setValue("/O2");
+    await flushPromises();
+    expect(slack.getManifest).not.toHaveBeenCalled();
+    await w.find('[data-test="slack-wizard-app-name"] input').setValue("Acme Prod");
+    await w.find('[data-test="slack-wizard-command"] input').setValue("/acme-prod");
+    await flushPromises();
+    expect(slack.getManifest).toHaveBeenLastCalledWith("acme", {
+      mode: "socket",
+      name: "Acme Prod",
+      channel_history: true,
+      command: "/acme-prod",
+    });
+    // A command-only change asks for a new manifest too.
+    await w.find('[data-test="slack-wizard-command"] input').setValue("/acme-alt");
+    await flushPromises();
+    expect(slack.getManifest).toHaveBeenLastCalledWith("acme", {
+      mode: "socket",
+      name: "Acme Prod",
+      channel_history: true,
+      command: "/acme-alt",
+    });
   });
 
   it("refuses a manual HTTP app without its signing secret", async () => {
