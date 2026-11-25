@@ -541,8 +541,9 @@ impl Loaded {
         let names = self.names().await?;
         let listable = rights.listable(&run.org, email).await;
         let mut plan = self.plan(&names);
+        let mut outcome = self.outcome();
         if let Some(plan) = plan.as_mut() {
-            self.hide_unlisted_missing(plan, &names, listable.as_deref());
+            self.hide_unlisted_missing(plan, outcome.as_mut(), &names, listable.as_deref());
         }
         let (approvers, can_approve) = match &plan {
             Some(plan) => rights.of(run, email, plan).await,
@@ -576,7 +577,7 @@ impl Loaded {
             approvers,
             can_approve,
             steps,
-            outcome: self.outcome(),
+            outcome,
             thread: self.thread(&names.current).await,
             autoresolve: self.autoresolve().await?,
             not_connected: self.not_connected(&names, listable.as_deref()),
@@ -749,11 +750,12 @@ impl Loaded {
         })
     }
 
-    /// The planner may name an MCP the viewer cannot list; then neither the card nor the raw
-    /// hint names it.
+    /// The planner may name an MCP the viewer cannot list; then neither the card, the raw hint
+    /// nor the outcome that repeats it names it.
     fn hide_unlisted_missing(
         &self,
         plan: &mut AutoResolvePlan,
+        outcome: Option<&mut AutoResolveOutcome>,
         names: &ConnectionNames,
         listable: Option<&[String]>,
     ) {
@@ -768,6 +770,11 @@ impl Loaded {
             normalize_tool_name(name) == key && !approve::is_permitted(&self.run.org, id, listable)
         });
         if unlisted {
+            if let Some(outcome) =
+                outcome.filter(|o| o.explanation.as_deref() == plan.missing_capability.as_deref())
+            {
+                outcome.explanation = None;
+            }
             plan.missing_connection = None;
             plan.missing_capability = None;
         }
@@ -1315,12 +1322,29 @@ mod tests {
             let off_run = loaded.not_connected(&names, permitted.as_deref());
             assert_eq!(off_run, want, "{case}");
             let mut plan = loaded.plan(&names).unwrap();
-            loaded.hide_unlisted_missing(&mut plan, &names, permitted.as_deref());
+            // A no-option plan ends the run with its missing capability as the explanation.
+            let mut outcome = AutoResolveOutcome {
+                verdict: Some("no_change".to_string()),
+                system_summary: String::new(),
+                explanation: plan.missing_capability.clone(),
+                error: None,
+                prior_verdict: None,
+            };
+            loaded.hide_unlisted_missing(
+                &mut plan,
+                Some(&mut outcome),
+                &names,
+                permitted.as_deref(),
+            );
             let missing = plan.missing_connection.map(|m| m.name);
-            let shown = (missing.as_deref(), plan.missing_capability.is_some());
+            let shown = (
+                missing.as_deref(),
+                plan.missing_capability.is_some(),
+                outcome.explanation.is_some(),
+            );
             let want = match want.is_empty() {
-                true => (None, false),
-                false => (Some("Postgres"), true),
+                true => (None, false, false),
+                false => (Some("Postgres"), true, true),
             };
             assert_eq!(shown, want, "{case}: the missing MCP");
         }
