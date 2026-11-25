@@ -750,6 +750,9 @@ impl MemorySize for WriterKey {
 
 #[cfg(test)]
 mod tests {
+    use arrow::{array::Int64Array, record_batch::RecordBatch};
+    use arrow_schema::{DataType, Field};
+
     use super::*;
 
     #[test]
@@ -802,9 +805,6 @@ mod tests {
     }
 
     async fn write_ts(writer: &Writer, org_id: &str, stream: &str, ts: Vec<i64>) {
-        use arrow::{array::Int64Array, record_batch::RecordBatch};
-        use arrow_schema::{DataType, Field};
-
         let schema = Arc::new(Schema::new(vec![Field::new(
             config::TIMESTAMP_COL_NAME,
             DataType::Int64,

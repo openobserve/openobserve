@@ -205,8 +205,6 @@ mod tests {
 
     #[test]
     fn test_execution_plan_name() {
-        use datafusion::physical_plan::ExecutionPlan;
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let exec = EnrichExec::new("org", "stream", schema);
         assert_eq!(ExecutionPlan::name(&exec), "EnrichExec");
@@ -214,8 +212,6 @@ mod tests {
 
     #[test]
     fn test_children_is_empty() {
-        use datafusion::physical_plan::ExecutionPlan;
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let exec = EnrichExec::new("org", "stream", schema);
         assert!(exec.children().is_empty());
@@ -231,8 +227,6 @@ mod tests {
 
     #[test]
     fn test_properties_not_null() {
-        use datafusion::physical_plan::ExecutionPlan;
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let exec = EnrichExec::new("org", "stream", schema);
         let props = exec.properties();
@@ -242,8 +236,6 @@ mod tests {
 
     #[test]
     fn test_metrics_returns_some() {
-        use datafusion::physical_plan::ExecutionPlan;
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let exec = EnrichExec::new("org", "stream", schema);
         assert!(exec.metrics().is_some());
