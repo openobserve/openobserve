@@ -30,7 +30,7 @@
                   size="chip-12"
                   class="!pe-1"
                   :data-test="`dashboard-join-item-${index}`"
-                  icon-right="arrow-drop-down"
+                  icon-right="expand-more"
                 >
                   <div class="flex items-center gap-1.5">
                     <LeftJoinTypeSvg

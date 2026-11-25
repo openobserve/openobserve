@@ -202,8 +202,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left><OIcon name="wrap-text" size="sm" /></template>
               {{ t("search.messageWrapContent") }}
-              <template v-if="searchObj.meta.toggleSourceWrap" #icon-right>
-                <OIcon name="check" size="sm" />
+              <template #icon-right>
+                <OSwitch
+                  class="ms-auto"
+                  v-model="searchObj.meta.toggleSourceWrap"
+                  :aria-label="t('search.messageWrapContent')"
+                  size="sm"
+                  data-test="logs-result-wrap-menu-switch"
+                  @click.stop
+                />
               </template>
             </ODropdownItem>
             <ODropdownItem

@@ -752,7 +752,6 @@ describe("OSelect", () => {
       expect(rows).toHaveLength(3);
       for (const row of rows) {
         expect(row.querySelector(":scope > span.size-4")).toBeNull();
-        expect(row.classList.contains("gap-2")).toBe(false);
       }
     });
   });

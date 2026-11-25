@@ -99,7 +99,7 @@
             :aria-label="t('aiObservability.playground.tools')"
             data-test="ai-playground-tools-menu"
           >
-            <OIcon name="arrow-drop-down" size="sm" />
+            <OIcon name="expand-more" size="xs" />
           </OButton>
         </template>
         <ODropdownItem

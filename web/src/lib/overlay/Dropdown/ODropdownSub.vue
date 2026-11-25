@@ -9,6 +9,13 @@ import {
 import type { DropdownSubProps, DropdownSubEmits, DropdownSubSlots } from "./ODropdownSub.types";
 import { O_DROPDOWN_NESTED_KEY, type DropdownNestedRegistry } from "./ODropdown.context";
 import OText from "../../core/Typography/OText.vue";
+import OIcon from "../../core/Icon/OIcon.vue";
+import {
+  MENU_ROW_CLASS,
+  MENU_ROW_VARIANT_CLASS,
+  MENU_SURFACE_CLASS,
+  menuSizeClass,
+} from "../menuClasses";
 
 defineOptions({ inheritAttrs: false });
 const props = defineProps<DropdownSubProps>();
@@ -83,7 +90,7 @@ function onKeydown(event: KeyboardEvent) {
       type="button"
       :text-value="textValue"
       :aria-describedby="description ? descriptionDomId : undefined"
-      class="group/sub rounded-default text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg relative flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-start transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none"
+      :class="['group/sub', MENU_ROW_CLASS, MENU_ROW_VARIANT_CLASS.default]"
     >
       <slot name="icon-left" />
       <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -98,7 +105,9 @@ function onKeydown(event: KeyboardEvent) {
         >
       </span>
       <slot v-else name="trigger" />
-      <slot name="icon-right" />
+      <slot name="icon-right">
+        <OIcon name="chevron-right" size="xs" class="text-text-secondary ms-auto shrink-0" />
+      </slot>
     </DropdownMenuSubTrigger>
     <DropdownMenuPortal>
       <DropdownMenuSubContent
@@ -106,7 +115,7 @@ function onKeydown(event: KeyboardEvent) {
         :collision-padding="8"
         :hide-when-detached="true"
         :style="{ zIndex: contentZIndex }"
-        class="bg-dropdown-bg rounded-default text-dropdown-item-text shadow-overlay max-h-[var(--reka-popper-available-height,75vh)] max-w-[calc(100vw-1rem)] min-w-40 overflow-y-auto border border-transparent p-1 text-sm"
+        :class="[...menuSizeClass(), MENU_SURFACE_CLASS]"
         @keydown.capture="onKeydown"
         @pointer-down-outside="onPointerDownOutside"
       >

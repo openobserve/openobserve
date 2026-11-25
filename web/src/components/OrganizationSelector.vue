@@ -24,9 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   once and the menu hangs. Here we drive @tanstack/vue-virtual directly
   with a small overscan and plain markup.
 
-  Styling is pure Tailwind ( prefix) + semantic design tokens — selected
-  / hover states reuse the same select-item-* tokens as OSelect so the menu
-  matches the rest of the app. No SCSS, no scoped classes.
+  Styling is pure Tailwind + semantic design tokens — rows, headings, search
+  and selected state follow the shared menu anatomy (lib/overlay/menuClasses).
 -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue";
@@ -37,7 +36,7 @@ import { useVirtualizer } from "@tanstack/vue-virtual";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import { MENU_LABEL_CLASS } from "@/lib/overlay/menuClasses";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -110,17 +109,14 @@ const SECTION_LABEL_KEYS = {
 } as const satisfies Record<OrgSection, string>;
 
 // ── Virtualization ──────────────────────────────────────────────
-// Headings are shorter than org rows, so estimateSize switches on row kind.
-const ROW_HEIGHT = 36;
-const HEADING_HEIGHT = 28;
+const ROW_HEIGHT = 28;
 const scrollRef = ref<HTMLElement | null>(null);
 
 const virtualizer = useVirtualizer(
   computed(() => ({
     count: listRows.value.length,
     getScrollElement: () => scrollRef.value,
-    estimateSize: (i: number) =>
-      listRows.value[i]?.kind === "heading" ? HEADING_HEIGHT : ROW_HEIGHT,
+    estimateSize: () => ROW_HEIGHT,
     getItemKey: (i: number) => listRows.value[i]?.key ?? i,
     overscan: 8,
   })),
@@ -325,16 +321,10 @@ watch(listRows, (rows, previous) => {
 
 const isSelected = (org: OrgOption) => org.identifier === props.current?.identifier;
 
-// Selection reuses the same tokens OSelect uses, so the menu is visually
-// consistent with every other dropdown in the app.
 const rowStateClass = (org: OrgOption, index: number) => {
-  if (isSelected(org)) {
-    return "bg-select-item-selected-bg text-select-item-selected-text";
-  }
-  if (index === activeIndex.value) {
-    return "bg-select-item-hover-bg text-select-item-text";
-  }
-  return "text-select-item-text";
+  const text = isSelected(org) ? "text-dropdown-item-selected-text" : "text-dropdown-item-text";
+  if (index === activeIndex.value) return ["bg-dropdown-item-hover-bg", text];
+  return isSelected(org) ? ["bg-dropdown-item-selected-bg", text] : text;
 };
 
 // Reserved slots: `invisible` keeps the box, so the name never shifts when the buttons appear.
@@ -410,8 +400,8 @@ useShortcuts([
           />
           <template #icon-right>
             <OIcon
-              name="arrow-drop-down"
-              size="sm"
+              name="expand-more"
+              size="xs"
               class="shrink-0 opacity-70 transition-transform"
               :class="open ? 'rotate-180' : ''"
             />
@@ -447,13 +437,21 @@ useShortcuts([
           </OButton>
         </div>
 
-        <div ref="searchWrapRef" class="px-3 pb-3">
-          <OSearchInput
-            data-test="organization-search-input"
+        <div
+          ref="searchWrapRef"
+          data-test="organization-search-input"
+          class="border-dropdown-border -mx-1 flex h-7 shrink-0 items-center gap-2 border-b px-3"
+        >
+          <OIcon name="search" size="xs" class="text-text-secondary shrink-0" />
+          <input
             v-model="searchQuery"
-            clearable
-            :debounce="1"
+            data-test="organization-search-input-field"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            class="text-text-body placeholder:text-text-secondary text-compact h-full min-w-0 flex-1 bg-transparent outline-none"
             :placeholder="t('organization.searchByNameOrId')"
+            :aria-label="t('organization.searchByNameOrId')"
             role="combobox"
             :aria-expanded="orgRowCount > 0"
             aria-haspopup="grid"
@@ -464,8 +462,6 @@ useShortcuts([
           />
         </div>
 
-        <div v-if="orgRowCount" class="bg-select-content-border mx-3 h-px" aria-hidden="true" />
-
         <div
           v-if="orgRowCount"
           :id="gridId"
@@ -474,7 +470,7 @@ useShortcuts([
           :aria-rowcount="listRows.length"
           :aria-label="t('organization.header')"
           data-test="organization-menu-table"
-          class="relative max-h-96 overflow-x-hidden overflow-y-auto pt-2 pb-1"
+          class="relative max-h-96 overflow-x-hidden overflow-y-auto pt-1"
         >
           <div class="relative w-full" :style="{ height: `${totalSize}px` }">
             <template v-for="v in virtualRows" :key="v.row.key">
@@ -483,10 +479,13 @@ useShortcuts([
                 role="row"
                 :aria-rowindex="v.index + 1"
                 :data-test="`organization-menu-section-${v.row.section}`"
-                class="absolute top-0 right-0 left-0 box-border flex h-7 items-end px-3 pb-1"
+                :class="[
+                  'absolute top-0 right-0 left-0 box-border flex h-7 items-end',
+                  MENU_LABEL_CLASS,
+                ]"
                 :style="{ transform: `translateY(${v.start}px)` }"
               >
-                <span role="columnheader" class="text-2xs text-text-secondary font-medium">
+                <span role="columnheader">
                   {{ t(SECTION_LABEL_KEYS[v.row.section]) }}
                 </span>
               </div>
@@ -497,7 +496,7 @@ useShortcuts([
                 :aria-selected="isSelected(v.row.org)"
                 data-test="organization-menu-item-label-item-label"
                 :data-test-org-identifier="v.row.org.identifier"
-                class="group rounded-default absolute top-0 right-0 left-0 box-border flex cursor-pointer items-center gap-1 px-3 transition-colors"
+                class="group rounded-default text-compact absolute top-0 right-0 left-0 box-border flex cursor-pointer items-center gap-1 px-2 transition-colors"
                 :class="rowStateClass(v.row.org, v.index)"
                 :style="{
                   transform: `translateY(${v.start}px)`,
@@ -512,9 +511,7 @@ useShortcuts([
                   role="gridcell"
                   class="flex min-w-0 flex-1 items-baseline gap-2"
                 >
-                  <OTruncatedText
-                    class="text-compact max-w-full flex-none leading-tight font-medium"
-                  >
+                  <OTruncatedText class="max-w-full flex-none leading-tight">
                     {{ v.row.org.label }}
                   </OTruncatedText>
                   <OTruncatedText
@@ -575,6 +572,14 @@ useShortcuts([
                     @click.stop="copyId(v.row.org)"
                   />
                 </div>
+                <OIcon
+                  v-if="isSelected(v.row.org)"
+                  name="check"
+                  size="sm"
+                  aria-hidden="true"
+                  data-test="organization-menu-item-check"
+                  class="shrink-0"
+                />
               </div>
             </template>
           </div>
@@ -583,12 +588,12 @@ useShortcuts([
         <div
           v-else
           data-test="organization-menu-no-data"
-          class="text-compact text-text-secondary w-full py-7 text-center"
+          class="text-compact text-text-secondary w-full py-4 text-center"
         >
           {{ t("organization.noOrganizationsFound") }}
         </div>
 
-        <div class="border-select-content-border flex border-t px-3 py-2">
+        <div class="border-dropdown-border -mx-1 -mb-1 flex border-t px-3 py-2">
           <OButton
             variant="link"
             size="xs"

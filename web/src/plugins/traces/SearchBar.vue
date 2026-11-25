@@ -468,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'rounded-e-default! rounded-s-none!',
                     ]"
                   >
-                    <OIcon name="arrow-drop-down" size="sm" />
+                    <OIcon name="expand-more" size="xs" />
                   </OButton>
                 </template>
                 <ODropdownItem

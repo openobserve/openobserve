@@ -436,7 +436,7 @@ export class HomePage {
         // ODropdown menuitem ancestor.
         return this.page
             .locator(`[data-test="language-dropdown-item-${langCode}"]`)
-            .locator('xpath=ancestor-or-self::*[@role="menuitem"][1]')
+            .locator('xpath=ancestor-or-self::*[@role="menuitem" or @role="menuitemradio"][1]')
             .first();
     }
 

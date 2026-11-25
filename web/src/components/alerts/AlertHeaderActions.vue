@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm"
           icon-left="notifications-paused"
-          icon-right="arrow-drop-down"
+          icon-right="expand-more"
           data-test="alerts-alertdetail-mute"
         >
           {{ t("alerts.downtimes.mute.bulk") }}

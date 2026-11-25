@@ -203,8 +203,8 @@ describe("SavedViewsMenu", () => {
 
   it("highlights the applied row with the selected background", async () => {
     await mountMenu({ appliedViewId: "a" });
-    expect(el("sv-apply-a")?.className).toContain("bg-select-item-selected-bg");
-    expect(el("sv-apply-c")?.className).not.toContain("bg-select-item-selected-bg");
+    expect(el("sv-apply-a")?.className).toContain("bg-dropdown-item-selected-bg");
+    expect(el("sv-apply-c")?.className).not.toContain("bg-dropdown-item-selected-bg");
   });
 
   it("disables create and edit with the reason when saving is blocked", async () => {

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="autoobserve2-range"
             >
               {{ t(RANGE_LABEL[range]) }}
-              <OIcon name="expand-more" size="sm" class="text-text-secondary" />
+              <OIcon name="expand-more" size="xs" class="text-text-secondary" />
             </button>
           </template>
           <ODropdownItem

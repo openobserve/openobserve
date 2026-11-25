@@ -88,7 +88,7 @@ describe("OSelect expandable rows", () => {
   it("styles the row like an option with the arrow on the right", async () => {
     await open({ modelValue: "bytes" });
     const row = expandRow()!;
-    expect(row.classList.contains("text-sm")).toBe(true);
+    expect(row.classList.contains("text-compact")).toBe(true);
     expect(row.classList.contains("font-bold")).toBe(false);
     expect(row.classList.contains("bg-surface-subtle")).toBe(false);
     expect(row.firstElementChild?.textContent?.trim()).toBe("Other Locale");
@@ -109,8 +109,8 @@ describe("OSelect expandable rows", () => {
   it("selects a nested option and indents its row", async () => {
     await open({ modelValue: "bytes" });
     await clickExpandRow();
-    expect(option("locale:cs-CZ")!.classList.contains("ps-7")).toBe(true);
-    expect(option("bytes")!.classList.contains("ps-3")).toBe(true);
+    expect(option("locale:cs-CZ")!.classList.contains("ps-6")).toBe(true);
+    expect(option("bytes")!.classList.contains("ps-2")).toBe(true);
     option("locale:cs-CZ")!.click();
     await flushPromises();
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["locale:cs-CZ"]);
@@ -137,7 +137,7 @@ describe("OSelect expandable rows", () => {
     input.value = "czech";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     await flushPromises();
-    expect(option("locale:cs-CZ")!.classList.contains("ps-3")).toBe(true);
+    expect(option("locale:cs-CZ")!.classList.contains("ps-2")).toBe(true);
     expect(option("bytes")).toBeNull();
     expect(expandRow()).toBeNull();
   });
@@ -171,7 +171,7 @@ describe("OSelect expandable rows", () => {
   it("renders no row for options without nesting", async () => {
     await open({ options: [{ label: "Bytes", value: "bytes" }], modelValue: "bytes" });
     expect(expandRow()).toBeNull();
-    expect(option("bytes")!.classList.contains("ps-3")).toBe(true);
+    expect(option("bytes")!.classList.contains("ps-2")).toBe(true);
   });
 });
 
@@ -247,13 +247,14 @@ describe("OSelect group headers while searching", () => {
       (el) => el.textContent?.trim() === label,
     )!;
 
-  it("styles every header like the option text, bold, with no border", async () => {
+  it("styles every header as a quiet secondary caption with no border", async () => {
     await open(GROUPED);
     for (const label of ["Number group", "Data group"]) {
       const el = headerRow(label);
-      expect(el.classList.contains("text-select-item-text")).toBe(true);
+      expect(el.classList.contains("text-text-secondary")).toBe(true);
       expect(el.classList.contains("text-xs")).toBe(true);
-      expect(el.classList.contains("font-bold")).toBe(true);
+      expect(el.classList.contains("font-medium")).toBe(true);
+      expect(el.classList.contains("uppercase")).toBe(false);
       expect([...el.classList].some((c) => c.includes("border"))).toBe(false);
     }
   });

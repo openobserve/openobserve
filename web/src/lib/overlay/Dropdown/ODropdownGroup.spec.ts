@@ -17,6 +17,22 @@ describe("ODropdownGroup", () => {
     expect(wrapper.text()).toContain("Actions");
   });
 
+  it("styles the label as a sentence-case group header", () => {
+    const wrapper = mount(ODropdownGroup, { props: { label: "Actions" } });
+    const label = wrapper.get(".font-medium");
+    expect(label.classes()).toEqual(
+      expect.arrayContaining([
+        "text-xs",
+        "font-medium",
+        "text-text-secondary",
+        "px-2",
+        "pt-2",
+        "pb-1",
+      ]),
+    );
+    expect(label.classes()).not.toContain("uppercase");
+  });
+
   it("does not render a label element when label prop is absent", () => {
     const wrapper = mount(ODropdownGroup);
     expect(wrapper.text().trim()).toBe("");

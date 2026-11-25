@@ -245,7 +245,7 @@ function onToggleEnvironment(id: string) {
             data-test="synthetics-journey-start-pill-envs-label"
             >{{ envsLabel }}</span
           >
-          <OIcon name="arrow-drop-down" size="sm" class="max-md:hidden" aria-hidden="true" />
+          <OIcon name="expand-more" size="xs" class="max-md:hidden" aria-hidden="true" />
         </OButton>
       </template>
       <div class="flex flex-col gap-3">

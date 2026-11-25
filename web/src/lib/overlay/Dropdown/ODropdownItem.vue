@@ -6,12 +6,14 @@ import { DropdownMenuItem } from "reka-ui";
 import OIcon from "../../core/Icon/OIcon.vue";
 import OShortcut from "../../core/Shortcut/OShortcut.vue";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
+import { MENU_ROW_CLASS, MENU_ROW_SELECTED_CLASS, MENU_ROW_VARIANT_CLASS } from "../menuClasses";
 
 const props = withDefaults(defineProps<DropdownItemProps>(), {
   as: "div",
   disabled: false,
   focusableUnavailable: false,
   variant: "default",
+  selected: undefined,
 });
 
 const emit = defineEmits<DropdownItemEmits>();
@@ -42,11 +44,16 @@ function onSelect(event: Event) {
   emit("select", event);
 }
 
-const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> = {
-  default: "text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg",
-  destructive:
-    "text-dropdown-item-destructive-text data-[highlighted]:bg-dropdown-item-destructive-hover-bg",
-};
+// Binding `role: undefined` would erase reka's own `menuitem` role, so plain rows get no keys at all.
+const choiceAttrs = computed(() =>
+  props.selected === undefined ? {} : { role: "menuitemradio", "aria-checked": props.selected },
+);
+
+const stateClass = computed(() =>
+  props.selected && props.variant === "default"
+    ? MENU_ROW_SELECTED_CLASS
+    : MENU_ROW_VARIANT_CLASS[props.variant],
+);
 </script>
 
 <template>
@@ -55,12 +62,11 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
     as-child
     :aria-describedby="description ? reasonId : undefined"
     :text-value="textValue"
+    v-bind="choiceAttrs"
     :class="[
-      'group/item relative flex items-center gap-2',
-      'rounded-default w-full px-3 py-1.5',
-      'cursor-pointer outline-none select-none',
-      'transition-colors duration-(--duration-control) ease-(--ease-control)',
-      variantClasses[variant],
+      'group/item',
+      MENU_ROW_CLASS,
+      stateClass,
       'data-[disabled]:text-dropdown-item-disabled data-[disabled]:cursor-not-allowed',
       unavailable &&
         'text-text-secondary! data-[highlighted]:text-text-heading! focus-visible:ring-focus-ring-accent cursor-not-allowed focus-visible:ring-2 focus-visible:ring-inset',
@@ -79,7 +85,7 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
           v-if="props.iconLeft"
           :name="props.iconLeft"
           size="sm"
-          :class="props.iconLeft === 'lock' ? 'lock-chip' : undefined"
+          :class="['text-text-secondary shrink-0', props.iconLeft === 'lock' && 'lock-chip']"
         />
       </slot>
       <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -101,6 +107,13 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
         :keys="props.shortcut"
         :id="props.shortcutId"
         class="ms-auto ps-4"
+      />
+      <OIcon
+        v-if="selected"
+        name="check"
+        size="sm"
+        data-test="o-dropdown-item-check"
+        :class="['shrink-0', !(props.shortcut || props.shortcutId) && 'ms-auto']"
       />
     </component>
   </DropdownMenuItem>

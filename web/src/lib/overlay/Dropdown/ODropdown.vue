@@ -31,7 +31,19 @@ import {
   DropdownMenuPortal,
   DropdownMenuContent,
 } from "reka-ui";
-import { computed, inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
+import {
+  Comment,
+  Fragment,
+  Text,
+  computed,
+  inject,
+  onBeforeUnmount,
+  provide,
+  ref,
+  watch,
+  type Ref,
+  type VNode,
+} from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
   O_DROPDOWN_NESTED_KEY,
@@ -39,6 +51,7 @@ import {
   setActiveOverlay,
   clearActiveOverlay,
 } from "./ODropdown.context";
+import { MENU_SURFACE_CLASS, menuSizeClass } from "../menuClasses";
 
 const { lgUp } = useBreakpoint();
 
@@ -308,6 +321,16 @@ onBeforeUnmount(() => {
     cancelTriggerMoveCheck();
   }
 });
+
+// A `v-for` over an empty list still renders a Fragment, so emptiness means no real node anywhere inside.
+function hasRenderableContent(nodes: VNode[] | undefined): boolean {
+  return (nodes ?? []).some((node) => {
+    if (node.type === Comment) return false;
+    if (node.type === Text) return String(node.children ?? "").trim() !== "";
+    if (node.type === Fragment) return hasRenderableContent(node.children as VNode[]);
+    return true;
+  });
+}
 </script>
 
 <template>
@@ -328,12 +351,8 @@ onBeforeUnmount(() => {
         @close-auto-focus="(event: Event) => emit('close-auto-focus', event)"
         :style="{ zIndex: contentZIndex }"
         :class="[
-          'min-w-40 p-1 max-lg:max-w-[calc(100vw-1rem)]',
-          'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
-          // Surface
-          'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
-          // Typography
-          'text-dropdown-item-text text-sm',
+          ...menuSizeClass(props.contentClass),
+          MENU_SURFACE_CLASS,
           // Animation — clip-path reveal: the menu is unveiled at full size from
           // its trigger edge (no scale/squish). Wipes down by default; top-placed
           // menus wipe up. Soft ease-out-expo in, quick wipe out.
@@ -344,7 +363,10 @@ onBeforeUnmount(() => {
           props.contentClass,
         ]"
       >
-        <slot />
+        <slot v-if="!$slots.empty || hasRenderableContent($slots.default?.())" />
+        <div v-else class="text-compact text-text-secondary py-4 text-center">
+          <slot name="empty" />
+        </div>
       </DropdownMenuContent>
     </DropdownMenuPortal>
   </DropdownMenuRoot>

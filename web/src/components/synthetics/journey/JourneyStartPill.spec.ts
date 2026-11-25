@@ -248,7 +248,7 @@ describe("JourneyStartPill", () => {
     const icons = wrapper.get(ENVS_HALF).findAll("[data-icon]");
 
     expect(icons.at(0)?.attributes("data-icon")).toBe("layers");
-    expect(icons.at(-1)?.attributes("data-icon")).toBe("arrow-drop-down");
+    expect(icons.at(-1)?.attributes("data-icon")).toBe("expand-more");
   });
 
   it("the Environments aria-label is plural: none, 1 selected, N selected", () => {

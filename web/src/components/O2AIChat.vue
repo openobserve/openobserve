@@ -28,7 +28,7 @@
                     >
                       {{ displayedTitle || t("common.newChat") }}
                     </OTruncatedText>
-                    <OIcon name="arrow-drop-down" size="md" class="flex-shrink-0" />
+                    <OIcon name="expand-more" size="xs" class="flex-shrink-0" />
                   </div>
                 </OButton>
               </template>

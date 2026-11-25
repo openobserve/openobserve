@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
         >
           <img :src="functionIconUrl" :alt="t('logs.functionSelector.function')" class="size-4" />
-          <OIcon name="arrow-drop-down" size="sm" class="-ms-0.5" />
+          <OIcon name="expand-more" size="xs" class="-ms-0.5" />
           <OTooltip :content="raw(selectedFunctionTooltip)" :side-offset="2" />
         </OButton>
       </template>

@@ -359,15 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODropdown>
 
           <!-- USER PROFILE MENU: Profile, language, theme, and logout -->
-          <ODropdown
-            side="bottom"
-            align="end"
-            @update:open="
-              (open) => {
-                if (!open) showLanguageSubmenu = false;
-              }
-            "
-          >
+          <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
                 variant="ghost"
@@ -407,21 +399,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <ODropdownSeparator />
 
-              <!-- A menuitem cannot hold menuitems, so the list is the row's sibling inside one positioned wrapper. -->
-              <div class="relative" role="none">
-                <ODropdownItem
-                  data-test="header-language-submenu-trigger"
-                  class="focus-visible:ring-focus-ring-accent focus-visible:ring-2 focus-visible:ring-inset"
-                  aria-haspopup="menu"
-                  :aria-expanded="showLanguageSubmenu"
-                  @select="onLanguageRowSelect"
-                  @keydown="onLanguageRowKeydown"
-                >
-                  <template #icon-left>
-                    <OIcon size="xs" name="language" class="padding-none" />
-                  </template>
+              <ODropdownSub
+                data-test="header-language-submenu-trigger"
+                :text-value="t('menu.language')"
+              >
+                <template #icon-left>
+                  <OIcon size="sm" name="language" class="text-text-secondary shrink-0" />
+                </template>
+                <template #trigger>
                   <span class="flex-1 whitespace-nowrap">{{ t("menu.language") }}</span>
-                  <span class="inline-flex items-center gap-1.5 whitespace-nowrap opacity-75">
+                  <span
+                    class="text-text-secondary inline-flex items-center gap-1.5 text-xs whitespace-nowrap"
+                  >
                     <img
                       v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
                       :src="selectedLanguage.icon.slice(4)"
@@ -432,31 +421,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else-if="selectedLanguage.icon"
                       size="xs"
                       :name="selectedLanguage.icon"
-                      class="padding-none"
                     />
                     <span>{{ selectedLanguage.label }}</span>
                   </span>
-                  <OIcon size="xs" name="chevron-right" />
-                </ODropdownItem>
-
-                <div
-                  v-if="showLanguageSubmenu"
-                  ref="languageListRef"
-                  role="group"
-                  :aria-label="t('menu.language')"
-                  class="rounded-default bg-dropdown-bg shadow-overlay max-lg:border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border border-transparent py-1 max-lg:static max-lg:me-0 max-lg:mt-1 max-lg:w-full max-lg:min-w-0 max-lg:shadow-none"
-                  data-test="language-dropdown-item"
-                  @keydown="onLanguageListKeydown"
-                >
+                </template>
+                <ODropdownGroup data-test="language-dropdown-item" :aria-label="t('menu.language')">
                   <ODropdownItem
                     v-for="lang in langList"
                     :key="lang.code"
                     :data-test="`language-dropdown-item-${lang.code}`"
-                    :class="{ 'font-semibold': selectedLanguage.code === lang.code }"
-                    @select="
-                      changeLanguage(lang);
-                      showLanguageSubmenu = false;
-                    "
+                    :selected="selectedLanguage.code === lang.code"
+                    @select="changeLanguage(lang)"
                   >
                     <img
                       v-if="lang.icon && lang.icon.startsWith('img:')"
@@ -464,12 +439,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :alt="lang.label"
                       class="rounded-default inline-block h-3 w-4 shrink-0 object-cover"
                     />
-                    <OIcon v-else-if="lang.icon" size="xs" :name="lang.icon" />
+                    <OIcon v-else-if="lang.icon" size="sm" :name="lang.icon" />
                     <span class="flex-1">{{ lang.label }}</span>
-                    <OIcon v-if="selectedLanguage.code === lang.code" size="xs" name="check" />
                   </ODropdownItem>
-                </div>
-              </div>
+                </ODropdownGroup>
+              </ODropdownSub>
               <ODropdownSeparator />
 
               <!-- Theme management -->
@@ -523,12 +497,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, computed, nextTick, ref } from "vue";
+import { defineComponent, PropType, computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
-import useBreakpoint from "@/composables/useBreakpoint";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
@@ -548,6 +521,7 @@ import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 
 import { getImageURL } from "@/utils/zincutils";
 import { featureLockedPath, menuState } from "@/utils/featureGate";
@@ -573,6 +547,7 @@ export default defineComponent({
     ODropdownItem,
     ODropdownSeparator,
     ODropdownGroup,
+    ODropdownSub,
   },
   props: {
     // Store instance
@@ -677,74 +652,6 @@ export default defineComponent({
     // open the SAME dialog instance this header button does.
     const { isOpen: showEnterpriseDialog, open: openEnterpriseDialog } =
       useEnterpriseUpgradeDialog();
-
-    const showLanguageSubmenu = ref(false);
-    const languageListRef = ref<HTMLElement | null>(null);
-    const { lgUp } = useBreakpoint();
-
-    const languageItems = (): HTMLElement[] =>
-      Array.from(
-        languageListRef.value?.querySelectorAll<HTMLElement>(
-          '[data-test^="language-dropdown-item-"]',
-        ) ?? [],
-      );
-
-    const focusSelectedLanguage = async () => {
-      await nextTick();
-      const items = languageItems();
-      const selected = items.find(
-        (el) => el.dataset.test === `language-dropdown-item-${props.selectedLanguage.code}`,
-      );
-      (selected ?? items[0])?.focus();
-    };
-
-    const focusLanguageRow = () => {
-      const row = languageListRef.value?.parentElement?.querySelector<HTMLElement>(
-        '[data-test="header-language-submenu-trigger"]',
-      );
-      row?.focus();
-    };
-
-    const closeLanguageList = () => {
-      focusLanguageRow();
-      showLanguageSubmenu.value = false;
-    };
-
-    // preventDefault keeps the profile menu open; reka closes it on any unprevented select.
-    const onLanguageRowSelect = (event: Event) => {
-      event.preventDefault();
-      showLanguageSubmenu.value = !showLanguageSubmenu.value;
-      if (showLanguageSubmenu.value) focusSelectedLanguage();
-    };
-
-    // Either horizontal arrow opens: the chevron points inline-end while the list opens inline-start.
-    const onLanguageRowKeydown = (event: KeyboardEvent) => {
-      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-      event.preventDefault();
-      event.stopPropagation();
-      showLanguageSubmenu.value = true;
-      focusSelectedLanguage();
-    };
-
-    const onLanguageListKeydown = (event: KeyboardEvent) => {
-      const items = languageItems();
-      const index = items.indexOf(document.activeElement as HTMLElement);
-      const awayKey = document.documentElement.dir === "rtl" ? "ArrowLeft" : "ArrowRight";
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        const step = event.key === "ArrowDown" ? 1 : -1;
-        items[(index + step + items.length) % items.length]?.focus();
-      } else if (event.key === "Escape") {
-        closeLanguageList();
-      } else if (event.key === awayKey) {
-        // Below lg the list sits inline under its row, so there is nothing to the side to return to.
-        if (!lgUp.value) return;
-        closeLanguageList();
-      } else {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-    };
 
     // AI chat toggle — shown locked (not hidden) in builds that don't unlock
     // it. Same `ai_enabled`-is-an-admin-preference-not-an-upsell-target
@@ -902,11 +809,6 @@ export default defineComponent({
       ingestionQuotaPercentage,
       ingestionQuotaColor,
       showEnterpriseDialog,
-      showLanguageSubmenu,
-      languageListRef,
-      onLanguageRowSelect,
-      onLanguageRowKeydown,
-      onLanguageListKeydown,
       updateOrganization,
       goToHome,
       homeUrl,

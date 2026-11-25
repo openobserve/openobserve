@@ -18,8 +18,8 @@
         {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
         <template #icon-right>
           <OIcon
-            name="arrow-drop-down"
-            size="sm"
+            name="expand-more"
+            size="xs"
             class="transition-transform duration-[250ms] ease-in-out"
             :class="picker.showMenu ? 'rotate-180' : ''"
           />

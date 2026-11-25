@@ -7,7 +7,7 @@ import {
   SELECT_PARENT_DATA_TEST_KEY,
   NULL_VALUE_SENTINEL,
 } from "./OSelect.types";
-import { SelectItem, SelectItemText } from "reka-ui";
+import { SelectItem, SelectItemIndicator, SelectItemText } from "reka-ui";
 import { computed, inject, onMounted, onUnmounted } from "vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -18,8 +18,6 @@ const props = withDefaults(defineProps<SelectItemProps>(), {
   iconComponent: undefined,
   reserveIconSpace: false,
 });
-
-const hasIconSlot = computed(() => !!props.iconComponent || !!props.icon || props.reserveIconSpace);
 
 defineSlots<SelectItemSlots>();
 
@@ -55,10 +53,8 @@ onUnmounted(() => {
     :data-test-value="rekaValue"
     :data-test-label="props.label"
     :class="[
-      'relative flex w-full items-center',
-      hasIconSlot && 'gap-2',
-      'py-1.5 ps-3 pe-3 text-sm',
-      'text-select-item-text rounded-default',
+      'relative flex min-h-7 w-full items-center gap-2 px-2 max-md:min-h-9',
+      'text-compact text-select-item-text rounded-default',
       'cursor-pointer outline-none select-none',
       'transition-colors duration-(--duration-control) ease-(--ease-control)',
       'data-highlighted:bg-select-item-hover-bg',
@@ -76,5 +72,8 @@ onUnmounted(() => {
         <OTruncatedText class="block flex-1">{{ props.label }}</OTruncatedText>
       </slot>
     </SelectItemText>
+    <SelectItemIndicator class="flex shrink-0 items-center">
+      <OIcon name="check" size="sm" />
+    </SelectItemIndicator>
   </SelectItem>
 </template>

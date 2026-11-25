@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             icon-left="add"
-            icon-right="keyboard-arrow-down"
+            icon-right="expand-more"
             type="button"
             >{{ t("settings.dataRetentionDefaults.addType") }}</OButton
           >

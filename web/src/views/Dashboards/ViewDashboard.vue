@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="w-6"
                   :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                   data-test="dashboard-refresh-options-btn"
-                  icon-left="arrow-drop-down"
+                  icon-right="expand-more"
                 />
               </template>
               <ODropdownItem
@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="toolbar-btn-rest -ms-px w-6"
                     :aria-label="t('dashboard.viewDashboard.moreShareOptions')"
                     data-test="dashboard-share-options-btn"
-                    icon-left="arrow-drop-down"
+                    icon-right="expand-more"
                   />
                 </template>
                 <ODropdownItem

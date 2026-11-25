@@ -73,15 +73,17 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
         await page.keyboard.press("ArrowUp");
         expect(await isFocused(row)).toBe(true);
 
-        testLogger.step("Enter opens the list and focuses the selected language");
+        testLogger.step("Enter opens the list and moves focus into it");
         await page.keyboard.press("Enter");
         await expect(page.locator(LIST)).toBeVisible();
         await expect(row).toHaveAttribute("aria-expanded", "true");
-        const selected = page.locator(`${OPTION}.font-semibold`).first();
-        expect(await isFocused(selected)).toBe(true);
+        const options = page.locator(OPTION);
+        const focusedIndex = () =>
+          options.evaluateAll((els) => els.findIndex((el) => el === document.activeElement));
+        await expect.poll(focusedIndex).toBeGreaterThanOrEqual(0);
+        await expect(page.locator(`${OPTION}[aria-checked="true"]`)).toHaveCount(1);
 
         testLogger.step("Every option is visible or reachable by the menu scroll and hit-testable");
-        const options = page.locator(OPTION);
         const count = await options.count();
         expect(count).toBeGreaterThan(10);
         for (let i = 0; i < count; i++) {
@@ -96,17 +98,11 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
         }
 
         testLogger.step("Up and Down move between languages and stay in the list");
-        await selected.focus();
-        const selectedIndex = await options.evaluateAll((els) =>
-          els.findIndex((el) => el === document.activeElement),
-        );
+        await options.first().focus();
         await page.keyboard.press("ArrowDown");
-        const afterDown = await options.evaluateAll((els) =>
-          els.findIndex((el) => el === document.activeElement),
-        );
-        expect(afterDown).toBe((selectedIndex + 1) % count);
+        expect(await focusedIndex()).toBe(1);
         await page.keyboard.press("ArrowUp");
-        expect(await isFocused(selected)).toBe(true);
+        expect(await focusedIndex()).toBe(0);
         await expect(page.locator(LIST)).toBeVisible();
 
         testLogger.step("Escape closes the list, refocuses the row and leaves the menu open");
@@ -116,12 +112,12 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
         await expect(row).toHaveAttribute("aria-expanded", "false");
         await expect(page.locator(THEME_ROW)).toBeVisible();
 
-        testLogger.step("The inline-start arrow (toward the list) opens it too; the other arrow as well");
-        await page.keyboard.press(dir === "rtl" ? "ArrowRight" : "ArrowLeft");
+        testLogger.step("The inline-end arrow opens the list and the inline-start arrow closes it");
+        await page.keyboard.press(dir === "rtl" ? "ArrowLeft" : "ArrowRight");
         await expect(page.locator(LIST)).toBeVisible();
-        expect(await isFocused(selected)).toBe(true);
-        await page.keyboard.press("Escape");
+        await page.keyboard.press(dir === "rtl" ? "ArrowRight" : "ArrowLeft");
         await expect(page.locator(LIST)).toBeHidden();
+        expect(await isFocused(row)).toBe(true);
         await page.keyboard.press(dir === "rtl" ? "ArrowLeft" : "ArrowRight");
         await expect(page.locator(LIST)).toBeVisible();
 

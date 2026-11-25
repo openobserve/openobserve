@@ -2,7 +2,7 @@
 
 import type { I18nText } from "@/types/i18n";
 
-export type DateSize = "sm" | "md";
+export type DateSize = "xs" | "sm" | "md";
 
 export interface DateProps {
   /** ISO-8601 date string in `YYYY-MM-DD` format */

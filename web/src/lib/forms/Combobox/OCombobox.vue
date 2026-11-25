@@ -65,6 +65,7 @@ watch(
 // Container ref — used only by the imperative `clear()` method to reach the
 // native <input> rendered by reka-ui's ComboboxInput.
 const rootEl = ref<HTMLElement | null>(null);
+const open = ref(false);
 
 // ── Filtered options ────────────────────────────────────────────────────────
 // Apply optional regex-based needle extraction (same logic as CommonAutoComplete).
@@ -220,6 +221,7 @@ onMounted(() =>
     </label>
 
     <ComboboxRoot
+      v-model:open="open"
       :model-value="internalValue"
       :ignore-filter="true"
       :open-on-click="true"
@@ -237,7 +239,7 @@ onMounted(() =>
           :tabindex="inputTabindex"
           auto-complete="off"
           :class="[
-            'rounded-default w-full border ps-3 pe-3',
+            'rounded-default w-full border ps-3 pe-8',
             'bg-input-bg text-input-text',
             'placeholder:text-input-placeholder',
             'transition-[border-color,box-shadow] duration-150 outline-none',
@@ -254,6 +256,14 @@ onMounted(() =>
           @update:model-value="onInputChange"
           @blur="handleBlur"
         />
+        <OIcon
+          name="expand-more"
+          size="xs"
+          :class="[
+            'text-select-icon pointer-events-none absolute end-2.5 transition-transform duration-150',
+            open ? 'rotate-180' : '',
+          ]"
+        />
       </ComboboxAnchor>
 
       <ComboboxPortal>
@@ -261,10 +271,10 @@ onMounted(() =>
           position="popper"
           :side-offset="4"
           :class="[
-            'z-10001 w-(--reka-combobox-trigger-width) max-w-(--reka-combobox-trigger-width) min-w-(--reka-combobox-trigger-width)',
-            'max-h-60 overflow-hidden',
-            'max-lg:max-h-[var(--reka-popper-available-height,15rem)]',
-            'rounded-default shadow-overlay border border-transparent',
+            'z-10001 max-w-[min(32rem,calc(100vw-1.5rem))] min-w-(--reka-combobox-trigger-width)',
+            'overflow-hidden',
+            'max-lg:max-h-[var(--reka-popper-available-height,18rem)]',
+            'rounded-default shadow-overlay border-select-content-border border',
             'bg-select-content-bg',
             'p-1',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
@@ -277,9 +287,9 @@ onMounted(() =>
           ]"
         >
           <ComboboxViewport
-            class="max-h-56 overflow-y-auto max-lg:max-h-[calc(var(--reka-popper-available-height,14rem)-0.5rem)]"
+            class="max-h-72 overflow-y-auto max-lg:max-h-[calc(var(--reka-popper-available-height,18rem)-0.5rem)]"
           >
-            <ComboboxEmpty class="text-select-placeholder px-3 py-2 text-center text-sm">
+            <ComboboxEmpty class="text-text-secondary text-compact py-4 text-center">
               {{ t("components.combobox.noOptionsFound") }}
             </ComboboxEmpty>
 
@@ -290,8 +300,8 @@ onMounted(() =>
               :data-test-value="option.value"
               :data-test-label="option.label"
               :class="[
-                'relative flex w-full items-start gap-2',
-                'py-1.5 ps-3 pe-8 text-sm',
+                'relative flex min-h-7 w-full items-center gap-2 px-2 py-1 max-md:min-h-9',
+                'text-compact',
                 'text-select-item-text rounded-default',
                 'cursor-pointer outline-none select-none',
                 'transition-colors duration-100',
@@ -312,22 +322,8 @@ onMounted(() =>
               <span v-else class="min-w-0 flex-1 wrap-break-word whitespace-normal">{{
                 option.label
               }}</span>
-              <ComboboxItemIndicator
-                class="absolute end-2 top-1/2 flex size-3.5 -translate-y-1/2 items-center justify-center"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 16 16"
-                  fill="currentColor"
-                  class="size-3.5"
-                  aria-hidden="true"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
+              <ComboboxItemIndicator class="flex shrink-0 items-center">
+                <OIcon name="check" size="sm" />
               </ComboboxItemIndicator>
             </ComboboxItem>
           </ComboboxViewport>

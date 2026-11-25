@@ -101,7 +101,7 @@ function itemKey(option: ReplayEnvironmentOption) {
           v-if="secretFailed"
           data-test="synthetics-journey-replay-menu-secret-failed"
         />
-        <OIcon name="arrow-drop-down" size="sm" aria-hidden="true" />
+        <OIcon name="expand-more" size="xs" aria-hidden="true" />
       </OButton>
     </template>
     <div class="flex flex-col px-3 py-1.5">
@@ -119,20 +119,13 @@ function itemKey(option: ReplayEnvironmentOption) {
           v-for="option in group.options"
           :key="option.id"
           :data-test="`synthetics-journey-replay-menu-env-${itemKey(option)}`"
+          :selected="option.id === selectedId"
           @select="emit('update:selected-id', option.id)"
         >
           <span class="flex min-w-0 flex-col">
-            <span :class="{ 'text-accent': option.id === selectedId }">{{ option.name }}</span>
+            <span>{{ option.name }}</span>
             <span class="text-text-secondary text-xs">{{ option.host }}</span>
           </span>
-          <span v-if="option.id === selectedId" class="sr-only">
-            {{ t("synthetics.journey.replayEnv.selected") }}
-          </span>
-          <template v-if="option.id === selectedId" #icon-right>
-            <span class="ms-auto inline-flex">
-              <OIcon name="check" size="sm" aria-hidden="true" />
-            </span>
-          </template>
         </ODropdownItem>
       </ODropdownGroup>
     </template>

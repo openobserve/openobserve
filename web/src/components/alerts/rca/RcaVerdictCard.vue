@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="refresh" size="sm" class="me-1" />
               {{ t("alerts.incidents.rcaRetry") }}
-              <OIcon name="keyboard-arrow-down" size="xs" class="ms-1" />
+              <OIcon name="expand-more" size="xs" class="ms-1" />
             </OButton>
           </template>
           <ODropdownItem

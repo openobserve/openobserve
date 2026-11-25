@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="w-6"
                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                 data-test="rum-performance-refresh-options-btn"
-                icon-left="arrow-drop-down"
+                icon-right="expand-more"
               />
             </template>
             <ODropdownItem

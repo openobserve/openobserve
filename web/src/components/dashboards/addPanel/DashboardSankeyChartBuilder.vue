@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-source-item-${sourceLabel}`"
               >
                 <AxisFieldChipLabel :label="sourceLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                <template #icon-right><OIcon name="expand-more" size="xs" /></template>
               </OButton>
             </template>
             <div
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-target-item-${targetLabel}`"
               >
                 <AxisFieldChipLabel :label="targetLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                <template #icon-right><OIcon name="expand-more" size="xs" /></template>
               </OButton>
             </template>
             <div
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-value-item-${valueLabel}`"
               >
                 <AxisFieldChipLabel :label="valueLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                <template #icon-right><OIcon name="expand-more" size="xs" /></template>
               </OButton>
             </template>
             <div

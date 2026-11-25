@@ -132,7 +132,7 @@ async function onPick(c: SubtestCandidate) {
         />
         <OIcon name="account-tree" size="sm" aria-hidden="true" />
         <span>{{ t("synthetics.journey.addMenu.addSubtest") }}</span>
-        <OIcon name="arrow-drop-down" size="sm" aria-hidden="true" />
+        <OIcon name="expand-more" size="xs" aria-hidden="true" />
       </OButton>
     </template>
 

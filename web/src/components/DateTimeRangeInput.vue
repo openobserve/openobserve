@@ -23,6 +23,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { MENU_ROW_CLASS, MENU_SURFACE_CLASS } from "@/lib/overlay/menuClasses";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { localeFileMap } from "@/locales";
 import { MAX_RANGE_TEXT_UNITS } from "@/utils/date";
@@ -816,7 +817,10 @@ defineExpose({
       role="listbox"
       :aria-label="t('timeRangeInput.readings')"
       data-test="date-time-range-readings"
-      class="bg-surface-base border-border-default rounded-default absolute inset-x-3 top-full z-50 -mt-1 flex flex-col overflow-hidden border py-1 shadow-md"
+      :class="[
+        MENU_SURFACE_CLASS,
+        'absolute inset-x-3 top-full z-50 -mt-1 flex flex-col overflow-hidden',
+      ]"
     >
       <div
         v-for="(row, i) in rows"
@@ -827,10 +831,11 @@ defineExpose({
         :aria-disabled="row.blocked ? true : undefined"
         :data-blocked="row.blocked"
         :data-test="`date-time-range-reading-${i}`"
-        class="flex min-w-0 items-center gap-2 px-3 py-1.5 tabular-nums max-sm:flex-wrap max-sm:gap-y-0.5"
         :class="[
-          highlighted === i ? 'bg-surface-accent-active' : '',
-          row.blocked ? 'opacity-50' : 'hover:bg-surface-accent-hover cursor-pointer',
+          MENU_ROW_CLASS,
+          'min-w-0 tabular-nums max-sm:flex-wrap max-sm:gap-y-0.5',
+          highlighted === i ? 'bg-dropdown-item-hover-bg' : '',
+          row.blocked ? 'cursor-default! opacity-50' : 'hover:bg-dropdown-item-hover-bg',
         ]"
         @mousedown.prevent
         @click="submit(i)"

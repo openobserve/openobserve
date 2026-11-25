@@ -53,17 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="run.run_id"
           :data-test="`workflow-run-switcher-run-${run.run_id}`"
           :data-run-id="run.run_id"
+          :selected="run.run_id === currentRunId"
           @click="onSelect(run.run_id)"
         >
           <div class="flex w-full items-center justify-between gap-2">
             <span class="flex min-w-0 items-center gap-1.5">
-              <OIcon
-                v-if="run.run_id === currentRunId"
-                name="check"
-                size="xs"
-                class="text-accent shrink-0"
-              />
-              <span v-else class="w-3.5 shrink-0" aria-hidden="true"></span>
               <OTimeCell
                 :value="run.start_time"
                 unit="us"
@@ -91,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="!sortedRuns.length"
           data-test="workflow-run-switcher-empty"
-          class="text-text-secondary px-3 py-4 text-center text-xs italic"
+          class="text-text-secondary text-compact py-4 text-center"
         >
           {{ t("workflow.ndv.noRunsList") }}
         </div>
@@ -127,7 +121,6 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

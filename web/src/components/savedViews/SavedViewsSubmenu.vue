@@ -89,11 +89,7 @@ const summary = computed(() => {
       @update:open="(open: boolean) => open && emit('open')"
     >
       <template #icon-left>
-        <span
-          class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-        >
-          <OIcon name="saved-search" size="sm" />
-        </span>
+        <OIcon name="saved-search" size="sm" class="text-text-secondary" />
       </template>
       <template #trigger>{{ t("search.savedViewsRowLabel") }}</template>
       <template #icon-right>

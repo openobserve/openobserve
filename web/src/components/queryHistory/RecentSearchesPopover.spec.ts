@@ -342,7 +342,7 @@ describe("the editor's suggest widget look", () => {
     const wrapper = mountPopover();
     await flushPromises();
     const first = wrapper.find('[data-test="recent-searches-row-e0"]');
-    expect(first.classes()).toEqual(expect.arrayContaining(["h-6", "flex", "items-center"]));
+    expect(first.classes()).toEqual(expect.arrayContaining(["h-7", "flex", "items-center"]));
     const parts = first.element.children;
     expect(parts[0].className).toContain("size-4");
     expect(parts[0].children).toHaveLength(1);
@@ -981,8 +981,7 @@ describe("keyboard: arrows then Enter or Shift+Enter", () => {
     expect(row("e1").hasAttribute("data-highlighted")).toBe(true);
     expect(row("e0").getAttribute("aria-selected")).toBe("false");
     expect(row("e0").hasAttribute("data-highlighted")).toBe(false);
-    expect(row("e1").className).toContain("data-[highlighted]:bg-surface-accent-active");
-    expect(row("e1").className).toContain("data-[highlighted]:border-accent");
+    expect(row("e1").className).toContain("data-[highlighted]:bg-dropdown-item-hover-bg");
 
     row("e0").dispatchEvent(new PointerEvent("pointerenter"));
     await nextTick();

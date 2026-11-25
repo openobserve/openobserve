@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ pageCountText }}
                 </span>
-                <template #icon-right><OIcon name="unfold-more" size="sm" /></template>
+                <template #icon-right><OIcon name="expand-more" size="xs" /></template>
               </OButton>
             </template>
             <div class="flex flex-col" data-test="rum-heatmap-page-list">

@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :disabled="isSavingPanel"
                     data-test="dashboard-panel-save-options-btn"
                     :aria-label="t('dashboard.moreActions')"
-                    icon-left="keyboard-arrow-down"
+                    icon-right="expand-more"
                   />
                 </template>
                 <ODropdownItem data-test="dashboard-panel-save-and-stay" @select="saveAndStay">
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :disabled="searchRequestTraceIds.length > 0"
                     data-test="dashboard-apply-options-btn"
                     :aria-label="t('dashboard.moreActions')"
-                    icon-left="keyboard-arrow-down"
+                    icon-right="expand-more"
                   />
                 </template>
                 <ODropdownItem v-if="config.isEnterprise === 'true'" @select="runQuery(true)">

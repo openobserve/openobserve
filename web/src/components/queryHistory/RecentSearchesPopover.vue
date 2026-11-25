@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     ref="rootRef"
     tabindex="-1"
-    class="text-select-item-text flex min-h-0 w-[min(26.75rem,calc(100vw-1rem))] max-w-full flex-col font-sans text-[0.8125rem] outline-none"
+    class="text-dropdown-item-text text-compact flex min-h-0 w-[min(26.75rem,calc(100vw-1rem))] max-w-full flex-col font-sans outline-none"
     data-test="recent-searches-popover"
     @keydown="onKeydown"
   >
     <div
-      class="border-border-subtle text-dropdown-label text-2xs flex h-6 shrink-0 items-center gap-1.5 border-b ps-2 pe-1 font-semibold uppercase"
+      class="border-dropdown-border text-text-secondary flex h-7 shrink-0 items-center gap-1.5 border-b ps-3 pe-1 text-xs font-medium"
     >
       <OIcon name="history" size="xs" />
       <span class="truncate">{{ t(`recentSearches.pageTitle.${source}`) }}</span>
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-chip"
         icon-left="info-outline"
-        class="ms-auto normal-case"
+        class="ms-auto"
         :aria-label="`${about} ${t('recentSearches.keyHints')}`"
         data-test="recent-searches-about"
       >
@@ -85,19 +85,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="listRef"
       role="listbox"
       :aria-label="t('recentSearches.title')"
-      class="max-h-72 min-h-0 overflow-auto"
+      class="max-h-72 min-h-0 overflow-auto p-1"
       data-test="recent-searches-list"
       @pointerenter="keepHover"
       @pointerleave="onPointerLeave"
     >
       <div
         v-if="view.pinnedFailure"
-        :class="[ROW_ACTIVE_CLASSES, 'flex flex-col gap-0.5 py-0.5 ps-1.5 pe-1']"
+        :class="[ROW_ACTIVE_CLASSES, 'flex flex-col gap-0.5 py-0.5 ps-2 pe-1']"
         :data-highlighted="highlighted(view.pinnedFailure.entry.id)"
         data-test="recent-searches-pinned-failure"
         @pointerenter="onRowEnter(view.pinnedFailure.entry.id)"
       >
-        <div class="flex h-6 min-w-0 items-center gap-2">
+        <div class="flex h-7 min-w-0 items-center gap-2">
           <button
             type="button"
             role="option"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTruncatedText
           v-if="view.pinnedFailure.entry.context.error"
           :tooltip="raw(view.pinnedFailure.entry.context.error)"
-          class="text-status-error-text text-2xs ps-6"
+          class="text-status-error-text ps-6 text-xs"
           data-test="recent-searches-pinned-error"
         >
           {{ view.pinnedFailure.entry.context.error }}
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-highlighted="highlighted(row.entry.id)"
         :class="[
           ROW_ACTIVE_CLASSES,
-          'flex h-6 w-full cursor-pointer items-center gap-2 ps-1.5 pe-2 text-left outline-none',
+          'flex h-7 w-full cursor-pointer items-center gap-2 px-2 text-left outline-none',
         ]"
         :data-test="`recent-searches-row-${row.entry.id}`"
         @focus="onRowFocus(row.entry.id)"
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             :name="row.starred ? 'star' : 'history'"
             size="xs"
-            :class="row.starred ? 'text-favorite' : 'text-select-item-selected-text'"
+            :class="row.starred ? 'text-favorite' : 'text-text-secondary'"
           />
         </span>
         <OTruncatedText :tooltip="false" class="flex-1 font-mono text-xs">
@@ -178,13 +178,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :value="row.entry.updated_at"
           unit="us"
           mode="relative"
-          class="text-text-secondary text-2xs shrink-0"
+          class="text-text-secondary shrink-0 text-xs"
         />
       </button>
     </div>
 
     <div
-      class="border-border-subtle text-text-secondary flex h-7 shrink-0 items-center gap-1 border-t px-1 text-xs"
+      class="border-dropdown-border text-text-secondary flex h-7 shrink-0 items-center gap-1 border-t px-1 text-xs"
     >
       <OButton
         v-if="failedCount > 0"
@@ -247,8 +247,7 @@ import RecentSearchesDetails from "./RecentSearchesDetails.vue";
 import analytics from "@/services/product_analytics";
 
 // The active fill, not the darker selected-option fill: the pinned row's outline button label must stay at 4.5:1 on it.
-const ROW_ACTIVE_CLASSES =
-  "border-s-2 border-transparent data-[highlighted]:border-accent data-[highlighted]:bg-surface-accent-active";
+const ROW_ACTIVE_CLASSES = "rounded-default data-[highlighted]:bg-dropdown-item-hover-bg";
 const HOVER_LEAVE_GRACE_MS = 200;
 
 const props = withDefaults(

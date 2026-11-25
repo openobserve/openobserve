@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="sm"
               icon-left="history"
-              icon-right="arrow-drop-down"
+              icon-right="expand-more"
               data-test="rum-analytics-funnel-recent-btn"
               >{{ t("rum.analytics.funnel.recent") }}</OButton
             >

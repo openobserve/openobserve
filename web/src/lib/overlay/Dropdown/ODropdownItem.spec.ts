@@ -78,4 +78,47 @@ describe("ODropdownItem", () => {
     expect(wrapper.html()).toContain("text-dropdown-item-destructive-text");
     expect(wrapper.html()).toContain("data-[highlighted]:bg-dropdown-item-destructive-hover-bg");
   });
+
+  it("uses the shared 28px row with touch height and 13px text", () => {
+    const wrapper = mountItemInDropdown({}, { default: () => h("span", "Action") });
+    const classes = wrapper.get('[role="menuitem"]').classes();
+    expect(classes).toEqual(
+      expect.arrayContaining(["min-h-7", "max-md:min-h-9", "px-2", "gap-2", "text-compact"]),
+    );
+  });
+
+  it("stays a plain menuitem with no check when selected is not set", () => {
+    const wrapper = mountItemInDropdown({}, { default: () => h("span", "Action") });
+    const item = wrapper.get('[role="menuitem"]');
+    expect(item.attributes("aria-checked")).toBeUndefined();
+    expect(wrapper.find('[data-test="o-dropdown-item-check"]').exists()).toBe(false);
+  });
+
+  it("tints the row, shows a check and reports aria-checked when selected", () => {
+    const wrapper = mountItemInDropdown({ selected: true }, { default: () => h("span", "UTC") });
+    const item = wrapper.get('[role="menuitemradio"]');
+    expect(item.attributes("aria-checked")).toBe("true");
+    expect(item.classes()).toEqual(
+      expect.arrayContaining(["bg-dropdown-item-selected-bg", "text-dropdown-item-selected-text"]),
+    );
+    expect(item.classes()).not.toContain("text-dropdown-item-text");
+    expect(wrapper.find('[data-test="o-dropdown-item-check"]').exists()).toBe(true);
+  });
+
+  it("announces an unselected choice as an unchecked radio item without a check", () => {
+    const wrapper = mountItemInDropdown({ selected: false }, { default: () => h("span", "Local") });
+    const item = wrapper.get('[role="menuitemradio"]');
+    expect(item.attributes("aria-checked")).toBe("false");
+    expect(item.classes()).not.toContain("bg-dropdown-item-selected-bg");
+    expect(wrapper.find('[data-test="o-dropdown-item-check"]').exists()).toBe(false);
+  });
+
+  it("keeps destructive tokens even when selected", () => {
+    const wrapper = mountItemInDropdown(
+      { selected: true, variant: "destructive" },
+      { default: () => h("span", "Delete") },
+    );
+    expect(wrapper.html()).toContain("text-dropdown-item-destructive-text");
+    expect(wrapper.html()).not.toContain("bg-dropdown-item-selected-bg");
+  });
 });

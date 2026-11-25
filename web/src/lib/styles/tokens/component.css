@@ -159,6 +159,8 @@
   --color-dropdown-item-text: var(--color-text-heading);
   --color-dropdown-item-hover-bg: var(--color-surface-accent-hover);
   --color-dropdown-item-active-bg: var(--color-surface-accent-active);
+  --color-dropdown-item-selected-bg: var(--color-select-item-selected-bg);
+  --color-dropdown-item-selected-text: var(--color-select-item-selected-text);
   --color-dropdown-item-disabled: var(--color-text-disabled);
   --color-dropdown-label: var(--color-text-secondary);
   --color-dropdown-separator: var(--color-border-default);
@@ -1517,6 +1519,8 @@
   --color-dropdown-item-text: var(--color-dropdown-item-text);
   --color-dropdown-item-hover-bg: var(--color-dropdown-item-hover-bg);
   --color-dropdown-item-active-bg: var(--color-dropdown-item-active-bg);
+  --color-dropdown-item-selected-bg: var(--color-dropdown-item-selected-bg);
+  --color-dropdown-item-selected-text: var(--color-dropdown-item-selected-text);
   --color-dropdown-item-disabled: var(--color-dropdown-item-disabled);
   --color-dropdown-label: var(--color-dropdown-label);
   --color-dropdown-separator: var(--color-dropdown-separator);

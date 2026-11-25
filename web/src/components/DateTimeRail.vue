@@ -27,10 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col"
       data-test="date-time-rail-recent-group"
     >
-      <div
-        class="text-input-label-text px-3 pt-3 pb-1 text-xs font-medium tracking-wide uppercase"
-        data-test="date-time-rail-recent-header"
-      >
+      <div :class="['mx-1', MENU_LABEL_CLASS]" data-test="date-time-rail-recent-header">
         {{ t("common.timeRangeRecent") }}
       </div>
       <span :id="recentKeysHintId" class="sr-only">{{ t("common.timeRangeRecentKeysHint") }}</span>
@@ -66,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabindex="tabindexFor(`recent-${item.id}`)"
             :data-test="`date-time-rail-recent-${item.id}`"
             class="w-full justify-start! gap-2 pe-8! font-normal tabular-nums aria-disabled:opacity-35"
-            :class="item.selected ? 'bg-selected-bg! text-selected-fg!' : ''"
+            :class="item.selected ? SELECTED_CLASS : ''"
             :disabled="item.disabled"
             focusable-unavailable
             :aria-pressed="item.selected"
@@ -86,7 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="text-2xs shrink-0 rounded-full px-2 font-normal"
                 :class="
-                  item.selected ? 'bg-selected-fg/15' : 'bg-text-heading/7 text-text-secondary'
+                  item.selected
+                    ? 'bg-dropdown-item-selected-text/15'
+                    : 'bg-text-heading/7 text-text-secondary'
                 "
                 :data-test="`date-time-rail-recent-${item.id}-duration`"
                 >{{ item.compact.duration }}</span
@@ -107,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="absolute! end-1.5 top-1/2 -translate-y-1/2"
             :class="
               item.selected
-                ? 'text-selected-fg/70! hover:text-selected-fg! focus-visible:text-selected-fg!'
+                ? 'text-dropdown-item-selected-text/70! hover:text-dropdown-item-selected-text! focus-visible:text-dropdown-item-selected-text!'
                 : 'text-text-secondary! hover:text-text-heading! focus-visible:text-text-heading!'
             "
             @click.stop="removeFocusedRecent(item.id, $event)"
@@ -141,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         :id="calendarHeadingId"
-        class="text-input-label-text px-3 pt-3 pb-1 text-xs font-medium tracking-wide uppercase"
+        :class="['mx-1', MENU_LABEL_CLASS]"
         data-test="date-time-rail-calendar-header"
       >
         {{ t("common.timeRangeCalendar") }}
@@ -169,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabindex="tabindexFor(`calendar-${item.id}`)"
             :data-test="`date-time-rail-calendar-${item.id}`"
             class="w-full justify-between! gap-2 font-medium! disabled:opacity-35"
-            :class="item.selected ? 'bg-selected-bg! text-selected-fg!' : 'text-text-heading!'"
+            :class="item.selected ? SELECTED_CLASS : 'text-text-heading!'"
             :disabled="item.disabled"
             :aria-pressed="item.selected"
             @mouseenter="emit('hover')"
@@ -204,10 +203,13 @@ import { computed, nextTick, ref, useId } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { MENU_LABEL_CLASS } from "@/lib/overlay/menuClasses";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { TimeRangeRailItem } from "@/utils/timeRangeRail";
 
 const COLLAPSED_COUNT = 6;
+// OButton paints its own ghost background, so the shared selected tint has to win over it.
+const SELECTED_CLASS = "bg-dropdown-item-selected-bg! text-dropdown-item-selected-text!";
 
 const props = defineProps<{
   recent: TimeRangeRailItem[];

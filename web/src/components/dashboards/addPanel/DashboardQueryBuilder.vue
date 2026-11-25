@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`dashboard-x-item-${itemX?.alias}`"
                     >
                       <AxisFieldChipLabel :label="xLabel[index]" />
-                      <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                      <template #icon-right><OIcon name="expand-more" size="xs" /></template>
                     </OButton>
                   </template>
                   <div
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`dashboard-b-item-${itemB?.alias}`"
                     >
                       <AxisFieldChipLabel :label="bLabel[index]" />
-                      <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                      <template #icon-right><OIcon name="expand-more" size="xs" /></template>
                     </OButton>
                   </template>
                   <div
@@ -440,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-y-item-${itemY?.alias}`"
                 >
                   <AxisFieldChipLabel :label="yLabel[index]" />
-                  <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                  <template #icon-right><OIcon name="expand-more" size="xs" /></template>
                 </OButton>
               </template>
               <div
@@ -578,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`dashboard-z-item-${itemZ?.alias}`"
                   >
                     <AxisFieldChipLabel :label="zLabel[index]" />
-                    <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                    <template #icon-right><OIcon name="expand-more" size="xs" /></template>
                   </OButton>
                 </template>
                 <div

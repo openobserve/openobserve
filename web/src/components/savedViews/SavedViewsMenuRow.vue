@@ -39,6 +39,9 @@ const emit = defineEmits<{
   (e: "toggle-favorite"): void;
 }>();
 
+// Not the `selected` prop: rows stay plain menuitems so the search box's Enter and arrow lookups find them.
+const APPLIED_CLASS = "bg-dropdown-item-selected-bg text-dropdown-item-selected-text!";
+
 const { t } = useI18nTyped();
 
 const viewId = props.view.view_id;
@@ -62,7 +65,7 @@ const onRowKeydown = (event: KeyboardEvent) => {
   <ODropdownItem
     :text-value="props.view.view_name"
     :aria-current="props.applied ? 'true' : undefined"
-    :class="['py-0.5!', props.applied ? 'bg-select-item-selected-bg' : '']"
+    :class="props.applied && APPLIED_CLASS"
     :data-test="`${props.dataTestPrefix}-apply-${viewId}`"
     @select="emit('apply')"
     @keydown="onRowKeydown"
@@ -76,8 +79,8 @@ const onRowKeydown = (event: KeyboardEvent) => {
         <OIcon
           v-if="props.applied"
           name="check"
-          size="md"
-          class="text-accent"
+          size="sm"
+          class="shrink-0"
           role="img"
           :aria-label="t('search.savedViewApplied')"
           :data-test="`${props.dataTestPrefix}-applied-${viewId}`"

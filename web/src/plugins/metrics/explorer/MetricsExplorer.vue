@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-explorer-mode-dropdown-btn"
             size="sm-toolbar"
             variant="outline"
-            icon-right="arrow-drop-down"
+            icon-right="expand-more"
           >
             <OIcon :name="currentModeOption.icon" size="sm" class="shrink-0" />
             {{ currentModeOption.label }}
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   :variant="isVisualizePending ? 'pending' : 'primary'"
                   size="icon-toolbar"
-                  icon-left="arrow-drop-down"
+                  icon-right="expand-more"
                   :aria-label="t('metrics.runQueryOptions')"
                   data-test="metrics-explorer-run-options"
                 />

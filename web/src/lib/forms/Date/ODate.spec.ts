@@ -110,4 +110,15 @@ describe("ODate", () => {
     );
     expect(label.classes()).not.toContain("font-semibold");
   });
+
+  it("uses the OSelect size scale with sm (28px, 13px) as the default", () => {
+    wrapper = mount(ODate);
+    expect(wrapper.find(".h-7.text-compact").exists()).toBe(true);
+    wrapper.unmount();
+    wrapper = mount(ODate, { props: { size: "xs" } });
+    expect(wrapper.find(".h-6.text-xs").exists()).toBe(true);
+    wrapper.unmount();
+    wrapper = mount(ODate, { props: { size: "md" } });
+    expect(wrapper.find(".h-8.text-compact").exists()).toBe(true);
+  });
 });

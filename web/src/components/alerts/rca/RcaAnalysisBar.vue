@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span data-test="rca-run-selector-label" class="min-w-0 truncate">{{
             selectorLabel
           }}</span>
-          <OIcon name="expand-more" size="sm" class="ms-1 shrink-0" />
+          <OIcon name="expand-more" size="xs" class="ms-1 shrink-0" />
         </OButton>
       </template>
       <ODropdownGroup :label="t('alerts.incidents.rcaHistory')">

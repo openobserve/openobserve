@@ -84,6 +84,20 @@ describe("OCombobox", () => {
     await open(described, row.service_name.slice(0, 6));
     expect(options().map((o) => o.dataset.testValue)).toEqual([row.service_name]);
   });
+  it("shows a trailing expand-more chevron that turns while the list is open", async () => {
+    await open(plain);
+    const chevron = wrapper!
+      .findAllComponents({ name: "OIcon" })
+      .find((icon) => icon.props("name") === "expand-more")!;
+    expect(chevron.props("size")).toBe("xs");
+    expect(chevron.classes()).toContain("rotate-180");
+  });
+
+  it("lays options out as 28px compact rows", async () => {
+    await open(plain);
+    expect(options()[0].classList).toContain("min-h-7");
+    expect(options()[0].classList).toContain("text-compact");
+  });
 });
 
 describe("OCombobox aria", () => {

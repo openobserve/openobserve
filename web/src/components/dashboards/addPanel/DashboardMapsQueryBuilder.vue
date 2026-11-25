@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-name-item-${nameLabel}`"
               >
                 <AxisFieldChipLabel :label="nameLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                <template #icon-right><OIcon name="expand-more" size="xs" /></template>
               </OButton>
             </template>
             <div
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
               >
                 <AxisFieldChipLabel :label="valueLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                <template #icon-right><OIcon name="expand-more" size="xs" /></template>
               </OButton>
             </template>
             <div

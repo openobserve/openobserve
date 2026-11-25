@@ -343,7 +343,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup :label="t('search.menuGroupSetOnce')">
             <!-- SQL Mode — toggles the same flag used for SQL auto-detection -->
             <ODropdownItem
-              class="h-8 py-1!"
               data-test="logs-search-bar-menu-sql-mode-toggle-btn"
               @select.prevent="
                 !isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)
@@ -386,7 +385,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Reset filters (shown here only when toolbar is too narrow for inline button) -->
             <ODropdownItem
-              class="h-8 py-1!"
               v-if="toolbarMoveResetToMenu"
               data-test="logs-search-bar-menu-reset-btn"
               @select="resetFilters"
@@ -403,7 +401,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Histogram — pinned copy renders on the toolbar -->
             <ODropdownItem
-              class="h-8 py-1!"
               data-test="logs-search-bar-menu-histogram-btn"
               @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
             >
@@ -443,7 +440,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Quick Mode — always in the More menu -->
             <ODropdownItem
-              class="h-8 py-1!"
               data-test="logs-search-bar-menu-quick-mode-toggle-btn"
               @select.prevent="handleQuickMode"
             >
@@ -483,7 +479,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Function Editor -->
             <ODropdownItem
-              class="h-8 py-1!"
               data-test="logs-search-bar-menu-transform-editor-toggle-btn"
               @select.prevent="
                 searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor
@@ -524,7 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- SAVED VIEWS -->
           <div
-            class="[&_[aria-hidden=true].w-8]:w-6! [&_[role=menuitem]]:h-8 [&_[role=menuitem]]:py-1! [&_[role=menuitem]>.bg-section-header-bg]:size-4! [&_[role=menuitem]>.bg-section-header-bg]:bg-transparent! [&_[role=menuitem]>span.flex-col]:flex-row! [&_[role=menuitem]>span.flex-col]:items-center [&_[role=menuitem]>span.flex-col]:gap-2 [&_[role=menuitem]>span.flex-col]:whitespace-nowrap [&_[role=menuitem]>span.flex-col>span]:min-w-0 [&_[role=menuitem]>span.flex-col>span]:truncate"
+            class="[&_[aria-hidden=true].w-8]:w-6! [&_[role=menuitem]>span.flex-col]:flex-row! [&_[role=menuitem]>span.flex-col]:items-center [&_[role=menuitem]>span.flex-col]:gap-2 [&_[role=menuitem]>span.flex-col]:whitespace-nowrap [&_[role=menuitem]>span.flex-col>span]:min-w-0 [&_[role=menuitem]>span.flex-col>span]:truncate"
           >
             <SavedViewsSubmenu
               :views="searchObj.data.savedViews"
@@ -766,7 +761,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         'rounded-e-default! rounded-s-none! bg-none! shadow-none!',
                       ]"
                     >
-                      <OIcon name="arrow-drop-down" size="sm" />
+                      <OIcon name="expand-more" size="xs" />
                     </OButton>
                   </template>
                   <ODropdownItem
@@ -828,7 +823,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         'rounded-e-default! rounded-s-none! bg-none! shadow-none!',
                       ]"
                     >
-                      <OIcon name="arrow-drop-down" size="sm" />
+                      <OIcon name="expand-more" size="xs" />
                     </OButton>
                   </template>
                   <ODropdownItem
@@ -932,7 +927,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'rounded-e-default! rounded-s-none! bg-none! shadow-none!',
                     ]"
                   >
-                    <OIcon name="arrow-drop-down" size="sm" />
+                    <OIcon name="expand-more" size="xs" />
                   </OButton>
                 </template>
                 <ODropdownItem
@@ -1036,11 +1031,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="showSearchHistoryfn"
             >
               <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon name="history" size="sm" />
-                </span>
+                <OIcon name="history" size="sm" class="text-text-secondary" />
               </template>
               {{ t("search.usageCostHistory") }}
             </ODropdownItem>
@@ -1059,14 +1050,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :description="downloadNote"
             >
               <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon size="sm" name="download" />
-                </span>
+                <OIcon size="sm" name="download" class="text-text-secondary" />
               </template>
               <template #trigger>{{ t("search.downloadTable") }}</template>
-              <template #icon-right><OIcon size="sm" name="chevron-right" /></template>
               <ODropdownItem
                 data-test="search-download-csv-btn"
                 icon-left="grid-on"
@@ -1092,11 +1078,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :text-value="t('search.downloadTable')"
             >
               <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon size="sm" name="download" />
-                </span>
+                <OIcon size="sm" name="download" class="text-text-secondary" />
               </template>
               {{ t("search.downloadTable") }}
               <template #icon-right
@@ -1112,15 +1094,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="toggleCustomDownloadDialog"
             >
               <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <img
-                    :src="customRangeIcon"
-                    :alt="t('logs.searchBar.customRangeAlt')"
-                    class="h-4 w-4"
-                  />
-                </span>
+                <img
+                  :src="customRangeIcon"
+                  :alt="t('logs.searchBar.customRangeAlt')"
+                  class="size-4 shrink-0"
+                />
               </template>
               {{ t("search.customRange") }}
             </ODropdownItem>
@@ -1148,15 +1126,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="scheduledSearchAccess.allowed ? createScheduleJob() : openUpgradeDialog()"
             >
               <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <img
-                    :src="createScheduledSearchIcon"
-                    :alt="t('logs.searchBar.createScheduledSearchAlt')"
-                    class="h-4 w-4"
-                  />
-                </span>
+                <img
+                  :src="createScheduledSearchIcon"
+                  :alt="t('logs.searchBar.createScheduledSearchAlt')"
+                  class="size-4 shrink-0"
+                />
               </template>
               <span data-test="search-scheduler-create-new-label">
                 {{ t("search.createScheduledSearch") }}
@@ -1170,15 +1144,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <img
-                    :src="listScheduledSearchIcon"
-                    :alt="t('logs.searchBar.listScheduledSearchAlt')"
-                    class="h-4 w-4"
-                  />
-                </span>
+                <img
+                  :src="listScheduledSearchIcon"
+                  :alt="t('logs.searchBar.listScheduledSearchAlt')"
+                  class="size-4 shrink-0"
+                />
               </template>
               <span data-test="search-scheduler-list-label">
                 {{ t("search.listScheduledSearch") }}
@@ -1204,11 +1174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Same icon badge every other item in this menu uses, so the
                    label column lines up. -->
               <template #icon-left="{ icon }">
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon :name="icon" size="sm" />
-                </span>
+                <OIcon :name="icon" size="sm" class="text-text-secondary" />
               </template>
             </CreateAlertAction>
           </ODropdownGroup>
@@ -1225,11 +1191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <ODropdownItem data-test="search-inspect-btn" @select="openSearchInspectDialog">
               <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon name="troubleshoot" size="sm" />
-                </span>
+                <OIcon name="troubleshoot" size="sm" class="text-text-secondary" />
               </template>
               <span data-test="search-inspect-label">{{ t("search.searchInspect") }}</span>
             </ODropdownItem>
@@ -1248,11 +1210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="openExplainDialog"
             >
               <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon name="lightbulb" size="sm" />
-                </span>
+                <OIcon name="lightbulb" size="sm" class="text-text-secondary" />
               </template>
               {{ t("search.explainQuery") }}
             </ODropdownItem>

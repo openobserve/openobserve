@@ -279,7 +279,7 @@ onBeforeUnmount(() => {
           'outline-none max-lg:max-w-[calc(100vw-1rem)]',
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface
-          'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
+          'bg-dropdown-bg border-dropdown-border rounded-default shadow-overlay border',
           // Open/close reveal animation (matches ODropdown)
           'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
           'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
@@ -292,6 +292,7 @@ onBeforeUnmount(() => {
         <PopoverArrow v-if="arrow" :width="14" :height="7" class="-translate-y-px overflow-visible">
           <slot name="arrow">
             <path class="fill-dropdown-bg" d="M0 0L6 6L12 0Z" />
+            <path class="stroke-dropdown-border fill-none" d="M0 0L6 6L12 0" />
           </slot>
         </PopoverArrow>
       </PopoverContent>

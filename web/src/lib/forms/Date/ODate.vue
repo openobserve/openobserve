@@ -42,7 +42,7 @@ const wrapperAttrs = computed(() => {
 });
 
 const props = withDefaults(defineProps<DateProps>(), {
-  size: "md",
+  size: "sm",
   labelPosition: "outside",
   disabled: false,
   readonly: false,
@@ -128,9 +128,11 @@ function onFocusOut(e: FocusEvent) {
   }
 }
 
+// Same scale as OSelect, so a date field lines up with the selects beside it.
 const heightClasses: Record<NonNullable<DateProps["size"]>, string> = {
-  sm: "h-6 text-sm",
-  md: "h-7 text-compact",
+  xs: "h-6 text-xs",
+  sm: "h-7 text-compact",
+  md: "h-8 text-compact",
 };
 
 const wrapperClasses = computed(() => [
@@ -142,7 +144,7 @@ const wrapperClasses = computed(() => [
     : "border-datepicker-border hover:border-datepicker-hover-border",
   "focus-within:ring-2 focus-within:ring-focus-ring-accent",
   isDisabled.value ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
-  heightClasses[props.size ?? "md"],
+  heightClasses[props.size ?? "sm"],
 ]);
 </script>
 
@@ -214,7 +216,7 @@ const wrapperClasses = computed(() => [
           :class="[
             'flex min-w-0 flex-1 items-center gap-px ps-2 outline-none',
             clearable ? 'pe-2' : 'pe-3',
-            heightClasses[size ?? 'md'],
+            heightClasses[size ?? 'sm'],
           ]"
         >
           <template #default="{ segments }">
@@ -260,7 +262,7 @@ const wrapperClasses = computed(() => [
       <DatePickerContent
         :side-offset="4"
         align="start"
-        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-10001 border p-3 shadow-md"
+        class="rounded-default bg-select-content-bg border-select-content-border shadow-overlay z-10001 border p-3"
       >
         <DatePickerCalendar v-slot="{ weekDays, grid }">
           <DatePickerHeader class="mb-3 flex items-center justify-between">

@@ -55,7 +55,7 @@
                       bracket-class="text-text-body"
                       leading-fn
                     />
-                    <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                    <template #icon-right><OIcon name="expand-more" size="xs" /></template>
                   </OButton>
                 </template>
                 <div
@@ -170,7 +170,7 @@
   >
     <OSearchInput v-model="searchQuery" data-test="operations-list-search-input" clearable />
 
-    <div class="overflow-y-auto" style="max-height: 25rem">
+    <div class="max-h-100 overflow-y-auto">
       <div class="border-border rounded-default divide-border divide-y border">
         <div
           v-for="category in categories"
@@ -178,10 +178,10 @@
           :data-test="`operations-list-category-${category}`"
         >
           <OCollapsible :default-open="true" :label="raw(category)">
-            <div>
+            <div class="p-1">
               <p
                 v-if="isRangeGroupBlocked(category)"
-                class="text-text-secondary px-4 pt-2 text-xs"
+                class="text-text-secondary px-2 pt-1 pb-1 text-xs"
                 data-test="operations-list-range-first-note"
               >
                 {{ t("metrics.operationsList.rangeOnlyFirstNote") }}
@@ -192,12 +192,13 @@
                 :data-test="`promql-operation-option-${op.id}`"
                 :data-test-value="op.name"
                 :aria-disabled="isBlocked(op) ? 'true' : 'false'"
-                class="promql-operation-option px-4 py-2 text-sm"
-                :class="
+                :class="[
+                  'promql-operation-option',
+                  MENU_ROW_CLASS,
                   isBlocked(op)
-                    ? 'cursor-not-allowed opacity-50'
-                    : 'hover:bg-primary-background cursor-pointer'
-                "
+                    ? 'cursor-not-allowed! opacity-50'
+                    : 'text-dropdown-item-text hover:bg-dropdown-item-hover-bg',
+                ]"
                 @click="
                   if (!isBlocked(op)) {
                     addOperation(op);
@@ -211,8 +212,10 @@
                   :content="t('metrics.operationsList.rangeOnlyFirst')"
                   side="top"
                 />
-                <div class="font-medium">{{ op.name }}</div>
-                <div class="text-text-secondary mt-0.5 text-xs">{{ op.documentation }}</div>
+                <div class="flex min-w-0 flex-col gap-0.5">
+                  <span class="font-medium">{{ op.name }}</span>
+                  <span class="text-text-secondary text-xs">{{ op.documentation }}</span>
+                </div>
               </div>
             </div>
           </OCollapsible>
@@ -235,6 +238,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import { MENU_ROW_CLASS } from "@/lib/overlay/menuClasses";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";

@@ -19,7 +19,6 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -71,6 +70,12 @@ const matching = computed(() => {
   return sorted.filter((view) => String(view.view_name).toLowerCase().includes(term));
 });
 
+const searchPlaceholder = computed(() =>
+  props.loading
+    ? t("search.savedViewsSearchPlaceholder")
+    : t("search.savedViewsSearchCount", { count: props.views.length }, props.views.length),
+);
+
 const favorites = computed(() => matching.value.filter(isFavorite));
 const others = computed(() => matching.value.filter((view) => !isFavorite(view)));
 
@@ -109,22 +114,25 @@ onMounted(() => nextTick(focusSearch));
     class="flex w-[min(20rem,calc(100vw-2rem))] flex-col"
     :data-test="`${props.dataTestPrefix}-content`"
   >
-    <div class="px-1 pt-0.5 pb-0.5" @keydown="onSearchKeydown">
-      <OSearchInput
+    <div
+      class="border-dropdown-border -mx-1 -mt-1 mb-1 flex h-7 shrink-0 items-center gap-2 border-b px-3"
+      :data-test="`${props.dataTestPrefix}-search`"
+      @keydown="onSearchKeydown"
+    >
+      <OIcon name="search" size="xs" class="text-text-secondary shrink-0" />
+      <input
         v-model="search"
-        size="sm"
-        class="w-full"
-        :placeholder="
-          props.loading
-            ? t('search.savedViewsSearchPlaceholder')
-            : t('search.savedViewsSearchCount', { count: props.views.length }, props.views.length)
-        "
-        :data-test="`${props.dataTestPrefix}-search`"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        class="text-text-body placeholder:text-text-secondary text-compact h-full min-w-0 flex-1 bg-transparent outline-none"
+        :placeholder="searchPlaceholder"
+        :aria-label="searchPlaceholder"
       />
     </div>
     <div
       v-if="props.loading"
-      class="text-text-secondary flex items-center gap-2 px-3 py-1.5 text-sm"
+      class="text-text-secondary text-compact flex items-center justify-center gap-2 py-4"
       :data-test="`${props.dataTestPrefix}-loading`"
     >
       <OSpinner size="xs" />
@@ -154,7 +162,7 @@ onMounted(() => nextTick(focusSearch));
           @toggle-favorite="onToggleFavorite(view, true)"
         />
       </ODropdownGroup>
-      <ODropdownSeparator v-if="favorites.length && others.length" class="my-0.5!" />
+      <ODropdownSeparator v-if="favorites.length && others.length" />
       <ODropdownGroup
         v-if="others.length"
         :label="t('search.savedViewsAllGroup')"
@@ -177,14 +185,13 @@ onMounted(() => nextTick(focusSearch));
     </div>
     <div
       v-else
-      class="text-text-secondary px-3 py-1.5 text-sm"
+      class="text-text-secondary text-compact py-4 text-center"
       :data-test="`${props.dataTestPrefix}-empty`"
     >
       {{ props.views.length ? t("search.savedViewsNoMatch") : t("search.savedViewsEmpty") }}
     </div>
-    <ODropdownSeparator class="my-0.5!" />
+    <ODropdownSeparator />
     <ODropdownItem
-      class="py-1!"
       :data-test="props.createTestId ?? `${props.dataTestPrefix}-create`"
       :disabled="!!props.saveReason"
       focusable-unavailable

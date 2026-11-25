@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-else
-            class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm transition-colors duration-200"
+            class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-4 py-2 text-sm transition-colors duration-200"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >

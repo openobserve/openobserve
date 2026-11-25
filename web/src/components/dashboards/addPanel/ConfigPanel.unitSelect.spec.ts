@@ -236,7 +236,7 @@ describe("ConfigPanel Unit select (real OSelect)", { timeout: 30_000 }, () => {
     row.click();
     await flushPromises();
     expect(option("locale:cs-CZ")).not.toBeNull();
-    expect(option("locale:cs-CZ")!.classList.contains("ps-7")).toBe(true);
+    expect(option("locale:cs-CZ")!.classList.contains("ps-6")).toBe(true);
   });
 
   it("opens with a pinned locale's group expanded", async () => {

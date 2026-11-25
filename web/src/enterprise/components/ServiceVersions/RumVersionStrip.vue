@@ -34,7 +34,7 @@
           <OButton
             variant="outline"
             size="xs"
-            icon-right="arrow-drop-down"
+            icon-right="expand-more"
             :aria-label="t('serviceVersions.rum.strip.switchApp')"
             data-test="svcver-rum-strip-app"
             ><b class="text-text-heading font-semibold">{{ scope.service }}</b

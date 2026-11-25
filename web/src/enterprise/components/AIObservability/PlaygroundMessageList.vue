@@ -195,7 +195,7 @@
             :aria-label="t('aiObservability.playground.addMessageChoose')"
             data-test="ai-playground-add-message-menu"
           >
-            <OIcon name="arrow-drop-down" size="sm" />
+            <OIcon name="expand-more" size="xs" />
           </OButton>
         </template>
         <ODropdownItem

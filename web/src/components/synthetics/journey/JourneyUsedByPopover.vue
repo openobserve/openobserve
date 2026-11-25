@@ -70,7 +70,7 @@ function editRoute(reference: { id: string; folder_id: string }) {
         data-test="synthetics-journey-used-by-trigger"
       >
         {{ t("synthetics.save.usedByCount", { count }, count) }}
-        <OIcon name="arrow-drop-down" size="sm" aria-hidden="true" />
+        <OIcon name="expand-more" size="xs" aria-hidden="true" />
       </OButton>
     </template>
     <div class="flex flex-col gap-3">

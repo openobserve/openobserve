@@ -12,11 +12,11 @@ describe("OSelectHeaderRow", () => {
     wrapper?.unmount();
   });
 
-  it("renders the label bold with the count after a separator", () => {
+  it("renders the label medium-weight with the count after a separator", () => {
     wrapper = mount(OSelectHeaderRow, {
       props: { label: raw("Internal streams"), count: raw("3 hidden") },
     });
-    expect(wrapper.find(".font-bold").text()).toBe("Internal streams");
+    expect(wrapper.find(".font-medium").text()).toBe("Internal streams");
     expect(wrapper.text()).toContain("3 hidden");
     const hidden = wrapper.findAll('[aria-hidden="true"]').map((el) => el.text());
     expect(hidden).toContain("·");

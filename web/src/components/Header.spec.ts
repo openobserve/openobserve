@@ -1003,30 +1003,6 @@ describe("Header Component", () => {
       expect(wrapper.props("langList")[0].code).toBe("en-us");
     });
 
-    it("positions the language submenu with logical RTL-safe utilities", async () => {
-      const languageWrapper = createWrapper({
-        stubsOverrides: {
-          ODropdown: {
-            template: '<div><slot name="trigger" /><slot /></div>',
-          },
-        },
-      });
-
-      languageWrapper.vm.showLanguageSubmenu = true;
-      await languageWrapper.vm.$nextTick();
-
-      const submenu = languageWrapper.find('[data-test="language-dropdown-item"]');
-      expect(submenu.exists()).toBe(true);
-      expect(submenu.classes()).toContain("end-full");
-      expect(submenu.classes()).toContain("me-1");
-      expect(submenu.classes()).not.toContain("right-full");
-      expect(submenu.classes()).toContain("max-lg:static");
-      expect(submenu.classes()).not.toContain("max-md:static");
-      expect(submenu.findAll('[data-test^="language-dropdown-item-"]')).toHaveLength(2);
-
-      languageWrapper.unmount();
-    });
-
     it("should have access to current language from cookies", () => {
       // Verify that getLanguage can be called (it's mocked to return "en-us")
       const currentLang = cookies.getLanguage();
@@ -1477,18 +1453,10 @@ describe("Header Component", () => {
     });
   });
 
-  describe("language row keyboard (AC-10)", () => {
-    const DropdownItemStub = {
-      emits: ["select"],
-      template:
-        '<div role="menuitem" tabindex="-1" @click="$emit(\'select\', $event)"><slot name="icon-left" /><slot /></div>',
-    };
-
-    const mountLanguage = (dir: "ltr" | "rtl" = "ltr") => {
-      document.documentElement.dir = dir;
+  describe("language submenu", () => {
+    const mountLanguage = () => {
       const store = mockStore;
       return mount(Header, {
-        attachTo: document.body,
         props: { ...defaultProps, store },
         global: {
           plugins: [i18n],
@@ -1498,157 +1466,46 @@ describe("Header Component", () => {
             OrganizationSelector: true,
             EnterpriseUpgradeDialog: true,
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
-            ODropdownItem: DropdownItemStub,
+            ODropdownSub: {
+              template:
+                '<div><button v-bind="$attrs"><slot name="trigger" /></button><slot /></div>',
+              inheritAttrs: false,
+            },
+            ODropdownItem: {
+              props: ["selected"],
+              emits: ["select"],
+              template: `<div role="menuitemradio" :aria-checked="selected" @click="$emit('select', $event)"><slot /></div>`,
+            },
           },
         },
       });
     };
 
-    const row = (w: any) => w.find('[data-test="header-language-submenu-trigger"]');
-    const list = (w: any) => w.find('[data-test="language-dropdown-item"]');
-    const option = (w: any, code: string) => w.find(`[data-test="language-dropdown-item-${code}"]`);
-    const activeTest = () => (document.activeElement as HTMLElement | null)?.dataset.test;
-
-    const openByKey = async (w: any, key: string) => {
-      await row(w).trigger("keydown", { key });
-      await nextTick();
-    };
-
-    let w: any;
-
-    beforeEach(() => {
-      breakpoint.lgUp = true;
+    it("uses the shared submenu with the current language on its trigger", () => {
+      const w = mountLanguage();
+      const row = w.find('[data-test="header-language-submenu-trigger"]');
+      expect(row.exists()).toBe(true);
+      expect(row.text()).toContain("English");
+      expect(w.find('[data-test="language-dropdown-item"]').exists()).toBe(true);
+      w.unmount();
     });
 
-    afterEach(() => {
-      w?.unmount();
-      w = null;
-      document.documentElement.dir = "ltr";
-    });
-
-    it("gives only the Language row a keyboard focus ring, so other dropdowns keep their look", () => {
-      w = mountLanguage();
-      expect(row(w).classes()).toEqual(
-        expect.arrayContaining([
-          "focus-visible:ring-2",
-          "focus-visible:ring-inset",
-          "focus-visible:ring-focus-ring-accent",
-        ]),
+    it("marks only the current language as selected", () => {
+      const w = mountLanguage();
+      expect(w.find('[data-test="language-dropdown-item-en-us"]').attributes("aria-checked")).toBe(
+        "true",
       );
+      expect(w.find('[data-test="language-dropdown-item-fr"]').attributes("aria-checked")).toBe(
+        "false",
+      );
+      w.unmount();
     });
 
-    it("exposes haspopup and an expanded state that follows the list", async () => {
-      w = mountLanguage();
-      expect(row(w).attributes("aria-haspopup")).toBe("menu");
-      expect(row(w).attributes("aria-expanded")).toBe("false");
-      expect(list(w).exists()).toBe(false);
-
-      await row(w).trigger("click");
-      await nextTick();
-      expect(row(w).attributes("aria-expanded")).toBe("true");
-      expect(list(w).exists()).toBe(true);
-    });
-
-    it("select opens the list, keeps the menu open and focuses the selected language", async () => {
-      w = mountLanguage();
-      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
-      row(w).element.dispatchEvent(event);
-      await nextTick();
-      await nextTick();
-
-      expect(event.defaultPrevented).toBe(true);
-      expect(list(w).exists()).toBe(true);
-      expect(activeTest()).toBe("language-dropdown-item-en-us");
-    });
-
-    it.each([
-      ["ltr", "ArrowLeft"],
-      ["ltr", "ArrowRight"],
-      ["rtl", "ArrowLeft"],
-      ["rtl", "ArrowRight"],
-    ] as const)("%s: %s on the row opens the list and stops before the menu", async (dir, key) => {
-      w = mountLanguage(dir);
-      const seenByMenu = vi.fn();
-      w.element.addEventListener("keydown", seenByMenu);
-
-      await openByKey(w, key);
-      await nextTick();
-
-      expect(list(w).exists()).toBe(true);
-      expect(activeTest()).toBe("language-dropdown-item-en-us");
-      expect(seenByMenu).not.toHaveBeenCalled();
-    });
-
-    it("Up and Down stay inside the list", async () => {
-      w = mountLanguage();
-      await openByKey(w, "ArrowRight");
-      await nextTick();
-      expect(activeTest()).toBe("language-dropdown-item-en-us");
-
-      await option(w, "en-us").trigger("keydown", { key: "ArrowDown" });
-      expect(activeTest()).toBe("language-dropdown-item-fr");
-      await option(w, "fr").trigger("keydown", { key: "ArrowDown" });
-      expect(activeTest()).toBe("language-dropdown-item-en-us");
-      await option(w, "en-us").trigger("keydown", { key: "ArrowUp" });
-      expect(activeTest()).toBe("language-dropdown-item-fr");
-      expect(list(w).exists()).toBe(true);
-    });
-
-    it("Enter on an option emits changeLanguage", async () => {
-      w = mountLanguage();
-      await openByKey(w, "ArrowRight");
-      await option(w, "fr").trigger("click");
-
+    it("emits changeLanguage when a language is chosen", async () => {
+      const w = mountLanguage();
+      await w.find('[data-test="language-dropdown-item-fr"]').trigger("click");
       expect(w.emitted("changeLanguage")?.[0]).toEqual([{ code: "fr", label: "Français" }]);
-    });
-
-    it("Escape closes the list and refocuses the row without reaching the menu", async () => {
-      w = mountLanguage();
-      await openByKey(w, "ArrowRight");
-      await nextTick();
-      const seenByMenu = vi.fn();
-      w.element.addEventListener("keydown", seenByMenu);
-
-      await option(w, "en-us").trigger("keydown", { key: "Escape" });
-      await nextTick();
-
-      expect(list(w).exists()).toBe(false);
-      expect(row(w).attributes("aria-expanded")).toBe("false");
-      expect(activeTest()).toBe("header-language-submenu-trigger");
-      expect(seenByMenu).not.toHaveBeenCalled();
-    });
-
-    it.each([
-      ["ltr", "ArrowRight", "ArrowLeft"],
-      ["rtl", "ArrowLeft", "ArrowRight"],
-    ] as const)(
-      "%s: the arrow away (%s) closes at lg and up; %s does nothing",
-      async (dir, away, toward) => {
-        w = mountLanguage(dir);
-        await openByKey(w, "ArrowRight");
-        await nextTick();
-
-        await option(w, "en-us").trigger("keydown", { key: toward });
-        expect(list(w).exists()).toBe(true);
-        expect(activeTest()).toBe("language-dropdown-item-en-us");
-
-        await option(w, "en-us").trigger("keydown", { key: away });
-        await nextTick();
-        expect(list(w).exists()).toBe(false);
-        expect(activeTest()).toBe("header-language-submenu-trigger");
-      },
-    );
-
-    it("the arrow away does nothing below lg, where the list sits under its row", async () => {
-      breakpoint.lgUp = false;
-      w = mountLanguage();
-      await openByKey(w, "ArrowRight");
-      await nextTick();
-
-      await option(w, "en-us").trigger("keydown", { key: "ArrowRight" });
-      await nextTick();
-      expect(list(w).exists()).toBe(true);
-      expect(activeTest()).toBe("language-dropdown-item-en-us");
+      w.unmount();
     });
   });
 
@@ -1672,6 +1529,7 @@ describe("Header Component", () => {
             OrganizationSelector: true,
             EnterpriseUpgradeDialog: true,
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+            ODropdownSub: true,
             ODropdownItem: {
               emits: ["select"],
               template:

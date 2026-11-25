@@ -69,12 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex flex-nowrap items-center">
             <OIcon name="update" size="sm" class="me-1" :class="isOn ? 'text-live!' : ''" />
             <span v-if="!isOn" class="text-text-secondary text-xs">{{ t("common.off") }}</span>
-            <OIcon
-              name="arrow-drop-down"
-              size="sm"
-              class="ms-0.5"
-              :class="isOn ? 'text-live!' : ''"
-            />
+            <OIcon name="expand-more" size="xs" class="ms-0.5" :class="isOn ? 'text-live!' : ''" />
           </div>
           <span
             v-if="isOn"
@@ -113,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <hr class="border-border-default my-0 border-0 border-t border-solid" />
         <div class="flex flex-col gap-3 px-4 py-3">
           <section v-for="section in refreshSections" :key="section.key">
-            <h5 class="text-text-secondary mb-2 text-xs font-semibold tracking-wider uppercase">
+            <h5 class="text-text-secondary mb-2 text-xs font-medium">
               {{ section.label }}
             </h5>
             <div class="grid grid-cols-4 gap-2">

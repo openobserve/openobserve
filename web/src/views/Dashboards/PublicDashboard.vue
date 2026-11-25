@@ -102,7 +102,7 @@
                 size="sm-toolbar"
                 class="h-8!"
                 icon-left="schedule"
-                icon-right="keyboard-arrow-down"
+                icon-right="expand-more"
                 data-test="dashboards-public-dashboard-preset-btn"
               >
                 {{ selectedRange ? rangeLabel(selectedRange) : "" }}

@@ -59,4 +59,6 @@ export interface DropdownSlots {
   trigger?: () => unknown;
   /** ODropdownItem / ODropdownGroup / ODropdownSeparator children */
   default?: () => unknown;
+  /** Shown in place of the items when the default slot renders nothing. */
+  empty?: () => unknown;
 }

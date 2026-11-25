@@ -144,4 +144,68 @@ describe("ODropdown", () => {
       wrapper.unmount();
     });
   });
+
+  describe("surface", () => {
+    // The stubbed portal renders a content wrapper, so the styled menu is the innermost one.
+    const content = (wrapper: ReturnType<typeof mount>) => wrapper.findAll('[role="menu"]').at(-1)!;
+
+    it("draws the shared bordered surface with default size caps", () => {
+      const wrapper = mount(ODropdown, {
+        props: { open: true },
+        slots: { trigger: "<button>Open</button>", default: "<div>Item</div>" },
+      });
+      expect(content(wrapper).classes()).toEqual(
+        expect.arrayContaining([
+          "bg-dropdown-bg",
+          "border",
+          "border-dropdown-border",
+          "shadow-overlay",
+          "rounded-default",
+          "p-1",
+          "min-w-40",
+          "text-compact",
+          "max-w-[min(20rem,calc(100vw-1.5rem))]",
+          "overflow-y-auto",
+        ]),
+      );
+    });
+
+    it("leaves width and height caps to a caller that sets its own", () => {
+      const wrapper = mount(ODropdown, {
+        props: { open: true, contentClass: "w-100 max-h-80" },
+        slots: { trigger: "<button>Open</button>", default: "<div>Item</div>" },
+      });
+      const classes = content(wrapper).classes();
+      expect(classes).toContain("w-100");
+      expect(classes).not.toContain("max-w-[min(20rem,calc(100vw-1.5rem))]");
+      expect(classes).not.toContain("max-h-[min(18rem,var(--reka-popper-available-height,18rem))]");
+    });
+  });
+
+  describe("empty slot", () => {
+    it("shows the empty slot when the items render nothing", () => {
+      const wrapper = mount(ODropdown, {
+        props: { open: true },
+        slots: {
+          trigger: "<button>Open</button>",
+          default: () => [],
+          empty: "<span data-testid='empty'>No views yet</span>",
+        },
+      });
+      expect(wrapper.find('[data-testid="empty"]').exists()).toBe(true);
+    });
+
+    it("shows the items and not the empty slot when there are items", () => {
+      const wrapper = mount(ODropdown, {
+        props: { open: true },
+        slots: {
+          trigger: "<button>Open</button>",
+          default: "<div data-testid='item'>Item</div>",
+          empty: "<span data-testid='empty'>No views yet</span>",
+        },
+      });
+      expect(wrapper.find('[data-testid="item"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="empty"]').exists()).toBe(false);
+    });
+  });
 });

@@ -48,9 +48,7 @@ const CONTROLS = [
   "lib/core/Button/OButton.vue",
   "lib/core/ToggleGroup/OToggleGroupItem.vue",
   "lib/navigation/Tabs/OTab.vue",
-  "lib/overlay/Dropdown/ODropdownItem.vue",
-  "lib/overlay/Dropdown/ODropdownSub.vue",
-  "lib/overlay/ContextMenu/OContextMenuItem.vue",
+  "lib/overlay/menuClasses.ts",
   "lib/forms/Select/OSelectItem.vue",
 ];
 

@@ -38,10 +38,10 @@ const ODropdownStub = {
 };
 const ODropdownItemStub = {
   name: "ODropdownItem",
-  props: ["disabled", "iconLeft", "variant"],
+  props: ["disabled", "iconLeft", "variant", "selected"],
   emits: ["select"],
   template:
-    '<div role="menuitem" @click="$emit(\'select\', $event)"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
+    '<div role="menuitem" :aria-checked="selected" @click="$emit(\'select\', $event)"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
 };
 const ODropdownGroupStub = {
   name: "ODropdownGroup",
@@ -103,19 +103,16 @@ describe("ReplayEnvironmentMenu", () => {
     wrapper?.unmount();
   });
 
-  it("marks the selected environment with a check and announces it as selected", () => {
+  it("marks the selected environment through the item's selected state", () => {
     wrapper = mountMenu();
 
     const selected = wrapper.get(item("env-stg"));
-    expect(selected.find('[data-icon="check"]').exists()).toBe(true);
-    expect(selected.find(".sr-only").text()).toBe("Selected");
-    expect(selected.find(".text-accent").text()).toBe("Staging");
+    expect(selected.attributes("aria-checked")).toBe("true");
+    expect(selected.text()).toContain("Staging");
     expect(selected.text()).toContain("stg.test");
 
     const other = wrapper.get(item("env-prod"));
-    expect(other.find('[data-icon="check"]').exists()).toBe(false);
-    expect(other.text()).not.toContain("Selected");
-    expect(other.find(".text-accent").exists()).toBe(false);
+    expect(other.attributes("aria-checked")).toBe("false");
     expect(other.text()).toContain("Production");
     expect(other.text()).toContain("prod.test");
   });
@@ -173,7 +170,7 @@ describe("ReplayEnvironmentMenu", () => {
     expect(trigger.get(".text-text-secondary").text()).toBe("Test on");
     const icons = trigger.findAll("[data-icon]").map((i) => i.attributes("data-icon"));
     expect(icons[0]).toBe("layers");
-    expect(icons.at(-1)).toBe("arrow-drop-down");
+    expect(icons.at(-1)).toBe("expand-more");
   });
 
   it("the trigger is a labelled outline button", () => {

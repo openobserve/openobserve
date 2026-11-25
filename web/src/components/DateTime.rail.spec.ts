@@ -38,6 +38,7 @@ const CALENDAR_IDS = [
 ];
 
 const SELECTED_CLASS = "bg-selected-bg!";
+const RAIL_SELECTED_CLASS = "bg-dropdown-item-selected-bg!";
 
 describe("DateTime rail", () => {
   let wrapper: VueWrapper<InstanceType<typeof DateTime>> | null = null;
@@ -128,8 +129,9 @@ describe("DateTime rail", () => {
       const recent = el("date-time-rail-recent-header")!;
       const calendar = el("date-time-rail-calendar-header")!;
       for (const header of [recent, calendar]) {
-        expect(header.className).toContain("text-input-label-text");
-        expect(header.className).toContain("tracking-wide");
+        expect(header.className).toContain("text-text-secondary");
+        expect(header.className).toContain("font-medium");
+        expect(header.className).not.toMatch(/uppercase|tracking-/);
       }
     });
 
@@ -257,14 +259,14 @@ describe("DateTime rail", () => {
 
       calendarItem("yesterday")!.click();
       await openMenu();
-      expect(calendarItem("yesterday")?.className).toContain(SELECTED_CLASS);
-      expect(calendarItem("today")?.className).not.toContain(SELECTED_CLASS);
+      expect(calendarItem("yesterday")?.className).toContain(RAIL_SELECTED_CLASS);
+      expect(calendarItem("today")?.className).not.toContain(RAIL_SELECTED_CLASS);
       expect(el("date-time-relative-15-m-btn")?.className).not.toContain(SELECTED_CLASS);
 
       el("date-time-relative-3-h-btn")!.click();
       await flushPromises();
       await openMenu();
-      expect(calendarItem("yesterday")?.className).not.toContain(SELECTED_CLASS);
+      expect(calendarItem("yesterday")?.className).not.toContain(RAIL_SELECTED_CLASS);
       expect(el("date-time-relative-3-h-btn")?.className).toContain(SELECTED_CLASS);
       expect(lastEmit().relativeTimePeriod).toBe("3h");
     });
@@ -901,7 +903,7 @@ describe("DateTime rail", () => {
       expect(storedHistory()).toEqual([hourRange(30), hourRange(1)]);
 
       await openMenu();
-      expect(el("date-time-rail-recent-0")?.className).toContain(SELECTED_CLASS);
+      expect(el("date-time-rail-recent-0")?.className).toContain(RAIL_SELECTED_CLASS);
       // Both tab panels stay mounted for equal height; the inactive one is just aria-hidden.
       expect(
         el("date-time-relative-15-m-btn")

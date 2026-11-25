@@ -62,4 +62,32 @@ describe("ODropdownSub", () => {
     await vi.waitFor(() => expect(select).toHaveBeenCalledTimes(1));
     await vi.waitFor(() => expect(item("sub")).toBeNull());
   });
+
+  it("draws a trailing chevron unless the caller fills icon-right", async () => {
+    const mountSub = (slots: Record<string, () => unknown>) =>
+      mount(ODropdown, {
+        attachTo: document.body,
+        props: { open: true },
+        slots: {
+          trigger: () => h("button", "Menu"),
+          default: () =>
+            h(
+              ODropdownSub,
+              { "data-test": "sub", textValue: raw("Export") },
+              { trigger: () => "Export", default: () => null, ...slots },
+            ),
+        },
+      });
+    wrapper = mountSub({});
+    await flushPromises();
+    const sub = document.querySelector<HTMLElement>('[data-test="sub"]')!;
+    expect(sub.classList.contains("min-h-7")).toBe(true);
+    expect(sub.querySelector(".text-text-secondary.ms-auto")).not.toBeNull();
+    wrapper.unmount();
+    wrapper = mountSub({ "icon-right": () => h("span", { "data-testid": "own" }) });
+    await flushPromises();
+    const custom = document.querySelector<HTMLElement>('[data-test="sub"]')!;
+    expect(custom.querySelector('[data-testid="own"]')).not.toBeNull();
+    expect(custom.querySelector(".text-text-secondary.ms-auto")).toBeNull();
+  });
 });

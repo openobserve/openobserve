@@ -452,19 +452,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               v-for="option in GROUP_PICKS"
               :key="option"
-              role="menuitemradio"
-              :aria-checked="option === groupPick"
+              :selected="option === groupPick"
               :data-test="`autoobserve-coverage-group-pick-${option}`"
               @select="groupPick = option"
             >
               <span class="flex-1">{{ t(GROUP_PICK_LABEL[option]) }}</span>
-              <template #icon-right>
-                <OIcon
-                  name="check"
-                  size="sm"
-                  :class="option === groupPick ? 'text-text-heading' : 'invisible'"
-                />
-              </template>
             </ODropdownItem>
           </ODropdown>
           <span v-if="unknownShown" data-test="autoobserve-coverage-traffic-unknown">{{

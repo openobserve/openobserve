@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               icon-left="add"
-              icon-right="arrow-drop-down"
+              icon-right="expand-more"
               data-test="oncall-timeline-add"
             >
               {{ t("oncall.addRotation") }}

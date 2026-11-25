@@ -167,7 +167,7 @@ describe("OrganizationSelector", () => {
       await openMenu();
       expect(document.activeElement).toBe(input());
       expect(activeDescendant()).toBeNull();
-      expect($$('[role="row"].bg-select-item-hover-bg')).toHaveLength(0);
+      expect($$('[role="row"].bg-dropdown-item-hover-bg')).toHaveLength(0);
     });
 
     it("D14 keeps every existing id, marks the current org selected and links to the orgs page", async () => {

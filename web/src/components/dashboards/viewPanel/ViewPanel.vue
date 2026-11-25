@@ -111,7 +111,7 @@
                 :disabled="disable"
                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                 data-test="dashboard-viewpanel-refresh-options-btn"
-                icon-left="arrow-drop-down"
+                icon-right="expand-more"
               />
             </template>
             <ODropdownItem

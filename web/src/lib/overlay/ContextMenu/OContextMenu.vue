@@ -8,6 +8,7 @@ import {
 } from "reka-ui";
 import { onBeforeUnmount, ref, watch } from "vue";
 import { setActiveOverlay, clearActiveOverlay } from "../Dropdown/ODropdown.context";
+import { MENU_SURFACE_CLASS, menuSizeClass } from "../menuClasses";
 
 const props = withDefaults(defineProps<ContextMenuProps>(), {
   disabled: false,
@@ -88,13 +89,9 @@ onBeforeUnmount(() => {
         :class="[
           // Layout + stacking — overlay layer 6000 (clears header 2000; ties with
           // drawer/dialog content broken by later DOM order). See tokens/base.css.
-          'z-6000 min-w-40 p-1',
-          // Surface — a context menu is visually the same object as a dropdown
-          // menu, so it deliberately shares the dropdown token set rather than
-          // duplicating one that would have to be kept in sync.
-          'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
-          // Typography
-          'text-dropdown-item-text text-sm',
+          'z-6000',
+          ...menuSizeClass(props.contentClass),
+          MENU_SURFACE_CLASS,
           // Animation — same clip-path reveal as ODropdown, wiping away from
           // the pointer. Soft ease-out-expo in, quick wipe out.
           'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',

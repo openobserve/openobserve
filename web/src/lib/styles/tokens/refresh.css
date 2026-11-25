@@ -305,6 +305,8 @@
   /* Menus, options and nav rows */
   --color-dropdown-item-hover-bg: var(--color-surface-hover);
   --color-dropdown-item-active-bg: var(--color-surface-band);
+  --color-dropdown-item-selected-bg: var(--color-select-item-selected-bg);
+  --color-dropdown-item-selected-text: var(--color-select-item-selected-text);
   --color-select-item-hover-bg: var(--color-surface-hover);
   --color-select-item-selected-bg: var(--color-selected-bg);
   --color-select-item-selected-text: var(--color-selected-fg);

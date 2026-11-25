@@ -16,44 +16,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="context-menu bg-surface-overlay border-border-default rounded-default fixed z-9999 min-w-50 overflow-hidden border py-1 shadow-md"
+    :class="['context-menu fixed z-9999 min-w-50 overflow-hidden', MENU_SURFACE_CLASS]"
     :style="{ top: `${y}px`, left: `${x}px` }"
     @click.stop
     data-test="alert-insights-context-menu"
   >
-    <div class="menu-header bg-surface-subtle text-text-secondary px-4 py-2 text-xs font-semibold">
+    <div :class="['menu-header truncate', MENU_LABEL_CLASS]">
       {{ isAlertNameContext ? value : panelTitle }}
     </div>
-    <OSeparator />
+    <div :class="MENU_SEPARATOR_CLASS" role="separator" />
 
     <!-- Alert-specific actions (shown for Dedup and similar panels) -->
     <template v-if="isAlertNameContext">
-      <div class="menu-section px-0 py-1">
+      <div class="menu-section">
         <div
-          class="menu-item hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          :class="['menu-item', ROW_CLASS]"
           @click="editAlert"
           data-test="context-menu-edit-alert"
         >
-          <OIcon name="edit" size="sm" class="me-2" />
+          <OIcon name="edit" size="sm" class="text-text-secondary shrink-0" />
           <span>{{ t("alerts.insights.actions.editAlert") }}</span>
         </div>
         <div
-          class="menu-item hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          :class="['menu-item', ROW_CLASS]"
           @click="viewAlertHistory"
           data-test="context-menu-view-history"
         >
-          <OIcon name="history" size="sm" class="me-2" />
+          <OIcon name="history" size="sm" class="text-text-secondary shrink-0" />
           <span>{{ t("alerts.insights.actions.viewAlertHistory") }}</span>
         </div>
       </div>
-      <OSeparator />
-      <div class="menu-section px-0 py-1">
+      <div :class="MENU_SEPARATOR_CLASS" role="separator" />
+      <div class="menu-section">
         <div
-          class="menu-item hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          :class="['menu-item', ROW_CLASS]"
           @click="$emit('close')"
           data-test="context-menu-cancel"
         >
-          <OIcon name="close" size="sm" class="me-2" />
+          <OIcon name="close" size="sm" class="text-text-secondary shrink-0" />
           <span>{{ t("common.cancel") }}</span>
         </div>
       </div>
@@ -65,7 +65,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, onUnmounted } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import {
+  MENU_LABEL_CLASS,
+  MENU_ROW_CLASS,
+  MENU_SEPARATOR_CLASS,
+  MENU_SURFACE_CLASS,
+} from "@/lib/overlay/menuClasses";
+
+const ROW_CLASS = [
+  MENU_ROW_CLASS,
+  "text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-hover-bg",
+];
 
 const { t } = useI18nTyped();
 

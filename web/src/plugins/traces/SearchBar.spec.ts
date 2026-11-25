@@ -2781,7 +2781,7 @@ describe("SearchBar", () => {
         .find('[data-test="traces-search-bar-saved-views-btn"]')
         .findAllComponents({ name: "OIcon" })
         .map((c) => c.props("name"));
-      expect(icons).toEqual(["saved-search", "arrow-drop-down"]);
+      expect(icons).toEqual(["saved-search", "expand-more"]);
     });
 
     it("opens the save dialog from the save button beside the menu, as logs does", async () => {

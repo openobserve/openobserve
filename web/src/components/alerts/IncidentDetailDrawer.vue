@@ -67,8 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               v-for="option in statusOptions"
               :key="option.value"
-              role="menuitemradio"
-              :aria-checked="editableStatus === option.value"
+              :selected="editableStatus === option.value"
               :description="option.help"
               :data-test="`incident-status-menu-${option.value}`"
               @select="
@@ -76,17 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 handleStatusChange(option.value as 'open' | 'acknowledged' | 'resolved')
               "
             >
-              <span :class="{ 'text-accent': editableStatus === option.value }">{{
-                option.label
-              }}</span>
-              <template #icon-right>
-                <OIcon
-                  name="check"
-                  size="sm"
-                  class="ms-auto"
-                  :class="editableStatus === option.value ? 'text-accent' : 'invisible'"
-                />
-              </template>
+              {{ option.label }}
             </ODropdownItem>
           </ODropdown>
 
@@ -120,8 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               v-for="option in severityOptions"
               :key="option.value"
-              role="menuitemradio"
-              :aria-checked="editableSeverity === option.value"
+              :selected="editableSeverity === option.value"
               :data-test="`incident-severity-menu-${option.value}`"
               @select="
                 editableSeverity !== option.value &&
@@ -129,17 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <OTag type="severity" :value="option.value" size="sm" />
-              <span :class="{ 'text-accent': editableSeverity === option.value }">{{
-                option.word
-              }}</span>
-              <template #icon-right>
-                <OIcon
-                  name="check"
-                  size="sm"
-                  class="ms-auto"
-                  :class="editableSeverity === option.value ? 'text-accent' : 'invisible'"
-                />
-              </template>
+              <span>{{ option.word }}</span>
             </ODropdownItem>
           </ODropdown>
 

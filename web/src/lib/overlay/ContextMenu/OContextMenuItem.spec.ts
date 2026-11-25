@@ -93,6 +93,22 @@ describe("OContextMenuItem", () => {
     expect(wrapper.find(".text-dropdown-item-destructive-text").exists()).toBe(true);
   });
 
+  it("tints the row, shows a check and reports aria-checked when selected", async () => {
+    const wrapper = await mountItemInMenu({ selected: true }, { default: () => h("span", "UTC") });
+    const item = wrapper.get('[role="menuitemradio"]');
+    expect(item.attributes("aria-checked")).toBe("true");
+    expect(item.classes()).toContain("bg-dropdown-item-selected-bg");
+    expect(wrapper.find('[data-test="o-context-menu-item-check"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("renders no check and keeps the menuitem role when selected is not set", async () => {
+    const wrapper = await mountItemInMenu({}, { default: () => h("span", "Copy") });
+    expect(wrapper.find('[role="menuitem"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="o-context-menu-item-check"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it("emits select when clicked", async () => {
     const wrapper = await mountItemInMenu({}, { default: () => h("span", "Copy") });
     const item = wrapper.findComponent(OContextMenuItem);

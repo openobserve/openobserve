@@ -429,6 +429,8 @@ const expandedParents = computed(() => {
 const isSearching = computed(() => searchTerm.value.trim() !== "");
 const isExpanded = (value: SelectPrimitiveValue) => expandedParents.value.has(toRekaString(value));
 const isNestedRow = (opt: NormalizedOption) => opt.parentKey !== undefined && !isSearching.value;
+const isStackedRow = (opt: NormalizedOption) =>
+  (!!opt.subLabel && !opt.subLabelInline) || !!opt.colorPalette?.length;
 const toggleExpanded = (value: SelectPrimitiveValue) => {
   const next = new Set(expandedParents.value);
   const key = toRekaString(value);
@@ -1004,8 +1006,8 @@ const virtualizer = useVirtualizer(
     estimateSize: (index: number) => {
       const opt = filteredOptions.value[index];
       if (!opt) return 28;
-      // Must equal the min-h-8 of OSelectHeaderRow or the virtual rows drift.
-      if (isRichHeader(opt)) return 32;
+      // Must equal the min-h-7 of OSelectHeaderRow or the virtual rows drift.
+      if (isRichHeader(opt)) return 28;
       const hasSubLabel = !!opt.subLabel;
       const isInline = !!opt.subLabelInline;
       const hasPalette = !!opt.colorPalette?.length;
@@ -1584,19 +1586,7 @@ const fieldWidthClass = computed(() => {
                 isOpen ? 'rotate-180' : '',
               ]"
             >
-              <!-- chevron-down — rotates 180° when the popover is open -->
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 16 16"
-                fill="currentColor"
-                class="size-4"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z"
-                  clip-rule="evenodd"
-                />
-              </svg>
+              <OIcon name="expand-more" size="xs" />
             </span>
           </div>
         </div>
@@ -1612,13 +1602,14 @@ const fieldWidthClass = computed(() => {
             @open-auto-focus="handlePopoverOpenAutoFocus"
             :class="[
               'z-10001 min-w-(--reka-popover-trigger-width)',
-              'flex flex-col overflow-hidden',
-              'rounded-default shadow-overlay border border-transparent',
+              !dropdownStyle && 'max-w-[min(32rem,calc(100vw-1.5rem))]',
+              'flex flex-col overflow-hidden p-1',
+              'rounded-default shadow-overlay border-select-content-border border',
               'bg-select-content-bg',
             ]"
             :style="[
               dropdownStyle,
-              { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' },
+              { maxHeight: 'var(--reka-popover-content-available-height, 24rem)' },
             ]"
             @click.stop
           >
@@ -1629,28 +1620,23 @@ const fieldWidthClass = computed(() => {
               class="flex min-h-0 flex-1 flex-col"
               @update:model-value="handleListboxUpdate"
             >
-              <!-- Single bordered container wrapping search + list -->
-              <div
-                :class="[
-                  'rounded-default border-dropdown-border overflow-hidden border',
-                  'bg-select-content-bg flex min-h-0 flex-1 flex-col',
-                ]"
-              >
-                <ListboxFilter
+              <div class="flex min-h-0 flex-1 flex-col">
+                <!-- The negative margin lets the hairline span the surface's p-1 inset. -->
+                <div
                   v-if="inputEnabled"
-                  ref="searchFilterRef"
-                  v-model="searchTerm"
-                  auto-focus
-                  :data-test="parentDataTest ? `${parentDataTest}-search` : undefined"
-                  :class="[
-                    'text-input-text w-full shrink-0 bg-transparent px-3',
-                    'placeholder:text-input-placeholder outline-none',
-                    'border-dropdown-border border-b',
-                    heightClasses[size ?? 'sm'],
-                  ]"
-                  :placeholder="resolvedSearchPlaceholder"
-                  @keydown="handleDropdownKeydown"
-                />
+                  class="border-select-content-border -mx-1 -mt-1 mb-1 flex h-7 shrink-0 items-center gap-2 border-b px-3"
+                >
+                  <OIcon name="search" size="xs" class="text-text-secondary shrink-0" />
+                  <ListboxFilter
+                    ref="searchFilterRef"
+                    v-model="searchTerm"
+                    auto-focus
+                    :data-test="parentDataTest ? `${parentDataTest}-search` : undefined"
+                    class="text-text-body placeholder:text-text-secondary text-compact h-full min-w-0 flex-1 bg-transparent outline-none"
+                    :placeholder="resolvedSearchPlaceholder"
+                    @keydown="handleDropdownKeydown"
+                  />
+                </div>
 
                 <!-- Select-all row: outside the listbox keyboard navigation but still focusable. -->
                 <div
@@ -1660,14 +1646,12 @@ const fieldWidthClass = computed(() => {
                   :aria-label="t('components.select.toggleAllOptions')"
                   :aria-checked="allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'"
                   :class="[
-                    'relative flex w-full shrink-0 items-center gap-2',
-                    'py-1.5 ps-3 pe-3 text-sm',
-                    'text-select-item-text',
+                    'relative flex min-h-7 w-full shrink-0 items-center gap-2 px-2 max-md:min-h-9',
+                    'text-compact text-select-item-text rounded-default',
                     'cursor-pointer outline-none select-none',
                     'hover:bg-select-item-hover-bg',
                     'focus-visible:bg-select-item-hover-bg',
                     'transition-colors duration-(--duration-control) ease-(--ease-control)',
-                    'border-select-content-border mb-1 border-b pb-1.5',
                   ]"
                   data-test="o-select-all"
                   @click="toggleAllSelections"
@@ -1702,25 +1686,27 @@ const fieldWidthClass = computed(() => {
                     t("components.select.selectAllLabel")
                   }}</span>
                 </div>
+                <div
+                  v-if="selectAll && multiple && selectableOptions.length > 0"
+                  class="bg-select-content-border my-1 h-px shrink-0"
+                  aria-hidden="true"
+                />
 
                 <!-- Consumer-supplied rows rendered above the option list -->
                 <slot name="before-options" />
 
-                <!-- Virtual scroll container — keyboard nav handled by handleDropdownKeydown
-                   on the ListboxFilter input above. Items are index-highlighted reactively.
-                   max-h-72 matches the popover's own 18rem cap exactly, so this inner limit
-                   is never the binding constraint (max-h-60 used to clip a 9-option list
-                   48px short of the space the popover actually had). -->
+                <!-- Keyboard nav lives on the ListboxFilter; virtual rows are index-highlighted
+                     because Reka's data-highlighted never reaches them. -->
                 <div
                   ref="listboxScrollEl"
                   :class="[
-                    'overflow-auto',
-                    multiple && rowClickSingleSelect ? 'min-h-24 flex-1' : 'max-h-72',
+                    'max-h-72 min-h-0 overflow-auto',
+                    multiple && rowClickSingleSelect ? 'min-h-24 flex-1' : '',
                   ]"
                 >
                   <div
                     v-if="filteredOptions.length === 0"
-                    class="text-select-placeholder px-3 py-2 text-sm"
+                    class="text-text-secondary text-compact py-4 text-center"
                   >
                     <slot name="empty">{{ t("components.select.noOptionsFound") }}</slot>
                   </div>
@@ -1764,10 +1750,8 @@ const fieldWidthClass = computed(() => {
                       <div
                         v-else-if="filteredOptions[vRow.index].header"
                         :class="[
-                          'text-select-item-text flex h-full w-full px-3 py-1 text-xs font-bold select-none',
-                          collapsibleGroups
-                            ? 'bg-surface-subtle cursor-pointer items-center gap-1'
-                            : 'bg-select-content-bg pointer-events-none',
+                          'text-text-secondary flex h-full w-full items-end px-2 pt-2 pb-1 text-xs font-medium select-none',
+                          collapsibleGroups ? 'cursor-pointer gap-1' : 'pointer-events-none',
                         ]"
                         @click.stop="
                           collapsibleGroups && toggleGroup(filteredOptions[vRow.index].label)
@@ -1775,13 +1759,11 @@ const fieldWidthClass = computed(() => {
                       >
                         <OIcon
                           v-if="collapsibleGroups"
-                          name="keyboard-arrow-up"
-                          size="sm"
+                          name="expand-more"
+                          size="xs"
                           :class="[
-                            'shrink-0 transition-transform duration-150',
-                            !isGroupCollapsed(filteredOptions[vRow.index].label)
-                              ? 'rotate-180'
-                              : '',
+                            'shrink-0 self-center transition-transform duration-150',
+                            isGroupCollapsed(filteredOptions[vRow.index].label) ? 'rotate-180' : '',
                           ]"
                         />
                         {{ filteredOptions[vRow.index].label }}
@@ -1794,8 +1776,8 @@ const fieldWidthClass = computed(() => {
                         :data-test-value="toRekaString(filteredOptions[vRow.index].value)"
                         :aria-expanded="isExpanded(filteredOptions[vRow.index].value)"
                         :class="[
-                          'flex h-full w-full items-center justify-between gap-2 ps-3 pe-3 text-sm',
-                          'text-select-item-text cursor-pointer select-none',
+                          'rounded-default flex h-full w-full items-center justify-between gap-2 px-2',
+                          'text-compact text-select-item-text cursor-pointer select-none',
                           'transition-colors duration-(--duration-control) ease-(--ease-control)',
                           vRow.index === highlightedIndex
                             ? 'bg-select-item-hover-bg'
@@ -1837,16 +1819,14 @@ const fieldWidthClass = computed(() => {
                           :data-test-value="toRekaString(filteredOptions[vRow.index].value)"
                           :data-test-label="String(filteredOptions[vRow.index].label ?? '')"
                           :class="[
-                            'relative flex h-full w-full gap-2',
-                            isNestedRow(filteredOptions[vRow.index]) ? 'ps-7' : 'ps-3',
-                            'pe-3 text-sm',
+                            'rounded-default relative flex h-full w-full gap-2',
+                            isNestedRow(filteredOptions[vRow.index]) ? 'ps-6' : 'ps-2',
+                            'text-compact pe-2',
                             'text-select-item-text',
                             'cursor-pointer outline-none select-none',
                             'transition-colors duration-(--duration-control) ease-(--ease-control)',
                             // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
-                            (filteredOptions[vRow.index].subLabel &&
-                              !filteredOptions[vRow.index].subLabelInline) ||
-                            filteredOptions[vRow.index].colorPalette?.length
+                            isStackedRow(filteredOptions[vRow.index])
                               ? 'flex-col items-start py-2'
                               : 'flex-row items-center',
                             // highlightedIndex-based highlight — works with virtualised items.
@@ -2011,6 +1991,21 @@ const fieldWidthClass = computed(() => {
                               >{{ filteredOptions[vRow.index].suffix }}</span
                             >
                           </template>
+                          <OIcon
+                            v-if="
+                              !multiple &&
+                              selectedValues.includes(filteredOptions[vRow.index].value)
+                            "
+                            name="check"
+                            size="sm"
+                            :class="[
+                              'shrink-0',
+                              isStackedRow(filteredOptions[vRow.index])
+                                ? 'absolute end-2 top-2'
+                                : 'ms-auto',
+                            ]"
+                            data-select-check
+                          />
                         </ListboxItem>
                       </div>
                     </div>
@@ -2018,16 +2013,12 @@ const fieldWidthClass = computed(() => {
                 </div>
 
                 <slot name="after-options" />
-                <!-- rowClickSingleSelect hint bar — inside bordered container so the border wraps it -->
                 <template v-if="multiple && rowClickSingleSelect">
-                  <div class="bg-input-border mx-2 mt-1 h-px shrink-0" aria-hidden="true" />
                   <div
-                    class="pointer-events-none flex shrink-0 items-center gap-2 px-3 py-2 select-none"
+                    class="border-select-content-border pointer-events-none -mx-1 mt-1 -mb-1 flex shrink-0 items-center gap-2 border-t px-3 py-1.5 select-none"
                   >
                     <!-- Checkbox zone hint -->
-                    <span
-                      class="text-2xs text-select-placeholder flex shrink-0 items-center gap-1.5"
-                    >
+                    <span class="text-2xs text-text-secondary flex shrink-0 items-center gap-1.5">
                       <span
                         class="rounded-checkbox border-select-placeholder inline-flex size-3.5 shrink-0 items-center justify-center border"
                         aria-hidden="true"
@@ -2047,12 +2038,10 @@ const fieldWidthClass = computed(() => {
                       <span>{{ t("components.select.multiSelect") }}</span>
                     </span>
 
-                    <span class="bg-input-border h-3.5 w-px shrink-0" aria-hidden="true" />
+                    <span class="bg-select-content-border h-3.5 w-px shrink-0" aria-hidden="true" />
 
                     <!-- Name zone hint -->
-                    <span
-                      class="text-2xs text-select-placeholder flex shrink-0 items-center gap-1.5"
-                    >
+                    <span class="text-2xs text-text-secondary flex shrink-0 items-center gap-1.5">
                       <svg
                         viewBox="0 0 14 14"
                         fill="none"
@@ -2070,7 +2059,6 @@ const fieldWidthClass = computed(() => {
                   </div>
                 </template>
               </div>
-              <!-- end bordered container -->
             </ListboxRoot>
           </PopoverContent>
         </PopoverPortal>
@@ -2201,19 +2189,7 @@ const fieldWidthClass = computed(() => {
               isOpen ? 'rotate-180' : '',
             ]"
           >
-            <!-- chevron-down — rotates 180° when the dropdown is open -->
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 16 16"
-              fill="currentColor"
-              class="size-4"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z"
-                clip-rule="evenodd"
-              />
-            </svg>
+            <OIcon name="expand-more" size="xs" />
           </span>
         </div>
       </div>
@@ -2226,10 +2202,11 @@ const fieldWidthClass = computed(() => {
           :collision-padding="lgUp ? 0 : 8"
           :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
           :class="[
-            'z-10001 min-w-(--reka-select-trigger-width) max-lg:max-w-[calc(100vw-1rem)]',
+            'z-10001 min-w-(--reka-select-trigger-width)',
+            !dropdownStyle && 'max-w-[min(32rem,calc(100vw-1.5rem))]',
             'overflow-hidden',
             'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
-            'rounded-default shadow-overlay border border-transparent',
+            'rounded-default shadow-overlay border-select-content-border border',
             'bg-select-content-bg',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft
@@ -2241,7 +2218,7 @@ const fieldWidthClass = computed(() => {
           ]"
           :style="[
             dropdownStyle,
-            { maxHeight: 'min(15rem, var(--reka-select-content-available-height, 15rem))' },
+            { maxHeight: 'min(18rem, var(--reka-select-content-available-height, 18rem))' },
           ]"
           @click.stop
           @pointerdown.stop
@@ -2276,7 +2253,10 @@ const fieldWidthClass = computed(() => {
               />
             </template>
 
-            <div v-else-if="!slots.default" class="text-select-placeholder px-3 py-2 text-sm">
+            <div
+              v-else-if="!slots.default"
+              class="text-text-secondary text-compact py-4 text-center"
+            >
               <slot name="empty">{{ t("components.select.noOptionsFound") }}</slot>
             </div>
 

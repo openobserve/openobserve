@@ -10,6 +10,7 @@ import { defineComponent, h, markRaw } from "vue";
 const itemStubs = {
   SelectItem: { template: "<div class='reka-item'><slot /></div>" },
   SelectItemText: { template: "<span class='reka-item-text'><slot /></span>" },
+  SelectItemIndicator: { template: "<span class='reka-indicator' />" },
 };
 
 describe("OSelectItem", () => {
@@ -36,6 +37,7 @@ describe("OSelectItem", () => {
         stubs: {
           SelectItem: { template: "<div><slot /></div>" },
           SelectItemText: { template: "<span class='reka-item-text'><slot /></span>" },
+          SelectItemIndicator: true,
         },
       },
     });
@@ -80,13 +82,30 @@ describe("OSelectItem", () => {
     expect(wrapper.find(".reka-item > span.size-4").exists()).toBe(true);
   });
 
-  it("renders no icon, spacer or gap without icon props", () => {
+  it("renders no leading icon or spacer without icon props", () => {
     wrapper = mount(OSelectItem, {
       props: { value: "a", label: "A" },
       global: { stubs: itemStubs },
     });
     expect(wrapper.findComponent(OIcon).exists()).toBe(false);
     expect(wrapper.find(".reka-item > span.size-4").exists()).toBe(false);
-    expect(wrapper.find(".reka-item").classes()).not.toContain("gap-2");
+  });
+
+  it("uses the 28px compact row and a trailing check for the selected item", () => {
+    wrapper = mount(OSelectItem, {
+      props: { value: "a", label: "A" },
+      global: {
+        stubs: {
+          ...itemStubs,
+          SelectItemIndicator: { template: "<span class='reka-indicator'><slot /></span>" },
+        },
+      },
+    });
+    expect(wrapper.find(".reka-item").classes()).toEqual(
+      expect.arrayContaining(["min-h-7", "px-2", "gap-2", "text-compact", "rounded-default"]),
+    );
+    const check = wrapper.find(".reka-indicator").findComponent(OIcon);
+    expect(check.props("name")).toBe("check");
+    expect(check.props("size")).toBe("sm");
   });
 });

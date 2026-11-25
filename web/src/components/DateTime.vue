@@ -85,9 +85,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <template #icon-right
             ><OIcon
-              name="arrow-drop-down"
-              size="sm"
-              class="date-time-arrow ms-auto text-lg! transition-transform duration-250"
+              name="expand-more"
+              size="xs"
+              class="date-time-arrow ms-auto transition-transform duration-250"
           /></template>
         </OButton>
       </template>

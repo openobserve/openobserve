@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm"
         icon-left="bookmark"
-        icon-right="arrow-drop-down"
+        icon-right="expand-more"
         data-test="metrics-explorer-views-btn"
       >
         {{ buttonLabel }}

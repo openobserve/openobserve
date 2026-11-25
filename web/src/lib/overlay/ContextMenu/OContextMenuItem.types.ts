@@ -21,6 +21,9 @@ export interface ContextMenuItemProps {
   textValue?: string;
   /** Icon placed before the label — renders an OIcon internally */
   iconLeft?: IconName;
+  /** Marks the current choice with an accent tint and a trailing check. Set it (true or false)
+   *  on every row of a pick-one menu so each row is announced as a radio item. */
+  selected?: boolean;
   /**
    * Renders a keyboard-shortcut hint (OShortcut keycaps) at the trailing edge
    * of the item. Accepts a pre-symbolised string (`"⌘I"`) or an array of

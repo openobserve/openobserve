@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-latitude-item-${latitudeLabel}`"
               >
                 <AxisFieldChipLabel :label="latitudeLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                <template #icon-right><OIcon name="expand-more" size="xs" /></template>
               </OButton>
             </template>
             <div
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-longitude-item-${longitudeLabel}`"
               >
                 <AxisFieldChipLabel :label="longitudeLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                <template #icon-right><OIcon name="expand-more" size="xs" /></template>
               </OButton>
             </template>
             <div
@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-weight-item-${weightLabel}`"
               >
                 <AxisFieldChipLabel :label="weightLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                <template #icon-right><OIcon name="expand-more" size="xs" /></template>
               </OButton>
             </template>
             <div

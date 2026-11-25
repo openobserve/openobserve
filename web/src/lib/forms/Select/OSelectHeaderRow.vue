@@ -17,13 +17,13 @@ const actionDataTest = computed(() =>
 <template>
   <div
     :class="[
-      'text-select-item-text flex h-full min-h-8 w-full items-center justify-between gap-2 ps-3 pe-1.5 text-xs select-none',
+      'rounded-default text-select-item-text flex h-full min-h-7 w-full items-center justify-between gap-2 ps-2 pe-1 text-xs select-none',
       highlighted ? 'bg-select-item-hover-bg' : 'bg-select-header-bg',
     ]"
     :data-highlighted="highlighted ? '' : undefined"
   >
     <span class="flex min-w-0 items-center gap-1">
-      <OTruncatedText class="font-bold">{{ label }}</OTruncatedText>
+      <OTruncatedText class="font-medium">{{ label }}</OTruncatedText>
       <span v-if="count" class="text-select-header-count-text shrink-0 whitespace-nowrap">
         <span aria-hidden="true">·</span>
         {{ count }}

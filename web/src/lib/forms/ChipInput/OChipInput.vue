@@ -586,8 +586,8 @@ function onFieldFocusOut() {
         :disable-outside-pointer-events="false"
         :collision-padding="8"
         :data-test="testId('suggest')"
-        class="rounded-default bg-select-content-bg border-select-content-border z-10001 flex w-max max-w-[min(20rem,calc(100vw-1.5rem))] min-w-52 flex-col overflow-hidden border shadow-md"
-        :style="{ maxHeight: 'min(20rem, var(--reka-popover-content-available-height, 20rem))' }"
+        class="rounded-default bg-select-content-bg border-select-content-border shadow-overlay z-10001 flex w-max max-w-[min(20rem,calc(100vw-1.5rem))] min-w-52 flex-col overflow-hidden border"
+        :style="{ maxHeight: 'var(--reka-popover-content-available-height, 24rem)' }"
         @open-auto-focus.prevent
         @close-auto-focus.prevent
         @interact-outside="onInteractOutside"
@@ -595,7 +595,7 @@ function onFieldFocusOut() {
       >
         <div
           v-if="searchInList"
-          class="border-select-content-border flex items-center gap-2 border-b px-2.5"
+          class="border-select-content-border flex h-7 shrink-0 items-center gap-2 border-b px-3"
         >
           <OIcon name="search" size="xs" class="text-text-secondary shrink-0" />
           <input
@@ -611,7 +611,7 @@ function onFieldFocusOut() {
             :aria-label="searchPlaceholder ?? ariaLabel"
             :placeholder="searchPlaceholder"
             :data-test="testId('search')"
-            class="text-text-body placeholder:text-text-secondary min-w-0 flex-1 border-0 bg-transparent py-1.5 text-xs outline-none"
+            class="text-text-body placeholder:text-text-secondary text-compact h-full min-w-0 flex-1 border-0 bg-transparent outline-none"
             @input="onInput"
             @keydown="onKeydown"
           />
@@ -627,13 +627,13 @@ function onFieldFocusOut() {
           :aria-multiselectable="multiple || undefined"
           :data-list-resting="resting ? '' : undefined"
           :aria-label="searchPlaceholder ?? ariaLabel"
-          class="min-h-0 flex-1 overflow-y-auto p-1"
+          class="max-h-72 min-h-0 flex-1 overflow-y-auto p-1"
         >
           <template v-for="(suggestion, index) in suggestions" :key="suggestion.key">
             <div
               v-if="startsSection(index)"
               role="presentation"
-              class="text-dropdown-label text-2xs px-2 pt-0.5 pb-1 font-semibold select-none"
+              class="text-text-secondary px-2 pt-2 pb-1 text-xs font-medium select-none"
               :data-test="testId('suggest-section')"
             >
               {{ suggestion.section }}
@@ -650,7 +650,12 @@ function onFieldFocusOut() {
               :data-index="index"
               :data-active="index === highlighted ? '' : undefined"
               :data-test="testId(`suggest-item-${suggestion.key}`)"
-              class="rounded-default text-select-item-text data-active:bg-select-item-hover-bg flex cursor-pointer items-center gap-2 px-2 py-1 text-xs select-none"
+              :class="[
+                'rounded-default text-compact flex min-h-7 cursor-pointer items-center gap-2 px-2 select-none max-md:min-h-9',
+                suggestion.selected && !multiple
+                  ? 'bg-select-item-selected-bg text-select-item-selected-text'
+                  : 'text-select-item-text data-active:bg-select-item-hover-bg',
+              ]"
               @mousedown.prevent
               @pointermove="highlighted = index"
               @click="emit('select', suggestion.key, $event)"
@@ -683,15 +688,15 @@ function onFieldFocusOut() {
                 <OIcon
                   v-if="suggestion.selected && !multiple"
                   name="check"
-                  size="xs"
-                  class="text-theme-accent shrink-0"
+                  size="sm"
+                  class="shrink-0"
                 />
               </slot>
             </div>
           </template>
           <div
             v-if="!suggestions.length && !loading && emptyText"
-            class="text-text-secondary w-0 min-w-full px-2 py-1 text-xs"
+            class="text-text-secondary text-compact w-0 min-w-full py-4 text-center"
           >
             {{ emptyText }}
           </div>

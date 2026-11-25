@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="xs"
-            icon-right="arrow-drop-down"
+            icon-right="expand-more"
             data-test="rum-analytics-funnel-breakdown-from-step"
             >{{ fromLabel }}</OButton
           >

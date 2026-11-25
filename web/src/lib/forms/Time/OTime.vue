@@ -319,8 +319,8 @@ function handleNativeTimeChange(e: Event) {
 
 // ── Field wrapper classes ──────────────────────────────────────
 const heightClasses: Record<NonNullable<TimeProps["size"]>, string> = {
-  sm: "h-6 text-sm",
-  md: "h-8.5 text-sm",
+  sm: "h-7 text-compact",
+  md: "h-8 text-compact",
 };
 
 const fieldClasses = computed(() => [

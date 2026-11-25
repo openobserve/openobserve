@@ -1240,7 +1240,7 @@ function openInLogs() {
                       <OButton
                         size="sm"
                         variant="outline"
-                        icon-right="arrow-drop-down"
+                        icon-right="expand-more"
                         data-test="log-explorer-surround-window"
                       >
                         {{ surroundLabel }}

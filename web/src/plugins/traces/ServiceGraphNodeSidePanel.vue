@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-graph-node-panel-view-related-btn"
             >
               {{ t("traces.serviceGraphNodeSidePanel.viewRelated") }}
-              <OIcon name="arrow-drop-down" size="sm" />
+              <OIcon name="expand-more" size="xs" />
             </OButton>
           </template>
           <ODropdownItem

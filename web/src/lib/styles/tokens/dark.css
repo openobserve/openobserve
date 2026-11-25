@@ -225,6 +225,8 @@
   /* Dropdown */
   --color-dropdown-item-hover-bg: var(--color-surface-accent-hover);
   --color-dropdown-item-active-bg: var(--color-surface-accent-active);
+  --color-dropdown-item-selected-bg: var(--color-select-item-selected-bg);
+  --color-dropdown-item-selected-text: var(--color-select-item-selected-text);
   --color-dropdown-item-destructive-text: var(--color-error-400);
   --color-dropdown-item-destructive-hover-bg: var(--color-surface-overlay);
 

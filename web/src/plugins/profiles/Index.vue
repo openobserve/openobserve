@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               :variant="queryLoading ? 'cancel-query' : runPending ? 'warning' : 'primary'"
               size="sm-toolbar"
-              icon-left="arrow-drop-down"
+              icon-right="expand-more"
               class="px-1"
               :disabled="!queryLoading && !canQuery"
               :aria-label="t('profiles.runOptions')"
