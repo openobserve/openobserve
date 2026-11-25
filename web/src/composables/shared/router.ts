@@ -35,6 +35,8 @@ import { ALERT_LIST_ALL_FOLDERS } from "@/utils/alerts/alertListLink";
 import { PUBLIC_LINKS_FOLDER_ID } from "@/utils/dashboard/pseudoFolders";
 import { endSignedInSession } from "@/utils/drafts/signOutFlow";
 import { silenceUnloadPrompts } from "@/utils/sessionServices";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { gt } from "@/types/i18n";
 import {
   PLAYLIST_TV_PATH,
   buildPlaylistQuery,
@@ -762,7 +764,21 @@ const useRoutes = () => {
           next({ path: PLAYLIST_TV_PATH, query: buildPlaylistQuery(playlist), replace: true });
           return;
         }
-        routeGuard(to, from, next);
+        // Saves are scoped to the URL's folder. The view checks it too, for links followed inside it,
+        // but on entry its own URL sync cancels that redirect, so entry is checked here.
+        const needsFolder = !query.folder && !isPlaylistPage(query);
+        routeGuard(to, from, (target?: unknown) => {
+          if (target !== undefined || !needsFolder) return next(target);
+          toast({ variant: "error", message: gt("dashboard.viewDashboard.failedToLoadDashboard") });
+          next({
+            path: "/dashboards",
+            query: {
+              org_identifier: query.org_identifier ?? store.state.selectedOrganization?.identifier,
+              folder: "default",
+            },
+            replace: true,
+          });
+        });
       },
     },
     {

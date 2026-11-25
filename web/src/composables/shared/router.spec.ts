@@ -62,6 +62,11 @@ vi.mock("@/utils/zincutils", () => ({
   getPath: vi.fn(() => "/"),
 }));
 
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
+  toast: vi.fn(),
+}));
+
 vi.mock("@/composables/security/useSecurityAccess", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/security/useSecurityAccess")>()),
   loadSecurityAccess: vi.fn(async () => ({ read: true, triage: true, admin: true })),
@@ -2377,11 +2382,38 @@ describe("useRoutes (router.ts)", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "viewDashboard");
 
-      const mockTo = {};
+      const mockTo = { query: { dashboard: "d1", folder: "default" } };
       const mockFrom = {};
       const mockNext = vi.fn();
       route.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, expect.any(Function));
+      expect(mockNext).toHaveBeenCalledWith(undefined);
+    });
+
+    it("sends a dashboard link without a folder to the dashboard list, with an error", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      vi.mocked(routeGuard).mockClear();
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        { query: { org_identifier: "acme", dashboard: "d1", tab: "default" } },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        path: "/dashboards",
+        query: { org_identifier: "acme", folder: "default" },
+        replace: true,
+      });
+      expect(routeGuard).toHaveBeenCalledTimes(1);
+      expect(toast).toHaveBeenCalledWith({
+        variant: "error",
+        message: "Failed to load dashboard. Redirecting to dashboard list.",
+      });
     });
 
     it("sends a playlist link on the dashboard view to the TV player", async () => {
@@ -2412,7 +2444,20 @@ describe("useRoutes (router.ts)", () => {
       const to = { query: { dashboard: "d1", playlist: "d1,d2", tvpage: "1", kiosk: "true" } };
       const next = vi.fn();
       route.beforeEnter(to, {}, next);
-      expect(routeGuard).toHaveBeenCalledWith(to, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith(to, {}, expect.any(Function));
+      expect(next).toHaveBeenCalledWith(undefined);
+    });
+
+    it("leaves a paywall or other route-guard redirect of a folderless link as it is", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      vi.mocked(routeGuard).mockImplementationOnce((_to: any, _from: any, next: any) =>
+        next({ name: "plans" }),
+      );
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const next = vi.fn();
+      route.beforeEnter({ query: { dashboard: "d1" } }, {}, next);
+      expect(next).toHaveBeenCalledExactlyOnceWith({ name: "plans" });
     });
 
     it("registers the TV playlist route behind the route guard", async () => {
