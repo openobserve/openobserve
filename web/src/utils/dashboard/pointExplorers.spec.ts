@@ -17,6 +17,8 @@ import { describe, expect, it } from "vitest";
 import {
   hasFullPage,
   eventSecondWindow,
+  explorerSql,
+  whereOfExplorerSql,
   labelsOnMetric,
   metricsSql,
   sampleLabels,
@@ -79,5 +81,27 @@ describe("eventSecondWindow", () => {
 
   it("an event on a whole second starts its own window", () => {
     expect(eventSecondWindow(5_000_000)).toEqual({ startTime: 5_000_000, endTime: 6_000_000 });
+  });
+});
+
+describe("explorerSql / whereOfExplorerSql", () => {
+  it("builds the list query and reads its WHERE back, case and spacing aside", () => {
+    expect(explorerSql("app", " level = 'error' ")).toBe(
+      `SELECT * FROM "app" WHERE level = 'error' ORDER BY _timestamp DESC`,
+    );
+    expect(explorerSql("app", "")).toBe(`SELECT * FROM "app" ORDER BY _timestamp DESC`);
+    expect(
+      whereOfExplorerSql(
+        "app",
+        `select *  from "app"\n where a = 1 and b = 'x' order by _timestamp desc;`,
+      ),
+    ).toBe("a = 1 and b = 'x'");
+    expect(whereOfExplorerSql("app", `SELECT * FROM "app" ORDER BY _timestamp DESC`)).toBe("");
+  });
+
+  it("anything else is not the plain shape", () => {
+    expect(whereOfExplorerSql("app", `SELECT a FROM "app" ORDER BY _timestamp DESC`)).toBeNull();
+    expect(whereOfExplorerSql("app", `SELECT * FROM "other" ORDER BY _timestamp DESC`)).toBeNull();
+    expect(whereOfExplorerSql("app", `SELECT * FROM "app" WHERE a = 1 LIMIT 5`)).toBeNull();
   });
 });

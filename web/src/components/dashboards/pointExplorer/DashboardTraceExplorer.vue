@@ -9,12 +9,18 @@ import { useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import { toFilterFields } from "@/utils/query/filterBar";
+import {
+  requestFieldValues,
+  requestFieldValuesMatching,
+  valuesWindowFor,
+} from "@/composables/fieldValueStore";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import ExplorerToolbar from "./ExplorerToolbar.vue";
 import ExplorerDetailNav from "./ExplorerDetailNav.vue";
+import ExplorerFilterBar from "./ExplorerFilterBar.vue";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
@@ -56,18 +62,29 @@ const showFilter = ref(false);
 const { buildColumns } = useTracesTableColumns();
 const columns = buildColumns(false, "traces", DEFAULT_TRACE_COLUMNS.traces);
 const streamFields = ref<{ name: string; isSchemaField: boolean }[]>([]);
+const schemaRows = ref<{ name: string; type?: string }[]>([]);
+const fieldsLoading = ref(true);
 const { getStream } = useStreams(t);
 onMounted(async () => {
   try {
     const stream = await getStream(props.stream, "traces", true);
-    streamFields.value = (stream?.schema ?? []).map((f: { name: string }) => ({
-      name: f.name,
-      isSchemaField: true,
-    }));
+    schemaRows.value = stream?.schema ?? [];
+    streamFields.value = schemaRows.value.map((f) => ({ name: f.name, isSchemaField: true }));
   } catch {
+    schemaRows.value = [];
     streamFields.value = [];
   }
+  fieldsLoading.value = false;
 });
+const filterFields = computed(() => toFilterFields(schemaRows.value));
+// Values come from the stream over the drawer's own range, never the Traces page's search state.
+const loadFilterValues = (field: string, search: string): Promise<string[]> => {
+  const ctx = { org: orgId.value, streamType: "traces", streamName: props.stream };
+  const timeRange = valuesWindowFor(rangeStart.value, rangeEnd.value) ?? undefined;
+  return search.trim()
+    ? requestFieldValuesMatching(ctx, field, search, { timeRange })
+    : requestFieldValues(ctx, field, { timeRange });
+};
 
 // ── Search over traces/latest_stream ─────────────────────────────────────────
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
@@ -146,6 +163,7 @@ function runQuery() {
   page.value = 0;
   search();
 }
+
 function goToPage(next: number) {
   page.value = next;
   search();
@@ -258,26 +276,21 @@ const detailTitle = computed(() =>
         @open="openInTraces"
         @run="runQuery"
       >
-        <div v-if="showFilter" class="flex items-center gap-2 px-2 pb-2">
-          <OInput
-            v-model="whereText"
-            class="min-w-0 flex-1 font-mono"
-            prefix="WHERE"
-            :placeholder="t('panel.traceExplorer.filterPlaceholder')"
-            :aria-label="t('panel.traceExplorer.filter')"
-            data-test="trace-explorer-filter-input"
-            @keydown.enter.prevent="runQuery"
-          />
-          <OButton
-            size="sm"
-            variant="primary"
-            icon-left="play-arrow"
-            data-test="trace-explorer-filter-run"
-            @click="runQuery"
-          >
-            {{ t("panel.traceExplorer.run") }}
-          </OButton>
-        </div>
+        <ExplorerFilterBar
+          v-if="showFilter"
+          :chips-query="whereText"
+          own-kind="where"
+          :own-value="whereText"
+          :fields="filterFields"
+          :fields-loading="fieldsLoading"
+          :load-values="loadFilterValues"
+          :placeholder="t('panel.traceExplorer.filterPlaceholder')"
+          :aria-label="t('panel.traceExplorer.filter')"
+          data-test-prefix="trace-explorer"
+          @update:chips-query="(where: string) => (whereText = where)"
+          @update:own-value="(where: string) => (whereText = where)"
+          @run="runQuery"
+        />
       </ExplorerToolbar>
 
       <div v-if="errorMsg" class="flex shrink-0 items-start gap-2 px-4 py-3">

@@ -52,12 +52,13 @@ export function useExplorerDetailKeys(handlers: {
 /**
  * Bound as the explorer root's `keydown`: Escape in one of its fields leaves the field instead of
  * closing the drawer (whose Escape listener sits on window, past this root). The next Escape then
- * goes back from the detail or closes the drawer as before. A key the field already used is left alone.
+ * goes back from the detail or closes the drawer as before. A field that used the key fully (an
+ * open suggest or chip list) stops it itself and never reaches here; one that only marked it
+ * (the chip bar with its list closed) is still left, or the drawer could never take Escape back.
  */
 export function leaveFieldOnEscape(e: KeyboardEvent): void {
   if (e.key !== "Escape" || !isTypingTarget(e.target)) return;
   e.stopPropagation();
-  if (e.defaultPrevented) return;
   const active = document.activeElement;
   if (active instanceof HTMLElement && e.currentTarget instanceof Node) {
     if (e.currentTarget.contains(active)) active.blur();

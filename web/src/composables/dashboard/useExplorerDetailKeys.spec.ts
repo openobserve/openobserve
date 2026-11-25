@@ -148,13 +148,31 @@ describe("leaveFieldOnEscape", () => {
     expect(drawerEscape).toHaveBeenCalledTimes(1);
   });
 
-  it("an Escape the field already used (an open suggest list) stays in the field", () => {
+  it("an Escape a field stops itself (an open suggest list) never reaches the drawer", () => {
+    const input = document.getElementById("f") as HTMLInputElement;
+    input.focus();
+    input.addEventListener(
+      "keydown",
+      (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      },
+      { once: true },
+    );
+    press(input);
+    expect(document.activeElement).toBe(input);
+    expect(drawerEscape).not.toHaveBeenCalled();
+  });
+
+  it("an Escape a field only marked (a chip bar with its list closed) still leaves the field", () => {
     const input = document.getElementById("f") as HTMLInputElement;
     input.focus();
     input.addEventListener("keydown", (e) => e.preventDefault(), { once: true });
     press(input);
-    expect(document.activeElement).toBe(input);
+    expect(document.activeElement).not.toBe(input);
     expect(drawerEscape).not.toHaveBeenCalled();
+    press(document.body);
+    expect(drawerEscape).toHaveBeenCalledTimes(1);
   });
 
   it("other keys, and Escape on a button, are left alone", () => {

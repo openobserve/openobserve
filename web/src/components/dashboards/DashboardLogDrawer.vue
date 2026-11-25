@@ -15,10 +15,18 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTime from "@/components/DateTime.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import ExplorerResultsPager from "@/components/dashboards/pointExplorer/ExplorerResultsPager.vue";
 import ExplorerResultRow from "@/components/dashboards/pointExplorer/ExplorerResultRow.vue";
+import ExplorerFilterBar from "@/components/dashboards/pointExplorer/ExplorerFilterBar.vue";
+import { explorerSql, whereOfExplorerSql } from "@/utils/dashboard/pointExplorers";
+import useStreams from "@/composables/useStreams";
+import { toFilterFields } from "@/utils/query/filterBar";
+import {
+  requestFieldValues,
+  requestFieldValuesMatching,
+  valuesWindowFor,
+} from "@/composables/fieldValueStore";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -104,7 +112,8 @@ const onDateChange = (d: { startTime: number; endTime: number }) => {
   if (s === rangeStart.value && e === rangeEnd.value) return;
   rangeStart.value = s;
   rangeEnd.value = e;
-  loadEvents();
+  // The user's filter or SQL stays; only the range changes, as in the Traces and Metrics explorers.
+  runQuery();
 };
 
 // ── Search state ──────────────────────────────────────────────────────────────
@@ -127,22 +136,52 @@ function isResultExpanded(i: number) {
   return resultExpandedIdx.value.has(i);
 }
 
-// ── SQL editor ────────────────────────────────────────────────────────────────
-const customSql = ref("");
-const showSql = ref(false); // query editor is collapsed until the SQL toggle
-
+// ── Filter bar and SQL mode ───────────────────────────────────────────────────
 // Clicked predicates AND-combined with the panel's own filter to match its scoped data.
+const defaultWhere = () => filtersWhere(props.baseWhere, activeFilters.value);
 function whereClause(): string {
-  const where = filtersWhere(props.baseWhere, activeFilters.value);
+  const where = defaultWhere();
   return where ? ` WHERE ${where}` : "";
 }
-function buildDefaultSql(): string {
-  return `SELECT * FROM "${props.stream}"${whereClause()} ORDER BY _timestamp DESC`;
-}
-
+// One query: the chips edit its WHERE while it keeps the plain shape (they open as the panel filter
+// and the clicked values); "write your own" edits it all. The SQL button shows or hides the area.
+const showSql = ref(false);
+const customSql = ref("");
 function activeSql() {
-  return customSql.value || buildDefaultSql();
+  return customSql.value.trim() || explorerSql(props.stream, defaultWhere());
 }
+// A query the chips cannot draw goes to them whole, so the builder shows its banner.
+const chipsQuery = computed(() => whereOfExplorerSql(props.stream, activeSql()) ?? activeSql());
+const onChipsQuery = (where: string) => {
+  customSql.value = explorerSql(props.stream, where);
+};
+
+const { getStream } = useStreams(t);
+const schemaRows = ref<{ name: string; type?: string }[]>([]);
+const fieldsLoading = ref(true);
+async function loadFields() {
+  fieldsLoading.value = true;
+  try {
+    const stream: any = await getStream(props.stream, props.streamType ?? "logs", true);
+    schemaRows.value = stream?.schema ?? [];
+  } catch {
+    schemaRows.value = [];
+  }
+  fieldsLoading.value = false;
+}
+const filterFields = computed(() => toFilterFields(schemaRows.value));
+// Values come from the stream over the drawer's own range.
+const loadFilterValues = (field: string, search: string): Promise<string[]> => {
+  const ctx = {
+    org: orgId.value,
+    streamType: props.streamType ?? "logs",
+    streamName: props.stream,
+  };
+  const timeRange = valuesWindowFor(rangeStart.value, rangeEnd.value) ?? undefined;
+  return search.trim()
+    ? requestFieldValuesMatching(ctx, field, search, { timeRange })
+    : requestFieldValues(ctx, field, { timeRange });
+};
 
 // ── Event detail drawer ───────────────────────────────────────────────────────
 const selectedEvent = ref<Record<string, any> | null>(null);
@@ -611,9 +650,8 @@ async function runSql(sql: string, fromOffset: number, count = false) {
 
 async function loadEvents() {
   page.value = 0;
-  const sql = buildDefaultSql();
-  customSql.value = sql;
-  await runSql(sql, 0, true);
+  customSql.value = explorerSql(props.stream, defaultWhere());
+  await runSql(activeSql(), 0, true);
 }
 async function runQuery() {
   page.value = 0;
@@ -652,6 +690,7 @@ watch(pageSize, () => goToPage(0));
 onMounted(async () => {
   if (!isLogs.value) return;
   dateReady = true;
+  void loadFields();
   await loadEvents();
   await restoreEventDetail();
 });
@@ -660,6 +699,7 @@ watch(
   () => {
     if (!isLogs.value) return;
     selectedEvent.value = null;
+    void loadFields();
     loadEvents();
   },
 );
@@ -765,6 +805,7 @@ function openInLogs() {
             size="sm"
             :variant="showSql ? 'primary' : 'outline'"
             icon-left="code"
+            :aria-pressed="showSql"
             data-test="log-explorer-sql-toggle"
             @click="showSql = !showSql"
           >
@@ -806,19 +847,19 @@ function openInLogs() {
             <OTooltip :content="t('panel.logExplorer.runQuery')" />
           </OButton>
         </div>
-        <div v-if="showSql" class="px-2 pb-2">
-          <div class="border-border-default rounded-default overflow-hidden border">
-            <QueryEditor
-              :query="customSql"
-              :languages="['sql']"
-              editor-height="4rem"
-              hide-nl-toggle
-              data-test-prefix="log-explorer-editor"
-              @update:query="customSql = $event"
-              @run-query="runQuery"
-            />
-          </div>
-        </div>
+        <ExplorerFilterBar
+          v-if="showSql"
+          :chips-query="chipsQuery"
+          own-kind="sql"
+          :own-value="activeSql()"
+          :fields="filterFields"
+          :fields-loading="fieldsLoading"
+          :load-values="loadFilterValues"
+          data-test-prefix="log-explorer"
+          @update:chips-query="onChipsQuery"
+          @update:own-value="(sql: string) => (customSql = sql)"
+          @run="runQuery"
+        />
       </div>
 
       <!-- ── Error ────────────────────────────────────────────────────── -->
@@ -846,7 +887,7 @@ function openInLogs() {
           <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
           <code
             class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
-            >{{ customSql }}</code
+            >{{ activeSql() }}</code
           >
         </div>
 

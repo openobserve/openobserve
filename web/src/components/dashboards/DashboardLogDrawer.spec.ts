@@ -54,6 +54,11 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({ fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId }),
 }));
 vi.mock("@/services/patterns", () => ({ default: {} }));
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStream: vi.fn().mockResolvedValue({ schema: [{ name: "level", type: "Utf8" }] }),
+  }),
+}));
 const routerReplace = vi.hoisted(() => vi.fn());
 vi.mock("vue-router", () => ({
   useRoute: () => ({ query: { tab: "t1" } }),
@@ -61,6 +66,7 @@ vi.mock("vue-router", () => ({
 }));
 
 import DashboardLogDrawer from "@/components/dashboards/DashboardLogDrawer.vue";
+import { b64DecodeUnicodeSafe } from "@/utils/zincutils";
 import ExplorerResultRow from "@/components/dashboards/pointExplorer/ExplorerResultRow.vue";
 
 const mountDrawer = (features: Record<string, string>, streamType?: string) =>
@@ -177,6 +183,90 @@ describe("DashboardLogDrawer filters", () => {
     expect(firstSql()).toBe(
       `SELECT * FROM "app" WHERE (level = 'error') AND service = 'cart' ORDER BY _timestamp DESC`,
     );
+  });
+
+  describe("filter area: chips or write your own SQL", () => {
+    const bar = (w: ReturnType<typeof mountWith>) => w.findComponent({ name: "ExplorerFilterBar" });
+    const st = (w: ReturnType<typeof mountWith>) => (w.vm as any).$.setupState;
+    const sql = (where: string) =>
+      `SELECT * FROM "app"${where ? ` WHERE ${where}` : ""} ORDER BY _timestamp DESC`;
+    const openArea = async (w: ReturnType<typeof mountWith>) => {
+      await w.find('[data-test="log-explorer-sql-toggle"]').trigger("click");
+      await flushPromises();
+    };
+
+    it("stays hidden until SQL is clicked, then opens on chips of the panel filter and clicked values", async () => {
+      const w = mountWith({
+        baseWhere: "level = 'error'",
+        filters: [{ field: "svc", value: "cart" }],
+      });
+      await flushPromises();
+      expect(bar(w).exists()).toBe(false);
+      await openArea(w);
+      expect(bar(w).props()).toMatchObject({
+        chipsQuery: "(level = 'error') AND svc = 'cart'",
+        ownKind: "sql",
+        ownValue: sql("(level = 'error') AND svc = 'cart'"),
+        fields: [{ name: "level", type: "string" }],
+      });
+    });
+
+    it("main's table-cell drawer gets the same area, its cell and the panel filter as chips", async () => {
+      const w = mountWith({ field: "level", value: "error", baseWhere: "a = 1" });
+      await flushPromises();
+      expect(bar(w).exists()).toBe(false);
+      await openArea(w);
+      expect(bar(w).props("chipsQuery")).toBe("(a = 1) AND level = 'error'");
+    });
+
+    it("a chip edit runs the plain query built from it", async () => {
+      const w = mountWith({ filters: [{ field: "svc", value: "cart" }] });
+      await flushPromises();
+      await openArea(w);
+      bar(w).vm.$emit("update:chipsQuery", "svc = 'pay' AND code >= 500");
+      bar(w).vm.$emit("run");
+      await flushPromises();
+      expect(searchCalls().at(-1).queryReq.query.sql).toBe(sql("svc = 'pay' AND code >= 500"));
+      expect(bar(w).props("ownValue")).toBe(sql("svc = 'pay' AND code >= 500"));
+    });
+
+    it("written SQL in the plain shape comes back as chips; any other SQL goes to the chips whole", async () => {
+      const w = mountWith({ filters: [{ field: "svc", value: "cart" }] });
+      await flushPromises();
+      await openArea(w);
+      bar(w).vm.$emit("update:ownValue", sql("svc = 'pay'"));
+      await flushPromises();
+      expect(bar(w).props("chipsQuery")).toBe("svc = 'pay'");
+      const custom = `SELECT level, count(*) AS n FROM "app" GROUP BY level`;
+      bar(w).vm.$emit("update:ownValue", custom);
+      await flushPromises();
+      // The builder shows its "can't draw this" banner for it; the SQL itself is kept and runs.
+      expect(bar(w).props("chipsQuery")).toBe(custom);
+      bar(w).vm.$emit("run");
+      await flushPromises();
+      expect(searchCalls().at(-1).queryReq.query.sql).toBe(custom);
+    });
+
+    it("Open in Logs carries the effective SQL from chips and from written SQL", async () => {
+      const open = vi.spyOn(window, "open").mockImplementation(() => null);
+      const w = mountWith({ filters: [{ field: "svc", value: "cart" }] });
+      await flushPromises();
+      const opened = () => {
+        const url = new URL(String(open.mock.calls.at(-1)?.[0]));
+        return b64DecodeUnicodeSafe(url.searchParams.get("query") ?? "");
+      };
+      await openArea(w);
+      bar(w).vm.$emit("update:chipsQuery", "svc = 'pay'");
+      await flushPromises();
+      await w.find('[data-test="log-explorer-open-in-logs"]').trigger("click");
+      expect(opened()).toBe(sql("svc = 'pay'"));
+      bar(w).vm.$emit("update:ownValue", "SELECT 1");
+      await flushPromises();
+      await w.find('[data-test="log-explorer-open-in-logs"]').trigger("click");
+      expect(opened()).toBe("SELECT 1");
+      expect(st(w).activeSql()).toBe("SELECT 1");
+      open.mockRestore();
+    });
   });
 
   it("table cell path: one field/value predicate and no Applied row, as before", async () => {

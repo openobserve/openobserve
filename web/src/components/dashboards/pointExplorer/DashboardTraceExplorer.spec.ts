@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -31,7 +31,7 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 }));
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
-    getStream: vi.fn().mockResolvedValue({ schema: [{ name: "service_name" }] }),
+    getStream: vi.fn().mockResolvedValue({ schema: [{ name: "service_name", type: "Utf8" }] }),
   }),
 }));
 const resolve = vi.fn((to: any) => ({ href: `/web/${to.name}?${new URLSearchParams(to.query)}` }));
@@ -42,6 +42,7 @@ vi.mock("vue-router", async (importOriginal) => ({
 }));
 
 import DashboardTraceExplorer from "./DashboardTraceExplorer.vue";
+import { EXPLORER_FILTER_MODE_KEY } from "@/utils/dashboard/pointExplorers";
 
 const MIN = 60_000_000;
 const rawTrace = (id: string, startUs: number) => ({
@@ -74,7 +75,18 @@ describe("DashboardTraceExplorer", () => {
   let wrapper: VueWrapper<any>;
   const { searchObj } = useTraces();
 
+  // The explorers' shared chips-or-text key, as the Traces page keeps its own: text unless "builder" is stored.
+  const FILTER_KEY = EXPLORER_FILTER_MODE_KEY;
+  const openTextFilter = async () => {
+    await wrapper.find("[data-test='trace-explorer-query-toggle']").trigger("click");
+    if (!wrapper.find("[data-test='trace-explorer-filter-input']").exists()) {
+      await wrapper.find("[data-test='trace-explorer-filter-builder-toggle']").trigger("click");
+    }
+  };
+
   beforeEach(() => {
+    localStorage.removeItem(FILTER_KEY);
+    localStorage.removeItem("o2.traces.queryInput");
     stream.hits = [rawTrace("t1", 100 * MIN), rawTrace("t2", 99 * MIN)];
     fetchQueryDataWithHttpStream.mockClear();
     cancelStreamQueryBasedOnRequestId.mockClear();
@@ -160,10 +172,197 @@ describe("DashboardTraceExplorer", () => {
     expect(wrapper.find("[data-test='trace-explorer-applied']").exists()).toBe(false);
   });
 
+  describe("chip filter builder", () => {
+    // These tests start from a browser that chose chips here before.
+    beforeEach(() => localStorage.setItem(FILTER_KEY, "builder"));
+    const openFilter = async () => {
+      mountExplorer();
+      await flushPromises();
+      await wrapper.find("[data-test='trace-explorer-query-toggle']").trigger("click");
+      await flushPromises();
+    };
+    const builder = () => wrapper.findComponent({ name: "SqlFilterBuilder" });
+    // Auto run as on the Logs/Traces pages: the server setting AND the user's Auto Run toggle.
+    const autoRun = (on: boolean) => {
+      const zoConfig = store.state.zoConfig as any;
+      const previous = zoConfig.auto_query_enabled;
+      zoConfig.auto_query_enabled = on;
+      if (on) localStorage.setItem("oo_toggle_auto_run", "true");
+      else localStorage.removeItem("oo_toggle_auto_run");
+      onTestFinished(() => {
+        zoConfig.auto_query_enabled = previous;
+        localStorage.removeItem("oo_toggle_auto_run");
+      });
+    };
+
+    it("shows the chips by default, with the clicked filter as a chip", async () => {
+      await openFilter();
+      expect(builder().exists()).toBe(true);
+      expect(wrapper.find("[data-test='trace-explorer-filter-input']").exists()).toBe(false);
+      expect(builder().props("query")).toBe("service_name = 'cart'");
+      const bar = wrapper.find("[data-test='trace-explorer-filter-builder']");
+      expect(bar.find("[data-test='trace-explorer-filter-builder-unparsable']").exists()).toBe(
+        false,
+      );
+      expect(bar.text()).toContain("service_name");
+      expect(bar.text()).toContain("cart");
+      expect(builder().props("fields")).toEqual([{ name: "service_name", type: "string" }]);
+    });
+
+    it("follows the Traces page's rule: text unless 'builder' is stored; <> saves; a reopen keeps it", async () => {
+      localStorage.removeItem(FILTER_KEY);
+      await openFilter();
+      expect(wrapper.find("[data-test='trace-explorer-filter-input']").exists()).toBe(true);
+      expect(builder().exists()).toBe(false);
+      await wrapper.find("[data-test='trace-explorer-filter-builder-toggle']").trigger("click");
+      expect(builder().exists()).toBe(true);
+      expect(localStorage.getItem(FILTER_KEY)).toBe("builder");
+      wrapper.unmount();
+      await openFilter();
+      expect(builder().exists()).toBe(true);
+      await wrapper.find("[data-test='trace-explorer-filter-builder-toggle']").trigger("click");
+      expect(localStorage.getItem(FILTER_KEY)).toBe("query");
+      // The Traces page's own key is never written.
+      expect(localStorage.getItem("o2.traces.queryInput")).toBeNull();
+    });
+
+    it("with auto-run on, a chip edit reruns the search once, with the new WHERE, after it settles", async () => {
+      autoRun(true);
+      await openFilter();
+      vi.useFakeTimers();
+      try {
+        const before = fetchQueryDataWithHttpStream.mock.calls.length;
+        builder().vm.$emit("update:query", "service_name = 'pay'");
+        vi.advanceTimersByTime(299);
+        expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before);
+        vi.advanceTimersByTime(1);
+        expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before + 1);
+        expect(lastRequest().queryReq.filter).toBe("service_name = 'pay'");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("with auto-run off, a chip edit only writes the filter; Run searches it", async () => {
+      autoRun(false);
+      await openFilter();
+      vi.useFakeTimers();
+      try {
+        const before = fetchQueryDataWithHttpStream.mock.calls.length;
+        builder().vm.$emit("update:query", "service_name = 'pay'");
+        vi.advanceTimersByTime(1000);
+        expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before);
+        await wrapper.find("[data-test='trace-explorer-run']").trigger("click");
+        expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before + 1);
+        expect(lastRequest().queryReq.filter).toBe("service_name = 'pay'");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("rapid chip edits make one search, with the last WHERE", async () => {
+      autoRun(true);
+      await openFilter();
+      vi.useFakeTimers();
+      try {
+        const before = fetchQueryDataWithHttpStream.mock.calls.length;
+        builder().vm.$emit("update:query", "service_name = 'a'");
+        vi.advanceTimersByTime(200);
+        builder().vm.$emit("update:query", "service_name = 'a' AND duration > 5");
+        vi.advanceTimersByTime(200);
+        builder().vm.$emit("update:query", "duration > 5");
+        vi.advanceTimersByTime(300);
+        expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before + 1);
+        expect(lastRequest().queryReq.filter).toBe("duration > 5");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("Run or submit searches at once and drops the pending chip rerun", async () => {
+      autoRun(true);
+      await openFilter();
+      vi.useFakeTimers();
+      try {
+        const before = fetchQueryDataWithHttpStream.mock.calls.length;
+        builder().vm.$emit("update:query", "service_name = 'pay'");
+        builder().vm.$emit("submit");
+        expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before + 1);
+        vi.advanceTimersByTime(1000);
+        expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before + 1);
+        expect(lastRequest().queryReq.filter).toBe("service_name = 'pay'");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("the filter row holds the chips and the <> toggle, in both modes, with no Run of its own", async () => {
+      await openFilter();
+      const row = wrapper.find("[data-test='trace-explorer-filter-box']");
+      expect(row.find("[data-test='trace-explorer-filter-builder-toggle']").exists()).toBe(true);
+      expect(row.find("[data-test='trace-explorer-filter-builder']").exists()).toBe(true);
+      expect(wrapper.find("[data-test='trace-explorer-filter-run']").exists()).toBe(false);
+      await row.find("[data-test='trace-explorer-filter-builder-toggle']").trigger("click");
+      const sameRow = wrapper.find("[data-test='trace-explorer-filter-box']");
+      expect(sameRow.find("[data-test='trace-explorer-filter-input']").exists()).toBe(true);
+      expect(sameRow.find("[data-test='trace-explorer-filter-builder-toggle']").exists()).toBe(
+        true,
+      );
+    });
+
+    it("text mode still searches only on Enter or Run", async () => {
+      mountExplorer();
+      await flushPromises();
+      await openTextFilter();
+      vi.useFakeTimers();
+      try {
+        const before = fetchQueryDataWithHttpStream.mock.calls.length;
+        await wrapper
+          .find("[data-test='trace-explorer-filter-input'] input")
+          .setValue("duration > 5");
+        vi.advanceTimersByTime(1000);
+        expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before);
+        await wrapper.find("[data-test='trace-explorer-run']").trigger("click");
+        expect(lastRequest().queryReq.filter).toBe("duration > 5");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a filter the chips cannot show is kept, and 'keep as text' switches to text", async () => {
+      mountExplorer({ filters: [] });
+      await flushPromises();
+      await openTextFilter();
+      const input = wrapper.find("[data-test='trace-explorer-filter-input'] input");
+      await input.setValue("upper(service_name) = 'CART'");
+      await wrapper.find("[data-test='trace-explorer-filter-builder-toggle']").trigger("click");
+      await flushPromises();
+      const banner = "[data-test='trace-explorer-filter-builder-unparsable']";
+      expect(wrapper.find(banner).exists()).toBe(true);
+      await wrapper.find("[data-test='trace-explorer-filter-builder-keep-query']").trigger("click");
+      expect(
+        wrapper.find("[data-test='trace-explorer-filter-input'] input").element,
+      ).toHaveProperty("value", "upper(service_name) = 'CART'");
+    });
+
+    it("Escape inside the chip bar never closes the drawer", async () => {
+      const drawerEscape = vi.fn();
+      window.addEventListener("keydown", drawerEscape);
+      await openFilter();
+      const field = wrapper.find("[data-test='trace-explorer-filter-builder'] input")
+        .element as HTMLInputElement;
+      field.focus();
+      field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+      expect(drawerEscape).not.toHaveBeenCalled();
+      window.removeEventListener("keydown", drawerEscape);
+    });
+  });
+
   it("the Filter editor runs its WHERE on Enter", async () => {
     mountExplorer();
     await flushPromises();
-    await wrapper.find("[data-test='trace-explorer-query-toggle']").trigger("click");
+    await openTextFilter();
     const input = wrapper.find("[data-test='trace-explorer-filter-input'] input");
     await input.setValue("status_code = 'ERROR'");
     await input.trigger("keydown", { key: "Enter" });
@@ -173,7 +372,7 @@ describe("DashboardTraceExplorer", () => {
 
   const runFilter = async (where: string) => {
     if (!wrapper.find("[data-test='trace-explorer-filter-input']").exists()) {
-      await wrapper.find("[data-test='trace-explorer-query-toggle']").trigger("click");
+      await openTextFilter();
     }
     const input = wrapper.find("[data-test='trace-explorer-filter-input'] input");
     await input.setValue(where);
@@ -202,7 +401,7 @@ describe("DashboardTraceExplorer", () => {
     window.addEventListener("keydown", drawerEscape);
     mountExplorer();
     await flushPromises();
-    await wrapper.find("[data-test='trace-explorer-query-toggle']").trigger("click");
+    await openTextFilter();
     const input = wrapper.find("[data-test='trace-explorer-filter-input'] input")
       .element as HTMLInputElement;
     input.focus();

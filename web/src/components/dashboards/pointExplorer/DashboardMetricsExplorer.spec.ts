@@ -80,6 +80,7 @@ vi.mock("@/plugins/logs/DetailTable.vue", () => ({
 }));
 
 import DashboardMetricsExplorer from "./DashboardMetricsExplorer.vue";
+import { EXPLORER_FILTER_MODE_KEY } from "@/utils/dashboard/pointExplorers";
 import ExplorerResultRow from "./ExplorerResultRow.vue";
 import ExplorerDetailSkeleton from "./ExplorerDetailSkeleton.vue";
 import ExplorerResultsPager from "./ExplorerResultsPager.vue";
@@ -222,11 +223,99 @@ describe("DashboardMetricsExplorer", () => {
 
   const runSqlEdit = async (sql: string) => {
     await wrapper.find("[data-test='metrics-explorer-query-toggle']").trigger("click");
+    await flushPromises();
+    if (!wrapper.findComponent({ name: "QueryEditor" }).exists()) {
+      await wrapper.find("[data-test='metrics-explorer-filter-builder-toggle']").trigger("click");
+    }
     const editor = wrapper.findComponent({ name: "QueryEditor" });
     editor.vm.$emit("update:query", sql);
     editor.vm.$emit("run-query");
     await flushPromises();
   };
+
+  describe("filter area: chips or write your own SQL", () => {
+    const KEY = EXPLORER_FILTER_MODE_KEY;
+    // Chips for these tests, as a browser that picked them in any explorer; each test clears it after.
+    beforeEach(() => localStorage.setItem(KEY, "builder"));
+    afterEach(() => localStorage.removeItem(KEY));
+    const bar = () => wrapper.findComponent({ name: "ExplorerFilterBar" });
+    const sql = (where: string) =>
+      `SELECT * FROM "cpu"${where ? ` WHERE ${where}` : ""} ORDER BY _timestamp DESC`;
+    const openArea = async () => {
+      await wrapper.find("[data-test='metrics-explorer-query-toggle']").trigger("click");
+      await flushPromises();
+    };
+
+    it("stays hidden until SQL is clicked, then opens on chips of the labels the metric carries", async () => {
+      mountExplorer();
+      await flushPromises();
+      expect(bar().exists()).toBe(false);
+      await openArea();
+      expect(bar().props()).toMatchObject({
+        chipsQuery: "service_name = 'cart'",
+        ownKind: "sql",
+      });
+      expect(
+        bar()
+          .props("fields")
+          .map((field: any) => field.name),
+      ).toEqual(["pod", "service_name", "value"]);
+      expect(wrapper.find("[data-test='metrics-explorer-filter-builder']").exists()).toBe(true);
+    });
+
+    it("a chip edit runs the plain query built from it", async () => {
+      mountExplorer();
+      await flushPromises();
+      await openArea();
+      bar().vm.$emit("update:chipsQuery", "pod = 'b'");
+      bar().vm.$emit("run");
+      await flushPromises();
+      expect(sqlOf(searches().at(-1))).toBe(sql("pod = 'b'"));
+    });
+
+    it("with nothing stored it opens on the full SQL, as the Logs page does", async () => {
+      localStorage.removeItem(KEY);
+      mountExplorer();
+      await flushPromises();
+      await openArea();
+      expect(wrapper.find("[data-test='metrics-explorer-filter-builder']").exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "QueryEditor" }).props("query")).toBe(
+        sql("service_name = 'cart'"),
+      );
+    });
+
+    it("the <> toggle shows the full SQL; plain SQL comes back as chips, other SQL is kept whole", async () => {
+      mountExplorer();
+      await flushPromises();
+      await openArea();
+      await wrapper.find("[data-test='metrics-explorer-filter-builder-toggle']").trigger("click");
+      const editor = wrapper.findComponent({ name: "QueryEditor" });
+      expect(editor.props("query")).toBe(sql("service_name = 'cart'"));
+      editor.vm.$emit("update:query", sql("pod = 'a'"));
+      await flushPromises();
+      expect(bar().props("chipsQuery")).toBe("pod = 'a'");
+      const custom = `SELECT pod, max(value) FROM "cpu" GROUP BY pod`;
+      editor.vm.$emit("update:query", custom);
+      await flushPromises();
+      expect(bar().props("chipsQuery")).toBe(custom);
+    });
+
+    it("Open in Metrics carries a chip edit as SQL; untouched chips open the metric", async () => {
+      const open = vi.spyOn(window, "open").mockImplementation(() => null);
+      mountExplorer();
+      await flushPromises();
+      wrapper.findComponent({ name: "ExplorerToolbar" }).vm.$emit("open");
+      expect(String(open.mock.calls.at(-1)?.[0])).toContain("/web/metrics");
+      await openArea();
+      bar().vm.$emit("update:chipsQuery", "pod = 'b'");
+      await flushPromises();
+      wrapper.findComponent({ name: "ExplorerToolbar" }).vm.$emit("open");
+      const url = new URL(String(open.mock.calls.at(-1)?.[0]));
+      expect(url.searchParams.get("query_type")).toBe("sql");
+      expect(b64DecodeUnicodeSafe(url.searchParams.get("query") ?? "")).toBe(sql("pod = 'b'"));
+      open.mockRestore();
+    });
+  });
 
   it("Open in Metrics carries an edited SQL to the Metrics page; unedited it opens the metric", async () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);

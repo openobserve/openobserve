@@ -9,7 +9,6 @@ import { useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
 import ExplorerResultsPager from "./ExplorerResultsPager.vue";
 import ExplorerToolbar from "./ExplorerToolbar.vue";
 import ExplorerDetailNav from "./ExplorerDetailNav.vue";
@@ -25,7 +24,20 @@ import {
 } from "@/composables/dashboard/useExplorerDetailKeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { type FieldFilter } from "@/utils/dashboard/chartPointExplore";
-import { metricsSql, sampleLabels, labelsOnMetric } from "@/utils/dashboard/pointExplorers";
+import {
+  explorerSql,
+  labelsOnMetric,
+  metricsSql,
+  sampleLabels,
+  whereOfExplorerSql,
+} from "@/utils/dashboard/pointExplorers";
+import { toFilterFields } from "@/utils/query/filterBar";
+import {
+  requestFieldValues,
+  requestFieldValuesMatching,
+  valuesWindowFor,
+} from "@/composables/fieldValueStore";
+import ExplorerFilterBar from "./ExplorerFilterBar.vue";
 const JsonPreview = defineAsyncComponent(() => import("@/plugins/logs/JsonPreview.vue"));
 // The sample detail paints a tab-and-chart skeleton at once while its chunk loads, and the
 // chunks start loading with the list, so opening a sample rarely waits on them at all.
@@ -61,6 +73,8 @@ const metric = computed(() => props.stream);
 
 // ── Labels: the metric's schema decides which clicked labels apply ───────────
 const labels = ref<string[] | null>(null);
+const schemaRows = ref<{ name: string; type?: string }[]>([]);
+const fieldsLoading = ref(true);
 // A clicked label the metric lacks would match no sample, so the query leaves it out.
 const appliedLabels = computed(() =>
   labels.value ? labelsOnMetric(props.filters, labels.value) : props.filters,
@@ -68,12 +82,16 @@ const appliedLabels = computed(() =>
 
 async function loadSchema() {
   labels.value = null;
+  fieldsLoading.value = true;
   try {
     const stream = await getStream(metric.value, "metrics", true);
-    labels.value = (stream?.schema ?? []).map((f: { name: string }) => f.name);
+    schemaRows.value = stream?.schema ?? [];
+    labels.value = schemaRows.value.map((f) => f.name);
   } catch {
+    schemaRows.value = [];
     labels.value = [];
   }
+  fieldsLoading.value = false;
 }
 
 // ── Search: raw samples over _search_stream, like the Logs Explorer ──────────
@@ -84,8 +102,26 @@ const page = ref(0);
 const pageSize = ref(100);
 const loading = ref(false);
 const errorMsg = ref("");
-const customSql = ref("");
+// One query: chips edit its WHERE while it keeps the plain shape; "write your own" edits it all.
 const showSql = ref(false);
+const customSql = ref("");
+const effectiveSql = () => customSql.value.trim() || metricsSql(metric.value, appliedLabels.value);
+// A query the chips cannot draw goes to them whole, so the builder shows its banner.
+const chipsQuery = computed(
+  () => whereOfExplorerSql(metric.value, effectiveSql()) ?? effectiveSql(),
+);
+const onChipsQuery = (where: string) => {
+  customSql.value = explorerSql(metric.value, where);
+};
+const filterFields = computed(() => toFilterFields(schemaRows.value));
+// Values come from the metric over the drawer's own range.
+const loadFilterValues = (field: string, search: string): Promise<string[]> => {
+  const ctx = { org: orgId.value, streamType: "metrics", streamName: metric.value };
+  const timeRange = valuesWindowFor(rangeStart.value, rangeEnd.value) ?? undefined;
+  return search.trim()
+    ? requestFieldValuesMatching(ctx, field, search, { timeRange })
+    : requestFieldValues(ctx, field, { timeRange });
+};
 const expanded = ref(new Set<number>());
 let queryRun = 0;
 
@@ -127,16 +163,17 @@ async function loadMetric() {
   selected.value = null;
   page.value = 0;
   await loadSchema();
+  // The clicked (or correlated) labels the metric carries open as the filter's chips.
   customSql.value = metricsSql(metric.value, appliedLabels.value);
-  await runSql(customSql.value, 0, true);
+  await runSql(effectiveSql(), 0, true);
 }
 function runQuery() {
   page.value = 0;
-  void runSql(customSql.value || metricsSql(metric.value, appliedLabels.value), 0, true);
+  void runSql(effectiveSql(), 0, true);
 }
 function goToPage(next: number) {
   page.value = next;
-  void runSql(customSql.value, next * pageSize.value, false);
+  void runSql(effectiveSql(), next * pageSize.value, false);
 }
 watch(pageSize, () => goToPage(0));
 
@@ -200,8 +237,8 @@ function metricsPageHref(filters: FieldFilter[]): string {
 }
 // An edited SQL opens in the Metrics page's Visualize mode, which runs SQL as given; a table fits raw samples.
 function openInMetrics() {
-  const sql = customSql.value.trim();
-  const edited = !!sql && sql !== metricsSql(metric.value, appliedLabels.value);
+  const sql = effectiveSql();
+  const edited = sql !== metricsSql(metric.value, appliedLabels.value);
   const href = edited
     ? buildMetricsUrl({
         orgId: orgId.value,
@@ -263,19 +300,19 @@ function fmtTs(ts: unknown): string {
         @open="openInMetrics"
         @run="runQuery"
       >
-        <div v-if="showSql" class="px-2 pb-2">
-          <div class="border-border-default rounded-default overflow-hidden border">
-            <QueryEditor
-              :query="customSql"
-              :languages="['sql']"
-              editor-height="4rem"
-              hide-nl-toggle
-              data-test-prefix="metrics-explorer-editor"
-              @update:query="customSql = $event"
-              @run-query="runQuery"
-            />
-          </div>
-        </div>
+        <ExplorerFilterBar
+          v-if="showSql"
+          :chips-query="chipsQuery"
+          own-kind="sql"
+          :own-value="effectiveSql()"
+          :fields="filterFields"
+          :fields-loading="fieldsLoading"
+          :load-values="loadFilterValues"
+          data-test-prefix="metrics-explorer"
+          @update:chips-query="onChipsQuery"
+          @update:own-value="(sql: string) => (customSql = sql)"
+          @run="runQuery"
+        />
       </ExplorerToolbar>
 
       <div v-if="errorMsg" class="flex shrink-0 items-start gap-2 px-4 py-3">
@@ -302,7 +339,7 @@ function fmtTs(ts: unknown): string {
           <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
           <code
             class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
-            >{{ customSql }}</code
+            >{{ effectiveSql() }}</code
           >
         </div>
         <div v-else class="min-h-0 flex-1 overflow-y-auto">

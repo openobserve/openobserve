@@ -47,11 +47,35 @@ export const labelsOnMetric = (filters: FieldFilter[], labels: string[]): FieldF
   return filters.filter((f) => known.has(f.field));
 };
 
-/** The raw-sample SQL of a metric under its label filters, newest first. */
-export const metricsSql = (stream: string, filters: FieldFilter[]): string => {
-  const where = filters.map(fieldPredicate).join(" AND ");
-  return `SELECT * FROM "${stream}"${where ? ` WHERE ${where}` : ""} ORDER BY _timestamp DESC`;
+/**
+ * Where the explorers' filter area remembers chips or "write your own": one key shared by the Logs,
+ * Traces and Metrics explorers (so a choice in one is how the others open), apart from the Logs and
+ * Traces pages' own keys.
+ */
+export const EXPLORER_FILTER_MODE_KEY = "o2.dashboard.explorer.queryInput";
+
+/** The explorers' list query: every column of the stream under a WHERE condition, newest first. */
+export const explorerSql = (stream: string, where: string): string => {
+  const condition = where.trim();
+  return `SELECT * FROM "${stream}"${condition ? ` WHERE ${condition}` : ""} ORDER BY _timestamp DESC`;
 };
+
+const EXPLORER_SQL =
+  /^SELECT\s+\*\s+FROM\s+"([^"]+)"(?:\s+WHERE\s+([\s\S]+?))?\s+ORDER\s+BY\s+_timestamp\s+DESC\s*;?$/i;
+
+/** The WHERE condition of an SQL still in the list query's plain shape on this stream, else null. */
+export const whereOfExplorerSql = (stream: string, sql: string): string | null => {
+  const match = sql.trim().match(EXPLORER_SQL);
+  if (!match || match[1] !== stream) return null;
+  return (match[2] ?? "").trim();
+};
+
+// The label filters as a WHERE condition.
+const labelsWhere = (filters: FieldFilter[]): string => filters.map(fieldPredicate).join(" AND ");
+
+/** The raw-sample SQL of a metric under its label filters, newest first. */
+export const metricsSql = (stream: string, filters: FieldFilter[]): string =>
+  explorerSql(stream, labelsWhere(filters));
 
 // A sample's own columns: its time, its value and the engine's bookkeeping, not labels.
 const isSampleColumn = (key: string): boolean => key === "value" || key.startsWith("_");
