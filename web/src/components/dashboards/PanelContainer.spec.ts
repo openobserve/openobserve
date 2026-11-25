@@ -32,6 +32,7 @@ import {
   writePanelDraft,
 } from "@/composables/dashboard/usePanelDraft";
 import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh";
+import { addPanel } from "@/utils/commons";
 
 // Mock shortURL service
 vi.mock("@/services/short_url", () => ({
@@ -1028,6 +1029,21 @@ describe("PanelContainer", () => {
       await flushPromises();
 
       expect(routerPushSpy).toHaveBeenCalled();
+    });
+
+    it("passes the source panel id so the copy joins its panel-scoped variables", async () => {
+      wrapper = createWrapper();
+
+      await wrapper.vm.onDuplicatePanel(mockPanelData);
+      await flushPromises();
+
+      const [, , copy, , , variablesToUpdate] = vi.mocked(addPanel).mock.calls.at(-1)!;
+      expect(variablesToUpdate).toEqual({
+        variableNames: [],
+        newPanelId: copy.id,
+        sourcePanelId: mockPanelData.id,
+      });
+      expect(copy.id).not.toBe(mockPanelData.id);
     });
 
     it("should show loading notification during duplication", async () => {

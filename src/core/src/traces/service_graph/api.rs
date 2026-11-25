@@ -31,9 +31,6 @@ const MAX_FUTURE_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
 const MIN_MAX_WINDOW_DAYS: i64 = 3650;
 #[cfg(any(feature = "enterprise", test))]
 const DAY_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
-/// Bounds one request's concurrent per-stream OpenFGA checks.
-#[cfg(feature = "enterprise")]
-const STREAM_CHECK_CONCURRENCY: usize = 16;
 
 /// Query parameters for service graph API
 #[derive(Debug, Deserialize)]
@@ -285,7 +282,7 @@ pub async fn get_current_topology(
 async fn readable_trace_streams(org_id: &str, user_id: &str) -> Option<Vec<String>> {
     use config::meta::stream::StreamType;
 
-    use crate::auth::{UserReads, check_permissions};
+    use crate::auth::check_permissions;
 
     // an org-wide reader keeps the unscoped graph, collector series included
     if check_permissions(
@@ -297,31 +294,33 @@ async fn readable_trace_streams(org_id: &str, user_id: &str) -> Option<Vec<Strin
     }
     let streams = crate::db::schema::list_streams_from_cache(org_id, StreamType::Traces).await;
     let placeholder = &config::get_config().common.dashboard_placeholder;
-    Some(readable_among(streams, placeholder, &UserReads { org_id, user_id }).await)
+    let checker = crate::authz::active_checker();
+    Some(readable_among(checker.as_ref(), org_id, user_id, streams, placeholder).await)
 }
 
-/// The `streams` that `reads` allows, sorted; one named as the dashboard placeholder never is.
+/// The `streams` the user may read, sorted; one named as the dashboard placeholder never is.
 #[cfg(feature = "enterprise")]
 async fn readable_among(
+    checker: &dyn crate::authz::StreamAccessChecker,
+    org_id: &str,
+    user_id: &str,
     streams: Vec<String>,
     placeholder: &str,
-    reads: &impl crate::auth::ReadCheck,
 ) -> Vec<String> {
-    use futures::StreamExt;
+    use config::meta::stream::StreamType;
 
     // the engine drops a matcher whose value is the placeholder, which would unscope the read
-    let checks = streams
+    let wanted: Vec<(StreamType, String)> = streams
         .into_iter()
         .filter(|stream| stream != placeholder)
-        .map(|stream| async move {
-            let id = crate::auth::into_ofga_supported_format(&stream);
-            reads.can_read("traces", &id).await.then_some(stream)
-        });
-    let mut readable: Vec<String> = futures::stream::iter(checks)
-        .buffer_unordered(STREAM_CHECK_CONCURRENCY)
-        .filter_map(std::future::ready)
-        .collect()
-        .await;
+        .map(|stream| (StreamType::Traces, stream))
+        .collect();
+    // the caller's traces:_all_ check came first, so the org-wide question would repeat it
+    let mut readable: Vec<String> = crate::authz::check_each(checker, user_id, org_id, wanted)
+        .await
+        .into_iter()
+        .map(|(_, name)| name)
+        .collect();
     readable.sort();
     readable
 }
@@ -497,26 +496,44 @@ mod tests {
         assert_eq!(scope(None, Some(&[])), None);
     }
 
-    #[cfg(feature = "enterprise")]
-    struct ReadsOnly(&'static [&'static str]);
-
-    #[cfg(feature = "enterprise")]
-    impl crate::auth::ReadCheck for ReadsOnly {
-        async fn can_read(&self, resource: &str, object_id: &str) -> bool {
-            resource == "traces" && self.0.contains(&object_id)
-        }
-    }
-
-    #[cfg(feature = "enterprise")]
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     #[tokio::test]
     async fn test_readable_among_checks_each_stream_and_skips_the_placeholder() {
+        use config::meta::stream::StreamType;
+
+        use crate::authz::{FakeStreamChecker, TypedStream};
+
+        let checker = FakeStreamChecker::default();
+        for name in ["a", "c", "_o2_all_"] {
+            checker.grant_read(
+                "u1",
+                &TypedStream {
+                    org_id: "o1".to_string(),
+                    stream_type: StreamType::Traces,
+                    name: name.to_string(),
+                },
+            );
+        }
         let streams = ["c", "a", "b", "_o2_all_"].map(str::to_string).to_vec();
-        let reads = ReadsOnly(&["a", "c", "_o2_all_"]);
         assert_eq!(
-            readable_among(streams, "_o2_all_", &reads).await,
+            readable_among(&checker, "o1", "u1", streams.clone(), "_o2_all_").await,
             vec!["a".to_string(), "c".to_string()]
         );
-        assert!(readable_among(vec![], "_o2_all_", &reads).await.is_empty());
+        assert!(
+            readable_among(&checker, "o1", "u1", vec![], "_o2_all_")
+                .await
+                .is_empty()
+        );
+        // o2-enterprise#3642: the per-stream Check honors a per-type grant; no org-wide repeat
+        checker.grant_read_all("u2", "o1", StreamType::Traces);
+        assert_eq!(
+            readable_among(&checker, "o1", "u2", streams, "_o2_all_").await,
+            vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        );
+        assert!(
+            checker.calls("u2").org_wide.is_empty(),
+            "the traces:_all_ pre-check already asked"
+        );
     }
 
     #[cfg(feature = "enterprise")]

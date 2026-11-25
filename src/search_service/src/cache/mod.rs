@@ -52,6 +52,8 @@ use tracing::Instrument;
 use transform::{get_all_transform_keys, init_vrl_runtime};
 use usage_reporting::{http_report_metrics, report_request_usage_stats};
 
+#[cfg(feature = "vectorscan")]
+use crate::datafusion::physical_optimizer::sdr_redact::redaction_digest;
 use crate::{
     self as SearchService,
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
@@ -593,7 +595,7 @@ pub async fn prepare_cache_response(
     // An unresolved request is pinned to redaction, so its search matches this key.
     req.raw_streams.get_or_insert_with(Default::default);
     #[cfg(feature = "vectorscan")]
-    if let Some(digest) = crate::datafusion::physical_optimizer::sdr_redact::redaction_digest(
+    if let Some(digest) = redaction_digest(
         org_id,
         stream_type,
         &sql.stream_names,
@@ -1554,6 +1556,16 @@ mod tests {
             (
                 "SELECT histogram(_timestamp, '1 hour') AS ts, sum(count(*)) OVER (ORDER BY histogram(_timestamp, '1 hour')) AS cum FROM t GROUP BY ts ORDER BY ts",
                 "ts",
+                false,
+            ),
+            (
+                "SELECT histogram(_timestamp + 28800000000, '1 day') AS ts, count(DISTINCT k) AS c FROM t GROUP BY ts ORDER BY ts",
+                // Enterprise names no time column for a histogram over a shifted _timestamp.
+                if cfg!(feature = "enterprise") {
+                    ""
+                } else {
+                    "ts"
+                },
                 false,
             ),
             (

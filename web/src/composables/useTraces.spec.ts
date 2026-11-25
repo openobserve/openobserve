@@ -2032,6 +2032,60 @@ describe("useTraces", () => {
       expect(searchObj.data.stream.selectedFields).toEqual(["service_name", "http.method"]);
     });
 
+    it("writes the Spans view's scope to the URL only when it is not All spans", () => {
+      const { searchObj, getUrlQueryParams } = freshState();
+      searchObj.meta.searchMode = "spans";
+      searchObj.data.stream.selectedFields = [...DEFAULT_TRACE_COLUMNS.spans];
+      expect(getUrlQueryParams()).not.toHaveProperty("scope");
+      searchObj.meta.scope = "root";
+      expect(getUrlQueryParams().scope).toBe("root");
+      searchObj.meta.searchMode = "traces";
+      searchObj.data.stream.selectedFields = [...DEFAULT_TRACE_COLUMNS.traces];
+      expect(getUrlQueryParams()).not.toHaveProperty("scope");
+    });
+
+    it("restores the scope from a link, and reads a link without it as All spans", () => {
+      const { searchObj, applyUrlListState } = freshState();
+      applyUrlListState({ tab: "spans", scope: "entrypoint" });
+      expect(searchObj.meta.scope).toBe("entrypoint");
+      applyUrlListState({ tab: "spans" });
+      expect(searchObj.meta.scope).toBe("all");
+    });
+
+    it("writes the Groups view to the URL only in the Spans view with SQL mode off", () => {
+      const { searchObj, getUrlQueryParams } = freshState();
+      searchObj.meta.searchMode = "spans";
+      searchObj.data.stream.selectedFields = [...DEFAULT_TRACE_COLUMNS.spans];
+      expect(getUrlQueryParams()).not.toHaveProperty("group_by");
+      searchObj.meta.groupBy = "service_name";
+      searchObj.meta.groupsSort = { by: "p99", order: "desc" };
+      const query = getUrlQueryParams();
+      expect(query.view).toBe("groups");
+      expect(query.group_by).toBe("service_name");
+      expect(query.group_sort).toBe("p99:desc");
+      searchObj.meta.sqlMode = true;
+      expect(getUrlQueryParams()).not.toHaveProperty("group_by");
+      searchObj.meta.sqlMode = false;
+      searchObj.meta.searchMode = "traces";
+      searchObj.data.stream.selectedFields = [...DEFAULT_TRACE_COLUMNS.traces];
+      expect(getUrlQueryParams()).not.toHaveProperty("view");
+    });
+
+    it("restores Group by and its sort from a link, and a link without them as the list", () => {
+      const { searchObj, applyUrlListState } = freshState();
+      applyUrlListState({
+        tab: "spans",
+        view: "groups",
+        group_by: "http_method",
+        group_sort: "p50:asc",
+      });
+      expect(searchObj.meta.groupBy).toBe("http_method");
+      expect(searchObj.meta.groupsSort).toEqual({ by: "p50", order: "asc" });
+      applyUrlListState({ tab: "spans" });
+      expect(searchObj.meta.groupBy).toBe("");
+      expect(searchObj.meta.groupsSort).toEqual({ by: "errors", order: "desc" });
+    });
+
     it("opens an old link without list keys unchanged", () => {
       const { searchObj, applyUrlListState } = freshState();
       searchObj.data.stream.selectedFields = ["service_name"];
@@ -2229,6 +2283,80 @@ describe("useTraces", () => {
       vi.advanceTimersByTime(300);
       expect(mockRouterReplace).toHaveBeenCalledTimes(1);
       vi.useRealTimers();
+    });
+  });
+
+  describe("SQL mode in the URL", () => {
+    const originalRoute = mockCurrentRoute.value;
+
+    afterEach(() => {
+      mockCurrentRoute.value = originalRoute;
+    });
+
+    const sqlState = (sqlMode: boolean, editorValue: string, view = "spans") => {
+      const inst = useTraces();
+      inst.resetSearchObj();
+      inst.searchObj.meta.searchMode = view as any;
+      inst.searchObj.meta.sqlMode = sqlMode;
+      inst.searchObj.data.editorValue = editorValue;
+      return inst;
+    };
+
+    it("writes sql_mode only in the Spans view, so a Traces link holds the filter only", () => {
+      expect(sqlState(true, `SELECT * FROM "a"`, "traces").getUrlQueryParams()).not.toHaveProperty(
+        "sql_mode",
+      );
+      const { searchObj, normalizeTracesView, getUrlQueryParams } = sqlState(
+        true,
+        `SELECT * FROM "a" WHERE b = 1`,
+      );
+      normalizeTracesView("traces", { kind: "move" });
+      const query = getUrlQueryParams();
+      expect(query).not.toHaveProperty("sql_mode");
+      expect(query.query).toBe("b64uni:");
+      expect(searchObj.data.editorValue).toBe("");
+    });
+
+    it.each(["service-graph", "services-catalog"])(
+      "keeps sql_mode in a %s URL with SQL on, so a reload brings the SQL back",
+      (view) => {
+        const query = sqlState(true, `SELECT * FROM "a"`, view).getUrlQueryParams();
+        expect(query.sql_mode).toBe("true");
+        expect(query.tab).toBe(view);
+      },
+    );
+
+    it("forgets the SQL text kept for Spans on an org change", () => {
+      const { sqlTexts, normalizeTracesView, resetSearchObj } = sqlState(
+        true,
+        `SELECT * FROM "a" WHERE b = 1`,
+      );
+      normalizeTracesView("traces", { kind: "move" });
+      expect(sqlTexts.sql).toBe(`SELECT * FROM "a" WHERE b = 1`);
+      resetSearchObj();
+      expect(sqlTexts.sql).toBe("");
+    });
+
+    it("writes sql_mode only while SQL mode is on with a query", () => {
+      expect(sqlState(true, `SELECT * FROM "a"`).getUrlQueryParams().sql_mode).toBe("true");
+      expect(sqlState(true, `SELECT * FROM "a"`).getUrlQueryParams(true).sql_mode).toBe("true");
+      expect(sqlState(true, "  ").getUrlQueryParams()).not.toHaveProperty("sql_mode");
+      expect(sqlState(false, "a = 1").getUrlQueryParams()).not.toHaveProperty("sql_mode");
+    });
+
+    it("adds and drops sql_mode as the URL follows the mode", async () => {
+      const { searchObj, patchUrlViewState } = sqlState(true, `SELECT * FROM "a"`);
+      mockCurrentRoute.value = { name: "traces", query: { stream: "a", tab: "spans" } };
+      await patchUrlViewState();
+      expect(mockRouterReplace).toHaveBeenLastCalledWith({
+        query: expect.objectContaining({ sql_mode: "true" }),
+      });
+
+      mockCurrentRoute.value = { name: "traces", query: { stream: "a", sql_mode: "true" } };
+      searchObj.meta.sqlMode = false;
+      searchObj.data.editorValue = "a = 1";
+      await patchUrlViewState();
+      expect(mockRouterReplace.mock.lastCall?.[0].query).not.toHaveProperty("sql_mode");
     });
   });
 });

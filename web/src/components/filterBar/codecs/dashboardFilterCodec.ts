@@ -105,7 +105,7 @@ const LIST_ITEM = /\s*(?:'([^']*)'|"([^"]*)"|([^,()]+))/y;
 const SQL_LIST_ITEM = /\s*(?:'((?:[^']|'')*)'|"([^"]*)"|([^,()]+))/y;
 
 // A whole value that the variable substitution replaces; anything else holding `$` is a literal.
-const PLACEHOLDER =
+export const PLACEHOLDER =
   /^(\{\{\s*[\w-]+\s*(:\s*[a-zA-Z]+\s*)?\}\}|\$\{\s*[\w-]+\s*(:\s*[a-zA-Z]+\s*)?\}|\$[\w-]+)$/;
 
 const QUOTED_PLACEHOLDER = new RegExp(`^'${PLACEHOLDER.source.slice(1, -1)}'$`);

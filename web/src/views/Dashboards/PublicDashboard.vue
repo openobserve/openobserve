@@ -239,7 +239,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ThemeSwitcher from "@/components/ThemeSwitcher.vue";
-import { CUSTOM_VALUE } from "@/utils/dashboard/constants";
+import { CUSTOM_VALUE, SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import publicDashboardsService from "@/services/public_dashboards";
 import { formatInTimeZone } from "date-fns-tz";
 import { durationFormatter } from "@/utils/formatters";
@@ -382,7 +382,10 @@ const variableValue = (value: unknown): string => {
     return t("dashboard.publicDashboard.variableUnset");
   }
   // A typed-in value is saved with the picker's custom marker, which only the search strips.
-  const shown = (v: unknown) => String(v).replace(new RegExp(`${CUSTOM_VALUE}$`), "");
+  const shown = (v: unknown) =>
+    v === SELECT_ALL_VALUE
+      ? t("dashboard.variableQueryValueSelector.all")
+      : String(v).replace(new RegExp(`${CUSTOM_VALUE}$`), "");
   return Array.isArray(value) ? value.map(shown).join(", ") : shown(value);
 };
 

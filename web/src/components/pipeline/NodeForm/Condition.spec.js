@@ -92,7 +92,7 @@ const ODrawerStub = {
   `,
 };
 
-function createWrapper(pipelineObjOverrides = {}) {
+function createWrapper(pipelineObjOverrides = {}, { realBuilder = false } = {}) {
   const mockPipelineObj = {
     currentSelectedNodeData: { data: {}, type: "condition" },
     currentSelectedNodeID: "node-123",
@@ -116,7 +116,7 @@ function createWrapper(pipelineObjOverrides = {}) {
       stubs: {
         ConfirmDialog: true,
         ODrawer: ODrawerStub,
-        ConditionBuilder: ConditionBuilderStub,
+        ...(realBuilder ? {} : { ConditionBuilder: ConditionBuilderStub }),
       },
     },
   });
@@ -216,6 +216,58 @@ describe("Condition.vue (drawer chrome)", () => {
     await wrapper.find('[data-test="cancel-btn"]').trigger("click");
     expect(wrapper.vm.dialog.show).toBe(true);
     expect(wrapper.vm.dialog.title).toBe("Discard changes");
+  });
+
+  const savedRule = () => ({
+    filterType: "group",
+    logicalOperator: "AND",
+    groupId: "g1",
+    conditions: [
+      {
+        filterType: "condition",
+        column: "level",
+        operator: "=",
+        value: "error",
+        logicalOperator: "AND",
+        id: "c1",
+      },
+    ],
+  });
+
+  it("closes an untouched saved rule even when the builder lists its keys in another order", async () => {
+    const saved = savedRule();
+    const { conditions, ...rest } = saved;
+    const reversed = Object.fromEntries(Object.entries(conditions[0]).reverse());
+    expect(Object.keys(reversed)).not.toEqual(Object.keys(conditions[0]));
+    builderGroup.value = { conditions: [reversed], ...rest };
+    const wrapper = createWrapper({
+      isEditNode: true,
+      currentSelectedNodeData: { data: { conditions: saved } },
+    });
+    await wrapper.find('[data-test="cancel-btn"]').trigger("click");
+    expect(wrapper.vm.dialog.show).toBe(false);
+  });
+
+  it("prompts when a saved rule's value was changed", async () => {
+    const saved = savedRule();
+    builderGroup.value = { ...saved, conditions: [{ ...saved.conditions[0], value: "warn" }] };
+    const wrapper = createWrapper({
+      isEditNode: true,
+      currentSelectedNodeData: { data: { conditions: saved } },
+    });
+    await wrapper.find('[data-test="cancel-btn"]').trigger("click");
+    expect(wrapper.vm.dialog.show).toBe(true);
+  });
+
+  it("closes an untouched saved rule with the real builder mounted in the drawer", async () => {
+    const wrapper = createWrapper(
+      { isEditNode: true, currentSelectedNodeData: { data: { conditions: savedRule() } } },
+      { realBuilder: true },
+    );
+    await tick();
+    expect(wrapper.findComponent({ name: "ConditionBuilder" }).exists()).toBe(true);
+    await wrapper.find('[data-test="cancel-btn"]').trigger("click");
+    expect(wrapper.vm.dialog.show).toBe(false);
   });
 
   it("clears the selected/clicked node when closing", () => {

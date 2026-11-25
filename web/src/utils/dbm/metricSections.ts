@@ -42,10 +42,9 @@ import {
   buildDbmSqlPanelSchema,
   dbmPromqlSelector,
   dbmSqlEscape,
-  escapeRegExp,
-  promqlEscape,
   type DbmMetricsScope,
 } from "./metricsPanels";
+import { escapeRegExp, promqlEscape } from "@/utils/query/promQLUtils";
 
 export type DbmSectionSource = "promql" | "sql-rate" | "sql-server";
 

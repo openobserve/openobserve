@@ -83,7 +83,15 @@ describe("useToolbarPins scopes", () => {
     const { isPinned, pinnedItems } = useToolbarPins("traces");
     expect(isPinned("savedViews")).toBe(false);
     expect(isPinned("histogram")).toBe(false);
+    expect(isPinned("sqlMode")).toBe(false);
     expect(pinnedItems.value).toEqual([]);
+  });
+
+  it("keeps traces SQL Mode pinned across reloads once the user pins it", async () => {
+    const { useToolbarPins } = await importFresh();
+    useToolbarPins("traces").togglePin("sqlMode");
+    const fresh = await importFresh();
+    expect(fresh.useToolbarPins("traces").isPinned("sqlMode")).toBe(true);
   });
 
   it("pins traces RED Metrics through the histogram key in canonical order", async () => {
@@ -91,10 +99,12 @@ describe("useToolbarPins scopes", () => {
     const { togglePin, pinnedItems } = useToolbarPins("traces");
     togglePin("savedViews");
     togglePin("histogram");
-    expect(pinnedItems.value).toEqual(["histogram", "savedViews"]);
+    togglePin("sqlMode");
+    expect(pinnedItems.value).toEqual(["histogram", "sqlMode", "savedViews"]);
     expect(JSON.parse(window.localStorage.getItem("traces_toolbar_pinned_items")!)).toEqual([
       "savedViews",
       "histogram",
+      "sqlMode",
     ]);
     const fresh = await importFresh();
     expect(fresh.useToolbarPins("traces").isPinned("histogram")).toBe(true);

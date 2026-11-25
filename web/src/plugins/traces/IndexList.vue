@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Stream selector sits on the same page-edge rail inset as the field list below it. -->
     <div class="px-page-edge">
       <OSelect
+        :aria-label="t('search.selectStream')"
         data-test="log-search-index-list-select-stream"
         :model-value="searchObj.data.stream.selectedStream?.value ?? null"
         :label="
@@ -55,6 +56,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:search="searchObj.data.stream.filterField = $event"
         @update:current-page="setPage($event)"
       >
+        <template v-if="searchObj.meta.sqlMode && storesExtraFieldsInAll" #before-list>
+          <p
+            class="px-page-edge text-text-secondary m-0 py-1 text-xs"
+            data-test="traces-sql-all-fields-note"
+          >
+            {{
+              t("traces.sqlMode.allFieldsNote", {
+                column: store.state.zoConfig?.all_fields_name || "_all",
+              })
+            }}
+          </p>
+        </template>
         <template #field-row="{ row }">
           <FieldRow
             :field="row"
@@ -63,8 +76,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :theme="store.state.theme"
             :show-quick-mode="false"
             :show-visibility-toggle="row.enableVisibility"
+            :show-group-by="groupByOffered(row)"
+            :grouped="groupByOffered(row) && searchObj.meta.groupBy === row.name"
             @add-to-filter="addToFilter(`${row.name}=''`)"
             @toggle-field="toggleField"
+            @group-by="groupByField"
           >
             <template #expansion="{ field }">
               <FieldExpansion
@@ -77,8 +93,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :selected-fields="searchObj.data.stream.selectedFields"
                 :theme="store.state.theme"
                 :show-visibility-toggle="row.enableVisibility"
-                :show-filter-icon="true"
+                :show-filter-icon="!searchObj.meta.sqlMode"
                 :show-quick-mode="false"
+                :show-group-by="groupByOffered(field)"
+                :grouped="groupByOffered(field) && searchObj.meta.groupBy === field.name"
                 :default-values-count="defaultValuesCount"
                 :value-mapper="getValueMapper(field.name)"
                 @add-to-filter="(val: string) => addSearchTerm(val)"
@@ -92,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @load-more-values="handleLoadMoreValues"
                 @before-show="openFilterCreator"
                 @before-hide="cancelFilterCreator"
+                @group-by="groupByField"
               >
                 <template v-if="field.name !== 'duration'" #caption>
                   <div
@@ -121,10 +140,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="p.key !== 'max'"
                           variant="ghost"
                           size="icon-xs-circle"
+                          :disabled="searchObj.meta.sqlMode"
                           :title="
-                            t('common.durationGte', {
-                              value: formatPercentile(durationPercentiles[p.key]),
-                            })
+                            searchObj.meta.sqlMode
+                              ? t('traces.sqlMode.putConditionInWhere')
+                              : t('common.durationGte', {
+                                  value: formatPercentile(durationPercentiles[p.key]),
+                                })
                           "
                           @click.stop="addSearchTerm(`duration>=${durationPercentiles[p.key]}`)"
                           class="o2-custom-button-hover border-card-glass-border! ms-1! border!"
@@ -134,10 +156,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
+                          :disabled="searchObj.meta.sqlMode"
                           :title="
-                            t('common.durationLte', {
-                              value: formatPercentile(durationPercentiles[p.key]),
-                            })
+                            searchObj.meta.sqlMode
+                              ? t('traces.sqlMode.putConditionInWhere')
+                              : t('common.durationLte', {
+                                  value: formatPercentile(durationPercentiles[p.key]),
+                                })
                           "
                           @click.stop="addSearchTerm(`duration<=${durationPercentiles[p.key]}`)"
                           class="o2-custom-button-hover border-card-glass-border! ms-auto! me-2.5! border!"
@@ -216,6 +241,8 @@ import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles from "@/composables/useDurationPercentiles";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { activeScopePredicate, withScope } from "@/utils/traces/tracesScope";
+import { analyzeTracesSql } from "@/utils/traces/tracesSql";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { removeConditions } from "@/utils/query/sqlFilterBuilder";
@@ -250,7 +277,7 @@ export default defineComponent({
     ),
     FieldExpansion: defineAsyncComponent(() => import("@/components/common/FieldExpansion.vue")),
   },
-  emits: ["update:changeStream", "update:selectedFields"],
+  emits: ["update:changeStream", "update:selectedFields", "group-by"],
   props: {
     fieldList: {
       type: Array,
@@ -263,6 +290,11 @@ export default defineComponent({
     activeExcludeFieldValues: {
       type: Object as () => Record<string, string[]>,
       default: () => ({}),
+    },
+    /** The stream has a user-defined schema, so fields outside it are packed into the _all column. */
+    storesExtraFieldsInAll: {
+      type: Boolean,
+      default: false,
     },
   },
   setup(props, { emit }) {
@@ -373,6 +405,18 @@ export default defineComponent({
       })),
     );
 
+    // Group by runs on the filter's span list only, and a header row or the timestamp names no group.
+    const groupByOffered = (field: any) =>
+      searchObj.meta.searchMode === "spans" &&
+      !searchObj.meta.sqlMode &&
+      !field.isGroup &&
+      field.name !== store.state.zoConfig.timestamp_column;
+
+    // Re-picking the grouped field would re-run the same query for the same groups.
+    const groupByField = (name: string) => {
+      if (name !== searchObj.meta.groupBy) emit("group-by", name);
+    };
+
     const totalFieldsCount = computed(
       () => normalizedFieldList.value.filter((f: any) => !f.isGroup).length,
     );
@@ -440,32 +484,46 @@ export default defineComponent({
 
     logsUtils();
 
-    const removeFieldFromWhereStr = (whereClause: string, fieldName: string): string => {
+    const removeFieldFromWhereStr = (
+      whereClause: string,
+      fieldName: string,
+      typedSql = false,
+    ): string => {
       const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const fieldPattern = new RegExp(
-        `^"?${escaped}"?\\s*(?:[=!<>]|is\\s+(?:not\\s+)?null\\b)`,
-        "i",
-      );
+      // Typed SQL may qualify a column with its FROM alias, as d.status or "d"."status".
+      const qualifier = typedSql ? `(?:(?:"[^"]+"|\\w+)\\.)?` : "";
+      // In typed SQL, IN and IS cover the conditions a sidebar tick writes.
+      const operator = typedSql
+        ? `\\s*(?:[=!<>]|(?:not\\s+)?in\\b|is\\b)`
+        : `\\s*(?:[=!<>]|is\\s+(?:not\\s+)?null\\b)`;
+      const fieldPattern = new RegExp(`^${qualifier}"?${escaped}"?${operator}`, "i");
       return removeConditions(whereClause, (condition) => fieldPattern.test(condition));
     };
 
     const buildFieldValuesSql = (fieldName: string): string => {
+      const streamName = searchObj.data.stream.selectedStream.value;
+      // Typed SQL may alias its stream; a JOIN's names may belong to either side, and the values API drops a WITH query's WHERE, so both read the stream.
+      const analyzed = searchObj.meta.sqlMode
+        ? analyzeTracesSql(searchObj.data.editorValue ?? "", tracesParser.value)
+        : null;
+      const typed = analyzed?.join || analyzed?.withClause ? null : analyzed;
       // The whole editor value is the where clause — never split it on "|", the
       // split is quote-unaware and would truncate match_all('text | error').
-      const whereClause = resolveTracesFilter(
-        searchObj.data.editorValue,
-        tracesParser.value,
-        searchObj.data.stream.selectedStream.value,
+      const whereClause = typed
+        ? typed.where
+        : analyzed
+          ? ""
+          : resolveTracesFilter(searchObj.data.editorValue, tracesParser.value, streamName);
+
+      let sql = `SELECT * FROM ${typed?.fromClause || `"${streamName}"`}`;
+
+      // Added last, so neither the field's removal nor the span_kind rewrite touches it.
+      const filteredWhere = withScope(
+        whereClause !== "" ? removeFieldFromWhereStr(whereClause, fieldName, !!typed) : "",
+        activeScopePredicate(searchObj),
       );
-
-      const streamName = searchObj.data.stream.selectedStream.value;
-      let sql = `SELECT * FROM "${streamName}"`;
-
-      if (whereClause !== "") {
-        const filteredWhere = removeFieldFromWhereStr(whereClause, fieldName);
-        if (filteredWhere.trim() !== "") {
-          sql += ` WHERE ${filteredWhere}`;
-        }
+      if (filteredWhere.trim() !== "") {
+        sql += ` WHERE ${filteredWhere}`;
       }
 
       return b64EncodeUnicode(sql) || "";
@@ -583,6 +641,14 @@ export default defineComponent({
     };
 
     const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
+      if (searchObj.meta.sqlMode) {
+        searchObj.data.stream.sqlFieldFilter = {
+          field: fieldName,
+          values: [...values],
+          exclude: action !== "include",
+        };
+        return;
+      }
       const joinOp = action === "include" ? " or " : " and ";
       // useFieldValuesStream keys the row of missing values "null".
       const condition = (v: string) => {
@@ -646,6 +712,8 @@ export default defineComponent({
       pagination,
       fieldListRef,
       totalFieldsCount,
+      groupByOffered,
+      groupByField,
       setPage,
       resetSelectedFields,
       // Field value fetching

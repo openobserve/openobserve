@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { ShortcutManager } from "../manager";
 import {
   getShortcutDef,
   SHORTCUT_MODULES,
@@ -262,6 +263,54 @@ describe("synthetics journey search shortcut", () => {
   });
 });
 
+describe("openOrgSwitcher (g o)", () => {
+  const globalGroup = () => SHORTCUT_REGISTRY.find((g) => g.pageKey === "shortcuts.pages.global");
+
+  it("E1 is a global g o entry listed in the cheatsheet on every edition", () => {
+    expect(getShortcutDef("openOrgSwitcher")).toMatchObject({
+      key: "g o",
+      descriptionKey: "shortcuts.actions.openOrgSwitcher",
+    });
+    expect(globalGroup()?.scope).toBeUndefined();
+    expect(globalGroup()?.shortcuts.map((e) => e.id)).toContain("openOrgSwitcher");
+    for (const caps of [OSS, ENTERPRISE, CLOUD]) {
+      expect(entryVisible("openOrgSwitcher", caps)).toBe(true);
+      expect(visiblePages(caps).has("shortcuts.pages.global")).toBe(true);
+    }
+  });
+
+  it("E1 conflicts with no other binding and no single g or o key", () => {
+    const keys = SHORTCUT_REGISTRY.flatMap((g) =>
+      g.shortcuts.flatMap((e) => [e.key, e.keyForMac, e.keyForWindows, ...(e.keys ?? [])]),
+    ).filter(Boolean);
+    expect(keys.filter((k) => k === "g o")).toHaveLength(1);
+    expect(keys.filter((k) => k === "g" || k?.startsWith("g "))).toEqual(["g o"]);
+  });
+
+  it("E2 fires on g then o outside a text field and never inside one", () => {
+    const def = getShortcutDef("openOrgSwitcher")!;
+    const manager = new ShortcutManager();
+    const handler = vi.fn();
+    manager.register({ key: def.key!, handler, allowInInput: def.allowInInput });
+    const press = (key: string, target: EventTarget) => {
+      const e = new KeyboardEvent("keydown", { key, bubbles: true });
+      Object.defineProperty(e, "target", { value: target });
+      manager.handleKeyDown(e);
+    };
+
+    const field = document.createElement("input");
+    document.body.appendChild(field);
+    press("g", field);
+    press("o", field);
+    expect(handler).not.toHaveBeenCalled();
+
+    press("g", document.body);
+    press("o", document.body);
+    expect(handler).toHaveBeenCalledOnce();
+    field.remove();
+  });
+});
+
 describe("row navigation entries (item 4a)", () => {
   const entry = (id: string) =>
     SHORTCUT_REGISTRY.flatMap((g) => g.shortcuts).find((e) => e.id === id);
@@ -271,6 +320,19 @@ describe("row navigation entries (item 4a)", () => {
   it("keeps every id unique across the registry", () => {
     const ids = SHORTCUT_REGISTRY.flatMap((g) => g.shortcuts.map((e) => e.id));
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("binds a plain t to open the time range, once and in the Global group", () => {
+    expect(getShortcutDef("timeRangeOpen")).toMatchObject({
+      key: "t",
+      descriptionKey: "shortcuts.actions.timeRangeOpen",
+    });
+    expect(groupOf("timeRangeOpen")?.pageKey).toBe("shortcuts.pages.global");
+    expect(groupOf("timeRangeOpen")?.scope).toBeUndefined();
+    const plainT = SHORTCUT_REGISTRY.flatMap((g) => g.shortcuts).filter((e) =>
+      [e.key, ...(e.keys ?? []), e.keyForMac, e.keyForWindows].includes("t"),
+    );
+    expect(plainT.map((e) => e.id)).toEqual(["timeRangeOpen"]);
   });
 
   it("binds J/K in the logs and traces scopes", () => {

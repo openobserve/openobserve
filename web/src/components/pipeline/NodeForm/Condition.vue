@@ -148,6 +148,7 @@ import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { sameConditionRule } from "@/utils/sameConditionRule";
 
 const { t } = useI18nTyped();
 
@@ -241,11 +242,10 @@ const importSqlParser = async () => {
 // Held for submit() and the cancel dirty-check.
 const builder = ref<any>(null);
 
-// Snapshot of the rule as first rendered, for the "discard changes?" prompt.
-const originalConditionGroup = ref<any>(null);
-onMounted(() => {
-  originalConditionGroup.value = JSON.parse(JSON.stringify(builder.value?.conditionGroup ?? null));
-});
+// The builder seeds from initialConditions, and mounts later inside the drawer's portal.
+const originalConditionGroup = ref<any>(
+  JSON.parse(JSON.stringify(initialConditions.value ?? null)),
+);
 
 const updateStreamFields = async (streamName: any, streamType: any) => {
   let streamCols: any = [];
@@ -362,10 +362,8 @@ const closeDialog = () => {
 const openCancelDialog = () => {
   try {
     try {
-      if (
-        JSON.stringify(originalConditionGroup.value) ===
-        JSON.stringify(builder.value?.conditionGroup)
-      ) {
+      const current = builder.value ? builder.value.conditionGroup : originalConditionGroup.value;
+      if (sameConditionRule(originalConditionGroup.value, current)) {
         closeDialog();
         return;
       }

@@ -606,7 +606,7 @@ describe("DateTimePickerDashboard", () => {
       realPicker.vm.onMenuOpenChange(true);
       realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
       await flushPromises();
-      expect(label()).toContain("2026/10/13 18:50:30 - 2026/10/13 18:25:22");
+      expect(label()).toContain("2026/10/13 10:00:00 - 2026/10/13 10:30:00");
 
       realPicker.vm.onMenuOpenChange(false);
       await flushPromises();
