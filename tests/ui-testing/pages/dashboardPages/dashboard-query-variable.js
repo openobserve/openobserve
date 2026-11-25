@@ -135,7 +135,8 @@ export default class DashboardQueryVariable {
   async fieldOptions() {
     await this.fieldTrigger.click();
     const options = this.page.locator(tid("dashboard-variable-field-select-option"));
-    await options.first().waitFor({ state: "visible", timeout: 15000 });
+    // `$variable` rows render at once; the stream's schema fields arrive later.
+    await expect(this.page.locator(`${tid("dashboard-variable-field-select-option")}:not([data-test-value^="$"])`).first()).toBeVisible({ timeout: 15000 });
     const values = await options.evaluateAll((els) => els.map((e) => e.getAttribute("data-test-value")));
     await this.page.keyboard.press("Escape");
     await this.page.locator(tid("dashboard-variable-field-select-popover")).waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
