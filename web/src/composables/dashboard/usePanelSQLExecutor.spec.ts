@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
-import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
+import { SERVER_QUERY_TIMEOUT_DEFAULT_SECONDS, usePanelSQLExecutor } from "./usePanelSQLExecutor";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
+import { generateTraceContext } from "@/utils/zincutils";
+import { ExportCancelledError } from "@/utils/dashboard/tableExport";
 
 // ─── module mocks ─────────────────────────────────────────────────────────────
 
@@ -508,6 +510,48 @@ describe("usePanelSQLExecutor", () => {
       expect(payload.queryReq.query.sql[0].sql).toBe("SELECT * FROM logs");
       expect(payload.queryReq.query.sql[1].sql).toBe("SELECT * FROM metrics");
       expect(payload.queryReq.query.per_query_response).toBe(true);
+    });
+
+    it("keeps ascending multi-query chunks in order, reading the latest partition's order_by", async () => {
+      const panelSchema = makePanelSchema([
+        {
+          query: "SELECT * FROM logs",
+          vrlFunctionQuery: "",
+          fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [] },
+        },
+        {
+          query: "SELECT * FROM metrics",
+          vrlFunctionQuery: "",
+          fields: { stream: "metrics", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [] },
+        },
+      ]);
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+      const { executeMultiSQL } = usePanelSQLExecutor(ctx);
+      await executeMultiSQL(100_000_000, 300_000_000, null, "logs");
+      const [[payload, stream]] = fetchQueryDataWithHttpStream.mock.calls;
+      const partition = (start: number, end: number) => ({
+        type: "search_response_metadata",
+        content: {
+          results: {
+            query_index: 0,
+            order_by: "asc",
+            time_offset: { start_time: start, end_time: end },
+          },
+        },
+      });
+      const hits = (id: number) => ({
+        type: "search_response_hits",
+        content: { results: { query_index: 0, hits: [{ id }] } },
+      });
+
+      stream.data(payload, partition(100_000_000, 200_000_000));
+      stream.data(payload, hits(1));
+      stream.data(payload, partition(200_000_000, 300_000_000));
+      stream.data(payload, hits(2));
+
+      expect(state.data[0]).toEqual([{ id: 1 }, { id: 2 }]);
     });
 
     it("shows the multi-query stream's averaged progress on the panel", async () => {
@@ -1216,6 +1260,333 @@ describe("usePanelSQLExecutor", () => {
       handlers.error(payload, { type: "error", content: { code: 500, message: "boom" } });
 
       expect(state.sparklineWarning).toBe("");
+    });
+  });
+
+  describe("fetchExportRows", () => {
+    type Row = { id: number };
+    type StreamHandlers = {
+      data: (payload: unknown, response: unknown) => void;
+      error: (payload: unknown, error: unknown) => void;
+      complete: (payload: unknown, response: unknown) => void;
+    };
+    const rowsOf = (count: number, offset = 0): Row[] =>
+      Array.from({ length: count }, (_, i) => ({ id: offset + i }));
+    const queryMeta = {
+      query: "SELECT * FROM logs",
+      startTime: 1000,
+      endTime: 2000,
+      panelQueryIndex: 0,
+    };
+
+    const streamChunks = (chunks: Row[][], results: Record<string, unknown> = {}) =>
+      vi.fn((payload: unknown, handlers: StreamHandlers) => {
+        handlers.data(payload, {
+          type: "search_response_metadata",
+          content: {
+            results: {
+              order_by: "desc",
+              time_offset: { start_time: 1500, end_time: 2000 },
+              ...results,
+            },
+          },
+        });
+        for (const hits of chunks) {
+          handlers.data(payload, { type: "search_response_hits", content: { results: { hits } } });
+        }
+        handlers.complete(payload, {});
+      });
+
+    it("re-runs the executed query with the explicit size and returns every row", async () => {
+      const fetchQueryDataWithHttpStream = streamChunks([rowsOf(2500), rowsOf(2500, 2500)]);
+      const { ctx, state } = makeCtx({ fetchQueryDataWithHttpStream });
+      const { fetchExportRows } = usePanelSQLExecutor(ctx);
+
+      const result = await fetchExportRows([queryMeta], [rowsOf(1000)], 100000, null);
+
+      const payload = fetchQueryDataWithHttpStream.mock.calls[0][0] as {
+        queryReq: { query: Record<string, unknown> };
+        meta: Record<string, unknown>;
+      };
+      expect(payload.queryReq.query).toMatchObject({
+        sql: "SELECT * FROM logs",
+        start_time: 1000,
+        end_time: 2000,
+        size: 100001,
+      });
+      expect(payload.meta).toMatchObject({
+        dashboard_name: "My Dashboard",
+        folder_name: "My Folder",
+        run_id: "run-1",
+        tab_id: "tab-1",
+        tab_name: "Tab 1",
+      });
+      expect(result.data[0]).toHaveLength(5000);
+      expect(result.capped).toBe(false);
+      expect(state.data).toEqual([]);
+    });
+
+    it("keeps streamed aggregation rows when the last chunk is empty", async () => {
+      const fetchQueryDataWithHttpStream = streamChunks([rowsOf(3), []], { streaming_aggs: true });
+      const { ctx } = makeCtx({ fetchQueryDataWithHttpStream });
+      const { fetchExportRows } = usePanelSQLExecutor(ctx);
+
+      const result = await fetchExportRows([queryMeta], [[]], 100, null);
+
+      expect(result.data[0]).toHaveLength(3);
+    });
+
+    it("asks one row past the bound and reports capped only when it arrives", async () => {
+      const exactly = streamChunks([rowsOf(50)]);
+      const { ctx } = makeCtx({ fetchQueryDataWithHttpStream: exactly });
+      const exact = await usePanelSQLExecutor(ctx).fetchExportRows(
+        [queryMeta],
+        [rowsOf(10)],
+        50,
+        null,
+      );
+
+      const payload = exactly.mock.calls[0][0] as { queryReq: { query: { size: number } } };
+      expect(payload.queryReq.query.size).toBe(51);
+      expect(exact.capped).toBe(false);
+      expect(exact.data[0]).toHaveLength(50);
+
+      const more = streamChunks([rowsOf(51)]);
+      const { ctx: moreCtx } = makeCtx({ fetchQueryDataWithHttpStream: more });
+      const over = await usePanelSQLExecutor(moreCtx).fetchExportRows([queryMeta], [[]], 50, null);
+
+      expect(over.capped).toBe(true);
+      expect(over.data[0]).toHaveLength(50);
+      expect(over.rowLimit).toBe(50);
+    });
+
+    it("raises the bound to the rows the panel already holds", async () => {
+      const fetchQueryDataWithHttpStream = streamChunks([rowsOf(8)]);
+      const { ctx } = makeCtx({ fetchQueryDataWithHttpStream });
+      const { fetchExportRows } = usePanelSQLExecutor(ctx);
+
+      const result = await fetchExportRows([queryMeta], [rowsOf(8)], 5, null);
+
+      const payload = fetchQueryDataWithHttpStream.mock.calls[0][0] as {
+        queryReq: { query: { size: number } };
+      };
+      expect(payload.queryReq.query.size).toBe(9);
+      expect(result.rowLimit).toBe(8);
+      expect(result.data[0]).toHaveLength(8);
+      expect(result.capped).toBe(false);
+    });
+
+    it("reports which queries kept their on-screen rows for lack of a stored request", async () => {
+      const { ctx } = makeCtx({ fetchQueryDataWithHttpStream: streamChunks([rowsOf(1)]) });
+      const { fetchExportRows } = usePanelSQLExecutor(ctx);
+
+      const result = await fetchExportRows([queryMeta, undefined], [[], rowsOf(3)], 100, null);
+
+      expect(result.heldIndexes).toEqual([1]);
+      expect(result.data[1]).toHaveLength(3);
+    });
+
+    it("stops a cancelled export's stall timer so it never fires a late server cancel", async () => {
+      vi.useFakeTimers();
+      try {
+        const cancelExportStreams = vi.fn();
+        const { ctx } = makeCtx({ fetchQueryDataWithHttpStream: vi.fn(), cancelExportStreams });
+        const { fetchExportRows, cancelExports } = usePanelSQLExecutor(ctx);
+
+        const pending = fetchExportRows([queryMeta], [[]], 100, null);
+        const outcome = expect(pending).rejects.toBeInstanceOf(ExportCancelledError);
+        cancelExports();
+        await outcome;
+        expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(SERVER_QUERY_TIMEOUT_DEFAULT_SECONDS * 1000 + 60_000);
+
+        expect(cancelExportStreams).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("rejects when the stream errors", async () => {
+      const fetchQueryDataWithHttpStream = vi.fn((payload: unknown, handlers: StreamHandlers) =>
+        handlers.error(payload, { content: { message: "boom" } }),
+      );
+      const { ctx } = makeCtx({ fetchQueryDataWithHttpStream });
+      const { fetchExportRows } = usePanelSQLExecutor(ctx);
+
+      await expect(fetchExportRows([queryMeta], [[]], 100, null)).rejects.toEqual({
+        message: "boom",
+      });
+    });
+
+    it("settles a cancelled export instead of leaving it pending", async () => {
+      const cancelExportStreams = vi.fn();
+      const { ctx } = makeCtx({ fetchQueryDataWithHttpStream: vi.fn(), cancelExportStreams });
+      const { fetchExportRows, cancelExports } = usePanelSQLExecutor(ctx);
+
+      const pending = fetchExportRows([queryMeta], [[]], 100, null);
+
+      expect(cancelExports()).toEqual(["mock-trace-sql"]);
+      await expect(pending).rejects.toBeInstanceOf(ExportCancelledError);
+      expect(cancelExportStreams).toHaveBeenCalledWith(["mock-trace-sql"]);
+      expect(cancelExports()).toEqual([]);
+    });
+
+    it("does not stream hidden queries and judges the cap on shown ones only", async () => {
+      const fetchQueryDataWithHttpStream = streamChunks([rowsOf(5)]);
+      const { ctx } = makeCtx({ fetchQueryDataWithHttpStream });
+      const { fetchExportRows } = usePanelSQLExecutor(ctx);
+
+      const result = await fetchExportRows(
+        [queryMeta, { ...queryMeta, panelQueryIndex: 1 }],
+        [rowsOf(9), rowsOf(2)],
+        4,
+        [1],
+      );
+
+      expect(fetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+      const payload = fetchQueryDataWithHttpStream.mock.calls[0][0] as {
+        meta: { currentQueryIndex: number };
+      };
+      expect(payload.meta.currentQueryIndex).toBe(1);
+      expect(result.data[0]).toEqual([]);
+      expect(result.capped).toBe(true);
+
+      const hiddenOnly = await fetchExportRows(
+        [queryMeta, undefined],
+        [rowsOf(9), rowsOf(2)],
+        5,
+        [1],
+      );
+      expect(hiddenOnly.capped).toBe(false);
+    });
+
+    it("stops the sibling streams when one export query fails", async () => {
+      vi.mocked(generateTraceContext)
+        .mockReturnValueOnce({ traceId: "trace-a", traceparent: "tp" })
+        .mockReturnValueOnce({ traceId: "trace-b", traceparent: "tp" });
+      const handlersByCall: StreamHandlers[] = [];
+      const fetchQueryDataWithHttpStream = vi.fn((_payload: unknown, handlers: StreamHandlers) => {
+        handlersByCall.push(handlers);
+      });
+      const cancelExportStreams = vi.fn();
+      const { ctx } = makeCtx({ fetchQueryDataWithHttpStream, cancelExportStreams });
+      const { fetchExportRows } = usePanelSQLExecutor(ctx);
+
+      vi.useFakeTimers();
+      try {
+        const pending = fetchExportRows([queryMeta, queryMeta], [[], []], 100, null);
+        handlersByCall[0].error({}, { content: { message: "boom" } });
+
+        await expect(pending).rejects.toEqual({ message: "boom" });
+        expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(SERVER_QUERY_TIMEOUT_DEFAULT_SECONDS * 1000 + 60_000);
+
+        expect(cancelExportStreams).toHaveBeenCalledTimes(1);
+        expect(cancelExportStreams).toHaveBeenCalledWith(["trace-b"]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("leaves a concurrent download running when another download's query fails", async () => {
+      vi.mocked(generateTraceContext)
+        .mockReturnValueOnce({ traceId: "first", traceparent: "tp" })
+        .mockReturnValueOnce({ traceId: "second", traceparent: "tp" });
+      const handlersByCall: StreamHandlers[] = [];
+      const fetchQueryDataWithHttpStream = vi.fn((_payload: unknown, handlers: StreamHandlers) => {
+        handlersByCall.push(handlers);
+      });
+      const cancelExportStreams = vi.fn();
+      const { ctx } = makeCtx({ fetchQueryDataWithHttpStream, cancelExportStreams });
+      const { fetchExportRows } = usePanelSQLExecutor(ctx);
+
+      const first = fetchExportRows([queryMeta], [[]], 100, null);
+      const second = fetchExportRows([queryMeta], [[]], 100, null);
+      handlersByCall[0].error({}, { content: { message: "boom" } });
+      await expect(first).rejects.toEqual({ message: "boom" });
+
+      handlersByCall[1].data(
+        {},
+        { type: "search_response_hits", content: { results: { hits: rowsOf(2) } } },
+      );
+      handlersByCall[1].complete({}, {});
+      await expect(second).resolves.toMatchObject({ data: [rowsOf(2)] });
+      expect(cancelExportStreams).not.toHaveBeenCalled();
+    });
+
+    it("marks the re-fetch partial when the server reports is_partial", async () => {
+      const fetchQueryDataWithHttpStream = streamChunks([rowsOf(3)], { is_partial: true });
+      const { ctx } = makeCtx({ fetchQueryDataWithHttpStream });
+      const { fetchExportRows } = usePanelSQLExecutor(ctx);
+
+      const result = await fetchExportRows([queryMeta], [[]], 100, null);
+
+      expect(result.partial).toBe(true);
+      expect(result.capped).toBe(false);
+    });
+
+    it("does not call a VRL function error partial data", async () => {
+      const fetchQueryDataWithHttpStream = streamChunks([rowsOf(3)], {
+        is_partial: true,
+        function_error: ["vrl failed"],
+      });
+      const { ctx, panelSchema } = makeCtx({ fetchQueryDataWithHttpStream });
+      panelSchema.value.queries[0].vrlFunctionQuery = ".x = 1";
+      const { fetchExportRows } = usePanelSQLExecutor(ctx);
+
+      const result = await fetchExportRows([queryMeta], [[]], 100, null);
+
+      expect(result.partial).toBe(false);
+    });
+
+    it("gives up a stream silent past the server query timeout and stops it on the server", async () => {
+      vi.useFakeTimers();
+      try {
+        const cancelExportStreams = vi.fn();
+        let touch: () => void = () => {};
+        const fetchQueryDataWithHttpStream = vi.fn(
+          (_payload: unknown, handlers: { onActivity: () => void }) => {
+            touch = handlers.onActivity;
+          },
+        );
+        const { ctx, store } = makeCtx({ fetchQueryDataWithHttpStream, cancelExportStreams });
+        (store.state.zoConfig as Record<string, unknown>).query_timeout = 60;
+        const { fetchExportRows } = usePanelSQLExecutor(ctx);
+        const limitMs = 60_000 + 30_000;
+
+        const pending = fetchExportRows([queryMeta], [[]], 100, null);
+        const outcome = expect(pending).rejects.toThrow("timed out");
+        await vi.advanceTimersByTimeAsync(limitMs - 1);
+        touch();
+        await vi.advanceTimersByTimeAsync(limitMs - 1);
+        expect(cancelExportStreams).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+
+        await outcome;
+        expect(cancelExportStreams).toHaveBeenCalledWith(["mock-trace-sql"]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("falls back to the server's default query timeout when the config has none", async () => {
+      vi.useFakeTimers();
+      try {
+        const cancelExportStreams = vi.fn();
+        const { ctx } = makeCtx({ fetchQueryDataWithHttpStream: vi.fn(), cancelExportStreams });
+        const { fetchExportRows } = usePanelSQLExecutor(ctx);
+
+        const pending = fetchExportRows([queryMeta], [[]], 100, null);
+        const outcome = expect(pending).rejects.toThrow("timed out");
+        await vi.advanceTimersByTimeAsync(SERVER_QUERY_TIMEOUT_DEFAULT_SECONDS * 1000);
+        expect(cancelExportStreams).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(30_000);
+
+        await outcome;
+        expect(cancelExportStreams).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });
