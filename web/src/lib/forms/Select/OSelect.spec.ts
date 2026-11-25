@@ -614,6 +614,24 @@ describe("OSelect", () => {
       wrapper = mount(OSelect, { props: { options } });
       expect(wrapper.find('button[role="combobox"]').attributes("aria-labelledby")).toBeUndefined();
     });
+
+    it("names an unlabelled trigger by its placeholder unless an aria name is given", () => {
+      wrapper = mount(OSelect, { props: { options, placeholder: "Pick a stream" } });
+      expect(wrapper.find('button[role="combobox"]').attributes("aria-label")).toBe(
+        "Pick a stream",
+      );
+      wrapper.unmount();
+      wrapper = mount(OSelect, {
+        props: { options, placeholder: "Pick a stream" },
+        attrs: { "aria-label": "Stream" },
+      });
+      expect(wrapper.find('button[role="combobox"]').attributes("aria-label")).toBe("Stream");
+    });
+
+    it("never names a labelled field by its placeholder", () => {
+      wrapper = mount(OSelect, { props: { label: "Country", options, placeholder: "Pick one" } });
+      expect(wrapper.find('button[role="combobox"]').attributes("aria-label")).toBeUndefined();
+    });
   });
 
   describe("cut-off text", () => {

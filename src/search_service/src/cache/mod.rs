@@ -52,6 +52,8 @@ use tracing::Instrument;
 use transform::{get_all_transform_keys, init_vrl_runtime};
 use usage_reporting::{http_report_metrics, report_request_usage_stats};
 
+#[cfg(feature = "vectorscan")]
+use crate::datafusion::physical_optimizer::sdr_redact::redaction_digest;
 use crate::{
     self as SearchService,
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
@@ -116,6 +118,15 @@ pub async fn search(
         &mut req.query.timezone,
         req.query.end_time,
     )?;
+    // The cache key needs it, and every search below runs with the same set.
+    crate::raw_streams::resolve_request(
+        trace_id,
+        org_id,
+        stream_type,
+        user_id.as_deref(),
+        &mut req,
+    )
+    .await;
 
     // check the original query function first
     let mut query_fn = req
@@ -581,11 +592,14 @@ pub async fn prepare_cache_response(
     if !req.clusters.is_empty() {
         hash_body.extend(req.clusters.clone());
     }
+    // An unresolved request is pinned to redaction, so its search matches this key.
+    req.raw_streams.get_or_insert_with(Default::default);
     #[cfg(feature = "vectorscan")]
-    if let Some(digest) = crate::datafusion::physical_optimizer::sdr_redact::redaction_digest(
+    if let Some(digest) = redaction_digest(
         org_id,
         stream_type,
         &sql.stream_names,
+        req.raw_streams.as_ref(),
     ) {
         hash_body.push(digest);
     }
@@ -1542,6 +1556,16 @@ mod tests {
             (
                 "SELECT histogram(_timestamp, '1 hour') AS ts, sum(count(*)) OVER (ORDER BY histogram(_timestamp, '1 hour')) AS cum FROM t GROUP BY ts ORDER BY ts",
                 "ts",
+                false,
+            ),
+            (
+                "SELECT histogram(_timestamp + 28800000000, '1 day') AS ts, count(DISTINCT k) AS c FROM t GROUP BY ts ORDER BY ts",
+                // Enterprise names no time column for a histogram over a shifted _timestamp.
+                if cfg!(feature = "enterprise") {
+                    ""
+                } else {
+                    "ts"
+                },
                 false,
             ),
             (

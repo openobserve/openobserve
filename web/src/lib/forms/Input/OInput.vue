@@ -28,13 +28,23 @@ const inputTabindex = computed(() => $attrs["tabindex"] as number | string | und
 const split = computed(() => splitControlAttrs($attrs, { forwardRole: true }));
 const wrapperAttrs = computed(() => split.value.wrapperAttrs);
 const controlAttrs = computed(() => split.value.controlAttrs);
-onMounted(() =>
+// A placeholder vanishes once the user types, so an otherwise unlabelled field keeps it as its name.
+const externallyLabelled = ref(false);
+const fallbackName = computed(() =>
+  props.label || externallyLabelled.value || $attrs["aria-label"] || $attrs["aria-labelledby"]
+    ? undefined
+    : props.placeholder || undefined,
+);
+onMounted(() => {
+  externallyLabelled.value = Array.from(document.getElementsByTagName("label")).some(
+    (label) => label.htmlFor === inputId.value,
+  );
   warnIfUnlabelled(
     "OInput",
     Boolean(props.label || props.placeholder || $attrs["aria-label"] || $attrs["aria-labelledby"]),
     inputId.value,
-  ),
-);
+  );
+});
 
 const props = withDefaults(defineProps<InputProps>(), {
   type: "text",
@@ -280,6 +290,7 @@ const WIDTH_CLASSES: Record<FieldWidth, string> = {
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
+        :aria-label="fallbackName"
         v-bind="controlAttrs"
         :aria-describedby="describedBy"
         :class="[

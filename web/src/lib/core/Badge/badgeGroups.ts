@@ -756,17 +756,6 @@ export const BADGE_GROUPS = {
     },
   },
 
-  // CLI command presets (AddAiToolset) — every preset shares ONE tone via a
-  // fallback-only entry (the list is data-driven via CLI_PRESETS). The `value` is
-  // passed for semantics but always resolves to the fallback. Add per-preset
-  // colours under `values` if ever needed.
-  cliPreset: {
-    mode: "plain",
-    size: "md",
-    values: {},
-    fallback: { tone: "neutral" },
-  },
-
   // Count chip — numeric count/total badges, keyed by colour INTENT (the number
   // itself is the slot); the leading `dot` (where present) stays a
   // per-call decorative prop.
@@ -1699,9 +1688,8 @@ export const BADGE_GROUPS = {
   aiToolsetKind: {
     mode: "plain",
     values: {
-      // MCP / CLI are acronyms — identical in every locale.
+      // MCP is an acronym — identical in every locale.
       mcp: { tone: "neutral", label: raw("MCP") },
-      cli: { tone: "neutral", label: raw("CLI") },
       skill: { tone: "neutral", labelKey: "components.badge.aiToolsetKind.skill" },
       generic: { tone: "neutral", labelKey: "components.badge.aiToolsetKind.generic" },
     },

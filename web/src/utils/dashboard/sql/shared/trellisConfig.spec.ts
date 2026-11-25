@@ -16,6 +16,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { createTrellisHelpers } from "@/utils/dashboard/sql/shared/trellisConfig";
 import { getTrellisGrid } from "@/utils/dashboard/calculateGridForSubPlot";
+import { NULL_BREAKDOWN_VALUE } from "@/utils/dashboard/sqlProcessData";
 
 vi.mock("@/utils/dashboard/chartDimensionUtils", () => ({
   calculateWidthText: vi.fn(() => 60),
@@ -244,5 +245,19 @@ describe("createTrellisHelpers", () => {
     // which will throw again when chartPanelRef.value is null.
     // That secondary throw is NOT caught, so it propagates to the caller.
     expect(() => updateTrellisConfig()).toThrow();
+  });
+
+  it.each([
+    ["the empty", "", "(empty)"],
+    ["the NULL", NULL_BREAKDOWN_VALUE, "(null)"],
+  ])("titles %s breakdown subplot by its label when grouped by y-axis", (_name, value, title) => {
+    const deps = makeDeps({ yAxisKeys: ["y1", "y2"] });
+    deps.panelSchema.config.trellis = { layout: "auto", group_by_y_axis: true };
+    deps.options.series = [
+      { name: `${title} (Y1)`, originalSeriesName: value, data: [1, 2] },
+      { name: `${title} (Y2)`, originalSeriesName: value, data: [3, 4] },
+    ];
+    createTrellisHelpers(deps).updateTrellisConfig();
+    expect(deps.options.title.map((it: { text: string }) => it.text)).toEqual([title]);
   });
 });

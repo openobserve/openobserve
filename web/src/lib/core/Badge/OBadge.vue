@@ -121,7 +121,7 @@ function handleRemove(e: MouseEvent): void {
 
     <span
       v-if="slots.trailing"
-      class="shrink-0 border-s border-current/25 ps-1 leading-none tabular-nums opacity-75"
+      class="shrink-0 border-s border-current/25 ps-1 leading-none tabular-nums"
     >
       <slot name="trailing" />
     </span>

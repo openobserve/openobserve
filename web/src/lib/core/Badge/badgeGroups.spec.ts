@@ -156,15 +156,6 @@ describe("badgeGroups", () => {
     expect(r.dot).toBe(false);
   });
 
-  it("resolves cliPreset to its uniform neutral fallback (md) for any value", () => {
-    for (const v of ["kubectl", "gh", "anything"]) {
-      const r = resolveBadge("cliPreset", v);
-      expect(r.tone, v).toBe("neutral");
-      expect(r.size, v).toBe("md");
-      expect(r.dot, v).toBe(false);
-    }
-  });
-
   it("resolves destinationKind 1:1 (prebuilt→primary, custom→default, pill)", () => {
     expect(resolveBadge("destinationKind", "prebuilt").tone).toBe("accent");
     expect(resolveBadge("destinationKind", "custom").tone).toBe("neutral");

@@ -33,6 +33,7 @@
       :draggable="!hideAllFieldsSelection && !promqlMode"
       :drag-enabled-fn="isRowDragEnabled"
       :sort-fn="sortFieldsFn"
+      keyboard
       @update:search="onSearchChange"
       @update:current-page="currentPage = $event"
       @drag-start="onDragStart"

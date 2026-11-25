@@ -525,6 +525,7 @@ export class LogsPage {
         this.searchSettledStates = `${this.logsSearchResultTableRows}, ${this.noResultsFoundText}, [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"], [data-test="logs-search-cancelled-state"], [data-test="logs-auto-run-guard"]`;
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.queryPlanDialog = '[data-test="query-plan-dialog"]';
+        this.queryPlanCloseBtn = `${this.queryPlanDialog} [data-test="o-dialog-close-btn"]`;
         this.queryPlanView = `${this.queryPlanDialog} [data-test="query-plan-view"]`;
         this.queryPlanTileOperators = `${this.queryPlanDialog} [data-test="query-plan-tile-operators"]`;
         this.queryPlanOperatorCards = `${this.queryPlanDialog} [data-profile-card]`;
@@ -2039,6 +2040,33 @@ export class LogsPage {
         }
     }
 
+    // Polling can miss a fast run's loading state, and the previous run's "complete" state and rows stay up until it.
+    async armRunLoadingObserver() {
+        await this.page.evaluate(([runBtn, title]) => {
+            const run = { clicked: false, loading: false };
+            window.__o2LogsRun?.observer.disconnect();
+            run.observer = new MutationObserver(() => {
+                if (!run.clicked || run.loading) return;
+                run.loading = [...document.querySelectorAll(title)].some(
+                    el => el.getClientRects().length > 0 && el.getAttribute('data-search-state') === 'loading'
+                );
+                if (run.loading) run.observer.disconnect();
+            });
+            document.addEventListener('click', e => {
+                if (e.target.closest?.(runBtn)) run.clicked = true;
+            }, { capture: true, once: true });
+            run.observer.observe(document.body, {
+                subtree: true, childList: true, attributes: true, attributeFilter: ['data-search-state'],
+            });
+            window.__o2LogsRun = run;
+        }, [this.queryButton, this.paginationRowCountTitle]);
+    }
+
+    /** Wait until the run clicked after armRunLoadingObserver() has entered its loading state. */
+    async expectRunLoadingObserved(timeout = 30000) {
+        await this.page.waitForFunction(() => window.__o2LogsRun?.loading === true, null, { timeout });
+    }
+
     async clickRunQueryButtonAndVerifyStreamingResponse() {
         const orgName = getOrgIdentifier() || 'default';
         testLogger.debug("[DEBUG] Setting up response listener before clicking run query button");
@@ -2049,6 +2077,7 @@ export class LogsPage {
             return url.includes(`/api/${orgName}/_search`) && method === 'POST';
         });
         
+        await this.armRunLoadingObserver();
         await this.clickRunQueryButton();
         
         const searchResponse = await searchPromise;
@@ -2059,10 +2088,9 @@ export class LogsPage {
         const responseUrl = searchResponse.url();
         if (responseUrl.includes('_search_stream')) {
             testLogger.debug("[DEBUG] Received streaming response (SSE format)");
-            const responseText = await searchResponse.text();
-            testLogger.debug("[DEBUG] Streaming response text (first 200 chars):", responseText.substring(0, 200));
-            expect(responseText).toBeDefined();
-            expect(responseText.length).toBeGreaterThan(0);
+            // The page aborts the SSE fetch, so CDP may drop its body; prove this run settled with rows on screen.
+            await this.expectRunLoadingObserved();
+            expect(await this.getResultHitsCount()).toBeGreaterThan(0);
         } else {
             testLogger.debug("[DEBUG] Received JSON response");
             const searchData = await searchResponse.json();
@@ -2209,6 +2237,21 @@ export class LogsPage {
         await option.click({ force: true });
         await expect(this.page.locator(this.paginationRowCountTitle))
             .toContainText(`1 to ${size}`, { timeout: 30000 });
+    }
+
+    /** Run the query and return its histogram's total event count; needs captureHistogramFrames() before the page loads. */
+    async runQueryAndSumHistogram() {
+        await this.page.evaluate(() => { /** @type {any} */ (window).__histFrames = []; });
+        await this.clickRefreshButton();
+        let totals = [];
+        await expect.poll(async () => {
+            totals = (await this.getHistogramFrames())
+                .map((frame) => frame.hits ?? frame.results?.hits ?? [])
+                .filter((hits) => hits.some((hit) => hit.zo_sql_num !== undefined))
+                .map((hits) => hits.reduce((sum, hit) => sum + Number(hit.zo_sql_num || 0), 0));
+            return totals.length;
+        }, { timeout: 30000, message: 'the histogram must return its buckets' }).toBeGreaterThan(0);
+        return totals[totals.length - 1];
     }
 
     /**
@@ -9163,6 +9206,12 @@ export class LogsPage {
         // Saved views list is now opened via the utilities ("More") dropdown menu.
         // Ensure any previously open dropdown is closed before opening fresh.
         const listMenuItem = this.page.locator(this.menuListSavedViewsBtn);
+        // Escape closes only the submenu, so the re-open click below would toggle the still-open root menu shut.
+        if (await this.page.locator(this.savedViewSearchInput).isVisible()
+            && (await listMenuItem.getAttribute('aria-expanded', { timeout: 5000 })) === 'true') {
+            testLogger.info('Saved views submenu already open, reusing it');
+            return;
+        }
         await this.page.keyboard.press('Escape').catch(() => {});
         await listMenuItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
         // After navigation the Vue component may need an extra render cycle before its
@@ -11553,6 +11602,15 @@ export class LogsPage {
         testLogger.info('Query plan dialog is hidden');
     }
 
+    async closeQueryPlanDialog() {
+        // The closing More options menu holds focus, and its refocused trigger opens a tooltip over the dialog.
+        await expect(this.page.locator(this.explainQueryMenuBtn)).toBeHidden({ timeout: 10000 });
+        const closeBtn = this.page.locator(this.queryPlanCloseBtn);
+        await closeBtn.focus();
+        await closeBtn.click();
+        testLogger.info('Closed the query plan dialog with its close button');
+    }
+
     /** Click Run and wait for the hits request of `stream`, skipping the histogram call. */
     async runQueryAndWaitForStreamSearch(stream) {
         const searched = this.page.waitForResponse(
@@ -11564,6 +11622,53 @@ export class LogsPage {
         );
         await this.clickRunQueryButton();
         return await searched;
+    }
+
+    /** Wait until a picked stream's fields are loaded and the auto-run the pick may start has ended. */
+    async waitForPickedStreamSettled(stream, timeout = 60000) {
+        await expect.poll(() => this._mutateSearchObj((searchObj, skeleton) => ({
+            streams: [...searchObj.data.stream.selectedStream],
+            fieldsLoaded: searchObj.data.stream.selectedStreamFields.length > 0,
+            loadingStream: searchObj.loadingStream,
+            running: searchObj.loading || searchObj.loadingHistogram,
+            // loadingStream clears before the auto-run starts; the skeleton goes only after it has.
+            switching: document.querySelector(skeleton) !== null,
+        }), this.logsQueryPage.streamSwitchSkeleton), { timeout }).toEqual({
+            streams: [stream],
+            fieldsLoaded: true,
+            loadingStream: false,
+            running: false,
+            switching: false,
+        });
+        testLogger.info(`Stream ${stream} is loaded and no search is running`);
+    }
+
+    /** Set the editor to a SQL query and wait until the app holds it in SQL mode with the streams it names loaded. */
+    async fillSqlQueryAndWaitForSqlMode(sql) {
+        await this.clearAndFillQueryEditor(sql);
+        await this.waitForSearchQueryCommitted(sql);
+        await expect.poll(() => this._isSqlModeEnabledViaVue(), { timeout: 15000 }).toBe(true);
+        // A run started while a stream is still loading is cancelled.
+        await expect.poll(() => this._mutateSearchObj((searchObj) => searchObj.loadingStream), { timeout: 30000 }).toBe(false);
+    }
+
+    /** Run the query and wait for the hits request of `stream` to be answered and its results applied. */
+    async runQueryAndWaitForSearchEnd(stream) {
+        const response = await this.runQueryAndWaitForStreamSearch(stream);
+        expect(response.status()).toBe(200);
+        await expect.poll(() => this._mutateSearchObj((searchObj) => searchObj.loading), { timeout: 60000 }).toBe(false);
+    }
+
+    /** Record the size of every Logs UI hits request whose SQL contains `sqlPart`, from this call on. */
+    recordRequestedSizes(sqlPart) {
+        const sizes = [];
+        this.page.on('request', (req) => {
+            const url = new URL(req.url());
+            if (!/\/_search(_stream)?$/.test(url.pathname) || url.searchParams.get('search_type') !== 'ui' || url.searchParams.has('is_ui_histogram')) return;
+            const query = req.postDataJSON()?.query;
+            if (query?.sql?.includes(sqlPart)) sizes.push(query.size);
+        });
+        return sizes;
     }
 
     /** Open the Explain query dialog from the More options menu. */
@@ -13652,6 +13757,10 @@ export class LogsPage {
         // The tooltip opens on the anchor's mouseenter, which never re-fires if the
         // pointer is already inside it — park the mouse elsewhere so the hover is real.
         await this.page.mouse.move(0, 0);
+        // Focus returns to the date button after its picker closes, and OTooltip stays open until blur.
+        await this.page.evaluate(() => document.activeElement?.blur());
+        await this.page.locator('[data-test="o-tooltip-content"]:visible').first()
+            .waitFor({ state: 'hidden', timeout: 5000 });
         await trigger.hover();
         const bubble = this.page.locator('[data-test="o-tooltip-content"]:visible').first();
         const appeared = await bubble

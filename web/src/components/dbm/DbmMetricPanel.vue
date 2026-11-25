@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="filter"
         :searchable="false"
         class="shrink-0"
+        :aria-label="t('panel.breakdown')"
         :data-test="`dbm-metric-panel-by-${panelKey}`"
         @update:model-value="emit('update:by', $event as string)"
       />

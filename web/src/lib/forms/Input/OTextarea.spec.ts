@@ -76,6 +76,14 @@ describe("OTextarea", () => {
     expect(wrapper.element.getAttribute("aria-describedby")).toBeNull();
   });
 
+  it("names an unlabelled textarea by its placeholder, and only then", () => {
+    wrapper = mount(OTextarea, { props: { placeholder: "Describe the issue" } });
+    expect(wrapper.find("textarea").attributes("aria-label")).toBe("Describe the issue");
+    wrapper.unmount();
+    wrapper = mount(OTextarea, { props: { placeholder: "Describe", label: "Notes" } });
+    expect(wrapper.find("textarea").attributes("aria-label")).toBeUndefined();
+  });
+
   it("warns when mounted without a label or aria name", () => {
     vi.stubEnv("MODE", "development");
     vi.stubGlobal("CSS", { escape: (v: string) => v });

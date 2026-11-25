@@ -2255,7 +2255,10 @@ export default defineComponent({
         const lineContent = model?.getLineContent?.(endLine) ?? "";
         const endCol = range.endColumn ?? (lineContent.length + 1 || startCol + 1);
         return {
-          severity: monaco.MarkerSeverity.Error,
+          severity:
+            range.severity === "warning"
+              ? monaco.MarkerSeverity.Warning
+              : monaco.MarkerSeverity.Error,
           startLineNumber: startLine,
           startColumn: startCol,
           endLineNumber: endLine,

@@ -30,6 +30,7 @@ use config::{
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 use object_store::{GetOptions, GetResult};
+use parquet::file::metadata::ParquetMetaDataReader;
 
 const DOWNLOAD_RETRY_TIMES: usize = 3;
 const INITIAL_CACHE_SIZE: usize = 128;
@@ -209,7 +210,7 @@ async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Erro
     match ftype {
         FileType::Parquet => {
             let b = Bytes::copy_from_slice(bytes);
-            let mut reader = parquet::file::metadata::ParquetMetaDataReader::new();
+            let mut reader = ParquetMetaDataReader::new();
             reader.try_parse(&b)?;
         }
         FileType::Ttv => {

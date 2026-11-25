@@ -5,6 +5,7 @@ import type { SliderProps, SliderEmits, SliderSlots } from "./OSlider.types";
 import { computed, useAttrs, useId } from "vue";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { splitControlAttrs } from "@/lib/forms/controlAttrs";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -12,10 +13,9 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the slider input; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const wrapperAttrs = computed(() => {
-  const { tabindex: _tabindex, ...rest } = $attrs;
-  return rest;
-});
+const split = computed(() => splitControlAttrs($attrs));
+const wrapperAttrs = computed(() => split.value.wrapperAttrs);
+const controlAttrs = computed(() => split.value.controlAttrs);
 
 const props = withDefaults(defineProps<SliderProps>(), {
   min: 0,
@@ -137,6 +137,7 @@ const displayValue = computed(() => {
         :disabled="isDisabled"
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
+        v-bind="controlAttrs"
         :class="[
           'o2-slider-input',
           'relative z-10 m-0 w-full appearance-none bg-transparent',

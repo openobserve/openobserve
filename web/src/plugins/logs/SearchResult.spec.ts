@@ -1297,12 +1297,17 @@ describe("SearchResult Component", () => {
     });
 
     afterEach(async () => {
+      wrapper.vm.searchObj.loading = false;
+      wrapper.vm.searchObj.loadingHistogram = false;
+      await flushPromises();
+      vi.clearAllTimers();
       vi.useRealTimers();
       wrapper.vm.searchObj.data.histogram = saved.histogram;
       wrapper.vm.searchObj.meta.showHistogram = saved.showHistogram;
       wrapper.vm.searchObj.meta.logsVisualizeToggle = saved.toggle;
       wrapper.vm.searchObj.data.queryResults = saved.queryResults;
       wrapper.vm.searchObj.data.searchAround.indexTimestamp = -1;
+      wrapper.vm.plotChart = {};
       await flushPromises();
     });
 
@@ -1312,7 +1317,7 @@ describe("SearchResult Component", () => {
       expect(wrapper.vm.summaryView.updating).toBe(true);
       expect(wrapper.vm.searchObj.meta.lastRunAt).toBe(1);
 
-      chart().vm.$emit("finished");
+      chart().vm.$emit("painted");
       await flushPromises();
       expect(wrapper.vm.summaryView.updating).toBe(false);
       expect(wrapper.vm.summaryView.parts).toEqual(parts);
@@ -1322,7 +1327,7 @@ describe("SearchResult Component", () => {
     it("keeps the previous chart dimmed until the re-run's chart has painted", async () => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       await runUntilHistogramLands(landed());
-      chart().vm.$emit("finished");
+      chart().vm.$emit("painted");
       await flushPromises();
 
       await runUntilHistogramLands(landed());
@@ -1334,7 +1339,7 @@ describe("SearchResult Component", () => {
       );
       expect(wrapper.vm.summaryView.updating).toBe(true);
 
-      chart().vm.$emit("finished");
+      chart().vm.$emit("painted");
       await flushPromises();
       expect(wrapper.find(".histogram-chart").classes()).not.toContain("opacity-60");
       expect(wrapper.vm.summaryView.updating).toBe(false);
@@ -1353,7 +1358,7 @@ describe("SearchResult Component", () => {
 
     it("settles without chips after search-around instead of staying dimmed", async () => {
       await runUntilHistogramLands(landed());
-      chart().vm.$emit("finished");
+      chart().vm.$emit("painted");
       await flushPromises();
 
       wrapper.vm.searchObj.data.searchAround.indexTimestamp = 1_700_000_000_000_000;
@@ -1366,6 +1371,149 @@ describe("SearchResult Component", () => {
       await flushPromises();
 
       expect(wrapper.vm.summaryView).toMatchObject({ parts: null, updating: false });
+    });
+
+    const empty = () => ({ ...landed(), xData: [], yData: [] });
+    const startHistogramStream = async () => {
+      wrapper.vm.searchObj.loading = true;
+      wrapper.vm.searchObj.data.histogram = empty();
+      await flushPromises();
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ _timestamp: 1 }] };
+      wrapper.vm.searchObj.loadingHistogram = true;
+      wrapper.vm.searchObj.loading = false;
+      await flushPromises();
+    };
+    const streamChunk = async (yData: number[]) => {
+      wrapper.vm.searchObj.data.histogram = { ...landed(), yData };
+      await flushPromises();
+    };
+    const endHistogramStream = async () => {
+      wrapper.vm.searchObj.loadingHistogram = false;
+      await flushPromises();
+    };
+    const dimmed = () => wrapper.find(".histogram-chart").classes().includes("opacity-60");
+
+    it("repaints the chart on every chunk while the histogram streams", async () => {
+      wrapper.vm.plotChart = {};
+      await startHistogramStream();
+      expect(chart().exists()).toBe(false);
+
+      await streamChunk([1, 2, 3]);
+      expect(chart().exists()).toBe(true);
+      const first = wrapper.vm.plotChart;
+      await streamChunk([4, 5, 6]);
+      expect(wrapper.vm.plotChart).not.toBe(first);
+      expect(wrapper.vm.plotChart.options.animation).toBe(false);
+    });
+
+    it("never marks the first run's own streaming chart stale", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      wrapper.vm.plotChart = {};
+      await startHistogramStream();
+      await streamChunk([1, 2, 3]);
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
+      await nextTick();
+      expect(wrapper.vm.histogramView).toEqual({ phase: "chart", stale: false });
+      expect(dimmed()).toBe(false);
+
+      await endHistogramStream();
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
+      await nextTick();
+      expect(dimmed()).toBe(false);
+    });
+
+    it("dims the previous chart on a re-run only until the first new chunk paints", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      await runUntilHistogramLands(landed());
+      chart().vm.$emit("painted");
+      await flushPromises();
+
+      await startHistogramStream();
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
+      await nextTick();
+      expect(dimmed()).toBe(true);
+      chart().vm.$emit("painted");
+      await nextTick();
+      expect(dimmed()).toBe(true);
+
+      await streamChunk([4, 5, 6]);
+      expect(dimmed()).toBe(true);
+      chart().vm.$emit("painted");
+      await nextTick();
+      expect(dimmed()).toBe(false);
+      expect(wrapper.vm.summaryView.updating).toBe(true);
+
+      await streamChunk([7, 8, 9]);
+      await endHistogramStream();
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
+      await nextTick();
+      expect(dimmed()).toBe(false);
+    });
+
+    it("dims the previous chart when a re-run replaces a histogram that is still streaming", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      wrapper.vm.plotChart = {};
+      await startHistogramStream();
+      await streamChunk([1, 2, 3]);
+      chart().vm.$emit("painted");
+      await flushPromises();
+
+      wrapper.vm.searchObj.loading = true;
+      wrapper.vm.searchObj.data.histogram = empty();
+      await flushPromises();
+      wrapper.vm.searchObj.loading = false;
+      await flushPromises();
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
+      await nextTick();
+      expect(wrapper.vm.searchObj.loadingHistogram).toBe(true);
+      expect(dimmed()).toBe(true);
+
+      await streamChunk([4, 5, 6]);
+      chart().vm.$emit("painted");
+      await nextTick();
+      expect(dimmed()).toBe(false);
+    });
+
+    it("settles the status row only on the final chart's paint", async () => {
+      await startHistogramStream();
+      await streamChunk([1, 2, 3]);
+      chart().vm.$emit("finished");
+      chart().vm.$emit("painted");
+      await flushPromises();
+      expect(wrapper.vm.summaryView.updating).toBe(true);
+      expect(wrapper.vm.searchObj.meta.lastRunAt).toBe(1);
+
+      await streamChunk([4, 5, 6]);
+      await endHistogramStream();
+      chart().vm.$emit("finished");
+      await flushPromises();
+      expect(wrapper.vm.summaryView.updating).toBe(true);
+
+      chart().vm.$emit("painted");
+      await flushPromises();
+      expect(wrapper.vm.summaryView).toMatchObject({ updating: false, parts });
+      expect(wrapper.vm.searchObj.meta.lastRunAt).toBeGreaterThan(1);
+    });
+
+    it("never dims or waits on a paint in live mode", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      await runUntilHistogramLands(landed());
+      chart().vm.$emit("painted");
+      await flushPromises();
+
+      wrapper.vm.searchObj.meta.refreshInterval = 10;
+      wrapper.vm.searchObj.loadingHistogram = true;
+      await flushPromises();
+      await streamChunk([4, 5, 6]);
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
+      await nextTick();
+      expect(dimmed()).toBe(false);
+
+      await endHistogramStream();
+      expect(wrapper.vm.chartPaintPending).toBe(false);
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
+      await nextTick();
+      expect(dimmed()).toBe(false);
     });
 
     it("settles after a bounded wait when the chart never reports a paint", async () => {

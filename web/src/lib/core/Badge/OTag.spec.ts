@@ -114,7 +114,7 @@ describe("OTag size", () => {
   });
 
   it("a registry md group renders 24 px", () => {
-    const w = mount(OTag, { props: { type: "cliPreset", value: "kubectl" } });
+    const w = mount(OTag, { props: { type: "billingTag", value: "subscribed" } });
     expect(w.classes()).toContain("h-control-xs");
   });
 });

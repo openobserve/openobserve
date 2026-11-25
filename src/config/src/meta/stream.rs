@@ -18,6 +18,7 @@ use std::{fmt::Display, ops::Range, str::FromStr, sync::Arc};
 use arrow::buffer::BooleanBuffer;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
+use parquet::file::metadata::KeyValue;
 use proto::cluster_rpc;
 use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct};
 use utoipa::ToSchema;
@@ -491,8 +492,8 @@ impl MemorySize for FileMeta {
     }
 }
 
-impl From<&[parquet::file::metadata::KeyValue]> for FileMeta {
-    fn from(values: &[parquet::file::metadata::KeyValue]) -> Self {
+impl From<&[KeyValue]> for FileMeta {
+    fn from(values: &[KeyValue]) -> Self {
         let mut meta = FileMeta::default();
         for kv in values {
             match kv.key.as_str() {
@@ -1790,6 +1791,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::DataType as ArrowDT;
+
     use super::*;
 
     #[test]
@@ -2064,7 +2067,6 @@ mod tests {
 
     #[test]
     fn test_data_type_into_arrow() {
-        use arrow_schema::DataType as ArrowDT;
         assert_eq!(ArrowDT::from(DataType::Utf8), ArrowDT::Utf8);
         assert_eq!(ArrowDT::from(DataType::LargeUtf8), ArrowDT::LargeUtf8);
         assert_eq!(ArrowDT::from(DataType::Int64), ArrowDT::Int64);
@@ -2723,7 +2725,6 @@ mod tests {
     #[test]
     fn test_kv_metadata_to_file_meta_leaves_bloom_ver_zero() {
         // Parquet KV metadata never carries bloom_ver — it must default to 0.
-        use parquet::file::metadata::KeyValue;
         let kvs = vec![
             KeyValue::new("min_ts".to_string(), "10".to_string()),
             KeyValue::new("max_ts".to_string(), "20".to_string()),

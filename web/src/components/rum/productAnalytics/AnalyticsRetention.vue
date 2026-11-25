@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="def.per"
           :options="perOptions"
           width="s"
+          :aria-label="t('rum.analytics.funnel.trendInterval')"
           data-test="rum-analytics-retention-granularity"
           @update:model-value="(v) => update({ per: v as Granularity })"
         />

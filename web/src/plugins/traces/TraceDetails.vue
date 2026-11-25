@@ -725,6 +725,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :search-query="searchQuery"
                         :spanList="spanList"
                         :selectedSpanId="selectedSpanId"
+                        :cacheUses="cacheUses"
                         :hoveredSpanId="hoveredSpanId"
                         :isSidebarOpen="!!(isSidebarOpen && (selectedSpanId || showTraceDetails))"
                         :showCriticalPath="showCriticalPath"
@@ -905,6 +906,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ThreadView
                   :spans="effectiveSpanList"
                   :selected-span-id="selectedSpanId"
+                  :warm-cache-models="warmCacheModels"
                   @span-selected="updateSelectedSpan"
                 />
               </div>
@@ -1179,7 +1181,8 @@ import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
-import { hasLLMPayload, spanTimeBounds } from "./threadView.utils";
+import { classify, classifyCacheUse, hasLLMPayload, spanTimeBounds } from "./threadView.utils";
+import { useWarmCacheModels } from "./composables/useWarmCacheModels";
 import {
   attributeSteps,
   headlineSteps,
@@ -1838,6 +1841,16 @@ export default defineComponent({
         ""
       );
     });
+
+    const warmCacheModels = useWarmCacheModels(currentTraceStreamName, spanList);
+    const cacheUses = computed(() =>
+      Object.fromEntries(
+        classifyCacheUse(
+          (spanList.value || []).filter((s: any) => classify(s) === "llm_turn"),
+          warmCacheModels.value,
+        ),
+      ),
+    );
 
     // Check if service streams feature is enabled
     const serviceStreamsEnabled = computed(() => {
@@ -3793,6 +3806,8 @@ export default defineComponent({
       copyToClipboard,
       copyTraceId,
       sessionId,
+      warmCacheModels,
+      cacheUses,
       copySessionId,
       traceDetailsShareURL,
       info: "info",

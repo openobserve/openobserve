@@ -235,6 +235,7 @@
                     @region-join-update="handleRegionJoinUpdate"
                     @sankey-notice-update="handleSankeyNoticeUpdate"
                     @treemap-notice-update="handleTreemapNoticeUpdate"
+                    @funnel-notice-update="handleFunnelNoticeUpdate"
                     @limit-number-of-series-warning-message-update="
                       handleLimitNumberOfSeriesWarningMessage
                     "
@@ -503,6 +504,7 @@ export default defineComponent({
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
       handleTreemapNoticeUpdate,
+      handleFunnelNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
     const limitNumberOfSeriesWarningMessage = ref("");
     const sparklineWarning = ref("");
@@ -1086,6 +1088,7 @@ export default defineComponent({
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
       handleTreemapNoticeUpdate,
+      handleFunnelNoticeUpdate,
       canEditFromNotice,
       onNoticeEditPanel,
       limitNumberOfSeriesWarningMessage,

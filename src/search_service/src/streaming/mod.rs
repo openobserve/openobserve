@@ -256,6 +256,8 @@ pub async fn process_search_stream_request(
     }
 
     req.query.query_fn = query_fn.clone();
+    crate::raw_streams::resolve_request(&trace_id, &org_id, stream_type, Some(&user_id), &mut req)
+        .await;
 
     let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await;
 
@@ -806,7 +808,11 @@ pub async fn process_search_stream_request(
                 Ok(patterns_response) => {
                     // Convert to JSON and send
                     match config::utils::json::to_value(&patterns_response) {
-                        Ok(patterns_json) => {
+                        Ok(mut patterns_json) => {
+                            execution::tag_partial_extraction(
+                                &mut patterns_json,
+                                &accumulated_results,
+                            );
                             log::info!(
                                 "[HTTP2_STREAM trace_id {trace_id}] Sending {} patterns",
                                 patterns_response.patterns.len()

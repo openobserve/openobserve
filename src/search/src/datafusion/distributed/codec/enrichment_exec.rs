@@ -78,10 +78,18 @@ fn is_plain_name(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::{
+        arrow::{
+            array::{Int32Array, RecordBatch},
+            datatypes::{DataType, Field, Schema},
+        },
+        physical_plan::collect,
+        prelude::SessionContext,
+    };
     use datafusion_proto::bytes::{
         physical_plan_from_bytes_with_extension_codec, physical_plan_to_bytes_with_extension_codec,
     };
+    use parquet::arrow::ArrowWriter;
 
     use super::*;
 
@@ -101,7 +109,7 @@ mod tests {
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
         let plan2 =
             physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.downcast_ref::<EnrichmentExec>().unwrap();
@@ -119,8 +127,6 @@ mod tests {
     #[tokio::test]
     async fn test_decoded_names_escaping_table_dir_are_error() -> Result<()> {
         use config::utils::enrichment_local_cache::get_table_dir;
-        use datafusion::arrow::array::{Int32Array, RecordBatch};
-        use parquet::arrow::ArrowWriter;
 
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let outside = tempfile::tempdir().unwrap();
@@ -159,13 +165,13 @@ mod tests {
             ));
             let codec = super::super::get_physical_extension_codec();
             let bytes = physical_plan_to_bytes_with_extension_codec(plan, &codec)?;
-            let ctx = datafusion::prelude::SessionContext::new();
+            let ctx = SessionContext::new();
             let ret = match physical_plan_from_bytes_with_extension_codec(
                 &bytes,
                 &ctx.task_ctx(),
                 &codec,
             ) {
-                Ok(decoded) => datafusion::physical_plan::collect(decoded, ctx.task_ctx())
+                Ok(decoded) => collect(decoded, ctx.task_ctx())
                     .await
                     .map(|b| b.iter().map(|b| b.num_rows()).sum::<usize>()),
                 Err(e) => Err(e),

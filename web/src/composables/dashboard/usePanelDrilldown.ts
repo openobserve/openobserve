@@ -40,11 +40,11 @@ import {
 } from "@/utils/query/sqlComplexity";
 import { isExemplarSeriesId } from "@/utils/dashboard/exemplars/applyExemplarSeries";
 import {
-  stateTimelineBreakdownColumn,
   stateTimelineDrilldownSeries,
   stateTimelineSourceRecord,
 } from "@/utils/dashboard/convertStateTimelineData";
 import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+import { NULL_BREAKDOWN_VALUE, OTHERS_BREAKDOWN_VALUE } from "@/utils/dashboard/sqlProcessData";
 import { boxplotDrilldownSeries, boxplotDrilldownTime } from "@/utils/dashboard/convertBoxplotData";
 import { barGaugeDrilldownSeries } from "@/utils/dashboard/convertBarGaugeData";
 import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/convertHostmapData";
@@ -55,6 +55,33 @@ const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge", "treemap", "sunburst", "f
 interface NamedItemParams {
   name?: string;
   data?: { rawName?: string | null; path?: string[]; rawPath?: (string | null)[] };
+}
+
+interface QuerySource {
+  run: number;
+  panelQuery: number;
+}
+
+interface SeriesQueryRef {
+  originalSeriesName?: string;
+  _queryIndex?: number;
+  _panelQueryIndex?: number;
+}
+
+interface BreakdownField {
+  alias?: string;
+  isDerived?: boolean;
+}
+
+interface SqlColumnRef {
+  type?: string;
+  table?: string | null;
+  column?: string | { expr?: { value?: string } };
+}
+
+interface SqlSelectColumn {
+  as?: string | null;
+  expr?: SqlColumnRef;
 }
 
 export function usePanelDrilldown({
@@ -332,15 +359,28 @@ export function usePanelDrilldown({
     return offSetValues;
   };
 
-  const getOriginalQueryAndStream = (queryDetails: any, metadata: any) => {
-    const originalQuery = metadata?.value?.queries[0]?.query;
-    const streamName = queryDetails?.queries[0]?.fields?.stream;
+  const getOriginalQueryAndStream = (
+    queryDetails: any,
+    metadata: any,
+    source: QuerySource = { run: 0, panelQuery: 0 },
+  ) => {
+    const originalQuery = metadata?.value?.queries[source.run]?.query;
+    const streamName = queryDetails?.queries[source.panelQuery]?.fields?.stream;
+    const streamType = queryDetails?.queries[source.panelQuery]?.fields?.stream_type;
 
     if (!originalQuery || !streamName) {
       return null;
     }
 
-    return { originalQuery, streamName };
+    return { originalQuery, streamName, streamType };
+  };
+
+  // A merged multi-query series names its run and panel query; trust them only when they agree.
+  const seriesQuerySource = (series: SeriesQueryRef | undefined): QuerySource | null => {
+    const run = series?._queryIndex ?? 0;
+    const panelQuery = series?._panelQueryIndex ?? 0;
+    const runPanelQuery = metadata?.value?.queries?.[run]?.panelQueryIndex ?? run;
+    return runPanelQuery === panelQuery ? { run, panelQuery } : null;
   };
 
   const calculateTimeRange = async (
@@ -371,17 +411,38 @@ export function usePanelDrilldown({
     }
   };
 
-  const buildWhereClause = (
-    ast: any,
-    breakdownColumn?: string,
-    breakdownValue?: string,
-  ): string => {
+  // Charts that fold NULL into the blank group draw it from both kinds of rows.
+  const breakdownFilter = (column: string, value: string, nullIsBlank: boolean): string => {
+    if (value === NULL_BREAKDOWN_VALUE) return `${column} IS NULL`;
+    if (value === "")
+      return nullIsBlank ? `(${column} = '' OR ${column} IS NULL)` : `${column} = ''`;
+    return `${column} = '${escapeSingleQuotes(String(value))}'`;
+  };
+
+  const columnRefName = (ref: SqlColumnRef | undefined): string | undefined =>
+    typeof ref?.column === "string" ? ref.column : ref?.column?.expr?.value;
+
+  // The breakdown alias names a query output; only one that is a bare stream column can be filtered.
+  const breakdownSourceColumn = (
+    columns: SqlSelectColumn[] | undefined,
+    field: BreakdownField | undefined,
+  ): string | undefined => {
+    if (!field?.alias || field.isDerived) return undefined;
+    const selected = (columns ?? []).find(
+      (column) => (column?.as ?? columnRefName(column?.expr)) === field.alias,
+    );
+    if (selected?.expr?.type !== "column_ref") return undefined;
+    const name = columnRefName(selected.expr);
+    if (!name) return undefined;
+    return selected.expr.table ? `${selected.expr.table}.${name}` : name;
+  };
+
+  const buildWhereClause = (ast: any, breakdownCondition?: string): string => {
     let whereClause = ast?.where
       ? parser.sqlify({ type: "select", where: ast.where }).slice("SELECT".length)
       : "";
 
-    if (breakdownColumn && breakdownValue) {
-      const breakdownCondition = `${breakdownColumn} = '${escapeSingleQuotes(String(breakdownValue))}'`;
+    if (breakdownCondition) {
       whereClause += whereClause ? ` AND ${breakdownCondition}` : ` WHERE ${breakdownCondition}`;
     }
 
@@ -539,11 +600,11 @@ export function usePanelDrilldown({
     streamName: string,
     calculatedTimeRange: { startTime: number; endTime: number },
     encodedQuery: string,
-    queryDetails: any,
+    streamType: string,
     currentUrl: string,
   ) => {
     const logsUrl = new URL(currentUrl + "/logs");
-    logsUrl.searchParams.set("stream_type", queryDetails.queries[0]?.fields?.stream_type);
+    logsUrl.searchParams.set("stream_type", streamType);
     logsUrl.searchParams.set("stream", streamName);
     logsUrl.searchParams.set("from", calculatedTimeRange.startTime.toString());
     logsUrl.searchParams.set("to", calculatedTimeRange.endTime.toString());
@@ -936,8 +997,12 @@ export function usePanelDrilldown({
           return;
         }
 
-        const { originalQuery, streamName } =
-          getOriginalQueryAndStream(queryDetails, metadata) || {};
+        const seriesIndex = drilldownParams[0]?.seriesIndex;
+        const clickedSeries: SeriesQueryRef | undefined =
+          seriesIndex !== undefined ? panelData.value?.options?.series?.[seriesIndex] : undefined;
+        const querySource = seriesQuerySource(clickedSeries);
+        const { originalQuery, streamName, streamType } =
+          getOriginalQueryAndStream(queryDetails, metadata, querySource ?? undefined) || {};
         if (!originalQuery || !streamName) return;
 
         const isHeatmap = panelSchema.value.type === "heatmap";
@@ -981,26 +1046,30 @@ export function usePanelDrilldown({
 
           const aliasClause = tableAliases?.length ? ` AS ${tableAliases.join(", ")}` : "";
 
+          // A series is filtered by its own query's breakdown, which it may lack.
+          const seriesBreakdown = querySource
+            ? (queryDetails.queries[querySource.panelQuery]?.fields?.breakdown ?? [])
+            : [];
           // A host map cell is one entity, so the logs are filtered to it by its entity column.
           const breakdownColumn = cell
             ? hostmapEntityColumn(queryDetails)
-            : segment && breakdown[0]
-              ? stateTimelineBreakdownColumn(breakdown[0])
-              : breakdown[0]?.column;
-
-          const seriesIndex = drilldownParams[0]?.seriesIndex;
-          const breakdownSeriesName =
-            seriesIndex !== undefined ? panelData.value.options.series[seriesIndex] : undefined;
+            : breakdownSourceColumn(ast.columns, segment ? breakdown[0] : seriesBreakdown[0]);
           const uniqueSeriesName = cell
             ? cell.__name
             : segment
               ? segment.__name
-              : breakdownSeriesName
-                ? breakdownSeriesName.originalSeriesName
+              : clickedSeries
+                ? clickedSeries.originalSeriesName
                 : drilldownParams[0]?.seriesName;
           const breakdownValue = uniqueSeriesName;
+          const isOthersBucket = breakdownValue === OTHERS_BREAKDOWN_VALUE;
 
-          const whereClause = buildWhereClause(ast, breakdownColumn, breakdownValue);
+          const whereClause = buildWhereClause(
+            ast,
+            breakdownColumn && breakdownValue !== undefined && !isOthersBucket
+              ? breakdownFilter(breakdownColumn, breakdownValue, !!(segment || cell))
+              : undefined,
+          );
 
           modifiedQuery = `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`;
         } else if (drilldownData.data.logsMode === "auto" && isPromQLQuery) {
@@ -1097,7 +1166,7 @@ export function usePanelDrilldown({
           streamName,
           calculatedTimeRange,
           encodedQuery,
-          queryDetails,
+          streamType,
           currentUrl,
         );
 

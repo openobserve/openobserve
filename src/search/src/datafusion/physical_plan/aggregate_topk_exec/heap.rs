@@ -25,7 +25,7 @@ use arrow::{
     array::{ArrayRef, RecordBatch},
     compute::{SortOptions, interleave_record_batch},
     datatypes::SchemaRef,
-    row::{RowConverter, SortField},
+    row::{RowConverter, Rows, SortField},
 };
 use datafusion::{
     common::{Result, internal_err},
@@ -179,7 +179,7 @@ impl TopKHeapStream {
         })
     }
 
-    fn convert_sort_column(&mut self, array: &ArrayRef) -> Result<arrow::row::Rows> {
+    fn convert_sort_column(&mut self, array: &ArrayRef) -> Result<Rows> {
         // Direct conversion - simpler and avoids persistent memory
         Ok(self
             .row_converter
@@ -299,10 +299,14 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::{
-        array::{Array, Int64Array, StringArray},
-        datatypes::{Field, Schema},
+        array::{
+            Array, BooleanArray, Float32Array, Int32Array, Int64Array, StringArray,
+            TimestampMillisecondArray,
+        },
+        datatypes::{DataType, Field, Schema, TimeUnit},
         util::pretty::pretty_format_batches,
     };
+    use datafusion::{common::DataFusionError, physical_plan::stream::RecordBatchStreamAdapter};
 
     use super::*;
 
@@ -346,8 +350,8 @@ mod tests {
     async fn test_cache_topk_stream_descending() {
         // Create schema with name and count columns
         let schema = Arc::new(Schema::new(vec![
-            Field::new("name", arrow::datatypes::DataType::Utf8, false),
-            Field::new("count", arrow::datatypes::DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("count", DataType::Int64, false),
         ]));
 
         // Create test data with multiple batches
@@ -427,8 +431,8 @@ mod tests {
     async fn test_cache_topk_stream_ascending() {
         // Create schema
         let schema = Arc::new(Schema::new(vec![
-            Field::new("name", arrow::datatypes::DataType::Utf8, false),
-            Field::new("value", arrow::datatypes::DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("value", DataType::Int64, false),
         ]));
 
         // Create test data
@@ -497,8 +501,8 @@ mod tests {
     async fn test_cache_topk_stream_limit() {
         // Create schema
         let schema = Arc::new(Schema::new(vec![
-            Field::new("id", arrow::datatypes::DataType::Utf8, false),
-            Field::new("score", arrow::datatypes::DataType::Int64, false),
+            Field::new("id", DataType::Utf8, false),
+            Field::new("score", DataType::Int64, false),
         ]));
 
         // Create test data with more items than limit
@@ -567,24 +571,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_complex_schema_final_row_construction() {
-        use arrow::array::{BooleanArray, Float32Array, Int32Array, TimestampMillisecondArray};
-
         // Test with a very complex schema including different data types
         let schema = Arc::new(Schema::new(vec![
-            Field::new("user_name", arrow::datatypes::DataType::Utf8, false),
-            Field::new("is_premium", arrow::datatypes::DataType::Boolean, false),
-            Field::new("score", arrow::datatypes::DataType::Float32, false),
-            Field::new("rank", arrow::datatypes::DataType::Int64, false),
-            Field::new("session_id", arrow::datatypes::DataType::Int32, false),
+            Field::new("user_name", DataType::Utf8, false),
+            Field::new("is_premium", DataType::Boolean, false),
+            Field::new("score", DataType::Float32, false),
+            Field::new("rank", DataType::Int64, false),
+            Field::new("session_id", DataType::Int32, false),
             Field::new(
                 "timestamp",
-                arrow::datatypes::DataType::Timestamp(
-                    arrow::datatypes::TimeUnit::Millisecond,
-                    None,
-                ),
+                DataType::Timestamp(TimeUnit::Millisecond, None),
                 false,
             ),
-            Field::new("region", arrow::datatypes::DataType::Utf8, true),
+            Field::new("region", DataType::Utf8, true),
         ]));
 
         // Create batches with mixed data types
@@ -720,8 +719,8 @@ mod tests {
         // Test with many batches where we have more batches than the limit
         // This forces the registry to manage entries across different batches
         let schema = Arc::new(Schema::new(vec![
-            Field::new("batch_name", arrow::datatypes::DataType::Utf8, false),
-            Field::new("value", arrow::datatypes::DataType::Int64, false),
+            Field::new("batch_name", DataType::Utf8, false),
+            Field::new("value", DataType::Int64, false),
         ]));
 
         // Create 6 batches, each with 1 row, but limit to only 3 results
@@ -793,8 +792,8 @@ mod tests {
     #[tokio::test]
     async fn test_input_error_is_propagated() {
         let schema = Arc::new(Schema::new(vec![
-            Field::new("name", arrow::datatypes::DataType::Utf8, false),
-            Field::new("count", arrow::datatypes::DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("count", DataType::Int64, false),
         ]));
         let batch = RecordBatch::try_new(
             schema.clone(),
@@ -806,13 +805,10 @@ mod tests {
         .unwrap();
         let input = futures::stream::iter(vec![
             Ok(batch),
-            Err(datafusion::common::DataFusionError::Execution(
-                "cast failed".to_string(),
-            )),
+            Err(DataFusionError::Execution("cast failed".to_string())),
         ]);
-        let stream: SendableRecordBatchStream = Box::pin(
-            datafusion::physical_plan::stream::RecordBatchStreamAdapter::new(schema.clone(), input),
-        );
+        let stream: SendableRecordBatchStream =
+            Box::pin(RecordBatchStreamAdapter::new(schema.clone(), input));
 
         let mut topk_stream =
             TopKHeapStream::new(schema, stream, "count".to_string(), true, 5).unwrap();
@@ -831,7 +827,7 @@ mod tests {
     async fn test_missing_sort_field_is_error() {
         let schema = Arc::new(Schema::new(vec![Field::new(
             "count",
-            arrow::datatypes::DataType::Int64,
+            DataType::Int64,
             false,
         )]));
         let stream: SendableRecordBatchStream =

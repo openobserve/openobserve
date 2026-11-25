@@ -590,6 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @region-join-update="handleRegionJoinUpdate"
         @sankey-notice-update="handleSankeyNoticeUpdate"
         @treemap-notice-update="handleTreemapNoticeUpdate"
+        @funnel-notice-update="handleFunnelNoticeUpdate"
         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -1028,6 +1029,7 @@ export default defineComponent({
       seriesLimit,
       sankeyNotice,
       treemapNotice,
+      funnelNotice,
       maxQueryRangeWarning,
       noticeProps,
       handleResultMetadataUpdate,
@@ -1036,6 +1038,7 @@ export default defineComponent({
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
       handleTreemapNoticeUpdate,
+      handleFunnelNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
@@ -1127,6 +1130,9 @@ export default defineComponent({
         !!sankeyNotice.value?.returnLinks ||
         !!sankeyNotice.value?.skippedRows ||
         !!treemapNotice.value?.skippedRows ||
+        !!treemapNotice.value?.ignoredQueries ||
+        !!funnelNotice.value?.skippedRows ||
+        !!funnelNotice.value?.ignoredQueries ||
         !!panelDiagnostics.value?.serverPartial ||
         injectedPartial.value ||
         !!panelDiagnostics.value?.functionErrors?.length ||
@@ -1322,6 +1328,7 @@ export default defineComponent({
           panelData,
           route.query.folder ?? "default",
           route.query.tab ?? data.panels[0]?.tabId,
+          { variableNames: [], newPanelId: panelId, sourcePanelId: data.id },
         );
 
         // Show a success notification.
@@ -1703,6 +1710,7 @@ export default defineComponent({
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
       handleTreemapNoticeUpdate,
+      handleFunnelNoticeUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
       panelNoticeProps,

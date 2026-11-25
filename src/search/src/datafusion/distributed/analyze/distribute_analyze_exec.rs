@@ -272,7 +272,7 @@ mod tests {
 
     use arrow::array::Array;
     use arrow_schema::{DataType, Field, Schema};
-    use datafusion::physical_plan::empty::EmptyExec;
+    use datafusion::physical_plan::{collect, empty::EmptyExec};
 
     use super::*;
 
@@ -321,7 +321,7 @@ mod tests {
             false,
             empty_input(),
         ));
-        let batches = datafusion::physical_plan::collect(exec, Arc::new(TaskContext::default()))
+        let batches = collect(exec, Arc::new(TaskContext::default()))
             .await
             .unwrap();
         assert_eq!(batches[0].num_columns(), 4);
@@ -335,7 +335,7 @@ mod tests {
             false,
             empty_input(),
         ));
-        let batches = datafusion::physical_plan::collect(exec, Arc::new(TaskContext::default()))
+        let batches = collect(exec, Arc::new(TaskContext::default()))
             .await
             .unwrap();
         let names = batches[0]
@@ -352,7 +352,7 @@ mod tests {
     #[tokio::test]
     async fn test_distribute_analyze_exec_emits_profile_on_first_row() {
         let exec = Arc::new(DistributeAnalyzeExec::new(true, false, true, empty_input()));
-        let batches = datafusion::physical_plan::collect(exec, Arc::new(TaskContext::default()))
+        let batches = collect(exec, Arc::new(TaskContext::default()))
             .await
             .unwrap();
         let profile = batches[0]

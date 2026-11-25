@@ -163,7 +163,12 @@ const controlAttrs = computed(() => split.value.controlAttrs);
 const isFilter = computed(() => props.variant === "filter");
 // Only a labelled filter has an "Any" to reset to; an unlabelled one always holds a pick.
 const isClearable = computed(() => props.clearable ?? (isFilter.value && !!props.label));
-const insideLabelName = computed(() => (isFilter.value && props.label ? props.label : undefined));
+// An unlabelled trigger still needs an accessible name; the placeholder is the closest one.
+const insideLabelName = computed(() => {
+  if (props.label) return isFilter.value ? props.label : undefined;
+  if ($attrs["aria-label"] || $attrs["aria-labelledby"]) return undefined;
+  return props.placeholder || undefined;
+});
 onMounted(() =>
   warnIfUnlabelled(
     "OSelect",

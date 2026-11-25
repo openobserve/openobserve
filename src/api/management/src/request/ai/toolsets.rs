@@ -23,7 +23,7 @@ use config::utils::time::now_micros;
 use infra::table::org_ai_toolsets::OrgToolset;
 use o2_enterprise::enterprise::ai::toolsets::{
     ToolsetCreateRequest, ToolsetKind, ToolsetListResponse, ToolsetResponse, ToolsetUpdateRequest,
-    validate_data,
+    restore_redacted_data, validate_data,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{UserEmail, check_permissions};
@@ -45,7 +45,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         ("org_id" = String, Path, description = "Organization name"),
     ),
     summary = "Create an AI toolset",
-    description = "Creates a new AI toolset (MCP server, CLI tool, skill, or generic config). \
+    description = "Creates a new AI toolset (MCP server, skill, or generic config). \
                    The `data` field is encrypted at rest using per-org envelope encryption. \
                    Only available in enterprise deployments.",
     request_body(
@@ -159,7 +159,7 @@ pub async fn get(
 pub struct ListQuery {
     /// Substring filter on the toolset name (case-insensitive `LIKE '%val%'`).
     pub name: Option<String>,
-    /// Exact filter on the toolset kind (`mcp`, `cli`, `skill`, `generic`).
+    /// Exact filter on the toolset kind (`mcp`, `skill`, `generic`).
     pub kind: Option<String>,
     /// Maximum number of results to return; a negative value is rejected with 400.
     pub limit: Option<u64>,
@@ -176,7 +176,7 @@ pub struct ListQuery {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("name"   = Option<String>, Query, description = "Substring filter on name (case-insensitive)"),
-        ("kind"   = Option<String>, Query, description = "Exact filter on kind: mcp | cli | skill | generic"),
+        ("kind"   = Option<String>, Query, description = "Exact filter on kind: mcp | skill | generic"),
         ("limit"  = Option<u64>,   Query, description = "Maximum number of results"),
     ),
     security(("Authorization" = [])),
@@ -223,7 +223,8 @@ pub async fn list(
     operation_id = "UpdateAiToolset",
     summary = "Update an AI toolset",
     description = "Updates the description and/or data of an existing AI toolset. \
-                   When `data` is provided it fully replaces the existing config. \
+                   When `data` is provided it fully replaces the existing config, except that \
+                   a secret value sent back as `***` keeps its stored value. \
                    Only available in enterprise deployments.",
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -262,11 +263,21 @@ pub async fn update(
         return MetaHttpResponse::bad_request(e);
     }
 
-    let data_str = body
-        .data
-        .as_ref()
-        .map(|v| serde_json::to_string(v).unwrap())
-        .or_else(|| existing.data.clone());
+    let data_str = match body.data {
+        Some(mut data) => {
+            let kind = existing
+                .kind
+                .parse::<ToolsetKind>()
+                .unwrap_or(ToolsetKind::Generic);
+            let stored = existing
+                .data
+                .as_deref()
+                .and_then(|s| serde_json::from_str(s).ok());
+            restore_redacted_data(kind, &mut data, stored.as_ref());
+            Some(serde_json::to_string(&data).unwrap())
+        }
+        None => existing.data.clone(),
+    };
 
     let updated = OrgToolset {
         id: existing.id.clone(),

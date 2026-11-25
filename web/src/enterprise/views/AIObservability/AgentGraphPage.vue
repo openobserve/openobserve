@@ -108,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="layoutType"
               :options="layoutOptions"
               :searchable="false"
+              :aria-label="t('traces.serviceGraph.layout')"
               data-test="agent-graph-layout-type"
               class="w-30"
               :disabled="vizType === 'graph'"

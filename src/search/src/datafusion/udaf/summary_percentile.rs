@@ -86,7 +86,7 @@ impl AggregateUDFImpl for SummaryPercentile {
         SUMMARY_PERCENTILE
     }
 
-    fn signature(&self) -> &datafusion::logical_expr::Signature {
+    fn signature(&self) -> &Signature {
         &self.0
     }
 
@@ -430,6 +430,7 @@ mod test {
         common::cast::{as_float64_array, as_uint32_array},
         datasource::MemTable,
         logical_expr::{Accumulator, AggregateUDF},
+        physical_expr::expressions::Literal,
         prelude::SessionContext,
     };
 
@@ -483,8 +484,8 @@ mod test {
         let values: Vec<_> = VALUES.into_iter().map(|v| v as f64).collect();
         let counts: Vec<_> = COUNTS.into_iter().map(|v| v as i64).collect();
         // Convert values to arrayref
-        let values: ArrayRef = Arc::new(arrow::array::Float64Array::from(values));
-        let counts: ArrayRef = Arc::new(arrow::array::Int64Array::from(counts));
+        let values: ArrayRef = Arc::new(Float64Array::from(values));
+        let counts: ArrayRef = Arc::new(Int64Array::from(counts));
         acc.update_batch(&[values, counts]).unwrap();
 
         // Check the result
@@ -558,37 +559,27 @@ mod test {
     #[test]
     fn test_validate_input_percentile_expr_valid() {
         // Test valid float64 percentile
-        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
-            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Float64(Some(0.5))),
-        );
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Float64(Some(0.5))));
         let result = validate_input_percentile_expr(&expr).unwrap();
         assert_eq!(result, 0.5);
 
         // Test valid float32 percentile
-        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
-            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Float32(Some(0.75))),
-        );
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Float32(Some(0.75))));
         let result = validate_input_percentile_expr(&expr).unwrap();
         assert_eq!(result, 0.75);
 
         // Test boundary values
-        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
-            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Float64(Some(0.0))),
-        );
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Float64(Some(0.0))));
         assert!(validate_input_percentile_expr(&expr).is_ok());
 
-        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
-            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Float64(Some(1.0))),
-        );
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Float64(Some(1.0))));
         assert!(validate_input_percentile_expr(&expr).is_ok());
     }
 
     #[test]
     fn test_validate_input_percentile_expr_invalid() {
         // Test invalid percentile > 1.0
-        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
-            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Float64(Some(1.5))),
-        );
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Float64(Some(1.5))));
         let result = validate_input_percentile_expr(&expr);
         assert!(result.is_err());
         assert!(
@@ -599,9 +590,7 @@ mod test {
         );
 
         // Test invalid percentile < 0.0
-        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
-            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Float64(Some(-0.1))),
-        );
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Float64(Some(-0.1))));
         let result = validate_input_percentile_expr(&expr);
         assert!(result.is_err());
         assert!(
@@ -612,9 +601,7 @@ mod test {
         );
 
         // Test invalid data type
-        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
-            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Int32(Some(1))),
-        );
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Int32(Some(1))));
         let result = validate_input_percentile_expr(&expr);
         assert!(result.is_err());
         assert!(

@@ -42,13 +42,23 @@ const _fallbackId = useId();
 const textareaId = computed(() => props.id ?? _fallbackId);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 
-onMounted(() =>
+// A placeholder vanishes once the user types, so an otherwise unlabelled field keeps it as its name.
+const externallyLabelled = ref(false);
+const fallbackName = computed(() =>
+  props.label || externallyLabelled.value || $attrs["aria-label"] || $attrs["aria-labelledby"]
+    ? undefined
+    : props.placeholder || undefined,
+);
+onMounted(() => {
+  externallyLabelled.value = Array.from(document.getElementsByTagName("label")).some(
+    (label) => label.htmlFor === textareaId.value,
+  );
   warnIfUnlabelled(
     "OTextarea",
     Boolean(props.label || props.placeholder || $attrs["aria-label"] || $attrs["aria-labelledby"]),
     textareaId.value,
-  ),
-);
+  );
+});
 
 // ── Error state ────────────────────────────────────────────────────────────
 // Error is only shown when `props.error` is true. A static `errorMessage`
@@ -154,6 +164,7 @@ const wrapperClasses = computed(() => [
     <!-- Textarea wrapper -->
     <div :class="[wrapperClasses, fill && 'min-h-0 flex-1']">
       <textarea
+        :aria-label="fallbackName"
         v-bind="controlAttrs"
         :id="textareaId"
         ref="textareaRef"

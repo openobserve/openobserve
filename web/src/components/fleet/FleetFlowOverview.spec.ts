@@ -196,33 +196,36 @@ afterEach(() => {
 });
 
 describe("FleetFlowOverview map", () => {
-  it("draws the three columns fleet, receiver, destination", async () => {
+  it("draws fleets straight to destinations, with no receiver column between them", async () => {
     serve(basePipelines());
     await mountOverview();
-    const columns = ["f:", "r:", "d:"].map((prefix) =>
+    const columns = ["f:", "d:"].map((prefix) =>
       nodes()
         .filter((n) => n.id.startsWith(prefix))
         .map((n) => n.id),
     );
     expect(columns).toEqual([
       ["f:prod", "f:edge"],
-      ["r:prod|filelog", "r:prod|hostmetrics", "r:edge|otlp"],
       [`d:${D1.id}`, `d:${D2.id}`],
     ]);
+    expect(nodes().some((n) => n.id.startsWith("r:"))).toBe(false);
     const x = (id: string) => nodes().find((n) => n.id === id).position.x;
-    expect(x("f:prod")).toBeLessThan(x("r:prod|filelog"));
-    expect(x("r:prod|filelog")).toBeLessThan(x(`d:${D1.id}`));
+    expect(x("f:prod")).toBeLessThan(x(`d:${D1.id}`));
   });
 
-  it("colours edges by signal and sizes them by rate, never by severity", async () => {
+  it("draws one line per fleet and destination, sized by rate, never by signal or severity", async () => {
     serve(basePipelines());
     await mountOverview();
-    const metrics = edge(`rd:prod|hostmetrics|${D1.id}|metrics`).data;
-    const logs = edge(`rd:prod|filelog|${D1.id}|logs`).data;
-    expect(metrics.signal).toBe("metrics");
-    expect(logs.signal).toBe("logs");
-    expect(metrics.width).toBeGreaterThan(logs.width);
-    expect(Object.keys(logs)).not.toContain("severity");
+    expect(
+      edges()
+        .filter((e) => !e.data.branch)
+        .map((e) => e.id),
+    ).toEqual([`fd:prod|${D1.id}`, `fd:prod|${D2.id}`, `fd:edge|${D1.id}`]);
+    const busy = edge(`fd:prod|${D1.id}`).data;
+    const quiet = edge(`fd:prod|${D2.id}`).data;
+    expect(busy.width).toBeGreaterThan(quiet.width);
+    expect(Object.keys(busy)).not.toContain("signal");
+    expect(Object.keys(busy)).not.toContain("severity");
   });
 
   it("lets zoom-out and fit reach a map far taller than the canvas", async () => {
@@ -236,14 +239,9 @@ describe("FleetFlowOverview map", () => {
     expect(wrapper.findComponent(VueFlowStub).attributes("zoom-on-scroll")).not.toBe("false");
   });
 
-  it("marks each signal filter with the colour its lines are drawn in", async () => {
+  it("offers no signal filter", async () => {
     await mountOverview();
-    const dot = (signal: string) =>
-      wrapper.find(`[data-test="fleet-flow-overview-telemetry-dot-${signal}"]`);
-    expect(dot("logs").classes()).toContain("bg-signal-logs");
-    expect(dot("metrics").classes()).toContain("bg-signal-metrics");
-    expect(dot("traces").classes()).toContain("bg-signal-traces");
-    expect(dot("all").exists()).toBe(false);
+    expect(wrapper.find('[data-test="fleet-flow-overview-telemetry"]').exists()).toBe(false);
   });
 
   it("branches the failing destination off with a dashed send-failed line and rings it", async () => {
@@ -273,11 +271,20 @@ describe("FleetFlowOverview map", () => {
     ).toContain("prod/logs-export_errors");
   });
 
-  it("opens a pipeline from its edge and a fleet from its node", async () => {
+  it("opens a route from its line, lighting only that line, and a fleet from its node", async () => {
     serve(basePipelines());
     await mountOverview();
-    await clickEdge("fr:prod|hostmetrics|metrics");
-    expect(details().props("title")).toBe("prod · metrics");
+    await clickEdge(`fd:prod|${D1.id}`);
+    expect(details().props("title")).toBe("prod → o2.acme.io");
+    expect(details().props("fleetId")).toBe("prod");
+    expect(details().props("hideConfig")).toBe(false);
+    expect(
+      details()
+        .props("issues")
+        .map((i: any) => i.id),
+    ).toContain("prod/logs-export_errors");
+    expect(edge(`fd:prod|${D1.id}`).data).toMatchObject({ highlighted: true, dimmed: false });
+    expect(edge(`fd:prod|${D2.id}`).data).toMatchObject({ highlighted: false, dimmed: true });
     await clickNode("f:edge");
     expect(details().props("title")).toBe("edge");
     expect(nodes().find((n) => n.id === "f:edge").data.selected).toBe(true);
@@ -419,16 +426,12 @@ describe("FleetFlowOverview window and states", () => {
     expect(analytics.track).toHaveBeenCalledWith("fleet_flow_window_changed", { window: "5m" });
   });
 
-  it("tracks a signal filter and a details card opened, but not one closed", async () => {
+  it("tracks a details card opened, but not one closed", async () => {
     serve(basePipelines());
     await mountOverview();
     vi.mocked(analytics.track).mockClear();
-    wrapper
-      .findComponent<any>('[data-test="fleet-flow-overview-telemetry"]')
-      .vm.$emit("update:model-value", "logs");
     await clickNode(`d:${D1.id}`);
     await clickNode(`d:${D1.id}`);
-    expect(analytics.track).toHaveBeenCalledWith("fleet_flow_signal_changed", { signal: "logs" });
     expect(analytics.track).toHaveBeenCalledWith("fleet_flow_detail_opened", { kind: "node" });
     expect(
       vi.mocked(analytics.track).mock.calls.filter(([e]) => e === "fleet_flow_detail_opened"),

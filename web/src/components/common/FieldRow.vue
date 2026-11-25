@@ -20,7 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
     :data-test="`logs-field-list-item-${field.name}`"
     class="ps-6"
-    :highlight="isFieldSelected && field.name !== timestampColumn"
+    :highlight="isFieldSelected && field.name !== timestampColumn && !grouped"
+    :class="{ 'bg-accent/10!': grouped }"
   >
     <OFieldLabel :field="field" :show-type-icon="false" />
     <OButton
@@ -78,6 +79,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="visibility-off" size="sm" />
       </OButton>
       <OButton
+        v-if="showGroupBy && field.isSchemaField"
+        icon-only
+        :aria-label="t('search.groupByThisField')"
+        :title="t('search.groupByThisField')"
+        variant="ghost"
+        size="xs"
+        class="gap-0!"
+        :data-test="`log-search-index-list-group-by-${field.name}-field-btn`"
+        @click.stop="$emit('group-by', field.name)"
+      >
+        <OIcon name="group-work" size="sm" />
+      </OButton>
+      <OButton
         v-if="showQuickMode && isInterestingCandidate && field.name !== timestampColumn"
         icon-only
         :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
@@ -117,11 +131,15 @@ interface Props {
   showQuickMode: boolean;
   showVisibilityToggle?: boolean;
   showFtsFieldValues?: boolean;
+  showGroupBy?: boolean;
+  grouped?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showVisibilityToggle: true,
   showFtsFieldValues: false,
+  showGroupBy: false,
+  grouped: false,
 });
 
 const { t } = useI18nTyped();
@@ -130,6 +148,7 @@ defineEmits<{
   "add-to-filter": [value: string];
   "toggle-field": [field: any];
   "toggle-interesting": [field: any, isInteresting: boolean];
+  "group-by": [fieldName: string];
 }>();
 
 const isFieldSelected = computed(() => props.selectedFields.includes(props.field.name));

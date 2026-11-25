@@ -115,6 +115,7 @@ const {
   atConditionLimit,
   valuesAtLimit,
   fieldEmptyText,
+  valueHint,
 } = editor;
 
 const hasFilters = computed(() => countConditions(props.modelValue) > 0);
@@ -198,7 +199,10 @@ const emptyText = computed(() => {
     if (fieldEmptyText.value) return fieldEmptyText.value;
     return props.fieldsLoading ? t("filterBar.loadingFields") : t("filterBar.noFields");
   }
-  if (step.value === "value") return valuesLoading.value ? undefined : t("filterBar.noValues");
+  if (step.value === "value") {
+    if (valueHint.value) return valueHint.value;
+    return valuesLoading.value ? undefined : t("filterBar.noValues");
+  }
   return t("filterBar.noOperators");
 });
 
@@ -248,6 +252,12 @@ function dismiss() {
   armedId.value = null;
   // A half-built chip would otherwise linger looking applied.
   editor.onEscape();
+}
+
+/** Focus left the bar, e.g. for Run query: a half-built chip is applied so the run uses it. */
+function onLeave() {
+  editor.commitPending();
+  close();
 }
 
 /** The user is done with the bar: empty groups go and the caret returns to the end. */
@@ -406,7 +416,7 @@ const draftOperator = computed(() => {
     @escape="onEscape"
     @dismiss="dismiss"
     @close="close"
-    @leave="close"
+    @leave="onLeave"
     @activate="onActivate"
   >
     <template #default="{ caret }">

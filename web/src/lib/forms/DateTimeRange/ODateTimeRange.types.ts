@@ -45,6 +45,8 @@ export interface DateTimeRangeProps {
   /** Keeps zone changes local to this picker instead of writing the app's timezone. */
   pickerTimezone?: string;
   hideClipboard?: boolean;
+  /** Hides the typed range bar; `hideClipboard` and a date-only picker hide it too. */
+  hideRangeInput?: boolean;
   hideRangeShift?: boolean;
   disablePrevShift?: boolean;
   /** First pickable day (`yyyy/MM/dd`), date-only pickers. */

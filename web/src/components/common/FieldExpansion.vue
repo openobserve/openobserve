@@ -23,7 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #trigger>
       <OFieldRow
         :data-test="`log-search-expand-${field.name}-field-btn`"
-        :highlight="isFieldSelected"
+        :highlight="isFieldSelected && !grouped"
+        :class="{ 'bg-accent/10!': grouped }"
       >
         <OFieldLabel
           :field="field"
@@ -83,6 +84,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop="$emit('toggle-field', field)"
           >
             <OIcon name="visibility-off" size="sm" />
+          </OButton>
+          <OButton
+            v-if="showGroupBy && field.isSchemaField"
+            icon-only
+            :aria-label="t('search.groupByThisField')"
+            :title="t('search.groupByThisField')"
+            variant="ghost"
+            size="xs"
+            class="gap-0!"
+            :data-test="`log-search-index-list-group-by-${field.name}-field-btn`"
+            @click.stop="$emit('group-by', field.name)"
+          >
+            <OIcon name="group-work" size="sm" />
           </OButton>
           <OButton
             v-if="showQuickMode && isInterestingCandidate"
@@ -159,6 +173,8 @@ interface Props {
   showVisibilityToggle?: boolean;
   showFilterIcon?: boolean;
   showQuickMode?: boolean;
+  showGroupBy?: boolean;
+  grouped?: boolean;
   valueMapper?: (values: { key: string; count: number }[]) => {
     key: string;
     count: number;
@@ -177,6 +193,8 @@ const props = withDefaults(defineProps<Props>(), {
   showVisibilityToggle: true,
   showFilterIcon: true,
   showQuickMode: false,
+  showGroupBy: false,
+  grouped: false,
   fieldValues: undefined,
   valueMapper: undefined,
 });
@@ -192,6 +210,7 @@ const emit = defineEmits<{
   "load-more-values": [fieldName: string];
   "before-show": [event: any, field: any];
   "before-hide": [field: any];
+  "group-by": [fieldName: string];
 }>();
 
 const isExpanded = ref(props.expanded ?? false);

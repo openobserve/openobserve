@@ -19,9 +19,6 @@ const { ingestOtlpTraces, deleteStream, stringAttr } = require('../utils/traces-
 
 const SERVICE_GRAPH_WAIT_MS = SERVICE_GRAPH_READY_FLOOR_MS + 120000;
 
-const EMPTY_TOPOLOGY_MESSAGE =
-  `Service graph topology is still empty ${SERVICE_GRAPH_WAIT_MS / 60000} minutes after ingesting traces: the service-graph jobs are not producing data on this environment (check O2_SERVICE_GRAPH_ENABLED).`;
-
 // Same scale as the node border, catalog row and side panel: Healthy < 1%, Degraded 1-5%, Warning >5-10%, Critical > 10%.
 const expectedHealth = (errorRate) => {
   if (errorRate > 10) return 'critical';
@@ -35,10 +32,11 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
   let pm;
   let topologyEmpty = false;
+  let topologyEmptyReason = 'the edge wait succeeded but the node check returned 0 (an API error also reads as 0)';
 
   test.beforeAll(async ({ browser }, testInfo) => {
     test.setTimeout(SERVICE_GRAPH_WAIT_MS + 180000);
-    // Every retry starts a new worker; this marker stops each one from repeating the full wait for a graph that never fills.
+    // Every failed test or retry starts a new worker; this marker stops each one from repeating the full wait for a graph that has not filled.
     const emptyTopologyMarker = path.join(testInfo.project.outputDir, 'service-graph-empty-topology.marker');
     const context = await browser.newContext({
       storageState: 'playwright-tests/utils/auth/user.json',
@@ -47,8 +45,9 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
     try {
       if (fs.existsSync(emptyTopologyMarker)) {
-        testLogger.info('=== SERVICE GRAPH SETUP: an earlier worker found no topology; checking once ===');
+        testLogger.info('=== SERVICE GRAPH SETUP: an earlier wait timed out; checking once ===');
         topologyEmpty = (await countTopologyNodes(page)) === 0;
+        topologyEmptyReason = `an earlier wait timed out: ${fs.readFileSync(emptyTopologyMarker, 'utf8')}; one more node check returned 0 (an API error also reads as 0)`;
         return;
       }
 
@@ -78,14 +77,13 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
         await new Promise(resolve => setTimeout(resolve, 30000));
       } else {
         testLogger.warn(`Service graph data may be incomplete after ${waitResult.waitedMs}ms - continuing with available data`);
+        topologyEmptyReason = waitResult.reason;
+        fs.mkdirSync(testInfo.project.outputDir, { recursive: true });
+        fs.writeFileSync(emptyTopologyMarker, waitResult.reason);
       }
 
       // Verify topology data is available
       topologyEmpty = (await countTopologyNodes(page)) === 0;
-      if (topologyEmpty) {
-        fs.mkdirSync(testInfo.project.outputDir, { recursive: true });
-        fs.writeFileSync(emptyTopologyMarker, new Date().toISOString());
-      }
     } finally {
       await page.close();
       await context.close();
@@ -95,7 +93,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     // Failing here rather than in beforeAll keeps every test reported as failed instead of "did not run".
-    expect(topologyEmpty, EMPTY_TOPOLOGY_MESSAGE).toBe(false);
+    expect(topologyEmpty, `Service graph topology is empty: ${topologyEmptyReason}`).toBe(false);
     pm = new PageManager(page);
     await navigateToBase(page);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});

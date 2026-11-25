@@ -139,7 +139,7 @@ onUnmounted(() => {
     <button
       v-if="action"
       type="button"
-      data-test="o-toast-action-btn"
+      :data-test="action.dataTest ?? 'o-toast-action-btn'"
       class="text-toast-inverse-action hover:bg-toast-inverse-text/10 focus-visible:outline-focus-ring-accent rounded-chip text-compact shrink-0 cursor-pointer px-1.5 py-1 font-semibold whitespace-nowrap outline-none focus-visible:outline-2 focus-visible:outline-solid"
       @click.stop="handleActionClick"
     >

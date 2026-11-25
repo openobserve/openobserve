@@ -219,14 +219,14 @@ impl From<DashboardError> for Response {
         match value {
             DashboardError::InfraError(err) => MetaHttpResponse::internal_error(err),
             DashboardError::DashboardNotFound => MetaHttpResponse::not_found("Dashboard not found"),
-            DashboardError::UpdateMissingHash => MetaHttpResponse::internal_error(
-                "Request to update existing dashboard with missing or invalid hash value. BUG",
+            DashboardError::UpdateMissingHash => MetaHttpResponse::bad_request(
+                "Request to update existing dashboard with missing or invalid hash value",
             ),
             DashboardError::UpdateConflictingHash => MetaHttpResponse::conflict(
                 "Conflict: Failed to save due to concurrent changes. Please refresh the page after backing up your work to avoid losing changes.",
             ),
             DashboardError::PutMissingTitle => {
-                MetaHttpResponse::internal_error("Dashboard should have title")
+                MetaHttpResponse::bad_request("Dashboard should have title")
             }
             DashboardError::MoveMissingFolderParam => MetaHttpResponse::bad_request(
                 "Please specify from & to folder from dashboard movement",
@@ -237,9 +237,6 @@ impl From<DashboardError> for Response {
             }
             DashboardError::CreateDefaultFolder => {
                 MetaHttpResponse::internal_error("Error saving default folder")
-            }
-            DashboardError::DistinctValueError => {
-                MetaHttpResponse::internal_error("Error in updating distinct values")
             }
             DashboardError::MoveDashboardDeleteOld(dashb_id, folder_id, e) => {
                 MetaHttpResponse::internal_error(format!(

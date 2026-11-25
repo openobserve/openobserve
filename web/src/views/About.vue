@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="rounded-default px-page-edge h-full w-full pt-2.5 pb-2.5">
     <div class="h-full overflow-auto">
       <div class="flex flex-col gap-4">
+        <h1 class="sr-only">{{ t("menu.about") }}</h1>
         <!-- ── Hero Banner ─────────────────────────────────────────── -->
         <div class="bg-card-glass-bg rounded-default relative overflow-hidden p-4">
           <div class="relative z-1">

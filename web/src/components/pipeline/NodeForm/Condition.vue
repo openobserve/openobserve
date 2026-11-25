@@ -122,6 +122,7 @@ import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { sameConditionRule } from "@/utils/sameConditionRule";
 
 const { t } = useI18nTyped();
 
@@ -212,23 +213,15 @@ const importSqlParser = async () => {
 // Held for submit() and the cancel dirty-check.
 const builder = ref<any>(null);
 
-// The rule as the builder first renders it; the builder mounts in the drawer's portal, after this component.
-const originalConditionGroup = ref<any>(null);
-watch(
-  builder,
-  (mounted) => {
-    originalConditionGroup.value = JSON.parse(JSON.stringify(mounted?.conditionGroup ?? null));
-  },
-  { once: true },
+// The builder seeds from initialConditions, and mounts later inside the drawer's portal.
+const originalConditionGroup = ref<any>(
+  JSON.parse(JSON.stringify(initialConditions.value ?? null)),
 );
 // A rule that cannot be compared counts as changed, so the prompt errs on keeping the edit.
 const isRuleChanged = computed(() => {
   if (!builder.value) return false;
   try {
-    return (
-      JSON.stringify(originalConditionGroup.value) !==
-      JSON.stringify(builder.value.conditionGroup ?? null)
-    );
+    return !sameConditionRule(originalConditionGroup.value, builder.value.conditionGroup);
   } catch {
     return true;
   }

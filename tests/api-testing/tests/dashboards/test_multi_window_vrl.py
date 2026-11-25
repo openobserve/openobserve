@@ -479,6 +479,53 @@ class TestSearchMultiStreamVRL:
 
         logger.info("Multi-stream search (no VRL) returned 2 hit arrays as expected")
 
+    def test_search_multi_stream_without_search_type(self, create_session, base_url):
+        """Without search_type the endpoint must still return hits, not only progress and [[DONE]] (#17210)."""
+        session = create_session
+
+        end_time = int(time.time() * 1000000)
+        start_time = end_time - (60 * 60 * 1000000)
+
+        url = f"{base_url}api/{ORG_ID}/_search_multi_stream"
+        params = {"type": "logs", "use_cache": "false"}
+        payload = {
+            "sql": [
+                {
+                    "sql": f'SELECT count(_timestamp) as cnt FROM "{STREAM_NAME}"',
+                    "start_time": start_time,
+                    "end_time": end_time,
+                },
+                {
+                    "sql": f'SELECT count(_timestamp) as cnt FROM "{STREAM_NAME}"',
+                    "start_time": start_time - (60 * 60 * 1000000),
+                    "end_time": end_time - (60 * 60 * 1000000),
+                },
+            ],
+            "start_time": start_time,
+            "end_time": end_time,
+            "from": 0,
+            "size": -1,
+            "quick_mode": False,
+            "per_query_response": True,
+        }
+
+        resp = session.post(url, params=params, json=payload)
+
+        if resp.status_code == 400 and "not found" in resp.text.lower():
+            pytest.skip(f"Stream '{STREAM_NAME}' not found — skipping")
+
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        assert "[[DONE]]" in resp.text, "SSE response should contain [[DONE]] marker"
+
+        events = _parse_sse_events(resp.text)
+        hits_events = [e for e in events if e[0] == "search_response_hits"]
+        assert len(hits_events) == 2, (
+            f"Expected 2 search_response_hits events without search_type, got {len(hits_events)}: {resp.text[:500]}"
+        )
+        for i, (_, data) in enumerate(hits_events):
+            assert len(data.get("hits", [])) == 1, f"hits event {i} should hold one count row: {data}"
+            assert "cnt" in data["hits"][0], f"hits event {i} row should have 'cnt': {data}"
+
     def test_search_single_stream_vrl_baseline(self, create_session, base_url):
         """Baseline: verify VRL works on the regular _search endpoint before testing multi-stream."""
         session = create_session

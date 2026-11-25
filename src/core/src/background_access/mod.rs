@@ -37,9 +37,9 @@ use {
     std::sync::Arc,
 };
 
-use crate::authz::QuerySource;
 #[cfg(feature = "enterprise")]
 use crate::authz::{StreamAccessChecker, WriteCheck};
+use crate::{authz::QuerySource, dashboards::prom_variables::PromVariableQuery};
 
 /// The stream check a save runs through its write hook, after every check of the save's own.
 #[cfg(feature = "enterprise")]
@@ -916,7 +916,7 @@ async fn stored_dashboard(
 ) -> Result<Dashboard, Response> {
     use crate::dashboards::DashboardError;
 
-    infra::table::dashboards::get_from_folder(org_id, folder_id, dashboard_id)
+    infra::table::dashboards::get_from_folder_primary(org_id, folder_id, dashboard_id)
         .await
         .map_err(|e| Response::from(DashboardError::from(e)))?
         .ok_or_else(|| Response::from(DashboardError::DashboardNotFound))
@@ -1180,12 +1180,60 @@ fn variable_sources(
             continue;
         };
         let stream_type = json_stream_type(data, StreamType::Logs);
+        let query = data.get("query").and_then(|q| q.as_str());
+        // A custom query reads what its text names; its saved stream is left over from Auto.
+        if let Some(query) = query.filter(|q| !q.trim().is_empty()) {
+            let promql = data.get("query_type").and_then(|t| t.as_str()) == Some("promql");
+            sources.extend(variable_query_sources(
+                org_id,
+                query,
+                promql,
+                stream_type,
+                values,
+            ));
+            continue;
+        }
         let name = data.get("stream").and_then(|s| s.as_str());
         if let Some(source) = stream_name_source(org_id, name, stream_type, values) {
             sources.push(source);
         }
     }
     sources
+}
+
+/// A PromQL variable function reads its selector; one across every metric names no stream to check.
+fn variable_query_sources(
+    org_id: &str,
+    query: &str,
+    promql: bool,
+    stream_type: StreamType,
+    values: &HashMap<String, String>,
+) -> Vec<QuerySource> {
+    if !promql {
+        return panel_query_sources(org_id, query, QueryLanguage::Sql, stream_type, values);
+    }
+    let unparseable = |error: &str| {
+        vec![QuerySource::Unparseable {
+            org_id: org_id.to_string(),
+            source: query.to_string(),
+            error: error.to_string(),
+        }]
+    };
+    match PromVariableQuery::parse(query) {
+        PromVariableQuery::Reads(expr) => panel_query_sources(
+            org_id,
+            expr,
+            QueryLanguage::PromQl,
+            StreamType::Metrics,
+            values,
+        ),
+        PromVariableQuery::EveryMetric => {
+            unparseable("the lookup spans every metric, so no stream can be checked")
+        }
+        PromVariableQuery::NotAVariableFunction | PromVariableQuery::Unsupported => {
+            unparseable("not a supported PromQL variable function")
+        }
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -1533,6 +1581,72 @@ mod tests {
             resolved_names(&with_report)[0],
             "o1/logs/report_stream".to_string()
         );
+    }
+
+    #[test]
+    fn a_custom_variable_query_reads_the_streams_its_text_names() {
+        let custom = |query: &str, query_type: Option<&str>| {
+            json!({"type": "query_values", "name": "v", "query_data": {
+                "stream": "left_over", "stream_type": "logs", "field": "f",
+                "query": query, "query_type": query_type,
+            }})
+        };
+        let dashboard = json!({"variables": {"list": [
+            {"type": "constant", "name": "ns", "value": "prod"},
+            custom("SELECT svc FROM secrets WHERE env = '$ns'", None),
+            custom("label_values(kube_pod_info{ns=\"$ns\"}, pod)", Some("promql")),
+            custom("label_names(up)", Some("promql")),
+            custom("query_result(sum(rate(http_total[5m])))", Some("promql")),
+            custom("   ", None),
+        ]}});
+        let sources = variable_sources("o1", &dashboard, &HashMap::new());
+        assert_eq!(
+            resolved_names(&sources),
+            vec![
+                "o1/logs/secrets",
+                "o1/metrics/kube_pod_info",
+                "o1/metrics/up",
+                "o1/metrics/http_total",
+                "o1/logs/left_over",
+            ]
+        );
+        assert!(resolve_query_sources(&sources).unparseable.is_empty());
+    }
+
+    #[test]
+    fn a_promql_variable_lookup_across_every_metric_is_unparseable() {
+        for query in [
+            "label_values(job)",
+            "label_names()",
+            "metrics(.*)",
+            "label_values(up, a, b)",
+            r#"label_values(up, "job")"#,
+            "rate(up[5m])",
+        ] {
+            let dashboard = json!({"variables": {"list": [
+                {"type": "query_values", "name": "v", "query_data": {
+                    "stream": "up", "stream_type": "metrics", "field": "job",
+                    "query": query, "query_type": "promql"}},
+            ]}});
+            let resolved =
+                resolve_query_sources(&variable_sources("o1", &dashboard, &HashMap::new()));
+            assert!(resolved.streams.is_empty(), "{query}");
+            assert_eq!(resolved.unparseable.len(), 1, "{query}");
+        }
+    }
+
+    #[test]
+    fn editing_only_a_custom_variable_query_changes_what_it_reads() {
+        let with = |query: &str| {
+            json!({"variables": {"list": [
+                {"type": "query_values", "name": "v", "query_data": {
+                    "stream": "", "stream_type": "logs", "field": "", "query": query}},
+            ]}})
+        };
+        let before = variable_sources("o1", &with("SELECT a FROM open"), &HashMap::new());
+        let after = variable_sources("o1", &with("SELECT a FROM secret"), &HashMap::new());
+        assert_ne!(before, after);
+        assert_eq!(resolved_names(&after), vec!["o1/logs/secret"]);
     }
 
     #[test]

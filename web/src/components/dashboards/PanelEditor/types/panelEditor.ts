@@ -392,6 +392,9 @@ export interface PanelEditorEmits {
    */
   (e: "searchRequestTraceIdsUpdated", traceIds: string[]): void;
 
+  /** A chart load ended without querying; `shown` means it drew data it already had (cache, injected). */
+  (e: "loadEndedWithoutFetch", shown: boolean): void;
+
   /**
    * Emitted when initial variable values are parsed from URL query params.
    * Parent can use these to initialize variables from URL.

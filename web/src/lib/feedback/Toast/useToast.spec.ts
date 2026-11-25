@@ -21,6 +21,15 @@ describe("toast()", () => {
     expect(toastRecords[0].count).toBe(2);
   });
 
+  it("keeps toasts for different subjects apart, each with its own action", () => {
+    const first = { label: "Switch", handler: vi.fn() };
+    const second = { label: "Switch", handler: vi.fn() };
+    toast({ variant: "success", message: "Acme: Created", action: first });
+    toast({ variant: "success", message: "Billing: Created", action: second });
+    expect(toastRecords).toHaveLength(2);
+    expect(toastRecords.map((r) => r.action)).toEqual([first, second]);
+  });
+
   it("adds a record to toastRecords", () => {
     toast({ variant: "success", message: "Saved!" });
     expect(toastRecords).toHaveLength(1);

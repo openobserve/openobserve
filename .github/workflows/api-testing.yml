@@ -181,7 +181,7 @@ jobs:
             sleep 1
           done
           # The wall-clock alert files run in api_alerts_pending_tests.
-          IGNORES="--ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex --ignore=tests/alerts/test_pending_silence.py --ignore=tests/alerts/test_alert_ack.py --ignore=tests/alerts/test_firing_cycle.py"
+          IGNORES="--ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex --ignore=tests/alerts/test_pending_silence.py --ignore=tests/alerts/test_alert_ack.py --ignore=tests/alerts/test_firing_cycle.py --ignore=tests/alerts/test_alert_leases_wallclock.py"
           rc=0
           # loadfile keeps each file on one worker, so module fixtures and in-file order still hold.
           rye run pytest $IGNORES -m "not serial" -n 4 --dist loadfile --junitxml=junit-integration.xml || rc=$?
@@ -379,7 +379,7 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest tests/alerts/test_pending_silence.py tests/alerts/test_alert_ack.py tests/alerts/test_firing_cycle.py -n 11 -v --junitxml=junit-alerts-pending.xml
+          rye run pytest tests/alerts/test_pending_silence.py tests/alerts/test_alert_ack.py tests/alerts/test_firing_cycle.py tests/alerts/test_alert_leases_wallclock.py -n 11 -v --junitxml=junit-alerts-pending.xml
           kill $SERVER_PID || true
         working-directory: tests/api-testing/
 

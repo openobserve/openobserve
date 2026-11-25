@@ -181,6 +181,7 @@ export const fillMissingValues = (
   // Fill slot-by-slot in chronological order, only between actual data points.
   let currentTime = binnedFillStart;
   let currentFormattedTime = formatUtc(currentTime);
+  const fillStartFormatted = currentFormattedTime;
 
   while (currentFormattedTime <= endTimeForFill) {
     if (!hasBreakdown) {
@@ -188,6 +189,7 @@ export const fillMissingValues = (
       const currentData = searchDataMap.get(key);
       if (currentData) {
         filledData.push(currentData);
+        searchDataMap.delete(key);
       } else {
         const nullEntry: any = { [timeKey]: currentFormattedTime };
         keys.forEach((key) => {
@@ -201,6 +203,7 @@ export const fillMissingValues = (
         const currentData = searchDataMap.get(key);
         if (currentData) {
           filledData.push(currentData);
+          searchDataMap.delete(key);
         } else {
           const nullEntry: any = {
             [timeKey]: currentFormattedTime,
@@ -218,6 +221,14 @@ export const fillMissingValues = (
 
     currentTime = new Date(currentTime.getTime() + intervalMillis);
     currentFormattedTime = formatUtc(currentTime);
+  }
+
+  // An in-range row that matched no slot sits on another grid; filling would hide it from the chart.
+  for (const d of searchDataMap.values()) {
+    const timeVal = `${getDataValue(d, timeKey)}`;
+    if (timeVal >= fillStartFormatted && timeVal <= endTimeForFill) {
+      return JSON.parse(JSON.stringify(processedData));
+    }
   }
 
   return filledData;
