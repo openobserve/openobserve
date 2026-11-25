@@ -411,6 +411,8 @@ async fn send_cached_responses(
     cached
         .cached_response
         .set_took(start_timer.elapsed().as_millis() as usize);
+    // the stored wait belongs to the query that filled the cache
+    cached.cached_response.set_wait_in_queue(0);
 
     log::info!(
         "[HTTP2_STREAM]: Sending cached search response for trace_id: {}, hits: {}, result_cache_ratio: {}",

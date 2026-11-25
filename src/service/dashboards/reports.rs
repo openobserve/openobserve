@@ -822,9 +822,9 @@ async fn generate_report(
 
     let timerange = &dashboard.timerange;
     let search_type_params = if no_of_recipients == 0 {
-        "search_type=ui".to_string()
+        "searchtype=ui".to_string()
     } else {
-        format!("search_type=reports&report_id={org_id}-{report_name}")
+        format!("searchtype=reports&report_id={org_id}-{report_name}")
     };
 
     // dashboard link in the email should contain data of the same period as the report

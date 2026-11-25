@@ -123,15 +123,64 @@ type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);
 // search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
 
+/// Whether one `search` call writes its own Search usage row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UsageReport {
+    /// Only for search types that no outer caller reports.
+    ByType,
+    Always,
+    /// The caller writes the row, for example `cache::search` for its deltas.
+    Never,
+}
+
+impl UsageReport {
+    fn reports(self, search_type: Option<search::SearchEventType>) -> bool {
+        match self {
+            Self::Never => false,
+            Self::Always => true,
+            Self::ByType => search_type.is_some_and(|t| {
+                !matches!(
+                    t,
+                    search::SearchEventType::UI
+                        | search::SearchEventType::Dashboards
+                        | search::SearchEventType::Values
+                        | search::SearchEventType::Other
+                        | search::SearchEventType::Alerts
+                        | search::SearchEventType::DerivedStream
+                )
+            }),
+        }
+    }
+}
+
 // Please note: `query_fn` which is the vrl needs to be base64::decoded
 // when using this search
-#[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     user_id: Option<String>,
     in_req: &search::Request,
+) -> Result<search::Response, Error> {
+    search_with_usage(
+        trace_id,
+        org_id,
+        stream_type,
+        user_id,
+        in_req,
+        UsageReport::ByType,
+    )
+    .await
+}
+
+#[tracing::instrument(name = "service:search:enter", skip_all)]
+pub async fn search_with_usage(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    user_id: Option<String>,
+    in_req: &search::Request,
+    usage: UsageReport,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = now_micros();
@@ -271,30 +320,7 @@ pub async fn search(
             }
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
-            let (report_usage, search_type, search_event_context) = match in_req.search_type {
-                Some(search_type) => {
-                    if matches!(
-                        search_type,
-                        search::SearchEventType::UI
-                            | search::SearchEventType::Dashboards
-                            | search::SearchEventType::Values
-                            | search::SearchEventType::Other
-                            | search::SearchEventType::Alerts
-                            | search::SearchEventType::DerivedStream
-                    ) {
-                        (false, None, None)
-                    } else {
-                        (
-                            true,
-                            in_req.search_type,
-                            in_req.search_event_context.clone(),
-                        )
-                    }
-                }
-                None => (false, None, None),
-            };
-
-            if report_usage {
+            if usage.reports(in_req.search_type) {
                 let stream_name = match resolve_stream_names(&req_query.sql) {
                     Ok(v) => v.join(","),
                     Err(e) => {
@@ -321,8 +347,8 @@ pub async fn search(
                     min_ts: Some(req_query.start_time),
                     max_ts: Some(req_query.end_time),
                     cached_ratio: Some(res.cached_ratio),
-                    search_type,
-                    search_event_context,
+                    search_type: in_req.search_type,
+                    search_event_context: in_req.search_event_context.clone(),
                     trace_id: Some(trace_id),
                     took_wait_in_queue: Some(res.took_detail.wait_in_queue),
                     work_group: _work_group,
@@ -434,12 +460,22 @@ pub async fn search_multi(
             }
         }
 
-        let res = search(&trace_id, org_id, stream_type, user_id.clone(), &req).await;
+        // Multi-period alerts reach here; no outer caller writes their Search usage.
+        let res = search_with_usage(
+            &trace_id,
+            org_id,
+            stream_type,
+            user_id.clone(),
+            &req,
+            UsageReport::Always,
+        )
+        .await;
 
         match res {
             Ok(res) => {
                 index += 1;
                 multi_res.took += res.took;
+                multi_res.took_detail.add(&res.took_detail);
 
                 if res.total > multi_res.total {
                     multi_res.total = res.total;
@@ -1649,4 +1685,22 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
 
     #[cfg(not(feature = "enterprise"))]
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_usage_report_by_type_skips_types_an_outer_caller_reports() {
+        use config::meta::search::SearchEventType as T;
+        assert!(UsageReport::ByType.reports(Some(T::SearchJob)));
+        assert!(UsageReport::ByType.reports(Some(T::RUM)));
+        assert!(!UsageReport::ByType.reports(Some(T::UI)));
+        assert!(!UsageReport::ByType.reports(Some(T::Alerts)));
+        assert!(!UsageReport::ByType.reports(None));
+        assert!(!UsageReport::Never.reports(Some(T::SearchJob)));
+        assert!(UsageReport::Always.reports(Some(T::Alerts)));
+        assert!(UsageReport::Always.reports(None));
+    }
 }

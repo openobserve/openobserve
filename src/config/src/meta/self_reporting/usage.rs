@@ -301,11 +301,15 @@ impl UsageData {
     }
 }
 
+/// Bucket key of `ingest_usages`. On a collision `size`, `num_records` and `dropped_records` sum,
+/// `response_time` and `took_wait_in_queue` average, and other fields keep the first row.
 #[derive(Hash, PartialEq, Eq)]
 pub struct GroupKey {
     pub stream_name: String,
     pub org_id: String,
     pub stream_type: StreamType,
+    pub year: i32,
+    pub month: u32,
     pub day: u32,
     pub hour: u32,
     pub event: UsageEvent,
@@ -316,6 +320,7 @@ pub struct GroupKey {
 pub struct AggregatedData {
     pub usage_data: UsageData,
     pub count: u64,
+    pub wait_count: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1122,6 +1127,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -1133,6 +1140,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -1144,6 +1153,8 @@ mod tests {
             stream_name: "stream2".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -1165,6 +1176,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -1179,6 +1192,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -1230,6 +1245,7 @@ mod tests {
         let aggregated = AggregatedData {
             usage_data,
             count: 5,
+            wait_count: 0,
         };
 
         assert_eq!(aggregated.count, 5);

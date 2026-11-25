@@ -67,7 +67,7 @@ use crate::{
     handler::http::request::search::{Headers, error_utils::map_error_to_http_response},
     service::{
         search::{self as SearchService, streaming::process_search_stream_request_multi},
-        self_reporting::report_request_usage_stats,
+        self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
 
@@ -232,13 +232,16 @@ pub async fn search_multi(
     let queries_len = queries.len();
     let mut vrl_stream_name = "".to_string();
     let mut sqls = vec![];
+    let mut any_query_failed = false;
 
     for mut req in queries {
+        let query_start = std::time::Instant::now();
         sqls.push(req.query.sql.clone());
         let stream_name = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v[0].clone(),
             Err(e) => {
-                return map_error_to_http_response(&(e.into()), Some(trace_id));
+                let res = map_error_to_http_response(&(e.into()), Some(trace_id));
+                return with_multi_metric(start, &org_id, stream_type, res);
             }
         };
         vrl_stream_name = stream_name.clone();
@@ -278,7 +281,8 @@ pub async fn search_multi(
             )
             .await
         {
-            return map_error_to_http_response(&e, Some(trace_id));
+            let res = map_error_to_http_response(&e, Some(trace_id));
+            return with_multi_metric(start, &org_id, stream_type, res);
         }
 
         // Check permissions on stream
@@ -317,14 +321,16 @@ pub async fn search_multi(
                 )
                 .await
                 {
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                    let res = MetaHttpResponse::forbidden("Unauthorized Access");
+                    return with_multi_metric(start, &org_id, stream_type, res);
                 }
             }
 
             let keys_used = match get_cipher_key_names(&req.query.sql) {
                 Ok(v) => v,
                 Err(e) => {
-                    return map_error_to_http_response(&e, Some(trace_id));
+                    let res = map_error_to_http_response(&e, Some(trace_id));
+                    return with_multi_metric(start, &org_id, stream_type, res);
                 }
             };
             if !keys_used.is_empty() {
@@ -358,7 +364,8 @@ pub async fn search_multi(
                     )
                     .await
                     {
-                        return MetaHttpResponse::forbidden("Unauthorized Access to key");
+                        let res = MetaHttpResponse::forbidden("Unauthorized Access to key");
+                        return with_multi_metric(start, &org_id, stream_type, res);
                     }
                     // Check permissions on key ends
                 }
@@ -377,6 +384,7 @@ pub async fn search_multi(
 
         // add search type to request
         req.search_type = search_type;
+        req.search_event_context = search_event_context.clone();
         if let Ok(sql) =
             config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql)
         {
@@ -401,57 +409,14 @@ pub async fn search_multi(
         .instrument(http_span.clone())
         .await;
 
+        // `cache::search` already wrote this query's Search usage row.
         match search_res {
             Ok(mut res) => {
-                let time = start.elapsed().as_secs_f64();
-                let label_values = &[
-                    "/api/org/_search_multi",
-                    "200",
-                    &org_id,
-                    stream_type.as_str(),
-                    "",
-                    "",
-                ];
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(label_values)
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(label_values)
-                    .inc();
                 res.set_trace_id(trace_id);
-                res.set_took(start.elapsed().as_millis() as usize);
-
-                let req_stats = RequestStats {
-                    records: res.hits.len() as i64,
-                    response_time: time,
-                    size: res.scan_size as f64,
-                    request_body: Some(req.query.sql),
-                    user_email: Some(user_id.to_string()),
-                    min_ts: Some(req.query.start_time),
-                    max_ts: Some(req.query.end_time),
-                    cached_ratio: Some(res.cached_ratio),
-                    search_type,
-                    search_event_context: search_event_context.clone(),
-                    trace_id: Some(res.trace_id.clone()),
-                    took_wait_in_queue: Some(res.took_detail.wait_in_queue),
-                    work_group: res.work_group,
-                    peak_memory_usage: res.peak_memory_usage,
-                    ..Default::default()
-                };
-                let num_fn = req.query.query_fn.is_some() as u16;
-
-                report_request_usage_stats(
-                    req_stats,
-                    &org_id,
-                    &stream_name,
-                    StreamType::Logs,
-                    UsageType::Search,
-                    num_fn,
-                    started_at,
-                )
-                .await;
+                res.set_took(query_start.elapsed().as_millis() as usize);
 
                 multi_res.took += res.took;
+                multi_res.took_detail.add(&res.took_detail);
 
                 if res.total > multi_res.total {
                     multi_res.total = res.total;
@@ -488,28 +453,22 @@ pub async fn search_multi(
                 }
             }
             Err(err) => {
-                let time = start.elapsed().as_secs_f64();
-                let label_values = &[
-                    "/api/org/_search_multi",
-                    "500",
-                    &org_id,
-                    stream_type.as_str(),
-                    "",
-                    "",
-                ];
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(label_values)
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(label_values)
-                    .inc();
-
+                any_query_failed = true;
                 log::error!("search error: {err:?}");
                 multi_res.function_error =
                     vec![multi_res.function_error.join(", "), err.to_string()];
                 if let errors::Error::ErrorCode(code) = err
                     && let errors::ErrorCodes::SearchCancelQuery(_) = code
                 {
+                    http_report_metrics(
+                        start,
+                        &org_id,
+                        stream_type,
+                        "429",
+                        "_search_multi",
+                        "",
+                        "",
+                    );
                     return (
                         StatusCode::TOO_MANY_REQUESTS,
                         Json(meta::http::HttpResponse::error_code_with_trace_id(
@@ -522,6 +481,9 @@ pub async fn search_multi(
             }
         }
     }
+
+    let code = if any_query_failed { "500" } else { "200" };
+    http_report_metrics(start, &org_id, stream_type, code, "_search_multi", "", "");
 
     let mut report_function_usage = false;
     multi_res.hits = if let Some(input_fn) = query_fn
@@ -1016,6 +978,7 @@ pub async fn around_multi(
         multi_resp.total += resp.total;
         multi_resp.scan_size += resp.scan_size;
         multi_resp.took += resp.took;
+        multi_resp.took_detail.add(&resp.took_detail);
         multi_resp.cached_ratio += resp.cached_ratio;
     }
 
@@ -1025,6 +988,26 @@ pub async fn around_multi(
         b_ts.cmp(&a_ts)
     });
     Json(multi_resp).into_response()
+}
+
+/// Records the one `_search_multi` request metric for a query refused inside the loop.
+fn with_multi_metric(
+    start: std::time::Instant,
+    org_id: &str,
+    stream_type: StreamType,
+    res: Response,
+) -> Response {
+    let code = res.status();
+    http_report_metrics(
+        start,
+        org_id,
+        stream_type,
+        code.as_str(),
+        "_search_multi",
+        "",
+        "",
+    );
+    res
 }
 
 /// Parse simple multi-stream request format and convert to MultiStreamRequest

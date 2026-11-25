@@ -393,6 +393,7 @@ pub struct ResponseTook {
 
 impl ResponseTook {
     pub fn add(&mut self, other: &ResponseTook) {
+        self.total += other.total;
         self.cache_took += other.cache_took;
         self.file_list_took += other.file_list_took;
         self.wait_in_queue += other.wait_in_queue;
@@ -1958,6 +1959,21 @@ impl StreamResponses {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_response_took_add_sums_total_like_took() {
+        let mut a = super::Response::default();
+        a.set_took(1000);
+        a.set_wait_in_queue(10);
+        let mut b = super::Response::default();
+        b.set_took(1000);
+        b.set_wait_in_queue(20);
+        a.took += b.took;
+        a.took_detail.add(&b.took_detail);
+        assert_eq!(a.took, 2000);
+        assert_eq!(a.took_detail.total, 2000);
+        assert_eq!(a.took_detail.wait_in_queue, 30);
+    }
+
     use super::*;
 
     #[test]
