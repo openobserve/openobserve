@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         ref="toolbarLeftRef"
-        class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 max-md:w-full max-md:flex-none"
+        class="flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 max-md:w-full max-md:flex-none"
       >
         <!-- Collapsible region — clips its overflow so the More button (a
              shrink-0 sibling below) always stays visible. Pinned items hide via
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              sits right after the pinned items instead of being pushed to the
              far right; it still shrinks + clips when content overflows. -->
         <div
-          class="-my-1 flex min-w-0 flex-initial flex-nowrap items-center gap-2 overflow-hidden py-1"
+          class="-my-1 flex min-w-0 flex-initial flex-nowrap items-center gap-1.5 overflow-hidden py-1"
         >
           <!-- View Mode: Dropdown when very narrow, Toggle Group otherwise -->
           <ODropdown v-if="toolbarToggleAsDropdown" side="bottom" align="start">
@@ -584,7 +584,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         ref="toolbarRightRef"
-        class="flex flex-shrink-0 items-center gap-2 max-md:w-full max-md:justify-end"
+        class="flex flex-shrink-0 items-center gap-1.5 max-md:w-full max-md:justify-end"
       >
         <OPageHeaderStatus />
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
@@ -638,7 +638,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="search-time order-2">
-          <div class="flex gap-2">
+          <div class="flex gap-1.5">
             <OTooltip
               v-if="
                 config.isEnterprise == 'true' &&
@@ -973,7 +973,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <AutoRefreshInterval
-                class="ms-2"
                 variant="ghost"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"

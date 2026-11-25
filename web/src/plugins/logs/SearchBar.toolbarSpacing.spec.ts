@@ -86,8 +86,8 @@ describe("SearchBar — toolbar controls are spaced only by the row gap", () => 
 
     const left = wrapper.vm.$refs.toolbarLeftRef as HTMLElement;
     const collapsible = left.firstElementChild as HTMLElement;
-    expect(left.classList).toContain("gap-2");
-    expect(collapsible.classList).toContain("gap-2");
+    expect(left.classList).toContain("gap-1.5");
+    expect(collapsible.classList).toContain("gap-1.5");
 
     const more = wrapper.get('[data-test="logs-search-bar-utilities-menu-btn"]');
     expect(marginClassesOf(more.element)).toEqual([]);
