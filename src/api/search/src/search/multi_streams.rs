@@ -285,7 +285,8 @@ pub async fn search_multi(
         let stream_name = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v[0].clone(),
             Err(e) => {
-                return map_error_to_http_response(&(e.into()), Some(trace_id));
+                let res = map_error_to_http_response(&(e.into()), Some(trace_id));
+                return with_multi_metric(start, &org_id, stream_type, res);
             }
         };
         vrl_stream_name = stream_name.clone();
@@ -328,7 +329,8 @@ pub async fn search_multi(
             )
             .await
         {
-            return map_error_to_http_response(&e, Some(trace_id));
+            let res = map_error_to_http_response(&e, Some(trace_id));
+            return with_multi_metric(start, &org_id, stream_type, res);
         }
 
         #[cfg(feature = "enterprise")]
@@ -343,12 +345,12 @@ pub async fn search_multi(
             )
             .await
             {
-                return res;
+                return with_multi_metric(start, &org_id, stream_type, res);
             }
 
             if let Some(res) = check_cipher_key_permissions(&org_id, user_id, &req.query.sql).await
             {
-                return res;
+                return with_multi_metric(start, &org_id, stream_type, res);
             }
         }
 
@@ -999,6 +1001,7 @@ pub async fn around_multi(
         multi_resp.total += resp.total;
         multi_resp.scan_size += resp.scan_size;
         multi_resp.took += resp.took;
+        multi_resp.took_detail.add(&resp.took_detail);
         multi_resp.cached_ratio += resp.cached_ratio;
     }
 
@@ -1008,6 +1011,26 @@ pub async fn around_multi(
         b_ts.cmp(&a_ts)
     });
     Json(multi_resp).into_response()
+}
+
+/// Records the one `_search_multi` request metric for a query refused inside the loop.
+fn with_multi_metric(
+    start: std::time::Instant,
+    org_id: &str,
+    stream_type: StreamType,
+    res: Response,
+) -> Response {
+    let code = res.status();
+    http_report_metrics(
+        start,
+        org_id,
+        stream_type,
+        code.as_str(),
+        "_search_multi",
+        "",
+        "",
+    );
+    res
 }
 
 /// Parse simple multi-stream request format and convert to MultiStreamRequest

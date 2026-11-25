@@ -88,6 +88,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             Entry::Vacant(vacant) => {
                 vacant.insert(AggregatedData {
                     count: 1,
+                    wait_count: usage_data.took_wait_in_queue.is_some() as u64,
                     usage_data: usage_data.clone(),
                 });
             }
@@ -425,6 +426,7 @@ fn merge_aggregated(entry: &mut AggregatedData, usage_data: &UsageData) {
         (a, b) => a.or(b),
     };
     entry.count += 1;
+    entry.wait_count += usage_data.took_wait_in_queue.is_some() as u64;
 }
 
 /// The bucket row reports the average `response_time` and queue wait of its events.
@@ -433,7 +435,7 @@ fn finish_aggregated(data: AggregatedData) -> UsageData {
     usage_data.response_time /= data.count as f64;
     usage_data.took_wait_in_queue = usage_data
         .took_wait_in_queue
-        .map(|w| w / data.count as usize);
+        .map(|w| w / data.wait_count.max(1) as usize);
     usage_data
 }
 
@@ -461,16 +463,26 @@ mod tests {
         second.took_wait_in_queue = Some(300);
         second.response_time = 4.0;
 
+        let mut no_wait = second.clone();
+        no_wait.took_wait_in_queue = None;
+        no_wait.response_time = 0.0;
+
         let mut entry = AggregatedData {
             count: 1,
+            wait_count: 1,
             usage_data: first,
         };
         merge_aggregated(&mut entry, &second);
+        merge_aggregated(&mut entry, &no_wait);
         let row = finish_aggregated(entry);
-        assert_eq!(row.dropped_records, 7);
-        assert_eq!(row.took_wait_in_queue, Some(200));
-        assert!((row.response_time - 3.0).abs() < 1e-9);
-        assert_eq!(row.num_records, 20);
+        assert_eq!(row.dropped_records, 11);
+        assert_eq!(
+            row.took_wait_in_queue,
+            Some(200),
+            "a row with no wait is not a 0"
+        );
+        assert!((row.response_time - 2.0).abs() < 1e-9);
+        assert_eq!(row.num_records, 30);
     }
 
     // Helper function to create test UsageData
@@ -777,6 +789,7 @@ mod tests {
 
         let aggregated = AggregatedData {
             count: 1,
+            wait_count: 0,
             usage_data: usage.clone(),
         };
 

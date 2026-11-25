@@ -711,7 +711,7 @@ impl UsageData {
 /// | `num_records` | **sums** |
 /// | `dropped_records` | **sums** |
 /// | `response_time` | summed then divided by `count` ⇒ an AVERAGE, not a sum |
-/// | `took_wait_in_queue` | summed then divided by `count` ⇒ an AVERAGE |
+/// | `took_wait_in_queue` | summed then divided by `wait_count` ⇒ an AVERAGE of the rows that have it |
 ///
 /// Every other field — `request_body` included — is taken from the FIRST row
 /// inserted into the bucket and the rest are discarded.
@@ -732,6 +732,7 @@ pub struct GroupKey {
 pub struct AggregatedData {
     pub usage_data: UsageData,
     pub count: u64,
+    pub wait_count: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -2573,6 +2574,7 @@ mod tests {
         let aggregated = AggregatedData {
             usage_data,
             count: 5,
+            wait_count: 0,
         };
 
         assert_eq!(aggregated.count, 5);

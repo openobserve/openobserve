@@ -100,7 +100,16 @@ pub fn get_search_event_context_from_request(
             f("folder_name"),
         )),
         SearchEventType::Alerts => Some(SearchEventContext::with_alert(f("alert_key"))),
-        SearchEventType::Reports => Some(SearchEventContext::with_report(f("report_id"))),
+        // A report renders a dashboard, so keep the dashboard context next to the report id.
+        SearchEventType::Reports => Some(SearchEventContext {
+            report_key: f("report_id"),
+            ..SearchEventContext::with_dashboard(
+                f("dashboard_id"),
+                f("dashboard_name"),
+                f("folder_id"),
+                f("folder_name"),
+            )
+        }),
         _ => None,
     }
 }
@@ -420,6 +429,16 @@ mod tests {
 
         let context = f(&SearchEventType::Reports, &query).unwrap();
         assert_eq!(context.report_key, Some("report123".to_string()));
+
+        query.insert("dashboard_id".to_string(), "123".to_string());
+        query.insert("folder_name".to_string(), "Test Folder".to_string());
+        let context = f(&SearchEventType::Reports, &query).unwrap();
+        assert_eq!(context.report_key, Some("report123".to_string()));
+        assert_eq!(context.dashboard_id, Some("123".to_string()));
+        assert_eq!(
+            context.dashboard_folder_name,
+            Some("Test Folder".to_string())
+        );
     }
 
     #[test]
