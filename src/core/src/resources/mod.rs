@@ -90,7 +90,7 @@ pub async fn search(
                 .await
                 .map_err(|_| SearchError::ServiceUnavailable)?;
             let limits = Limits {
-                max_bytes: config::get_config().limit.resource_catalog_max_bytes,
+                max_bytes: config::get_config().limit.resource_catalog_max_size,
                 ..Limits::default()
             };
             let catalog = Catalog::new(catalog::production_reader(), limits);
