@@ -401,9 +401,15 @@ export const buildPatternLogsSql = (
   template: string,
   streamName: string,
   allTemplates?: string[],
+  baseFilter?: string,
 ): string | null => {
   if (patternFilterBlockedReason(template, allTemplates)) return null;
-  const sql = buildPatternSetSqlQuery({ streamName, includes: [template], allTemplates });
+  const sql = buildPatternSetSqlQuery({
+    streamName,
+    includes: [template],
+    allTemplates,
+    baseFilter,
+  });
   return `${sql} ORDER BY _timestamp DESC`;
 };
 

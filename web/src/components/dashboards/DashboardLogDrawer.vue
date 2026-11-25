@@ -163,6 +163,7 @@ const anomalyColumns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 const insightPatterns = ref<any[]>([]);
+const allPatternTemplates = ref<string[]>([]);
 const surroundEvents = ref<any[]>([]);
 const surroundMinutes = ref(3);
 const surroundLoading = ref(false);
@@ -347,6 +348,7 @@ async function loadInsights(ev: Record<string, any>) {
   insightsLoading.value = true;
   timeline.value = [];
   insightPatterns.value = [];
+  allPatternTemplates.value = [];
   surroundEvents.value = [];
 
   const intv = getTimeBucket();
@@ -399,7 +401,9 @@ async function loadInsights(ev: Record<string, any>) {
       .sort((a: any, b: any) => a.keyMs - b.keyMs);
   }
   if (patR.status === "fulfilled") {
-    insightPatterns.value = (patR.value.data?.patterns ?? []).slice(0, 8).map((p: any) => ({
+    const allPatterns: any[] = patR.value.data?.patterns ?? [];
+    allPatternTemplates.value = allPatterns.map((p: any) => p.template || p.description || "—");
+    insightPatterns.value = allPatterns.slice(0, 8).map((p: any) => ({
       template: p.template || p.description || "—",
       count: p.frequency ?? p.count ?? 0,
       pct: Math.round(p.percentage ?? 0),
@@ -742,11 +746,7 @@ function isSurroundExpanded(pageIdx: number) {
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 function patternToSql(template: string): string | null {
-  return buildPatternLogsSql(
-    template,
-    props.stream,
-    insightPatterns.value.map((p) => p.template),
-  );
+  return buildPatternLogsSql(template, props.stream, allPatternTemplates.value, effectiveWhere());
 }
 
 function openPatternInLogs(template: string) {

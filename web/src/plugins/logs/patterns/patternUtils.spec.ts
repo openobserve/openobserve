@@ -554,6 +554,18 @@ describe("buildPatternLogsSql", () => {
     expect(sql).not.toContain("<*>");
   });
 
+  it("keeps the scope the patterns were mined under", () => {
+    const sql = buildPatternLogsSql(
+      "Payment <*> failed for order <*>",
+      "app",
+      [],
+      "level = 'error'",
+    );
+    expect(sql).toBe(
+      "SELECT * FROM 'app' WHERE (level = 'error') AND match_all('failed for order') ORDER BY _timestamp DESC",
+    );
+  });
+
   it("returns null when no text separates the pattern from the others", () => {
     expect(buildPatternLogsSql("<*> <*>", "app", [])).toBeNull();
   });
