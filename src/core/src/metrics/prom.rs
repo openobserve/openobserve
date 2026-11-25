@@ -663,7 +663,7 @@ pub async fn remote_write(
 
     let step_start = std::time::Instant::now();
     for (stream_name, mut json_data) in json_data_by_stream {
-        #[cfg(feature = "vectorscan")]
+        #[cfg(feature = "enterprise")]
         apply_redaction(org_id, &stream_name, &mut json_data).await;
         finish_identity_columns(&mut json_data);
         let has_uds = matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)));
@@ -1219,7 +1219,7 @@ fn metadata_sql(
 
 /// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
 /// Redacts a stream's pending records and drops the series hash computed from the raw labels.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut [PendingRecord]) {
     if json_data.is_empty()
         || config::meta::self_reporting::redaction::is_self_reporting_stream(

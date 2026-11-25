@@ -344,7 +344,7 @@ pub async fn handle_otlp_request(
         }
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     apply_redaction(org_id, &stream_name, &mut all_records).await;
 
     let mut user_defined_schema_map = HashMap::with_capacity(1);
@@ -544,7 +544,7 @@ fn new_stream_schema(
 }
 
 /// Redacts flattened profile records before they are buffered for the WAL.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 async fn apply_redaction(
     org_id: &str,
     stream_name: &str,

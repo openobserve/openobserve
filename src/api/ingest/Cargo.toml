@@ -23,7 +23,6 @@ cloud = [
     "openobserve-core/cloud",
     "openobserve-api-common/cloud",
 ]
-vectorscan = ["openobserve-core/vectorscan"]
 
 [dependencies]
 axum.workspace = true

@@ -112,7 +112,7 @@ pub async fn ingest(
     // for a rejection is unchanged (still `Custom(_, 400)`).
     if let Err(e) = preflight_streams(org_id, &streams, &user).await {
         // A 503 error, not a `Custom(_, 400)` status: HEC clients drop a 400 and retry a 503.
-        #[cfg(feature = "vectorscan")]
+        #[cfg(feature = "enterprise")]
         if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
             return Err(e);
         }
@@ -120,7 +120,7 @@ pub async fn ingest(
     }
     if let Err(e) = ingest_prepared(thread_id, org_id, streams, user).await {
         // Fail-closed refusal is a 503 so HEC clients retry; written groups are re-sent.
-        #[cfg(feature = "vectorscan")]
+        #[cfg(feature = "enterprise")]
         if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
             return Err(e);
         }
@@ -202,7 +202,7 @@ pub async fn preflight_streams(
         check_ingestion_allowed(org_id, StreamType::Logs, Some(stream)).await?;
     }
     // Every group at once, so a collector batch is refused before its first group is written.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         let counts: Vec<(&str, u64)> = streams
             .iter()
