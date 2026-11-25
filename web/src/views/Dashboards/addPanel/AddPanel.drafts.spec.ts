@@ -35,6 +35,7 @@ import {
   readPanelDraft,
   writePanelDraft,
 } from "@/composables/dashboard/usePanelDraft";
+import { applyPanelConfigDefaults } from "@/utils/dashboard/panelConfigDefaults";
 import AddPanel from "./AddPanel.vue";
 
 vi.mock("@/composables/dashboard/usePanelDraft", async (importOriginal) => {
@@ -632,6 +633,95 @@ describe("AddPanel drafts and Save and keep editing", () => {
 
       expect(leaveDialog()).toBeNull();
       expect(next).toHaveBeenCalledWith();
+    });
+
+    // #7454: the click that opens Config takes the snapshot, then the sidebar fills the keys the server dropped.
+    const openConfigSidebar = async (wrapper: any) => {
+      window.dispatchEvent(new Event("pointerdown"));
+      applyPanelConfigDefaults(wrapper.vm.dashboardPanelData.data, store);
+      await nextTick();
+    };
+
+    it("opening Config on a saved panel without editing leaves without asking", async () => {
+      nav.route = routeWith({ panelId: "p1" });
+      wrapper = await mountEditor();
+      await openConfigSidebar(wrapper);
+      expect(wrapper.vm.dashboardPanelData.data.config.legends_position).toBeNull();
+
+      const { next, done } = leave();
+      await done;
+
+      expect(leaveDialog()).toBeNull();
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it("a config edit after opening Config still asks", async () => {
+      nav.route = routeWith({ panelId: "p1" });
+      wrapper = await mountEditor();
+      await openConfigSidebar(wrapper);
+      wrapper.vm.dashboardPanelData.data.config.legends_position = "right";
+      await nextTick();
+
+      const { next, done } = leave();
+      await leaveAsked();
+      await pressEscape();
+      await done;
+
+      expect(next).toHaveBeenCalledWith(false);
+    });
+
+    it("a description edit after opening Config still asks", async () => {
+      nav.route = routeWith({ panelId: "p1" });
+      wrapper = await mountEditor();
+      await openConfigSidebar(wrapper);
+      wrapper.vm.dashboardPanelData.data.description = "Now described";
+      await nextTick();
+
+      const { next, done } = leave();
+      await leaveAsked();
+      await pressEscape();
+      await done;
+
+      expect(next).toHaveBeenCalledWith(false);
+    });
+
+    // Opening Config remounts DashboardQueryEditor, whose onBeforeMount turns a null VRL function into "".
+    const savedPanelWithNullVrl = () => {
+      const panel: any = serverPanel();
+      panel.queries[0].vrlFunctionQuery = null;
+      vi.mocked(getPanel).mockResolvedValue(panel);
+    };
+
+    it("opening Config on a panel saved with a null VRL function leaves without asking", async () => {
+      savedPanelWithNullVrl();
+      nav.route = routeWith({ panelId: "p1" });
+      wrapper = await mountEditor();
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].vrlFunctionQuery).toBeNull();
+      await openConfigSidebar(wrapper);
+      wrapper.vm.dashboardPanelData.data.queries[0].vrlFunctionQuery = "";
+      await nextTick();
+
+      const { next, done } = leave();
+      await done;
+
+      expect(leaveDialog()).toBeNull();
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it("a VRL edit on a panel saved with a null VRL function still asks", async () => {
+      savedPanelWithNullVrl();
+      nav.route = routeWith({ panelId: "p1" });
+      wrapper = await mountEditor();
+      await openConfigSidebar(wrapper);
+      wrapper.vm.dashboardPanelData.data.queries[0].vrlFunctionQuery = ".x = 1";
+      await nextTick();
+
+      const { next, done } = leave();
+      await leaveAsked();
+      await pressEscape();
+      await done;
+
+      expect(next).toHaveBeenCalledWith(false);
     });
 
     it("Escape keeps the user in the editor", async () => {
