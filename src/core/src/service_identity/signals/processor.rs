@@ -1251,6 +1251,8 @@ fn alias_state(row: &AliasRow) -> Option<AliasState> {
 
 #[cfg(test)]
 mod tests {
+    use datafusion::prelude::SessionContext;
+
     use super::*;
 
     const RECORDED_POD: &str = r#"{"_timestamp": 1792774500000000, "cluster": "fixture-region", "env": "fixture-cluster", "k8s_cluster": "fixture-cluster", "k8s_container": "app", "k8s_namespace": "fixture-ns", "k8s_pod": "store-pod-2.0", "k8s_workload": "store-workload", "k8s_workload_kind": "deployment", "max_ts": 1792774700000000, "min_ts": 1792774501000000, "service": "store", "source_stream": "default", "spans": 200, "version": "2.0", "where_key": "k8s:fixture-cluster/fixture-ns", "window_secs": 300, "written_at": 1792778565492884}"#;
@@ -1473,7 +1475,7 @@ mod tests {
     }
 
     async fn local_pages(sql: &str, first: &Value, page: usize) -> Vec<Value> {
-        let session = datafusion::prelude::SessionContext::new();
+        let session = SessionContext::new();
         let ordered = ordered_query(sql, first).unwrap();
         collect_pages(page, |from| {
             let session = &session;

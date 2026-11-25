@@ -562,4 +562,39 @@ describe("FieldRow", () => {
       expect(label.exists()).toBe(true);
     });
   });
+
+  describe("Group by shortcut", () => {
+    const groupByBtn = (wrapper: ReturnType<typeof createWrapper>, name = defaultField.name) =>
+      wrapper.find(`[data-test="log-search-index-list-group-by-${name}-field-btn"]`);
+    const ftsField = { ...defaultField, ftsKey: true };
+
+    it("is off unless the caller opts in", () => {
+      expect(groupByBtn(createWrapper({ field: ftsField })).exists()).toBe(false);
+    });
+
+    it("emits the field name when opted in", async () => {
+      const wrapper = createWrapper({ field: ftsField, showGroupBy: true });
+      expect(groupByBtn(wrapper).attributes("aria-label")).toBe("search.groupByThisField");
+      await groupByBtn(wrapper).trigger("click");
+      expect(wrapper.emitted("group-by")).toEqual([[defaultField.name]]);
+    });
+
+    it("is not offered on a header row or the timestamp column", () => {
+      const header = { name: "Common", label: true, isSchemaField: false, showValues: false };
+      expect(
+        groupByBtn(createWrapper({ field: header, showGroupBy: true }), "Common").exists(),
+      ).toBe(false);
+      const ts = { ...ftsField, name: "_timestamp" };
+      expect(
+        groupByBtn(createWrapper({ field: ts, showGroupBy: true }), "_timestamp").exists(),
+      ).toBe(false);
+    });
+
+    it("marks the grouped field's row with the accent, not the selected-field highlight", () => {
+      const wrapper = createWrapper({ field: ftsField, grouped: true });
+      const row = wrapper.find(".o-field-row").classes();
+      expect(row).toContain("bg-accent/10!");
+      expect(row).not.toContain("bg-field-list-row-hover-bg!");
+    });
+  });
 });

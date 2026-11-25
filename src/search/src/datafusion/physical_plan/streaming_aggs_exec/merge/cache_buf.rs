@@ -198,7 +198,7 @@ mod tests {
         ipc::{reader::FileReader, writer::FileWriter},
     };
     use datafusion::{
-        common::tree_node::TreeNode,
+        common::{ScalarValue, tree_node::TreeNode},
         datasource::{MemTable, memory::MemorySourceConfig},
         physical_plan::{
             ChildrenPropertiesMode, ExecutionPlan, ReplaceChildrenOptions,
@@ -235,9 +235,7 @@ mod tests {
                     let values = batch
                         .columns()
                         .iter()
-                        .map(|column| {
-                            datafusion::common::ScalarValue::try_from_array(column, row).unwrap()
-                        })
+                        .map(|column| ScalarValue::try_from_array(column, row).unwrap())
                         .collect::<Vec<_>>();
                     format!("{values:?}")
                 })

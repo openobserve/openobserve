@@ -187,6 +187,8 @@ fn plan_hash(plan: &LogicalPlan) -> u64 {
 #[cfg(test)]
 mod tests {
     use datafusion::{
+        functions::expr_fn::random,
+        functions_aggregate::expr_fn::{count, sum},
         logical_expr::{JoinType, LogicalPlanBuilder, lit, table_scan},
         prelude::col,
     };
@@ -208,10 +210,7 @@ mod tests {
         let builder = LogicalPlanBuilder::from(scan());
         let builder = if aggregate {
             builder
-                .aggregate(
-                    vec![col("name")],
-                    vec![datafusion::functions_aggregate::expr_fn::sum(col("v")).alias("sv")],
-                )
+                .aggregate(vec![col("name")], vec![sum(col("v")).alias("sv")])
                 .unwrap()
         } else {
             builder.filter(col("v").gt(lit(1))).unwrap()
@@ -261,12 +260,9 @@ mod tests {
     #[test]
     fn volatile_subplan_is_left_inlined() {
         let cte = LogicalPlanBuilder::from(scan())
-            .filter(col("v").gt(datafusion::functions::expr_fn::random()))
+            .filter(col("v").gt(random()))
             .unwrap()
-            .aggregate(
-                vec![col("name")],
-                vec![datafusion::functions_aggregate::expr_fn::sum(col("v")).alias("sv")],
-            )
+            .aggregate(vec![col("name")], vec![sum(col("v")).alias("sv")])
             .unwrap()
             .alias("c")
             .unwrap()
@@ -286,10 +282,7 @@ mod tests {
         let cte = LogicalPlanBuilder::from(scan())
             .aggregate(
                 vec![col("name")],
-                vec![
-                    datafusion::functions_aggregate::expr_fn::sum(col("v")).alias("sv"),
-                    datafusion::functions_aggregate::expr_fn::count(lit(1)).alias("cnt"),
-                ],
+                vec![sum(col("v")).alias("sv"), count(lit(1)).alias("cnt")],
             )
             .unwrap()
             .alias("c")
@@ -358,10 +351,7 @@ mod tests {
     #[test]
     fn different_ctes_get_different_ids() {
         let other = LogicalPlanBuilder::from(scan())
-            .aggregate(
-                vec![col("name")],
-                vec![datafusion::functions_aggregate::expr_fn::count(lit(1)).alias("cnt")],
-            )
+            .aggregate(vec![col("name")], vec![count(lit(1)).alias("cnt")])
             .unwrap()
             .alias("d")
             .unwrap()

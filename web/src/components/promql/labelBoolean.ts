@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { escapeRegExp } from "@/utils/query/promQLUtils";
+
 export type LabelMatchOp = "=" | "!=" | "=~" | "!~";
 
 export interface LabelMatch {
@@ -52,10 +54,6 @@ const plain = (m: LabelMatch): LabelMatch => ({ label: m.label, op: m.op, value:
 /** True when any matcher sits in an OR group, i.e. the list is more than a plain AND. */
 export const hasFilterGroups = (matchers: ReadonlyArray<{ group?: number }>): boolean =>
   matchers.some((m) => (m.group ?? 0) > 0);
-
-/** Escapes a literal so it matches only itself inside an RE2 pattern. */
-export const escapeRegexLiteral = (value: string): string =>
-  value.replace(/[\\^$.|?*+()[\]{}]/g, "\\$&");
 
 /** The groups in ascending order, each with its matchers and negation. */
 export function filterGroupsOf<T extends { group?: number; negate?: boolean }>(
@@ -120,7 +118,7 @@ const mergeOnLabel = (branches: LabelMatch[][], label: string): LabelMatch[][] =
   return out.map((entry) => {
     if (Array.isArray(entry)) return entry;
     if (entry.values.size === 1) return entry.branch;
-    const alternation = `(?:${[...entry.values].map(escapeRegexLiteral).join("|")})`;
+    const alternation = `(?:${[...entry.values].map(escapeRegExp).join("|")})`;
     return entry.branch.map((m) =>
       m.label === label ? { label, op: "=~" as const, value: alternation } : m,
     );

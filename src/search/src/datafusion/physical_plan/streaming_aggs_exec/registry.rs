@@ -364,8 +364,15 @@ pub(crate) fn get_cache_file_path_from_streaming_id(streaming_id: &str) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use datafusion::physical_plan::{
-        ChildrenPropertiesMode, ExecutionPlan, ReplaceChildrenOptions,
+    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::{
+        execution::context::TaskContext,
+        physical_plan::{
+            ChildrenPropertiesMode, ExecutionPlan, Partitioning, ReplaceChildrenOptions,
+            StatisticsArgs, StatisticsContext,
+            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
+            empty::EmptyExec,
+        },
     };
 
     use super::*;
@@ -630,12 +637,6 @@ mod tests {
     fn test_streaming_aggs_exec_execution_plan_trait_simple_methods() {
         use std::sync::Arc;
 
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
             DataType::Int64,
@@ -674,11 +675,8 @@ mod tests {
         assert_eq!(exec.children().len(), 1);
         assert_eq!(exec.benefits_from_input_partitioning(), vec![false]);
         // Test statistics method (returns Statistics with unknown values)
-        let _stats = datafusion::physical_plan::StatisticsContext::new()
-            .compute(
-                &exec,
-                &datafusion::physical_plan::StatisticsArgs::new().with_partition(Some(0)),
-            )
+        let _stats = StatisticsContext::new()
+            .compute(&exec, &StatisticsArgs::new().with_partition(Some(0)))
             .unwrap();
         // Just verify statistics() method doesn't panic - we can't easily test Precision enum
         // values
@@ -687,12 +685,6 @@ mod tests {
     #[test]
     fn test_streaming_aggs_exec_with_new_children() {
         use std::sync::Arc;
-
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
 
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
@@ -742,12 +734,6 @@ mod tests {
     #[test]
     fn test_display_as_trait() {
         use std::sync::Arc;
-
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
 
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
@@ -809,7 +795,7 @@ mod tests {
         let partitioning = StreamingAggsExec::output_partitioning_helper(5);
 
         // Should return UnknownPartitioning with correct count
-        if let datafusion::physical_plan::Partitioning::UnknownPartitioning(count) = partitioning {
+        if let Partitioning::UnknownPartitioning(count) = partitioning {
             assert_eq!(count, 5);
         } else {
             panic!("Expected UnknownPartitioning");
@@ -820,23 +806,18 @@ mod tests {
     fn test_compute_properties() {
         use std::sync::Arc;
 
-        use arrow::datatypes::{DataType, Field, Schema};
-
         let schema = Arc::new(Schema::new(vec![Field::new(
             "test_col",
             DataType::Utf8,
             false,
         )]));
 
-        let input: Arc<dyn datafusion::physical_plan::ExecutionPlan> =
-            Arc::new(datafusion::physical_plan::empty::EmptyExec::new(schema));
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
         let properties = StreamingAggsExec::compute_properties(&input, 3);
 
         // Verify the properties are set correctly - we can't access schema() directly but we can
         // verify partitioning Check partitioning
-        if let datafusion::physical_plan::Partitioning::UnknownPartitioning(count) =
-            properties.output_partitioning()
-        {
+        if let Partitioning::UnknownPartitioning(count) = properties.output_partitioning() {
             assert_eq!(*count, 3);
         } else {
             panic!("Expected UnknownPartitioning");
@@ -931,12 +912,6 @@ mod tests {
     fn test_streaming_aggs_exec_constructor_variations() {
         use std::sync::Arc;
 
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
             DataType::Int64,
@@ -1005,15 +980,6 @@ mod tests {
     async fn test_execute_method_error_cases() {
         use std::sync::Arc;
 
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::{
-            execution::context::TaskContext,
-            physical_plan::{
-                aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-                empty::EmptyExec,
-            },
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
             DataType::Int64,
@@ -1054,12 +1020,6 @@ mod tests {
     #[test]
     fn test_display_as_fmt_as_method() {
         use std::sync::Arc;
-
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
 
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
@@ -1214,12 +1174,6 @@ mod tests {
     fn test_streaming_aggs_exec_aggregate_plan() {
         use std::sync::Arc;
 
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
             DataType::Int64,
@@ -1263,12 +1217,6 @@ mod tests {
     #[test]
     fn test_streaming_aggs_exec_with_new_children_error_cases() {
         use std::sync::Arc;
-
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
 
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",

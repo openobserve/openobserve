@@ -213,21 +213,8 @@ const rowsPerPage = ref(20);
 // preserves the exact list when navigating into a session and back.
 const sortBy = ref<SessionSortField>("end_time");
 const sortOrder = ref<SessionSortOrder>("desc");
-// Module-scoped so back-navigation restores the filtered page; not persisted, a search is one-time.
-export interface SessionSearch {
-  keyword?: string;
-  user?: string;
-}
-const searchKeyword = ref("");
-const searchUser = ref("");
-/** Hard cap on a search term; longer input is truncated, never rejected. */
-export const SESSION_SEARCH_MAX_LEN = 256;
-/** Trims and caps a raw search term. Empty result = no search. */
-export function normalizeSearchTerm(raw: string): string {
-  return String(raw ?? "")
-    .trim()
-    .slice(0, SESSION_SEARCH_MAX_LEN);
-}
+// Span predicate from the filter bar; kept on back navigation with the list.
+const searchFilter = ref("");
 // Monotonic id of the most recent `fetchPage` call. A response from an older
 // call (Enter pressed again while a search was still in flight) is dropped, so
 // a slow first run can never overwrite the newer result. Last request wins.
@@ -286,7 +273,6 @@ export function useSessions() {
     page: number,
     pageSize: number,
     filter = "",
-    search?: SessionSearch,
   ): Promise<void> {
     if (!streamName || !startTime || !endTime) return;
     const seq = ++fetchSeq;
@@ -295,7 +281,6 @@ export function useSessions() {
 
     try {
       const orgId = store.state.selectedOrganization?.identifier || "default";
-      const keywordTerm = normalizeSearchTerm(search?.keyword ?? "");
       const res = await sessionsService.list({
         orgId,
         streamName,
@@ -304,8 +289,6 @@ export function useSessions() {
         page,
         pageSize,
         filter,
-        keyword: keywordTerm || undefined,
-        userId: normalizeSearchTerm(search?.user ?? "") || undefined,
         sortBy: sortBy.value,
         sortOrder: sortOrder.value,
       });
@@ -606,12 +589,16 @@ export function useSessions() {
     return buildTurnDetail(traceId, hits || []);
   }
 
-  /** Fetch all gen_ai spans of the given turns, by trace id so tool-execution spans are included. */
+  /**
+   * Fetch all gen_ai spans of the given turns, by trace id so tool-execution spans are included.
+   * `cacheColumns` are selected only when the caller knows the stream has them.
+   */
   async function fetchSessionSpans(
     streamName: string,
     turns: Pick<SessionTraceRow, "traceId" | "spanCount">[],
     startTime: number,
     endTime: number,
+    cacheColumns: string[] = [],
   ): Promise<any[]> {
     if (!streamName || !turns.length || !startTime || !endTime) return [];
     const pages = await Promise.all(
@@ -625,6 +612,7 @@ export function useSessions() {
             span_status, status_message,
             gen_ai_request_model, gen_ai_response_model,
             gen_ai_usage_cost, gen_ai_usage_total_tokens,
+            ${cacheColumns.map((c) => `${c},`).join(" ")}
             gen_ai_input_messages, gen_ai_output_messages
           FROM "${streamName}"
           WHERE trace_id IN (${inList})
@@ -658,8 +646,7 @@ export function useSessions() {
     loadedOrg,
     currentPage,
     rowsPerPage,
-    searchKeyword,
-    searchUser,
+    searchFilter,
     sortBy,
     sortOrder,
     agents,

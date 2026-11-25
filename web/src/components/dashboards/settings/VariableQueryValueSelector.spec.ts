@@ -200,6 +200,18 @@ describe("VariableQueryValueSelector", () => {
       expect(filtered).toHaveLength(0);
     });
 
+    it("lists a query variable's server search results only while their text is typed", async () => {
+      const found = [{ label: "host15", value: "host15" }];
+      wrapper = createWrapper({
+        variableItem: { ...defaultVariableItem, querySearch: { text: "host15", options: found } },
+      });
+      expect(wrapper.vm.computedOptions).toHaveLength(3);
+      wrapper.vm.onSearch("host15 ");
+      expect(wrapper.vm.computedOptions).toEqual(found);
+      wrapper.vm.onSearch("host1");
+      expect(wrapper.vm.computedOptions).toHaveLength(3);
+    });
+
     it("should perform case-insensitive filtering", () => {
       // Filtering is delegated to OSelect, but the search term is preserved.
       wrapper.vm.onSearch("EUROPE");
@@ -540,21 +552,26 @@ describe("VariableQueryValueSelector", () => {
       wrapper = createWrapper();
     });
 
-    it("should display single value correctly", () => {
+    it("should display the selected option's label", () => {
       wrapper.vm.selectedValue = "us-east-1";
-      expect(wrapper.vm.displayValue).toBe("us-east-1");
+      expect(wrapper.vm.displayValue).toBe("US East");
+    });
+
+    it("should fall back to the value when no option carries it", () => {
+      wrapper.vm.selectedValue = "ap-south-1";
+      expect(wrapper.vm.displayValue).toBe("ap-south-1");
     });
 
     it("should display multiple values (≤2 items)", () => {
       wrapper = createWrapper({ variableItem: multiSelectVariableItem });
       wrapper.vm.selectedValue = ["us-east-1", "us-west-1"];
-      expect(wrapper.vm.displayValue).toBe("us-east-1, us-west-1");
+      expect(wrapper.vm.displayValue).toBe("US East, US West");
     });
 
     it("should display multiple values with overflow (>2 items)", () => {
       wrapper = createWrapper({ variableItem: multiSelectVariableItem });
       wrapper.vm.selectedValue = ["us-east-1", "us-west-1", "eu-west-1"];
-      expect(wrapper.vm.displayValue).toBe("us-east-1, us-west-1 ...+1 more");
+      expect(wrapper.vm.displayValue).toBe("US East, US West ...+1 more");
     });
 
     it("should display blank value as '<blank>'", () => {
@@ -570,6 +587,33 @@ describe("VariableQueryValueSelector", () => {
 
     it("should display SELECT_ALL_VALUE as '<ALL>'", () => {
       wrapper.vm.selectedValue = "_o2_all_";
+      expect(wrapper.vm.displayValue).toBe("<ALL>");
+    });
+
+    const customQuery = { type: "query_values", query_data: { query: "SELECT 1" } };
+
+    it("keeps '<ALL>' over an empty list for an auto query_values variable", () => {
+      wrapper = createWrapper({ variableItem: { ...multiSelectVariableItem, options: [] } });
+      wrapper.vm.selectedValue = ["_o2_all_"];
+      expect(wrapper.vm.displayValue).toBe("<ALL>");
+    });
+
+    it("shows the no-values state for 'All' on a custom query variable with an empty list", () => {
+      wrapper = createWrapper({
+        variableItem: { ...multiSelectVariableItem, ...customQuery, options: [] },
+      });
+      wrapper.vm.selectedValue = ["_o2_all_"];
+      expect(wrapper.vm.displayValue).toBe("(No Data Found)");
+    });
+
+    it("keeps '<ALL>' while the query variable is loading or lists values", () => {
+      wrapper = createWrapper({
+        variableItem: { ...multiSelectVariableItem, ...customQuery, options: [], isLoading: true },
+      });
+      wrapper.vm.selectedValue = ["_o2_all_"];
+      expect(wrapper.vm.displayValue).toBe("<ALL>");
+      wrapper = createWrapper({ variableItem: { ...multiSelectVariableItem, ...customQuery } });
+      wrapper.vm.selectedValue = ["_o2_all_"];
       expect(wrapper.vm.displayValue).toBe("<ALL>");
     });
 

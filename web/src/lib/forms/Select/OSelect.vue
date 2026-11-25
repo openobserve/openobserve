@@ -159,9 +159,12 @@ const split = computed(() => splitControlAttrs($attrs));
 const wrapperAttrs = computed(() => split.value.wrapperAttrs);
 const controlAttrs = computed(() => split.value.controlAttrs);
 
-const insideLabelName = computed(() =>
-  props.labelPosition === "inside" && props.label ? props.label : undefined,
-);
+// An unlabelled trigger still needs an accessible name; the placeholder is the closest one.
+const insideLabelName = computed(() => {
+  if (props.label) return props.labelPosition === "inside" ? props.label : undefined;
+  if ($attrs["aria-label"] || $attrs["aria-labelledby"]) return undefined;
+  return props.placeholder || undefined;
+});
 onMounted(() =>
   warnIfUnlabelled(
     "OSelect",

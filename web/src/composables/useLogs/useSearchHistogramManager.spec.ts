@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSearchHistogramManager } from "./useSearchHistogramManager";
 import { gt } from "@/types/i18n";
@@ -359,6 +360,53 @@ describe("useSearchHistogramManager", () => {
       expect(buildWebSocketPayload).toHaveBeenCalled();
       expect(initializeSearchConnection).toHaveBeenCalled();
       expect(mockState.searchObj.loadingHistogram).toBe(true);
+    });
+
+    it("counts the rows without the SQL OFFSET and tells the handler to subtract it", async () => {
+      mockState.searchObj.data.queryResults = { total: 50 };
+      const queryReq: any = {
+        query: { from: 0, size: 50, sql: 'SELECT * FROM "s" ORDER BY _timestamp DESC OFFSET 5' },
+      };
+      const mockPayload: any = { traceId: "t" };
+      const buildWebSocketPayload = vi.fn(() => mockPayload);
+
+      await histogramManager.getPageCountThroughSocket(queryReq, buildWebSocketPayload, vi.fn());
+
+      expect(queryReq.query.sql).toBe('SELECT * FROM "s" ORDER BY _timestamp DESC');
+      expect(mockPayload.meta).toEqual({ rowOffset: 5 });
+    });
+
+    it("decodes and re-encodes a base64 SQL when it drops the OFFSET", async () => {
+      mockState.searchObj.data.queryResults = { total: 50 };
+      const queryReq: any = {
+        encoding: "base64",
+        query: { from: 0, size: 50, sql: b64EncodeUnicode('SELECT * FROM "s" OFFSET 5') },
+      };
+      const mockPayload: any = { traceId: "t" };
+
+      await histogramManager.getPageCountThroughSocket(
+        queryReq,
+        vi.fn(() => mockPayload),
+        vi.fn(),
+      );
+
+      expect(b64DecodeUnicode(queryReq.query.sql)).toBe('SELECT * FROM "s"');
+      expect(mockPayload.meta).toEqual({ rowOffset: 5 });
+    });
+
+    it("leaves the request alone when the SQL has no OFFSET", async () => {
+      mockState.searchObj.data.queryResults = { total: 50 };
+      const queryReq: any = { query: { from: 0, size: 50, sql: 'SELECT * FROM "s"' } };
+      const mockPayload: any = { traceId: "t" };
+
+      await histogramManager.getPageCountThroughSocket(
+        queryReq,
+        vi.fn(() => mockPayload),
+        vi.fn(),
+      );
+
+      expect(queryReq.query.sql).toBe('SELECT * FROM "s"');
+      expect(mockPayload.meta).toBeUndefined();
     });
 
     it("should use time_offset when available", async () => {

@@ -225,6 +225,14 @@ fn scalar_operand(value: Value, expr: &PromExpr, eval_ctx: &EvalContext) -> Valu
 pub(crate) mod tests {
     use std::{sync::Arc, time::Duration};
 
+    use datafusion::{
+        arrow::{
+            array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+            datatypes::{DataType, Field, Schema},
+        },
+        datasource::MemTable,
+        prelude::SessionContext,
+    };
     use promql_parser::{
         label::Matchers,
         parser::{
@@ -355,7 +363,7 @@ pub(crate) mod tests {
     }
 
     /// Serves `m{job="api"}` on instances `a` = 100 and `b` = 200, sampled every minute.
-    struct TwoInstanceProvider(datafusion::prelude::SessionContext, Vec<String>);
+    struct TwoInstanceProvider(SessionContext, Vec<String>);
 
     #[async_trait::async_trait]
     impl crate::TableProvider for TwoInstanceProvider {
@@ -381,9 +389,8 @@ pub(crate) mod tests {
         }
     }
 
-    fn two_instance_schema() -> Arc<datafusion::arrow::datatypes::Schema> {
+    fn two_instance_schema() -> Arc<Schema> {
         use config::meta::promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL};
-        use datafusion::arrow::datatypes::{DataType, Field, Schema};
         Arc::new(Schema::new(vec![
             Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new(HASH_LABEL, DataType::UInt64, false),
@@ -395,9 +402,6 @@ pub(crate) mod tests {
     }
 
     fn two_instance_provider() -> TwoInstanceProvider {
-        use datafusion::arrow::array::{
-            Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array,
-        };
         let rows: Vec<(i64, u64, &str, f64)> = (0..5)
             .flat_map(|minute| {
                 let ts = T0 - minute * 60_000_000;
@@ -416,10 +420,8 @@ pub(crate) mod tests {
             ],
         )
         .unwrap();
-        let table =
-            datafusion::datasource::MemTable::try_new(two_instance_schema(), vec![vec![batch]])
-                .unwrap();
-        let ctx = datafusion::prelude::SessionContext::new();
+        let table = MemTable::try_new(two_instance_schema(), vec![vec![batch]]).unwrap();
+        let ctx = SessionContext::new();
         ctx.register_table("m", Arc::new(table)).unwrap();
         TwoInstanceProvider(ctx, vec![])
     }

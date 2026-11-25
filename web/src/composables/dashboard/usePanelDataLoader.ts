@@ -54,6 +54,7 @@ import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
 import { DASHBOARD_FRESH_PANEL_TIME } from "./dashboardFreshPanelTime";
 import { parseSearchError } from "@/utils/query/searchError";
 import { PANEL_KEY_IGNORED_PATHS, normalizeVariablesForCache } from "@/composables/query/panelKey";
+import { isCustomQueryVariable } from "@/utils/dashboard/variables/queryVariableUtils";
 import { summarizePanelDiagnostics } from "@/utils/dashboard/panelDiagnostics";
 
 /**
@@ -82,6 +83,7 @@ export const usePanelDataLoader = (
   regionClusterParams?: any,
   allowAnnotationsAPI?: any,
   injectedPromqlData?: any,
+  onLoadEndedWithoutFetch?: (shown: boolean) => void,
 ) => {
   const PANEL_DATA_LOADER_DEBUG = false;
   const log = (...args: any[]) => {
@@ -420,6 +422,8 @@ export const usePanelDataLoader = (
 
   const loadData = async () => {
     const loadCall = ++latestLoadCall;
+    let fetched = false;
+    let shown = false;
     failedRefreshHold.loadScheduled();
     log("[usePanelDataLoader] " + panelSchema?.value?.title + ": loadData() PROCEEDING");
 
@@ -463,6 +467,7 @@ export const usePanelDataLoader = (
         state.annotations = [];
         state.errorDetail = injectedPromqlData.value.errorDetail ?? { message: "", code: "" };
         runCount++;
+        shown = true;
         return;
       }
 
@@ -511,6 +516,7 @@ export const usePanelDataLoader = (
           log("loadData: panelcache: restored from cache");
           failedRefreshHold.loadRestored();
           runCount++;
+          shown = true;
           if (!refreshAfterRestore.queueRefresh()) return;
         }
       }
@@ -558,6 +564,7 @@ export const usePanelDataLoader = (
 
       refreshAfterRestore.holdIfQueued();
       failedRefreshHold.loadStarted();
+      fetched = true;
       state.loading = true;
       state.isCachedDataDifferWithCurrentTimeRange = false;
 
@@ -585,6 +592,9 @@ export const usePanelDataLoader = (
     } finally {
       // Covers every early return: a call that was not superseded and left nothing running has its answer.
       if (loadCall === latestLoadCall && !state.loading) settleLoad();
+      // A superseded call hands its answer to the newer one, which reports for itself.
+      if (loadCall === latestLoadCall && !fetched)
+        onLoadEndedWithoutFetch?.(shown && !state.errorDetail?.message);
     }
   };
 
@@ -922,12 +932,22 @@ export const usePanelDataLoader = (
     const cachedIncompleteLoad =
       tempPanelCacheValue?.loading === true || tempPanelCacheValue?.isPartialData === true;
 
+    const cachedRangeDiffers = cachedWindowDiffers(
+      cache?.cacheTimeRange,
+      selectedTimeObj?.value,
+      refreshAfterRestore.isCalendarRange(selectedTimeObj?.value),
+    );
+    // A query variable's values come from the time range, so a result from another range was filtered by other values.
+    const rangeBoundToQueryVariable =
+      cachedRangeDiffers && (getDependentVariablesData() ?? []).some(isCustomQueryVariable);
+
     // Check if it is stale or not
     if (
       tempPanelCacheValue &&
       Object.keys(tempPanelCacheValue).length > 0 &&
       cacheKeysMatch &&
       !cachedIncompleteLoad &&
+      !rangeBoundToQueryVariable &&
       refreshAfterRestore.acceptsCachedWindow(cache.cacheTimeRange, selectedTimeObj?.value)
     ) {
       // const cache = getPanelCache();
@@ -954,13 +974,7 @@ export const usePanelDataLoader = (
         };
       }
 
-      if (
-        cachedWindowDiffers(
-          cache?.cacheTimeRange,
-          selectedTimeObj?.value,
-          refreshAfterRestore.isCalendarRange(selectedTimeObj?.value),
-        )
-      ) {
+      if (cachedRangeDiffers) {
         state.isCachedDataDifferWithCurrentTimeRange = true;
       }
 

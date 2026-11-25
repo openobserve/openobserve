@@ -582,6 +582,7 @@ describe("SessionDetails — turn rows", () => {
       [expect.objectContaining({ traceId: "trace-xyz" })],
       1698999999999999,
       1700000000000001,
+      expect.any(Array),
     );
   });
 

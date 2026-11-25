@@ -15,8 +15,10 @@
 
 use std::str::FromStr;
 
+use arrow::error::ArrowError;
 use async_nats::{error::Error as NatsError, jetstream};
 use config::{meta::feature::Feature, utils::json};
+use parquet::errors::ParquetError;
 use thiserror::Error as ThisError;
 pub mod grpc;
 
@@ -36,9 +38,9 @@ pub enum Error {
     #[error("SerdeJsonError# {0}")]
     SerdeJsonError(#[from] json::Error),
     #[error("ArrowError# {0}")]
-    ArrowError(#[from] arrow::error::ArrowError),
+    ArrowError(#[from] ArrowError),
     #[error("ParquetError# {0}")]
-    ParquetError(#[from] parquet::errors::ParquetError),
+    ParquetError(#[from] ParquetError),
     #[error("ObjectStoreError# {0}")]
     ObjectStoreError(#[from] object_store::Error),
     #[error("WatchError# watcher is exists {0}")]

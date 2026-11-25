@@ -98,7 +98,9 @@ pub(crate) async fn node_alive(node: &str) -> bool {
     !node.is_empty()
         && node != LOCAL_NODE.uuid
         && get_node_by_uuid(node).await.is_some_and(|owner| {
-            owner.http_addr != LOCAL_NODE.http_addr || owner.grpc_addr != LOCAL_NODE.grpc_addr
+            owner.is_alive()
+                && (owner.http_addr != LOCAL_NODE.http_addr
+                    || owner.grpc_addr != LOCAL_NODE.grpc_addr)
         })
 }
 
@@ -879,6 +881,14 @@ mod tests {
                 "peer",
                 Some(node("peer", "peer-host", peer_http, peer_grpc)),
                 ClaimDecision::Skip,
+            ),
+            (
+                "stopped-peer",
+                Some(config::meta::cluster::Node {
+                    status: config::meta::cluster::NodeStatus::Offline,
+                    ..node("stopped-peer", "stopped-host", peer_http, peer_grpc)
+                }),
+                ClaimDecision::Claim,
             ),
         ];
         for (_, entry, _) in &cases {

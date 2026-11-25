@@ -15,6 +15,8 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { applyHBarChart } from "@/utils/dashboard/sql/charts/convertSQLHBarChart";
+import { largestLabel } from "@/utils/dashboard/sql/shared/contextBuilder";
+import { NULL_BREAKDOWN_VALUE } from "@/utils/dashboard/sqlProcessData";
 
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
   formatUnitValue: vi.fn((v) => String(v ?? "")),
@@ -212,5 +214,16 @@ describe("applyHBarChart", () => {
     applyHBarChart(ctx);
     // Should be called with xAxisKeys[0] = "x1" during xAxisMaxLabel calculation
     expect(ctx.getAxisDataFromKey).toHaveBeenCalledWith("x1");
+  });
+
+  it("measures a NULL breakdown by its label, not its stand-in value", () => {
+    const ctx = makeMockContext({
+      breakDownKeys: ["breakdown"],
+      getAxisDataFromKey: vi.fn((key: string) =>
+        key === "breakdown" ? [NULL_BREAKDOWN_VALUE] : [],
+      ),
+    });
+    applyHBarChart(ctx);
+    expect(largestLabel).toHaveBeenCalledWith(["(null)"]);
   });
 });

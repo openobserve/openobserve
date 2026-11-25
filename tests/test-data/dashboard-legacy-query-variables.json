@@ -1,0 +1,332 @@
+{
+  "version": 8,
+  "title": "e2e legacy query variables",
+  "description": "v8 Query Values variables saved before AND/OR filter groups",
+  "role": "",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Default",
+      "panels": [
+        {
+          "id": "Panel_legacy",
+          "type": "table",
+          "title": "legacy_panel",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT service_name, count(*) AS cnt FROM \"e2e_query_vars\" WHERE k8s_cluster = '$cluster' GROUP BY service_name",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_query_vars",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "",
+                    "alias": "service_name",
+                    "column": "service_name",
+                    "type": "custom",
+                    "color": null,
+                    "args": []
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "",
+                    "alias": "cnt",
+                    "column": "cnt",
+                    "type": "custom",
+                    "color": null,
+                    "args": []
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 96,
+            "h": 14,
+            "i": 1
+          }
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [
+      {
+        "type": "query_values",
+        "name": "cluster",
+        "label": "cluster",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "e2e_query_vars",
+          "field": "k8s_cluster",
+          "max_record_size": null,
+          "filter": []
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": false,
+        "hideOnDashboard": false,
+        "selectAllValueForMultiSelect": "first",
+        "customMultiSelectValue": [],
+        "escapeSingleQuotes": true,
+        "scope": "global",
+        "tabs": [],
+        "panels": []
+      },
+      {
+        "type": "query_values",
+        "name": "ns",
+        "label": "ns",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "e2e_query_vars",
+          "field": "k8s_namespace",
+          "max_record_size": null,
+          "filter": [
+            {
+              "name": "k8s_cluster",
+              "operator": "=",
+              "value": "$cluster"
+            }
+          ]
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "hideOnDashboard": false,
+        "selectAllValueForMultiSelect": "first",
+        "customMultiSelectValue": [],
+        "escapeSingleQuotes": true,
+        "scope": "global",
+        "tabs": [],
+        "panels": []
+      },
+      {
+        "type": "query_values",
+        "name": "svc_eq",
+        "label": "svc_eq",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "e2e_query_vars",
+          "field": "service_name",
+          "max_record_size": null,
+          "filter": [
+            {
+              "name": "level",
+              "operator": "=",
+              "value": "error"
+            }
+          ]
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": false,
+        "hideOnDashboard": false,
+        "selectAllValueForMultiSelect": "first",
+        "customMultiSelectValue": [],
+        "escapeSingleQuotes": true,
+        "scope": "global",
+        "tabs": [],
+        "panels": []
+      },
+      {
+        "type": "query_values",
+        "name": "svc_ne",
+        "label": "svc_ne",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "e2e_query_vars",
+          "field": "service_name",
+          "max_record_size": null,
+          "filter": [
+            {
+              "name": "level",
+              "operator": "!=",
+              "value": "debug"
+            },
+            {
+              "name": "k8s_cluster",
+              "operator": "=",
+              "value": "$cluster"
+            }
+          ]
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": false,
+        "hideOnDashboard": false,
+        "selectAllValueForMultiSelect": "first",
+        "customMultiSelectValue": [],
+        "escapeSingleQuotes": true,
+        "scope": "global",
+        "tabs": [],
+        "panels": []
+      },
+      {
+        "type": "query_values",
+        "name": "svc_in",
+        "label": "svc_in",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "e2e_query_vars",
+          "field": "service_name",
+          "max_record_size": null,
+          "filter": [
+            {
+              "name": "level",
+              "operator": "IN",
+              "value": "error,warn"
+            }
+          ]
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": false,
+        "hideOnDashboard": false,
+        "selectAllValueForMultiSelect": "first",
+        "customMultiSelectValue": [],
+        "escapeSingleQuotes": true,
+        "scope": "global",
+        "tabs": [],
+        "panels": []
+      },
+      {
+        "type": "query_values",
+        "name": "svc_contains",
+        "label": "svc_contains",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "e2e_query_vars",
+          "field": "service_name",
+          "max_record_size": null,
+          "filter": [
+            {
+              "name": "message",
+              "operator": "Contains",
+              "value": "timeout"
+            }
+          ]
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": false,
+        "hideOnDashboard": false,
+        "selectAllValueForMultiSelect": "first",
+        "customMultiSelectValue": [],
+        "escapeSingleQuotes": true,
+        "scope": "global",
+        "tabs": [],
+        "panels": []
+      },
+      {
+        "type": "query_values",
+        "name": "svc_null",
+        "label": "svc_null",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "e2e_query_vars",
+          "field": "service_name",
+          "max_record_size": null,
+          "filter": [
+            {
+              "name": "service_id",
+              "operator": "Is Null",
+              "value": ""
+            }
+          ]
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": false,
+        "hideOnDashboard": false,
+        "selectAllValueForMultiSelect": "first",
+        "customMultiSelectValue": [],
+        "escapeSingleQuotes": true,
+        "scope": "global",
+        "tabs": [],
+        "panels": []
+      },
+      {
+        "type": "query_values",
+        "name": "svc_notnull",
+        "label": "svc_notnull",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "e2e_query_vars",
+          "field": "service_name",
+          "max_record_size": null,
+          "filter": [
+            {
+              "name": "service_id",
+              "operator": "Is Not Null",
+              "value": ""
+            }
+          ]
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": false,
+        "hideOnDashboard": false,
+        "selectAllValueForMultiSelect": "first",
+        "customMultiSelectValue": [],
+        "escapeSingleQuotes": true,
+        "scope": "global",
+        "tabs": [],
+        "panels": []
+      },
+      {
+        "type": "query_values",
+        "name": "svc_multi",
+        "label": "svc_multi",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "e2e_query_vars",
+          "field": "service_name",
+          "max_record_size": null,
+          "filter": [
+            {
+              "name": "k8s_namespace",
+              "operator": "=",
+              "value": "$ns"
+            }
+          ]
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": false,
+        "hideOnDashboard": false,
+        "selectAllValueForMultiSelect": "first",
+        "customMultiSelectValue": [],
+        "escapeSingleQuotes": true,
+        "scope": "global",
+        "tabs": [],
+        "panels": []
+      }
+    ],
+    "showDynamicFilters": false
+  },
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "30m"
+  }
+}

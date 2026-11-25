@@ -246,6 +246,27 @@ describe("AddUpdateOrganization", () => {
       );
     });
 
+    it("F3 a create emits updated with the new org's identifier", async () => {
+      // Mirrors OrganizationCreationResponse: the org is flattened next to service_account.
+      vi.spyOn(orgService, "create").mockResolvedValueOnce({
+        status: 200,
+        data: { identifier: "org-new", name: "New Org", type: "custom", service_account: null },
+      } as any);
+      const wrapper = mountComp();
+      await getNameInput(wrapper).setValue("New Org");
+      await submitForm(wrapper);
+
+      expect(wrapper.emitted("updated")).toEqual([["org-new", "New Org"]]);
+    });
+
+    it("F3 a rename emits updated with no identifier", async () => {
+      const wrapper = mountComp({ modelValue: { id: "123", name: "Acme" } });
+      await getNameInput(wrapper).setValue("Acme Renamed");
+      await submitForm(wrapper);
+
+      expect(wrapper.emitted("updated")).toEqual([[]]);
+    });
+
     it("renames the organization in update mode", async () => {
       const wrapper = mountComp({ modelValue: { id: "123", name: "Acme" } });
       await getNameInput(wrapper).setValue("Acme Renamed");

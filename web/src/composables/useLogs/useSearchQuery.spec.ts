@@ -1367,6 +1367,33 @@ describe("useSearchQuery › free text (item 1)", () => {
     expect(getSql(getQueryReq(false))).toBe(`SELECT * FROM "fts_a" WHERE status=500 --404`);
   });
 
+  describe("SQL OFFSET without a LIMIT", () => {
+    const sqlReq = async (sql: string) => {
+      select(ftsStream("fts_a"));
+      mockState.searchObj.meta.sqlMode = true;
+      mockState.searchObj.data.query = sql;
+      mockState.searchObj.meta.resultGrid.showPagination = true;
+      const real = await vi.importActual<typeof import("./logsUtils")>("./logsUtils");
+      const { logsUtils } = await import("./logsUtils");
+      vi.mocked(logsUtils).mockImplementationOnce(() => real.logsUtils() as any);
+      return useSearchQuery(gt).getQueryReq(false) as any;
+    };
+
+    it("keeps the page size and paging instead of taking the offset as the size", async () => {
+      const req = await sqlReq('SELECT * FROM "fts_a" ORDER BY _timestamp DESC OFFSET 5');
+
+      expect(req.query.size).toBe(mockState.searchObj.meta.resultGrid.rowsPerPage);
+      expect(mockState.searchObj.meta.resultGrid.showPagination).toBe(true);
+    });
+
+    it("still uses the LIMIT as the size, without paging", async () => {
+      const req = await sqlReq('SELECT * FROM "fts_a" LIMIT 10 OFFSET 5');
+
+      expect(req.query.size).toBe(10);
+      expect(mockState.searchObj.meta.resultGrid.showPagination).toBe(false);
+    });
+  });
+
   it("sends an EXPLAIN ANALYZE statement as typed without a pre-flight syntax error", () => {
     select(ftsStream("fts_a"));
     mockState.searchObj.meta.sqlMode = true;

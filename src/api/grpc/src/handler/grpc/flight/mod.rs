@@ -25,7 +25,8 @@ use config::{
 };
 use datafusion::{
     common::{DataFusionError, Result},
-    physical_plan::execute_stream_partitioned,
+    physical_plan::{ExecutionPlan, execute_stream_partitioned},
+    prelude::SessionContext,
 };
 use flight::common::{MetricsInfo, NodeMessages};
 use futures::{StreamExt, stream::BoxStream};
@@ -299,8 +300,8 @@ impl Drop for SessionGuard {
 }
 
 type PlanResult = (
-    datafusion::prelude::SessionContext,
-    Arc<dyn datafusion::physical_plan::ExecutionPlan>,
+    SessionContext,
+    Arc<dyn ExecutionPlan>,
     Option<DeferredLock>,
     ScanStats,
 );

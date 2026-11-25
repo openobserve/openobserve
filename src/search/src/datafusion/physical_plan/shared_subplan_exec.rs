@@ -30,8 +30,8 @@ use datafusion::{
     },
     physical_expr::PhysicalExpr,
     physical_plan::{
-        DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, PlanProperties,
-        SpillManager, Statistics,
+        ChildStats, DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties,
+        PlanProperties, SpillManager, Statistics, StatisticsArgs, StatisticsContext,
         execution_plan::{Boundedness, CardinalityEffect, EmissionType},
         metrics::{Count, ExecutionPlanMetricsSet, MetricBuilder, MetricsSet, SpillMetrics},
         stream::RecordBatchStreamAdapter,
@@ -125,17 +125,14 @@ impl ExecutionPlan for SharedSubplanMarkerExec {
         self.input.execute(partition, context)
     }
 
-    fn child_stats_requests(
-        &self,
-        partition: Option<usize>,
-    ) -> Vec<datafusion::physical_plan::ChildStats> {
-        vec![datafusion::physical_plan::ChildStats::At(partition)]
+    fn child_stats_requests(&self, partition: Option<usize>) -> Vec<ChildStats> {
+        vec![ChildStats::At(partition)]
     }
 
     fn statistics_from_inputs(
         &self,
         input_stats: &[Arc<Statistics>],
-        _args: &datafusion::physical_plan::StatisticsArgs,
+        _args: &StatisticsArgs,
     ) -> Result<Arc<Statistics>> {
         Ok(Arc::clone(&input_stats[0]))
     }
@@ -279,17 +276,14 @@ impl ExecutionPlan for SharedSubplanExec {
         Some(self.metrics.clone_inner())
     }
 
-    fn child_stats_requests(
-        &self,
-        partition: Option<usize>,
-    ) -> Vec<datafusion::physical_plan::ChildStats> {
-        vec![datafusion::physical_plan::ChildStats::At(partition)]
+    fn child_stats_requests(&self, partition: Option<usize>) -> Vec<ChildStats> {
+        vec![ChildStats::At(partition)]
     }
 
     fn statistics_from_inputs(
         &self,
         input_stats: &[Arc<Statistics>],
-        _args: &datafusion::physical_plan::StatisticsArgs,
+        _args: &StatisticsArgs,
     ) -> Result<Arc<Statistics>> {
         Ok(Arc::clone(&input_stats[0]))
     }
@@ -360,10 +354,9 @@ impl ExecutionPlan for SharedSubplanReaderExec {
     fn statistics_from_inputs(
         &self,
         _input_stats: &[Arc<Statistics>],
-        args: &datafusion::physical_plan::StatisticsArgs,
+        args: &StatisticsArgs,
     ) -> Result<Arc<Statistics>> {
-        datafusion::physical_plan::StatisticsContext::new()
-            .compute(self.state.input.read().as_ref(), args)
+        StatisticsContext::new().compute(self.state.input.read().as_ref(), args)
     }
 
     fn cardinality_effect(&self) -> CardinalityEffect {

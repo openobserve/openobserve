@@ -647,6 +647,40 @@ describe("TracesSearchResultList", () => {
     });
   });
 
+  describe("header sorting", () => {
+    afterEach(() => {
+      (sharedSearchObj.meta as any).sqlMode = false;
+    });
+
+    it("sorts on the server in the span list, and not for typed SQL, whose ORDER BY decides", () => {
+      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: "spans" as any });
+      expect(wrapper.findComponent({ name: "OTable" }).props("sorting")).toBe("server");
+      wrapper.unmount();
+
+      (sharedSearchObj.meta as any).sqlMode = true;
+      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: "spans" as any });
+      expect(wrapper.findComponent({ name: "OTable" }).props("sorting")).toBe("none");
+    });
+  });
+
+  describe("table columns", () => {
+    afterEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [];
+    });
+
+    it("passes the stored columns through", () => {
+      sharedSearchObj.data.resultGrid.columns = [
+        { id: "service_name", size: 160, meta: {} },
+        { id: "method", size: 160, minSize: 160, meta: { autoWidth: true, fillRemaining: true } },
+      ];
+      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: "spans" as any });
+
+      expect(wrapper.findComponent({ name: "OTable" }).props("columns")).toBe(
+        sharedSearchObj.data.resultGrid.columns,
+      );
+    });
+  });
+
   describe("onColumnReorder — fill column", () => {
     afterEach(() => {
       sharedSearchObj.data.resultGrid.columns = [];
@@ -824,6 +858,18 @@ describe("TracesSearchResultList", () => {
       // non-span_kind field — no translation
       await cellActions.vm.$emit("add-search-term", "service_name", "my-svc", "include");
       expect(sharedSearchObj.data.stream.addToFilter).toContain("service_name = 'my-svc'");
+    });
+
+    it("keeps the stored span_kind value in SQL mode, where typed SQL compares the raw column", async () => {
+      (sharedSearchObj.meta as any).sqlMode = true;
+      try {
+        wrapper = mount_({ hits: [hit], loading: false });
+        const cellActions = wrapper.findComponent({ name: "CellActions" });
+        await cellActions.vm.$emit("add-search-term", "span_kind", "2", "include");
+        expect(sharedSearchObj.data.stream.addToFilter).toBe("span_kind = '2'");
+      } finally {
+        (sharedSearchObj.meta as any).sqlMode = false;
+      }
     });
 
     it("should use != operator for exclude action", async () => {
