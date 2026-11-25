@@ -17,8 +17,9 @@ use std::{ops::Range, sync::Arc};
 
 use anyhow::{Context, Result, bail, ensure};
 use arrow::{
-    array::{Array, BooleanArray, RecordBatch, UInt32Array},
-    datatypes::SchemaRef,
+    array::{Array, ArrayRef, BooleanArray, RecordBatch, UInt32Array},
+    compute::cast,
+    datatypes::{DataType, Field, Schema, SchemaRef},
 };
 use bytes::Bytes;
 use datafusion::physical_plan::PhysicalExpr;
@@ -342,12 +343,8 @@ fn metrics_block_index_data(
         config::FileFormat::Vortex if index.header.row_group_size.is_none() => None,
         _ => bail!("Invalid block parent format/row-group binding"),
     };
-    let mut fields = vec![arrow::datatypes::Field::new(
-        METRICS_INDEX_ROW_COUNT,
-        arrow::datatypes::DataType::UInt32,
-        false,
-    )];
-    let mut columns: Vec<arrow::array::ArrayRef> = vec![Arc::new(UInt32Array::from_iter_values(
+    let mut fields = vec![Field::new(METRICS_INDEX_ROW_COUNT, DataType::UInt32, false)];
+    let mut columns: Vec<ArrayRef> = vec![Arc::new(UInt32Array::from_iter_values(
         index.blocks.row_counts(),
     ))];
     for (i, field) in index.labels.schema().fields().iter().enumerate() {
@@ -360,17 +357,14 @@ fn metrics_block_index_data(
             if flat_labels.contains(field.name()) {
                 let source_field = index.header.source_schema.field_with_name(field.name())?;
                 fields.push(source_field.clone());
-                columns.push(arrow::compute::cast(
-                    index.labels.column(i),
-                    source_field.data_type(),
-                )?);
+                columns.push(cast(index.labels.column(i), source_field.data_type())?);
             } else {
                 fields.push(field.as_ref().clone());
                 columns.push(Arc::clone(index.labels.column(i)));
             }
         }
     }
-    let schema = Arc::new(arrow::datatypes::Schema::new(fields));
+    let schema = Arc::new(Schema::new(fields));
     let batch = RecordBatch::try_new(Arc::clone(&schema), columns)?;
     Ok(MetricsIndexData {
         schema,
@@ -387,7 +381,7 @@ mod tests {
         datatypes::{DataType, Field, Schema},
     };
     use config::meta::stream::{FileKey, FileMeta, FileSelection};
-    use object_store::{ObjectStore, PutOptions};
+    use object_store::{ObjectStore, PutOptions, memory::InMemory};
     use promql_parser::label::{MatchOp, Matcher, Matchers};
 
     use super::*;
@@ -469,7 +463,7 @@ mod tests {
     }
 
     async fn store(file: &FileKey, bytes: Option<Vec<u8>>) {
-        let store = object_store::memory::InMemory::new();
+        let store = InMemory::new();
         if let Some(bytes) = bytes {
             let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
             store

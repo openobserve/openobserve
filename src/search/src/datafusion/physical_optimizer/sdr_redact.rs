@@ -301,10 +301,10 @@ mod tests {
         },
         catalog::Session,
         common::cast::as_string_array,
-        datasource::{MemTable, TableProvider, TableType},
+        datasource::{MemTable, TableProvider, TableType, memory::MemorySourceConfig},
         logical_expr::{
-            ColumnarValue, TableProviderFilterPushDown, Volatility, create_udf,
-            expr::ScalarFunction,
+            ColumnarValue, TableProviderFilterPushDown, Volatility, col, create_udf,
+            expr::ScalarFunction, lit,
         },
         physical_plan::displayable,
         prelude::SessionContext,
@@ -505,8 +505,6 @@ mod tests {
 
     #[test]
     fn test_scan_filters_drop_redacted_and_match_all() {
-        use datafusion::logical_expr::{col, lit};
-
         let redacted = redacted_columns(&protected());
         let match_all = Expr::ScalarFunction(ScalarFunction::new_udf(
             Arc::new(create_udf(
@@ -530,8 +528,6 @@ mod tests {
 
     #[test]
     fn test_wrap_keeps_the_schema_and_skips_a_scan_without_redacted_columns() {
-        use datafusion::datasource::memory::MemorySourceConfig;
-
         let options = Arc::new(ConfigOptions::default());
         let scan: Arc<dyn ExecutionPlan> =
             MemorySourceConfig::try_new_exec(&[vec![test_batch()]], test_schema(), None).unwrap();
@@ -642,7 +638,7 @@ mod tests {
         )
         .unwrap();
 
-        let streams = [datafusion::common::TableReference::from("app")];
+        let streams = [TableReference::from("app")];
         let digest = |raw: Option<&RawStreams>| {
             redaction_digest("sdr_digest", StreamType::Logs, &streams, raw)
         };
@@ -652,7 +648,7 @@ mod tests {
         assert!(redacted.is_some());
         assert_eq!(digest(None), redacted);
 
-        let unprotected = [datafusion::common::TableReference::from("plain")];
+        let unprotected = [TableReference::from("plain")];
         let plain = redaction_digest("sdr_digest", StreamType::Logs, &unprotected, None);
         assert_eq!(plain, None);
         assert_eq!(digest(Some(&raw)), plain);

@@ -32,6 +32,7 @@ use config::meta::{
     service_streams::{RelatedStreams, StreamInfo},
     stream::StreamType,
 };
+use datafusion::common::TableReference;
 #[cfg(feature = "enterprise")]
 use db::user::is_root_user;
 #[cfg(any(feature = "enterprise", test))]
@@ -831,9 +832,7 @@ pub fn resolve_query_sources(sources: &[QuerySource]) -> ResolvedSources {
 }
 
 /// Every table `sql` reads, after the custom-pattern rewrite the search engine applies first.
-pub fn resolve_sql_tables(
-    sql: &str,
-) -> Result<Vec<datafusion::common::TableReference>, anyhow::Error> {
+pub fn resolve_sql_tables(sql: &str) -> Result<Vec<TableReference>, anyhow::Error> {
     config::meta::sql::resolve_stream_names_with_type(&search_rewritten_sql(sql))
 }
 

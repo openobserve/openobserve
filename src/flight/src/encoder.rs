@@ -18,7 +18,7 @@ use arrow::{
     compute::BatchCoalescer,
     datatypes::DataType,
     ipc::{
-        MessageHeader,
+        MessageBuilder, MessageHeader, MetadataVersion,
         writer::{DictionaryTracker, IpcDataGenerator, IpcWriteContext, IpcWriteOptions},
     },
 };
@@ -206,8 +206,8 @@ fn split_batch_for_grpc_response(
 pub fn header_none() -> Bytes {
     let mut builder: FlatBufferBuilder<'_> = FlatBufferBuilder::new();
 
-    let mut message = arrow::ipc::MessageBuilder::new(&mut builder);
-    message.add_version(arrow::ipc::MetadataVersion::V5);
+    let mut message = MessageBuilder::new(&mut builder);
+    message.add_version(MetadataVersion::V5);
     message.add_header_type(MessageHeader::NONE);
     message.add_bodyLength(0);
 
@@ -223,10 +223,11 @@ mod tests {
 
     use arrow::{
         array::{
-            ArrayRef, BinaryArray, Int32Array, ListArray, StringArray, StringViewArray, StructArray,
+            ArrayRef, BinaryArray, DictionaryArray, Int32Array, ListArray, StringArray,
+            StringViewArray, StructArray, types::Int32Type,
         },
-        buffer::OffsetBuffer,
-        ipc::writer::IpcWriteOptions,
+        buffer::{Buffer, OffsetBuffer},
+        ipc::{CompressionType, reader::read_dictionary, root_as_message, writer::IpcWriteOptions},
     };
     use arrow_schema::{DataType, Field, Fields, Schema};
     use config::meta::search::ScanStats;
@@ -298,11 +299,6 @@ mod tests {
     ) -> Vec<RecordBatch> {
         use std::collections::HashMap;
 
-        use arrow::{
-            buffer::Buffer,
-            ipc::{MessageHeader, reader::read_dictionary, root_as_message},
-        };
-
         let mut dictionaries: HashMap<i64, ArrayRef> = HashMap::new();
         let mut out = Vec::new();
         for data in fds {
@@ -341,8 +337,6 @@ mod tests {
     // chunk. Verify the sequential decoder still reconstructs every row correctly.
     #[test]
     fn test_parallel_chunks_roundtrip_with_dictionary() {
-        use arrow::array::{DictionaryArray, Int32Array, types::Int32Type};
-
         let n = 20_000i32;
         let values: ArrayRef = Arc::new(StringArray::from(vec!["red", "green", "blue"]));
         let keys = Int32Array::from((0..n).map(|i| i % 3).collect::<Vec<_>>());
@@ -361,7 +355,7 @@ mod tests {
             RecordBatch::try_new(schema.clone(), vec![Arc::new(id), Arc::new(color)]).unwrap();
 
         let options = IpcWriteOptions::default()
-            .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
+            .try_with_compression(Some(CompressionType::ZSTD))
             .unwrap();
         let mut coalescer = ChunkCoalescer::new();
         // coalescer emits 8192-row chunks -> multiple chunks for 20000 rows
@@ -479,8 +473,8 @@ mod tests {
 
         assert!(!header.is_empty());
         // Verify it's a valid flatbuffer message
-        let message = arrow::ipc::root_as_message(&header).unwrap();
-        assert_eq!(message.header_type(), arrow::ipc::MessageHeader::NONE);
+        let message = root_as_message(&header).unwrap();
+        assert_eq!(message.header_type(), MessageHeader::NONE);
         assert_eq!(message.bodyLength(), 0);
     }
 
@@ -492,9 +486,7 @@ mod tests {
         // 10000 rows: BatchCoalescer emits one 8192-row chunk during push_batch,
         // then finish() flushes the remaining 1808 rows → total 2 messages
         let ids: Vec<i32> = (0..10000).collect();
-        let batch =
-            arrow::array::RecordBatch::try_new(schema, vec![Arc::new(Int32Array::from(ids))])
-                .unwrap();
+        let batch = RecordBatch::try_new(schema, vec![Arc::new(Int32Array::from(ids))]).unwrap();
 
         let mut chunks = coalescer.push_batch(batch).unwrap();
         chunks.extend(coalescer.finish().unwrap());

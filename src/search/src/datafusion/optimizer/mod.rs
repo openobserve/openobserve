@@ -351,7 +351,7 @@ fn stream_index_fields(sql: &Sql) -> HashMap<TableReference, HashSet<String>> {
 #[cfg(test)]
 mod tests {
     use arrow::{
-        array::{ArrayRef, Int64Array, RecordBatch, StringArray, StructArray},
+        array::{ArrayRef, Int64Array, RecordBatch, StringArray, StringViewArray, StructArray},
         util::pretty::pretty_format_batches,
     };
     use arrow_schema::{DataType, Field, Fields, Schema};
@@ -742,7 +742,7 @@ mod tests {
             Arc::new(schema),
             vec![
                 Arc::new(Int64Array::from(vec![1, 2, 3])) as ArrayRef,
-                Arc::new(arrow::array::StringViewArray::from_iter([
+                Arc::new(StringViewArray::from_iter([
                     Some("auth-gw"),
                     Some("billing"),
                     None,

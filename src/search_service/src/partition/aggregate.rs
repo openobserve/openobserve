@@ -35,6 +35,7 @@ use config::{
     },
     utils::sql::is_simple_aggregate_query,
 };
+use datafusion::common::TableReference;
 use infra::errors::Error;
 
 #[cfg(feature = "vectorscan")]
@@ -98,7 +99,7 @@ pub fn check_streaming_redaction(
     org_id: &str,
     stream_type: config::meta::stream::StreamType,
     streaming_id: Option<&str>,
-    streams: &[datafusion::common::TableReference],
+    streams: &[TableReference],
     raw_streams: &RawStreams,
 ) -> Result<(), Error> {
     let Some(recorded) = streaming_id.and_then(registry::get_redaction_digest) else {
@@ -118,7 +119,7 @@ pub fn check_streaming_redaction(
     _org_id: &str,
     _stream_type: config::meta::stream::StreamType,
     _streaming_id: Option<&str>,
-    _streams: &[datafusion::common::TableReference],
+    _streams: &[TableReference],
     _raw_streams: &RawStreams,
 ) -> Result<(), Error> {
     Ok(())

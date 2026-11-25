@@ -15,7 +15,10 @@
 
 use std::{io, path::PathBuf};
 
+use arrow::error::ArrowError;
 use config::utils::size::bytes_to_human_readable;
+use datafusion::error::DataFusionError;
+use parquet::errors::ParquetError;
 use snafu::Snafu;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -76,44 +79,44 @@ pub enum Error {
     NotImplemented,
     #[snafu(display("Failed to infer JSON schema: {source}"))]
     InferJsonSchemaError {
-        source: arrow::error::ArrowError,
+        source: ArrowError,
     },
     #[snafu(display("Failed to merge schema: {source}"))]
     MergeSchemaError {
-        source: arrow::error::ArrowError,
+        source: ArrowError,
     },
     #[snafu(display("Failed to create arrow writer: {source}"))]
     CreateArrowWriterError {
-        source: arrow::error::ArrowError,
+        source: ArrowError,
     },
     #[snafu(display("Failed to write arrow record batch: {source}"))]
     WriteArrowRecordBatchError {
-        source: arrow::error::ArrowError,
+        source: ArrowError,
     },
     #[snafu(display("Failed to create arrow JSON encoder: {source}"))]
     CreateArrowJsonEncoder {
-        source: arrow::error::ArrowError,
+        source: ArrowError,
     },
     #[snafu(display("Failed to encode records into an arrow record batch: {source}"))]
     ArrowJsonEncodeError {
-        source: arrow::error::ArrowError,
+        source: ArrowError,
     },
     #[snafu(display("Failed to encode arrow IPC: {source}"))]
     ArrowIpcEncodeError {
-        source: arrow::error::ArrowError,
+        source: ArrowError,
     },
     #[snafu(display("Failed to decode arrow IPC: {source}"))]
     ArrowIpcDecodeError {
-        source: arrow::error::ArrowError,
+        source: ArrowError,
     },
     ReadParquetFileError {
-        source: parquet::errors::ParquetError,
+        source: ParquetError,
     },
     WriteParquetRecordBatchError {
-        source: parquet::errors::ParquetError,
+        source: ParquetError,
     },
     MergeRecordBatchError {
-        source: datafusion::error::DataFusionError,
+        source: DataFusionError,
     },
     TokioJoinError {
         source: tokio::task::JoinError,
