@@ -4,13 +4,20 @@
 declare const __COMMIT_HASH__: string;
 declare const __BUILD_TIME__: number;
 
-// en-US.json minus the lazily loaded blocks, and one such block (locale-blocks plugin in vite.config.ts).
-declare module "*en-US.json?without=serviceVersions" {
-  const messages: Omit<typeof import("./src/locales/languages/en-US.json"), "serviceVersions">;
+// en-US.json minus the lazily loaded blocks, and each such block (locale-blocks plugin in vite.config.ts).
+declare module "*en-US.json?without=serviceVersions,starterPacks" {
+  const messages: Omit<
+    typeof import("./src/locales/languages/en-US.json"),
+    "serviceVersions" | "starterPacks"
+  >;
   export default messages;
 }
 declare module "*en-US.json?block=serviceVersions" {
   const block: (typeof import("./src/locales/languages/en-US.json"))["serviceVersions"];
+  export default block;
+}
+declare module "*en-US.json?block=starterPacks" {
+  const block: (typeof import("./src/locales/languages/en-US.json"))["starterPacks"];
   export default block;
 }
 
