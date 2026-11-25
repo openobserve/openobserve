@@ -390,6 +390,7 @@ import { usePanelLivePreview } from "@/composables/dashboard/usePanelLivePreview
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import {
   validateConditions,
+  builderQueryRejection,
   validateJoinFields,
   validateSQLPanelFields,
 } from "@/utils/dashboard/panelValidation";
@@ -2277,7 +2278,11 @@ export default defineComponent({
           "dashboard",
         );
         if (panel.queryType !== "promql") validateJoinFields(t, query?.joins, errors);
-        if ((query?.query ?? "").trim() === "") {
+        // A query the builder left empty on purpose says why, not that it is empty.
+        const rejection = builderQueryRejection(t, dashboardPanelData, query);
+        if (rejection) {
+          errors.push(rejection);
+        } else if ((query?.query ?? "").trim() === "") {
           errors.push(t("dashboard.utils.queryIsEmpty", { index: index + 1 }));
         }
       });

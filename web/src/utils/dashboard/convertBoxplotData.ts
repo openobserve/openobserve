@@ -24,6 +24,7 @@ import { getGridLineStyle, getSeriesColor } from "./colorPalette";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { getFieldLabel } from "./fieldLabel";
 import { BOXPLOT_STATS, boxplotStatAlias, type BoxplotStatKey } from "./boxplotStats";
+import { hasTopLevelOrderBy } from "./sqlOrderBy";
 import { parseTimestampValue } from "./tableConfigUtils";
 import { echartsPaletteColor } from "./thresholds";
 
@@ -31,12 +32,8 @@ export const BOXPLOT_WHISKERS = ["minmax", "iqr"] as const;
 export const DEFAULT_BOXPLOT_WHISKER = "minmax";
 // Tukey fences: a value further than this many interquartile ranges past a quartile is an outlier.
 const IQR_FENCE = 1.5;
-const LABEL_CHAR_WIDTH = 7;
-// Room the y-axis labels and grid padding take from the plot width.
-const Y_AXIS_ALLOWANCE = 80;
-const CROWDED_ROTATION = 45;
-const CROWDED_WIDTH = 120;
-const FALLBACK_PANEL_WIDTH = 800;
+// The label width bar and line charts truncate category labels to.
+const DEFAULT_LABEL_WIDTH = 120;
 const TIME_BUCKET_FUNCTIONS = new Set(["histogram", "date_bin"]);
 
 /** Five-number summary of one category; outliers are only split off in iqr mode. */
@@ -107,7 +104,14 @@ interface BoxGroup {
 const byName = (a: BoxGroup, b: BoxGroup) =>
   a.name.localeCompare(b.name, undefined, { numeric: true });
 
-/** The SQL-computed summary of a builder row, or null when the row carries raw values instead. */
+/** Whether the query sets the category order itself: a builder category with a sort direction, or a top-level ORDER BY in custom SQL. */
+const keepsRowOrder = (query: any, category: any): boolean => {
+  if (query?.customQuery) return hasTopLevelOrderBy(String(query?.query ?? ""));
+  const direction = String(category?.sortBy ?? "").toUpperCase();
+  return !category?.isDerived && (direction === "ASC" || direction === "DESC");
+};
+
+/** The SQL-computed summary of a row (the builder's, or a custom query that kept it), or null when the row carries raw values instead. */
 const rowSummary = (row: any, alias: string): Record<BoxplotStatKey, number> | null => {
   const entries = BOXPLOT_STATS.map(
     (stat) =>
@@ -117,7 +121,10 @@ const rowSummary = (row: any, alias: string): Record<BoxplotStatKey, number> | n
   return Object.fromEntries(entries) as Record<BoxplotStatKey, number>;
 };
 
-/** Raw y values (or a builder query's per-category summary) per x value of query 1; without an x field everything lands in one box named after the y field. */
+/**
+ * Raw y values (or a per-category summary from the builder, or from custom SQL that kept its summary columns) per x value of query 1; without an x field everything lands in one box named after the y field.
+ * Time buckets run chronologically; other categories keep the query's row order when it sorts them, else run A to Z.
+ */
 export const boxplotGroups = (panelSchema: any, data: any[], timezone = "UTC"): BoxGroup[] => {
   const groups = new Map<string, BoxGroup>();
   // One query per box plot: boxes from several queries would collide on shared category names.
@@ -134,7 +141,7 @@ export const boxplotGroups = (panelSchema: any, data: any[], timezone = "UTC"): 
   };
   rows.forEach((row: any) => {
     const name = category ? categoryName(getDataValue(row, category.alias)) : label;
-    const summary = query?.customQuery ? null : rowSummary(row, field.alias);
+    const summary = rowSummary(row, field.alias);
     const value = summary ? null : toNumber(getDataValue(row, field.alias));
     if (!summary && value === null) return;
     if (!groups.has(name)) groups.set(name, { name, values: [] });
@@ -142,6 +149,8 @@ export const boxplotGroups = (panelSchema: any, data: any[], timezone = "UTC"): 
     if (summary) group.summary ??= summary;
     else group.values.push(value!);
   });
+  // Time-bucket labels are zero-padded date-times, so name order is chronological.
+  if (!isTimeBucket && keepsRowOrder(query, category)) return [...groups.values()];
   return [...groups.values()].sort(byName);
 };
 
@@ -170,22 +179,24 @@ const seriesName = (panelSchema: any): string => {
   return getFieldLabel(field, panelSchema?.config, query?.customQuery) || field?.alias || "";
 };
 
-/** Shows every category; crowded labels tilt and truncate, unless the panel sets its own rotation or width. */
-export const categoryLabelLayout = (names: string[], panelWidth: number, config: any) => {
-  const slot = Math.max(panelWidth - Y_AXIS_ALLOWANCE, 40) / Math.max(names.length, 1);
-  const longest = Math.max(0, ...names.map((name) => String(name).length)) * LABEL_CHAR_WIDTH;
-  const crowded = longest + 8 > slot;
-  const rotate = Number(config?.axis_label_rotate) || (crowded ? CROWDED_ROTATION : 0);
-  const width = Number(config?.axis_label_truncate_width) || (crowded ? CROWDED_WIDTH : undefined);
-  return { interval: 0, rotate, width, overflow: "truncate" as const };
-};
+/** The x labels a bar or line chart draws for its last x field: ECharts skips labels that would overlap, so a crowded axis shows a readable subset; time buckets stay flat at the default width. */
+export const categoryLabelLayout = (config: any, isTimeBucket: boolean) => ({
+  interval: "auto" as const,
+  hideOverlap: true,
+  overflow: "none" as const,
+  rotate: isTimeBucket ? 0 : Number(config?.axis_label_rotate) || 0,
+  width: isTimeBucket
+    ? DEFAULT_LABEL_WIDTH
+    : Number(config?.axis_label_truncate_width) || DEFAULT_LABEL_WIDTH,
+});
 
-/** Converts SQL rows into a box plot: one box per x value, from the builder's per-category summary or a custom query's raw values. */
+/** Converts SQL rows into a box plot: one box per x value, from a per-category SQL summary or a custom query's raw values. */
 export const convertBoxplotData = (
   panelSchema: any,
   data: any,
   store: any,
-  chartPanelRef?: any,
+  // Kept for the converter signature; ECharts sizes the labels itself.
+  _chartPanelRef?: any,
 ) => {
   const config = panelSchema?.config ?? {};
   const whisker = config.boxplot_whisker === "iqr" ? "iqr" : DEFAULT_BOXPLOT_WHISKER;
@@ -285,9 +296,8 @@ export const convertBoxplotData = (
       boundaryGap: true,
       axisLabel: {
         ...categoryLabelLayout(
-          groups.map((group) => group.name),
-          chartPanelRef?.value?.offsetWidth || FALLBACK_PANEL_WIDTH,
           config,
+          TIME_BUCKET_FUNCTIONS.has(panelSchema?.queries?.[0]?.fields?.x?.[0]?.functionName),
         ),
         color: chartAxisTextColor(),
       },
