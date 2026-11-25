@@ -86,7 +86,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="flex h-full min-h-0 max-lg:flex-col max-lg:overflow-auto">
       <div class="min-w-0 flex-1 overflow-auto max-lg:flex-none max-lg:overflow-visible">
         <OContent y class="flex max-w-240 flex-col gap-4" data-test="autoresolve-run-main">
-          <RcaStageStepper :stages="AUTORESOLVE_STAGES" :stage="stageKey" />
+          <RcaStageStepper
+            :stages="AUTORESOLVE_STAGES"
+            :stage="stageKey"
+            :skipped="skippedStages(run)"
+          />
 
           <AutoResolveMissingConnection
             v-if="missingConnection"
@@ -169,7 +173,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AutoResolveOutcome
             v-if="run.outcome?.verdict"
             :outcome="run.outcome"
-            :checked-at-us="run.ended_at_us"
+            :ended-at-us="run.ended_at_us"
+            :checked="checkRan(run)"
             :error="outcomeCardError"
             :hide-explanation="!!missingConnection"
             :cant-fix="shownState === 'cant_fix'"
@@ -463,6 +468,7 @@ import {
   autoresolveTime,
   autoresolveWhen,
   canUseSentence,
+  checkRan,
   CORRECTION_KIND_KEY,
   deadlineText,
   investigationSummary,
@@ -470,6 +476,7 @@ import {
   removedChips,
   runConnections,
   shownRunState,
+  skippedStages,
   stageIndexFor,
   startedByText,
   stepResultView,
@@ -739,7 +746,11 @@ const approvedFact = computed(() => {
 });
 
 const checkFact = computed(() => {
-  switch (run.value?.state) {
+  const current = run.value;
+  if (current?.state === "no_change" && checkRan(current)) {
+    return t("autoresolve.run.facts.checkNotMet");
+  }
+  switch (current?.state) {
     case "checking":
       return t("autoresolve.run.facts.checkRunning");
     case "worked":

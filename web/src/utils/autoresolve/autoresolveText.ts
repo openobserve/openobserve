@@ -19,6 +19,7 @@ import {
   autoresolveErrorConnection,
   autoresolveErrorMessage,
   autoresolveErrorStatus,
+  isTerminalRunState,
   type AutoResolveApprover,
   type AutoResolveChangedMcp,
   type AutoResolveConnectionRef,
@@ -26,6 +27,7 @@ import {
   type AutoResolveMissingConnection,
   type AutoResolvePlanCorrectionKind,
   type AutoResolveRun,
+  type AutoResolveRunRow,
   type AutoResolveRunState,
   type AutoResolveSavedTrigger,
   type AutoResolveStepState,
@@ -82,6 +84,9 @@ const VERDICT_STATES: ReadonlySet<AutoResolveRunState> = new Set([
   "outcome_unknown",
   "worse",
 ]);
+
+/** Ends a run reaches only after it asked for approval. */
+const ASKED_ENDS: ReadonlySet<AutoResolveRunState> = new Set(["declined", "lapsed"]);
 
 /** A step of the current plan in one of these ran, so the run can no longer take a connection. */
 const RAN_STEP_STATES: ReadonlySet<AutoResolveStepState> = new Set([
@@ -351,10 +356,29 @@ export function addableConnection(
 
 /** The state a run's chips show: a run that ended because no MCP can make the fix reads as its own end. */
 export function shownRunState(
-  run: Pick<AutoResolveRun, "state" | "steps" | "plan">,
+  run: Pick<AutoResolveRunRow, "state" | "cant_fix">,
 ): AutoResolveRunState | "cant_fix" {
-  const missing = run.plan?.missing_capability || run.plan?.missing_connection;
-  return run.state === "no_change" && !run.steps.length && missing ? "cant_fix" : run.state;
+  return run.cant_fix ? "cant_fix" : run.state;
+}
+
+/** A check follows steps that ran, so a run that ended before any never checked. */
+export function checkRan(run: Pick<AutoResolveRun, "state" | "steps">): boolean {
+  if (run.state === "worked" || run.state === "worse") return true;
+  return run.state === "no_change" && run.steps.some((s) => RAN_STEP_STATES.has(s.state));
+}
+
+/** Keys of the stages an ended run never reached; its stepper shows them skipped, not done. */
+export function skippedStages(
+  run: Pick<AutoResolveRun, "state" | "steps" | "approved_at_us" | "approval_deadline_us">,
+): string[] {
+  if (!isTerminalRunState(run.state)) return [];
+  const proceeded =
+    run.approved_at_us !== null || run.steps.some((s) => RAN_STEP_STATES.has(s.state));
+  const asked = proceeded || run.approval_deadline_us !== null || ASKED_ENDS.has(run.state);
+  const reached = { ask: asked, proceed: proceeded, check: checkRan(run) };
+  return Object.entries(reached)
+    .filter(([, yes]) => !yes)
+    .map(([key]) => key);
 }
 
 /** What a run can use: its MCPs, folded past `max`, then always OpenObserve data last. */

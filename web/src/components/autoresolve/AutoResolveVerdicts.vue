@@ -27,13 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <span class="text-text-body text-compact wrap-anywhere">
         <span v-if="verdict.agent_explanation">{{ verdict.agent_explanation }}</span>
-        <span v-if="verdict.agent_checked_at_us" class="ms-1">
-          {{
-            t("autoresolve.run.outcome.checkedAt", {
-              time: autoresolveTime(verdict.agent_checked_at_us),
-            })
-          }}
-        </span>
+        <span v-if="agentAt" class="ms-1">{{ agentAt }}</span>
       </span>
     </section>
     <section
@@ -63,6 +57,8 @@ import {
   type OutcomeTone,
 } from "@/utils/autoresolve/autoresolveText";
 
+const CHECK_VERDICTS: ReadonlySet<string> = new Set(["worked", "no_change", "worse"]);
+
 const props = defineProps<{ verdict: AutoResolvePersonVerdict }>();
 
 const { t } = useI18nTyped();
@@ -70,6 +66,15 @@ const { t } = useI18nTyped();
 const agentTone = computed<OutcomeTone>(() => {
   if (props.verdict.agent_verdict === "worked") return "positive";
   return props.verdict.agent_verdict === "worse" ? "negative" : "neutral";
+});
+// A check that gave no verdict leaves the run's end state here, so the time is when it ended.
+const agentAt = computed(() => {
+  const at = props.verdict.agent_checked_at_us;
+  if (!at) return raw("");
+  const time = autoresolveTime(at);
+  return CHECK_VERDICTS.has(props.verdict.agent_verdict ?? "")
+    ? t("autoresolve.run.outcome.checkedAt", { time })
+    : t("autoresolve.run.outcome.endedAt", { time });
 });
 const personTone = computed<OutcomeTone>(() =>
   props.verdict.verdict === "fixed" ? "positive" : "warning",

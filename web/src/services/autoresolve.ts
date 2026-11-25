@@ -84,6 +84,8 @@ export interface AutoResolveRunRow {
   connections: AutoResolveConnectionRef[];
   created_at_us: number;
   ended_at_us: number | null;
+  /** The run ended because no MCP of the run can make the fix its plan needs. */
+  cant_fix: boolean;
 }
 
 /** Filters of `GET /runs`; `page` is 1-based. */
@@ -345,6 +347,8 @@ export interface AutoResolveRun {
   requester: string;
   created_at_us: number;
   ended_at_us: number | null;
+  /** The run ended because no MCP of the run can make the fix its plan needs. */
+  cant_fix: boolean;
   approval_deadline_us: number | null;
   /** When the current plan was accepted; null until one is. */
   planned_at_us: number | null;

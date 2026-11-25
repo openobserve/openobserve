@@ -60,6 +60,7 @@ const run = (id: string): AutoResolveRunRow => ({
   connections: [{ id: "c1", name: "Code host" }],
   created_at_us: 1_700_000_000_000_000,
   ended_at_us: 1_700_000_600_000_000,
+  cant_fix: false,
 });
 
 let wrapper: VueWrapper | undefined;
@@ -87,7 +88,7 @@ describe("AutoResolveRunsTable", () => {
     service.listRuns.mockImplementation(async (_org: string, q: AutoResolveRunQuery) =>
       axiosReply(
         q.page === 2
-          ? { runs: [run("r-26")], total: 26 }
+          ? { runs: [{ ...run("r-26"), state: "no_change", cant_fix: true }], total: 26 }
           : { runs: Array.from({ length: 25 }, (_, i) => run(`r-${i}`)), total: 26 },
       ),
     );
@@ -113,6 +114,7 @@ describe("AutoResolveRunsTable", () => {
     });
     await next().trigger("click");
     await vi.waitFor(() => expect(rows()).toHaveLength(1));
+    expect(rows()[0].text()).toContain(i18n.global.t("autoresolve.state.cantFix"));
 
     expect(service.listRuns).toHaveBeenLastCalledWith(
       "default",

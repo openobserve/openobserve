@@ -34813,6 +34813,7 @@
       },
       "outcome": {
         "checkedAt": "Checked at {time}",
+        "endedAt": "Ended at {time}",
         "error": "The run reported an error: {reason}"
       },
       "evidence": {

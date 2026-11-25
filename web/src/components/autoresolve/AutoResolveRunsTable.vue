@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTimeCell :value="row.created_at_us" unit="us" :timezone="store.state.timezone" />
       </template>
       <template #cell-state="{ row }">
-        <OTag type="autoresolveRunState" :value="row.state" size="sm" />
+        <OTag type="autoresolveRunState" :value="shownRunState(row)" size="sm" />
       </template>
       <template #cell-requester="{ row }">
         <OUserCell v-if="row.trigger.kind === 'person'" :value="row.requester" />
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTimeCell :value="row.created_at_us" unit="us" :timezone="store.state.timezone" />
     </template>
     <template #cell-state="{ row }">
-      <OTag type="autoresolveRunState" :value="row.state" size="sm" />
+      <OTag type="autoresolveRunState" :value="shownRunState(row)" size="sm" />
     </template>
     <template #cell-requester="{ row }">
       <OUserCell v-if="row.trigger.kind === 'person'" :value="row.requester" />
@@ -242,6 +242,7 @@ import { autoresolveRunsQuery, autoresolveSummaryQuery } from "@/services/autore
 import {
   autoresolveDuration,
   connectionsSentence,
+  shownRunState,
   startedByText,
 } from "@/utils/autoresolve/autoresolveText";
 

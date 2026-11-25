@@ -25,7 +25,7 @@ describe("AutoResolveOutcome", () => {
     const w = mount(AutoResolveOutcome, {
       props: {
         outcome: { verdict: "worked", system_summary: "Step 1 done.", explanation },
-        checkedAtUs: null,
+        endedAtUs: null,
         error: "The check query timed out.",
       },
       global: { plugins: [i18n] },
@@ -50,7 +50,7 @@ describe("AutoResolveOutcome", () => {
           system_summary: "No approved steps ran.",
           explanation: "needs postgres: end session 4211",
         },
-        checkedAtUs: null,
+        endedAtUs: null,
         hideExplanation: true,
       },
       global: { plugins: [i18n] },
@@ -63,7 +63,7 @@ describe("AutoResolveOutcome", () => {
     w.unmount();
   });
 
-  it("names a run no MCP could fix as its own end, in amber", () => {
+  it("names a run no MCP could fix as its own end, in amber, ended not checked", () => {
     const w = mount(AutoResolveOutcome, {
       props: {
         outcome: {
@@ -71,7 +71,7 @@ describe("AutoResolveOutcome", () => {
           system_summary: "None of this run's MCPs can do this, so nothing was changed.",
           explanation: null,
         },
-        checkedAtUs: null,
+        endedAtUs: Date.now() * 1000,
         cantFix: true,
       },
       global: { plugins: [i18n] },
@@ -79,6 +79,7 @@ describe("AutoResolveOutcome", () => {
 
     expect(w.find("h2").text()).toBe(i18n.global.t("autoresolve.state.cantFix"));
     expect(w.find('[data-test="autoresolve-outcome"]').attributes("data-tone")).toBe("warning");
+    expect(w.find('[data-test="autoresolve-outcome-at"]').text()).toMatch(/^Ended at /);
     w.unmount();
   });
 
@@ -90,7 +91,7 @@ describe("AutoResolveOutcome", () => {
     const w = mount(AutoResolveOutcome, {
       props: {
         outcome: { verdict, prior_verdict, system_summary: "Done.", explanation: null },
-        checkedAtUs: null,
+        endedAtUs: null,
       },
       global: { plugins: [i18n] },
     });

@@ -24,8 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <h2 class="m-0 text-lg font-semibold" :class="TITLE_CLASS[tone]">{{ verdictLabel }}</h2>
-      <span v-if="checkedAtUs" class="text-text-secondary text-xs">
-        {{ t("autoresolve.run.outcome.checkedAt", { time: autoresolveWhen(checkedAtUs).text }) }}
+      <span v-if="endedLine" class="text-text-secondary text-xs" data-test="autoresolve-outcome-at">
+        {{ endedLine }}
       </span>
     </div>
     <p
@@ -80,8 +80,10 @@ import {
 const props = withDefaults(
   defineProps<{
     outcome: AutoResolveOutcome;
-    /** When the check finished; null when the run has no check time. */
-    checkedAtUs: number | null;
+    /** When the run ended; null while it has no end time. */
+    endedAtUs: number | null;
+    /** A check ran, so the run ended when it finished. */
+    checked?: boolean;
     /** The run's own error, shown apart from the model's explanation; null when the page shows it elsewhere. */
     error?: string | null;
     /** The missing-connection card already says what the fix needs. */
@@ -89,7 +91,7 @@ const props = withDefaults(
     /** The run ended because none of its MCPs can make the fix. */
     cantFix?: boolean;
   }>(),
-  { error: null, hideExplanation: false, cantFix: false },
+  { error: null, hideExplanation: false, cantFix: false, checked: false },
 );
 
 const { t } = useI18nTyped();
@@ -101,6 +103,14 @@ const tone = computed<OutcomeTone>(() => {
   if (verdict === "worse") return "negative";
   if (prior_verdict === "worse") return "warning";
   return verdict === "worked" ? "positive" : "neutral";
+});
+
+const endedLine = computed(() => {
+  if (!props.endedAtUs) return raw("");
+  const time = autoresolveWhen(props.endedAtUs).text;
+  return props.checked
+    ? t("autoresolve.run.outcome.checkedAt", { time })
+    : t("autoresolve.run.outcome.endedAt", { time });
 });
 
 const needs = computed(() => needsText(props.outcome.explanation, t));

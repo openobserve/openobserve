@@ -67,6 +67,17 @@ describe("RcaStageStepper (02 TH37)", () => {
     expect(wrapper.findAll('[data-state="todo"]')).toHaveLength(7);
   });
 
+  it("shows the stages a run moved past without reaching as skipped, not done", () => {
+    const wrapper = mountStepper({
+      stages: AUTORESOLVE_STAGES,
+      stage: "outcome",
+      skipped: ["ask", "proceed", "check"],
+    });
+
+    const states = wrapper.findAll("[data-state]").map((bar) => bar.attributes("data-state"));
+    expect(states).toEqual(["done", "skipped", "skipped", "skipped", "current"]);
+  });
+
   it.each([
     ["RCA stages by default", undefined, RCA_STEPPER_STAGES],
     ["the stages passed in", AUTORESOLVE_STAGES, AUTORESOLVE_STAGES],

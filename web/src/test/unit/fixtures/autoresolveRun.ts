@@ -68,6 +68,7 @@ export function autoresolveRun(overrides: Partial<AutoResolveRun> = {}): AutoRes
     requester: "ana@example.com",
     created_at_us: RCA_T0,
     ended_at_us: null,
+    cant_fix: false,
     approval_deadline_us: RCA_T0 + sec(1800),
     revision: 1,
     plan: {

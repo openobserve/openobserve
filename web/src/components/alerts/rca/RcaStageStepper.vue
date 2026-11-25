@@ -63,8 +63,10 @@ const props = withDefaults(
     stage?: string | null;
     /** Stages in order; Incidents uses the RCA protocol stages. */
     stages?: readonly StepperStage[];
+    /** Keys of stages the run moved past without reaching. */
+    skipped?: readonly string[];
   }>(),
-  { stageIndex: null, stage: null, stages: () => RCA_STEPPER_STAGES },
+  { stageIndex: null, stage: null, stages: () => RCA_STEPPER_STAGES, skipped: () => [] },
 );
 
 const { t } = useI18nTyped();
@@ -82,15 +84,27 @@ const currentLabel = computed(() =>
   current.value > 0 ? t(stages.value[current.value - 1].labelKey) : "",
 );
 
-const barState = (position: number) =>
-  position < current.value ? "done" : position === current.value ? "current" : "todo";
+type BarState = "done" | "skipped" | "current" | "todo";
 
-const BAR_CLASS = { done: "bg-accent", current: "bg-accent/45", todo: "bg-border-default" };
+const barState = (position: number): BarState => {
+  if (position === current.value) return "current";
+  if (position > current.value) return "todo";
+  return props.skipped.includes(stages.value[position - 1].key) ? "skipped" : "done";
+};
 
-const labelClass = (position: number) =>
-  position < current.value
-    ? "text-text-body"
-    : position === current.value
-      ? "text-text-heading font-bold"
-      : "text-text-secondary";
+const BAR_CLASS: Record<BarState, string> = {
+  done: "bg-accent",
+  skipped: "bg-border-default",
+  current: "bg-accent/45",
+  todo: "bg-border-default",
+};
+
+const LABEL_CLASS: Record<BarState, string> = {
+  done: "text-text-body",
+  skipped: "text-text-muted",
+  current: "text-text-heading font-bold",
+  todo: "text-text-secondary",
+};
+
+const labelClass = (position: number) => LABEL_CLASS[barState(position)];
 </script>

@@ -110,6 +110,8 @@ pub struct AutoResolveRunRow {
     pub connections: Vec<AutoResolveConnectionRef>,
     pub created_at_us: i64,
     pub ended_at_us: Option<i64>,
+    /// The run ended because no MCP of the run can make the fix its plan needs.
+    pub cant_fix: bool,
 }
 
 /// `GET …/autoresolve/runs`.
@@ -280,6 +282,8 @@ pub struct AutoResolveRunDetail {
     pub connections: Vec<AutoResolveConnectionRef>,
     pub created_at_us: i64,
     pub ended_at_us: Option<i64>,
+    /// The run ended because no MCP of the run can make the fix its plan needs.
+    pub cant_fix: bool,
     pub approval_deadline_us: Option<i64>,
     pub revision: i32,
     /// When the current revision's steps were written: the plan's acceptance, or the hold that
@@ -567,6 +571,7 @@ impl Loaded {
             connections: run_connections(run, &names.current),
             created_at_us: run.created_at_us,
             ended_at_us: run.ended_at_us,
+            cant_fix: evidence::cannot_act(&run.state, run.plan.as_deref()),
             approval_deadline_us: run.approval_deadline_us,
             revision: run.revision,
             planned_at_us: self.planned_at_us(),
@@ -915,19 +920,7 @@ pub async fn list_runs(
 ) -> Result<AutoResolveRunList, AutoResolveError> {
     let (rows, total) = autoresolve_runs::list(org, filter, page, page_size).await?;
     let current = connection_names(org).await?;
-    let runs = rows
-        .into_iter()
-        .map(|run| AutoResolveRunRow {
-            trigger: trigger_of(&run),
-            connections: run_connections(&run, &current),
-            id: run.id,
-            goal: run.goal,
-            state: run.state,
-            requester: run.requester,
-            created_at_us: run.created_at_us,
-            ended_at_us: run.ended_at_us,
-        })
-        .collect();
+    let runs = rows.into_iter().map(|run| run_row(run, &current)).collect();
     Ok(AutoResolveRunList { runs, total })
 }
 
@@ -1090,6 +1083,20 @@ fn run_connections(
             connection_ref(id, current, || last.unwrap_or_default())
         })
         .collect()
+}
+
+fn run_row(run: RunRow, current: &HashMap<String, String>) -> AutoResolveRunRow {
+    AutoResolveRunRow {
+        trigger: trigger_of(&run),
+        connections: run_connections(&run, current),
+        cant_fix: evidence::cannot_act(&run.state, run.plan.as_deref()),
+        id: run.id,
+        goal: run.goal,
+        state: run.state,
+        requester: run.requester,
+        created_at_us: run.created_at_us,
+        ended_at_us: run.ended_at_us,
+    }
 }
 
 fn stored_names(run: &RunRow) -> HashMap<String, String> {
@@ -1347,6 +1354,33 @@ mod tests {
                 false => (Some("Postgres"), true, true),
             };
             assert_eq!(shown, want, "{case}: the missing MCP");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_run_row_says_when_no_mcp_of_the_run_can_make_the_fix() {
+        let db = memory_db().await;
+        autoresolve_runs::insert_with(&db, new_run("r1"))
+            .await
+            .unwrap();
+        let run = autoresolve_runs::get_with(&db, ORG, "r1")
+            .await
+            .unwrap()
+            .unwrap();
+        let plan = json!({"options": [], "omitted_count": 0, "omitted_reason": null,
+            "missing_capability": "VACUUM public.orders"})
+        .to_string();
+        let cases = [
+            ("ended on it", "no_change", true),
+            ("still investigating", "investigating", false),
+        ];
+        for (case, state, want) in cases {
+            let run = RunRow {
+                state: state.into(),
+                plan: Some(plan.clone()),
+                ..run.clone()
+            };
+            assert_eq!(run_row(run, &HashMap::new()).cant_fix, want, "{case}");
         }
     }
 

@@ -38,6 +38,7 @@ import {
   removedChips,
   runConnections,
   shownRunState,
+  skippedStages,
   stageIndexFor,
   stepResultView,
   theMcps,
@@ -369,35 +370,27 @@ describe("autoresolveText", () => {
     expect(addableConnection(run, RCA_T0)).toEqual(offered ? MISSING : null);
   });
 
-  const CANT_PLAN = {
-    ...(PLANNED.plan as AutoResolvePlan),
-    options: [],
-    missing_capability: "VACUUM orders",
-  };
   it.each<[string, Partial<AutoResolveRun>, string]>([
-    ["no MCP can make the fix", { state: "no_change", steps: [], plan: CANT_PLAN }, "cant_fix"],
-    [
-      "the fix needs an MCP the run lacks",
-      { state: "no_change", steps: [], plan: NEEDS_PLAN },
-      "cant_fix",
-    ],
-    [
-      "a no-change run whose step ran",
-      { state: "no_change", steps: [RAN], plan: CANT_PLAN },
-      "no_change",
-    ],
-    [
-      "a no-change run with nothing missing",
-      { state: "no_change", steps: [], plan: PLANNED.plan },
-      "no_change",
-    ],
-    [
-      "a waiting run that needs an MCP",
-      { state: "waiting_approval", plan: NEEDS_PLAN },
-      "waiting_approval",
-    ],
+    ["a run the server marks no MCP can fix", { state: "no_change", cant_fix: true }, "cant_fix"],
+    ["any other run", { state: "no_change", cant_fix: false }, "no_change"],
   ])("shownRunState for %s", (_case, overrides, expected) => {
     expect(shownRunState(autoresolveRun(overrides))).toBe(expected);
+  });
+
+  const UNASKED = { approval_deadline_us: null };
+  const RAN_ON = { approved_at_us: RCA_T0, approval_deadline_us: null, steps: [RAN] };
+  const ALL = ["ask", "proceed", "check"];
+  it.each<[string, Partial<AutoResolveRun>, string[]]>([
+    ["a worked run", { state: "worked", ...RAN_ON }, []],
+    ["a no-change run whose check ran", { state: "no_change", ...RAN_ON }, []],
+    ["a run no MCP can fix", { state: "no_change", ...UNASKED }, ALL],
+    ["a declined run", { state: "declined", ...UNASKED }, ["proceed", "check"]],
+    ["a lapsed run", { state: "lapsed" }, ["proceed", "check"]],
+    ["a run whose step failed", { state: "step_failed", ...RAN_ON }, ["check"]],
+    ["a run that failed before its plan", { state: "failed", ...UNASKED }, ALL],
+    ["a waiting run", { state: "waiting_approval" }, []],
+  ])("skippedStages for %s", (_case, overrides, expected) => {
+    expect(skippedStages(autoresolveRun(overrides))).toEqual(expected);
   });
 
   const DEC_1_1048 = Date.UTC(2026, 11, 1, 10, 48) * 1000;
