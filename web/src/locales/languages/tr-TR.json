@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Henüz hiçbir kanalın varsayılan kuruluşu yok",
-      "description": "Varsayılanı olmayan bir kanaldaki sorular, her kişinin varsayılan kuruluşuna gider (/o2 org ile değiştirebilirler)."
+      "description": "Varsayılanı olmayan bir kanaldaki sorular, her kişinin varsayılan kuruluşuna gider ({command} org ile değiştirebilirler)."
     },
     "noSlackLinkedPeople": {
       "title": "Bu kuruluşta henüz kimse Slack'i bağlamadı"
@@ -28714,7 +28714,7 @@
     "mineJoinTeam": "Bir ekibe katıl",
     "mineTestTeam": "{team} ekibine test çağrısı gönder",
     "mineCoverSaved": "Vekalet kaydedildi",
-    "mineSlackLinkHow": "Slack'te /o2 link komutunu yazın",
+    "mineSlackLinkHow": "Slack'te {command} link komutunu yazın",
     "mineSlackSetUpHint": "Ayarlar › Slack bölümünü açar",
     "myDeliveriesWhen": "Ne zaman",
     "phoneAddHint": "SMS ve aramalar için bir numara ekleyin",
@@ -29285,7 +29285,7 @@
     "channelUnavailable": "{channel} — arkasında hiçbir sağlayıcı yok",
     "channelUnverified": "{channel} — kayıtlı, ama kimse doğrulamadı",
     "channelAddPhone": "{reason}. Telefonunuzu Nöbetim sayfasından ekleyin",
-    "channelLinkSlack": "{reason}. Slack'te /o2 link komutunu çalıştırın",
+    "channelLinkSlack": "{reason}. Slack'te {command} link komutunu çalıştırın",
     "loadUneven": "{name} son {days} gün içinde medyanın {factor} katı yük taşıdı",
     "loadUnevenLabel": "Yük dengesiz:",
     "membersUnreachableMore": "{name} bu ekipte, ancak ona hiçbir çağrı ulaşamıyor — {why}. {count} diğer üye de aynı durumda. | {name} bu ekipte, ancak ona hiçbir çağrı ulaşamıyor — {why}. {count} diğer üye de aynı durumda.",
@@ -31071,7 +31071,7 @@
         "settings": "Ayarlar",
         "install": "Kurulum sırasında",
         "destination": "Bir uyarı hedefinden",
-        "oncall": "Buradan /o2 oncall ile"
+        "oncall": "Buradan {command} oncall ile"
       },
       "channel": "Kanal",
       "channelPlaceholder": "Kanal ara",
@@ -31085,7 +31085,7 @@
       "editDefault": "Kanal varsayılanını düzenle",
       "removeConfirm": "Varsayılanı kaldır",
       "removeTitle": "#{channel} için varsayılan kaldırılsın mı?",
-      "removeMessage": "{name} kanalındaki sorular bu durumda her kişinin varsayılan kuruluşuna gider (bunu /o2 org ile değiştirebilirler).",
+      "removeMessage": "{name} kanalındaki sorular bu durumda her kişinin varsayılan kuruluşuna gider (bunu {command} org ile değiştirebilirler).",
       "instanceAdminOnly": "Yalnızca örnek yöneticisi",
       "ownOrgOnlyHint": "Bir örnek çalışma alanında kanalları kendi kuruluşunuza eşlersiniz",
       "claimableHint": "Sahiplenilmemiş kanallar ve {org} kuruluşunun sahip olduğu kanallar",

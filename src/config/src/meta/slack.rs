@@ -284,6 +284,9 @@ pub struct InstallationView {
     pub created_at: i64,
     pub scope: InstallScope,
     pub managed: bool,
+    /// The slash command the app registered, such as `/o2`; the web names it in its Slack hints.
+    #[serde(default)]
+    pub command: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub org_access: Option<OrgAccess>,
     #[serde(skip_serializing_if = "Option::is_none")]

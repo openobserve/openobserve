@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useQuery } from "@tanstack/vue-query";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -66,6 +67,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { ABSENT } from "@/composables/useSloFormat";
+import { DEFAULT_SLACK_COMMAND } from "@/components/settings/SlackSettings.schema";
+import { slackMyLinksQuery } from "@/services/slack.queries";
 import type { Channel, ChannelReadiness } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -86,6 +89,16 @@ const props = withDefaults(
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
+
+const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const ownSlackUnlinked = computed(
+  () => props.own && props.channels.some((c) => c.channel === "slack" && isUnlinkedSlack(c)),
+);
+// Only the caller's own unlinked Slack chip names the command, so only that row asks for it.
+const myLinks = useQuery(() =>
+  Object.assign(slackMyLinksQuery(org.value), { enabled: ownSlackUnlinked.value && !!org.value }),
+);
+const slackCommand = computed(() => raw(myLinks.data.value?.command || DEFAULT_SLACK_COMMAND));
 
 /// The person channels in the order the chips read; webhook is the team's room, not a person's.
 const PERSON_CHANNELS: Channel[] = ["email", "slack", "sms", "voice"];
@@ -167,9 +180,13 @@ function chipOf(c: ChannelReadiness): Chip {
 
 /// DM-7: a person links their own Slack account from Slack, so only their own "not linked" chip says how. [pure]
 function ownFixTip(c: ChannelReadiness, reason: I18nText): I18nText {
-  return props.own && c.channel === "slack" && c.blocked_because === "not linked"
-    ? t("oncall.channelLinkSlack", { reason })
+  return props.own && c.channel === "slack" && isUnlinkedSlack(c)
+    ? t("oncall.channelLinkSlack", { reason, command: slackCommand.value })
     : reason;
+}
+
+function isUnlinkedSlack(c: ChannelReadiness): boolean {
+  return !c.deliverable && c.blocked_because === "not linked";
 }
 
 /// One word for the worst blocked state; a cause no word names (no provider, failing sends) stays quiet rather than wrong.
