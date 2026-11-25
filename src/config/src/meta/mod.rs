@@ -47,6 +47,7 @@ pub mod promql;
 pub mod public_dashboards;
 pub mod queue_store;
 pub mod ratelimit;
+pub mod resources;
 pub mod search;
 pub mod self_reporting;
 pub mod service_graph;

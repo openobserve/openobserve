@@ -449,6 +449,12 @@
 </template>
 
 <script setup lang="ts">
+import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+  removeFailedRecentVisit,
+  resourceFailureStatus,
+} from "@/components/commandPalette/useRecentlyViewed";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
@@ -973,17 +979,32 @@ onBeforeUnmount(() => {
 const fetchAlert = async () => {
   if (!orgId.value || !alertId.value) return;
   const request = captureDetailRequest();
+  const recentScope = captureRecentVisitScope();
+  const recentId = request.id;
+  const recentFolder = String(route.query.folder ?? "default");
   try {
     const res = await alertsService.get_by_alert_id(request.org, request.id);
     if (!isCurrentDetailRequest(request)) return;
     alert.value = res.data;
     loadFailure.value = res.data ? null : "not-found";
+    if (res.data)
+      recordResourceVisit(recentScope, {
+        type: "alert",
+        id: recentId,
+        name: res.data.name,
+        route_ref: {
+          alert_id: recentId,
+          folder_id: recentFolder,
+          alert_type: res.data.alert_type ?? (res.data.is_real_time ? "realtime" : "scheduled"),
+        },
+      });
     // Same tick as the assignment, not down in onMounted: setting alert.value
     // queues the render, so any await before this one lets the default History
     // tab mount and fire a fetch for a page that is about to switch away.
     if (isAnomalyAlert.value) activeTab.value = "charts";
   } catch (e: unknown) {
     if (!isCurrentDetailRequest(request)) return;
+    removeFailedRecentVisit(recentScope, "alert", recentId, resourceFailureStatus(e));
     alert.value = null;
     const status = (e as { response?: { status?: number } })?.response?.status;
     loadFailure.value = status === 403 ? "forbidden" : status === 404 ? "not-found" : "failed";

@@ -13,6 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import {
+  captureRecentResourceRequest,
+  removeFailedResourceRequest,
+  type RecentResourceRequest,
+} from "@/components/commandPalette/useRecentlyViewed";
 import store from "../stores";
 import type { AxiosInstance } from "axios";
 import axios from "axios";
@@ -36,6 +41,7 @@ declare module "axios" {
     /** Route the request started on, so a late 403 is not pinned on the page the user moved to. */
     accessRouteKey?: string;
     startedAt?: number;
+    recentResourceRequest?: RecentResourceRequest;
     /** Set on the retry after a token refresh, so a second 401 is not refreshed again. */
     _afterRefresh?: boolean;
   }
@@ -147,6 +153,10 @@ const http = ({ headers } = {} as any) => {
     // A retry after a token refresh reuses its config, so it keeps the page that first asked.
     requestConfig.accessRouteKey ??= currentAccessRouteKey();
     requestConfig.startedAt = Date.now();
+    requestConfig.recentResourceRequest ??= captureRecentResourceRequest(
+      requestConfig.url ?? "",
+      requestConfig.method ?? "get",
+    );
     return requestConfig;
   });
 
@@ -168,6 +178,7 @@ const http = ({ headers } = {} as any) => {
       }
       // Ahead of the status switch: a license denial must not read as a missing RBAC permission.
       if (receiveLicenseDenial(error, error?.config?.startedAt)) return Promise.reject(error);
+      removeFailedResourceRequest(error.config?.recentResourceRequest, error.response?.status);
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:

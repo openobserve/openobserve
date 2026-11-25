@@ -297,10 +297,10 @@
       "importDesc": "Télécharger une définition de pipeline"
     },
     "noQueues": {
-      "title": "Créez votre première file d'attente",
-      "description": "Les files d'attente sont des listes de tâches de révision avec état — associez des configurations de score, un jeu de données cible et un filtre qui alimente les éléments pour la révision humaine.",
-      "action": "Nouvelle file d'attente",
-      "actionDesc": "Démarrer une file d'attente vide"
+      "title": "Créez votre première file d'attente d'annotation",
+      "description": "Les files d'attente d'annotation sont des listes de tâches de revue — associez des configurations de score, un jeu de données cible et un filtre qui y fait entrer des éléments pour une revue humaine.",
+      "action": "Nouvelle file d'attente d'annotation",
+      "actionDesc": "Créer une file d'attente d'annotation vide"
     },
     "noPrompts": {
       "title": "Créez votre premier prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Rien d'anormal ici",
-      "description": "Aucun élément anormal dans cette fenêtre. Élargissez la plage de temps, ou changez le filtre de la file d'attente pour voir les éléments que vous avez déjà triés."
+      "description": "Aucun élément défaillant dans cette fenêtre. Élargissez la plage temporelle ou modifiez le filtre de file d'attente d'annotation pour voir les éléments déjà triés."
     },
     "noTraces": {
       "title": "Aucune trace trouvée",
@@ -9987,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "Le navigateur a refusé le téléchargement du fichier...",
     "chartDataDownloadedCsv": "Données du graphique téléchargées en tant que fichier CSV",
+    "tableDownloadPartial": "Seules les {count} premières lignes du résultat ont été récupérées ; le fichier est donc partiel.",
+    "tableDownloadServerPartial": "Le serveur a renvoyé des données partielles ; le fichier peut donc être incomplet.",
+    "tableDownloadWaitForLoad": "Le panneau est encore en cours de chargement. Téléchargez à nouveau une fois terminé.",
+    "preparingTableDownload": "Récupération de toutes les lignes pour le téléchargement…",
     "chartDataDownloadedJson": "Données du graphique téléchargées en tant que fichier JSON",
     "dynamicFilters": "Filtres dynamiques",
     "failedToCancelRunningQuery": "Échec de l'annulation de la requête en cours d'exécution",
@@ -16092,8 +16096,10 @@
         "searchSuffixesAria": "Rechercher des filtres de suffixe",
         "searchTypesAria": "Rechercher dans les filtres de type",
         "facetAria": "{label}, {count} métriques",
+        "facetAriaUnchecked": "{label}, {count} avec des données, {unchecked} non cochés pour l'instant",
         "noPrefixMatch": "Aucun préfixe ne correspond.",
         "noSuffixMatch": "Aucun suffixe ne correspond.",
+        "uncheckedTooltip": "{count} avec des données · {unchecked} non cochés pour l'instant",
         "noTypeMatch": "Aucun type ne correspond."
       },
       "views": {
@@ -17763,13 +17769,9 @@
       "noAgentsDescription": "Aucun agent GenAI détecté pour la fenêtre temporelle sélectionnée. Essayez une plage plus large ou revenez à la vue flux.",
       "viewByStream": "Voir par flux",
       "search": {
-        "placeholder": "Rechercher par utilisateur ou message",
-        "title": "Correspond aux sessions dont l'ID utilisateur ou le texte de conversation contient le texte",
         "noResultsTitle": "Aucune session ne correspond à votre recherche",
-        "noResultsDescription": "Essayez un autre terme, un autre champ ou une plage de temps plus large.",
-        "clear": "Effacer la recherche",
-        "user": "Utilisateur : {user}",
-        "clearUser": "Afficher tous les utilisateurs"
+        "noResultsDescription": "Essayez un autre filtre ou une plage temporelle plus large.",
+        "clear": "Effacer le filtre"
       }
     },
     "sessionDetail": {
@@ -19080,7 +19082,7 @@
       "users": "Utilisateurs",
       "budgets": "Budgets",
       "discovery": "Découverte",
-      "queues": "Files d'attente",
+      "queues": "Files d'attente d'annotation",
       "datasets": "Jeux de données",
       "experiments": "Expériences",
       "quality": "Qualité",
@@ -19365,15 +19367,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Ajouter à la file de révision",
-        "title": "Ajouter à la file de révision",
-        "hint": "Mettez {ref} en file pour révision humaine. Il reste là où il est — l'état de révision réside dans la file.",
-        "queueLabel": "File",
-        "queuePlaceholder": "Sélectionner une file...",
-        "noQueues": "Aucune file n'accepte un {scope} — créez-en une depuis la page Files d'attente d'abord.",
-        "confirm": "Ajouter à la file",
+        "button": "Ajouter à la file d'attente d'annotation",
+        "title": "Ajouter à la file d'attente d'annotation",
+        "hint": "Ajoutez {ref} pour une revue humaine. L'élément reste à sa place — la file d'attente d'annotation suit son statut de revue.",
+        "queueLabel": "File d'attente d'annotation",
+        "queuePlaceholder": "Sélectionnez une file d'attente d'annotation...",
+        "noQueues": "Aucune file d'attente d'annotation n'accepte de {scope} — créez-en une d'abord depuis la page Files d'attente d'annotation.",
+        "confirm": "Ajouter à la file d'attente d'annotation",
         "success": "Ajouté à {queue}",
-        "error": "Échec de l'ajout de cet élément à la file"
+        "error": "Impossible d'ajouter cet élément à la file d'attente d'annotation"
       },
       "dataset": {
         "button": "Ajouter au jeu de données",
@@ -19410,12 +19412,12 @@
         "session": "Sessions"
       },
       "inQueueFilter": {
-        "label": "Dans la file",
-        "notEnqueued": "En file : Non en file",
-        "enqueued": "En file : Toute file",
-        "pending": "En file : En attente",
-        "reviewed": "En file : Examiné",
-        "all": "En file : Toutes"
+        "label": "Statut de la file d'attente d'annotation",
+        "notEnqueued": "Non mis en file d'attente",
+        "enqueued": "Dans une file d'attente d'annotation",
+        "pending": "En attente de revue",
+        "reviewed": "Revu",
+        "all": "Tous les éléments"
       },
       "columns": {
         "timestamp": "Horodatage",
@@ -19431,7 +19433,7 @@
         "service": "Service",
         "input": "Entrée",
         "quality": "Qualité",
-        "inQueue": "En file ?",
+        "inQueue": "Dans une file d'attente d'annotation ?",
         "actions": "Actions"
       },
       "spanParent": "Dans {trace}",
@@ -19443,26 +19445,26 @@
       "inQueue": {
         "none": "Non en file",
         "reviewed": "Déjà examiné",
-        "multiple": "Dans {count} files"
+        "multiple": "Dans {count} files d'attente d'annotation"
       },
-      "addToQueue": "Ajouter à la file",
+      "addToQueue": "Ajouter à la file d'attente d'annotation",
       "addToQueueMenu": {
-        "loading": "Chargement des files...",
-        "noQueues": "Aucune file pour le moment — créez-en une depuis la page Files.",
+        "loading": "Chargement des files d'attente d'annotation...",
+        "noQueues": "Aucune file d'attente d'annotation pour l'instant — créez-en une d'abord depuis la page Files d'attente d'annotation.",
         "dimensions": "{count} dimension | {count} dimensions",
         "accepts": "Accepte uniquement {types}",
-        "sectionTitle": "Ajouter à la file",
-        "manageQueues": "Gérer les files"
+        "sectionTitle": "Ajouter à la file d'attente d'annotation",
+        "manageQueues": "Gérer les files d'attente d'annotation"
       },
-      "addSuccess": "Ajouté à {queue} — la ligne reste dans Discovery, son état réside dans la file.",
-      "addError": "Échec de l'ajout des éléments à la file",
-      "openQueue": "Ouvrir la file",
-      "queuesError": "Échec du chargement des files"
+      "addSuccess": "Ajouté à {queue} — la ligne reste dans Découverte, et la file d'attente d'annotation suit son statut de revue.",
+      "addError": "Impossible d'ajouter des éléments à la file d'attente d'annotation",
+      "openQueue": "Ouvrir la file d'attente d'annotation",
+      "queuesError": "Impossible de charger les files d'attente d'annotation"
     },
     "queues": {
-      "searchPlaceholder": "Rechercher des files...",
-      "newButton": "Nouvelle file",
-      "loadError": "Échec du chargement des files",
+      "searchPlaceholder": "Rechercher des files d'attente d'annotation...",
+      "newButton": "Nouvelle file d'attente d'annotation",
+      "loadError": "Impossible de charger les files d'attente d'annotation",
       "optionsLoadError": "Échec du chargement des configurations de score",
       "review": "Examiner",
       "cleared": "Effacé",
@@ -19477,7 +19479,7 @@
         "actions": "Actions"
       },
       "create": {
-        "title": "Nouvelle file",
+        "title": "Nouvelle file d'attente d'annotation",
         "errors": {
           "name": "Le nom est requis",
           "scoreConfigs": "Lier au moins une configuration de score"
@@ -19485,9 +19487,9 @@
         "nameLabel": "Nom",
         "namePlaceholder": "p. ex. hallucination_review",
         "descriptionLabel": "Description",
-        "descriptionPlaceholder": "À quoi sert cette file et qui la révise...",
+        "descriptionPlaceholder": "À quoi sert cette file d'attente d'annotation et qui en effectue la revue...",
         "scoreConfigsLabel": "Configurations de score",
-        "scoreConfigsHint": "Une file évalue des éléments selon une ou plusieurs dimensions. Chaque configuration de score est une dimension unique — choisissez les configurations à lier et épinglez chacune à une version.",
+        "scoreConfigsHint": "Une file d'attente d'annotation évalue les éléments sur une ou plusieurs dimensions. Chaque configuration de score représente une seule dimension — choisissez les configurations à associer et fixez chacune à une version.",
         "scoreConfigsEmpty": "Choisissez les configurations de score à lier.",
         "addScoreConfig": "Ajouter une configuration de score",
         "allScoreConfigsAdded": "Toutes les configurations de score sont ajoutées.",
@@ -19495,10 +19497,10 @@
         "noScoreConfigs": "Aucune configuration de score pour le moment — créez-en une dans Configurations de score d'abord.",
         "targetDatasetLabel": "Jeu de données cible",
         "targetDatasetNone": "Aucun (révision uniquement)",
-        "targetDatasetHint": "File de révision uniquement — les éléments révisés ne seront pas distillés dans un jeu de données.",
+        "targetDatasetHint": "Sans jeu de données cible, les éléments de cette file d'attente d'annotation sont uniquement revus.",
         "autoRoutingLabel": "Routage automatique",
-        "autoRoutingHint": "Mettre automatiquement en file les objets dont les scores correspondent à une condition. Laissez vide pour alimenter cette file manuellement depuis Discovery.",
-        "autoRoutingEmpty": "Aucun routage automatique — cette file est alimentée manuellement.",
+        "autoRoutingHint": "Mettez automatiquement en file d'attente les objets dont les scores correspondent à une condition. Laissez vide pour ajouter des éléments à cette file d'attente d'annotation depuis Découverte.",
+        "autoRoutingEmpty": "Les éléments sont ajoutés manuellement à cette file d'attente d'annotation.",
         "addCondition": "Ajouter une condition",
         "conditionAnd": "ET",
         "operatorIs": "est",
@@ -19507,12 +19509,12 @@
         "conditionValuePlaceholder": "Valeur",
         "pin": "Épingler la version",
         "versionLatest": "v{version} (dernière)",
-        "success": "File créée",
-        "error": "Échec de la création de la file"
+        "success": "File d'attente d'annotation créée",
+        "error": "Impossible de créer la file d'attente d'annotation"
       },
       "detail": {
-        "fallbackTitle": "File",
-        "loadError": "Échec du chargement des éléments de la file",
+        "fallbackTitle": "File d'attente d'annotation",
+        "loadError": "Impossible de charger les éléments de la file d'attente d'annotation",
         "startReviewing": "Commencer la révision",
         "scoreConfigs": "Configurations de score ({count})",
         "targetDataset": "Jeu de données cible",
@@ -19522,7 +19524,7 @@
         "inTrace": "Dans la trace {traceId}",
         "reviewAgain": "Réviser à nouveau",
         "emptyTitle": "Rien à réviser",
-        "emptyBody": "Ajoutez des traces, des spans ou des sessions à cette file d'attente depuis Discovery ou une vue de trace.",
+        "emptyBody": "Ajoutez des traces, des spans ou des sessions à cette file d'attente d'annotation depuis Découverte ou une vue de trace.",
         "columns": {
           "refType": "Réf",
           "refId": "Référence",
@@ -19593,7 +19595,7 @@
         "true": "Vrai",
         "false": "Faux",
         "allReviewedTitle": "Tous les éléments révisés",
-        "allReviewedBody": "Chaque élément de cette file d'attente a une révision terminée."
+        "allReviewedBody": "Tous les éléments de cette file d'attente d'annotation ont une revue terminée."
       }
     },
     "experiments": {
@@ -25749,8 +25751,8 @@
     "sloDetail": "Détail du SLO",
     "alertDetail": "Détail de l'alerte",
     "editAlert": "Modifier l'alerte",
-    "aiQueueDetail": "File d'attente",
-    "aiQueueReview": "Examen de la file d'attente",
+    "aiQueueDetail": "File d'annotation",
+    "aiQueueReview": "Revue de la file d'annotation",
     "aiDatasetDetail": "Jeu de données",
     "aiPromptCreate": "Nouveau prompt",
     "aiPromptVersionCreate": "Nouvelle version de prompt",
@@ -34703,6 +34705,25 @@
       },
       "noHighConfidence": "Aucun nom à confiance élevée"
     }
+  },
+  "commandPalette": {
+    "title": "Rechercher des pages, ressources et actions",
+    "placeholder": "Rechercher des noms et ID",
+    "moreTypes": "Autres types",
+    "pages": "Pages",
+    "actions": "Créer",
+    "recent": "Visites récentes",
+    "localHistory": "Historique local",
+    "clearRecent": "Effacer les visites récentes",
+    "historyStorageUnavailable": "Impossible d’enregistrer les visites",
+    "recentUnavailable": "Cet élément est indisponible",
+    "loading": "Recherche…",
+    "partial": "Certains résultats sont indisponibles",
+    "failed": "La recherche a échoué",
+    "offline": "Hors ligne. Les visites récentes restent disponibles.",
+    "sourceUnavailable": "Ce type de ressource est indisponible",
+    "emptyHelp": "Saisissez un nom ou un ID",
+    "globalShortcut": "Ouvrir la recherche globale"
   },
   "timeRangeInput": {
     "label": "Saisissez une plage temporelle",

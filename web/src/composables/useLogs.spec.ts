@@ -484,6 +484,14 @@ describe("Use Logs Composable", () => {
       });
     });
 
+    it("keeps the range in force when the link names only a stream", async () => {
+      const kept = { startTime: 1, endTime: 2, relativeTimePeriod: "1h", type: "relative" };
+      wrapper.vm.searchObj.data.datetime = { ...kept };
+      wrapper.vm.router.currentRoute.value.query = { stream: "stream1", stream_type: "logs" };
+      await wrapper.vm.restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.data.datetime).toEqual(kept);
+    });
+
     it("should handle relative time period", async () => {
       wrapper.vm.router.currentRoute.value.query = {
         stream: "stream1,stream2",

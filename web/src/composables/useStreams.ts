@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import {
+  captureRecentVisitScope,
+  recordLoadedStream,
+} from "@/components/commandPalette/useRecentlyViewed";
 import { CancelledError } from "@tanstack/vue-query";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
@@ -269,6 +273,7 @@ const useStreams = (t: TranslateFn) => {
     schema: boolean,
     force: boolean = false,
   ): Promise<any> => {
+    const recentScope = captureRecentVisitScope();
     return new Promise((resolve, reject) => {
       void (async () => {
         if (!streamName || !streamType) {
@@ -322,7 +327,9 @@ const useStreams = (t: TranslateFn) => {
               }
             }
             const currentIndex = store.state.streams.streamsIndexMapping[streamType]?.[streamName];
-            return resolve(streamsCache[streamType].value?.list[currentIndex] || {});
+            const loaded = streamsCache[streamType].value?.list[currentIndex];
+            if (loaded?.name) recordLoadedStream(recentScope, streamType, streamName);
+            return resolve(loaded || {});
           } else {
             // Stream not found in cache - reject with proper Error object
             // await StreamService.schema(
