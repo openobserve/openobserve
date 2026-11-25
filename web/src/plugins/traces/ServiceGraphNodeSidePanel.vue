@@ -1960,11 +1960,20 @@ export default defineComponent({
     };
 
     // Under service_optional the backend drops a bare service name, so send the latest span's
-    // dimensions and let it resolve the span's own service.
+    // dimensions. An inferred dependency's span is its caller's, so it keeps the bare name.
     const correlateSelectedService = async () => {
       const node = props.selectedNode;
       const serviceName = node?.name || node?.label || node?.id || "";
       const [latestSpan] = await Promise.all([fetchLatestSpan(), loadOrgSemanticGroups()]);
+      const org = store.state.selectedOrganization.identifier;
+      const base = { source_stream: props.streamFilter || "default", source_type: "traces" };
+      if (node?.service_type) {
+        const response = await correlateStreams(org, {
+          ...base,
+          available_dimensions: { service: serviceName },
+        });
+        return { data: response.data, latestSpan };
+      }
       const dimensions = {
         ...extractSemanticDimensions(
           { timestamp: 0, fields: latestSpan ?? {} },
@@ -1972,9 +1981,8 @@ export default defineComponent({
         ),
         service: serviceName,
       };
-      const response = await correlateStreams(store.state.selectedOrganization.identifier, {
-        source_stream: props.streamFilter || "default",
-        source_type: "traces",
+      const response = await correlateStreams(org, {
+        ...base,
         available_dimensions: dimensions,
         source_dimensions: dimensions,
         resolve_from_source: true,

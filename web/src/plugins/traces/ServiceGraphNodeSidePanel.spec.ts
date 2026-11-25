@@ -1042,6 +1042,29 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
     });
 
+    it("keeps the bare service name for an inferred dependency, whose span is its caller's", async () => {
+      vi.mocked(getSemanticGroups).mockResolvedValue({
+        data: [{ id: "k8s-namespace", fields: ["service_k8s_namespace_name"] }],
+      } as any);
+      vi.mocked(streamTraceRows).mockResolvedValue([
+        { service_name: "frontend", service_k8s_namespace_name: "shop" },
+      ]);
+      wrapper = mountPanel({
+        streamFilter: "otel_demo",
+        selectedNode: { ...baseNode, id: "redis", name: "redis", service_type: "database" },
+      });
+      await flushPromises();
+      vi.mocked(correlateStreams).mockClear();
+
+      await clickViewRelatedLogs(wrapper);
+
+      expect(correlateStreams).toHaveBeenCalledWith("default", {
+        source_stream: "otel_demo",
+        source_type: "traces",
+        available_dimensions: { service: "redis" },
+      });
+    });
+
     it("opens the log stream named like the source stream before other matches", async () => {
       vi.mocked(correlateStreams).mockResolvedValue({
         data: {
