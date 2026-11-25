@@ -415,7 +415,11 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
         <TabsList as-child :loop="true">
           <div
             ref="tablistRef"
-            :class="['o-tabs relative flex flex-row px-0.75', filled ? 'items-center gap-0.5' : '', alignClasses[align]]"
+            :class="[
+              'o-tabs relative flex flex-row px-0.75',
+              filled ? 'items-center gap-0.5' : '',
+              alignClasses[align],
+            ]"
             @focusin="handleFocusin"
             @dragstart="onTabDragStart"
             @dragover="onTabDragOver"

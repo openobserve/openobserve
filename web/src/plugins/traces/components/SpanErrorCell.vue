@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </span>
   <span
     v-else
-    class="bg-text-secondary inline-block h-0.5 w-3 align-middle text-[0px]"
+    class="bg-text-secondary inline-block h-0.5 w-3 align-middle text-[0rem]"
     data-test="span-error-cell-empty"
     ><!-- A sub-pixel dash glyph anti-aliases to ~3.6:1; a 2px bar keeps a solid token row. -->{{
       raw("—")

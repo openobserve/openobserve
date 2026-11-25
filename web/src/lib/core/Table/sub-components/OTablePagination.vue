@@ -236,8 +236,8 @@ const selectionLabel = computed(() => {
         :aria-hidden="rangeHidden ? 'true' : undefined"
         data-test="o2-table-pagination-info"
       >
-        {{ showingFrom }}–{{ showingTo }} {{ t("search.of") }}
-        {{ totalCount.toLocaleString() }}{{ totalCountExact ? "" : "+" }}
+        {{ showingFrom }}–{{ showingTo }} {{ t("search.of") }} {{ totalCount.toLocaleString()
+        }}{{ totalCountExact ? "" : "+" }}
       </span>
       <div
         :class="[
@@ -274,7 +274,9 @@ const selectionLabel = computed(() => {
 
       <!-- Same compact pager as OPagination (prev, current, next), so every pager reads alike. -->
       <nav
-        class="rounded-default border-button-outline-border bg-button-outline-bg inline-flex items-center gap-0.5 border p-px" :aria-label="t('components.pagination.pagination')">
+        class="rounded-default border-button-outline-border bg-button-outline-bg inline-flex items-center gap-0.5 border p-px"
+        :aria-label="t('components.pagination.pagination')"
+      >
         <OButton
           variant="ghost"
           size="icon-chip"

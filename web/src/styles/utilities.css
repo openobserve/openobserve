@@ -248,6 +248,7 @@
     font-weight: var(--font-normal) !important;
     color: var(--color-text-secondary) !important;
     border: 0 !important;
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline ring width */
     box-shadow: inset 0 0 0 1px var(--toolbar-btn-rest-edge) !important;
     background-color: var(--toolbar-btn-rest-bg) !important;
   }
@@ -274,6 +275,7 @@
     bottom: 0.3125rem !important;
     width: 0.1875rem !important;
     height: auto;
+    /* eslint-disable-next-line local/no-hardcoded-px -- pill radius */
     border-radius: 9999px;
     box-shadow: none;
   }

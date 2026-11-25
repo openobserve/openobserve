@@ -393,10 +393,7 @@ export const applyThemeColors = (
       "--color-theme-menu-gradient-start",
       menuGradientStart,
     );
-    document.documentElement.style.setProperty(
-      "--color-theme-menu-gradient-end",
-      menuGradientEnd,
-    );
+    document.documentElement.style.setProperty("--color-theme-menu-gradient-end", menuGradientEnd);
     // Use theme color as menu color for light mode
     document.documentElement.style.setProperty("--color-theme-menu-color", themeColor);
 

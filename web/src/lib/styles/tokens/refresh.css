@@ -673,6 +673,7 @@
   background-color: var(--toolbar-btn-rest-bg);
 }
 :root .toolbar-btn-rest:not(:focus-visible):not([aria-pressed="true"]) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline ring width */
   box-shadow: inset 0 0 0 1px var(--toolbar-btn-rest-edge);
 }
 :root:not(.dark) {
@@ -691,6 +692,7 @@
 /* Their icons stay secondary grey (as in the reference apps) but get a thin currentColor stroke, lifting the 300-weight outlines to about the 400 weight (≈1.3px at 16px). */
 :root :is(.toolbar-btn-rest, .row-actions button, #date-time-button) svg path[fill="currentColor"] {
   stroke: currentColor;
+  /* eslint-disable-next-line local/no-hardcoded-px -- icon stroke width */
   stroke-width: 0.75px;
   stroke-linejoin: round;
 }

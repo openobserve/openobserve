@@ -120,9 +120,7 @@ const wrapperClasses = computed(() => [
   hasError.value
     ? "border-input-border-error focus-within:ring-2 focus-within:ring-input-border-error/20"
     : "border-input-border hover:border-input-border-hover focus-within:ring-2 focus-within:ring-focus-ring-accent",
-  isDisabled.value
-    ? "opacity-50 cursor-not-allowed"
-    : "",
+  isDisabled.value ? "opacity-50 cursor-not-allowed" : "",
 ]);
 </script>
 

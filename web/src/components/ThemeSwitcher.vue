@@ -189,7 +189,8 @@ export default defineComponent({
     const onMenuSelect = (event: Event) => {
       event.preventDefault();
       const next =
-        segmentPick ?? PREFERENCES[(PREFERENCES.indexOf(preference.value) + 1) % PREFERENCES.length];
+        segmentPick ??
+        PREFERENCES[(PREFERENCES.indexOf(preference.value) + 1) % PREFERENCES.length];
       segmentPick = null;
       applyPreference(next);
     };
