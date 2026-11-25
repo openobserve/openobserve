@@ -1157,6 +1157,12 @@ export function createAutoRun(deps: AutoRunDeps) {
     return !!meta.editorDirty || !sameSignature(deps.readSignature(), executed.signature);
   }
 
+  function isPatternsStale(): boolean {
+    const executed = meta.executedPatterns;
+    if (!executed) return false;
+    return !!meta.editorDirty || !sameSignature(deps.readSignature(), executed.signature);
+  }
+
   function staleReason(): string | null {
     return isResultsStale() ? translate(AUTO_RUN_I18N.staleTooltip) : null;
   }
@@ -1525,6 +1531,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     reconcileEditorDirty,
     syncBlockedScope,
     isResultsStale,
+    isPatternsStale,
     isRunDirty,
     staleReason,
     canPersistOrShare,

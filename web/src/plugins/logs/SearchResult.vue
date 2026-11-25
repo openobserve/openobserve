@@ -792,8 +792,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div v-for="w in patternsWarnings" :key="w">{{ w }}</div>
           </div>
+          <div
+            v-if="patternsStale"
+            data-test="logs-patterns-stale"
+            class="text-text-secondary flex flex-1 items-center justify-center py-10 text-sm"
+          >
+            {{ t("search.autoRunStaleTooltip") }}
+          </div>
           <!-- Patterns List -->
           <PatternList
+            v-else
             :patterns="patternsState?.patterns?.patterns || []"
             :loading="patternsState?.loading"
             :totalLogsAnalyzed="patternsState?.patterns?.statistics?.total_logs_analyzed"
@@ -2956,6 +2964,7 @@ export default defineComponent({
     const { processedResults, processHitsInChunks } = useLogsHighlighter(t);
 
     const isFunctionErrorOpen = ref(false);
+    const patternsStale = computed(() => autoRun.engine.isPatternsStale());
     const patternsWarnings = computed<string[]>(() => {
       const fe = patternsState.value?.patterns?.function_error;
       return Array.isArray(fe) ? fe.filter((m): m is string => typeof m === "string") : [];
@@ -3245,6 +3254,7 @@ export default defineComponent({
       openLogDetailsByRow,
       isFunctionErrorOpen,
       patternsWarnings,
+      patternsStale,
       contextCell,
       contextCellIsStreamField,
       aiEnabled,
