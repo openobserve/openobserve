@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 
 const MAX_BUFFER = 200 * 1024 * 1024;
 const TOO_LARGE_RE = /exceeded the maximum number of lines|too_large|HTTP 406|HTTP 422/i;
+export const FULL_SHA_RE = /^[0-9a-f]{40}$/;
 
 export function runFile(cmd, args, options = {}) {
   return execFileSync(cmd, args, {
@@ -13,14 +14,24 @@ export function runFile(cmd, args, options = {}) {
   });
 }
 
+// What a git child of a dry run may see: no model key, no trace or API credential, nothing else of the process's environment.
+export function safeGitEnv(env = process.env) {
+  return { PATH: env.PATH ?? "/usr/local/bin:/usr/bin:/bin", HOME: env.HOME ?? "", LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" };
+}
+
+// Outside a dry run git keeps inheriting the environment, as it always did.
+export function gitEnvForRun(env = process.env) {
+  return env.REVIEW_DRY_RUN === "true" ? safeGitEnv(env) : undefined;
+}
+
 // The flags stop a PR's .gitattributes (diff drivers, textconv, binary) from hiding content from the review.
-export function localDiff(prDir, mergeBase, head, run = runFile) {
+export function localDiff(prDir, mergeBase, head, run = runFile, env = undefined) {
   return run("git", [
     "-C", prDir,
     "-c", "core.attributesFile=/dev/null",
     "diff", "--no-ext-diff", "--no-textconv", "--text", "-M",
     mergeBase, head,
-  ]);
+  ], ...(env ? [{ env }] : []));
 }
 
 export function fetchDiff({ repo, prNumber, prDir, mergeBase, head, env = process.env, run = runFile, log = () => {} }) {
@@ -52,7 +63,16 @@ export function pinDiff({ diff, prDir, mergeBase, head, run = runFile, log = () 
   }
 }
 
+// A dry run reads no live PR state: the diff is the two named commits in the checkout, or the run stops. `dryRun` is the only way to get here.
+export function fetchDryRunDiff({ prDir, mergeBase, head, run = runFile }) {
+  if (!prDir || !FULL_SHA_RE.test(mergeBase ?? "") || !FULL_SHA_RE.test(head ?? "")) {
+    throw new Error("a dry run diffs two pinned commits: it needs the PR checkout and both full commit SHAs");
+  }
+  return { diff: localDiff(prDir, mergeBase, head, run, safeGitEnv()), pinned: true };
+}
+
 export function fetchPinnedDiff(params) {
+  if (params.dryRun) return fetchDryRunDiff(params);
   return pinDiff({ ...params, diff: fetchDiff(params) });
 }
 
@@ -90,17 +110,19 @@ export function hunksLocatable(diff, readBase) {
 }
 
 // `unfocused` keeps the whole diff for a gate candidate, whose approval must rest on reviewers that saw every file; requiresFocus agents still opt out.
+// `focusFiles` are the new paths (as the headers show them) a narrowed diff keeps; empty whenever the reviewer sees the whole diff.
 export function reviewerDiff(diff, { fileFocus, requiresFocus }, { unfocused = false, pathOf = path => path } = {}) {
-  if (!fileFocus) return { diff, skipped: false, fullDiff: true };
+  if (!fileFocus) return { diff, skipped: false, fullDiff: true, focusFiles: [] };
   const sections = diff.split(/^diff --git /gm).filter(Boolean);
   const relevant = sections.filter(s => {
     const m = s.match(/^a\/(.*?) b\/(.*?)\n/);
     return m && fileFocus(pathOf(m[2]));
   });
-  if (relevant.length === 0) return { diff, skipped: Boolean(requiresFocus), fullDiff: !requiresFocus };
-  if (unfocused) return { diff, skipped: false, fullDiff: true };
+  if (relevant.length === 0) return { diff, skipped: Boolean(requiresFocus), fullDiff: !requiresFocus, focusFiles: [] };
+  if (unfocused) return { diff, skipped: false, fullDiff: true, focusFiles: [] };
   const narrowed = relevant.map(s => `diff --git ${s}`).join("");
-  return { diff: narrowed, skipped: false, fullDiff: narrowed === diff };
+  const whole = narrowed === diff;
+  return { diff: narrowed, skipped: false, fullDiff: whole, focusFiles: whole ? [] : relevant.map(s => s.match(/^a\/(.*?) b\/(.*?)\n/)[2]) };
 }
 
 // Rewrites only header lines (before the first hunk of each file), so a removed line like "-- a/b" is never touched.
