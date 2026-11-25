@@ -4304,6 +4304,19 @@
       "aiAssistant": "AI assistant",
       "other": "Other",
       "thanks": "Thanks for telling us!"
+    },
+    "brand": {
+      "headline": "See every log, metric and trace in one place",
+      "tagline": "Open source observability for teams who ship fast.",
+      "unifiedTitle": "All your telemetry together",
+      "unifiedBody": "Logs, metrics and traces side by side, searched with one query engine.",
+      "storageTitle": "{factor} lower storage cost",
+      "storageBody": "Columnar storage on your own object store, measured against {product}.",
+      "otelTitle": "Built for {standard}",
+      "otelBody": "Send data from the collectors and agents you already run.",
+      "openTitle": "Open source at heart",
+      "openBody": "Self-host it or use the cloud, with no vendor lock-in.",
+      "learnMore": "Learn more at {site}"
     }
   },
   "user": {

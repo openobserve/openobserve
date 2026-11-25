@@ -17,191 +17,199 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- dvh, not vh: mobile browser chrome overlaps a 100vh box. -->
   <main
-    class="bg-card-glass-bg h-[100vh] w-[100vw] max-md:h-dvh max-md:w-full max-md:overflow-y-auto"
+    class="bg-card-glass-bg grid h-[100vh] w-[100vw] max-md:h-dvh max-md:w-full max-md:overflow-y-auto"
+    :class="showBrandPanel ? 'lg:grid-cols-2' : ''"
   >
-    <div style="max-width: 25rem; padding-top: 6.25rem" class="mx-auto p-3">
-      <div
-        class="flex justify-center text-center"
-        v-if="
-          (config.isEnterprise == 'true' &&
-            store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
-            store.state.zoConfig.custom_logo_text != '') ||
-          (config.isEnterprise == 'true' &&
-            store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-            store.state.zoConfig.custom_logo_img != null)
-        "
-      >
-        <span
-          v-if="
-            store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
-            store.state.zoConfig?.custom_logo_text != ''
-          "
-          class="me-2 w-full cursor-pointer p-0 text-xl font-bold font-semibold"
-          >{{ store.state.zoConfig.custom_logo_text }}</span
-        >
-        <span class="flex w-full justify-center">
-          <img
-            :alt="t('common.customLogoAlt')"
-            v-if="
-              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-              store.state.zoConfig?.custom_logo_img != null
-            "
-            :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 9.375rem; max-height: 1.9375rem"
-          />
-        </span>
-        <a
-          v-if="store.state.zoConfig.custom_hide_self_logo == false"
-          href="https://openobserve.ai/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img
-            class="appLogo h-auto"
-            :style="
-              store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
-            "
-            :src="
-              isDark
-                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-                : getImageURL('images/common/openobserve_latest_light_2.svg')
-            "
-            :alt="t('login.openObserveLogoAlt')"
-          />
-        </a>
-      </div>
-      <div class="mb-4 flex justify-center" v-else>
-        <a href="https://openobserve.ai/" target="_blank" rel="noopener noreferrer">
-          <img
-            class="appLogo h-auto"
-            :style="
-              store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
-            "
-            :alt="t('login.openObserveLogoAlt')"
-            :src="
-              isDark
-                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-                : getImageURL('images/common/openobserve_latest_light_2.svg')
-            "
-          />
-        </a>
-      </div>
-
-      <div v-if="autoRedirectDexLogin">
-        <p>
-          {{ t("login.redirectingToSsoMessage") }}
-          <a href="#" @click="loginWithSSo" class="cursor-pointer underline">{{
-            t("login.clickHere")
-          }}</a
-          >.
-        </p>
-      </div>
-
-      <div v-else>
-        <h1 style="font-size: var(--text-xl)" class="w-full pb-3 text-center">
-          {{ t("login.login") }}
-        </h1>
-
-        <div v-if="showSSO" class="flex justify-center">
-          <OButton
-            data-test="sso-login-btn"
-            variant="primary"
-            size="sm-action"
-            style="width: 25rem"
-            @click="loginWithSSo"
-          >
-            <div class="relative flex w-full items-center justify-center text-center">
-              <img
-                class="absolute"
-                style="width: 1.875rem; left: 1rem"
-                :src="getImageURL('images/common/sso.svg')"
-                alt=""
-              />
-              <span class="text-center"> {{ t("login.loginWithSso") }}</span>
-            </div>
-          </OButton>
-        </div>
-
-        <div v-if="showSSO && showInternalLogin" class="py-3 text-center">
-          <OButton
-            variant="ghost-primary"
-            type="button"
-            data-test="login-as-internal-user"
-            :aria-expanded="loginAsInternalUser"
-            aria-controls="login-internal-form"
-            @click="toggleInternalLogin"
-          >
-            {{ t("login.loginAsInternalUser") }}
-          </OButton>
-        </div>
-
+    <LoginBrandPanel v-if="showBrandPanel" class="max-lg:hidden" />
+    <div class="flex min-h-0 items-center justify-center overflow-y-auto p-6 max-md:items-start">
+      <div class="w-full max-w-100 max-md:pt-16">
         <div
-          v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
-          id="login-internal-form"
-          class="login-inputs"
+          class="flex justify-center text-center"
+          v-if="
+            (config.isEnterprise == 'true' &&
+              store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
+              store.state.zoConfig.custom_logo_text != '') ||
+            (config.isEnterprise == 'true' &&
+              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+              store.state.zoConfig.custom_logo_img != null)
+          "
         >
-          <!-- Only retry_after is shown, never the attempt counters or the thresholds behind them. -->
-          <OBanner
-            v-if="lockoutSecondsLeft > 0"
-            variant="error"
-            icon="error"
-            dense
-            class="mb-3"
-            :content="
-              t('login.lockedOut', { duration: raw(durationFormatter(lockoutSecondsLeft)) })
+          <span
+            v-if="
+              store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
+              store.state.zoConfig?.custom_logo_text != ''
             "
-            data-test="login-lockout-banner"
-          />
-          <OForm
-            :schema="loginSchema"
-            :default-values="loginDefaults"
-            @submit="onSignIn"
-            class="flex flex-col gap-3"
+            class="me-2 w-full cursor-pointer p-0 text-xl font-bold font-semibold"
+            >{{ store.state.zoConfig.custom_logo_text }}</span
           >
-            <OFormInput
-              name="name"
-              data-cy="login-user-id"
-              data-test="login-user-id"
-              :label="t('login.userEmail')"
-              :placeholder="t('login.email')"
-              type="email"
-              autocomplete="username"
-              required
+          <span class="flex w-full justify-center">
+            <img
+              :alt="t('common.customLogoAlt')"
+              v-if="
+                store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+                store.state.zoConfig?.custom_logo_img != null
+              "
+              :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
+              style="max-width: 9.375rem; max-height: 1.9375rem"
             />
-
-            <OFormInput
-              name="password"
-              data-cy="login-password"
-              data-test="login-password"
-              :label="t('login.password')"
-              :placeholder="t('login.password')"
-              type="password"
-              autocomplete="current-password"
-              required
+          </span>
+          <a
+            v-if="store.state.zoConfig.custom_hide_self_logo == false"
+            href="https://openobserve.ai/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img
+              class="appLogo h-auto"
+              :style="
+                store.state.zoConfig.custom_logo_text != ''
+                  ? 'width: 9.375rem;'
+                  : 'width: 15.625rem;'
+              "
+              :src="
+                isDark
+                  ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                  : getImageURL('images/common/openobserve_latest_light_2.svg')
+              "
+              :alt="t('login.openObserveLogoAlt')"
             />
+          </a>
+        </div>
+        <div class="mb-4 flex justify-center" :class="{ 'lg:hidden': showBrandPanel }" v-else>
+          <a href="https://openobserve.ai/" target="_blank" rel="noopener noreferrer">
+            <img
+              class="appLogo h-auto"
+              :style="
+                store.state.zoConfig.custom_logo_text != ''
+                  ? 'width: 9.375rem;'
+                  : 'width: 15.625rem;'
+              "
+              :alt="t('login.openObserveLogoAlt')"
+              :src="
+                isDark
+                  ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                  : getImageURL('images/common/openobserve_latest_light_2.svg')
+              "
+            />
+          </a>
+        </div>
 
-            <p
-              v-if="loginError"
-              role="alert"
-              class="text-input-error-text text-sm"
-              data-test="login-error-message"
-            >
-              {{ loginError }}
-            </p>
+        <div v-if="autoRedirectDexLogin">
+          <p>
+            {{ t("login.redirectingToSsoMessage") }}
+            <a href="#" @click="loginWithSSo" class="cursor-pointer underline">{{
+              t("login.clickHere")
+            }}</a
+            >.
+          </p>
+        </div>
 
+        <div v-else>
+          <h1 style="font-size: var(--text-xl)" class="w-full pb-3 text-center">
+            {{ t("login.login") }}
+          </h1>
+
+          <div v-if="showSSO" class="flex justify-center">
             <OButton
-              data-cy="login-sign-in"
-              data-test="login-sign-in"
+              data-test="sso-login-btn"
               variant="primary"
               size="sm-action"
-              block
-              type="submit"
-              :loading="submitting"
-              :disabled="lockoutSecondsLeft > 0"
+              style="width: 25rem"
+              @click="loginWithSSo"
             >
-              {{ t("login.login") }}
+              <div class="relative flex w-full items-center justify-center text-center">
+                <img
+                  class="absolute"
+                  style="width: 1.875rem; left: 1rem"
+                  :src="getImageURL('images/common/sso.svg')"
+                  alt=""
+                />
+                <span class="text-center"> {{ t("login.loginWithSso") }}</span>
+              </div>
             </OButton>
-          </OForm>
+          </div>
+
+          <div v-if="showSSO && showInternalLogin" class="py-3 text-center">
+            <OButton
+              variant="ghost-primary"
+              type="button"
+              data-test="login-as-internal-user"
+              :aria-expanded="loginAsInternalUser"
+              aria-controls="login-internal-form"
+              @click="toggleInternalLogin"
+            >
+              {{ t("login.loginAsInternalUser") }}
+            </OButton>
+          </div>
+
+          <div
+            v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
+            id="login-internal-form"
+            class="login-inputs"
+          >
+            <!-- Only retry_after is shown, never the attempt counters or the thresholds behind them. -->
+            <OBanner
+              v-if="lockoutSecondsLeft > 0"
+              variant="error"
+              icon="error"
+              dense
+              class="mb-3"
+              :content="
+                t('login.lockedOut', { duration: raw(durationFormatter(lockoutSecondsLeft)) })
+              "
+              data-test="login-lockout-banner"
+            />
+            <OForm
+              :schema="loginSchema"
+              :default-values="loginDefaults"
+              @submit="onSignIn"
+              class="flex flex-col gap-3"
+            >
+              <OFormInput
+                name="name"
+                data-cy="login-user-id"
+                data-test="login-user-id"
+                :label="t('login.userEmail')"
+                :placeholder="t('login.email')"
+                type="email"
+                autocomplete="username"
+                required
+              />
+
+              <OFormInput
+                name="password"
+                data-cy="login-password"
+                data-test="login-password"
+                :label="t('login.password')"
+                :placeholder="t('login.password')"
+                type="password"
+                autocomplete="current-password"
+                required
+              />
+
+              <p
+                v-if="loginError"
+                role="alert"
+                class="text-input-error-text text-sm"
+                data-test="login-error-message"
+              >
+                {{ loginError }}
+              </p>
+
+              <OButton
+                data-cy="login-sign-in"
+                data-test="login-sign-in"
+                variant="primary"
+                size="sm-action"
+                block
+                type="submit"
+                :loading="submitting"
+                :disabled="lockoutSecondsLeft > 0"
+              >
+                {{ t("login.login") }}
+              </OButton>
+            </OForm>
+          </div>
         </div>
       </div>
     </div>
@@ -238,10 +246,11 @@ import { openobserveRum } from "@openobserve/browser-rum";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeLoginSchema, loginDefaults, type LoginForm } from "./Login.schema";
+import LoginBrandPanel from "./LoginBrandPanel.vue";
 
 export default defineComponent({
   name: "PageLogin",
-  components: { OButton, OBanner, OForm, OFormInput },
+  components: { OButton, OBanner, OForm, OFormInput, LoginBrandPanel },
 
   setup() {
     const store = useStore();
@@ -522,9 +531,18 @@ export default defineComponent({
       }
     };
 
+    // A white-labelled install shows its own logo, so the OpenObserve pitch stays off its login.
+    const showBrandPanel = computed(() => {
+      const zo = store.state.zoConfig ?? {};
+      const customBranding =
+        config.isEnterprise == "true" && (!!zo.custom_logo_text || zo.custom_logo_img != null);
+      return !customBranding;
+    });
+
     return {
       t,
       raw,
+      showBrandPanel,
       durationFormatter,
       lockoutSecondsLeft,
       name,

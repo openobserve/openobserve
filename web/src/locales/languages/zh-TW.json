@@ -4290,6 +4290,19 @@
       "aiAssistant": "AI 助手",
       "other": "其他",
       "thanks": "感謝您告訴我們！"
+    },
+    "brand": {
+      "headline": "所有日誌、指標與追蹤盡在一處",
+      "tagline": "為快速交付的團隊打造的開源可觀測性平台。",
+      "unifiedTitle": "所有遙測資料匯聚一處",
+      "unifiedBody": "日誌、指標與追蹤並列呈現，用同一個查詢引擎搜尋。",
+      "storageTitle": "儲存成本降低 {factor}",
+      "storageBody": "在您自己的物件儲存上使用欄式儲存，與 {product} 相比。",
+      "otelTitle": "為 {standard} 而生",
+      "otelBody": "從您已在使用的收集器與代理程式傳送資料。",
+      "openTitle": "堅持開源",
+      "openBody": "自行託管或使用雲端，沒有供應商鎖定。",
+      "learnMore": "在 {site} 了解更多"
     }
   },
   "user": {

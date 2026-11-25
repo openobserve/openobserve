@@ -4290,6 +4290,19 @@
       "aiAssistant": "AI 어시스턴트",
       "other": "기타",
       "thanks": "알려주셔서 감사합니다!"
+    },
+    "brand": {
+      "headline": "모든 로그, 메트릭, 트레이스를 한곳에서",
+      "tagline": "빠르게 출시하는 팀을 위한 오픈 소스 관측성.",
+      "unifiedTitle": "모든 텔레메트리를 함께",
+      "unifiedBody": "로그, 메트릭, 트레이스를 나란히, 하나의 쿼리 엔진으로 검색합니다.",
+      "storageTitle": "스토리지 비용 {factor} 절감",
+      "storageBody": "자체 오브젝트 스토어의 컬럼형 스토리지, {product} 대비.",
+      "otelTitle": "{standard}를 위해 설계",
+      "otelBody": "이미 사용 중인 수집기와 에이전트에서 데이터를 보내세요.",
+      "openTitle": "본질은 오픈 소스",
+      "openBody": "직접 호스팅하거나 클라우드를 사용하세요. 벤더 종속 없음.",
+      "learnMore": "{site}에서 자세히 알아보기"
     }
   },
   "user": {

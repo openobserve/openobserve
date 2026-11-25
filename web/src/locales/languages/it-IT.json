@@ -4290,6 +4290,19 @@
       "aiAssistant": "Assistente AI",
       "other": "Altro",
       "thanks": "Grazie per avercelo detto!"
+    },
+    "brand": {
+      "headline": "Tutti i log, le metriche e le tracce in un unico posto",
+      "tagline": "Osservabilità open source per i team che rilasciano in fretta.",
+      "unifiedTitle": "Tutta la telemetria insieme",
+      "unifiedBody": "Log, metriche e tracce affiancati, interrogati con un solo motore.",
+      "storageTitle": "Costi di archiviazione {factor} inferiori",
+      "storageBody": "Archiviazione colonnare sul tuo object store, rispetto a {product}.",
+      "otelTitle": "Pensato per {standard}",
+      "otelBody": "Invia i dati dai collector e dagli agent che usi già.",
+      "openTitle": "Open source nel profondo",
+      "openBody": "Ospitalo in proprio o usa il cloud, senza vincoli di fornitore.",
+      "learnMore": "Scopri di più su {site}"
     }
   },
   "user": {

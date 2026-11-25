@@ -4290,6 +4290,19 @@
       "aiAssistant": "AI-assistent",
       "other": "Anders",
       "thanks": "Bedankt dat je het ons hebt verteld!"
+    },
+    "brand": {
+      "headline": "Al je logs, metrics en traces op één plek",
+      "tagline": "Open source observability voor teams die snel opleveren.",
+      "unifiedTitle": "Al je telemetrie bij elkaar",
+      "unifiedBody": "Logs, metrics en traces naast elkaar, doorzocht met één query-engine.",
+      "storageTitle": "{factor} lagere opslagkosten",
+      "storageBody": "Kolomopslag in je eigen object store, vergeleken met {product}.",
+      "otelTitle": "Gebouwd voor {standard}",
+      "otelBody": "Stuur data vanuit de collectors en agents die je al gebruikt.",
+      "openTitle": "Open source in de kern",
+      "openBody": "Host het zelf of gebruik de cloud, zonder vendor lock-in.",
+      "learnMore": "Meer informatie op {site}"
     }
   },
   "user": {

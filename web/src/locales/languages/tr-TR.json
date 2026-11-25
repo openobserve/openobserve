@@ -4290,6 +4290,19 @@
       "aiAssistant": "Yapay zeka asistanı",
       "other": "Diğer",
       "thanks": "Bize söylediğiniz için teşekkürler!"
+    },
+    "brand": {
+      "headline": "Tüm log, metrik ve izleriniz tek yerde",
+      "tagline": "Hızlı teslim eden ekipler için açık kaynak gözlemlenebilirlik.",
+      "unifiedTitle": "Tüm telemetriniz bir arada",
+      "unifiedBody": "Loglar, metrikler ve izler yan yana, tek bir sorgu motoruyla aranır.",
+      "storageTitle": "{factor} daha düşük depolama maliyeti",
+      "storageBody": "Kendi nesne deponuzda sütunlu depolama, {product} ile karşılaştırıldığında.",
+      "otelTitle": "{standard} için tasarlandı",
+      "otelBody": "Verileri zaten kullandığınız toplayıcı ve ajanlardan gönderin.",
+      "openTitle": "Özünde açık kaynak",
+      "openBody": "Kendiniz barındırın ya da bulutu kullanın, satıcıya bağımlılık olmadan.",
+      "learnMore": "{site} adresinde daha fazla bilgi"
     }
   },
   "user": {

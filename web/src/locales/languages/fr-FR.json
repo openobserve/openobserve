@@ -4290,6 +4290,19 @@
       "aiAssistant": "Assistant IA",
       "other": "Autre",
       "thanks": "Merci de nous l'avoir dit !"
+    },
+    "brand": {
+      "headline": "Tous vos logs, métriques et traces au même endroit",
+      "tagline": "L’observabilité open source pour les équipes qui livrent vite.",
+      "unifiedTitle": "Toute votre télémétrie réunie",
+      "unifiedBody": "Logs, métriques et traces côte à côte, interrogés avec un seul moteur.",
+      "storageTitle": "Coût de stockage {factor} plus bas",
+      "storageBody": "Stockage en colonnes sur votre propre stockage objet, comparé à {product}.",
+      "otelTitle": "Conçu pour {standard}",
+      "otelBody": "Envoyez les données depuis les collecteurs et agents que vous utilisez déjà.",
+      "openTitle": "Open source avant tout",
+      "openBody": "Auto-hébergez-le ou utilisez le cloud, sans dépendance fournisseur.",
+      "learnMore": "En savoir plus sur {site}"
     }
   },
   "user": {

@@ -4290,6 +4290,19 @@
       "aiAssistant": "Trợ lý AI",
       "other": "Khác",
       "thanks": "Cảm ơn bạn đã cho chúng tôi biết!"
+    },
+    "brand": {
+      "headline": "Mọi log, metric và trace ở cùng một nơi",
+      "tagline": "Observability mã nguồn mở cho những đội phát hành nhanh.",
+      "unifiedTitle": "Toàn bộ dữ liệu telemetry ở cùng nhau",
+      "unifiedBody": "Log, metric và trace đặt cạnh nhau, tìm kiếm bằng một công cụ truy vấn.",
+      "storageTitle": "Chi phí lưu trữ thấp hơn {factor}",
+      "storageBody": "Lưu trữ dạng cột trên object store của riêng bạn, so với {product}.",
+      "otelTitle": "Được xây dựng cho {standard}",
+      "otelBody": "Gửi dữ liệu từ các collector và agent bạn đang dùng.",
+      "openTitle": "Cốt lõi là mã nguồn mở",
+      "openBody": "Tự lưu trữ hoặc dùng cloud, không bị khóa nhà cung cấp.",
+      "learnMore": "Tìm hiểu thêm tại {site}"
     }
   },
   "user": {

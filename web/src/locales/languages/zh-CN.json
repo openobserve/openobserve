@@ -4290,6 +4290,19 @@
       "aiAssistant": "人工智能助手",
       "other": "其他",
       "thanks": "感谢告知！"
+    },
+    "brand": {
+      "headline": "所有日志、指标和链路尽在一处",
+      "tagline": "为快速交付的团队打造的开源可观测性平台。",
+      "unifiedTitle": "全部遥测数据汇聚一处",
+      "unifiedBody": "日志、指标和链路并排呈现，用同一个查询引擎检索。",
+      "storageTitle": "存储成本降低 {factor}",
+      "storageBody": "在您自己的对象存储上使用列式存储，与 {product} 相比。",
+      "otelTitle": "为 {standard} 而生",
+      "otelBody": "从您已在使用的采集器和代理发送数据。",
+      "openTitle": "坚持开源",
+      "openBody": "自行托管或使用云服务，无供应商锁定。",
+      "learnMore": "在 {site} 了解更多"
     }
   },
   "user": {

@@ -4290,6 +4290,19 @@
       "aiAssistant": "KI-Assistent",
       "other": "Sonstiges",
       "thanks": "Danke für Ihre Rückmeldung!"
+    },
+    "brand": {
+      "headline": "Alle Logs, Metriken und Traces an einem Ort",
+      "tagline": "Open-Source-Observability für Teams, die schnell liefern.",
+      "unifiedTitle": "Alle Telemetriedaten zusammen",
+      "unifiedBody": "Logs, Metriken und Traces nebeneinander, durchsucht mit einer Query-Engine.",
+      "storageTitle": "{factor} geringere Speicherkosten",
+      "storageBody": "Spaltenbasierter Speicher in Ihrem eigenen Object Store, gemessen an {product}.",
+      "otelTitle": "Entwickelt für {standard}",
+      "otelBody": "Senden Sie Daten von den Collectors und Agents, die Sie bereits nutzen.",
+      "openTitle": "Open Source im Kern",
+      "openBody": "Selbst hosten oder die Cloud nutzen, ohne Vendor-Lock-in.",
+      "learnMore": "Mehr erfahren auf {site}"
     }
   },
   "user": {

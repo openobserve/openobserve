@@ -4290,6 +4290,19 @@
       "aiAssistant": "Asystent AI",
       "other": "Inne",
       "thanks": "Dziękujemy za odpowiedź!"
+    },
+    "brand": {
+      "headline": "Wszystkie logi, metryki i ślady w jednym miejscu",
+      "tagline": "Obserwowalność open source dla zespołów, które dostarczają szybko.",
+      "unifiedTitle": "Cała telemetria razem",
+      "unifiedBody": "Logi, metryki i ślady obok siebie, przeszukiwane jednym silnikiem.",
+      "storageTitle": "{factor} niższy koszt przechowywania",
+      "storageBody": "Kolumnowe przechowywanie we własnym magazynie obiektów, w porównaniu z {product}.",
+      "otelTitle": "Stworzone dla {standard}",
+      "otelBody": "Wysyłaj dane z kolektorów i agentów, których już używasz.",
+      "openTitle": "Open source w podstawach",
+      "openBody": "Hostuj samodzielnie lub korzystaj z chmury, bez uzależnienia od dostawcy.",
+      "learnMore": "Dowiedz się więcej na {site}"
     }
   },
   "user": {

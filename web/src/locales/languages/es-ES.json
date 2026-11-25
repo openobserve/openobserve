@@ -4290,6 +4290,19 @@
       "aiAssistant": "Asistente de IA",
       "other": "Otro",
       "thanks": "¡Gracias por decírnoslo!"
+    },
+    "brand": {
+      "headline": "Todos tus logs, métricas y trazas en un solo lugar",
+      "tagline": "Observabilidad de código abierto para equipos que entregan rápido.",
+      "unifiedTitle": "Toda tu telemetría junta",
+      "unifiedBody": "Logs, métricas y trazas lado a lado, consultados con un solo motor.",
+      "storageTitle": "Coste de almacenamiento {factor} menor",
+      "storageBody": "Almacenamiento columnar en tu propio almacén de objetos, frente a {product}.",
+      "otelTitle": "Diseñado para {standard}",
+      "otelBody": "Envía datos desde los recolectores y agentes que ya usas.",
+      "openTitle": "Código abierto de verdad",
+      "openBody": "Alójalo tú mismo o usa la nube, sin dependencia del proveedor.",
+      "learnMore": "Más información en {site}"
     }
   },
   "user": {
