@@ -137,6 +137,15 @@ test("a changed code file outside web/ runs everything, since it can re-export o
   assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/shared.ts");
 });
 
+test("a glob over files outside web/ runs everything when an outside file changes", () => {
+  git("checkout", "-q", base);
+  write({ "web/src/utils/cat.spec.ts": `const all = import.meta.glob("../../../src/config/*.json");` });
+  const b2 = commit();
+  write({ "src/config/parity.json": `{"b":1}`, "web/.prettierignore": "y" });
+  const r = select({ repo, base: b2, head: commit() });
+  assert.equal(r.reason, `src/utils/cat.spec.ts globs files outside web/: ../../../src/config/*.json`);
+});
+
 test("a template-literal import of a changed file outside web/ picks its importer", () => {
   const r = run({ "src/config/tpl.json": `{"a":1}`, "web/.prettierignore": "x" });
   assert.deepEqual(graphSpecs(r), ["src/utils/tpl.spec.ts"]);

@@ -353,6 +353,8 @@ export function select({ repo, base, head }) {
     for (const [f, t] of texts)
       for (const m of t.matchAll(/(["'`])(\.\.?\/[^"'`\s]+)\1/g)) {
         const p = posix.join("web", posix.dirname(f), m[2].replace(/[?#].*$/, ""));
+        if (/[*{]/.test(m[2]) && !p.startsWith("web/"))
+          return { ...full(`${f} globs files outside web/: ${m[2]}`), changed };
         const hit = [p, ...EXTS.map((e) => p + e), ...EXTS.map((e) => `${p}/index${e}`)].find(
           (c) => outside.has(c),
         );
