@@ -81,6 +81,10 @@ vi.mock("@/plugins/logs/DetailTable.vue", () => ({
 
 import DashboardMetricsExplorer from "./DashboardMetricsExplorer.vue";
 import { EXPLORER_FILTER_MODE_KEY } from "@/utils/dashboard/pointExplorers";
+import {
+  EXPLORER_BACK_KEY,
+  createExplorerBack,
+} from "@/composables/dashboard/useExplorerDetailKeys";
 import ExplorerResultRow from "./ExplorerResultRow.vue";
 import ExplorerDetailSkeleton from "./ExplorerDetailSkeleton.vue";
 import ExplorerResultsPager from "./ExplorerResultsPager.vue";
@@ -119,7 +123,10 @@ describe("DashboardMetricsExplorer", () => {
   });
   afterEach(() => wrapper?.unmount());
 
-  const mountExplorer = (props: Record<string, unknown> = {}) => {
+  const mountExplorer = (
+    props: Record<string, unknown> = {},
+    provide: Record<string | symbol, unknown> = {},
+  ) => {
     wrapper = mount(DashboardMetricsExplorer, {
       props: {
         stream: "cpu",
@@ -134,6 +141,7 @@ describe("DashboardMetricsExplorer", () => {
       attachTo: document.body,
       global: {
         plugins: [i18n, store],
+        provide,
         stubs: {
           DateTime: true,
           QueryEditor: true,
@@ -433,6 +441,46 @@ describe("DashboardMetricsExplorer", () => {
     // Opening a sample fetches nothing more: there is no series chart.
     expect(searches()).toHaveLength(before);
     expect(wrapper.find("[data-test='metrics-explorer-detail-position']").text()).toBe("1 / 2");
+  });
+
+  describe("the drawer's × and Escape from an open sample", () => {
+    const openOne = async (explorerBack = createExplorerBack()) => {
+      mountExplorer({}, { [EXPLORER_BACK_KEY as symbol]: explorerBack });
+      await flushPromises();
+      await wrapper.findAll("[data-test='metrics-explorer-row-open']")[0].trigger("click");
+      await flushPromises();
+      expect(wrapper.find("[data-test='metrics-explorer-detail']").exists()).toBe(true);
+      return explorerBack;
+    };
+
+    it("× (the drawer's close guard) goes back to the list, kept as it was; the next × closes", async () => {
+      const explorerBack = await openOne();
+      const searchesBefore = fetchQueryDataWithHttpStream.mock.calls.length;
+      expect(explorerBack.back()).toBe(true);
+      await flushPromises();
+      expect(wrapper.find("[data-test='metrics-explorer-detail']").exists()).toBe(false);
+      expect(wrapper.find("[data-test='metrics-explorer-row-open']").exists()).toBe(true);
+      // The list comes back as it was: no new search.
+      expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(searchesBefore);
+      // From the list, the drawer may close.
+      expect(explorerBack.back()).toBe(false);
+    });
+
+    it("Escape in a field inside the sample goes back to the list in one press", async () => {
+      await openOne();
+      const drawerEscape = vi.fn();
+      window.addEventListener("keydown", drawerEscape);
+      const field = document.createElement("input");
+      wrapper.find("[data-test='metrics-explorer-detail']").element.appendChild(field);
+      field.focus();
+      field.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+      );
+      await flushPromises();
+      window.removeEventListener("keydown", drawerEscape);
+      expect(wrapper.find("[data-test='metrics-explorer-detail']").exists()).toBe(false);
+      expect(drawerEscape).not.toHaveBeenCalled();
+    });
   });
 
   it("Escape returns from a sample to the list", async () => {

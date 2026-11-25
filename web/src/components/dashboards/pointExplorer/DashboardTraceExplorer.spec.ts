@@ -43,6 +43,10 @@ vi.mock("vue-router", async (importOriginal) => ({
 
 import DashboardTraceExplorer from "./DashboardTraceExplorer.vue";
 import { EXPLORER_FILTER_MODE_KEY } from "@/utils/dashboard/pointExplorers";
+import {
+  EXPLORER_BACK_KEY,
+  createExplorerBack,
+} from "@/composables/dashboard/useExplorerDetailKeys";
 
 const MIN = 60_000_000;
 const rawTrace = (id: string, startUs: number) => ({
@@ -71,6 +75,25 @@ const TraceDetailsStub = {
   template: "<div data-test='trace-details-stub' />",
 };
 
+// The code editor (Monaco) as a plain textarea: typing writes the query, Ctrl+Enter runs it.
+const QueryEditorStub = {
+  name: "QueryEditor",
+  props: {
+    query: String,
+    dataTestPrefix: String,
+    filterMode: Boolean,
+    fullTextSearch: Boolean,
+    keywords: Array,
+    fieldValueResolver: Function,
+    editorHeight: String,
+    hideNlToggle: Boolean,
+  },
+  emits: ["update:query", "run-query"],
+  template: `<div :data-test="dataTestPrefix"><textarea :value="query"
+    @input="$emit('update:query', $event.target.value)"
+    @keydown.enter.ctrl="$emit('run-query')" /></div>`,
+};
+
 describe("DashboardTraceExplorer", () => {
   let wrapper: VueWrapper<any>;
   const { searchObj } = useTraces();
@@ -96,7 +119,10 @@ describe("DashboardTraceExplorer", () => {
     document.body.innerHTML = "";
   });
 
-  const mountExplorer = (props: Record<string, unknown> = {}) => {
+  const mountExplorer = (
+    props: Record<string, unknown> = {},
+    provide: Record<string | symbol, unknown> = {},
+  ) => {
     wrapper = mount(DashboardTraceExplorer, {
       props: {
         stream: "otel",
@@ -108,7 +134,8 @@ describe("DashboardTraceExplorer", () => {
       attachTo: document.body,
       global: {
         plugins: [i18n, store],
-        stubs: { TraceDetails: TraceDetailsStub, DateTime: true },
+        provide,
+        stubs: { TraceDetails: TraceDetailsStub, DateTime: true, QueryEditor: QueryEditorStub },
       },
     });
     return wrapper;
@@ -310,7 +337,7 @@ describe("DashboardTraceExplorer", () => {
       );
     });
 
-    it("text mode still searches only on Enter or Run", async () => {
+    it("text mode still searches only on Ctrl+Enter or Run", async () => {
       mountExplorer();
       await flushPromises();
       await openTextFilter();
@@ -318,7 +345,7 @@ describe("DashboardTraceExplorer", () => {
       try {
         const before = fetchQueryDataWithHttpStream.mock.calls.length;
         await wrapper
-          .find("[data-test='trace-explorer-filter-input'] input")
+          .find("[data-test='trace-explorer-filter-input'] textarea")
           .setValue("duration > 5");
         vi.advanceTimersByTime(1000);
         expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before);
@@ -333,7 +360,7 @@ describe("DashboardTraceExplorer", () => {
       mountExplorer({ filters: [] });
       await flushPromises();
       await openTextFilter();
-      const input = wrapper.find("[data-test='trace-explorer-filter-input'] input");
+      const input = wrapper.find("[data-test='trace-explorer-filter-input'] textarea");
       await input.setValue("upper(service_name) = 'CART'");
       await wrapper.find("[data-test='trace-explorer-filter-builder-toggle']").trigger("click");
       await flushPromises();
@@ -341,7 +368,7 @@ describe("DashboardTraceExplorer", () => {
       expect(wrapper.find(banner).exists()).toBe(true);
       await wrapper.find("[data-test='trace-explorer-filter-builder-keep-query']").trigger("click");
       expect(
-        wrapper.find("[data-test='trace-explorer-filter-input'] input").element,
+        wrapper.find("[data-test='trace-explorer-filter-input'] textarea").element,
       ).toHaveProperty("value", "upper(service_name) = 'CART'");
     });
 
@@ -359,24 +386,47 @@ describe("DashboardTraceExplorer", () => {
     });
   });
 
-  it("the Filter editor runs its WHERE on Enter", async () => {
+  it("the Filter editor runs its WHERE on Ctrl+Enter", async () => {
     mountExplorer();
     await flushPromises();
     await openTextFilter();
-    const input = wrapper.find("[data-test='trace-explorer-filter-input'] input");
+    const input = wrapper.find("[data-test='trace-explorer-filter-input'] textarea");
     await input.setValue("status_code = 'ERROR'");
     await input.trigger("keydown", { key: "Enter" });
     await flushPromises();
+    expect(lastRequest().queryReq.filter).not.toBe("status_code = 'ERROR'");
+    await input.trigger("keydown", { key: "Enter", ctrlKey: true });
+    await flushPromises();
     expect(lastRequest().queryReq.filter).toBe("status_code = 'ERROR'");
+  });
+
+  it("the Filter editor is the code editor in filter mode, offering the trace fields and their values", async () => {
+    mountExplorer();
+    await flushPromises();
+    await openTextFilter();
+    const editor = wrapper.findComponent({ name: "QueryEditor" });
+    expect(editor.props()).toMatchObject({
+      query: "service_name = 'cart'",
+      filterMode: true,
+      fullTextSearch: false,
+      editorHeight: "4rem",
+      hideNlToggle: true,
+    });
+    expect(editor.props("keywords")).toEqual([
+      { name: "service_name", label: "service_name", kind: "Field", insertText: "service_name" },
+    ]);
+    expect(typeof editor.props("fieldValueResolver")).toBe("function");
+    // No WHERE prefix around it: the editor holds the bare condition, and that is what runs.
+    expect(wrapper.find("[data-test='trace-explorer-filter-box']").text()).not.toContain("WHERE");
   });
 
   const runFilter = async (where: string) => {
     if (!wrapper.find("[data-test='trace-explorer-filter-input']").exists()) {
       await openTextFilter();
     }
-    const input = wrapper.find("[data-test='trace-explorer-filter-input'] input");
+    const input = wrapper.find("[data-test='trace-explorer-filter-input'] textarea");
     await input.setValue(where);
-    await input.trigger("keydown", { key: "Enter" });
+    await input.trigger("keydown", { key: "Enter", ctrlKey: true });
     await flushPromises();
   };
 
@@ -402,8 +452,8 @@ describe("DashboardTraceExplorer", () => {
     mountExplorer();
     await flushPromises();
     await openTextFilter();
-    const input = wrapper.find("[data-test='trace-explorer-filter-input'] input")
-      .element as HTMLInputElement;
+    const input = wrapper.find("[data-test='trace-explorer-filter-input'] textarea")
+      .element as HTMLTextAreaElement;
     input.focus();
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(document.activeElement).not.toBe(input);
@@ -411,6 +461,48 @@ describe("DashboardTraceExplorer", () => {
     document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(drawerEscape).toHaveBeenCalledTimes(1);
     window.removeEventListener("keydown", drawerEscape);
+  });
+
+  describe("the drawer's × and Escape from an open trace", () => {
+    const openOne = async (explorerBack = createExplorerBack()) => {
+      mountExplorer({}, { [EXPLORER_BACK_KEY as symbol]: explorerBack });
+      await flushPromises();
+      wrapper
+        .findComponent({ name: "TracesSearchResultList" })
+        .vm.$emit("row-click", wrapper.vm.hits[0]);
+      await flushPromises();
+      expect(wrapper.find("[data-test='trace-explorer-detail']").exists()).toBe(true);
+      return explorerBack;
+    };
+
+    it("× (the drawer's close guard) goes back to the list, kept as it was; the next × closes", async () => {
+      const explorerBack = await openOne();
+      const searchesBefore = fetchQueryDataWithHttpStream.mock.calls.length;
+      expect(explorerBack.back()).toBe(true);
+      await flushPromises();
+      expect(wrapper.find("[data-test='trace-explorer-detail']").exists()).toBe(false);
+      expect(wrapper.find("[data-test='trace-explorer-results']").exists()).toBe(true);
+      // The list comes back as it was: no new search.
+      expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(searchesBefore);
+      // From the list, the drawer may close.
+      expect(explorerBack.back()).toBe(false);
+    });
+
+    it("Escape in a field inside the trace goes back to the list in one press", async () => {
+      await openOne();
+      const drawerEscape = vi.fn();
+      window.addEventListener("keydown", drawerEscape);
+      const field = document.createElement("input");
+      wrapper.find("[data-test='trace-details-stub']").element.appendChild(field);
+      field.focus();
+      field.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+      );
+      await flushPromises();
+      window.removeEventListener("keydown", drawerEscape);
+      expect(wrapper.find("[data-test='trace-explorer-detail']").exists()).toBe(false);
+      expect(drawerEscape).not.toHaveBeenCalled();
+    });
   });
 
   it("a row opens the embedded trace over its own window ±1 min, with links in new tabs", async () => {

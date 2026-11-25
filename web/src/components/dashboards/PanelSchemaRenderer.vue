@@ -417,6 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
       :title="cellDrawerTitle"
       data-test="dashboard-cell-explorer-drawer"
+      :close-guard="cellDrawerCloseGuard"
       @update:open="onCellDrawerOpenChange"
     >
       <DashboardLogDrawer
@@ -447,6 +448,7 @@ import {
   inject,
   nextTick,
   defineAsyncComponent,
+  provide,
   onMounted,
   onUnmounted,
   toRaw,
@@ -496,6 +498,10 @@ import { overlayNewDataOnOldOptions, isOverlayEligible } from "@/utils/dashboard
 import { usePanelExemplars } from "@/composables/dashboard/usePanelExemplars";
 import { usePanelExemplarInteraction } from "@/composables/dashboard/usePanelExemplarInteraction";
 import { useExemplarTraceLookup } from "@/composables/dashboard/useExemplarTraceLookup";
+import {
+  EXPLORER_BACK_KEY,
+  createExplorerBack,
+} from "@/composables/dashboard/useExplorerDetailKeys";
 import {
   applyExemplarSeries,
   seriesValueExtent,
@@ -2863,6 +2869,12 @@ export default defineComponent({
       });
     }
 
+    // With an item open (a log event, metric sample or trace), the drawer's ×, Escape and outside
+    // click go back to the list; only from the list do they close the drawer.
+    const explorerBack = createExplorerBack();
+    provide(EXPLORER_BACK_KEY, explorerBack);
+    const cellDrawerCloseGuard = () => !explorerBack.back();
+
     function onCellDrawerOpenChange(open: boolean) {
       cellDrawer.value.open = open;
       if (!open) {
@@ -3109,6 +3121,7 @@ export default defineComponent({
       ensureDrilldownSchema,
       panelBaseWhere,
       onCellDrawerOpenChange,
+      cellDrawerCloseGuard,
       exemplarsEligible,
       exemplarsEnabled,
       exemplarsStatus,

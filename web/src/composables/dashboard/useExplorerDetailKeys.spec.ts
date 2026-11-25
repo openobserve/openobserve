@@ -14,9 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, h } from "vue";
-import { mount, type VueWrapper } from "@vue/test-utils";
-import { isTypingTarget, leaveFieldOnEscape, useExplorerDetailKeys } from "./useExplorerDetailKeys";
+import { defineComponent, h, provide, ref } from "vue";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { DialogContent } from "reka-ui";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import {
+  EXPLORER_BACK_KEY,
+  createExplorerBack,
+  isTypingTarget,
+  leaveFieldOnEscape,
+  useExplorerDetailKeys,
+} from "./useExplorerDetailKeys";
+
+// The drawer renders in place, so the host test can reach its × and panel.
+vi.mock("reka-ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("reka-ui")>();
+  return { ...actual, DialogPortal: actual.DialogContent };
+});
 
 const html = (markup: string) => {
   const host = document.createElement("div");
@@ -179,5 +193,149 @@ describe("leaveFieldOnEscape", () => {
     press(document.getElementById("f")!, { key: "a" });
     press(document.getElementById("b")!);
     expect(drawerEscape).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("the drawer steps back from an open item before it closes", () => {
+  let wrapper: VueWrapper<any> | null = null;
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  // A drawer host as PanelSchemaRenderer builds it: the real ODrawer, its closeGuard asking the
+  // explorer inside, which registers its open item through useExplorerDetailKeys.
+  const mountHost = () => {
+    const itemOpen = ref(true);
+    const drawerOpen = ref(true);
+    const back = vi.fn(() => (itemOpen.value = false));
+    const Explorer = defineComponent({
+      setup() {
+        const onKeydown = useExplorerDetailKeys({
+          isOpen: () => itemOpen.value,
+          prev: () => {},
+          next: () => {},
+          back,
+        });
+        return () =>
+          h("div", { onKeydown, "data-test": "explorer" }, [
+            h("input", { "data-test": "detail-field" }),
+            h("button", { "data-test": "detail-tab" }),
+          ]);
+      },
+    });
+    const Host = defineComponent({
+      setup() {
+        const explorerBack = createExplorerBack();
+        provide(EXPLORER_BACK_KEY, explorerBack);
+        return () =>
+          h(
+            ODrawer,
+            {
+              open: drawerOpen.value,
+              title: "Explorer",
+              closeGuard: () => !explorerBack.back(),
+              "onUpdate:open": (v: boolean) => (drawerOpen.value = v),
+            },
+            { default: () => h(Explorer) },
+          );
+      },
+    });
+    wrapper = mount(Host, { attachTo: document.body });
+    return { itemOpen, drawerOpen, back };
+  };
+  const closeBtn = () => wrapper!.find("[data-test='o-drawer-close-btn']");
+  const panel = () =>
+    wrapper!
+      .findAllComponents(DialogContent)
+      .find((c) => c.attributes("data-o2-drawer") !== undefined)!;
+  const drawerEscape = async () => {
+    const e = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+    await panel().vm.$emit("escapeKeyDown", e);
+    return e;
+  };
+
+  it("× with an item open goes back to the list; a second × closes the drawer", async () => {
+    const { itemOpen, drawerOpen, back } = mountHost();
+    await closeBtn().trigger("click");
+    await flushPromises();
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(itemOpen.value).toBe(false);
+    expect(drawerOpen.value).toBe(true);
+    await closeBtn().trigger("click");
+    await flushPromises();
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(drawerOpen.value).toBe(false);
+  });
+
+  it("an Escape that reaches the drawer with an item open goes back, and is cancelled", async () => {
+    const { itemOpen, drawerOpen } = mountHost();
+    const first = await drawerEscape();
+    expect(first.defaultPrevented).toBe(true);
+    expect(itemOpen.value).toBe(false);
+    expect(drawerOpen.value).toBe(true);
+    await drawerEscape();
+    expect(drawerOpen.value).toBe(false);
+  });
+
+  it("an outside click with an item open goes back too", async () => {
+    const { itemOpen, drawerOpen } = mountHost();
+    // reka's DialogRoot reports an outside dismissal as update:open(false).
+    const root = wrapper!.findComponent({ name: "DialogRoot" });
+    await root.vm.$emit("update:open", false);
+    expect(itemOpen.value).toBe(false);
+    expect(drawerOpen.value).toBe(true);
+  });
+
+  it("Escape in a field inside the open item goes back in one press, never closing the drawer", async () => {
+    const { itemOpen, drawerOpen, back } = mountHost();
+    const field = wrapper!.find("[data-test='detail-field']").element as HTMLInputElement;
+    field.focus();
+    const e = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    field.dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(true);
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(itemOpen.value).toBe(false);
+    expect(drawerOpen.value).toBe(true);
+    expect(document.activeElement).not.toBe(field);
+  });
+
+  it("an Escape an open suggest list stops in the field stays there", () => {
+    const { back } = mountHost();
+    const field = wrapper!.find("[data-test='detail-field']").element as HTMLInputElement;
+    field.addEventListener("keydown", (e) => e.stopPropagation(), { once: true });
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(back).not.toHaveBeenCalled();
+  });
+
+  it("Escape on a detail tab (not a field) goes back", () => {
+    const { back, drawerOpen } = mountHost();
+    const tab = wrapper!.find("[data-test='detail-tab']").element as HTMLButtonElement;
+    tab.focus();
+    tab.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(drawerOpen.value).toBe(true);
+  });
+
+  it("with no item open, Escape in a field only leaves the field", () => {
+    const { itemOpen, back, drawerOpen } = mountHost();
+    itemOpen.value = false;
+    const field = wrapper!.find("[data-test='detail-field']").element as HTMLInputElement;
+    field.focus();
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(back).not.toHaveBeenCalled();
+    expect(document.activeElement).not.toBe(field);
+    expect(drawerOpen.value).toBe(true);
+  });
+
+  it("an explorer that unmounts stops answering the drawer", () => {
+    const explorerBack = createExplorerBack();
+    const back = vi.fn();
+    const unregister = explorerBack.register({ isOpen: () => true, back });
+    expect(explorerBack.back()).toBe(true);
+    unregister();
+    expect(explorerBack.back()).toBe(false);
+    expect(back).toHaveBeenCalledTimes(1);
   });
 });

@@ -68,6 +68,10 @@ vi.mock("vue-router", () => ({
 import DashboardLogDrawer from "@/components/dashboards/DashboardLogDrawer.vue";
 import { b64DecodeUnicodeSafe } from "@/utils/zincutils";
 import ExplorerResultRow from "@/components/dashboards/pointExplorer/ExplorerResultRow.vue";
+import {
+  EXPLORER_BACK_KEY,
+  createExplorerBack,
+} from "@/composables/dashboard/useExplorerDetailKeys";
 
 const mountDrawer = (features: Record<string, string>, streamType?: string) =>
   shallowMount(DashboardLogDrawer, {
@@ -727,5 +731,65 @@ describe("DashboardLogDrawer event URL param", () => {
       opened: [{ query: { tab: "t1", cell_event_ts: "42" } }],
       closed: [{ query: { tab: "t1" } }],
     });
+  });
+});
+
+describe("DashboardLogDrawer: the drawer's × and Escape from an open log (table cell)", () => {
+  const mountCell = () => {
+    const explorerBack = createExplorerBack();
+    const wrapper = shallowMount(DashboardLogDrawer, {
+      props: { stream: "app", field: "level", value: "error", startTime: 1, endTime: 2 },
+      attachTo: document.body,
+      global: {
+        renderStubDefaultSlot: true,
+        provide: { [EXPLORER_BACK_KEY as symbol]: explorerBack },
+        plugins: [
+          i18n,
+          createStore({
+            state: {
+              selectedOrganization: { identifier: "org" },
+              timezone: "UTC",
+              zoConfig: { features: {} },
+            },
+          }),
+        ],
+      },
+    });
+    return { wrapper, explorerBack, state: () => (wrapper.vm as any).$.setupState };
+  };
+
+  it("× goes back to the list (clearing the event from the URL); the next × closes", async () => {
+    const { wrapper, explorerBack, state } = mountCell();
+    await flushPromises();
+    state().openEventDetail({ _timestamp: 42 });
+    await flushPromises();
+    expect(state().detailOpen).toBe(true);
+    routerReplace.mockClear();
+    expect(explorerBack.back()).toBe(true);
+    await flushPromises();
+    expect(state().detailOpen).toBe(false);
+    expect(routerReplace).toHaveBeenCalledWith({ query: { tab: "t1" } });
+    expect(explorerBack.back()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("Escape in a field inside the open log goes back in one press", async () => {
+    const { wrapper, state } = mountCell();
+    await flushPromises();
+    state().openEventDetail({ _timestamp: 42 });
+    await flushPromises();
+    const drawerEscape = vi.fn();
+    window.addEventListener("keydown", drawerEscape);
+    const field = document.createElement("input");
+    wrapper.element.appendChild(field);
+    field.focus();
+    field.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+    );
+    await flushPromises();
+    window.removeEventListener("keydown", drawerEscape);
+    expect(state().detailOpen).toBe(false);
+    expect(drawerEscape).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 });

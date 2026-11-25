@@ -18,6 +18,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import ExplorerFilterBar from "./ExplorerFilterBar.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 import { EXPLORER_FILTER_MODE_KEY } from "@/utils/dashboard/pointExplorers";
 
 // The one chips-or-own key all three explorers share, apart from the Logs/Traces pages' keys.
@@ -26,7 +27,29 @@ const PAGE_KEYS = ["o2.logs.queryInput", "o2.traces.queryInput"];
 
 describe("ExplorerFilterBar", () => {
   let wrapper: VueWrapper<any>;
-  const mountBar = (ownKind: "where" | "sql" = "where", prefix = "x") => {
+  const loadValues = vi.fn(async (field: string) => [`${field}-a`, `${field}-b`]);
+  const mountBar = (
+    ownKind: "where" | "sql" = "where",
+    prefix = "x",
+    stubs: Record<string, unknown> = {
+      QueryEditor: {
+        name: "QueryEditor",
+        props: {
+          query: String,
+          dataTestPrefix: String,
+          filterMode: Boolean,
+          fullTextSearch: Boolean,
+          keywords: Array,
+          fieldValueResolver: Function,
+          editorHeight: String,
+          hideNlToggle: Boolean,
+          languages: Array,
+        },
+        emits: ["update:query", "run-query"],
+        template: "<div :data-test='dataTestPrefix' />",
+      },
+    },
+  ) => {
     wrapper = mount(ExplorerFilterBar, {
       props: {
         chipsQuery: "level = 'error'",
@@ -34,20 +57,11 @@ describe("ExplorerFilterBar", () => {
         ownValue:
           ownKind === "sql" ? `SELECT * FROM "app" WHERE level = 'error'` : "level = 'error'",
         fields: [{ name: "level", type: "string" }],
+        loadValues,
         dataTestPrefix: prefix,
       },
       attachTo: document.body,
-      global: {
-        plugins: [i18n, store],
-        stubs: {
-          QueryEditor: {
-            name: "QueryEditor",
-            props: ["query"],
-            emits: ["update:query", "run-query"],
-            template: "<div data-test='editor' />",
-          },
-        },
-      },
+      global: { plugins: [i18n, store], stubs },
     });
     return wrapper;
   };
@@ -103,7 +117,8 @@ describe("ExplorerFilterBar", () => {
     const editor = wrapper.findComponent({ name: "QueryEditor" });
     expect(editor.props("query")).toBe(`SELECT * FROM "app" WHERE level = 'error'`);
     // The editor sits in the same row as the toggle.
-    expect(wrapper.find("[data-test='x-filter-box'] [data-test='editor']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='x-filter-box'] [data-test='x-editor']").exists()).toBe(true);
+    expect(editor.props()).toMatchObject({ filterMode: false, fullTextSearch: true, keywords: [] });
     editor.vm.$emit("update:query", "SELECT 1");
     editor.vm.$emit("run-query");
     expect(wrapper.emitted("update:ownValue")?.at(-1)).toEqual(["SELECT 1"]);
@@ -188,15 +203,67 @@ describe("ExplorerFilterBar", () => {
     expect(localStorage.getItem(AUTO_RUN_KEY)).toBe(value);
   });
 
-  it("the WHERE text runs on Enter only (the header's refresh runs it otherwise)", async () => {
+  it("the WHERE text is the code editor in filter mode, no WHERE prefix, the fields and their values offered", async () => {
+    localStorage.removeItem(KEY);
+    mountBar();
+    const editor = wrapper.findComponent({ name: "QueryEditor" });
+    expect(editor.props()).toMatchObject({
+      query: "level = 'error'",
+      dataTestPrefix: "x-filter-input",
+      filterMode: true,
+      fullTextSearch: false,
+      editorHeight: "4rem",
+      hideNlToggle: true,
+      languages: ["sql"],
+    });
+    expect(editor.props("keywords")).toEqual([
+      { name: "level", label: "level", kind: "Field", insertText: "level" },
+    ]);
+    expect(await editor.props("fieldValueResolver")("level")).toEqual(["level-a", "level-b"]);
+    expect(loadValues).toHaveBeenCalledWith("level", "");
+    expect(wrapper.find("[data-test='x-filter-box']").text()).not.toContain("WHERE");
+    // The bare condition goes out as typed.
+    editor.vm.$emit("update:query", "level = 'warn'");
+    expect(wrapper.emitted("update:ownValue")?.at(-1)).toEqual(["level = 'warn'"]);
+  });
+
+  it("the WHERE editor runs on its run-query (Ctrl+Enter) only, even with auto run on", async () => {
     autoRun("true");
     server(true);
     localStorage.removeItem(KEY);
     mountBar();
-    const input = wrapper.find("[data-test='x-filter-input'] input");
-    await input.setValue("level = 'warn'");
+    vi.useFakeTimers();
+    const editor = wrapper.findComponent({ name: "QueryEditor" });
+    editor.vm.$emit("update:query", "level = 'warn'");
+    vi.advanceTimersByTime(1000);
     expect(wrapper.emitted("run")).toBeUndefined();
-    await input.trigger("keydown", { key: "Enter" });
+    editor.vm.$emit("run-query");
+    expect(wrapper.emitted("run")).toHaveLength(1);
+  });
+
+  it("hands filter mode, fields and values through the real QueryEditor, and its Ctrl+Enter runs", async () => {
+    localStorage.removeItem(KEY);
+    mountBar("where", "x", {
+      CodeQueryEditor: {
+        name: "CodeQueryEditor",
+        props: ["query", "filterMode", "fullTextSearch", "keywords", "fieldValueResolver"],
+        emits: ["update:query", "run-query"],
+        template: "<div data-test='code-editor' />",
+      },
+    });
+    await flushPromises();
+    expect(wrapper.findComponent(QueryEditor).exists()).toBe(true);
+    const code = wrapper.findComponent({ name: "CodeQueryEditor" });
+    expect(code.props()).toMatchObject({
+      query: "level = 'error'",
+      filterMode: true,
+      fullTextSearch: false,
+    });
+    expect(code.props("keywords")).toEqual([
+      { name: "level", label: "level", kind: "Field", insertText: "level" },
+    ]);
+    expect(await code.props("fieldValueResolver")("level")).toEqual(["level-a", "level-b"]);
+    code.vm.$emit("run-query");
     await flushPromises();
     expect(wrapper.emitted("run")).toHaveLength(1);
   });

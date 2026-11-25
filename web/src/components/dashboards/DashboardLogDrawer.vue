@@ -48,10 +48,7 @@ import {
   type ExplorerMode,
 } from "@/utils/dashboard/chartPointExplore";
 import { eventSecondWindow } from "@/utils/dashboard/pointExplorers";
-import {
-  leaveFieldOnEscape,
-  useExplorerDetailKeys,
-} from "@/composables/dashboard/useExplorerDetailKeys";
+import { useExplorerDetailKeys } from "@/composables/dashboard/useExplorerDetailKeys";
 const DetailTable = defineAsyncComponent(() => import("@/plugins/logs/DetailTable.vue"));
 const DashboardTraceExplorer = defineAsyncComponent(
   () => import("@/components/dashboards/pointExplorer/DashboardTraceExplorer.vue"),
@@ -483,7 +480,7 @@ function goPrev() {
 function goNext() {
   if (hasNext.value) openEventDetail(events.value[selectedIndex.value + 1]);
 }
-useExplorerDetailKeys({
+const onExplorerKeydown = useExplorerDetailKeys({
   isOpen: () => !!selectedEvent.value,
   prev: goPrev,
   next: goNext,
@@ -789,7 +786,7 @@ function openInLogs() {
     :end-time="endTime"
     @send-to-ai-chat="(v: unknown, a?: boolean) => emit('sendToAiChat', v, a)"
   />
-  <div v-else class="flex h-full min-h-0 flex-col overflow-hidden" @keydown="leaveFieldOnEscape">
+  <div v-else class="flex h-full min-h-0 flex-col overflow-hidden" @keydown="onExplorerKeydown">
     <div v-show="!detailOpen" class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
       <div class="border-border-default flex min-w-0 shrink-0 flex-col border-b">

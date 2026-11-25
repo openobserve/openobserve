@@ -18,10 +18,7 @@ import { buildMetricsUrl } from "@/utils/metrics/buildMetricsUrl";
 import useStreams from "@/composables/useStreams";
 import { useExplorerSqlSearch } from "@/composables/dashboard/useExplorerSqlSearch";
 import { useExplorerCorrelation } from "@/composables/dashboard/useExplorerCorrelation";
-import {
-  leaveFieldOnEscape,
-  useExplorerDetailKeys,
-} from "@/composables/dashboard/useExplorerDetailKeys";
+import { useExplorerDetailKeys } from "@/composables/dashboard/useExplorerDetailKeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { type FieldFilter } from "@/utils/dashboard/chartPointExplore";
 import {
@@ -209,7 +206,7 @@ function stepSample(by: number) {
   const next = events.value[selectedIndex.value + by];
   if (next) openSample(next);
 }
-useExplorerDetailKeys({
+const onExplorerKeydown = useExplorerDetailKeys({
   isOpen: () => !!selected.value,
   prev: () => stepSample(-1),
   next: () => stepSample(1),
@@ -282,7 +279,7 @@ function fmtTs(ts: unknown): string {
   <div
     class="flex h-full min-h-0 flex-col overflow-hidden"
     data-test="metrics-explorer"
-    @keydown="leaveFieldOnEscape"
+    @keydown="onExplorerKeydown"
   >
     <div v-show="!selected" class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <ExplorerToolbar

@@ -2,14 +2,13 @@
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <!-- The explorers' filter area: one field box holding the <> toggle and either the chip builder or
-     "write your own" (the WHERE text for traces, the full SQL for logs and metrics), then Run.
+     "write your own" in the code editor (the WHERE condition for traces, the full SQL for logs and metrics).
      The host keeps the two in step; this bar only shows them and reports edits. -->
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
@@ -19,7 +18,7 @@ import { isAutoRunActive } from "@/composables/useLogs/useAutoRun";
 import type { FilterField } from "@/utils/query/filterBar";
 import { EXPLORER_FILTER_MODE_KEY } from "@/utils/dashboard/pointExplorers";
 
-defineProps<{
+const props = defineProps<{
   /** The WHERE condition the chips show; a query they cannot draw shows the builder's banner. */
   chipsQuery: string;
   /** What "write your own" edits: the WHERE text, or the full SQL. */
@@ -28,8 +27,6 @@ defineProps<{
   fields: FilterField[];
   fieldsLoading?: boolean;
   loadValues?: (field: string, search: string) => Promise<string[]>;
-  placeholder?: I18nText;
-  ariaLabel?: I18nText;
   dataTestPrefix: string;
 }>();
 
@@ -52,7 +49,7 @@ const { builderOn, toggle } = useFilterBuilderPreference(EXPLORER_FILTER_MODE_KE
 // on (stored as "true" under AUTO_RUN_STORAGE_KEY; missing or anything else is off, as they read it).
 // Then a chip edit reruns the search once edits settle, so rapid edits make one search. Otherwise it
 // only writes the filter, and the header's Run query or Enter on an empty bar runs it. The drawers
-// never write the key. "Write your own" always waits for Enter (Ctrl+Enter in SQL) or Run query.
+// never write the key. "Write your own" always waits for Ctrl+Enter or Run query.
 const store = useStore();
 const autoRunOn = (): boolean => {
   let liveMode = false;
@@ -80,6 +77,18 @@ const onChipsChange = (where: string) => {
   chipsRunTimer = setTimeout(runNow, CHIPS_RUN_DELAY_MS);
 };
 onBeforeUnmount(cancelPendingRun);
+
+// The WHERE editor offers the stream's fields as it types, and their values through the host's loader.
+const fieldKeywords = computed(() =>
+  props.fields.map((field) => ({
+    name: field.name,
+    label: field.name,
+    kind: "Field",
+    insertText: field.name,
+  })),
+);
+const resolveFieldValues = (field: string): Promise<string[]> =>
+  props.loadValues ? props.loadValues(field, "") : Promise.resolve([]);
 const builderRef = ref<InstanceType<typeof SqlFilterBuilder> | null>(null);
 
 defineExpose({ cancelPendingRun });
@@ -124,31 +133,25 @@ defineExpose({ cancelPendingRun });
           @exit="toggle"
         />
       </div>
+      <!-- Write your own, in the code editor the Logs and Traces pages use: the full SQL here for logs
+           and metrics, and for traces the bare WHERE condition in filter mode (as the Traces page's
+           filter), with the stream's fields and values offered. Ctrl+Enter runs it. -->
       <QueryEditor
-        v-else-if="ownKind === 'sql'"
+        v-else
         :query="ownValue"
         :languages="['sql']"
         editor-height="4rem"
         hide-nl-toggle
-        :data-test-prefix="`${dataTestPrefix}-editor`"
+        :filter-mode="ownKind === 'where'"
+        :full-text-search="ownKind !== 'where'"
+        :keywords="ownKind === 'where' ? fieldKeywords : []"
+        :field-value-resolver="ownKind === 'where' ? resolveFieldValues : null"
+        :data-test-prefix="
+          ownKind === 'where' ? `${dataTestPrefix}-filter-input` : `${dataTestPrefix}-editor`
+        "
         @update:query="(v: string) => emit('update:ownValue', v)"
         @run-query="runNow"
       />
-      <div v-else class="py-0.75 ps-1.5 pe-10">
-        <OInput
-          :model-value="ownValue"
-          class="font-mono"
-          prefix="WHERE"
-          size="xs"
-          :placeholder="placeholder"
-          :aria-label="ariaLabel"
-          :data-test="`${dataTestPrefix}-filter-input`"
-          @update:model-value="
-            (v: string | number | null) => emit('update:ownValue', String(v ?? ''))
-          "
-          @keydown.enter.prevent="runNow"
-        />
-      </div>
     </div>
   </div>
 </template>

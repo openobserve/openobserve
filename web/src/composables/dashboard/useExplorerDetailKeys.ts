@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { onBeforeUnmount, onMounted } from "vue";
+import { inject, onBeforeUnmount, onMounted, type InjectionKey } from "vue";
 
 const TYPING_SELECTOR =
   "input, textarea, select, [contenteditable]:not([contenteditable='false']), .monaco-editor";
@@ -22,13 +22,48 @@ const TYPING_SELECTOR =
 export const isTypingTarget = (target: EventTarget | null): boolean =>
   target instanceof Element && !!target.closest(TYPING_SELECTOR);
 
-/** The explorer drawer's detail keys: arrows step the open item, Escape returns to the list. */
+interface DetailBack {
+  isOpen: () => boolean;
+  back: () => void;
+}
+
+/** The drawer's way back from an open item: its × / Escape / outside click step back to the list first. */
+export interface ExplorerBack {
+  /** Adds an explorer's open item; returns its removal. */
+  register: (detail: DetailBack) => () => void;
+  /** Goes back from whichever item is open; false when none is, so the drawer may close. */
+  back: () => boolean;
+}
+
+/** Provided by the drawer host; every explorer inside it registers its open item. */
+export const EXPLORER_BACK_KEY: InjectionKey<ExplorerBack> = Symbol("explorerBack");
+
+export function createExplorerBack(): ExplorerBack {
+  const details = new Set<DetailBack>();
+  return {
+    register: (detail) => {
+      details.add(detail);
+      return () => details.delete(detail);
+    },
+    back: () => {
+      const open = [...details].find((detail) => detail.isOpen());
+      open?.back();
+      return !!open;
+    },
+  };
+}
+
+/**
+ * The explorer drawer's detail keys: arrows step the open item, Escape returns to the list. Returns
+ * the explorer root's `keydown`: Escape in a field goes back while an item is open, and otherwise
+ * only leaves the field (leaveFieldOnEscape).
+ */
 export function useExplorerDetailKeys(handlers: {
   isOpen: () => boolean;
   prev: () => void;
   next: () => void;
   back: () => void;
-}) {
+}): (e: KeyboardEvent) => void {
   const onKeydown = (e: KeyboardEvent) => {
     if (!handlers.isOpen() || isTypingTarget(e.target)) return;
     if (e.key === "ArrowLeft") {
@@ -47,6 +82,25 @@ export function useExplorerDetailKeys(handlers: {
   // Capture phase, so the drawer's own Escape handler never sees a key the detail used.
   onMounted(() => window.addEventListener("keydown", onKeydown, true));
   onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
+
+  // The drawer's ×, Escape and outside click ask here first, so they step back to the list.
+  const host = inject(EXPLORER_BACK_KEY, null);
+  const unregister = host?.register({ isOpen: handlers.isOpen, back: handlers.back });
+  onBeforeUnmount(() => unregister?.());
+
+  // A field inside the open item (a JSON value, the Table tab's search, a span's inputs) gets one
+  // Escape back to the list too; an open dropdown or suggest list stops the key before it gets here.
+  return (e: KeyboardEvent) => {
+    if (e.key === "Escape" && handlers.isOpen() && isTypingTarget(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+      handlers.back();
+      return;
+    }
+    leaveFieldOnEscape(e);
+  };
 }
 
 /**

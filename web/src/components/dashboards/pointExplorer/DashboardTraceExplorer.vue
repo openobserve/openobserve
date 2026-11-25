@@ -25,10 +25,7 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import { useTracesTableColumns } from "@/plugins/traces/composables/useTracesTableColumns";
-import {
-  leaveFieldOnEscape,
-  useExplorerDetailKeys,
-} from "@/composables/dashboard/useExplorerDetailKeys";
+import { useExplorerDetailKeys } from "@/composables/dashboard/useExplorerDetailKeys";
 import { generateTraceContext } from "@/utils/auth";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -209,7 +206,7 @@ function stepTrace(by: number) {
   const next = hits.value[selectedIndex.value + by];
   if (next) openTrace(next);
 }
-useExplorerDetailKeys({
+const onExplorerKeydown = useExplorerDetailKeys({
   isOpen: () => !!selected.value,
   prev: () => stepTrace(-1),
   next: () => stepTrace(1),
@@ -258,7 +255,7 @@ const detailTitle = computed(() =>
   <div
     class="flex h-full min-h-0 flex-col overflow-hidden"
     data-test="trace-explorer"
-    @keydown="leaveFieldOnEscape"
+    @keydown="onExplorerKeydown"
   >
     <div v-show="!selected" class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <ExplorerToolbar
@@ -284,8 +281,6 @@ const detailTitle = computed(() =>
           :fields="filterFields"
           :fields-loading="fieldsLoading"
           :load-values="loadFilterValues"
-          :placeholder="t('panel.traceExplorer.filterPlaceholder')"
-          :aria-label="t('panel.traceExplorer.filter')"
           data-test-prefix="trace-explorer"
           @update:chips-query="(where: string) => (whereText = where)"
           @update:own-value="(where: string) => (whereText = where)"
