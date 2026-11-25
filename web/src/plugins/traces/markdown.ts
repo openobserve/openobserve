@@ -13,89 +13,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { Marked, type MarkedExtension, type Token, type Tokens } from "marked";
+import { Marked } from "marked";
 import DOMPurify from "dompurify";
 import { SAFE_HTML_TAGS } from "@/utils/safeHtml";
 
 const safeHtmlTags = new Set(SAFE_HTML_TAGS);
 
-function tagName(tag: string): string {
-  return /^<\/?([\w:-]+)/.exec(tag)?.[1].toLowerCase() ?? "";
+function startsWithSafeTag(source: string): boolean {
+  const name = /^ {0,3}<\/?([a-zA-Z][\w:-]*)(?=[\s/>])/.exec(source)?.[1];
+  return !!name && safeHtmlTags.has(name.toLowerCase());
 }
 
-function escapeAngles(text: string): string {
-  return text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function escapeUnknownTags(html: string): string {
+  // Match quoted attributes with their outer tag so embedded markup stays literal.
+  return html.replace(
+    /<\/?([a-zA-Z][\w:-]*)(?=[\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*>/g,
+    (tag, name: string) =>
+      safeHtmlTags.has(name.toLowerCase()) ? tag : tag.replace(/</g, "&lt;").replace(/>/g, "&gt;"),
+  );
 }
 
-function parseMarkdown(content: string): string {
-  const openTags: string[] = [];
-  const closingTags = new Set<string>();
-
-  function collectClosingTags(token: Token) {
-    if (token.type === "html" && token.text.startsWith("</")) {
-      closingTags.add(tagName(token.text));
-    }
-  }
-
-  function isHtmlIndentation(token: Token): token is Tokens.Code {
-    return (
-      token.type === "code" &&
-      token.codeBlockStyle === "indented" &&
-      safeHtmlTags.has(openTags.at(-1) ?? "")
-    );
-  }
-  const options: MarkedExtension = {
-    gfm: true,
-    breaks: false,
-    tokenizer: { html: () => undefined },
-    walkTokens: collectClosingTags,
-    renderer: {
-      html({ text }) {
-        const name = tagName(text);
-        if (text.startsWith("</")) {
-          const opening = openTags.lastIndexOf(name);
-          if (opening !== -1) openTags.splice(opening);
-        } else if (
-          !["br", "hr", "img"].includes(name) &&
-          !text.endsWith("/>") &&
-          (safeHtmlTags.has(name) || closingTags.has(name))
-        ) {
-          // Unpaired placeholders do not create an HTML or Markdown wrapper context.
-          openTags.push(name);
-        }
-        return safeHtmlTags.has(name) ? text : escapeAngles(text);
-      },
-      code(token) {
-        if (!isHtmlIndentation(token)) return false;
-        const lexer = new Marked(options);
-        const pending: Token[] = [];
-        const output: string[] = [];
-        const enqueue = (text: string) => {
-          const tokens = lexer.lexer(text);
-          lexer.walkTokens(tokens, collectClosingTags);
-          for (let index = tokens.length - 1; index >= 0; index--) pending.push(tokens[index]);
-        };
-        enqueue(token.text);
-        // Expand indentation iteratively so its depth cannot consume the JavaScript call stack.
-        for (let next = pending.pop(); next; next = pending.pop()) {
-          if (isHtmlIndentation(next)) enqueue(next.text);
-          else output.push(this.parser.parse([next]));
-        }
-        return output.join("");
-      },
-      text(token) {
-        // Marked skips text escaping inside raw pre/code elements.
-        if ("escaped" in token && token.escaped) return escapeAngles(token.text);
-        return false;
-      },
-    },
-  };
-  // Each message owns its HTML context and is isolated from app-wide Markdown options.
-  return new Marked(options).parse(content) as string;
-}
+const markdown = new Marked({
+  gfm: true,
+  breaks: false,
+  // Unknown wrappers use inline parsing so their Markdown still renders.
+  tokenizer: { html: (source) => (startsWithSafeTag(source) ? false : undefined) },
+  renderer: {
+    html: ({ text }) => escapeUnknownTags(text),
+    // Marked skips text escaping inside raw pre/code elements.
+    text: (token) => ("escaped" in token && token.escaped ? escapeUnknownTags(token.text) : false),
+  },
+});
 
 /** Render an LLM message as sanitized HTML while preserving unknown tags as text. */
 export function renderMarkdown(content: string | null | undefined): string {
   if (!content) return "";
-  return DOMPurify.sanitize(parseMarkdown(content));
+  return DOMPurify.sanitize(markdown.parse(content) as string);
 }
