@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="trace-dag-flow bg-surface-panel! h-full w-full"
       >
         <Background :gap="16" />
-        <Controls />
+        <FlowControls />
 
         <template #node-custom="{ data }">
           <Handle
@@ -111,7 +111,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, computed, watch, nextTick } from "vue";
 import { VueFlow, Position, MarkerType, Handle, useVueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
-import { Controls } from "@vue-flow/controls";
+import FlowControls from "@/components/flow/FlowControls.vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -152,7 +152,7 @@ export default defineComponent({
   components: {
     VueFlow,
     Background,
-    Controls,
+    FlowControls,
     Handle,
     OSpinner,
     OIcon,

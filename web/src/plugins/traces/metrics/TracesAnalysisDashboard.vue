@@ -347,12 +347,14 @@ interface Props {
   streamFields?: any[]; // Stream schema fields for smart dimension selection
   logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
   embedded?: boolean; // Render as a page in place instead of a drawer
+  initialDimensions?: string[] | null; // Picks handed back after a remount
 }
 
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
   (e: "close"): void;
+  (e: "update:dimensions", dimensions: string[]): void;
 }>();
 
 // Page shell for `embedded`: lays out the drawer's slots in place, without drawer-only attrs.
@@ -423,6 +425,13 @@ const activeAnalysisType = ref<"duration" | "volume" | "error">(props.analysisTy
  * - For traces: Uses OpenTelemetry semantic conventions
  */
 const getInitialDimensions = () => {
+  const restored = props.initialDimensions;
+  if (restored) {
+    if (restored.length === 0) return [];
+    const known = new Set((props.streamFields || []).map((f: any) => f.name || f));
+    const kept = restored.filter((d) => known.has(d));
+    if (kept.length > 0) return kept;
+  }
   const streamType = props.streamType || "traces";
   const schemaFields = (props.streamFields || []).map((f: any) => ({
     name: f.name || f,
@@ -447,6 +456,7 @@ const getInitialDimensions = () => {
 
 // Selected dimensions (user can modify)
 const selectedDimensions = ref<string[]>(getInitialDimensions());
+watch(selectedDimensions, (dimensions) => emit("update:dimensions", dimensions));
 
 // Available dimensions for dropdown (all stream fields)
 const availableDimensions = computed(() => {

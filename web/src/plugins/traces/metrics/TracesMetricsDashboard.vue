@@ -17,48 +17,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="traces-metrics-dashboard" class="traces-metrics-dashboard w-full overflow-hidden">
     <!-- Charts Section -->
-    <div
-      v-if="show"
-      class="charts-wrapper dashboard-strip relative flex h-auto min-h-[8.5rem] flex-col overflow-hidden py-0! will-change-[transform,opacity] md:h-40 md:flex-row"
-    >
-      <div class="h-40 min-w-0 md:h-auto md:flex-2 dark:hover:shadow-sm">
-        <RenderDashboardCharts
-          v-if="show"
-          ref="dashboardChartsRef"
-          :viewOnly="true"
-          :frame="false"
-          :dashboardData="dashboardData || {}"
-          :currentTimeObj="currentTimeObj"
-          :allowAlertCreation="false"
-          :exploreActions="true"
-          searchType="dashboards"
-          @updated:dataZoom="onDataZoom"
-          @exploreCreateAlert="onExploreCreateAlert"
-          @exploreAddToDashboard="onExploreAddToDashboard"
-        >
-          <!-- Until a panel mounts it keeps the page placeholder's cell, so one placeholder lasts to first draw. -->
-          <template #panel-placeholder="{ panel, title }">
-            <TracesRedPanelPlaceholder :title="title" :meta="panel.config?.title_meta" />
-          </template>
-        </RenderDashboardCharts>
-      </div>
-      <!-- Tied to the Rate/Errors panels: metrics.json h (9 rows after migration) × 17px cellHeight, 4px GridStack margin -->
-      <div class="h-40 min-w-0 px-1 py-0.5 md:h-[9.5625rem] md:flex-1 md:py-1">
-        <TracesLatencyHeatmap
-          :request="heatmapRequest"
-          :stream="streamName"
-          :source="heatmapSource"
-          :selection="heatmapSelection"
-          :ai-enabled="aiEnabled"
-          @select="onHeatmapSelect"
-          @filter="heatmapSelection && onHeatmapFilter(heatmapSelection)"
-          @drill-down="onHeatmapDrillDown"
-          @clear="onHeatmapClear"
-          @ask-ai="onHeatmapAskAi"
-          @create-alert="createAlert('duration')"
-          @add-to-dashboard="openAddToDashboard('duration')"
-          @refresh-failed="reportTracesChartRefreshFailed(searchObj)"
+    <div v-if="show" class="flex flex-col will-change-[transform,opacity]">
+      <div
+        v-if="sqlSpanSet?.kind === 'none'"
+        class="border-border-default bg-surface-base rounded-default m-1 flex min-h-[8.5rem] items-center justify-center border md:h-[9.5625rem]"
+        data-test="traces-red-frame"
+      >
+        <OEmptyState
+          size="inline"
+          icon="bar-chart"
+          :backdrop="false"
+          :title="frameReason"
+          :action-label="t('traces.redCharts.showAllSpans', { stream: chartsStreamName })"
+          @action="onShowAllSpans"
         />
+      </div>
+      <div
+        v-else
+        class="charts-wrapper dashboard-strip relative flex h-auto min-h-[8.5rem] flex-col overflow-hidden py-0! md:h-40 md:flex-row"
+      >
+        <div class="h-40 min-w-0 md:h-auto md:flex-2 dark:hover:shadow-sm">
+          <div
+            v-if="sqlSpanSet"
+            class="flex h-full min-w-0 flex-col gap-1 px-1 py-0.5 md:flex-row md:py-1"
+            data-test="traces-red-sql-panels"
+          >
+            <TracesRedSqlPanel
+              v-for="panel in sqlPanels"
+              :key="panel.name"
+              class="min-h-0 flex-1"
+              :name="panel.name"
+              :panel-schema="panel.schema"
+              :status="redStatus"
+              :error="redError"
+              :hits="panel.hits"
+              :selected-time-obj="currentTimeObj.__global"
+              :run-key="redRunKey"
+              :caption="captionLines"
+              @retry="runCombinedRed"
+              @data-zoom="onDataZoom"
+            />
+          </div>
+          <RenderDashboardCharts
+            v-else
+            ref="dashboardChartsRef"
+            :viewOnly="true"
+            :frame="false"
+            :dashboardData="dashboardData || {}"
+            :currentTimeObj="currentTimeObj"
+            :allowAlertCreation="false"
+            :exploreActions="!searchObj.meta.sqlMode"
+            searchType="dashboards"
+            @updated:dataZoom="onDataZoom"
+            @exploreCreateAlert="onExploreCreateAlert"
+            @exploreAddToDashboard="onExploreAddToDashboard"
+          >
+            <!-- Until a panel mounts it keeps the page placeholder's cell, so one placeholder lasts to first draw. -->
+            <template #panel-placeholder="{ panel, title }">
+              <TracesRedPanelPlaceholder :title="title" :meta="panel.config?.title_meta" />
+            </template>
+          </RenderDashboardCharts>
+        </div>
+        <!-- Tied to the Rate/Errors panels: metrics.json h (9 rows after migration) × 17px cellHeight, 4px GridStack margin -->
+        <div class="h-40 min-w-0 px-1 py-0.5 md:h-[9.5625rem] md:flex-1 md:py-1">
+          <TracesLatencyHeatmap
+            :request="heatmapRequest"
+            :stream="streamName"
+            :source="heatmapSource"
+            :selection="heatmapSelection"
+            :ai-enabled="aiEnabled"
+            :sql-mode="!!searchObj.meta.sqlMode"
+            :caption="captionLines"
+            @select="onHeatmapSelect"
+            @filter="heatmapSelection && onHeatmapFilter(heatmapSelection)"
+            @drill-down="onHeatmapDrillDown"
+            @clear="onHeatmapClear"
+            @ask-ai="onHeatmapAskAi"
+            @create-alert="createAlert('duration')"
+            @add-to-dashboard="openAddToDashboard('duration')"
+            @refresh-failed="reportTracesChartRefreshFailed(searchObj)"
+          />
+        </div>
       </div>
     </div>
 
@@ -119,9 +158,28 @@ import {
 } from "./latencyHeatmap";
 import useTraces from "@/composables/useTraces";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import {
+  deriveSpanSet,
+  type RedDroppedClause,
+  type SpanSet,
+  type SpanSetResult,
+} from "@/utils/traces/tracesSql";
+import {
+  buildRedSql,
+  buildSpanSetHeatmapSql,
+  fillRedBuckets,
+  streamSpanSet,
+  type RedInterval,
+  type RedPoint,
+} from "./tracesRedSql";
+import { useTracesRedStream } from "./useTracesRedStream";
+import { tracesEditorIsStaged } from "@/plugins/traces/tracesSearchBar.utils";
+import TracesRedSqlPanel from "./TracesRedSqlPanel.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { activeScopePredicate, withScope } from "@/utils/traces/tracesScope";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
 import { buildTracesRedPanel, tracesBucketNotice, type TracesRedChart } from "./tracesRedPanels";
-import type { I18nText } from "@/types/i18n";
+import type { I18nKey, I18nText } from "@/types/i18n";
 import { PANEL_FAILED_REFRESH_HOLD } from "@/composables/dashboard/panelFailedRefreshHold";
 import {
   createTracesFailedRefreshHold,
@@ -157,7 +215,6 @@ export interface TimeRange {
 defineProps<{
   streamName: string;
   show?: boolean;
-  streamFields?: any[];
   aiEnabled?: boolean;
 }>();
 
@@ -204,6 +261,16 @@ const currentTimeObj = ref({
 });
 
 const dashboardData = ref(null);
+// The span set the last Spans SQL run draws, or why there is none; null in filter mode, which keeps its panels.
+const sqlSpanSet = shallowRef<SpanSetResult | null>(null);
+const redStatus = ref<"loading" | "ready" | "error">("loading");
+const redError = ref("");
+const redPoints = shallowRef<RedPoint[]>([]);
+const redSpans = ref<number | null>(null);
+const redRunKey = ref(0);
+let redRun: { set: SpanSet; interval: RedInterval; startTime: number; endTime: number } | null =
+  null;
+const redStream = useTracesRedStream();
 const heatmapRequest = ref<LatencyHeatmapRequest | null>(null);
 // The box drawn on the heatmap; it is applied only from its popover.
 const heatmapSelection = shallowRef<LatencyHeatmapSelection | null>(null);
@@ -224,6 +291,8 @@ let comparisonEntry: MetricsRangeFilter | null = null;
 let chartsRange: TimeRange | null = null;
 // The editor text the charts ran with; with auto-run off the editor may hold an unrun edit.
 let chartsFilter = "";
+// The scope condition the charts ran with, which a comparison of their spans keeps.
+let chartsScope = "";
 // The stream and mode the charts ran with, for the same reason.
 let chartsStream = "";
 let chartsMode: "spans" | "traces" = "traces";
@@ -252,7 +321,7 @@ const getBaseFilters = () => {
     }
   });
 
-  const parsedFilter = parseEffectiveFilter();
+  const parsedFilter = withScope(parseEffectiveFilter(), activeScopePredicate(searchObj));
   if (parsedFilter) baseFilters.push(parsedFilter);
 
   return baseFilters;
@@ -274,7 +343,6 @@ const loadDashboard = async () => {
     const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
-    const baseFilters: string[] = getBaseFilters();
     const streamName = searchObj.data.stream.selectedStream.value;
     const interval = chartInterval(
       effectiveTimeRange.value.startTime,
@@ -283,17 +351,32 @@ const loadDashboard = async () => {
 
     const source = tracesChartSource(searchObj);
     heatmapSource.value = source;
-    heatmapRequest.value = {
-      sql: buildLatencyHeatmapSql(streamName, baseFilters, interval.sql),
-      startTime: effectiveTimeRange.value.startTime,
-      endTime: effectiveTimeRange.value.endTime,
-    };
     chartsRange = { ...effectiveTimeRange.value };
     chartsFilter = searchObj.data.editorValue ?? "";
+    chartsScope = activeScopePredicate(searchObj);
     chartsStream = streamName;
+    chartsStreamName.value = streamName;
     chartsMode = isSpansMode ? "spans" : "traces";
     chartsInterval = interval;
     heatmapSelection.value = null;
+
+    if (searchObj.meta.sqlMode && isSpansMode) {
+      showSpanSet(deriveSpanSet(chartsFilter, tracesParser.value, { isTracesStream }), interval);
+      return;
+    }
+    sqlSpanSet.value = null;
+    redRun = null;
+    redStream.cancel();
+
+    const baseFilters: string[] = getBaseFilters();
+    const fromClause = `"${streamName}"`;
+    heatmapRequest.value = {
+      sql: buildLatencyHeatmapSql(streamName, baseFilters, interval.sql, fromClause),
+      startTime: effectiveTimeRange.value.startTime,
+      endTime: effectiveTimeRange.value.endTime,
+      intervalSec: interval.seconds,
+      size: -1,
+    };
     convertedDashboard.tabs[0].panels.forEach(
       (
         panel: { title?: string; config: Record<string, unknown>; queries: { query: string }[] },
@@ -319,7 +402,7 @@ const loadDashboard = async () => {
 
         // Build the final query: substitute placeholders then apply mode transforms
         let query = panel["queries"][0].query
-          .replace("[STREAM_NAME]", () => `"${streamName}"`)
+          .replace("[STREAM_NAME]", () => fromClause)
           .replace("[WHERE_CLAUSE]", () => whereClause)
           .replace("[INTERVAL]", interval.sql)
           // The range clips the first and last buckets, so their per-second value dips, as their heatmap columns thin.
@@ -366,6 +449,168 @@ const loadDashboard = async () => {
   }
 };
 
+// The selected stream the strip last ran on, which the frame's button names.
+const chartsStreamName = ref("");
+
+const isTracesStream = (name: string): boolean => {
+  const streams: { value: string }[] = searchObj.data.stream.streamLists ?? [];
+  return !streams.length || streams.some((s) => s.value === name);
+};
+
+const showSpanSet = (result: SpanSetResult, interval: RedInterval) => {
+  sqlSpanSet.value = result;
+  redStream.cancel();
+  if (result.kind === "none") {
+    redRun = null;
+    heatmapRequest.value = null;
+    return;
+  }
+  const { startTime, endTime } = chartsRange ?? effectiveTimeRange.value;
+  redRun = { set: result, interval, startTime, endTime };
+  heatmapRequest.value = {
+    ...buildSpanSetHeatmapSql(result, interval),
+    startTime,
+    endTime,
+    intervalSec: interval.seconds,
+  };
+  runCombinedRed();
+};
+
+const runCombinedRed = () => {
+  const run = redRun;
+  if (!run) return;
+  redStatus.value = "loading";
+  redError.value = "";
+  redSpans.value = null;
+  redStream.run(
+    { ...buildRedSql(run.set, run.interval), startTime: run.startTime, endTime: run.endTime },
+    (hits) => {
+      redPoints.value = fillRedBuckets(hits, run.interval.seconds, run.startTime, run.endTime);
+      redSpans.value = redPoints.value.reduce((sum, point) => sum + point.spans, 0);
+      redRunKey.value++;
+      redStatus.value = "ready";
+    },
+    (message) => {
+      redError.value = message;
+      redStatus.value = "error";
+    },
+  );
+};
+
+// The whole stream is scanned only on this click, never on its own.
+const onShowAllSpans = () => {
+  const interval =
+    chartsInterval ??
+    chartInterval(effectiveTimeRange.value.startTime, effectiveTimeRange.value.endTime);
+  showSpanSet(streamSpanSet(chartsStreamName.value), interval);
+};
+
+const sqlPanelSchemas: any[] = convertDashboardSchemaVersion(deepCopy(metrics)).tabs[0].panels;
+const sqlPanelFor = (title: string) => sqlPanelSchemas.find((panel) => panel.title === title);
+
+const sqlRateSchema = computed(() => {
+  const rate = sqlPanelFor("Rate");
+  const rateUnit = t("traces.metrics.perSecond.spans");
+  return {
+    ...rate,
+    config: {
+      ...rate.config,
+      title_meta: rateUnit,
+      override_config: [
+        {
+          field: { matchBy: SERIES_OVERRIDE_MATCH_BY.REGEX, value: ".*" },
+          config: [{ type: "unit", value: { unit: "custom", customUnit: rateUnit } }],
+        },
+      ],
+    },
+  };
+});
+
+// The metrics.json panels read their own column names, so the combined rows are renamed per panel.
+const sqlPanels = computed(() => {
+  const seconds = redRun?.interval.seconds ?? 1;
+  return [
+    {
+      name: "rate" as const,
+      schema: sqlRateSchema.value,
+      hits: redPoints.value.map((p) => ({
+        time_bucket: p.time_bucket,
+        max_rate: p.spans / seconds,
+      })),
+    },
+    {
+      name: "errors" as const,
+      schema: sqlPanelFor("Errors"),
+      hits: redPoints.value.map((p) => ({ time_bucket: p.time_bucket, error_rate: p.errors })),
+    },
+  ];
+});
+
+const DROPPED_LABELS: Record<RedDroppedClause, I18nKey> = {
+  groupBy: "traces.redCaption.clause.groupBy",
+  having: "traces.redCaption.clause.having",
+  distinct: "traces.redCaption.clause.distinct",
+  orderBy: "traces.redCaption.clause.orderBy",
+  limit: "traces.redCaption.clause.limit",
+  offset: "traces.redCaption.clause.offset",
+  window: "traces.redCaption.clause.window",
+  qualify: "traces.redCaption.clause.qualify",
+  outerWhere: "traces.redCaption.clause.outerWhere",
+  bothSidesWhere: "traces.redCaption.clause.bothSidesWhere",
+  join: "traces.redCaption.clause.join",
+};
+
+const subjectCaption = (set: SpanSet, count: number | null): string => {
+  const shown = count?.toLocaleString() ?? "";
+  switch (set.subject) {
+    case "matched":
+      if (count === null) return t("traces.redCaption.matched");
+      return count === 0
+        ? t("traces.redCaption.noneMatched")
+        : t("traces.redCaption.matchedCount", { count: shown }, count);
+    case "cte":
+      return t("traces.redCaption.cte", { name: set.cte ?? "" });
+    case "branches":
+      return t("traces.redCaption.branches", { count: set.branches ?? 0 }, set.branches ?? 0);
+    case "joinMatched":
+      return t("traces.redCaption.joinMatched");
+    case "joinLeft":
+      return t("traces.redCaption.joinLeft");
+    case "inner":
+      return t("traces.redCaption.inner");
+    default:
+      return t("traces.redCaption.stream", { stream: chartsStreamName.value });
+  }
+};
+
+// Which spans, how many, each clause not applied and the scope, in that order.
+const captionLines = computed((): string[] => {
+  const set = sqlSpanSet.value;
+  if (set?.kind !== "set") return [];
+  const count = redStatus.value === "ready" ? redSpans.value : null;
+  if (set.subject === "stream") return [subjectCaption(set, count)];
+  const parts = [subjectCaption(set, count)];
+  if (set.subject !== "matched" && count !== null) {
+    parts.push(t("traces.redCaption.count", { count: count.toLocaleString() }, count));
+  }
+  if (set.dropped.length) {
+    const clauses = set.dropped.map((clause) => t(DROPPED_LABELS[clause])).join(", ");
+    parts.push(t("traces.redCaption.notApplied", { clauses }));
+  }
+  parts.push(t("traces.redCaption.scope"));
+  return parts;
+});
+
+const frameReason = computed(() => {
+  const set = sqlSpanSet.value;
+  if (set?.kind !== "none") return raw("");
+  if (set.reason === "notTraces")
+    return t("traces.redCharts.notTraces", { stream: set.stream ?? "" });
+  return set.reason === "unreadable"
+    ? t("traces.redCharts.unreadable")
+    : t("traces.redCharts.shape");
+});
+
 const updateLayout = async () => {
   window.dispatchEvent(new Event("resize"));
 };
@@ -411,7 +656,7 @@ const openAddToDashboard = (chart: TracesRedChart) => {
     chartInterval(effectiveTimeRange.value.startTime, effectiveTimeRange.value.endTime);
   addToDashboardPanel.value = buildTracesRedPanel(chart, {
     streamName: chartsStream || searchObj.data.stream.selectedStream.value,
-    filter: decodeFilter(chartsFilter),
+    filter: withScope(decodeFilter(chartsFilter), chartsScope),
     filterText: chartsFilter,
     view: chartsMode,
     interval,
@@ -474,7 +719,7 @@ const onHeatmapDrillDown = () => {
     rangeEndUs: range.endTime,
     durationLoUs: box.durationLoUs || null,
     durationHiUs: box.durationHiUs,
-    filter: decodeFilter(chartsFilter),
+    filter: withScope(decodeFilter(chartsFilter), chartsScope),
   };
   showComparison.value = true;
 };
@@ -503,7 +748,10 @@ const onHeatmapAskAi = ({ selection, count, band, window }: LatencyHeatmapAskAi)
   const from = new Date(timeStartUs / 1000).toISOString();
   const to = new Date(timeEndUs / 1000).toISOString();
   // Model input, not screen copy: kept English, like the traces page's other Ask AI prompts.
-  const query = `I selected a box on the traces latency heatmap. Spans in the box: ${count}. Duration: ${band}. Time: ${from} to ${to} (shown as ${window}). I am searching ${mode}. Stream: ${stream}. The filter expression is: ${chartsFilter.trim() || "(none)"}. This is a WHERE-clause filter — not a full SQL query. What do these spans have in common, and what explains their duration?`;
+  const queryText = searchObj.meta.sqlMode
+    ? `The SQL query is: ${chartsFilter.trim()}.`
+    : `The filter expression is: ${chartsFilter.trim() || "(none)"}. This is a WHERE-clause filter — not a full SQL query.`;
+  const query = `I selected a box on the traces latency heatmap. Spans in the box: ${count}. Duration: ${band}. Time: ${from} to ${to} (shown as ${window}). I am searching ${mode}. Stream: ${stream}. ${queryText} What do these spans have in common, and what explains their duration?`;
   emit("send-to-ai-chat", {
     query,
     chipName: t(
@@ -569,6 +817,12 @@ const applySelection = async (
       : undefined;
   const baselineFilter = current?.baselineFilter ?? searchObj.data.editorValue ?? "";
 
+  // Typed SQL takes no inserted conditions, so a brush only moves the time picker.
+  if (searchObj.meta.sqlMode) {
+    emit("time-range-selected", pickerRange);
+    return;
+  }
+
   if (!current || !originalTimeRangeBeforeSelection.value) {
     // The charts show the last search's range; in manual mode the picker may already hold an unsearched box.
     originalTimeRangeBeforeSelection.value = { ...(chartsRange ?? effectiveTimeRange.value) };
@@ -609,7 +863,7 @@ const openComparison = () => {
   presetContext.value = {
     rangeStartUs: shown.startTime,
     rangeEndUs: shown.endTime,
-    filter: decodeFilter(chartsFilter),
+    filter: withScope(decodeFilter(chartsFilter), chartsScope),
   };
   const range = originalTimeRangeBeforeSelection.value ?? effectiveTimeRange.value;
   const current =
@@ -635,7 +889,7 @@ const openComparison = () => {
           rangeEndUs: range.endTime,
           durationLoUs: entry.start,
           durationHiUs: entry.end,
-          filter: decodeFilter(entry.baselineFilter),
+          filter: withScope(decodeFilter(entry.baselineFilter), chartsScope),
         }
       : null;
   showComparison.value = true;
@@ -666,6 +920,8 @@ const clearOriginalTimeRange = () => {
 };
 
 onMounted(() => {
+  // Typed SQL waits for Run, so a remount over an unrun edit draws no panels yet.
+  if (searchObj.meta.sqlMode && tracesEditorIsStaged(searchObj)) return;
   loadDashboard();
 });
 

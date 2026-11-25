@@ -44,6 +44,14 @@ use infra::{
 use sea_orm::{IntoActiveModel, Set};
 use search_service as search;
 use serde::{Deserialize, Serialize};
+use sqlparser::{
+    ast::{
+        Expr, FunctionArg, FunctionArguments, SelectItem, SetExpr, Statement, visit_expressions,
+        visit_statements,
+    },
+    dialect::PostgreSqlDialect,
+    parser::Parser,
+};
 use svix_ksuid::KsuidLike;
 use utoipa::ToSchema;
 
@@ -2900,13 +2908,12 @@ fn validate_custom_sql_grid(
     stream_fields: Option<&HashSet<String>>,
 ) -> Result<()> {
     use std::ops::ControlFlow;
-    let statements =
-        sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::PostgreSqlDialect {}, sql)
-            .map_err(|e| anyhow::anyhow!("custom_sql could not be parsed: {e}"))?;
+    let statements = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+        .map_err(|e| anyhow::anyhow!("custom_sql could not be parsed: {e}"))?;
     // visit_statements, because a Query can hold a DELETE behind WITH or in a subquery.
-    if !matches!(statements.as_slice(), [sqlparser::ast::Statement::Query(_)])
-        || sqlparser::ast::visit_statements(&statements, |statement| {
-            if matches!(statement, sqlparser::ast::Statement::Query(_)) {
+    if !matches!(statements.as_slice(), [Statement::Query(_)])
+        || visit_statements(&statements, |statement| {
+            if matches!(statement, Statement::Query(_)) {
                 ControlFlow::Continue(())
             } else {
                 ControlFlow::Break(())
@@ -2918,13 +2925,12 @@ fn validate_custom_sql_grid(
     }
     // §4.5 (D9): only the interval-equality rule needs the stored interval's parse.
     let config_interval_secs = parse_interval(histogram_interval).ok();
-    let walk =
-        sqlparser::ast::visit_expressions(&statements, |expr| {
-            match validated_histogram_call(expr, config_interval_secs, histogram_interval) {
-                Ok(()) => ControlFlow::Continue(()),
-                Err(e) => ControlFlow::Break(e),
-            }
-        });
+    let walk = visit_expressions(&statements, |expr| {
+        match validated_histogram_call(expr, config_interval_secs, histogram_interval) {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(e) => ControlFlow::Break(e),
+        }
+    });
     if let ControlFlow::Break(e) = walk {
         return Err(e);
     }
@@ -2941,18 +2947,18 @@ fn validate_custom_sql_grid(
 
 /// One `histogram()` call held to §4.1.1's four rules; every other expression passes through.
 fn validated_histogram_call(
-    expr: &sqlparser::ast::Expr,
+    expr: &Expr,
     config_interval_secs: Option<i64>,
     configured_interval: &str,
 ) -> Result<()> {
-    let sqlparser::ast::Expr::Function(func) = expr else {
+    let Expr::Function(func) = expr else {
         return Ok(());
     };
     if !func.name.to_string().eq_ignore_ascii_case("histogram") {
         return Ok(());
     }
-    let args: &[sqlparser::ast::FunctionArg] = match &func.args {
-        sqlparser::ast::FunctionArguments::List(list) => &list.args,
+    let args: &[FunctionArg] = match &func.args {
+        FunctionArguments::List(list) => &list.args,
         _ => &[],
     };
     if args.len() > 2 {
@@ -4034,12 +4040,11 @@ fn logs_aggregate_sql(
 /// Custom SQL with the band columns added; None leaves it unchanged, as when it has its own.
 #[cfg(feature = "enterprise")]
 fn custom_sql_with_band(sql: &str, band: &[(&'static str, String)]) -> Option<String> {
-    use sqlparser::ast::{Expr, SelectItem, SetExpr, Statement};
     if band.is_empty() {
         return None;
     }
-    let dialect = sqlparser::dialect::PostgreSqlDialect {};
-    let mut statements = sqlparser::parser::Parser::parse_sql(&dialect, sql).ok()?;
+    let dialect = PostgreSqlDialect {};
+    let mut statements = Parser::parse_sql(&dialect, sql).ok()?;
     let [Statement::Query(query)] = statements.as_mut_slice() else {
         return None;
     };
@@ -4064,9 +4069,7 @@ fn custom_sql_with_band(sql: &str, band: &[(&'static str, String)]) -> Option<St
         .iter()
         .map(|(name, value)| format!("{value} AS {name}"))
         .collect();
-    let mut extra =
-        sqlparser::parser::Parser::parse_sql(&dialect, &format!("SELECT {}", columns.join(", ")))
-            .ok()?;
+    let mut extra = Parser::parse_sql(&dialect, &format!("SELECT {}", columns.join(", "))).ok()?;
     let [Statement::Query(extra)] = extra.as_mut_slice() else {
         return None;
     };
@@ -4209,10 +4212,7 @@ fn histogram_bucket(interval: &str) -> String {
 /// Custom SQL with its WHERE removed; None when it has no WHERE or does not parse as one SELECT.
 #[cfg(feature = "enterprise")]
 fn custom_sql_without_where(sql: &str) -> Option<String> {
-    use sqlparser::ast::{SetExpr, Statement};
-    let mut statements =
-        sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::PostgreSqlDialect {}, sql)
-            .ok()?;
+    let mut statements = Parser::parse_sql(&PostgreSqlDialect {}, sql).ok()?;
     let [Statement::Query(query)] = statements.as_mut_slice() else {
         return None;
     };

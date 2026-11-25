@@ -466,11 +466,12 @@ fn chain(events: &[(i64, i64)], steps: usize, window: i64, collect: Option<usize
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::StringArray;
+    use arrow::{array::StringArray, compute::concat_batches, util::pretty::pretty_format_batches};
     use datafusion::{
         datasource::MemTable,
         prelude::{SessionConfig, SessionContext},
     };
+    use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
 
     use super::*;
     use crate::datafusion::exec::register_builtin_udfs;
@@ -697,7 +698,7 @@ mod tests {
             "SELECT trace_id, sequence_depth(0, start_time, {steps}) AS d, sequence_depth(12, start_time, {steps}) AS dw, sequence_step_times(0, start_time, {steps}) AS st FROM spans GROUP BY trace_id ORDER BY trace_id"
         );
         let batches = run(&ctx, &sql).await;
-        let batch = arrow::compute::concat_batches(&batches[0].schema(), &batches).unwrap();
+        let batch = concat_batches(&batches[0].schema(), &batches).unwrap();
         let ids = batch.column(0).as_string::<i32>();
         let depth = batch.column(1).as_primitive::<Int64Type>();
         let windowed = batch.column(2).as_primitive::<Int64Type>();
@@ -728,7 +729,7 @@ mod tests {
         let ctx = spans_context().await;
         let sql = "SELECT trace_id, start_time, sequence_step_match(0, 2, start_time, operation_name = 'auth', operation_name = 'fetch', operation_name = 'query') OVER (PARTITION BY trace_id ORDER BY start_time) AS m, sequence_depth(0, start_time, operation_name = 'auth', operation_name = 'fetch') OVER (PARTITION BY trace_id) AS d FROM spans ORDER BY trace_id, start_time, operation_name";
         let batches = run(&ctx, sql).await;
-        let batch = arrow::compute::concat_batches(&batches[0].schema(), &batches).unwrap();
+        let batch = concat_batches(&batches[0].schema(), &batches).unwrap();
         assert_eq!(batch.column(2).data_type(), &DataType::Boolean);
         let ids = batch.column(0).as_string::<i32>();
         let ts = batch.column(1).as_primitive::<Int64Type>();
@@ -748,8 +749,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_sql_ungrouped_aggregate_plans_and_runs_after_the_search_rewrite() {
-        use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
-
         use crate::sql::rewriter::add_timestamp::AddTimestampVisitor;
 
         let schema = Arc::new(Schema::new(vec![
@@ -791,9 +790,7 @@ mod tests {
             let frame = ctx.sql(&rewritten).await;
             let frame = frame.unwrap_or_else(|e| panic!("{rewritten}: {e}"));
             let batches = frame.collect().await.unwrap();
-            let shown = arrow::util::pretty::pretty_format_batches(&batches)
-                .unwrap()
-                .to_string();
+            let shown = pretty_format_batches(&batches).unwrap().to_string();
             assert!(shown.contains(want), "{rewritten}\n{shown}");
         }
     }

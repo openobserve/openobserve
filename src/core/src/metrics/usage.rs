@@ -43,7 +43,8 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use utoipa::ToSchema;
 
 use crate::{
-    alerts::alert::is_alert_permitted, dashboards::is_dashboard_permitted,
+    alerts::alert::is_alert_permitted,
+    dashboards::{is_dashboard_permitted, prom_variables::PromVariableQuery},
     pipeline::is_user_pipeline_visible,
 };
 
@@ -833,7 +834,7 @@ fn dashboard_queries(inner: &Value) -> Vec<Query<'_>> {
         );
     }
     for variable in inner["variables"]["list"].as_array().into_iter().flatten() {
-        queries.push(stream_query(&variable["query_data"]));
+        queries.extend(variable_query(&variable["query_data"]));
     }
     queries
 }
@@ -842,6 +843,29 @@ fn stream_query(fields: &Value) -> Query<'_> {
     Query::Stream {
         stream_type: fields["stream_type"].as_str().unwrap_or_default(),
         stream: fields["stream"].as_str().unwrap_or_default(),
+    }
+}
+
+/// A variable with its own query reads only that query; its saved stream is an unused builder
+/// setting.
+fn variable_query(fields: &Value) -> Option<Query<'_>> {
+    let text = fields["query"].as_str().unwrap_or_default().trim();
+    if text.is_empty() {
+        Some(stream_query(fields))
+    } else if fields["query_type"].as_str() == Some("promql") {
+        match PromVariableQuery::parse(text) {
+            PromVariableQuery::Reads(expr) => Some(Query::PromQl(expr)),
+            PromVariableQuery::EveryMetric => None,
+            // Unrunnable text is still scanned, so a broken variable never hides a use.
+            PromVariableQuery::NotAVariableFunction | PromVariableQuery::Unsupported => {
+                Some(Query::PromQl(text))
+            }
+        }
+    } else {
+        Some(Query::Sql {
+            sql: text,
+            default_type: fields["stream_type"].as_str().unwrap_or_default(),
+        })
     }
 }
 
@@ -1279,6 +1303,73 @@ mod tests {
         let d = dashboard_with("d", "promql", vec![custom("up")], variable);
         assert_eq!(hits_of(&d), (Some(None), 0));
         assert_eq!(hits_of(&dashboard("promql", vec![custom("up")])), (None, 0));
+    }
+
+    fn with_query_variable(stream: &str, query_type: &str, query: &str) -> Dashboard {
+        let variable = json!([{
+            "type": "query_values", "name": "v", "label": "V",
+            "query_data": {
+                "stream_type": "metrics", "stream": stream, "field": "job",
+                "query_type": query_type, "query": query
+            }
+        }]);
+        dashboard_with("d", "promql", vec![custom("up")], variable)
+    }
+
+    #[test]
+    fn a_query_variable_reading_the_metric_is_a_use() {
+        let used = [
+            (
+                "promql",
+                r#"label_values(http_requests_total{a="1,2", b="$b"}, path)"#,
+            ),
+            ("promql", "label_names(http_requests_total)"),
+            ("promql", "query_result(sum(rate(http_requests_total[5m])))"),
+            ("sql", r#"SELECT DISTINCT path FROM "http_requests_total""#),
+        ];
+        for (query_type, query) in used {
+            let d = with_query_variable("up", query_type, query);
+            assert_eq!(hits_of(&d), (Some(None), 0), "{query}");
+        }
+        let d = with_query_variable(METRIC, "promql", "label_values(up, job)");
+        let names = dashboard_queries(&dashboard_json(&d)).iter().fold(
+            HashSet::new(),
+            |mut names, query| {
+                query.add_names(&mut names);
+                names
+            },
+        );
+        assert!(names.contains("up") && !names.contains(METRIC));
+    }
+
+    #[test]
+    fn a_query_variable_reads_only_its_query_not_its_saved_stream() {
+        let not_used = [
+            ("promql", "label_values(path)"),
+            ("promql", "metrics(http_requests_.*)"),
+            (
+                "promql",
+                r#"label_values(up{path="http_requests_total"}, job)"#,
+            ),
+            ("sql", r#"SELECT DISTINCT job FROM "up""#),
+        ];
+        for (query_type, query) in not_used {
+            let d = with_query_variable(METRIC, query_type, query);
+            assert_eq!(hits_of(&d), (None, 0), "{query}");
+        }
+    }
+
+    #[test]
+    fn a_promql_variable_the_dashboard_cannot_run_is_scanned_as_written() {
+        let d = with_query_variable("up", "promql", "rate(http_requests_total[5m])");
+        assert_eq!(hits_of(&d), (Some(None), 0));
+        for query in [
+            "label_values(http_requests_total, a, b)",
+            r#"label_values(http_requests_total, "path")"#,
+        ] {
+            let d = with_query_variable("up", "promql", query);
+            assert_eq!(hits_of(&d).0, Some(Some(MatchKind::Text)), "{query}");
+        }
     }
 
     #[test]

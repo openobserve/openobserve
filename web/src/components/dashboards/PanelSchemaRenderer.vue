@@ -458,6 +458,7 @@ import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
 import type { TreemapNotice } from "@/utils/dashboard/convertTreemapData";
+import type { FunnelNotice } from "@/utils/dashboard/convertFunnelData";
 
 interface CustomChartVariable {
   name: string;
@@ -714,11 +715,13 @@ export default defineComponent({
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
     "loading-state-change",
+    "load-ended-without-fetch",
     "limit-number-of-series-warning-message-update",
     "series-limit-update",
     "region-join-update",
     "sankey-notice-update",
     "treemap-notice-update",
+    "funnel-notice-update",
     "panel-diagnostics-update",
     "sparkline-warning-update",
     "is-partial-data-update",
@@ -795,6 +798,7 @@ export default defineComponent({
     const regionJoin = shallowRef<RegionJoinInfo | null>(null);
     const sankeyNotice = ref<SankeyNotice | null>(null);
     const treemapNotice = ref<TreemapNotice | null>(null);
+    const funnelNotice = ref<FunnelNotice | null>(null);
 
     const chartPanelStyle = ref({
       height: "100%",
@@ -972,6 +976,7 @@ export default defineComponent({
       regionClusterParams,
       allowAnnotationsAPI,
       injectedPromqlData,
+      (shown: boolean) => emit("load-ended-without-fetch", shown),
     );
 
     // Html, markdown and the alert list render without a query, so they never wait on one.
@@ -1738,6 +1743,7 @@ export default defineComponent({
           regionJoin.value = panelData.value?.extras?.regionJoin ?? null;
           sankeyNotice.value = panelData.value?.extras?.sankeyNotice ?? null;
           treemapNotice.value = panelData.value?.extras?.treemapNotice ?? null;
+          funnelNotice.value = panelData.value?.extras?.funnelNotice ?? null;
 
           // A new run reports its own outcome; with no run left there is nothing to report it.
           if (!showsCustomChartError.value || !customChartRun.value) {
@@ -1755,6 +1761,7 @@ export default defineComponent({
           regionJoin.value = null;
           sankeyNotice.value = null;
           treemapNotice.value = null;
+          funnelNotice.value = null;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
@@ -1764,6 +1771,7 @@ export default defineComponent({
         regionJoin.value = null;
         sankeyNotice.value = null;
         treemapNotice.value = null;
+        funnelNotice.value = null;
         // if no data is available, then show the default data
         // if there is an error config in the panel schema, then show the default data on error
         // if no default data on error is set, then show the custom error message
@@ -2148,6 +2156,13 @@ export default defineComponent({
       treemapNotice,
       (value) => {
         emit("treemap-notice-update", value);
+      },
+      { immediate: true },
+    );
+    watch(
+      funnelNotice,
+      (value) => {
+        emit("funnel-notice-update", value);
       },
       { immediate: true },
     );

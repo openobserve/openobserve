@@ -28,6 +28,7 @@ const {
   refreshCloudConfig,
 } = require("../utils/cloud-auth.js");
 const { waitForStreamData } = require("../utils/data-ingestion.js");
+const { deleteDashboardsTitled, deleteLogStream } = require("../utils/dashboard-seed-api.js");
 
 // Test data from external file
 const testRecords = require("../../../test-data/dashboard-functions/test_records.json");
@@ -117,43 +118,6 @@ const ingestTestData = async (page, streamName, data) => {
   return fetchResponse.json();
 };
 
-const deleteStream = async (streamName) => {
-  const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
-  try {
-    await fetch(`${baseUrl}/api/${getOrgIdentifier()}/streams/${streamName}`, {
-      method: "DELETE",
-      headers: getAuthHeaders(),
-    });
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const deleteDashboardByName = async (dashboardName) => {
-  const orgId = getOrgIdentifier();
-  const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
-  try {
-    const headers = getAuthHeaders();
-    const listResponse = await fetch(`${baseUrl}/api/${orgId}/dashboards`, {
-      method: "GET",
-      headers,
-    });
-    if (!listResponse.ok) return false;
-    const dashboards = await listResponse.json();
-    const dashboard = dashboards.dashboards?.find(d => d.title === dashboardName);
-    if (!dashboard) return true;
-    await fetch(`${baseUrl}/api/${orgId}/dashboards/${dashboard.dashboardId}`, {
-      method: "DELETE",
-      headers,
-    });
-    testLogger.info(`Deleted dashboard: ${dashboardName}`);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 async function createDashboardAndAddFirstPanel(page, pm, dashboardName) {
   await pm.dashboardList.menuItem("dashboards-item");
   await waitForDashboardPage(page);
@@ -220,14 +184,14 @@ test.describe("Dashboard Functions", () => {
 
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
-      await pm.dashboardCreate.applyButton();
-      await page.waitForTimeout(3000);
+      await pm.dashboardCreate.applyAfterLivePreview();
 
       await pm.dashboardPanelActions.verifyChartRenders(expect);
-      const countRows = await pm.dashboardPanelActions.getTableRowCount();
-      expect(countRows).toBeGreaterThan(0);
+      await expect
+        .poll(() => pm.dashboardPanelActions.getTableRowCount(), { timeout: 30000 })
+        .toBeGreaterThan(0);
       await pm.chartTypeSelector.verifyYAxisLabel("y_axis_1", "count", expect);
-      testLogger.info(`Panel 1 COUNT: ${countRows} rows`);
+      testLogger.info("Panel 1 COUNT: Verified");
 
       await pm.dashboardPanelActions.addPanelName("count-panel");
       await pm.dashboardPanelActions.savePanel();
@@ -244,8 +208,7 @@ test.describe("Dashboard Functions", () => {
       // UI shows "Distinct" for COUNT-DISTINCT function; label displays as "count"
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "Distinct");
 
-      await pm.dashboardCreate.applyButton();
-      await page.waitForTimeout(3000);
+      await pm.dashboardCreate.applyAfterLivePreview();
 
       await pm.dashboardPanelActions.verifyChartRenders(expect);
       await pm.chartTypeSelector.verifyYAxisLabel("y_axis_1", "count", expect);
@@ -265,8 +228,7 @@ test.describe("Dashboard Functions", () => {
 
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "avg");
 
-      await pm.dashboardCreate.applyButton();
-      await page.waitForTimeout(3000);
+      await pm.dashboardCreate.applyAfterLivePreview();
 
       await pm.dashboardPanelActions.verifyChartRenders(expect);
       await pm.chartTypeSelector.verifyYAxisLabel("y_axis_1", "avg", expect);
@@ -286,8 +248,7 @@ test.describe("Dashboard Functions", () => {
 
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "sum");
 
-      await pm.dashboardCreate.applyButton();
-      await page.waitForTimeout(3000);
+      await pm.dashboardCreate.applyAfterLivePreview();
 
       await pm.dashboardPanelActions.verifyChartRenders(expect);
       await pm.chartTypeSelector.verifyYAxisLabel("y_axis_1", "sum", expect);
@@ -299,8 +260,8 @@ test.describe("Dashboard Functions", () => {
       testLogger.info("Test 1: Basic Aggregation Functions - ALL PANELS PASSED");
 
     } finally {
-      await deleteDashboardByName(DASHBOARD_NAME);
-      await deleteStream(STREAM_NAME);
+      await deleteDashboardsTitled(page, "default", DASHBOARD_NAME);
+      await deleteLogStream(page, STREAM_NAME);
     }
   });
 
@@ -348,8 +309,7 @@ test.describe("Dashboard Functions", () => {
       await pm.chartTypeSelector.searchAndAddField("score", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_3", "avg");
 
-      await pm.dashboardCreate.applyButton();
-      await page.waitForTimeout(3000);
+      await pm.dashboardCreate.applyAfterLivePreview();
 
       await pm.dashboardPanelActions.verifyChartRenders(expect);
       await pm.chartTypeSelector.verifyYAxisLabel("y_axis_1", "count", expect);
@@ -376,8 +336,7 @@ test.describe("Dashboard Functions", () => {
       await pm.chartTypeSelector.searchAndAddField("score", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_2", "max");
 
-      await pm.dashboardCreate.applyButton();
-      await page.waitForTimeout(3000);
+      await pm.dashboardCreate.applyAfterLivePreview();
 
       await pm.dashboardPanelActions.verifyChartRenders(expect);
       await pm.chartTypeSelector.verifyYAxisLabel("y_axis_1", "min", expect);
@@ -390,8 +349,8 @@ test.describe("Dashboard Functions", () => {
       testLogger.info("Test 2: Advanced Aggregation Functions - ALL PANELS PASSED");
 
     } finally {
-      await deleteDashboardByName(DASHBOARD_NAME);
-      await deleteStream(STREAM_NAME);
+      await deleteDashboardsTitled(page, "default", DASHBOARD_NAME);
+      await deleteLogStream(page, STREAM_NAME);
     }
   });
 });

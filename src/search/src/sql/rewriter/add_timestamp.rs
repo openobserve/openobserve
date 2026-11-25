@@ -82,14 +82,14 @@ impl VisitorMut for AddTimestampVisitor {
 #[cfg(test)]
 mod tests {
 
-    use sqlparser::{ast::VisitMut, dialect::GenericDialect};
+    use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
 
     use super::*;
 
     #[test]
     fn test_add_timestamp_visitor() {
         let sql = "SELECT name, age FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn test_add_timestamp_already_present_unnamed_expr() {
         let sql = "SELECT _timestamp, name FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -120,7 +120,7 @@ mod tests {
     #[test]
     fn test_add_timestamp_wildcard_skips_insertion() {
         let sql = "SELECT * FROM events";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -136,7 +136,7 @@ mod tests {
     fn test_add_timestamp_alias_expr_already_present() {
         // _timestamp as aliased expression — should not insert a second copy
         let sql = "SELECT _timestamp AS ts, name FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn test_add_timestamp_single_column_gets_timestamp() {
         let sql = "SELECT level FROM logs";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();

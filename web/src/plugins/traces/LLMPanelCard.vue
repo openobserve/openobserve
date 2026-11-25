@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
   >
     <div
-      class="border-border-default rounded-t-default flex min-h-7 w-full flex-nowrap items-center gap-2 border-b px-2 py-1"
+      class="border-border-default rounded-t-default box-content flex min-h-8.5 flex-nowrap items-center gap-2 border-b px-2 py-1"
     >
       <div class="flex min-w-0 items-baseline gap-2">
         <span class="text-compact text-text-heading shrink-0 font-medium tracking-[0.02em]">

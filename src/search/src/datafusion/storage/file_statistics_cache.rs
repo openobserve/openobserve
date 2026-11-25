@@ -388,7 +388,8 @@ mod tests {
     use chrono::{DateTime, Utc};
     use datafusion::{
         arrow::datatypes::{DataType, Field, Schema, TimeUnit},
-        common::Statistics,
+        common::{ScalarValue, Statistics, stats::Precision},
+        execution::cache::Cache as FscTrait,
     };
     use object_store::ObjectMeta;
 
@@ -429,9 +430,7 @@ mod tests {
             &key(&meta.location),
             CachedFileMetadata::new(
                 meta,
-                Arc::new(
-                    datafusion::execution::cache::SchemaFingerprint::from_schema(&Schema::empty()),
-                ),
+                Arc::new(SchemaFingerprint::from_schema(&Schema::empty())),
                 stats,
                 None,
             ),
@@ -473,11 +472,6 @@ mod tests {
 
     #[test]
     fn test_cache_preserves_schema_fingerprint_and_ordering() {
-        use datafusion::{
-            execution::cache::SchemaFingerprint,
-            physical_expr::{LexOrdering, PhysicalSortExpr, expressions::Column},
-        };
-
         let schema = Schema::new(vec![Field::new("value", DataType::Int64, false)]);
         let fingerprint = Arc::new(SchemaFingerprint::from_schema(&schema));
         let changed = Arc::new(SchemaFingerprint::from_schema(&Schema::new(vec![
@@ -507,11 +501,6 @@ mod tests {
 
     #[test]
     fn test_ordering_is_charged_to_memory_size() {
-        use datafusion::{
-            execution::cache::SchemaFingerprint,
-            physical_expr::{LexOrdering, PhysicalSortExpr, expressions::Column},
-        };
-
         let schema = Schema::new(vec![Field::new("value", DataType::Int64, false)]);
         let meta = object_meta("ordered", 128);
         let entry = |ordering| {
@@ -608,8 +597,6 @@ mod tests {
 
     #[test]
     fn test_list_entries() {
-        use datafusion::execution::cache::Cache as FscTrait;
-
         let cache = FileStatisticsCache::new();
         let meta = object_meta("list_test", 256);
         let k = key(&meta.location);
@@ -628,8 +615,6 @@ mod tests {
 
     #[test]
     fn test_fingerprint_size_counts_columns() {
-        use datafusion::execution::cache::SchemaFingerprint;
-
         let names = ["a", "bb", "ccc"];
         let schema = Schema::new(
             names
@@ -647,8 +632,6 @@ mod tests {
 
     #[test]
     fn test_equal_fingerprints_are_shared_and_charged_once() {
-        use datafusion::execution::cache::SchemaFingerprint;
-
         let schema = Schema::new(vec![Field::new("value", DataType::Utf8, true)]);
         let stats = Arc::new(Statistics::new_unknown(&schema));
         let cache = FileStatisticsCache::new();
@@ -682,8 +665,6 @@ mod tests {
 
     #[test]
     fn test_estimate_counts_min_max_strings() {
-        use datafusion::common::{ColumnStatistics, ScalarValue, stats::Precision};
-
         let schema = Schema::new(vec![
             Field::new("a", DataType::Utf8, true),
             Field::new("b", DataType::Utf8, true),
@@ -704,7 +685,7 @@ mod tests {
         let entry = |stats: Statistics| {
             CachedFileMetadata::new(
                 object_meta("f", 1),
-                Arc::new(datafusion::execution::cache::SchemaFingerprint::from_schema(&schema)),
+                Arc::new(SchemaFingerprint::from_schema(&schema)),
                 Arc::new(stats),
                 None,
             )
@@ -763,9 +744,7 @@ mod tests {
         let value = |name: &str| {
             CachedFileMetadata::new(
                 object_meta(name, 64),
-                Arc::new(
-                    datafusion::execution::cache::SchemaFingerprint::from_schema(&Schema::empty()),
-                ),
+                Arc::new(SchemaFingerprint::from_schema(&Schema::empty())),
                 stats.clone(),
                 None,
             )

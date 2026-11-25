@@ -70,7 +70,8 @@ vi.mock("vuex", () => ({
   }),
 }));
 
-vi.mock("@/utils/query/promQLUtils", () => ({
+vi.mock("@/utils/query/promQLUtils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/query/promQLUtils")>()),
   addLabelToPromQlQuery: vi.fn((query) => query),
 }));
 
@@ -1622,6 +1623,153 @@ describe("usePanelDataLoader", () => {
     });
   });
 
+  describe("a load that ends without querying", () => {
+    const window = () =>
+      createMockSelectedTimeObj({
+        start_time: new Date(Date.now() - 3600000),
+        end_time: new Date(),
+      });
+    const loaderWith = (
+      onEnded: (shown: boolean) => void,
+      {
+        panelSchema = createMockPanelSchema(),
+        selectedTimeObj = window(),
+        forceLoad = true,
+        injected = undefined as any,
+      } = {},
+    ) =>
+      usePanelDataLoader(
+        panelSchema,
+        selectedTimeObj,
+        createMockVariablesData(),
+        ref({ offsetWidth: 1000 }),
+        ref(forceLoad),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null), // runId
+        ref(null), // tabId
+        ref(null), // tabName
+        ref(null), // searchResponse
+        ref(false), // is_ui_histogram
+        ref(null), // dashboardName
+        ref(null), // folderName
+        ref(false), // shouldRefreshWithoutCache
+        ref(null), // regionClusterParams
+        ref(false), // allowAnnotationsAPI
+        ref(injected),
+        onEnded,
+      );
+    const cacheFor = (panelSchema: any, errorMessage = "") => ({
+      key: {
+        panelSchema: panelSchema.value,
+        variablesData: [],
+        forceLoad: false,
+        dashboardId: "test-dashboard",
+        folderId: "test-folder",
+      },
+      value: {
+        data: [{ test: "cached_data" }],
+        loading: false,
+        errorDetail: { message: errorMessage, code: "" },
+        metadata: { queries: [] },
+        annotations: [],
+        resultMetaData: [],
+        lastTriggeredAt: Date.now(),
+        isPartialData: false,
+        isOperationCancelled: false,
+      },
+      cacheTimeRange: { start_time: Date.now() - 3600000, end_time: Date.now() },
+    });
+
+    it.each([
+      ["no queries", []],
+      ["only empty query text", [{ query: "", fields: { stream_type: "logs" } }]],
+    ])("reports nothing shown for a panel with %s", async (_label, queries) => {
+      const onEnded = vi.fn();
+      await loaderWith(onEnded, { panelSchema: createMockPanelSchema({ queries }) }).loadData();
+      expect(onEnded.mock.calls).toEqual([[false]]);
+    });
+
+    it("reports nothing shown when the time range is invalid", async () => {
+      const onEnded = vi.fn();
+      const selectedTimeObj = createMockSelectedTimeObj({
+        start_time: new Date("Invalid"),
+        end_time: new Date("Invalid"),
+      });
+      await loaderWith(onEnded, { selectedTimeObj }).loadData();
+      expect(onEnded.mock.calls).toEqual([[false]]);
+    });
+
+    it("reports a shown result when the first load restores the cache", async () => {
+      const onEnded = vi.fn();
+      const panelSchema = createMockPanelSchema();
+      mockCacheData = cacheFor(panelSchema);
+      allowPanelToBecomeVisible();
+      const loader = loaderWith(onEnded, { panelSchema, forceLoad: false });
+      await loader.loadData();
+      expect(loader.data.value).toEqual([{ test: "cached_data" }]);
+      expect(onEnded.mock.calls).toEqual([[true]]);
+    });
+
+    it("reports nothing shown when the restored cache holds an error", async () => {
+      const onEnded = vi.fn();
+      const panelSchema = createMockPanelSchema();
+      mockCacheData = cacheFor(panelSchema, "query failed");
+      allowPanelToBecomeVisible();
+      await loaderWith(onEnded, { panelSchema, forceLoad: false }).loadData();
+      expect(onEnded.mock.calls).toEqual([[false]]);
+    });
+
+    it("reports a shown result for injected PromQL data", async () => {
+      const onEnded = vi.fn();
+      const injected = { data: [{ result: [] }], metadata: { queries: [] } };
+      await loaderWith(onEnded, { injected }).loadData();
+      expect(onEnded.mock.calls).toEqual([[true]]);
+    });
+
+    it("stays silent for a load that queries", async () => {
+      const onEnded = vi.fn();
+      const payloads: any[] = [];
+      streamOverride = (payload) => {
+        payloads.push(payload);
+        return "held-stream";
+      };
+      await loaderWith(onEnded).loadData();
+      expect(payloads).toHaveLength(1);
+      expect(onEnded).not.toHaveBeenCalled();
+    });
+
+    it("stays silent for a superseded load, since the newer one answers for the panel", async () => {
+      global.AbortController = class {
+        signal = { aborted: false, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+        abort() {
+          this.signal.aborted = true;
+        }
+      } as unknown as typeof AbortController;
+      let releaseFirst: (v: unknown) => void = () => {};
+      mockGetStream
+        .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = resolve)))
+        .mockResolvedValueOnce(null);
+      streamOverride = () => "held-stream";
+      const onEnded = vi.fn();
+      const loader = loaderWith(onEnded, {
+        panelSchema: createMockPanelSchema({
+          queryConfig: { fields: { stream: "geo", stream_type: "enrichment_tables" } },
+        }),
+      });
+
+      const first = loader.loadData();
+      await vi.waitFor(() => expect(mockGetStream).toHaveBeenCalledTimes(1));
+      await loader.loadData();
+      releaseFirst(null);
+      await first;
+
+      expect(onEnded).not.toHaveBeenCalled();
+    });
+  });
+
   describe("enrichment table panels superseded while the stats load", () => {
     it("fires only the newer run's query", async () => {
       global.AbortController = class {
@@ -2321,6 +2469,81 @@ describe("usePanelDataLoader", () => {
         await loader.loadData();
 
         expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBeDefined();
+      });
+
+      describe("a cached result from another time range", () => {
+        const svc = {
+          name: "svc",
+          type: "query_values",
+          query_data: { query: "SELECT 1" },
+          multiSelect: true,
+          value: ["checkout", "payments"],
+          options: [],
+          isVariablePartialLoaded: true,
+        };
+        const restoreWith = async (variable: any, cachedRangeMs: number) => {
+          const panelSchema = createMockPanelSchema({
+            queryConfig: { query: "SELECT * FROM test WHERE s IN ($svc)" },
+          });
+          const variablesData = createMockVariablesData({ values: [variable] });
+          mockCacheData = {
+            key: {
+              panelSchema: panelSchema.value,
+              variablesData: [variable],
+              forceLoad: false,
+              dashboardId: "test-dashboard",
+              folderId: "test-folder",
+            },
+            value: {
+              data: [{ test: "cached_data" }],
+              loading: false,
+              errorDetail: { message: "", code: "" },
+              metadata: { queries: [] },
+              annotations: [],
+              resultMetaData: [],
+              lastTriggeredAt: Date.now(),
+              isPartialData: false,
+              isOperationCancelled: false,
+            },
+            cacheTimeRange: { start_time: Date.now() - cachedRangeMs, end_time: Date.now() },
+          };
+          allowPanelToBecomeVisible();
+          const loader = usePanelDataLoader(
+            panelSchema,
+            ref({ start_time: new Date(Date.now() - 300000), end_time: new Date() }),
+            variablesData,
+            ref({ offsetWidth: 1000 }),
+            ref(false),
+            ref("dashboards"),
+            ref("test-dashboard"),
+            ref("test-folder"),
+            ref(null),
+            ref(null),
+            ref(null),
+            ref(null),
+            ref(null),
+            ref(false),
+          );
+          await loader.loadData();
+          return loader;
+        };
+
+        it("is not shown when the panel reads a query variable", async () => {
+          const loader = await restoreWith(svc, 21600000);
+          expect(loader.data.value).not.toEqual([{ test: "cached_data" }]);
+          expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBeFalsy();
+        });
+
+        it("is still shown, flagged, for other variable types", async () => {
+          const loader = await restoreWith({ ...svc, type: "custom" }, 21600000);
+          expect(loader.data.value).toEqual([{ test: "cached_data" }]);
+          expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBe(true);
+        });
+
+        it("is shown for a query variable when the range length matches", async () => {
+          const loader = await restoreWith(svc, 300000);
+          expect(loader.data.value).toEqual([{ test: "cached_data" }]);
+        });
       });
 
       it("should handle cache retrieval errors", async () => {

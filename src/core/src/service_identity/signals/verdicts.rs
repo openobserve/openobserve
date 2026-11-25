@@ -1585,6 +1585,12 @@ async fn emit_changes(
 mod tests {
     use std::collections::BTreeSet;
 
+    use arrow::{
+        array::{Array, StringArray},
+        compute::cast,
+        datatypes::DataType,
+    };
+
     #[test]
     fn every_baseline_switch_reason_restores() {
         for reason in [
@@ -2312,7 +2318,6 @@ mod tests {
 
     /// Two builds of checkout 2.4.0 sent over OTLP, each span row read back as ingest stored it.
     async fn ingested_image_spans(org: &str, stream: &str) -> Vec<serde_json::Value> {
-        use arrow::{array::Array, compute::cast, datatypes::DataType};
         use opentelemetry_proto::tonic::{
             collector::trace::v1::ExportTraceServiceRequest,
             common::v1::{AnyValue, KeyValue, any_value::Value},
@@ -2402,10 +2407,7 @@ mod tests {
                     let Ok(column) = cast(entry.data.column(i), &DataType::Utf8) else {
                         continue;
                     };
-                    let column = column
-                        .as_any()
-                        .downcast_ref::<arrow::array::StringArray>()
-                        .unwrap();
+                    let column = column.as_any().downcast_ref::<StringArray>().unwrap();
                     if column.is_valid(row) {
                         let text = column.value(row);
                         values.insert(
@@ -2426,6 +2428,7 @@ mod tests {
     #[cfg(not(feature = "cloud"))]
     #[tokio::test]
     async fn otlp_and_k1_images_store_no_control_character_in_deploys_verdicts_or_streams() {
+        use datafusion::prelude::SessionContext;
         use o2_enterprise::enterprise::{
             search::datafusion::udaf::ddsketch::DDSketchAgg,
             service_identity::{
@@ -2438,7 +2441,7 @@ mod tests {
         let (org, stream) = ("svcver_no_unit_sep_org", "svcver_no_unit_sep");
         let spans = ingested_image_spans(org, stream).await;
         assert_eq!(spans.len(), 60);
-        let session = datafusion::prelude::SessionContext::new();
+        let session = SessionContext::new();
         session.register_udaf(DDSketchAgg::new().into());
         let path = std::env::temp_dir().join(format!(
             "{stream}_{}_{}.json",

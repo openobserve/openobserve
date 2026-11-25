@@ -53,6 +53,17 @@ export class EmptyPagesPage {
         }, [this.base(), orgId]);
     }
 
+    /** The first-data watcher's baseline probe; a stream that exists before it answers counts as pre-existing. */
+    waitForStreamProbe(orgId, type) {
+        return this.page.waitForResponse((r) => {
+            const url = new URL(r.url());
+            return url.pathname === `/api/${orgId}/streams`
+                && url.searchParams.get('type') === type
+                && url.searchParams.get('limit') === '1'
+                && r.ok();
+        }, { timeout: 20000 });
+    }
+
     ingestionRedirects() {
         return this.visitedUrls.filter((u) => new URL(u).pathname.includes('/ingestion'));
     }

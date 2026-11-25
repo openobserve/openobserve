@@ -25,7 +25,8 @@
       "alerts-from-panel.spec.js",
       "alertCalibration.spec.js",
       "alertCalibrationDismiss.spec.js",
-      "alerts-content-templates.spec.js"
+      "alerts-content-templates.spec.js",
+      "alert-leases.spec.js"
     ],
     "disabled": [
       {
@@ -241,6 +242,19 @@
     "disabled": []
   },
   {
+    "testfolder": "Dashboards-Variables-Query",
+    "actual_folder": "Dashboards",
+    "browser": "chrome",
+    "run_files": [
+      "dashboard-variables-query-compat.spec.js",
+      "dashboard-variables-filter-groups.spec.js",
+      "dashboard-variables-promql.spec.js",
+      "dashboard-variables-custom-sql.spec.js",
+      "dashboard-variables-query-runtime.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "Dashboards-Visualize",
     "actual_folder": "Dashboards",
     "browser": "chrome",
@@ -282,6 +296,7 @@
       "sanity.spec.js",
       "landingPage.spec.js",
       "datetime-picker-copy-paste.spec.js",
+      "datetime-typed-bar.spec.js",
       "dateTime.spec.js",
       "dateTimeCustomRange.spec.js",
       "otableSelectCell.spec.js",

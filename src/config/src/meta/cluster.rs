@@ -100,6 +100,11 @@ impl Node {
             && self.status == other.status
     }
 
+    /// Prepare counts as alive: jobs start in `job::init()` before `set_online()`, so a node still
+    /// in Prepare may already own claims.
+    pub fn is_alive(&self) -> bool {
+        self.status != NodeStatus::Offline
+    }
     pub fn is_single_node(&self) -> bool {
         get_config().common.local_mode
     }
@@ -313,6 +318,21 @@ pub enum CompactionJobType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_node_is_alive_unless_offline() {
+        for (status, want) in [
+            (NodeStatus::Online, true),
+            (NodeStatus::Prepare, true),
+            (NodeStatus::Offline, false),
+        ] {
+            let node = Node {
+                status: status.clone(),
+                ..Default::default()
+            };
+            assert_eq!(node.is_alive(), want, "{status:?}");
+        }
+    }
 
     #[test]
     fn test_node_is_local() {

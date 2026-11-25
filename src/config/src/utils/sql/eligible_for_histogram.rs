@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sqlparser::{ast::Statement, dialect::GenericDialect, parser::Parser};
+use sqlparser::{
+    ast::Statement,
+    dialect::GenericDialect,
+    parser::{Parser, ParserError},
+};
 
 use super::{
     helpers::{has_cte, has_join, has_limit},
@@ -25,7 +29,7 @@ use super::{
 pub fn is_eligible_for_histogram(
     query: &str,
     is_multi_stream_search: bool,
-) -> Result<bool, sqlparser::parser::ParserError> {
+) -> Result<bool, ParserError> {
     if is_multi_stream_search {
         return is_multi_search_eligible_for_histogram(query);
     }

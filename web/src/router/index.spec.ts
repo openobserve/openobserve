@@ -118,6 +118,10 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+vi.mock("@/composables/useOrgSwitcherPrefs", () => ({
+  noteLanding: vi.fn(),
+}));
+
 vi.mock("@/layouts/MainLayout.vue", () => ({
   default: { template: "<div><router-view /></div>" },
 }));
@@ -125,7 +129,8 @@ vi.mock("@/layouts/MainLayout.vue", () => ({
 // ---------------------------------------------------------------------------
 // Import factory after mocks are registered
 // ---------------------------------------------------------------------------
-import createAppRouter from "@/router/index";
+import createAppRouter, { applyDocumentTitle } from "@/router/index";
+import { noteLanding } from "@/composables/useOrgSwitcherPrefs";
 import { getDecodedUserInfo } from "@/utils/zincutils";
 import { openobserveRum } from "@openobserve/browser-rum";
 import i18n from "@/locales";
@@ -134,10 +139,11 @@ import { PUBLIC_LINKS_FOLDER_ID } from "@/utils/dashboard/pseudoFolders";
 // ---------------------------------------------------------------------------
 // Helper: build a minimal Vuex store for tests
 // ---------------------------------------------------------------------------
-function buildStore(loggedIn = false) {
+function buildStore(loggedIn = false, organizations: unknown[] = []) {
   return createStore({
     state: {
       loggedIn,
+      organizations,
     },
     mutations: {
       login(state: any, payload: any) {
@@ -398,6 +404,63 @@ describe("router/index (factory)", () => {
 
       await router.push({ path: "/dashboards", query: { folder: "default" } });
       expect(document.title).toBe(`OpenObserve - ${i18n.global.t("menu.dashboard")}`);
+    });
+  });
+  // -------------------------------------------------------------------------
+  // Org-aware title and recents (afterEach)
+  // -------------------------------------------------------------------------
+  describe("afterEach org title and recents", () => {
+    const ORGS = [
+      { identifier: "acme", name: "Acme staging" },
+      { identifier: "pay", name: "Payments partner" },
+    ];
+
+    beforeEach(() => {
+      vi.mocked(getDecodedUserInfo).mockReturnValue(JSON.stringify({ email: "user@example.com" }));
+      store = buildStore(true, ORGS);
+      router = createAppRouter(store);
+    });
+
+    it("C1 records a landing when org_identifier changes", async () => {
+      await router.push({ path: "/logs", query: { org_identifier: "acme" } });
+      expect(noteLanding).toHaveBeenCalledWith("acme", ["acme", "pay"]);
+      await router.push({ path: "/logs", query: { org_identifier: "pay" } });
+      expect(noteLanding).toHaveBeenLastCalledWith("pay", ["acme", "pay"]);
+    });
+
+    it("C1 records nothing for the same org, a missing org or a failed navigation", async () => {
+      await router.push({ path: "/logs", query: { org_identifier: "acme" } });
+      vi.mocked(noteLanding).mockClear();
+      await router.push({ path: "/", query: { org_identifier: "acme" } });
+      await router.push({ path: "/logs" });
+      expect(noteLanding).not.toHaveBeenCalled();
+
+      router.beforeEach(() => false);
+      await router.push({ path: "/logs", query: { org_identifier: "pay" } });
+      expect(noteLanding).not.toHaveBeenCalled();
+    });
+
+    it("C2 titles the tab <org> · <page> · OpenObserve after navigation", async () => {
+      await router.push({ path: "/logs", query: { org_identifier: "acme" } });
+      expect(document.title).toBe(`Acme staging · ${i18n.global.t("menu.search")} · OpenObserve`);
+      await router.push({ path: "/ingestion", query: { org_identifier: "pay" } });
+      expect(document.title).toBe("Payments partner · OpenObserve");
+    });
+
+    it("C2 keeps the previous title when the navigation fails", async () => {
+      await router.push({ path: "/logs", query: { org_identifier: "acme" } });
+      const before = document.title;
+      router.beforeEach(() => false);
+      await router.push({ path: "/", query: { org_identifier: "pay" } });
+      expect(document.title).toBe(before);
+    });
+
+    it("C3 applyDocumentTitle refreshes the title once the org list arrives", () => {
+      const route = { meta: { titleKey: "menu.home" }, query: { org_identifier: "acme" } };
+      applyDocumentTitle(route, []);
+      expect(document.title).toBe(`OpenObserve - ${i18n.global.t("menu.home")}`);
+      applyDocumentTitle(route, ORGS);
+      expect(document.title).toBe(`Acme staging · ${i18n.global.t("menu.home")} · OpenObserve`);
     });
   });
 });

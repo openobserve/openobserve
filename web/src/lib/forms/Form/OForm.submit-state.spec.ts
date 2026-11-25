@@ -2,10 +2,12 @@
 // TanStack's `isSubmitting` spans the whole save, re-entry is guarded, and the
 // state is mirrored into the overlay-provided ref that drives the Save spinner.
 import { describe, it, expect, vi } from "vitest";
-import { ref } from "vue";
+import { defineComponent, h, ref } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
+import { z } from "zod";
 import OForm from "./OForm.vue";
 import { FORM_SUBMIT_STATE_KEY } from "./OForm.types";
+import { useOForm } from "./useOForm";
 
 // A promise we resolve by hand — lets us observe the "mid-save" window without
 // timers (Date.now/setTimeout are awkward in this harness).
@@ -92,5 +94,30 @@ describe("OForm awaited submit state", () => {
     d.resolve();
     await flushPromises();
     expect(overlayState.value).toBe(false);
+  });
+});
+
+describe("useOForm rejected submit", () => {
+  it("calls onSubmitInvalid, not onSubmit, when the schema rejects the values", async () => {
+    const onSubmit = vi.fn();
+    const onSubmitInvalid = vi.fn();
+    const Host = defineComponent({
+      setup() {
+        const form = useOForm({
+          defaultValues: { name: "" },
+          schema: z.object({ name: z.string().min(1) }),
+          onSubmit,
+          onSubmitInvalid,
+        });
+        return () => h(OForm, { form });
+      },
+    });
+    const wrapper = mount(Host);
+
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onSubmitInvalid).toHaveBeenCalledTimes(1);
   });
 });
