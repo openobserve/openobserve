@@ -325,7 +325,8 @@ describe("AiMemory page", () => {
       toolsetId: "ts1",
     });
     expect(drawer.find('[data-test="ai-memory-history-selector"]').text()).toContain("Revision 2");
-    expect(drawer.find('[data-test="ai-memory-history-selector"]').text()).toContain("Current");
+    expect(drawer.find('[data-test="ai-memory-history-selector"]').text()).not.toContain("Current");
+    expect(drawer.find('[data-test="ai-memory-history-current"]').exists()).toBe(true);
     expect(drawer.find('[data-test="ai-memory-history-meta"]').text()).toContain(
       "Reason: seen in RCA",
     );
@@ -345,6 +346,7 @@ describe("AiMemory page", () => {
     const drawer = w.find('[data-test="ai-memory-history-drawer"]');
     expect(drawer.find('[data-test="ai-memory-history-selector"]').text()).toContain("Revision 1");
     expect(drawer.find('[data-test="ai-memory-history-compare"]').text()).toBe("First version");
+    expect(drawer.find('[data-test="ai-memory-history-current"]').exists()).toBe(false);
     expect(drawer.find('[data-test="ai-memory-diff"]').text()).toBe(">old");
     expect(drawer.find('[data-test="ai-memory-revert"]').text()).toBe("Revert to revision 1");
     await drawer.find('[data-test="ai-memory-revert"]').trigger("click");

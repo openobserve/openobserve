@@ -249,12 +249,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <template v-else-if="selected">
-        <div class="flex flex-col gap-0.5 text-sm" data-test="ai-memory-history-meta">
-          <span class="flex items-center gap-1"
-            >{{ authorLabel(selected.updated_by) }} ·
-            <OTimeCell :value="selected.created_at" unit="us"
-          /></span>
-          <span v-if="selected.reason" class="text-text-secondary">{{
+        <div class="flex flex-col gap-1" data-test="ai-memory-history-meta">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-semibold">{{
+              t("aiMemory.revisionTitle", { rev: selected.rev })
+            }}</span>
+            <OTag
+              v-if="isCurrent"
+              variant="default-soft"
+              size="sm"
+              :label="t('aiMemory.current')"
+              data-test="ai-memory-history-current"
+            />
+          </div>
+          <div class="text-text-secondary flex min-w-0 items-center gap-1 text-xs">
+            <OTruncatedText>{{ authorLabel(selected.updated_by) }}</OTruncatedText>
+            <span>·</span>
+            <OTimeCell :value="selected.created_at" unit="us" class="shrink-0" />
+          </div>
+          <span v-if="selected.reason" class="text-text-secondary text-xs">{{
             t("aiMemory.historyReason", { reason: selected.reason })
           }}</span>
         </div>
@@ -307,12 +320,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="ai-memory-history-selector"
             >
               {{ t("aiMemory.revisionTitle", { rev: selected.rev }) }}
-              <OTag
-                v-if="isCurrent"
-                variant="default-soft"
-                size="sm"
-                :label="t('aiMemory.current')"
-              />
             </OButton>
           </template>
           <ODropdownItem
