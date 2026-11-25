@@ -15,7 +15,11 @@
 
 use std::{collections::HashMap, fmt::Debug, pin::Pin, sync::Arc, task::Poll};
 
-use arrow::{array::ArrayRef, buffer::Buffer, ipc::MessageHeader};
+use arrow::{
+    array::ArrayRef,
+    buffer::Buffer,
+    ipc::{MessageHeader, reader::read_dictionary, root_as_message},
+};
 use arrow_flight::{
     FlightData,
     error::{FlightError, Result},
@@ -71,7 +75,7 @@ impl FlightDataDecoder {
     /// Extracts flight data from the next message
     fn extract_message(&mut self, data: FlightData) -> Result<Option<FlightMessage>> {
         let timer = self.metrics.decode_time.timer();
-        let message = arrow::ipc::root_as_message(&data.data_header[..])
+        let message = root_as_message(&data.data_header[..])
             .map_err(|e| FlightError::DecodeError(format!("Error decoding header: {e}")))?;
 
         let result = match message.header_type() {
@@ -108,7 +112,7 @@ impl FlightDataDecoder {
                     )
                 })?;
 
-                arrow::ipc::reader::read_dictionary(
+                read_dictionary(
                     &buffer,
                     dictionary_batch,
                     schema,
@@ -188,7 +192,7 @@ mod tests {
     use arrow::{
         array::{ArrayRef, Int32Array, RecordBatch, StringArray},
         ipc::{
-            MessageHeader,
+            MessageBuilder, MessageHeader, MetadataVersion,
             writer::{DictionaryTracker, IpcDataGenerator, IpcWriteContext, IpcWriteOptions},
         },
     };
@@ -237,8 +241,8 @@ mod tests {
 
         // Create NONE header
         let mut builder = FlatBufferBuilder::new();
-        let mut message = arrow::ipc::MessageBuilder::new(&mut builder);
-        message.add_version(arrow::ipc::MetadataVersion::V5);
+        let mut message = MessageBuilder::new(&mut builder);
+        message.add_version(MetadataVersion::V5);
         message.add_header_type(MessageHeader::NONE);
         message.add_bodyLength(0);
         let data = message.finish();

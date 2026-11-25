@@ -348,7 +348,7 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::{
         execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
-        physical_plan::ExecutionPlan,
+        physical_plan::{ExecutionPlan, displayable},
         prelude::{SessionConfig, SessionContext},
     };
 
@@ -511,9 +511,7 @@ mod tests {
         let plan = ctx.state().create_logical_plan(sql).await.unwrap();
         let plan = ctx.state().create_physical_plan(&plan).await.unwrap();
 
-        let plan_before_index_optimizer = datafusion::physical_plan::displayable(plan.as_ref())
-            .indent(true)
-            .to_string();
+        let plan_before_index_optimizer = displayable(plan.as_ref()).indent(true).to_string();
         assert!(
             plan_before_index_optimizer.contains("AggregateTopkExec"),
             "the regression setup must contain AggregateTopkExec before SimpleTopN is selected:\n{plan_before_index_optimizer}"
@@ -522,9 +520,7 @@ mod tests {
         let plan = LeaderIndexOptimizerRule::new(index_fields)
             .optimize(plan, &ConfigOptions::new())
             .unwrap();
-        let plan_after_index_optimizer = datafusion::physical_plan::displayable(plan.as_ref())
-            .indent(true)
-            .to_string();
+        let plan_after_index_optimizer = displayable(plan.as_ref()).indent(true).to_string();
         assert!(
             !plan_after_index_optimizer.contains("AggregateTopkExec"),
             "SimpleTopN must not truncate file-local rows before the final aggregate:\n{plan_after_index_optimizer}"

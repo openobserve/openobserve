@@ -15,6 +15,7 @@ import {
   getOutputRaw,
   getCost,
   getTokens,
+  classifyCacheUse,
   hasLLMPayload,
   classify,
   safeParseJSON,
@@ -121,6 +122,45 @@ describe("getCost / getTokens", () => {
     expect(getTokens({})).toBe(0);
     expect(getCost({ gen_ai_usage_cost: "abc" })).toBe(0);
     expect(getTokens({ gen_ai_usage_total_tokens: null })).toBe(0);
+  });
+});
+
+describe("classifyCacheUse", () => {
+  const call = (id: string, start: number, read: number, write: number, extra = {}) => ({
+    span_id: id,
+    start_time: start,
+    gen_ai_response_model: "m1",
+    gen_ai_usage_total_tokens: 500,
+    gen_ai_usage_cache_read_input_tokens: read,
+    gen_ai_usage_cache_creation_input_tokens: write,
+    ...extra,
+  });
+  const states = (spans: any[]) =>
+    Object.fromEntries([...classifyCacheUse(spans)].map(([id, use]) => [id, use.state]));
+
+  it("calls the first write cold and a later read-less call a miss", () => {
+    const spans = [call("c", 3, 0, 400), call("a", 1, 0, 400), call("b", 2, 400, 0)];
+    expect(states(spans)).toEqual({ a: "cold", b: "hit", c: "miss" });
+  });
+
+  it("reports nothing for a model that never uses the cache", () => {
+    expect(states([call("a", 1, 0, 0), call("b", 2, 0, 0)])).toEqual({});
+  });
+
+  it("tracks warmth per model", () => {
+    const other = { gen_ai_response_model: "m2" };
+    expect(states([call("a", 1, 0, 400), call("b", 2, 0, 0, other)])).toEqual({ a: "cold" });
+  });
+
+  it("does not call a failed call with no tokens a miss", () => {
+    const failed = { gen_ai_usage_total_tokens: 0 };
+    expect(states([call("a", 1, 0, 400), call("b", 2, 0, 0, failed)])).toEqual({ a: "cold" });
+  });
+
+  it("calls a first write a miss when the model was warm before these spans", () => {
+    expect(Object.fromEntries(classifyCacheUse([call("a", 1, 0, 400)], ["m1"]))).toMatchObject({
+      a: { state: "miss" },
+    });
   });
 });
 

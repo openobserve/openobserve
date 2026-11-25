@@ -1992,6 +1992,17 @@ describe("PanelSchemaRenderer", () => {
       ]);
     });
 
+    it("forwards a load that ended without querying as load-ended-without-fetch", () => {
+      wrapper = createWrapper();
+      const loaderArgs = vi.mocked(usePanelDataLoader).mock.lastCall!;
+      const onLoadEndedWithoutFetch = loaderArgs[loaderArgs.length - 1] as (shown: boolean) => void;
+
+      onLoadEndedWithoutFetch(true);
+      onLoadEndedWithoutFetch(false);
+
+      expect(wrapper.emitted("load-ended-without-fetch")).toEqual([[true], [false]]);
+    });
+
     it("should emit update:initialVariableValues during drilldown navigation", () => {
       wrapper = createWrapper();
 

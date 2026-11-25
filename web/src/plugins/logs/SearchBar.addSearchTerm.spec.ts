@@ -244,6 +244,57 @@ describe("SearchBar — adding a filter term to the query", () => {
       ).toBe("SELECT id FROM t WHERE svc_name = 'alpha' ORDER BY id");
     });
 
+    it("adds the filter to the WHERE of a query with a quoted field named limit", async () => {
+      expect(await run('SELECT * FROM "qb_logs" WHERE "limit" > 5', "svc_name = 'alpha'")).toBe(
+        `SELECT * FROM "qb_logs" WHERE "limit" > 5 AND svc_name = 'alpha'`,
+      );
+    });
+
+    it("adds a WHERE when the only limit is a quoted column", async () => {
+      expect(await run('SELECT "limit", "order by" FROM "qb_logs"', "svc_name = 'alpha'")).toBe(
+        `SELECT "limit", "order by" FROM "qb_logs" where svc_name = 'alpha'`,
+      );
+    });
+
+    it.each([
+      "order by date",
+      "sort by name, order by date",
+      "group by team",
+      "having x",
+      "limit 5",
+    ])("keeps the clause words in the value '%s' inside the quotes", async (value) => {
+      expect(
+        await run(`SELECT * FROM "qb_logs" WHERE note = '${value}'`, "svc_name = 'alpha'"),
+      ).toBe(`SELECT * FROM "qb_logs" WHERE note = '${value}' AND svc_name = 'alpha'`);
+    });
+
+    it("puts the filter before the real clauses when a value also contains them", async () => {
+      expect(
+        await run(
+          `SELECT svc_name, count(*) FROM "qb_logs" WHERE note = 'order by date' GROUP BY svc_name HAVING count(*) > 1 ORDER BY 2 LIMIT 10`,
+          "svc_name = 'alpha'",
+        ),
+      ).toBe(
+        `SELECT svc_name, count(*) FROM "qb_logs" WHERE note = 'order by date' AND svc_name = 'alpha' GROUP BY svc_name HAVING count(*) > 1 ORDER BY 2 LIMIT 10`,
+      );
+    });
+
+    it("keeps each branch's own UNION or UNION ALL and filters every branch", async () => {
+      const query = await run(
+        'SELECT id FROM "a" UNION SELECT id FROM "b" UNION ALL SELECT id FROM "c"',
+        "svc_name = 'alpha'",
+      );
+
+      expect(query.match(/UNION( ALL)?/g)).toEqual(["UNION", "UNION ALL"]);
+      expect(query.match(/svc_name = 'alpha'/g)).toHaveLength(3);
+    });
+
+    it("does not split a query at a UNION that is only text in a value", async () => {
+      expect(
+        await run(`SELECT * FROM "qb_logs" WHERE note = 'a union b'`, "svc_name = 'alpha'"),
+      ).toBe(`SELECT * FROM "qb_logs" WHERE note = 'a union b' AND svc_name = 'alpha'`);
+    });
+
     it("ignores a where inside a string literal and handles each UNION branch alone", async () => {
       expect(
         await run(

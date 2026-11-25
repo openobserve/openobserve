@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sqlparser::{ast::Statement, dialect::GenericDialect, parser::Parser};
+use sqlparser::{
+    ast::Statement,
+    dialect::GenericDialect,
+    parser::{Parser, ParserError},
+};
 
 use super::{
     helpers::{has_cte, has_join, is_aggregate_in_select},
     visitors::{has_subquery, has_union, has_window_functions},
 };
 
-pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
+pub fn is_simple_aggregate_query(query: &str) -> Result<bool, ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
         if has_subquery(statement) || has_window_functions(statement) {

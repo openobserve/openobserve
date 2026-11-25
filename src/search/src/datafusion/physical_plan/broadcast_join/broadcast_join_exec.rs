@@ -20,7 +20,7 @@ use config::get_config;
 use datafusion::{
     arrow::datatypes::SchemaRef,
     common::{
-        Result, internal_err,
+        DataFusionError, Result, internal_err,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
     },
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
@@ -336,7 +336,7 @@ impl BroadcastJoinStream {
             }
         } else {
             // This should not happen as we set right_stream in handle_wait_build_side
-            Poll::Ready(Some(Err(datafusion::common::DataFusionError::Internal(
+            Poll::Ready(Some(Err(DataFusionError::Internal(
                 "Right stream not initialized".to_string(),
             ))))
         }

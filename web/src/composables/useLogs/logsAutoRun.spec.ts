@@ -393,6 +393,17 @@ describe("transport binding (AC4.1, P2 records)", () => {
     });
   });
 
+  it("a replacing run clears the histogram loading the replaced run left behind", () => {
+    openGrid();
+    fakeSearchObj.value.loadingHistogram = true;
+    fakeSearchObj.value.loadingHistogramProgressPercentage = 40;
+
+    openGrid();
+
+    expect(fakeSearchObj.value.loadingHistogram).toBe(false);
+    expect(fakeSearchObj.value.loadingHistogramProgressPercentage).toBe(0);
+  });
+
   it("sends nothing for a follow-up of a replaced generation", () => {
     const connection = useSearchConnection((key: string) => key as any);
     const old = openGrid();
@@ -946,6 +957,112 @@ describe("panel records for Visualize and Build (J7)", () => {
     expect(run().persistReason("visualize", "add-to-dashboard")).toBeNull();
     type = "line";
     expect(run().persistReason("visualize", "add-to-dashboard")).toBeTruthy();
+  });
+
+  it("a Visualize toggle that reuses the Logs results opens no panel run", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const before = run().engine.currentGeneration("grid")?.id;
+    expect(run().openToggleChartRun(true)).toBeNull();
+    expect(run().engine.currentGeneration("grid")?.id).toBe(before);
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    expect(fakeSearchObj.value.meta.executedPanel).toBeUndefined();
+  });
+
+  it("a Visualize toggle that loads the chart records the live query once the load ends", () => {
+    const events: any[] = [];
+    run().engine.onExecutedRecorded((event) => events.push(event));
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.query = "level = 'warn'";
+    const id = run().openToggleChartRun(false);
+    expect(id).toEqual(expect.any(Number));
+    expect(run().hasPanelRun(id as number)).toBe(true);
+    expect(run().engine.currentGeneration("grid")?.id).toBe(id);
+    run().markPanelDispatched(id as number);
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    expect(run().hasPanelRun(id as number)).toBe(false);
+    const recorded = events.filter((e) => e.surface === "visualize");
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0].generation).toBe(id);
+    expect(recorded[0].signature.query).toBe("level = 'warn'");
+  });
+
+  it("a Visualize toggle keeps a panel run already open for the live grid generation", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const open = run().openPanelRun();
+    expect(run().openToggleChartRun(false)).toBeNull();
+    expect(run().hasPanelRun(open)).toBe(true);
+    expect(run().engine.currentGeneration("grid")?.id).toBe(open);
+    run().engine.cancelGeneration(null, { cause: "user" });
+    const reopened = run().openToggleChartRun(false);
+    expect(reopened).toEqual(expect.any(Number));
+    expect(reopened).not.toBe(open);
+    expect(run().hasPanelRun(reopened as number)).toBe(true);
+  });
+
+  it("leaving the chart cancels a panel run whose load never started, but not one in flight", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const parked = run().openToggleChartRun(false) as number;
+    run().cancelUnstartedPanelRun();
+    expect(run().hasPanelRun(parked)).toBe(false);
+    expect(run().engine.currentGeneration("grid")?.settled).toBe(true);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("cancelled");
+
+    const loading = run().openPanelRun();
+    run().panelLoadingChanged(true, false);
+    run().cancelUnstartedPanelRun();
+    expect(run().hasPanelRun(loading)).toBe(true);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("running");
+  });
+
+  it("a handed chart load that ends without querying closes the run: a shown result records, nothing cancels", () => {
+    let type = "bar";
+    run().setPanelConfigReader(() => ({ type }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const empty = run().openToggleChartRun(false) as number;
+    run().markPanelDispatched(empty);
+    run().panelLoadEndedWithoutFetch(false);
+    expect(run().hasPanelRun(empty)).toBe(false);
+    expect(run().engine.currentGeneration("grid")?.settled).toBe(true);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("cancelled");
+    expect(fakeSearchObj.value.meta.executedPanel).toBeNull();
+
+    const restored = run().openToggleChartRun(false) as number;
+    run().markPanelDispatched(restored);
+    const handed = run().panelSignature("visualize");
+    type = "line";
+    run().panelLoadEndedWithoutFetch(true);
+    expect(run().hasPanelRun(restored)).toBe(false);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("complete");
+    expect(fakeSearchObj.value.meta.executedPanel).toMatchObject({
+      generation: restored,
+      configSignature: handed,
+    });
+  });
+
+  it("a no-fetch end leaves open a run not yet handed its config, or one whose load is in flight", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const unhanded = run().openToggleChartRun(false) as number;
+    run().panelLoadEndedWithoutFetch(false);
+    expect(run().hasPanelRun(unhanded)).toBe(true);
+
+    run().panelLoadingChanged(true, false);
+    run().panelLoadEndedWithoutFetch(true);
+    expect(run().hasPanelRun(unhanded)).toBe(true);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("running");
+  });
+
+  it("a Visualize toggle that resolves after the user left Visualize opens no panel run", () => {
+    fakeSearchObj.value.meta.logsVisualizeToggle = "logs";
+    const before = run().engine.currentGeneration("grid")?.id;
+    expect(run().openToggleChartRun(false)).toBeNull();
+    expect(run().engine.currentGeneration("grid")?.id).toBe(before);
   });
 });
 

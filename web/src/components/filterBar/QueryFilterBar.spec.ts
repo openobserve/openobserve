@@ -1102,3 +1102,88 @@ describe("QueryFilterBar value edit with an empty value loaded", () => {
     expect(sql(state)).toBe("level = 'error'");
   });
 });
+
+describe("a half-built filter when focus leaves the bar (e.g. the Run query button)", () => {
+  const focusLeaves = async () => {
+    wrapper!.findComponent({ name: "OChipInput" }).vm.$emit("leave");
+    await flushPromises();
+  };
+
+  it("applies ticked is-any-of values instead of dropping them", async () => {
+    const state = mountBar();
+    await openBar();
+    await clickRow("level");
+    await clickRow("in");
+    await vi.waitFor(() => expect(rowKeys()).toContain("warn"));
+    await clickRow("error");
+    await clickRow("warn");
+
+    await focusLeaves();
+
+    expect(sql(state)).toBe("level IN ('error', 'warn')");
+    expect(wrapper!.find('[data-test="query-filter-bar-draft"]').exists()).toBe(false);
+  });
+
+  it("applies a value that was typed but not confirmed with Enter", async () => {
+    const state = mountBar();
+    await openBar();
+    await type("level");
+    await press("Enter");
+    await press("Enter");
+    await type("error");
+
+    await focusLeaves();
+
+    expect(sql(state)).toBe("level = 'error'");
+  });
+
+  it("adds a value typed after ticking some, for is any of", async () => {
+    const state = mountBar();
+    await openBar();
+    await clickRow("level");
+    await clickRow("in");
+    await vi.waitFor(() => expect(rowKeys()).toContain("warn"));
+    await clickRow("error");
+    await type("custom");
+
+    await focusLeaves();
+
+    expect(sql(state)).toBe("level IN ('error', 'custom')");
+  });
+
+  it("reverts a half-typed edit of an existing chip when focus leaves", async () => {
+    const state = mountBar({ modelValue: parseSqlFilter("level = 'error' AND status = 1")! });
+    await editPart("level", "value");
+    await type("warn");
+
+    await focusLeaves();
+
+    expect(sql(state)).toBe("level = 'error' AND status = 1");
+  });
+
+  it("drops a draft that has no value to apply", async () => {
+    const state = mountBar();
+    await openBar();
+    await clickRow("level");
+    await clickRow("in");
+
+    await focusLeaves();
+
+    expect(sql(state)).toBe("");
+    expect(wrapper!.find('[data-test="query-filter-bar-draft"]').exists()).toBe(false);
+  });
+
+  it("still discards the draft on Escape", async () => {
+    const state = mountBar();
+    await openBar();
+    await clickRow("level");
+    await clickRow("in");
+    await vi.waitFor(() => expect(rowKeys()).toContain("warn"));
+    await clickRow("error");
+
+    await press("Escape");
+    await press("Escape");
+
+    expect(sql(state)).toBe("");
+  });
+});

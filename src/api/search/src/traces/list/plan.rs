@@ -378,6 +378,15 @@ pub fn validate_filter(filter: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use arrow_schema::{DataType, Field};
+    use datafusion::{
+        arrow::{
+            array::{ArrayRef, Int64Array, StringArray},
+            record_batch::RecordBatch,
+            util::display::array_value_to_string,
+        },
+        datasource::MemTable,
+        prelude::SessionContext,
+    };
 
     use super::*;
 
@@ -705,16 +714,6 @@ mod tests {
     #[tokio::test]
     async fn root_version_comes_from_the_span_that_names_the_root_service() {
         use std::sync::Arc;
-
-        use datafusion::{
-            arrow::{
-                array::{ArrayRef, Int64Array, StringArray},
-                record_batch::RecordBatch,
-                util::display::array_value_to_string,
-            },
-            datasource::MemTable,
-            prelude::SessionContext,
-        };
 
         let text = |name: &str| Field::new(name, DataType::Utf8, true);
         let number = |name: &str| Field::new(name, DataType::Int64, true);

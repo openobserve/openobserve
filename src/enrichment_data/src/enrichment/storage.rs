@@ -608,7 +608,7 @@ mod tests {
     use std::{collections::HashMap, sync::Arc};
 
     use arrow::{
-        array::RecordBatch,
+        array::{RecordBatch, StringArray},
         datatypes::{DataType, Field, Schema},
     };
     use serde_json::json;
@@ -1036,13 +1036,7 @@ mod tests {
 
     #[test]
     fn test_values_recordbatch_len_single_batch() {
-        use arrow::array::Int64Array;
-
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "val",
-            arrow::datatypes::DataType::Int64,
-            false,
-        )]));
+        let schema = Arc::new(Schema::new(vec![Field::new("val", DataType::Int64, false)]));
         let arr = Int64Array::from(vec![1, 2, 3, 4]);
         let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr)]).unwrap();
         let v = Values::RecordBatch(vec![batch]);
@@ -1051,13 +1045,7 @@ mod tests {
 
     #[test]
     fn test_values_recordbatch_len_multiple_batches_summed() {
-        use arrow::array::Int64Array;
-
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "val",
-            arrow::datatypes::DataType::Int64,
-            false,
-        )]));
+        let schema = Arc::new(Schema::new(vec![Field::new("val", DataType::Int64, false)]));
         let arr1 = Int64Array::from(vec![10, 20]);
         let arr2 = Int64Array::from(vec![30, 40, 50]);
         let batch1 = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr1)]).unwrap();
@@ -1103,13 +1091,7 @@ mod tests {
 
     #[test]
     fn test_values_recordbatch_is_empty_all_zero_row_batches() {
-        use arrow::array::Int64Array;
-
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "val",
-            arrow::datatypes::DataType::Int64,
-            false,
-        )]));
+        let schema = Arc::new(Schema::new(vec![Field::new("val", DataType::Int64, false)]));
         // A batch with 0 rows
         let empty_arr: Int64Array = Int64Array::from(Vec::<i64>::new());
         let empty_batch =
@@ -1120,13 +1102,7 @@ mod tests {
 
     #[test]
     fn test_values_recordbatch_is_empty_has_rows() {
-        use arrow::array::Int64Array;
-
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "val",
-            arrow::datatypes::DataType::Int64,
-            false,
-        )]));
+        let schema = Arc::new(Schema::new(vec![Field::new("val", DataType::Int64, false)]));
         let arr = Int64Array::from(vec![1]);
         let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr)]).unwrap();
         let v = Values::RecordBatch(vec![batch]);
@@ -1179,13 +1155,7 @@ mod tests {
 
     #[test]
     fn test_values_recordbatch_clone_and_debug() {
-        use arrow::array::Int64Array;
-
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "val",
-            arrow::datatypes::DataType::Int64,
-            false,
-        )]));
+        let schema = Arc::new(Schema::new(vec![Field::new("val", DataType::Int64, false)]));
         let arr = Int64Array::from(vec![42]);
         let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr)]).unwrap();
         let v = Values::RecordBatch(vec![batch]);
@@ -1200,11 +1170,9 @@ mod tests {
 
     #[test]
     fn test_values_recordbatch_to_json_multiple_batches() {
-        use arrow::array::{Int64Array, StringArray};
-
         let schema = Arc::new(Schema::new(vec![
-            Field::new("id", arrow::datatypes::DataType::Int64, false),
-            Field::new("name", arrow::datatypes::DataType::Utf8, false),
+            Field::new("id", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
         ]));
 
         let batch1 = RecordBatch::try_new(
@@ -1242,13 +1210,7 @@ mod tests {
 
     #[test]
     fn test_values_recordbatch_to_record_batch_passthrough() {
-        use arrow::array::Int64Array;
-
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "x",
-            arrow::datatypes::DataType::Int64,
-            false,
-        )]));
+        let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
         let arr = Int64Array::from(vec![7, 8]);
         let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr)]).unwrap();
         let v = Values::RecordBatch(vec![batch]);
@@ -1285,8 +1247,6 @@ mod tests {
 
     #[test]
     fn test_values_record_batch_conversion() {
-        use arrow::array::{Int64Array, StringArray};
-
         // Create a simple RecordBatch
         let schema = Arc::new(Schema::new(vec![
             Field::new("name", DataType::Utf8, false),
@@ -1318,8 +1278,6 @@ mod tests {
 
     #[test]
     fn test_last_updated_at() {
-        use arrow::array::{Int64Array, StringArray};
-
         // Create a schema with _timestamp column
         let schema = Arc::new(Schema::new(vec![
             Field::new("name", DataType::Utf8, false),

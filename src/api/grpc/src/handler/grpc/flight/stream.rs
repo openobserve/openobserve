@@ -372,7 +372,13 @@ fn write_options() -> IpcWriteOptions {
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Int32Array, RecordBatch};
+    use arrow::{
+        array::{
+            ArrayRef, DictionaryArray, Int32Array, RecordBatch, StringArray, types::Int32Type,
+        },
+        buffer::Buffer,
+        ipc::{MessageHeader, reader::read_dictionary, root_as_message},
+    };
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::search::ScanStats;
     use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
@@ -589,12 +595,6 @@ mod tests {
     fn decode_in_order(fds: &[FlightData], schema: Arc<Schema>) -> Vec<RecordBatch> {
         use std::collections::HashMap;
 
-        use arrow::{
-            array::ArrayRef,
-            buffer::Buffer,
-            ipc::{MessageHeader, reader::read_dictionary, root_as_message},
-        };
-
         let mut dictionaries: HashMap<i64, ArrayRef> = HashMap::new();
         let mut out = Vec::new();
         for data in fds {
@@ -634,8 +634,6 @@ mod tests {
     // every label.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_multi_partition_dictionary_no_mixup() {
-        use arrow::array::{ArrayRef, DictionaryArray, StringArray, types::Int32Type};
-
         let schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int32, false),
             Field::new(

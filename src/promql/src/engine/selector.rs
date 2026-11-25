@@ -726,7 +726,13 @@ mod tests {
         promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL},
         search::ScanStats,
     };
-    use datafusion::{arrow::datatypes::Schema, prelude::SessionContext};
+    use datafusion::{
+        arrow::{
+            array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+            datatypes::{DataType, Field, Schema},
+        },
+        prelude::SessionContext,
+    };
     use promql_parser::{
         label::{MatchOp, Matchers},
         parser::VectorSelector,
@@ -998,10 +1004,6 @@ mod tests {
             _filters: &mut [(String, Vec<String>)],
             _streaming: bool,
         ) -> Result<Vec<ScanContext>> {
-            use datafusion::arrow::{
-                array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
-                datatypes::{DataType, Field},
-            };
             let schema = Arc::new(Schema::new(vec![
                 Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
                 Field::new(VALUE_LABEL, DataType::Float64, false),
