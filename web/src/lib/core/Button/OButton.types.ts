@@ -60,6 +60,8 @@ export type ButtonVariant =
   | "section-chip"
   // Outline with primary color text + border — for "always highlighted" branded badges (e.g. edition indicator)
   | "outline-primary"
+  // Reads as a search field (white fill, light border) — a button that opens a search or picker, e.g. the header Ctrl K trigger
+  | "field"
   // Dashed outline "add tile" — transparent bg, dashed muted border + muted icon.
   // For the small "+" add-affordance buttons in the query builder (add join / filter / condition).
   | "dashed"

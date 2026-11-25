@@ -312,6 +312,13 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
+  // field: an input's white fill with a light hairline that firms up on hover, for a button that opens a search or picker.
+  field: [
+    "bg-input-bg text-text-secondary border border-border-default",
+    "enabled:hover:border-input-border",
+    "focus-visible:border-input-border-focus focus-visible:ring-[0.125rem] focus-visible:ring-focus-ring-accent",
+    "disabled:opacity-50",
+  ].join(" "),
   // dashed: "add tile" — transparent bg, dashed muted border + muted icon/text.
   // For the small "+" add-affordance buttons in the query builder (add join / filter / condition).
   dashed: [
@@ -428,6 +435,7 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "banner-dismiss": "opacity-60",
   link: "opacity-60",
   "outline-primary": "opacity-50",
+  field: "opacity-50",
   dashed: "opacity-50",
   "pricing-chip": "opacity-60",
   "tint-teal": "opacity-60",
