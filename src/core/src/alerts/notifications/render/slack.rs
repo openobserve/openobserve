@@ -179,14 +179,8 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
 }
 
 fn title_block(title: &str, ctx: &NotificationContext) -> Value {
-    // Datadog-style clickable title: a bold mrkdwn link section that opens
-    // the alert (user-picked over the plain header in a live A/B on a real
-    // channel). mrkdwn link syntax breaks on `|` (terminates the label) and
-    // `>` (terminates the link), so a title containing either — and an
-    // undispatchable alert URL — falls back to the plain `header` block.
-    // The label is escape_mrkdwn'd (entity-encoding `&`/`<`/`>`); the URL must
-    // be an absolute http(s) one (`dispatchable_url`), which also rules out the
-    // blocked placeholder, an empty `ZO_WEB_URL` and relative paths.
+    // mrkdwn link syntax breaks on `|` and `>`, so such a title, or an alert URL that is not
+    // absolute http(s), falls back to the plain `header` block.
     let title_url = dispatchable_url(&ctx.alert_url).unwrap_or_default();
     let linked = format!(
         "*<{}|{}>*",
@@ -204,9 +198,7 @@ fn title_block(title: &str, ctx: &NotificationContext) -> Value {
             "text": {"type": "mrkdwn", "text": linked}
         })
     } else {
-        // `plain_text` is not mrkdwn — Slack renders it literally, so the
-        // title's `&`/`<`/`>` need no entity encoding here and must NOT be
-        // encoded or the user would see the entities themselves.
+        // `plain_text` renders literally, so encoding `&`/`<`/`>` here would show the entities.
         json!({
             "type": "header",
             "text": {"type": "plain_text", "text": clamp(title, HEADER_MAX), "emoji": true}

@@ -1190,7 +1190,7 @@ mod tests {
         let end = T0 + 10 * B;
         let stale = merge_current(
             vec![at(pt(0, 100.0), T0 + 9 * B)],
-            &[absence.clone()],
+            std::slice::from_ref(&absence),
             T0 + 5 * B,
             T0,
             end,
@@ -1208,7 +1208,7 @@ mod tests {
         assert!(!returned[0].is_absence);
         let gone = merge_current(
             vec![at(pt(0, 100.0), T0 + 5 * B)],
-            &[absence.clone()],
+            std::slice::from_ref(&absence),
             T0 + 9 * B,
             T0,
             end,
@@ -1220,7 +1220,14 @@ mod tests {
             judged_end_us: None,
         };
         assert_eq!(
-            merge_current(vec![legacy], &[absence.clone()], T0 + 5 * B, T0, end).len(),
+            merge_current(
+                vec![legacy],
+                std::slice::from_ref(&absence),
+                T0 + 5 * B,
+                T0,
+                end
+            )
+            .len(),
             2
         );
         let history = vec![
@@ -1232,7 +1239,7 @@ mod tests {
         assert!(only_history[0].is_absence);
         let tie = merge_current(
             vec![at(pt(0, 100.0), T0 + 5 * B)],
-            &[absence.clone()],
+            std::slice::from_ref(&absence),
             T0 + 5 * B,
             T0,
             end,
@@ -1240,7 +1247,7 @@ mod tests {
         assert_eq!(tie.len(), 2, "equal judged ends keep both");
         let beside = merge_current(
             vec![at(pt(0, 100.0), T0 + 9 * B)],
-            &[drop],
+            std::slice::from_ref(&drop),
             T0 + 5 * B,
             T0,
             end,
