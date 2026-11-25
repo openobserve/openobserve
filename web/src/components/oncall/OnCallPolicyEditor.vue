@@ -1073,9 +1073,9 @@ const leadGapOptions = computed(() => [
 ]);
 
 /// A delay saved outside the presets joins the list, or the select shows raw microseconds.
-function withCurrent(options: { label: string; value: number }[], current: number) {
+function withCurrent(options: { label: I18nText; value: number }[], current: number) {
   if (options.some((o) => o.value === current)) return options;
-  return [...options, { label: `+${formatMicrosDuration(current)}`, value: current }].sort(
+  return [...options, { label: raw(`+${formatMicrosDuration(current)}`), value: current }].sort(
     (a, b) => a.value - b.value,
   );
 }
