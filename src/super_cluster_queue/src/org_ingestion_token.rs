@@ -16,13 +16,12 @@
 use bytes::Bytes;
 use config::utils::{json, str::mask_secret};
 use infra::{
+    coordinator::events::{ORG_INGESTION_TOKENS_KEY_PREFIX, loggable_key},
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{Error, Result},
     table::org_ingestion_tokens::{self, OrgIngestionTokenRecord},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-
-const ORG_INGESTION_TOKENS_KEY_PREFIX: &str = "/org_ingestion_tokens/";
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
@@ -36,7 +35,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             log::error!(
                 "[SUPER_CLUSTER:DB] Invalid message: type: {:?}, key: {}",
                 msg.message_type,
-                msg.key
+                loggable_key(&msg.key)
             );
             return Err(Error::Message("Invalid message type".to_string()));
         }
