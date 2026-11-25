@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-card-glass-bg border-border-default rounded-default flex flex-col border"
     :class="stickyHeader ? 'overflow-visible border-t-0' : 'overflow-clip'"
   >
-    <!-- Square page-colour backing hides the section behind the rounded corners while the header is pinned. -->
+    <!-- Square page-colour backing hides the section behind the curved corners while the header is pinned. -->
     <div v-if="stickyHeader" class="bg-surface-base sticky top-0 z-10 -mx-px">
       <div
         :class="[
