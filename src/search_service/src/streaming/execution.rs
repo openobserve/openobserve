@@ -595,6 +595,9 @@ async fn count_and_split(
     slices: Vec<[i64; 2]>,
     req_size: i64,
 ) -> (Vec<[i64; 2]>, Option<Vec<usize>>) {
+    if !rows_countable(req) {
+        return (slices, None);
+    }
     let Some(rows) = count_slices(ctx, req, "c", &slices).await else {
         return (slices, None);
     };
@@ -612,6 +615,11 @@ async fn count_and_split(
     };
     let rows = fill_counts(&split, sub_rows);
     (split.into_iter().map(|(r, _)| r).collect(), Some(rows))
+}
+
+/// Whether a slice count matches what its fetch returns: a query function may drop rows [pure].
+fn rows_countable(req: &config::meta::search::Request) -> bool {
+    req.query.query_fn.is_none()
 }
 
 /// Slices holding more than `limit` rows cut into equal sub-slices still to count [pure].
@@ -765,10 +773,8 @@ fn build_sample(
             res.total = res.hits.len();
         }
         if ranges.len() > 1 {
-            reasons.push(
-                "Pattern percentages reflect the sample only: counting rows per time slice failed"
-                    .to_string(),
-            );
+            let reason = "Pattern percentages reflect the sample only: rows per time slice could not be counted";
+            reasons.push(reason.to_string());
         }
     }
     let failed_slices = failed.iter().filter(|f| **f).count();
@@ -1504,6 +1510,14 @@ mod tests {
     }
 
     #[test]
+    fn test_rows_countable_only_without_a_query_function() {
+        let mut req = config::meta::search::Request::default();
+        assert!(rows_countable(&req));
+        req.query.query_fn = Some("LmEgPSAx".to_string());
+        assert!(!rows_countable(&req));
+    }
+
+    #[test]
     fn test_split_dense_slices() {
         // (slice, rows) -> pieces, for a limit of 10 rows; None marks a piece still to count
         type Piece = ([i64; 2], Option<usize>);
@@ -1671,7 +1685,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![(1, 1), (1, 1), (1, 1)]
         );
-        assert!(reasons(&uncounted).contains("counting rows per time slice failed"));
+        assert!(reasons(&uncounted).contains("rows per time slice could not be counted"));
         assert!(!reasons(&uncounted).contains("dense burst"));
 
         let clean = build_sample(&ranges, slices(), &[false; 3], Some(&[2, 2, 1]), 100);
