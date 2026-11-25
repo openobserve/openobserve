@@ -9190,6 +9190,12 @@ export class LogsPage {
         // Saved views list is now opened via the utilities ("More") dropdown menu.
         // Ensure any previously open dropdown is closed before opening fresh.
         const listMenuItem = this.page.locator(this.menuListSavedViewsBtn);
+        // Escape closes only the submenu, so the re-open click below would toggle the still-open root menu shut.
+        if (await this.page.locator(this.savedViewSearchInput).isVisible()
+            && (await listMenuItem.getAttribute('aria-expanded', { timeout: 5000 })) === 'true') {
+            testLogger.info('Saved views submenu already open, reusing it');
+            return;
+        }
         await this.page.keyboard.press('Escape').catch(() => {});
         await listMenuItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
         // After navigation the Vue component may need an extra render cycle before its
