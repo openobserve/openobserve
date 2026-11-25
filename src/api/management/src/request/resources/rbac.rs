@@ -17,8 +17,9 @@ use std::{collections::HashSet, sync::Arc};
 
 use config::meta::resources::{ResourceKind, ResourceRoute, ResourceSummary, SourceReason};
 use openobserve_core::resources::ResourceAccess;
+use tokio::time::Instant;
 
-use super::permissions::{enabled, unavailable};
+use super::permissions::{bounded, enabled, unavailable};
 
 const OBJECT_LIMIT: usize = 1_000;
 
@@ -221,37 +222,39 @@ pub(super) async fn resolve(
     org: &str,
     subject: &str,
     kinds: &[ResourceKind],
+    deadline: Instant,
 ) -> Vec<ResourceAccess> {
-    let authority = match Authority::new(org, subject).await {
-        Ok(authority) => authority,
-        Err(reason) => {
-            return kinds
-                .iter()
-                .map(|&kind| unavailable(kind, reason))
-                .collect();
-        }
+    let shared = async {
+        let authority = Authority::new(org, subject).await?;
+        let shortcut_verified = authority.shortcut_membership(kinds).await;
+        Ok::<_, SourceReason>((authority, shortcut_verified))
     };
-    let shortcut_verified = authority.shortcut_membership(kinds).await;
+    let (authority, shortcut_verified) = match tokio::time::timeout_at(deadline, shared).await {
+        Ok(Ok(shared)) => shared,
+        Ok(Err(reason)) => return all_unavailable(kinds, reason),
+        Err(_) => return all_unavailable(kinds, SourceReason::PermissionUnavailable),
+    };
     let authority = &authority;
-    futures::future::join_all(kinds.iter().map(|&kind| async move {
-        if !enabled(kind) {
-            return unavailable(kind, SourceReason::Disabled);
-        }
-        if kind.folder_type().is_some() && !shortcut_verified {
-            return unavailable(kind, SourceReason::PermissionDenied);
-        }
-        let resolved = resolve_kind(authority, kind).await;
-        match resolved {
-            Ok(resolved) => ResourceAccess {
-                kind,
-                predicate: Arc::new(move |row| {
-                    resolved.visibility.allows(row) && row_feature_enabled(row)
-                }),
-                partial: resolved.partial,
-                unavailable_reason: None,
-            },
-            Err(reason) => unavailable(kind, reason),
-        }
+    futures::future::join_all(kinds.iter().map(|&kind| {
+        bounded(kind, deadline, async move {
+            if !enabled(kind) {
+                return unavailable(kind, SourceReason::Disabled);
+            }
+            if kind.folder_type().is_some() && !shortcut_verified {
+                return unavailable(kind, SourceReason::PermissionDenied);
+            }
+            match resolve_kind(authority, kind).await {
+                Ok(resolved) => ResourceAccess {
+                    kind,
+                    predicate: Arc::new(move |row| {
+                        resolved.visibility.allows(row) && row_feature_enabled(row)
+                    }),
+                    partial: resolved.partial,
+                    unavailable_reason: None,
+                },
+                Err(reason) => unavailable(kind, reason),
+            }
+        })
     }))
     .await
 }
@@ -285,6 +288,13 @@ fn row_feature_enabled(row: &ResourceSummary) -> bool {
         } => check_features(&[Feature::AnomalyDetection]),
         _ => true,
     }
+}
+
+fn all_unavailable(kinds: &[ResourceKind], reason: SourceReason) -> Vec<ResourceAccess> {
+    kinds
+        .iter()
+        .map(|&kind| unavailable(kind, reason))
+        .collect()
 }
 
 /// Keeps the ids granted on `object_type`; an org-wide `_all_` grant becomes no restriction.
