@@ -1496,6 +1496,7 @@ export default defineComponent({
         if (generationId !== null && generationId !== undefined && !engine.isCurrent(generationId))
           return;
         searchObj.loading = false;
+        searchObj.meta.searchApplied = true;
         if (generationId !== null && generationId !== undefined)
           engine.recordPatternsComplete(generationId);
 
