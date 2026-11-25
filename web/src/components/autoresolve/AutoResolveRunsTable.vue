@@ -171,6 +171,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
+    <template #footer-note>
+      <span data-test="autoresolve-home-region-note">{{ t("autoresolve.runs.regionNote") }}</span>
+    </template>
     <template #toolbar-trailing>
       <ORefreshButton
         layout="inline"

@@ -15,7 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout :title="title" icon="bolt" :back="back" bleed data-test="autoresolve-run-page">
+  <OPageLayout
+    :title="title"
+    :subtitle="subtitle"
+    icon="bolt"
+    :back="back"
+    bleed
+    data-test="autoresolve-run-page"
+  >
     <template v-if="run && isTerminalRunState(run.state) && !run.autoresolve" #actions>
       <OButton
         variant="outline"
@@ -283,88 +290,103 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <aside
-        class="border-border-default bg-surface-subtle w-80 shrink-0 overflow-auto border-s max-lg:w-full max-lg:flex-none max-lg:overflow-visible max-lg:border-s-0 max-lg:border-t"
+        class="w-88 shrink-0 overflow-auto max-lg:w-full max-lg:flex-none max-lg:overflow-visible"
         data-test="autoresolve-run-facts"
       >
-        <OContent y class="flex flex-col gap-3">
-          <h2 class="text-text-heading m-0 text-sm font-semibold">
-            {{ t("autoresolve.run.facts.title") }}
-          </h2>
-          <ODescriptionList dense label-width="narrow">
-            <ODescriptionItem :label="t('autoresolve.run.facts.startedBy')">
-              <span class="wrap-anywhere">{{ startedBy }}</span>
-            </ODescriptionItem>
-            <ODescriptionItem :label="t('autoresolve.run.facts.started')">
-              {{ autoresolveTime(run.created_at_us, "MMM d, HH:mm") }}
-            </ODescriptionItem>
-            <ODescriptionItem :label="t('autoresolve.run.facts.canUse')">
-              <span
-                class="flex flex-wrap items-center gap-x-2 gap-y-1"
-                data-test="autoresolve-run-can-use"
-              >
-                <span>{{ canUse }}</span>
-                <AutoResolveRemovedConnection
-                  v-for="name in removedConnections.shown"
-                  :key="name"
-                  :name="name"
-                />
-                <OTag
-                  v-if="removedConnections.more"
-                  variant="error-outline"
-                  size="sm"
-                  :label="removedConnections.more"
-                  data-test="autoresolve-run-removed-more"
-                />
-                <span
-                  v-if="notInAutoResolve"
-                  class="text-text-secondary w-full text-xs wrap-anywhere"
-                  data-test="autoresolve-run-not-in-autoresolve"
-                  >{{ notInAutoResolve }}</span
-                >
-              </span>
-            </ODescriptionItem>
-            <ODescriptionItem :label="t('autoresolve.run.facts.canApprove')">
-              <template v-if="run.approvers.length">{{ canApprove }}</template>
-            </ODescriptionItem>
-            <ODescriptionItem :label="t('autoresolve.run.facts.option')">
-              <span class="wrap-anywhere">{{ optionFact }}</span>
-            </ODescriptionItem>
-            <ODescriptionItem :label="t('autoresolve.run.facts.approval')">
-              {{ approvalFact }}
-            </ODescriptionItem>
-            <ODescriptionItem :label="t('autoresolve.run.facts.check')">
-              {{ checkFact }}
-            </ODescriptionItem>
-            <ODescriptionItem :label="t('autoresolve.run.facts.outcome')">
-              <span
-                v-if="shownVerdict"
-                class="flex flex-col items-start gap-1.5"
-                data-test="autoresolve-run-verdicts-fact"
-              >
-                <span v-if="agentState" class="flex flex-col items-start gap-0.5">
-                  <OTag type="autoresolveRunState" :value="agentState" />
-                  <span class="text-text-secondary text-xs">{{
-                    t("autoresolve.verdict.agent")
-                  }}</span>
-                </span>
-                <span class="flex flex-col items-start gap-0.5">
-                  <OTag type="autoresolvePersonVerdict" :value="shownVerdict.verdict" />
-                  <span class="text-text-secondary text-xs wrap-anywhere">{{
-                    shownVerdict.by
-                  }}</span>
-                </span>
-              </span>
-              <OTag
-                v-else-if="isTerminalRunState(run.state)"
-                type="autoresolveRunState"
-                :value="run.state"
-              />
-              <template v-else>{{ t("autoresolve.run.facts.notKnown") }}</template>
-            </ODescriptionItem>
-          </ODescriptionList>
-          <p class="border-border-default text-text-secondary m-0 border-t pt-3 text-xs">
-            {{ t("autoresolve.run.facts.evidenceNote") }}
-          </p>
+        <OContent y class="max-lg:ps-page-edge ps-0">
+          <OCard variant="glass">
+            <OCardSection role="header" dense>
+              <h2 class="text-text-heading m-0 text-sm font-semibold">
+                {{ t("autoresolve.run.facts.title") }}
+              </h2>
+            </OCardSection>
+            <OCardSection role="body" dense class="flex flex-col gap-3">
+              <ODescriptionList dense label-width="narrow">
+                <ODescriptionItem :label="t('autoresolve.run.facts.startedBy')">
+                  <OUserCell v-if="run.trigger.kind === 'person'" :value="run.requester" />
+                  <span v-else class="wrap-anywhere">{{ startedBy }}</span>
+                </ODescriptionItem>
+                <ODescriptionItem :label="t('autoresolve.run.facts.started')">
+                  <OTimeCell :value="run.created_at_us" unit="us" :timezone="timezone" />
+                </ODescriptionItem>
+                <ODescriptionItem :label="t('autoresolve.run.facts.canUse')">
+                  <span
+                    class="flex flex-wrap items-center gap-x-2 gap-y-1"
+                    data-test="autoresolve-run-can-use"
+                  >
+                    <span>{{ canUse }}</span>
+                    <AutoResolveRemovedConnection
+                      v-for="name in removedConnections.shown"
+                      :key="name"
+                      :name="name"
+                    />
+                    <OTag
+                      v-if="removedConnections.more"
+                      variant="error-outline"
+                      size="sm"
+                      :label="removedConnections.more"
+                      data-test="autoresolve-run-removed-more"
+                    />
+                    <span
+                      v-if="notInAutoResolve"
+                      class="text-text-secondary w-full text-xs wrap-anywhere"
+                      data-test="autoresolve-run-not-in-autoresolve"
+                      >{{ notInAutoResolve }}</span
+                    >
+                  </span>
+                </ODescriptionItem>
+                <ODescriptionItem :label="t('autoresolve.run.facts.canApprove')">
+                  <template v-if="run.approvers.length">{{ canApprove }}</template>
+                </ODescriptionItem>
+                <ODescriptionItem :label="t('autoresolve.run.facts.option')">
+                  <span class="wrap-anywhere">{{ optionFact }}</span>
+                </ODescriptionItem>
+                <ODescriptionItem :label="t('autoresolve.run.facts.approval')">
+                  <span
+                    v-if="approvedFact"
+                    class="flex min-w-0 flex-col items-start gap-0.5"
+                    data-test="autoresolve-run-approved-fact"
+                  >
+                    <OUserCell :value="approvedFact.by" />
+                    <OTimeCell :value="approvedFact.atUs" unit="us" :timezone="timezone" />
+                  </span>
+                  <template v-else>{{ approvalFact }}</template>
+                </ODescriptionItem>
+                <ODescriptionItem :label="t('autoresolve.run.facts.check')">
+                  {{ checkFact }}
+                </ODescriptionItem>
+                <ODescriptionItem :label="t('autoresolve.run.facts.outcome')">
+                  <span
+                    v-if="shownVerdict"
+                    class="flex flex-col items-start gap-1.5"
+                    data-test="autoresolve-run-verdicts-fact"
+                  >
+                    <span v-if="agentState" class="flex flex-col items-start gap-0.5">
+                      <OTag type="autoresolveRunState" :value="agentState" />
+                      <span class="text-text-secondary text-xs">{{
+                        t("autoresolve.verdict.agent")
+                      }}</span>
+                    </span>
+                    <span class="flex flex-col items-start gap-0.5">
+                      <OTag type="autoresolvePersonVerdict" :value="shownVerdict.verdict" />
+                      <span class="text-text-secondary text-xs wrap-anywhere">{{
+                        shownVerdict.by
+                      }}</span>
+                    </span>
+                  </span>
+                  <OTag
+                    v-else-if="isTerminalRunState(run.state)"
+                    type="autoresolveRunState"
+                    :value="run.state"
+                  />
+                  <template v-else>{{ t("autoresolve.run.facts.notKnown") }}</template>
+                </ODescriptionItem>
+              </ODescriptionList>
+              <p class="border-border-default text-text-secondary m-0 border-t pt-3 text-xs">
+                {{ t("autoresolve.run.facts.evidenceNote") }}
+              </p>
+            </OCardSection>
+          </OCard>
         </OContent>
       </aside>
     </div>
@@ -377,11 +399,15 @@ import { useRoute, useRouter } from "vue-router";
 import { useMutation } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
@@ -434,6 +460,7 @@ import {
   asksVerdict,
   autoresolveDuration,
   autoresolveTime,
+  autoresolveWhen,
   canUseSentence,
   CORRECTION_KIND_KEY,
   deadlineText,
@@ -485,7 +512,11 @@ const { run, reconnecting, error, errorStatus, refresh, retry } = useAutoResolve
 
 const timezone = computed(() => store.state.timezone || "UTC");
 
-const title = computed(() => (run.value ? raw(run.value.goal) : t("autoresolve.runTitle")));
+const title = computed(() => {
+  if (run.value) return raw(run.value.goal);
+  return error.value ? t("autoresolve.runTitle") : raw("");
+});
+const subtitle = computed(() => (error.value ? raw("") : t("autoresolve.runTitle")));
 const back = computed(() => ({
   label: t("autoresolve.title"),
   to: { name: "autoresolve", query: { tab: "runs", org_identifier: orgId.value } },
@@ -689,15 +720,18 @@ const approvalFact = computed(() => {
       ? deadlineText(deadline, WAITING_FOR_YOU_KEYS, t)
       : deadlineText(deadline, WAITING_FOR_KEYS, t, { names: canApprove.value });
   }
-  if (current.approved_by && current.approved_at_us) {
-    return t("autoresolve.run.facts.approvedAt", {
-      name: raw(current.approved_by),
-      time: autoresolveTime(current.approved_at_us),
-    });
-  }
   if (current.state === "lapsed" && deadline) return deadlineText(deadline, LAPSED_KEYS, t);
   if (current.state === "declined") return t("autoresolve.state.declined");
-  return t("autoresolve.run.facts.notAsked");
+  return isTerminalRunState(current.state)
+    ? t("autoresolve.run.facts.notAskedEnded")
+    : t("autoresolve.run.facts.notAsked");
+});
+
+const approvedFact = computed(() => {
+  const current = run.value;
+  if (!current?.approved_by || !current.approved_at_us) return null;
+  if (current.state === "waiting_approval" && current.approval_deadline_us) return null;
+  return { by: current.approved_by, atUs: current.approved_at_us };
 });
 
 const checkFact = computed(() => {
@@ -717,10 +751,14 @@ const checkFact = computed(() => {
   }
 });
 
+const evidenceTime = (us: number): string => autoresolveWhen(us).text;
+const sameDay = (a: number, b: number) =>
+  autoresolveTime(a, "YYYY-MM-DD") === autoresolveTime(b, "YYYY-MM-DD");
+
 // One entry per sent step: sent and finished times share it, so the record reads one line per call.
 const stepEvidence = (step: AutoResolveStep): EvidenceItem[] => {
   if (!step.consumed_at_us) return [];
-  const sent = autoresolveTime(step.consumed_at_us);
+  const sent = evidenceTime(step.consumed_at_us);
   const params = { seq: step.seq, tool: raw(step.tool) };
   const failed = step.state === "failed";
   const view = stepResultView(failed ? step.error : step.result_summary);
@@ -745,7 +783,9 @@ const stepEvidence = (step: AutoResolveStep): EvidenceItem[] => {
       time: step.finished_at_us
         ? t("autoresolve.run.evidence.span", {
             from: sent,
-            to: autoresolveTime(step.finished_at_us),
+            to: sameDay(step.consumed_at_us, step.finished_at_us)
+              ? autoresolveTime(step.finished_at_us)
+              : evidenceTime(step.finished_at_us),
           })
         : raw(sent),
       variant: failed ? "destructive" : step.finished_at_us ? "success" : "primary",
@@ -755,7 +795,7 @@ const stepEvidence = (step: AutoResolveStep): EvidenceItem[] => {
 
 const correctionEvidence = (c: AutoResolveRunCorrection, idx: number): EvidenceItem => {
   const name = raw(c.created_by);
-  const time = autoresolveTime(c.created_at_us);
+  const time = evidenceTime(c.created_at_us);
   const notFixed = c.kind === "not_fixed";
   return {
     key: `correction-${idx}`,
@@ -783,7 +823,7 @@ const addedEvidence = (a: AutoResolveAddedConnection, idx: number): EvidenceItem
       ? t("autoresolve.run.evidence.connectionAdded", params)
       : t("autoresolve.run.evidence.connectionAddedRun", params),
     detail: a.trigger_off ? t("autoresolve.run.evidence.triggerOff") : undefined,
-    time: raw(autoresolveTime(a.at_us)),
+    time: raw(evidenceTime(a.at_us)),
     variant: "info",
   };
 };
@@ -804,7 +844,7 @@ const evidence = computed<EvidenceItem[]>(() => {
       title: current.trigger.label
         ? raw(current.trigger.label)
         : t("autoresolve.run.evidence.started", { name: raw(current.requester) }),
-      time: raw(autoresolveTime(current.created_at_us)),
+      time: raw(evidenceTime(current.created_at_us)),
       variant: "muted",
     },
   ];
@@ -819,7 +859,7 @@ const evidence = computed<EvidenceItem[]>(() => {
             option: raw(chosenOption.value.title),
           })
         : t("autoresolve.run.evidence.approvedPlan", { name: raw(current.approved_by) }),
-      time: raw(autoresolveTime(current.approved_at_us)),
+      time: raw(evidenceTime(current.approved_at_us)),
       variant: "primary",
     });
   }
@@ -831,7 +871,7 @@ const evidence = computed<EvidenceItem[]>(() => {
       kind: "verdict",
       at: fixed.at_us,
       title: t("autoresolve.run.evidence.markedFixed", { name: raw(fixed.by) }),
-      time: raw(autoresolveTime(fixed.at_us)),
+      time: raw(evidenceTime(fixed.at_us)),
       variant: "info",
     });
   }
@@ -841,7 +881,7 @@ const evidence = computed<EvidenceItem[]>(() => {
       kind: "ended",
       at: current.ended_at_us,
       title: t("autoresolve.run.evidence.ended"),
-      time: raw(autoresolveTime(current.ended_at_us)),
+      time: raw(evidenceTime(current.ended_at_us)),
       variant: current.state === "worked" ? "success" : "muted",
     });
   }
@@ -852,7 +892,7 @@ const evidence = computed<EvidenceItem[]>(() => {
       kind: "planning",
       at,
       title: t("autoresolve.run.evidence.planningAgain"),
-      time: raw(autoresolveTime(at)),
+      time: raw(evidenceTime(at)),
       variant: "primary",
     });
   }

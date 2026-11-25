@@ -34849,7 +34849,7 @@
         "notChosen": "Not chosen yet",
         "noneChosen": "None chosen",
         "notAsked": "Not asked yet",
-        "approvedAt": "{name}, {time}",
+        "notAskedEnded": "Not asked",
         "waitingForYou": "Waiting for you. Lapses at {time}",
         "waitingForYouOn": "Waiting for you. Lapses {time}",
         "waitingFor": "Waiting for {names}. Lapses at {time}",

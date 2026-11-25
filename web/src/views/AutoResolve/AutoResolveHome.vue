@@ -102,14 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-else class="flex h-full min-h-0 flex-col">
-      <OContent y>
-        <p class="text-text-secondary m-0 text-sm" data-test="autoresolve-home-region-note">
-          {{ t("autoresolve.runs.regionNote") }}
-        </p>
-      </OContent>
-      <div class="min-h-0 flex-1">
-        <AutoResolveRunsTable :org="orgId" />
-      </div>
+      <AutoResolveRunsTable :org="orgId" />
     </div>
   </OPageLayout>
 </template>
@@ -121,7 +114,6 @@ import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";

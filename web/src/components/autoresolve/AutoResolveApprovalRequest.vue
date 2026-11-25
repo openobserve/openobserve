@@ -89,14 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ORadio>
     </ORadioGroup>
 
-    <p
-      v-if="recommended?.reason"
-      class="text-text-body text-compact m-0 wrap-anywhere"
-      data-test="autoresolve-approval-why"
-    >
-      <span class="text-text-heading font-semibold">{{ t("autoresolve.step.reason") }}</span>
-      <span class="ms-1 whitespace-pre-wrap">{{ recommended.reason }}</span>
-    </p>
+    <ODescriptionList v-if="recommended?.reason" dense label-width="narrow">
+      <ODescriptionItem :label="t('autoresolve.step.reason')" data-test="autoresolve-approval-why">
+        <span class="text-compact wrap-anywhere whitespace-pre-wrap">{{ recommended.reason }}</span>
+      </ODescriptionItem>
+    </ODescriptionList>
 
     <p
       v-if="omittedCount > 0"
@@ -437,6 +434,8 @@ import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import type { InlineNoticeVariant } from "@/lib/feedback/InlineNotice/OInlineNotice.types";
+import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
+import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import AutoResolveCorrectionPanel from "@/components/autoresolve/AutoResolveCorrectionPanel.vue";
 import AutoResolveCorrectionsUsed from "@/components/autoresolve/AutoResolveCorrectionsUsed.vue";
 import AutoResolveRemovedConnection from "@/components/autoresolve/AutoResolveRemovedConnection.vue";
