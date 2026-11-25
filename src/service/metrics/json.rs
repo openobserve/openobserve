@@ -506,7 +506,7 @@ pub async fn ingest(
         } else {
             Some(email_str)
         };
-        req_stats.response_time = start.elapsed().as_secs_f64();
+        req_stats.response_time = start.elapsed().as_secs_f64() * 1000.0;
         let fns_length: usize =
             stream_executable_pipelines
                 .get(&stream_name)

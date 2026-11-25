@@ -616,7 +616,7 @@ pub async fn search_multi(
         let req_stats = RequestStats {
             // For functions, records = records * num_function, in this case num_function = 1
             records: multi_res.total as i64,
-            response_time: time,
+            response_time: time * 1000.0,
             size: multi_res.scan_size as f64,
             request_body: Some(json::to_string(&sqls).unwrap()),
             user_email: None,
