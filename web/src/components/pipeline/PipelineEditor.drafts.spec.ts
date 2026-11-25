@@ -234,6 +234,27 @@ describe("PipelineEditor drafts", () => {
     document.body.innerHTML = "";
   });
 
+  it("consumes a repeated Command K create intent only after the same-page unsaved guard allows it", async () => {
+    await mountEditor("/pipeline/pipelines/add?action=add&palette_intent=first");
+    expect(router.currentRoute.value.query.palette_intent).toBeUndefined();
+    await addValidPipeline("unfinished");
+    const stayed = router.push("/pipeline/pipelines/add?action=add&palette_intent=second");
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    clickLeave("o-dialog-close-btn");
+    await stayed;
+    expect(pipelineObj.currentSelectedPipeline.name).toBe("unfinished");
+    const discarded = router.push("/pipeline/pipelines/add?action=add&palette_intent=third");
+    await flushPromises();
+    clickLeave("o-dialog-neutral-btn");
+    await discarded;
+    await flushPromises();
+    expect(router.currentRoute.value.query.palette_intent).toBeUndefined();
+    expect(pipelineObj.currentSelectedPipeline.name).toBe("");
+    expect(pipelineObj.currentSelectedPipeline.nodes).toEqual([]);
+    expect(pipelineService.createPipeline).not.toHaveBeenCalled();
+  });
+
   it("writes a new pipeline's nodes, edges and name when the page hides", async () => {
     await mountEditor("/pipeline/pipelines/add");
     await addValidPipeline("my_pipe");

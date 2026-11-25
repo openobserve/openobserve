@@ -297,10 +297,10 @@
       "importDesc": "上傳管線定義"
     },
     "noQueues": {
-      "title": "建立您的第一個佇列",
-      "description": "佇列是有狀態的審閱待辦清單 — 綁定評分配置、目標資料集，以及一個篩選器，將項目送入人工審閱。",
-      "action": "新增佇列",
-      "actionDesc": "開始一個空白佇列"
+      "title": "建立您的第一個標註佇列",
+      "description": "標註佇列是審查待辦清單 — 綁定評分配置、目標資料集，以及一個將項目送入以供人工審查的篩選條件。",
+      "action": "新增標註佇列",
+      "actionDesc": "建立一個空的標註佇列"
     },
     "noPrompts": {
       "title": "建立您的第一個提示詞",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "此處沒有不健康項目",
-      "description": "此時間範圍內沒有不健康的項目。請擴大時間範圍，或切換佇列篩選器以查看您已分檢的項目。"
+      "description": "此時間範圍內沒有異常項目。請擴大時間範圍，或切換標註佇列篩選條件，以查看您已初步分類的項目。"
     },
     "noTraces": {
       "title": "找不到追蹤",
@@ -1575,7 +1575,8 @@
     "pinToToolbar": "固定到工具列",
     "unpinFromToolbar": "從工具列取消固定",
     "shareLink": "分享連結",
-    "downloadTable": "下載結果",
+    "downloadTable": "下載目前頁面",
+    "patternsPartialResult": "模式是依據所選時間範圍的一部分建立。",
     "customRange": "下載自訂範圍的結果",
     "initialNumber": "起始編號",
     "range": "記錄數",
@@ -6332,6 +6333,8 @@
     "fieldRequired": "欄位為必填！",
     "sqlQuery": "SQL 查詢",
     "promqlQuery": "PromQL 查詢",
+    "queryRowLimitNote": "除非查詢自行設定 LIMIT，否則每次執行最多處理 {limit} 列。",
+    "queryRowLimitNoteNoLimit": "除非查詢自行設定 LIMIT，否則每次執行最多處理預設列數。",
     "output": "輸出",
     "validating": "驗證中...",
     "validateAndClose": "驗證並關閉",
@@ -9979,6 +9982,10 @@
     },
     "browserDeniedFileDownload": "瀏覽器拒絕檔案下載...",
     "chartDataDownloadedCsv": "圖表資料已下載為 CSV 檔案",
+    "tableDownloadPartial": "僅取得結果的前 {count} 列，因此檔案不完整。",
+    "tableDownloadServerPartial": "伺服器回傳了部分資料，因此檔案可能不完整。",
+    "tableDownloadWaitForLoad": "面板仍在載入。載入完成後請重新下載。",
+    "preparingTableDownload": "正在取得所有列以供下載…",
     "chartDataDownloadedJson": "圖表資料已下載為 JSON 檔案",
     "dynamicFilters": "動態篩選",
     "failedToCancelRunningQuery": "無法取消執行中的查詢",
@@ -16084,8 +16091,10 @@
         "searchSuffixesAria": "搜尋後置篩選器",
         "searchTypesAria": "搜尋類型篩選器",
         "facetAria": "{label}，{count} 個指標",
+        "facetAriaUnchecked": "{label}，{count} 個有資料，{unchecked} 個尚未勾選",
         "noPrefixMatch": "沒有相符的前置詞。",
         "noSuffixMatch": "沒有相符的後置詞。",
+        "uncheckedTooltip": "{count} 個有資料 · {unchecked} 個尚未勾選",
         "noTypeMatch": "沒有相符的類型。"
       },
       "views": {
@@ -17755,13 +17764,9 @@
       "noAgentsDescription": "在所選時間範圍內未偵測到 GenAI 代理。請嘗試更廣的範圍或切回串流檢視。",
       "viewByStream": "依串流檢視",
       "search": {
-        "placeholder": "依使用者或訊息搜尋",
-        "title": "比對使用者 ID 或對話文字包含該文字的 session",
         "noResultsTitle": "沒有符合搜尋的工作階段",
-        "noResultsDescription": "請嘗試其他關鍵字、其他欄位或更大的時間範圍。",
-        "clear": "清除搜尋",
-        "user": "使用者：{user}",
-        "clearUser": "顯示所有使用者"
+        "noResultsDescription": "請嘗試不同的篩選條件或更廣的時間範圍。",
+        "clear": "清除篩選條件"
       }
     },
     "sessionDetail": {
@@ -17822,6 +17827,7 @@
         "costLead": "峰值 {peak} ·",
         "tokens": "{ratio}% 已快取",
         "cacheImpact": "{ratio}% 被重用 · {tokens} Tok 讀取",
+        "cacheHits": "· {calls} 次呼叫中 {hits} 次命中",
         "cacheEstimate": "淨影響包含快取讀取和快取建立成本。",
         "cacheImpactTooltipTitle": "快取成本明細",
         "actualCost": "實際成本",
@@ -18104,6 +18110,11 @@
       "unknown": "未知",
       "tokens": "令牌",
       "tokensSuffix": "令牌",
+      "cacheHit": "快取 {tokens}",
+      "cacheWrite": "快取寫入 {tokens}",
+      "cacheMiss": "快取未命中",
+      "cacheMissCount": "{n} 次快取未命中",
+      "cacheDetail": "快取讀取 {read} 個令牌，寫入 {written} 個令牌",
       "error": "錯誤",
       "viewSpan": "檢視 Span"
     },
@@ -19066,7 +19077,7 @@
       "users": "使用者",
       "budgets": "預算",
       "discovery": "探索",
-      "queues": "佇列",
+      "queues": "標註佇列",
       "datasets": "資料集",
       "experiments": "實驗",
       "quality": "品質",
@@ -19351,15 +19362,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "加入審閱佇列",
-        "title": "加入審閱佇列",
-        "hint": "將 {ref} 排入人工審閱佇列。它會留在原位——審閱狀態存在佇列中。",
-        "queueLabel": "佇列",
-        "queuePlaceholder": "選擇佇列...",
-        "noQueues": "沒有佇列接受 {scope}——請先到「佇列」頁面建立佇列。",
-        "confirm": "加入佇列",
+        "button": "加入標註佇列",
+        "title": "加入標註佇列",
+        "hint": "將 {ref} 加入以供人工審查。它會留在原處 — 標註佇列會追蹤其審查狀態。",
+        "queueLabel": "標註佇列",
+        "queuePlaceholder": "選擇標註佇列...",
+        "noQueues": "沒有標註佇列接受 {scope} — 請先從「標註佇列」頁面建立一個。",
+        "confirm": "加入標註佇列",
         "success": "已加入 {queue}",
-        "error": "無法將此項目加入佇列"
+        "error": "無法將此項目加入標註佇列"
       },
       "dataset": {
         "button": "新增至資料集",
@@ -19396,12 +19407,12 @@
         "session": "Sessions"
       },
       "inQueueFilter": {
-        "label": "在佇列中",
-        "notEnqueued": "佇列中：未加入佇列",
-        "enqueued": "佇列中：任何佇列",
-        "pending": "佇列中：待處理",
-        "reviewed": "佇列中：已審核",
-        "all": "佇列中：全部"
+        "label": "標註佇列狀態",
+        "notEnqueued": "未加入佇列",
+        "enqueued": "已在標註佇列中",
+        "pending": "待審查",
+        "reviewed": "已審查",
+        "all": "所有項目"
       },
       "columns": {
         "timestamp": "時間戳記",
@@ -19417,7 +19428,7 @@
         "service": "服務",
         "input": "輸入",
         "quality": "品質",
-        "inQueue": "在佇列中？",
+        "inQueue": "在標註佇列中？",
         "actions": "操作"
       },
       "spanParent": "在 {trace} 中",
@@ -19429,26 +19440,26 @@
       "inQueue": {
         "none": "未加入佇列",
         "reviewed": "已審核",
-        "multiple": "在 {count} 個佇列中"
+        "multiple": "在 {count} 個標註佇列中"
       },
-      "addToQueue": "加入佇列",
+      "addToQueue": "加入標註佇列",
       "addToQueueMenu": {
-        "loading": "正在載入佇列...",
-        "noQueues": "尚無佇列 — 請先從「佇列」頁面建立一個。",
+        "loading": "正在載入標註佇列...",
+        "noQueues": "尚無標註佇列 — 請先從「標註佇列」頁面建立一個。",
         "dimensions": "{count} 個維度 | {count} 個維度",
         "accepts": "僅接受 {types}",
-        "sectionTitle": "加入佇列",
-        "manageQueues": "管理佇列"
+        "sectionTitle": "加入標註佇列",
+        "manageQueues": "管理標註佇列"
       },
-      "addSuccess": "已加入至 {queue} — 該列仍保留在「探索」中，其狀態存在於佇列中。",
-      "addError": "無法將項目加入佇列",
-      "openQueue": "開啟佇列",
-      "queuesError": "無法載入佇列"
+      "addSuccess": "已加入 {queue} — 該列會留在 Discovery，標註佇列會追蹤其審查狀態。",
+      "addError": "無法將項目加入標註佇列",
+      "openQueue": "開啟標註佇列",
+      "queuesError": "無法載入標註佇列"
     },
     "queues": {
-      "searchPlaceholder": "搜尋佇列...",
-      "newButton": "新增佇列",
-      "loadError": "無法載入佇列",
+      "searchPlaceholder": "搜尋標註佇列...",
+      "newButton": "新增標註佇列",
+      "loadError": "無法載入標註佇列",
       "optionsLoadError": "無法載入評分配置",
       "review": "審核",
       "cleared": "已清除",
@@ -19463,7 +19474,7 @@
         "actions": "操作"
       },
       "create": {
-        "title": "新增佇列",
+        "title": "新增標註佇列",
         "errors": {
           "name": "名稱為必填",
           "scoreConfigs": "至少綁定一個評分配置"
@@ -19471,9 +19482,9 @@
         "nameLabel": "名稱",
         "namePlaceholder": "例如 hallucination_review",
         "descriptionLabel": "描述",
-        "descriptionPlaceholder": "此佇列的用途以及由誰審核...",
+        "descriptionPlaceholder": "說明此標註佇列的用途，以及由誰審查...",
         "scoreConfigsLabel": "評分配置",
-        "scoreConfigsHint": "佇列會以一個或多個維度為項目評分。每個評分配置代表一個維度——選擇要綁定的配置，並將每個配置固定到某個版本。",
+        "scoreConfigsHint": "標註佇列會依據一或多個維度為項目評分。每個評分配置代表單一維度 — 選擇要綁定的配置，並將每個配置固定至某個版本。",
         "scoreConfigsEmpty": "選擇要綁定的評分配置。",
         "addScoreConfig": "新增評分配置",
         "allScoreConfigsAdded": "所有評分配置都已新增。",
@@ -19481,10 +19492,10 @@
         "noScoreConfigs": "尚無評分配置——請先在評分配置中建立一個。",
         "targetDatasetLabel": "目標資料集",
         "targetDatasetNone": "無（僅審核）",
-        "targetDatasetHint": "僅審核佇列——已審核項目不會萃取到資料集。",
+        "targetDatasetHint": "若沒有目標資料集，此標註佇列中的項目僅供審查。",
         "autoRoutingLabel": "自動路由",
-        "autoRoutingHint": "自動將分數符合條件的物件加入佇列。留空則從 Discovery 手動提供此佇列。",
-        "autoRoutingEmpty": "無自動路由——此佇列為手動提供。",
+        "autoRoutingHint": "自動將分數符合條件的物件加入佇列。留空則可從 Discovery 將項目加入此標註佇列。",
+        "autoRoutingEmpty": "項目會手動加入此標註佇列。",
         "addCondition": "新增條件",
         "conditionAnd": "且",
         "operatorIs": "是",
@@ -19493,12 +19504,12 @@
         "conditionValuePlaceholder": "數值",
         "pin": "固定版本",
         "versionLatest": "v{version}（最新）",
-        "success": "佇列已建立",
-        "error": "建立佇列失敗"
+        "success": "已建立標註佇列",
+        "error": "無法建立標註佇列"
       },
       "detail": {
-        "fallbackTitle": "佇列",
-        "loadError": "載入佇列項目失敗",
+        "fallbackTitle": "標註佇列",
+        "loadError": "無法載入標註佇列項目",
         "startReviewing": "開始審核",
         "scoreConfigs": "評分配置 ({count})",
         "targetDataset": "目標資料集",
@@ -19508,7 +19519,7 @@
         "inTrace": "在追蹤 {traceId} 中",
         "reviewAgain": "重新審核",
         "emptyTitle": "沒有可審核的項目",
-        "emptyBody": "從 Discovery 或追蹤檢視將追蹤、區段或工作階段加入此佇列。",
+        "emptyBody": "從 Discovery 或追蹤檢視將追蹤、Span 或工作階段加入此標註佇列。",
         "columns": {
           "refType": "參考",
           "refId": "參考",
@@ -19579,7 +19590,7 @@
         "true": "是",
         "false": "否",
         "allReviewedTitle": "所有項目已審閱",
-        "allReviewedBody": "此佇列中的每個項目都已完成審閱。"
+        "allReviewedBody": "此標註佇列中的每個項目都已完成審查。"
       }
     },
     "experiments": {
@@ -21908,6 +21919,9 @@
       "initialNumberPositive": "初始數字必須為正數。",
       "runQueryBeforeDownload": "請先執行查詢再下載。",
       "noDataToDownload": "未找到要下載的數據。",
+      "noDataToDownloadPartial": "找不到可下載的資料。結果不完整：{reason}",
+      "downloadMayBeIncomplete": "下載的檔案可能不完整。",
+      "downloadMayBeIncompleteReason": "下載的檔案可能不完整：{reason}",
       "transformTypeFunction": "函數",
       "jobContextRemoved": "作業上下文已移除",
       "histogramNotAvailableScheduled": "直方圖不適用於排程搜尋",
@@ -25735,8 +25749,8 @@
     "sloDetail": "SLO 詳細資料",
     "alertDetail": "警示詳細資料",
     "editAlert": "編輯警示",
-    "aiQueueDetail": "佇列",
-    "aiQueueReview": "佇列檢閱",
+    "aiQueueDetail": "標註佇列",
+    "aiQueueReview": "標註佇列審查",
     "aiDatasetDetail": "資料集",
     "aiPromptCreate": "新增提示詞",
     "aiPromptVersionCreate": "新增提示詞版本",
@@ -34689,6 +34703,25 @@
       },
       "noHighConfidence": "沒有高信心的名稱"
     }
+  },
+  "commandPalette": {
+    "title": "搜尋頁面、資源和操作",
+    "placeholder": "搜尋名稱和 ID",
+    "moreTypes": "更多類型",
+    "pages": "頁面",
+    "actions": "建立",
+    "recent": "最近瀏覽",
+    "localHistory": "本機歷史",
+    "clearRecent": "清除最近瀏覽",
+    "historyStorageUnavailable": "無法儲存最近瀏覽",
+    "recentUnavailable": "此項目目前無法使用",
+    "loading": "搜尋中…",
+    "partial": "部分結果無法使用",
+    "failed": "無法完成搜尋",
+    "offline": "目前離線，仍可查看最近瀏覽。",
+    "sourceUnavailable": "此資源類型目前無法使用",
+    "emptyHelp": "輸入名稱或 ID 搜尋資源",
+    "globalShortcut": "開啟全域搜尋"
   },
   "timeRangeInput": {
     "label": "輸入時間範圍",

@@ -148,8 +148,6 @@ const sessions = {
     page = 0,
     pageSize = 25,
     filter = "",
-    keyword,
-    userId,
     timeout,
     sortBy = "end_time",
     sortOrder = "desc",
@@ -161,16 +159,6 @@ const sessions = {
     page?: number;
     pageSize?: number;
     filter?: string;
-    /**
-     * Case-insensitive substring match on the session's user id OR its
-     * conversation text (input/output messages) — a session is selected when
-     * ANY of its spans matches either. The backend resolves the columns and
-     * escapes the term; the frontend never builds SQL for search. Streams
-     * with no message column at all just fall back to matching the user id.
-     */
-    keyword?: string;
-    /** Exact match on the session's user id: only that user's sessions. */
-    userId?: string;
     sortBy?: SessionSortField;
     sortOrder?: SessionSortOrder;
     timeout?: number;
@@ -182,8 +170,6 @@ const sessions = {
       end_time: String(endTime),
     });
     if (filter) params.set("filter", filter);
-    if (keyword) params.set("keyword", keyword);
-    if (userId) params.set("user_id", userId);
     params.set("sort_by", sortBy);
     params.set("sort_order", sortOrder);
     if (timeout) params.set("timeout", String(timeout));

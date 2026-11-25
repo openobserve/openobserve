@@ -21,7 +21,10 @@ use datafusion::{
     arrow::datatypes::DataType::{self, *},
     common::{ScalarValue, cast::as_generic_string_array, exec_err},
     error::{DataFusionError, Result},
-    logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature, Volatility},
+    logical_expr::{
+        ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature,
+        Volatility,
+    },
 };
 use regex::Regex;
 
@@ -92,17 +95,14 @@ impl ScalarUDFImpl for RegexpMatchesFunc {
         &self.signature
     }
 
-    fn return_type(&self, arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
+    fn return_type(&self, arg_types: &[DataType]) -> Result<DataType> {
         Ok(match &arg_types[0] {
             Null => Null,
             other => List(Arc::new(Field::new("item", other.clone(), true))),
         })
     }
 
-    fn invoke_with_args(
-        &self,
-        args: datafusion::logical_expr::ScalarFunctionArgs,
-    ) -> datafusion::common::Result<ColumnarValue> {
+    fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
         let len = args
             .args
             .iter()
@@ -229,7 +229,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{RecordBatch, StringArray};
+    use arrow::array::{ListArray, RecordBatch, StringArray};
     use arrow_schema::Schema;
     use datafusion::{
         assert_batches_eq, datasource::MemTable, logical_expr::ScalarUDFImpl,
@@ -250,7 +250,6 @@ mod tests {
         let pattern = StringArray::from(vec!["(\\d+)"]);
         let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
         let result = regexp_matches::<i32>(&args).unwrap();
-        use arrow::array::{Array, ListArray};
         let list = result.as_any().downcast_ref::<ListArray>().unwrap();
         assert!(!list.is_null(0));
     }
@@ -261,7 +260,6 @@ mod tests {
         let pattern = StringArray::from(vec![r#"(")"#]);
         let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
         let result = regexp_matches::<i32>(&args).unwrap();
-        use arrow::array::{Array, ListArray};
         let list = result.as_any().downcast_ref::<ListArray>().unwrap();
         assert!(!list.is_null(0));
     }
@@ -272,7 +270,6 @@ mod tests {
         let pattern = StringArray::from(vec!["(\\d+)"]);
         let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
         let result = regexp_matches::<i32>(&args).unwrap();
-        use arrow::array::{Array, ListArray};
         let list = result.as_any().downcast_ref::<ListArray>().unwrap();
         assert!(list.is_null(0));
     }

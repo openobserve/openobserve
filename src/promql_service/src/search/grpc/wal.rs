@@ -25,7 +25,7 @@ use datafusion::{
     common::TableReference,
     datasource::MemTable,
     error::{DataFusionError, Result},
-    physical_plan::visit_execution_plan,
+    physical_plan::{collect, visit_execution_plan},
     prelude::{SessionContext, col, lit},
 };
 use hashbrown::HashSet;
@@ -230,7 +230,7 @@ async fn get_wal_batches(
     physical_plan = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
 
     // run datafusion
-    let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
+    let ret = collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
     let (batches, stats, partial_err) = if let Err(e) = ret {

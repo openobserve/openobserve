@@ -805,6 +805,7 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: val
 #[cfg(test)]
 mod tests {
     use config::meta::stream::FileMeta;
+    use datafusion::arrow::datatypes::{DataType, Field};
 
     use super::*;
 
@@ -1107,8 +1108,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_matches_nothing_on_a_label_the_stream_lacks() {
-        use datafusion::arrow::datatypes::{DataType, Field, Schema};
-
         let (org_id, stream_name) = ("test_org_absent_label", "absent_label_metric");
         {
             let mut w = infra::schema::STREAM_SCHEMAS_LATEST.write().await;

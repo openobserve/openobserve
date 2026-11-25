@@ -32,6 +32,7 @@ use lettre::{
         client::{Tls, TlsParameters},
     },
 };
+use parquet::basic::Compression;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 
@@ -2212,7 +2213,7 @@ pub struct Common {
     /// server legitimately needs to send notifications to itself.
     #[env_config(name = "ZO_SSRF_ALLOW_LOOPBACK", default = false)]
     pub ssrf_allow_loopback: bool,
-    /// Skips SSRF checks and lets any org's VRL call `http_request`, `dns_lookup`, `reverse_dns`.
+    /// Skips SSRF checks on outbound requests; VRL network functions stay disabled regardless.
     #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
     pub skip_ssrf_checks: bool,
     /// Comma-separated CIDRs that only send-only destinations may reach; changes need a restart.
@@ -2766,6 +2767,13 @@ impl Common {
 
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Limit {
+    // MB, converted to bytes in check_common_config
+    #[env_config(
+        name = "ZO_RESOURCE_CATALOG_MAX_SIZE",
+        default = 100,
+        help = "Maximum size in MB of the Command K resource catalogs one process keeps in memory; 0 means 100"
+    )]
+    pub resource_catalog_max_size: usize,
     // no need set by environment
     pub cpu_num: usize,
     pub real_cpu_num: usize,
@@ -3979,7 +3987,7 @@ pub struct Pipeline {
     #[env_config(
         name = "ZO_PIPELINE_REMOTE_REQUEST_MAX_RETRY_TIME",
         default = 86400,
-        help = "pipeline exporter client request max retry times, default 1440 minutes(24 hours)， unit is seconds"
+        help = "seconds one export keeps retrying before the file goes back to the retry queue, default 86400 (24 hours)"
     )]
     pub remote_request_max_retry_time: u64,
     #[env_config(
@@ -4519,6 +4527,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.req_cols_per_record_limit = 1000;
     }
 
+    cfg.limit.resource_catalog_max_size = match cfg.limit.resource_catalog_max_size {
+        0 => 100,
+        v => v,
+    }
+    .saturating_mul(SIZE_IN_MB as usize);
     cfg.limit.sourcemap_file_max_size = match cfg.limit.sourcemap_file_max_size {
         0 => 50,
         v => v,
@@ -5459,15 +5472,15 @@ pub fn get_cluster_name() -> String {
 }
 
 #[inline]
-pub fn get_parquet_compression(compression: &str) -> parquet::basic::Compression {
+pub fn get_parquet_compression(compression: &str) -> Compression {
     match compression.to_lowercase().as_str() {
-        "none" | "uncompressed" => parquet::basic::Compression::UNCOMPRESSED,
-        "snappy" => parquet::basic::Compression::SNAPPY,
-        "gzip" => parquet::basic::Compression::GZIP(Default::default()),
-        "brotli" => parquet::basic::Compression::BROTLI(Default::default()),
-        "lz4" | "lz4_raw" => parquet::basic::Compression::LZ4_RAW,
-        "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
-        _ => parquet::basic::Compression::ZSTD(Default::default()),
+        "none" | "uncompressed" => Compression::UNCOMPRESSED,
+        "snappy" => Compression::SNAPPY,
+        "gzip" => Compression::GZIP(Default::default()),
+        "brotli" => Compression::BROTLI(Default::default()),
+        "lz4" | "lz4_raw" => Compression::LZ4_RAW,
+        "zstd" => Compression::ZSTD(Default::default()),
+        _ => Compression::ZSTD(Default::default()),
     }
 }
 
@@ -6361,6 +6374,19 @@ mod tests {
     }
 
     #[test]
+    fn test_resource_catalog_max_size_is_mb_with_zero_as_default() {
+        let mut cfg = Config::init().unwrap();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.resource_catalog_max_size, 100 * 1024 * 1024);
+        for (mb, bytes) in [(0, 100 * 1024 * 1024), (7, 7 * 1024 * 1024)] {
+            let mut cfg = Config::init().unwrap();
+            cfg.limit.resource_catalog_max_size = mb;
+            check_common_config(&mut cfg).unwrap();
+            assert_eq!(cfg.limit.resource_catalog_max_size, bytes);
+        }
+    }
+
+    #[test]
     fn test_sourcemap_limits_default_to_bytes() {
         let mut cfg = Config::init().unwrap();
         check_common_config(&mut cfg).unwrap();
@@ -6462,7 +6488,6 @@ mod tests {
 
     #[test]
     fn test_get_parquet_compression() {
-        use parquet::basic::Compression;
         assert_eq!(get_parquet_compression("snappy"), Compression::SNAPPY);
         assert_eq!(
             get_parquet_compression("uncompressed"),

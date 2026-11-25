@@ -845,7 +845,6 @@ mod tests {
     }
 
     fn deep_or_chain(terms: usize) -> Arc<dyn PhysicalExpr> {
-        use datafusion::physical_expr::expressions::{Column, Literal};
         let leaf = |i: usize| -> Arc<dyn PhysicalExpr> {
             Arc::new(BinaryExpr::new(
                 Arc::new(Column::new("field1", 0)),
@@ -875,7 +874,6 @@ mod tests {
 
     #[test]
     fn test_from_physical_expr_keeps_mixed_operator_nesting() {
-        use datafusion::physical_expr::expressions::{Column, Literal};
         let eq = |v: &str| -> Arc<dyn PhysicalExpr> {
             Arc::new(BinaryExpr::new(
                 Arc::new(Column::new("field1", 0)),

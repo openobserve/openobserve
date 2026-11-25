@@ -297,10 +297,10 @@
       "importDesc": "Prześlij definicję potoku"
     },
     "noQueues": {
-      "title": "Utwórz swoją pierwszą kolejkę",
-      "description": "Kolejki to stanowe listy zadań do przeglądu — powiąż konfiguracje ocen, docelowy zbiór danych i filtr, który dostarcza elementy do ręcznego przeglądu.",
-      "action": "Nowa kolejka",
-      "actionDesc": "Rozpocznij pustą kolejkę"
+      "title": "Utwórz pierwszą kolejkę adnotacji",
+      "description": "Kolejki adnotacji to listy zadań do przeglądu — przypisz konfiguracje oceniania, docelowy zbiór danych i filtr, który dostarcza elementy do przeglądu przez człowieka.",
+      "action": "Nowa kolejka adnotacji",
+      "actionDesc": "Utwórz pustą kolejkę adnotacji"
     },
     "noPrompts": {
       "title": "Utwórz swój pierwszy prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Nic niezdrowego tutaj",
-      "description": "Brak niezdrowych elementów w tym oknie. Poszerz zakres czasu lub zmień filtr kolejki, aby zobaczyć elementy już rozpatrzone."
+      "description": "Brak niezdrowych elementów w tym oknie. Rozszerz zakres czasu lub zmień filtr kolejki adnotacji, aby zobaczyć elementy już zweryfikowane."
     },
     "noTraces": {
       "title": "Brak trace",
@@ -1575,7 +1575,8 @@
     "pinToToolbar": "Przypnij do paska narzędzi",
     "unpinFromToolbar": "Odepnij z paska narzędzi",
     "shareLink": "Udostępnij link",
-    "downloadTable": "Pobierz wyniki",
+    "downloadTable": "Pobierz bieżącą stronę",
+    "patternsPartialResult": "Wzorce zostały zbudowane z części wybranego zakresu czasu.",
     "customRange": "Pobierz wyniki dla niestandardowego zakresu",
     "initialNumber": "Numer początkowy",
     "range": "Liczba rekordów",
@@ -6332,6 +6333,8 @@
     "fieldRequired": "Pole jest wymagane!",
     "sqlQuery": "Zapytanie SQL",
     "promqlQuery": "Zapytanie PromQL",
+    "queryRowLimitNote": "Każde uruchomienie przetwarza najwyżej {limit} wierszy, chyba że zapytanie ustawia własny LIMIT.",
+    "queryRowLimitNoteNoLimit": "Każde uruchomienie przetwarza najwyżej domyślną liczbę wierszy, chyba że zapytanie ustawia własny LIMIT.",
     "output": "Wyjście",
     "validating": "Sprawdzanie...",
     "validateAndClose": "Sprawdź i zamknij",
@@ -9984,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "Przeglądarka zablokowała pobieranie pliku...",
     "chartDataDownloadedCsv": "Dane wykresu pobrano jako plik CSV",
+    "tableDownloadPartial": "Pobrano tylko pierwsze {count} wierszy wyniku, więc plik jest niepełny.",
+    "tableDownloadServerPartial": "Serwer zwrócił częściowe dane, więc plik może być niekompletny.",
+    "tableDownloadWaitForLoad": "Panel nadal się ładuje. Pobierz ponownie po zakończeniu.",
+    "preparingTableDownload": "Pobieranie wszystkich wierszy do pliku…",
     "chartDataDownloadedJson": "Dane wykresu pobrano jako plik JSON",
     "dynamicFilters": "Filtry dynamiczne",
     "failedToCancelRunningQuery": "Nie udało się anulować uruchomionego zapytania",
@@ -16089,8 +16096,10 @@
         "searchSuffixesAria": "Szukaj filtrów sufiksu",
         "searchTypesAria": "Filtry typów wyszukiwania",
         "facetAria": "{label}, metryki: {count}",
+        "facetAriaUnchecked": "{label}, {count} z danymi, {unchecked} jeszcze nieoznaczonych",
         "noPrefixMatch": "Brak pasujących prefiksów.",
         "noSuffixMatch": "Brak pasujących sufiksów.",
+        "uncheckedTooltip": "{count} z danymi · {unchecked} jeszcze nieoznaczonych",
         "noTypeMatch": "Brak pasujących typów."
       },
       "views": {
@@ -17760,13 +17769,9 @@
       "noAgentsDescription": "Nie wykryto żadnych agentów GenAI w wybranym przedziale czasowym. Spróbuj rozszerzyć zakres lub przełącz się na widok strumienia.",
       "viewByStream": "Widok według strumienia",
       "search": {
-        "placeholder": "Szukaj według użytkownika lub wiadomości",
-        "title": "Dopasuj sesje, których identyfikator użytkownika lub tekst rozmowy zawiera szukany tekst",
         "noResultsTitle": "Brak sesji pasujących do wyszukiwania",
-        "noResultsDescription": "Spróbuj innego hasła, innego pola lub szerszego zakresu czasu.",
-        "clear": "Wyczyść wyszukiwanie",
-        "user": "Użytkownik: {user}",
-        "clearUser": "Pokaż wszystkich użytkowników"
+        "noResultsDescription": "Spróbuj innego filtra lub szerszego zakresu czasu.",
+        "clear": "Wyczyść filtr"
       }
     },
     "sessionDetail": {
@@ -17827,6 +17832,7 @@
         "costLead": "Szczyt {peak} ·",
         "tokens": "{ratio}% w cache",
         "cacheImpact": "{ratio}% ponownie użyte · {tokens} Tok odczytane",
+        "cacheHits": "· trafienia: {hits} z {calls} wywołań",
         "cacheEstimate": "Wpływ netto uwzględnia odczyty z cache i koszty tworzenia cache.",
         "cacheImpactTooltipTitle": "Podział kosztów cache",
         "actualCost": "Rzeczywisty koszt",
@@ -18109,6 +18115,11 @@
       "unknown": "nieznane",
       "tokens": "Tokeny",
       "tokensSuffix": "tokeny",
+      "cacheHit": "{tokens} z pamięci podręcznej",
+      "cacheWrite": "{tokens} zapisano w pamięci podręcznej",
+      "cacheMiss": "Chybienie pamięci podręcznej",
+      "cacheMissCount": "Chybienia pamięci podręcznej: {n}",
+      "cacheDetail": "Odczytano {read} tokenów z pamięci podręcznej, zapisano {written} tokenów",
       "error": "Błąd",
       "viewSpan": "Zobacz span"
     },
@@ -19071,7 +19082,7 @@
       "users": "Użytkownicy",
       "budgets": "Budżety",
       "discovery": "Odkrywanie",
-      "queues": "Kolejki",
+      "queues": "Kolejki adnotacji",
       "datasets": "Zbiory danych",
       "experiments": "Eksperymenty",
       "quality": "Jakość",
@@ -19356,15 +19367,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Dodaj do kolejki przeglądu",
-        "title": "Dodaj do kolejki przeglądu",
-        "hint": "Umieść {ref} w kolejce do przeglądu przez człowieka. Pozostaje na swoim miejscu — stan przeglądu znajduje się w kolejce.",
-        "queueLabel": "Kolejka",
-        "queuePlaceholder": "Wybierz kolejkę...",
-        "noQueues": "Żadna kolejka nie akceptuje {scope} — najpierw utwórz ją na stronie Kolejki.",
-        "confirm": "Dodaj do kolejki",
+        "button": "Dodaj do kolejki adnotacji",
+        "title": "Dodaj do kolejki adnotacji",
+        "hint": "Dodaj {ref} do przeglądu przez człowieka. Element pozostaje na swoim miejscu — kolejka adnotacji śledzi jego status przeglądu.",
+        "queueLabel": "Kolejka adnotacji",
+        "queuePlaceholder": "Wybierz kolejkę adnotacji...",
+        "noQueues": "Żadna kolejka adnotacji nie akceptuje {scope} — najpierw utwórz kolejkę na stronie Kolejki adnotacji.",
+        "confirm": "Dodaj do kolejki adnotacji",
         "success": "Dodano do kolejki {queue}",
-        "error": "Nie udało się dodać tego elementu do kolejki"
+        "error": "Nie udało się dodać tego elementu do kolejki adnotacji"
       },
       "dataset": {
         "button": "Dodaj do zestawu danych",
@@ -19401,12 +19412,12 @@
         "session": "Sesje"
       },
       "inQueueFilter": {
-        "label": "W kolejce",
-        "notEnqueued": "W kolejce: Niezakolejkowany",
-        "enqueued": "W kolejce: Dowolna kolejka",
-        "pending": "W kolejce: Oczekujące",
-        "reviewed": "W kolejce: Przejrzane",
-        "all": "W kolejce: Wszystkie"
+        "label": "Status kolejki adnotacji",
+        "notEnqueued": "Nie dodano do kolejki",
+        "enqueued": "W kolejce adnotacji",
+        "pending": "Oczekuje na przegląd",
+        "reviewed": "Przejrzano",
+        "all": "Wszystkie elementy"
       },
       "columns": {
         "timestamp": "Znacznik czasu",
@@ -19422,7 +19433,7 @@
         "service": "Usługa",
         "input": "Wejście",
         "quality": "Jakość",
-        "inQueue": "W kolejce?",
+        "inQueue": "W kolejce adnotacji?",
         "actions": "Akcje"
       },
       "spanParent": "W {trace}",
@@ -19434,26 +19445,26 @@
       "inQueue": {
         "none": "Niezakolejkowany",
         "reviewed": "Już przejrzane",
-        "multiple": "W {count} kolejkach"
+        "multiple": "W kolejkach adnotacji: {count}"
       },
-      "addToQueue": "Dodaj do kolejki",
+      "addToQueue": "Dodaj do kolejki adnotacji",
       "addToQueueMenu": {
-        "loading": "Ładowanie kolejek...",
-        "noQueues": "Brak kolejek — najpierw utwórz jedną na stronie Kolejki.",
+        "loading": "Ładowanie kolejek adnotacji...",
+        "noQueues": "Brak kolejek adnotacji — najpierw utwórz kolejkę na stronie Kolejki adnotacji.",
         "dimensions": "{count} wymiar | wymiary: {count}",
         "accepts": "Akceptuje tylko {types}",
-        "sectionTitle": "Dodaj do kolejki",
-        "manageQueues": "Zarządzaj kolejkami"
+        "sectionTitle": "Dodaj do kolejki adnotacji",
+        "manageQueues": "Zarządzaj kolejkami adnotacji"
       },
-      "addSuccess": "Dodano do {queue} — wiersz pozostaje w Discovery, a jego stan znajduje się w kolejce.",
-      "addError": "Nie udało się dodać elementów do kolejki",
-      "openQueue": "Otwórz kolejkę",
-      "queuesError": "Nie udało się wczytać kolejek"
+      "addSuccess": "Dodano do {queue} — wiersz pozostaje w Discovery, a kolejka adnotacji śledzi jego status przeglądu.",
+      "addError": "Nie udało się dodać elementów do kolejki adnotacji",
+      "openQueue": "Otwórz kolejkę adnotacji",
+      "queuesError": "Nie udało się załadować kolejek adnotacji"
     },
     "queues": {
-      "searchPlaceholder": "Szukaj kolejek...",
-      "newButton": "Nowa kolejka",
-      "loadError": "Nie udało się wczytać kolejek",
+      "searchPlaceholder": "Szukaj kolejek adnotacji...",
+      "newButton": "Nowa kolejka adnotacji",
+      "loadError": "Nie udało się załadować kolejek adnotacji",
       "optionsLoadError": "Nie udało się wczytać konfiguracji ocen",
       "review": "Przejrzyj",
       "cleared": "Wyczyszczone",
@@ -19468,7 +19479,7 @@
         "actions": "Akcje"
       },
       "create": {
-        "title": "Nowa kolejka",
+        "title": "Nowa kolejka adnotacji",
         "errors": {
           "name": "Nazwa jest wymagana",
           "scoreConfigs": "Powiąż co najmniej jedną konfigurację ocen"
@@ -19476,9 +19487,9 @@
         "nameLabel": "Nazwa",
         "namePlaceholder": "np. hallucination_review",
         "descriptionLabel": "Opis",
-        "descriptionPlaceholder": "Do czego służy ta kolejka i kto ją przegląda...",
+        "descriptionPlaceholder": "Do czego służy ta kolejka adnotacji i kto ją przegląda...",
         "scoreConfigsLabel": "Konfiguracje ocen",
-        "scoreConfigsHint": "Kolejka ocenia elementy w jednym lub większej liczbie wymiarów. Każda konfiguracja ocen to pojedynczy wymiar — wybierz konfiguracje do powiązania i przypnij każdą do wersji.",
+        "scoreConfigsHint": "Kolejka adnotacji ocenia elementy w jednym lub kilku wymiarach. Każda konfiguracja oceniania to jeden wymiar — wybierz konfiguracje do przypisania i przypnij każdą do wersji.",
         "scoreConfigsEmpty": "Wybierz konfiguracje ocen do powiązania.",
         "addScoreConfig": "Dodaj konfigurację ocen",
         "allScoreConfigsAdded": "Wszystkie konfiguracje ocen zostały dodane.",
@@ -19486,10 +19497,10 @@
         "noScoreConfigs": "Nie ma jeszcze konfiguracji ocen — najpierw utwórz jedną w Konfiguracjach ocen.",
         "targetDatasetLabel": "Docelowy zbiór danych",
         "targetDatasetNone": "Brak (tylko przegląd)",
-        "targetDatasetHint": "Kolejka tylko do przeglądu — przejrzane elementy nie będą destylowane do zbioru danych.",
+        "targetDatasetHint": "Bez docelowego zbioru danych elementy w tej kolejce adnotacji są tylko przeglądane.",
         "autoRoutingLabel": "Automatyczne kierowanie",
-        "autoRoutingHint": "Automatycznie dodawaj do kolejki obiekty, których wyniki spełniają warunek. Pozostaw puste, aby zasilać tę kolejkę ręcznie z Discovery.",
-        "autoRoutingEmpty": "Brak automatycznego kierowania — ta kolejka jest zasilana ręcznie.",
+        "autoRoutingHint": "Automatycznie dodawaj do kolejki obiekty, których oceny spełniają warunek. Pozostaw puste, aby dodawać elementy do tej kolejki adnotacji z Discovery.",
+        "autoRoutingEmpty": "Elementy są dodawane do tej kolejki adnotacji ręcznie.",
         "addCondition": "Dodaj warunek",
         "conditionAnd": "ORAZ",
         "operatorIs": "jest",
@@ -19498,12 +19509,12 @@
         "conditionValuePlaceholder": "Wartość",
         "pin": "Przypnij wersję",
         "versionLatest": "v{version} (najnowsza)",
-        "success": "Utworzono kolejkę",
-        "error": "Nie udało się utworzyć kolejki"
+        "success": "Utworzono kolejkę adnotacji",
+        "error": "Nie udało się utworzyć kolejki adnotacji"
       },
       "detail": {
-        "fallbackTitle": "Kolejka",
-        "loadError": "Nie udało się załadować elementów kolejki",
+        "fallbackTitle": "Kolejka adnotacji",
+        "loadError": "Nie udało się załadować elementów kolejki adnotacji",
         "startReviewing": "Rozpocznij przegląd",
         "scoreConfigs": "Konfiguracje ocen ({count})",
         "targetDataset": "Docelowy zbiór danych",
@@ -19513,7 +19524,7 @@
         "inTrace": "W trace {traceId}",
         "reviewAgain": "Przeglądnij ponownie",
         "emptyTitle": "Nic do przeglądu",
-        "emptyBody": "Dodaj trace, spany lub sesje do tej kolejki z Discovery lub widoku trace.",
+        "emptyBody": "Dodaj trace'y, spany lub sesje do tej kolejki adnotacji z Discovery lub widoku trace'a.",
         "columns": {
           "refType": "Ref",
           "refId": "Referencja",
@@ -19584,7 +19595,7 @@
         "true": "Prawda",
         "false": "Fałsz",
         "allReviewedTitle": "Wszystkie elementy przejrzane",
-        "allReviewedBody": "Każdy element w tej kolejce ma ukończony przegląd."
+        "allReviewedBody": "Wszystkie elementy w tej kolejce adnotacji mają ukończony przegląd."
       }
     },
     "experiments": {
@@ -21913,6 +21924,9 @@
       "initialNumberPositive": "Początkowa liczba musi być liczbą dodatnią.",
       "runQueryBeforeDownload": "Najpierw uruchom zapytanie przed pobraniem.",
       "noDataToDownload": "Nie znaleziono danych do pobrania.",
+      "noDataToDownloadPartial": "Nie znaleziono danych do pobrania. Wynik jest częściowy: {reason}",
+      "downloadMayBeIncomplete": "Pobrany plik może być niekompletny.",
+      "downloadMayBeIncompleteReason": "Pobrany plik może być niekompletny: {reason}",
       "transformTypeFunction": "Funkcja",
       "jobContextRemoved": "Kontekst zadania został usunięty",
       "histogramNotAvailableScheduled": "Histogram nie jest dostępny dla zaplanowanego wyszukiwania",
@@ -25740,8 +25754,8 @@
     "sloDetail": "Szczegóły SLO",
     "alertDetail": "Szczegóły alertu",
     "editAlert": "Edytuj alert",
-    "aiQueueDetail": "Kolejka",
-    "aiQueueReview": "Przegląd kolejki",
+    "aiQueueDetail": "Kolejka adnotacji",
+    "aiQueueReview": "Przegląd kolejki adnotacji",
     "aiDatasetDetail": "Zbiór danych",
     "aiPromptCreate": "Nowy prompt",
     "aiPromptVersionCreate": "Nowa wersja promptu",
@@ -34694,6 +34708,25 @@
       },
       "noHighConfidence": "Brak nazw o wysokiej pewności"
     }
+  },
+  "commandPalette": {
+    "title": "Szukaj stron, zasobów i działań",
+    "placeholder": "Szukaj nazw i identyfikatorów",
+    "moreTypes": "Więcej typów",
+    "pages": "Strony",
+    "actions": "Utwórz",
+    "recent": "Ostatnie wizyty",
+    "localHistory": "Historia lokalna",
+    "clearRecent": "Wyczyść ostatnie wizyty",
+    "historyStorageUnavailable": "Nie można zapisać wizyt",
+    "recentUnavailable": "Ten element jest niedostępny",
+    "loading": "Wyszukiwanie…",
+    "partial": "Część wyników jest niedostępna",
+    "failed": "Nie udało się ukończyć wyszukiwania",
+    "offline": "Tryb offline. Ostatnie wizyty są nadal dostępne.",
+    "sourceUnavailable": "Ten typ zasobu jest niedostępny",
+    "emptyHelp": "Wpisz nazwę lub identyfikator",
+    "globalShortcut": "Otwórz wyszukiwanie globalne"
   },
   "timeRangeInput": {
     "label": "Wpisz zakres czasu",

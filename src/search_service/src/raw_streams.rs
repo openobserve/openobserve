@@ -22,7 +22,7 @@ use config::meta::{search, stream::StreamType};
 const RAW_READ_AUDIT_PATH: &str = "search/unredacted";
 
 /// How one user's permission to read protected streams unredacted is answered.
-#[cfg(any(all(feature = "enterprise", feature = "vectorscan"), test))]
+#[cfg(any(feature = "enterprise", test))]
 trait RawAccess {
     fn is_root(&self) -> bool;
     fn rbac_enabled(&self) -> bool;
@@ -30,14 +30,14 @@ trait RawAccess {
 }
 
 /// Answers [`RawAccess`] from the user cache and OpenFGA.
-#[cfg(all(feature = "enterprise", feature = "vectorscan"))]
+#[cfg(feature = "enterprise")]
 struct OpenFgaAccess<'a> {
     org_id: &'a str,
     user_id: &'a str,
     role: Option<String>,
 }
 
-#[cfg(all(feature = "enterprise", feature = "vectorscan"))]
+#[cfg(feature = "enterprise")]
 impl<'a> OpenFgaAccess<'a> {
     async fn load(org_id: &'a str, user_id: &'a str) -> Self {
         let role = db::user::get(Some(org_id), user_id)
@@ -53,7 +53,7 @@ impl<'a> OpenFgaAccess<'a> {
     }
 }
 
-#[cfg(all(feature = "enterprise", feature = "vectorscan"))]
+#[cfg(feature = "enterprise")]
 impl RawAccess for OpenFgaAccess<'_> {
     fn is_root(&self) -> bool {
         db::user::is_root_user(self.user_id)
@@ -114,7 +114,7 @@ pub async fn resolve_and_audit(
 
 /// The protected streams `sql` reads that `user_id` may read unredacted. A stream that cannot
 /// be confirmed is left out, so the scanning node redacts it.
-#[cfg(all(feature = "enterprise", feature = "vectorscan"))]
+#[cfg(feature = "enterprise")]
 pub async fn resolve(
     org_id: &str,
     stream_type: StreamType,
@@ -132,7 +132,7 @@ pub async fn resolve(
     raw_for(&protected, &access).await
 }
 
-#[cfg(not(all(feature = "enterprise", feature = "vectorscan")))]
+#[cfg(not(feature = "enterprise"))]
 pub async fn resolve(
     _org_id: &str,
     _stream_type: StreamType,
@@ -144,7 +144,7 @@ pub async fn resolve(
 
 /// Whether `user_id` may read every protected stream `sql` reads unredacted. Stored results such
 /// as a search job's may hold raw values; protection that cannot be determined denies.
-#[cfg(all(feature = "enterprise", feature = "vectorscan"))]
+#[cfg(feature = "enterprise")]
 pub async fn may_read_unredacted(
     org_id: &str,
     stream_type: StreamType,
@@ -161,7 +161,7 @@ pub async fn may_read_unredacted(
     covers(&raw_for(&protected, &access).await, &protected)
 }
 
-#[cfg(not(all(feature = "enterprise", feature = "vectorscan")))]
+#[cfg(not(feature = "enterprise"))]
 pub async fn may_read_unredacted(
     _org_id: &str,
     _stream_type: StreamType,
@@ -173,7 +173,7 @@ pub async fn may_read_unredacted(
 
 /// Streams `sql` reads that carry search-time patterns, including ones whose patterns fail
 /// to build; none when the patterns cannot be loaded, which redacts everything.
-#[cfg(all(feature = "enterprise", feature = "vectorscan"))]
+#[cfg(feature = "enterprise")]
 async fn protected_streams(
     org_id: &str,
     stream_type: StreamType,
@@ -185,7 +185,7 @@ async fn protected_streams(
 }
 
 /// [`protected_streams`], but `None` when the patterns cannot be loaded or `sql` does not parse.
-#[cfg(all(feature = "enterprise", feature = "vectorscan"))]
+#[cfg(feature = "enterprise")]
 async fn protected_streams_checked(
     org_id: &str,
     stream_type: StreamType,
@@ -208,7 +208,7 @@ async fn protected_streams_checked(
 }
 
 /// Root reads every protected stream raw; anyone else only logs streams OpenFGA grants.
-#[cfg(any(all(feature = "enterprise", feature = "vectorscan"), test))]
+#[cfg(any(feature = "enterprise", test))]
 async fn raw_for(
     protected: &[(StreamType, String)],
     access: &impl RawAccess,
@@ -231,7 +231,7 @@ async fn raw_for(
     raw
 }
 
-#[cfg(any(all(feature = "enterprise", feature = "vectorscan"), test))]
+#[cfg(any(feature = "enterprise", test))]
 fn covers(raw: &search::RawStreams, protected: &[(StreamType, String)]) -> bool {
     protected
         .iter()

@@ -109,6 +109,33 @@ export const replaceExistingFieldCondition = (
 };
 
 const TOP_LEVEL_KEYWORD = /(where|group\s+by|having|order\s+by|limit|offset|or)\b/iy;
+const UNION_KEYWORD = /union(\s+all)?\b/iy;
+
+/** Splits at top-level UNION / UNION ALL, outside quotes, comments and brackets. */
+export const splitUnion = (query: string): { parts: string[]; ops: string[] } => {
+  const parts: string[] = [];
+  const ops: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < query.length; i++) {
+    const span = maskedSpanEnd(query, i);
+    if (span !== null) i = span - 1;
+    else if (query[i] === "(") depth++;
+    else if (query[i] === ")") depth--;
+    else if (depth === 0 && !/\w/.test(query[i - 1] ?? " ")) {
+      UNION_KEYWORD.lastIndex = i;
+      const m = UNION_KEYWORD.exec(query);
+      if (m) {
+        parts.push(query.slice(start, i));
+        ops.push(m[1] ? "UNION ALL" : "UNION");
+        i += m[0].length - 1;
+        start = i + 1;
+      }
+    }
+  }
+  parts.push(query.slice(start));
+  return { parts, ops };
+};
 
 // Keyword offsets outside quotes, comments and brackets.
 const topLevelKeywords = (sql: string): { kw: string; index: number }[] => {

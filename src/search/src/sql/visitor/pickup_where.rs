@@ -17,7 +17,7 @@ use std::ops::ControlFlow;
 
 use infra::errors::Error;
 use sqlparser::{
-    ast::{Expr, Query, TableFactor, VisitMut, VisitorMut},
+    ast::{Expr, Query, SetExpr, TableFactor, VisitMut, VisitorMut},
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -55,7 +55,7 @@ impl VisitorMut for PickupWhereVisitor {
             return ControlFlow::Break(());
         }
         match query.body.as_ref() {
-            sqlparser::ast::SetExpr::Select(select) => {
+            SetExpr::Select(select) => {
                 if select.from.len() > 1
                     || select.from.iter().any(|from| {
                         !from.joins.is_empty()
@@ -77,7 +77,7 @@ impl VisitorMut for PickupWhereVisitor {
                     return ControlFlow::Break(());
                 }
             }
-            sqlparser::ast::SetExpr::SetOperation { .. } => {
+            SetExpr::SetOperation { .. } => {
                 self.where_str = None;
                 return ControlFlow::Break(());
             }

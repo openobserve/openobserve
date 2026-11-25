@@ -38,15 +38,6 @@ cloud = [
     "common/cloud",
     "stream/cloud",
 ]
-vectorscan = [
-    "db/vectorscan",
-    "enrichment-data/vectorscan",
-    "o2_enterprise/vectorscan",
-    "search/vectorscan",
-    "search_service/vectorscan",
-    "promql-service/vectorscan",
-    "stream/vectorscan",
-]
 # Lets dependants' tests install a fake stream access checker; never enabled outside dev-dependencies.
 test-utils = []
 cpu-profiling = ["dep:pprof"]
@@ -138,6 +129,7 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
+unicode-normalization = "0.1"
 version-compare = { workspace = true, optional = true }
 config.workspace = true
 infra.workspace = true

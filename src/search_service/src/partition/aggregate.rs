@@ -35,9 +35,10 @@ use config::{
     },
     utils::sql::is_simple_aggregate_query,
 };
+use datafusion::common::TableReference;
 use infra::errors::Error;
 
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use crate::datafusion::physical_optimizer::sdr_redact::redaction_digest;
 use crate::{
     cache::result_utils::{is_ranked_by_non_timestamp, normalize_ts_order_by},
@@ -93,12 +94,12 @@ pub fn check_streaming_owner(
 
 /// Fails a streaming search whose redaction differs from the one its streaming id was cached
 /// with, since its results would land under the other class's key; a retry re-partitions.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub fn check_streaming_redaction(
     org_id: &str,
     stream_type: config::meta::stream::StreamType,
     streaming_id: Option<&str>,
-    streams: &[datafusion::common::TableReference],
+    streams: &[TableReference],
     raw_streams: &RawStreams,
 ) -> Result<(), Error> {
     let Some(recorded) = streaming_id.and_then(registry::get_redaction_digest) else {
@@ -113,12 +114,12 @@ pub fn check_streaming_redaction(
     Ok(())
 }
 
-#[cfg(not(feature = "vectorscan"))]
+#[cfg(not(feature = "enterprise"))]
 pub fn check_streaming_redaction(
     _org_id: &str,
     _stream_type: config::meta::stream::StreamType,
     _streaming_id: Option<&str>,
-    _streams: &[datafusion::common::TableReference],
+    _streams: &[TableReference],
     _raw_streams: &RawStreams,
 ) -> Result<(), Error> {
     Ok(())
@@ -132,7 +133,7 @@ pub async fn prepare_streaming_aggregate(
     trace_id: &str,
     req: &SearchPartitionRequest,
     ctx: &PartitionSqlContext,
-    #[cfg_attr(not(feature = "vectorscan"), allow(unused_variables))] raw_streams: &RawStreams,
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))] raw_streams: &RawStreams,
     use_cache: bool,
 ) -> Result<(bool, Option<String>, Option<StreamingAggsPartitionStrategy>), Error> {
     if ctx.sql.histogram_offset != Some(0) {
@@ -173,14 +174,14 @@ pub async fn prepare_streaming_aggregate(
         let cache_interval_mins = cache_interval.get_duration_minutes();
         if cache_interval_mins > 0 {
             let streaming_id = ider::uuid();
-            #[cfg(feature = "vectorscan")]
+            #[cfg(feature = "enterprise")]
             let digest = redaction_digest(
                 org_id,
                 stream_type,
                 &ctx.sql.stream_names,
                 Some(raw_streams),
             );
-            #[cfg(not(feature = "vectorscan"))]
+            #[cfg(not(feature = "enterprise"))]
             let digest: Option<String> = None;
             let hashed_query = get_aggregation_cache_key_from_request(
                 req,
@@ -306,7 +307,7 @@ mod tests {
 
     use super::*;
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     #[test]
     fn a_streaming_search_must_match_its_partition_redaction() {
         let streams = [TableReference::from("app")];

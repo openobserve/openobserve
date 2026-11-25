@@ -118,7 +118,11 @@ pub fn try_encode(
 #[cfg(test)]
 mod tests {
     use datafusion::{
-        arrow::datatypes::{DataType, Field, Schema},
+        arrow::{
+            array::{Int32Array, RecordBatch},
+            datatypes::{DataType, Field, Schema},
+            ipc::writer::FileWriter,
+        },
         common::config::ConfigOptions,
         functions_aggregate::count::count_udaf,
         physical_expr::{
@@ -128,9 +132,11 @@ mod tests {
         },
         physical_plan::{
             aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
+            collect,
             empty::EmptyExec,
             filter::FilterExec,
         },
+        prelude::SessionContext,
     };
     use datafusion_proto::bytes::{
         physical_plan_from_bytes_with_extension_codec, physical_plan_to_bytes_with_extension_codec,
@@ -184,7 +190,7 @@ mod tests {
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
         let plan2 =
             physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.downcast_ref::<StreamingAggsExec>().unwrap();
@@ -268,7 +274,7 @@ mod tests {
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
         // Register UDFs in the context
         ctx.register_udf(STR_MATCH_UDF.clone());
         let plan2 =
@@ -336,7 +342,7 @@ mod tests {
             panic!("expected an extension node");
         };
         ext.inputs.clear();
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
 
         let ret = physical_plan_from_bytes_with_extension_codec(
             &proto.encode_to_vec(),
@@ -350,18 +356,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_decoded_cached_files_traversal_fails_closed() -> Result<()> {
-        use datafusion::{
-            arrow::{array::Int32Array, ipc::writer::FileWriter},
-            physical_plan::collect,
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let outside = tempfile::tempdir().unwrap();
         let planted = outside.path().join("planted.arrow");
-        let batch = datafusion::arrow::array::RecordBatch::try_new(
-            schema.clone(),
-            vec![Arc::new(Int32Array::from(vec![42]))],
-        )?;
+        let batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![42]))])?;
         let mut writer = FileWriter::try_new(std::fs::File::create(&planted)?, &schema)?;
         writer.write(&batch)?;
         writer.finish()?;
@@ -405,7 +404,7 @@ mod tests {
         ));
         let codec = super::super::get_physical_extension_codec();
         let bytes = physical_plan_to_bytes_with_extension_codec(plan, &codec)?;
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
         let decoded =
             physical_plan_from_bytes_with_extension_codec(&bytes, &ctx.task_ctx(), &codec)?;
 

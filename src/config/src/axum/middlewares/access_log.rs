@@ -311,6 +311,11 @@ where
 /// `url` as the access log may write it, with every known credential in it cut.
 pub fn mask_log_url(url: &str) -> String {
     let masked = mask_slack_callback_query(&mask_share_tokens(url));
+    if let Some((path, _)) = masked.split_once('?')
+        && path.trim_end_matches('/').ends_with("/resources/_search")
+    {
+        return format!("{path}?…");
+    }
     if !masked.contains("api_key=") {
         return masked;
     }
@@ -440,6 +445,22 @@ fn mask_query_values(url: &str, keys: &[&str]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resource_search_query_and_offset_never_enter_url_logs() {
+        for url in [
+            "/api/acme/resources/_search?q=private-name&offset=40",
+            "https://observe.invalid/o2/api/acme/resources/_search?%71=private-name&q=other-name",
+        ] {
+            let masked = mask_log_url(url);
+            assert!(masked.ends_with("?…"));
+            assert!(!masked.contains("private-name"));
+            assert!(!masked.contains("offset"));
+            assert!(!masked.contains("other-name"));
+        }
+        let unrelated = "/api/acme/dashboards?title=overview";
+        assert_eq!(mask_log_url(unrelated), unrelated);
+    }
 
     static LOG_LINES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
     static CAPTURE_LOGGER: CaptureLogger = CaptureLogger;

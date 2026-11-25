@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { readFileSync, existsSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +13,7 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import {
   addUsage,
   cleanAttributes,
+  experimentAttributes,
   genAiProviderName,
   genAiRequestAttributes,
   genAiResponseAttributes,
@@ -64,11 +66,11 @@ import {
   selectInlineComments,
 } from "./src/inline.mjs";
 import { changedCodeEvidence, mergeConfidence, reviewerFinished, severityCounts, unfinishedReviewers } from "./src/confidence.mjs";
-import { OpencodeServer, modelVariantIds, resolveOpencodeConfig, selfCheck, shouldRetry } from "./src/opencode.mjs";
+import { OpencodeServer, deriveSelectedConfig, modelVariantIds, resolveOpencodeConfig, selfCheck, shouldRetry } from "./src/opencode.mjs";
 import { stripJsonc } from "./src/jsonc.mjs";
 import { lostPasses, lostPassesNote, mergePassResults, parseColdPasses, passLabel, passPlan, reviewComplete, runPooled } from "./src/passes.mjs";
 import { MAX_USER_PROMPT_CHARS, fitCoordinatorPrompt } from "./src/coordinator-input.mjs";
-import { diffFingerprint, fetchPinnedDiff, hunksLocatable, prefixDiffPaths, reviewerDiff, runFile } from "./src/pr-diff.mjs";
+import { diffFingerprint, fetchPinnedDiff, gitEnvForRun, hunksLocatable, prefixDiffPaths, reviewerDiff, runFile } from "./src/pr-diff.mjs";
 import {
   buildFallbackReview,
   partialFindingsBlock,
@@ -80,10 +82,14 @@ import {
   selectFallbackFindings,
   toKeptFinding,
 } from "./src/report.mjs";
+import { exitWithParent } from "./src/parent-exit.mjs";
 import { sanitizePrTree } from "./src/sanitize.mjs";
 import { scrubReviewBody, scrubSecrets } from "./src/scrub.mjs";
 import { isReleaseFile, narrowTier, resolveRulesFiles } from "./src/selection.mjs";
 import { buildImpactContext } from "./src/impact.mjs";
+import { MAX_SYSTEM_PROMPT_CHARS, armsProblem, foldAgents, foldedAgentPrompt, parseArmFlags, reviewerPrompts } from "./src/arms.mjs";
+import { EXPERIMENT_TRACE_STREAM, dryRunEnabled, dryRunGhAllowed, dryRunGhEnv, dryRunProblems, installScrubbedConsole, scrubber } from "./src/dry-run.mjs";
+import { RunSummary, parseTokenPrices, writeRunSummary } from "./src/run-summary.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -93,6 +99,13 @@ const PR_DIR = process.env.PR_DIR ? resolve(process.env.PR_DIR) : "";
 // REVIEW_OPENCODE_CONFIG: "default" (opencode.jsonc, read-only tools) or "ci-full" (opencode.ci.jsonc, file tools and a shell allowlist).
 const OPENCODE_CONFIG = resolveOpencodeConfig(process.env.REVIEW_OPENCODE_CONFIG);
 const OPENCODE_CONFIG_PATH = resolve(ENGINE_DIR, OPENCODE_CONFIG.file);
+
+// A dry run reviews two pinned commits in a scratch checkout and writes nothing to GitHub (README: "Dry runs and cost experiments"). Only the exact value "true" enables it.
+const DRY_RUN = dryRunEnabled(process.env);
+// Experiment arms (src/arms.mjs), each off unless exactly "true"; with none set the run is the production one.
+const ARMS = parseArmFlags(process.env);
+// A dry run's logs and errors pass the secret scrubber like its artifacts do.
+if (DRY_RUN) installScrubbedConsole(scrubber());
 // A same-named PR in another repo reviewed together with this one (the OSS side of an ENT pair).
 const PAIRED = {
   repo: process.env.PAIRED_REPO || "",
@@ -149,8 +162,8 @@ const REVIEW_IGNORE_PASS_LIMIT = process.env.REVIEW_IGNORE_PASS_LIMIT === "true"
 const REVIEW_MANUAL_RUN = process.env.REVIEW_MANUAL_RUN === "true";
 // Only a dispatch sets any of these, and a paired repo receives the last two only from a hand-started run, so a push-driven review never counts as manual.
 const REVIEW_IS_MANUAL = REVIEW_MANUAL_RUN || REVIEW_IGNORE_PASS_LIMIT || process.env.FORCE_FULL === "true";
-// Anything but an exact known mode is "off": the gate must be opted into.
-const AUTO_APPROVE_MODE = parseAutoApproveMode(process.env.REVIEW_AUTO_APPROVE);
+// Anything but an exact known mode is "off": the gate must be opted into. A dry run never approves or dismisses.
+const AUTO_APPROVE_MODE = DRY_RUN ? "off" : parseAutoApproveMode(process.env.REVIEW_AUTO_APPROVE);
 // Only the workflow's "no open PR on this branch" path sets this; any failed or skipped pairing lookup leaves it unset.
 const REVIEW_PAIR_CLEAR = process.env.REVIEW_PAIR_CLEAR === "true";
 // Where the raw findings JSON is written for the workflow to upload; unset skips it.
@@ -298,13 +311,15 @@ const CONDITIONAL_AGENTS = [
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function gh(args, input) {
+  // A dry run only reads PR metadata; the runner makes no other call, and this stops any path that would.
+  if (DRY_RUN && !dryRunGhAllowed(args)) throw new Error("dry run: refusing a gh command that is not a PR metadata read");
   const result = execSync(`gh ${args}`, {
     encoding: "utf-8",
     maxBuffer: 50 * 1024 * 1024,
     input,
     stdio: ["pipe", "pipe", "pipe"],
     env: {
-      ...process.env,
+      ...(DRY_RUN ? dryRunGhEnv(process.env) : process.env),
       GH_REPO: process.env.GH_REPO || process.env.GITHUB_REPOSITORY,
       NO_COLOR: "1",
       GH_NO_UPDATE_NOTIFIER: "1",
@@ -337,7 +352,7 @@ function readBaseFile(path) {
   const base = paired ? PAIRED.mergeBase : process.env.MERGE_BASE_SHA;
   if (!dir || !base) return null;
   try {
-    return runFile("git", ["-C", dir, "cat-file", "blob", `${base}:${rel}`]);
+    return runFile("git", ["-C", dir, "cat-file", "blob", `${base}:${rel}`], { env: gitEnvForRun() });
   } catch {
     return null;
   }
@@ -353,6 +368,7 @@ function fetchPrDiff(prNumber) {
     mergeBase: process.env.MERGE_BASE_SHA,
     head: process.env.HEAD_SHA,
     log,
+    dryRun: DRY_RUN,
   });
   if (!PAIRED.repo || !PAIRED.prNumber) return { diff: own.diff, own: own.diff, pinned: own.pinned };
   const paired = fetchPinnedDiff({
@@ -362,6 +378,7 @@ function fetchPrDiff(prNumber) {
     mergeBase: PAIRED.mergeBase,
     head: PAIRED.head,
     log,
+    dryRun: DRY_RUN,
   });
   log(`Reviewing together with paired PR ${PAIRED.repo}#${PAIRED.prNumber} (paths prefixed with ${PAIRED.dir}/)`);
   // The review key names both heads, so both sides must be pinned for it to be true.
@@ -440,6 +457,11 @@ function traceAuthHeader() {
   const password = process.env.O2_TRACE_PASSWORD;
   if (!username || !password) return "";
   return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+}
+
+// Experiments never fall back to the production stream.
+function traceStream() {
+  return process.env.O2_TRACE_STREAM || (DRY_RUN ? EXPERIMENT_TRACE_STREAM : DEFAULT_TRACE_STREAM);
 }
 
 function formatTraceExportError(error) {
@@ -537,6 +559,8 @@ class SerialTraceExporter {
 class TraceRecorder {
   constructor() {
     this.traceId = workflowTraceId();
+    this.experiment = experimentAttributes(process.env);
+    this.scrub = DRY_RUN ? scrubber() : null;
     this.spanCount = 0;
     this.exportedSpanCount = 0;
     this.exportFailures = [];
@@ -555,7 +579,7 @@ class TraceRecorder {
         url: endpoint,
         headers: {
           Authorization: authHeader,
-          "stream-name": process.env.O2_TRACE_STREAM || DEFAULT_TRACE_STREAM,
+          "stream-name": traceStream(),
         },
         timeoutMillis: timeoutMs,
         concurrencyLimit: 1,
@@ -601,30 +625,33 @@ class TraceRecorder {
     this.tracer = this.provider.getTracer(TRACE_SCOPE_NAME, "1.0.0");
   }
 
+  // Experiment coordinates ride on every span; a dry run's strings are scrubbed before they leave the process.
+  cleaned(attributes) {
+    const cleaned = cleanAttributes({ ...attributes, ...this.experiment });
+    return this.scrub ? mapStrings(cleaned, this.scrub) : cleaned;
+  }
+
   startSpan(name, attributes = {}, parentSpan = null, kind = SpanKind.INTERNAL) {
     const parentContext = parentSpan ? trace.setSpan(context.active(), parentSpan) : undefined;
-    return this.tracer.startSpan(
-      name,
-      { attributes: cleanAttributes(attributes), kind },
-      parentContext,
-    );
+    return this.tracer.startSpan(name, { attributes: this.cleaned(attributes), kind }, parentContext);
   }
 
   setSpanAttributes(span, attributes = {}) {
     if (!span) return;
-    span.setAttributes(cleanAttributes(attributes));
+    span.setAttributes(this.cleaned(attributes));
   }
 
   endSpan(span, attributes = {}, error = null) {
     if (!span) return;
     this.setSpanAttributes(span, attributes);
     if (error) {
-      const message = (error.message || String(error)).slice(0, 500);
+      const raw = (error.message || String(error)).slice(0, 500);
+      const message = this.scrub ? this.scrub(raw) : raw;
       span.setAttributes(cleanAttributes({
         "error.type": error.name || "Error",
         "error.message": message,
       }));
-      span.recordException(error);
+      span.recordException(this.scrub ? Object.assign(new Error(message), { name: error.name }) : error);
       span.setStatus({ code: SpanStatusCode.ERROR, message });
     } else {
       span.setStatus({ code: SpanStatusCode.OK });
@@ -681,6 +708,10 @@ class TraceRecorder {
 
 const TRACE = new TraceRecorder();
 let activeRootSpan = null;
+// What a dry run reports on exit (review-run-summary.json); callOpencode records the sessions.
+const SUMMARY = new RunSummary({ traceId: TRACE.traceId, prices: parseTokenPrices(process.env.REVIEW_TOKEN_PRICES).prices });
+// The pool hands the first reviewer pass its stagger hook through this, so the reviewer's own signature stays as it is.
+const REVIEWER_HOOKS = new AsyncLocalStorage();
 
 // ─── Diff filtering ────────────────────────────────────────────────────────
 
@@ -815,6 +846,7 @@ const OPENCODE = new OpencodeServer({
   configPath: OPENCODE_CONFIG_PATH,
   providerKeyVars: [API_KEY_VAR_NAME],
   readOnly: OPENCODE_CONFIG.readOnly,
+  selection: DRY_RUN ? { providerId: PROVIDER_ID, modelId: MODEL_ID, keyEnv: API_KEY_VAR_NAME } : null,
 });
 const MAX_TRANSIENT_RETRIES = 2;
 const selfChecks = new WeakMap();
@@ -858,8 +890,10 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
     "timeout.ms": timeoutMs,
   }, traceOptions.parentSpan, SpanKind.CLIENT);
 
-  const truncatedSystem = systemPrompt.slice(0, 100_000);
-  const truncatedUser = userPrompt.slice(0, MAX_USER_PROMPT_CHARS);
+  // Under C the shared block follows the rules and is never cut; every other prompt keeps the single cut.
+  const truncatedSystem = `${systemPrompt.slice(0, MAX_SYSTEM_PROMPT_CHARS)}${traceOptions.sharedBlock ? `\n\n${traceOptions.sharedBlock}` : ""}`;
+  // Arms B and C lead the user turn with the reviewer's own instructions; they sit outside the task's character budget, which is the baseline's.
+  const truncatedUser = `${traceOptions.userPreamble ? `${traceOptions.userPreamble}\n\n` : ""}${userPrompt.slice(0, MAX_USER_PROMPT_CHARS)}`;
 
   TRACE.setSpanAttributes(llmSpan, genAiRequestAttributes(truncatedSystem, truncatedUser));
 
@@ -868,8 +902,10 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
   try {
     for (;;) {
       attempt += 1;
+      let session = null;
       try {
         const client = await opencodeClient();
+        session = SUMMARY.startSession({ agent: traceOptions.agentKey || agentName, pass: traceOptions.pass ?? null, attempt });
         const result = await client.prompt({
           agent: agentName,
           model: { providerID: PROVIDER_ID, modelID: MODEL_ID },
@@ -879,7 +915,9 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
           title: `ai-review:${traceOptions.agentKey || agentName}${traceOptions.pass ? `:pass-${traceOptions.pass}` : ""}`,
           timeoutMs,
           wrapUp: traceOptions.wrapUp,
+          onFirstResponse: REVIEWER_HOOKS.getStore()?.onFirstResponse,
         });
+        SUMMARY.endSession(session, { outcome: "ok", tokens: result.info?.sessionTokens });
         if (result.wrappedUp) console.warn(`[${isoNow()}] ${agentName}: interrupted near its timeout and asked for its findings`);
         if (result.rejectedPermissions > 0) {
           console.warn(`[${isoNow()}] ${agentName}: rejected ${result.rejectedPermissions} permission request(s)`);
@@ -897,6 +935,7 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
         });
         return { text: result.text, responseId: result.responseId, wrappedUp: Boolean(result.wrappedUp) };
       } catch (err) {
+        if (session) SUMMARY.endSession(session, { outcome: err?.name === "TimeoutError" ? "timeout" : "error", tokens: err?.usage?.tokens, error: err?.message });
         failedUsage = addUsage(failedUsage, err?.usage);
         const retry = shouldRetry({
           err,
@@ -944,16 +983,18 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     return { agentKey, agentName: agentDef.name, pass, findings: [], rawText: "", error: `${API_KEY_VAR_NAME} not set`, genAIResponseId: "" };
   }
 
-  const systemPrompt = [readPrompt("shared-rules.md"), readRepoRules()].filter(Boolean).join("\n\n");
-  // The repo checklist (recurring OpenObserve defect classes) goes to the reviewers that hunt bugs.
-  const agentPrompt = [readPrompt(agentDef.promptFile), agentDef.checklist ? readPrompt("openobserve-checklist.md") : ""].filter(Boolean).join("\n\n");
+  const trustedSystem = [readPrompt("shared-rules.md"), readRepoRules()].filter(Boolean).join("\n\n");
+  // The repo checklist (recurring OpenObserve defect classes) goes to the reviewers that hunt bugs; a folded session (arm E) carries its areas' prompts too.
+  const agentPrompt = agentDef.folded
+    ? foldedAgentPrompt(agentDef, readPrompt, agentKey)
+    : [readPrompt(agentDef.promptFile), agentDef.checklist ? readPrompt("openobserve-checklist.md") : ""].filter(Boolean).join("\n\n");
   if (!agentPrompt) {
     const err = new Error(`Missing agent prompt: ${agentDef.promptFile}`);
     TRACE.endSpan(reviewerSpan, {}, err);
     throw err;
   }
 
-  const { diff: relevantDiff, skipped, fullDiff } = reviewerDiff(diff, agentDef, { unfocused, pathOf: logicalPath });
+  const { diff: relevantDiff, skipped, fullDiff, focusFiles } = reviewerDiff(diff, agentDef, { unfocused, pathOf: logicalPath });
   if (skipped) {
     console.log(`[${isoNow()}] ${label}: SKIPPED — no files in focus`);
     TRACE.endSpan(reviewerSpan, { "review.skipped": true, "review.skip_reason": "no_focus_files" });
@@ -969,25 +1010,15 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     return { agentKey, agentName: agentDef.name, pass, findings: [], rawText: "", error, genAIResponseId: "" };
   }
 
-  const userPrompt = [
-    `<review_task>`,
-    `<pr_context>${prContext}</pr_context>`,
-    `<diff>${relevantDiff.slice(0, MAX_DIFF_TOKENS)}</diff>`,
-    impact ? `<impact_map>\nWhere symbols this PR changes are used outside the diff (DEF = another definition of the same name, possibly a parallel implementation). Generated by grep; verify before relying on it.\n${impact}\n</impact_map>` : "",
-    existingReview ? `<previous_review>${existingReview}</previous_review>` : "",
-    `</review_task>`,
-  ].join("\n");
-
-  const fullSystem = `${systemPrompt}\n\n${agentPrompt}`;
-
   console.log(`[${isoNow()}] Starting ${label} (${MODEL_SLUG}, ${agentDef.opencodeAgent})`);
   const start = Date.now();
 
   try {
+    const prompts = reviewerPrompts({ arms: ARMS, trustedSystem, agentPrompt, prContext, diff: relevantDiff, commonDiff: diff, impact, existingReview, maxDiffChars: MAX_DIFF_TOKENS, focusFiles });
     const completion = await callOpencode(
       agentDef.opencodeAgent,
-      fullSystem,
-      userPrompt,
+      prompts.system,
+      prompts.user,
       timeoutMs,
       {
         parentSpan: reviewerSpan,
@@ -996,6 +1027,8 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
         pass,
         operationName: "code_review",
         wrapUp: REVIEWER_WRAP_UP,
+        userPreamble: prompts.userPreamble,
+        sharedBlock: prompts.sharedBlock,
       },
     );
     const text = completion.text;
@@ -1017,8 +1050,9 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
       "review.raw_text_length": text.length,
       "review.wrapped_up": completion.wrappedUp,
       "gen_ai.response.id": completion.responseId,
+      "review.shared_context.diff_truncated": prompts.sharedContext?.truncated.diff,
     });
-    return { agentKey, agentName: agentDef.name, pass, findings, rawText: text, error: null, genAIResponseId: completion.responseId, fullDiff, parsed, wrappedUp: completion.wrappedUp };
+    return { agentKey, agentName: agentDef.name, pass, findings, rawText: text, error: null, genAIResponseId: completion.responseId, fullDiff, sharedDiffTruncated: prompts.sharedContext?.truncated.diff === true, parsed, wrappedUp: completion.wrappedUp };
   } catch (err) {
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     console.error(`[${isoNow()}] ${label} FAILED after ${elapsed}s: ${err.message}`);
@@ -1361,12 +1395,45 @@ function prepareReviewTree(rootSpan) {
   });
 }
 
+// Everything that must hold before any model or GitHub call; main stops when this returns an entry.
+function startupProblems() {
+  const problems = [armsProblem(ARMS, { dryRun: DRY_RUN })].filter(Boolean);
+  if (!DRY_RUN) return problems;
+  problems.push(...dryRunProblems({ env: process.env, engineDir: ENGINE_DIR, prDir: PR_DIR, readOnly: OPENCODE_CONFIG.readOnly }));
+  try {
+    deriveSelectedConfig(JSON.parse(stripJsonc(readFileSync(OPENCODE_CONFIG_PATH, "utf-8"))), { providerId: PROVIDER_ID, modelId: MODEL_ID, keyEnv: API_KEY_VAR_NAME });
+  } catch (err) {
+    problems.push(`provider selection: ${err.message}`);
+  }
+  return problems;
+}
+
+// A dry run's machine-readable result, written on every exit (a failure or the overall timeout included) beside the findings artifact.
+let summaryWritten = false;
+function writeDryRunSummary(outcome, error) {
+  // The first writer owns the outcome: the watchdog's timeout must not be rewritten by a main() that its own shutdown let finish.
+  if (!DRY_RUN || !REVIEW_ARTIFACT_DIR || summaryWritten) return;
+  summaryWritten = true;
+  try {
+    const clean = text => scrubSecrets(redactIdentity(text), process.env).text;
+    const summary = SUMMARY.build({ outcome, error: error ? (error.message || String(error)) : null });
+    writeRunSummary(REVIEW_ARTIFACT_DIR, mapStrings(summary, clean));
+  } catch (err) {
+    console.warn(`[${isoNow()}] Could not write the run summary: ${err.message}`);
+  }
+}
+
 async function main() {
   const prNumber = process.env.PR_NUMBER;
   const rootSpan = TRACE.startSpan("github.workflow.ai_code_review", {
     "workflow.trace_id": TRACE.traceId,
     "github.pr.number": prNumber,
     "review.force_full": process.env.FORCE_FULL === "true",
+    "review.dry_run": DRY_RUN,
+    "review.arm.stagger": ARMS.stagger,
+    "review.arm.shared_prefix": ARMS.sharedPrefix,
+    "review.arm.shared_context": ARMS.sharedContext,
+    "review.arm.fold": ARMS.fold,
   });
   activeRootSpan = rootSpan;
   let rootError = null;
@@ -1378,14 +1445,20 @@ async function main() {
       console.error("PR_NUMBER environment variable is required");
       throw new Error("PR_NUMBER environment variable is required");
     }
+    // Before any model or GitHub call: a refused arm or an unsafe dry run stops here.
+    const startupIssues = startupProblems();
+    if (startupIssues.length > 0) {
+      outcome = "misconfigured";
+      throw new Error(`Not starting: ${startupIssues.join("; ")}`);
+    }
 
     console.log(`[${isoNow()}] AI Code Review started for PR #${prNumber}`);
     console.log(`[${isoNow()}] Repository: ${process.env.GITHUB_REPOSITORY}`);
     prepareReviewTree(rootSpan);
 
-    // Counted before the key check, so a misconfiguration notice keeps the PR's review count.
-    const existingSpan = TRACE.startSpan("github.pr.existing_review_lookup", { "github.pr.number": prNumber }, rootSpan);
-    const lookup = findExistingReviewComment(prNumber);
+    // Counted before the key check, so a misconfiguration notice keeps the PR's review count. A dry run reads no comments and counts nothing.
+    const existingSpan = DRY_RUN ? null : TRACE.startSpan("github.pr.existing_review_lookup", { "github.pr.number": prNumber }, rootSpan);
+    const lookup = DRY_RUN ? { comment: null, ok: false } : findExistingReviewComment(prNumber);
     const existingComment = lookup.comment;
     const passesDone = passesDoneIn(existingComment);
     const manualDone = manualReviews(existingComment?.body);
@@ -1399,14 +1472,14 @@ async function main() {
       "review.manual_run": REVIEW_IS_MANUAL,
       "review.max_passes": REVIEW_MAX_PASSES,
     });
-    if (!REVIEW_IGNORE_PASS_LIMIT && !lookup.ok) {
+    if (!DRY_RUN && !REVIEW_IGNORE_PASS_LIMIT && !lookup.ok) {
       outcome = "misconfigured";
       TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "pass_count_unknown" });
       throw new Error("Cannot read this PR's review comments (no reviewer app token, or the comment list failed), so the reviewed commit and the review limit cannot be checked; not reviewing.");
     }
     const headKey = reviewKey(process.env.HEAD_SHA, PAIRED.head);
     const manualAfterRun = REVIEW_IS_MANUAL ? { count: manualDone.count + 1, key: headKey } : manualDone;
-    const skipReason = reviewSkipReason({
+    const skipReason = DRY_RUN ? "" : reviewSkipReason({
       body: existingComment?.body,
       key: headKey,
       passesDone: automaticPassCount(passesDone, manualDone.count),
@@ -1424,7 +1497,7 @@ async function main() {
     });
     // Ahead of the cap skip too: a push the cap leaves unreviewed must still lose the earlier approval.
     if (skipReason !== "already_reviewed") gate.start();
-    const early = skipReason === "already_reviewed" ? null : unchangedDiffCheck(prNumber, existingComment);
+    const early = DRY_RUN || skipReason === "already_reviewed" ? null : unchangedDiffCheck(prNumber, existingComment);
     if (early?.unchanged) {
       console.log(`[${isoNow()}] PR #${prNumber} skipped (unchanged_diff): ${headKey} changes the same lines the last review read. Dispatch the workflow to review it again.`);
       const kept = bodyAtUnchangedDiff(existingComment.body, headKey, REVIEW_MAX_PASSES);
@@ -1454,15 +1527,17 @@ async function main() {
       // visible without digging into Actions logs.
       const message = `${API_KEY_VAR_NAME} is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip.`;
       console.error(`[${isoNow()}] ${message}`);
-      try {
-        // The key's env var name is named in the log but not in the comment: it carries the
-        // provider name, and the posted comment must not.
-        const notice = `${REVIEW_MARKER}\n${NOTICE_TAG}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> The review API key is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip. Please confirm the review secrets are provisioned.`;
-        const tagged = withManualTag(withPassTag(notice, passesDone), manualDone);
-        if (existingComment) updateReviewComment(prNumber, existingComment.id, tagged);
-        else postReviewComment(prNumber, tagged);
-      } catch (postErr) {
-        console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
+      if (!DRY_RUN) {
+        try {
+          // The key's env var name is named in the log but not in the comment: it carries the
+          // provider name, and the posted comment must not.
+          const notice = `${REVIEW_MARKER}\n${NOTICE_TAG}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> The review API key is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip. Please confirm the review secrets are provisioned.`;
+          const tagged = withManualTag(withPassTag(notice, passesDone), manualDone);
+          if (existingComment) updateReviewComment(prNumber, existingComment.id, tagged);
+          else postReviewComment(prNumber, tagged);
+        } catch (postErr) {
+          console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
+        }
       }
       throw new Error(message);
     }
@@ -1534,6 +1609,8 @@ async function main() {
     const tier = process.env.FORCE_FULL === "true" || gateNeedsFullTier ? "full" : assessRiskTier(filtered);
     const tierConfig = RISK_TIERS[tier] || RISK_TIERS.full;
     const selectedAgents = selectAgents(tierConfig, filtered);
+    SUMMARY.state.tier = tier;
+    SUMMARY.state.agents = selectedAgents;
     TRACE.endSpan(riskSpan, {
       "review.risk_tier": tier,
       "review.agent_count": selectedAgents.length,
@@ -1606,15 +1683,23 @@ async function main() {
     } catch (err) {
       console.warn(`[${isoNow()}] Impact map skipped: ${err.message}`);
     }
-    const agentsToRun = selectedAgents;
+    // Arm E folds Security, Performance and Documentation into the sessions that host them (src/arms.mjs); it only runs as a dry run.
+    const fold = ARMS.fold ? foldAgents(selectedAgents, AGENTS) : null;
+    if (fold) {
+      Object.assign(AGENTS, fold.defs);
+      SUMMARY.state.folds = fold.folds;
+      TRACE.setSpanAttributes(rootSpan, { "review.agents": fold.agents, "review.agent_count": fold.agents.length, "review.arm.fold.hosts": Object.keys(fold.folds) });
+    }
+    const agentsToRun = fold ? fold.agents : selectedAgents;
+    SUMMARY.state.agents = agentsToRun;
     const plan = passPlan(agentsToRun, REVIEW_COLD_PASSES);
     console.log(`[${isoNow()}] Launching ${agentsToRun.length} reviewers x ${REVIEW_COLD_PASSES} cold passes (${plan.length} sessions, up to ${REVIEWER_CONCURRENCY} at once)...`);
 
-    const settled = await runPooled(plan, REVIEWER_CONCURRENCY, ({ agentKey, pass }) => {
+    const settled = await runPooled(plan, REVIEWER_CONCURRENCY, ({ agentKey, pass }, _index, hooks) => {
       const def = AGENTS[agentKey];
       if (!def) return Promise.resolve({ agentKey, agentName: agentKey, pass, findings: [], error: `Unknown agent: ${agentKey}`, genAIResponseId: "" });
-      return runReviewer(agentKey, def, filtered.diff, prContext, existingReview, rootSpan, impact, gateNeedsFullTier, pass);
-    });
+      return REVIEWER_HOOKS.run(hooks, () => runReviewer(agentKey, def, filtered.diff, prContext, existingReview, rootSpan, impact, gateNeedsFullTier, pass));
+    }, { primer: ARMS.stagger });
 
     const passResults = settled.map((r, i) => r.status === "fulfilled"
       ? r.value
@@ -1661,6 +1746,11 @@ async function main() {
     // (saving another AGENT_TIMEOUT_MS of waiting on a provider that is already failing),
     // and exit non-zero so the check surfaces as red.
     const allAgentsFailed = ranResults.length > 0 && failedAgents.length === ranResults.length;
+    const noReviewError = () => {
+      const err = new Error(`All ${ranResults.length} reviewers failed against ${MODEL_SLUG}; no review was produced.`);
+      err.suppressFatalLog = true;
+      return err;
+    };
     let finalReview;
     let coordinatorResult = null;
     let responseIds = reviewerResponseIds;
@@ -1706,6 +1796,8 @@ async function main() {
         });
       }
     }
+    SUMMARY.state.kept = coordinatorResult?.kept ?? [];
+    SUMMARY.state.keptKnown = Boolean(coordinatorResult?.findingsKnown);
 
     const confidence = mergeConfidence({
       counts: severityCounts(coordinatorResult?.kept ?? []),
@@ -1759,13 +1851,20 @@ async function main() {
     // Written now so a failed post still leaves the findings behind; rewritten with the inline outcome below.
     writeFindingsArtifact(prNumber, tier, results, coordinatorResult, null, confidence, autoApprove);
 
+    // A dry run ends here: the findings artifact and the run summary are its only output. Nothing is claimed, stamped, posted or approved.
+    if (DRY_RUN) {
+      if (allAgentsFailed) throw noReviewError();
+      console.log(`[${isoNow()}] AI Code Review dry run complete for PR #${prNumber}`);
+      return;
+    }
+
     // A run where no reviewer finished reviewed nothing, so it does not use up a pass.
     const reviewed = completedAgents.length > 0;
     const passes = reviewed ? passesDone + 1 : passesDone;
     const manual = reviewed ? manualAfterRun : manualDone;
     const complete = reviewComplete(passResults, coordinatorResult);
-    // A reviewer reads at most MAX_DIFF_TOKENS chars of diff, so a longer one was never fully reviewed.
-    const fullyRead = diff.length <= MAX_DIFF_TOKENS;
+    // A reviewer reads at most MAX_DIFF_TOKENS chars of diff, so a longer one was never fully reviewed; under C a cut shared diff counts too.
+    const fullyRead = diff.length <= MAX_DIFF_TOKENS && !passResults.some(r => r.sharedDiffTruncated);
     if (reviewed && !complete) console.warn(`[${isoNow()}] The review was partial, so the next push re-reviews even an unchanged diff`);
     if (reviewed && !diffPinned) console.warn(`[${isoNow()}] The reviewed diff is not tied to ${headKey}, so the commit stays reviewable`);
     finalReview = finishReviewBody(sanitizedReview, { key: headKey, passes, manual, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove), diffFingerprint: complete && fullyRead && diffPinned && hunksLocatable(diff, readBaseFile) ? fingerprint : "" });
@@ -1813,11 +1912,7 @@ async function main() {
     // The failure notice is posted above so it is visible on the PR; now fail the check too,
     // so a total reviewer outage can't pass as a green tick. Thrown after the comment lands
     // (not at detection time) to guarantee both happen.
-    if (allAgentsFailed) {
-      const err = new Error(`All ${ranResults.length} reviewers failed against ${MODEL_SLUG}; no review was produced.`);
-      err.suppressFatalLog = true;
-      throw err;
-    }
+    if (allAgentsFailed) throw noReviewError();
 
     console.log(`[${isoNow()}] AI Code Review complete for PR #${prNumber}`);
   } catch (err) {
@@ -1834,31 +1929,42 @@ async function main() {
     }, rootError);
     activeRootSpan = null;
     OPENCODE.stop();
+    writeDryRunSummary(outcome, rootError);
   }
 }
 
 // ─── Entry point ───────────────────────────────────────────────────────────
 
 // Let the loop drain (so stdout isn't truncated); unref'd 1s backstop forces exit if OTel handles linger.
+let watchdogFired = false;
 function finishAndExit(code) {
+  // Once the watchdog has fired it alone decides the exit status.
+  if (watchdogFired) return;
   process.exitCode = code;
   const t = setTimeout(() => process.exit(code), 1000);
   if (typeof t.unref === "function") t.unref();
 }
 
+// Started by the experiment harness: no review work before its "go" byte, and the review, opencode included, ends if the harness goes away.
+const harnessGo = exitWithParent({ onGone: () => { console.error(`[${isoNow()}] The harness is gone. Ending the review.`); OPENCODE.stop(); } });
+
 const startTime = Date.now();
 const timeout = setTimeout(() => {
+  watchdogFired = true;
   const err = new Error(`Overall timeout (${OVERALL_TIMEOUT_MS / 1000}s) reached`);
   console.error(`[${isoNow()}] ${err.message}. Exiting.`);
   TRACE.endSpan(activeRootSpan, {
     "workflow.outcome": "timeout",
     "process.exit_code": 1,
   }, err);
+  // Before the server stops: stopping it settles every waiter, and main() would then write its own outcome over this one.
+  writeDryRunSummary("timeout", err);
   OPENCODE.stop();
   TRACE.flush().finally(() => process.exit(1));
 }, OVERALL_TIMEOUT_MS);
 
-main()
+harnessGo
+  .then(() => main())
   .then(async () => {
     clearTimeout(timeout);
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);

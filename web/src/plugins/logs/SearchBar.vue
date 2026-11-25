@@ -1923,7 +1923,12 @@ import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isExplainQuery, isSqlQuery } from "@/utils/query/sqlUtils";
-import { applyDownloadRange, downloadRangeWindow, sqlLimitOf } from "@/utils/logs/downloadRange";
+import {
+  applyDownloadRange,
+  downloadRangeWindow,
+  partialDownloadReason,
+  sqlLimitOf,
+} from "@/utils/logs/downloadRange";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
 import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
@@ -1972,6 +1977,7 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import {
   appendSqlFilter,
+  splitUnion,
   hasFieldCondition,
   qualifyFieldConditions,
   removeFieldCondition,
@@ -2182,11 +2188,23 @@ export default defineComponent({
             this.downloadCustomRange,
             sqlLimit,
           );
-          if (hits.length > 0) {
-            this.downloadLogs(hits, this.downloadCustomFileType);
-          } else {
+          const partialReason = partialDownloadReason(res.data);
+          const partialMessage =
+            partialReason === null
+              ? null
+              : hits.length === 0
+                ? partialReason
+                  ? this.t("logs.searchBar.noDataToDownloadPartial", { reason: partialReason })
+                  : this.t("logs.searchBar.noDataToDownload")
+                : partialReason
+                  ? this.t("logs.searchBar.downloadMayBeIncompleteReason", {
+                      reason: partialReason,
+                    })
+                  : this.t("logs.searchBar.downloadMayBeIncomplete");
+          if (hits.length > 0) this.downloadLogs(hits, this.downloadCustomFileType);
+          if (partialMessage !== null || hits.length === 0) {
             toast({
-              message: this.t("logs.searchBar.noDataToDownload"),
+              message: partialMessage ?? this.t("logs.searchBar.noDataToDownload"),
               variant: "warning",
             });
           }
@@ -2347,11 +2365,15 @@ export default defineComponent({
         searchObj.meta.logsVisualizeToggle !== "patterns" &&
         (searchObj.loading === true || searchObj.loadingHistogram === true),
     );
+    // Drill down is fed by the logs search, so its charts go stale the same way the grid does.
+    const isLogsRunToggle = computed(() =>
+      ["logs", "drilldown"].includes(searchObj.meta.logsVisualizeToggle),
+    );
     const showRunQueryPending = computed(
       () =>
         !!searchObj.meta.runPending ||
         !!searchObj.meta.editorDirty ||
-        (searchObj.meta.logsVisualizeToggle === "logs" && autoRun.engine.isRunDirty()),
+        (isLogsRunToggle.value && autoRun.engine.isRunDirty()),
     );
     // Logs-mode pending flags (a guard block, a dirty-time run) say nothing about a freshly loaded chart.
     const panelRunPending = computed(
@@ -3475,7 +3497,7 @@ export default defineComponent({
 
         if (format === "csv") {
           filename += ".csv";
-          dataobj = await json2csv(data, options);
+          dataobj = "\uFEFF" + (await json2csv(data, options));
         } else {
           filename += ".json";
           dataobj = JSON.stringify(data, null, 2);
@@ -5725,18 +5747,7 @@ export default defineComponent({
         // and the split is quote-unaware, so a pipe inside a term such as
         // match_all('text | error') would corrupt the query when a filter is added.
         const currentQuery = [this.searchObj.data.query];
-        let unionType: string = "";
-        if (currentQuery[0].replace("union all", "UNION ALL").includes("UNION ALL")) {
-          unionType = "UNION ALL";
-        } else if (currentQuery[0].replace("union", "UNION").includes("UNION")) {
-          unionType = "UNION";
-        }
-
-        // Use regular expression to match "UNION" or "UNION ALL" (case insensitive)
-        const unionRegex = /\bUNION ALL\b|\bUNION\b/i;
-
-        // Split the string by "UNION" or "UNION ALL" if they are present
-        const queries = currentQuery[0].split(unionRegex);
+        const { parts: queries, ops: unionOps } = splitUnion(currentQuery[0]);
 
         // Iterate over each part
         queries.forEach((query, index) => {
@@ -5753,7 +5764,7 @@ export default defineComponent({
           }
 
           if (this.searchObj.meta.sqlMode == true) {
-            if (unionType == "" && this.searchObj.data.stream.selectedStream.length > 1) {
+            if (unionOps.length === 0 && this.searchObj.data.stream.selectedStream.length > 1) {
               const parsedSQL = this.fnParsedSQL();
               const streamPrefix: string =
                 parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
@@ -5793,11 +5804,11 @@ export default defineComponent({
           queries[index] = currentQuery[0];
         });
 
-        if (unionType == "") {
-          this.searchObj.data.query = queries.join("");
-        } else {
-          this.searchObj.data.query = queries.join(` ${unionType} `);
-        }
+        this.searchObj.data.query = queries.reduce(
+          (sql, branch, index) =>
+            index === 0 ? branch : `${sql} ${unionOps[index - 1]} ${branch}`,
+          "",
+        );
         this.searchObj.data.editorValue = this.searchObj.data.query;
         this.searchObj.data.stream.addToFilter = "";
         this.searchObj.data.stream.addToFilterMode = "replace";

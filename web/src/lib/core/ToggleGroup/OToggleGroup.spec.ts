@@ -65,6 +65,16 @@ describe("OToggleGroup", () => {
     expect(wrapper.emitted("update:modelValue")).toBeDefined();
   });
 
+  it("keeps a single selection unless the group is deselectable", async () => {
+    const items = [{ value: "left", label: "Left" }];
+    const locked = mountGroup({ modelValue: "left" }, items);
+    await locked.find("button").trigger("click");
+    expect(locked.emitted("update:modelValue")).toBeUndefined();
+    const clearable = mountGroup({ modelValue: "left", deselectable: true }, items);
+    await clearable.find("button").trigger("click");
+    expect(clearable.emitted("update:modelValue")).toEqual([[null]]);
+  });
+
   // --- v-model: active item has data-state=on ---
 
   it('marks the active item with data-state="on"', async () => {
@@ -305,6 +315,35 @@ describe("OToggleGroup", () => {
       await settle();
       expect(indicator().style.transform).toBe(`translate(${ITEM_WIDTH * 2}px, 0px)`);
 
+      wrapper.unmount();
+    });
+
+    it("stays on the active item when the track is scrolled", async () => {
+      const selected = ref("a");
+      const wrapper = mount(
+        {
+          components: { OToggleGroup, OToggleGroupItem },
+          setup: () => ({ selected }),
+          template: `
+            <OToggleGroup :model-value="selected">
+              <OToggleGroupItem v-for="value in ['a', 'b', 'c']" :key="value" :value="value">
+                {{ value }}
+              </OToggleGroupItem>
+            </OToggleGroup>`,
+        },
+        { attachTo: document.body },
+      );
+      const track = wrapper.get("[data-variant]").element as HTMLElement;
+      stubGeometry(track);
+      const onScreen = track.querySelector<HTMLElement>('[data-otoggle-value="c"]')!;
+      onScreen.getBoundingClientRect = () =>
+        ({ left: ITEM_WIDTH, top: 0, width: ITEM_WIDTH, height: 20 }) as DOMRect;
+      Object.defineProperty(track, "scrollLeft", { value: ITEM_WIDTH, configurable: true });
+      selected.value = "c";
+      await settle();
+      expect((track.firstElementChild as HTMLElement).style.transform).toBe(
+        `translate(${ITEM_WIDTH * 2}px, 0px)`,
+      );
       wrapper.unmount();
     });
 

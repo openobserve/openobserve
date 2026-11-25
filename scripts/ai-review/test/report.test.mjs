@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { dryRunGhAllowed, dryRunGhEnv, dryRunProblems, installScrubbedConsole } from "../src/dry-run.mjs";
 
 import {
   MAX_REVIEWED_CHARS,
@@ -45,6 +50,8 @@ import * as confidenceModule from "../src/confidence.mjs";
 import * as reportModule from "../src/report.mjs";
 import * as passesModule from "../src/passes.mjs";
 import * as coordinatorInputModule from "../src/coordinator-input.mjs";
+import { foldAgents } from "../src/arms.mjs";
+import { RunSummary } from "../src/run-summary.mjs";
 import { SEVERITIES, normalizeSeverity, severityRank } from "../src/severity.mjs";
 
 test("the failed-reviewer line names each reviewer and why it did not finish", () => {
@@ -653,8 +660,30 @@ test("a gate candidate's reviewers get the whole diff, and a narrowed one is rep
   const whole = reviewerDiff(diff, rustOnly, { unfocused: true });
   assert.equal(whole.fullDiff, true);
   assert.equal(whole.diff, diff);
-  assert.deepEqual(reviewerDiff(diff, {}, {}), { diff, skipped: false, fullDiff: true });
+  assert.deepEqual(reviewerDiff(diff, {}, {}), { diff, skipped: false, fullDiff: true, focusFiles: [] });
   assert.equal(reviewerDiff(diff, { fileFocus: () => false }).fullDiff, true);
+});
+
+test("reviewerDiff names the files a narrowed focus kept, and nothing when the reviewer sees the whole diff", () => {
+  const diff = `${fileDiff("src/a.rs")}${fileDiff("web/src/a.ts")}${fileDiff("src/b.rs")}`;
+  const rust = { fileFocus: path => path.endsWith(".rs") };
+  const matched = reviewerDiff(diff, rust);
+  assert.deepEqual(matched.focusFiles, ["src/a.rs", "src/b.rs"]);
+  assert.deepEqual([matched.skipped, matched.fullDiff], [false, false]);
+  // Everything selected, the whole-diff fallback for no match, a gate candidate and an agent without focus: no list.
+  assert.deepEqual(reviewerDiff(diff, { fileFocus: () => true }).focusFiles, []);
+  const none = reviewerDiff(diff, { fileFocus: path => path.endsWith(".py") });
+  assert.deepEqual([none.focusFiles, none.diff === diff, none.skipped], [[], true, false]);
+  assert.deepEqual(reviewerDiff(diff, rust, { unfocused: true }).focusFiles, []);
+  assert.deepEqual(reviewerDiff(diff, {}).focusFiles, []);
+  // requiresFocus with no match is skipped before any session.
+  const skipped = reviewerDiff(diff, { requiresFocus: true, fileFocus: path => path.endsWith(".py") });
+  assert.deepEqual([skipped.skipped, skipped.focusFiles], [true, []]);
+  // A paired diff's paths carry the repo prefix in the headers; focus is decided on the logical path, the list shows the header's.
+  const paired = `${fileDiff("openobserve/src/a.rs")}${fileDiff("o2-enterprise/web/a.ts")}`;
+  const logical = reviewerDiff(paired, { fileFocus: path => path.endsWith(".rs") }, { pathOf: path => path.replace(/^(openobserve|o2-enterprise)\//, "") });
+  assert.deepEqual(logical.focusFiles, ["openobserve/src/a.rs"]);
+  assert.equal(logical.diff.includes("o2-enterprise"), false, "its other fields are as before");
 });
 
 test("a requiresFocus agent keeps its opt-out for a gate candidate, and joins with the whole diff when in scope", () => {
@@ -796,8 +825,10 @@ const silentReviewer = key => ({ ...finishedReviewer(key), parsed: false, rawTex
 const smallRawDiff = "diff --git a/docs/a.md b/docs/a.md\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1 +1 @@\n-old\n+new\n";
 
 // Every default makes the run an approvable one, so a test changes the single fact it is about.
-async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, manual = false, head = MAIN_HEAD, coordinatorOutput = cleanCoordinatorOutput, rawDiff = smallRawDiff, keptDiff = null, variantError = "", ignorePassLimit = false, forceFull = false, baseFile = "old\n", maxPasses = 0 } = {}) {
-  const run = { posted: "", approvals: [], logs: [], coordinatorCalls: 0, coordinatorArgs: null, reviewerCalls: [], artifact: null, updates: 0, creates: 0, claims: 0, sanitized: 0, attributes: {} };
+async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, manual = false, head = MAIN_HEAD, coordinatorOutput = cleanCoordinatorOutput, rawDiff = smallRawDiff, keptDiff = null, variantError = "", ignorePassLimit = false, forceFull = false, baseFile = "old\n", maxPasses = 0, dryRun = false, startupIssues = [], keyMissing = false, arms = {}, agents = null } = {}) {
+  const run = { posted: "", approvals: [], logs: [], coordinatorCalls: 0, coordinatorArgs: null, reviewerCalls: [], artifact: null, updates: 0, creates: 0, claims: 0, sanitized: 0, attributes: {}, lookups: 0, inlineCalls: 0, diffCalls: [], summaryWrites: [], hookArgs: [], ghCalls: 0 };
+  const summary = new RunSummary({ traceId: "f".repeat(32) });
+  run.summary = summary;
   const pr = { ...eligibleInput().pr, title: "fix a bug", body: "plain words", head: { sha: head }, changed_files: 1, additions: 1, deletions: 1, ...prNow };
   const noop = () => {};
   const scope = {
@@ -806,19 +837,22 @@ async function runMain({ results = [finishedReviewer("security"), finishedReview
     process: { env: { PR_NUMBER: "1", GITHUB_REPOSITORY: "test/repo", HEAD_SHA: head, MERGE_BASE_SHA: "c".repeat(40), ...(forceFull ? { FORCE_FULL: "true" } : {}) } },
     console: { log: (...args) => run.logs.push(args.join(" ")), warn: noop, error: noop },
     TRACE: { startSpan: () => ({}), endSpan: noop, setSpanAttributes: (span, attrs) => Object.assign(run.attributes, attrs) }, activeRootSpan: null, isoNow: () => "now", prepareReviewTree: noop,
-    findExistingReviewComment: () => ({ comment: existing, ok: true }),
+    findExistingReviewComment: () => { run.lookups += 1; return { comment: existing, ok: true }; },
     passesDoneIn: comment => (comment ? commentsModule.reviewPassCount(comment.body) : 0),
-    REVIEW_IGNORE_PASS_LIMIT: ignorePassLimit, REVIEW_MANUAL_RUN: manual, REVIEW_IS_MANUAL: manual || ignorePassLimit || forceFull, MAX_DIFF_TOKENS: 150_000, diffFingerprint, hunksLocatable, readBaseFile: () => baseFile, variantProblem: () => variantError, MODEL_VARIANT: "high", COORDINATOR_VARIANT: "high", REVIEW_MAX_PASSES: maxPasses, REVIEW_BOT_LOGIN: "review[bot]", REVIEW_PAIR_CLEAR: true, AUTO_APPROVE_MODE: mode,
+    REVIEW_IGNORE_PASS_LIMIT: ignorePassLimit, REVIEW_MANUAL_RUN: manual, REVIEW_IS_MANUAL: manual || ignorePassLimit || forceFull, MAX_DIFF_TOKENS: 150_000, diffFingerprint, hunksLocatable, readBaseFile: () => baseFile, variantProblem: () => variantError, MODEL_VARIANT: "high", COORDINATOR_VARIANT: "high", REVIEW_MAX_PASSES: maxPasses, REVIEW_BOT_LOGIN: "review[bot]", REVIEW_PAIR_CLEAR: true, AUTO_APPROVE_MODE: dryRun ? "off" : mode,
+    DRY_RUN: dryRun, ARMS: { stagger: false, sharedPrefix: false, sharedContext: false, fold: false, ...arms }, SUMMARY: summary, foldAgents,
+    REVIEWER_HOOKS: { run: (hooks, fn) => { run.hookArgs.push(hooks); return fn(); } },
+    startupProblems: () => startupIssues, writeDryRunSummary: (outcome, error) => { run.summaryWrites.push({ outcome, error: error?.message ?? null }); },
     REVIEW_MARKER: "<!-- ai-code-review -->", PAIRED: { repo: "", prNumber: "", dir: "", mergeBase: "", head: "", ...paired }, PR_DIR: "/pr", resolve: (...parts) => parts.join("/"),
     githubReviewApi: () => ({ readPr: () => pr, listReviews: () => [], dismissReview: noop, approve: payload => run.approvals.push(payload) }),
-    noteSkippedPush: noop, apiKey: () => "configured", API_KEY_VAR_NAME: "TEST_KEY", MODEL_SLUG: "test/model",
-    fetchPinnedDiff: ({ repo }) => { if (diffFails) throw new Error("diff unavailable"); return { diff: rawDiff, pinned: pinned[repo] ?? true }; }, prefixDiffPaths: diff => diff,
+    noteSkippedPush: noop, apiKey: () => (keyMissing ? "" : "configured"), API_KEY_VAR_NAME: "TEST_KEY", MODEL_SLUG: "test/model",
+    fetchPinnedDiff: ({ repo, dryRun: dry }) => { run.diffCalls.push({ repo, dryRun: dry }); if (diffFails) throw new Error("diff unavailable"); return { diff: rawDiff, pinned: pinned[repo] ?? true }; }, prefixDiffPaths: diff => diff,
     parseDiffFiles: () => [{ oldPath: "docs/a.md", newPath: "docs/a.md" }], execErrorText: err => err.message,
     filterDiff: diff => (noiseOnly ? { diff: "", files: [], totalAdded: 0, totalRemoved: 0 } : { diff: keptDiff ?? diff, files: [{ oldPath: "docs/a.md", newPath: "docs/a.md" }], totalAdded: 1, totalRemoved: 1 }),
     sha256: () => "hash", RISK_TIERS: { full: {} }, assessRiskTier: () => "full", selectAgents: () => results.map(r => r.agentKey),
-    ghJson: () => { if (contextFails) throw new Error("no context"); return { title: "fix a bug", body: reviewedBody, files: [{}] }; },
+    ghJson: () => { run.ghCalls += 1; if (contextFails) throw new Error("no context"); return { title: "fix a bug", body: reviewedBody, files: [{}] }; },
     pairedPrContext: () => "", isPlaceholderComment: () => false, claimReviewPass: () => { run.claims += 1; return 1; }, buildImpactContext: () => "",
-    AGENTS: Object.fromEntries(results.map(r => [r.agentKey, {}])),
+    AGENTS: agents ?? Object.fromEntries(results.map(r => [r.agentKey, {}])),
     runReviewer: async (key, def, diff, context, existingReview, span, impact, unfocused, pass) => {
       run.reviewerCalls.push([key, pass]);
       const r = byPass ? byPass(key, pass) : results.find(x => x.agentKey === key);
@@ -834,7 +868,7 @@ async function runMain({ results = [finishedReviewer("security"), finishedReview
     sanitizeForPosting: text => { run.sanitized += 1; return commentsModule.sanitizeReviewBody(text, { marker: "<!-- ai-code-review -->", providerId: "test-provider", modelId: "test-model", env: {} }).text; },
     updateReviewComment: (prNumber, id, body) => { run.posted = body; run.updates += 1; return { action: "update", id }; },
     postReviewComment: (prNumber, body) => { run.posted = body; run.creates += 1; return 1; },
-    postInlineReview: () => ({ posted: 0 }), OPENCODE: { stop: noop },
+    postInlineReview: () => { run.inlineCalls += 1; return { posted: 0 }; }, OPENCODE: { stop: noop },
   };
   const main = new Function(...Object.keys(scope), mainSource())(...Object.values(scope));
   try {
@@ -934,6 +968,17 @@ test("a push the run stops on before claiming a pass loses the old verdict and k
 test("a new head whose diff matches the reviewed one is skipped without a pass, a model call or a claim", async () => {
   const first = await runMain({ mode: "off" });
   assert.equal(commentsModule.reviewedDiffFingerprint(first.posted), diffFingerprint(smallRawDiff));
+  // C reviews and posts like any run outside a dry run, and writes the fingerprint exactly when the shared diff was not cut.
+  const c = { sharedPrefix: true, sharedContext: true };
+  const whole = await runMain({ mode: "off", arms: c });
+  assert.equal(whole.error, undefined);
+  assert.equal(whole.creates + whole.updates, 1, "it posted");
+  assert.equal(commentsModule.reviewedDiffFingerprint(whole.posted), diffFingerprint(smallRawDiff));
+  const cut = await runMain({ mode: "off", arms: c, results: [{ ...finishedReviewer("security"), sharedDiffTruncated: true }, finishedReviewer("correctness")] });
+  assert.equal(cut.error, undefined);
+  assert.equal(cut.creates + cut.updates, 1);
+  assert.ok(commentsModule.reviewedKey(cut.posted), "the commit is still stamped");
+  assert.equal(commentsModule.reviewedDiffFingerprint(cut.posted), "", "a cut shared diff records no fingerprint, so the next push reviews again");
   const rebased = await runMain({ mode: "off", existing: { id: 1, body: first.posted }, head: PAIRED_MAIN_HEAD });
   assert.equal(rebased.error, undefined);
   assert.ok(rebased.logs.some(line => line.includes("unchanged_diff")));
@@ -1545,4 +1590,347 @@ test("a diff longer than a reviewer reads records no fingerprint, so the next pu
   const big = `diff --git a/docs/a.md b/docs/a.md\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1 +1,2 @@\n-old\n+new\n+${"x".repeat(160_000)}\n`;
   const run = await runMain({ mode: "off", rawDiff: big });
   assert.equal(commentsModule.reviewedDiffFingerprint(run.posted), "");
+});
+
+// ─── dry run: a full review that reads and writes nothing on GitHub ────────────────────────────────
+const WRITES = run => ({ creates: run.creates, updates: run.updates, claims: run.claims, approvals: run.approvals.length, inline: run.inlineCalls });
+const NO_WRITES = { creates: 0, updates: 0, claims: 0, approvals: 0, inline: 0 };
+const stampedAt = key => commentsModule.finishReviewBody(`${commentsModule.REVIEW_HEADING}\n\n> [!TIP]\n> ### ✅ Approved`, {
+  key, passes: 1, maxPasses: 0, reviewed: true, confidence: { level: "high", reasons: ["no blockers"] }, gateLine: "**Auto-approved** — small change, all gates passed.",
+});
+
+test("a dry run reviews a head the last review covered and a PR past its cap, reads no comments, and writes nothing", async () => {
+  const first = await runMain({ mode: "off" });
+  const existing = { id: 1, body: first.posted };
+  // The same inputs live: the head is already reviewed, and a new head with the same diff is skipped without a model call.
+  assert.equal((await runMain({ mode: "off", existing })).coordinatorCalls, 0);
+  assert.equal((await runMain({ mode: "off", existing, maxPasses: 1, head: PAIRED_MAIN_HEAD })).coordinatorCalls, 0);
+  for (const extra of [{}, { maxPasses: 1, head: PAIRED_MAIN_HEAD }, { maxPasses: 1, ignorePassLimit: false, manual: false }]) {
+    const dry = await runMain({ dryRun: true, existing, ...extra });
+    assert.equal(dry.error, undefined);
+    assert.equal(dry.lookups, 0, "no previous-comment lookup");
+    assert.deepEqual(WRITES(dry), NO_WRITES);
+    assert.equal(dry.posted, "");
+    assert.equal(dry.coordinatorCalls, 1);
+    assert.deepEqual(dry.reviewerCalls, [["security", 1], ["correctness", 1], ["security", 2], ["correctness", 2]]);
+    assert.ok(dry.artifact, "the findings artifact is written");
+    assert.deepEqual(dry.summaryWrites, [{ outcome: "success", error: null }]);
+    assert.equal(dry.logs.some(line => /skipped|already_reviewed|pass_limit/.test(line)), false);
+    assert.ok(dry.logs.some(line => line.includes("dry run complete")));
+  }
+});
+
+test("a dry run takes its diff from the two pinned commits only, own and paired side alike, and reads PR metadata as its one GitHub call", async () => {
+  const paired = { repo: "test/oss", prNumber: "2", dir: "openobserve", mergeBase: "d".repeat(40), head: PAIRED_MAIN_HEAD };
+  const dry = await runMain({ dryRun: true, paired });
+  assert.deepEqual(dry.diffCalls, [{ repo: "test/repo", dryRun: true }, { repo: "test/oss", dryRun: true }]);
+  assert.equal(dry.ghCalls, 1, "the metadata read");
+  const live = await runMain({ paired, mode: "off" });
+  assert.deepEqual(live.diffCalls.map(c => c.dryRun), [false, false], "a live run is not asked to pin only");
+});
+
+test("a dry run with a missing key, an empty diff or a failure still writes nothing, and says how it ended", async () => {
+  const stamped = stampedAt(PAIRED_MAIN_HEAD);
+  const existing = { id: 1, body: stamped };
+
+  const noKey = await runMain({ dryRun: true, keyMissing: true, existing });
+  assert.match(noKey.error, /TEST_KEY is not set/);
+  assert.deepEqual(WRITES(noKey), NO_WRITES);
+  assert.equal(noKey.reviewerCalls.length, 0);
+  assert.deepEqual(noKey.summaryWrites.map(s => s.outcome), ["misconfigured"]);
+  assert.equal((await runMain({ keyMissing: true })).creates, 1, "live, the same run posts a notice");
+
+  const empty = await runMain({ dryRun: true, noiseOnly: true, existing });
+  assert.equal(empty.error, undefined);
+  assert.deepEqual(WRITES(empty), NO_WRITES);
+  assert.deepEqual(empty.summaryWrites.map(s => s.outcome), ["skipped"]);
+  assert.equal(empty.coordinatorCalls, 0);
+  assert.equal((await runMain({ noiseOnly: true, existing })).updates, 1, "live, the old verdict is retracted");
+
+  const noDiff = await runMain({ dryRun: true, diffFails: true, existing });
+  assert.match(noDiff.error, /Failed to fetch PR diff: diff unavailable/);
+  assert.deepEqual(WRITES(noDiff), NO_WRITES);
+  assert.deepEqual(noDiff.summaryWrites.map(s => s.outcome), ["failure"]);
+  assert.equal((await runMain({ diffFails: true, existing })).updates, 1);
+
+  const results = [silentReviewer("security"), silentReviewer("correctness")];
+  const failed = await runMain({ dryRun: true, results, existing });
+  assert.match(failed.error, /no review was produced/);
+  assert.equal(failed.coordinatorCalls, 0, "the existing all-reviewers-failed handling stands");
+  assert.deepEqual(WRITES(failed), NO_WRITES);
+  assert.deepEqual(failed.summaryWrites, [{ outcome: "all_agents_failed", error: failed.error }]);
+  assert.match((await runMain({ results })).posted, /Not reviewed/, "live, the failure notice is posted");
+});
+
+test("a dry run runs tiering, selection and the coordinator, and hands the summary the tier, the agents and the kept findings", async () => {
+  const output = `${commentsModule.REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Blockers found\n\n<!-- ai-review-inline [{"file":"src/a.rs","line":3,"severity":"p1","category":"Correctness","title":"a bug","body":"why"}] -->`;
+  const run = await runMain({ dryRun: true, coordinatorOutput: output });
+  assert.equal(run.error, undefined);
+  assert.equal(run.summary.state.tier, "full");
+  assert.deepEqual(run.summary.state.agents, ["security", "correctness"]);
+  assert.deepEqual(run.summary.state.kept.map(f => [f.file, f.line, f.severity, f.title]), [["src/a.rs", 3, "p1", "a bug"]]);
+  assert.equal(run.summary.state.keptKnown, true);
+});
+
+test("a refused start stops before the first GitHub read, diff, key check or model call", async () => {
+  const run = await runMain({ dryRun: true, startupIssues: ["REVIEW_ARM_FOLD only runs with REVIEW_DRY_RUN=true", "PR_DIR is required"], existing: { id: 1, body: "x" } });
+  assert.equal(run.error, "Not starting: REVIEW_ARM_FOLD only runs with REVIEW_DRY_RUN=true; PR_DIR is required");
+  assert.deepEqual([run.lookups, run.diffCalls.length, run.ghCalls, run.reviewerCalls.length, run.coordinatorCalls], [0, 0, 0, 0, 0]);
+  assert.deepEqual(WRITES(run), NO_WRITES);
+  assert.deepEqual(run.summaryWrites.map(s => s.outcome), ["misconfigured"]);
+  const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
+  const main = source.slice(source.indexOf("async function main() {"));
+  for (const later of ["prepareReviewTree(rootSpan)", "findExistingReviewComment(prNumber)", "fetchPrDiff(prNumber)", "runPooled(plan"]) {
+    assert.ok(main.indexOf("startupProblems()") > 0 && main.indexOf("startupProblems()") < main.indexOf(later), later);
+  }
+});
+
+const fiveAgents = () => Object.fromEntries(["security", "correctness", "code-quality", "performance", "documentation"].map(key => [key, { name: `${key} Reviewer`, promptFile: `agents/${key}.md`, checklist: key === "security" || key === "correctness", fileFocus: () => true }]));
+
+test("arm A hands the stagger hook to the first pass alone; without it no pass gets one", async () => {
+  const staggered = await runMain({ dryRun: true, arms: { stagger: true } });
+  assert.equal(typeof staggered.hookArgs[0].onFirstResponse, "function");
+  assert.deepEqual(staggered.hookArgs.slice(1).map(h => Object.keys(h)), [[], [], []]);
+  assert.equal(staggered.reviewerCalls.length, 4, "the same reviewers run");
+  const baseline = await runMain({ dryRun: true });
+  assert.deepEqual(baseline.hookArgs, [undefined, undefined, undefined, undefined]);
+  const live = await runMain({ arms: { stagger: true }, mode: "off" });
+  assert.equal(typeof live.hookArgs[0].onFirstResponse, "function", "A also works outside a dry run");
+});
+
+test("arm E runs the folded hosts only, tells the summary the fold, and leaves the plan alone when the flag is off", async () => {
+  const results = ["security", "correctness", "code-quality", "performance", "documentation"].map(finishedReviewer);
+  const agents = fiveAgents();
+  const folded = await runMain({ dryRun: true, arms: { fold: true }, results, agents });
+  assert.deepEqual([...new Set(folded.reviewerCalls.map(([key]) => key))], ["correctness", "code-quality"]);
+  assert.deepEqual(folded.reviewerCalls.filter(([, pass]) => pass === 1).map(([key]) => key), ["correctness", "code-quality"]);
+  assert.deepEqual(folded.summary.state.folds, { correctness: ["security"], "code-quality": ["performance", "documentation"] });
+  assert.deepEqual(folded.summary.state.agents, ["correctness", "code-quality"]);
+  assert.deepEqual(folded.attributes["review.agents"], ["correctness", "code-quality"]);
+  assert.deepEqual(agents.correctness.folded.map(f => f.key), ["security"]);
+  assert.deepEqual(agents["code-quality"].folded.map(f => f.key), ["performance", "documentation"]);
+  const plain = await runMain({ dryRun: true, results, agents: fiveAgents() });
+  assert.deepEqual([...new Set(plain.reviewerCalls.map(([key]) => key))], ["security", "correctness", "code-quality", "performance", "documentation"]);
+  assert.equal(plain.summary.state.folds, null);
+});
+
+test("the gate stays off, comments are never read and every GitHub call but the PR metadata read is refused, by construction", () => {
+  const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
+  assert.match(source, /const AUTO_APPROVE_MODE = DRY_RUN \? "off" : parseAutoApproveMode\(process\.env\.REVIEW_AUTO_APPROVE\);/);
+  assert.match(source, /const DRY_RUN = dryRunEnabled\(process\.env\);/);
+  assert.match(source, /function gh\(args, input\) \{\n.*\n  if \(DRY_RUN && !dryRunGhAllowed\(args\)\) throw/);
+  assert.match(source, /const lookup = DRY_RUN \? \{ comment: null, ok: false \} : findExistingReviewComment\(prNumber\);/);
+  assert.match(source, /if \(!DRY_RUN && !REVIEW_IGNORE_PASS_LIMIT && !lookup\.ok\)/);
+  assert.match(source, /const skipReason = DRY_RUN \? "" : reviewSkipReason\(/);
+  assert.match(source, /const early = DRY_RUN \|\| skipReason === "already_reviewed" \? null : unchangedDiffCheck\(/);
+  // The dry-run exit comes before the pass bookkeeping, the review body, the comment and the inline review.
+  const afterArtifact = source.slice(source.indexOf("// A dry run ends here"));
+  assert.ok(afterArtifact.indexOf("if (DRY_RUN) {") < afterArtifact.indexOf("const reviewed = completedAgents.length > 0;"));
+  assert.ok(afterArtifact.indexOf("return;") < afterArtifact.indexOf("postReviewComment(prNumber, finalReview)"));
+  // Every write helper builds on gh() or the gate, which is off.
+  for (const name of ["postReviewComment", "updateReviewComment", "githubReviewApi", "postInlineReview"]) {
+    const at = source.indexOf(`function ${name}(`);
+    assert.ok(at > 0 && /gh\(/.test(source.slice(at, at + 1800)), `${name} goes through gh()`);
+  }
+});
+
+test("the only gh commands a dry run may run are the PR metadata reads the runner makes", () => {
+  const allowed = [
+    `pr view "17126" --json title,body,author,files,baseRefOid,headRefOid --jq '.'`,
+    `pr view "2" --repo "openobserve/o2-enterprise" --json title,body,author --jq '.'`,
+  ];
+  for (const args of allowed) assert.equal(dryRunGhAllowed(args), true, args);
+  for (const args of [
+    `api "repos/o/r/issues/5/comments" --method POST --input "/tmp/x.json" --jq .id`,
+    `api "repos/o/r/issues/comments/9" --method PATCH --input "/tmp/x.json"`,
+    `api "repos/o/r/pulls/5/reviews" --method POST --input -`,
+    `api "repos/o/r/pulls/5/reviews/7/dismissals" --method PUT --input -`,
+    `api --paginate --slurp "repos/o/r/issues/5/comments"`,
+    `api "repos/o/r/pulls/5"`,
+    `pr diff 5 --repo o/r`,
+    `pr comment 5 --body hi`,
+    `pr review 5 --approve`,
+    `pr view "5; touch /tmp/x" --json title`,
+    `pr view "5" --json title --web`,
+    `pr view "5" --json title && gh pr merge 5`,
+    `pr view "x" --json title`,
+    "",
+  ]) assert.equal(dryRunGhAllowed(args), false, args);
+});
+
+// A real git checkout in `dir` with one commit; returns its SHA.
+function makeCheckout(dir, name = "a.txt") {
+  const git = (...args) => execFileSync("git", ["-C", dir, ...args], { encoding: "utf-8", env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" } }).trim();
+  mkdirSync(dir, { recursive: true });
+  git("init", "-q", "-b", "main");
+  git("config", "user.email", "t@example.com");
+  git("config", "user.name", "t");
+  writeFileSync(join(dir, name), "one\n");
+  git("add", ".");
+  git("-c", "commit.gpgsign=false", "commit", "-qm", "c");
+  return { head: git("rev-parse", "HEAD"), git };
+}
+
+function dryRunFixture(t) {
+  const root = mkdtempSync(join(tmpdir(), "ai-review-dry-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const pr = join(root, "slot", "pr");
+  const engine = join(root, "engine");
+  const checkout = makeCheckout(pr);
+  mkdirSync(engine);
+  const env = {
+    PR_NUMBER: "17126", GITHUB_REPOSITORY: "openobserve/openobserve", MERGE_BASE_SHA: "a".repeat(40), HEAD_SHA: checkout.head,
+    REVIEW_ARTIFACT_DIR: join(root, "slot", "artifacts"), REVIEW_API_KEY_ENV: "OPENROUTER_REVIEW_API_KEY", O2_TRACE_STREAM: "ai_code_review_experiments",
+    REVIEW_TOKEN_PRICES: '{"input":3,"output":15,"cache_read":0.3,"cache_write":3.75}',
+  };
+  return { root, pr, engine, env, checkout, input: (over = {}) => ({ env: { ...env, ...over.env }, engineDir: over.engineDir ?? engine, prDir: over.prDir ?? pr, readOnly: over.readOnly ?? true }) };
+}
+
+test("a dry run needs a scratch PR_DIR, both full SHAs, an artifact dir, read-only opencode and a clean ancestry, and refuses otherwise", t => {
+  const f = dryRunFixture(t);
+  assert.deepEqual(dryRunProblems(f.input()), []);
+  const refused = (input, pattern) => assert.match(dryRunProblems(input).join("\n"), pattern);
+  refused(f.input({ prDir: "" }), /PR_DIR is required/);
+  refused(f.input({ prDir: join(f.root, "nowhere") }), /not an existing directory/);
+  refused(f.input({ prDir: f.engine }), /scratch directory apart from the engine checkout/);
+  const inside = join(f.engine, "pr");
+  mkdirSync(inside);
+  refused(f.input({ prDir: inside }), /apart from the engine checkout/);
+  refused(f.input({ engineDir: join(f.pr, "engine") }), /apart from the engine checkout/);
+  refused(f.input({ env: { MERGE_BASE_SHA: "main" } }), /MERGE_BASE_SHA must be a full 40-character commit SHA/);
+  refused(f.input({ env: { HEAD_SHA: "b".repeat(12) } }), /HEAD_SHA must be a full/);
+  refused(f.input({ env: { PR_NUMBER: "1; rm -rf /" } }), /PR_NUMBER must be a number/);
+  refused(f.input({ env: { GITHUB_REPOSITORY: 'o/r"; x' } }), /GITHUB_REPOSITORY must be owner\/name/);
+  refused(f.input({ env: { REVIEW_ARTIFACT_DIR: "" } }), /REVIEW_ARTIFACT_DIR is required/);
+  refused(f.input({ env: { REVIEW_ARTIFACT_DIR: "relative/out" } }), /must be an absolute path/);
+  refused(f.input({ env: { REVIEW_ARTIFACT_DIR: join(f.pr, "out") } }), /must be outside PR_DIR/);
+  refused(f.input({ readOnly: false }), /read-only opencode config/);
+  refused(f.input({ env: { REVIEW_API_KEY_ENV: "lower case key" } }), /REVIEW_API_KEY_ENV must name an environment variable/);
+  refused(f.input({ env: { REVIEW_TOKEN_PRICES: "{" } }), /REVIEW_TOKEN_PRICES is not valid JSON/);
+  for (const stream of ["github_ai_code_review", "github_actions_ai_traces"]) refused(f.input({ env: { O2_TRACE_STREAM: stream } }), /is a production stream/);
+  assert.deepEqual(dryRunProblems(f.input({ env: { O2_TRACE_STREAM: "my_own_experiments" } })), []);
+});
+
+test("a paired side must be whole: repo, number, directory and both SHAs", t => {
+  const f = dryRunFixture(t);
+  const inner = makeCheckout(join(f.pr, "o2-enterprise"), "b.txt");
+  const paired = { PAIRED_REPO: "openobserve/o2-enterprise", PAIRED_PR_NUMBER: "9", PAIRED_DIR: "o2-enterprise", PAIRED_MERGE_BASE_SHA: "c".repeat(40), PAIRED_HEAD_SHA: inner.head };
+  assert.deepEqual(dryRunProblems(f.input({ env: paired })), [], "the paired checkout inside PR_DIR is checked on its own and is not an extra file of the outer one");
+  assert.match(dryRunProblems(f.input({ env: { PAIRED_REPO: paired.PAIRED_REPO } })).join("\n"), /PAIRED_HEAD_SHA is required when any paired value is set/);
+  assert.match(dryRunProblems(f.input({ env: { ...paired, PAIRED_HEAD_SHA: "main" } })).join("\n"), /PAIRED_HEAD_SHA must be a full/);
+  assert.match(dryRunProblems(f.input({ env: { ...paired, PAIRED_DIR: "../x" } })).join("\n"), /PAIRED_DIR must be one directory name/);
+});
+
+test("loader files and credential files above PR_DIR are refused, in any letter case and at any height", t => {
+  const f = dryRunFixture(t);
+  const slot = join(f.root, "slot");
+  const cases = [[join(slot, "AGENTS.md"), "file"], [join(f.root, "Claude.md"), "file"], [join(slot, "opencode.jsonc"), "file"], [join(f.root, ".netrc"), "file"], [join(slot, ".git-credentials"), "file"], [join(f.root, ".opencode"), "dir"]];
+  for (const [path, kind] of cases) {
+    if (kind === "dir") mkdirSync(path);
+    else writeFileSync(path, "x");
+    const problems = dryRunProblems(f.input());
+    assert.ok(problems.some(p => p.includes(path)), `${path}: ${problems.join(" | ")}`);
+    rmSync(path, { recursive: true, force: true });
+  }
+  // Inside PR_DIR sanitize owns loader files: they are not an ancestry problem (the checkout check reports the extra file instead).
+  writeFileSync(join(f.pr, "AGENTS.md"), "planted");
+  const inside = dryRunProblems(f.input());
+  assert.equal(inside.some(p => p.includes("sits above")), false);
+  assert.deepEqual(inside.length, 1);
+  assert.match(inside[0], /PR_DIR has 1 changed or extra file\(s\), such as AGENTS\.md/);
+});
+
+test("the scratch checkout must be the pinned head's, at its own root and untouched, or the run is refused before sanitizing", t => {
+  const f = dryRunFixture(t);
+  const refused = (input, pattern) => assert.match(dryRunProblems(input).join("\n"), pattern);
+  assert.deepEqual(dryRunProblems(f.input()), []);
+  // A newer commit checked out while both pinned commits are still in the repository.
+  const older = f.checkout.head;
+  writeFileSync(join(f.pr, "a.txt"), "two\n");
+  f.checkout.git("-c", "commit.gpgsign=false", "commit", "-qam", "newer");
+  refused(f.input({ env: { HEAD_SHA: older } }), new RegExp(`PR_DIR is at ${f.checkout.git("rev-parse", "HEAD").slice(0, 12)}, not the pinned head ${older.slice(0, 12)}`));
+  assert.deepEqual(dryRunProblems(f.input({ env: { HEAD_SHA: f.checkout.git("rev-parse", "HEAD") } })), [], "at the right commit it passes");
+  // Changed and extra files.
+  writeFileSync(join(f.pr, "a.txt"), "edited\n");
+  refused(f.input({ env: { HEAD_SHA: f.checkout.git("rev-parse", "HEAD") } }), /PR_DIR has 1 changed or extra file\(s\), such as a\.txt/);
+  f.checkout.git("checkout", "--", "a.txt");
+  writeFileSync(join(f.pr, "extra.txt"), "x\n");
+  refused(f.input({ env: { HEAD_SHA: f.checkout.git("rev-parse", "HEAD") } }), /such as extra\.txt/);
+  rmSync(join(f.pr, "extra.txt"));
+  // Files the checkout's own .gitignore hides are still files the reviewer can read.
+  writeFileSync(join(f.pr, ".gitignore"), "*.log\n");
+  f.checkout.git("add", ".gitignore");
+  f.checkout.git("-c", "commit.gpgsign=false", "commit", "-qm", "ignore");
+  const withIgnore = { HEAD_SHA: f.checkout.git("rev-parse", "HEAD") };
+  assert.deepEqual(dryRunProblems(f.input({ env: withIgnore })), []);
+  writeFileSync(join(f.pr, "local.log"), "secret local state\n");
+  refused(f.input({ env: withIgnore }), /PR_DIR has 1 changed or extra file\(s\), such as local\.log/);
+  rmSync(join(f.pr, "local.log"));
+  // A subdirectory of some other checkout is not a checkout of its own.
+  mkdirSync(join(f.pr, "sub"));
+  refused(f.input({ prDir: join(f.pr, "sub") }), /PR_DIR is not the root of its own git checkout/);
+  // Not a repository at all.
+  const plain = join(f.root, "plain");
+  mkdirSync(plain);
+  refused(f.input({ prDir: plain }), /PR_DIR is not a git checkout of its pinned head/);
+  // The paired checkout: its own head, and nothing extra in it.
+  const inner = makeCheckout(join(f.pr, "o2-enterprise"), "b.txt");
+  const paired = { PAIRED_REPO: "o/r", PAIRED_PR_NUMBER: "9", PAIRED_DIR: "o2-enterprise", PAIRED_MERGE_BASE_SHA: "c".repeat(40), PAIRED_HEAD_SHA: inner.head };
+  const ok = { ...paired, HEAD_SHA: f.checkout.git("rev-parse", "HEAD") };
+  assert.deepEqual(dryRunProblems(f.input({ env: ok })), []);
+  refused(f.input({ env: { ...ok, PAIRED_HEAD_SHA: "e".repeat(40) } }), /the paired checkout is at /);
+  writeFileSync(join(f.pr, "o2-enterprise", "stray.txt"), "x\n");
+  refused(f.input({ env: ok }), /the paired checkout has 1 changed or extra file\(s\), such as stray\.txt/);
+  // A checkout that is clean at the right commit and still lacks files: sparse, skip-worktree or assume-unchanged.
+  const whole = { HEAD_SHA: f.checkout.git("rev-parse", "HEAD") };
+  const hiddenFile = f.checkout.git("ls-files").split("\n")[0];
+  rmSync(join(f.pr, "o2-enterprise"), { recursive: true, force: true });
+  assert.deepEqual(dryRunProblems(f.input({ env: whole })), []);
+  f.checkout.git("config", "core.sparseCheckout", "true");
+  refused(f.input({ env: whole }), /PR_DIR is not a whole checkout \(core\.sparseCheckout is on\)/);
+  f.checkout.git("config", "--unset", "core.sparseCheckout");
+  f.checkout.git("update-index", "--skip-worktree", hiddenFile);
+  refused(f.input({ env: whole }), new RegExp(`PR_DIR is not a whole checkout \\(1 entries are skip-worktree or assume-unchanged, such as ${hiddenFile.replace(".", "\\.")}\\)`));
+  f.checkout.git("update-index", "--no-skip-worktree", hiddenFile);
+  f.checkout.git("update-index", "--assume-unchanged", hiddenFile);
+  refused(f.input({ env: whole }), /assume-unchanged/);
+  f.checkout.git("update-index", "--no-assume-unchanged", hiddenFile);
+  assert.deepEqual(dryRunProblems(f.input({ env: whole })), []);
+});
+
+test("gh in a dry run gets the token it was given and nothing else of the environment", () => {
+  const env = { PATH: "/usr/bin", HOME: "/h", GH_TOKEN: "ghp_read", GH_HOST: "github.com", OPENROUTER_REVIEW_API_KEY: "sk-or-secret", O2_TRACE_AUTH: "Basic x", OPENOBSERVE_AUTH_TOKEN: "Basic y", GITHUB_TOKEN: "ghs_other" };
+  assert.deepEqual(dryRunGhEnv(env), { PATH: "/usr/bin", HOME: "/h", GH_TOKEN: "ghp_read", GH_HOST: "github.com" });
+  assert.deepEqual(dryRunGhEnv({ PATH: "/usr/bin" }), { PATH: "/usr/bin" });
+  const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
+  assert.match(source, /\.\.\.\(DRY_RUN \? dryRunGhEnv\(process\.env\) : process\.env\),/);
+  // Every git the runner starts itself passes the run's git environment (the pinned diff and the impact grep are tested in their own modules).
+  const gitRuns = source.match(/runFile\("git"/g) ?? [];
+  assert.ok(gitRuns.length >= 1);
+  assert.equal((source.match(/runFile\("git",[^\n]*\{ env: gitEnvForRun\(\) \}\)/g) ?? []).length, gitRuns.length);
+});
+
+test("the runner ends its review, opencode included, when the harness that started it goes away, and starts main() only after the harness's go", () => {
+  const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
+  assert.match(source, /import \{ exitWithParent \} from "\.\/src\/parent-exit\.mjs";/);
+  const hook = source.indexOf("const harnessGo = exitWithParent({ onGone: () => {");
+  assert.ok(hook > 0 && source.slice(hook, hook + 260).includes("OPENCODE.stop();"));
+  const start = source.indexOf("harnessGo\n  .then(() => main())\n");
+  assert.ok(start > hook, "main() runs only once the harness said go");
+  assert.equal(/^main\(\)/m.test(source), false, "no other start of main()");
+});
+
+test("a dry run's logs and errors are scrubbed of secrets before they print", () => {
+  const secret = "sk-or-v1-abcdef0123456789"; // gitleaks:allow
+  const lines = [];
+  const target = { log: (...a) => lines.push(["log", ...a]), warn: (...a) => lines.push(["warn", ...a]), error: (...a) => lines.push(["error", ...a]) };
+  installScrubbedConsole(text => text.split(secret).join("[redacted]"), target);
+  target.log(`key ${secret}`, 5, { nested: secret });
+  target.error("Fatal error:", Object.assign(new Error(`401 for ${secret}`), { stack: `Error: 401 for ${secret}\n    at x` }));
+  target.warn(secret);
+  const printed = JSON.stringify(lines);
+  assert.equal(printed.includes(secret), false);
+  assert.deepEqual(lines[0].slice(0, 3), ["log", "key [redacted]", 5]);
+  assert.match(lines[1][2], /^Error: 401 for \[redacted\]/);
+  assert.equal(lines[2][1], "[redacted]");
 });

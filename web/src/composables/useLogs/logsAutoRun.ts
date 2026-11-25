@@ -318,6 +318,11 @@ function createLogsAutoRun() {
       obj.loadingProgressPercentage = 0;
       obj.loadingHistogramProgressPercentage = 0;
     },
+    resetHistogramLoading: () => {
+      const obj = searchObj();
+      obj.loadingHistogram = false;
+      obj.loadingHistogramProgressPercentage = 0;
+    },
     clearResults: () => {
       if (skipClearResults) return;
       const data = searchObj().data;
@@ -691,6 +696,23 @@ function createLogsAutoRun() {
     endPanelRun(!panelRun.failed && !hasErrors);
   }
 
+  // A hidden chart parks its load until shown, so an unstarted run would hold the engine busy.
+  function cancelUnstartedPanelRun(): void {
+    const run = panelRun;
+    if (!run || run.started) return;
+    panelRun = null;
+    engine.recordPanelFailure(run.generationId, true);
+    engine.settleGeneration(run.generationId);
+  }
+
+  // A load that ends without querying never flips loading, so the run it was handed would stay open.
+  function panelLoadEndedWithoutFetch(shown: boolean): void {
+    const run = panelRun;
+    if (!run || run.started || run.dispatched === null) return;
+    if (shown) endPanelRun(!run.failed);
+    else cancelUnstartedPanelRun();
+  }
+
   function cancelPanelLoad(): void {
     outsideRunLoad = null;
     if (panelRun) panelRun.scope = null;
@@ -698,6 +720,14 @@ function createLogsAutoRun() {
 
   function hasPanelRun(generationId: number): boolean {
     return panelRun?.generationId === generationId;
+  }
+
+  // A chart load outside a panel run is never recorded, so the URL keeps the last shown query.
+  function openToggleChartRun(reusesLogsResults: boolean, abort?: () => void): number | null {
+    if (reusesLogsResults || searchObj().meta.logsVisualizeToggle !== "visualize") return null;
+    const live = engine.currentGeneration("grid");
+    if (live && !live.cancelled && !live.settled && hasPanelRun(live.id)) return null;
+    return openPanelRun(abort);
   }
 
   function searchAroundActive(): boolean {
@@ -736,12 +766,15 @@ function createLogsAutoRun() {
     openPanelRun,
     markPanelFailed,
     endPanelRun,
+    cancelUnstartedPanelRun,
+    panelLoadEndedWithoutFetch,
     panelLoadingChanged,
     cancelPanelLoad,
     notePanelScopeApplied,
     isPanelScopeStale,
     executedTimeMatches,
     hasPanelRun,
+    openToggleChartRun,
     panelSignature: (surface: "visualize" | "build") =>
       panelConfigReader
         ? panelConfigSignature(panelConfigReader(surface), readLogsSignature(searchObj()))

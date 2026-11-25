@@ -382,6 +382,7 @@ mod tests {
             expressions::{BinaryExpr, Column, Literal},
         },
         physical_optimizer::PhysicalOptimizerRule,
+        physical_plan::displayable,
         prelude::SessionContext,
         scalar::ScalarValue,
     };
@@ -739,9 +740,7 @@ mod tests {
                     true,
                 );
                 let plan = physical_plan.rewrite(&mut rewriter).unwrap().data;
-                let plan = datafusion::physical_plan::displayable(plan.as_ref())
-                    .indent(false)
-                    .to_string();
+                let plan = displayable(plan.as_ref()).indent(false).to_string();
 
                 assert_eq!(
                     index_condition.lock().clone().map(|c| c.conditions),

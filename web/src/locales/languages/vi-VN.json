@@ -297,10 +297,10 @@
       "importDesc": "Tải lên định nghĩa pipeline"
     },
     "noQueues": {
-      "title": "Tạo hàng đợi đầu tiên của bạn",
-      "description": "Hàng đợi là danh sách việc cần làm để đánh giá có trạng thái — liên kết Cấu hình Điểm, một tập dữ liệu mục tiêu và bộ lọc đưa các mục vào để con người xem xét.",
-      "action": "Hàng đợi mới",
-      "actionDesc": "Bắt đầu một hàng đợi trống"
+      "title": "Tạo hàng đợi gán nhãn đầu tiên của bạn",
+      "description": "Hàng đợi gán nhãn là danh sách việc cần làm để đánh giá — liên kết Cấu hình điểm, một tập dữ liệu đích và bộ lọc đưa các mục vào cho quá trình đánh giá thủ công.",
+      "action": "Tạo hàng đợi gán nhãn",
+      "actionDesc": "Bắt đầu một hàng đợi gán nhãn trống"
     },
     "noPrompts": {
       "title": "Tạo prompt đầu tiên của bạn",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Không có gì bất ổn ở đây",
-      "description": "Không có mục bất ổn nào trong khoảng thời gian này. Mở rộng phạm vi thời gian hoặc chuyển bộ lọc hàng đợi để xem các mục bạn đã phân loại."
+      "description": "Không có mục nào có vấn đề trong khoảng thời gian này. Hãy mở rộng phạm vi thời gian hoặc chuyển bộ lọc hàng đợi gán nhãn để xem những mục bạn đã phân loại."
     },
     "noTraces": {
       "title": "Không tìm thấy trace nào.",
@@ -1575,7 +1575,8 @@
     "pinToToolbar": "Ghim vào thanh công cụ",
     "unpinFromToolbar": "Bỏ ghim khỏi thanh công cụ",
     "shareLink": "Chia sẻ liên kết",
-    "downloadTable": "Tải xuống kết quả",
+    "downloadTable": "Tải trang hiện tại",
+    "patternsPartialResult": "Các mẫu được xây dựng từ một phần của khoảng thời gian đã chọn.",
     "customRange": "Tải xuống kết quả cho phạm vi tùy chỉnh",
     "initialNumber": "Số bắt đầu",
     "range": "Số bản ghi",
@@ -6332,6 +6333,8 @@
     "fieldRequired": "Trường là bắt buộc!",
     "sqlQuery": "Truy vấn SQL",
     "promqlQuery": "Truy vấn PromQL",
+    "queryRowLimitNote": "Mỗi lần chạy xử lý tối đa {limit} hàng, trừ khi truy vấn tự đặt LIMIT.",
+    "queryRowLimitNoteNoLimit": "Mỗi lần chạy xử lý tối đa số hàng mặc định, trừ khi truy vấn tự đặt LIMIT.",
     "output": "Đầu ra",
     "validating": "Đang xác thực...",
     "validateAndClose": "Xác thực và Đóng",
@@ -9984,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "Trình duyệt đã chặn tải tệp...",
     "chartDataDownloadedCsv": "Dữ liệu biểu đồ đã được tải xuống dưới dạng tệp CSV",
+    "tableDownloadPartial": "Chỉ lấy được {count} hàng đầu tiên của kết quả nên tệp không đầy đủ.",
+    "tableDownloadServerPartial": "Máy chủ trả về dữ liệu không đầy đủ nên tệp có thể bị thiếu.",
+    "tableDownloadWaitForLoad": "Bảng vẫn đang tải. Hãy tải xuống lại khi hoàn tất.",
+    "preparingTableDownload": "Đang lấy tất cả các hàng để tải xuống…",
     "chartDataDownloadedJson": "Dữ liệu biểu đồ đã được tải xuống dưới dạng tệp JSON",
     "dynamicFilters": "Bộ lọc động",
     "failedToCancelRunningQuery": "Không thể hủy truy vấn đang chạy",
@@ -16089,8 +16096,10 @@
         "searchSuffixesAria": "Tìm kiếm bộ lọc hậu tố",
         "searchTypesAria": "Tìm kiếm trong bộ lọc loại",
         "facetAria": "{label}, {count} chỉ số",
+        "facetAriaUnchecked": "{label}, {count} có dữ liệu, {unchecked} chưa được chọn",
         "noPrefixMatch": "Không có tiền tố nào khớp.",
         "noSuffixMatch": "Không có hậu tố nào khớp.",
+        "uncheckedTooltip": "{count} có dữ liệu · {unchecked} chưa được chọn",
         "noTypeMatch": "Không có loại nào phù hợp."
       },
       "views": {
@@ -17760,13 +17769,9 @@
       "noAgentsDescription": "Không phát hiện tác nhân GenAI nào trong khoảng thời gian đã chọn. Hãy thử khoảng rộng hơn hoặc chuyển lại chế độ stream.",
       "viewByStream": "Xem theo stream",
       "search": {
-        "placeholder": "Tìm kiếm theo người dùng hoặc tin nhắn",
-        "title": "Khớp các phiên có ID người dùng hoặc văn bản hội thoại chứa văn bản",
         "noResultsTitle": "Không có phiên nào khớp với tìm kiếm của bạn",
-        "noResultsDescription": "Hãy thử từ khóa khác, trường khác hoặc khoảng thời gian rộng hơn.",
-        "clear": "Xóa tìm kiếm",
-        "user": "Người dùng: {user}",
-        "clearUser": "Hiển thị tất cả người dùng"
+        "noResultsDescription": "Thử bộ lọc khác hoặc phạm vi thời gian rộng hơn.",
+        "clear": "Xóa bộ lọc"
       }
     },
     "sessionDetail": {
@@ -17827,6 +17832,7 @@
         "costLead": "Cao nhất {peak} ·",
         "tokens": "{ratio}% Đã cache",
         "cacheImpact": "{ratio}% Tái sử dụng · {tokens} Tok Đã đọc",
+        "cacheHits": "· {hits}/{calls} lần gọi trúng cache",
         "cacheEstimate": "Tác động ròng bao gồm chi phí đọc cache và tạo cache.",
         "cacheImpactTooltipTitle": "Phân tích chi phí cache",
         "actualCost": "Chi phí thực tế",
@@ -18109,6 +18115,11 @@
       "unknown": "không xác định",
       "tokens": "Token",
       "tokensSuffix": "token",
+      "cacheHit": "{tokens} từ cache",
+      "cacheWrite": "Ghi cache {tokens}",
+      "cacheMiss": "Trượt cache",
+      "cacheMissCount": "{n} lần trượt cache",
+      "cacheDetail": "Đọc {read} token từ cache, ghi {written} token",
       "error": "Lỗi",
       "viewSpan": "Xem span"
     },
@@ -19071,7 +19082,7 @@
       "users": "Người dùng",
       "budgets": "Ngân sách",
       "discovery": "Khám phá",
-      "queues": "Hàng đợi",
+      "queues": "Hàng đợi gán nhãn",
       "datasets": "Tập dữ liệu",
       "experiments": "Thử nghiệm",
       "quality": "Chất lượng",
@@ -19356,15 +19367,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Thêm vào hàng đợi xem xét",
-        "title": "Thêm vào hàng đợi xem xét",
-        "hint": "Đưa {ref} vào hàng đợi để con người xem xét. Nó vẫn giữ nguyên vị trí — trạng thái xem xét nằm trong hàng đợi.",
-        "queueLabel": "Hàng đợi",
-        "queuePlaceholder": "Chọn một hàng đợi...",
-        "noQueues": "Không có hàng đợi nào chấp nhận {scope} — hãy tạo một hàng đợi từ trang Hàng đợi trước.",
-        "confirm": "Thêm vào hàng đợi",
+        "button": "Thêm vào hàng đợi gán nhãn",
+        "title": "Thêm vào hàng đợi gán nhãn",
+        "hint": "Thêm {ref} để đánh giá thủ công. Mục này vẫn ở nguyên vị trí — hàng đợi gán nhãn theo dõi trạng thái đánh giá của mục đó.",
+        "queueLabel": "Hàng đợi gán nhãn",
+        "queuePlaceholder": "Chọn hàng đợi gán nhãn...",
+        "noQueues": "Không có hàng đợi gán nhãn nào chấp nhận {scope} — hãy tạo một hàng đợi từ trang Hàng đợi gán nhãn trước.",
+        "confirm": "Thêm vào hàng đợi gán nhãn",
         "success": "Đã thêm vào {queue}",
-        "error": "Không thêm được mục này vào hàng đợi"
+        "error": "Không thể thêm mục này vào hàng đợi gán nhãn"
       },
       "dataset": {
         "button": "Thêm vào bộ dữ liệu",
@@ -19401,12 +19412,12 @@
         "session": "Phiên"
       },
       "inQueueFilter": {
-        "label": "Trong hàng đợi",
-        "notEnqueued": "Trong hàng đợi: Chưa xếp hàng",
-        "enqueued": "Trong hàng đợi: Bất kỳ hàng đợi nào",
-        "pending": "Trong hàng đợi: Đang chờ",
-        "reviewed": "Trong hàng đợi: Đã xem xét",
-        "all": "Trong hàng đợi: Tất cả"
+        "label": "Trạng thái hàng đợi gán nhãn",
+        "notEnqueued": "Chưa vào hàng đợi",
+        "enqueued": "Trong hàng đợi gán nhãn",
+        "pending": "Chờ đánh giá",
+        "reviewed": "Đã đánh giá",
+        "all": "Tất cả mục"
       },
       "columns": {
         "timestamp": "Dấu thời gian",
@@ -19422,7 +19433,7 @@
         "service": "Dịch vụ",
         "input": "Đầu vào",
         "quality": "Chất lượng",
-        "inQueue": "Trong hàng đợi?",
+        "inQueue": "Trong hàng đợi gán nhãn?",
         "actions": "Hành động"
       },
       "spanParent": "Trong {trace}",
@@ -19434,26 +19445,26 @@
       "inQueue": {
         "none": "Chưa xếp hàng",
         "reviewed": "Đã xem xét",
-        "multiple": "Trong {count} hàng đợi"
+        "multiple": "Trong {count} hàng đợi gán nhãn"
       },
-      "addToQueue": "Thêm vào hàng đợi",
+      "addToQueue": "Thêm vào hàng đợi gán nhãn",
       "addToQueueMenu": {
-        "loading": "Đang tải hàng đợi...",
-        "noQueues": "Chưa có hàng đợi nào — hãy tạo một hàng đợi từ trang Hàng đợi trước.",
+        "loading": "Đang tải hàng đợi gán nhãn...",
+        "noQueues": "Chưa có hàng đợi gán nhãn nào — hãy tạo một hàng đợi từ trang Hàng đợi gán nhãn trước.",
         "dimensions": "{count} chiều | {count} chiều",
         "accepts": "Chỉ chấp nhận {types}",
-        "sectionTitle": "Thêm vào hàng đợi",
-        "manageQueues": "Quản lý hàng đợi"
+        "sectionTitle": "Thêm vào hàng đợi gán nhãn",
+        "manageQueues": "Quản lý hàng đợi gán nhãn"
       },
-      "addSuccess": "Đã thêm vào {queue} — hàng này vẫn ở trong Discovery, trạng thái của nó nằm trong hàng đợi.",
-      "addError": "Không thể thêm các mục vào hàng đợi",
-      "openQueue": "Mở hàng đợi",
-      "queuesError": "Không thể tải hàng đợi"
+      "addSuccess": "Đã thêm vào {queue} — dòng vẫn ở trong Discovery và hàng đợi gán nhãn theo dõi trạng thái đánh giá của dòng đó.",
+      "addError": "Không thể thêm các mục vào hàng đợi gán nhãn",
+      "openQueue": "Mở hàng đợi gán nhãn",
+      "queuesError": "Không thể tải hàng đợi gán nhãn"
     },
     "queues": {
-      "searchPlaceholder": "Tìm kiếm hàng đợi...",
-      "newButton": "Hàng đợi mới",
-      "loadError": "Không thể tải hàng đợi",
+      "searchPlaceholder": "Tìm kiếm hàng đợi gán nhãn...",
+      "newButton": "Tạo hàng đợi gán nhãn",
+      "loadError": "Không thể tải hàng đợi gán nhãn",
       "optionsLoadError": "Không thể tải cấu hình điểm",
       "review": "Xem xét",
       "cleared": "Đã xóa",
@@ -19468,7 +19479,7 @@
         "actions": "Thao tác"
       },
       "create": {
-        "title": "Hàng đợi mới",
+        "title": "Hàng đợi gán nhãn mới",
         "errors": {
           "name": "Tên là bắt buộc",
           "scoreConfigs": "Liên kết ít nhất một Cấu hình điểm số"
@@ -19476,9 +19487,9 @@
         "nameLabel": "Tên",
         "namePlaceholder": "ví dụ: hallucination_review",
         "descriptionLabel": "Mô tả",
-        "descriptionPlaceholder": "Hàng đợi này dùng để làm gì và ai xem xét...",
+        "descriptionPlaceholder": "Hàng đợi gán nhãn này dùng để làm gì và ai sẽ đánh giá...",
         "scoreConfigsLabel": "Cấu hình điểm số",
-        "scoreConfigsHint": "Hàng đợi chấm điểm các mục trên một hoặc nhiều khía cạnh. Mỗi Cấu hình điểm số là một khía cạnh duy nhất — chọn các cấu hình để liên kết và ghim từng cấu hình vào một phiên bản.",
+        "scoreConfigsHint": "Hàng đợi gán nhãn chấm điểm các mục theo một hoặc nhiều chiều. Mỗi Cấu hình điểm là một chiều — hãy chọn các cấu hình để liên kết và ghim từng cấu hình vào một phiên bản.",
         "scoreConfigsEmpty": "Chọn các Cấu hình điểm số để liên kết.",
         "addScoreConfig": "Thêm Cấu hình điểm số",
         "allScoreConfigsAdded": "Tất cả các cấu hình điểm số đã được thêm.",
@@ -19486,10 +19497,10 @@
         "noScoreConfigs": "Chưa có cấu hình điểm số nào — hãy tạo một cấu hình trong Cấu hình điểm số trước.",
         "targetDatasetLabel": "Tập dữ liệu đích",
         "targetDatasetNone": "Không có (chỉ xem xét)",
-        "targetDatasetHint": "Hàng đợi chỉ xem xét — các mục đã xem xét sẽ không được chưng cất vào tập dữ liệu.",
+        "targetDatasetHint": "Nếu không có tập dữ liệu đích, các mục trong hàng đợi gán nhãn này sẽ chỉ được đánh giá.",
         "autoRoutingLabel": "Tự động định tuyến",
-        "autoRoutingHint": "Tự động xếp hàng đợi các đối tượng có điểm số khớp với điều kiện. Để trống để cung cấp hàng đợi này theo cách thủ công từ Discovery.",
-        "autoRoutingEmpty": "Không có tự động định tuyến — hàng đợi này được cung cấp thủ công.",
+        "autoRoutingHint": "Tự động xếp hàng các đối tượng có điểm khớp với một điều kiện. Để trống nếu muốn thêm các mục vào hàng đợi gán nhãn này từ Discovery.",
+        "autoRoutingEmpty": "Các mục được thêm vào hàng đợi gán nhãn này theo cách thủ công.",
         "addCondition": "Thêm điều kiện",
         "conditionAnd": "VÀ",
         "operatorIs": "bằng",
@@ -19498,12 +19509,12 @@
         "conditionValuePlaceholder": "Giá trị",
         "pin": "Ghim phiên bản",
         "versionLatest": "v{version} (mới nhất)",
-        "success": "Đã tạo hàng đợi",
-        "error": "Không thể tạo hàng đợi"
+        "success": "Đã tạo hàng đợi gán nhãn",
+        "error": "Không thể tạo hàng đợi gán nhãn"
       },
       "detail": {
-        "fallbackTitle": "Hàng đợi",
-        "loadError": "Không thể tải các mục trong hàng đợi",
+        "fallbackTitle": "Hàng đợi gán nhãn",
+        "loadError": "Không thể tải các mục trong hàng đợi gán nhãn",
         "startReviewing": "Bắt đầu xem xét",
         "scoreConfigs": "Cấu hình điểm số ({count})",
         "targetDataset": "Tập dữ liệu đích",
@@ -19513,7 +19524,7 @@
         "inTrace": "Trong Trace {traceId}",
         "reviewAgain": "Xem xét lại",
         "emptyTitle": "Không có gì để xem xét",
-        "emptyBody": "Thêm trace, span hoặc phiên vào hàng đợi này từ Khám phá hoặc chế độ xem trace.",
+        "emptyBody": "Thêm trace, span hoặc phiên vào hàng đợi gán nhãn này từ Discovery hoặc chế độ xem trace.",
         "columns": {
           "refType": "Tham chiếu",
           "refId": "Tham chiếu",
@@ -19584,7 +19595,7 @@
         "true": "Đúng",
         "false": "Sai",
         "allReviewedTitle": "Tất cả các mục đã được đánh giá",
-        "allReviewedBody": "Mọi mục trong hàng đợi này đều có một đánh giá hoàn tất."
+        "allReviewedBody": "Mọi mục trong hàng đợi gán nhãn này đều đã hoàn tất đánh giá."
       }
     },
     "experiments": {
@@ -21913,6 +21924,9 @@
       "initialNumberPositive": "Số ban đầu phải là số dương.",
       "runQueryBeforeDownload": "Vui lòng chạy truy vấn trước khi tải xuống.",
       "noDataToDownload": "Không tìm thấy dữ liệu để tải xuống.",
+      "noDataToDownloadPartial": "Không tìm thấy dữ liệu để tải. Kết quả là một phần: {reason}",
+      "downloadMayBeIncomplete": "Tệp đã tải có thể không đầy đủ.",
+      "downloadMayBeIncompleteReason": "Tệp đã tải có thể không đầy đủ: {reason}",
       "transformTypeFunction": "Hàm",
       "jobContextRemoved": "Ngữ cảnh công việc đã bị xóa",
       "histogramNotAvailableScheduled": "Biểu đồ histogram không khả dụng cho tìm kiếm định kỳ",
@@ -25740,8 +25754,8 @@
     "sloDetail": "Chi tiết SLO",
     "alertDetail": "Chi tiết cảnh báo",
     "editAlert": "Chỉnh sửa cảnh báo",
-    "aiQueueDetail": "Hàng đợi",
-    "aiQueueReview": "Xem xét hàng đợi",
+    "aiQueueDetail": "Hàng đợi chú thích",
+    "aiQueueReview": "Đánh giá hàng đợi chú thích",
     "aiDatasetDetail": "Tập dữ liệu",
     "aiPromptCreate": "Prompt mới",
     "aiPromptVersionCreate": "Phiên bản Prompt mới",
@@ -34694,6 +34708,25 @@
       },
       "noHighConfidence": "Không có tên nào có độ tin cậy cao"
     }
+  },
+  "commandPalette": {
+    "title": "Tìm trang, tài nguyên và thao tác",
+    "placeholder": "Tìm tên và ID",
+    "moreTypes": "Loại khác",
+    "pages": "Trang",
+    "actions": "Tạo",
+    "recent": "Truy cập gần đây",
+    "localHistory": "Lịch sử cục bộ",
+    "clearRecent": "Xóa truy cập gần đây",
+    "historyStorageUnavailable": "Không thể lưu lịch sử truy cập",
+    "recentUnavailable": "Mục này hiện không khả dụng",
+    "loading": "Đang tìm…",
+    "partial": "Một số kết quả không khả dụng",
+    "failed": "Không thể hoàn tất tìm kiếm",
+    "offline": "Bạn đang ngoại tuyến. Vẫn xem được truy cập gần đây.",
+    "sourceUnavailable": "Loại tài nguyên này hiện không khả dụng",
+    "emptyHelp": "Nhập tên hoặc ID để tìm",
+    "globalShortcut": "Mở tìm kiếm toàn cục"
   },
   "timeRangeInput": {
     "label": "Nhập khoảng thời gian",

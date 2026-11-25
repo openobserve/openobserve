@@ -5,6 +5,7 @@ import { usePanelDataLoader } from "./usePanelDataLoader";
 import { DASHBOARD_FRESH_PANEL_TIME } from "./dashboardFreshPanelTime";
 import queryService from "../../services/search";
 import config from "@/aws-exports";
+import { generateTraceContext } from "@/utils/zincutils";
 
 const RealAbortController = globalThis.AbortController;
 
@@ -1623,6 +1624,153 @@ describe("usePanelDataLoader", () => {
     });
   });
 
+  describe("a load that ends without querying", () => {
+    const window = () =>
+      createMockSelectedTimeObj({
+        start_time: new Date(Date.now() - 3600000),
+        end_time: new Date(),
+      });
+    const loaderWith = (
+      onEnded: (shown: boolean) => void,
+      {
+        panelSchema = createMockPanelSchema(),
+        selectedTimeObj = window(),
+        forceLoad = true,
+        injected = undefined as any,
+      } = {},
+    ) =>
+      usePanelDataLoader(
+        panelSchema,
+        selectedTimeObj,
+        createMockVariablesData(),
+        ref({ offsetWidth: 1000 }),
+        ref(forceLoad),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null), // runId
+        ref(null), // tabId
+        ref(null), // tabName
+        ref(null), // searchResponse
+        ref(false), // is_ui_histogram
+        ref(null), // dashboardName
+        ref(null), // folderName
+        ref(false), // shouldRefreshWithoutCache
+        ref(null), // regionClusterParams
+        ref(false), // allowAnnotationsAPI
+        ref(injected),
+        onEnded,
+      );
+    const cacheFor = (panelSchema: any, errorMessage = "") => ({
+      key: {
+        panelSchema: panelSchema.value,
+        variablesData: [],
+        forceLoad: false,
+        dashboardId: "test-dashboard",
+        folderId: "test-folder",
+      },
+      value: {
+        data: [{ test: "cached_data" }],
+        loading: false,
+        errorDetail: { message: errorMessage, code: "" },
+        metadata: { queries: [] },
+        annotations: [],
+        resultMetaData: [],
+        lastTriggeredAt: Date.now(),
+        isPartialData: false,
+        isOperationCancelled: false,
+      },
+      cacheTimeRange: { start_time: Date.now() - 3600000, end_time: Date.now() },
+    });
+
+    it.each([
+      ["no queries", []],
+      ["only empty query text", [{ query: "", fields: { stream_type: "logs" } }]],
+    ])("reports nothing shown for a panel with %s", async (_label, queries) => {
+      const onEnded = vi.fn();
+      await loaderWith(onEnded, { panelSchema: createMockPanelSchema({ queries }) }).loadData();
+      expect(onEnded.mock.calls).toEqual([[false]]);
+    });
+
+    it("reports nothing shown when the time range is invalid", async () => {
+      const onEnded = vi.fn();
+      const selectedTimeObj = createMockSelectedTimeObj({
+        start_time: new Date("Invalid"),
+        end_time: new Date("Invalid"),
+      });
+      await loaderWith(onEnded, { selectedTimeObj }).loadData();
+      expect(onEnded.mock.calls).toEqual([[false]]);
+    });
+
+    it("reports a shown result when the first load restores the cache", async () => {
+      const onEnded = vi.fn();
+      const panelSchema = createMockPanelSchema();
+      mockCacheData = cacheFor(panelSchema);
+      allowPanelToBecomeVisible();
+      const loader = loaderWith(onEnded, { panelSchema, forceLoad: false });
+      await loader.loadData();
+      expect(loader.data.value).toEqual([{ test: "cached_data" }]);
+      expect(onEnded.mock.calls).toEqual([[true]]);
+    });
+
+    it("reports nothing shown when the restored cache holds an error", async () => {
+      const onEnded = vi.fn();
+      const panelSchema = createMockPanelSchema();
+      mockCacheData = cacheFor(panelSchema, "query failed");
+      allowPanelToBecomeVisible();
+      await loaderWith(onEnded, { panelSchema, forceLoad: false }).loadData();
+      expect(onEnded.mock.calls).toEqual([[false]]);
+    });
+
+    it("reports a shown result for injected PromQL data", async () => {
+      const onEnded = vi.fn();
+      const injected = { data: [{ result: [] }], metadata: { queries: [] } };
+      await loaderWith(onEnded, { injected }).loadData();
+      expect(onEnded.mock.calls).toEqual([[true]]);
+    });
+
+    it("stays silent for a load that queries", async () => {
+      const onEnded = vi.fn();
+      const payloads: any[] = [];
+      streamOverride = (payload) => {
+        payloads.push(payload);
+        return "held-stream";
+      };
+      await loaderWith(onEnded).loadData();
+      expect(payloads).toHaveLength(1);
+      expect(onEnded).not.toHaveBeenCalled();
+    });
+
+    it("stays silent for a superseded load, since the newer one answers for the panel", async () => {
+      global.AbortController = class {
+        signal = { aborted: false, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+        abort() {
+          this.signal.aborted = true;
+        }
+      } as unknown as typeof AbortController;
+      let releaseFirst: (v: unknown) => void = () => {};
+      mockGetStream
+        .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = resolve)))
+        .mockResolvedValueOnce(null);
+      streamOverride = () => "held-stream";
+      const onEnded = vi.fn();
+      const loader = loaderWith(onEnded, {
+        panelSchema: createMockPanelSchema({
+          queryConfig: { fields: { stream: "geo", stream_type: "enrichment_tables" } },
+        }),
+      });
+
+      const first = loader.loadData();
+      await vi.waitFor(() => expect(mockGetStream).toHaveBeenCalledTimes(1));
+      await loader.loadData();
+      releaseFirst(null);
+      await first;
+
+      expect(onEnded).not.toHaveBeenCalled();
+    });
+  });
+
   describe("enrichment table panels superseded while the stats load", () => {
     it("fires only the newer run's query", async () => {
       global.AbortController = class {
@@ -1818,6 +1966,66 @@ describe("usePanelDataLoader", () => {
 
       expect(queryService.delete_running_queries).not.toHaveBeenCalled();
       expect(streams).toHaveLength(2);
+    });
+
+    const failOneExport = async (edition: { isEnterprise: string; isCloud: string }) => {
+      const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
+      Object.assign(config, edition);
+      const streams: {
+        payload: { traceId: string };
+        callbacks: { error: (payload: unknown, error: unknown) => void };
+      }[] = [];
+      streamOverride = (payload, callbacks) => {
+        streams.push({ payload, callbacks });
+        return "held-stream";
+      };
+      try {
+        const loader = usePanelDataLoader(
+          createMockPanelSchema(),
+          createMockSelectedTimeObj({
+            start_time: new Date(Date.now() - 3600000),
+            end_time: new Date(),
+          }),
+          createMockVariablesData(),
+          ref(null),
+          ref(true),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(false),
+        );
+        const meta = { query: "SELECT * FROM logs", startTime: 1, endTime: 2 };
+        vi.mocked(generateTraceContext)
+          .mockReturnValueOnce({ traceId: "export-a", traceparent: "tp" } as never)
+          .mockReturnValueOnce({ traceId: "export-b", traceparent: "tp" } as never);
+        const exported = loader.fetchExportRows([meta, meta], [[], []], 100, null);
+        const [failing, sibling] = streams.slice(-2);
+        vi.mocked(queryService.delete_running_queries).mockClear();
+        failing.callbacks.error(failing.payload, { content: { message: "boom" } });
+        await expect(exported).rejects.toEqual({ message: "boom" });
+        return sibling.payload.traceId;
+      } finally {
+        Object.assign(config, original);
+      }
+    };
+
+    it("cancels a failed export's sibling queries on the server", async () => {
+      const siblingTraceId = await failOneExport({ isEnterprise: "true", isCloud: "false" });
+
+      expect(queryService.delete_running_queries).toHaveBeenCalledWith("test-org", [
+        siblingTraceId,
+      ]);
+    });
+
+    it("skips the export's server-side cancel on OSS", async () => {
+      await failOneExport({ isEnterprise: "false", isCloud: "false" });
+
+      expect(queryService.delete_running_queries).not.toHaveBeenCalled();
     });
 
     it("a stream completing while the rerun is debounced writes nothing", async () => {
