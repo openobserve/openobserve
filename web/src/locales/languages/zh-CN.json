@@ -1920,6 +1920,7 @@
     "patternCount": "计数",
     "errorConstructingSearchQuery": "构造搜索查询时发生错误。",
     "errorExtractingPatterns": "提取模式时出错。请重试。",
+    "patternsNoReadPermission": "您无权读取此数据流。",
     "errorWhileApplyingSavedView": "应用已保存视图时出错。",
     "errorWhileExtractingStreamFields": "提取流字段时出错。",
     "errorWhileGeneratingHistogramData": "生成直方图数据时出错。",

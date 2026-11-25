@@ -1920,6 +1920,7 @@
     "patternCount": "Conteggio",
     "errorConstructingSearchQuery": "Si è verificato un errore durante la costruzione della query di ricerca.",
     "errorExtractingPatterns": "Errore nell'estrazione dei pattern. Riprova.",
+    "patternsNoReadPermission": "Non hai l’autorizzazione per leggere questo stream.",
     "errorWhileApplyingSavedView": "Errore durante l'applicazione della vista salvata.",
     "errorWhileExtractingStreamFields": "Errore durante l'estrazione dei campi dello stream.",
     "errorWhileGeneratingHistogramData": "Errore durante la generazione dei dati dell'istogramma.",

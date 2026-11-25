@@ -1920,6 +1920,7 @@
     "patternCount": "Sayı",
     "errorConstructingSearchQuery": "Arama sorgusu oluşturulurken bir hata oluştu.",
     "errorExtractingPatterns": "Desenler çıkarılırken hata oluştu. Lütfen tekrar deneyin.",
+    "patternsNoReadPermission": "Bu akışı okuma izniniz yok.",
     "errorWhileApplyingSavedView": "Kayıtlı görünüm uygulanırken hata oluştu.",
     "errorWhileExtractingStreamFields": "Akış alanları çıkarılırken hata oluştu.",
     "errorWhileGeneratingHistogramData": "Histogram verileri oluşturulurken hata oluştu.",

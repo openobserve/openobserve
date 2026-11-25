@@ -1920,6 +1920,7 @@
     "patternCount": "الكونت",
     "errorConstructingSearchQuery": "حدث خطأ أثناء بناء استعلام البحث.",
     "errorExtractingPatterns": "خطأ في استخراج الأنماط. يرجى المحاولة مرة أخرى.",
+    "patternsNoReadPermission": "ليس لديك إذن لقراءة هذا التدفق.",
     "errorWhileApplyingSavedView": "خطأ أثناء تطبيق العرض المحفوظ.",
     "errorWhileExtractingStreamFields": "خطأ أثناء استخراج حقول التدفقات.",
     "errorWhileGeneratingHistogramData": "خطأ أثناء توليد بيانات الرسم التكراري.",

@@ -1920,6 +1920,7 @@
     "patternCount": "Anzahl",
     "errorConstructingSearchQuery": "Beim Erstellen der Suchabfrage ist ein Fehler aufgetreten.",
     "errorExtractingPatterns": "Fehler beim Extrahieren von Mustern. Bitte versuchen Sie es erneut.",
+    "patternsNoReadPermission": "Sie haben keine Berechtigung, diesen Stream zu lesen.",
     "errorWhileApplyingSavedView": "Fehler beim Anwenden der gespeicherten Ansicht.",
     "errorWhileExtractingStreamFields": "Fehler beim Extrahieren der Stream-Felder.",
     "errorWhileGeneratingHistogramData": "Fehler beim Generieren der Histogrammdaten.",

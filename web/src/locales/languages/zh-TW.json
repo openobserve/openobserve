@@ -1920,6 +1920,7 @@
     "patternCount": "計數",
     "errorConstructingSearchQuery": "建構搜尋查詢時發生錯誤。",
     "errorExtractingPatterns": "擷取模式時發生錯誤。請再試一次。",
+    "patternsNoReadPermission": "您無權讀取此資料流。",
     "errorWhileApplyingSavedView": "套用已儲存檢視時發生錯誤。",
     "errorWhileExtractingStreamFields": "擷取串流欄位時發生錯誤。",
     "errorWhileGeneratingHistogramData": "產生直方圖資料時發生錯誤。",

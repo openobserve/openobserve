@@ -1920,6 +1920,7 @@
     "patternCount": "Số lượng",
     "errorConstructingSearchQuery": "Đã xảy ra lỗi khi xây dựng truy vấn tìm kiếm.",
     "errorExtractingPatterns": "Lỗi khi trích xuất mẫu. Vui lòng thử lại.",
+    "patternsNoReadPermission": "Bạn không có quyền đọc luồng này.",
     "errorWhileApplyingSavedView": "Lỗi khi áp dụng khung nhìn đã lưu.",
     "errorWhileExtractingStreamFields": "Lỗi khi trích xuất các trường stream.",
     "errorWhileGeneratingHistogramData": "Lỗi khi tạo dữ liệu histogram.",

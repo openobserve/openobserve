@@ -1920,6 +1920,7 @@
     "patternCount": "จำนวน",
     "errorConstructingSearchQuery": "An error occurred while constructing the search query.",
     "errorExtractingPatterns": "Error extracting patterns. Please try again.",
+    "patternsNoReadPermission": "คุณไม่มีสิทธิ์อ่านสตรีมนี้",
     "errorWhileApplyingSavedView": "Error while applying saved view.",
     "errorWhileExtractingStreamFields": "Error while extracting stream fields.",
     "errorWhileGeneratingHistogramData": "Error while generating histogram data.",

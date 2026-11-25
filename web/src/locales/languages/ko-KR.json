@@ -1920,6 +1920,7 @@
     "patternCount": "개수",
     "errorConstructingSearchQuery": "검색 쿼리를 구성하는 동안 오류가 발생했습니다.",
     "errorExtractingPatterns": "패턴을 추출하는 중 오류가 발생했습니다. 다시 시도해 주세요.",
+    "patternsNoReadPermission": "이 스트림을 읽을 권한이 없습니다.",
     "errorWhileApplyingSavedView": "저장된 보기를 적용하는 동안 오류가 발생했습니다.",
     "errorWhileExtractingStreamFields": "스트림 필드를 추출하는 동안 오류가 발생했습니다.",
     "errorWhileGeneratingHistogramData": "히스토그램 데이터를 생성하는 동안 오류가 발생했습니다.",

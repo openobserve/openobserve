@@ -1920,6 +1920,7 @@
     "patternCount": "Liczba",
     "errorConstructingSearchQuery": "Wystąpił błąd podczas konstruowania zapytania wyszukiwania.",
     "errorExtractingPatterns": "Błąd podczas wyodrębniania wzorców. Spróbuj ponownie.",
+    "patternsNoReadPermission": "Nie masz uprawnień do odczytu tego strumienia.",
     "errorWhileApplyingSavedView": "Błąd podczas stosowania zapisanego widoku.",
     "errorWhileExtractingStreamFields": "Błąd podczas wyodrębniania pól strumienia.",
     "errorWhileGeneratingHistogramData": "Błąd podczas generowania danych histogramu.",

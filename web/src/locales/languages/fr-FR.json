@@ -1920,6 +1920,7 @@
     "patternCount": "Nombre",
     "errorConstructingSearchQuery": "Une erreur est survenue lors de la construction de la requête de recherche.",
     "errorExtractingPatterns": "Erreur lors de l'extraction des modèles. Veuillez réessayer.",
+    "patternsNoReadPermission": "Vous n’avez pas l’autorisation de lire ce flux.",
     "errorWhileApplyingSavedView": "Erreur lors de l'application de la vue enregistrée.",
     "errorWhileExtractingStreamFields": "Erreur lors de l'extraction des champs de flux.",
     "errorWhileGeneratingHistogramData": "Erreur lors de la génération des données d'histogramme.",

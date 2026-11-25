@@ -1920,6 +1920,7 @@
     "patternCount": "Количество",
     "errorConstructingSearchQuery": "Произошла ошибка при построении поискового запроса.",
     "errorExtractingPatterns": "Ошибка извлечения шаблонов. Попробуйте еще раз.",
+    "patternsNoReadPermission": "У вас нет разрешения на чтение этого потока.",
     "errorWhileApplyingSavedView": "Ошибка при применении сохраненного представления.",
     "errorWhileExtractingStreamFields": "Ошибка при извлечении полей потока.",
     "errorWhileGeneratingHistogramData": "Ошибка при генерации данных гистограммы.",

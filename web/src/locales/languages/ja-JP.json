@@ -1920,6 +1920,7 @@
     "patternCount": "カウント",
     "errorConstructingSearchQuery": "検索クエリの作成中にエラーが発生しました。",
     "errorExtractingPatterns": "パターンの抽出中にエラーが発生しました。もう一度お試しください。",
+    "patternsNoReadPermission": "このストリームを読み取る権限がありません。",
     "errorWhileApplyingSavedView": "保存済みビューの適用中にエラーが発生しました。",
     "errorWhileExtractingStreamFields": "ストリームフィールドの抽出中にエラーが発生しました。",
     "errorWhileGeneratingHistogramData": "ヒストグラムデータの生成中にエラーが発生しました。",
