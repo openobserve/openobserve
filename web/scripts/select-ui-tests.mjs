@@ -346,8 +346,9 @@ export function select({ repo, base, head }) {
       changed,
     };
   }
-  // The graph stops at web/, so a changed file outside it that web code imports runs everything.
+  // The graph stops at web/, so a changed file outside it counts as a change to each web file naming it.
   const outside = new Set(changed.filter((p) => !p.startsWith("web/")));
+  const outsideUsers = [];
   if (outside.size)
     for (const [f, t] of texts)
       for (const m of t.matchAll(/["'](\.\.?\/[^"'\s]+)["']/g)) {
@@ -355,7 +356,9 @@ export function select({ repo, base, head }) {
         const hit = [p, ...EXTS.map((e) => p + e), ...EXTS.map((e) => `${p}/index${e}`)].find(
           (c) => outside.has(c),
         );
-        if (hit) return { ...full(`web/ imports a changed file outside web/: ${hit}`), changed };
+        if (!hit) continue;
+        if (inSetup(f)) return { ...full(`setupTests loads ${f}, which names ${hit}`), changed };
+        outsideUsers.push([hit, f]);
       }
   const idx = new TextIndex(texts, specs);
   let switchers;
@@ -370,6 +373,7 @@ export function select({ repo, base, head }) {
     for (const s of got) picked.add(s);
     reasons.push({ file, specs: got.size });
   };
+  for (const [hit, f] of outsideUsers) take(hit, [f]);
   for (const repoPath of changed) {
     if (!repoPath.startsWith("web/")) continue;
     const f = repoPath.slice(4);

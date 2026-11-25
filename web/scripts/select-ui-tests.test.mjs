@@ -52,7 +52,11 @@ write({
   "web/src/test/readData.ts": `import fs from "node:fs";\nexport const d = () => fs.readFileSync("src/data/a.json");`,
   "web/src/data/a.json": `{"value":1}`,
   "web/src/data.spec.ts": `import { d } from "./test/readData";`,
-  "web/src/utils/q.ts": "export const q = 1;",
+  "web/src/utils/q.ts": `export const q = 1;\nconst cfg = "../../../src/config/setup.json";`,
+  "src/config/setup.json": "{}",
+  "src/config/state.json": "{}",
+  "web/src/utils/state.ts": `export const st = "../../../src/config/state.json";`,
+  "web/src/utils/state.spec.ts": `import { st } from "./state";`,
   "web/src/test/helper.ts": "export const h = 1;",
   "web/src/utils/a.ts": "export const a = 1;",
   "web/src/comp/B.vue": `<script setup>import { a } from "@/utils/a";</script>`,
@@ -120,21 +124,26 @@ test("app code loaded by the setup file runs everything", () => {
   assert.equal(r.setupHits, 1);
 });
 
-test("a changed file outside web/ that a web file imports runs everything", () => {
-  const r = run({
-    "src/config/parity.json": `{"a":1}`,
-    "web/src/utils/a.ts": "export const a = 3;",
-  });
-  assert.equal(r.mode, "full");
-  assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/parity.json");
+test("a changed file outside web/ picks the spec that imports it", () => {
+  const r = run({ "src/config/parity.json": `{"a":1}`, "web/.prettierignore": "x" });
+  assert.equal(r.mode, "picked");
+  assert.deepEqual(graphSpecs(r), ["src/utils/parity.spec.ts"]);
 });
 
-test("an extensionless import of a changed file outside web/ runs everything", () => {
-  const r = run({
-    "src/config/shared.ts": "export const s = 2;",
-    "web/src/utils/a.ts": "export const a = 3;",
-  });
-  assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/shared.ts");
+test("an extensionless import of a changed file outside web/ picks its importer", () => {
+  const r = run({ "src/config/shared.ts": "export const s = 2;", "web/.prettierignore": "x" });
+  assert.deepEqual(graphSpecs(r), ["src/utils/shared.spec.ts"]);
+});
+
+test("a changed file outside web/ picks the specs that reach the web file naming it", () => {
+  const r = run({ "src/config/state.json": `{"a":1}`, "web/.prettierignore": "x" });
+  assert.deepEqual(graphSpecs(r), ["src/utils/state.spec.ts"]);
+});
+
+test("a changed file outside web/ named by a setup-loaded file runs everything", () => {
+  const r = run({ "src/config/setup.json": `{"a":1}`, "web/.prettierignore": "x" });
+  assert.equal(r.mode, "full");
+  assert.equal(r.reason, "setupTests loads src/utils/q.ts, which names src/config/setup.json");
 });
 
 test("index.html runs everything, since a spec reads it from disk", () => {
@@ -142,9 +151,9 @@ test("index.html runs everything, since a spec reads it from disk", () => {
   assert.equal(run({ "web/index.html": null }).mode, "full");
 });
 
-test("a query-suffixed import of a changed file outside web/ runs everything", () => {
+test("a query-suffixed import of a changed file outside web/ picks its importer", () => {
   const r = run({ "src/config/raw.json": "2", "web/.prettierignore": "x" });
-  assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/raw.json");
+  assert.deepEqual(graphSpecs(r), ["src/utils/raw.spec.ts"]);
 });
 
 test("a change outside web/ runs the specs that read files from disk", () => {
