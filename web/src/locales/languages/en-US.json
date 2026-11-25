@@ -10431,13 +10431,17 @@
       "openInMetrics": "Open in Metrics",
       "openSample": "Open sample",
       "prevSample": "Previous sample",
-      "nextSample": "Next sample"
+      "nextSample": "Next sample",
+      "noSamples": "No samples match this filter"
     },
     "logExplorer": {
       "title": "Logs Explorer",
       "openInLogs": "Open in Logs",
       "invalidParams": "Invalid drilldown parameters",
       "noEvents": "No events match this filter",
+      "pagerCounting": "{start}-{end} of …",
+      "pagerRange": "{start}-{end}",
+      "queryFailed": "The query could not run",
       "filterHint": "Click to explore related logs",
       "timestamp": "Timestamp",
       "queryMode": "SQL",

@@ -406,6 +406,10 @@ describe("DashboardLogDrawer streaming search", () => {
   });
 
   it("a page turn keeps the count and asks for no new one", async () => {
+    stream.reply = (req, h) => {
+      h.data(req, hits(rowsOf(req.queryReq.query.size)));
+      h.complete(req, {});
+    };
     stream.count = countOf([500]);
     const wrapper = mountIt();
     await flushPromises();
@@ -413,6 +417,83 @@ describe("DashboardLogDrawer streaming search", () => {
     await state(wrapper).goToPage(3);
     expect(countCalls()).toHaveLength(1);
     expect(state(wrapper).total).toBe(500);
+  });
+
+  it("no rows: the total is 0 and there is no pager", async () => {
+    stream.count = countOf([100]);
+    const wrapper = mountIt();
+    await flushPromises();
+    expect(state(wrapper).total).toBe(0);
+    expect(wrapper.find("[data-test='explorer-results-pager']").exists()).toBe(false);
+  });
+
+  it("a full page waits for its count ('x-y of …'); a failed count leaves just the range", async () => {
+    stream.reply = (req, h) => {
+      h.data(req, hits(rowsOf(100)));
+      h.complete(req, {});
+    };
+    const pendingCounts: any[] = [];
+    stream.count = (req, h) => pendingCounts.push([req, h]);
+    const wrapper = mountIt();
+    await flushPromises();
+    expect(state(wrapper).total).toBeNull();
+    const count = () =>
+      wrapper.findComponent({ name: "TablePaginationControls" }).props("countText");
+    expect(count()).toBe("1-100 of …");
+    const [req, h] = pendingCounts[0];
+    h.error(req, { type: "error", content: { error: "count failed" } });
+    await flushPromises();
+    expect(state(wrapper).total).toBeNull();
+    expect(count()).toBe("1-100");
+  });
+
+  it("a new query or time range never keeps the old total; the old count's late answer is dropped", async () => {
+    stream.reply = (req, h) => {
+      h.data(req, hits(rowsOf(100)));
+      h.complete(req, {});
+    };
+    stream.count = countOf([500]);
+    const wrapper = mountIt();
+    await flushPromises();
+    expect(state(wrapper).total).toBe(500);
+    const pendingCounts: any[] = [];
+    stream.count = (req, h) => pendingCounts.push([req, h]);
+    state(wrapper).onDateChange({ startTime: 5, endTime: 9 });
+    await flushPromises();
+    expect(state(wrapper).total).toBeNull();
+    // Another rerun cancels that count; its late answer changes nothing.
+    state(wrapper).runQuery();
+    await flushPromises();
+    const [oldReq, oldH] = pendingCounts[0];
+    oldH.data(oldReq, hits([{ zo_sql_num: 999 }]));
+    oldH.complete(oldReq, {});
+    await flushPromises();
+    expect(state(wrapper).total).toBeNull();
+    const [req, h] = pendingCounts[1];
+    h.data(req, hits([{ zo_sql_num: 120 }]));
+    h.complete(req, {});
+    await flushPromises();
+    expect(state(wrapper).total).toBe(120);
+  });
+
+  it("the detail counter is the event's place in the whole result, out of the total once known", async () => {
+    stream.reply = (req, h) => {
+      h.data(req, hits(rowsOf(100)));
+      h.complete(req, {});
+    };
+    const pendingCounts: any[] = [];
+    stream.count = (req, h) => pendingCounts.push([req, h]);
+    const wrapper = mountIt();
+    await flushPromises();
+    await state(wrapper).goToPage(1);
+    state(wrapper).openEventDetail(state(wrapper).events[1]);
+    await flushPromises();
+    expect(state(wrapper).detailPosition).toBe("102");
+    const [req, h] = pendingCounts[0];
+    h.data(req, hits([{ zo_sql_num: 203 }]));
+    h.complete(req, {});
+    await flushPromises();
+    expect(state(wrapper).detailPosition).toBe("102 / 203");
   });
 
   it("a streaming aggregate replaces its rows with each chunk instead of appending", async () => {
@@ -441,8 +522,8 @@ describe("DashboardLogDrawer streaming search", () => {
     stream.reply = (req, h) => h.error(req, { type: "error", content: { error: "bad field" } });
     const wrapper = mountIt();
     await flushPromises();
-    expect(state(wrapper).errorMsg).toContain("bad field");
-    expect(state(wrapper).errorMsg).toContain('SELECT * FROM "app"');
+    expect(state(wrapper).errorMsg).toBe("bad field");
+    expect(state(wrapper).errorSql).toContain('SELECT * FROM "app"');
     expect(state(wrapper).events).toEqual([]);
     expect(state(wrapper).loading).toBe(false);
   });
@@ -469,11 +550,11 @@ describe("DashboardLogDrawer streaming search", () => {
     };
     answer(pending[0], [{ old: 1 }]);
     answer(pendingCounts[0], [{ zo_sql_num: 999 }]);
-    answer(pending[1], [{ fresh: 1 }]);
-    answer(pendingCounts[1], [{ zo_sql_num: 7 }]);
+    answer(pending[1], rowsOf(100));
+    answer(pendingCounts[1], [{ zo_sql_num: 300 }]);
     await flushPromises();
-    expect(state(wrapper).events).toEqual([{ fresh: 1 }]);
-    expect(state(wrapper).total).toBe(7);
+    expect(state(wrapper).events).toEqual(rowsOf(100));
+    expect(state(wrapper).total).toBe(300);
     expect(state(wrapper).loading).toBe(false);
   });
 

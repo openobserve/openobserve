@@ -17,11 +17,14 @@ import ExplorerDetailSkeleton from "./ExplorerDetailSkeleton.vue";
 import { buildMetricsUrl } from "@/utils/metrics/buildMetricsUrl";
 import useStreams from "@/composables/useStreams";
 import { useExplorerSqlSearch } from "@/composables/dashboard/useExplorerSqlSearch";
+import { useExplorerTotal } from "@/composables/dashboard/useExplorerTotal";
+import ExplorerQueryError from "./ExplorerQueryError.vue";
 import { useExplorerCorrelation } from "@/composables/dashboard/useExplorerCorrelation";
 import { useExplorerDetailKeys } from "@/composables/dashboard/useExplorerDetailKeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { type FieldFilter } from "@/utils/dashboard/chartPointExplore";
 import {
+  explorerErrorText,
   explorerSql,
   labelsOnMetric,
   metricsSql,
@@ -94,11 +97,22 @@ async function loadSchema() {
 // ── Search: raw samples over _search_stream, like the Logs Explorer ──────────
 const { streamSearch, countMatches } = useExplorerSqlSearch(() => "metrics");
 const events = ref<any[]>([]);
-const total = ref(0);
+// The match total of the current query: null until a short page or the count makes it known.
+const {
+  total,
+  counting,
+  begin: beginTotal,
+  pageLoaded,
+  counted,
+  fail: failTotal,
+  currentRun,
+} = useExplorerTotal();
 const page = ref(0);
 const pageSize = ref(100);
 const loading = ref(false);
 const errorMsg = ref("");
+// The SQL a failed search ran, shown under its message.
+const errorSql = ref("");
 // One query: chips edit its WHERE while it keeps the plain shape; "write your own" edits it all.
 const showSql = ref(false);
 const customSql = ref("");
@@ -120,22 +134,16 @@ const loadFilterValues = (field: string, search: string): Promise<string[]> => {
     : requestFieldValues(ctx, field, { timeRange });
 };
 const expanded = ref(new Set<number>());
-let queryRun = 0;
 
 const searchRange = () => ({ start_time: rangeStart.value, end_time: rangeEnd.value });
 
+// `count` is set for a new query (its own run and total); paging keeps the run's total.
 async function runSql(sql: string, fromOffset: number, count: boolean) {
   loading.value = true;
   errorMsg.value = "";
-  const run = count ? ++queryRun : queryRun;
-  if (count) {
-    total.value = 0;
-    void countMatches(sql, searchRange()).then((matches) => {
-      if (matches !== null && run === queryRun && !errorMsg.value) {
-        total.value = Math.max(matches, events.value.length + page.value * pageSize.value);
-      }
-    });
-  }
+  errorSql.value = "";
+  const run = count ? beginTotal() : currentRun();
+  if (count) void countMatches(sql, searchRange()).then((matches) => counted(run, matches));
   try {
     const res = await streamSearch("events", {
       sql,
@@ -146,12 +154,13 @@ async function runSql(sql: string, fromOffset: number, count: boolean) {
     if (!res) return;
     events.value = res.hits;
     expanded.value = new Set();
-    total.value = Math.max(total.value, fromOffset + res.hits.length);
+    pageLoaded(run, fromOffset, res.hits.length, pageSize.value);
     loading.value = false;
-  } catch (e: any) {
-    errorMsg.value = `${e?.response?.data?.error ?? e?.message ?? "Search failed"}\n\n${sql}`;
+  } catch (e: unknown) {
+    errorMsg.value = explorerErrorText(e);
+    errorSql.value = sql;
     events.value = [];
-    total.value = 0;
+    failTotal(run);
     loading.value = false;
   }
 }
@@ -312,14 +321,12 @@ function fmtTs(ts: unknown): string {
         />
       </ExplorerToolbar>
 
-      <div v-if="errorMsg" class="flex shrink-0 items-start gap-2 px-4 py-3">
-        <OIcon name="error-outline" size="sm" class="text-error-500 mt-0.5 shrink-0" />
-        <code
-          class="text-error-500 font-mono text-xs break-all whitespace-pre-wrap"
-          data-test="metrics-explorer-error"
-          >{{ errorMsg }}</code
-        >
-      </div>
+      <ExplorerQueryError
+        v-if="errorMsg"
+        :message="errorMsg"
+        :sql="errorSql"
+        data-test="metrics-explorer-error"
+      />
 
       <div
         v-else
@@ -333,7 +340,9 @@ function fmtTs(ts: unknown): string {
           data-test="metrics-explorer-empty"
         >
           <OIcon name="manage-search" size="xl" class="text-text-secondary opacity-30" />
-          <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
+          <span class="text-text-secondary text-sm">{{
+            t("panel.metricsExplorer.noSamples")
+          }}</span>
           <code
             class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
             >{{ effectiveSql() }}</code
@@ -375,6 +384,8 @@ function fmtTs(ts: unknown): string {
           v-model:page-size="pageSize"
           :page="page"
           :total="total"
+          :rows="events.length"
+          :counting="counting"
           @go-to-page="goToPage"
         />
       </div>
@@ -386,6 +397,8 @@ function fmtTs(ts: unknown): string {
         :subtitle="raw(metric)"
         :index="selectedIndex"
         :count="events.length"
+        :offset="page * pageSize"
+        :total="total"
         :prev-label="t('panel.metricsExplorer.prevSample')"
         :next-label="t('panel.metricsExplorer.nextSample')"
         data-test-prefix="metrics-explorer"

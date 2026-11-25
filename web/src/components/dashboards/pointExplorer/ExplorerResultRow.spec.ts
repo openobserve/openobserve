@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -31,6 +31,10 @@ const mountRow = (expanded = false, attach = false) =>
     },
     global: { plugins: [i18n, store] },
   });
+
+// A real click with its click count: test-utils cannot set a MouseEvent detail.
+const click = (row: { element: Element }, detail: number) =>
+  row.element.dispatchEvent(new MouseEvent("click", { bubbles: true, detail }));
 
 describe("ExplorerResultRow", () => {
   // jsdom computes no Tailwind, so the row's look is pinned by its classes. The chevron must carry
@@ -75,12 +79,52 @@ describe("ExplorerResultRow", () => {
     expect(row.emitted("open")).toBeUndefined();
   });
 
-  it("a row click and the right › both open the detail, and toggle nothing", async () => {
-    const row = mountRow();
-    await row.trigger("click");
-    await row.find("[data-test='row-open']").trigger("click");
-    expect(row.emitted("open")).toHaveLength(2);
-    expect(row.emitted("toggle")).toBeUndefined();
+  it("a row click opens the detail after the double-click gap; the right › opens at once", async () => {
+    vi.useFakeTimers();
+    try {
+      const row = mountRow();
+      click(row, 1);
+      expect(row.emitted("open")).toBeUndefined();
+      vi.advanceTimersByTime(250);
+      expect(row.emitted("open")).toHaveLength(1);
+      await row.find("[data-test='row-open']").trigger("click");
+      expect(row.emitted("open")).toHaveLength(2);
+      expect(row.emitted("toggle")).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a double-click selects text and never opens the detail", async () => {
+    vi.useFakeTimers();
+    try {
+      const row = mountRow();
+      click(row, 1);
+      vi.advanceTimersByTime(100);
+      click(row, 2);
+      await row.trigger("dblclick");
+      vi.advanceTimersByTime(1000);
+      expect(row.emitted("open")).toBeUndefined();
+      // A later single click still opens it.
+      click(row, 1);
+      vi.advanceTimersByTime(250);
+      expect(row.emitted("open")).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a click whose open is pending is dropped when the row goes away", async () => {
+    vi.useFakeTimers();
+    try {
+      const row = mountRow();
+      click(row, 1);
+      row.unmount();
+      vi.advanceTimersByTime(1000);
+      expect(row.emitted("open")).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("Enter on the focused row opens the detail; Enter on the chevron does not", async () => {
@@ -102,9 +146,15 @@ describe("ExplorerResultRow", () => {
     await row.trigger("click");
     expect(row.emitted("open")).toBeUndefined();
 
-    // With the selection gone, the same click opens the detail.
+    // With the selection gone, the same click opens the detail (after the double-click gap).
     selection.removeAllRanges();
-    await row.trigger("click");
+    vi.useFakeTimers();
+    try {
+      click(row, 1);
+      vi.advanceTimersByTime(250);
+    } finally {
+      vi.useRealTimers();
+    }
     expect(row.emitted("open")).toHaveLength(1);
     row.unmount();
   });

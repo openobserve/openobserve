@@ -128,12 +128,18 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    /** Replaces the "x-y of N" text, for a caller whose total is not known yet. */
+    countText: {
+      type: String,
+      default: "",
+    },
   },
   emits: ["update:rowsPerPage", "firstPage", "prevPage", "nextPage", "lastPage"],
   setup(props) {
     const { t } = useI18nTyped();
     const countDisplay = computed(() => {
       const { showPagination, pagination, totalRows } = props;
+      if (props.countText) return props.countText;
       if (totalRows === 0) return t("dashboard.dashboards.paginationEmpty");
       if (!showPagination || pagination.rowsPerPage === 0) {
         return t("dashboard.dashboards.paginationRange", {

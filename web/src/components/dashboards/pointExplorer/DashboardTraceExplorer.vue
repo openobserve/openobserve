@@ -33,7 +33,12 @@ import {
   tracesPageQuery,
   type FieldFilter,
 } from "@/utils/dashboard/chartPointExplore";
-import { hasFullPage, traceDetailWindow } from "@/utils/dashboard/pointExplorers";
+import {
+  explorerErrorText,
+  hasFullPage,
+  traceDetailWindow,
+} from "@/utils/dashboard/pointExplorers";
+import ExplorerQueryError from "./ExplorerQueryError.vue";
 
 const props = defineProps<{
   stream: string;
@@ -87,11 +92,17 @@ const loadFilterValues = (field: string, search: string): Promise<string[]> => {
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 const { formatTracesMetaData } = useTraces();
 const page = ref(0);
+// The list's sort, as on the Traces page in traces mode: the endpoint sorts by start_time or
+// duration (the only sortable headers); a header click reruns from page 1 and paging keeps it.
+const sortBy = ref<"start_time" | "duration">("start_time");
+const sortOrder = ref<"asc" | "desc">("desc");
 const hits = ref<any[]>([]);
 const loading = ref(false);
 const scrollRef = ref<HTMLElement | null>(null);
 const searched = ref(false);
 const errorMsg = ref("");
+// The filter a failed search ran, shown under its message.
+const errorFilter = ref("");
 let runningId: string | null = null;
 
 function cancelRunning() {
@@ -106,6 +117,7 @@ function search() {
   runningId = traceId;
   loading.value = true;
   errorMsg.value = "";
+  errorFilter.value = "";
   hits.value = [];
   const rows: any[] = [];
   const filter = whereText.value.trim();
@@ -118,8 +130,8 @@ function search() {
         end_time: rangeEnd.value,
         from: page.value * PAGE_SIZE,
         size: PAGE_SIZE,
-        sort_by: "start_time",
-        sort_order: "desc",
+        sort_by: sortBy.value,
+        sort_order: sortOrder.value,
       },
       type: "traces",
       traceId,
@@ -136,9 +148,14 @@ function search() {
       error: (_payload: unknown, response: any) => {
         if (runningId !== traceId) return;
         runningId = null;
+        // A streamed error event carries its body in `content`; an HTTP failure is the body itself
+        // (with `status`), or just a status message when the body was not JSON.
         const body = response?.content ?? response ?? {};
-        const message = String(body.error ?? body.message ?? body.error_detail ?? "Search failed");
-        errorMsg.value = filter ? `${message}\n\n${filter}` : message;
+        errorMsg.value = explorerErrorText({
+          message: response?.message,
+          response: { data: body },
+        });
+        errorFilter.value = filter;
         hits.value = [];
         loading.value = false;
         searched.value = true;
@@ -159,6 +176,13 @@ onBeforeUnmount(cancelRunning);
 function runQuery() {
   page.value = 0;
   search();
+}
+
+function onSortChange(field: string, order: "asc" | "desc") {
+  if (field !== "start_time" && field !== "duration") return;
+  sortBy.value = field;
+  sortOrder.value = order;
+  runQuery();
 }
 
 function goToPage(next: number) {
@@ -288,14 +312,12 @@ const detailTitle = computed(() =>
         />
       </ExplorerToolbar>
 
-      <div v-if="errorMsg" class="flex shrink-0 items-start gap-2 px-4 py-3">
-        <OIcon name="error-outline" size="sm" class="text-error-500 mt-0.5 shrink-0" />
-        <code
-          class="text-error-500 font-mono text-xs break-all whitespace-pre-wrap"
-          data-test="trace-explorer-error"
-          >{{ errorMsg }}</code
-        >
-      </div>
+      <ExplorerQueryError
+        v-if="errorMsg"
+        :message="errorMsg"
+        :sql="errorFilter"
+        data-test="trace-explorer-error"
+      />
 
       <div v-else class="relative flex min-h-0 flex-1 flex-col" data-test="trace-explorer-results">
         <OInnerLoading :showing="loading && !hits.length" size="sm" :label="t('common.loading')" />
@@ -323,6 +345,9 @@ const detailTitle = computed(() =>
             :stream-name="stream"
             :query-window-us="{ start: rangeStart, end: rangeEnd }"
             :scroll-el="scrollRef"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @sort-change="onSortChange"
             @row-click="openTrace"
             @add-filter="addFilter"
           />
@@ -368,6 +393,8 @@ const detailTitle = computed(() =>
         :subtitle="raw(selected.trace_id)"
         :index="selectedIndex"
         :count="hits.length"
+        :offset="page * PAGE_SIZE"
+        :total="page === 0 && !hasNextPage ? hits.length : null"
         :prev-label="t('panel.traceExplorer.prevTrace')"
         :next-label="t('panel.traceExplorer.nextTrace')"
         data-test-prefix="trace-explorer"

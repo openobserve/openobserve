@@ -3,16 +3,23 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <!-- The explorer drawer's detail bar: back, the item's position with prev/next, and Copy link. -->
 <script setup lang="ts">
+import { computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
-defineProps<{
+const props = defineProps<{
   title: I18nText;
   subtitle?: I18nText;
+  /** Index in the loaded page; prev/next step within it. */
   index: number;
+  /** Items on the loaded page. */
   count: number;
+  /** Items before the loaded page, so the position shown is the item's place in the whole result. */
+  offset?: number;
+  /** The whole result's size: null while unknown (position only); omitted, the page's count. */
+  total?: number | null;
   prevLabel: I18nText;
   nextLabel: I18nText;
   dataTestPrefix: string;
@@ -21,6 +28,12 @@ defineProps<{
 const emit = defineEmits<{ back: []; prev: []; next: []; copyLink: [] }>();
 
 const { t } = useI18nTyped();
+
+const position = computed(() => {
+  const at = (props.offset ?? 0) + props.index + 1;
+  if (props.total === null) return String(at);
+  return `${at} / ${props.total ?? props.count}`;
+});
 </script>
 
 <template>
@@ -56,9 +69,9 @@ const { t } = useI18nTyped();
         <OTooltip :content="prevLabel" />
       </OButton>
       <span
-        class="text-text-secondary w-12 text-center text-xs tabular-nums"
+        class="text-text-secondary min-w-12 px-1 text-center text-xs whitespace-nowrap tabular-nums"
         :data-test="`${dataTestPrefix}-detail-position`"
-        >{{ index + 1 }} / {{ count }}</span
+        >{{ position }}</span
       >
       <OButton
         size="icon-xs"

@@ -88,3 +88,27 @@ export const sampleLabels = (row: Record<string, unknown>): FieldFilter[] =>
       field,
       value: value === null || value === undefined || value === "" ? null : String(value),
     }));
+
+/**
+ * A search failure as a reader can take it: the backend's own message without its "Error#" prefix
+ * or the parser's `ParserError("…")` wrapper (its escaped quotes undone) or the traces endpoint's
+ * "invalid filter: invalid filter expression:" lead, falling back to the HTTP message only when the
+ * backend sent none.
+ */
+export const explorerErrorText = (e: unknown): string => {
+  const err = e as { message?: unknown; response?: { data?: Record<string, unknown> } } | null;
+  const body = err?.response?.data ?? {};
+  const backend = [body.error, body.message, body.error_detail].find(
+    (v) => typeof v === "string" && v.trim(),
+  ) as string | undefined;
+  const raw = backend ?? (typeof err?.message === "string" ? err.message : "") ?? "";
+  const text = raw
+    .trim()
+    .replace(/^Error#\s*/i, "")
+    .replace(/\b[A-Z]\w*Error\("([\s\S]*)"\)/, (_m, inner: string) => inner.replace(/\\"/g, '"'))
+    // The traces endpoint repeats its own lead: "invalid filter: invalid filter expression: sql …".
+    .replace(/^(?:invalid filter(?: expression)?:\s*)+/i, "")
+    .replace(/^sql\b/i, "SQL")
+    .trim();
+  return text || "Search failed";
+};

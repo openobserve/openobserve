@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   hasFullPage,
   eventSecondWindow,
+  explorerErrorText,
   explorerSql,
   whereOfExplorerSql,
   labelsOnMetric,
@@ -103,5 +104,51 @@ describe("explorerSql / whereOfExplorerSql", () => {
     expect(whereOfExplorerSql("app", `SELECT a FROM "app" ORDER BY _timestamp DESC`)).toBeNull();
     expect(whereOfExplorerSql("app", `SELECT * FROM "other" ORDER BY _timestamp DESC`)).toBeNull();
     expect(whereOfExplorerSql("app", `SELECT * FROM "app" WHERE a = 1 LIMIT 5`)).toBeNull();
+  });
+});
+
+describe("explorerErrorText", () => {
+  const backendError = (error: string) => ({
+    message: "Request failed",
+    response: { data: { error } },
+  });
+
+  it("drops the Error# prefix and unwraps the parser's ParserError(...)", () => {
+    const raw = String.raw`Error# SQL error: ParserError("Expected: end of statement, found: \"k8s\" at Line: 1, Column: 14")`;
+    expect(explorerErrorText(backendError(raw))).toBe(
+      'SQL error: Expected: end of statement, found: "k8s" at Line: 1, Column: 14',
+    );
+  });
+
+  it("keeps a plain backend message as it is", () => {
+    expect(explorerErrorText(backendError("Search field not found: foo"))).toBe(
+      "Search field not found: foo",
+    );
+  });
+
+  it("falls back to the HTTP message only when the backend sent none", () => {
+    expect(explorerErrorText({ message: "Request failed with status code 400" })).toBe(
+      "Request failed with status code 400",
+    );
+    expect(explorerErrorText({ message: "x", response: { data: { message: "from body" } } })).toBe(
+      "from body",
+    );
+    expect(explorerErrorText(null)).toBe("Search failed");
+  });
+});
+
+describe("explorerErrorText: the traces endpoint", () => {
+  it("drops the repeated 'invalid filter: invalid filter expression:' lead, keeping the parser part", () => {
+    const error =
+      "invalid filter: invalid filter expression: sql parser error: Expected: an expression, found: = at Line: 1, Column: 39";
+    expect(explorerErrorText({ response: { data: { error } } })).toBe(
+      "SQL parser error: Expected: an expression, found: = at Line: 1, Column: 39",
+    );
+  });
+
+  it("leaves 'invalid filter' inside a message alone", () => {
+    expect(
+      explorerErrorText({ response: { data: { error: "field x: invalid filter value" } } }),
+    ).toBe("field x: invalid filter value");
   });
 });

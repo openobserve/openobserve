@@ -19,7 +19,12 @@ import TablePaginationControls from "@/components/dashboards/addPanel/TablePagin
 import ExplorerResultsPager from "@/components/dashboards/pointExplorer/ExplorerResultsPager.vue";
 import ExplorerResultRow from "@/components/dashboards/pointExplorer/ExplorerResultRow.vue";
 import ExplorerFilterBar from "@/components/dashboards/pointExplorer/ExplorerFilterBar.vue";
-import { explorerSql, whereOfExplorerSql } from "@/utils/dashboard/pointExplorers";
+import {
+  explorerErrorText,
+  explorerSql,
+  whereOfExplorerSql,
+} from "@/utils/dashboard/pointExplorers";
+import ExplorerQueryError from "@/components/dashboards/pointExplorer/ExplorerQueryError.vue";
 import useStreams from "@/composables/useStreams";
 import { toFilterFields } from "@/utils/query/filterBar";
 import {
@@ -40,6 +45,7 @@ import patternsService from "@/services/patterns";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { streamTypeFeature } from "@/utils/featureGate";
 import { useExplorerSqlSearch } from "@/composables/dashboard/useExplorerSqlSearch";
+import { useExplorerTotal } from "@/composables/dashboard/useExplorerTotal";
 import { useExplorerCorrelation } from "@/composables/dashboard/useExplorerCorrelation";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import {
@@ -115,11 +121,22 @@ const onDateChange = (d: { startTime: number; endTime: number }) => {
 
 // ── Search state ──────────────────────────────────────────────────────────────
 const events = ref<any[]>([]);
-const total = ref(0);
+// The match total of the current query: null until a short page or the count makes it known.
+const {
+  total,
+  counting,
+  begin: beginTotal,
+  pageLoaded,
+  counted,
+  fail: failTotal,
+  currentRun,
+} = useExplorerTotal();
 const page = ref(0);
 const pageSize = ref(100);
 const loading = ref(false);
 const errorMsg = ref("");
+// The SQL a failed search ran, shown under its message.
+const errorSql = ref("");
 
 // Inline per-row JSON expand (same interaction as Surrounding events), keyed by page index.
 const resultExpandedIdx = ref(new Set<number>());
@@ -470,6 +487,11 @@ function closeEventDetail() {
 const selectedIndex = computed(() =>
   selectedEvent.value ? events.value.indexOf(selectedEvent.value) : -1,
 );
+// The event's place in the whole result, out of the total once it is known.
+const detailPosition = computed(() => {
+  const at = page.value * pageSize.value + selectedIndex.value + 1;
+  return total.value !== null ? `${at} / ${total.value}` : String(at);
+});
 const hasPrev = computed(() => selectedIndex.value > 0);
 const hasNext = computed(
   () => selectedIndex.value >= 0 && selectedIndex.value < events.value.length - 1,
@@ -585,41 +607,27 @@ const { streamSearch, countMatches: countIn } = useExplorerSqlSearch(
 const countMatches = (sql: string) =>
   countIn(sql, { start_time: rangeStart.value, end_time: rangeEnd.value });
 
-// A count belongs to one query run: page turns reuse it, and a newer run drops a late one.
-let queryRun = 0;
-let runRows = { run: 0, seen: 0, failed: false };
-
-async function countInto(sql: string, run: number) {
-  const matches = await countMatches(sql);
-  if (matches === null || run !== queryRun) return;
-  // A failed search shows its error with no rows; a late count must not bring a pager back.
-  if (runRows.run === run && runRows.failed) return;
-  // The run's rows already on screen are a floor, so the pager never hides a page being shown.
-  total.value = Math.max(matches, runRows.run === run ? runRows.seen : 0);
-}
-
-// `count` is set for a new query; paging keeps the total it already has.
+// `count` is set for a new query (its own run and total); paging keeps the run's total.
 async function runSql(sql: string, fromOffset: number, count = false) {
   if (!orgId.value || !props.stream) {
     errorMsg.value = props.stream ? "" : `Stream not resolved (field: ${props.field})`;
+    errorSql.value = "";
     return;
   }
   if (!paramsValid.value) {
     errorMsg.value = t("panel.logExplorer.invalidParams");
+    errorSql.value = "";
     events.value = [];
     total.value = 0;
     return;
   }
   loading.value = true;
   errorMsg.value = "";
+  errorSql.value = "";
   let superseded = false;
-  const run = count ? ++queryRun : queryRun;
+  const run = count ? beginTotal() : currentRun();
   try {
-    if (count) {
-      total.value = 0;
-      runRows = { run, seen: 0, failed: false };
-      void countInto(sql, run);
-    }
+    if (count) void countMatches(sql).then((matches) => counted(run, matches));
     const res = await streamSearch("events", {
       sql,
       start_time: rangeStart.value,
@@ -631,15 +639,13 @@ async function runSql(sql: string, fromOffset: number, count = false) {
     superseded = !res;
     if (!res) return;
     events.value = res.hits;
-    runRows = { run, seen: fromOffset + res.hits.length, failed: false };
-    // Until the count answers, or if it fails, the total is at least the rows seen so far.
-    total.value = Math.max(total.value, runRows.seen);
+    pageLoaded(run, fromOffset, res.hits.length, pageSize.value);
     resultExpandedIdx.value = new Set();
-  } catch (e: any) {
-    errorMsg.value = `${e?.response?.data?.error ?? e?.message ?? "Search failed"}\n\n${sql}`;
+  } catch (e: unknown) {
+    errorMsg.value = explorerErrorText(e);
+    errorSql.value = sql;
     events.value = [];
-    total.value = 0;
-    runRows = { run, seen: 0, failed: true };
+    failTotal(run);
   } finally {
     if (!superseded) loading.value = false;
   }
@@ -860,12 +866,12 @@ function openInLogs() {
       </div>
 
       <!-- ── Error ────────────────────────────────────────────────────── -->
-      <div v-if="errorMsg" class="flex shrink-0 items-start gap-2 px-4 py-3">
-        <OIcon name="error-outline" size="sm" class="text-error-500 mt-0.5 shrink-0" />
-        <code class="text-error-500 font-mono text-xs break-all whitespace-pre-wrap">{{
-          errorMsg
-        }}</code>
-      </div>
+      <ExplorerQueryError
+        v-if="errorMsg"
+        :message="errorMsg"
+        :sql="errorSql"
+        data-test="log-explorer-error"
+      />
 
       <!-- ── Results — rendered by the dashboard table-panel renderer for parity ── -->
       <div
@@ -924,6 +930,8 @@ function openInLogs() {
           v-model:page-size="pageSize"
           :page="page"
           :total="total"
+          :rows="events.length"
+          :counting="counting"
           @go-to-page="goToPage"
         />
       </div>
@@ -963,8 +971,10 @@ function openInLogs() {
             >
               <OTooltip :content="t('panel.logExplorer.detail.prevEvent')" />
             </OButton>
-            <span class="text-text-secondary w-12 text-center text-xs tabular-nums"
-              >{{ selectedIndex + 1 }} / {{ events.length }}</span
+            <span
+              class="text-text-secondary min-w-12 px-1 text-center text-xs whitespace-nowrap tabular-nums"
+              data-test="log-explorer-detail-position"
+              >{{ detailPosition }}</span
             >
             <OButton
               size="icon-xs"

@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!-- One result row of the Logs and Metrics explorers: the left chevron shows the record's JSON inline;
      the row and the right › open its detail. -->
 <script setup lang="ts">
-import { ref } from "vue";
+import { onBeforeUnmount, ref } from "vue";
 import type { I18nText } from "@/types/i18n";
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -36,9 +36,23 @@ const endsSelectionInRow = (): boolean => {
     [selection.anchorNode, selection.focusNode].some((node) => !!node && row.contains(node))
   );
 };
-const openFromRow = () => {
-  if (!endsSelectionInRow()) emit("open");
+// A double-click selects a word, so a row click waits out the double-click gap before it opens; the
+// second click cancels it. Enter and the › open at once.
+const DOUBLE_CLICK_GAP_MS = 250;
+let pendingOpen: ReturnType<typeof setTimeout> | null = null;
+const cancelPendingOpen = () => {
+  if (pendingOpen) clearTimeout(pendingOpen);
+  pendingOpen = null;
 };
+const openFromRow = (event: MouseEvent) => {
+  cancelPendingOpen();
+  if (event.detail > 1 || endsSelectionInRow()) return;
+  pendingOpen = setTimeout(() => {
+    pendingOpen = null;
+    if (!endsSelectionInRow()) emit("open");
+  }, DOUBLE_CLICK_GAP_MS);
+};
+onBeforeUnmount(cancelPendingOpen);
 </script>
 
 <template>
@@ -47,6 +61,7 @@ const openFromRow = () => {
     class="dld-result-row border-border-default hover:bg-surface-subtle flex cursor-pointer items-center gap-2 border-b px-2 py-1"
     tabindex="0"
     @click="openFromRow"
+    @dblclick="cancelPendingOpen"
     @keydown.enter.self.prevent="emit('open')"
   >
     <!-- Same look as DashboardLogDrawer's scoped .dld-expand-btn rule, which cannot reach this component. -->

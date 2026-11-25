@@ -208,6 +208,7 @@ describe("DashboardMetricsExplorer", () => {
 
   it("the pager pages through the count, and a page turn cancels the search in flight", async () => {
     stream.count = 288;
+    stream.rows = Array.from({ length: 100 }, (_, i) => sample(103 * MIN - i, `p${i}`));
     mountExplorer();
     await flushPromises();
     const pager = () => wrapper.findComponent(ExplorerResultsPager);
@@ -227,6 +228,98 @@ describe("DashboardMetricsExplorer", () => {
     );
     expect(searches().at(-1).queryReq.query).toMatchObject({ from: 200, size: 100 });
     expect(pager().find("[data-test='dashboard-table-row-count']").text()).toBe("201-288 of 288");
+  });
+
+  const fullPage = () => Array.from({ length: 100 }, (_, i) => sample(103 * MIN - i, `p${i}`));
+
+  it("no samples: the samples empty state and no pager, even when the count beats the rows", async () => {
+    stream.count = 288;
+    stream.rows = fullPage();
+    mountExplorer();
+    await flushPromises();
+    // The next query's count (0) answers while its search is still out, over the old page's rows.
+    stream.hold = true;
+    stream.count = 0;
+    wrapper.vm.runQuery();
+    await flushPromises();
+    expect(wrapper.vm.total).toBe(0);
+    expect(wrapper.find("[data-test='explorer-results-pager']").exists()).toBe(false);
+    stream.hold = false;
+    stream.rows = [];
+    wrapper.vm.runQuery();
+    await flushPromises();
+    expect(wrapper.find("[data-test='metrics-explorer-empty']").text()).toContain(
+      "No samples match this filter",
+    );
+    expect(wrapper.find("[data-test='explorer-results-pager']").exists()).toBe(false);
+  });
+
+  it("a full page waits for its count: 'x-y of …', never the page size as the total", async () => {
+    stream.rows = fullPage();
+    fetchQueryDataWithHttpStream.mockImplementation((req: any, h: any) => {
+      if (isCount(req)) return; // The count never answers.
+      h.data(req, { type: "search_response_hits", content: { results: { hits: stream.rows } } });
+      h.complete(req, { type: "end" });
+    });
+    try {
+      mountExplorer();
+      await flushPromises();
+      expect(wrapper.vm.total).toBeNull();
+      expect(wrapper.find("[data-test='dashboard-table-row-count']").text()).toBe("1-100 of …");
+      expect(wrapper.find("[data-test='dashboard-table-pagination-next-page']").exists()).toBe(
+        true,
+      );
+    } finally {
+      fetchQueryDataWithHttpStream.mockImplementation((req: any, h: any) => {
+        if (stream.hold && !isCount(req)) return;
+        const hits = isCount(req)
+          ? [{ zo_sql_num: stream.count ?? stream.rows.length }]
+          : stream.rows;
+        h.data(req, { type: "search_response_hits", content: { results: { hits } } });
+        h.complete(req, { type: "end" });
+      });
+    }
+  });
+
+  it("the detail counter is the sample's place in the whole result, out of the total", async () => {
+    stream.count = 288;
+    stream.rows = fullPage();
+    mountExplorer();
+    await flushPromises();
+    wrapper.vm.goToPage(1);
+    await flushPromises();
+    wrapper.vm.openSample(wrapper.vm.events[1]);
+    await flushPromises();
+    expect(wrapper.find("[data-test='metrics-explorer-detail-position']").text()).toBe("102 / 288");
+  });
+
+  it("a broken query shows a short title, the cleaned backend message and the SQL", async () => {
+    const backend = String.raw`Error# SQL error: ParserError("Expected: end of statement, found: \"cpu\" at Line: 1, Column: 14")`;
+    fetchQueryDataWithHttpStream.mockImplementation((req: any, h: any) => {
+      if (isCount(req)) return;
+      h.error(req, { type: "error", content: { error: backend } });
+    });
+    try {
+      mountExplorer();
+      await flushPromises();
+      const error = wrapper.find("[data-test='metrics-explorer-error']");
+      expect(error.find("[data-test='explorer-error-title']").text()).toBe(
+        "The query could not run",
+      );
+      expect(error.find("[data-test='explorer-error-message']").text()).toBe(
+        'SQL error: Expected: end of statement, found: "cpu" at Line: 1, Column: 14',
+      );
+      expect(error.find("[data-test='explorer-error-sql']").text()).toContain('FROM "cpu"');
+    } finally {
+      fetchQueryDataWithHttpStream.mockImplementation((req: any, h: any) => {
+        if (stream.hold && !isCount(req)) return;
+        const hits = isCount(req)
+          ? [{ zo_sql_num: stream.count ?? stream.rows.length }]
+          : stream.rows;
+        h.data(req, { type: "search_response_hits", content: { results: { hits } } });
+        h.complete(req, { type: "end" });
+      });
+    }
   });
 
   const runSqlEdit = async (sql: string) => {
@@ -370,6 +463,7 @@ describe("DashboardMetricsExplorer", () => {
     expect(wrapper.find("[data-test='metrics-explorer-detail']").exists()).toBe(false);
     expect(wrapper.vm.expanded.has(0)).toBe(true);
     await row().trigger("click");
+    await new Promise((r) => setTimeout(r, 300));
     await flushPromises();
     expect(wrapper.find("[data-test='metrics-explorer-detail']").exists()).toBe(true);
   });

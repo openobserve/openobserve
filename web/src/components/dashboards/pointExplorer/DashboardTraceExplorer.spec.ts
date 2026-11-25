@@ -505,6 +505,115 @@ describe("DashboardTraceExplorer", () => {
     });
   });
 
+  describe("a failed search", () => {
+    const backend =
+      "invalid filter: invalid filter expression: sql parser error: Expected: an expression, found: = at Line: 1, Column: 39";
+    const failOnce = (response: any) =>
+      fetchQueryDataWithHttpStream.mockImplementationOnce((req: any, h: any) =>
+        h.error(req, response),
+      );
+    const error = () => wrapper.find("[data-test='trace-explorer-error']");
+
+    it("shows the explorers' error: title, cleaned message, then the filter", async () => {
+      mountExplorer();
+      await flushPromises();
+      failOnce({ type: "error", content: { error: backend } });
+      await runFilter("service_name = = 'pt-frontend'");
+      expect(error().find("[data-test='explorer-error-title']").text()).toBe(
+        "The query could not run",
+      );
+      expect(error().find("[data-test='explorer-error-message']").text()).toBe(
+        "SQL parser error: Expected: an expression, found: = at Line: 1, Column: 39",
+      );
+      expect(error().find("[data-test='explorer-error-sql']").text()).toBe(
+        "service_name = = 'pt-frontend'",
+      );
+    });
+
+    it("an HTTP failure reads the same, from its JSON body", async () => {
+      mountExplorer();
+      await flushPromises();
+      failOnce({ status: 400, error: backend });
+      await runFilter("service_name = = 'x'");
+      expect(error().find("[data-test='explorer-error-message']").text()).toBe(
+        "SQL parser error: Expected: an expression, found: = at Line: 1, Column: 39",
+      );
+    });
+
+    it("a successful rerun clears the error", async () => {
+      mountExplorer();
+      await flushPromises();
+      failOnce({ type: "error", content: { error: backend } });
+      await runFilter("service_name = = 'x'");
+      expect(error().exists()).toBe(true);
+      await runFilter("service_name = 'x'");
+      expect(error().exists()).toBe(false);
+      expect(wrapper.find("[data-test='trace-explorer-results']").exists()).toBe(true);
+    });
+  });
+
+  it("Timestamp and Duration headers sort on the server from page 1; paging keeps the sort", async () => {
+    stream.hits = Array.from({ length: 25 }, (_, i) => rawTrace(`t${i}`, 100 * MIN - i));
+    mountExplorer();
+    await flushPromises();
+    const list = wrapper.findComponent({ name: "TracesSearchResultList" });
+    expect(list.props()).toMatchObject({ sortBy: "start_time", sortOrder: "desc" });
+    expect(lastRequest().queryReq).toMatchObject({ sort_by: "start_time", sort_order: "desc" });
+    // Only the columns the endpoint sorts by look sortable.
+    const sortable = (list.props("columns") as any[])
+      .filter((c) => c.meta?.sortable)
+      .map((c) => c.id);
+    expect(sortable).toEqual(["_timestamp", "duration"]);
+
+    await wrapper.find("[data-test='trace-explorer-next-page']").trigger("click");
+    await flushPromises();
+    list.vm.$emit("sort-change", "duration", "asc");
+    await flushPromises();
+    expect(lastRequest().queryReq).toMatchObject({
+      sort_by: "duration",
+      sort_order: "asc",
+      from: 0,
+    });
+    expect(list.props()).toMatchObject({ sortBy: "duration", sortOrder: "asc" });
+    await wrapper.find("[data-test='trace-explorer-next-page']").trigger("click");
+    await flushPromises();
+    expect(lastRequest().queryReq).toMatchObject({
+      sort_by: "duration",
+      sort_order: "asc",
+      from: 25,
+    });
+    // A field the endpoint cannot sort by is ignored.
+    const before = fetchQueryDataWithHttpStream.mock.calls.length;
+    list.vm.$emit("sort-change", "service_name", "asc");
+    await flushPromises();
+    expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before);
+  });
+
+  it("the detail counter is the trace's place in the whole list; a total only for a complete list", async () => {
+    mountExplorer();
+    await flushPromises();
+    const list = () => wrapper.findComponent({ name: "TracesSearchResultList" });
+    const position = () => wrapper.find("[data-test='trace-explorer-detail-position']").text();
+    list().vm.$emit("row-click", wrapper.vm.hits[1]);
+    await flushPromises();
+    expect(position()).toBe("2 / 2");
+    wrapper.vm.closeTrace();
+
+    stream.hits = Array.from({ length: 25 }, (_, i) => rawTrace(`t${i}`, 100 * MIN - i));
+    wrapper.vm.runQuery();
+    await flushPromises();
+    list().vm.$emit("row-click", wrapper.vm.hits[1]);
+    await flushPromises();
+    expect(position()).toBe("2");
+    wrapper.vm.closeTrace();
+    await flushPromises();
+    await wrapper.find("[data-test='trace-explorer-next-page']").trigger("click");
+    await flushPromises();
+    list().vm.$emit("row-click", wrapper.vm.hits[2]);
+    await flushPromises();
+    expect(position()).toBe("28");
+  });
+
   it("a row opens the embedded trace over its own window ±1 min, with links in new tabs", async () => {
     mountExplorer();
     await flushPromises();
