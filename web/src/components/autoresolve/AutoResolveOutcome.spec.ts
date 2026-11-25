@@ -63,6 +63,25 @@ describe("AutoResolveOutcome", () => {
     w.unmount();
   });
 
+  it("names a run no MCP could fix as its own end, in amber", () => {
+    const w = mount(AutoResolveOutcome, {
+      props: {
+        outcome: {
+          verdict: "no_change",
+          system_summary: "None of this run's MCPs can do this, so nothing was changed.",
+          explanation: null,
+        },
+        checkedAtUs: null,
+        cantFix: true,
+      },
+      global: { plugins: [i18n] },
+    });
+
+    expect(w.find("h2").text()).toBe(i18n.global.t("autoresolve.state.cantFix"));
+    expect(w.find('[data-test="autoresolve-outcome"]').attributes("data-tone")).toBe("warning");
+    w.unmount();
+  });
+
   it.each([
     ["worked", null, "positive"],
     ["worked", "worse", "warning"],

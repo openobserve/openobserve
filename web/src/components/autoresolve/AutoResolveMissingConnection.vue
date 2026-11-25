@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("autoresolve.missing.add", { mcp }) }}
       </OButton>
       <span
+        v-if="help"
         class="text-text-secondary min-w-0 text-xs wrap-anywhere"
         data-test="autoresolve-missing-connection-help"
       >
@@ -97,9 +98,10 @@ const action = computed(() => sentenceStart(props.missing.action.trim()));
 const blocked = computed(() => !props.missing.can_add || !!props.missing.cannot_add_reason?.trim());
 
 // A person who may not add it reads why; one who may reads what else the run offers.
+// An ended run's outcome card already says nothing was changed.
 const help = computed(() => {
   if (blocked.value) return cannotAddConnectionText(props.missing, t);
-  if (props.run.state === "no_change") return t("autoresolve.missing.nothingChanged");
+  if (props.run.state === "no_change") return null;
   const count = props.run.plan?.options.length ?? 0;
   return t("autoresolve.missing.orPartial", { count }, count);
 });

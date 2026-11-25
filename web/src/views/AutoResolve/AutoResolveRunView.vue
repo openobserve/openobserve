@@ -37,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #title-trail>
       <BetaBadge stage="alpha" />
       <OTag
-        v-if="run"
+        v-if="shownState"
         type="autoresolveRunState"
-        :value="run.state"
+        :value="shownState"
         data-test="autoresolve-run-state"
       />
       <span
@@ -172,6 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :checked-at-us="run.ended_at_us"
             :error="outcomeCardError"
             :hide-explanation="!!missingConnection"
+            :cant-fix="shownState === 'cant_fix'"
           />
           <AutoResolveVerdictCheck
             v-if="verdictRow && run.outcome?.verdict"
@@ -377,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag
                     v-else-if="isTerminalRunState(run.state)"
                     type="autoresolveRunState"
-                    :value="run.state"
+                    :value="shownState"
                   />
                   <template v-else>{{ t("autoresolve.run.facts.notKnown") }}</template>
                 </ODescriptionItem>
@@ -468,6 +469,7 @@ import {
   namesSentence,
   removedChips,
   runConnections,
+  shownRunState,
   stageIndexFor,
   startedByText,
   stepResultView,
@@ -521,6 +523,8 @@ const back = computed(() => ({
   label: t("autoresolve.title"),
   to: { name: "autoresolve", query: { tab: "runs", org_identifier: orgId.value } },
 }));
+
+const shownState = computed(() => (run.value ? shownRunState(run.value) : null));
 
 const stageKey = computed(() =>
   run.value ? AUTORESOLVE_STAGES[stageIndexFor(run.value.state)].key : null,

@@ -349,6 +349,14 @@ export function addableConnection(
   return run.state === "no_change" && !ran ? missing : null;
 }
 
+/** The state a run's chips show: a run that ended because no MCP can make the fix reads as its own end. */
+export function shownRunState(
+  run: Pick<AutoResolveRun, "state" | "steps" | "plan">,
+): AutoResolveRunState | "cant_fix" {
+  const missing = run.plan?.missing_capability || run.plan?.missing_connection;
+  return run.state === "no_change" && !run.steps.length && missing ? "cant_fix" : run.state;
+}
+
 /** What a run can use: its MCPs, folded past `max`, then always OpenObserve data last. */
 export function canUseSentence(
   connectionNames: readonly string[],

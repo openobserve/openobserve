@@ -37,6 +37,7 @@ import {
   needsText,
   removedChips,
   runConnections,
+  shownRunState,
   stageIndexFor,
   stepResultView,
   theMcps,
@@ -366,6 +367,37 @@ describe("autoresolveText", () => {
   ])("addableConnection offers the connection on %s", (_case, overrides, offered) => {
     const run = autoresolveRun({ plan: NEEDS_PLAN, ...overrides });
     expect(addableConnection(run, RCA_T0)).toEqual(offered ? MISSING : null);
+  });
+
+  const CANT_PLAN = {
+    ...(PLANNED.plan as AutoResolvePlan),
+    options: [],
+    missing_capability: "VACUUM orders",
+  };
+  it.each<[string, Partial<AutoResolveRun>, string]>([
+    ["no MCP can make the fix", { state: "no_change", steps: [], plan: CANT_PLAN }, "cant_fix"],
+    [
+      "the fix needs an MCP the run lacks",
+      { state: "no_change", steps: [], plan: NEEDS_PLAN },
+      "cant_fix",
+    ],
+    [
+      "a no-change run whose step ran",
+      { state: "no_change", steps: [RAN], plan: CANT_PLAN },
+      "no_change",
+    ],
+    [
+      "a no-change run with nothing missing",
+      { state: "no_change", steps: [], plan: PLANNED.plan },
+      "no_change",
+    ],
+    [
+      "a waiting run that needs an MCP",
+      { state: "waiting_approval", plan: NEEDS_PLAN },
+      "waiting_approval",
+    ],
+  ])("shownRunState for %s", (_case, overrides, expected) => {
+    expect(shownRunState(autoresolveRun(overrides))).toBe(expected);
   });
 
   const DEC_1_1048 = Date.UTC(2026, 11, 1, 10, 48) * 1000;

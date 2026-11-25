@@ -86,8 +86,10 @@ const props = withDefaults(
     error?: string | null;
     /** The missing-connection card already says what the fix needs. */
     hideExplanation?: boolean;
+    /** The run ended because none of its MCPs can make the fix. */
+    cantFix?: boolean;
   }>(),
-  { error: null, hideExplanation: false },
+  { error: null, hideExplanation: false, cantFix: false },
 );
 
 const { t } = useI18nTyped();
@@ -95,6 +97,7 @@ const { t } = useI18nTyped();
 // The summary already says an earlier attempt made things worse; the tone is the only other mark.
 const tone = computed<OutcomeTone>(() => {
   const { verdict, prior_verdict } = props.outcome;
+  if (props.cantFix) return "warning";
   if (verdict === "worse") return "negative";
   if (prior_verdict === "worse") return "warning";
   return verdict === "worked" ? "positive" : "neutral";
@@ -103,6 +106,7 @@ const tone = computed<OutcomeTone>(() => {
 const needs = computed(() => needsText(props.outcome.explanation, t));
 
 const verdictLabel = computed(() => {
+  if (props.cantFix) return t("autoresolve.state.cantFix");
   switch (props.outcome.verdict) {
     case "worked":
       return t("autoresolve.state.worked");

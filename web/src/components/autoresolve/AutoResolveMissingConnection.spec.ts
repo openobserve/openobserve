@@ -40,9 +40,15 @@ afterEach(() => wrapper?.unmount());
 
 describe("AutoResolveMissingConnection", () => {
   // Who may not add the connection sees the button disabled and reads why, beside it.
-  it.each<[string, Partial<Missing>, boolean, string, AutoResolveRunState]>([
+  it.each<[string, Partial<Missing>, boolean, string | null, AutoResolveRunState]>([
     ["a person who may add it", {}, false, "partial fix", "waiting_approval"],
-    ["a run that ended with no option", {}, false, "Nothing was changed", "no_change"],
+    [
+      "a run that ended with no option, which the outcome card explains",
+      {},
+      false,
+      null,
+      "no_change",
+    ],
     [
       "a person the server refused",
       { can_add: false, cannot_add_reason: "You can't edit this AutoResolve." },
@@ -69,8 +75,8 @@ describe("AutoResolveMissingConnection", () => {
     const add = wrapper.find('[data-test="autoresolve-missing-connection-add"]');
     expect(add.text()).toContain("postgres");
     expect(add.attributes("disabled") !== undefined).toBe(disabled);
-    expect(wrapper.find('[data-test="autoresolve-missing-connection-help"]').text()).toContain(
-      help,
-    );
+    const shownHelp = wrapper.find('[data-test="autoresolve-missing-connection-help"]');
+    if (help === null) expect(shownHelp.exists()).toBe(false);
+    else expect(shownHelp.text()).toContain(help);
   });
 });
