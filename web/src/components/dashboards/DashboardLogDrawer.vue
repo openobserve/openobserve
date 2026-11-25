@@ -26,6 +26,7 @@ const ChartRenderer = defineAsyncComponent(
 );
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/formatters";
+import { buildPatternLogsSql } from "@/plugins/logs/patterns/patternUtils";
 import searchService from "@/services/search";
 import patternsService from "@/services/patterns";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -740,13 +741,20 @@ function isSurroundExpanded(pageIdx: number) {
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
-function patternToSql(template: string): string {
-  // Replace SDR wildcards like <:IP>, <:NUM>, <:URI> with SQL LIKE wildcards (%)
-  const likePattern = template.replace(/<:[^>]+>/g, "%").replace(/'/g, "''");
-  return `SELECT * FROM "${props.stream}" WHERE _all LIKE '${likePattern}' ORDER BY _timestamp DESC`;
+function patternToSql(template: string): string | null {
+  return buildPatternLogsSql(
+    template,
+    props.stream,
+    insightPatterns.value.map((p) => p.template),
+  );
 }
 
 function openPatternInLogs(template: string) {
+  const sql = patternToSql(template);
+  if (!sql) {
+    toast({ variant: "warning", message: t("logs.patternList.noDistinctTextTooltip") });
+    return;
+  }
   const pos = window.location.pathname.indexOf("/web/");
   const base =
     pos > -1
@@ -758,7 +766,7 @@ function openPatternInLogs(template: string) {
   url.searchParams.set("stream", props.stream);
   url.searchParams.set("from", String(rangeStart.value));
   url.searchParams.set("to", String(rangeEnd.value));
-  url.searchParams.set("query", b64EncodeUnicode(patternToSql(template)) ?? "");
+  url.searchParams.set("query", b64EncodeUnicode(sql) ?? "");
   url.searchParams.set("sql_mode", "true");
   url.searchParams.set("quick_mode", "false");
   url.searchParams.set("show_histogram", "true");

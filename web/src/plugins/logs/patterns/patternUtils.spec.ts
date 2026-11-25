@@ -21,6 +21,7 @@ import {
   escapeForMatchAll,
   buildPatternSqlQuery,
   buildPatternSetSqlQuery,
+  buildPatternLogsSql,
   buildAlertNameFromPattern,
   buildPatternAlertData,
   compactCount,
@@ -540,5 +541,20 @@ describe("pattern clauses for templates that share a long prefix", () => {
     expect(
       buildPatternSetSqlQuery({ streamName: "s", includes: [SHARED], allTemplates: [SHARED, A] }),
     ).toBe("SELECT * FROM 's'");
+  });
+});
+
+describe("buildPatternLogsSql", () => {
+  it("matches the pattern's literal segments, never _all or a raw <*>", () => {
+    const sql = buildPatternLogsSql("Payment <*> failed for order <*> at gateway", "app", []);
+    expect(sql).toBe(
+      "SELECT * FROM 'app' WHERE match_all('failed for order') ORDER BY _timestamp DESC",
+    );
+    expect(sql).not.toContain("_all LIKE");
+    expect(sql).not.toContain("<*>");
+  });
+
+  it("returns null when no text separates the pattern from the others", () => {
+    expect(buildPatternLogsSql("<*> <*>", "app", [])).toBeNull();
   });
 });
