@@ -16,46 +16,19 @@
 import type { LocationQueryRaw, RouteLocationNormalizedLoaded } from "vue-router";
 import type { NavGateContext, SubnavChild } from "./ONavbar.types";
 import type { I18nKey } from "@/types/i18n";
-import { isGateOpen } from "./useNavGateContext";
-import { featureState } from "@/utils/featureGate";
-import {
-  checkFeatureAccess,
-  buildFeatureGateContext,
-  isFeatureKey,
-} from "@/utils/enterpriseFeatures";
-
-// Shared by the rail flyout (ONavGroup) and the grouped sidebar (OSidebarGroup) so both gate children identically.
+import { buildFeatureGateContext } from "@/utils/enterpriseFeatures";
+import { visibleNavChildren as gateNavChildren } from "./navVisibility";
 
 export const childKey = (child: SubnavChild) => `${child.name}-${child.tab ?? ""}`;
 
-export const licenseStateOf = (ctx: NavGateContext, c: SubnavChild) =>
-  c.feature ? featureState(ctx.features, c.feature) : "enabled";
-
-/**
- * A child shows when its route is registered and custom_hide_menus does not name it. A FeatureKey
- * `gate` then decides locked vs. unlocked; a plain gate keeps hide-on-fail.
- */
+/** The sidebar's form of the shared nav gate, which the command palette also uses. */
 export function visibleNavChildren(
   children: SubnavChild[],
   ctx: NavGateContext,
   hasRoute: (name: string) => boolean,
   zoConfig: Record<string, any> | undefined,
 ): SubnavChild[] {
-  return children
-    .filter((c) => hasRoute(c.name) && !ctx.hiddenMenus.has(c.name))
-    .flatMap((c): SubnavChild[] => {
-      if (c.gate && isFeatureKey(c.gate)) {
-        const access = checkFeatureAccess(c.gate, buildFeatureGateContext(zoConfig));
-        if (!access.visible) return [];
-        if (!access.allowed) return [{ ...c, locked: true, lockedMessage: access.message }];
-      }
-      // The license applies once the edition allows the feature; a locked license also turns its runtime flag off.
-      const license = licenseStateOf(ctx, c);
-      if (license === "hidden") return [];
-      if (license === "locked") return [{ ...c, locked: false, licenseLocked: true }];
-      if (!c.gate) return [{ ...c, locked: false }];
-      return isGateOpen(ctx, c.gate) ? [{ ...c, locked: false }] : [];
-    });
+  return gateNavChildren(children, ctx, buildFeatureGateContext(zoConfig), hasRoute);
 }
 
 /**
