@@ -785,6 +785,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'min-h-[calc(100%-6.25rem)]!',
           ]"
         >
+          <div
+            v-if="!patternsState?.loading && patternsWarnings.length"
+            data-test="logs-patterns-partial-warning"
+            class="px-page-edge bg-status-warning-bg text-status-warning-text py-2 text-xs"
+          >
+            <div v-for="w in patternsWarnings" :key="w">{{ w }}</div>
+          </div>
           <!-- Patterns List -->
           <PatternList
             :patterns="patternsState?.patterns?.patterns || []"
@@ -2949,6 +2956,10 @@ export default defineComponent({
     const { processedResults, processHitsInChunks } = useLogsHighlighter(t);
 
     const isFunctionErrorOpen = ref(false);
+    const patternsWarnings = computed<string[]>(() => {
+      const fe = patternsState.value?.patterns?.function_error;
+      return Array.isArray(fe) ? fe.filter((m): m is string => typeof m === "string") : [];
+    });
 
     const logsTimestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
 
@@ -3233,6 +3244,7 @@ export default defineComponent({
       turnOffQuickMode,
       openLogDetailsByRow,
       isFunctionErrorOpen,
+      patternsWarnings,
       contextCell,
       contextCellIsStreamField,
       aiEnabled,

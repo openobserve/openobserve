@@ -176,6 +176,7 @@ pub async fn do_partitioned_search(
             user_id,
             req_size,
             (modified_start_time, modified_end_time),
+            &range_error,
             accumulated_results,
             is_multi_stream_search,
         )
@@ -245,17 +246,12 @@ pub async fn do_partitioned_search(
         search_res.set_took(start_timer.elapsed().as_millis() as usize);
 
         // check range error
-        if !range_error.is_empty() {
-            search_res.is_partial = true;
-            search_res.function_error = if search_res.function_error.is_empty() {
-                vec![range_error.clone()]
-            } else {
-                search_res.function_error.push(range_error.clone());
-                search_res.function_error
-            };
-            search_res.new_start_time = Some(modified_start_time);
-            search_res.new_end_time = Some(modified_end_time);
-        }
+        apply_range_warning(
+            &mut search_res,
+            &range_error,
+            modified_start_time,
+            modified_end_time,
+        );
 
         // Accumulate the result
         if is_streaming_aggs {
@@ -385,6 +381,7 @@ async fn fetch_extraction_sample(
     user_id: &str,
     req_size: i64,
     window: (i64, i64),
+    range_error: &str,
     accumulated_results: &mut Vec<SearchResultType>,
     is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
@@ -491,7 +488,8 @@ async fn fetch_extraction_sample(
     mark_partial_slices(&mut responses, failed_slices, slices);
 
     let fetched: usize = responses.iter().map(|r| r.hits.len()).sum();
-    for res in responses {
+    for mut res in responses {
+        apply_range_warning(&mut res, range_error, w_start, w_end);
         accumulated_results.push(SearchResultType::Search(res));
     }
 
@@ -499,6 +497,17 @@ async fn fetch_extraction_sample(
         "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: fetched {fetched} rows from {slices} time slices"
     );
     Ok(())
+}
+
+/// Marks `res` partial when the stream's max query range shortened the window.
+fn apply_range_warning(res: &mut Response, range_error: &str, new_start: i64, new_end: i64) {
+    if range_error.is_empty() {
+        return;
+    }
+    res.is_partial = true;
+    res.function_error.push(range_error.to_string());
+    res.new_start_time = Some(new_start);
+    res.new_end_time = Some(new_end);
 }
 
 /// Trim per-slice hits so the total fits `budget`, giving every slice as equal a
@@ -1011,6 +1020,22 @@ mod tests {
             total: n,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn test_apply_range_warning_marks_partial() {
+        let mut r = slice_with(1);
+        apply_range_warning(&mut r, "clamped", 5, 9);
+        assert!(r.is_partial);
+        assert_eq!(r.function_error, vec!["clamped".to_string()]);
+        assert_eq!((r.new_start_time, r.new_end_time), (Some(5), Some(9)));
+    }
+
+    #[test]
+    fn test_apply_range_warning_noop_without_range_error() {
+        let mut r = slice_with(1);
+        apply_range_warning(&mut r, "", 5, 9);
+        assert!(!r.is_partial && r.function_error.is_empty() && r.new_start_time.is_none());
     }
 
     #[test]
