@@ -27,9 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="predefined-themes-reset-btn"
         variant="ghost-destructive"
         size="xs"
+        icon-left="refresh"
         @click="resetToDefaultTheme"
       >
-        <template #icon-left><OIcon name="refresh" size="xs" /></template>
         {{ t("common.reset") }}
       </OButton>
     </template>

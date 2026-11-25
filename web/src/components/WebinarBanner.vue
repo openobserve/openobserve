@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="webinar-header-banner"
   >
     <div class="flex flex-wrap items-center justify-center gap-2">
-      <span class="webinar-top-bar-text text-center font-bold">
+      <span class="webinar-top-bar-text text-center font-semibold">
         <strong>{{ webinarData.tag }}:</strong> {{ webinarData.title }}
         <span v-if="webinarData.date" class="webinar-top-bar-date font-medium">
           {{ formattedDate }}
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :href="webinarData.primaryButton.link"
         target="_blank"
         rel="noopener noreferrer"
-        class="webinar-top-bar-link text-promo-webinar-link hover:text-promo-webinar-link-hover font-bold whitespace-nowrap underline"
+        class="webinar-top-bar-link text-promo-webinar-link hover:text-promo-webinar-link-hover font-semibold whitespace-nowrap underline"
         data-test="webinar-top-bar-register-link"
       >
         {{ webinarData.primaryButton.text }}
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="webinar-home-left flex flex-col gap-[0.3rem]">
         <!-- Live badge -->
         <div
-          class="webinar-home-badge text-2xs text-promo-webinar-accent-text inline-flex items-center gap-1.5 font-bold tracking-[0.06em] uppercase"
+          class="webinar-home-badge text-2xs text-promo-webinar-accent-text inline-flex items-center gap-1.5 font-semibold tracking-[0.06em] uppercase"
         >
           <span
             class="webinar-home-badge-dot bg-promo-webinar-accent h-2 w-2 shrink-0 rounded-full"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="webinar-home-title text-text-heading max-w-[36rem] text-base leading-[1.35] font-bold"
+          class="webinar-home-title text-text-heading max-w-[36rem] text-base leading-[1.35] font-semibold"
         >
           {{ webinarData.title }}
         </div>
@@ -116,9 +116,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         target="_blank"
         rel="noopener noreferrer"
         data-test="webinar-home-register-btn"
+        icon-right="arrow-forward"
       >
         {{ webinarData.primaryButton.text }}
-        <OIcon name="arrow-forward" size="sm" class="ms-2" />
       </OButton>
     </div>
   </div>

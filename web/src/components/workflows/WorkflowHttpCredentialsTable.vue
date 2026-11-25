@@ -126,9 +126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t('ingestion.setupCard.revealToken')
                 "
                 :data-test="`workflow-http-credential-${row.id}-show`"
+                :icon-left="revealed[row.id] ? 'visibility-off' : 'visibility'"
                 @click="toggleShow(row.id)"
               >
-                <OIcon :name="revealed[row.id] ? 'visibility-off' : 'visibility'" size="sm" />
                 <OTooltip
                   :content="
                     revealed[row.id]
@@ -143,9 +143,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-xs-sq"
                 :aria-label="copyLabel"
                 :data-test="`workflow-http-credential-${row.id}-copy`"
+                icon-left="content-copy"
                 @click="emit('copy', row.id)"
               >
-                <OIcon name="content-copy" size="sm" />
                 <OTooltip :content="copyLabel" side="top" />
               </OButton>
             </template>
@@ -210,7 +210,6 @@ import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";

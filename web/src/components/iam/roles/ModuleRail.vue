@@ -97,8 +97,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('iam.editRole.expandModuleGroup')
               "
               :data-test="`edit-role-module-rail-group-toggle-${group.id}`"
+              :icon-left="isExpanded(group.id) ? 'expand-more' : 'chevron-right'"
             >
-              <OIcon :name="isExpanded(group.id) ? 'expand-more' : 'chevron-right'" size="sm" />
+              <OTooltip
+                :content="
+                  isExpanded(group.id)
+                    ? t('iam.editRole.collapseModuleGroup')
+                    : t('iam.editRole.expandModuleGroup')
+                "
+              />
             </OButton>
           </div>
           <OTab
@@ -149,6 +156,7 @@ import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";

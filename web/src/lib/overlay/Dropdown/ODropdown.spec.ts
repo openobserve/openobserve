@@ -162,7 +162,7 @@ describe("ODropdown", () => {
           "shadow-overlay",
           "rounded-default",
           "p-1",
-          "min-w-40",
+          "min-w-48",
           "text-compact",
           "max-w-[min(20rem,calc(100vw-1.5rem))]",
           "overflow-y-auto",

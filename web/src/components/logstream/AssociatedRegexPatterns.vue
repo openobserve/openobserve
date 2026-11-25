@@ -270,7 +270,7 @@
             >
               <div class="flex flex-col gap-2.5">
                 <div class="flex items-center justify-between">
-                  <span class="text-compact leading-6 font-bold">
+                  <span class="text-compact leading-6 font-semibold">
                     {{ t("regex_patterns.test_pattern") }}
                   </span>
                   <OButton
@@ -349,7 +349,7 @@
                           </span>
                         </div>
                         <div v-else-if="!testLoading && outputString.length === 0">
-                          <OIcon name="lightbulb" size="md" class="text-icon-color" />
+                          <OIcon name="lightbulb" size="md" class="text-text-secondary" />
                           <span class="text-text-secondary text-center text-xs font-[400]">
                             {{ t("regex_patterns.click_test_input_hint") }}
                           </span>

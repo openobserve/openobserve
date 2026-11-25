@@ -124,6 +124,7 @@
                 data-test="refresh-license-limits-btn"
                 variant="outline"
                 size="sm-action"
+                icon-left="refresh"
                 :loading="refreshingLimits"
                 @click="refreshLimitsOnOldNode"
               >
@@ -167,9 +168,10 @@
                   size="icon"
                   class="shrink-0"
                   data-test="show-license-key-btn"
+                  icon-left="visibility"
                   @click="showLicenseKeyModal = true"
                 >
-                  <OIcon name="visibility" size="xs" />
+                  <OTooltip :content="t('common.reveal')" />
                 </OButton>
               </div>
             </OSettingRow>
@@ -493,6 +495,7 @@ import LicenseStatusCard from "./LicenseStatusCard.vue";
 import LicenseWaiversCard from "./LicenseWaiversCard.vue";
 import LicenseFeatures from "./LicenseFeatures.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -525,6 +528,7 @@ const RenderDashboardCharts = defineAsyncComponent(
 export default defineComponent({
   name: "License",
   components: {
+    OTooltip,
     LicensePeriod,
     LicenseStatusCard,
     LicenseOnlineRefreshCard,

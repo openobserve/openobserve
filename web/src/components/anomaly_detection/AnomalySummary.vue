@@ -37,9 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-sm"
         class="!border-accent !text-accent !bg-surface-overlay pointer-events-auto !border-2 shadow-sm backdrop-blur-sm"
         data-test="anomaly-summary-scroll-btn"
+        icon-left="arrow-downward"
+        :aria-label="t('alerts.anomaly.scrollToBottom')"
         @click="scrollToBottom"
       >
-        <OIcon name="arrow-downward" size="sm" />
         <OTooltip :content="t('alerts.anomaly.scrollToBottom')" side="top" align="center" />
       </OButton>
     </div>
@@ -51,7 +52,6 @@ import { computed, ref, nextTick, watch, onMounted } from "vue";
 import DOMPurify from "dompurify";
 import { generateAnomalySummary } from "@/utils/alerts/anomalySummaryGenerator";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
 

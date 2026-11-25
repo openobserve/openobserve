@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :error-message="workflowObj.nameError ? t('workflow.nameRequired') : undefined"
             @update:model-value="onNameChange"
           />
-          <BetaBadge class="max-md:hidden" />
+          <OBetaBadge class="max-md:hidden" />
           <OTag
             v-if="workflowObj.currentSelectedWorkflow.isDraft"
             variant="warning-soft"
@@ -144,7 +144,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="switchEditorRun"
         >
           <template #trigger>
-            <OButton variant="outline" size="sm-action" data-test="workflow-editor-history">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              icon-left="history"
+              data-test="workflow-editor-history"
+            >
               {{ t("workflow.history.open") }}
             </OButton>
           </template>
@@ -348,7 +353,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

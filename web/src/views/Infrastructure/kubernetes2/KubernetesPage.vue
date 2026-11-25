@@ -53,6 +53,7 @@ import {
 import K8sResourceTree from "./K8sResourceTree.vue";
 import { buildTree, clusterSeen, clusterStatsOf, clusterTone, nodeSummary } from "./k8sTree";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { buildPaletteItems, mergePaletteItems, type PaletteItem } from "./k8sPalette";
 import { usePaletteIndex } from "./usePaletteIndex";
@@ -507,9 +508,10 @@ k8s.loadStreams();
           size="icon-sm"
           :aria-label="t('infra.k8s2.paletteButton')"
           data-test="k8s2-palette-open-compact"
+          icon-left="search"
           @click="openPalette"
         >
-          <OIcon name="search" size="sm" />
+          <OTooltip :content="t('infra.k8s2.paletteButton')" />
         </OButton>
         <OSelect
           v-if="ready"

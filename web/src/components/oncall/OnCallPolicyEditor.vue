@@ -16,7 +16,7 @@
       <OIcon
         name="info-outline"
         size="sm"
-        class="text-icon-color cursor-pointer"
+        class="text-text-secondary cursor-pointer"
         data-test="oncall-policy-editor-info"
       >
         <OTooltip side="bottom" :content="t('oncall.policyHint')" />

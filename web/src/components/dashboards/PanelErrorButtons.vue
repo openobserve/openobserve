@@ -186,8 +186,8 @@
       variant="ghost-warning"
       size="icon"
       data-test="panel-sparkline-warning"
+      icon-left="show-chart"
     >
-      <template #icon-left><OIcon name="show-chart" size="sm" /></template>
       <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
         <template #content
           ><div class="whitespace-pre-wrap" data-test="panel-sparkline-warning-content">
@@ -215,8 +215,9 @@
       variant="ghost-warning"
       size="icon"
       data-test="panel-is-cached-data-differ-with-current-time-range-warning"
+      icon-left="running-with-errors"
+      :aria-label="t('dashboard.panelErrorButtons.cachedDataDiffers')"
     >
-      <template #icon-left><OIcon name="running-with-errors" size="sm" /></template>
       <OTooltip
         side="bottom"
         align="end"

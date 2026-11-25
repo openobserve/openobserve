@@ -44,9 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="ms-auto"
           :aria-label="t('iam.editRole.presetsClose')"
           data-test="edit-role-presets-close"
+          icon-left="close"
           @click="emit('close')"
         >
-          <OIcon name="close" size="sm" />
+          <OTooltip :content="t('iam.editRole.presetsClose')" />
         </OButton>
       </div>
 
@@ -126,9 +127,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs"
           :aria-label="t('iam.editRole.presetBack')"
           data-test="edit-role-preset-back"
+          icon-left="chevron-left"
           @click="closePreset"
         >
-          <OIcon name="chevron-left" size="sm" />
+          <OTooltip :content="t('iam.editRole.presetBack')" />
         </OButton>
         <span
           class="rounded-default inline-flex size-8 shrink-0 items-center justify-center"
@@ -150,9 +152,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="ms-auto"
           :aria-label="t('iam.editRole.presetsClose')"
           data-test="edit-role-presets-close"
+          icon-left="close"
           @click="emit('close')"
         >
-          <OIcon name="close" size="sm" />
+          <OTooltip :content="t('iam.editRole.presetsClose')" />
         </OButton>
       </div>
 

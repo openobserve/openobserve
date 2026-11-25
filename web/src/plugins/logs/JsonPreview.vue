@@ -139,8 +139,9 @@
                   : 'opacity-0 group-hover/jrow:opacity-100 focus-visible:opacity-100'
               "
               :aria-label="t('logs.jsonPreview.addIcon')"
+              :icon-left="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'"
             >
-              <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
+              <OTooltip :content="t('logs.jsonPreview.addIcon')" />
             </OButton>
           </template>
           <ODropdownItem

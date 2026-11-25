@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-2 p-4"
             >
               <div class="flex min-w-0 flex-1 flex-col">
-                <span class="text-sm font-bold"
+                <span class="text-sm font-semibold"
                   >{{ t("function.jobLabelPrefix") }} {{ (index as number) + 1 }}</span
                 >
                 <span class="text-muted-foreground block text-xs">{{ job.url }}</span>

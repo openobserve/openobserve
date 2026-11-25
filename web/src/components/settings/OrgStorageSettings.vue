@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="feature-card__content flex-1 pt-0.5">
-                <div class="feature-card__title text-text-heading mb-1.25 text-sm font-bold">
+                <div class="feature-card__title text-text-heading mb-1.25 text-sm font-semibold">
                   {{ feature.title }}
                 </div>
                 <div class="feature-card__desc text-text-secondary text-compact leading-[1.55]">

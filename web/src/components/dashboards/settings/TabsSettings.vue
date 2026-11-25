@@ -68,21 +68,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon"
-              :title="t('dashboard.save')"
+              icon-left="check"
+              :aria-label="t('dashboard.save')"
               @click.stop="saveEdit"
               :disabled="!editTabObj.data.name.trim()"
               data-test="dashboard-tab-settings-tab-name-edit-save"
-              icon-left="check"
             >
+              <OTooltip :content="t('dashboard.save')" />
             </OButton>
             <OButton
               variant="ghost"
               size="icon"
-              :title="t('dashboard.cancel')"
+              icon-left="close"
+              :aria-label="t('dashboard.cancel')"
               @click.stop="cancelEdit"
               data-test="dashboard-tab-settings-tab-name-edit-cancel"
-              icon-left="close"
             >
+              <OTooltip :content="t('dashboard.cancel')" />
             </OButton>
           </div>
         </template>
@@ -93,35 +95,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon"
               :disabled="row.tabId === editTabId"
-              :title="t('dashboard.edit')"
+              :aria-label="t('dashboard.edit')"
               @click.stop="editItem(row.tabId)"
               data-test="dashboard-tab-settings-tab-edit-btn"
               icon-left="edit"
               class="max-md:hidden"
             >
+              <OTooltip :content="t('dashboard.edit')" />
             </OButton>
             <OButton
               v-if="currentDashboardData.data.tabs.length !== 1"
               variant="ghost"
               size="icon"
-              :title="t('dashboard.delete')"
+              icon-left="delete"
+              :aria-label="t('dashboard.delete')"
               @click.stop="deleteItem(row.tabId)"
               data-test="dashboard-tab-settings-tab-delete-btn"
               class="max-md:hidden"
             >
-              <template #icon-left><OIcon name="delete" size="sm" /></template>
+              <OTooltip :content="t('dashboard.delete')" />
             </OButton>
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
                   icon-left="more-vert"
-                  :title="t('dashboard.moreActions')"
                   variant="ghost"
                   size="icon-xs-sq"
                   class="md:hidden"
                   data-test="dashboard-tab-settings-row-more-actions"
+                  :aria-label="t('dashboard.moreActions')"
                   @click.stop
-                />
+                >
+                  <OTooltip :content="t('dashboard.moreActions')" />
+                </OButton>
               </template>
               <ODropdownItem
                 icon-left="edit"
@@ -187,6 +193,7 @@ import { deleteTab, editTab, getDashboard, updateDashboard } from "@/utils/commo
 import { useRoute } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -201,6 +208,7 @@ import { useDashboardSettingsDraft } from "./dashboardSettingsDraft";
 export default defineComponent({
   name: "TabsSettings",
   components: {
+    OTooltip,
     DashboardHeader,
     AddTab,
     TabsDeletePopUp,

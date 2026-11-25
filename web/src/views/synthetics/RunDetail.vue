@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
                       <span
-                        class="text-status-error-text text-sm font-bold"
+                        class="text-status-error-text text-sm font-semibold"
                         data-test="synthetics-run-detail-error-type"
                       >
                         {{ currentRun.errorType }}
@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OCard v-if="currentRun.hasReplay" class="w-[30%] min-w-[30rem] gap-0 p-0">
                   <OCardSection role="header" class="gap-2">
                     <OIcon name="smart_display" size="sm" class="text-accent" />
-                    <span class="text-text-heading text-sm font-bold">{{
+                    <span class="text-text-heading text-sm font-semibold">{{
                       t("synthetics.runDetail.sessionReplay")
                     }}</span>
                     <span class="flex-1" />

@@ -58,9 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost-neutral"
         size="icon"
         :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
+        icon-left="add"
         @click.stop="$emit('add-to-filter', `${field.name}=''`)"
       >
-        <OIcon name="add" size="sm" />
+        <OTooltip :content="t('common.addFilter')" />
       </OButton>
       <OButton
         :data-test="`log-search-index-list-add-${field.name}-field-btn`"
@@ -68,11 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost-neutral"
         size="icon"
         class="gap-0!"
-        :title="t('search.addFieldToTable')"
         aria-pressed="false"
+        icon-left="visibility"
+        :aria-label="t('search.addFieldToTable')"
         @click.stop="$emit('toggle-field', field)"
       >
-        <OIcon name="visibility" size="sm" class="text-text-secondary!" />
+        <OTooltip :content="t('search.addFieldToTable')" />
       </OButton>
       <OButton
         :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
@@ -89,14 +91,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="showGroupBy && field.isSchemaField"
         :aria-label="t('search.groupByThisField')"
-        :title="t('search.groupByThisField')"
         variant="ghost-neutral"
         size="icon"
         class="gap-0!"
         :data-test="`log-search-index-list-group-by-${field.name}-field-btn`"
+        icon-left="group-work"
         @click.stop="$emit('group-by', field.name)"
       >
-        <OIcon name="group-work" size="sm" />
+        <OTooltip :content="t('search.groupByThisField')" />
       </OButton>
       <OButton
         :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
@@ -134,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";

@@ -97,9 +97,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="ackingId === row.response_id"
                 :aria-label="t('oncall.acknowledge')"
                 :data-test="`oncall-my-needs-you-ack-${row.response_id}`"
+                icon-left="check-circle"
                 @click.stop="acknowledge(row)"
               >
-                <OIcon name="check-circle" size="sm" aria-hidden="true" />
                 <OTooltip :content="t('oncall.acknowledge')" />
               </OButton>
               <span v-else class="size-8 shrink-0" aria-hidden="true" />
@@ -141,9 +141,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="unread ? '' : 'invisible'"
               :loading="marking"
               data-test="oncall-my-deliveries-read-all"
+              icon-left="check"
               @click="markAll"
-            >
-              <OIcon name="check" size="sm" />{{ t("oncall.myDeliveriesMarkAll") }}
+              >{{ t("oncall.myDeliveriesMarkAll") }}
             </OButton>
           </span>
         </div>

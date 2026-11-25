@@ -90,7 +90,7 @@ const onDateChange = (field: any, dt: any) => {
       <div v-if="props.label || props.description" class="mb-2">
         <div
           v-if="props.label && $slots['label-append']"
-          class="text-input-label-text flex items-center gap-1 text-sm font-bold"
+          class="text-input-label-text text-compact flex items-center gap-1 font-medium"
         >
           <span
             >{{ props.label
@@ -98,7 +98,7 @@ const onDateChange = (field: any, dt: any) => {
           >
           <slot name="label-append" />
         </div>
-        <div v-else-if="props.label" class="text-input-label-text text-sm font-bold">
+        <div v-else-if="props.label" class="text-input-label-text text-compact font-medium">
           {{ props.label }}<span v-if="props.required" class="text-input-error-text"> *</span>
         </div>
         <div v-if="props.description" class="text-xs">

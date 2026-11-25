@@ -204,17 +204,17 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
     vi.clearAllMocks();
   });
 
-  it("locks the real page-size select while loading and restores it afterward", async () => {
-    const select = () =>
-      document.querySelector<HTMLElement>(
-        '[data-test="logs-search-result-records-per-page-trigger"]',
-      )!;
+  it("holds the real page-size select inactive while loading and frees it afterward", async () => {
+    const group = () =>
+      document
+        .querySelector<HTMLElement>('[data-test="logs-search-result-records-per-page-trigger"]')!
+        .closest('[data-test="o2-table-page-size"]')!;
     searchObj.loading = true;
     await flushPromises();
-    expect(select().getAttribute("data-disabled")).not.toBeNull();
+    expect(group().getAttribute("aria-disabled")).toBe("true");
     searchObj.loading = false;
     await flushPromises();
-    expect(select().getAttribute("data-disabled")).toBeNull();
+    expect(group().getAttribute("aria-disabled")).toBeNull();
   });
 
   it("locks the page-size trigger for search-around even after loading stops", async () => {

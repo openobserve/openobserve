@@ -89,10 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="outline"
       size="icon"
       class="shrink-0"
-      :title="t('common.addFolder')"
+      icon-left="add"
+      :aria-label="t('common.addFolder')"
       @click="showDialog = true"
     >
-      <OIcon name="add" size="sm" />
+      <OTooltip :content="t('common.addFolder')" />
     </OButton>
     <AddFolder
       v-if="!disable"
@@ -115,10 +116,10 @@ import type { Folder } from "@/services/common";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
 import { licenseDeniedFeatures } from "@/utils/featureGate";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useFolderIcons } from "@/composables/useFolderIcons";
 import { folderIconOption } from "./folderIconOption";
@@ -128,9 +129,9 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 export default defineComponent({
   name: "InlineSelectFolderDropdown",
   components: {
+    OTooltip,
     AddFolder,
     OButton,
-    OIcon,
     OSelect,
     OSeparator,
     FolderIcon,

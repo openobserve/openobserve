@@ -108,10 +108,11 @@
                 :aria-label="t('common.remove')"
                 variant="ghost"
                 size="icon"
+                icon-left="close"
                 @click="removecolorBySeriesByIndex(index)"
                 :data-test="`dashboard-addpanel-config-color-by-series-delete-btn-${index}`"
               >
-                <template #icon-left><OIcon name="close" size="sm" /></template>
+                <OTooltip :content="t('common.remove')" />
               </OButton>
             </div>
           </div>
@@ -125,6 +126,7 @@ import { computed, ref, nextTick, defineComponent, onMounted, watch } from "vue"
 import { useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -139,6 +141,7 @@ import {
 export default defineComponent({
   name: "colorBySeriesPopUp",
   components: {
+    OTooltip,
     draggable: VueDraggableNext as any,
     OButton,
     ODialog,

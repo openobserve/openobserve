@@ -74,9 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="index === 0"
             :aria-label="raw(t('workflow.node.branchMoveUp'))"
             :data-test="`workflow-branch-move-up-${row.handle}`"
+            icon-left="arrow-upward"
             @click="moveCase(index, -1)"
           >
-            <OIcon name="arrow-upward" size="xs" />
+            <OTooltip :content="raw(t('workflow.node.branchMoveUp'))" />
           </OButton>
           <OButton
             variant="ghost"
@@ -84,9 +85,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="index === cases.length - 1"
             :aria-label="raw(t('workflow.node.branchMoveDown'))"
             :data-test="`workflow-branch-move-down-${row.handle}`"
+            icon-left="arrow-downward"
             @click="moveCase(index, 1)"
           >
-            <OIcon name="arrow-downward" size="xs" />
+            <OTooltip :content="raw(t('workflow.node.branchMoveDown'))" />
           </OButton>
           <OButton
             v-if="cases.length > 1"
@@ -94,9 +96,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-xs"
             :aria-label="raw(t('workflow.node.branchRemoveCase'))"
             :data-test="`workflow-branch-remove-case-${row.handle}`"
+            icon-left="delete"
             @click="removeCase(index)"
           >
-            <OIcon name="delete" size="xs" />
+            <OTooltip :content="raw(t('workflow.node.branchRemoveCase'))" />
           </OButton>
         </div>
 
@@ -111,8 +114,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <WorkflowHttpFieldHint v-if="httpOn" />
 
-      <OButton variant="dashed" size="sm" data-test="workflow-branch-add-case" @click="addCase">
-        <OIcon name="add" size="xs" />
+      <OButton
+        variant="dashed"
+        size="sm"
+        data-test="workflow-branch-add-case"
+        icon-left="add"
+        @click="addCase"
+      >
         {{ t("workflow.node.branchAddCase") }}
       </OButton>
 
@@ -123,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default bg-surface-subtle rounded-surface flex w-full items-center gap-2 border border-dashed p-3"
       >
         <OBadge variant="default-soft" size="sm">{{ cases.length + 1 }}</OBadge>
-        <span class="text-text-body text-sm font-bold">
+        <span class="text-text-body text-sm font-semibold">
           {{ t("workflow.node.branchElseTitle") }}
         </span>
         <span class="text-text-secondary text-xs">{{ t("workflow.node.branchElseHint") }}</span>

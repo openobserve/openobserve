@@ -280,7 +280,7 @@ const namespaceOf = (row: any): string =>
     :columns="columns"
     row-key="key"
     dense
-    :row-height="hasSub ? 44 : 28"
+    :row-height="hasSub ? 44 : 32"
     sticky-header
     virtual-scroll
     :overscan="10"

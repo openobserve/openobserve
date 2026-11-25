@@ -5,7 +5,7 @@ export const MENU_SURFACE_CLASS =
 
 export const MENU_ROW_CLASS = [
   "relative flex w-full min-h-7 max-md:min-h-9 items-center gap-2",
-  "rounded-default px-2 py-0.5 text-compact text-start",
+  "rounded-default ps-2 pe-4 py-0.5 text-compact text-start",
   "cursor-pointer outline-none select-none",
   "transition-colors duration-(--duration-control) ease-(--ease-control)",
 ].join(" ");
@@ -32,7 +32,7 @@ const OWN_MAX_HEIGHT = /(^|[\s:])max-h-/;
 export function menuSizeClass(contentClass?: string): string[] {
   const own = contentClass ?? "";
   return [
-    "min-w-40",
+    "min-w-48",
     OWN_WIDTH.test(own)
       ? "max-lg:max-w-[calc(100vw-1rem)]"
       : "max-w-[min(20rem,calc(100vw-1.5rem))]",

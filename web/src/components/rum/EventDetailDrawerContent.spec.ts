@@ -456,7 +456,7 @@ describe("EventDetailDrawerContent", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.text()).toContain("Action Type:");
+      expect(wrapper.text()).toContain("Action type:");
       expect(wrapper.text()).toContain("click");
     });
 

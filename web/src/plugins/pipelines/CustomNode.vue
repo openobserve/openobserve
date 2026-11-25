@@ -385,7 +385,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
       <template #body>
         <div
           v-if="data.node_type == 'function'"
-          class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
+          class="flex w-auto text-left text-sm! leading-[1.4]! font-semibold! text-wrap text-ellipsis"
           align="left"
         >
           {{ data.name }} -
@@ -395,13 +395,13 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <template v-else-if="data.node_type == 'stream'">
           <div
             v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
-            class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
+            class="flex w-auto text-left text-sm! leading-[1.4]! font-semibold! text-wrap text-ellipsis"
           >
             {{ data.stream_type }} - {{ streamNameLabel }}
           </div>
           <div
             v-else
-            class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
+            class="flex w-auto text-left text-sm! leading-[1.4]! font-semibold! text-wrap text-ellipsis"
           >
             {{ data.stream_type }} - {{ data.stream_name }}
           </div>
@@ -409,14 +409,14 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
 
         <div
           v-else-if="data.node_type == 'query'"
-          class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
+          class="flex w-auto text-left text-sm! leading-[1.4]! font-semibold! text-wrap text-ellipsis"
         >
           {{ data.stream_type }} - {{ data.stream_name }}
         </div>
 
         <div
           v-else-if="data.node_type == 'remote_stream'"
-          class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
+          class="flex w-auto text-left text-sm! leading-[1.4]! font-semibold! text-wrap text-ellipsis"
         >
           {{ data.destination_name }}
         </div>
@@ -424,7 +424,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <OTruncatedText
           v-else-if="data.node_type == 'condition'"
           as="div"
-          class="w-auto max-w-44 text-left text-sm! leading-[1.4]! font-bold!"
+          class="w-auto max-w-44 text-left text-sm! leading-[1.4]! font-semibold!"
         >
           {{ buildConditionPreview(data.condition || data.conditions) }}
         </OTruncatedText>
@@ -442,7 +442,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           <span
             data-test="pipeline-node-error-count"
             v-if="nodeErrorCount"
-            class="bg-status-negative text-3xs absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border-[0.09375rem] border-solid border-white px-0.75 font-bold text-white shadow-xs"
+            class="bg-status-negative text-3xs absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border-[0.09375rem] border-solid border-white px-0.75 font-semibold text-white shadow-xs"
           >
             {{ nodeErrorCount }}
           </span>
@@ -466,11 +466,11 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           <OButton
             variant="ghost"
             size="icon"
+            icon-left="delete"
             @click.stop="deleteNode(id)"
             class="rounded-default! bg-surface-overlay/95! node-action-btn delete-btn h-5! w-5! min-w-5! border! border-(--node-color)! p-0! text-(--node-color)! transition-all! duration-200!"
             :data-test="`pipeline-node-${io_type}-delete-btn`"
           >
-            <OIcon name="delete" size="sm" />
             <!-- Central OTooltip (same as the workflow node and the rest of the
                  app). Replaced a hand-rolled `fixed`-positioned tooltip div that
                  drifted inside the transformed Vue Flow node — reka-ui/Floating

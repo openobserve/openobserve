@@ -37,7 +37,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { CardSubstitutions, RichCardContent } from "@/components/ingestion/setupCard/types";
 import rumCard from "@/components/ingestion/setupCard/content/rum";
@@ -187,7 +187,7 @@ const subs = computed<CardSubstitutions>(() => ({
           >
             <OIcon :name="p.icon" size="xs" class="me-1" />
             {{ t(p.labelKey) }}
-            <BetaBadge v-if="p.beta" size="xs" class="ms-1.5" />
+            <OBetaBadge v-if="p.beta" class="ms-1.5" />
           </OToggleGroupItem>
         </OToggleGroup>
       </template>

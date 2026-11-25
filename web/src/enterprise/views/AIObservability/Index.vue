@@ -59,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :active="configureActive"
                   :aria-label="t('aiObservability.nav.tools')"
                   data-test="ai-rail-tools"
+                  icon-left="tune"
                 >
-                  <OIcon name="tune" size="sm" />
                   <!-- Off while the menu is open: it would sit over the menu's items. -->
                   <OTooltip
                     v-if="!toolsOpen"

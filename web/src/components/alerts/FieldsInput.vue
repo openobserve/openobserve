@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          injected form (pushFieldValue/removeFieldValue). No v-model, no manual
          error refs — the consuming form's schema owns validation (Rule ②). -->
     <template v-if="formMode">
-      <div data-test="alert-conditions-text" class="font-bold">
+      <div data-test="alert-conditions-text" class="font-semibold">
         {{ t("alerts.filters.conditions") + " *" }} {{ t("alerts.filters.conditionsHint") }}
       </div>
       <template v-if="!formRows.length">
@@ -31,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm"
           class="mt-2"
-          @click="addFormRow"
           icon-left="add"
+          @click="addFormRow"
         >
           {{ t("alerts.addCondition") }}
         </OButton>
@@ -84,10 +84,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="ms-1"
               variant="ghost"
               size="icon-circle-sm"
-              :title="t('alert_templates.edit')"
+              icon-left="delete"
+              :aria-label="t('alert_templates.edit')"
               @click="removeFormRow(index)"
             >
-              <OIcon name="delete" size="sm" />
+              <OTooltip :content="t('alert_templates.edit')" />
             </OButton>
             <OButton
               data-test="alert-conditions-add-condition-btn"
@@ -95,10 +96,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="ms-1"
               variant="ghost"
               size="icon-circle-sm"
-              :title="t('alert_templates.edit')"
+              icon-left="add"
+              :aria-label="t('alert_templates.edit')"
               @click="addFormRow()"
             >
-              <OIcon name="add" size="sm" />
+              <OTooltip :content="t('alert_templates.edit')" />
             </OButton>
           </div>
         </div>
@@ -108,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Consumed bare by functions/logstream/pipeline forms; a legitimate
          permanent pattern (see START-HERE 🔀). Do NOT delete. -->
     <template v-else>
-      <div data-test="alert-conditions-text" class="font-bold">
+      <div data-test="alert-conditions-text" class="font-semibold">
         {{ t("alerts.filters.conditions") + " *" }} {{ t("alerts.filters.conditionsHint") }}
       </div>
       <template v-if="!fields.length">
@@ -117,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm"
           class="mt-2"
-          @click="addApiHeader"
           icon-left="add"
+          @click="addApiHeader"
         >
           {{ t("alerts.addCondition") }}
         </OButton>
@@ -198,10 +200,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="ms-1"
               variant="ghost"
               size="icon-circle-sm"
-              :title="t('alert_templates.edit')"
+              icon-left="delete"
+              :aria-label="t('alert_templates.edit')"
               @click="deleteApiHeader(field)"
             >
-              <OIcon name="delete" size="sm" />
+              <OTooltip :content="t('alert_templates.edit')" />
             </OButton>
             <OButton
               data-test="alert-conditions-add-condition-btn"
@@ -209,10 +212,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="ms-1"
               variant="ghost"
               size="icon-circle-sm"
-              :title="t('alert_templates.edit')"
+              icon-left="add"
+              :aria-label="t('alert_templates.edit')"
               @click="addApiHeader()"
             >
-              <OIcon name="add" size="sm" />
+              <OTooltip :content="t('alert_templates.edit')" />
             </OButton>
           </div>
         </div>
@@ -225,8 +229,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, reactive, inject } from "vue";
 import type { PropType, Ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";

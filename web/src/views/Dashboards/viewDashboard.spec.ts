@@ -1825,7 +1825,7 @@ describe("ViewDashboard", () => {
     await flushPromises();
     const button = wrapper.find('[data-test="dashboard-publish-public-btn"]');
     expect(button.exists()).toBe(true);
-    expect(wrapper.findComponent({ name: "BetaBadge" }).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OBetaBadge" }).exists()).toBe(false);
     // This spec's t() returns the key, so the rendered label is checked against the real message.
     expect(button.text()).toBe("dashboard.publicDashboard.shareTooltip");
     expect(i18n.global.t("dashboard.publicDashboard.shareTooltip")).toBe("Publish publicly (beta)");

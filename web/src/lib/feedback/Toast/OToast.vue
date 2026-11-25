@@ -251,7 +251,7 @@ onUnmounted(() => {
         <div v-if="details && details.length > 0" class="mt-2 w-full" data-test="o-toast-details">
           <button
             type="button"
-            class="text-toast-fg-secondary hover:text-toast-fg flex cursor-pointer items-center gap-1 text-xs font-semibold tracking-wide uppercase transition-colors"
+            class="text-toast-fg-secondary hover:text-toast-fg flex cursor-pointer items-center gap-1 text-xs font-medium transition-colors"
             :aria-expanded="detailsExpanded"
             data-test="o-toast-details-toggle"
             @click.stop="detailsExpanded = !detailsExpanded"

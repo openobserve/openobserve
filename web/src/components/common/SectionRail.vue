@@ -65,9 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-expanded="true"
         :aria-label="toggleLabel"
         data-test="section-rail-toggle"
+        icon-left="keyboard-double-arrow-left"
         @click="toggle"
       >
-        <OIcon name="keyboard-double-arrow-left" size="sm" />
         <OTooltip :content="toggleLabel" side="right" />
       </OButton>
     </div>

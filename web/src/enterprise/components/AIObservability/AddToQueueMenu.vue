@@ -33,14 +33,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs"
           :loading="busy"
           :aria-label="splitAction ? actionLabel : label"
+          icon-left="fact-check"
           @click.stop.prevent="splitAction && emit('action')"
         >
-          <OIcon name="fact-check" size="sm" />
           <OTooltip v-if="splitAction" side="bottom" :content="actionLabel" />
         </OButton>
-        <OButton :variant="variant" size="icon-xs" tabindex="-1" aria-hidden="true">
-          <OIcon :name="open ? 'expand-less' : 'expand-more'" size="xs" />
-        </OButton>
+        <OButton
+          :variant="variant"
+          size="icon-xs"
+          tabindex="-1"
+          aria-hidden="true"
+          :icon-left="open ? 'expand-less' : 'expand-more'"
+        />
         <OTooltip side="bottom" :content="label" />
       </OButtonGroup>
 
@@ -123,7 +127,6 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";

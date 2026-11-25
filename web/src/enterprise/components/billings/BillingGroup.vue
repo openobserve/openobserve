@@ -64,12 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             data-test="org-group-view-usage-btn"
+            icon-right="arrow-forward"
             @click="goToUsage"
           >
             {{ t("billing.billingGroup.viewUsage") }}
-            <template #icon-right>
-              <OIcon name="arrow-forward" size="sm" class="ms-1" />
-            </template>
           </OButton>
         </div>
 
@@ -105,14 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost-destructive"
                   size="icon-sm"
-                  :title="t('billing.billingGroup.remove')"
                   :aria-label="t('billing.billingGroup.remove')"
                   :disabled="actioningToken === row.org_id"
                   class="max-md:hidden"
                   :data-test="`org-group-remove-member-${row.org_id}`"
+                  icon-left="delete"
                   @click="removeTarget = row"
                 >
-                  <OIcon name="delete" size="sm" />
+                  <OTooltip :content="t('billing.billingGroup.remove')" />
                 </OButton>
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
@@ -124,7 +122,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="md:hidden"
                       data-test="org-group-row-more-actions"
                       @click.stop
-                    />
+                    >
+                      <OTooltip :content="t('common.moreActions')" />
+                    </OButton>
                   </template>
                   <ODropdownItem
                     variant="destructive"
@@ -183,12 +183,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="primary"
                 class="h-11 px-6 font-semibold"
                 data-test="org-group-child-view-usage-btn"
+                icon-right="arrow-forward"
                 @click="goToUsage"
               >
                 {{ t("billing.billingGroup.viewUsage") }}
-                <template #icon-right>
-                  <OIcon name="arrow-forward" size="sm" class="ms-1" />
-                </template>
               </OButton>
               <OButton
                 variant="outline-destructive"
@@ -314,7 +312,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="md:hidden"
                       data-test="org-group-row-more-actions"
                       @click.stop
-                    />
+                    >
+                      <OTooltip :content="t('common.moreActions')" />
+                    </OButton>
                   </template>
                   <ODropdownItem
                     class="md:hidden"

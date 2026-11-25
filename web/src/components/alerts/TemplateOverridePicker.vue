@@ -22,9 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="xs"
       class="gap-1 self-start font-medium"
       data-test="template-override-help-btn"
+      icon-left="help"
       @click="helpOpen = true"
     >
-      <OIcon name="help" size="xs" />
       <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
     </OButton>
     <template v-if="state === 'empty'">
@@ -165,7 +165,6 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import AlertSettingsHelpDrawer from "@/components/alerts/AlertSettingsHelpDrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { raw, useI18nTyped } from "@/types/i18n";

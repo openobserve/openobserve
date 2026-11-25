@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="thread-bubble thread-bubble--user thread-user-row rounded-default text-text-body border-chat-bubble-user-border bg-chat-bubble-user dark:border-thread-bubble-border-dark ms-auto mb-4 flex w-fit max-w-[40%] items-start gap-2.5 border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-xs dark:shadow-white/8"
         >
           <div
-            class="thread-user-avatar text-2xs bg-gradient-ai inline-flex h-6 w-6 shrink-0 cursor-default items-center justify-center rounded-full font-bold text-white dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)]"
+            class="thread-user-avatar text-2xs bg-gradient-ai inline-flex h-6 w-6 shrink-0 cursor-default items-center justify-center rounded-full font-semibold text-white dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)]"
             :title="group.userId || t('traces.threadView.user')"
           >
             <OIcon name="person" size="sm" />

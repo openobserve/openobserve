@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- x-axis title — matches the dashboard axis name (nameLocation
                "middle" + nameTextStyle bold/14px). -->
-          <div class="text-text-heading mt-1 text-center text-sm font-bold">
+          <div class="text-text-heading mt-1 text-center text-sm font-semibold">
             {{ t("traces.sessionDetail.turnLabel") }}
           </div>
         </div>

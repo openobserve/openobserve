@@ -164,34 +164,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon"
-                :title="t('dashboard.edit')"
+                :aria-label="t('dashboard.edit')"
                 @click="editVariableFn(row.name)"
                 :data-test="`dashboard-edit-variable-${row.name}`"
                 icon-left="edit"
                 class="max-md:hidden"
               >
+                <OTooltip :content="t('dashboard.edit')" />
               </OButton>
               <OButton
                 variant="ghost"
                 size="icon"
-                :title="t('dashboard.delete')"
+                icon-left="delete"
+                :aria-label="t('dashboard.delete')"
                 @click.stop="showDeleteDialogFn({ row: { name: row.name } })"
                 data-test="dashboard-delete-variable"
                 class="max-md:hidden"
               >
-                <template #icon-left><OIcon name="delete" size="sm" /></template>
+                <OTooltip :content="t('dashboard.delete')" />
               </OButton>
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
                     icon-left="more-vert"
-                    :title="t('dashboard.moreActions')"
                     variant="ghost"
                     size="icon-xs-sq"
                     class="md:hidden"
                     data-test="dashboard-variable-row-more-actions"
+                    :aria-label="t('dashboard.moreActions')"
                     @click.stop
-                  />
+                  >
+                    <OTooltip :content="t('dashboard.moreActions')" />
+                  </OButton>
                 </template>
                 <ODropdownItem
                   icon-left="edit"

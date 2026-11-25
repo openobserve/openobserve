@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot name="actions" />
     </template>
     <template v-else-if="inertActions?.links.length || inertActions?.dismissible" #actions>
-      <div class="flex flex-wrap items-center gap-3 font-bold underline" aria-hidden="true">
+      <div class="flex flex-wrap items-center gap-3 font-semibold underline" aria-hidden="true">
         <span v-for="(link, position) in inertActions.links" :key="position">{{ raw(link) }}</span>
         <span v-if="inertActions.dismissible">{{ t("announcements.dismiss") }}</span>
       </div>

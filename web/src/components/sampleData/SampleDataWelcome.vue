@@ -80,9 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="-me-1 shrink-0"
           :aria-label="t('common.close')"
           data-test="sample-welcome-close"
+          icon-left="close"
           @click="dismiss"
         >
-          <OIcon name="close" size="sm" />
+          <OTooltip :content="t('common.close')" />
         </OButton>
       </div>
 
@@ -171,6 +172,7 @@ import { useRoute, useRouter } from "vue-router";
 import config from "@/aws-exports";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import WelcomeChoices from "./WelcomeChoices.vue";

@@ -12,8 +12,8 @@ export interface IconProps {
    */
   name?: IconName | string;
   /**
-   * Semantic size. Defaults to "md" (24px).
-   * xs=12px  sm=16px  md=24px  lg=32px  xl=40px
+   * Semantic size, paired with the text beside it. Defaults to "md" (20px).
+   * xs=14px  sm=16px  md=20px  lg=32px  xl=40px
    */
   size?: "xs" | "sm" | "md" | "lg" | "xl";
   /** Accessible label. When provided the icon has role="img". When omitted it is aria-hidden. */

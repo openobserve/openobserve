@@ -84,10 +84,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             data-test="session-detail-annotate-btn"
+            icon-right="lock"
             @click="openUpgradeDialog"
           >
             {{ t("aiObservability.traceActions.annotate.button") }}
-            <template #icon-right><OIcon name="lock" size="sm" class="lock-chip" /></template>
           </OButton>
         </template>
         <OTooltip
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Error -->
         <div v-else-if="error" class="flex flex-1 flex-col items-center justify-center text-center">
-          <OIcon name="error-outline" size="xl" class="text-error-600 mb-3" />
+          <OIcon name="error-outline" size="xl" class="text-status-error-text mb-3" />
           <div class="text-text-heading mb-2 text-base">
             {{ t("traces.sessionDetail.failedToLoad") }}
           </div>
@@ -342,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :user-text="turnPreviewText(turnAt(chip.n))"
                     >
                       <span
-                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs hover:border-border-tint-neutral hover:bg-surface-tint-neutral inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-bold transition-colors"
+                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs hover:border-border-tint-neutral hover:bg-surface-tint-neutral inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-semibold transition-colors"
                         @click="jumpToTurn(chip.n)"
                         >{{ chip.label }}</span
                       >
@@ -531,7 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-text-muted flex-shrink-0"
                         />
                         <span
-                          class="text-2xs inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-bold tabular-nums"
+                          class="text-2xs inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-semibold tabular-nums"
                           :class="
                             trace.status === 'error'
                               ? 'text-error-500 bg-error-500/15'
@@ -669,7 +669,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="border-border-default flex items-center justify-between border-b px-2.5 py-1.5"
                             >
-                              <span class="text-text-heading text-xs font-bold">
+                              <span class="text-text-heading text-xs font-semibold">
                                 {{ t("traces.sessionDetail.roles.user") }}
                               </span>
                               <!-- Harness text hidden by the agent's patterns; Show puts it back. -->
@@ -723,7 +723,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="border-border-default flex items-center justify-between border-b px-2.5 py-1.5"
                             >
                               <span
-                                class="text-text-heading flex items-center gap-1.5 text-xs font-bold"
+                                class="text-text-heading flex items-center gap-1.5 text-xs font-semibold"
                               >
                                 {{ t("traces.sessionDetail.roles.assistant") }}
                                 <OTag
@@ -780,8 +780,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{ t("traces.sessionDetail.stats.toolCalls") }}
                             </span>
                             <div class="flex-1"></div>
-                            <OButton variant="outline" size="sm" @click="openTrace(trace.traceId)">
-                              <OIcon name="open-in-new" size="xs" class="me-1" />
+                            <OButton
+                              variant="outline"
+                              size="sm"
+                              icon-left="open-in-new"
+                              @click="openTrace(trace.traceId)"
+                            >
                               {{ t("traces.sessionDetail.openInTraceExplorer") }}
                             </OButton>
                           </div>
@@ -895,7 +899,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="jumpToTurn(turnNumberOf(row.topTraceId))"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-semibold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -921,12 +925,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip side="left" :delay="120" max-width="13.75rem" content-class="p-0!">
                       <template #content>
                         <div class="text-text-body w-50 px-3 py-2.25 text-xs">
-                          <div class="mb-0.5 font-bold break-words">{{ row.name }}</div>
+                          <div class="mb-0.5 font-semibold break-words">{{ row.name }}</div>
                           <div class="text-3xs text-text-muted mb-1.75">
                             {{ t("traces.sessionDetail.rail.call", { n: row.calls }) }}
                           </div>
                           <div
-                            class="text-3xs text-text-secondary mb-1 font-bold tracking-[0.05em]"
+                            class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.05em]"
                           >
                             {{ t("traces.sessionDetail.rail.usedIn") }}
                           </div>
@@ -978,7 +982,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-semibold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -1031,7 +1035,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-semibold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>

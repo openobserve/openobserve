@@ -73,9 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="ghost"
       size="icon-toolbar"
       class="size-7!"
+      icon-left="save"
+      :aria-label="t('common.save')"
       @click="fnSavedFunctionDialog"
     >
-      <OIcon name="save" size="sm" />
       <OTooltip :content="t('common.save')" :side-offset="6" />
     </OButton>
   </OButtonGroup>

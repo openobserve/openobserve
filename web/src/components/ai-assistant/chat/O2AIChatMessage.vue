@@ -137,9 +137,9 @@ const isStopped = computed(() =>
                   size="icon-xs-circle"
                   class="copy-btn rounded-default absolute top-2 right-2 z-1 px-2 py-1 opacity-60 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:opacity-100 hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
                   :aria-label="t('aiAssistant.copyContent')"
+                  icon-left="content-copy"
                   @click.stop="copyToClipboard(block.content, t)"
                 >
-                  <OIcon name="content-copy" size="sm" />
                   <OTooltip :content="t('aiAssistant.copyContent')" />
                 </OButton>
                 <code
@@ -213,9 +213,9 @@ const isStopped = computed(() =>
               variant="ghost"
               size="xs"
               data-test="o2-ai-chat-stopped-retry"
+              icon-left="refresh"
               @click="emit('retry', message)"
             >
-              <template #icon-left><OIcon name="refresh" size="sm" /></template>
               {{ t("common.retry") }}
             </OButton>
           </div>
@@ -231,9 +231,9 @@ const isStopped = computed(() =>
               variant="outline"
               size="xs"
               data-test="o2-ai-chat-running-stop"
+              icon-left="stop"
               @click="emit('stop-turn')"
             >
-              <template #icon-left><OIcon name="stop" size="sm" /></template>
               {{ t("aiAssistant.stopTurn") }}
             </OButton>
           </div>
@@ -265,9 +265,9 @@ const isStopped = computed(() =>
               variant="primary"
               size="xs"
               class="navigation-block-btn text-compact"
+              icon-left="open-in-new"
               @click="emit('navigate', block.navigationAction)"
             >
-              <template #icon-left><OIcon :name="'open-in-new'" size="sm" /></template>
               {{ block.navigationAction.label }}
             </OButton>
           </div>
@@ -293,9 +293,9 @@ const isStopped = computed(() =>
                     variant="ghost"
                     size="xs"
                     class="copy-button"
+                    icon-left="content-copy"
                     @click="copyToClipboard(textBlock.content, t)"
                   >
-                    <OIcon size="sm" name="content-copy" />
                     <span class="ms-1">{{ t("common.copy") }}</span>
                   </OButton>
                 </div>
@@ -313,9 +313,9 @@ const isStopped = computed(() =>
                     variant="ghost"
                     size="xs"
                     class="retry-button"
+                    icon-left="refresh"
                     @click="emit('retry', message)"
                   >
-                    <OIcon size="sm" name="refresh" />
                     <span class="ms-1">{{ t("common.retry") }}</span>
                   </OButton>
                 </div>
@@ -365,9 +365,9 @@ const isStopped = computed(() =>
                   variant="ghost"
                   size="xs"
                   class="copy-button"
+                  icon-left="content-copy"
                   @click="copyToClipboard(block.content, t)"
                 >
-                  <OIcon size="sm" name="content-copy" />
                   <span class="ms-1">{{ t("common.copy") }}</span>
                 </OButton>
               </div>
@@ -400,9 +400,9 @@ const isStopped = computed(() =>
             :class="message.feedback === 'thumbs_up' ? 'text-accent opacity-100!' : ''"
             data-test="o2-ai-chat-thumbs-up-btn"
             :aria-label="t('aiAssistant.helpful')"
+            icon-left="thumb-up-off-alt"
             @click="emit('like')"
           >
-            <OIcon name="thumb-up-off-alt" size="xs" />
             <OTooltip :content="t('aiAssistant.helpful')" />
           </OButton>
           <OButton
@@ -412,9 +412,9 @@ const isStopped = computed(() =>
             :class="message.feedback === 'thumbs_down' ? 'text-accent opacity-100!' : ''"
             data-test="o2-ai-chat-thumbs-down-btn"
             :aria-label="t('aiAssistant.notHelpful')"
+            icon-left="thumb-down-off-alt"
             @click="emit('dislike')"
           >
-            <OIcon name="thumb-down-off-alt" size="xs" />
             <OTooltip :content="t('aiAssistant.notHelpful')" />
           </OButton>
         </div>

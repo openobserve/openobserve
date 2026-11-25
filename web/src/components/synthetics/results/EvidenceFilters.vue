@@ -31,7 +31,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
@@ -117,9 +116,10 @@ const stepFilter = computed({
       class="ms-auto"
       :active="wrap"
       data-test="synthetics-evidence-wrap-btn"
+      icon-left="wrap-text"
+      :aria-label="t('search.messageWrapContent')"
       @click="wrap = !wrap"
     >
-      <OIcon name="wrap-text" size="sm" />
       <OTooltip :content="t('search.messageWrapContent')" />
     </OButton>
   </div>

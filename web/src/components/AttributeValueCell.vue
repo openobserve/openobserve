@@ -7,8 +7,9 @@
           size="icon-xs"
           variant="ghost"
           :aria-label="t('components.attributeValueCell.addIcon')"
+          :icon-left="isDropdownOpen ? 'expand-less' : 'expand-more'"
         >
-          <OIcon :name="isDropdownOpen ? 'expand-less' : 'expand-more'" size="xs" />
+          <OTooltip :content="t('components.attributeValueCell.addIcon')" />
         </OButton>
       </template>
       <div class="logs-table-list min-w-45">
@@ -22,18 +23,18 @@
 <script lang="ts">
 import { computed, ref, useSlots } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default {
   name: "AttributeValueCell",
   components: {
+    OTooltip,
     OButton,
     ODropdown,
-    OIcon,
     OTruncatedText,
   },
   props: {

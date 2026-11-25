@@ -570,7 +570,7 @@ describe("AllSuggestionsDrawer: Slack deep links (C4)", () => {
     const wrapper = mountWith({ kind: "coverage_lost" });
     await flushPromises();
     const empty = wrapper.get('[data-test="autoobserve2-suggestions-drawer-empty"]');
-    expect(empty.text()).toContain("No open suggestions of the kind Coverage Lost");
+    expect(empty.text()).toContain("No open suggestions of the kind Coverage lost");
     expect(empty.text()).toContain("26 other suggestions are open.");
     expect(empty.text()).not.toContain("No suggestions right now");
     await empty.get("button").trigger("click");

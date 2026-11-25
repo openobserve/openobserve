@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'error-item px-0 py-1.25 text-sm font-bold wrap-break-word': true,
+                  'error-item px-0 py-1.25 text-sm font-semibold wrap-break-word': true,
                   'text-green': val.success,
                   'text-status-negative': !val.success,
                 }"

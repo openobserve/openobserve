@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="notifications-active"
   >
     <template #title-trail>
-      <BetaBadge class="shrink-0" />
+      <OBetaBadge class="shrink-0" />
     </template>
     <template #actions>
       <!-- Whether the reader is themselves on call, beside the buttons rather
@@ -209,7 +209,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :active="narrowed"
                 :aria-label="t('oncall.filters')"
                 data-test="oncall-responses-filters-btn"
-              />
+              >
+                <OTooltip :content="t('oncall.filters')" />
+              </OButton>
             </template>
             <div class="flex flex-col gap-3 p-3" data-test="oncall-responses-filters-panel">
               <OSelect
@@ -254,9 +256,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :loading="bulkBusy"
           data-test="oncall-bulk-ack"
+          icon-left="check-circle"
           @click="bulkAcknowledge"
-        >
-          <OIcon name="check-circle" size="sm" />{{ t("oncall.acknowledge") }}
+          >{{ t("oncall.acknowledge") }}
         </OButton>
         <ODropdown>
           <template #trigger>
@@ -284,9 +286,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :loading="bulkBusy"
           data-test="oncall-bulk-resolve"
+          icon-left="task-alt"
           @click="confirmBulkResolve = true"
-        >
-          <OIcon name="task-alt" size="sm" />{{ t("oncall.resolve") }}
+          >{{ t("oncall.resolve") }}
         </OButton>
       </template>
 
@@ -628,9 +630,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :loading="busyId === row.rowKey"
                   :aria-label="t('oncall.assignTeamShort')"
                   :data-test="`oncall-row-assign-${row.rowKey}`"
+                  icon-left="group-add"
                   @click.stop
                 >
-                  <OIcon name="group-add" size="sm" />
                   <OTooltip side="bottom" :content="t('oncall.assignTeamShort')" />
                 </OButton>
               </template>
@@ -658,9 +660,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="busyId === row.rowKey"
               :aria-label="t('oncall.acknowledge')"
               :data-test="`oncall-row-ack-${row.rowKey}`"
+              icon-left="check-circle"
               @click.stop="acknowledgeRow(row)"
             >
-              <OIcon name="check-circle" size="sm" aria-hidden="true" />
               <OTooltip :content="ackTooltip(row)" />
             </OButton>
             <span
@@ -676,9 +678,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="busyId === row.rowKey"
               :aria-label="t('oncall.resolve')"
               :data-test="`oncall-row-resolve-${row.rowKey}`"
+              icon-left="task-alt"
               @click.stop="resolveRow(row)"
             >
-              <OIcon name="task-alt" size="sm" aria-hidden="true" />
               <OTooltip :content="t('oncall.resolve')" />
             </OButton>
             <span
@@ -854,7 +856,7 @@ import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallPolicyReviewed } from "@/composables/useOnCallPolicyReviewed";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";

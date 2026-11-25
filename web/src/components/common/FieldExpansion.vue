@@ -51,15 +51,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           variant="ghost-neutral"
           class="bg-field-list-actions-bg absolute end-0 top-0 gap-0!"
-          :title="
+          size="icon"
+          :icon-left="field.isInterestingField ? 'info-filled' : 'info-outline'"
+          @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
+          :aria-label="
             field.isInterestingField
               ? t('logStream.removeFromInterestingFields')
               : t('logStream.addToInterestingFields')
           "
-          size="icon"
-          @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
         >
-          <OIcon :name="field.isInterestingField ? 'info-filled' : 'info-outline'" size="sm" />
+          <OTooltip
+            :content="
+              field.isInterestingField
+                ? t('logStream.removeFromInterestingFields')
+                : t('logStream.addToInterestingFields')
+            "
+          />
         </OButton>
 
         <template #actions>
@@ -69,9 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
             variant="ghost-neutral"
             size="icon"
+            icon-left="add"
             @click.stop="$emit('add-to-filter', `${field.name}=''`)"
           >
-            <OIcon name="add" size="sm" />
+            <OTooltip :content="t('common.addFilter')" />
           </OButton>
           <OButton
             :aria-label="t('common.addFieldToTable')"
@@ -80,9 +88,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost-neutral"
             size="icon"
             class="gap-0!"
+            icon-left="visibility"
             @click.stop="$emit('toggle-field', field)"
           >
-            <OIcon name="visibility" size="sm" />
+            <OTooltip :content="t('common.addFieldToTable')" />
           </OButton>
           <OButton
             :aria-label="t('common.removeFieldFromTable')"
@@ -91,21 +100,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost-neutral"
             class="gap-0!"
             size="icon"
+            icon-left="visibility-off"
             @click.stop="$emit('toggle-field', field)"
           >
-            <OIcon name="visibility-off" size="sm" />
+            <OTooltip :content="t('common.removeFieldFromTable')" />
           </OButton>
           <OButton
             v-if="showGroupBy && field.isSchemaField"
             :aria-label="t('search.groupByThisField')"
-            :title="t('search.groupByThisField')"
             variant="ghost-neutral"
             size="icon"
             class="gap-0!"
             :data-test="`log-search-index-list-group-by-${field.name}-field-btn`"
+            icon-left="group-work"
             @click.stop="$emit('group-by', field.name)"
           >
-            <OIcon name="group-work" size="sm" />
+            <OTooltip :content="t('search.groupByThisField')" />
           </OButton>
           <OButton
             :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
@@ -117,15 +127,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             variant="ghost-neutral"
             class="gap-0!"
-            :title="
+            size="icon"
+            :icon-left="field.isInterestingField ? 'info-filled' : 'info-outline'"
+            @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
+            :aria-label="
               field.isInterestingField
                 ? t('logStream.removeFromInterestingFields')
                 : t('logStream.addToInterestingFields')
             "
-            size="icon"
-            @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
           >
-            <OIcon :name="field.isInterestingField ? 'info-filled' : 'info-outline'" size="sm" />
+            <OTooltip
+              :content="
+                field.isInterestingField
+                  ? t('logStream.removeFromInterestingFields')
+                  : t('logStream.addToInterestingFields')
+              "
+            />
           </OButton>
         </template>
       </OFieldRow>
@@ -160,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";

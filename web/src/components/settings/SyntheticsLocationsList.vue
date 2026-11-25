@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="sm"
+            icon-left="file-upload"
             @click="openImportDialog"
             data-test="synthetics-locations-import-btn"
             >{{ t("synthetics.locations.importTitle") }}</OButton
@@ -29,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="sm"
+            icon-left="download"
             @click="exportLocations"
             data-test="synthetics-locations-export-btn"
             >{{ t("synthetics.locations.exportTitle") }}</OButton

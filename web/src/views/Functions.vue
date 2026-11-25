@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="pipeline-list-import-pipeline-btn"
                 variant="outline"
                 size="sm"
-                icon-left="upload-file"
+                icon-left="file-upload"
                 @click="goToImportPipeline"
               >
                 {{ t("pipeline.import") }}

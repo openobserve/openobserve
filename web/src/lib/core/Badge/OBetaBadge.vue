@@ -14,29 +14,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  The "Beta" tag. One component so every beta surface (Workflows list / editor /
-  runs, the AI assistant, …) looks identical — change the look here and it moves
-  everywhere, instead of the badge being re-typed per header.
-
-  `size` only shrinks the padding/type scale for tight hosts (a toggle item,
-  a menu row); the variant and casing stay fixed so the tag reads the same.
--->
-<template>
-  <OBadge variant="primary-outline" :size="size" class="font-medium" :data-test="`${stage}-badge`">
-    {{ stage === "alpha" ? t("common.alpha") : t("common.beta") }}
-  </OBadge>
-</template>
-
-<script lang="ts" setup>
+<script setup lang="ts">
 import { useI18nTyped } from "@/types/i18n";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeProps } from "@/lib/core/Badge/OBadge.types";
+import type { BetaBadgeProps } from "./OBetaBadge.types";
 
-withDefaults(defineProps<{ size?: BadgeProps["size"]; stage?: "alpha" | "beta" }>(), {
-  size: "xs",
-  stage: "beta",
-});
+withDefaults(defineProps<BetaBadgeProps>(), { stage: "beta" });
 
 const { t } = useI18nTyped();
 </script>
+
+<template>
+  <!-- Fixed height, leading-none and reset casing/italics keep it identical inside any host line. -->
+  <span
+    class="bg-accent/12 text-selected-fg text-2xs inline-flex h-4 shrink-0 items-center rounded-full px-1.5 leading-none font-medium whitespace-nowrap normal-case not-italic"
+    :data-test="`${stage}-badge`"
+  >
+    {{ stage === "alpha" ? t("common.alpha") : t("common.beta") }}
+  </span>
+</template>

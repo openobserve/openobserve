@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-compact min-w-0 flex-1 leading-tight">
                 <template v-if="serviceNameDetected">
                   {{ t("settings.serviceIdentitySetup.serviceNameDetectedFrom") }}
-                  <span class="text-primary font-bold">{{
+                  <span class="text-primary font-semibold">{{
                     t("settings.correlation.service")
                   }}</span>
                   {{ t("settings.serviceIdentitySetup.fieldAlias") }}
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-default flex flex-col items-center gap-2 border border-dashed px-4 py-3"
                   :class="'border-border-default bg-surface-subtle'"
                 >
-                  <OIcon name="tune" size="lg" class="text-icon-color mb-1" />
+                  <OIcon name="tune" size="lg" class="text-text-secondary mb-1" />
                   <span class="text-sm font-medium" :class="'text-text-secondary'">
                     {{ t("settings.serviceIdentitySetup.noFieldsConfiguredYet") }}
                   </span>
@@ -200,9 +200,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     class="mt-1"
                     data-test="service-identity-add-distinguish-btn"
+                    icon-left="add"
                     @click="addingToEnv = activeEnvironment"
                   >
-                    <template #icon-left><OIcon name="add" size="xs" /></template>
                     {{ t("settings.correlation.addField") }}
                   </OButton>
                 </div>
@@ -317,8 +317,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else-if="(setDistinguishBy[envKey] ?? []).filter(Boolean).length < 5"
                       variant="outline"
                       size="sm"
-                      @click="addingToEnv = envKey"
                       icon-left="add"
+                      @click="addingToEnv = envKey"
                     >
                       {{ t("settings.correlation.addField") }}
                       <OTooltip
@@ -379,8 +379,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     variant="outline"
                     size="sm"
-                    @click="addingToEnv = generateGroupId()"
                     icon-left="add"
+                    @click="addingToEnv = generateGroupId()"
                   >
                     {{ t("settings.correlation.addGroup") }}
                     <OTooltip
@@ -531,8 +531,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     variant="outline"
                     size="sm"
-                    @click="addingTrackedAlias = true"
                     icon-left="add"
+                    @click="addingTrackedAlias = true"
                   >
                     {{ t("settings.correlation.addField") }}
                   </OButton>
@@ -581,7 +581,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
                 <!-- Plus connector between cards -->
                 <div v-if="idx > 0" class="flex shrink-0 items-center">
-                  <OIcon name="add" size="sm" class="text-icon-color" />
+                  <OIcon name="add" size="sm" class="text-text-secondary" />
                 </div>
 
                 <!-- Dim card -->
@@ -594,7 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="text-2xs font-medium" :class="'text-text-secondary'">{{
                       card.label
                     }}</span>
-                    <span class="ms-auto text-lg font-bold" :class="card.theme.countClass">{{
+                    <span class="ms-auto text-lg font-semibold" :class="card.theme.countClass">{{
                       card.count
                     }}</span>
                   </div>
@@ -709,7 +709,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="'bg-surface-subtle'"
           >
             <div class="min-w-0 flex-1 text-xs" :class="'text-text-secondary'">
-              <span class="font-bold" :class="'text-text-body'">{{
+              <span class="font-semibold" :class="'text-text-body'">{{
                 t("settings.serviceIdentitySetup.recommended")
               }}</span>
               {{ " " }}{{ t("settings.serviceIdentitySetup.recommendedUse") }}
@@ -733,9 +733,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon"
                 class="opacity-40 hover:opacity-100"
+                icon-left="cancel"
                 @click="dismissSuggestion"
               >
-                <OIcon name="cancel" size="xs" />
+                <OTooltip :content="t('common.dismiss')" />
               </OButton>
             </div>
           </div>
@@ -930,7 +931,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex min-w-0 flex-1 flex-col px-3"
                     :class="[dimIdx > 0 ? 'border-border-default border-s' : '']"
                   >
-                    <div class="text-compact mb-2 font-bold" :class="'text-text-body'">
+                    <div class="text-compact mb-2 font-semibold" :class="'text-text-body'">
                       {{ dim.label }}
                       <span class="font-normal" :class="'text-text-secondary'"
                         >({{ dim.values.length }})</span
@@ -1076,7 +1077,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       v-if="typeIdx > 0"
-                      class="text-3xs text-text-label bg-surface-subtle sticky top-0 z-10 border-t border-b px-4 py-1 font-bold uppercase"
+                      class="text-3xs text-text-label bg-surface-subtle sticky top-0 z-10 border-t border-b px-4 py-1 font-semibold uppercase"
                     >
                       {{ typeName }}
                     </div>

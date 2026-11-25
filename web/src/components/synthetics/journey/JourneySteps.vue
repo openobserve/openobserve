@@ -672,11 +672,11 @@ const startRowColspan = computed(
               :aria-label="t('synthetics.journey.recordBeforeStep')"
               data-test="synthetics-journey-step-record-before-btn"
               :disabled="recordBeforeDisabled()"
+              icon-right="smart-display"
               @click="emit('record-before', row)"
             >
               <!-- The same icon as the toolbar's Record button: this row action starts a
                    recording too, just anchored, so the two must read as one action. -->
-              <OIcon name="smart-display" size="sm" aria-hidden="true" />
             </OButton>
           </span>
         </OTooltip>
@@ -689,9 +689,10 @@ const startRowColspan = computed(
           :aria-label="t('synthetics.journey.insertStepBelow')"
           data-test="synthetics-journey-step-insert-btn"
           :disabled="isLocked"
+          icon-left="add"
           @click="emit('insert-below', row)"
         >
-          <OIcon name="add" size="sm" aria-hidden="true" />
+          <OTooltip :content="t('synthetics.journey.insertStepBelow')" />
         </OButton>
 
         <OButton
@@ -703,9 +704,10 @@ const startRowColspan = computed(
           data-test="synthetics-journey-step-duplicate-btn"
           data-row-action="duplicate"
           :disabled="isLocked"
+          icon-left="content-copy"
           @click="emit('duplicate', row)"
         >
-          <OIcon name="content-copy" size="sm" aria-hidden="true" />
+          <OTooltip :content="t('synthetics.journey.duplicateStep')" />
         </OButton>
 
         <OButton
@@ -717,9 +719,10 @@ const startRowColspan = computed(
           data-row-action="delete"
           :disabled="isLocked"
           class="hover:text-status-error-text max-md:hidden"
+          icon-left="delete"
           @click="emit('delete', row)"
         >
-          <OIcon name="delete" size="sm" aria-hidden="true" />
+          <OTooltip :content="t('synthetics.journey.deleteStepAria')" />
         </OButton>
 
         <ODropdown v-if="!readonly" side="bottom" align="end">
@@ -732,7 +735,9 @@ const startRowColspan = computed(
               class="md:hidden"
               data-test="synthetics-journey-step-row-more-actions"
               @click.stop
-            />
+            >
+              <OTooltip :content="t('common.moreActions')" />
+            </OButton>
           </template>
           <ODropdownItem
             icon-left="smart-display"

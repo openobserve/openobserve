@@ -609,7 +609,7 @@ describe("FolderList.vue", () => {
   describe("Template Rendering", () => {
     it("reads Folders in the rail header and Add Folder on the add button by default", () => {
       expect(wrapper.text()).toContain("Folders");
-      expect(wrapper.find('[data-test="dashboard-new-folder-btn"]').attributes("title")).toBe(
+      expect(wrapper.find('[data-test="dashboard-new-folder-btn"]').attributes("aria-label")).toBe(
         "Add Folder",
       );
     });
@@ -626,7 +626,7 @@ describe("FolderList.vue", () => {
       });
       expect(fleets.text()).toContain("Fleets");
       expect(fleets.text()).not.toContain("Folders");
-      expect(fleets.find('[data-test="dashboard-new-folder-btn"]').attributes("title")).toBe(
+      expect(fleets.find('[data-test="dashboard-new-folder-btn"]').attributes("aria-label")).toBe(
         "New Fleet",
       );
       fleets.unmount();

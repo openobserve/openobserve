@@ -28,9 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-copy-btn"
         variant="ghost"
         size="icon-xs-sq"
+        icon-left="content-copy"
+        :aria-label="t('common.copy')"
         @click="copyToClipboardFn()"
       >
-        <OIcon name="content-copy" size="sm" />
         <OTooltip :content="t('common.copy')" side="top" />
       </OButton>
     </div>
@@ -51,7 +52,6 @@ import { copyToClipboard } from "@/utils/clipboard";
 import analytics from "@/services/product_analytics";
 import { maskText, b64EncodeStandard } from "../utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
@@ -59,7 +59,7 @@ const PASSCODE_PLACEHOLDERS = ["[PASSCODE]", "[BASIC_PASSCODE]"];
 
 export default defineComponent({
   name: "CopyContent",
-  components: { OButton, OIcon, OTooltip, OBanner },
+  components: { OButton, OTooltip, OBanner },
   props: {
     content: {
       type: String as unknown as PropType<I18nText>,

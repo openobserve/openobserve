@@ -58,11 +58,9 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   section: ["text-xs font-medium", "text-typography-section", "leading-none"].join(" "),
 
   // Card or panel title (h3).
-  "panel-title": [
-    "text-compact font-semibold",
-    "text-typography-panel-title",
-    "leading-tight",
-  ].join(" "),
+  "panel-title": ["text-sm font-semibold", "text-typography-panel-title", "leading-tight"].join(
+    " ",
+  ),
 
   // Section title (h2) on a detail page; no 15px token yet, so text-sm is the nearest.
   "card-title": ["text-sm font-semibold", "text-typography-panel-title", "leading-tight"].join(" "),

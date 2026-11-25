@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'px-0 py-1.25 text-sm font-bold': true,
+                  'px-0 py-1.25 text-sm font-semibold': true,
                   'text-green': val.success,
                   'text-status-negative': !val.success,
                 }"

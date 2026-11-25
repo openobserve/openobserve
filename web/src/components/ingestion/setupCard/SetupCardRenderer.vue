@@ -889,9 +889,10 @@ function fireConfetti() {
                     data-test="ai-code-env-btn"
                     variant="ghost"
                     size="icon-xs-sq"
+                    icon-left="download"
+                    :aria-label="t('ingestion.setupCard.downloadEnvTooltip')"
                     @click="downloadEnv"
                   >
-                    <OIcon name="download" size="sm" />
                     <OTooltip :content="t('ingestion.setupCard.downloadEnvTooltip')" side="top" />
                   </OButton>
                 </template>

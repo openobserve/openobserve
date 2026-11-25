@@ -6,9 +6,10 @@
       size="icon-sm"
       class="absolute! top-0! right-0 z-10"
       :class="copyButtonClass"
+      icon-left="content-copy"
+      :aria-label="t('common.copyToClipboard')"
       @click="copyToClipboard"
     >
-      <OIcon name="content-copy" size="sm" />
       <OTooltip :content="t('common.copyToClipboard')" />
     </OButton>
     <div class="copy-log-btn flex items-center justify-start px-3 pb-1">
@@ -35,8 +36,9 @@
             variant="ghost"
             class="ms-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
             :aria-label="t('common.addIcon')"
+            :icon-left="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'"
           >
-            <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
+            <OTooltip :content="t('common.addIcon')" />
           </OButton>
         </template>
         <div class="logs-table-list min-w-45">
@@ -74,7 +76,6 @@ import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 export default {
@@ -85,7 +86,6 @@ export default {
     OButton,
     ODropdown,
     OTooltip,
-    OIcon,
   },
   props: {
     value: {

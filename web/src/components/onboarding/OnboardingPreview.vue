@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="['col-start-1 row-start-1', i > 0 && 'invisible']"
         :aria-hidden="i > 0 || undefined"
       >
-        <p class="text-onboarding-panel-text text-xs font-bold">{{ p.eyebrow }}</p>
+        <p class="text-onboarding-panel-text text-xs font-semibold">{{ p.eyebrow }}</p>
         <h2
           class="text-onboarding-panel-text mt-1.5 text-2xl leading-tight font-semibold text-balance"
           :data-test="i === 0 ? 'onboarding-preview-title' : undefined"

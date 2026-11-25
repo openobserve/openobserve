@@ -19,334 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full max-h-full flex-col overflow-hidden">
     <div class="flex h-full max-h-full w-full flex-col overflow-hidden" ref="searchListContainer">
-      <!-- Section header: static at top -->
-      <div
-        class="border-card-glass-border bg-card-glass-bg flex min-h-10 shrink-0 items-center border-b max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
-      >
-        <!-- Field panel toggle — same style as add-panel config sidebar -->
-        <OButton
-          variant="ghost"
-          size="icon-toolbar"
-          class="toolbar-btn-rest ms-1.5 shrink-0"
-          data-test="logs-search-field-list-collapse-btn"
-          @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
-        >
-          <OIcon
-            :name="
-              isMobile
-                ? 'menu'
-                : searchObj.meta.showFields
-                  ? 'keyboard-double-arrow-left'
-                  : 'keyboard-double-arrow-right'
-            "
-            size="sm"
-          />
-          <OTooltip
-            :content="
-              isMobile
-                ? t('search.showFields')
-                : searchObj.meta.showFields
-                  ? t('logs.searchResult.collapseFields')
-                  : t('logs.searchResult.openFields')
-            "
-            side="bottom"
-            shortcut-id="logsToggleSidebar"
-          />
-        </OButton>
-        <div
-          class="bg-warning text-text-inverse rounded-default min-w-0 flex-1 ps-2 text-left"
-          v-if="searchObj.data.countErrorMsg != ''"
-        >
-          <SanitizedHtmlRenderer
-            data-test="logs-search-total-count-error-message"
-            :htmlContent="searchObj.data.countErrorMsg"
-          />
-        </div>
-        <div
-          v-else
-          class="text-text-secondary flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left transition-opacity max-md:min-w-32"
-          :class="{ [STALE_DIM]: summaryDimmed }"
-          data-test="logs-search-result-title"
-          :data-search-state="
-            searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
-          "
-          :data-hits-count="searchObj.data?.queryResults?.hits?.length ?? 0"
-        >
-          <!-- Logs mode: structured chips -->
-          <template v-if="searchObj.meta.logsVisualizeToggle !== 'patterns'">
-            <span v-if="recordsChips" class="logs-strip-box">
-              <OTag
-                type="logsResultChip"
-                value="neutral"
-                class="text-text-secondary! logs-strip-chip logs-strip-chip--lead tabular-nums"
-                data-test="logs-result-records-chip"
-                ><i18n-t keypath="search.stripTotal" tag="span" scope="global">
-                  <template #total
-                    ><span class="text-text-body text-sm font-semibold">{{
-                      recordsChips.parts.total
-                    }}</span></template
-                  >
-                </i18n-t></OTag
-              >
-              <OTag
-                type="logsResultChip"
-                value="neutral"
-                class="text-text-secondary! logs-strip-chip logs-strip-chip--neutral max-md:hidden"
-                data-test="logs-result-showing-chip"
-                ><span>{{ recordsChips.parts.start }}–{{ recordsChips.parts.end }}</span></OTag
-              >
-              <OTag
-                type="logsResultChip"
-                value="info"
-                class="text-text-secondary! logs-strip-chip logs-strip-chip--ok tabular-nums max-md:hidden"
-                data-test="logs-result-time-chip"
-                ><i18n-t keypath="search.tookChipCompact" tag="span" scope="global">
-                  <template #took
-                    ><span>{{ recordsChips.parts.took }}</span></template
-                  >
-                </i18n-t></OTag
-              >
-              <OTag
-                v-if="recordsChips.scan"
-                type="logsResultChip"
-                value="warn"
-                class="text-text-secondary! logs-strip-chip logs-strip-chip--info max-md:hidden"
-                data-test="logs-result-scan-chip"
-                ><OTooltip :content="recordsChips.scan" /><i18n-t
-                  keypath="search.scannedChip"
-                  tag="span"
-                  scope="global"
-                >
-                  <template #size
-                    ><span>{{ splitUnit(recordsChips.parts.scanSize).value }}</span
-                    >{{ splitUnit(recordsChips.parts.scanSize).unit }}</template
-                  >
-                </i18n-t></OTag
-              >
-            </span>
-            <span v-else-if="!summaryView.updating" class="min-w-0 truncate">{{
-              noOfRecordsTitle
-            }}</span>
-          </template>
-          <!-- Patterns mode: structured chips -->
-          <template v-else>
-            <span v-if="patternChips" class="logs-strip-box">
-              <OTag
-                v-if="patternChips.events !== null"
-                type="logsResultChip"
-                value="neutral"
-                class="text-text-secondary! logs-strip-chip logs-strip-chip--lead"
-                data-test="logs-result-events-chip"
-                ><span class="text-text-body text-sm font-semibold tabular-nums">{{
-                  patternChips.events
-                }}</span>
-                {{ t("logs.searchResult.events") }}</OTag
-              >
-              <OTag
-                type="logsResultChip"
-                value="neutral"
-                class="text-text-secondary! logs-strip-chip logs-strip-chip--neutral"
-                data-test="logs-result-patterns-chip"
-                ><span class="tabular-nums">{{ patternChips.patterns }}</span>
-                {{ t("logs.searchResult.patterns") }}</OTag
-              >
-              <OTag
-                type="logsResultChip"
-                value="info"
-                class="text-text-secondary! logs-strip-chip logs-strip-chip--ok tabular-nums max-md:hidden"
-                data-test="logs-result-pattern-time-chip"
-                ><i18n-t keypath="search.tookChipCompact" tag="span" scope="global">
-                  <template #took
-                    ><span>{{ patternChips.time }}</span></template
-                  >
-                </i18n-t></OTag
-              >
-            </span>
-            <span v-else class="min-w-0 truncate">{{ patternSummaryText }}</span>
-          </template>
-          <span v-if="searchObj.loadingCounter" class="shrink-0">
-            <OSpinner size="xs" class="mx-auto block" />
-          </span>
-          <div
-            v-else-if="
-              searchObj.data.histogram.errorCode == -1 &&
-              !searchObj.loadingCounter &&
-              searchObj.meta.showHistogram
-            "
-            class="text-warning shrink-0 cursor-pointer"
-          >
-            <OIcon name="info-outline" size="sm"> </OIcon>
-            <OTooltip :content="raw(searchObj.data.histogram.errorMsg)" side="top" align="center" />
-          </div>
-        </div>
-
-        <div
-          class="results-bar-quiet flex flex-none items-center justify-end gap-1.5 pe-2 max-md:ms-auto"
-        >
-          <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
-          <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
-            <template #trigger>
-              <OButton variant="ghost" size="icon-toolbar" data-test="logs-result-actions-menu-btn">
-                <OIcon name="more-horiz" size="sm" />
-                <OTooltip :content="t('search.moreActions')" />
-              </OButton>
-            </template>
-            <ODropdownItem data-test="logs-result-refresh-menu-item" @select="$emit('run-query')">
-              <template #icon-left><OIcon name="refresh" size="sm" /></template>
-              {{ t("common.refresh") }}
-            </ODropdownItem>
-            <ODropdownItem
-              v-if="showWrapBtn"
-              data-test="logs-result-wrap-menu-item"
-              @select="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
-            >
-              <template #icon-left><OIcon name="wrap-text" size="sm" /></template>
-              {{ t("search.messageWrapContent") }}
-              <template #icon-right>
-                <OSwitch
-                  class="ms-auto"
-                  v-model="searchObj.meta.toggleSourceWrap"
-                  :aria-label="t('search.messageWrapContent')"
-                  size="sm"
-                  data-test="logs-result-wrap-menu-switch"
-                  @click.stop
-                />
-              </template>
-            </ODropdownItem>
-            <ODropdownItem
-              v-if="showInspectBtn"
-              data-test="logs-inspect-button"
-              @select="openSearchJobInspector"
-            >
-              <template #icon-left><OIcon name="troubleshoot" size="sm" /></template>
-              {{ t("volumeInsights.searchInspectionsLabel") }}
-            </ODropdownItem>
-          </ODropdown>
-
-          <!-- INLINE BUTTONS (wider container) -->
-          <template v-else>
-            <ORefreshButton
-              layout="inline"
-              variant="ghost"
-              class="toolbar-btn-rest gap-1.5! ps-2! pe-2! text-xs!"
-              :last-run-at="searchObj.meta.lastRunAt"
-              :loading="searchObj.loading || histogramSettling"
-              :disabled="searchObj.loading || histogramSettling"
-              @click="$emit('run-query')"
-            />
-            <!-- Action buttons -->
-            <div v-if="inspectAvailable || showWrapBtn" class="inline-flex items-center gap-1.5">
-              <OButton
-                v-if="inspectAvailable"
-                variant="ghost"
-                :size="showActionLabels ? 'sm-toolbar' : 'icon-toolbar'"
-                :disabled="!showInspectBtn"
-                class="toolbar-btn-rest"
-                :aria-label="t('volumeInsights.searchInspectionsLabel')"
-                @click="openSearchJobInspector"
-                data-test="logs-inspect-button"
-              >
-                <OIcon name="troubleshoot" size="sm" />
-                <span v-if="showActionLabels" class="whitespace-nowrap">{{
-                  t("volumeInsights.inspectBtnLabel")
-                }}</span>
-                <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
-              </OButton>
-              <OButton
-                v-if="showWrapBtn"
-                as="div"
-                variant="ghost"
-                size="sm-toolbar"
-                class="toolbar-btn-rest"
-                data-test="logs-search-result-wrap-table-content-btn"
-                @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
-              >
-                <OSwitch
-                  class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
-                  v-model="searchObj.meta.toggleSourceWrap"
-                  :aria-label="t('search.messageWrapContent')"
-                  size="sm"
-                  @click.stop
-                />
-                <OIcon name="wrap-text" size="sm" class="shrink-0" />
-                <OTooltip :content="t('search.messageWrapContent')" side="bottom" />
-              </OButton>
-            </div>
-          </template>
-
-          <span
-            v-if="
-              searchObj.meta.resultGrid.showPagination &&
-              searchObj.meta.logsVisualizeToggle === 'logs'
-            "
-            :tabindex="gridLockReason ? 0 : undefined"
-            :aria-disabled="gridLockReason ? true : undefined"
-            :aria-describedby="gridLockReason ? 'logs-page-size-reason' : undefined"
-          >
-            <OSelect
-              v-if="
-                searchObj.meta.resultGrid.showPagination &&
-                searchObj.meta.logsVisualizeToggle === 'logs'
-              "
-              :aria-label="t('search.resultsPerPage')"
-              data-test="logs-search-result-records-per-page"
-              v-model="searchObj.meta.resultGrid.rowsPerPage"
-              :options="rowsPerPageOptions"
-              class="select-pagination results-page-select"
-              appearance="inline"
-              size="sm"
-              :searchable="false"
-              :disabled="searchObj.loading || !!gridLockReason"
-              @update:model-value="getPageData('recordsPerPage')"
-            >
-              <template #trigger>
-                {{ searchObj.meta.resultGrid.rowsPerPage }}
-              </template>
-            </OSelect>
-            <span v-if="gridLockReason" id="logs-page-size-reason" class="sr-only">{{
-              gridLockReason
-            }}</span>
-          </span>
-          <OTooltip
-            v-if="gridLockReason && searchObj.meta.resultGrid.showPagination"
-            :content="gridLockReason"
-          />
-          <span
-            v-if="
-              searchObj.meta.resultGrid.showPagination &&
-              searchObj.meta.logsVisualizeToggle === 'logs'
-            "
-            :tabindex="gridLockReason ? 0 : undefined"
-            :aria-disabled="gridLockReason ? true : undefined"
-            :aria-describedby="gridLockReason ? 'logs-pagination-reason' : undefined"
-            class="inline-flex justify-start"
-            :class="paginationMaxPages === 5 ? 'min-w-[11.25rem]' : 'min-w-[8rem]'"
-          >
-            <OPagination
-              v-if="
-                searchObj.meta.resultGrid.showPagination &&
-                searchObj.meta.logsVisualizeToggle === 'logs'
-              "
-              :disable="searchObj.loading || histogramSettling || !!gridLockReason"
-              :data-locked="gridLockReason ? 'true' : undefined"
-              v-model="pageNumberInput"
-              class="border-0! bg-transparent! p-0!"
-              :max="summaryView.pageCount"
-              :max-pages="paginationMaxPages"
-              @update:model-value="getPageData('pageChange')"
-              data-test="logs-search-result-pagination"
-            />
-            <span v-if="gridLockReason" id="logs-pagination-reason" class="sr-only">{{
-              gridLockReason
-            }}</span>
-          </span>
-          <OTooltip
-            v-if="gridLockReason && searchObj.meta.resultGrid.showPagination"
-            :content="gridLockReason"
-          />
-        </div>
-      </div>
-
       <!-- Outside scrollContainerRef so the results progress bar can't scroll away. -->
       <div class="relative">
         <div
@@ -868,6 +540,306 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- end combined scroll area -->
+      <div
+        class="border-border-default bg-card-glass-bg flex shrink-0 items-center border-t max-md:flex-wrap"
+        data-test="logs-search-result-footer"
+      >
+        <!-- Results bar: counts, refresh and view toggles share the footer row with the pager. -->
+        <div
+          class="flex min-h-10 min-w-0 flex-1 items-center max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
+        >
+          <!-- Field panel toggle — same style as add-panel config sidebar -->
+          <OButton
+            variant="ghost"
+            size="icon-toolbar"
+            class="toolbar-btn-rest ms-1.5 shrink-0"
+            data-test="logs-search-field-list-collapse-btn"
+            @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
+            :icon-left="
+              isMobile
+                ? 'menu'
+                : searchObj.meta.showFields
+                  ? 'keyboard-double-arrow-left'
+                  : 'keyboard-double-arrow-right'
+            "
+            :aria-label="
+              isMobile
+                ? t('search.showFields')
+                : searchObj.meta.showFields
+                  ? t('logs.searchResult.collapseFields')
+                  : t('logs.searchResult.openFields')
+            "
+          >
+            <OTooltip
+              :content="
+                isMobile
+                  ? t('search.showFields')
+                  : searchObj.meta.showFields
+                    ? t('logs.searchResult.collapseFields')
+                    : t('logs.searchResult.openFields')
+              "
+              side="bottom"
+              shortcut-id="logsToggleSidebar"
+            />
+          </OButton>
+          <div
+            class="bg-warning text-text-inverse rounded-default min-w-0 flex-1 ps-2 text-left"
+            v-if="searchObj.data.countErrorMsg != ''"
+          >
+            <SanitizedHtmlRenderer
+              data-test="logs-search-total-count-error-message"
+              :htmlContent="searchObj.data.countErrorMsg"
+            />
+          </div>
+          <div
+            v-else
+            class="text-text-secondary flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left transition-opacity max-md:min-w-32"
+            :class="{ [STALE_DIM]: summaryDimmed }"
+            data-test="logs-search-result-title"
+            :data-search-state="
+              searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
+            "
+            :data-hits-count="searchObj.data?.queryResults?.hits?.length ?? 0"
+          >
+            <!-- Logs mode: structured chips -->
+            <template v-if="searchObj.meta.logsVisualizeToggle !== 'patterns'">
+              <span v-if="recordsChips" class="logs-strip-box">
+                <OTag
+                  type="logsResultChip"
+                  value="neutral"
+                  class="text-text-secondary! logs-strip-chip logs-strip-chip--lead tabular-nums"
+                  data-test="logs-result-records-chip"
+                  ><i18n-t keypath="search.stripTotal" tag="span" scope="global">
+                    <template #total
+                      ><span class="text-text-body text-sm font-semibold">{{
+                        recordsChips.parts.total
+                      }}</span></template
+                    >
+                  </i18n-t></OTag
+                >
+                <OTag
+                  type="logsResultChip"
+                  value="neutral"
+                  class="text-text-secondary! logs-strip-chip logs-strip-chip--neutral max-md:hidden"
+                  data-test="logs-result-showing-chip"
+                  ><span>{{ recordsChips.parts.start }}–{{ recordsChips.parts.end }}</span></OTag
+                >
+                <OTag
+                  type="logsResultChip"
+                  value="info"
+                  class="text-text-secondary! logs-strip-chip logs-strip-chip--ok tabular-nums max-md:hidden"
+                  data-test="logs-result-time-chip"
+                  ><i18n-t keypath="search.tookChipCompact" tag="span" scope="global">
+                    <template #took
+                      ><span>{{ recordsChips.parts.took }}</span></template
+                    >
+                  </i18n-t></OTag
+                >
+                <OTag
+                  v-if="recordsChips.scan"
+                  type="logsResultChip"
+                  value="warn"
+                  class="text-text-secondary! logs-strip-chip logs-strip-chip--info max-md:hidden"
+                  data-test="logs-result-scan-chip"
+                  ><OTooltip :content="recordsChips.scan" /><i18n-t
+                    keypath="search.scannedChip"
+                    tag="span"
+                    scope="global"
+                  >
+                    <template #size
+                      ><span>{{ splitUnit(recordsChips.parts.scanSize).value }}</span
+                      >{{ splitUnit(recordsChips.parts.scanSize).unit }}</template
+                    >
+                  </i18n-t></OTag
+                >
+              </span>
+              <span v-else-if="!summaryView.updating" class="min-w-0 truncate">{{
+                noOfRecordsTitle
+              }}</span>
+            </template>
+            <!-- Patterns mode: structured chips -->
+            <template v-else>
+              <span v-if="patternChips" class="logs-strip-box">
+                <OTag
+                  v-if="patternChips.events !== null"
+                  type="logsResultChip"
+                  value="neutral"
+                  class="text-text-secondary! logs-strip-chip logs-strip-chip--lead"
+                  data-test="logs-result-events-chip"
+                  ><span class="text-text-body text-sm font-semibold tabular-nums">{{
+                    patternChips.events
+                  }}</span>
+                  {{ t("logs.searchResult.events") }}</OTag
+                >
+                <OTag
+                  type="logsResultChip"
+                  value="neutral"
+                  class="text-text-secondary! logs-strip-chip logs-strip-chip--neutral"
+                  data-test="logs-result-patterns-chip"
+                  ><span class="tabular-nums">{{ patternChips.patterns }}</span>
+                  {{ t("logs.searchResult.patterns") }}</OTag
+                >
+                <OTag
+                  type="logsResultChip"
+                  value="info"
+                  class="text-text-secondary! logs-strip-chip logs-strip-chip--ok tabular-nums max-md:hidden"
+                  data-test="logs-result-pattern-time-chip"
+                  ><i18n-t keypath="search.tookChipCompact" tag="span" scope="global">
+                    <template #took
+                      ><span>{{ patternChips.time }}</span></template
+                    >
+                  </i18n-t></OTag
+                >
+              </span>
+              <span v-else class="min-w-0 truncate">{{ patternSummaryText }}</span>
+            </template>
+            <span v-if="searchObj.loadingCounter" class="shrink-0">
+              <OSpinner size="xs" class="mx-auto block" />
+            </span>
+            <div
+              v-else-if="
+                searchObj.data.histogram.errorCode == -1 &&
+                !searchObj.loadingCounter &&
+                searchObj.meta.showHistogram
+              "
+              class="text-warning shrink-0 cursor-pointer"
+            >
+              <OIcon name="info-outline" size="sm"> </OIcon>
+              <OTooltip
+                :content="raw(searchObj.data.histogram.errorMsg)"
+                side="top"
+                align="center"
+              />
+            </div>
+          </div>
+
+          <div
+            class="results-bar-quiet flex flex-none items-center justify-end gap-1.5 pe-2 max-md:ms-auto"
+          >
+            <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
+            <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="icon-toolbar"
+                  data-test="logs-result-actions-menu-btn"
+                  icon-left="more-horiz"
+                  :aria-label="t('search.moreActions')"
+                >
+                  <OTooltip :content="t('search.moreActions')" />
+                </OButton>
+              </template>
+              <ODropdownItem data-test="logs-result-refresh-menu-item" @select="$emit('run-query')">
+                <template #icon-left><OIcon name="refresh" size="sm" /></template>
+                {{ t("common.refresh") }}
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="showWrapBtn"
+                data-test="logs-result-wrap-menu-item"
+                @select="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+              >
+                <template #icon-left><OIcon name="wrap-text" size="sm" /></template>
+                {{ t("search.messageWrapContent") }}
+                <template #icon-right>
+                  <OSwitch
+                    class="ms-auto"
+                    v-model="searchObj.meta.toggleSourceWrap"
+                    :aria-label="t('search.messageWrapContent')"
+                    size="sm"
+                    data-test="logs-result-wrap-menu-switch"
+                    @click.stop
+                  />
+                </template>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="showInspectBtn"
+                data-test="logs-inspect-button"
+                @select="openSearchJobInspector"
+              >
+                <template #icon-left><OIcon name="troubleshoot" size="sm" /></template>
+                {{ t("volumeInsights.searchInspectionsLabel") }}
+              </ODropdownItem>
+            </ODropdown>
+
+            <!-- INLINE BUTTONS (wider container) -->
+            <template v-else>
+              <ORefreshButton
+                layout="inline"
+                variant="ghost"
+                class="toolbar-btn-rest gap-1.5! ps-2! pe-2! text-xs!"
+                :last-run-at="searchObj.meta.lastRunAt"
+                :loading="searchObj.loading || histogramSettling"
+                :disabled="searchObj.loading || histogramSettling"
+                @click="$emit('run-query')"
+              />
+              <!-- Action buttons -->
+              <div v-if="inspectAvailable || showWrapBtn" class="inline-flex items-center gap-1.5">
+                <OButton
+                  v-if="inspectAvailable"
+                  variant="ghost"
+                  :size="showActionLabels ? 'sm-toolbar' : 'icon-toolbar'"
+                  :disabled="!showInspectBtn"
+                  class="toolbar-btn-rest"
+                  :aria-label="t('volumeInsights.searchInspectionsLabel')"
+                  icon-left="troubleshoot"
+                  @click="openSearchJobInspector"
+                  data-test="logs-inspect-button"
+                >
+                  <span v-if="showActionLabels" class="whitespace-nowrap">{{
+                    t("volumeInsights.inspectBtnLabel")
+                  }}</span>
+                  <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
+                </OButton>
+                <OButton
+                  v-if="showWrapBtn"
+                  as="div"
+                  variant="ghost"
+                  size="sm-toolbar"
+                  class="toolbar-btn-rest"
+                  data-test="logs-search-result-wrap-table-content-btn"
+                  @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+                >
+                  <OSwitch
+                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
+                    v-model="searchObj.meta.toggleSourceWrap"
+                    :aria-label="t('search.messageWrapContent')"
+                    size="sm"
+                    @click.stop
+                  />
+                  <OIcon name="wrap-text" size="sm" class="shrink-0" />
+                  <OTooltip :content="t('search.messageWrapContent')" side="bottom" />
+                </OButton>
+              </div>
+            </template>
+          </div>
+        </div>
+        <OTablePagination
+          v-if="
+            searchObj.meta.resultGrid.showPagination &&
+            searchObj.meta.logsVisualizeToggle === 'logs'
+          "
+          :current-page="pageNumberInput"
+          :total-pages="summaryView.pageCount"
+          :total-count="searchObj.data.queryResults?.total ?? 0"
+          :page-size="searchObj.meta.resultGrid.rowsPerPage"
+          :page-size-options="rowsPerPageOptions"
+          :showing-from="0"
+          :showing-to="0"
+          :is-first-page="pageNumberInput <= 1"
+          :is-last-page="pageNumberInput >= summaryView.pageCount"
+          :pending="searchObj.loading"
+          :nav-pending="histogramSettling"
+          :locked-reason="gridLockReason ?? undefined"
+          :page-window="paginationMaxPages"
+          hide-range
+          data-test-prefix="logs-search-result-pagination"
+          page-size-data-test="logs-search-result-records-per-page"
+          :bordered="false"
+          class="shrink-0"
+          @update:page-size="onLogsPageSize"
+          @go-to-page="onLogsGoToPage"
+        />
+      </div>
 
       <ODrawer
         bleed
@@ -1061,8 +1033,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
+import OTablePagination from "@/lib/core/Table/sub-components/OTablePagination.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OContextMenu from "@/lib/overlay/ContextMenu/OContextMenu.vue";
@@ -1115,8 +1086,7 @@ export default defineComponent({
     ODrawer,
     OSpinner,
     OTooltip,
-    OSelect,
-    OPagination,
+    OTablePagination,
     OEmptyState,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
@@ -1225,6 +1195,14 @@ export default defineComponent({
       }
     },
 
+    onLogsPageSize(size: number) {
+      this.searchObj.meta.resultGrid.rowsPerPage = size;
+      this.getPageData("recordsPerPage");
+    },
+    onLogsGoToPage(page: number) {
+      this.pageNumberInput = page;
+      this.getPageData("pageChange");
+    },
     getPageData(actionType: string) {
       if (this.gridLockReason) return false;
       if (actionType == "prev") {

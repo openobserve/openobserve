@@ -3,12 +3,10 @@
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { flushPromises, mount, VueWrapper, config } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { h, nextTick, Teleport } from "vue";
+import { nextTick } from "vue";
 import OTablePagination from "./OTablePagination.vue";
 import { LOADER_DELAY_MS } from "@/lib/styles/motion";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
 const i18n = createI18n({
   legacy: false,
@@ -22,7 +20,7 @@ beforeAll(() => {
 
 const SKEL = '[data-test="o2-table-pagination-info-skel"]';
 const INFO = '[data-test="o2-table-pagination-info"]';
-const FIRST = '[data-test="o2-table-first-page-btn"]';
+const PREV = '[data-test="o2-table-prev-page-btn"]';
 const NEXT = '[data-test="o2-table-next-page-btn"]';
 const PAGE_SIZE = '[data-test="o2-table-page-size"]';
 
@@ -82,13 +80,13 @@ describe("OTablePagination loading and stale states", () => {
     expect(wrapper.find(SKEL).exists()).toBe(false);
     expect(wrapper.find(INFO).text()).toBe(before);
     expect(wrapper.find(INFO).classes()).toContain("opacity-60");
-    for (const selector of [FIRST, NEXT]) {
+    for (const selector of [PREV, NEXT]) {
       const button = wrapper.find(selector);
       expect(button.attributes("disabled")).toBeUndefined();
       expect(button.attributes("aria-disabled")).toBe("true");
       await button.trigger("click");
     }
-    expect(wrapper.emitted("first-page")).toBeUndefined();
+    expect(wrapper.emitted("prev-page")).toBeUndefined();
     expect(wrapper.emitted("next-page")).toBeUndefined();
   });
 
@@ -105,23 +103,9 @@ describe("OTablePagination loading and stale states", () => {
     expect(tab.defaultPrevented).toBe(false);
   });
 
-  it("keeps the selection bar and its count while stale, with its actions inactive", async () => {
-    mountPager(
-      { selectedCount: 2, stale: true },
-      { "selection-actions": '<button data-test="bulk">Delete</button>' },
-    );
-    expect(wrapper.find('[data-test="o2-table-selected-count"]').exists()).toBe(true);
-    const actions = wrapper.find('[data-test="o2-table-selection-actions"]');
-    expect(actions.attributes("aria-disabled")).toBe("true");
-    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
-    wrapper.find('[data-test="bulk"]').element.dispatchEvent(click);
-    expect(click.defaultPrevented).toBe(true);
-  });
-
-  it("gives the pager its own line on narrow screens and hides the page-size label there", () => {
-    mountPager({ selectedCount: 1 }, { "selection-actions": "<button>Pause</button>" });
+  it("gives the pager its own line on narrow screens", () => {
+    mountPager();
     expect(wrapper.find(INFO).element.parentElement!.className).toContain("max-md:basis-full");
-    expect(wrapper.find(PAGE_SIZE).find("span").classes()).toContain("max-md:hidden");
   });
 
   it("keeps focus on next when it lands on the last page, inactive but never disabled", async () => {
@@ -189,67 +173,6 @@ describe("OTablePagination loading and stale states", () => {
     expect(wrapper.emitted("update:pageSize")).toBeUndefined();
   });
 
-  it("closes a bulk-action menu opened before the rows went stale and blocks its items", async () => {
-    const onSelect = vi.fn();
-    mountPager({ selectedCount: 2 });
-    wrapper.unmount();
-    wrapper = mount(OTablePagination, {
-      props: { ...wrapper.props(), selectedCount: 2 },
-      slots: {
-        "selection-actions": () =>
-          h(ODropdown, null, {
-            trigger: () => h("button", { "data-test": "bulk-menu" }, "Snooze"),
-            default: () => h(ODropdownItem, { onSelect, "data-test": "bulk-item" }, () => "1 hour"),
-          }),
-      },
-      attachTo: document.body,
-    });
-    const trigger = wrapper.find('[data-test="bulk-menu"]');
-    await trigger.trigger("keydown", { key: "Enter" });
-    await flushPromises();
-    expect(trigger.attributes("aria-expanded")).toBe("true");
-    const item = document.querySelector('[data-test="bulk-item"]')!;
-    await wrapper.setProps({ stale: true });
-    await flushPromises();
-    expect(trigger.attributes("aria-expanded")).toBe("false");
-    item.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-    item.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    await flushPromises();
-    expect(onSelect).not.toHaveBeenCalled();
-  });
-
-  it("blocks the items of a portaled bulk menu that stays open while stale, and frees them after", async () => {
-    const onItem = vi.fn();
-    const onEscape = vi.fn();
-    mountPager({ selectedCount: 2 });
-    wrapper.unmount();
-    wrapper = mount(OTablePagination, {
-      props: { ...wrapper.props(), selectedCount: 2 },
-      slots: {
-        "selection-actions": () => [
-          h("button", { id: "bulk-trigger", "aria-expanded": "true" }, "More"),
-          h(Teleport, { to: "body" }, [
-            h("div", { "aria-labelledby": "bulk-trigger", onKeydown: onEscape }, [
-              h("button", { "data-test": "kept-item", onClick: onItem }, "Archive"),
-            ]),
-          ]),
-        ],
-      },
-      attachTo: document.body,
-    });
-    const item = document.querySelector<HTMLElement>('[data-test="kept-item"]')!;
-    await wrapper.setProps({ stale: true });
-    expect(onEscape.mock.calls.map(([event]) => event.key)).toEqual(["Escape"]);
-    item.click();
-    const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
-    item.dispatchEvent(enter);
-    expect(onItem).not.toHaveBeenCalled();
-    expect(enter.defaultPrevented).toBe(true);
-    await wrapper.setProps({ stale: false });
-    item.click();
-    expect(onItem).toHaveBeenCalledTimes(1);
-  });
-
   it("ignores paging and page size at once while a page is pending, before any dim", async () => {
     mountPager({ isFirstPage: false, currentPage: 2, showingFrom: 11, showingTo: 20 });
     const trigger = wrapper.find(`${PAGE_SIZE} [aria-controls]`);
@@ -262,7 +185,7 @@ describe("OTablePagination loading and stale states", () => {
     expect(trigger.attributes("aria-expanded")).toBe("false");
     expect(wrapper.find(INFO).text()).toBe(before);
     expect(wrapper.find(INFO).classes()).not.toContain("opacity-60");
-    for (const selector of [FIRST, NEXT]) {
+    for (const selector of [PREV, NEXT]) {
       const button = wrapper.find(selector);
       expect(button.attributes("aria-disabled")).toBe("true");
       expect(button.attributes("disabled")).toBeUndefined();
@@ -274,7 +197,7 @@ describe("OTablePagination loading and stale states", () => {
     expect(group.classes()).not.toContain("opacity-60");
     wrapper.findComponent(OSelect).vm.$emit("update:modelValue", 20);
     await nextTick();
-    expect(wrapper.emitted("first-page")).toBeUndefined();
+    expect(wrapper.emitted("prev-page")).toBeUndefined();
     expect(wrapper.emitted("next-page")).toBeUndefined();
     expect(wrapper.emitted("update:pageSize")).toBeUndefined();
     await wrapper.setProps({ pending: false });
@@ -284,8 +207,8 @@ describe("OTablePagination loading and stale states", () => {
 
   it("keeps today's controls when stale is absent", () => {
     mountPager();
-    expect(wrapper.find(FIRST).attributes("disabled")).toBeUndefined();
-    expect(wrapper.find(FIRST).attributes("aria-disabled")).toBe("true");
+    expect(wrapper.find(PREV).attributes("disabled")).toBeUndefined();
+    expect(wrapper.find(PREV).attributes("aria-disabled")).toBe("true");
     expect(wrapper.find(NEXT).attributes("disabled")).toBeUndefined();
     expect(wrapper.find(NEXT).attributes("aria-disabled")).toBeUndefined();
     expect(wrapper.find(PAGE_SIZE).attributes("aria-disabled")).toBeUndefined();
@@ -293,12 +216,7 @@ describe("OTablePagination loading and stale states", () => {
   });
 });
 
-const PAGER = [
-  FIRST,
-  '[data-test="o2-table-prev-page-btn"]',
-  NEXT,
-  '[data-test="o2-table-last-page-btn"]',
-];
+const PAGER = [PREV, NEXT];
 
 function heightOf(classes: string[]): string | undefined {
   return classes.find((name) => /^(h|size)-/.test(name))?.replace(/^size-/, "h-");
@@ -307,13 +225,13 @@ function heightOf(classes: string[]): string | undefined {
 describe("OTablePagination footer", () => {
   afterEach(() => wrapper?.unmount());
 
-  it("gives the pager buttons and the page-size select one height", () => {
+  it("sets the page-size select to the height of the framed pager group", () => {
     mountPager({ isFirstPage: false, currentPage: 2 });
     const select = wrapper.find('[data-test="o2-table-page-size-select-trigger"]');
-    const selectHeight = heightOf(select.classes());
-    expect(selectHeight).toBe("h-6");
+    expect(heightOf(select.classes())).toBe("h-7");
+    expect(wrapper.find("nav").classes()).toEqual(expect.arrayContaining(["border", "p-px"]));
     for (const selector of PAGER) {
-      expect(heightOf(wrapper.find(selector).classes()), selector).toBe(selectHeight);
+      expect(heightOf(wrapper.find(selector).classes()), selector).toBe("h-6");
     }
   });
 
@@ -322,5 +240,54 @@ describe("OTablePagination footer", () => {
     const info = wrapper.find(INFO);
     expect(info.classes()).toEqual(expect.arrayContaining(["tabular-nums", "text-text-secondary"]));
     expect(wrapper.html()).not.toMatch(/\btext-primary\b/);
+  });
+});
+
+describe("OTablePagination options for a caller-owned pager", () => {
+  afterEach(() => wrapper?.unmount());
+
+  it("draws a numbered page window under the caller's data-test and emits the page picked", async () => {
+    mountPager({ pageWindow: 5, totalPages: 8, currentPage: 3, dataTestPrefix: "pg" });
+    const pages = wrapper.findAll('[data-test^="pg-page-"]').map((b) => b.text());
+    expect(pages).toEqual(["1", "2", "3", "4", "5"]);
+    expect(wrapper.find('[data-test="pg-page-3"]').attributes("aria-current")).toBe("page");
+    expect(wrapper.find('[data-test="pg-prev"]').exists()).toBe(true);
+    await wrapper.find('[data-test="pg-page-4"]').trigger("click");
+    expect(wrapper.emitted("go-to-page")).toEqual([[4]]);
+  });
+
+  it("keeps the compact pager by default", () => {
+    mountPager();
+    expect(wrapper.find('[data-test="o2-table-page-window"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="o2-table-current-page"]').exists()).toBe(true);
+  });
+
+  it("locks every control and states why", async () => {
+    mountPager({ pageWindow: 3, totalPages: 3, dataTestPrefix: "pg", lockedReason: "Run first" });
+    const root = wrapper.find('[data-test="o2-table-pagination-bottom"]');
+    expect(root.attributes("data-locked")).toBe("true");
+    expect(wrapper.find('[data-test="pg"]').attributes("data-locked")).toBe("true");
+    expect(root.text()).toContain("Run first");
+    expect(wrapper.find('[data-test="pg-page-2"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.findComponent(OSelect).props("disabled")).toBe(true);
+    wrapper.findComponent(OSelect).vm.$emit("update:modelValue", 20);
+    await nextTick();
+    expect(wrapper.emitted("update:pageSize")).toBeUndefined();
+  });
+
+  it("holds only the page buttons while the page count settles", async () => {
+    mountPager({ pageWindow: 3, totalPages: 3, dataTestPrefix: "pg", navPending: true });
+    expect(wrapper.find('[data-test="pg-page-2"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.find(PAGE_SIZE).attributes("aria-disabled")).toBeUndefined();
+    wrapper.findComponent(OSelect).vm.$emit("update:modelValue", 20);
+    await nextTick();
+    expect(wrapper.emitted("update:pageSize")).toEqual([[20]]);
+  });
+
+  it("names the page-size select and hides the range on request", () => {
+    mountPager({ pageSizeDataTest: "rpp", hideRange: true });
+    expect(wrapper.find('[data-test="rpp-trigger"]').exists()).toBe(true);
+    expect(wrapper.find(INFO).exists()).toBe(false);
+    expect(wrapper.find('[data-test="o2-table-pagination-divider"]').exists()).toBe(false);
   });
 });

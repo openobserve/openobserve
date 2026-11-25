@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Header: Turn N · time · status -->
           <div class="mb-2 flex items-center gap-2">
-            <span class="text-compact font-bold">
+            <span class="text-compact font-semibold">
               {{ t("traces.sessionDetail.turnLabel") }} {{ index + 1 }}
             </span>
             <span class="text-3xs text-text-muted">{{ timeLabel }}</span>
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- User message preview -->
           <div class="mb-2.25 leading-[1.5]">
             <span
-              class="text-3xs text-text-muted mb-0.5 block font-bold tracking-[0.05em] uppercase"
+              class="text-3xs text-text-muted mb-0.5 block font-semibold tracking-[0.05em] uppercase"
             >
               {{ t("traces.sessionDetail.roles.user") }}
             </span>

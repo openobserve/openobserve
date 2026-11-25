@@ -21,9 +21,13 @@
     </span>
     <OPopover v-else-if="info" align="start" :aria-label="info.message">
       <template #trigger>
-        <OButton variant="ghost" size="icon-sm" :aria-label="info.message" :data-test="info.test">
-          <OIcon name="info" size="sm" class="text-text-secondary" />
-        </OButton>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          :aria-label="info.message"
+          :data-test="info.test"
+          icon-left="info"
+        />
       </template>
       <div class="text-text-body flex max-w-80 flex-col items-start gap-2 px-3 py-2.5 text-xs">
         <span>{{ info.message }}</span>

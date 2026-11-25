@@ -42,12 +42,9 @@
             variant="ghost"
             size="icon"
             class="hover:bg-button-ghost-hover-bg! border! border-transparent! bg-transparent!"
+            :icon-left="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
           >
-            <OIcon
-              :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
-              size="sm"
-              class="text-text-secondary! size-4!"
-            />
+            <OTooltip :content="raw(groupName)" />
           </OButton>
         </div>
       </slot>
@@ -87,8 +84,9 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 

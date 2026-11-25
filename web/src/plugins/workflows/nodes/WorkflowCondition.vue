@@ -74,15 +74,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="workflow-condition-note"
         >
           <div class="flex items-start justify-between gap-2">
-            <div class="text-sm font-bold">{{ t("workflow.node.conditionNoteTitle") }}</div>
+            <div class="text-sm font-semibold">{{ t("workflow.node.conditionNoteTitle") }}</div>
             <OButton
               variant="ghost"
               size="icon-xs"
               data-test="workflow-condition-note-dismiss"
               :aria-label="t('common.close')"
+              icon-left="close"
               @click="dismissGuidelines"
             >
-              <OIcon name="close" size="xs" />
+              <OTooltip :content="t('common.close')" />
             </OButton>
           </div>
           <div class="flex flex-col gap-1 text-sm">

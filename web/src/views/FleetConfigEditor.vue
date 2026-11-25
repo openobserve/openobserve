@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         :disabled="!loaded || saving"
         data-test="fleet-config-editor-save"
+        icon-left="save"
         @click="save"
       >
         {{ t("fleet.editor.saveDraft") }}

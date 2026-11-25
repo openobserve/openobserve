@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="schema" size="sm"></OIcon>
             <OTooltip max-width="18.75rem" side="right" align="center">
               <template #content>
-                <span class="font-bold">{{ t("search.allFieldsLabel") }}</span>
+                <span class="font-semibold">{{ t("search.allFieldsLabel") }}</span>
                 <hr class="my-1 opacity-50" />
                 {{ t("search.allFieldsWarningMsg") }}
               </template>
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="schema" size="sm"></OIcon>
             <OTooltip max-width="18.75rem" side="right" align="center">
               <template #content>
-                <span class="font-bold">{{ t("search.allFieldsLabel") }}</span>
+                <span class="font-semibold">{{ t("search.allFieldsLabel") }}</span>
                 <hr class="my-1 opacity-50" />
                 {{ t("search.allFieldsWarningMsg") }}
               </template>
@@ -132,10 +132,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-chip"
           :disabled="isFirstPage"
-          @click="$emit('first-page')"
+          icon-left="fast-rewind"
           :aria-label="t('search.firstPage')"
+          @click="$emit('first-page')"
         >
-          <OIcon name="fast-rewind" size="xs" />
+          <OTooltip :content="t('search.firstPage')" />
         </OButton>
 
         <template v-for="page in visiblePages" :key="page">
@@ -162,10 +163,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-chip"
           :disabled="isLastPage"
-          @click="$emit('last-page')"
+          icon-left="fast-forward"
           :aria-label="t('search.lastPage')"
+          @click="$emit('last-page')"
         >
-          <OIcon name="fast-forward" size="xs" />
+          <OTooltip :content="t('search.lastPage')" />
         </OButton>
       </div>
 
@@ -174,9 +176,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-chip"
         :data-test="`${dataTestPrefix}-fields-list-reset-icon`"
         :aria-label="t('search.resetFields')"
+        icon-left="restart-alt"
         @click="$emit('reset-fields')"
       >
-        <OIcon name="restart-alt" size="sm" class="text-text-secondary" />
         <OTooltip
           :content="t('search.resetFields')"
           max-width="18.75rem"

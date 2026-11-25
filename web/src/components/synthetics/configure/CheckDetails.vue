@@ -25,8 +25,8 @@ import type { VariableSuggestion } from "../variables/suggestions";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import PrefillNote from "../prefill/PrefillNote.vue";
 import { useSyntheticPrefillView, type TestRunResult } from "../prefill/useSyntheticPrefill";
 
@@ -289,9 +289,10 @@ function handleTagKeydown(event: KeyboardEvent) {
               :aria-label="t('synthetics.checkDetails.removeTag', { tag })"
               :data-test="`synthetics-check-details-remove-tag-${index}-btn`"
               class="text-text-muted hover:text-text-body transition-colors"
+              icon-left="close"
               @click="removeTag(index)"
             >
-              <OIcon name="close" size="xs" />
+              <OTooltip :content="t('synthetics.checkDetails.removeTag', { tag })" />
             </OButton>
           </OTag>
         </div>

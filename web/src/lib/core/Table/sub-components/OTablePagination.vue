@@ -1,14 +1,16 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { raw, useI18nTyped } from "@/types/i18n";
-import { useSlots, computed, onBeforeUnmount, ref, watch } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useSlots, computed, ref, useId } from "vue";
 import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
 import { LOADER_DELAY_MS } from "@/lib/styles/motion";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { activates } from "@/lib/core/Button/activation";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { guardMenusWhile, swallowActivation } from "../composables/useInactiveGuard";
 
 const { t } = useI18nTyped();
 const slots = useSlots();
@@ -33,16 +35,25 @@ const props = withDefaults(
     pending?: boolean;
     /** The rows on screen are being refetched: the range stays dimmed, controls stay focusable but inactive. */
     stale?: boolean;
-    /** Rows currently selected; read only when `#selection-actions` is provided. */
-    selectedCount?: number;
     bordered?: boolean;
     /** No rows are on screen (the table shows its error state), so the range would describe rows nobody sees. */
     rangeHidden?: boolean;
+    /** Show up to this many numbered page buttons between prev and next; off by default. */
+    pageWindow?: number;
+    /** Paging is locked for this reason: every control is inert and the reason shows on hover. */
+    lockedReason?: I18nText;
+    /** Replaces the pager's data-test root; prev, next and pages take `-prev`, `-next`, `-page-N`. */
+    dataTestPrefix?: string;
+    /** Replaces the page-size select's data-test. */
+    pageSizeDataTest?: string;
+    /** Only the page buttons wait, e.g. while the page count is still settling; page size stays live. */
+    navPending?: boolean;
+    /** Omit the "x–y of z" range when the page states its counts elsewhere. */
+    hideRange?: boolean;
   }>(),
   {
     position: "bottom",
     totalCountExact: true,
-    selectedCount: 0,
     bordered: true,
   },
 );
@@ -53,19 +64,17 @@ const emit = defineEmits<{
   "prev-page": [];
   "next-page": [];
   "last-page": [];
+  "go-to-page": [page: number];
 }>();
 
 const showSkeleton = useDelayedFlag(() => !!props.loading, LOADER_DELAY_MS);
 
 // A second "next" before the first page arrives would count from the requested page, so paging waits for it.
-const pagingInactive = computed(() => !!props.pending || !!props.stale);
+const pageSizeInactive = computed(() => !!props.pending || !!props.stale || !!props.lockedReason);
+const pagingInactive = computed(() => pageSizeInactive.value || !!props.navPending);
 
-// Controls a consumer renders or a select owns cannot take aria-disabled themselves, so their wrapper swallows activation.
-function swallowActivation(event: Event, inactive: boolean): void {
-  if (!inactive) return;
-  if (!activates(event)) return;
-  event.preventDefault();
-  event.stopPropagation();
+function goToPage(page: number): void {
+  if (!pagingInactive.value) emit("go-to-page", page);
 }
 
 function requestPage(event: "prev-page" | "next-page"): void {
@@ -74,73 +83,18 @@ function requestPage(event: "prev-page" | "next-page"): void {
   else emit("next-page");
 }
 
-// Menus these wrappers open are portaled outside them, so an inactive wrapper closes them and blocks their items.
 const pageSizeRef = ref<HTMLElement | null>(null);
-const selectionActionsRef = ref<HTMLElement | null>(null);
-const MENU_EVENTS = ["pointerdown", "pointerup", "mousedown", "click", "keydown"] as const;
-
-// Reka fills a dropdown's aria-controls only after its trigger rendered, so the menu is also found by its aria-labelledby.
-function openMenus(root: HTMLElement | null): Element[] {
-  if (!root) return [];
-  const triggers = Array.from(root.querySelectorAll('[aria-expanded="true"]'));
-  if (!triggers.length) return [];
-  const triggerIds = new Set(triggers.map((trigger) => trigger.id).filter(Boolean));
-  const controlled = triggers.flatMap((trigger) =>
-    (trigger.getAttribute("aria-controls") ?? "")
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((id) => document.getElementById(id)),
-  );
-  const labelled = Array.from(document.querySelectorAll("[aria-labelledby]")).filter((el) =>
-    (el.getAttribute("aria-labelledby") ?? "").split(/\s+/).some((id) => triggerIds.has(id)),
-  );
-  return [...new Set([...controlled, ...labelled])].filter(
-    (menu): menu is Element => !!menu && !root.contains(menu),
-  );
-}
-
-function guardMenusWhile(root: () => HTMLElement | null, active: () => boolean): void {
-  let menus: Element[] = [];
-  const block = (event: Event): void => {
-    if (!activates(event)) return;
-    const target = event.target;
-    if (!(target instanceof Node)) return;
-    if (![...menus, ...openMenus(root())].some((menu) => menu.contains(target))) return;
-    event.preventDefault();
-    event.stopPropagation();
-  };
-  const stop = (): void => {
-    MENU_EVENTS.forEach((type) => document.removeEventListener(type, block, true));
-    menus = [];
-  };
-  watch(active, (on) => {
-    if (!on) {
-      stop();
-      return;
-    }
-    menus = openMenus(root());
-    MENU_EVENTS.forEach((type) => document.addEventListener(type, block, true));
-    // Escape is the menus' own dismiss path and only reaches the topmost layer, which an open menu is.
-    menus.forEach((menu) =>
-      menu.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })),
-    );
-  });
-  onBeforeUnmount(stop);
-}
+const lockReasonId = useId();
 
 guardMenusWhile(
   () => pageSizeRef.value,
-  () => pagingInactive.value,
-);
-guardMenusWhile(
-  () => selectionActionsRef.value,
-  () => !!props.stale,
+  () => pageSizeInactive.value,
 );
 
 const pageSizeModel = computed({
   get: () => props.pageSize,
   set: (val: number) => {
-    if (!pagingInactive.value) emit("update:pageSize", val);
+    if (!pageSizeInactive.value) emit("update:pageSize", val);
   },
 });
 
@@ -155,60 +109,23 @@ const pageSizeSelectOptions = computed(() => {
   }
   return opts.map((n) => ({ label: raw(String(n)), value: n }));
 });
-
-const selectionLabel = computed(() => {
-  const selected = props.selectedCount.toLocaleString();
-  // A selection can outlive its rows (filter, refetch), and "5 of 3 selected" reads as a bug.
-  if (props.selectedCount > props.totalCount) {
-    return t("components.table.selectedCount", { selected });
-  }
-  const total = `${props.totalCount.toLocaleString()}${props.totalCountExact ? "" : "+"}`;
-  return t("components.table.selectedOfTotal", { selected, total });
-});
 </script>
 
 <template>
   <div
     :data-test="`o2-table-pagination-${position}`"
+    :data-locked="lockedReason ? 'true' : undefined"
+    :aria-describedby="lockedReason ? lockReasonId : undefined"
     :class="[
       'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 max-md:gap-y-2',
       bordered ? 'border-border-default border-t' : '',
     ]"
   >
-    <!-- Slot presence is read here, not in a computed: slots are not reactive, so a cached answer would miss a slot the page adds later. -->
-    <div
-      v-if="!loading && selectedCount > 0 && slots['selection-actions']"
-      class="flex min-h-[2.125rem] min-w-0 items-center gap-x-3 gap-y-1 max-md:basis-full max-md:flex-wrap"
-      data-test="o2-table-pagination-selection"
-    >
-      <span
-        class="text-text-heading text-xs font-medium whitespace-nowrap"
-        role="status"
-        data-test="o2-table-selected-count"
-        >{{ selectionLabel }}</span
-      >
-      <span class="bg-border-default h-4 w-px shrink-0 max-md:hidden" aria-hidden="true" />
-      <div
-        :class="[
-          'flex min-w-0 flex-wrap items-center gap-2 transition-opacity',
-          stale ? 'cursor-not-allowed opacity-60' : '',
-        ]"
-        :role="stale ? 'group' : undefined"
-        :aria-disabled="stale ? 'true' : undefined"
-        ref="selectionActionsRef"
-        data-test="o2-table-selection-actions"
-        @pointerdown.capture="swallowActivation($event, !!stale)"
-        @mousedown.capture="swallowActivation($event, !!stale)"
-        @click.capture="swallowActivation($event, !!stale)"
-        @keydown.capture="swallowActivation($event, !!stale)"
-      >
-        <slot name="selection-actions" />
-      </div>
-    </div>
-
+    <span v-if="lockedReason" :id="lockReasonId" class="sr-only">{{ lockedReason }}</span>
+    <OTooltip v-if="lockedReason" :content="lockedReason" />
     <!-- max-md:contents makes the note's own root the flex item, so a root that is max-md:hidden leaves no row and no gap. -->
     <div
-      v-else-if="!loading && slots['footer-note']"
+      v-if="!loading && slots['footer-note']"
       class="text-text-secondary min-w-0 flex-auto text-xs max-md:contents"
       data-test="o2-table-pagination-note"
     >
@@ -227,7 +144,7 @@ const selectionLabel = computed(() => {
         data-test="o2-table-pagination-info-skel"
       />
       <span
-        v-else
+        v-else-if="!hideRange"
         :class="[
           'text-text-secondary text-xs whitespace-nowrap tabular-nums transition-opacity',
           stale ? 'opacity-60' : '',
@@ -244,7 +161,7 @@ const selectionLabel = computed(() => {
           'bg-border-default h-4 w-px shrink-0 max-md:hidden',
           rangeHidden ? 'invisible' : '',
         ]"
-        v-if="pageSizeOptions.length > 0"
+        v-if="pageSizeOptions.length > 0 && !hideRange"
         data-test="o2-table-pagination-divider"
       />
       <div
@@ -253,37 +170,51 @@ const selectionLabel = computed(() => {
           'flex items-center gap-1.5 text-xs transition-opacity',
           stale ? 'cursor-not-allowed opacity-60' : '',
         ]"
-        :role="pagingInactive ? 'group' : undefined"
-        :aria-disabled="pagingInactive ? 'true' : undefined"
+        :role="pageSizeInactive ? 'group' : undefined"
+        :aria-disabled="pageSizeInactive ? 'true' : undefined"
         ref="pageSizeRef"
         data-test="o2-table-page-size"
-        @pointerdown.capture="swallowActivation($event, pagingInactive)"
-        @mousedown.capture="swallowActivation($event, pagingInactive)"
-        @click.capture="swallowActivation($event, pagingInactive)"
-        @keydown.capture="swallowActivation($event, pagingInactive)"
+        @pointerdown.capture="swallowActivation($event, pageSizeInactive)"
+        @mousedown.capture="swallowActivation($event, pageSizeInactive)"
+        @click.capture="swallowActivation($event, pageSizeInactive)"
+        @keydown.capture="swallowActivation($event, pageSizeInactive)"
       >
         <OSelect
           v-model="pageSizeModel"
           :options="pageSizeSelectOptions"
           :searchable="false"
+          :disabled="!!lockedReason"
           size="sm"
           :aria-label="t('search.recordsPerPage')"
-          data-test="o2-table-page-size-select"
+          :data-test="pageSizeDataTest ?? 'o2-table-page-size-select'"
         />
       </div>
 
+      <OPagination
+        v-if="pageWindow"
+        :model-value="currentPage"
+        :max="totalPages"
+        :max-pages="pageWindow"
+        :disable="pagingInactive"
+        :data-locked="lockedReason ? 'true' : undefined"
+        :data-test="dataTestPrefix ?? 'o2-table-page-window'"
+        @update:model-value="goToPage"
+      />
+
       <!-- Same compact pager as OPagination (prev, current, next), so every pager reads alike. -->
       <nav
+        v-else
+        :data-test="dataTestPrefix"
         class="rounded-default border-button-outline-border bg-button-outline-bg inline-flex items-center gap-0.5 border p-px"
         :aria-label="t('components.pagination.pagination')"
       >
         <OButton
           variant="ghost"
           size="icon-chip"
-          :disabled="isFirstPage || stale"
+          :disabled="isFirstPage || stale || !!lockedReason"
           focusable-unavailable
           :aria-label="t('components.pagination.previousPage')"
-          data-test="o2-table-prev-page-btn"
+          :data-test="dataTestPrefix ? `${dataTestPrefix}-prev` : 'o2-table-prev-page-btn'"
           :aria-disabled="isFirstPage || pagingInactive ? 'true' : undefined"
           @click="requestPage('prev-page')"
         >
@@ -301,10 +232,10 @@ const selectionLabel = computed(() => {
         <OButton
           variant="ghost"
           size="icon-chip"
-          :disabled="isLastPage || stale"
+          :disabled="isLastPage || stale || !!lockedReason"
           focusable-unavailable
           :aria-label="t('components.pagination.nextPage')"
-          data-test="o2-table-next-page-btn"
+          :data-test="dataTestPrefix ? `${dataTestPrefix}-next` : 'o2-table-next-page-btn'"
           :aria-disabled="isLastPage || pagingInactive ? 'true' : undefined"
           @click="requestPage('next-page')"
         >

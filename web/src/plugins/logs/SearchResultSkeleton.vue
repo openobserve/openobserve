@@ -25,14 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-card-glass-border bg-card-glass-bg flex h-8 shrink-0 items-center border-b max-md:h-auto max-md:min-h-8 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       inert
     >
-      <OButton variant="ghost" size="icon-toolbar" class="ms-1.5 shrink-0">
-        <OIcon :name="collapseIcon" size="sm" />
-      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon-toolbar"
+        class="ms-1.5 shrink-0"
+        :icon-left="collapseIcon"
+      />
       <div class="min-w-0 flex-1 ps-2 max-md:min-w-32" />
       <div class="flex flex-none items-center justify-end gap-1 pe-2 max-md:ms-auto">
-        <OButton v-if="narrow" variant="ghost" size="icon-toolbar">
-          <OIcon name="more-horiz" size="sm" />
-        </OButton>
+        <OButton v-if="narrow" variant="ghost" size="icon-toolbar" icon-left="more-horiz" />
         <template v-else>
           <ORefreshButton
             layout="inline"

@@ -123,12 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="xs"
               class="ms-1 align-middle opacity-60"
             />
-            <OTag
-              v-if="feature.beta"
-              type="featureFlag"
-              value="beta"
-              data-test="enterprise-upgrade-feature-beta-badge"
-            />
+            <OBetaBadge v-if="feature.beta" data-test="enterprise-upgrade-feature-beta-badge" />
           </div>
           <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">
             {{ feature.note }}
@@ -180,12 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="enterprise-upgrade-feature-external-link"
               class="ms-1 align-middle opacity-60"
             />
-            <OTag
-              v-if="feature.beta"
-              type="featureFlag"
-              value="beta"
-              data-test="enterprise-upgrade-feature-beta-badge"
-            />
+            <OBetaBadge v-if="feature.beta" data-test="enterprise-upgrade-feature-beta-badge" />
             <span v-if="feature.requiresHA" class="inline-flex">
               <OTag type="featureFlag" value="ha" data-test="enterprise-upgrade-feature-ha-badge" />
               <OTooltip
@@ -209,6 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 interface OfferFeature {

@@ -66,11 +66,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-circle-sm"
               :disabled="created"
-              :title="t('alerts.alertSettings.refreshDestinations')"
               data-test="add-alert-source-refresh-destinations-btn"
+              icon-left="refresh"
+              :aria-label="t('alerts.alertSettings.refreshDestinations')"
               @click="fetchDestinationOptions"
             >
-              <OIcon name="refresh" size="sm" />
+              <OTooltip :content="t('alerts.alertSettings.refreshDestinations')" />
             </OButton>
             <OButton
               variant="outline"
@@ -153,7 +154,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
@@ -179,12 +180,12 @@ const FORM_ID = "add-alert-source-form";
 export default defineComponent({
   name: "AddExternalAlertSource",
   components: {
+    OTooltip,
     ODrawer,
     OForm,
     OFormInput,
     OFormSelect,
     OButton,
-    OIcon,
     OTag,
     OStepper,
     OStep,

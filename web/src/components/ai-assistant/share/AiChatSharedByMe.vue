@@ -26,7 +26,6 @@ import AiChatShareRow from "./AiChatShareRow.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -81,9 +80,9 @@ const { pendingShareId, refreshSnapshot, switchMode, toggleRedaction, revoke, co
         :loading="fetching"
         data-test="ai-chat-shared-by-me-refresh"
         :aria-label="t('common.refresh')"
+        icon-left="refresh"
         @click="refreshShares"
       >
-        <OIcon name="refresh" size="sm" />
         <OTooltip :content="t('common.refresh')" />
       </OButton>
     </template>

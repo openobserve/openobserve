@@ -36,12 +36,9 @@
               variant="ghost"
               size="icon"
               class="hover:bg-button-ghost-hover-bg! border! border-transparent! bg-transparent!"
+              :icon-left="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
             >
-              <OIcon
-                :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
-                size="sm"
-                class="text-text-secondary! size-4!"
-              />
+              <OTooltip :content="raw(groupName)" />
             </OButton>
           </div>
         </template>
@@ -66,9 +63,10 @@
                 variant="ghost-neutral"
                 size="icon"
                 :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
+                icon-left="add"
                 @click.stop="addSearchTerm(`${row.name}=''`)"
               >
-                <OIcon name="add" size="sm" />
+                <OTooltip :content="t('common.addFilter')" />
               </OButton>
               <OButton
                 :aria-label="t('common.copyToClipboard')"
@@ -76,9 +74,10 @@
                 variant="ghost-neutral"
                 size="icon"
                 :data-test="`log-search-index-list-filter-${row.name}-copy-btn`"
+                icon-left="content-copy"
                 @click.stop="copyContentValue(row.name)"
               >
-                <OIcon name="content-copy" size="sm" />
+                <OTooltip :content="t('common.copyToClipboard')" />
               </OButton>
             </template>
           </OFieldRow>
@@ -174,10 +173,11 @@
               variant="ghost-primary"
               size="icon-panel"
               :disabled="bottomProps.isFirstPage"
+              icon-left="fast-rewind"
               @click="bottomProps.firstPage"
               class="rounded-default! m-0! h-5.5! min-h-5.5! w-6! min-w-6! overflow-visible! px-1! py-1.5"
             >
-              <OIcon name="fast-rewind" size="sm" />
+              <OTooltip :content="t('search.firstPage')" />
             </OButton>
             <template v-for="page in visiblePagesForTotal(bottomProps)" :key="page">
               <OButton
@@ -193,10 +193,11 @@
               variant="ghost-primary"
               size="icon-panel"
               :disabled="bottomProps.isLastPage"
+              icon-left="fast-forward"
               @click="bottomProps.lastPage"
               class="rounded-default! m-0! h-5.5! min-h-5.5! w-6! min-w-6! overflow-visible! px-1! py-1.5"
             >
-              <OIcon name="fast-forward" size="sm" />
+              <OTooltip :content="t('search.lastPage')" />
             </OButton>
           </div>
         </template>
@@ -208,7 +209,7 @@
 <script setup lang="ts">
 import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { computed, ref, watch, onMounted, type Ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useFieldGrouping from "@/composables/useFieldGrouping";

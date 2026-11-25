@@ -155,9 +155,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :aria-label="t('common.view')"
                       variant="ghost"
                       size="icon-circle-sm"
+                      icon-left="visibility"
                       @click.stop="viewGroup(group)"
                     >
-                      <OIcon name="visibility" size="sm" />
+                      <OTooltip :content="t('common.view')" />
                     </OButton>
                   </div>
                 </li>
@@ -202,9 +203,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :aria-label="t('common.compare')"
                       variant="ghost"
                       size="icon-circle-sm"
+                      icon-left="compare"
                       @click.stop="viewModification(mod)"
                     >
-                      <OIcon name="compare" size="sm" />
+                      <OTooltip :content="t('common.compare')" />
                     </OButton>
                   </div>
                 </li>
@@ -349,6 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";

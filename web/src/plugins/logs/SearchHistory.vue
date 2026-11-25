@@ -25,9 +25,10 @@
             ? 'bg-theme-accent! text-white hover:opacity-85'
             : 'bg-white/10! hover:bg-white/15!'
         "
+        icon-left="wrap-text"
+        :aria-label="t('search.messageWrapContent')"
         @click="wrapText = !wrapText"
       >
-        <OIcon name="wrap-text" size="sm" />
         <OTooltip :content="t('search.messageWrapContent')" />
       </OButton>
       <div
@@ -61,6 +62,7 @@
           icon-left="refresh"
           :loading="isLoading"
           data-test="search-history-get-history-btn"
+          :aria-label="t('search_history.get_history')"
           @click="fetchSearchHistory"
         >
           <OTooltip
@@ -151,6 +153,7 @@
                       variant="outline"
                       size="icon-chip"
                       class="ms-2"
+                      icon-left="content-copy"
                       @click.stop="
                         copyToClipboard(row.sql, t, {
                           successMessage: t('logs.searchHistory.sqlQueryCopied'),
@@ -158,7 +161,7 @@
                         })
                       "
                     >
-                      <OIcon name="content-copy" size="xs" /> </OButton></span
+                      <OTooltip :content="t('common.copyToClipboard')" /> </OButton></span
                 ></strong>
                 <!-- Logs and Inspect are both navigations, so they share one
                          variant and size. -->
@@ -168,9 +171,9 @@
                   data-test="search-history-go-to-logs-btn"
                   variant="outline"
                   size="chip"
+                  icon-left="search"
                   @click.stop="goToLogs(row)"
                 >
-                  <template #icon-left><OIcon name="search" size="xs" /></template>
                   {{ goToLogsLabel(row) }}
                 </OButton>
                 <OButton
@@ -182,9 +185,9 @@
                   data-test="search-history-inspect-btn"
                   variant="outline"
                   size="chip"
+                  icon-left="analytics"
                   @click.stop="goToInspector(row)"
                 >
-                  <template #icon-left><OIcon name="analytics" size="xs" /></template>
                   {{ t("logs.searchHistory.inspect") }}
                 </OButton>
               </div>
@@ -224,6 +227,7 @@
                       variant="outline"
                       size="icon-chip"
                       class="ms-2"
+                      icon-left="content-copy"
                       @click.stop="
                         copyToClipboard(row.function, t, {
                           successMessage: t('logs.searchHistory.functionDefinitionCopied'),
@@ -231,7 +235,7 @@
                         })
                       "
                     >
-                      <OIcon name="content-copy" size="xs" /> </OButton></span
+                      <OTooltip :content="t('common.copyToClipboard')" /> </OButton></span
                 ></strong>
               </div>
 

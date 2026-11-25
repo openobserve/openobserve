@@ -227,15 +227,15 @@ describe("OButton", () => {
         "text-button-pending-text",
         "border",
         "border-button-pending-bg",
-        "enabled:hover:bg-button-pending-hover-bg",
-        "enabled:hover:border-button-pending-hover-bg",
-        "enabled:active:bg-button-pending-active-bg",
-        "enabled:active:border-button-pending-active-bg",
+        "actionable:hover:bg-button-pending-hover-bg",
+        "actionable:hover:border-button-pending-hover-bg",
+        "actionable:active:bg-button-pending-active-bg",
+        "actionable:active:border-button-pending-active-bg",
         "focus-visible:ring-button-pending-focus-ring",
         "rounded-default",
       ]),
     );
-    const paint = classes.filter((value) => /^(enabled:\w+:)?(bg|text|border)-/.test(value));
+    const paint = classes.filter((value) => /^(actionable:\w+:)?(bg|text|border)-/.test(value));
     expect(paint.filter((value) => /warning|accent|primary/.test(value))).toEqual([]);
   });
 
@@ -667,7 +667,7 @@ describe("OButton", () => {
           )
           .sort(),
       ).toEqual(disabledClasses.sort());
-      expect(unavailable.classes().some((value) => value.startsWith("enabled:"))).toBe(false);
+      expect(unavailable.classes().some((value) => value.startsWith("actionable:"))).toBe(false);
       expect(unavailable.attributes("disabled")).toBeUndefined();
       disabled.unmount();
       unavailable.unmount();

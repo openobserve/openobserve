@@ -110,8 +110,10 @@
               v-if="healthyLabel"
               class="rounded-default border-status-success-text/35 bg-status-success-text/8 flex items-baseline gap-2 border p-[0.75rem_0.875rem]"
             >
-              <span class="text-status-success-text text-lg font-bold">{{ thresholdSign }}</span>
-              <span class="text-text-body font-mono text-sm font-bold">{{ healthyLabel }}</span>
+              <span class="text-status-success-text text-lg font-semibold">{{
+                thresholdSign
+              }}</span>
+              <span class="text-text-body font-mono text-sm font-semibold">{{ healthyLabel }}</span>
               <span class="text-2xs text-text-secondary ms-auto">{{
                 t("onlineEvals.scoreConfig.detail.thresholdHint")
               }}</span>
@@ -181,7 +183,7 @@
             >
               <div class="flex items-center gap-2">
                 <span
-                  class="text-compact text-text-body font-mono font-bold [font-variant-numeric:tabular-nums]"
+                  class="text-compact text-text-body font-mono font-semibold [font-variant-numeric:tabular-nums]"
                   >{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</span
                 >
                 <OTag type="activeVersionFlag" value="active" />
@@ -219,7 +221,7 @@
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2">
                     <span
-                      class="text-compact text-text-heading font-mono font-bold [font-variant-numeric:tabular-nums]"
+                      class="text-compact text-text-heading font-mono font-semibold [font-variant-numeric:tabular-nums]"
                       >{{ scorer.name }}</span
                     >
                     <OTag type="scorerType" :value="scorerTypeOf(scorer)" />

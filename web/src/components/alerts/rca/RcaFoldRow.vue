@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rca-fold-row-chevron"
             name="expand-more"
             size="sm"
-            class="text-icon-color shrink-0 transition-transform duration-150 motion-reduce:transition-none"
+            class="text-text-secondary shrink-0 transition-transform duration-150 motion-reduce:transition-none"
             :class="open ? 'rotate-180' : ''"
           />
         </span>

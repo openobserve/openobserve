@@ -23,7 +23,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
 import type { NavItem, RailEntry, SubnavChild } from "./ONavbar.types";
 import { groupNavLinks } from "./navGroups";
@@ -310,8 +310,8 @@ const flyoutColumnCount = computed(() =>
 );
 // Static class strings so Tailwind sees them: one 200px column per group.
 const FLYOUT_GRID: Record<number, string> = {
-  2: "grid grid-cols-[repeat(2,12.5rem)] gap-x-2 gap-y-1.5",
-  3: "grid grid-cols-[repeat(3,12.5rem)] gap-x-2 gap-y-1.5",
+  2: "grid grid-cols-[repeat(2,13.5rem)] gap-x-2 gap-y-1.5",
+  3: "grid grid-cols-[repeat(3,13.5rem)] gap-x-2 gap-y-1.5",
 };
 
 const flyoutItems = () =>
@@ -378,7 +378,7 @@ const headingId = (scope: string, group: string, s: ChildSection) =>
     data-test="sidebar"
     :data-collapsed="collapsed ? 'true' : undefined"
     class="bg-surface-chrome-deeper flex h-full min-h-0 shrink-0 flex-col overflow-hidden transition-[width] duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
-    :class="collapsible ? (collapsed ? 'w-13' : 'w-[9.6875rem]') : 'w-full'"
+    :class="collapsible ? (collapsed ? 'w-13' : 'w-42') : 'w-full'"
   >
     <div class="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-2">
       <div
@@ -405,7 +405,7 @@ const headingId = (scope: string, group: string, s: ChildSection) =>
             aria-hidden="true"
           >
             <div
-              class="overflow-hidden px-2 pt-3 pb-1 text-xs font-semibold tracking-wide whitespace-nowrap text-[var(--color-sidebar-section-label)] transition-opacity duration-150 motion-reduce:transition-none"
+              class="overflow-hidden px-2 pt-4 pb-1 text-xs font-medium whitespace-nowrap text-[var(--color-sidebar-section-label)] transition-opacity duration-150 motion-reduce:transition-none"
               :class="collapsed ? 'opacity-0' : 'opacity-100'"
             >
               {{ sectionTitle(section) }}
@@ -478,11 +478,7 @@ const headingId = (scope: string, group: string, s: ChildSection) =>
                       :data-test="`sidebar-section-label-${childSection.key}`"
                     >
                       {{ t(childSection.titleKey) }}
-                      <BetaBadge
-                        v-if="childSection.beta"
-                        size="xs"
-                        class="px-1! py-px! text-[0.625rem]! leading-none! font-semibold! tracking-normal! normal-case!"
-                      />
+                      <OBetaBadge v-if="childSection.beta" />
                     </div>
                     <OSidebarItem
                       v-for="child in childSection.children"
@@ -523,7 +519,7 @@ const headingId = (scope: string, group: string, s: ChildSection) =>
       <button
         v-if="collapsible"
         type="button"
-        class="group/nav rounded-default text-text-body hover:bg-dropdown-item-hover-bg focus-visible:ring-accent mt-0.5 flex h-8 w-full min-w-9 cursor-pointer items-center gap-2.5 overflow-hidden border-0 bg-transparent px-2 text-start [font-family:inherit] text-xs font-normal transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset motion-reduce:transition-none"
+        class="group/nav rounded-default text-text-body hover:bg-dropdown-item-hover-bg focus-visible:ring-accent text-compact mt-0.5 flex h-7 w-full min-w-9 cursor-pointer items-center gap-2.5 overflow-hidden border-0 bg-transparent px-2 text-start [font-family:inherit] font-normal transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset motion-reduce:transition-none"
         :aria-label="toggleLabel"
         :aria-expanded="!collapsed"
         data-test="sidebar-collapse-toggle"
@@ -550,7 +546,7 @@ const headingId = (scope: string, group: string, s: ChildSection) =>
         ref="flyoutRef"
         role="menu"
         :aria-label="flyoutRow.entry.item.title"
-        class="shadow-overlay rounded-default fixed flex max-w-150 min-w-52 flex-col gap-0.5 overflow-y-auto overscroll-contain border border-[var(--color-sidebar-flyout-border)] bg-[var(--color-sidebar-flyout-bg)] p-1"
+        class="shadow-overlay rounded-default fixed flex max-w-[min(46rem,calc(100vw-12rem))] min-w-52 flex-col gap-0.5 overflow-x-hidden overflow-y-auto overscroll-contain border border-[var(--color-sidebar-flyout-border)] bg-[var(--color-sidebar-flyout-bg)] p-1"
         :style="flyoutStyle"
         :data-test="`sidebar-flyout-${flyoutRow.entry.item.name}`"
         @mouseenter="clearFlyoutTimers"
@@ -584,15 +580,11 @@ const headingId = (scope: string, group: string, s: ChildSection) =>
               v-if="childSection.titleKey"
               :id="headingId('flyout', flyoutRow.entry.item.name, childSection)"
               role="presentation"
-              class="flex items-center gap-1.5 overflow-hidden px-2 pt-1 pb-0.5 text-xs font-semibold tracking-wide whitespace-nowrap text-[var(--color-sidebar-section-label)] transition-opacity duration-150 motion-reduce:transition-none"
+              class="flex items-center gap-1.5 overflow-hidden px-2 pt-1 pb-0.5 text-xs font-medium whitespace-nowrap text-[var(--color-sidebar-section-label)] transition-opacity duration-150 motion-reduce:transition-none"
               :data-test="`sidebar-flyout-section-label-${childSection.key}`"
             >
               {{ t(childSection.titleKey) }}
-              <BetaBadge
-                v-if="childSection.beta"
-                size="xs"
-                class="px-1! py-px! text-[0.625rem]! leading-none! font-semibold! tracking-normal! normal-case!"
-              />
+              <OBetaBadge v-if="childSection.beta" />
             </div>
             <OSidebarItem
               v-for="child in childSection.children"

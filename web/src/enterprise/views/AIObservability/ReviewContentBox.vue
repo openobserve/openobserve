@@ -12,29 +12,37 @@
 <template>
   <div class="flex min-w-0 flex-col gap-1.5" :class="fill ? 'min-h-0 flex-1' : ''">
     <div class="flex items-center justify-between">
-      <span class="text-text-heading text-sm font-bold">{{ label }}</span>
+      <span class="text-text-heading text-sm font-semibold">{{ label }}</span>
       <div class="flex items-center gap-1">
         <OButton
           variant="outline"
           size="icon"
           :data-test="`ai-review-content-copy-${contentType}`"
-          :title="t('aiObservability.queues.workbench.copyContent', { label })"
+          icon-left="content-copy"
+          :aria-label="t('aiObservability.queues.workbench.copyContent', { label })"
           @click="copy"
         >
-          <OIcon name="content-copy" size="xs" />
+          <OTooltip :content="t('aiObservability.queues.workbench.copyContent', { label })" />
         </OButton>
         <OButton
           variant="outline"
           size="icon"
           :data-test="`ai-review-content-expand-${contentType}`"
-          :title="
+          :icon-left="fullscreen ? 'fullscreen-exit' : 'fullscreen'"
+          @click="emit('toggle-fullscreen')"
+          :aria-label="
             fullscreen
               ? t('aiObservability.queues.workbench.exitFullscreen')
               : t('aiObservability.queues.workbench.enterFullscreen')
           "
-          @click="emit('toggle-fullscreen')"
         >
-          <OIcon :name="fullscreen ? 'fullscreen-exit' : 'fullscreen'" size="xs" />
+          <OTooltip
+            :content="
+              fullscreen
+                ? t('aiObservability.queues.workbench.exitFullscreen')
+                : t('aiObservability.queues.workbench.enterFullscreen')
+            "
+          />
         </OButton>
       </div>
     </div>
@@ -73,7 +81,7 @@
 <script setup lang="ts">
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import { copyToClipboard } from "@/utils/clipboard";

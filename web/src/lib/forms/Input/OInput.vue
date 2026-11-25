@@ -280,7 +280,7 @@ const wrapperClasses = computed(() => [
   // The accent border is the focus cue; the glow only softens it. Error keeps its red border on focus.
   hasError.value
     ? "border-input-border-error focus-within:ring-2 focus-within:ring-input-border-error/20"
-    : "border-input-border hover:border-input-border-hover focus-within:ring-2 focus-within:ring-focus-ring-accent",
+    : "border-input-border hover:border-input-border-hover focus-within:ring-3 focus-within:ring-input-focus-glow focus-within:border-input-border-focus",
   // Whole-control dim: a dashed edge read as a drop zone.
   isDisabled.value ? "opacity-50 cursor-not-allowed" : "",
   props.readonly ? "border-input-border bg-input-bg" : "",
@@ -318,7 +318,7 @@ const wrapperClasses = computed(() => [
         v-if="label && labelPosition === 'inside' && !isTextarea"
         :for="inputId"
         :class="[
-          'text-text-secondary max-w-1/2 shrink-0 self-center truncate ps-3 select-none',
+          'text-text-secondary max-w-40 shrink-0 self-center truncate ps-3 select-none',
           textSizeClasses[size ?? 'sm'],
         ]"
         >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></label

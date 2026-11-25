@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- import dashboard button with dropdown -->
       <ODropdown side="bottom" align="end">
         <template #trigger>
-          <OButton variant="ghost" size="sm" data-test="dashboard-import" icon-left="upload-file">
+          <OButton variant="outline" size="sm" data-test="dashboard-import" icon-left="file-upload">
             {{ t(`dashboard.import`) }}
             <template #icon-right>
               <OIcon name="expand-more" size="xs" data-menu-chevron class="-ms-0.5" />
@@ -137,8 +137,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading-reset-key="activeFolderId"
               :forbidden="forbidden"
               :frame="false"
-              :bordered="false"
-              :row-height="28"
               :default-columns="false"
               :global-filter="filterQuery"
               :show-global-filter="false"
@@ -292,31 +290,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </button>
               </template>
               <template #cell-actions="{ row }">
-                <span class="row-actions flex items-center justify-end gap-0.5">
-                  <!-- Thin outline glyphs anti-alias under 3:1 in secondary, so row actions rest in body. -->
+                <span class="row-actions flex items-center justify-end gap-1">
                   <OButton
                     v-if="row.actions == 'true'"
+                    icon-left="drive-file-move"
                     :aria-label="t('dashboard.move_to_another_folder')"
                     variant="ghost"
-                    size="icon-toolbar"
+                    size="icon-xs-sq"
                     class="max-md:hidden"
                     data-test="dashboard-move-to-another-folder"
                     @click.stop="showMoveDashboardPanel(row)"
                   >
-                    <OIcon name="drive-file-move" size="sm" class="text-text-body!" />
                     <OTooltip side="bottom" :content="t('dashboard.move_to_another_folder')" />
                   </OButton>
                   <OButton
                     v-if="row.actions == 'true'"
+                    icon-left="content-copy"
                     :aria-label="t('dashboard.duplicate')"
                     variant="ghost"
-                    size="icon-toolbar"
+                    size="icon-xs-sq"
                     class="max-md:hidden"
                     data-test="dashboard-duplicate"
                     data-row-action="duplicate"
                     @click.stop="duplicateDashboard(row.id, row.folder_id)"
                   >
-                    <OIcon name="content-copy" size="sm" class="text-text-body!" />
                     <OTooltip side="bottom" :content="t('dashboard.duplicate')" />
                   </OButton>
                   <OButton

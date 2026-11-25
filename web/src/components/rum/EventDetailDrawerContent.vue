@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="event && Object.keys(event).length">
           <!-- Error Details -->
           <div v-if="event.type === 'error'" class="mb-3" data-test="error-details">
-            <div class="mb-1 text-sm font-bold">{{ t("common.errorDetails") }}</div>
+            <div class="mb-1 text-sm font-semibold">{{ t("common.errorDetails") }}</div>
             <div>
               <div
                 v-if="rawEvent?.error_type"
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- View Details -->
           <div v-if="event.type === 'view'" class="mb-3" data-test="view-details">
-            <div class="mb-1 text-sm font-bold">{{ t("common.viewDetails") }}</div>
+            <div class="mb-1 text-sm font-semibold">{{ t("common.viewDetails") }}</div>
             <div>
               <div
                 v-if="rawEvent?.view_loading_type"
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mb-3"
             data-test="failed-request-details"
           >
-            <div class="mb-1 text-sm font-bold">
+            <div class="mb-1 text-sm font-semibold">
               {{ t("rum.playerEvents.failedRequestDetails") }}
             </div>
             <div>
@@ -269,9 +269,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('common.viewTraceDetails')"
                   data-test="failed-request-view-trace-btn"
                   :loading="isResolvingTraceNav"
+                  icon-left="account-tree"
                   @click="navigateToSpecificTrace(failedRequestTraceId)"
                 >
-                  <OIcon name="account-tree" size="xs" />
                   <span>{{ t("common.viewTrace") }}</span>
                 </OButton>
               </div>
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template v-else-if="relatedResources.length > 0">
-              <div class="mb-1 text-sm font-bold">
+              <div class="mb-1 text-sm font-semibold">
                 {{ t("common.relatedEvents") }} ({{ relatedResources.length }})
               </div>
               <div>
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
-                      <span class="text-3xs text-button-primary me-1 font-bold">
+                      <span class="text-3xs text-button-primary me-1 font-semibold">
                         {{ item.resource_method || "GET" }}
                       </span>
                       <OTruncatedText class="text-xs">
@@ -398,9 +398,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="view-trace-btn"
                       class="ms-2 h-5! px-1.5"
                       :loading="isResolvingTraceNav"
+                      icon-left="account-tree"
                       @click.stop="navigateToSpecificTrace(rumField(item, 'trace_id'))"
                     >
-                      <OIcon name="account-tree" size="xs" />
                       <span v-if="rumField(item, 'trace_id')">{{ t("common.viewTrace") }}</span>
                     </OButton>
                   </div>
@@ -414,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Network Tab -->
       <OTabPanel name="network" padding="sm" data-test="network-tab">
         <template v-if="networkResources.length > 0">
-          <div class="mb-2 text-sm font-bold">
+          <div class="mb-2 text-sm font-semibold">
             {{ t("common.networkRequests") }} ({{ networkResources.length }})
           </div>
           <div>
@@ -428,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="mb-1 flex items-center">
                 <span
-                  class="rounded-default text-3xs bg-badge-blue-soft-bg text-badge-blue-soft-text me-2 px-1.5 py-0.5 font-bold"
+                  class="rounded-default text-3xs bg-badge-blue-soft-bg text-badge-blue-soft-text me-2 px-1.5 py-0.5 font-semibold"
                 >
                   {{ resource.resource_method || "GET" }}
                 </span>

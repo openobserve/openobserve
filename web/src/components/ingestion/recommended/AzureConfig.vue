@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-start gap-3">
         <div
-          class="bg-status-info-bg text-status-info-text flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+          class="bg-status-info-bg text-status-info-text flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
         >
           {{ t("ingestion.azureSetup.step1Number") }}
         </div>
@@ -52,10 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="primary"
             size="sm"
+            icon-left="rocket-launch"
             @click="handleDeploy"
             data-test="azure-activity-logs-deploy-btn"
           >
-            <template #icon-left><OIcon name="rocket-launch" size="sm" /></template>
             {{ t("ingestion.azureSetup.deployToAzure") }}
           </OButton>
         </div>
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-start gap-3">
         <div
-          class="bg-status-info-bg text-status-info-text flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+          class="bg-status-info-bg text-status-info-text flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
         >
           {{ t("ingestion.azureSetup.step2Number") }}
         </div>

@@ -31,9 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="icon-toolbar"
           class="border-border-default rounded-default shrink-0 border p-0"
+          icon-left="swap-horiz"
+          :aria-label="t('search.switchToLogs')"
           @click="onStreamTypeChange('logs')"
         >
-          <OIcon name="swap-horiz" size="sm" />
           <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
         </OButton>
       </FeatureLockExempt>

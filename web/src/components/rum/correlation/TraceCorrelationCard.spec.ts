@@ -338,19 +338,19 @@ describe("TraceCorrelationCard", () => {
       expect(wrapper.text()).toContain("Application Span");
     });
 
-    it("displays Browser SDK Span label", () => {
+    it("displays Browser SDK span label", () => {
       // Assert
-      expect(wrapper.text()).toContain("Browser SDK Span");
+      expect(wrapper.text()).toContain("Browser SDK span");
     });
 
     it("displays Backend Spans label", () => {
       // Assert
-      expect(wrapper.text()).toContain("Backend Spans");
+      expect(wrapper.text()).toContain("Backend spans");
     });
 
     it("displays backend span count in parentheses", () => {
       // Assert
-      expect(wrapper.text()).toContain("Backend Spans (2)");
+      expect(wrapper.text()).toContain("Backend spans (2)");
     });
   });
 
@@ -893,7 +893,7 @@ describe("TraceCorrelationCard", () => {
 
       // Act: verify trace info is shown
       expect(wrapper.text()).toContain("test-tra...23456789");
-      expect(wrapper.text()).toContain("Backend Spans (2)");
+      expect(wrapper.text()).toContain("Backend spans (2)");
 
       // Act: copy trace ID
       const copyBtn = findCopyButton(wrapper);

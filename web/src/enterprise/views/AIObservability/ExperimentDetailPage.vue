@@ -41,6 +41,7 @@
         size="sm"
         variant="outline"
         data-test="ai-experiment-detail-save-prompt"
+        icon-left="save"
         @click="savePromptOpen = true"
       >
         {{ t("aiObservability.experiments.detail.saveAsPrompt") }}

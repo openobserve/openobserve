@@ -132,12 +132,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="primary"
         size="sm"
         data-test="plans-view-org-group-btn"
+        icon-right="arrow-forward"
         @click="goToOrgGroup"
       >
         {{ t("billing.billingGroup.viewOrgGroup") }}
-        <template #icon-right>
-          <OIcon name="arrow-forward" size="sm" class="ms-1" />
-        </template>
       </OButton>
     </div>
     <template v-else>

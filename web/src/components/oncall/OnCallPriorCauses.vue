@@ -59,9 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             :data-test="`oncall-prior-cause-open-${group.cause}`"
+            icon-left="open-in-new"
             @click="emit('open', group.last_response_id)"
-          >
-            <OIcon name="open-in-new" size="sm" />{{ t("oncall.openThatOne") }}
+            >{{ t("oncall.openThatOne") }}
           </OButton>
         </li>
       </ul>
@@ -72,7 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

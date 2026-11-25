@@ -85,10 +85,10 @@ const goToMcp = () => {
         variant="primary"
         size="sm-action"
         data-test="mcp-cross-link-btn"
+        icon-right="arrow-forward"
         @click="goToMcp"
       >
         {{ t("ingestion.mcp.crossLinkCta") }}
-        <OIcon name="arrow-forward" size="sm" />
       </OButton>
     </div>
   </div>

@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error message -->
         <div
           v-if="stackTrace.error"
-          class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-bold font-semibold [letter-spacing:0.01em] shadow-sm"
+          class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-semibold [letter-spacing:0.01em] shadow-sm"
           :style="{
             'background-color': errorHeaderBackground,
             color: errorHeaderColor,
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 :name="isFrameExpanded(traceIndex, 0) ? 'expand-more' : 'chevron-right'"
                 size="xs"
-                class="text-icon-color me-1"
+                class="text-text-secondary me-1"
               />
               <div
                 v-if="stackTrace.stack[0].line"
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       isFrameExpanded(traceIndex, frameIndex + 1) ? 'expand-more' : 'chevron-right'
                     "
                     size="xs"
-                    class="text-icon-color me-1"
+                    class="text-text-secondary me-1"
                   />
                   <div
                     v-if="frame.line"

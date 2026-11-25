@@ -36,8 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon"
             class="shrink-0"
             data-test="traces-duration-actions-btn"
+            icon-left="more-vert"
           >
-            <OIcon name="more-vert" size="sm" class="size-4!" />
+            <OTooltip :content="t('traces.redActions.durationActions')" />
           </OButton>
         </template>
         <ODropdownItem
@@ -148,7 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="pointer-events-auto absolute top-0.5 right-0.5"
               :aria-label="t('traces.latencyHeatmap.selection.reopen')"
               data-test="traces-latency-heatmap-selection-reopen"
-            />
+            >
+              <OTooltip :content="t('traces.latencyHeatmap.selection.reopen')" />
+            </OButton>
           </template>
           <div
             ref="menuBody"
@@ -240,7 +243,7 @@ import PanelBar from "@/components/common/PanelBar.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";

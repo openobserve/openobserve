@@ -157,19 +157,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('dashboard.newTab')"
           variant="ghost"
           size="icon"
+          icon-left="add"
           @click.stop="addTab"
           data-test="dashboard-panel-query-tab-add"
-          icon-left="add"
         >
+          <OTooltip :content="t('dashboard.newTab')" />
         </OButton>
         <OButton
           v-if="promqlMode"
           variant="ghost"
           size="sm"
           :aria-label="t('dashboard.addFormula')"
+          icon-left="functions"
           @click.stop="addFormulaTab"
           data-test="dashboard-panel-query-tab-add-formula"
-          icon-left="functions"
         >
           <span class="max-md:hidden">{{ t("dashboard.addFormula") }}</span>
         </OButton>
@@ -355,8 +356,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     data-test="dashboard-addpanel-config-drilldown-info"
+                    icon-left="info-outline"
+                    :aria-label="t('dashboard.vrlExtractionTooltip')"
                   >
-                    <template #icon-left><OIcon name="info-outline" size="sm" /></template>
                     <OTooltip
                       :content="t('dashboard.vrlExtractionTooltip')"
                       max-width="15.625rem"

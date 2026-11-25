@@ -63,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="menu"
                 class="md:hidden"
                 data-test="rum-sessions-mobile-fields-btn"
+                :aria-label="t('search.showFields')"
                 @click="mobileFieldsOpen = true"
               >
                 <OTooltip :content="t('search.showFields')" />
@@ -104,6 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="isLoading.length > 0"
                 data-test="rum-app-sessions-refresh-btn"
                 class="shrink-0"
+                :aria-label="t('common.refresh')"
                 @click="runQuery"
               >
                 <OTooltip
@@ -356,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="row.has_replay"
                     name="play-circle-filled"
                     size="md"
-                    class="session-play-icon text-icon-color hover:text-button-primary cursor-pointer"
+                    class="session-play-icon text-text-secondary hover:text-button-primary cursor-pointer"
                   />
                 </template>
                 <template #cell-session="{ row }">
@@ -388,9 +390,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :aria-label="t('rum.heatmap.viewHeatmap')"
                       :disabled="heatmapOpening === row.session_id"
                       data-test="rum-app-sessions-view-heatmap-btn"
+                      icon-left="grid-on"
                       @click.stop="openSessionHeatmap(row.session_id, sessionStartUs(row))"
                     >
-                      <OIcon name="grid-on" size="sm" />
                       <OTooltip :content="t('rum.heatmap.viewHeatmapTip')" side="bottom" />
                     </OButton>
                   </div>
@@ -450,7 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg">
         <div class="enable-rum max-w-[64rem] p-4">
           <div class="pb-4">
-            <div class="pb-3 text-left text-xl font-bold font-semibold">
+            <div class="pb-3 text-left text-xl font-semibold">
               {{ t("rum.discoverSessionTitle") }}
             </div>
             <div class="text-base font-medium">

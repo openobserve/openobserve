@@ -43,18 +43,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
-          @click="scrollToTop"
+          icon-left="keyboard-arrow-up"
           :aria-label="scrollTopTooltip"
+          @click="scrollToTop"
           :data-test="dataTestScrollTop"
-          ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip :content="scrollTopTooltip"
+          ><OTooltip :content="scrollTopTooltip"
         /></OButton>
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
-          @click="scrollToBottom"
+          icon-left="keyboard-arrow-down"
           :aria-label="scrollBottomTooltip"
+          @click="scrollToBottom"
           :data-test="dataTestScrollBottom"
-          ><OIcon name="keyboard-arrow-down" size="sm" /><OTooltip :content="scrollBottomTooltip"
+          ><OTooltip :content="scrollBottomTooltip"
         /></OButton>
       </div>
 
@@ -214,10 +216,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-circle-sm"
               :disabled="!commentText.trim() || submitting"
               :loading="submitting"
-              @click="onSubmit"
+              icon-left="send"
               :aria-label="sendTooltip"
+              @click="onSubmit"
               :data-test="dataTestCommentSend"
-              ><OIcon name="send" size="sm" /><OTooltip :content="sendTooltip"
+              ><OTooltip :content="sendTooltip"
             /></OButton>
           </div>
         </div>

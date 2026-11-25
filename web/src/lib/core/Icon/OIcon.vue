@@ -49,12 +49,11 @@ const isRtlMirroredIcon = computed<boolean>(() =>
   Boolean(props.name && RTL_MIRRORED_ICONS.has(props.name)),
 );
 
-// Maps semantic size tokens to Tailwind size utilities (width + height).
-// md = 24px matches the default OIcon rendering size.
+// Sizes pair with the type scale (typography-and-icons.md): xs↔text-xs, sm↔text-sm, md↔titles.
 const sizeClasses: Record<NonNullable<IconProps["size"]>, string> = {
-  xs: "size-3", // 12px
+  xs: "size-3.5", // 14px
   sm: "size-4", // 16px
-  md: "size-6", // 24px
+  md: "size-5", // 20px
   lg: "size-8", // 32px
   xl: "size-10", // 40px
 };

@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            available. -->
         <span
           v-if="section.count != null && section.count !== '0'"
-          class="text-2xs inline-flex items-baseline gap-1 rounded-full px-1.5 py-0.5 leading-none font-bold"
+          class="text-2xs inline-flex items-baseline gap-1 rounded-full px-1.5 py-0.5 leading-none font-semibold"
           :class="
             section.key === activeTab
               ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'

@@ -281,7 +281,7 @@ const startTime = computed({
       <!-- Cron inputs -->
       <div v-if="check.schedule.type === 'cron'" class="flex flex-wrap items-start gap-3">
         <div>
-          <div class="text-text-secondary mb-1 font-bold">
+          <div class="text-text-secondary mb-1 font-semibold">
             {{ t("synthetics.scheduleAlert.cronExpression") }}
             <OIcon name="info" size="sm" class="text-text-muted ms-1 cursor-pointer">
               <OTooltip side="right" align="center">

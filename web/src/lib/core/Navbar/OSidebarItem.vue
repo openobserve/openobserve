@@ -21,7 +21,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -95,8 +95,8 @@ const rootAttrs = computed<Record<string, unknown>>(() => {
 const rowClass = computed(() => [
   "group/nav flex min-w-9 w-full items-center gap-2.5 overflow-hidden rounded-default [text-decoration:none]! transition-colors duration-150 motion-reduce:transition-none cursor-pointer border-0 text-start [font-family:inherit]",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent",
-  props.large ? "text-compact" : "text-xs",
-  props.sub ? "h-8 ps-8.5 pe-2" : "h-8 px-2",
+  "text-compact",
+  props.sub ? "h-7 ps-8.5 pe-2" : "h-7 px-2",
   // Calm selection: a soft accent tint, no ring and no bold; the accent icon carries the state cue.
   props.active
     ? "bg-[var(--selected-tint)] text-text-body! font-normal"
@@ -140,11 +140,7 @@ function onKeydown(event: KeyboardEvent) {
       :aria-hidden="collapsed ? true : undefined"
     >
       <span class="min-w-0 truncate">{{ label }}</span>
-      <BetaBadge
-        v-if="beta"
-        size="xs"
-        class="-ms-1 shrink-0 px-1! py-px! text-[0.625rem]! leading-none! font-semibold! tracking-normal! normal-case!"
-      />
+      <OBetaBadge v-if="beta" class="-ms-1 shrink-0" />
       <span class="-ms-2.5 flex-1" aria-hidden="true" />
       <OIcon
         v-if="locked || licenseLocked || paywalled"

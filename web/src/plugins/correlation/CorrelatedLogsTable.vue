@@ -47,9 +47,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon"
             :class="{ 'bg-theme-accent! text-white!': wrapTableCells }"
             data-test="correlated-logs-table-wrap-content-btn"
+            icon-left="wrap-text"
+            :aria-label="t('search.messageWrapContent')"
             @click="wrapTableCells = !wrapTableCells"
           >
-            <OIcon name="wrap-text" size="sm" />
             <OTooltip :content="t('search.messageWrapContent')" />
           </OButton>
 
@@ -176,9 +177,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="h-5!"
           :class="{ 'bg-theme-accent! text-white! hover:opacity-80': wrapTableCells }"
           data-test="correlated-logs-table-wrap-content-btn"
+          icon-left="wrap-text"
+          :aria-label="t('search.messageWrapContent')"
           @click="wrapTableCells = !wrapTableCells"
         >
-          <OIcon name="wrap-text" size="sm" />
           <OTooltip :content="t('search.messageWrapContent')" />
         </OButton>
       </template>

@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="xs"
           :data-test="`oncall-setup-bar-cta-${nextStep.key}`"
+          :icon-left="nextStep.icon"
           @click="nextStep.act()"
-        >
-          <OIcon :name="nextStep.icon" size="sm" />{{ nextStep.cta }}
+          >{{ nextStep.cta }}
         </OButton>
         <OButton
           variant="ghost"
@@ -142,9 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               :loading="step.key === 'test' && testing"
               :data-test="`oncall-setup-cta-${step.key}`"
+              :icon-left="step.icon"
               @click="step.act()"
-            >
-              <OIcon :name="step.icon" size="sm" />{{ step.cta }}
+              >{{ step.cta }}
             </OButton>
           </template>
         </template>

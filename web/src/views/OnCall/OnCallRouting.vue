@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="alt-route"
   >
     <template #title-trail>
-      <BetaBadge class="shrink-0" />
+      <OBetaBadge class="shrink-0" />
       <OTooltip side="bottom" :content="t('oncall.routingPrecedence')">
         <OIcon
           name="info-outline"
@@ -391,7 +391,7 @@ import OnCallRuleEditor from "@/components/oncall/OnCallRuleEditor.vue";
 import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import OnCallUnroutedQueue from "@/components/oncall/OnCallUnroutedQueue.vue";
 import type { UnroutedFilters } from "@/components/oncall/OnCallUnroutedQueue.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";

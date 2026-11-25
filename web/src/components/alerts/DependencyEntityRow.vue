@@ -64,9 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-xs"
         :data-test="`dependency-impact-open-${node.name}`"
+        icon-left="open-in-new"
+        :aria-label="t('alert_dependencies.actionOpen')"
         @click.stop="emit('open', node)"
       >
-        <OIcon name="open-in-new" size="sm" />
         <OTooltip side="top" :content="t('alert_dependencies.actionOpen')" />
       </OButton>
       <OButton

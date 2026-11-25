@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-status-error-text/25 rounded-none border-b"
             data-test="dbm-deadlocks-storm"
           >
-            <span class="font-bold">{{ t("dbm.deadlocks.storm.title") }}</span>
+            <span class="font-semibold">{{ t("dbm.deadlocks.storm.title") }}</span>
             {{ stormBody }}
             <span class="block">{{ t("dbm.deadlocks.storm.biasWarning") }}</span>
             <template #actions>

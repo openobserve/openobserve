@@ -457,7 +457,7 @@ describe("Versions tab at 1600 px", () => {
     expect(link.attributes("size")).toBe("chip");
     expect(compare.get('[data-test="tip"]').text()).toBe("serviceVersions.panel.compareTo");
     const current = wrapper.get('[data-test="svcver-expand-key-2"]');
-    expect(current.text()).toBe("");
+    expect(current.get('[data-test="tip"]').text()).toBe("serviceVersions.panel.deployCount");
     expect(current.attributes("aria-label")).toBe("serviceVersions.panel.deployCount");
     expect(current.attributes("size")).toBe("icon-chip");
     expect(wrapper.text()).toContain("serviceVersions.panel.current");

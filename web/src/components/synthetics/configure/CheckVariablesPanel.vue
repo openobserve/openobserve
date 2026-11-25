@@ -519,7 +519,7 @@ function onPromoted(name: string) {
                   <OIcon
                     name="warning"
                     size="xs"
-                    class="text-warning cursor-help"
+                    class="text-status-warning-text cursor-help"
                     role="img"
                     :aria-label="t('synthetics.variablesPanel.overridesInherited')"
                     :data-test="`synthetics-check-variables-panel-overrides-${index}-badge`"

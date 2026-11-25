@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg h-full">
         <OTable
           data-test="log-stream-table"
-          :row-height="28"
           :data="logStream"
           :columns="columns"
           show-index

@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Module tabs (Level-2 nav), inline to the right of the title. -->
         <div
           v-if="hasTabs()"
-          class="flex h-full min-w-0 flex-1 items-center max-md:h-auto max-md:basis-full max-md:flex-wrap"
+          class="flex h-full min-w-0 flex-1 items-stretch max-md:h-auto max-md:basis-full max-md:flex-wrap md:[&_[role=tab]]:h-full md:[&_[role=tablist]]:h-full md:[&>*]:h-full"
         >
           <slot name="tabs" />
         </div>

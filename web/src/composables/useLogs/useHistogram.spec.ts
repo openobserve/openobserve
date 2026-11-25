@@ -199,7 +199,7 @@ describe("useHistogram Composable", () => {
       mockState.searchObj.data.queryResults.result_cache_ratio = 50;
 
       expect(wrapper.vm.getHistogramTitle()).toBe(
-        "Showing 1 to 100 out of 250 events in 42 ms. (Delta Scan Size: 0 MB)",
+        "Showing 1 to 100 out of 250 events in 42 ms. (Delta scan size: 0 MB)",
       );
     });
 

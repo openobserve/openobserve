@@ -26,9 +26,10 @@
               size="sm"
               :disabled="!hasContent(detail.input)"
               data-test="ai-experiment-row-copy-input"
+              icon-left="content-copy"
               @click="copyContent(detail.input, 'input')"
             >
-              <OIcon name="content-copy" size="xs" />
+              <OTooltip :content="t('aiObservability.experiments.rowDetail.copyInput')" />
             </OButton>
           </div>
           <div
@@ -64,9 +65,10 @@
               size="sm"
               :disabled="!hasContent(detail.expectedOutput)"
               data-test="ai-experiment-row-copy-expected"
+              icon-left="content-copy"
               @click="copyContent(detail.expectedOutput, 'output')"
             >
-              <OIcon name="content-copy" size="xs" />
+              <OTooltip :content="t('aiObservability.experiments.rowDetail.copyExpected')" />
             </OButton>
           </div>
           <div
@@ -179,9 +181,10 @@
                   size="sm"
                   :disabled="!hasContent(activeTrial.execution.output)"
                   data-test="ai-experiment-row-copy-output"
+                  icon-left="content-copy"
                   @click="copyContent(activeTrial.execution.output, 'output')"
                 >
-                  <OIcon name="content-copy" size="xs" />
+                  <OTooltip :content="t('aiObservability.experiments.rowDetail.copyOutput')" />
                 </OButton>
               </div>
               <div

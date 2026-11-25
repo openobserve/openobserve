@@ -45,12 +45,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         as="a"
         :href="row.pdf"
         target="_blank"
-        :title="t('billing.downloadInvoice')"
         variant="ghost"
         size="icon-sm"
         class="ms-1"
+        icon-left="download"
+        :aria-label="t('billing.downloadInvoice')"
       >
-        <OIcon name="download" size="sm" />
+        <OTooltip :content="t('billing.downloadInvoice')" />
       </OButton>
     </template>
   </OTable>
@@ -63,7 +64,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

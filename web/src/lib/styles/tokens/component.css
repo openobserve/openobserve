@@ -823,7 +823,7 @@
   /* Subtle amber wash for warning/flagged rows (theme-aware). */
   --color-warning-surface: color-mix(in srgb, var(--color-warning-400) 10%, transparent);
   /* Row height tokens: change these to resize all OTable rows globally. */
-  --table-row-height-dense: 1.75rem; /* 28px */
+  --table-row-height-dense: 2.375rem; /* 38px */
   --table-row-height-normal: 2.75rem; /* 44px */
   --table-row-height-compact: 1.5625rem; /* 25px */
 

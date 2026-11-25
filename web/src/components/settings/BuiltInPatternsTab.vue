@@ -124,10 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon"
+                icon-left="visibility"
+                :aria-label="t('regex_patterns.preview')"
                 @click="previewPattern(pattern)"
                 :data-test="`pattern-preview-${index}`"
               >
-                <OIcon name="visibility" size="sm" />
                 <OTooltip :content="t('regex_patterns.preview')" side="top" />
               </OButton>
             </div>
@@ -160,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div style="max-height: 60vh" class="overflow-y-auto">
         <div class="mb-3">
-          <div class="mb-1 font-bold">
+          <div class="mb-1 font-semibold">
             {{ t("regex_patterns.description") }}
           </div>
           <div>
@@ -169,12 +170,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-3">
-          <div class="mb-1 font-bold">{{ t("regex_patterns.pattern") }}</div>
+          <div class="mb-1 font-semibold">{{ t("regex_patterns.pattern") }}</div>
           <OTextarea :model-value="previewedPattern?.pattern" readonly :rows="3" />
         </div>
 
         <div class="mb-3">
-          <div class="mb-1 font-bold">{{ t("regex_patterns.tags") }}</div>
+          <div class="mb-1 font-semibold">{{ t("regex_patterns.tags") }}</div>
           <div class="flex flex-wrap gap-2">
             <OTag
               v-for="tag in previewedPattern?.tags"
@@ -188,12 +189,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-3">
-          <div class="mb-1 font-bold">{{ t("regex_patterns.rarity") }}</div>
+          <div class="mb-1 font-semibold">{{ t("regex_patterns.rarity") }}</div>
           <div>{{ previewedPattern?.rarity }}</div>
         </div>
 
         <div v-if="(previewedPattern?.examples?.Valid?.length ?? 0) > 0" class="mb-3">
-          <div class="mb-1 font-bold">
+          <div class="mb-1 font-semibold">
             {{ t("regex_patterns.valid_examples") }}
           </div>
           <ul class="divide-border rounded-default flex flex-col divide-y border">

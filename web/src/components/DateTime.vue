@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         id="date-time-menu"
         class="date-time-dialog z-10001 flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] max-w-[calc(100vw-1rem)] flex-col max-sm:overflow-y-auto"
-        :class="showRail ? 'w-158.25 max-sm:w-81.25' : 'w-81.25'"
+        :class="showRail ? 'w-126 max-sm:w-74' : 'w-74'"
         @keydown.capture="onPickerKeydown"
         @paste="onPickerPaste"
       >
@@ -119,9 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           class="grid min-h-0 flex-1 max-sm:flex max-sm:flex-col max-sm:overflow-y-auto"
-          :class="
-            showRail ? 'grid-cols-[19.25rem_1fr] grid-rows-[auto_1fr]' : 'grid-rows-[auto_1fr]'
-          "
+          :class="showRail ? 'grid-cols-[13rem_1fr] grid-rows-[auto_1fr]' : 'grid-rows-[auto_1fr]'"
         >
           <div
             v-if="!disableRelative || (!hideClipboard && !showRangeInput)"
@@ -206,27 +204,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-hidden="selectedType !== 'relative'"
                 :inert="selectedType !== 'relative'"
               >
-                <div class="date-time-table relative flex flex-col">
+                <div class="date-time-table relative flex h-full flex-col justify-evenly py-1.5">
                   <div
-                    class="relative-row border-border-default flex items-center border-b py-2 ps-3 [&>*]:me-1.5"
+                    class="relative-row flex items-center gap-1 px-3 py-0.5"
                     v-for="(period, index) in relativePeriods"
                     :key="'date_' + index"
                   >
-                    <div class="min-w-18.75 text-sm font-semibold">
+                    <div class="text-text-secondary min-w-16 text-xs font-medium">
                       {{ period.label }}
                     </div>
                     <div v-for="(item, item_index) in relativeDates[period.value]" :key="item">
                       <OButton
                         :disabled="blockedChips.has(`${item}${period.value}`)"
                         :data-test="`date-time-relative-${item}-${period.value}-btn`"
-                        class="h-8! w-8! font-bold! disabled:opacity-35"
+                        class="h-7! w-7! text-xs! font-normal! disabled:opacity-35"
                         :class="
                           selectedType == 'relative' &&
                           calendarToken === null &&
                           relativePeriod == period.value &&
                           relativeValue == item
-                            ? 'bg-selected-bg! text-selected-fg!'
-                            : `bg-text-heading/7! ${relativePeriod}`
+                            ? 'bg-selected-bg! text-selected-fg! font-medium!'
+                            : relativePeriod
                         "
                         variant="ghost"
                         size="xs"
@@ -246,10 +244,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div
-                    class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:me-1.5"
+                    class="relative-row flex items-center gap-1 px-3 pt-1.5 pb-0.5"
                     @focusout="onCustomRowFocusout"
                   >
-                    <div class="min-w-18.75 text-sm font-semibold">{{ t("common.custom") }}</div>
+                    <div class="text-text-secondary min-w-16 text-xs font-medium">
+                      {{ t("common.custom") }}
+                    </div>
                     <OTooltip
                       side="right"
                       align="center"
@@ -263,6 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OInput
                           :model-value="customDraft"
                           :error="customBlocked"
+                          size="sm"
                           data-test="date-time-custom-value"
                           :aria-label="t('common.timeAmount')"
                           type="number"
@@ -284,6 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="relativePeriod"
                           :aria-label="t('common.timeUnit')"
                           :options="relativePeriodsSelect"
+                          size="sm"
                           data-test="date-time-custom-unit"
                           @update:model-value="commitCustom(false)"
                         >
@@ -311,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="queryRangeRestrictionInHour > 0"
                     :content="raw(queryRangeRestrictionMsg)"
                   />
-                  <div class="flex justify-center px-3 py-2">
+                  <div class="flex justify-center px-3 py-1.5">
                     <ODateRangeCalendar
                       :start-date="selectedDate.from"
                       :end-date="selectedDate.to"
@@ -322,24 +324,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:pending-date="pendingDay = $event"
                     />
                   </div>
-                  <div class="text-text-secondary ps-6 pe-6 text-xs">
-                    {{ t("common.datetimeMessage") }}
-                  </div>
-                  <OSeparator v-if="!disableRelative" class="my-2" />
+                  <OSeparator v-if="!disableRelative" class="my-1.5" />
 
                   <table
                     v-if="!hideRelativeTime"
-                    class="startEndTime mx-[0.4rem] mt-2 mb-[0.3rem] w-[calc(100%-0.8rem)] px-3"
+                    class="startEndTime mx-[0.4rem] mb-[0.3rem] w-[calc(100%-0.8rem)] px-3"
                   >
                     <tbody>
                       <tr>
                         <td
-                          class="label o-input-label text-compact text-input-label-text w-1/2 pe-1.5 leading-tight font-medium"
+                          class="label o-input-label text-text-secondary w-1/2 pe-1.5 pb-1 text-xs leading-tight font-medium"
                         >
                           {{ t("common.startTime") }}
                         </td>
                         <td
-                          class="label o-input-label text-compact text-input-label-text w-1/2 ps-1.5 leading-tight font-medium"
+                          class="label o-input-label text-text-secondary w-1/2 ps-1.5 pb-1 text-xs leading-tight font-medium"
                         >
                           {{ t("common.endTime") }}
                         </td>
@@ -349,6 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OTime
                             class="w-full"
                             v-model="selectedTime.startTime"
+                            size="sm"
                             with-seconds
                             data-test="datetime-start-time"
                             @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
@@ -358,6 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OTime
                             class="w-full"
                             v-model="selectedTime.endTime"
+                            size="sm"
                             :with-seconds="true"
                             data-test="datetime-end-time"
                             @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"

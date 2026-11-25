@@ -61,9 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="size-5!"
       :aria-label="t('traces.groups.clear')"
       data-test="traces-group-by-clear"
+      icon-left="close"
       @click.stop="emit('update:modelValue', '')"
     >
-      <OIcon name="close" size="xs" />
+      <OTooltip :content="t('traces.groups.clear')" />
     </OButton>
   </span>
 </template>
@@ -75,7 +76,7 @@ import { formatLargeNumber } from "@/utils/zincutils";
 import { GROUPS_LIMIT } from "@/utils/traces/tracesGroups";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = withDefaults(
   defineProps<{

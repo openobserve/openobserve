@@ -36,7 +36,7 @@
     data-test="alerts-alertmultitoggle-row"
   >
     <span
-      class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+      class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
     >
       {{ t("alerts.multiAlert.label") }}
       <OTooltip :content="t(onDescriptionKey)" side="top" />

@@ -286,7 +286,7 @@ describe("OTable", () => {
       });
       await nextTick();
       expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(4);
-      expect(footerText()).toMatch(/1 - 4 \S+ 4$/);
+      expect(footerText()).toMatch(/1–4 \S+ 4$/);
     });
 
     it("counts only rows matching a column filter", async () => {
@@ -298,12 +298,12 @@ describe("OTable", () => {
           pageSize: 10,
         },
       });
-      expect(footerText()).toMatch(/1 - 10 \S+ 16$/);
+      expect(footerText()).toMatch(/1–10 \S+ 16$/);
 
       (wrapper.vm as any).table.getColumn("status").setFilterValue(["Pending"]);
       await nextTick();
       expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(4);
-      expect(footerText()).toMatch(/1 - 4 \S+ 4$/);
+      expect(footerText()).toMatch(/1–4 \S+ 4$/);
     });
 
     it("applies the active column filters to rows it does not hold", async () => {
@@ -392,7 +392,7 @@ describe("OTable", () => {
       });
 
       expect(wrapper.find('[data-test="o2-table-pagination-info"]').text()).toContain("21+");
-      expect(wrapper.find('[data-test="o2-table-first-page-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-prev-page-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="o2-table-last-page-btn"]').exists()).toBe(false);
 
       await wrapper.find('[data-test="o2-table-next-page-btn"]').trigger("click");
@@ -414,10 +414,8 @@ describe("OTable", () => {
       });
 
       const names = {
-        first: "First page",
         prev: "Previous page",
         next: "Next page",
-        last: "Last page",
       };
       for (const [id, name] of Object.entries(names)) {
         expect(wrapper.find(`[data-test="o2-table-${id}-page-btn"]`).attributes("aria-label")).toBe(
@@ -441,11 +439,11 @@ describe("OTable", () => {
           currentPage: 1,
         },
       });
-      expect(wrapper.find('[data-test="o2-table-pagination-info"]').text()).toContain("1 - 20");
+      expect(wrapper.find('[data-test="o2-table-pagination-info"]').text()).toContain("1–20");
 
       await wrapper.setProps({ pageSize: 10 });
 
-      expect(wrapper.find('[data-test="o2-table-pagination-info"]').text()).toContain("1 - 10");
+      expect(wrapper.find('[data-test="o2-table-pagination-info"]').text()).toContain("1–10");
       expect(wrapper.findComponent(OSelect).props("modelValue")).toBe(10);
     });
 
@@ -2075,9 +2073,9 @@ describe("OTable", () => {
           dense: true,
         },
       });
-      // dense mode sets row height to 1.75rem via CSS variable on the table
+      // dense mode sets row height to 2.25rem via CSS variable on the table
       const tableEl = wrapper.find('[data-test="o2-table"]');
-      expect(tableEl.attributes("style")).toContain("1.75rem");
+      expect(tableEl.attributes("style")).toContain("2.25rem");
     });
 
     it("uses the compact row token and unpadded cells when compact is true", () => {
@@ -2540,6 +2538,7 @@ describe("OTable", () => {
           data: makeRows(4),
           columns: cols,
           striped: true,
+          bordered: false,
           activeRowIndex: 2,
           onRowClick: vi.fn(),
         },
@@ -2702,11 +2701,11 @@ describe("OTable", () => {
     });
   });
 
-  // ── Footer start side ──────────────────────────────────────
+  // ── Selection bar and footer start side ──────────────────────────────────────
 
-  describe("footer start side", () => {
+  describe("selection bar and footer start side", () => {
     const BAR = '[data-test="o2-table-pagination-bottom"]';
-    const SELECTION = '[data-test="o2-table-pagination-selection"]';
+    const SELECTION = '[data-test="o2-table-selection-bar"]';
     const COUNT = '[data-test="o2-table-selected-count"]';
     const NOTE = '[data-test="o2-table-pagination-note"]';
     const ACTIONS = { "selection-actions": '<button data-test="bulk-delete">Delete</button>' };
@@ -2783,14 +2782,42 @@ describe("OTable", () => {
       expect(wrapper.find(SELECTION).exists()).toBe(false);
     });
 
-    it("gives the start side to the selection over the note", async () => {
+    it("keeps the note in the footer while the selection shows at the top", async () => {
       wrapper = mountFooter({ selectedIds: ["1"] }, { ...ACTIONS, ...NOTE_SLOT });
       expect(wrapper.find(COUNT).text()).toBe("1 of 25 selected");
-      expect(wrapper.find(NOTE).exists()).toBe(false);
+      expect(wrapper.find(BAR).find(SELECTION).exists()).toBe(false);
+      expect(wrapper.find(BAR).find('[data-test="cap-note"]').exists()).toBe(true);
 
       await wrapper.setProps({ selectedIds: [] });
       expect(wrapper.find(SELECTION).exists()).toBe(false);
-      expect(wrapper.find('[data-test="cap-note"]').exists()).toBe(true);
+    });
+
+    it("puts the selection bar above the table, covering the toolbar without unmounting it", () => {
+      wrapper = mountFooter(
+        { selectedIds: ["1"] },
+        { ...ACTIONS, toolbar: '<input data-test="search" />' },
+      );
+      const toolbar = wrapper.find('[data-test="o2-table-toolbar"]');
+      expect(toolbar.classes()).toContain("invisible");
+      expect(toolbar.find(SELECTION).classes()).toContain("visible");
+      expect(toolbar.find('[data-test="search"]').exists()).toBe(true);
+    });
+
+    it("renders the selection bar in flow when the table has no toolbar", () => {
+      wrapper = mountFooter({ selectedIds: ["1"] }, ACTIONS);
+      const root = wrapper.find('[data-test="o2-table-root"]');
+      const bar = wrapper.find(SELECTION).element;
+      const table = wrapper.find('[data-test="o2-table"]').element;
+      expect(root.find('[data-test="o2-table-toolbar"]').exists()).toBe(false);
+      expect(bar.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("clears the selection from the bar", async () => {
+      wrapper = mountFooter({}, ACTIONS);
+      await wrapper.find('[data-test="o2-table-select-0"] button').trigger("click");
+      await wrapper.find('[data-test="o2-table-selection-clear"]').trigger("click");
+      expect(wrapper.find(SELECTION).exists()).toBe(false);
+      expect(wrapper.emitted("update:selectedIds")!.at(-1)).toEqual([[]]);
     });
 
     it("keeps the note when rows are selected but the table has no bulk actions", () => {
@@ -3737,12 +3764,13 @@ describe("OTable activeRowIndex", () => {
 
   it("renders no active state when the prop is absent or null", async () => {
     wrapper = mount(OTable, { props: { data: makeRows(4), columns: makeColumns() } });
-    expect(wrapper.findAll("[aria-current]")).toHaveLength(0);
+    const body = () => wrapper.find('[data-test="o2-table-body"]');
+    expect(body().findAll("[aria-current]")).toHaveLength(0);
     expect(wrapper.findAll("[data-active-row]")).toHaveLength(0);
     expect(wrapper.findAll("tr.ring-2")).toHaveLength(0);
 
     await wrapper.setProps({ activeRowIndex: null });
-    expect(wrapper.findAll("[aria-current]")).toHaveLength(0);
+    expect(body().findAll("[aria-current]")).toHaveLength(0);
   });
 
   it("moves the highlight when the index changes, and clears it on null", async () => {
@@ -3774,7 +3802,13 @@ describe("OTable activeRowIndex", () => {
 
   it("does not stripe the active row", () => {
     wrapper = mount(OTable, {
-      props: { data: makeRows(4), columns: makeColumns(), striped: true, activeRowIndex: 1 },
+      props: {
+        data: makeRows(4),
+        columns: makeColumns(),
+        striped: true,
+        bordered: false,
+        activeRowIndex: 1,
+      },
     });
     expect(wrapper.find('[data-test="o2-table-row-1"]').classes()).not.toContain(
       "bg-table-row-striped-bg",

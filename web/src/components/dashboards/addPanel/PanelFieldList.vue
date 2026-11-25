@@ -12,10 +12,12 @@
         size="icon-xs-sq"
         class="rotate-90"
         icon-left="unfold-less"
-        :title="t('panel.collapseFields')"
         data-test="panel-field-list-collapse-btn"
+        :aria-label="t('panel.collapseFields')"
         @click="emit('collapse')"
-      />
+      >
+        <OTooltip :content="t('panel.collapseFields')" />
+      </OButton>
     </div>
     <OFieldList
       ref="fieldListRef"
@@ -376,9 +378,10 @@
             size="icon-panel"
             :disabled="bottomProps.isFirstPage"
             data-test="field-list-pagination-first"
+            icon-left="fast-rewind"
             @click="bottomProps.firstPage"
           >
-            <OIcon name="fast-rewind" size="sm" />
+            <OTooltip :content="t('search.firstPage')" />
           </OButton>
           <template v-for="page in visiblePagesForTotal(bottomProps)" :key="page">
             <OButton
@@ -396,9 +399,10 @@
             size="icon-panel"
             :disabled="bottomProps.isLastPage"
             data-test="field-list-pagination-last"
+            icon-left="fast-forward"
             @click="bottomProps.lastPage"
           >
-            <OIcon name="fast-forward" size="sm" />
+            <OTooltip :content="t('search.lastPage')" />
           </OButton>
         </div>
       </template>

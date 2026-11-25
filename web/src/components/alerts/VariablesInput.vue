@@ -26,12 +26,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'flex w-full items-center gap-2': formRows.length == 0,
     }"
   >
-    <div class="custom-input-label pb-1 font-bold">
+    <div class="custom-input-label pb-1 font-semibold">
       <span>
         {{ t("alerts.variables.label") }}
       </span>
-      <OButton variant="ghost-muted" size="icon-sm">
-        <OIcon name="info-outline" size="sm" />
+      <OButton
+        variant="ghost-muted"
+        size="icon-sm"
+        icon-left="info-outline"
+        :aria-label="t('alerts.advanced.variablesTooltip')"
+      >
         <OTooltip :content="t('alerts.advanced.variablesTooltip')" />
       </OButton>
     </div>
@@ -41,9 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-variables-add-btn"
           size="sm"
           variant="outline"
+          icon-left="add"
           @click="addFormRow"
         >
-          <OIcon name="add" size="sm" />
           <span>{{ t("alerts.advanced.addVariable") }}</span>
         </OButton>
       </div>
@@ -84,10 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="ms-1"
             variant="ghost"
             size="icon-circle-sm"
-            :title="t('alert_templates.edit')"
+            icon-left="delete"
+            :aria-label="t('alert_templates.edit')"
             @click="removeFormRow(index)"
           >
-            <OIcon name="delete" size="sm" />
+            <OTooltip :content="t('alert_templates.edit')" />
           </OButton>
           <OButton
             data-test="alert-variables-add-variable-btn"
@@ -95,10 +100,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="ms-1"
             variant="ghost"
             size="icon-circle-sm"
-            :title="t('alert_templates.edit')"
+            icon-left="add"
+            :aria-label="t('alert_templates.edit')"
             @click="addFormRow"
           >
-            <OIcon name="add" size="sm" />
+            <OTooltip :content="t('alert_templates.edit')" />
           </OButton>
         </div>
       </div>
@@ -110,7 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { inject, ref } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";

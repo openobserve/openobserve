@@ -83,14 +83,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <!-- Panel-count badge: conveys how dense each tab is without opening it.
                Section headers are layout labels, not panels, so they're excluded. -->
-          <OBadge
-            variant="default"
-            size="xs"
-            shape="rounded"
-            class="ms-1 shrink-0"
+          <OTag
+            type="countChip"
+            value="neutral"
+            class="ms-1.5 shrink-0"
             :aria-label="t('dashboard.tabPanelCount', { count: panelCount(tab) }, panelCount(tab))"
             :data-test="`dashboard-tab-${tab.tabId}-panel-count`"
-            >{{ panelCount(tab) }}</OBadge
+            >{{ panelCount(tab) }}</OTag
           >
           <!-- Editable affordance: a pencil in the tab's right gutter that
                fades in when the tab is hovered (group/otab comes from OTab) and
@@ -153,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { computed, inject, nextTick, ref, defineComponent, type PropType } from "vue";
@@ -173,7 +172,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
-    OBadge,
+    OTag,
     OIcon,
     OTooltip,
   },

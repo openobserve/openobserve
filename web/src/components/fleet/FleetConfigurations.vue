@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="sm"
-            icon-left="upload-file"
+            icon-left="file-upload"
             data-test="fleet-configurations-import"
             @click="fileInput?.click()"
           >

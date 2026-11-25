@@ -68,9 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="sm"
         data-test="data-source-sidebar-mobile-btn"
+        icon-left="menu"
         @click="mobileSidebarOpen = true"
       >
-        <template #icon-left><OIcon name="menu" size="sm" /></template>
         {{ triggerLabel }}
       </OButton>
     </div>
@@ -189,7 +189,6 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 

@@ -33,7 +33,7 @@
       <OButton
         variant="outline"
         size="sm"
-        icon-left="upload-file"
+        icon-left="file-upload"
         data-test="slos-slolist-import"
         @click="goToImport"
       >

@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #title-trail>
             <span class="inline-flex shrink-0 items-center gap-2">
-              <BetaBadge />
+              <OBetaBadge />
               <OTag
                 v-if="editStatus"
                 type="downtimeStatus"
@@ -466,7 +466,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import InlineSelectFolderDropdown from "@/components/common/sidebar/InlineSelectFolderDropdown.vue";
 import DowntimeConditionSection from "./DowntimeConditionSection.vue";
 import DowntimeTargetCard from "./DowntimeTargetCard.vue";

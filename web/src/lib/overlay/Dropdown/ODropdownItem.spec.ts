@@ -83,7 +83,14 @@ describe("ODropdownItem", () => {
     const wrapper = mountItemInDropdown({}, { default: () => h("span", "Action") });
     const classes = wrapper.get('[role="menuitem"]').classes();
     expect(classes).toEqual(
-      expect.arrayContaining(["min-h-7", "max-md:min-h-9", "px-2", "gap-2", "text-compact"]),
+      expect.arrayContaining([
+        "min-h-7",
+        "max-md:min-h-9",
+        "ps-2",
+        "pe-4",
+        "gap-2",
+        "text-compact",
+      ]),
     );
   });
 

@@ -37,17 +37,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="me-1.5 shrink-0"
           data-test="traces-search-field-list-collapse-btn"
           @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
+          :icon-left="
+            isMobile
+              ? 'menu'
+              : searchObj.meta.showFields
+                ? 'keyboard-double-arrow-left'
+                : 'keyboard-double-arrow-right'
+          "
+          :aria-label="
+            isMobile
+              ? t('traces.openFields')
+              : searchObj.meta.showFields
+                ? t('traces.collapseFields')
+                : t('traces.openFields')
+          "
         >
-          <OIcon
-            :name="
-              isMobile
-                ? 'menu'
-                : searchObj.meta.showFields
-                  ? 'keyboard-double-arrow-left'
-                  : 'keyboard-double-arrow-right'
-            "
-            size="sm"
-          />
           <OTooltip
             :content="
               isMobile

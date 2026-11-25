@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-center gap-2">
         <OIcon name="forum" size="sm" class="text-accent" />
-        <h2 class="text-text-heading m-0 text-sm font-bold">
+        <h2 class="text-text-heading m-0 text-sm font-semibold">
           {{ t("alerts.incidents.rcaThread.title") }}
         </h2>
         <OBadge
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div class="flex min-w-0 flex-col gap-1">
             <div class="flex min-w-0 items-baseline gap-2">
-              <span class="text-text-heading text-compact shrink-0 font-bold">
+              <span class="text-text-heading text-compact shrink-0 font-semibold">
                 {{ t("alerts.incidents.rcaThread.analysisStarted") }}
               </span>
               <span
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-tint-warning flex min-w-0 flex-col gap-1 px-3 py-2"
             >
               <div class="flex min-w-0 items-baseline gap-2">
-                <span class="text-text-heading text-compact min-w-0 flex-1 font-bold">
+                <span class="text-text-heading text-compact min-w-0 flex-1 font-semibold">
                   {{ t("alerts.incidents.rcaSteer.needsInput") }}
                 </span>
                 <span
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p
                 v-if="questionStatus(entry.question)"
                 data-test="rca-thread-question-status"
-                class="text-text-heading m-0 text-xs font-bold"
+                class="text-text-heading m-0 text-xs font-semibold"
               >
                 {{ questionStatus(entry.question) }}
               </p>
@@ -281,14 +281,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("alerts.incidents.rcaSteer.pill.leadNotEvidence") }}
               </OBadge>
-              <span class="text-text-heading truncate text-xs font-bold">
+              <span class="text-text-heading truncate text-xs font-semibold">
                 {{ userLocalPart(entry.item.author_email) }}
               </span>
               <span class="text-text-secondary text-2xs shrink-0 font-mono">
                 {{ clock(entry.item.created_at) }}
               </span>
               <span
-                class="bg-surface-tint-accent text-accent text-3xs inline-flex size-5 shrink-0 items-center justify-center rounded-full font-bold uppercase"
+                class="bg-surface-tint-accent text-accent text-3xs inline-flex size-5 shrink-0 items-center justify-center rounded-full font-semibold uppercase"
                 aria-hidden="true"
               >
                 {{ initials(entry.item.author_email) }}
@@ -372,9 +372,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-xs"
           :aria-label="t('common.close')"
+          icon-left="close"
           @click="refusal = null"
         >
-          <OIcon name="close" size="xs" />
+          <OTooltip :content="t('common.close')" />
         </OButton>
       </div>
       <p
@@ -426,6 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, ref, useId, watch } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";

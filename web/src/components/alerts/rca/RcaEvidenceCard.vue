@@ -28,8 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ entry.number }}
       </span>
-      <OIcon :name="rcaEvidenceKindIcon(entry.kind)" size="sm" class="text-icon-color" />
-      <span class="text-text-secondary text-3xs font-mono font-bold uppercase">
+      <OIcon :name="rcaEvidenceKindIcon(entry.kind)" size="sm" class="text-text-secondary" />
+      <span class="text-text-secondary text-3xs font-mono font-semibold uppercase">
         {{ entry.kind }}
       </span>
       <span class="text-text-heading text-compact min-w-0 flex-1 font-semibold">

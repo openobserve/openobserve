@@ -64,106 +64,106 @@ defineSlots<ButtonSlots>();
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary: [
     "bg-button-primary text-button-primary-foreground",
-    "enabled:hover:bg-button-primary-hover",
-    "enabled:active:bg-button-primary-active",
+    "actionable:hover:bg-button-primary-hover",
+    "actionable:active:bg-button-primary-active",
     "focus-visible:ring-3 focus-visible:ring-button-primary-hover",
     "disabled:opacity-50",
   ].join(" "),
   secondary: [
     "bg-button-secondary text-button-secondary-foreground border border-button-secondary-border",
-    "enabled:hover:bg-button-secondary-hover enabled:hover:border-button-outline-hover-border",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-secondary-active",
+    "actionable:hover:bg-button-secondary-hover actionable:hover:border-button-outline-hover-border",
+    "group-hover/row:actionable:hover:not-active:bg-table-row-action-hover-bg",
+    "actionable:active:bg-button-secondary-active",
     "focus-visible:ring-3 focus-visible:ring-button-secondary-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   outline: [
     "bg-button-outline-bg text-button-outline-text border border-button-outline-border",
-    "enabled:hover:bg-button-outline-hover-bg enabled:hover:border-button-outline-hover-border",
-    "enabled:active:bg-button-outline-active-bg",
+    "actionable:hover:bg-button-outline-hover-bg actionable:hover:border-button-outline-hover-border",
+    "actionable:active:bg-button-outline-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-outline-hover-border",
     "disabled:opacity-50",
   ].join(" "),
   ghost: [
     "bg-transparent text-button-ghost-text border-0",
     // An open menu keeps the hover fill, never the segmented-track tone.
-    "enabled:hover:bg-button-ghost-hover-bg enabled:aria-expanded:bg-button-ghost-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-active-bg",
+    "actionable:hover:bg-button-ghost-hover-bg actionable:aria-expanded:bg-button-ghost-hover-bg",
+    "group-hover/row:actionable:hover:not-active:bg-table-row-action-hover-bg",
+    "actionable:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   "ghost-primary": [
     "bg-transparent text-button-ghost-primary-text border-0",
-    "enabled:hover:text-button-ghost-primary-hover-text enabled:hover:bg-button-ghost-primary-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-primary-active-bg",
+    "actionable:hover:text-button-ghost-primary-hover-text actionable:hover:bg-button-ghost-primary-hover-bg",
+    "group-hover/row:actionable:hover:not-active:bg-table-row-action-hover-bg",
+    "actionable:active:bg-button-ghost-primary-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   "ghost-muted": [
     "bg-transparent text-button-ghost-muted-text border-0",
-    "enabled:hover:text-button-ghost-muted-hover-text enabled:hover:bg-button-ghost-muted-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-muted-active-bg",
+    "actionable:hover:text-button-ghost-muted-hover-text actionable:hover:bg-button-ghost-muted-hover-bg",
+    "group-hover/row:actionable:hover:not-active:bg-table-row-action-hover-bg",
+    "actionable:active:bg-button-ghost-muted-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-muted-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   "ghost-subtle": [
     "bg-transparent text-button-ghost-subtle-text border-0",
-    "enabled:hover:text-text-body enabled:hover:bg-button-ghost-subtle-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-subtle-active-bg",
+    "actionable:hover:text-text-body actionable:hover:bg-button-ghost-subtle-hover-bg",
+    "group-hover/row:actionable:hover:not-active:bg-table-row-action-hover-bg",
+    "actionable:active:bg-button-ghost-subtle-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-subtle-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   "ghost-destructive": [
     "bg-transparent text-button-ghost-destructive-text border-0",
-    "enabled:hover:bg-button-ghost-destructive-hover-bg",
-    "enabled:active:bg-button-ghost-destructive-active-bg",
+    "actionable:hover:bg-button-ghost-destructive-hover-bg",
+    "actionable:active:bg-button-ghost-destructive-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-destructive-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   "ghost-success": [
     "bg-transparent text-button-ghost-success-text border-0",
-    "enabled:hover:bg-button-ghost-success-hover-bg",
-    "enabled:active:bg-button-ghost-success-active-bg",
+    "actionable:hover:bg-button-ghost-success-hover-bg",
+    "actionable:active:bg-button-ghost-success-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-success-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   destructive: [
     "bg-button-destructive text-button-destructive-foreground",
-    "enabled:hover:bg-button-destructive-hover",
-    "enabled:active:bg-button-destructive-hover",
+    "actionable:hover:bg-button-destructive-hover",
+    "actionable:active:bg-button-destructive-hover",
     "focus-visible:ring-3 focus-visible:ring-button-destructive-hover",
     "disabled:opacity-50",
   ].join(" "),
   "filter-exclude": [
     "bg-error-500 text-button-destructive-foreground border-0",
-    "enabled:hover:bg-error-600",
-    "enabled:active:bg-error-600",
+    "actionable:hover:bg-error-600",
+    "actionable:active:bg-error-600",
     "focus-visible:ring-3 focus-visible:ring-error-600",
     "disabled:opacity-50",
   ].join(" "),
   "ghost-warning": [
     "bg-transparent text-button-ghost-warning-text border-0",
-    "enabled:hover:bg-button-ghost-warning-hover-bg",
-    "enabled:active:bg-button-ghost-warning-active-bg",
+    "actionable:hover:bg-button-ghost-warning-hover-bg",
+    "actionable:active:bg-button-ghost-warning-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-warning-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   warning: [
     "bg-button-warning text-button-warning-foreground border border-button-warning-border",
-    "enabled:hover:bg-button-warning-hover",
-    "enabled:active:bg-button-warning-active",
+    "actionable:hover:bg-button-warning-hover",
+    "actionable:active:bg-button-warning-active",
     "focus-visible:ring-3 focus-visible:ring-button-warning-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   // A stale result awaiting a re-run is not an alert, so it stays off the solid warning fill.
   pending: [
     "bg-button-pending-bg text-button-pending-text border border-button-pending-bg",
-    "enabled:hover:bg-button-pending-hover-bg enabled:hover:border-button-pending-hover-bg",
-    "enabled:active:bg-button-pending-active-bg enabled:active:border-button-pending-active-bg",
+    "actionable:hover:bg-button-pending-hover-bg actionable:hover:border-button-pending-hover-bg",
+    "actionable:active:bg-button-pending-active-bg actionable:active:border-button-pending-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-pending-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
@@ -171,9 +171,9 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // where no color accent is desired (e.g. field adder buttons +X +Y +B +F)
   "ghost-neutral": [
     "bg-transparent text-inherit border-0",
-    "enabled:hover:bg-button-ghost-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-active-bg",
+    "actionable:hover:bg-button-ghost-hover-bg",
+    "group-hover/row:actionable:hover:not-active:bg-table-row-action-hover-bg",
+    "actionable:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
@@ -181,8 +181,8 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // that need visible affordance without the full filled destructive background
   "outline-destructive": [
     "bg-transparent text-button-ghost-destructive-text border border-button-ghost-destructive-text",
-    "enabled:hover:bg-button-ghost-destructive-hover-bg",
-    "enabled:active:bg-button-ghost-destructive-active-bg",
+    "actionable:hover:bg-button-ghost-destructive-hover-bg",
+    "actionable:active:bg-button-ghost-destructive-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-destructive-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
@@ -191,8 +191,8 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // states are opacity-derived from the one cancel-query-bg color.
   "cancel-query": [
     "bg-cancel-query-bg text-button-primary-foreground",
-    "enabled:hover:opacity-90",
-    "enabled:active:opacity-80",
+    "actionable:hover:opacity-90",
+    "actionable:active:opacity-80",
     "focus-visible:ring-3 focus-visible:ring-cancel-query-bg",
     "disabled:opacity-50",
   ].join(" "),
@@ -200,50 +200,50 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // Transparent bg, muted icon color, subtle hover. Blends into header without visual weight.
   "panel-collapse": [
     "bg-transparent text-button-ghost-muted-text border-0",
-    "enabled:hover:text-button-ghost-muted-hover-text enabled:hover:bg-button-ghost-muted-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-muted-active-bg",
+    "actionable:hover:text-button-ghost-muted-hover-text actionable:hover:bg-button-ghost-muted-hover-bg",
+    "group-hover/row:actionable:hover:not-active:bg-table-row-action-hover-bg",
+    "actionable:active:bg-button-ghost-muted-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-muted-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   // Primary-colored tall-narrow vertical rectangle — for splitter collapse/expand buttons
   "sidebar-button": [
     "bg-button-primary text-button-primary-foreground",
-    "enabled:hover:bg-button-primary-hover",
-    "enabled:active:bg-button-primary-active",
+    "actionable:hover:bg-button-primary-hover",
+    "actionable:active:bg-button-primary-active",
     "focus-visible:ring-3 focus-visible:ring-button-primary-hover",
     "disabled:opacity-50",
   ].join(" "),
   // Sidebar toggle: bg-surface border shadow — for persistent panel collapse/expand buttons
   "sidebar-toggle": [
     "bg-surface-panel text-button-ghost-text border border-border-default",
-    "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-active-bg",
+    "actionable:hover:bg-button-ghost-hover-bg actionable:hover:border-button-border-hover",
+    "group-hover/row:actionable:hover:not-active:bg-table-row-action-hover-bg",
+    "actionable:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   // AI-themed gradient — purple→pink gradient background, white text
   "ai-gradient": [
     "bg-gradient-ai text-white border-0",
-    "enabled:hover:shadow-md enabled:hover:shadow-ai-accent/40",
-    "enabled:active:opacity-90",
+    "actionable:hover:shadow-md actionable:hover:shadow-ai-accent/40",
+    "actionable:active:opacity-90",
     "focus-visible:ring-3 focus-visible:ring-ai-accent",
     "disabled:opacity-50",
   ].join(" "),
   // On-dark primary — white background with primary color text, for use on dark gradient panels
   "on-dark-primary": [
     "bg-white text-button-on-dark-primary-text font-bold border-0 shadow-md",
-    "enabled:hover:shadow-lg",
-    "enabled:active:opacity-90",
+    "actionable:hover:shadow-lg",
+    "actionable:active:opacity-90",
     "focus-visible:ring-3 focus-visible:ring-white/50",
     "disabled:opacity-50",
   ].join(" "),
   // On-dark ghost — transparent with white border/text, for use on dark gradient panels
   "on-dark-ghost": [
     "bg-transparent text-white border-2 border-white/30",
-    "enabled:hover:bg-white/10 enabled:hover:border-white/50",
-    "enabled:active:opacity-90",
+    "actionable:hover:bg-white/10 actionable:hover:border-white/50",
+    "actionable:active:opacity-90",
     "focus-visible:ring-3 focus-visible:ring-white/50",
     "disabled:opacity-50",
   ].join(" "),
@@ -253,19 +253,19 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // preview-slack: Slack green (#007a5a)
   "preview-slack": [
     "bg-brand-slack text-brand-slack-foreground border-0 !rounded !text-sm !h-auto !py-2 !px-3",
-    "enabled:hover:bg-brand-slack-hover",
+    "actionable:hover:bg-brand-slack-hover",
     "disabled:opacity-50",
   ].join(" "),
   // preview-teams: Microsoft Teams purple (#6264a7)
   "preview-teams": [
     "bg-brand-teams text-brand-teams-foreground border-0 !rounded !h-auto !py-2 !px-4",
-    "enabled:hover:bg-brand-teams-hover",
+    "actionable:hover:bg-brand-teams-hover",
     "disabled:opacity-50",
   ].join(" "),
   // preview-email: Email blue (#0069d9)
   "preview-email": [
     "bg-brand-email text-brand-email-foreground border-0 !rounded !h-auto !py-3 !px-6",
-    "enabled:hover:bg-brand-email-hover",
+    "actionable:hover:bg-brand-email-hover",
     "disabled:opacity-50",
   ].join(" "),
   // preview-opsgenie: Opsgenie ink (dark neutral CTA). Was a scoped
@@ -273,20 +273,20 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // variant map from unlayered CSS; it belongs with its sibling brand variants.
   "preview-opsgenie": [
     "bg-brand-email-ink text-brand-email-ink-foreground border-0 !rounded !text-sm !h-auto !py-2 !px-3",
-    "enabled:hover:bg-brand-email-ink-deep",
+    "actionable:hover:bg-brand-email-ink-deep",
     "disabled:opacity-50",
   ].join(" "),
   // preview-action: Generic action button for destination previews with no brand color
   "preview-action": [
     "bg-transparent text-button-outline-text border border-button-outline-border !rounded !h-auto !py-2 !px-3 !text-sm",
-    "enabled:hover:bg-button-outline-hover-bg",
+    "actionable:hover:bg-button-outline-hover-bg",
     "disabled:opacity-50",
   ].join(" "),
   // webinar-dismiss: Inline text-link style for the webinar top bar banner dismiss button
   "webinar-dismiss": [
     "bg-transparent border-0 text-promo-webinar-link underline font-bold text-compact whitespace-nowrap",
     "h-auto! p-0!",
-    "enabled:hover:text-promo-webinar-link-hover",
+    "actionable:hover:text-promo-webinar-link-hover",
     "disabled:opacity-50",
   ].join(" "),
   // banner-dismiss: Inline text-link style for the actions inside an OBanner bar.
@@ -294,22 +294,22 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "banner-dismiss": [
     "bg-transparent border-0 text-inherit underline font-bold text-compact whitespace-nowrap",
     "h-auto! p-0!",
-    "enabled:hover:opacity-80",
+    "actionable:hover:opacity-80",
     "disabled:opacity-50",
   ].join(" "),
   // link: an action that reads as a link inside running copy, at the copy's own size.
   link: [
     "bg-transparent border-0 text-text-link underline underline-offset-2",
     "h-auto! p-0! align-baseline",
-    "enabled:hover:opacity-80",
+    "actionable:hover:opacity-80",
     "focus-visible:ring-3 focus-visible:ring-button-outline-hover-border",
   ].join(" "),
   // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.
   // Use for edition/tier badges that must stand out without being a heavy CTA.
   "outline-primary": [
     "bg-button-ghost-primary-active-bg text-button-ghost-primary-hover-text border border-button-outline-hover-border",
-    "enabled:hover:bg-button-ghost-primary-active-bg enabled:hover:border-button-outline-hover-border",
-    "enabled:active:bg-button-ghost-primary-active-bg",
+    "actionable:hover:bg-button-ghost-primary-active-bg actionable:hover:border-button-outline-hover-border",
+    "actionable:active:bg-button-ghost-primary-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
@@ -317,9 +317,9 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // For the small "+" add-affordance buttons in the query builder (add join / filter / condition).
   dashed: [
     "bg-transparent text-button-ghost-muted-text border border-dashed border-button-outline-border",
-    "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover enabled:hover:text-button-ghost-text",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-active-bg",
+    "actionable:hover:bg-button-ghost-hover-bg actionable:hover:border-button-border-hover actionable:hover:text-button-ghost-text",
+    "group-hover/row:actionable:hover:not-active:bg-table-row-action-hover-bg",
+    "actionable:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
@@ -327,7 +327,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   cell: [
     "bg-transparent border-0 text-inherit text-left font-normal rounded-default",
     "h-auto! w-full p-0! flex-col! items-stretch! justify-center! gap-1! whitespace-normal!",
-    "enabled:hover:opacity-80",
+    "actionable:hover:opacity-80",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
@@ -335,9 +335,9 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   row: [
     "bg-transparent text-button-ghost-text border-0 text-start rounded-default",
     "h-auto! justify-between! gap-3! px-0! py-1.5!",
-    "enabled:hover:bg-button-ghost-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-active-bg",
+    "actionable:hover:bg-button-ghost-hover-bg",
+    "group-hover/row:actionable:hover:not-active:bg-table-row-action-hover-bg",
+    "actionable:active:bg-button-ghost-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
@@ -345,8 +345,8 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   "locked-body": [
     "bg-transparent text-button-outline-text border border-button-outline-border text-start",
     "h-auto! justify-start! px-3! py-3! whitespace-normal!",
-    "enabled:hover:bg-button-outline-hover-bg enabled:hover:border-button-outline-hover-border",
-    "enabled:active:bg-button-outline-active-bg",
+    "actionable:hover:bg-button-outline-hover-bg actionable:hover:border-button-outline-hover-border",
+    "actionable:active:bg-button-outline-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-outline-hover-border",
     "disabled:opacity-50",
   ].join(" "),
@@ -355,14 +355,14 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-inherit border border-border-default",
     "!rounded-full !text-xs !font-medium !h-auto !py-1.25 !px-3.5 !gap-1.5",
     "transition-colors duration-(--duration-control) ease-(--ease-control)",
-    "enabled:hover:border-accent enabled:hover:text-accent-on-tint enabled:hover:bg-button-ghost-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
+    "actionable:hover:border-accent actionable:hover:text-accent-on-tint actionable:hover:bg-button-ghost-hover-bg",
+    "group-hover/row:actionable:hover:not-active:bg-table-row-action-hover-bg",
     "disabled:opacity-50",
   ].join(" "),
   "section-chip": [
     "bg-transparent text-text-body border border-border-default whitespace-nowrap",
     "!rounded-full !h-auto !py-1 !px-3 !text-sm",
-    "enabled:hover:bg-button-ghost-hover-bg",
+    "actionable:hover:bg-button-ghost-hover-bg",
     "aria-[current=location]:bg-surface-accent-active aria-[current=location]:border-button-outline-hover-border",
     "aria-[current=location]:text-text-heading aria-[current=location]:font-semibold",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
@@ -371,25 +371,25 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // tint-*: soft categorical badge fill for tiles that identify an entity by colour, e.g. a cluster code.
   "tint-teal": [
     "bg-badge-teal-soft-bg text-badge-teal-soft-text border-0",
-    "enabled:hover:brightness-95",
+    "actionable:hover:brightness-95",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   "tint-purple": [
     "bg-badge-purple-soft-bg text-badge-purple-soft-text border-0",
-    "enabled:hover:brightness-95",
+    "actionable:hover:brightness-95",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   "tint-blue": [
     "bg-badge-blue-soft-bg text-badge-blue-soft-text border-0",
-    "enabled:hover:brightness-95",
+    "actionable:hover:brightness-95",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   "tint-orange": [
     "bg-badge-orange-soft-bg text-badge-orange-soft-text border-0",
-    "enabled:hover:brightness-95",
+    "actionable:hover:brightness-95",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
@@ -452,7 +452,7 @@ const unavailableClasses = computed(() => {
       .filter(
         (value) =>
           value === "text-start" ||
-          (!value.startsWith("enabled:") &&
+          (!value.startsWith("actionable:") &&
             !value.startsWith("disabled:") &&
             !overriddenGroups.includes(value.split("-")[0])),
       ),
@@ -496,7 +496,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
 const activeClasses = [
   // No weight change: bold text would widen the button and shift its neighbours.
   "bg-selected-bg text-selected-fg border border-selected-border",
-  "enabled:hover:bg-selected-bg",
+  "actionable:hover:bg-selected-bg",
 ].join(" ");
 
 const classes = computed<string[]>(() => [
@@ -518,7 +518,7 @@ const classes = computed<string[]>(() => [
   "focus-visible:outline-2! focus-visible:outline-solid! focus-visible:outline-offset-2! focus-visible:outline-focus-ring-accent! focus-visible:ring-0!",
   inactive.value || lockedLink.value
     ? "cursor-not-allowed!"
-    : "disabled:cursor-not-allowed enabled:cursor-pointer",
+    : "disabled:cursor-not-allowed actionable:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
   inactive.value || lockedLink.value
     ? unavailableClasses.value

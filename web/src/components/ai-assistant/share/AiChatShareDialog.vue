@@ -26,7 +26,6 @@ import AiChatShareRow from "./AiChatShareRow.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -148,9 +147,9 @@ const setRedactTools = (value: unknown) => {
             variant="primary"
             size="sm-action"
             data-test="ai-chat-share-dialog-copy"
+            icon-left="content-copy"
             @click="copyLink(createdShare)"
           >
-            <template #icon-left><OIcon name="content-copy" size="sm" /></template>
             {{ t("common.copy") }}
           </OButton>
         </div>

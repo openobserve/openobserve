@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             y="115"
             text-anchor="middle"
             font-size="56"
-            class="fill-accent font-[inherit] font-bold"
+            class="fill-accent font-[inherit] font-semibold"
           >
             {{ "404" }}
           </text>

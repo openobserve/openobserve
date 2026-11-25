@@ -39,7 +39,7 @@ const REMOVED_PROPS = new Set([
   "custom-pagination-bar",
   "customPaginationBar",
 ]);
-const BAR_SLOTS = new Set(["selection-actions", "footer-note"]);
+const BAR_SLOTS = new Set(["footer-note"]);
 
 const propName = (prop: TemplateProp): string | undefined => {
   if (prop.type === ATTRIBUTE) return prop.name;
@@ -137,7 +137,6 @@ describe("OTable call sites", () => {
     ]);
     expect(found.flatMap((table) => inertSlotsIn("fixture.vue", table))).toEqual([
       "fixture.vue:3 #footer-note",
-      "fixture.vue:4 #selection-actions",
       "fixture.vue:6 #footer-note",
     ]);
   });

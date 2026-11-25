@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
         <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.priority") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+          <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
           </OIcon>
         </div>
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
         <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.tags") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+          <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.tagsTooltip')" side="right" />
           </OIcon>
         </div>
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex h-9 w-47.5 shrink-0 items-center font-semibold"
         >
           {{ t("alerts.anomaly.notifications") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+          <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
           </OIcon>
         </div>
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
         <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.anomaly.alertDirection") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+          <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.anomaly.alertDirectionTooltip')" side="right" />
           </OIcon>
         </div>
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
         <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.anomaly.windowShare") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+          <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.anomaly.windowShareTooltip')" side="right" />
           </OIcon>
         </div>

@@ -24,6 +24,8 @@
 /* Bind `dark:` to the app's `.dark` class (set by utils/theme.ts), not the OS
    `prefers-color-scheme` — Tailwind v4's default — so it follows the app theme. */
 @custom-variant dark (&:where(.dark, .dark *));
+/* Like `enabled:`, but also matches an OButton rendered as a div or link, which has no :enabled state. */
+@custom-variant actionable (&:not(:disabled, [aria-disabled="true"]));
 
 @source "../**/*.{vue,js,ts}";
 

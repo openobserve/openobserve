@@ -404,9 +404,9 @@ function setNamespaces(namespaces: string[]) {
             variant="ghost-primary"
             size="xs"
             :data-test="`k8s2-workloads-title-${card.kind}`"
+            :icon-left="card.icon"
             @click="emit('view', card.view)"
           >
-            <OIcon :name="card.icon" size="sm" />
             {{ t(card.title) }}
           </OButton>
           <span

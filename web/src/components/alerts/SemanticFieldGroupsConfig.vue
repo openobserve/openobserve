@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm"
           :disabled="localGroups.length === 0"
+          icon-left="download"
           @click="exportGroups"
           >{{ t("correlation.exportToJson") }}</OButton
         >
@@ -35,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="correlation-semanticfieldgroup-import-json-btn"
           variant="outline"
           size="sm"
+          icon-left="file-upload"
           @click="navigateToImport"
           >{{ t("correlation.importFromJson") }}</OButton
         >
@@ -42,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="correlation-semanticfieldgroup-add-custom-group-btn"
           variant="outline"
           size="sm"
+          icon-left="add"
           @click="addGroup"
           >{{ t("correlation.addCustomGroup") }}</OButton
         >
@@ -80,7 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('correlation.searchGroupsPlaceholder')"
             class="shrink-0"
           >
-            <template #icon-left><OIcon name="search" size="sm" /></template>
           </OInput>
         </div>
 
@@ -191,7 +193,6 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 const { t } = useI18nTyped();

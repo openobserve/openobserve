@@ -291,12 +291,9 @@ function toggleSteps(executionId: string) {
                   size="xs"
                   class="text-text-body mb-2 flex items-center gap-1.5 font-semibold"
                   :data-test="`synthetics-run-detail-toggle-steps-${loc.executionId}-btn`"
+                  :icon-left="expandedSteps.has(loc.executionId) ? 'expand-less' : 'expand-more'"
                   @click="toggleSteps(loc.executionId)"
                 >
-                  <OIcon
-                    :name="expandedSteps.has(loc.executionId) ? 'expand_less' : 'expand_more'"
-                    size="sm"
-                  />
                   {{ t("synthetics.runDetail.stepsCount", { count: loc.steps.length }) }}
                   <span
                     v-if="loc.steps.some((s) => s.status === 'fail')"
@@ -348,7 +345,7 @@ function toggleSteps(executionId: string) {
                     class="flex items-start gap-2.5 py-1.5 text-xs"
                   >
                     <span
-                      class="text-3xs mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold text-white"
+                      class="text-3xs mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-semibold text-white"
                       :class="step.status === 'ok' ? 'bg-success-600' : 'bg-error-500'"
                       >{{ idx + 1 }}</span
                     >

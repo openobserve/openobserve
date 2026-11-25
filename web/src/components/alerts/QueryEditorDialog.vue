@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span class="text-2xs text-text-label font-semibold">{{ t("alerts.streamType") }}</span>
             <span class="text-2xs text-text-label">:</span>
-            <span class="text-text-link text-xs font-bold">{{ streamType }}</span>
+            <span class="text-text-link text-xs font-semibold">{{ streamType }}</span>
           </div>
           <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
           <div
@@ -59,10 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               t("alerts.stream_name")
             }}</span>
             <span class="text-2xs text-text-label">:</span>
-            <span v-if="streamName" class="text-sql-accent text-xs font-bold">{{
+            <span v-if="streamName" class="text-sql-accent text-xs font-semibold">{{
               streamName
             }}</span>
-            <span v-else class="text-text-muted text-xs font-bold italic">{{
+            <span v-else class="text-text-muted text-xs font-semibold italic">{{
               t("alerts.queryEditor.noStream")
             }}</span>
           </div>
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}</span>
                     <span
                       v-if="multiTimeRange && multiTimeRange.length > 0"
-                      class="text-3xs rounded-default bg-status-info-bg border-banner-info-border text-text-link border px-1.75 py-px font-bold tracking-[0.04em]"
+                      class="text-3xs rounded-default bg-status-info-bg border-banner-info-border text-text-link border px-1.75 py-px font-semibold tracking-[0.04em]"
                       >{{ t("alerts.queryEditor.resultsAcrossWindows") }}</span
                     >
                   </div>
@@ -386,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="bg-card-glass-bg flex h-full flex-col items-center justify-center"
                   >
                     <div class="flex flex-col items-center gap-2">
-                      <OIcon name="warning" size="xl" class="text-warning opacity-60" />
+                      <OIcon name="warning" size="xl" class="text-status-warning-text opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       t("alerts.queryEditor.combinedOutput")
                     }}</span>
                     <span
-                      class="text-3xs rounded-default bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-ol-text border px-1.75 py-px font-bold tracking-[0.04em]"
+                      class="text-3xs rounded-default bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-ol-text border px-1.75 py-px font-semibold tracking-[0.04em]"
                       >{{ t("alerts.queryEditor.sqlVrlBadge") }}</span
                     >
                   </div>
@@ -465,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="bg-card-glass-bg flex h-full flex-col items-center justify-center"
                   >
                     <div class="flex flex-col items-center gap-2">
-                      <OIcon name="warning" size="xl" class="text-warning opacity-60" />
+                      <OIcon name="warning" size="xl" class="text-status-warning-text opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->

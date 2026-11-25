@@ -48,9 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost-muted"
             size="icon-xs-sq"
             data-test="workflow-config-summary-condition-copy"
+            icon-left="content-copy"
+            :aria-label="t('common.copy')"
             @click="copyConditions"
           >
-            <OIcon name="content-copy" size="sm" />
             <OTooltip :content="t('common.copy')" />
           </OButton>
         </div>
@@ -103,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="functionName">
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-text-secondary text-sm">{{ t("workflow.results.functionLabel") }}</span>
-          <span class="text-text-body text-sm font-bold">{{ functionName }}</span>
+          <span class="text-text-body text-sm font-semibold">{{ functionName }}</span>
           <OBadge variant="default-soft" size="sm">{{ flattenLabel }}</OBadge>
         </div>
         <div
@@ -194,7 +195,6 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";

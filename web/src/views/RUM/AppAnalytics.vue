@@ -23,11 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="insights"
     bleed
   >
-    <!-- Beta tag rides inside the title line, like Workflows (see BetaBadge.vue). -->
+    <!-- Beta tag rides inside the title line, like Workflows (OBetaBadge). -->
     <template #title>
       <span class="inline-flex items-center gap-2">
         {{ t("rum.analytics.title") }}
-        <BetaBadge />
+        <OBetaBadge />
         <span
           tabindex="0"
           role="img"
@@ -379,7 +379,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import SampledTag from "@/components/rum/productAnalytics/SampledTag.vue";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import RumNoDataState from "@/components/rum/RumNoDataState.vue";

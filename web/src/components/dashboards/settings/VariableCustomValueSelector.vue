@@ -18,12 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <OSelect
       v-model="selectedValue"
-      :label="variableItem?.label || variableItem?.name"
-      label-position="inside"
+      :aria-label="variableItem?.label || variableItem?.name"
       :options="variableItem?.options || []"
       labelKey="label"
       valueKey="value"
-      class="textbox no-case o2-custom-select-dashboard flex max-w-160 min-w-37.5 flex-col"
+      class="textbox no-case o2-custom-select-dashboard flex max-w-80 min-w-37.5 flex-col"
       :loading="variableItem.isLoading"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
@@ -31,20 +30,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onUpdateValue"
       @close="onPopupHide"
     >
+      <template #icon-left>
+        <OTruncatedText
+          class="text-text-secondary max-w-40 font-normal"
+          :data-test="`variable-selector-${variableItem.name}-inner-label`"
+          >{{ variableItem?.label || variableItem?.name }}</OTruncatedText
+        >
+      </template>
+      <template #trigger>
+        <OTruncatedText class="text-text-heading flex-1 text-start font-medium">{{
+          displayValue
+        }}</OTruncatedText>
+      </template>
       <template #empty>{{ t("dashboard.variableCustomValueSelector.noDataFound") }}</template>
     </OSelect>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
+import { computed, defineComponent, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
 
 export default defineComponent({
   name: "VariableCustomValueSelector",
-  components: { OSelect },
+  components: { OSelect, OTruncatedText },
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
@@ -58,6 +70,21 @@ export default defineComponent({
       },
       { immediate: true },
     );
+
+    const optionLabel = (value: any) =>
+      props.variableItem?.options?.find((o: any) => o.value === value)?.label ?? value;
+
+    const displayValue = computed(() => {
+      const value = selectedValue.value;
+      if (!Array.isArray(value))
+        return value === undefined || value === null ? "" : optionLabel(value);
+      const labels = value.map(optionLabel);
+      if (labels.length <= 2) return labels.join(", ");
+      return t("dashboard.variableQueryValueSelector.moreCount", {
+        firstTwoValues: labels.slice(0, 2).join(", "),
+        remainingCount: labels.length - 2,
+      });
+    });
 
     const onUpdateValue = (val: any) => {
       selectedValue.value = val;
@@ -74,6 +101,7 @@ export default defineComponent({
     return {
       t,
       selectedValue,
+      displayValue,
       onUpdateValue,
       onPopupHide,
     };

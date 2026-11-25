@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
       <span
         v-if="label"
-        class="text-text-label text-2xs font-semibold tracking-wide uppercase"
+        class="text-text-secondary text-xs font-medium"
         :data-test="`${dataTestPrefix}-coverage-meter-label`"
       >
         {{ label }}

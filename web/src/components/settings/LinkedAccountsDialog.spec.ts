@@ -77,7 +77,7 @@ describe("LinkedAccountsDialog (L3)", () => {
     expect(first.text()).toContain("@alice · org prod · Sign in with Slack");
     expect(first.text()).toContain("Last Used");
     expect(body().find(testId("linked-accounts-item-link-2")).text()).toContain(
-      "@al · org prod · Email Match",
+      "@al · org prod · Email match",
     );
     expect(body().text()).toContain("To link another workspace, mention @OpenObserve there");
   });

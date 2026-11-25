@@ -45,30 +45,36 @@
           icon-left="chevron-left"
           class="rounded-s-default! rounded-e-none!"
           :disabled="stepping || sample.index <= 0"
-          :title="t('aiObservability.playground.samplePrev')"
           data-test="ai-playground-sample-prev"
+          :aria-label="t('aiObservability.playground.samplePrev')"
           @click="emit('step-sample', -1)"
-        />
+        >
+          <OTooltip :content="t('aiObservability.playground.samplePrev')" />
+        </OButton>
         <OButton
           variant="outline"
           size="icon-xs-sq"
           icon-left="chevron-right"
           class="rounded-e-default! rounded-s-none! border-s-0"
           :disabled="stepping || sample.index >= sample.total - 1"
-          :title="t('aiObservability.playground.sampleNext')"
           data-test="ai-playground-sample-next"
+          :aria-label="t('aiObservability.playground.sampleNext')"
           @click="emit('step-sample', 1)"
-        />
+        >
+          <OTooltip :content="t('aiObservability.playground.sampleNext')" />
+        </OButton>
       </div>
       <OButton
         variant="ghost-muted"
         size="icon-xs-sq"
         icon-left="close"
         class="self-center"
-        :title="t('aiObservability.playground.sampleClear')"
         data-test="ai-playground-sample-clear"
+        :aria-label="t('aiObservability.playground.sampleClear')"
         @click="emit('clear-sample')"
-      />
+      >
+        <OTooltip :content="t('aiObservability.playground.sampleClear')" />
+      </OButton>
     </template>
 
     <!-- Shared by every column, so they live here rather than being redrawn per
@@ -100,6 +106,7 @@
             data-test="ai-playground-tools-menu"
           >
             <OIcon name="expand-more" size="xs" />
+            <OTooltip :content="t('aiObservability.playground.tools')" />
           </OButton>
         </template>
         <ODropdownItem
@@ -121,7 +128,9 @@
               :aria-label="t('aiObservability.playground.removeTool')"
               :data-test="`ai-playground-tool-remove-${index}`"
               @click.stop="removeTool(index)"
-            />
+            >
+              <OTooltip :content="t('aiObservability.playground.removeTool')" />
+            </OButton>
           </template>
         </ODropdownItem>
         <ODropdownItem v-if="!tools.length" disabled data-test="ai-playground-tools-none">
@@ -194,6 +203,7 @@ import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";

@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -53,9 +53,16 @@ defineExpose({ focusWebhook });
                 : t('alert_destinations.slackOAuth.revealWebhook')
             "
             :aria-pressed="revealed"
+            :icon-left="revealed ? 'visibility-off' : 'visibility'"
             @click="revealed = !revealed"
           >
-            <OIcon :name="revealed ? 'visibility-off' : 'visibility'" size="sm" />
+            <OTooltip
+              :content="
+                revealed
+                  ? t('alert_destinations.slackOAuth.hideWebhook')
+                  : t('alert_destinations.slackOAuth.revealWebhook')
+              "
+            />
           </OButton>
         </template>
       </OFormInput>

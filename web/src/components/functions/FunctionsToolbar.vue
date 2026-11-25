@@ -147,7 +147,7 @@
             v-else
             name="info-outline"
             size="sm"
-            class="text-icon-color shrink-0 cursor-pointer"
+            class="text-text-secondary shrink-0 cursor-pointer"
             data-test="function-transform-type-info"
           >
             <OTooltip>

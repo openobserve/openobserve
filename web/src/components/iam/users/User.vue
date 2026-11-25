@@ -44,7 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTable
           :key="tableKey"
           :frame="false"
-          :row-height="28"
           :data="displayedRows"
           :columns="columns"
           row-key="email"

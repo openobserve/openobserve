@@ -93,11 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :class="{ 'pointer-events-none': drillDownBlockedReason }"
               :focusable-unavailable="!drillDownBlockedReason"
+              icon-left="timeline"
               @click="$emit('drill-down')"
             >
-              <template #icon-left>
-                <OIcon name="timeline" size="sm" class="shrink-0" />
-              </template>
               <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
               <OTooltip
                 v-if="!drillDownBlockedReason"
@@ -120,11 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="sm-toolbar"
               :aria-label="t('common.reset')"
+              icon-left="restart-alt"
               @click="resetFilters"
             >
-              <template #icon-left>
-                <OIcon name="restart-alt" size="sm" class="shrink-0" />
-              </template>
               <span>{{ t("common.reset") }}</span>
             </OButton>
           </template>
@@ -203,9 +199,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-panel"
               class="toolbar-btn-rest h-full!"
+              icon-left="save"
+              :aria-label="t('search.createSavedView')"
               @click="openSaveViewDialog"
             >
-              <OIcon name="save" size="sm" />
               <OTooltip :content="t('search.createSavedView')" :side-offset="6" />
             </OButton>
           </OButtonGroup>
@@ -271,12 +268,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="traces-search-bar-menu-pin-metrics-btn"
                   variant="ghost-neutral"
                   size="icon-sm"
-                  :title="
+                  :icon-left="isPinned('histogram') ? 'keep' : 'keep-outline'"
+                  @click.stop="togglePin('histogram')"
+                  :aria-label="
                     isPinned('histogram') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
                   "
-                  @click.stop="togglePin('histogram')"
                 >
-                  <OIcon :name="isPinned('histogram') ? 'keep' : 'keep-outline'" size="sm" />
+                  <OTooltip
+                    :content="
+                      isPinned('histogram')
+                        ? t('search.unpinFromToolbar')
+                        : t('search.pinToToolbar')
+                    "
+                  />
                 </OButton>
               </span>
             </template>
@@ -308,12 +312,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="traces-search-bar-menu-pin-sql-mode-btn"
                   variant="ghost-neutral"
                   size="icon-sm"
-                  :title="
+                  :icon-left="isPinned('sqlMode') ? 'keep' : 'keep-outline'"
+                  @click.stop="togglePin('sqlMode')"
+                  :aria-label="
                     isPinned('sqlMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
                   "
-                  @click.stop="togglePin('sqlMode')"
                 >
-                  <OIcon :name="isPinned('sqlMode') ? 'keep' : 'keep-outline'" size="sm" />
+                  <OTooltip
+                    :content="
+                      isPinned('sqlMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
+                    "
+                  />
                 </OButton>
               </span>
             </template>
@@ -341,12 +350,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="traces-search-bar-menu-pin-saved-views-btn"
                   variant="ghost-neutral"
                   size="icon-sm"
-                  :title="
+                  :icon-left="isPinned('savedViews') ? 'keep' : 'keep-outline'"
+                  @click.stop="togglePin('savedViews')"
+                  :aria-label="
                     isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
                   "
-                  @click.stop="togglePin('savedViews')"
                 >
-                  <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
+                  <OTooltip
+                    :content="
+                      isPinned('savedViews')
+                        ? t('search.unpinFromToolbar')
+                        : t('search.pinToToolbar')
+                    "
+                  />
                 </OButton>
               </template>
             </SavedViewsSubmenu>
@@ -469,6 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ]"
                   >
                     <OIcon name="expand-more" size="xs" />
+                    <OTooltip :content="t('common.moreOptions')" />
                   </OButton>
                 </template>
                 <ODropdownItem
@@ -519,8 +536,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="toolbarActionsLabel"
                 variant="ghost"
                 size="icon-toolbar"
+                icon-left="more-vert"
               >
-                <OIcon name="more-vert" size="sm" />
                 <OTooltip :content="toolbarActionsLabel" />
               </OButton>
             </template>
@@ -668,8 +685,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ORefreshButton
               data-test="services-catalog-refresh-btn"
               layout="inline"
-              variant="outline"
-              size="header"
+              variant="ghost"
+              class="toolbar-btn-rest"
               :loading="refreshLoading"
               :last-run-at="refreshLastRunAt"
               @click="$emit('services-catalog-refresh')"
@@ -700,13 +717,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
           class="rounded-default absolute! top-0.75 z-51 size-7! min-h-7! min-w-7!"
           :style="{ right: filterBuilderToggleRight }"
+          :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
           @click="toggleFilterBuilder"
+          :aria-label="
+            filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')
+          "
         >
-          <OIcon
-            :name="filterBuilderOn ? 'code' : 'filter-list'"
-            size="sm"
-            class="text-text-secondary"
-          />
           <OTooltip
             :content="filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')"
           />

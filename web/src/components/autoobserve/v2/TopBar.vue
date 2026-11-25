@@ -45,9 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="sm:hidden"
       :aria-label="t('autoobserve2.nav.searchLabel')"
       data-test="autoobserve2-nav-search-open"
+      icon-left="search"
       @click="openSearch"
     >
-      <OIcon name="search" size="sm" />
+      <OTooltip :content="t('autoobserve2.nav.searchLabel')" />
     </OButton>
     <OButton
       variant="ghost-muted"
@@ -63,9 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="icon-sm"
       :aria-label="t('autoobserve2.nav.settings')"
       data-test="autoobserve2-nav-settings"
+      icon-left="settings"
       @click="emit('open', 'settings')"
     >
-      <OIcon name="settings" size="sm" />
       <OTooltip :content="t('autoobserve2.nav.settings')" />
     </OButton>
     <OButton
@@ -73,9 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="icon-sm"
       :aria-label="t('autoobserve2.nav.howItWorks')"
       data-test="autoobserve2-nav-how-it-works"
+      icon-left="help-outline"
       @click="emit('open', 'howItWorks')"
     >
-      <OIcon name="help-outline" size="sm" />
       <OTooltip :content="t('autoobserve2.nav.howItWorks')" />
     </OButton>
   </nav>

@@ -58,10 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="ms-1"
       variant="ghost"
       size="icon-circle-sm"
-      :title="t('alerts.alertSettings.refreshDestinations')"
+      icon-left="refresh"
+      :aria-label="t('alerts.alertSettings.refreshDestinations')"
       @click="emit('refresh')"
     >
-      <OIcon name="refresh" size="sm" />
+      <OTooltip :content="t('alerts.alertSettings.refreshDestinations')" />
     </OButton>
     <OButton
       data-test="create-destination-btn"
@@ -104,9 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm"
         class="ms-2"
+        icon-left="lock"
         @click="openUpgradeDialog"
       >
-        <template #icon-left><OIcon name="lock" size="sm" class="lock-chip" /></template>
         {{ t("workflow.create") }}
       </OButton>
     </template>
@@ -118,7 +119,6 @@ import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 

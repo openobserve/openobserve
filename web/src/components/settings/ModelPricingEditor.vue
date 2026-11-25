@@ -87,9 +87,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-xs-sq"
                   class="text-theme-accent opacity-50 hover:opacity-100"
                   data-test="model-pricing-pattern-examples-btn"
+                  icon-left="lightbulb-outline"
+                  :aria-label="t('modelPricing.patternExamplesBtn')"
                   @click="showExamples = true"
                 >
-                  <OIcon name="lightbulb-outline" size="xs" />
                   <OTooltip
                     side="top"
                     align="end"
@@ -152,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="examples-table border-card-glass-border rounded-default overflow-hidden border"
             >
               <div
-                class="bg-surface-subtle border-card-glass-border text-2xs text-text-secondary grid grid-cols-[11.25rem_1fr_auto] gap-3 border-b px-3 py-1.5 font-bold tracking-[0.06em] uppercase"
+                class="bg-surface-subtle border-card-glass-border text-2xs text-text-secondary grid grid-cols-[11.25rem_1fr_auto] gap-3 border-b px-3 py-1.5 font-semibold tracking-[0.06em] uppercase"
               >
                 <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
                 <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
@@ -257,9 +258,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon"
                       type="button"
                       :data-test="`model-pricing-tier-remove-btn-${idx}`"
+                      icon-left="delete"
                       @click="removeTier(idx)"
                     >
-                      <OIcon name="delete" size="sm" />
+                      <OTooltip :content="t('common.remove')" />
                     </OButton>
                   </div>
                 </div>
@@ -334,9 +336,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="icon"
                             type="button"
                             :data-test="`model-pricing-tier-window-remove-btn-${idx}-${winIdx}`"
+                            icon-left="delete"
+                            :aria-label="t('modelPricing.removeTimeWindow')"
                             @click="removeWindow(idx, winIdx)"
                           >
-                            <OIcon name="delete" size="sm" />
                             <OTooltip
                               :side-offset="4"
                               :content="t('modelPricing.removeTimeWindow')"
@@ -407,7 +410,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               icon-left="info-outline"
                               :aria-label="t('modelPricing.aboutTierPriority')"
                               :data-test="`model-pricing-tier-priority-hint-trigger-${idx}`"
-                            />
+                            >
+                              <OTooltip :content="t('modelPricing.aboutTierPriority')" />
+                            </OButton>
                           </template>
                           <p
                             class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
@@ -513,9 +518,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="icon"
                             type="button"
                             :data-test="`model-pricing-price-delete-btn-${idx}-${entryIdx}`"
+                            icon-left="delete"
                             @click="removePrice(idx, entryIdx)"
                           >
-                            <OIcon name="delete" size="sm" />
+                            <OTooltip :content="t('common.remove')" />
                           </OButton>
                         </div>
                       </div>
@@ -564,9 +570,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           type="button"
                           :disabled="!String(tier.draftKey ?? '').trim()"
                           :data-test="`model-pricing-add-price-btn-${idx}`"
+                          icon-left="add"
                           @click="addPrice(idx)"
                         >
-                          <OIcon name="add" size="xs" />
+                          <OTooltip :content="t('common.add')" />
                         </OButton>
                       </div>
                     </div>

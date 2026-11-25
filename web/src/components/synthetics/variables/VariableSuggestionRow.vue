@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon
           name="warning"
           size="xs"
-          class="text-warning cursor-help"
+          class="text-status-warning-text cursor-help"
           role="img"
           :aria-label="gapText"
           data-test="synthetics-variable-suggestion-gap"

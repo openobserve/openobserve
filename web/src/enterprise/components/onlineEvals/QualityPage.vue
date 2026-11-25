@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm"
           data-test="quality-detail-edit-config"
+          icon-left="edit"
           @click="openEditConfig"
         >
           {{ t("onlineEvals.quality.detail.editConfig") }}

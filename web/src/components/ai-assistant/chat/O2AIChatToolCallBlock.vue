@@ -80,7 +80,7 @@ const navLockReason = computed(() => {
           block.pendingConfirmation
             ? block.tool === 'navigation_action'
               ? 'text-accent'
-              : 'text-warning'
+              : 'text-status-warning-text'
             : block.success === false
               ? 'text-status-negative'
               : 'text-status-positive'
@@ -235,9 +235,10 @@ const navLockReason = computed(() => {
             variant="ghost"
             size="icon-xs-circle"
             class="copy-btn opacity-60 hover:opacity-100"
+            icon-left="content-copy"
+            :aria-label="t('aiAssistant.copyQuery')"
             @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.query, t)"
           >
-            <OIcon name="content-copy" size="sm" />
             <OTooltip :content="t('aiAssistant.copyQuery')" />
           </OButton>
         </div>
@@ -342,9 +343,10 @@ const navLockReason = computed(() => {
             variant="ghost"
             size="icon-xs-circle"
             class="copy-btn opacity-60 hover:opacity-100"
+            icon-left="content-copy"
+            :aria-label="t('aiAssistant.copyVrl')"
             @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.vrl, t)"
           >
-            <OIcon name="content-copy" size="sm" />
             <OTooltip :content="t('aiAssistant.copyVrl')" />
           </OButton>
         </div>
@@ -365,9 +367,10 @@ const navLockReason = computed(() => {
             variant="ghost"
             size="icon-xs-circle"
             class="copy-btn opacity-60 hover:opacity-100"
+            icon-left="content-copy"
+            :aria-label="t('aiAssistant.copyCommand')"
             @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.command, t)"
           >
-            <OIcon name="content-copy" size="sm" />
             <OTooltip :content="t('aiAssistant.copyCommand')" />
           </OButton>
         </div>
@@ -387,9 +390,10 @@ const navLockReason = computed(() => {
               variant="ghost"
               size="icon-xs-circle"
               class="copy-btn opacity-60 hover:opacity-100"
+              icon-left="content-copy"
+              :aria-label="t('aiAssistant.copyResults')"
               @click.stop="copyToClipboard(JSON.stringify(block.response.hits, null, 2), t)"
             >
-              <OIcon name="content-copy" size="sm" />
               <OTooltip :content="t('aiAssistant.copyResults')" />
             </OButton>
           </div>
@@ -503,9 +507,10 @@ const navLockReason = computed(() => {
               variant="ghost"
               size="icon-xs-circle"
               class="copy-btn opacity-60 hover:opacity-100"
+              icon-left="content-copy"
+              :aria-label="t('aiAssistant.copyItems')"
               @click.stop="copyToClipboard(JSON.stringify(block.response.items, null, 2), t)"
             >
-              <OIcon name="content-copy" size="sm" />
               <OTooltip :content="t('aiAssistant.copyItems')" />
             </OButton>
           </div>
@@ -539,6 +544,8 @@ const navLockReason = computed(() => {
             variant="ghost"
             size="icon-xs-circle"
             class="copy-btn opacity-60 hover:opacity-100"
+            icon-left="content-copy"
+            :aria-label="t('aiAssistant.copyResponse')"
             @click.stop="
               copyToClipboard(
                 typeof block.response === 'string'
@@ -548,7 +555,6 @@ const navLockReason = computed(() => {
               )
             "
           >
-            <OIcon name="content-copy" size="sm" />
             <OTooltip :content="t('aiAssistant.copyResponse')" />
           </OButton>
         </div>

@@ -26,11 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost"
           size="icon"
-          :title="t('synthetics.environments.newButton')"
           data-test="synthetics-scope-new-environment"
+          icon-left="add"
+          :aria-label="t('synthetics.environments.newButton')"
           @click.stop="$emit('new-environment')"
         >
-          <OIcon name="add" size="sm" />
+          <OTooltip :content="t('synthetics.environments.newButton')" />
         </OButton>
       </div>
     </div>
@@ -81,7 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="more-vert"
                     class="h-5 w-5"
                     :data-test="`synthetics-scope-more-${env.name}`"
-                  />
+                  >
+                    <OTooltip :content="t('common.moreActions')" />
+                  </OButton>
                 </template>
 
                 <ODropdownItem
@@ -134,6 +137,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";

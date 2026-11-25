@@ -318,13 +318,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="ghost"
                           class="h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
                           :aria-label="t('logs.detailTable.addIcon')"
+                          :icon-left="
+                            tableDropdownOpenMap[row.field] ? 'arrow-drop-up' : 'arrow-drop-down'
+                          "
                         >
-                          <OIcon
-                            :name="
-                              tableDropdownOpenMap[row.field] ? 'arrow-drop-up' : 'arrow-drop-down'
-                            "
-                            size="sm"
-                          />
+                          <OTooltip :content="t('logs.detailTable.addIcon')" />
                         </OButton>
                       </template>
                       <ODropdownItem
@@ -470,10 +468,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mb-4"
                 data-test="logs-correlation-loading-indicator"
               />
-              <div v-else-if="correlationError" class="text-status-error-text text-base">
+              <div v-else-if="correlationError" class="text-status-error-text text-compact">
                 {{ correlationError }}
               </div>
-              <div v-else class="text-text-muted text-base">
+              <div v-else class="text-text-secondary text-compact">
                 {{ t("correlation.clickToLoadLogs") }}
               </div>
             </div>
@@ -515,10 +513,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mb-4"
                 data-test="logs-correlation-loading-indicator"
               />
-              <div v-else-if="correlationError" class="text-status-error-text text-base">
+              <div v-else-if="correlationError" class="text-status-error-text text-compact">
                 {{ correlationError }}
               </div>
-              <div v-else class="text-text-muted text-base">
+              <div v-else class="text-text-secondary text-compact">
                 {{ t("correlation.clickToLoadMetrics") }}
               </div>
             </div>
@@ -561,10 +559,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mb-4"
                 data-test="logs-correlation-loading-indicator"
               />
-              <div v-else-if="correlationError" class="text-status-error-text text-base">
+              <div v-else-if="correlationError" class="text-status-error-text text-compact">
                 {{ correlationError }}
               </div>
-              <div v-else class="text-text-muted text-base">
+              <div v-else class="text-text-secondary text-compact">
                 {{ t("correlation.clickToLoadTraces") }}
               </div>
             </div>
@@ -608,7 +606,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="flex items-center gap-2 max-md:order-last max-md:basis-full max-md:justify-center"
         >
-          <label class="font-bold whitespace-nowrap">{{ t("common.noOfRecords") }}</label>
+          <label class="font-semibold whitespace-nowrap">{{ t("common.noOfRecords") }}</label>
           <OSelect
             v-model="selectedRelativeValue"
             :options="recordSizeOptions"

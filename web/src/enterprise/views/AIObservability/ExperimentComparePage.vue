@@ -38,10 +38,9 @@
             :disabled="!baselineId || !candidateId"
             :aria-label="t('aiObservability.experiments.comparePage.swap')"
             data-test="ai-experiment-compare-swap"
+            icon-left="swap-horiz"
             @click="swapSides"
-          >
-            <OIcon name="swap-horiz" size="sm" />
-          </OButton>
+          />
         </OTooltip>
         <div class="flex min-w-0 items-center gap-2">
           <span class="text-text-tertiary shrink-0 text-xs">
@@ -124,7 +123,6 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import useSmartBack from "@/composables/useSmartBack";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";

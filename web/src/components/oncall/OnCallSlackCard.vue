@@ -76,9 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="xs"
         data-test="oncall-slack-settings-link"
+        icon-left="settings"
         @click="openSlackSettings"
-      >
-        <OIcon name="settings" size="sm" />{{ t("oncall.reachSetUp") }}
+        >{{ t("oncall.reachSetUp") }}
         <OTooltip :content="t('oncall.mineSlackSetUpHint')" />
       </OButton>
       <OnCallHint v-else :hint="t('oncall.mineSlackAskAdmin')" data-test="oncall-slack-ask-admin" />
@@ -99,7 +99,6 @@ import { DEFAULT_SLACK_COMMAND } from "@/components/settings/SlackSettings.schem
 import { useTheme } from "@/composables/useTheme";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

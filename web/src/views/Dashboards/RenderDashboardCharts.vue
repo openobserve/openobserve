@@ -29,10 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'h-full overflow-y-auto',
     ]"
   >
-    <div
-      class="px-page-edge render-dashboard-charts-container"
-      :class="kiosk || (showTabs && selectedTabId !== null) ? 'pt-0' : 'pt-2'"
-    >
+    <div class="px-page-edge render-dashboard-charts-container" :class="kiosk ? 'pt-0' : 'pt-2'">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
       <span
         class="hidden"
@@ -64,14 +61,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selectedTimeDate="currentTimeObj['__global']"
           :initialVariableValues="initialVariableValues"
           class="global-variables-selector"
-          :class="kiosk ? KIOSK_VARIABLES_CLASS : undefined"
+          :class="kiosk ? KIOSK_VARIABLES_CLASS : 'pb-1'"
           data-test="global-variables-selector"
         />
 
         <!-- Tab List -->
         <TabList
           v-if="showTabs && selectedTabId !== null"
-          :class="kiosk ? (kioskHasTabs ? 'order-first min-w-0 flex-1' : 'hidden') : 'h-8'"
+          :class="
+            kiosk ? (kioskHasTabs ? 'order-first min-w-0 flex-1' : 'hidden') : 'mt-2 mb-2 h-8'
+          "
           :dashboardData="dashboardData"
           :viewOnly="viewOnly"
           :layoutMode="layoutMode"

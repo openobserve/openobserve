@@ -214,7 +214,7 @@ const globalStubs = {
       '<div class="page-layout"><slot name="title" /><slot name="sidebar" />' +
       '<slot name="actions" /><slot /></div>',
   },
-  BetaBadge: { name: "BetaBadge", template: '<span class="beta-badge" />' },
+  OBetaBadge: { name: "OBetaBadge", template: '<span class="beta-badge" />' },
   FolderList: {
     name: "FolderList",
     props: ["type"],

@@ -1617,8 +1617,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           variant="destructive"
           size="xs"
           data-test="synthetics-journey-stop-replay-btn"
-          @click="emit('stop-replay')"
           icon-left="stop"
+          @click="emit('stop-replay')"
         >
           {{ t("synthetics.journey.stop") }}
         </OButton>
@@ -1640,8 +1640,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           variant="outline"
           size="xs"
           data-test="synthetics-journey-cancel-btn"
-          @click="cancelRecording"
           icon-left="close"
+          @click="cancelRecording"
         >
           {{ t("synthetics.journey.cancel") }}
         </OButton>
@@ -1651,8 +1651,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           variant="destructive"
           size="xs"
           data-test="synthetics-journey-stop-btn"
-          @click="stopRecording"
           icon-left="stop"
+          @click="stopRecording"
         >
           {{ t("synthetics.journey.stop") }}
         </OButton>
@@ -1663,8 +1663,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           :disabled="readonly || isRecording || isReplayLocked || isRestoring"
           class="max-md:hidden"
           data-test="synthetics-journey-record-btn"
-          @click="onRecordButtonClick"
           icon-left="smart-display"
+          @click="onRecordButtonClick"
         >
           {{ t("synthetics.journey.record") }}
         </OButton>
@@ -1995,9 +1995,10 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         variant="ghost"
         size="xs"
         data-test="synthetics-journey-clear-results-btn"
+        icon-left="close"
         @click="emit('clear-results')"
       >
-        <OIcon name="close" size="sm" />
+        <OTooltip :content="t('synthetics.journey.clearResults')" />
       </OButton>
     </div>
 
@@ -2045,9 +2046,10 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         variant="ghost"
         size="xs"
         data-test="synthetics-journey-clear-results-btn"
+        icon-left="close"
         @click="emit('clear-results')"
       >
-        <OIcon name="close" size="sm" />
+        <OTooltip :content="t('synthetics.journey.clearResults')" />
       </OButton>
     </div>
 
@@ -2079,9 +2081,10 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         variant="ghost"
         size="xs"
         data-test="synthetics-journey-clear-results-btn"
+        icon-left="close"
         @click="emit('clear-results')"
       >
-        <OIcon name="close" size="sm" />
+        <OTooltip :content="t('synthetics.journey.clearResults')" />
       </OButton>
     </div>
 

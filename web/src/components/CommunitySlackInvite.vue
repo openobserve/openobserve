@@ -32,6 +32,7 @@ import {
 import { isFirstLoginOf } from "@/components/onboarding/onboardingFlow";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
@@ -212,9 +213,10 @@ const joinSlack = () => {
           class="-me-1 shrink-0"
           :aria-label="t('common.close')"
           data-test="community-slack-invite-close-btn"
+          icon-left="close"
           @click="dismiss"
         >
-          <OIcon name="close" size="sm" />
+          <OTooltip :content="t('common.close')" />
         </OButton>
       </div>
 

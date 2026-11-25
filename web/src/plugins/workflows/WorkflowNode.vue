@@ -157,9 +157,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'border-status-warning-text! text-status-warning-text!'
           "
           :data-test="`workflows-node-disable-toggle`"
+          :icon-left="isDisabled ? 'play-circle' : 'pause-circle-filled'"
+          :aria-label="isDisabled ? t('workflow.node.enable') : t('workflow.node.disable')"
           @click.stop="onToggleDisabled"
         >
-          <OIcon :name="isDisabled ? 'play-circle' : 'pause-circle-filled'" size="sm" />
           <OTooltip
             :content="isDisabled ? t('workflow.node.enable') : t('workflow.node.disable')"
             side="top"
@@ -172,9 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon"
           class="rounded-default! bg-surface-overlay/95! border-status-negative! text-status-negative! h-5! w-5! min-w-5! border! p-0!"
           :data-test="`workflow-node-${data?.node_type}-delete-btn`"
+          icon-left="delete"
           @click.stop="requestDeleteNode(id)"
         >
-          <OIcon name="delete" size="sm" />
           <!-- Same OTooltip the test badges below use — the delete button simply
                never had one. Preferred over the pipeline node's hand-rolled
                tooltip div: reka-ui/Floating UI handles the Vue Flow node's

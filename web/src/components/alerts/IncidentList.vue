@@ -276,42 +276,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-sq"
               :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
               class="max-md:hidden"
+              icon-left="check-circle"
               @click.stop="acknowledgeIncident(row)"
               data-test="incident-ack-btn"
-              ><OIcon name="check-circle" size="sm" aria-hidden="true" /><OTooltip
-                :content="t('alerts.incidents.acknowledge')"
+              ><OTooltip :content="t('alerts.incidents.acknowledge')"
             /></OButton>
             <OButton
               v-if="row.status !== 'resolved'"
               variant="ghost-primary"
               size="icon-xs-sq"
               class="max-md:hidden"
+              icon-left="task-alt"
+              :aria-label="t('alerts.incidents.resolve')"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
-              ><OIcon name="task-alt" size="sm" /><OTooltip
-                :content="t('alerts.incidents.resolve')"
+              ><OTooltip :content="t('alerts.incidents.resolve')"
             /></OButton>
             <OButton
               v-if="row.status === 'resolved'"
               variant="ghost-warning"
               size="icon-xs-sq"
               class="max-md:hidden"
+              icon-left="restart-alt"
+              :aria-label="t('alerts.incidents.reopen')"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"
-              ><OIcon name="restart-alt" size="sm" /><OTooltip
-                :content="t('alerts.incidents.reopen')"
+              ><OTooltip :content="t('alerts.incidents.reopen')"
             /></OButton>
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
                   icon-left="more-vert"
-                  :title="t('dashboard.moreActions')"
                   variant="ghost"
                   size="icon-xs-sq"
                   class="md:hidden"
                   data-test="incident-row-more-actions"
+                  :aria-label="t('dashboard.moreActions')"
                   @click.stop
-                />
+                >
+                  <OTooltip :content="t('dashboard.moreActions')" />
+                </OButton>
               </template>
               <ODropdownItem
                 v-if="row.status === 'open'"

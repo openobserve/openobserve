@@ -572,7 +572,6 @@ describe("BillingGroup.vue", () => {
       expect(removeLabel).toBe("Remove");
       expect(removeButton.props("variant")).toBe("ghost-destructive");
       expect(removeButton.props("size")).toBe("icon-sm");
-      expect(removeButton.attributes("title")).toBe(removeLabel);
       expect(removeButton.attributes("aria-label")).toBe(removeLabel);
     });
 

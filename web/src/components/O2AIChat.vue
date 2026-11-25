@@ -50,9 +50,9 @@
               variant="ghost"
               size="icon-sm"
               :aria-label="t('aiAssistant.editTitleTooltip')"
+              icon-left="edit"
               @click.stop="openEditTitleDialog"
             >
-              <OIcon name="edit" size="sm" />
               <OTooltip :content="t('aiAssistant.editTitleTooltip')" />
             </OButton>
             <OButton
@@ -61,18 +61,18 @@
               size="icon-sm"
               data-test="o2-ai-chat-share-btn"
               :aria-label="t('aiChatShare.share')"
+              icon-left="share"
               @click.stop="shareCurrentChat"
             >
-              <OIcon name="share" size="sm" />
               <OTooltip :content="t('aiChatShare.share')" />
             </OButton>
             <OButton
               variant="ghost"
               size="icon-sm"
               :aria-label="t('common.newChat')"
+              icon-left="add"
               @click="addNewChat"
             >
-              <OIcon name="add" size="sm" />
               <OTooltip :content="t('common.newChat')" />
             </OButton>
             <OButton
@@ -80,12 +80,9 @@
               size="icon-sm"
               data-test="ai-chat-expand-btn"
               :aria-label="store.state.isAiChatExpanded ? t('common.collapse') : t('common.expand')"
+              :icon-left="store.state.isAiChatExpanded ? 'close-fullscreen' : 'open-in-full'"
               @click="toggleExpand"
             >
-              <OIcon
-                :name="store.state.isAiChatExpanded ? 'close-fullscreen' : 'open-in-full'"
-                size="sm"
-              />
               <OTooltip
                 :content="
                   t('common.collapseExpandShortcut', {
@@ -101,9 +98,10 @@
               variant="ghost"
               size="icon-sm"
               :aria-label="t('common.close')"
+              icon-left="close"
               @click="$emit('close')"
             >
-              <OIcon name="close" size="sm" />
+              <OTooltip :content="t('common.close')" />
             </OButton>
           </div>
         </div>
@@ -269,7 +267,7 @@
                   <span class="text-sm font-[600]">{{
                     t("aiAssistant.welcome.taglineHighlight")
                   }}</span>
-                  <BetaBadge />
+                  <OBetaBadge />
                 </div>
               </div>
             </div>
@@ -319,9 +317,9 @@
             size="icon-sm"
             class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-sm [backdrop-filter:blur(0.5rem)] transition-all duration-300 hover:scale-110 hover:shadow-md active:scale-100"
             :aria-label="t('aiAssistant.scrollToBottom')"
+            icon-left="arrow-downward"
             @click="scrollToBottomSmooth"
           >
-            <OIcon name="arrow-downward" size="sm" />
             <OTooltip side="top" align="center" :content="t('aiAssistant.scrollToBottom')" />
           </OButton>
         </div>
@@ -377,9 +375,10 @@
                 size="icon-sm"
                 data-test="o2-ai-chat-turn-limit-dismiss"
                 :aria-label="t('common.close')"
+                icon-left="close"
                 @click="turnLimitError = false"
               >
-                <OIcon name="close" size="sm" />
+                <OTooltip :content="t('common.close')" />
               </OButton>
             </div>
           </template>
@@ -477,7 +476,7 @@ import { useTypewriter } from "@/composables/useTypewriter";
 import { abortBackgroundStreams, useChatStream } from "@/composables/useChatStream";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import OButton from "@/lib/core/Button/OButton.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -527,7 +526,7 @@ export default defineComponent({
   components: {
     AiChatShareDialog,
     OButton,
-    BetaBadge,
+    OBetaBadge,
     ConfirmDialog,
     O2AIConfirmDialog,
     O2AIPaidUsageConsent,

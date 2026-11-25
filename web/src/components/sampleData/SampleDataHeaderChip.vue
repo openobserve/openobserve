@@ -34,10 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="xs"
         class="bg-ingest-tint-purple! text-ingest-accent-purple! border-ingest-accent-purple/40! hover:border-ingest-accent-purple!"
         data-test="header-sample-data-btn"
+        icon-left="science"
       >
-        <template #icon-left>
-          <OIcon name="science" size="sm" />
-        </template>
         {{ t("sampleData.header.label") }}
         <span
           aria-hidden="true"
@@ -76,11 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-ingest-tint-purple! text-ingest-accent-purple! border-ingest-accent-purple/40! hover:border-ingest-accent-purple! max-md:hidden"
     :disabled="session.removing.value"
     data-test="header-sample-data-try"
+    icon-left="science"
     @click="load"
   >
-    <template #icon-left>
-      <OIcon name="science" size="sm" />
-    </template>
     {{ t("sampleData.header.try") }}
   </OButton>
 

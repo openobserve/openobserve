@@ -141,9 +141,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="absolute end-3 top-3 z-10"
         :aria-label="t('iam.editRole.presetsShow')"
         data-test="edit-role-presets-open"
+        icon-left="library-add"
         @click="setPresetsOpen(true)"
       >
-        <OIcon name="library-add" size="sm" />
         <OTooltip :content="t('iam.editRole.presetsShow')" side="left" />
       </OButton>
 

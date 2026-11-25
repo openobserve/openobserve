@@ -99,7 +99,7 @@
               v-if="bands[tile.key]?.crossed && bands[tile.key]?.after !== 'good'"
               name="warning"
               size="xs"
-              class="text-warning-600"
+              class="text-status-warning-text"
               :aria-label="t('serviceVersions.compare.drill.bandCrossed')"
               data-test="svcver-tile-band-crossed" /></span
         ></span>

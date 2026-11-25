@@ -16,7 +16,7 @@
         />
         <div
           @click="showExpandIcon ? (expanded = !expanded) : null"
-          class="text-text-secondary text-sm font-bold"
+          class="text-text-secondary text-sm font-semibold"
           :class="labelClass"
         >
           {{ label }}

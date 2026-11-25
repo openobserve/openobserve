@@ -263,6 +263,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <OButton
                     v-if="anomalySql"
+                    icon-left="content-copy"
+                    :aria-label="t('alerts.alertDetails.copy')"
                     @click="
                       copyToClipboard(anomalySql, t, {
                         successMessage: t('common.itemCopiedSuccessfully', { item: 'SQL' }),
@@ -273,7 +275,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     data-test="anomaly-details-copy-sql-btn"
                   >
-                    <OIcon name="content-copy" size="sm" />
                     <OTooltip :content="t('alerts.alertDetails.copy')" />
                   </OButton>
                 </div>
@@ -311,6 +312,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       alertDetails.conditions !== '' &&
                       alertDetails.conditions !== '--'
                     "
+                    icon-left="content-copy"
+                    :aria-label="t('alerts.alertDetails.copy')"
                     @click="
                       copyToClipboard(alertDetails.conditions, t, {
                         successMessage: t('common.itemCopiedSuccessfully', {
@@ -327,7 +330,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     data-test="alert-details-copy-conditions-btn"
                   >
-                    <OIcon name="content-copy" size="sm" />
                     <OTooltip :content="t('alerts.alertDetails.copy')" />
                   </OButton>
                 </div>

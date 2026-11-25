@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base max-md:hidden">
+                <div class="text-text-secondary text-xs max-md:hidden">
                   {{ t("logs.searchJobInspector.results") }}
                 </div>
                 <div
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base max-md:hidden">
+                <div class="text-text-secondary text-xs max-md:hidden">
                   {{ t("logs.searchJobInspector.scannedEvents") }}
                 </div>
                 <div
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base max-md:hidden">
+                <div class="text-text-secondary text-xs max-md:hidden">
                   {{ t("logs.searchJobInspector.timeTaken") }}
                 </div>
                 <div
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base max-md:hidden">
+                <div class="text-text-secondary text-xs max-md:hidden">
                   {{ t("logs.searchJobInspector.traceId") }}
                 </div>
                 <div
@@ -411,9 +411,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('common.copyToClipboard')"
           variant="primary"
           size="sm-action"
+          icon-left="content-copy"
           @click="copyTraceId"
-          ><OIcon name="content-copy" size="sm" class="me-1"
-        /></OButton>
+        >
+          <OTooltip :content="t('common.copyToClipboard')" />
+        </OButton>
       </div>
     </ODialog>
   </OPageLayout>

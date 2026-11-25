@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -66,9 +65,9 @@ const canShare = (chat: (typeof props.chats)[number]) =>
             class="opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 group-data-[highlighted]:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
             :data-test="`o2-ai-chat-history-menu-share-${chat.id}`"
             :aria-label="t('aiChatShare.share')"
+            icon-left="share"
             @click.stop="emit('share', chat.id)"
           >
-            <OIcon name="share" size="sm" />
             <OTooltip :content="t('aiChatShare.share')" />
           </OButton>
           <OButton
@@ -76,9 +75,9 @@ const canShare = (chat: (typeof props.chats)[number]) =>
             size="icon-xs-circle"
             class="delete-history-btn opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 group-data-[highlighted]:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
             :aria-label="t('aiAssistant.deleteChatTooltip')"
+            icon-left="delete"
             @click.stop="emit('delete', chat.id)"
           >
-            <OIcon name="delete" size="sm" />
             <OTooltip :content="t('aiAssistant.deleteChatTooltip')" />
           </OButton>
         </div>
@@ -93,11 +92,9 @@ const canShare = (chat: (typeof props.chats)[number]) =>
       <OButton
         variant="ghost-destructive"
         class="clear-all-btn text-compact w-full justify-start px-3 py-1.5"
+        icon-left="delete-sweep"
         @click.stop="emit('clear-all')"
       >
-        <template #icon-left>
-          <OIcon name="delete-sweep" size="sm" />
-        </template>
         {{ t("aiAssistant.clearAllConversations") }}
       </OButton>
     </div>

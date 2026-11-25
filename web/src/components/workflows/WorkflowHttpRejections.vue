@@ -42,9 +42,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-xs-sq"
         :aria-label="t('workflow.http.rejectionsHide')"
         data-test="workflow-http-rejections-hide"
+        icon-left="expand-more"
         @click="open = false"
       >
-        <OIcon name="expand-more" size="sm" />
+        <OTooltip :content="t('workflow.http.rejectionsHide')" />
       </OButton>
       <OText variant="body-strong">{{ t("workflow.http.rejectionsTitle") }}</OText>
       <OText variant="meta" class="min-w-0 flex-1">
@@ -132,6 +133,7 @@ import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";

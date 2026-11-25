@@ -47,9 +47,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         /></OButton>
       </template>
       <template #actions-overflow>
-        <OButton variant="outline" size="sm" @click="importTemplate" data-test="template-import">{{
-          t(`dashboard.import`)
-        }}</OButton>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="file-upload"
+          @click="importTemplate"
+          data-test="template-import"
+          >{{ t(`dashboard.import`) }}</OButton
+        >
       </template>
 
       <OBanner
@@ -225,29 +230,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-actions="{ row }">
             <OButton
-              :title="t('alert_templates.exportTemplate')"
               class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-xs-sq"
+              icon-left="download"
+              :aria-label="t('alert_templates.exportTemplate')"
               @click.stop="exportTemplate(row)"
               data-test="destination-export"
               data-row-action="export"
             >
-              <OIcon name="download" size="sm" />
+              <OTooltip :content="t('alert_templates.exportTemplate')" />
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-update-template`"
               class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-xs-sq"
-              :title="
-                row.isPrebuilt ? t('alert_templates.systemReadOnlyEdit') : t('alert_templates.edit')
-              "
               :disabled="row.isPrebuilt"
+              icon-left="edit"
               @click="editTemplate(row)"
               data-row-action="edit"
+              :aria-label="
+                row.isPrebuilt ? t('alert_templates.systemReadOnlyEdit') : t('alert_templates.edit')
+              "
             >
-              <OIcon name="edit" size="sm" />
+              <OTooltip
+                :content="
+                  row.isPrebuilt
+                    ? t('alert_templates.systemReadOnlyEdit')
+                    : t('alert_templates.edit')
+                "
+              />
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-clone-template`"
@@ -255,10 +268,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-xs-sq"
               :aria-label="cloneActionLabel(row, t('alert_templates.clone'))"
+              icon-left="content-copy"
               @click="cloneTemplate(row)"
               data-row-action="duplicate"
             >
-              <OIcon name="content-copy" size="sm" />
               <OTooltip
                 side="bottom"
                 :content="cloneActionLabel(row, t('alert_templates.clone'))"
@@ -275,17 +288,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-xs-sq"
-              :title="
+              :disabled="row.isPrebuilt"
+              :loading="deletingTemplates.has(row.name)"
+              icon-left="delete"
+              @click="conformDeleteDestination(row)"
+              data-row-action="delete"
+              :aria-label="
                 row.isPrebuilt
                   ? t('alert_templates.systemReadOnlyDelete')
                   : t('alert_templates.delete')
               "
-              :disabled="row.isPrebuilt"
-              :loading="deletingTemplates.has(row.name)"
-              @click="conformDeleteDestination(row)"
-              data-row-action="delete"
             >
-              <OIcon name="delete" size="sm" />
+              <OTooltip
+                :content="
+                  row.isPrebuilt
+                    ? t('alert_templates.systemReadOnlyDelete')
+                    : t('alert_templates.delete')
+                "
+              />
             </OButton>
             <ODropdown side="bottom" align="end">
               <template #trigger>

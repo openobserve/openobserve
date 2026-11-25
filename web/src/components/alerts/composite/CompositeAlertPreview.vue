@@ -157,7 +157,7 @@ const warningText = (code: string) => {
           />
           <div class="flex flex-col gap-0.5">
             <span class="flex min-w-0 items-center gap-2 text-xs">
-              <span class="text-theme-accent font-bold">{{
+              <span class="text-theme-accent font-semibold">{{
                 raw(letterById.get(token.id) ?? "?")
               }}</span>
               <OTruncatedText class="text-text-heading">{{ nameFor(token.id) }}</OTruncatedText>

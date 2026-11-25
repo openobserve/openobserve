@@ -50,18 +50,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           :aria-label="t('sampleData.tour.minimize')"
           data-test="sample-tour-minimize"
+          icon-left="remove"
           @click="session.setTourMinimized(true)"
         >
-          <OIcon name="remove" size="sm" />
+          <OTooltip :content="t('sampleData.tour.minimize')" />
         </OButton>
         <OButton
           variant="ghost"
           size="icon-sm"
           :aria-label="t('sampleData.tour.close')"
           data-test="sample-tour-close"
+          icon-left="close"
           @click="session.stopTour()"
         >
-          <OIcon name="close" size="sm" />
+          <OTooltip :content="t('sampleData.tour.close')" />
         </OButton>
       </div>
 
@@ -161,6 +163,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

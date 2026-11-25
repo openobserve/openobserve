@@ -74,9 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs"
                 icon-left="content-copy"
-                :title="t('traces.copyTraceId')"
+                :aria-label="t('traces.copyTraceId')"
                 @click="copyTraceId"
-              />
+              >
+                <OTooltip :content="t('traces.copyTraceId')" />
+              </OButton>
 
               <!-- Session ID (LLM traces) -->
               <template v-if="sessionId">
@@ -96,9 +98,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs"
                   icon-left="content-copy"
-                  :title="t('traces.traceDetails.copySessionId')"
+                  :aria-label="t('traces.traceDetails.copySessionId')"
                   @click="copySessionId"
-                />
+                >
+                  <OTooltip :content="t('traces.traceDetails.copySessionId')" />
+                </OButton>
               </template>
 
               <div class="bg-text-label h-4 w-px py-0" />
@@ -157,9 +161,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-apply-filters-btn-right"
               variant="outline"
               size="xs"
+              icon-left="filter-alt"
               @click="openFilterPopover"
             >
-              <template #icon-left><OIcon name="filter-alt" size="xs" /></template>
               <span class="text-xs">{{ t("traces.viewFilters") }}</span>
               <OTooltip :content="t('traces.reviewAndApplyFilters')" />
             </OButton>
@@ -173,9 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-xs"
               :aria-label="t('onlineEvals.manualEvaluation.titles.trace')"
+              icon-left="rule"
               @click="openTraceEvaluation"
             >
-              <OIcon name="rule" size="sm" />
               <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.trace')" />
             </OButton>
 
@@ -199,10 +203,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('aiObservability.traceActions.annotate.button')"
                 data-test="trace-details-annotate-trace-btn"
                 class="toolbar-btn-rest"
+                icon-right="lock"
                 @click="openUpgradeDialog"
               >
                 <OIcon name="fact-check" size="sm" />
-                <template #icon-right><OIcon name="lock" size="xs" class="lock-chip" /></template>
               </OButton>
             </template>
 
@@ -243,9 +247,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="toolbar-btn-rest"
               variant="outline"
               size="icon-xs"
+              icon-left="close"
+              :aria-label="t('common.close')"
               @click="handleBackOrClose"
             >
-              <OIcon name="close" size="sm" />
               <OTooltip :content="t('common.close')" />
             </OButton>
           </template>
@@ -265,9 +270,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-muted"
               size="icon-xs"
               class="me-1.5"
+              icon-left="arrow-back"
               @click="handleBackOrClose"
+              :aria-label="
+                areFiltersAdded ? t('traces.applyPendingFilters') : t('traces.backToTraces')
+              "
             >
-              <OIcon name="arrow-back" size="sm" />
               <OTooltip
                 :content="
                   areFiltersAdded ? t('traces.applyPendingFilters') : t('traces.backToTraces')
@@ -318,9 +326,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs"
                   icon-left="content-copy"
-                  :title="t('traces.copyTraceId')"
+                  :aria-label="t('traces.copyTraceId')"
                   @click="copyTraceId"
-                />
+                >
+                  <OTooltip :content="t('traces.copyTraceId')" />
+                </OButton>
 
                 <!-- Session ID (LLM traces) -->
                 <template v-if="sessionId">
@@ -340,9 +350,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-xs"
                     icon-left="content-copy"
-                    :title="t('traces.traceDetails.copySessionId')"
+                    :aria-label="t('traces.traceDetails.copySessionId')"
                     @click="copySessionId"
-                  />
+                  >
+                    <OTooltip :content="t('traces.traceDetails.copySessionId')" />
+                  </OButton>
                 </template>
 
                 <!-- Open in new icon (embedded mode only) -->
@@ -352,9 +364,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs"
                   icon-left="open-in-new"
-                  :title="t('traces.openInTraces')"
+                  :aria-label="t('traces.openInTraces')"
                   @click="handleExpandToFullView"
-                />
+                >
+                  <OTooltip :content="t('traces.openInTraces')" />
+                </OButton>
               </div>
 
               <div class="bg-text-label h-4 w-px py-0" />
@@ -409,9 +423,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="xs"
               class="me-2.5"
+              icon-left="filter-alt"
               @click="openFilterPopover"
             >
-              <template #icon-left><OIcon name="filter-alt" size="xs" /></template>
               <span class="text-xs">{{ t("traces.viewFilters") }}</span>
               <OTooltip :content="t('traces.reviewAndApplyFilters')" />
             </OButton>
@@ -422,9 +436,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-expand-btn"
               variant="outline"
               size="icon-xs"
+              icon-left="open-in-new"
+              :aria-label="t('traces.openInTraces')"
               @click="handleExpandToFullView"
             >
-              <OIcon name="open-in-new" size="sm" />
               <OTooltip :content="t('traces.openInTraces')" />
             </OButton>
 
@@ -445,9 +460,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-xs"
               class="me-1!"
+              icon-left="close"
+              :aria-label="t('common.close')"
               @click="handleBackOrClose"
             >
-              <OIcon name="close" size="sm" />
               <OTooltip :content="t('common.close')" />
             </OButton>
           </div>
@@ -555,9 +571,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :disabled="!searchResults || currentIndex === 0"
                     variant="ghost-muted"
                     size="icon"
+                    icon-left="keyboard-arrow-up"
+                    :aria-label="t('traces.previousMatch')"
                     @click="prevMatch"
                   >
-                    <OIcon name="keyboard-arrow-up" size="sm" />
                     <OTooltip :content="t('traces.previousMatch')" />
                   </OButton>
                   <div class="bg-card-glass-border mx-0.5 h-[1.125rem] w-px"></div>
@@ -566,9 +583,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :disabled="!searchResults || currentIndex + 1 === searchResults"
                     variant="ghost-muted"
                     size="icon"
+                    icon-left="keyboard-arrow-down"
+                    :aria-label="t('traces.nextMatch')"
                     @click="nextMatch"
                   >
-                    <OIcon name="keyboard-arrow-down" size="sm" />
                     <OTooltip :content="t('traces.nextMatch')" />
                   </OButton>
                 </div>
@@ -641,10 +659,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   disabled
+                  icon-left="lock"
                 >
-                  <template #icon-left>
-                    <OIcon name="lock" class="lock-chip" size="sm" />
-                  </template>
                   {{ t("rum.playSessionReplay") }}
                 </OButton>
               </span>
@@ -655,11 +671,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm"
               class="ms-1"
+              icon-left="play-circle"
               @click="redirectToSessionReplay"
             >
-              <template #icon-left>
-                <OIcon name="play-circle" size="sm" />
-              </template>
               {{ t("rum.playSessionReplay") }}
             </OButton>
           </div>

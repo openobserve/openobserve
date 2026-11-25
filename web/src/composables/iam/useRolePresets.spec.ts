@@ -630,7 +630,7 @@ describe("useRolePresets - apply", () => {
     await ctx.applyPreset("dashboard_editor", { announce: true });
     expect(mockToast).toHaveBeenCalledWith({
       variant: "success",
-      message: "Dashboard Editor: 1 permission added. Review Changes before you save.",
+      message: "Dashboard editor: 1 permission added. Review Changes before you save.",
     });
   });
 
@@ -643,7 +643,7 @@ describe("useRolePresets - apply", () => {
     expect(added(ctx)).toEqual([]);
     expect(mockToast).toHaveBeenCalledWith({
       variant: "success",
-      message: "Dashboard Editor: 3 permissions restored. Review Changes before you save.",
+      message: "Dashboard editor: 3 permissions restored. Review Changes before you save.",
     });
   });
 

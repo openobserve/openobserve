@@ -128,11 +128,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             class="shrink-0"
             :loading="savingFn"
-            :title="t('function.save')"
             data-test="wf-function-save-btn"
+            icon-left="save"
+            :aria-label="t('function.save')"
             @click="onBottomSave"
           >
-            <OIcon name="save" size="sm" />
+            <OTooltip :content="t('function.save')" />
           </OButton>
         </div>
 
@@ -195,14 +196,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-start gap-2">
                 <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                 <span>
-                  <span class="text-text-link font-bold">{{ t("flow.function.rbf") }}</span>
+                  <span class="text-text-link font-semibold">{{ t("flow.function.rbf") }}</span>
                   {{ t("flow.function.rbfDesc") }}
                 </span>
               </div>
               <div class="flex items-start gap-2">
                 <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                 <span>
-                  <span class="text-text-link font-bold">{{ t("flow.function.raf") }}</span>
+                  <span class="text-text-link font-semibold">{{ t("flow.function.raf") }}</span>
                   {{ t("flow.function.rafDesc") }}
                 </span>
               </div>

@@ -127,19 +127,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="replay-10"
               size="md"
-              class="text-icon-color hover:text-button-primary me-2 cursor-pointer"
+              class="text-text-secondary hover:text-button-primary me-2 cursor-pointer"
               @click="skipTo('backward')"
             />
             <OIcon
               :name="playerState.isPlaying ? 'pause-circle-filled' : 'play-circle-filled'"
               size="lg"
-              class="text-icon-color hover:text-button-primary cursor-pointer"
+              class="text-text-secondary hover:text-button-primary cursor-pointer"
               @click="togglePlay"
             />
             <OIcon
               name="forward-10"
               size="md"
-              class="text-icon-color hover:text-button-primary ms-2 cursor-pointer"
+              class="text-text-secondary hover:text-button-primary ms-2 cursor-pointer"
               @click="skipTo('forward')"
             />
           </div>

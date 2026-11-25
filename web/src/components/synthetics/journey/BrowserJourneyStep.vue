@@ -28,6 +28,7 @@ import { ACTION_ICONS, ACTION_LABEL_KEYS } from "@/constants/synthetics";
  */
 export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -235,9 +236,14 @@ function toggleExpanded() {
             expanded ? t('synthetics.journey.collapseStep') : t('synthetics.journey.expandStep')
           "
           data-test="synthetics-journey-step-expand-btn"
+          :icon-left="expanded ? 'expand-less' : 'expand-more'"
           @click="toggleExpanded"
         >
-          <OIcon :name="expanded ? 'expand-less' : 'expand-more'" size="sm" aria-hidden="true" />
+          <OTooltip
+            :content="
+              expanded ? t('synthetics.journey.collapseStep') : t('synthetics.journey.expandStep')
+            "
+          />
         </OButton>
 
         <OButton
@@ -246,9 +252,10 @@ function toggleExpanded() {
           :aria-label="t('synthetics.journey.insertStepBelow')"
           data-test="synthetics-journey-step-insert-btn"
           :disabled="replayLocked"
+          icon-left="add"
           @click="emit('insert-below')"
         >
-          <OIcon name="add" size="sm" aria-hidden="true" />
+          <OTooltip :content="t('synthetics.journey.insertStepBelow')" />
         </OButton>
 
         <OButton
@@ -257,9 +264,10 @@ function toggleExpanded() {
           :aria-label="t('synthetics.journey.duplicateStep')"
           data-test="synthetics-journey-step-duplicate-btn"
           :disabled="replayLocked"
+          icon-left="content-copy"
           @click="emit('duplicate')"
         >
-          <OIcon name="content-copy" size="sm" aria-hidden="true" />
+          <OTooltip :content="t('synthetics.journey.duplicateStep')" />
         </OButton>
 
         <OButton
@@ -269,9 +277,10 @@ function toggleExpanded() {
           data-test="synthetics-journey-step-delete-btn"
           :disabled="replayLocked"
           class="hover:text-status-error-text"
+          icon-left="delete"
           @click="emit('delete')"
         >
-          <OIcon name="delete" size="sm" aria-hidden="true" />
+          <OTooltip :content="t('synthetics.journey.deleteStepAria')" />
         </OButton>
       </div>
     </div>
@@ -306,9 +315,9 @@ function toggleExpanded() {
             size="xs"
             class="text-text-link text-xs"
             data-test="synthetics-journey-step-stack-toggle"
+            :icon-left="showStackTrace ? 'expand-less' : 'expand-more'"
             @click="toggleStackTrace"
           >
-            <OIcon :name="showStackTrace ? 'expand-less' : 'expand-more'" size="xs" />
             {{
               showStackTrace
                 ? t("synthetics.journey.hideStackTrace")
@@ -322,9 +331,10 @@ function toggleExpanded() {
             variant="ghost"
             size="xs"
             data-test="synthetics-journey-step-stack-copy"
+            icon-left="content-copy"
             @click.stop="copyStackTrace"
           >
-            <OIcon name="content-copy" size="xs" />
+            <OTooltip :content="t('common.copyToClipboard')" />
           </OButton>
         </div>
         <pre
@@ -358,8 +368,8 @@ function toggleExpanded() {
           variant="outline"
           size="xs"
           data-test="synthetics-journey-error-retry-btn"
-          @click="emit('retry-replay')"
           icon-left="replay"
+          @click="emit('retry-replay')"
         >
           {{ t("synthetics.journey.reRun") }}
         </OButton>

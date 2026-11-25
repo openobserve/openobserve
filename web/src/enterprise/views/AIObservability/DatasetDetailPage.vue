@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :disabled="!dataset"
           data-test="ai-dataset-detail-upload-csv"
+          icon-left="file-upload"
           @click="openCsvImport"
         >
           {{ t("aiObservability.datasets.detail.csvImport.button") }}

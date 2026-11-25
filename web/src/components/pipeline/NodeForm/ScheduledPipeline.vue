@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="collapseFieldList"
         >
           <OIcon name="expand-all" size="sm" class="mt-2.5 rotate-90 text-xl" />
-          <div class="text-xs font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
+          <div class="text-xs font-semibold [text-orientation:mixed] [writing-mode:vertical-rl]">
             {{ t("pipeline.buildQuery") }}
           </div>
         </div>
@@ -239,9 +239,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         class="flex items-center gap-2"
                       >
-                        <div class="flex w-40 shrink-0 items-center gap-1 font-bold">
+                        <div class="flex w-40 shrink-0 items-center gap-1 font-semibold">
                           <span>{{ t("pipeline.trigger") }}</span>
-                          <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
+                          <OIcon name="info" size="sm" class="text-text-secondary cursor-pointer">
                             <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span class="text-sm">
@@ -269,7 +269,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="scheduled-pipeline-promlq-condition-value"
                         />
                       </div>
-                      <div v-if="tab === 'custom'" class="mb-4 flex items-center gap-2 font-bold">
+                      <div
+                        v-if="tab === 'custom'"
+                        class="mb-4 flex items-center gap-2 font-semibold"
+                      >
                         <div data-test="scheduled-pipeline-aggregation-title" class="w-43 shrink-0">
                           {{ t("pipeline.aggregation") }}
                         </div>
@@ -286,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <div
                           data-test="scheduled-pipeline-group-by-title"
-                          class="font-bold"
+                          class="font-semibold"
                           style="width: 11.875rem"
                         >
                           {{ t("alerts.groupBy") }}
@@ -338,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <div
                           data-test="scheduled-pipeline-threshold-title"
-                          class="flex items-center font-bold"
+                          class="flex items-center font-semibold"
                           style="width: 11.875rem"
                         >
                           {{ t("alerts.threshold") + " *" }}
@@ -474,10 +477,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex items-center gap-2">
                         <div
                           data-test="scheduled-pipeline-cron-toggle-title"
-                          class="flex w-40 shrink-0 items-center gap-1 font-bold"
+                          class="flex w-40 shrink-0 items-center gap-1 font-semibold"
                         >
                           <span>{{ t("alerts.crontitle") + " *" }}</span>
-                          <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
+                          <OIcon name="info" size="sm" class="text-text-secondary cursor-pointer">
                             <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span class="text-sm">
@@ -495,10 +498,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex items-start gap-2">
                         <div
                           data-test="scheduled-pipeline-frequency-title"
-                          class="flex w-40 shrink-0 items-center gap-1 pt-2 font-bold"
+                          class="flex w-40 shrink-0 items-center gap-1 pt-2 font-semibold"
                         >
                           <span>{{ t("alerts.frequency") + " *" }}</span>
-                          <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
+                          <OIcon name="info" size="sm" class="text-text-secondary cursor-pointer">
                             <OTooltip side="right">
                               <template #content>
                                 <span class="text-sm" v-if="triggerData.frequency_type == 'minutes'"
@@ -595,10 +598,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex items-start gap-2">
                         <div
                           data-test="scheduled-pipeline-period-title"
-                          class="flex w-40 shrink-0 items-center gap-1 pt-2 font-bold"
+                          class="flex w-40 shrink-0 items-center gap-1 pt-2 font-semibold"
                         >
                           <span>{{ t("alerts.period") + " *" }}</span>
-                          <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
+                          <OIcon name="info" size="sm" class="text-text-secondary cursor-pointer">
                             <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span class="text-sm">
@@ -660,10 +663,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex items-center gap-2">
                         <div
                           data-test="scheduled-pipeline-delay-title"
-                          class="flex w-40 shrink-0 items-center gap-1 font-bold"
+                          class="flex w-40 shrink-0 items-center gap-1 font-semibold"
                         >
                           <span>{{ t("pipeline.delay") }}</span>
-                          <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
+                          <OIcon name="info" size="sm" class="text-text-secondary cursor-pointer">
                             <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span class="text-sm"

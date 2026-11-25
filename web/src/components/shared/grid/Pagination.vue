@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="me-4 text-xs font-semibold">{{ t("search.maxRecords") }}</span>
       <OInput v-model="maxRecords" @blur="changeMaxRecordToReturn" />
     </div>
-    <div v-if="position === 'top' && pageTitle" class="flex items-center font-bold">
+    <div v-if="position === 'top' && pageTitle" class="flex items-center font-semibold">
       <OButton
         v-if="collapsibleIcon === 'show' && searchCollapseImage == 'collapse_sidebar_icon'"
         :aria-label="t('common.collapse')"

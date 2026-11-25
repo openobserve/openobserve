@@ -82,9 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="xs"
           data-test="oncall-phone-telephony-link"
+          icon-left="settings"
           @click="openTelephony"
-        >
-          <OIcon name="settings" size="sm" />{{ t("oncall.reachSetUp") }}
+          >{{ t("oncall.reachSetUp") }}
           <OTooltip :content="t('oncall.phoneSetUpHint')" />
         </OButton>
         <OnCallHint
@@ -236,7 +236,6 @@ import OnCallHint from "@/components/oncall/OnCallHint.vue";
 import OnCallReachRow from "@/components/oncall/OnCallReachRow.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

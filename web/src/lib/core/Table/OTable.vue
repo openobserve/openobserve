@@ -49,6 +49,7 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import { useTablePagination } from "./composables/useTablePagination";
 import { useTableSorting } from "./composables/useTableSorting";
 import { useTableSelection } from "./composables/useTableSelection";
+import { useScrollHoverGuard } from "./composables/useScrollHoverGuard";
 import { useTableExpansion } from "./composables/useTableExpansion";
 import {
   useTableTree,
@@ -64,6 +65,7 @@ import { useTableRowShortcuts } from "./composables/useTableRowShortcuts";
 import OTableHeader from "./sub-components/OTableHeader.vue";
 import OTableBody from "./sub-components/OTableBody.vue";
 import OTablePagination from "./sub-components/OTablePagination.vue";
+import OTableSelectionBar from "./sub-components/OTableSelectionBar.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTableEmpty from "./sub-components/OTableEmpty.vue";
@@ -92,7 +94,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   showSelectAll: true,
   expansion: "none",
   virtualScroll: false,
-  virtualScrollItemSize: 38,
+  virtualScrollItemSize: 48,
   enableColumnResize: false,
   enableColumnReorder: false,
   enableColumnPin: false,
@@ -773,6 +775,13 @@ const selection = useTableSelection(
   },
   emit,
 );
+const selectionBarShown = computed(() => !coldLoading.value && selection.selectedCount.value > 0);
+const selectionBarProps = computed(() => ({
+  selectedCount: selection.selectedCount.value,
+  totalCount: pagerView.value.totalCount,
+  totalCountExact: props.totalCountExact,
+  stale: staleDimmed.value,
+}));
 
 // ── Expansion ───────────────────────────────────────────────────
 const expansion = useTableExpansion<TData>(
@@ -982,9 +991,9 @@ const {
   // rebind once either resolves after mount.
   scrollEl: () => props.scrollEl ?? scrollContainerRef.value ?? null,
   scrollMargin: props.scrollMargin ?? 0,
-  // Keep this in sync with the --table-row-height-* tokens (dense 28px, normal 44px) so the
+  // Keep this in sync with the --table-row-height-* tokens (dense = 38px) so the
   // virtualizer's measured height matches the actual rendered row height.
-  rowHeight: props.rowHeight ?? (props.compact ? 25 : props.dense ? 28 : 44),
+  rowHeight: props.rowHeight ?? (props.compact ? 25 : props.dense ? 38 : 54),
   overscan: props.overscan ?? 100,
   dynamicRowHeight: () => useDynamicRowHeight.value,
   includeExpansionRow: () => measuresExpandedRows.value,
@@ -1029,6 +1038,8 @@ const isVirtual = computed(() => props.virtualScroll && displayRows.value.length
 // With an external `scrollEl` the table must not create its own scroll container,
 // or a second nested scrollbar appears; it flows into the caller's element instead.
 const isDelegatedScroll = computed(() => !!props.scrollEl);
+// Rows sliding under a still cursor would flash their hover fill and hover-revealed actions.
+const scrolling = useScrollHoverGuard(() => props.scrollEl ?? scrollContainerRef.value);
 
 // ── Per-column CSS size-var overrides ──────────────────────────
 // Override channel the table style/sums read from, overriding the nominal sizes
@@ -1587,8 +1598,9 @@ defineExpose({
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
         :class="[
-          'px-page-edge flex flex-wrap items-center gap-2 py-2',
+          'px-page-edge relative flex flex-wrap items-center gap-2 py-2',
           props.toolbarBordered ? 'border-table-row-divider border-b' : '',
+          selectionBarShown && slots['selection-actions'] ? 'invisible' : '',
         ]"
         data-test="o2-table-toolbar"
       >
@@ -1614,7 +1626,24 @@ defineExpose({
           />
           <slot name="toolbar-trailing" />
         </div>
+        <!-- Covers the toolbar instead of replacing it, so the search and filters keep their state and the rows do not move. -->
+        <OTableSelectionBar
+          v-if="selectionBarShown && slots['selection-actions']"
+          v-bind="selectionBarProps"
+          class="visible absolute inset-x-0 top-0 min-h-full"
+          @clear="selection.clearSelection"
+        >
+          <slot name="selection-actions" />
+        </OTableSelectionBar>
       </div>
+      <OTableSelectionBar
+        v-else-if="selectionBarShown && slots['selection-actions']"
+        v-bind="selectionBarProps"
+        class="border-selected-border border-b"
+        @clear="selection.clearSelection"
+      >
+        <slot name="selection-actions" />
+      </OTableSelectionBar>
       <!-- ── Sub-header slot: custom full-width content between the toolbar and
          the table body (e.g. a summary-stat strip). ── -->
       <slot name="subheader" />
@@ -1672,8 +1701,9 @@ defineExpose({
       <!-- ── Scrollable table area ────────────────────────────── -->
       <div
         ref="scrollContainerRef"
+        :data-scrolling="scrolling || undefined"
         :class="[
-          'relative flex min-h-0 flex-col',
+          'relative flex min-h-0 flex-col data-scrolling:[&_tbody]:pointer-events-none',
           isDelegatedScroll
             ? 'overflow-visible'
             : ['overflow-y-auto', allowHorizontalScroll ? 'overflow-x-auto' : 'overflow-x-hidden'],
@@ -1760,7 +1790,7 @@ defineExpose({
                 : props.compact
                   ? 'var(--table-row-height-compact, 1.5625rem)'
                   : props.dense
-                    ? 'var(--table-row-height-dense, 1.75rem)'
+                    ? 'var(--table-row-height-dense, 2.25rem)'
                     : 'var(--table-row-height-normal, 2.75rem)',
           }"
           data-test="o2-table"
@@ -2158,7 +2188,6 @@ defineExpose({
         :loading="coldLoading"
         :pending="heldLoading"
         :stale="staleDimmed"
-        :selected-count="selection.selectedCount.value"
         :bordered="props.paginationBordered"
         :range-hidden="showError"
         @update:page-size="pagination.setPageSize"
@@ -2167,9 +2196,6 @@ defineExpose({
         @next-page="pagination.nextPage"
         @last-page="pagination.lastPage"
       >
-        <template v-if="slots['selection-actions']" #selection-actions>
-          <slot name="selection-actions" />
-        </template>
         <template v-if="slots['footer-note']" #footer-note>
           <slot name="footer-note" />
         </template>

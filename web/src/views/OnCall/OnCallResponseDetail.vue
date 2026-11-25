@@ -267,9 +267,9 @@
             :disabled="escalation?.exhausted"
             :focusable-unavailable="escalation?.exhausted"
             data-test="oncall-response-escalate-btn"
+            icon-left="trending-up"
             @click="escalateNow"
-          >
-            <OIcon name="trending-up" size="sm" />{{ t("oncall.escalate") }}
+            >{{ t("oncall.escalate") }}
             <template v-if="escalation?.exhausted" #unavailable-reason>{{
               t("oncall.ladderExhausted")
             }}</template>
@@ -282,9 +282,9 @@
           variant="outline"
           size="sm"
           data-test="oncall-response-handoff-btn"
+          icon-left="swap-horiz"
           @click="showHandoff = true"
-        >
-          <OIcon name="swap-horiz" size="sm" />{{ t("oncall.handoff") }}
+          >{{ t("oncall.handoff") }}
         </OButton>
       </template>
 
@@ -299,9 +299,9 @@
         variant="outline"
         size="sm"
         data-test="oncall-response-promote-btn"
+        icon-left="local-fire-department"
         @click="promoteOpen = true"
-      >
-        <OIcon name="local-fire-department" size="sm" />{{ t("oncall.promote") }}
+        >{{ t("oncall.promote") }}
       </OButton>
 
       <template v-if="response && isOpenState">
@@ -315,9 +315,9 @@
           size="sm"
           :loading="confirmingRecovery"
           data-test="oncall-response-confirm-recovery-btn"
+          icon-left="task-alt"
           @click="confirmRecoveryOpen = true"
-        >
-          <OIcon name="task-alt" size="sm" />{{ t("oncall.confirmRecovery") }}
+          >{{ t("oncall.confirmRecovery") }}
         </OButton>
         <OButton
           v-else
@@ -325,9 +325,9 @@
           size="sm"
           :loading="resolving"
           data-test="oncall-response-resolve-btn"
+          icon-left="task-alt"
           @click="confirmResolve = true"
-        >
-          <OIcon name="task-alt" size="sm" />{{ t("oncall.resolve") }}
+          >{{ t("oncall.resolve") }}
         </OButton>
       </template>
 
@@ -340,7 +340,9 @@
             :loading="snoozing || escalatingNow"
             :aria-label="t('oncall.moreActions')"
             data-test="oncall-response-more-btn"
-          />
+          >
+            <OTooltip :content="t('oncall.moreActions')" />
+          </OButton>
         </template>
         <ODropdownItem
           v-if="canUnsnooze"
@@ -468,9 +470,9 @@
               size="sm"
               :loading="snoozing"
               data-test="oncall-response-snoozed-banner-unsnooze"
+              icon-left="notifications-active"
               @click="unsnoozeRecord"
-            >
-              <OIcon name="notifications-active" size="sm" />{{ t("oncall.unsnooze") }}
+              >{{ t("oncall.unsnooze") }}
             </OButton>
           </template>
         </OBanner>

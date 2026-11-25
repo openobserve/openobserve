@@ -1,7 +1,7 @@
 <template>
-  <div class="flex flex-wrap items-center">
+  <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
     <div
-      class="me-4 mb-2 flex flex-nowrap items-center gap-x-1"
+      class="flex flex-nowrap items-center gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
@@ -41,12 +41,13 @@
     </div>
     <OButton
       variant="ghost"
-      size="sm"
-      class="hideOnPrintMode ms-1 mb-2"
+      size="icon-toolbar"
+      class="toolbar-btn-rest hideOnPrintMode"
+      :aria-label="t('dashboard.variableAdHocValueSelector.addDynamicFilter')"
       @click="addFields"
       data-test="dashboard-variable-adhoc-add-selector"
     >
-      <DynamicFilterIcon />
+      <DynamicFilterIcon class="size-4" />
       <OTooltip :content="t('dashboard.variableAdHocValueSelector.addDynamicFilter')" />
     </OButton>
   </div>

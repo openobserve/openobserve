@@ -144,7 +144,7 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="text-text-secondary text-compact ms-2 flex items-center font-bold"
+            class="text-text-secondary text-compact ms-2 flex items-center font-semibold"
           >
             <OSpinner size="xs" />
             <div class="relative top-0.5">
@@ -205,7 +205,7 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="text-text-secondary text-compact ms-2 flex items-center text-sm font-bold font-medium"
+            class="text-text-secondary text-compact ms-2 flex items-center text-sm font-medium font-semibold"
           >
             <OSpinner size="xs" />
             <div class="relative top-0.5">

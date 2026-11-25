@@ -123,9 +123,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('common.delete')"
                 variant="ghost-destructive"
                 size="icon-xs-sq"
+                icon-left="delete"
                 @click="removeHeader(idx)"
               >
-                <OIcon name="delete" size="xs" />
+                <OTooltip :content="t('common.delete')" />
               </OButton>
             </div>
             <OButton variant="outline" size="sm" class="mb-4" @click="addHeader" icon-left="add">
@@ -200,6 +201,7 @@ import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -229,6 +231,7 @@ interface AiToolsetDraftData extends Omit<AddAiToolsetForm, "mcp"> {
 export default defineComponent({
   name: "AddAiToolset",
   components: {
+    OTooltip,
     OPageLayout,
     OButton,
     OIcon,

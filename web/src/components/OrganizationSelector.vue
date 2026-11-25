@@ -385,10 +385,8 @@ useShortcuts([
           data-test="navbar-organizations-select-trigger"
           class="text-text-body! w-56 max-md:w-full max-md:max-w-28 md:max-xl:w-full"
           :class="open ? 'ring-focus-ring-accent ring-2 ring-inset' : ''"
+          icon-left="domain"
         >
-          <template #icon-left>
-            <OIcon name="domain" size="sm" class="shrink-0 opacity-60" />
-          </template>
           <OTruncatedText v-if="current?.label" class="flex-1 text-left">{{
             current.label
           }}</OTruncatedText>
@@ -570,7 +568,11 @@ useShortcuts([
                     :aria-label="t('common.copyOrganizationId', { id: v.row.org.identifier })"
                     data-test="organization-menu-item-copy-id"
                     @click.stop="copyId(v.row.org)"
-                  />
+                  >
+                    <OTooltip
+                      :content="t('common.copyOrganizationId', { id: v.row.org.identifier })"
+                    />
+                  </OButton>
                 </div>
                 <OIcon
                   v-if="isSelected(v.row.org)"

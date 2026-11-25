@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="refresh"
             :loading="isLoading"
             data-test="source-maps-refresh-btn"
+            :aria-label="t('common.refresh')"
             @click="fetchSourceMaps"
           >
             <OTooltip
@@ -161,10 +162,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`source-maps-${row.service}-delete`"
             variant="ghost-destructive"
             size="icon-sm"
-            :title="t('common.delete')"
+            icon-left="delete"
+            :aria-label="t('common.delete')"
             @click="confirmDeleteSourceMap(row)"
           >
-            <OIcon name="delete" size="sm" />
+            <OTooltip :content="t('common.delete')" />
           </OButton>
         </template>
 
@@ -239,7 +241,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";

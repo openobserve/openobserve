@@ -236,14 +236,10 @@ function failedAtStep(steps: StepResult[]): string {
             size="xs"
             class="w-full justify-start gap-2 px-4 py-2.5 text-left text-xs font-medium"
             :data-test="`synthetics-run-row-toggle-location-${group.location}-btn`"
+            :icon-left="expandedLocations.has(group.location) ? 'expand-more' : 'chevron-right'"
             @click="toggleLocation(group.location)"
           >
-            <OIcon
-              :name="expandedLocations.has(group.location) ? 'expand_more' : 'chevron_right'"
-              size="sm"
-              class="text-text-muted shrink-0"
-            />
-            <span :class="STATUS_COLOR[group.status]" class="text-sm font-bold">
+            <span :class="STATUS_COLOR[group.status]" class="text-sm font-semibold">
               {{ statusDot(group.status) }}
             </span>
             <span class="text-text-heading font-semibold">{{ group.location }}</span>

@@ -170,7 +170,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('rum.analytics.events.edit')"
                 :data-test="`rum-analytics-named-events-row-${index}-edit-btn`"
                 @click="openEdit(row)"
-              />
+              >
+                <OTooltip :content="t('rum.analytics.events.edit')" />
+              </OButton>
               <OTooltip :content="canWrite ? t('rum.analytics.events.edit') : readOnlyTip" />
             </span>
             <span class="max-md:hidden">
@@ -180,9 +182,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="!canCreate"
                 :aria-label="duplicateDraftLabel(row, t('rum.analytics.events.duplicate'))"
                 :data-test="`rum-analytics-named-events-row-${index}-duplicate-btn`"
+                icon-left="content-copy"
                 @click="duplicate(row)"
               >
-                <OIcon name="content-copy" size="sm" />
                 <EditorDraftDot
                   v-if="hasDuplicateDraft(row)"
                   corner
@@ -201,7 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('rum.analytics.events.delete')"
                 :data-test="`rum-analytics-named-events-row-${index}-delete-btn`"
                 @click="remove(row)"
-              />
+              >
+                <OTooltip :content="t('rum.analytics.events.delete')" />
+              </OButton>
               <OTooltip :content="canWrite ? t('rum.analytics.events.delete') : readOnlyTip" />
             </span>
             <ODropdown side="bottom" align="end">
@@ -322,7 +326,6 @@ import { useListViewState } from "@/composables/useListViewState";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";

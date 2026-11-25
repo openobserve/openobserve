@@ -319,11 +319,13 @@
             :aria-label="t('serviceVersions.panel.deployCount', { count: row.history.length })"
             :data-test="`svcver-expand-${row.version_key}`"
             :aria-expanded="expanded.includes(row.version_key)"
+            :icon-left="expanded.includes(row.version_key) ? 'expand-less' : 'expand-more'"
             @click.stop="toggle(row.version_key)"
-            ><OIcon
-              :name="expanded.includes(row.version_key) ? 'expand-less' : 'expand-more'"
-              size="sm"
-          /></OButton>
+          >
+            <OTooltip
+              :content="t('serviceVersions.panel.deployCount', { count: row.history.length })"
+            />
+          </OButton>
           <!-- Rows without history keep the expander's slot, so every row's label sits at one edge. -->
           <span v-else class="size-6 shrink-0" aria-hidden="true" />
         </template>

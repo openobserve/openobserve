@@ -11,11 +11,11 @@
         variant="ghost"
         size="icon-xs-circle"
         data-test="logs-cell-actions-copy-btn"
-        @click.prevent.stop="copyLogToClipboard(cellValue)"
-        :title="t('logs.cellActions.copy')"
+        icon-left="content-copy"
         :aria-label="t('logs.cellActions.copy')"
+        @click.prevent.stop="copyLogToClipboard(cellValue)"
       >
-        <OIcon name="content-copy" size="xs" />
+        <OTooltip :content="t('logs.cellActions.copy')" />
       </OButton>
     </span>
     <span v-if="isStreamField && !hideSearchTermActions" class="me-1">
@@ -65,6 +65,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 

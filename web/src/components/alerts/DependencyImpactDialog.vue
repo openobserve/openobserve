@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dependency-impact-lane-destination"
             >
               <div class="mb-1.5 flex items-center gap-1.5 px-1">
-                <OIcon name="location-on" size="sm" class="text-info" />
+                <OIcon name="location-on" size="sm" class="text-status-info-text" />
                 <span class="text-text-secondary text-2xs font-semibold">
                   {{ t("alert_dependencies.sectionDestinations") }}
                 </span>
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @mouseleave="hoveredDest = null"
                     @click="scrollToGroup(g.dest)"
                   >
-                    <OIcon name="location-on" size="xs" class="text-info shrink-0" />
+                    <OIcon name="location-on" size="xs" class="text-status-info-text shrink-0" />
                     <OTruncatedText>{{ g.dest.name }}</OTruncatedText>
                   </div>
                   <!-- Hovering an alert highlights its destination card(s). -->

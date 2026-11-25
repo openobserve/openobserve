@@ -25,7 +25,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import type { FilterField } from "@/utils/query/filterBar";
 
@@ -156,18 +156,19 @@ function removeHeader(index: number) {
             size="icon-sm"
             :aria-label="t('common.delete')"
             :data-test="`synthetics-check-http-header-remove-${i}`"
+            icon-left="close"
             @click="removeHeader(i)"
           >
-            <template #icon-left><OIcon name="close" size="xs" /></template>
+            <OTooltip :content="t('common.delete')" />
           </OButton>
         </div>
         <OButton
           variant="outline"
           size="sm"
           data-test="synthetics-check-http-add-header-btn"
+          icon-left="add"
           @click="addHeader"
         >
-          <template #icon-left><OIcon name="add" size="xs" /></template>
           {{ t("synthetics.protocolConfig.http.addHeader") }}
         </OButton>
       </div>

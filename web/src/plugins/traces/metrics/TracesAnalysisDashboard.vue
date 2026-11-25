@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleDimensionSelector"
         >
           <OIcon name="expand-all" size="sm" class="mt-2.5 rotate-90 text-xl" />
-          <div class="text-xs font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
+          <div class="text-xs font-semibold [text-orientation:mixed] [writing-mode:vertical-rl]">
             {{ t("traces.tracesAnalysisDashboard.dimensions") }}
           </div>
         </div>
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="mb-4"
                     data-test="traces-analysis-dashboard-loading-indicator"
                   />
-                  <div class="text-base">
+                  <div class="text-compact">
                     {{ t("latencyInsights.analyzingDimensions") }}
                   </div>
                   <div class="text-text-secondary mt-2 text-xs">

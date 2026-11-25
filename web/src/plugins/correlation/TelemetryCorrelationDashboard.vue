@@ -116,8 +116,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="logsDashboardData"
             class="border-card-glass-border flex justify-end border-b border-solid p-2"
           >
-            <OButton variant="ghost" size="sm-action" @click="loadDashboard" :loading="loading">
-              <OIcon name="refresh" size="xs" class="me-1" />
+            <OButton
+              variant="ghost"
+              size="sm-action"
+              icon-left="refresh"
+              @click="loadDashboard"
+              :loading="loading"
+            >
               {{ t("common.refresh") }}
             </OButton>
           </div>
@@ -190,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @click="toggleGroupCollapse(group.id)"
                         >
                           <div
-                            class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
+                            class="text-2xs flex items-center gap-1.5 font-semibold tracking-[0.05em] uppercase opacity-75"
                           >
                             <OIcon
                               :name="
@@ -370,8 +375,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mb-4 text-sm opacity-70">
                       {{ error || t("correlation.metricsErrorDetails") }}
                     </div>
-                    <OButton variant="ghost" size="sm-action" @click="loadDashboard">
-                      <OIcon name="refresh" size="xs" class="me-1" />
+                    <OButton
+                      variant="ghost"
+                      size="sm-action"
+                      icon-left="refresh"
+                      @click="loadDashboard"
+                    >
                       {{ t("correlation.retryButton") }}
                     </OButton>
                   </div>
@@ -450,8 +459,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-4 text-sm opacity-70">
                   {{ tracesError || t("correlation.tracesErrorDetails") }}
                 </div>
-                <OButton variant="ghost" size="sm-action" @click="loadCorrelatedTraces">
-                  <OIcon name="refresh" size="xs" class="me-1" />
+                <OButton
+                  variant="ghost"
+                  size="sm-action"
+                  icon-left="refresh"
+                  @click="loadCorrelatedTraces"
+                >
                   {{ t("correlation.retryButton") }}
                 </OButton>
               </div>
@@ -568,8 +581,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="logsDashboardData"
           class="border-card-glass-border flex justify-end border-b border-solid p-2"
         >
-          <OButton variant="ghost" size="sm-action" @click="loadDashboard" :loading="loading">
-            <OIcon name="refresh" size="xs" class="me-1" />
+          <OButton
+            variant="ghost"
+            size="sm-action"
+            icon-left="refresh"
+            @click="loadDashboard"
+            :loading="loading"
+          >
             {{ t("common.refresh") }}
           </OButton>
         </div>
@@ -647,7 +665,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="toggleGroupCollapse(group.id)"
                       >
                         <div
-                          class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
+                          class="text-2xs flex items-center gap-1.5 font-semibold tracking-[0.05em] uppercase opacity-75"
                         >
                           <OIcon
                             :name="collapsedGroups.has(group.id) ? 'chevron-right' : 'expand-more'"
@@ -825,8 +843,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="mb-4 text-sm opacity-70">
                     {{ error || t("correlation.metricsErrorDetails") }}
                   </div>
-                  <OButton variant="ghost" size="sm-action" @click="loadDashboard">
-                    <OIcon name="refresh" size="xs" class="me-1" />
+                  <OButton
+                    variant="ghost"
+                    size="sm-action"
+                    icon-left="refresh"
+                    @click="loadDashboard"
+                  >
                     {{ t("correlation.retryButton") }}
                   </OButton>
                 </div>
@@ -881,7 +903,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div v-if="tracesLoading" class="flex h-full flex-col items-center justify-center py-20">
             <OSpinner size="xl" class="mb-4" />
-            <div class="text-base">{{ t("correlation.loadingTraces") }}</div>
+            <div class="text-compact">{{ t("correlation.loadingTraces") }}</div>
           </div>
 
           <!-- Error State -->
@@ -890,12 +912,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex h-full flex-col items-center justify-center py-20"
           >
             <OIcon name="error-outline" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
-            <div class="mb-2 text-base">
+            <div class="text-text-heading mb-2 text-sm font-semibold">
               {{ t("correlation.tracesError") }}
             </div>
             <div class="text-text-secondary text-sm">{{ tracesError }}</div>
-            <OButton variant="outline" size="sm-action" class="mt-4" @click="loadCorrelatedTraces">
-              <OIcon name="refresh" size="xs" class="me-1" />
+            <OButton
+              variant="outline"
+              size="sm-action"
+              class="mt-4"
+              icon-left="refresh"
+              @click="loadCorrelatedTraces"
+            >
               {{ t("correlation.retryButton") }}
             </OButton>
           </div>
@@ -960,7 +987,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Initial State (waiting for tab to be shown) -->
           <div v-else class="flex h-full flex-col items-center justify-center py-20">
             <OIcon name="account-tree" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
-            <div class="text-base">
+            <div class="text-text-heading text-sm font-semibold">
               {{ t("correlation.correlatedTraces") }}
             </div>
             <div class="text-text-secondary mt-2 text-sm">
@@ -997,7 +1024,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="bg-section-header-bg border-border-default sticky top-0 z-10 flex items-center justify-between border-b border-solid px-2 py-1.5"
             >
               <div
-                class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
+                class="text-2xs flex items-center gap-1.5 font-semibold tracking-[0.05em] uppercase opacity-75"
               >
                 <OIcon
                   v-if="typeof group.icon === 'string'"

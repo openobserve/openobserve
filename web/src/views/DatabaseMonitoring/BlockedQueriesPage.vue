@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex min-w-0 flex-1 flex-col gap-px">
               <div v-if="row.pill" class="flex min-w-0 items-center gap-1.5">
                 <span
-                  class="text-3xs shrink-0 rounded-full px-1.5 py-px font-bold"
+                  class="text-3xs shrink-0 rounded-full px-1.5 py-px font-semibold"
                   :class="row.pill.tone"
                   :data-test="`dbm-blocked-pill-${row.kind}`"
                 >

@@ -50,12 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedValues.length > 0"
           variant="ghost"
           size="icon"
-          :title="t('search.clearSelection')"
           class="selection-clear-btn"
+          icon-left="close"
+          :aria-label="t('search.clearSelection')"
           @click="clearSelection"
           data-test="field-values-panel-clear-selection-btn"
         >
-          <OIcon name="close" size="xs" />
+          <OTooltip :content="t('search.clearSelection')" />
         </OButton>
       </div>
       <div
@@ -206,6 +207,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { formatLargeNumber } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";

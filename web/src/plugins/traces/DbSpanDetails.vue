@@ -9,7 +9,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 
@@ -145,10 +144,8 @@ const metadataRows = computed(() =>
             size="sm"
             disabled
             data-test="traces-db-span-details-view-trend"
+            icon-left="lock"
           >
-            <template #icon-left>
-              <OIcon name="lock" class="lock-chip" size="sm" />
-            </template>
             {{ t("traces.dbSpanDetails.viewQueryTrend") }}
           </OButton>
         </span>

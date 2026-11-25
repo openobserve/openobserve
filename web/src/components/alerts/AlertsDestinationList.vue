@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm"
+          icon-left="file-upload"
           @click="importDestination"
           data-test="destination-import"
           >{{ t(`dashboard.import`) }}</OButton
@@ -139,11 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline-destructive"
               size="sm"
               :loading="bulkDeleteLoading"
+              icon-left="delete"
               @click="openBulkDeleteDialog"
             >
-              <template #icon-left>
-                <OIcon name="delete" size="sm" />
-              </template>
               {{ t("common.delete") }}
             </OButton>
           </template>
@@ -300,10 +299,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-sq"
                 class="max-md:hidden"
-                :title="t('alert_destinations.exportDestination')"
+                icon-left="download"
+                :aria-label="t('alert_destinations.exportDestination')"
                 @click.stop="exportDestination(row)"
               >
-                <OIcon name="download" size="sm" />
+                <OTooltip :content="t('alert_destinations.exportDestination')" />
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${row.name}-update-destination`"
@@ -311,10 +311,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-sq"
                 class="max-md:hidden"
-                :title="t('alert_destinations.edit')"
+                icon-left="edit"
+                :aria-label="t('alert_destinations.edit')"
                 @click="editDestination(row)"
               >
-                <OIcon name="edit" size="sm" />
+                <OTooltip :content="t('alert_destinations.edit')" />
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${row.name}-delete-destination`"
@@ -322,11 +323,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-sq"
                 class="max-md:hidden"
-                :title="t('alert_destinations.delete')"
                 :loading="deletingDestinations.has(row.name)"
+                icon-left="delete"
+                :aria-label="t('alert_destinations.delete')"
                 @click="conformDeleteDestination(row)"
               >
-                <OIcon name="delete" size="sm" />
+                <OTooltip :content="t('alert_destinations.delete')" />
               </OButton>
               <ODropdown side="bottom" align="end">
                 <template #trigger>
@@ -338,7 +340,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="md:hidden"
                     data-test="alert-destination-list-row-more-actions"
                     @click.stop
-                  />
+                  >
+                    <OTooltip :content="t('common.moreActions')" />
+                  </OButton>
                 </template>
                 <ODropdownItem
                   icon-left="download"
@@ -450,6 +454,7 @@ import type { DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -488,6 +493,7 @@ interface ConformDelete {
 export default defineComponent({
   name: "PageAlerts",
   components: {
+    OTooltip,
     OIcon,
     ORefreshButton,
     AddDestination,

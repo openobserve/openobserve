@@ -176,9 +176,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             :loading="updating"
             :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
+            icon-left="check-circle"
             @click="acknowledgeIncident"
-            ><OIcon name="check-circle" size="sm" aria-hidden="true" />{{
-              t("alerts.incidents.acknowledge")
+            >{{ t("alerts.incidents.acknowledge")
             }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')"
           /></OButton>
           <OButton
@@ -186,8 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             :loading="updating"
+            icon-left="task-alt"
             @click="resolveIncident"
-            ><OIcon name="task-alt" size="sm" />{{ t("alerts.incidents.resolve")
+            >{{ t("alerts.incidents.resolve")
             }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsResolvedTooltip')"
           /></OButton>
           <OButton
@@ -195,8 +196,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             :loading="updating"
+            icon-left="refresh"
             @click="reopenIncident"
-            ><OIcon name="refresh" size="sm" />{{ t("alerts.incidents.reopen")
+            >{{ t("alerts.incidents.reopen")
             }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')"
           /></OButton>
         </template>
@@ -955,7 +957,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'h-16 w-16',
                       correlationError
                         ? correlationError.includes('disambiguation fields')
-                          ? 'text-warning'
+                          ? 'text-status-warning-text'
                           : 'text-status-negative'
                         : 'text-text-muted',
                     ]"
@@ -1021,7 +1023,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="mb-4"
                     data-test="incident-telemetry-loading-indicator"
                   />
-                  <div class="text-base">{{ t("alerts.incidents.loadingCorrelatedMetrics") }}</div>
+                  <div class="text-compact">
+                    {{ t("alerts.incidents.loadingCorrelatedMetrics") }}
+                  </div>
                 </div>
 
                 <!-- Error/No Data State -->
@@ -1041,7 +1045,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'h-16 w-16',
                       correlationError
                         ? correlationError.includes('disambiguation fields')
-                          ? 'text-warning'
+                          ? 'text-status-warning-text'
                           : 'text-status-negative'
                         : 'text-text-muted',
                     ]"
@@ -1111,9 +1115,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     :disabled="correlationLoading"
+                    icon-left="refresh"
+                    :aria-label="t('alerts.incidents.refreshCorrelatedData')"
                     @click="refreshCorrelation"
-                    ><OIcon name="refresh" size="sm" /><OTooltip
-                      :content="t('alerts.incidents.refreshCorrelatedData')"
+                    ><OTooltip :content="t('alerts.incidents.refreshCorrelatedData')"
                   /></OButton>
                 </div>
 
@@ -1127,7 +1132,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="mb-4"
                     data-test="incident-telemetry-loading-indicator"
                   />
-                  <div class="text-base">{{ t("alerts.incidents.loadingCorrelatedTraces") }}</div>
+                  <div class="text-compact">
+                    {{ t("alerts.incidents.loadingCorrelatedTraces") }}
+                  </div>
                 </div>
 
                 <!-- Error/No Data State -->
@@ -1147,7 +1154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'h-16 w-16',
                       correlationError
                         ? correlationError.includes('disambiguation fields')
-                          ? 'text-warning'
+                          ? 'text-status-warning-text'
                           : 'text-status-negative'
                         : 'text-text-muted',
                     ]"

@@ -37,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           variant="ghost"
           size="icon-toolbar"
+          :aria-label="t('menu.aiAssistant')"
           @click="toggleAIChat"
           data-test="add-regex-pattern-open-close-ai-btn"
-          :aria-label="t('menu.aiAssistant')"
           class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
           @mouseenter="isHovered = true"
@@ -111,20 +111,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OBanner>
             <div class="regex-pattern-input-container">
               <div class="flex items-center justify-between">
-                <span class="text-sm leading-5.25 font-bold">{{
+                <span class="text-sm leading-5.25 font-semibold">{{
                   t("settings.addRegexPattern.regexPatternLabel")
                 }}</span>
                 <OButton
                   v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
                   variant="ghost"
                   size="sm"
+                  icon-right="arrow-right-alt"
                   @click="toggleAIChat"
                 >
                   <img alt="" :src="goToAILogo" class="me-1 h-5 w-5" />
                   <span class="text-brand-indigo flex items-center gap-1 text-sm">
                     {{ t("settings.addRegexPattern.tryAiAssistant") }}
                   </span>
-                  <OIcon size="sm" name="arrow-right-alt" class="text-brand-indigo ms-1 h-5 w-5" />
                 </OButton>
               </div>
               <div class="regex-pattern-input">
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator class="my-2" />
             <div>
               <div class="flex items-center justify-between">
-                <span class="text-sm leading-5.25 font-bold">
+                <span class="text-sm leading-5.25 font-semibold">
                   {{ t("settings.addRegexPattern.testRegexPattern") }}
                 </span>
                 <OButton
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-default border-input-border bg-input-bg flex h-27.75 flex-col items-center justify-center border"
                 >
                   <div v-if="!testLoading && outputStringValue.length === 0">
-                    <OIcon name="lightbulb" size="md" class="text-icon-color" />
+                    <OIcon name="lightbulb" size="md" class="text-text-secondary" />
                     <span class="text-text-secondary text-center text-xs font-[400]">
                       {{ t("settings.addRegexPattern.clickTestInputHint") }}
                     </span>

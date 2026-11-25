@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="previewOf(variant).error"
             :data-test="`metrics-fn-error-${variant.id}`"
           >
-            <OIcon name="error" size="sm" class="text-error-600" />
+            <OIcon name="error" size="sm" class="text-status-error-text" />
             <span>{{ t("metrics.explorer.queryFailed") }}</span>
             <OButton
               variant="ghost-primary"

@@ -42,9 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost-primary"
                 size="xs"
                 class="gap-1 font-medium"
+                icon-left="help"
                 @click="openHelp('template')"
               >
-                <OIcon name="help" size="xs" />
                 <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
               </OButton>
             </div>
@@ -63,10 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-circle-sm"
-                :title="t('alerts.advanced.refreshTemplates')"
+                icon-left="refresh"
+                :aria-label="t('alerts.advanced.refreshTemplates')"
                 @click="$emit('refresh:templates')"
               >
-                <OIcon name="refresh" size="sm" />
+                <OTooltip :content="t('alerts.advanced.refreshTemplates')" />
               </OButton>
             </div>
           </div>
@@ -82,9 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost-primary"
                 size="xs"
                 class="gap-1 font-medium"
+                icon-left="help"
                 @click="openHelp('variables')"
               >
-                <OIcon name="help" size="xs" />
                 <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
               </OButton>
             </div>
@@ -130,9 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-circle-sm"
                   :aria-label="t('common.delete')"
+                  icon-left="delete-outline"
                   @click="removeVariable(index)"
                 >
-                  <OIcon name="delete-outline" size="sm" />
+                  <OTooltip :content="t('common.delete')" />
                 </OButton>
                 <OButton
                   :aria-label="t('common.add')"
@@ -140,9 +142,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="index === variableRows.length - 1"
                   variant="ghost"
                   size="icon-circle-sm"
+                  icon-left="add"
                   @click="addVariable"
                 >
-                  <OIcon name="add" size="sm" />
+                  <OTooltip :content="t('common.add')" />
                 </OButton>
               </div>
             </template>
@@ -244,9 +247,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost-primary"
                   size="xs"
                   class="gap-1 font-medium"
+                  icon-left="help"
                   @click="openHelp('rowTemplate')"
                 >
-                  <OIcon name="help" size="xs" />
                   <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
                 </OButton>
               </div>

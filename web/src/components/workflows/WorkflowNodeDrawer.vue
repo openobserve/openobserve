@@ -153,9 +153,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="order-last shrink-0"
           data-test="workflow-ndv-close"
           :aria-label="t('common.close')"
+          icon-left="close"
           @click="requestClose"
         >
-          <OIcon name="close" size="sm" />
+          <OTooltip :content="t('common.close')" />
         </OButton>
         <div class="min-w-0 flex-1">
           <OInlineEdit
@@ -258,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex h-8 items-center"
           :class="stepsCollapsed ? 'justify-center' : 'justify-between ps-2'"
         >
-          <span v-if="!stepsCollapsed" class="text-text-body text-sm font-bold">
+          <span v-if="!stepsCollapsed" class="text-text-body text-sm font-semibold">
             {{ t("workflow.results.nodesTitle") }}
           </span>
           <!-- Same toggle style as the Logs field-panel collapse button
@@ -269,11 +270,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="shrink-0"
             data-test="workflow-ndv-steps-collapse"
             @click="toggleStepsCollapsed"
+            :icon-left="
+              stepsCollapsed ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'
+            "
+            :aria-label="
+              stepsCollapsed ? t('workflow.ndv.expandSteps') : t('workflow.ndv.collapseSteps')
+            "
           >
-            <OIcon
-              :name="stepsCollapsed ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'"
-              size="sm"
-            />
             <OTooltip
               :content="
                 stepsCollapsed ? t('workflow.ndv.expandSteps') : t('workflow.ndv.collapseSteps')
@@ -440,7 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="flex h-8 items-center gap-2 ps-2">
-          <div class="text-text-body text-sm font-bold">{{ t("workflow.ndv.input") }}</div>
+          <div class="text-text-body text-sm font-semibold">{{ t("workflow.ndv.input") }}</div>
           <div
             v-if="inputPaged && inputCount > 1"
             data-test="workflow-ndv-input-pager"
@@ -451,19 +454,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-xs"
               data-test="workflow-ndv-input-prev"
-              :title="t('workflow.ndv.prevEvent')"
+              icon-left="chevron-left"
+              :aria-label="t('workflow.ndv.prevEvent')"
               @click="stepInput(-1)"
             >
-              <OIcon name="chevron-left" size="xs" />
+              <OTooltip :content="t('workflow.ndv.prevEvent')" />
             </OButton>
             <OButton
               variant="ghost"
               size="icon-xs"
               data-test="workflow-ndv-input-next"
-              :title="t('workflow.ndv.nextEvent')"
+              icon-left="chevron-right"
+              :aria-label="t('workflow.ndv.nextEvent')"
               @click="stepInput(1)"
             >
-              <OIcon name="chevron-right" size="xs" />
+              <OTooltip :content="t('workflow.ndv.nextEvent')" />
             </OButton>
           </div>
           <OButton
@@ -638,7 +643,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <div class="flex h-8 shrink-0 items-center gap-2 ps-2">
-          <div class="text-text-body text-sm font-bold">{{ t("workflow.ndv.output") }}</div>
+          <div class="text-text-body text-sm font-semibold">{{ t("workflow.ndv.output") }}</div>
           <!-- Run status (Passed / Errored / No Records) — same source as the canvas
                badge and the results dock. -->
           <OBadge
@@ -664,19 +669,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-xs"
               data-test="workflow-ndv-output-prev"
-              :title="t('workflow.ndv.prevEvent')"
+              icon-left="chevron-left"
+              :aria-label="t('workflow.ndv.prevEvent')"
               @click="stepOutput(-1)"
             >
-              <OIcon name="chevron-left" size="xs" />
+              <OTooltip :content="t('workflow.ndv.prevEvent')" />
             </OButton>
             <OButton
               variant="ghost"
               size="icon-xs"
               data-test="workflow-ndv-output-next"
-              :title="t('workflow.ndv.nextEvent')"
+              icon-left="chevron-right"
+              :aria-label="t('workflow.ndv.nextEvent')"
               @click="stepOutput(1)"
             >
-              <OIcon name="chevron-right" size="xs" />
+              <OTooltip :content="t('workflow.ndv.nextEvent')" />
             </OButton>
           </div>
         </div>

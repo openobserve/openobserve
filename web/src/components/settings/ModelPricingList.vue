@@ -31,8 +31,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout overflow-first v-if="!showImportModelPricingPage" icon="paid" bleed>
       <template #title>
         {{ t("modelPricing.header") }}
-        <OButton variant="ghost" size="icon-xs-sq" class="-ms-1" data-test="model-pricing-info-btn">
-          <OIcon name="info-outline" size="sm" />
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
+          class="-ms-1"
+          data-test="model-pricing-info-btn"
+          icon-left="info-outline"
+          :aria-label="t('modelPricing.matchingPriorityTooltip')"
+        >
           <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
         </OButton>
       </template>
@@ -60,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm"
+          icon-left="file-upload"
           @click="openImport"
           data-test="model-pricing-import-btn"
         >
@@ -275,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTooltip>
                         <template #content>
                           <div class="min-w-60">
-                            <div class="text-compact mb-0.75 font-bold">
+                            <div class="text-compact mb-0.75 font-semibold">
                               {{ row.name }}
                             </div>
                             <table class="w-full border-collapse">
@@ -329,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip side="top" align="center">
                     <template #content>
                       <div class="min-w-60">
-                        <div class="text-compact mb-1 font-bold">{{ row.name }}</div>
+                        <div class="text-compact mb-1 font-semibold">{{ row.name }}</div>
                         <div
                           v-for="(tier, tIdx) in row.tiers ?? []"
                           :key="tIdx"
@@ -397,9 +404,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="model-pricing-export-selected-btn"
               variant="outline"
               size="sm"
+              icon-left="download"
               @click="exportSelected"
             >
-              <template #icon-left><OIcon name="download" size="xs" /></template>
               {{ t("common.export") }}
             </OButton>
             <OButton
@@ -408,8 +415,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline-destructive"
               size="sm"
               :loading="bulkDeleteLoading"
-              @click="confirmDeleteSelected"
               icon-left="delete"
+              @click="confirmDeleteSelected"
             >
               {{ t("common.delete") }}
             </OButton>

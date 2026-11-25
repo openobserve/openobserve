@@ -15,20 +15,25 @@
 
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
-import BetaBadge from "./BetaBadge.vue";
+import OBetaBadge from "./OBetaBadge.vue";
 
-describe("BetaBadge", () => {
+describe("OBetaBadge", () => {
   it("renders the beta tag by default", () => {
-    const w = mount(BetaBadge);
+    const w = mount(OBetaBadge);
     const badge = w.get('[data-test="beta-badge"]');
     expect(badge.text()).toBe("Beta");
     expect(w.find('[data-test="alpha-badge"]').exists()).toBe(false);
   });
 
   it("renders the alpha tag for stage alpha", () => {
-    const w = mount(BetaBadge, { props: { stage: "alpha" } });
+    const w = mount(OBetaBadge, { props: { stage: "alpha" } });
     const badge = w.get('[data-test="alpha-badge"]');
     expect(badge.text()).toBe("Alpha");
     expect(w.find('[data-test="beta-badge"]').exists()).toBe(false);
+  });
+
+  it("lets the host override the data-test", () => {
+    const w = mount(OBetaBadge, { attrs: { "data-test": "feature-beta-badge" } });
+    expect(w.find('[data-test="feature-beta-badge"]').exists()).toBe(true);
   });
 });

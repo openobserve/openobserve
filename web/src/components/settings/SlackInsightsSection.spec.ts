@@ -367,7 +367,7 @@ describe("SlackInsightsSection: save failed (S7f)", () => {
     expect(error.attributes("role")).toBe("alert");
     expect(error.text()).toContain("AutoObserve settings weren't saved:");
     expect(error.text()).toContain("someone else changed these settings. Refresh and try again.");
-    expect(error.text()).toContain("Your edit: Post Trial Findings → On.");
+    expect(error.text()).toContain("Your edit: Post trial findings → On.");
     expect(find(w, "slack-insights-status").text()).not.toContain("Nothing is saved");
     await find(w, "slack-insights-refresh").trigger("click");
     await flushPromises();
@@ -441,7 +441,7 @@ describe("SlackInsightsSection: save failed (S7f)", () => {
     expect(error.exists()).toBe(true);
     expect(error.text()).toContain("someone else changed these settings.");
     expect(error.text()).toContain(
-      "Post Trial Findings → On. Refresh didn't work either. Try again.",
+      "Post trial findings → On. Refresh didn't work either. Try again.",
     );
     expect(find(w, "slack-insights-refresh").exists()).toBe(true);
   });

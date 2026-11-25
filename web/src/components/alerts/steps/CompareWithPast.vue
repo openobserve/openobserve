@@ -86,9 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-circle-sm"
                     disable
-                  >
-                    <OIcon name="delete-outline" size="sm" />
-                  </OButton>
+                    icon-left="delete-outline"
+                  />
                   <OTooltip
                     :content="t('alerts.compareWithPast.currentWindowCannotBeDeleted')"
                     side="top"
@@ -193,9 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="multi-time-range-alerts-delete-btn"
                   variant="ghost"
                   size="icon-circle-sm"
+                  icon-left="delete-outline"
                   @click="removeTimeShift(index)"
                 >
-                  <OIcon name="delete-outline" size="sm" />
+                  <OTooltip :content="t('common.delete')" />
                 </OButton>
               </div>
             </div>

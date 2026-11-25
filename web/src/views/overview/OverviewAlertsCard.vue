@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="flex flex-col gap-0 px-3 py-1.5 text-start">
               <span
                 :class="[
-                  'text-xl font-bold tabular-nums',
+                  'text-xl font-semibold tabular-nums',
                   box.count > 0 ? box.tone : 'text-text-heading',
                 ]"
                 data-test="overview-alerts-box-count"

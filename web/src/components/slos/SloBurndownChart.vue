@@ -80,7 +80,7 @@
           <OIcon
             name="info"
             size="sm"
-            class="text-icon-color cursor-help"
+            class="text-text-secondary cursor-help"
             :label="t('slos.chart.about')"
             :data-test="`slos-sloburndownchart-${panel.key}-info`"
           >

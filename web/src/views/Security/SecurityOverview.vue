@@ -23,7 +23,7 @@ import SecurityNotices, { type SecurityNotice } from "@/components/security/Secu
 import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
 import { failedRequests, viewDenial, type AccessDenial } from "@/composables/useAccessStore";
 import { isForbiddenError, isSecurityAlpha } from "@/composables/security/useSecurityAccess";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -579,7 +579,7 @@ function nav(path: string, query: Record<string, string> = {}) {
     <template v-if="securityAlpha" #title>
       <span class="inline-flex max-w-full min-w-0 items-center gap-2">
         <span class="truncate">{{ t("siem.overview.title") }}</span>
-        <BetaBadge stage="alpha" class="shrink-0" />
+        <OBetaBadge stage="alpha" class="shrink-0" />
       </span>
     </template>
     <template #actions>

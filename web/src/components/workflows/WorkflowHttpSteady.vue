@@ -81,8 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-sq"
               :aria-label="t('workflow.http.authAbout')"
               data-test="workflow-http-auth-info"
+              icon-left="info"
             >
-              <OIcon name="info" size="sm" />
+              <OTooltip :content="t('workflow.http.authAbout')" />
             </OButton>
           </template>
           <OText variant="meta" as="p" class="w-80 max-w-[calc(100vw-1.5rem)] p-3">
@@ -188,7 +189,6 @@ import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";

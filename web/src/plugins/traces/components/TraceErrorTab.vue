@@ -192,9 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-sm"
                   class="copy-btn"
                   data-test="exception-copy-stacktrace-btn"
+                  icon-left="content-copy"
+                  :aria-label="t('traces.copyStacktrace')"
                   @click="copyStackTrace(row['exception.stacktrace'])"
                 >
-                  <OIcon name="content-copy" size="sm" />
                   <OTooltip :content="t('traces.copyStacktrace')" />
                 </OButton>
               </div>

@@ -65,7 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="rounded-default stream-routing-container w-full">
         <div>
-          <div class="showLabelOnTop text-h7 font-bold" data-test="add-condition-query-input-title">
+          <div
+            class="showLabelOnTop text-h7 font-semibold"
+            data-test="add-condition-query-input-title"
+          >
             <div></div>
             <ConditionBuilder
               ref="builder"
@@ -97,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <span>
                         {{ t("pipeline.customColumnGuideline") }}
-                        <span class="highlight text-text-link font-bold">{{
+                        <span class="highlight text-text-link font-semibold">{{
                           t("pipeline.enterKey")
                         }}</span
                         >.

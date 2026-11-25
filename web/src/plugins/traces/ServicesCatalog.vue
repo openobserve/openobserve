@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="services-catalog-status-legend"
       >
         <span
-          class="text-2xs font-bold text-text-heading whitespace-nowrap"
+          class="text-2xs font-semibold text-text-heading whitespace-nowrap"
         >
           {{ t("traces.servicesCatalog.legend.title") }}
         </span>

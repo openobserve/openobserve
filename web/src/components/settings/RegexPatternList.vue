@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="sm"
+            icon-left="file-upload"
             @click="importRegexPattern"
             data-test="regex-pattern-list-import"
             >{{ t("regex_patterns.import") }}</OButton

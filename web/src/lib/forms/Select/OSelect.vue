@@ -1349,7 +1349,7 @@ const inlineTriggerClasses = computed(() => [
 const insideLabelClasses = computed(() =>
   isInlineAppearance.value
     ? "text-text-secondary pointer-events-none me-1.5 font-normal whitespace-nowrap select-none"
-    : "text-text-secondary pointer-events-none max-w-1/2 truncate ps-3 font-normal select-none",
+    : "text-text-secondary pointer-events-none max-w-40 truncate ps-3 font-normal select-none",
 );
 
 const triggerEndPadding = computed(() =>
@@ -1451,7 +1451,7 @@ const fieldWidthClass = computed(() => {
                     'bg-select-bg',
                     hasError
                       ? 'border-select-border-error focus:ring-select-border-error/20 data-[state=open]:ring-select-border-error/20 focus:ring-2 data-[state=open]:ring-2'
-                      : 'border-select-border hover:border-select-border-hover focus:ring-focus-ring-accent data-[state=open]:ring-focus-ring-accent focus:ring-2 data-[state=open]:ring-2',
+                      : 'border-select-border hover:border-select-border-hover focus:ring-input-focus-glow focus:border-select-border-focus data-[state=open]:ring-input-focus-glow data-[state=open]:border-select-border-focus focus:ring-3 data-[state=open]:ring-3',
                     /* Keep the red error border on focus; focus border color applies only when there's no error. */
                     'focus:outline-none',
                     'transition-[color,background-color,border-color,box-shadow] duration-150',

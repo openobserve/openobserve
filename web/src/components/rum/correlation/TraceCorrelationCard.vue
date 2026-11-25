@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="border-card-glass-border rounded-default mt-3 border border-solid">
-    <div class="text-text-heading ms-1 mb-2 text-base font-bold">
+    <div class="text-text-heading ms-1 mb-2 text-base font-semibold">
       {{ t("traces.correlation.distributedTrace") }}
     </div>
 
@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               class="ms-1"
+              :aria-label="t('traces.correlation.copyTraceId')"
               @click="copyTraceId"
             >
               <OTooltip :content="t('traces.correlation.copyTraceId')" />
@@ -108,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="bg-surface-accent rounded-default p-2 text-sm">
             <div class="mb-1 flex items-center">
               <div class="text-text-label w-5/12">{{ t("traces.correlation.totalDuration") }}</div>
-              <div class="w-7/12 font-bold">{{ performanceData.total_duration_ms }}ms</div>
+              <div class="w-7/12 font-semibold">{{ performanceData.total_duration_ms }}ms</div>
             </div>
             <div class="mb-1 flex items-center" v-if="performanceData.browser_duration_ms">
               <div class="text-text-label w-5/12">{{ t("traces.correlation.browserLabel") }}</div>
@@ -164,9 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="!hasBackendTrace"
             data-test="trace-correlation-card-view-details-btn"
+            icon-left="git-branch"
             @click="viewTraceDetails"
           >
-            <OIcon name="git-branch" size="sm" class="me-1" />
             {{ t("traces.correlation.viewTraceDetails") }}
             <OTooltip
               v-if="!hasBackendTrace && !error"

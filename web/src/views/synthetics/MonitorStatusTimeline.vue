@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="monitor-status-timeline"
   >
     <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
-      <span class="text-text-heading text-xs font-bold">
+      <span class="text-text-heading text-xs font-semibold">
         {{ t("synthetics.timeline.title") }}
       </span>
       <span class="flex-1" />
@@ -60,9 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="!canScrollLeft"
           data-test="synthetics-timeline-scroll-left-btn"
           :aria-label="t('synthetics.timeline.scrollLeft')"
+          icon-left="chevron-left"
           @click="scrollTimeline('left')"
         >
-          <OIcon name="chevron-left" size="xs" />
+          <OTooltip :content="t('synthetics.timeline.scrollLeft')" />
         </OButton>
         <div
           v-if="isLaned"
@@ -215,9 +216,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="!canScrollRight"
           data-test="synthetics-timeline-scroll-right-btn"
           :aria-label="t('synthetics.timeline.scrollRight')"
+          icon-left="chevron-right"
           @click="scrollTimeline('right')"
         >
-          <OIcon name="chevron-right" size="xs" />
+          <OTooltip :content="t('synthetics.timeline.scrollRight')" />
         </OButton>
       </div>
       <div class="text-3xs text-text-secondary flex justify-between font-mono tabular-nums">

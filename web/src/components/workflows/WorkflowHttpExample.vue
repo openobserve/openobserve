@@ -48,9 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="revealing === active.id"
           :aria-label="revealLabel"
           data-test="workflow-http-example-reveal"
+          :icon-left="shown !== undefined ? 'visibility-off' : 'visibility'"
           @click="toggleReveal"
         >
-          <OIcon :name="shown !== undefined ? 'visibility-off' : 'visibility'" size="sm" />
           <OTooltip :content="revealLabel" side="top" />
         </OButton>
         <OButton
@@ -58,9 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           :aria-label="t('common.copy')"
           data-test="workflow-http-example-copy"
+          icon-left="content-copy"
           @click="onCopy"
         >
-          <OIcon name="content-copy" size="sm" />
           <OTooltip :content="t('common.copy')" side="top" />
         </OButton>
       </template>

@@ -164,9 +164,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 aria-controls="edit-role-companions-list"
                 :aria-label="calloutTitle"
                 data-test="edit-role-companions-toggle"
+                :icon-left="calloutOpen ? 'expand-less' : 'expand-more'"
                 @click.stop="toggleCallout"
               >
-                <OIcon :name="calloutOpen ? 'expand-less' : 'expand-more'" size="sm" />
+                <OTooltip :content="calloutTitle" />
               </OButton>
             </div>
             <OButton

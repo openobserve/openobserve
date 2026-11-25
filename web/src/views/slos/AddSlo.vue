@@ -57,7 +57,7 @@
       class="mb-3"
       data-test="slos-addslo-regen-warning"
     >
-      <span class="font-bold">{{ t("slos.regenerate.title") }}</span>
+      <span class="font-semibold">{{ t("slos.regenerate.title") }}</span>
       {{ t("slos.regenerate.body") }}
     </OBanner>
 

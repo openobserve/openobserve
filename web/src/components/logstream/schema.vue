@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
                   <div class="tile-header flex items-start justify-between">
-                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
+                    <div class="tile-title text-text-secondary text-left text-xs font-semibold">
                       {{ t("common.events") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
                   <div class="tile-header flex items-start justify-between">
-                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
+                    <div class="tile-title text-text-secondary text-left text-xs font-semibold">
                       {{ t("logStream.storageSize") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
                   <div class="tile-header flex items-start justify-between">
-                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
+                    <div class="tile-title text-text-secondary text-left text-xs font-semibold">
                       {{ t("logStream.compressedSize") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
                   <div class="tile-header flex items-start justify-between">
-                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
+                    <div class="tile-title text-text-secondary text-left text-xs font-semibold">
                       {{ t("logStream.indexSize") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -641,7 +641,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mt-2 flex min-h-0 flex-1 flex-col">
                       <div class="mt-2 flex items-center text-center">
                         <div class="flex items-center">
-                          <span class="font-bold"> {{ t("logStream.selectDate") }}</span>
+                          <span class="font-semibold"> {{ t("logStream.selectDate") }}</span>
                           <DateTime
                             class="mx-2"
                             @on:date-change="dateChangeValue"
@@ -651,7 +651,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :minDate="minDate ?? undefined"
                           />
                         </div>
-                        <span class="font-bold"> {{ t("logStream.utcTimezone") }} </span>
+                        <span class="font-semibold"> {{ t("logStream.utcTimezone") }} </span>
                       </div>
 
                       <div class="mt-2 flex min-h-0 flex-1 flex-col">

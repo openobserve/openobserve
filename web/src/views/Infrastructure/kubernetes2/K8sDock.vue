@@ -85,9 +85,10 @@ const heightClass = computed(() => (props.dock.maximized ? "h-2/3" : "h-80"));
               size="icon-xs"
               :aria-label="t('infra.k8s2.dockCloseTab')"
               :data-test="`k8s2-dock-close-${tab.kind}`"
+              icon-left="close"
               @click.stop="emit('close', tab.id)"
             >
-              <OIcon name="close" size="xs" />
+              <OTooltip :content="t('infra.k8s2.dockCloseTab')" />
             </OButton>
           </template>
         </OTab>
@@ -97,9 +98,9 @@ const heightClass = computed(() => (props.dock.maximized ? "h-2/3" : "h-80"));
         size="icon-xs"
         :aria-label="dock.open ? t('infra.k8s2.dockMinimize') : t('infra.k8s2.dockRestore')"
         data-test="k8s2-dock-minimize"
+        :icon-left="dock.open ? 'remove' : 'expand-less'"
         @click="emit('minimize')"
       >
-        <OIcon :name="dock.open ? 'remove' : 'expand-less'" size="sm" />
         <OTooltip
           :content="dock.open ? t('infra.k8s2.dockMinimize') : t('infra.k8s2.dockRestore')"
         />
@@ -109,9 +110,9 @@ const heightClass = computed(() => (props.dock.maximized ? "h-2/3" : "h-80"));
         size="icon-xs"
         :aria-label="dock.maximized ? t('infra.k8s2.dockUnmaximize') : t('infra.k8s2.dockMaximize')"
         data-test="k8s2-dock-maximize"
+        :icon-left="dock.maximized ? 'close-fullscreen' : 'open-in-full'"
         @click="emit('maximize')"
       >
-        <OIcon :name="dock.maximized ? 'close-fullscreen' : 'open-in-full'" size="sm" />
         <OTooltip
           :content="dock.maximized ? t('infra.k8s2.dockUnmaximize') : t('infra.k8s2.dockMaximize')"
         />
@@ -121,9 +122,9 @@ const heightClass = computed(() => (props.dock.maximized ? "h-2/3" : "h-80"));
         size="icon-xs"
         :aria-label="t('infra.k8s2.dockClose')"
         data-test="k8s2-dock-dismiss"
+        icon-left="close"
         @click="emit('dismiss')"
       >
-        <OIcon name="close" size="sm" />
         <OTooltip :content="t('infra.k8s2.dockClose')" />
       </OButton>
     </div>

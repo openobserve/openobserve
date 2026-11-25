@@ -57,14 +57,14 @@ describe("ReviewContentBox", () => {
 
   it("flips the control to exit when the pane it belongs to is fullscreen", () => {
     const normal = mountBox();
-    expect(normal.find('[data-test="ai-review-content-expand-input"]').attributes("title")).toBe(
-      "aiObservability.queues.workbench.enterFullscreen",
-    );
+    expect(
+      normal.find('[data-test="ai-review-content-expand-input"]').attributes("aria-label"),
+    ).toBe("aiObservability.queues.workbench.enterFullscreen");
 
     const expanded = mountBox({ fullscreen: true });
-    expect(expanded.find('[data-test="ai-review-content-expand-input"]').attributes("title")).toBe(
-      "aiObservability.queues.workbench.exitFullscreen",
-    );
+    expect(
+      expanded.find('[data-test="ai-review-content-expand-input"]').attributes("aria-label"),
+    ).toBe("aiObservability.queues.workbench.exitFullscreen");
   });
 
   it("shows the empty text inside the box when there is no content", () => {

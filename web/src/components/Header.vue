@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="md:hidden"
         data-test="header-mobile-nav-toggle"
         :aria-label="t('components.navbar.mainNavigation')"
+        icon-left="menu"
         @click="$emit('toggle-mobile-nav')"
       >
-        <OIcon name="menu" size="sm" />
         <OTooltip side="bottom" :content="t('components.navbar.mainNavigation')" />
       </OButton>
       <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="securityAccess.canOpen.value"
-      class="ms-3 flex shrink-0 items-center max-xl:min-w-0 max-xl:shrink max-md:ms-1 max-md:min-w-12"
+      class="ms-0.5 flex shrink-0 items-center max-xl:min-w-0 max-xl:shrink max-md:ms-1 max-md:min-w-12"
     >
       <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
     </div>
@@ -159,9 +159,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="w-full max-w-112 justify-start max-md:w-auto"
         data-test="header-command-palette"
         :aria-label="t('commandPalette.title')"
+        icon-left="search"
         @click="$emit('open-command-palette')"
       >
-        <OIcon name="search" size="sm" />
         <span class="min-w-0 flex-1 text-start max-md:hidden">{{ t("commandPalette.title") }}</span>
         <OShortcut id="commandPalette" class="max-md:hidden" />
       </OButton>
@@ -218,17 +218,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="upgrade-to-enterprise-btn"
           :aria-label="enterpriseButtonTooltip"
           @click="openEnterpriseDialog"
+          :icon-left="
+            config.isEnterprise === 'true' || config.isCloud === 'true'
+              ? 'verified'
+              : 'card-giftcard'
+          "
         >
-          <template #icon-left>
-            <OIcon
-              :name="
-                config.isEnterprise === 'true' || config.isCloud === 'true'
-                  ? 'verified'
-                  : 'card-giftcard'
-              "
-              size="sm"
-            />
-          </template>
           <span class="md:max-xl:truncate">{{ enterpriseButtonText }}</span>
           <OTooltip
             side="left"
@@ -259,9 +254,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon-toolbar"
+              :aria-label="aiButtonLabel"
               @click="aiLicenseLocked ? openLockedAiAssistant() : toggleAIChat()"
               :data-test="aiLicenseLocked ? 'menu-link-ai-locked' : 'menu-link-ai-item'"
-              :aria-label="aiButtonLabel"
               :aria-pressed="store.state.isAiChatEnabled && !aiLicenseLocked ? 'true' : 'false'"
               class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
               :class="store.state.isAiChatEnabled && !aiLicenseLocked ? 'ai-btn-active' : ''"
@@ -313,8 +308,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="max-md:hidden"
                 data-test="menu-link-help-item"
                 :aria-label="t('menu.help')"
+                icon-left="sb-help"
               >
-                <OIcon name="sb-help" size="sm" />
                 <OTooltip side="top" align="center" :content="t('menu.help')" />
               </OButton>
             </template>

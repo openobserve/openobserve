@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="pickQueryOnly && pickedQuery" data-test="create-alert-picked-query">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-bold tracking-wider">
+          <span class="text-xs font-semibold tracking-wider">
             {{ t("alerts.prefill.dialog.queryLabel") }}
           </span>
           <OButton

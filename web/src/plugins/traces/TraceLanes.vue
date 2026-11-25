@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-text-secondary flex shrink-0 items-center gap-1 px-2"
       :style="{ width: labelWidth + 'px' }"
     >
-      <OIcon name="lock" size="xs" class="text-warning-600" />
+      <OIcon name="lock" size="xs" class="text-status-warning-text" />
       {{ t("requestTimeline.logsAndMetrics") }}
     </div>
     <button

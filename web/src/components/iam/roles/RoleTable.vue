@@ -10,7 +10,6 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { useI18nTyped } from "@/types/i18n";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
@@ -155,7 +154,6 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
   <OTable
     ref="oTableRef"
     :frame="false"
-    :row-height="28"
     :data="data"
     :columns="columns"
     :loading="loading"
@@ -287,11 +285,9 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
         variant="outline-destructive"
         size="sm"
         :loading="actionLoading"
+        icon-left="delete"
         @click="emit('bulk-delete')"
       >
-        <template #icon-left>
-          <OIcon name="delete" size="sm" />
-        </template>
         {{ t("common.delete") }}
       </OButton>
     </template>

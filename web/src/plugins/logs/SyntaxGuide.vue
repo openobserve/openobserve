@@ -41,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           :size="label ? 'sm-toolbar' : 'icon-toolbar'"
           :class="sqlmode ? 'sql-mode' : 'normal-mode'"
+          icon-left="help"
         >
-          <OIcon name="help" size="sm" />
           <span v-if="label">{{ label }}</span>
           <OTooltip :content="t('search.syntaxGuideLabel')" />
         </OButton>
@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : '',
           ]"
           class="h-4.5!"
+          icon-left="help"
         >
-          <OIcon name="help" size="sm" />
           <span v-if="label">{{ label }}</span>
           <span v-else-if="!noBorder" class="ms-1">{{ t("search.syntaxGuideLabel") }}</span>
           <OTooltip :content="t('search.syntaxGuideLabel')" />
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <div v-if="!sqlmode">
         <div class="w-105">
-          <div class="label text-sm font-bold">{{ t("search.syntaxGuideLabel") }}</div>
+          <div class="label text-sm font-semibold">{{ t("search.syntaxGuideLabel") }}</div>
         </div>
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else>
         <div class="w-105">
-          <div class="label text-sm font-bold">{{ t("search.syntaxGuide.sqlTitle") }}</div>
+          <div class="label text-sm font-semibold">{{ t("search.syntaxGuide.sqlTitle") }}</div>
         </div>
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">

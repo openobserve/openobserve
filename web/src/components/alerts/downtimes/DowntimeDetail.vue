@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #title>
       <span class="inline-flex max-w-full min-w-0 items-center gap-2">
         <span class="truncate">{{ title }}</span>
-        <BetaBadge class="shrink-0" />
+        <OBetaBadge class="shrink-0" />
       </span>
     </template>
 
@@ -451,7 +451,7 @@ import {
   type FolderNameFn,
 } from "@/utils/downtimes/targetSummary";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

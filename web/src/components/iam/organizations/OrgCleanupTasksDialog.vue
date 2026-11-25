@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 :class="{
                   'text-success': row.status === 'done',
-                  'text-primary o2-motion-keep animate-spin': row.status === 'running',
+                  'text-accent o2-motion-keep animate-spin': row.status === 'running',
                   'text-error': row.status === 'failed',
                   'text-text-secondary': row.status === 'pending',
                 }"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="xs"
                     :class="{
                       'text-success': child.status === 'done',
-                      'text-primary o2-motion-keep animate-spin': child.status === 'running',
+                      'text-accent o2-motion-keep animate-spin': child.status === 'running',
                       'text-error': child.status === 'failed',
                       'text-text-secondary': child.status === 'pending',
                     }"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 :class="{
                   'text-success': row.task.status === 'done',
-                  'text-primary o2-motion-keep animate-spin': row.task.status === 'running',
+                  'text-accent o2-motion-keep animate-spin': row.task.status === 'running',
                   'text-error': row.task.status === 'failed',
                   'text-text-secondary': row.task.status === 'pending',
                 }"
@@ -233,8 +233,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton variant="outline" size="sm" @click="$emit('update:open', false)">
         {{ t("iam.orgCleanupTasksDialog.close") }}
       </OButton>
-      <OButton variant="ghost" size="sm" :disabled="loading" @click="refreshTasks">
-        <OIcon name="refresh" size="sm" />
+      <OButton
+        variant="ghost"
+        size="sm"
+        :disabled="loading"
+        icon-left="refresh"
+        @click="refreshTasks"
+      >
         {{ t("iam.orgCleanupTasksDialog.refresh") }}
       </OButton>
     </template>

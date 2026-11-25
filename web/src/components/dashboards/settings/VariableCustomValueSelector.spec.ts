@@ -70,7 +70,7 @@ describe("VariableCustomValueSelector", () => {
                     {{ option.label }}
                   </option>
                 </select>
-                <span data-test="o-select-label">{{ label }}</span>
+                <slot name="icon-left"></slot>
                 <slot name="empty"></slot>
               </div>
             `,
@@ -133,14 +133,18 @@ describe("VariableCustomValueSelector", () => {
 
     it("displays the label from variableItem", () => {
       wrapper = mountComponent();
-      expect(wrapper.find('[data-test="o-select-label"]').text()).toBe("Environment");
+      expect(wrapper.find('[data-test="variable-selector-environment-inner-label"]').text()).toBe(
+        "Environment",
+      );
     });
 
     it("falls back to name when label is not available", () => {
       const itemWithoutLabel = { ...defaultVariableItem };
       delete (itemWithoutLabel as any).label;
       wrapper = mountComponent({ variableItem: itemWithoutLabel });
-      expect(wrapper.find('[data-test="o-select-label"]').text()).toBe("environment");
+      expect(wrapper.find('[data-test="variable-selector-environment-inner-label"]').text()).toBe(
+        "environment",
+      );
     });
 
     it("handles loading state", () => {
@@ -307,7 +311,9 @@ describe("VariableCustomValueSelector", () => {
       });
       await nextTick();
 
-      expect(wrapper.find('[data-test="o-select-label"]').text()).toBe("New Label");
+      expect(wrapper.find('[data-test="variable-selector-environment-inner-label"]').text()).toBe(
+        "New Label",
+      );
     });
 
     it("handles options changes", async () => {

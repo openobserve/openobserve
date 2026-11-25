@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="text-text-secondary flex items-center gap-4 text-xs italic">
           <span class="flex items-center gap-2">
-            <OTag type="featureFlag" value="beta" />
+            <OBetaBadge />
             {{ t("enterpriseFeature.legendBeta") }}
           </span>
           <span class="flex items-center gap-2">
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-text-heading flex flex-wrap items-center gap-1.5 text-base leading-tight font-semibold"
               >
                 {{ feature.name }}
-                <OTag v-if="feature.beta" type="featureFlag" value="beta" />
+                <OBetaBadge v-if="feature.beta" />
                 <span v-if="feature.requiresHA" class="inline-flex">
                   <OTag type="featureFlag" value="ha" />
                   <OTooltip
@@ -160,6 +160,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
 import {

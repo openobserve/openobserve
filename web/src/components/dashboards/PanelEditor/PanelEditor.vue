@@ -251,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="{ invisible: panelSchemaRendererRef?.noData }"
                       variant="ghost"
                       size="icon"
+                      :aria-label="t('dashboard.panelContainer.showLegends')"
                       @click="showLegendsDialog = true"
                       icon-left="format-list-bulleted"
                       data-test="panel-editor-show-legends-btn"
@@ -285,13 +286,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon"
                       @click="panelSchemaRendererRef?.toggleAddAnnotationMode()"
                       data-test="panel-editor-annotation-btn"
+                      :icon-left="
+                        panelSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'bookmark-add'
+                      "
+                      :aria-label="
+                        panelSchemaRendererRef?.isAddAnnotationMode
+                          ? t('dashboard.exitAnnotationsMode')
+                          : t('dashboard.addAnnotations')
+                      "
                     >
-                      <OIcon
-                        :name="
-                          panelSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'bookmark-add'
-                        "
-                        size="sm"
-                      />
                       <OTooltip
                         :content="
                           panelSchemaRendererRef?.isAddAnnotationMode
@@ -649,10 +652,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OButton
                             variant="primary"
                             size="sm"
+                            icon-left="bar-chart"
                             @click="showCustomChartTypeSelector = true"
                             data-test="custom-chart-type-selector-btn"
                           >
-                            <template #icon-left><OIcon name="bar-chart" size="sm" /></template>
                             {{ t("panel.exampleCharts") }}
                           </OButton>
                           <ODialog

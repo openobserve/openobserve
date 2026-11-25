@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('home.viewButton')"
           :title="t('home.viewButton')"
           data-test="home-usage-tab-view-streams-btn"
+          icon-left="arrow-forward"
         >
-          <OIcon name="arrow-forward" size="sm" />
           <router-link
             exact
             :to="{

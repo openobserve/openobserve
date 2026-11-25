@@ -21,7 +21,6 @@ import type { ShareView } from "@/services/ai_chat_share";
 import { formatMicros } from "./chatShare";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = defineProps<{
@@ -183,9 +182,9 @@ const confirmPending = () => {
         size="icon-sm"
         data-test="ai-chat-share-row-copy"
         :aria-label="t('aiChatShare.copyLink')"
+        icon-left="content-copy"
         @click="emit('copy')"
       >
-        <OIcon name="content-copy" size="sm" />
         <OTooltip :content="t('aiChatShare.copyLink')" />
       </OButton>
       <template v-if="!readOnlySettings">
@@ -196,9 +195,9 @@ const confirmPending = () => {
           :disabled="busy"
           data-test="ai-chat-share-row-refresh"
           :aria-label="t('aiChatShare.refreshSnapshot')"
+          icon-left="refresh"
           @click="emit('refresh-snapshot')"
         >
-          <OIcon name="refresh" size="sm" />
           <OTooltip :content="t('aiChatShare.refreshSnapshot')" />
         </OButton>
         <OButton
@@ -211,9 +210,9 @@ const confirmPending = () => {
               ? t('aiChatShare.switchToSnapshot')
               : t('aiChatShare.switchToLive')
           "
+          :icon-left="share.mode === 'live' ? 'photo-camera' : 'sync'"
           @click="emit('switch-mode')"
         >
-          <OIcon :name="share.mode === 'live' ? 'photo-camera' : 'sync'" size="sm" />
           <OTooltip
             :content="
               share.mode === 'live'
@@ -228,9 +227,9 @@ const confirmPending = () => {
           :disabled="busy"
           data-test="ai-chat-share-row-toggle-redaction"
           :aria-label="share.redact_tools ? t('aiChatShare.showTools') : t('aiChatShare.hideTools')"
+          :icon-left="share.redact_tools ? 'visibility' : 'visibility-off'"
           @click="toggleRedaction"
         >
-          <OIcon :name="share.redact_tools ? 'visibility' : 'visibility-off'" size="sm" />
           <OTooltip
             :content="share.redact_tools ? t('aiChatShare.showTools') : t('aiChatShare.hideTools')"
           />
@@ -242,9 +241,9 @@ const confirmPending = () => {
         :disabled="busy"
         data-test="ai-chat-share-row-revoke"
         :aria-label="t('aiChatShare.revoke')"
+        icon-left="link-off"
         @click="confirming = 'revoke'"
       >
-        <OIcon name="link-off" size="sm" />
         <OTooltip :content="t('aiChatShare.revoke')" />
       </OButton>
     </div>

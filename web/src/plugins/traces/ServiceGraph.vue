@@ -50,7 +50,7 @@
               : undefined
           "
         >
-          <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap max-md:hidden">
+          <div class="text-text-label! mb-0! text-xs font-semibold whitespace-nowrap max-md:hidden">
             {{ t("traces.serviceGraph.borderColor") }}
             <span class="font-normal">| {{ t("traces.serviceGraph.borderColorMetric") }}</span>
           </div>
@@ -105,7 +105,7 @@
               size="xs"
               icon-right="expand-more"
             >
-              <span v-if="lastRunAt !== null" class="text-text-secondary font-bold">{{
+              <span v-if="lastRunAt !== null" class="text-text-secondary font-semibold">{{
                 totalEntities
               }}</span>
               <span class="text-text-body ms-1">{{ t("traces.serviceGraph.entities") }}</span>
@@ -157,7 +157,7 @@
             </OButton>
           </template>
           <div class="flex min-w-52 flex-col gap-2 p-2" data-test="service-graph-collapse-mode">
-            <div class="text-3xs font-bold uppercase opacity-60">
+            <div class="text-3xs font-semibold uppercase opacity-60">
               {{ t("traces.serviceGraph.layout") }}
             </div>
             <OToggleGroup
@@ -176,7 +176,7 @@
                 {{ t(`traces.serviceGraph.mode.${m}`) }}
               </OToggleGroupItem>
             </OToggleGroup>
-            <div class="text-3xs mt-1 font-bold uppercase opacity-60">
+            <div class="text-3xs mt-1 font-semibold uppercase opacity-60">
               {{ t("traces.serviceGraph.types") }}
             </div>
             <!-- Each row: type name + live count, with a checkbox to show/hide.
@@ -212,7 +212,7 @@
           class="flex min-w-0 flex-row items-center gap-2"
         >
           <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
-          <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap">
+          <div class="text-text-label! mb-0! text-xs font-semibold whitespace-nowrap">
             {{ t("traces.serviceGraph.nodeSize") }}
             <span class="font-normal">| {{ t("traces.serviceGraph.nodeSizeMetric") }}</span>
           </div>

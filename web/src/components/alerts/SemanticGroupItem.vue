@@ -67,9 +67,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :variant="isProtected ? 'ghost-muted' : 'ghost'"
               size="icon-circle-sm"
               :disabled="isProtected"
+              icon-left="delete"
               @click="!isProtected && emit('delete')"
+              :aria-label="
+                isProtected
+                  ? t('correlation.serviceGroupProtected')
+                  : t('correlation.removeSemanticGroup')
+              "
             >
-              <OIcon name="delete" size="sm" />
               <OTooltip
                 :content="
                   isProtected
@@ -95,7 +100,6 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
   makeSemanticGroupItemSchema,

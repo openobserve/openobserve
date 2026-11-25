@@ -104,11 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :aria-expanded="!collapsed"
                   data-test="rum-analytics-funnel-rail-collapse-btn"
                   @click="toggleCollapsed"
+                  :icon-left="
+                    collapsed ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'
+                  "
                 >
-                  <OIcon
-                    :name="collapsed ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'"
-                    size="sm"
-                  />
                   <OTooltip :content="collapseLabel" />
                 </OButton>
                 <slot name="header" />
@@ -193,7 +192,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

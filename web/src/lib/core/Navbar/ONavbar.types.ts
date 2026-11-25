@@ -97,7 +97,7 @@ export interface SubnavChild {
    * flyout when the page itself would hide it.
    */
   gate?: string;
-  /** Shows the shared "Beta" tag (see BetaBadge.vue) next to this child's label. */
+  /** Shows the shared "Beta" tag (OBetaBadge) next to this child's label. */
   beta?: boolean;
   /** License feature key; `locked` keeps a lock badge on a link to the locked page, `hidden` drops the child. */
   feature?: string;

@@ -211,19 +211,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-icon-color hover:text-status-error-text self-center"
                           :aria-label="t('alerts.removeWarning')"
                           data-test="alert-remove-warning-button"
+                          icon-left="close"
                           @click="removeCountWarning"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
+                        />
                       </div>
                       <div v-else>
                         <OButton
                           variant="ghost-primary"
                           size="sm"
                           data-test="alert-add-warning-button"
+                          icon-left="add"
                           @click="addCountWarning"
                         >
-                          <OIcon name="add" size="sm" />
                           {{ t("alerts.addWarning") }}
                         </OButton>
                       </div>
@@ -304,19 +303,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-icon-color hover:text-status-error-text self-center"
                           :aria-label="t('alerts.removeWarning')"
                           data-test="alert-remove-warning-button"
+                          icon-left="close"
                           @click="removeAggWarning"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
+                        />
                       </div>
                       <div v-else>
                         <OButton
                           variant="ghost-primary"
                           size="sm"
                           data-test="alert-add-warning-button"
+                          icon-left="add"
                           @click="addAggWarning"
                         >
-                          <OIcon name="add" size="sm" />
                           {{ t("alerts.addWarning") }}
                         </OButton>
                       </div>
@@ -353,19 +351,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="ghost"
                           size="icon-circle-sm"
                           class="text-icon-color hover:text-status-error-text"
+                          icon-left="close"
                           @click="deleteLogGroupByColumn(index)"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
+                        />
                       </div>
                     </template>
                     <OButton
                       variant="ghost-primary"
                       size="icon-circle-sm"
                       data-test="alert-group-by-add-btn"
+                      icon-left="add"
+                      :aria-label="t('alerts.queryConfig.addGroupByField')"
                       @click="addLogGroupByColumn"
                     >
-                      <OIcon name="add" size="sm" />
                       <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
                     </OButton>
                   </div>
@@ -580,19 +578,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-icon-color hover:text-status-error-text self-center"
                           :aria-label="t('alerts.removeWarning')"
                           data-test="alert-remove-warning-button"
+                          icon-left="close"
                           @click="removeCountWarning"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
+                        />
                       </div>
                       <div v-else>
                         <OButton
                           variant="ghost-primary"
                           size="sm"
                           data-test="alert-add-warning-button"
+                          icon-left="add"
                           @click="addCountWarning"
                         >
-                          <OIcon name="add" size="sm" />
                           {{ t("alerts.addWarning") }}
                         </OButton>
                       </div>
@@ -672,19 +669,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-icon-color hover:text-status-error-text self-center"
                           :aria-label="t('alerts.removeWarning')"
                           data-test="alert-remove-warning-button"
+                          icon-left="close"
                           @click="removeAggWarning"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
+                        />
                       </div>
                       <div v-else>
                         <OButton
                           variant="ghost-primary"
                           size="sm"
                           data-test="alert-add-warning-button"
+                          icon-left="add"
                           @click="addAggWarning"
                         >
-                          <OIcon name="add" size="sm" />
                           {{ t("alerts.addWarning") }}
                         </OButton>
                       </div>
@@ -720,18 +716,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="ghost"
                           size="icon-circle-sm"
                           class="text-icon-color hover:text-status-error-text"
+                          icon-left="close"
                           @click="deleteGroupByColumn(index)"
-                        >
-                          <OIcon name="close" size="sm" />
-                        </OButton>
+                        />
                       </div>
                     </template>
                     <OButton
                       variant="ghost-primary"
                       size="icon-circle-sm"
+                      icon-left="add"
+                      :aria-label="t('alerts.queryConfig.addGroupByField')"
                       @click="addGroupByColumn"
                     >
-                      <OIcon name="add" size="sm" />
                       <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
                     </OButton>
                   </div>
@@ -883,7 +879,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <span
                         v-if="filterCount > 0"
-                        class="text-2xs rounded-full px-1.5 py-0 leading-5 font-bold"
+                        class="text-2xs rounded-full px-1.5 py-0 leading-5 font-semibold"
                         :class="'bg-status-info-bg text-status-info-text'"
                       >
                         {{ filterCount }}
@@ -979,7 +975,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <span
                     v-if="filterCount > 0"
-                    class="text-2xs rounded-full px-1.5 py-0 leading-5 font-bold"
+                    class="text-2xs rounded-full px-1.5 py-0 leading-5 font-semibold"
                     :class="'bg-status-info-bg text-status-info-text'"
                   >
                     {{ filterCount }}
@@ -1443,19 +1439,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="text-icon-color hover:text-status-error-text self-center"
                       :aria-label="t('alerts.removeWarning')"
                       data-test="alert-remove-warning-button"
+                      icon-left="close"
                       @click="removeCountWarning"
-                    >
-                      <OIcon name="close" size="sm" />
-                    </OButton>
+                    />
                   </div>
                   <div v-else>
                     <OButton
                       variant="ghost-primary"
                       size="sm"
                       data-test="alert-add-warning-button"
+                      icon-left="add"
                       @click="addCountWarning"
                     >
-                      <OIcon name="add" size="sm" />
                       {{ t("alerts.addWarning") }}
                     </OButton>
                   </div>
@@ -1574,19 +1569,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="text-icon-color hover:text-status-error-text self-center"
                       :aria-label="t('alerts.removeWarning')"
                       data-test="alert-remove-warning-button"
+                      icon-left="close"
                       @click="removeAggWarning"
-                    >
-                      <OIcon name="close" size="sm" />
-                    </OButton>
+                    />
                   </div>
                   <div v-else>
                     <OButton
                       variant="ghost-primary"
                       size="sm"
                       data-test="alert-add-warning-button"
+                      icon-left="add"
                       @click="addAggWarning"
                     >
-                      <OIcon name="add" size="sm" />
                       {{ t("alerts.addWarning") }}
                     </OButton>
                   </div>
@@ -1696,19 +1690,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-icon-color hover:text-status-error-text self-center"
                         :aria-label="t('alerts.removeWarning')"
                         data-test="alert-remove-warning-button"
+                        icon-left="close"
                         @click="removePromqlWarning"
-                      >
-                        <OIcon name="close" size="sm" />
-                      </OButton>
+                      />
                     </div>
                     <div v-else>
                       <OButton
                         variant="ghost-primary"
                         size="sm"
                         data-test="alert-add-warning-button"
+                        icon-left="add"
                         @click="addPromqlWarning"
                       >
-                        <OIcon name="add" size="sm" />
                         {{ t("alerts.addWarning") }}
                       </OButton>
                     </div>

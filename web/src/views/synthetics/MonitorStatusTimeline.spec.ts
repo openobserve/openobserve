@@ -115,9 +115,10 @@ function makeWrapper(props: Record<string, unknown> = {}) {
       plugins: [i18n],
       stubs: {
         OIcon: { template: '<span class="oicon-stub" />', props: ["name", "size"] },
+        // Icon-button labels pass `content`; only the bars' rich tooltips use the slot.
         OTooltip: {
-          template: '<div class="otooltip-stub"><slot name="content" /></div>',
-          props: ["side", "delay", "maxWidth"],
+          template: `<div :class="content ? 'otooltip-label-stub' : 'otooltip-stub'"><slot name="content" /></div>`,
+          props: ["side", "delay", "maxWidth", "content"],
         },
       },
     },

@@ -71,14 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isFullscreen && !isEditingLayout"
             v-show="store.state.printMode !== true"
             variant="ghost"
-            class="toolbar-btn-rest"
+            class="toolbar-btn-rest @max-5xl/page:w-7 @max-5xl/page:ps-0 @max-5xl/page:pe-0"
             :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
             @click="addPanelData"
             data-test="dashboard-panel-add"
             icon-left="add"
             :aria-label="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
           >
-            <template v-if="!isMobile">{{ t("panel.add") }}</template>
+            <span v-if="!isMobile" class="@max-5xl/page:hidden">{{ t("panel.add") }}</span>
             <OTooltip
               :content="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
               shortcut-id="dashboardAddPanel"
@@ -231,14 +231,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isFullscreen && !isEditingLayout"
             v-show="store.state.printMode !== true"
             variant="ghost"
-            class="toolbar-btn-rest"
+            class="toolbar-btn-rest @max-5xl/page:w-7 @max-5xl/page:ps-0 @max-5xl/page:pe-0"
             :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
             icon-left="edit"
             :aria-label="t('dashboard.layoutEdit.enter')"
             data-test="dashboard-edit-btn"
             @click="enterLayoutEdit"
           >
-            <template v-if="!isMobile">{{ t("dashboard.layoutEdit.edit") }}</template>
+            <span v-if="!isMobile" class="@max-5xl/page:hidden">{{
+              t("dashboard.layoutEdit.edit")
+            }}</span>
             <OTooltip :content="t('dashboard.layoutEdit.enter')" />
           </OButton>
           <template v-if="isEditingLayout">
@@ -300,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="primary"
               size="sm-toolbar"
-              icon-left="check"
+              icon-left="save"
               :disabled="layoutChangeCount === 0"
               :loading="isSavingLayout"
               data-test="dashboard-edit-save-btn"
@@ -334,8 +336,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @copy:success="onDashboardShared"
                 variant="ghost"
                 class="toolbar-btn-rest"
-                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
-                :show-label="!isMobile"
+                size="icon-toolbar"
+                :show-label="false"
                 data-test="dashboard-share-btn"
               />
               <ODropdown
@@ -418,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     variant="ghost"
                     class="toolbar-btn-rest"
-                    :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+                    size="icon-toolbar"
                     icon-left="more-horiz"
                     :aria-label="
                       hasSettingsDraft
@@ -427,11 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     data-test="dashboard-more-options-btn"
                   >
-                    <template v-if="!isMobile">{{ t("search.menuMore") }}</template>
-                    <OTooltip v-if="isMobile" :content="t('common.moreOptions')" />
-                    <template v-if="!isMobile" #icon-right>
-                      <OIcon name="expand-more" size="xs" data-menu-chevron class="-ms-0.5" />
-                    </template>
+                    <OTooltip :content="t('common.moreOptions')" />
                     <EditorDraftDot
                       v-if="hasSettingsDraft"
                       corner

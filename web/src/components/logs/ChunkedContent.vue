@@ -50,9 +50,9 @@ Usage:
         :data-test="`load-more-btn-${fieldKey}`"
         variant="outline"
         size="sm-action"
+        icon-left="expand-more"
         @click="handleLoadMore"
       >
-        <OIcon name="expand-more" size="xs" class="me-1" />
         {{
           t("logs.chunkedContent.loadMore", {
             loaded: chunkInfo.loadedSizeKB,
@@ -78,7 +78,6 @@ import { useI18nTyped } from "@/types/i18n";
 import { useChunkedContent } from "@/composables/useChunkedContent";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export interface ChunkedContentProps {
   data: any;

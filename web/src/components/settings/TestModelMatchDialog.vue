@@ -89,9 +89,9 @@
               type="button"
               :aria-label="t('modelPricing.testRemoveAttribute')"
               :data-test="`test-match-attribute-remove-${aIdx}`"
+              icon-left="close"
               @click="removeAttribute(aIdx)"
             >
-              <OIcon name="close" size="xs" />
               <OTooltip :side-offset="4" :content="t('modelPricing.testRemoveAttribute')" />
             </OButton>
           </div>
@@ -152,7 +152,7 @@
             data-test="test-match-no-result"
           >
             <OBanner variant="error-soft" icon="error-outline" inline-actions>
-              <div class="text-compact font-bold">
+              <div class="text-compact font-semibold">
                 {{ t("modelPricing.noMatchFound") }}
               </div>
               <div class="text-text-secondary mt-0.5 text-xs">
@@ -185,7 +185,7 @@
               :icon="isApproximateMatch ? 'warning' : 'check-circle'"
               inline-actions
             >
-              <div class="text-compact font-bold">
+              <div class="text-compact font-semibold">
                 {{
                   isApproximateMatch
                     ? t("modelPricing.approximateMatchFound")
@@ -228,7 +228,7 @@
                   <div
                     class="rounded-default border-card-glass-border text-2xs flex items-center gap-1.25 border bg-transparent px-2.5 py-1.25 font-medium"
                     :class="{
-                      'border-status-positive bg-banner-success-bg font-bold':
+                      'border-status-positive bg-banner-success-bg font-semibold':
                         step.key === winnerSource,
                       'opacity-40': step.key !== winnerSource,
                     }"
@@ -250,7 +250,7 @@
             <div class="border-card-glass-border rounded-default overflow-hidden border">
               <div class="bg-surface-panel border-card-glass-border border-b px-3.5 py-3">
                 <div>
-                  <div class="text-compact font-bold">
+                  <div class="text-compact font-semibold">
                     {{ testResult.tier || t("settings.testModelMatchDialog.defaultTier") }}
                   </div>
                   <div class="text-2xs text-text-secondary mt-0.5" v-if="matchedTierDef?.condition">

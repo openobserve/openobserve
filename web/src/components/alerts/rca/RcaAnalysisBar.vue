@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :description="item.description"
           @select="$emit('select-run', item.isLatest ? null : item.runId)"
         >
-          <span :class="item.selected ? 'font-bold' : 'font-semibold'">{{ item.label }}</span>
+          <span :class="item.selected ? 'font-semibold' : 'font-semibold'">{{ item.label }}</span>
         </ODropdownItem>
       </ODropdownGroup>
     </ODropdown>
@@ -99,7 +99,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="close"
                 :aria-label="t('alerts.incidents.rcaLight.closePreview')"
                 @click="$emit('close-preview')"
-              />
+              >
+                <OTooltip :content="t('alerts.incidents.rcaLight.closePreview')" />
+              </OButton>
             </header>
             <pre
               data-test="rca-copy-preview-text"
@@ -187,8 +189,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-toolbar"
             class="shrink-0"
             :aria-label="t('alerts.incidents.rcaRun.more')"
+            icon-left="more-horiz"
           >
-            <OIcon name="more-horiz" size="sm" />
+            <OTooltip :content="t('alerts.incidents.rcaRun.more')" />
           </OButton>
         </template>
         <ODropdownItem

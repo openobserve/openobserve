@@ -176,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           variant="ghost"
           size="icon"
+          :aria-label="t('dashboard.panelContainer.showLegends')"
           @click="showLegendsDialog = true"
           icon-left="format-list-bulleted"
           data-test="dashboard-show-legends-btn"
@@ -207,13 +208,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           variant="ghost"
           size="icon"
+          :icon-left="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'bookmark-add'"
           @click="PanleSchemaRendererRef?.toggleAddAnnotationMode()"
           data-test="panel-schema-renderer-annotation-button"
+          :aria-label="
+            PanleSchemaRendererRef?.isAddAnnotationMode
+              ? t('dashboard.panelContainer.exitAnnotationsMode')
+              : t('dashboard.panelContainer.addAnnotations')
+          "
         >
-          <OIcon
-            :name="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'bookmark-add'"
-            size="sm"
-          />
           <OTooltip
             :content="
               PanleSchemaRendererRef?.isAddAnnotationMode
@@ -254,9 +257,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!viewOnly && !simplifiedPanelView"
           variant="ghost"
           size="icon"
+          icon-left="fullscreen"
+          :aria-label="t('panel.fullScreen')"
           @click="onPanelModifyClick('ViewPanel')"
           data-test="dashboard-panel-fullscreen-btn"
-          icon-left="fullscreen"
         >
           <OTooltip side="bottom" :content="t('panel.fullScreen')" shortcut-id="panelView" />
         </OButton>
@@ -273,9 +277,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="dependentAdHocVariable && !kiosk"
           variant="ghost-warning"
           size="icon"
+          icon-left="warning"
+          :aria-label="t('dashboard.panelContainer.dependentAdhocVariableWarning')"
           @click="showViewPanel = true"
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
-          icon-left="warning"
         >
           <OTooltip
             side="bottom"
@@ -345,8 +350,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!viewOnly && !simplifiedPanelView && !isLayoutEditing"
           :variant="variablesDataUpdated || isTimeRangeWaiting ? 'ghost-warning' : 'ghost'"
           size="icon"
-          @click="() => onRefreshPanel(false)"
           :aria-label="t('panel.refreshPanel')"
+          @click="() => onRefreshPanel(false)"
           data-test="dashboard-panel-refresh-panel-btn"
           :disabled="isPanelLoading"
         >
@@ -359,10 +364,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!viewOnly && simplifiedPanelView"
           variant="ghost"
           size="icon"
-          @click="deletePanelDialog"
-          :aria-label="t('panel.deletePanel')"
-          :data-test="`dashboard-delete-panel-${props.data.title}-btn`"
           icon-left="close"
+          :aria-label="t('panel.deletePanel')"
+          @click="deletePanelDialog"
+          :data-test="`dashboard-delete-panel-${props.data.title}-btn`"
         >
           <OTooltip side="bottom" :content="t('panel.deletePanel')" />
         </OButton>
@@ -375,8 +380,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon"
               data-test="panel-explore-actions-btn"
+              icon-left="more-vert"
             >
-              <OIcon name="more-vert" size="sm" class="size-4!" />
+              <OTooltip :content="t('dashboard.moreActions')" />
             </OButton>
           </template>
           <ODropdownItem
@@ -395,7 +401,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODropdownItem>
         </ODropdown>
         <!-- Dropdown menu (shown when simplifiedPanelView is false) -->
-        <ODropdown side="bottom" align="end" v-if="!viewOnly && !simplifiedPanelView">
+        <!-- The panel menu is long, so it uses the room the viewport has instead of the default menu cap. -->
+        <ODropdown
+          side="bottom"
+          align="end"
+          content-class="max-h-(--reka-popper-available-height) overflow-y-auto"
+          v-if="!viewOnly && !simplifiedPanelView"
+        >
           <template #trigger>
             <OButton
               :aria-label="
@@ -406,8 +418,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon"
               :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
+              icon-left="more-vert"
             >
-              <OIcon name="more-vert" size="sm" class="size-4!" />
               <span
                 v-if="showDraftDot"
                 class="bg-button-pending-bg ring-button-pending-bg/30 pointer-events-none absolute -end-0.5 top-0 size-2.5 rounded-full ring-3 in-[.fullscreen]:hidden"

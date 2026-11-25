@@ -110,9 +110,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="text-text-secondary! opacity-0 group-focus-within/timestamp:opacity-100 group-hover/timestamp:opacity-100 max-md:opacity-100"
                       data-test="logs-cell-actions-copy-btn"
                       :aria-label="t('logs.cellActions.copy')"
+                      icon-left="content-copy"
                       @click.prevent.stop="copyToClipboard(timestampCol, row[timestampCol])"
                     >
-                      <OIcon name="content-copy" size="sm" class="size-4" />
                       <OTooltip :content="t('logs.cellActions.copy')" />
                     </OButton>
                   </div>

@@ -133,9 +133,9 @@ describe("primary ink on the accent fills (item 1)", () => {
     "pricing-chip",
   ];
   const HOVER_FILLS = [
-    "enabled:hover:bg-",
-    "enabled:active:bg-",
-    "group-hover/row:enabled:hover:not-active:bg-",
+    "actionable:hover:bg-",
+    "actionable:active:bg-",
+    "group-hover/row:actionable:hover:not-active:bg-",
   ];
 
   const isColor = (token: string) => resolveColor(token, THEMES.light) !== null;
@@ -151,7 +151,7 @@ describe("primary ink on the accent fills (item 1)", () => {
     const classes = wrapper.get("button").classes();
     wrapper.unmount();
     const restInk = tokensAfter(classes, "text-")[0];
-    const hoverInk = tokensAfter(classes, "enabled:hover:text-")[0] ?? restInk;
+    const hoverInk = tokensAfter(classes, "actionable:hover:text-")[0] ?? restInk;
     if (!hoverInk) throw new Error(`${variant} has no label colour`);
     const pairs: [string, string][] = [];
     for (const bg of tokensAfter(classes, "bg-")) pairs.push([restInk ?? hoverInk, bg]);
@@ -236,12 +236,12 @@ describe("labels on the accent fills under every preset and its semantic colours
         .filter((c) => c.startsWith(prefix))
         .map((c) => `--color-${c.slice(prefix.length)}`)
         .filter((t) => resolveColor(t, THEMES.light) !== null);
-    const ink = token("enabled:hover:text-")[0] ?? token("text-")[0];
+    const ink = token("actionable:hover:text-")[0] ?? token("text-")[0];
     if (!ink) throw new Error(`${variant} has no label colour`);
     return [
-      "enabled:hover:bg-",
-      "enabled:active:bg-",
-      "group-hover/row:enabled:hover:not-active:bg-",
+      "actionable:hover:bg-",
+      "actionable:active:bg-",
+      "group-hover/row:actionable:hover:not-active:bg-",
     ].flatMap((prefix) => token(prefix).map((bg) => [ink, bg] as [string, string]));
   };
 

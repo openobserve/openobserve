@@ -35,9 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="sm"
         data-test="ai-integrations-list-mobile-btn"
+        icon-left="menu"
         @click="listDrawerOpen = true"
       >
-        <template #icon-left><OIcon name="menu" size="sm" /></template>
         {{ selectedIntegrationName || t("common.sidePanel") }}
       </OButton>
     </div>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <span
                   v-else
-                  class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-bold"
+                  class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-semibold"
                   aria-hidden="true"
                   >{{ integration.name.charAt(0) }}</span
                 >
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <span
                           v-else
-                          class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-bold"
+                          class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-semibold"
                           aria-hidden="true"
                           >{{ integration.name.charAt(0) }}</span
                         >
@@ -219,7 +219,6 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import FirstSourcePickGroup, {
   type FirstSourcePickTab,
@@ -236,7 +235,6 @@ export default defineComponent({
     OSplitter,
     ODrawer,
     OButton,
-    OIcon,
     FirstSourcePickGroup,
   },
   setup() {

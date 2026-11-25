@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #title>
         <span class="flex min-w-0 items-center gap-2">
           <OTruncatedText>{{ workflowName || t("workflow.runs.title") }}</OTruncatedText>
-          <BetaBadge />
+          <OBetaBadge />
         </span>
       </template>
       <template #actions-overflow>
@@ -65,7 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton variant="outline" data-test="workflow-runs-test" @click="onTest">
           {{ t("workflow.test.button") }}
         </OButton>
-        <OButton variant="outline" data-test="workflow-runs-edit" @click="onEditWorkflow">
+        <OButton
+          variant="outline"
+          icon-left="edit"
+          data-test="workflow-runs-edit"
+          @click="onEditWorkflow"
+        >
           {{ t("workflow.runs.edit") }}
         </OButton>
         <!-- Replaying is only possible for a run the backend persisted input for,
@@ -114,12 +119,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="absolute top-2 right-2 z-10"
           data-test="workflow-runs-panel-collapse"
           :aria-label="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
+          :icon-left="panelCollapsed ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
           @click="togglePanel"
         >
-          <OIcon
-            :name="panelCollapsed ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
-            size="sm"
-          />
           <OTooltip
             :content="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
             side="left"
@@ -183,9 +185,8 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

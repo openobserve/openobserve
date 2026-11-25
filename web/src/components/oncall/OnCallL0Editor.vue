@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="info-outline"
               size="sm"
-              class="text-icon-color cursor-pointer"
+              class="text-text-secondary cursor-pointer"
               data-test="oncall-l0-budget-info"
             >
               <OTooltip side="bottom" :content="t('oncall.l0WaitAtMostInfo')" />
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon
           name="info-outline"
           size="sm"
-          class="text-icon-color cursor-pointer"
+          class="text-text-secondary cursor-pointer"
           data-test="oncall-l0-may-info"
         >
           <OTooltip side="bottom" :content="t('oncall.l0MayInfo')" />

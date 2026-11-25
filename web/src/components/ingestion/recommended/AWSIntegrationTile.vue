@@ -27,11 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="integration.documentationUrl"
           variant="ghost"
           size="icon-circle-sm"
+          icon-left="description"
+          :aria-label="t('ingestion.awsSetup.viewDocumentation')"
           @click="handleDocumentation()"
           class="docs-btn opacity-70 transition-opacity duration-200 ease-in-out hover:opacity-100"
           :data-test="`aws-${integration.id}-docs-btn`"
         >
-          <OIcon name="description" size="sm" />
           <OTooltip :content="t('ingestion.awsSetup.viewDocumentation')" />
         </OButton>
       </div>

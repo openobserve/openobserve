@@ -2020,10 +2020,10 @@ function onClearResults() {
           :aria-label="variablesToggleLabel"
           :aria-pressed="variablesPanelOpen"
           data-test="synthetics-journey-toggle-variables-btn"
+          icon-right="data-object"
           @click="variablesPanelOpen = !variablesPanelOpen"
         >
           <OTooltip :content="variablesToggleLabel" side="bottom" />
-          <OIcon name="data-object" size="sm" aria-hidden="true" />
         </OButton>
       </template>
     </template>
@@ -2084,22 +2084,18 @@ function onClearResults() {
             :disabled="!isGateUrlValid"
             :loading="checkingExtension"
             data-test="synthetics-create-record-btn"
+            icon-left="smart-display"
             @click="onRecordClick"
           >
-            <template #icon-left>
-              <OIcon name="smart-display" size="sm" />
-            </template>
             {{ t("synthetics.journey.recordJourney") }}
           </OButton>
           <OButton
             variant="outline"
             :disabled="!isGateUrlValid"
             data-test="synthetics-create-build-btn"
+            icon-left="edit"
             @click="buildManually"
           >
-            <template #icon-left>
-              <OIcon name="edit" size="sm" />
-            </template>
             {{ t("synthetics.createBrowserTest.buildManually") }}
           </OButton>
         </div>
@@ -2365,9 +2361,9 @@ function onClearResults() {
                 variant="outline-destructive"
                 size="sm"
                 data-test="synthetics-journey-delete-selected-btn"
+                icon-left="delete"
                 @click="showBulkDeleteDialog = true"
               >
-                <template #icon-left><OIcon name="delete" size="sm" /></template>
                 {{ t("synthetics.journey.delete") }}
               </OButton>
               <OButton
@@ -2375,9 +2371,9 @@ function onClearResults() {
                 size="sm"
                 :aria-disabled="!extractEligibilityResult.ok"
                 data-test="synthetics-extract-open-btn"
+                icon-left="git-branch"
                 @click="openExtractDialog"
               >
-                <template #icon-left><OIcon name="git-branch" size="sm" /></template>
                 {{ t("synthetics.journey.extract.action") }}
               </OButton>
               <span

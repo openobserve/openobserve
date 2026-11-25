@@ -59,9 +59,10 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
           variant="ghost"
           size="icon-xs-circle"
           class="image-remove-btn bg-status-negative! hover:bg-status-negative! absolute! -top-1.5! -right-1.5! z-10 h-5! min-h-5! w-5! min-w-5! p-0!"
+          icon-left="close"
           @click.stop="emit('remove-image', index)"
         >
-          <OIcon name="close" size="xs" />
+          <OTooltip :content="t('common.remove')" />
         </OButton>
         <OTooltip
           :content="
@@ -94,12 +95,13 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
         <!-- Image upload button -->
         <OButton
           v-if="!isLoading"
+          icon-left="image"
+          :aria-label="t('aiAssistant.attachImageTooltip')"
           @click.stop="emit('trigger-image-upload')"
           variant="ghost"
           size="icon-sm"
           class="image-upload-btn opacity-70 transition-opacity duration-200 hover:opacity-100"
         >
-          <OIcon name="image" size="sm" class="text-icon-color" />
           <OTooltip :content="t('aiAssistant.attachImageTooltip')" />
         </OButton>
         <div v-else class="w-8"></div>
@@ -115,7 +117,10 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
           <OIcon
             :name="autoNavigation ? 'check-circle' : 'radio-button-unchecked'"
             size="sm"
-            :class="['auto-nav-icon', autoNavigation ? 'text-theme-accent!' : 'text-icon-color']"
+            :class="[
+              'auto-nav-icon',
+              autoNavigation ? 'text-theme-accent!' : 'text-text-secondary',
+            ]"
           />
           <span
             class="auto-nav-label ms-1 text-xs font-medium"
@@ -138,24 +143,26 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
           :aria-label="t('common.send')"
           v-if="!isLoading"
           :disabled="!modelValue.trim() && pendingImages.length === 0"
+          icon-left="arrow-upward"
           @click="emit('send')"
           variant="primary"
           size="icon-xs-circle"
           class="send-button hover:bg-gradient-ai!"
         >
-          <OIcon name="arrow-upward" size="sm" />
+          <OTooltip :content="t('common.send')" />
         </OButton>
 
         <!-- Stop button - shown when loading/streaming -->
         <OButton
           :aria-label="t('common.stopGenerating')"
           v-if="isLoading"
+          icon-left="stop"
           @click="emit('cancel')"
           variant="ghost"
           size="icon-xs-circle"
           class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-gradient-danger! hover:bg-gradient-danger-hover! shadow-lg! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:shadow-lg! active:translate-y-0! active:shadow-md!"
         >
-          <OIcon name="stop" size="sm" />
+          <OTooltip :content="t('common.stopGenerating')" />
         </OButton>
       </div>
     </div>

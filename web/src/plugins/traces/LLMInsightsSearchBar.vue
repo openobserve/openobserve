@@ -52,9 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-xs-sq"
         :aria-label="t('llmInsightsDrill.searchClear')"
         data-test="llm-insights-search-clear"
+        icon-left="close"
         @click="clear"
       >
-        <OIcon name="close" size="sm" />
+        <OTooltip :content="t('llmInsightsDrill.searchClear')" />
       </OButton>
     </div>
     <p v-if="error" class="text-error-600 mt-1 text-xs" data-test="llm-insights-search-error">
@@ -69,6 +70,7 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import useStreams from "@/composables/useStreams";

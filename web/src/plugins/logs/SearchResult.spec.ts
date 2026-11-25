@@ -1677,13 +1677,12 @@ describe("SearchResult Component", () => {
       wrapper.vm.searchObj.meta.resultGrid.showPagination = true;
       wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
       await setProgress(true, 40);
-      const pageSize = () =>
-        wrapper.findComponent('[data-test="logs-search-result-records-per-page"]');
-      expect(pageSize().props("disabled")).toBe(true);
+      const pageSize = () => wrapper.find('[data-test="o2-table-page-size"]');
+      expect(pageSize().attributes("aria-disabled")).toBe("true");
       wrapper.vm.searchObj.loadingHistogram = true;
       wrapper.vm.searchObj.loading = false;
       await flushPromises();
-      expect(pageSize().props("disabled")).toBe(false);
+      expect(pageSize().attributes("aria-disabled")).toBeUndefined();
     });
   });
 

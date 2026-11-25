@@ -199,10 +199,9 @@ describe("FieldExpansion", () => {
         showQuickMode: true,
         field: { ...defaultField, isInterestingField: true },
       });
-      // The OIcon stub renders data-name on a span inside the OButton stub.
-      // Find all OIcon stubs whose data-name is "info-filled".
-      const iconSpans = wrapper.findAll(".OIcon-stub");
-      const infoIcon = iconSpans.find((i) => i.attributes("data-name") === "info-filled");
+      const infoIcon = wrapper
+        .findAll("button")
+        .find((b) => b.attributes("icon-left") === "info-filled");
       expect(infoIcon).toBeDefined();
     });
 
@@ -211,10 +210,9 @@ describe("FieldExpansion", () => {
         showQuickMode: true,
         field: { ...defaultField, isInterestingField: false },
       });
-      // The OIcon stub renders data-name on a span inside the OButton stub.
-      // Find all OIcon stubs whose data-name is "info-outline".
-      const iconSpans = wrapper.findAll(".OIcon-stub");
-      const outlineIcon = iconSpans.find((i) => i.attributes("data-name") === "info-outline");
+      const outlineIcon = wrapper
+        .findAll("button")
+        .find((b) => b.attributes("icon-left") === "info-outline");
       expect(outlineIcon).toBeDefined();
     });
   });

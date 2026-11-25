@@ -60,9 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           :aria-label="t('common.close')"
           data-test="sample-data-progress-dock-close"
+          icon-left="close"
           @click="dismissed = true"
         >
-          <OIcon name="close" size="sm" />
+          <OTooltip :content="t('common.close')" />
         </OButton>
       </div>
       <span
@@ -96,9 +97,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           :aria-label="t('common.close')"
           data-test="sample-data-progress-dock-close"
+          icon-left="close"
           @click="dismissed = true"
         >
-          <OIcon name="close" size="sm" />
+          <OTooltip :content="t('common.close')" />
         </OButton>
       </div>
       <div class="flex justify-end">
@@ -120,6 +122,7 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { raw, useI18nTyped } from "@/types/i18n";

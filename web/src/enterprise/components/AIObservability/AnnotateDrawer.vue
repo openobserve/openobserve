@@ -111,9 +111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="ms-auto"
               :aria-label="t('common.remove')"
               :data-test="`annotate-drawer-remove-${dimension.id}`"
+              icon-left="close"
               @click="removeDimension(dimension.rowId)"
             >
-              <OIcon name="close" size="xs" />
+              <OTooltip :content="t('common.remove')" />
             </OButton>
           </div>
 
@@ -121,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="dimension.dataType === 'numeric'">
             <div class="flex items-baseline gap-2">
               <span
-                class="font-mono text-lg font-bold"
+                class="font-mono text-lg font-semibold"
                 :class="isHealthy(dimension) ? 'text-text-heading' : 'text-status-warning-text'"
               >
                 {{ numericDisplay(dimension) }}
@@ -198,6 +199,7 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmQueuesService, { type LlmScoreConfigOption } from "@/services/llm-queues.service";
 import llmAnnotationsService, { type AnnotationScope } from "@/services/llm-annotations.service";

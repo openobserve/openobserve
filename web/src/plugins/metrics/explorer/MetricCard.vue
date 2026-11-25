@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             max-width="22.5rem"
             :delay="200"
           />
-          <OIcon name="error-outline" size="sm" class="text-error-600" />
+          <OIcon name="error-outline" size="sm" class="text-status-error-text" />
           <span>{{ t("metrics.explorer.queryFailed") }}</span>
         </span>
 
@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             max-width="22.5rem"
             :delay="200"
           />
-          <OIcon name="error-outline" size="sm" class="text-error-600" />
+          <OIcon name="error-outline" size="sm" class="text-status-error-text" />
           <span>{{ t("metrics.explorer.queryFailed") }}</span>
         </span>
         <OButton

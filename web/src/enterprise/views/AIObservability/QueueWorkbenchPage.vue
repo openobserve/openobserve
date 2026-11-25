@@ -48,7 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('aiObservability.queues.workbench.prev')"
           data-test="ai-queue-workbench-prev"
           @click="selectItem(currentIndex - 1)"
-        />
+        >
+          <OTooltip :content="t('aiObservability.queues.workbench.prev')" />
+        </OButton>
         <OButton
           variant="ghost"
           size="icon-sm"
@@ -57,7 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('aiObservability.queues.workbench.next')"
           data-test="ai-queue-workbench-next"
           @click="selectItem(currentIndex + 1)"
-        />
+        >
+          <OTooltip :content="t('aiObservability.queues.workbench.next')" />
+        </OButton>
       </template>
     </template>
 
@@ -173,13 +177,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="shrink-0"
                     data-test="ai-queue-workbench-nav-toggle"
                     @click="navCollapsed = !navCollapsed"
+                    :icon-left="
+                      navCollapsed ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'
+                    "
+                    :aria-label="
+                      navCollapsed
+                        ? t('aiObservability.queues.workbench.expandNav')
+                        : t('aiObservability.queues.workbench.collapseNav')
+                    "
                   >
-                    <OIcon
-                      :name="
-                        navCollapsed ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'
-                      "
-                      size="sm"
-                    />
                     <OTooltip
                       :content="
                         navCollapsed
@@ -278,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="ai-queue-workbench-system-scores"
               >
                 <span class="inline-flex items-center gap-2">
-                  <span class="text-text-heading text-sm font-bold">
+                  <span class="text-text-heading text-sm font-semibold">
                     {{ t("aiObservability.queues.workbench.systemScores") }}
                   </span>
                   <span class="text-text-disabled text-sm font-normal">
@@ -508,7 +514,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div class="flex items-center gap-2">
                         <span
-                          class="bg-primary/15 text-text-body text-2xs flex h-5 w-5 items-center justify-center rounded-full font-bold"
+                          class="bg-primary/15 text-text-body text-2xs flex h-5 w-5 items-center justify-center rounded-full font-semibold"
                         >
                           {{ a.initials }}
                         </span>

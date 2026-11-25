@@ -29,7 +29,6 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { EvidenceEvent } from "@/composables/synthetics/syntheticResultsSchema";
@@ -124,9 +123,10 @@ function copyValue() {
         size="xs"
         class="shrink-0"
         data-test="synthetics-evidence-event-detail-copy-value"
+        icon-left="content-copy"
+        :aria-label="t('common.copyToClipboard')"
         @click="copyValue"
       >
-        <OIcon name="content-copy" size="xs" />
         <OTooltip :content="t('common.copyToClipboard')" />
       </OButton>
     </div>

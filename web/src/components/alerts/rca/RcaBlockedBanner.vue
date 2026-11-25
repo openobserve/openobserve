@@ -52,9 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm"
         :loading="retrying"
+        icon-left="refresh"
         @click="$emit('retry')"
       >
-        <OIcon name="refresh" size="sm" class="me-1" />
         {{ t("alerts.incidents.rcaRetry") }}
       </OButton>
     </template>
@@ -65,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { siteURL } from "@/constants/config";
 import { useI18nTyped } from "@/types/i18n";

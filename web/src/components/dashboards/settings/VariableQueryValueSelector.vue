@@ -28,12 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSelect
       ref="selectRef"
       :model-value="oSelectModelValue"
-      :label="variableItem?.label || variableItem?.name"
-      label-position="inside"
+      :aria-label="variableItem?.label || variableItem?.name"
       :options="computedOptions"
       labelKey="label"
       valueKey="value"
-      class="textbox no-case o2-custom-select-dashboard flex max-w-160 min-w-37.5 flex-col"
+      class="textbox no-case o2-custom-select-dashboard flex max-w-80 min-w-37.5 flex-col"
       :loading="variableItem.isLoading && !isOpen"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
@@ -45,9 +44,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @keydown="handleKeydown"
       @update:model-value="onUpdateValue"
     >
+      <template #icon-left>
+        <OTruncatedText
+          class="text-text-secondary max-w-40 font-normal"
+          :data-test="`variable-selector-${variableItem.name}-inner-label`"
+          >{{ variableItem?.label || variableItem?.name }}</OTruncatedText
+        >
+      </template>
       <template #trigger>
         <OTruncatedText
-          class="text-select-text flex-1 text-start text-xs leading-4 font-semibold"
+          class="text-text-heading flex-1 text-start font-medium"
           :data-test="`variable-selector-${variableItem.name}-inner-value`"
           >{{ displayValue }}</OTruncatedText
         >

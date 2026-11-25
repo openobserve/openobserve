@@ -18,9 +18,9 @@ import { mount } from "@vue/test-utils";
 import OButton from "./OButton.vue";
 import type { ButtonVariant } from "./OButton.types";
 
-const STEP = "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg";
+const STEP = "group-hover/row:actionable:hover:not-active:bg-table-row-action-hover-bg";
 const NEUTRAL_HOVER =
-  /(^|\s)enabled:hover:bg-button-(ghost|ghost-primary|ghost-muted|ghost-subtle)-hover-bg(\s|$)|(^|\s)enabled:hover:bg-button-secondary-hover(\s|$)/;
+  /(^|\s)actionable:hover:bg-button-(ghost|ghost-primary|ghost-muted|ghost-subtle)-hover-bg(\s|$)|(^|\s)actionable:hover:bg-button-secondary-hover(\s|$)/;
 
 function classesOf(variant: ButtonVariant): string {
   return mount(OButton, { props: { variant }, slots: { default: "Go" } })

@@ -31,10 +31,12 @@
           size="icon-sm"
           icon-left="refresh"
           :loading="isLoadingKpis || isLoadingRuns"
-          :title="t('onlineEvals.job.detail.refresh')"
           data-test="eval-job-detail-refresh"
+          :aria-label="t('onlineEvals.job.detail.refresh')"
           @click="refreshAll"
-        />
+        >
+          <OTooltip :content="t('onlineEvals.job.detail.refresh')" />
+        </OButton>
       </div>
 
       <!-- ── KPI strip ── -->
@@ -173,13 +175,14 @@
                   variant="ghost-muted"
                   size="icon-xs-sq"
                   data-test="eval-job-detail-filter-copy-btn"
+                  icon-left="content-copy"
+                  :aria-label="t('common.copy')"
                   @click="
                     copyToClipboard(filterText, t, {
                       successMessage: t('common.copySuccess'),
                     })
                   "
                 >
-                  <OIcon name="content-copy" size="sm" />
                   <OTooltip :content="t('common.copy')" />
                 </OButton>
               </div>
@@ -248,7 +251,7 @@
                   </span>
                   <div class="flex min-w-0 flex-1 flex-col gap-1.25">
                     <div class="flex flex-wrap items-center gap-2">
-                      <span class="text-text-heading text-sm font-bold">{{ item.name }}</span>
+                      <span class="text-text-heading text-sm font-semibold">{{ item.name }}</span>
                       <OTag
                         v-if="item.scorerTypeLabel"
                         type="scorerType"
@@ -270,7 +273,7 @@
                       <span class="font-medium">
                         {{ t("onlineEvals.job.detail.producesPrefix") }}
                       </span>
-                      <span class="text-text-body font-bold">{{ item.scoreConfigName }}</span>
+                      <span class="text-text-body font-semibold">{{ item.scoreConfigName }}</span>
                       <template v-if="item.scoreConfigDataType">
                         <span class="text-text-secondary opacity-50">·</span>
                         <span class="text-text-secondary">

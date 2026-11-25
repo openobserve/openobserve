@@ -51,7 +51,7 @@
         <span class="text-dialog-header-text truncate text-base font-semibold">
           {{ drawerTitle }}
         </span>
-        <BetaBadge class="shrink-0" />
+        <OBetaBadge class="shrink-0" />
       </div>
     </template>
     <!-- Listing and creating are separate grants, so a refused list doesn't mean a refused create. -->
@@ -198,9 +198,16 @@
                         })
                       "
                       :data-test="`dashboards-public-links-panel-range-${index}-remove-btn`"
+                      icon-left="close"
                       @click="removeRange(row)"
                     >
-                      <template #icon-left><OIcon name="close" size="xs" /></template>
+                      <OTooltip
+                        :content="
+                          t('dashboard.publicLinks.removeRange', {
+                            range: longRange(row.range, t, timezone),
+                          })
+                        "
+                      />
                     </OButton>
                   </div>
                   <span
@@ -519,11 +526,12 @@
                   icon-left="more-vert"
                   variant="ghost"
                   size="icon-sm"
-                  :title="t('dashboard.moreActions')"
                   :aria-label="t('dashboard.moreActions')"
                   :loading="busyRows.get(row.id) === 'menu'"
                   :data-test="`dashboards-public-links-panel-${row.id}-menu-btn`"
-                />
+                >
+                  <OTooltip :content="t('dashboard.moreActions')" />
+                </OButton>
               </template>
               <ODropdownItem
                 v-if="row.slug"
@@ -633,7 +641,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import PublicLinkRangesCell from "./PublicLinkRangesCell.vue";
 import PublicLinkExpiresCell from "./PublicLinkExpiresCell.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";

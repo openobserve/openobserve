@@ -52,10 +52,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-label="t('common.close')"
         variant="ghost"
         size="icon"
+        icon-left="close"
         @click="closeSidebar"
         data-test="trace-details-sidebar-header-close-btn"
       >
-        <OIcon name="close" size="xs" />
+        <OTooltip :content="t('common.close')" />
       </OButton>
     </div>
     <div
@@ -253,10 +254,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="h-full text-xs!"
                   disabled
                   data-test="trace-details-sidebar-header-toolbar-view-profile-btn"
+                  icon-left="lock"
                 >
-                  <template #icon-left>
-                    <OIcon name="lock" class="lock-chip" size="sm" />
-                  </template>
                   {{ t("traces.viewProfile") }}
                 </OButton>
               </span>
@@ -295,9 +294,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs"
               :aria-label="t('onlineEvals.manualEvaluation.titles.span')"
               data-test="trace-details-sidebar-evaluate-span-btn"
+              icon-left="rule"
               @click.stop="evaluateSpan"
             >
-              <OIcon name="rule" size="sm" />
               <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.span')" />
             </OButton>
 
@@ -319,9 +318,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs"
               :aria-label="t('aiObservability.traceActions.dataset.button')"
               data-test="trace-details-sidebar-dataset-span-btn"
+              icon-left="table-chart"
               @click.stop="addSpanToDataset"
             >
-              <OIcon name="table-chart" size="sm" />
               <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
             </OButton>
 
@@ -331,9 +330,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs"
               :aria-label="t('aiObservability.traceActions.playground.button')"
               data-test="trace-details-sidebar-playground-span-btn"
+              icon-left="play-circle"
               @click.stop="openInPlayground"
             >
-              <OIcon name="play-circle" size="sm" />
               <OTooltip
                 side="bottom"
                 :content="t('aiObservability.traceActions.playground.hint')"
@@ -584,7 +583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pe-2"
               >
                 <div
-                  class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-semibold"
                   :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.input") }}</div>
@@ -592,23 +591,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="outline"
                       size="icon"
-                      :title="
+                      :icon-left="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
+                      @click="toggleFullscreen"
+                      :aria-label="
                         isFullscreen
                           ? t('traces.traceDetailsSidebar.exitFullscreen')
                           : t('traces.traceDetailsSidebar.enterFullscreen')
                       "
-                      @click="toggleFullscreen"
                     >
-                      <OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="xs" />
+                      <OTooltip
+                        :content="
+                          isFullscreen
+                            ? t('traces.traceDetailsSidebar.exitFullscreen')
+                            : t('traces.traceDetailsSidebar.enterFullscreen')
+                        "
+                      />
                     </OButton>
                     <OButton
                       variant="outline"
                       size="icon"
-                      :title="t('traces.traceDetailsSidebar.copyInput')"
+                      icon-left="content-copy"
+                      :aria-label="t('traces.traceDetailsSidebar.copyInput')"
                       @click="copyContent(previewInput, 'input')"
                       :disabled="!hasContent(previewInput)"
                     >
-                      <OIcon name="content-copy" size="xs" />
+                      <OTooltip :content="t('traces.traceDetailsSidebar.copyInput')" />
                     </OButton>
                   </div>
                 </div>
@@ -657,7 +664,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col"
               >
                 <div
-                  class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-semibold"
                   :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.output") }}</div>
@@ -665,23 +672,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="outline"
                       size="icon"
-                      :title="
+                      :icon-left="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
+                      @click="toggleFullscreen"
+                      :aria-label="
                         isFullscreen
                           ? t('traces.traceDetailsSidebar.exitFullscreen')
                           : t('traces.traceDetailsSidebar.enterFullscreen')
                       "
-                      @click="toggleFullscreen"
                     >
-                      <OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="xs" />
+                      <OTooltip
+                        :content="
+                          isFullscreen
+                            ? t('traces.traceDetailsSidebar.exitFullscreen')
+                            : t('traces.traceDetailsSidebar.enterFullscreen')
+                        "
+                      />
                     </OButton>
                     <OButton
                       variant="outline"
                       size="icon"
-                      :title="t('traces.traceDetailsSidebar.copyOutput')"
+                      icon-left="content-copy"
+                      :aria-label="t('traces.traceDetailsSidebar.copyOutput')"
                       @click="copyContent(previewOutput, 'output')"
                       :disabled="!hasContent(previewOutput)"
                     >
-                      <OIcon name="content-copy" size="xs" />
+                      <OTooltip :content="t('traces.traceDetailsSidebar.copyOutput')" />
                     </OButton>
                   </div>
                 </div>
@@ -1044,7 +1059,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="flex h-full items-center justify-center py-20">
             <div class="text-center">
               <OSpinner v-if="correlationLoading" size="lg" class="mb-4" />
-              <div v-else-if="correlationError" class="text-sm font-bold">
+              <div v-else-if="correlationError" class="text-sm font-semibold">
                 {{ correlationError }}
               </div>
               <div v-else class="text-text-muted text-base">
@@ -1094,7 +1109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="flex h-full items-center justify-center py-20">
             <div class="text-center">
               <OSpinner v-if="correlationLoading" size="lg" class="mb-4" />
-              <div v-else-if="correlationError" class="text-sm font-bold">
+              <div v-else-if="correlationError" class="text-sm font-semibold">
                 {{ correlationError }}
               </div>
               <div v-else class="text-text-muted text-base">

@@ -60,10 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="justify-start"
                     disabled
                     :data-test="`nodes-${key}-filter-locked`"
+                    icon-left="lock"
                   >
-                    <template #icon-left>
-                      <OIcon name="lock" size="sm" class="lock-chip" />
-                    </template>
                     {{ t(`nodes.${key}`) }}
                   </OButton>
                 </span>

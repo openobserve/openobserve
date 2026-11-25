@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mt-3 w-full"
                 data-test="prebuilt-additional-settings"
               >
-                <div class="py-1 font-bold">
+                <div class="py-1 font-semibold">
                   {{ t("alert_destinations.additional_settings") }}
                 </div>
 
@@ -218,10 +218,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="ms-1"
                         variant="ghost"
                         size="icon-circle-sm"
-                        :title="t('alert_templates.edit')"
+                        icon-left="delete"
+                        :aria-label="t('alert_templates.edit')"
                         @click="deleteApiHeader(index)"
                       >
-                        <OIcon name="delete" size="sm" />
+                        <OTooltip :content="t('alert_templates.edit')" />
                       </OButton>
                       <OButton
                         data-test="add-destination-add-header-btn"
@@ -229,10 +230,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="ms-1"
                         variant="ghost"
                         size="icon-circle-sm"
-                        :title="t('alert_templates.edit')"
+                        icon-left="add"
+                        :aria-label="t('alert_templates.edit')"
                         @click="addApiHeader()"
                       >
-                        <OIcon name="add" size="sm" />
+                        <OTooltip :content="t('alert_templates.edit')" />
                       </OButton>
                     </div>
                   </div>
@@ -358,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="w-full py-2">
-                <div class="py-1 font-bold">{{ t("alert_destinations.headers") }}</div>
+                <div class="py-1 font-semibold">{{ t("alert_destinations.headers") }}</div>
                 <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
                   <div class="ms-0 w-5/12">
                     <OFormInput
@@ -384,10 +386,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="ms-1"
                       variant="ghost"
                       size="icon-circle-sm"
-                      :title="t('alert_templates.edit')"
+                      icon-left="delete"
+                      :aria-label="t('alert_templates.edit')"
                       @click="deleteApiHeader(index)"
                     >
-                      <OIcon name="delete" size="sm" />
+                      <OTooltip :content="t('alert_templates.edit')" />
                     </OButton>
                     <OButton
                       data-test="add-destination-add-header-btn"
@@ -395,10 +398,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="ms-1"
                       variant="ghost"
                       size="icon-circle-sm"
-                      :title="t('alert_templates.edit')"
+                      icon-left="add"
+                      :aria-label="t('alert_templates.edit')"
                       @click="addApiHeader()"
                     >
-                      <OIcon name="add" size="sm" />
+                      <OTooltip :content="t('alert_templates.edit')" />
                     </OButton>
                   </div>
                 </div>
@@ -483,8 +487,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="destination-preview-button"
               variant="outline"
               size="sm"
-              @click="showPreview"
               icon-left="preview"
+              @click="showPreview"
             >
               {{ t("alert_destinations.preview") }}
             </OButton>
@@ -493,8 +497,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="isTestInProgress"
               variant="outline"
               size="sm"
-              @click="handleTestDestination"
               icon-left="send"
+              @click="handleTestDestination"
             >
               {{ t("alert_destinations.test") }}
             </OButton>
@@ -560,6 +564,7 @@ import type { PropType } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";

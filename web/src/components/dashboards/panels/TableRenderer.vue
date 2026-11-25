@@ -159,12 +159,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-circle"
           :data-test="`dashboard-table-cell-copy-${column.id}`"
           :data-copied="copiedCellKey === cellKey(column, row) ? 'true' : undefined"
+          :icon-left="copiedCellKey === cellKey(column, row) ? 'check' : 'content-copy'"
+          :aria-label="t('common.copy')"
           @click.stop="copyCellValue(value, column, row)"
         >
-          <OIcon
-            :name="copiedCellKey === cellKey(column, row) ? 'check' : 'content-copy'"
-            size="xs"
-          />
           <OTooltip :content="t('common.copy')" />
         </OButton>
         <OButton
@@ -172,9 +170,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-xs-circle"
           :data-test="`dashboard-table-cell-drilldown-${column.id}`"
+          icon-left="search"
+          :aria-label="t('dashboard.tableCellDrilldownTooltip')"
           @click.stop="onCellDrilldown({ columnId: column.id, row, value })"
         >
-          <OIcon name="search" size="xs" />
           <OTooltip :content="t('dashboard.tableCellDrilldownTooltip')" />
         </OButton>
       </template>
@@ -230,7 +229,6 @@ import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
@@ -302,7 +300,6 @@ export default defineComponent({
     OTable,
     OEmptyState,
     OButton,
-    OIcon,
     OTooltip,
     TablePaginationControls,
     JsonFieldRenderer,

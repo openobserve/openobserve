@@ -909,7 +909,7 @@ async function onSaved() {
             </OButton>
           </template>
           <ODropdownItem
-            icon-left="upload-file"
+            icon-left="file-upload"
             data-test="security-intel-import-file-item"
             @select="importMode = 'file'"
           >

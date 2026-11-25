@@ -2096,13 +2096,12 @@ export const BADGE_GROUPS = {
     },
   },
 
-  // Feature flags — PILL, extra-small (compact BETA / HA / Coming Soon chips).
+  // Feature flags — PILL, extra-small (compact HA / Coming Soon chips; Beta is OBetaBadge).
   featureFlag: {
     mode: "plain",
     shape: "pill",
     size: "xs",
     values: {
-      beta: { variant: "primary-soft", label: raw("BETA") },
       ha: { variant: "primary-soft", label: raw("HA") },
       comingsoon: { variant: "default-soft", labelKey: "components.badge.featureFlag.comingsoon" },
     },

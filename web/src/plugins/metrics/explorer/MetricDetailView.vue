@@ -519,7 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-text-secondary flex h-full flex-col items-center justify-center gap-1 text-xs"
               :title="overviewState.error"
             >
-              <OIcon name="error" size="sm" class="text-error-600" />
+              <OIcon name="error" size="sm" class="text-status-error-text" />
               <span>{{ t("metrics.explorer.queryFailed") }}</span>
               <OButton variant="ghost-primary" size="xs" @click="loadOverview()">
                 {{ t("metrics.explorer.retry") }}

@@ -754,11 +754,11 @@ describe("Discovered Services", () => {
     catalog = [...scopes, { ...scopes[0], scope_key: "other", newest_version: "v-other" }];
     await mountDiscovered();
     expect(tile("discovered")).toBe(
-      `Discovered (All Signals)${keys.size}${traced.size} of these send traces`,
+      `Discovered (all signals)${keys.size}${traced.size} of these send traces`,
     );
-    expect(tile("envs")).toBe(`Envs Detected${stage7.envs.envs.length}prod`);
+    expect(tile("envs")).toBe(`Envs detected${stage7.envs.envs.length}prod`);
     expect(tile("overrides")).toContain(String(stage7.overrides.total));
-    expect(tile("names")).toBe("Names to Review3Review →");
+    expect(tile("names")).toBe("Names to review3Review →");
     expect(tile("versions")).toBe(versionTile(catalog));
     expect(tile("versions")).not.toContain("raw");
     await byTest("svcver-tile-overrides-view").trigger("click");

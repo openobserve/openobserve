@@ -99,7 +99,7 @@ describe("K8sListView", () => {
     const props = table().props();
     expect(props).toMatchObject({
       dense: true,
-      rowHeight: 28,
+      rowHeight: 32,
       virtualScroll: true,
       overscan: 10,
       pagination: "none",

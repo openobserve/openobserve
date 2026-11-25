@@ -1949,7 +1949,7 @@ const errorLabel = (row: QueryRow): I18nText =>
 
 const errorClass = (row: QueryRow) => {
   if ((row.errors ?? 0) <= 0) return "text-text-secondary";
-  return row.critical ? "text-status-error-text font-bold" : "text-status-error-text";
+  return row.critical ? "text-status-error-text font-semibold" : "text-status-error-text";
 };
 
 /**

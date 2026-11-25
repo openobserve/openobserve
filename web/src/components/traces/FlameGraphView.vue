@@ -14,7 +14,7 @@
         class="border-border-default bg-card-glass-bg! flex items-center justify-between border-b px-6 py-3"
       >
         <div class="flex items-center space-x-4">
-          <div class="text-text-secondary text-xs font-bold">
+          <div class="text-text-secondary text-xs font-semibold">
             <span class="text-text-body">{{ totalSpans }}</span>
             {{ t("traces.flameGraphView.spans") }}
             <span class="mx-2">•</span>

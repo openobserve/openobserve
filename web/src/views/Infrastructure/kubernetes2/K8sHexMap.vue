@@ -20,7 +20,7 @@ import { format } from "echarts/core";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useTheme from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
@@ -755,9 +755,10 @@ function resetZoom() {
         :aria-label="t('infra.k8s2.mapZoomIn')"
         :disabled="atMax"
         data-test="k8s2-map-zoom-in"
+        icon-left="add"
         @click="zoomStep(ZOOM_STEP)"
       >
-        <OIcon name="add" size="sm" />
+        <OTooltip :content="t('infra.k8s2.mapZoomIn')" />
       </OButton>
       <OButton
         class="max-md:hidden"
@@ -766,18 +767,20 @@ function resetZoom() {
         :aria-label="t('infra.k8s2.mapZoomOut')"
         :disabled="atFit"
         data-test="k8s2-map-zoom-out"
+        icon-left="remove"
         @click="zoomStep(1 / ZOOM_STEP)"
       >
-        <OIcon name="remove" size="sm" />
+        <OTooltip :content="t('infra.k8s2.mapZoomOut')" />
       </OButton>
       <OButton
         variant="ghost"
         size="icon-sm"
         :aria-label="t('infra.k8s2.mapFit')"
         data-test="k8s2-map-fit"
+        icon-left="fit-screen"
         @click="resetZoom"
       >
-        <OIcon name="fit-screen" size="sm" />
+        <OTooltip :content="t('infra.k8s2.mapFit')" />
       </OButton>
     </div>
   </div>

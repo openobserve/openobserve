@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="warning" size="sm" class="mt-0.5 shrink-0" />
                 <div>
-                  <div class="text-status-error-text font-bold">
+                  <div class="text-status-error-text font-semibold">
                     {{ t("search.patternAnomalyDetected") }}
                   </div>
                   <div class="text-text-secondary mt-1 text-xs">
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-card-glass-border w-full border border-solid"
             >
               <template #cell-name="{ row }">
-                <span class="text-primary text-left font-bold">
+                <span class="text-primary text-left font-semibold">
                   {{ raw(row.name || "var_" + row.index) }}
                 </span>
               </template>

@@ -14,7 +14,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div v-if="variablesData.values?.length > 0" class="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+  <div
+    v-if="variablesData.values?.length > 0"
+    class="mt-2 flex flex-wrap items-start gap-x-2 gap-y-2"
+  >
     <div
       v-for="(item, index) in variablesData.values"
       v-show="!isVariableOffTab(item) && !isVariableOmitted(item)"

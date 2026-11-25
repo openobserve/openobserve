@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #title>
       <span class="inline-flex items-center gap-2">
         {{ t("profiles.title") }}
-        <BetaBadge />
+        <OBetaBadge />
       </span>
     </template>
     <template #actions>
@@ -686,7 +686,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import CommonFlameGraph from "@/components/common/FlameGraphView.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import ProfilesLabelFilters from "./ProfilesLabelFilters.vue";
 import ProfilesFunctionMenu from "./ProfilesFunctionMenu.vue";
 import ProfilesFunctionDetails from "./ProfilesFunctionDetails.vue";

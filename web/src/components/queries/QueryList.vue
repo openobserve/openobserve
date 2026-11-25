@@ -4,7 +4,7 @@
     <div class="px-2 py-3">
       <OCardSection role="header" class="w-full">
         <div class="flex w-full items-center justify-between">
-          <div class="text-base font-bold" data-test="queryList-title-text">
+          <div class="text-base font-semibold" data-test="queryList-title-text">
             {{ t("queries.queryList") }}
           </div>
           <OButton

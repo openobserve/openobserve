@@ -149,11 +149,12 @@
       <OButton
         variant="outline"
         size="icon-chip"
+        icon-left="add"
+        :aria-label="t('metrics.operationsList.addOperation')"
         @click="showOperationSelector = true"
         class="add-operation-btn"
         data-test="promql-add-operation"
       >
-        <OIcon name="add" size="sm" />
         <OTooltip :content="t('metrics.operationsList.addOperation')" side="top" />
       </OButton>
     </div>

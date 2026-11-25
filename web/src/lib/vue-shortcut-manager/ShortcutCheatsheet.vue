@@ -96,7 +96,7 @@
               :class="idx === 0 ? 'pt-1' : 'border-border-default mt-2 border-t pt-3'"
               data-test="shortcut-cheatsheet-module"
             >
-              <span class="text-accent text-xs font-semibold tracking-wide">
+              <span class="text-text-heading text-sm font-semibold">
                 {{ m.title }}
               </span>
             </div>
@@ -105,7 +105,7 @@
             <template v-for="sec in m.sections" :key="sec.title">
               <div
                 v-if="m.sections.length > 1"
-                class="text-3xs text-accent px-1 pt-2 pb-1 font-semibold tracking-wider uppercase"
+                class="text-text-secondary px-1 pt-2 pb-1 text-xs font-medium"
                 data-test="shortcut-cheatsheet-category"
               >
                 {{ sec.title }}
@@ -153,7 +153,7 @@
               :class="idx === 0 ? 'pt-1' : 'border-border-default mt-2 border-t pt-3'"
               data-test="shortcut-cheatsheet-module"
             >
-              <span class="text-accent text-xs font-semibold tracking-wide">
+              <span class="text-text-heading text-sm font-semibold">
                 {{ m.title }}
               </span>
             </div>
@@ -162,7 +162,7 @@
             <template v-for="sec in m.sections" :key="sec.title">
               <div
                 v-if="m.sections.length > 1"
-                class="text-3xs text-accent px-1 pt-2 pb-1 font-semibold tracking-wider uppercase"
+                class="text-text-secondary px-1 pt-2 pb-1 text-xs font-medium"
                 data-test="shortcut-cheatsheet-category"
               >
                 {{ sec.title }}

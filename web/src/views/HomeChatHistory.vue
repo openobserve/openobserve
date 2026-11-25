@@ -10,7 +10,6 @@ import type { ChatHistoryEntry } from "@/ts/interfaces/chat";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -171,9 +170,9 @@ function formatTime(ts: string): string {
           size="icon"
           data-test="home-chat-history-shared-by-me"
           :aria-label="t('aiChatShare.sharedByMe')"
+          icon-left="link"
           @click="sharedByMeOpen = true"
         >
-          <OIcon name="link" size="sm" />
           <OTooltip :content="t('aiChatShare.sharedByMe')" />
         </OButton>
         <OButton
@@ -287,9 +286,9 @@ function formatTime(ts: string): string {
             size="icon"
             :data-test="`home-chat-history-share-${chat.id}`"
             :aria-label="t('aiChatShare.share')"
+            icon-left="share"
             @click="openShare($event, chat)"
           >
-            <OIcon name="share" size="sm" />
             <OTooltip :content="t('aiChatShare.share')" />
           </OButton>
           <OButton

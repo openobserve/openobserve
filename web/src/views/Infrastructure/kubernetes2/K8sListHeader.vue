@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -172,9 +171,9 @@ const onNamespaces = (value: unknown) =>
         size="icon-sm"
         :aria-label="t('infra.k8s2.namespaceFilter')"
         data-test="k8s2-namespace-filter-btn"
+        icon-left="filter-list"
         @click="filterOpen = true"
       >
-        <OIcon name="filter-list" size="sm" />
         <span v-if="namespaces.length" class="text-2xs">{{ namespaces.length }}</span>
       </OButton>
       <OSearchInput

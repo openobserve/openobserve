@@ -25,14 +25,14 @@
   --color-grey-950: #09090b;
 
   /* Surface ladder, darker to lighter: shell < card < raised. */
-  --color-surface-shell: #e1e4ea;
-  --color-surface-card: #fbfbfc;
-  --color-surface-panel: #f5f6f8;
-  --color-surface-band: #eceef2;
+  --color-surface-shell: #eff0f2;
+  --color-surface-card: #ffffff;
+  --color-surface-panel: #f7f8f9;
+  --color-surface-band: #eff0f2;
   --color-surface-raised: #ffffff;
   --color-surface-overlay: #ffffff;
-  --color-surface-hover: #dadde4;
-  --color-surface-subtle-hover: #e3e5ea;
+  --color-surface-hover: #e4e6e9;
+  --color-surface-subtle-hover: #e9eaed;
 
   --color-text-heading: #16171d;
   --color-text-body: #2b2d36;
@@ -68,6 +68,7 @@
   --color-sidebar-flyout-bg: var(--color-dropdown-bg);
   --color-sidebar-flyout-border: var(--color-border-subtle);
   --selected-tint: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --toggle-pill: var(--color-surface-raised);
   --color-log-key: #2f5fb8;
   --color-selected-border: var(--color-accent-text);
   /* Opaque twin of the selected fill, so sticky table cells stay solid. */
@@ -129,29 +130,32 @@
   --color-sidebar-flyout-bg: color-mix(in srgb, white 5%, var(--color-surface-overlay));
   --color-sidebar-flyout-border: color-mix(in srgb, white 10%, transparent);
   --selected-tint: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  /* A raised pill one step above the dark track. */
+  --toggle-pill: var(--color-surface-selected-neutral);
   --color-log-key: #8ab4f8;
   /* dark.css builds its surfaces and borders from these. */
-  --d-chrome: #0f1013;
+  /* Neutral greys: a blue cast read as tinted next to the accent. */
+  --d-chrome: #0e0e10;
   /* One step further from the shell so the card reads as its own surface. */
-  --d-base: #17181c;
-  --d-panel: #1b1c21;
-  --d-well: #262830;
-  --d-overlay: #26272e;
-  --d-divider: #2a2c33;
-  --d-border: #3a3c45;
-  --d-border-strong: #6e717d;
-  --d-zebra: #1b1c21;
-  --d-hover: #33353e;
+  --d-base: #161618;
+  --d-panel: #1b1b1e;
+  --d-well: #242428;
+  --d-overlay: #232327;
+  --d-divider: #2a2a2e;
+  --d-border: #38383e;
+  --d-border-strong: #6c6c75;
+  --d-zebra: #1b1b1e;
+  --d-hover: #2f2f34;
 
   --color-surface-shell: var(--d-chrome);
   --color-surface-card: var(--d-base);
   --color-surface-panel: var(--d-panel);
   --color-surface-band: var(--d-well);
-  --color-surface-raised: #202127;
+  --color-surface-raised: #1e1e21;
   --color-surface-overlay: var(--d-overlay);
   --color-surface-hover: var(--d-hover);
-  --color-surface-subtle-hover: #2c2e36;
-  --color-surface-selected-neutral: #383a45;
+  --color-surface-subtle-hover: #29292e;
+  --color-surface-selected-neutral: #36363c;
 
   /* Not pure white: near-white text halates on dark surfaces. */
   --color-text-heading: #e6e7ec;
@@ -287,9 +291,9 @@
   --color-toggle-item-text: var(--color-text-body);
   --color-toggle-item-hover-bg: var(--color-surface-subtle-hover);
   /* Calm selection, same as the sidebar: soft accent tint, no ring, body text; the accent glyph carries the state. */
-  --color-toggle-item-active-bg: var(--selected-tint);
+  --color-toggle-item-active-bg: var(--toggle-pill);
   --color-toggle-item-active-border: transparent;
-  --color-toggle-item-active-text: var(--color-text-body);
+  --color-toggle-item-active-text: var(--color-text-heading);
   --color-toggle-item-disabled: var(--color-text-disabled);
 
   /* Pager: the current page takes the selected recipe, never a solid fill. */
@@ -310,6 +314,12 @@
   --color-select-item-hover-bg: var(--color-surface-hover);
   --color-select-item-selected-bg: var(--color-selected-bg);
   --color-select-item-selected-text: var(--color-selected-fg);
+  /* Calendar days match the relative-time cells: a tint, not a solid fill. */
+  --color-datepicker-day-selected-bg: var(--color-selected-bg);
+  --color-datepicker-day-selected-text: var(--color-selected-fg);
+  --color-datepicker-day-range-bg: color-mix(in srgb, var(--color-selected-bg) 45%, transparent);
+  --color-datepicker-day-range-text: var(--color-text-heading);
+  --color-datepicker-day-hover-bg: var(--color-surface-hover);
   --color-nav-flyout-item-hover-bg: var(--color-surface-hover);
   --color-nav-flyout-item-selected-bg: var(--color-selected-bg);
   --color-datepicker-relative-btn-selected-bg: var(--color-selected-bg);
@@ -319,13 +329,18 @@
   --color-input-bg: var(--color-surface-raised);
   --color-input-border: var(--color-border-button);
   --color-input-border-hover: var(--color-border-control);
-  --color-input-border-focus: var(--color-border-control);
-  --color-input-focus-glow: var(--color-focus-ring-accent);
+  /* Focus is an accent edge plus a soft halo, never a solid accent ring. */
+  --color-input-border-focus: color-mix(
+    in srgb,
+    var(--color-accent) 70%,
+    var(--color-border-button)
+  );
+  --color-input-focus-glow: color-mix(in srgb, var(--color-accent) 22%, transparent);
   --color-input-placeholder: var(--color-text-placeholder);
   --color-select-bg: var(--color-surface-raised);
   --color-select-border: var(--color-border-button);
   --color-select-border-hover: var(--color-border-control);
-  --color-select-border-focus: var(--color-border-control);
+  --color-select-border-focus: var(--color-input-border-focus);
   --color-select-icon: var(--color-text-secondary);
   --color-datepicker-focus-border: var(--color-border-control);
   --color-field-rest-bg: var(--color-input-bg);
@@ -658,7 +673,7 @@
   color: var(--color-selected-fg);
 }
 /* Glyph sizes: 16px in 28px controls, 14px in 24px controls. */
-:root [data-o2-btn]:is(.h-7, .size-7) span.inline-flex.shrink-0.align-middle.size-6 {
+:root [data-o2-btn]:is(.h-7, .size-7) span.inline-flex.shrink-0.align-middle:is(.size-6, .size-5) {
   width: 1rem;
   height: 1rem;
 }
@@ -730,7 +745,11 @@
   ) !important;
 }
 :root [data-otoggle-value][data-state="on"] span.inline-flex.shrink-0.align-middle {
-  color: var(--color-selected-fg);
+  color: var(--color-text-heading);
+}
+/* The selected segment is a raised pill on the track, not a tint. */
+:root [data-otoggle-value][data-state="on"] {
+  box-shadow: var(--shadow-xs);
 }
 :root [aria-current="page"]:is(.o-pagination__btn, [class*="bg-pagination-item-active-bg"]) {
   box-shadow: none !important;

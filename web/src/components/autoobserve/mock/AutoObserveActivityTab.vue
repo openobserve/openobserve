@@ -239,12 +239,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="outline"
                         size="icon-xs"
-                        :title="t('autoobserve.activity.edit')"
                         :aria-label="t('autoobserve.activity.editFor', actionOf(row.entry))"
                         :data-test="`autoobserve-ledger-${row.entry.id}-edit`"
+                        icon-left="edit"
                         @click="startEdit(row.entry)"
                       >
-                        <OIcon name="edit" size="sm" aria-hidden="true" />
+                        <OTooltip :content="t('autoobserve.activity.edit')" />
                       </OButton>
                       <OButton
                         variant="primary"
@@ -489,6 +489,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";

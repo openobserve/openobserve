@@ -161,14 +161,22 @@
         icon-left="close"
         class="mt-0.5"
         :disabled="message.role === 'system'"
-        :title="
+        :data-test="`ai-playground-message-remove-${message.id}`"
+        @click="message.role !== 'system' && emit('remove', message.id)"
+        :aria-label="
           message.role === 'system'
             ? t('aiObservability.playground.systemMessageFixed')
             : t('aiObservability.playground.removeMessage')
         "
-        :data-test="`ai-playground-message-remove-${message.id}`"
-        @click="message.role !== 'system' && emit('remove', message.id)"
-      />
+      >
+        <OTooltip
+          :content="
+            message.role === 'system'
+              ? t('aiObservability.playground.systemMessageFixed')
+              : t('aiObservability.playground.removeMessage')
+          "
+        />
+      </OButton>
     </div>
 
     <!-- One control, not one per role: the common case is continuing the
@@ -196,6 +204,7 @@
             data-test="ai-playground-add-message-menu"
           >
             <OIcon name="expand-more" size="xs" />
+            <OTooltip :content="t('aiObservability.playground.addMessageChoose')" />
           </OButton>
         </template>
         <ODropdownItem

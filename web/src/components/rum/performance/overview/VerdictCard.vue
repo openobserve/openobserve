@@ -19,7 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0 flex-1 basis-80">
         <div class="flex flex-wrap items-center gap-2">
-          <h2 class="text-text-heading text-xl font-bold" data-test="rum-overview-verdict-title">
+          <h2
+            class="text-text-heading text-xl font-semibold"
+            data-test="rum-overview-verdict-title"
+          >
             {{ heading }}
           </h2>
           <OBadge

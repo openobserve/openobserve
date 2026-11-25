@@ -9,7 +9,7 @@
         <OIcon
           name="help-outline"
           size="md"
-          class="confirmation-icon text-icon-color mt-0.5 shrink-0"
+          class="confirmation-icon text-text-secondary mt-0.5 shrink-0"
         />
         <i18n-t
           v-if="deleteTarget?.name"

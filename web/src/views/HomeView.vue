@@ -29,9 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm"
           data-test="home-mobile-chats-toggle"
+          icon-left="menu"
           @click="mobileChatsOpen = true"
         >
-          <template #icon-left><OIcon name="menu" size="sm" /></template>
           {{ t("chatHistory.title") }}
         </OButton>
       </template>

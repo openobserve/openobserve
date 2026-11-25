@@ -21,6 +21,7 @@
             class=""
             :loading="isLoading"
             data-test="search-scheduler-get-jobs-btn"
+            :aria-label="t('search_scheduler_job.get_jobs')"
             @click="fetchSearchHistory"
           >
             <OTooltip
@@ -84,10 +85,12 @@
               size="icon-sm"
               icon-left="cancel"
               class="max-md:hidden"
-              :title="t('search_scheduler_job.cancel')"
               :disabled="row.status_code !== 0 && row.status_code !== 1"
+              :aria-label="t('search_scheduler_job.cancel')"
               @click="confirmCancelJob(row)"
-            />
+            >
+              <OTooltip :content="t('search_scheduler_job.cancel')" />
+            </OButton>
 
             <OButton
               data-test="search-scheduler-delete-btn"
@@ -96,9 +99,11 @@
               size="icon-sm"
               icon-left="delete"
               class="max-md:hidden"
-              :title="t('search_scheduler_job.delete')"
+              :aria-label="t('search_scheduler_job.delete')"
               @click="confirmDeleteJob(row)"
-            />
+            >
+              <OTooltip :content="t('search_scheduler_job.delete')" />
+            </OButton>
             <OButton
               data-test="search-scheduler-restart-btn"
               data-row-action="resume"
@@ -106,10 +111,12 @@
               size="icon-sm"
               icon-left="refresh"
               class="max-md:hidden"
-              :title="t('search_scheduler_job.restart')"
               :disabled="row.status_code !== 2 && row.status_code !== 3"
+              :aria-label="t('search_scheduler_job.restart')"
               @click="retrySearchJob(row)"
-            />
+            >
+              <OTooltip :content="t('search_scheduler_job.restart')" />
+            </OButton>
             <OButton
               data-test="search-scheduler-explore-btn"
               data-row-action="view"
@@ -117,10 +124,12 @@
               size="icon-sm"
               icon-left="search"
               class="max-md:hidden"
-              :title="t('search_scheduler_job.explore')"
               :disabled="row.status_code == 0 || row.status_code == 3"
+              :aria-label="t('search_scheduler_job.explore')"
               @click="fetchSearchResults(row)"
-            />
+            >
+              <OTooltip :content="t('search_scheduler_job.explore')" />
+            </OButton>
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
@@ -131,7 +140,9 @@
                   class="md:hidden"
                   data-test="search-scheduler-row-more-actions"
                   @click.stop
-                />
+                >
+                  <OTooltip :content="t('search.moreActions')" />
+                </OButton>
               </template>
               <ODropdownItem
                 icon-left="cancel"
@@ -194,6 +205,7 @@
                         size="icon-chip"
                         class="ms-2"
                         data-test="search-scheduler-copy-sql-btn"
+                        icon-left="content-copy"
                         @click.stop="
                           copyToClipboard(row.sql, t, {
                             successMessage: t('logs.searchSchedulersList.sqlQueryCopied'),
@@ -201,15 +213,15 @@
                           })
                         "
                       >
-                        <OIcon name="content-copy" size="xs" /> </OButton></span
+                        <OTooltip :content="t('common.copyToClipboard')" /> </OButton></span
                   ></strong>
                   <OButton
                     variant="outline"
                     size="chip"
                     data-test="search-scheduler-go-to-logs-btn"
                     :disabled="row.status_code == 0 || row.status_code == 3"
-                    @click.stop="fetchSearchResults(row)"
                     icon-left="search"
+                    @click.stop="fetchSearchResults(row)"
                   >
                     {{ t("search_scheduler_job.logs") }}
                   </OButton>
@@ -247,6 +259,7 @@
                         variant="outline"
                         size="icon-chip"
                         class="ms-2"
+                        icon-left="content-copy"
                         @click.stop="
                           copyToClipboard(row.function, t, {
                             successMessage: t('logs.searchSchedulersList.functionDefinitionCopied'),
@@ -254,7 +267,7 @@
                           })
                         "
                       >
-                        <OIcon name="content-copy" size="xs" /> </OButton></span
+                        <OTooltip :content="t('common.copyToClipboard')" /> </OButton></span
                   ></strong>
                 </div>
 
@@ -365,7 +378,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
@@ -389,7 +401,6 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
-    OIcon,
     OPageLayout,
   },
   methods: {

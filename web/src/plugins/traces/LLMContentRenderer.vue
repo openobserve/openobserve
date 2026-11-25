@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- eslint-enable local/no-hardcoded-px -->
               <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
-                class="message-role p-2 text-xs font-bold capitalize"
+                class="message-role p-2 text-xs font-semibold capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
                   borderBottom: '1px solid var(--color-border-default)',
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- eslint-enable local/no-hardcoded-px -->
               <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
-                class="message-role p-2 text-xs font-bold capitalize"
+                class="message-role p-2 text-xs font-semibold capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
                   borderBottom: '1px solid var(--color-border-default)',

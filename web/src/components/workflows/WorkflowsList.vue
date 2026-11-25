@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #title>
         <span class="inline-flex items-center gap-2">
           {{ t("workflow.header") }}
-          <BetaBadge />
+          <OBetaBadge />
         </span>
       </template>
       <template #sidebar>
@@ -397,7 +397,7 @@ const MoveAcrossFolders = defineAsyncComponent(
 );
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";

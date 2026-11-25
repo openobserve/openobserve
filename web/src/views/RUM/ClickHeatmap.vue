@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="!pageRows.length"
                 :aria-label="t('rum.heatmap.pageLabel')"
                 data-test="rum-heatmap-page-select"
+                icon-left="link"
               >
-                <template #icon-left><OIcon name="link" size="sm" /></template>
                 <span
                   class="text-compact min-w-0 flex-1 truncate text-left font-mono"
                   :title="pageUrl"
@@ -282,9 +282,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="fullscreenLabel"
               :aria-pressed="isFullscreen"
               data-test="rum-heatmap-fullscreen-toggle"
+              :icon-left="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
               @click="toggleFullscreenMode"
             >
-              <OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="sm" />
               <OTooltip :content="fullscreenLabel" side="bottom" />
             </OButton>
             <OButton
@@ -293,12 +293,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="panelLabel"
               :aria-expanded="panelOpen"
               data-test="rum-heatmap-panel-toggle"
+              :icon-left="panelOpen ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'"
               @click="panelOpen = !panelOpen"
             >
-              <OIcon
-                :name="panelOpen ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'"
-                size="sm"
-              />
               <span class="max-lg:hidden" data-test="rum-heatmap-panel-toggle-text">{{
                 panelLabel
               }}</span>

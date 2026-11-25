@@ -44,9 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-expanded="expanded"
         :aria-label="t('autoobserve.coverage.detailsFor', { metric: title })"
         :data-test="`autoobserve-coverage-chart-details-${def.signal}`"
+        :icon-left="expanded ? 'expand-less' : 'expand-more'"
         @click="emit('toggle')"
       >
-        <OIcon :name="expanded ? 'expand-less' : 'expand-more'" size="xs" />
         {{ t("autoobserve.coverage.details") }}
       </OButton>
     </div>

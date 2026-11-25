@@ -311,7 +311,7 @@ describe("OTable kept rows while refetching", () => {
       const serverProps = { pagination: "server", currentPage: 1, pageSize: 25, totalCount: 60 };
       mountTable({ ...serverProps, data: makeRows(25) });
       const settled = wrapper.find(PAGER_INFO).text();
-      expect(settled).toMatch(/1 - 25 .*60/);
+      expect(settled).toMatch(/1–25 .*60/);
       await wrapper.setProps({ ...next, loading: true });
       expect(wrapper.find(PAGER_INFO).text()).toBe(settled);
       await advance(STALE_DIM_DELAY_MS);
@@ -321,7 +321,7 @@ describe("OTable kept rows while refetching", () => {
       const from = (live.currentPage - 1) * live.pageSize + 1;
       const to = Math.min(live.currentPage * live.pageSize, live.totalCount);
       expect(wrapper.find(PAGER_INFO).text()).toMatch(
-        new RegExp(`${from} - ${to} .*${live.totalCount}`),
+        new RegExp(`${from}–${to} .*${live.totalCount}`),
       );
     },
   );

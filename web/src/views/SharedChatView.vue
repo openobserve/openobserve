@@ -41,7 +41,6 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -178,9 +177,9 @@ const fork = async () => {
           :loading="fetching"
           data-test="shared-chat-view-refresh"
           :aria-label="t('common.refresh')"
+          icon-left="refresh"
           @click="reload"
         >
-          <OIcon name="refresh" size="sm" />
           <OTooltip :content="t('common.refresh')" />
         </OButton>
         <OButton
@@ -188,9 +187,9 @@ const fork = async () => {
           variant="primary"
           size="sm-action"
           data-test="shared-chat-view-open-mine"
+          icon-left="open-in-new"
           @click="openOwnChat"
         >
-          <template #icon-left><OIcon name="open-in-new" size="sm" /></template>
           {{ t("aiChatShare.openInMyChats") }}
         </OButton>
         <OButton
@@ -199,9 +198,9 @@ const fork = async () => {
           size="sm-action"
           :loading="forking"
           data-test="shared-chat-view-fork"
+          icon-left="fork-right"
           @click="fork"
         >
-          <template #icon-left><OIcon name="fork-right" size="sm" /></template>
           {{ t("aiChatShare.forkIntoMyChats") }}
         </OButton>
       </template>

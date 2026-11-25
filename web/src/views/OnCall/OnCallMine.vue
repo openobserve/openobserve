@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout bleed data-test="oncall-mine-page" :title="t('oncall.mineTitle')" icon="person">
     <template #title-trail>
-      <BetaBadge class="shrink-0" />
+      <OBetaBadge class="shrink-0" />
     </template>
     <template #actions>
       <!-- Personal and org-wide, so it heads the page rather than sitting under one team. -->
@@ -29,9 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         :disabled="!loaded"
         data-test="oncall-mine-away"
+        icon-left="event-busy"
         @click="openAway"
-      >
-        <OIcon name="event-busy" size="sm" />{{ t("oncall.mineAway") }}
+        >{{ t("oncall.mineAway") }}
       </OButton>
       <OButton
         v-if="!unavailable && !licenseDenied && myAway"
@@ -201,7 +201,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :loading="coverLoadingId === row.team_id || testingId === row.team_id"
                     :aria-label="t('oncall.moreActions')"
                     :data-test="`oncall-mine-row-menu-${row.team_id}`"
-                  />
+                  >
+                    <OTooltip :content="t('oncall.moreActions')" />
+                  </OButton>
                 </template>
                 <ODropdownItem
                   icon-left="person-add"
@@ -225,9 +227,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="testingId === row.team_id"
                 :aria-label="t('oncall.mineTestTeam', { team: raw(row.team_name) })"
                 :data-test="`oncall-mine-test-page-${row.team_id}`"
+                icon-left="campaign"
                 @click="askTestPage(row.team_id)"
               >
-                <OIcon name="campaign" size="sm" aria-hidden="true" />
                 <OTooltip :content="t('oncall.mineTestTeam', { team: raw(row.team_name) })" />
               </OButton>
             </div>
@@ -314,9 +316,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :loading="coverLoadingId === row.team_id"
                     :aria-label="t('oncall.mineCoverShift')"
                     :data-test="`oncall-mine-cover-${row.team_id}`"
+                    icon-left="person-add"
                     @click="openCover(row)"
                   >
-                    <OIcon name="person-add" size="sm" aria-hidden="true" />
                     <OTooltip :content="t('oncall.mineCoverShift')" />
                   </OButton>
                   <span v-else class="size-8 shrink-0" aria-hidden="true" />
@@ -326,9 +328,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :loading="testingId === row.team_id"
                     :aria-label="t('oncall.mineTestTeam', { team: raw(row.team_name) })"
                     :data-test="`oncall-mine-test-page-${row.team_id}`"
+                    icon-left="campaign"
                     @click="askTestPage(row.team_id)"
                   >
-                    <OIcon name="campaign" size="sm" aria-hidden="true" />
                     <OTooltip :content="t('oncall.mineTestTeam', { team: raw(row.team_name) })" />
                   </OButton>
                 </div>
@@ -505,7 +507,7 @@ import OnCallReachRow from "@/components/oncall/OnCallReachRow.vue";
 import OnCallSetupBanner from "@/components/oncall/OnCallSetupBanner.vue";
 import OnCallSlackCard from "@/components/oncall/OnCallSlackCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

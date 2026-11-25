@@ -165,7 +165,7 @@ const agentGuideName = computed(
     <AIIntegrationCard v-else-if="cardContent" :content="raw(cardContent)" :doc-url="docURL" />
     <div v-else class="text-compact">
       <CredentialCodeBlock slug="ai-integration" :content="aiContent" />
-      <div class="pt-6 pb-2 font-bold">
+      <div class="pt-6 pb-2 font-semibold">
         {{ t("ingestion.ai.viewDocsPrefix") }}
         <a
           :href="safeHttpUrl(docURL)"

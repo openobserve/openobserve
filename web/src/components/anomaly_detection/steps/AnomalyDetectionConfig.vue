@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alerts.detectionFunction") }}
               <span class="text-status-error-text ms-1">*</span>
-              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+              <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alerts.anomaly.detectionResolution") }}
               <span class="text-status-error-text ms-1">*</span>
-              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+              <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
             {{ t("alerts.anomaly.detectionResolution") }}
             <span class="text-status-error-text ms-1">*</span>
-            <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+            <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
               <OTooltip
                 side="right"
                 align="center"
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alerts.anomaly.checkEvery") }}
               <span class="text-status-error-text ms-1">*</span>
-              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+              <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alerts.anomaly.lookBackWindow") }}
               <span class="text-status-error-text ms-1">*</span>
-              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+              <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -429,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alerts.trainingWindow") }}
               <span class="text-status-error-text ms-1">*</span>
-              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+              <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
                 <OTooltip side="right" align="center" max-width="18.75rem">
                   <!-- Uses a #content slot (not :content) so the font-size
                        span survives. -->
@@ -465,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.anomaly.retrainEvery") }}
-              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+              <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -496,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("alerts.sensitivity") }}
             <span class="text-status-error-text ms-1">*</span>
-            <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+            <OIcon name="info" size="sm" class="text-text-secondary ms-1 cursor-pointer">
               <OTooltip
                 side="right"
                 align="center"

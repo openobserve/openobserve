@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   :class="{
-                    'py-1.25 text-sm font-bold': true,
+                    'py-1.25 text-sm font-semibold': true,
                     'text-green': val.success,
                     'text-status-negative': !val.success,
                   }"

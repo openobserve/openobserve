@@ -142,7 +142,7 @@
                   size="sm"
                   :label="row.help"
                   tabindex="0"
-                  class="text-icon-color cursor-pointer"
+                  class="text-text-secondary cursor-pointer"
                 >
                   <OTooltip :content="row.help" side="right" />
                 </OIcon>

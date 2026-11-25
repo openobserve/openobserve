@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg h-full">
         <OTable
           :frame="false"
-          :row-height="28"
           :data="serviceAccountsState.service_accounts_users"
           :columns="columns"
           row-key="email"
@@ -321,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-accounts-list-token-download-btn"
               variant="outline"
               size="sm"
-              icon-left="file-download"
+              icon-left="download"
               :title="t('serviceAccounts.downloadToken')"
               @click.stop="downloadTokenAsFile(serviceToken)"
             >
@@ -416,7 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="group rounded-default border-border-default text-text-body hover:border-primary hover:bg-primary/5 inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-xs transition-colors"
                 @click="onQuickLinkClick"
               >
-                <OIcon name="shield" size="sm" class="text-primary shrink-0" />
+                <OIcon name="shield" size="sm" class="text-accent shrink-0" />
                 <span class="font-medium">{{ t("serviceAccounts.tokenReveal.addToRole") }}</span>
                 <OIcon
                   :name="rbacAccess.allowed ? 'arrow-right' : 'lock'"
@@ -435,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="group rounded-default border-border-default text-text-body hover:border-primary hover:bg-primary/5 inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-xs transition-colors"
                 @click="onQuickLinkClick"
               >
-                <OIcon name="group" size="sm" class="text-primary shrink-0" />
+                <OIcon name="group" size="sm" class="text-accent shrink-0" />
                 <span class="font-medium">{{ t("serviceAccounts.tokenReveal.addToGroup") }}</span>
                 <OIcon
                   :name="rbacAccess.allowed ? 'arrow-right' : 'lock'"

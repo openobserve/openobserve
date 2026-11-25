@@ -44,11 +44,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost"
         size="icon"
+        icon-left="add"
+        :aria-label="t(folderKey(type, 'common.addFolder'))"
         @click.stop="addFolder"
         data-test="dashboard-new-folder-btn"
-        :title="t(folderKey(type, 'common.addFolder'))"
       >
-        <OIcon name="add" size="sm" />
+        <OTooltip :content="t(folderKey(type, 'common.addFolder'))" />
       </OButton>
     </div>
     <component
@@ -67,11 +68,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon"
+                icon-left="add"
+                :aria-label="t(folderKey(type, 'common.addFolder'))"
                 @click.stop="addFolder"
                 data-test="dashboard-new-folder-btn"
-                :title="t(folderKey(type, 'common.addFolder'))"
               >
-                <OIcon name="add" size="sm" />
+                <OTooltip :content="t(folderKey(type, 'common.addFolder'))" />
               </OButton>
             </div>
           </div>
@@ -119,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-folder-name-${tab.name}`"
                   >{{ tab.name }}</OTruncatedText
                 >
-                <BetaBadge v-if="isPublicTab(tab)" size="xs" class="shrink-0" />
+                <OBetaBadge v-if="isPublicTab(tab)" class="shrink-0" />
                 <!-- Kept in flow rather than overlaid: an overlay needs a backdrop
                  matching the row, and OTab only paints a hover background on
                  INACTIVE tabs, so it would read wrong on the open folder. -->
@@ -137,7 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         icon-left="more-vert"
                         class="h-5 w-5"
                         data-test="dashboard-more-icon"
-                      />
+                      >
+                        <OTooltip :content="t('common.moreActions')" />
+                      </OButton>
                     </template>
                     <ODropdownItem
                       data-test="dashboard-edit-folder-icon"
@@ -195,6 +199,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -215,7 +220,7 @@ import AddFolder from "./AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
 import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
 import { PUBLIC_LINKS_FOLDER_ID, isPseudoFolder } from "@/utils/dashboard/pseudoFolders";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import { useFolderIcons } from "@/composables/useFolderIcons";
 import { selectSyntheticsFolder } from "@/utils/synthetics/selectFolder";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -224,9 +229,10 @@ export default defineComponent({
   name: "FolderList",
   inheritAttrs: false,
   components: {
+    OTooltip,
     OIcon,
     FolderIcon,
-    BetaBadge,
+    OBetaBadge,
     ConfirmDialog,
     AddFolder,
     OTabs,

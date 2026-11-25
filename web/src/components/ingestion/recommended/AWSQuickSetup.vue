@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-start gap-3">
           <OIcon name="rocket-launch" size="xl" class="text-text-link" />
           <div>
-            <h6 class="m-0 mb-2! text-sm! font-bold">
+            <h6 class="m-0 mb-2! text-sm! font-semibold">
               {{ t("ingestion.completeAwsIntegration") }}
             </h6>
             <p class="text-compact mt-0 mb-0" :class="descriptionClass">
@@ -220,12 +220,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             enabledServices.length === 0 ||
             (deploymentMode === 'stackset' && targetRegions.length === 0)
           "
+          icon-left="cloud-upload"
           @click="handleLaunch"
           :data-test="
             deploymentMode === 'single' ? 'aws-quick-setup-deploy-btn' : 'aws-stackset-launch-btn'
           "
         >
-          <template #icon-left><OIcon name="cloud-upload" size="sm" /></template>
           {{
             deploymentMode === "single"
               ? t("ingestion.launchCloudFormationStack")
@@ -272,9 +272,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :aria-label="t('common.close')"
                   variant="ghost"
                   size="icon-circle-sm"
+                  icon-left="close"
                   @click="showParamHelper = false"
                 >
-                  <OIcon name="close" size="sm" />
+                  <OTooltip :content="t('common.close')" />
                 </OButton>
               </div>
               <p class="mb-3 text-xs" :class="hintTextClass">
@@ -297,8 +298,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="paramValTextClass"
                       >{{ param.secret ? maskSecret(param.value) : param.value }}</OTruncatedText
                     >
-                    <OButton variant="ghost" size="icon-xs-circle" @click="copyParam(param.value)">
-                      <OIcon name="content-copy" size="sm" />
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs-circle"
+                      icon-left="content-copy"
+                      :aria-label="t('common.copy')"
+                      @click="copyParam(param.value)"
+                    >
                       <OTooltip :content="t('common.copy')" />
                     </OButton>
                   </div>

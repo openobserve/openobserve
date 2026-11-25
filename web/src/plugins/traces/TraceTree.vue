@@ -176,11 +176,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <!-- shrink-0 + a cap, not plain shrink: flex shrinks in proportion to width, so a long operation name would eat a short service name first. -->
                       <OTruncatedText
-                        class="me-2 max-w-[50%] shrink-0 text-sm font-bold font-medium"
+                        class="me-2 max-w-[50%] shrink-0 text-sm font-medium font-semibold"
                         :class="{
-                          'bg-table-highlight-bg text-table-highlight-text font-bold':
+                          'bg-table-highlight-bg text-table-highlight-text font-semibold':
                             isHighlighted((spans as any[])[virtualRow.index].spanId),
-                          'bg-table-highlight-bg text-status-error-text font-bold':
+                          'bg-table-highlight-bg text-status-error-text font-semibold':
                             currentSelectedValue === (spans as any[])[virtualRow.index].spanId,
                         }"
                         :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
@@ -307,8 +307,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           disabled
                           :aria-label="t('traces.viewLogs')"
                           :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
+                          icon-left="lock"
                         >
-                          <OIcon name="lock" class="text-icon-locked" size="sm" />
+                          <OTooltip :content="t('traces.viewLogs')" />
                         </OButton>
                         <OTooltip :content="logsLockedReason" />
                       </span>
@@ -316,11 +317,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-else
                         variant="outline"
                         size="icon"
-                        :title="t('traces.viewLogs')"
+                        icon-left="search"
+                        :aria-label="t('traces.viewLogs')"
                         @click.stop="viewSpanLogs((spans as any[])[virtualRow.index])"
                         :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
                       >
-                        <OIcon name="search" size="xs" />
+                        <OTooltip :content="t('traces.viewLogs')" />
                       </OButton>
                     </div>
                     <span

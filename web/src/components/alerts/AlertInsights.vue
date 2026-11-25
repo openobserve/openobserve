@@ -36,13 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <OButton
+        icon-left="refresh"
+        :aria-label="t('common.refresh')"
         @click="refreshDashboard"
         :loading="isLoading"
         variant="ghost"
         size="icon-sm"
         data-test="alert-insights-refresh-btn"
       >
-        <OIcon name="refresh" size="sm" />
         <OTooltip :content="t('common.refresh')" />
       </OButton>
     </template>
@@ -139,9 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="sm"
         class="ms-2"
+        icon-left="close"
         @click="clearAllFilters"
         data-test="clear-all-filters-btn"
-        icon-left="close"
       >
         {{ t("alerts.insights.filters.clearAll") }}
       </OButton>
@@ -162,9 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost-primary"
         size="sm"
+        icon-left="edit"
         @click="editAlert"
         data-test="edit-alert-btn"
-        icon-left="edit"
       >
         {{ t("alerts.insights.actions.editAlert") }}
         <OTooltip :content="t('alerts.insights.actions.editAlertTooltip')" />
@@ -173,9 +174,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost-primary"
         size="sm"
+        icon-left="history"
         @click="viewHistory"
         data-test="view-history-btn"
-        icon-left="history"
       >
         {{ t("alerts.insights.actions.viewHistory") }}
         <OTooltip :content="t('alerts.insights.actions.viewHistoryTooltip')" />
@@ -186,10 +187,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost"
         size="icon-circle-sm"
+        icon-left="close"
+        :aria-label="t('alerts.insights.actions.closeActions')"
         @click="selectedAlertForAction = null"
         data-test="close-actions-btn"
       >
-        <OIcon name="close" size="sm" />
         <OTooltip :content="t('alerts.insights.actions.closeActions')" />
       </OButton>
     </div>

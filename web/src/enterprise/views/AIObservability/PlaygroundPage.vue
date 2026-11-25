@@ -88,6 +88,7 @@
         size="sm-action"
         :loading="sharing"
         data-test="ai-playground-share-btn"
+        icon-left="share"
         @click="onShare"
       >
         {{ t("aiObservability.playground.share") }}

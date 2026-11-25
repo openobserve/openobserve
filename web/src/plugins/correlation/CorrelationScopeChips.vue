@@ -62,9 +62,9 @@
       variant="outline"
       size="sm-action"
       data-test="svcver-correlation-open-service"
+      icon-left="account-tree"
       @click="openService(scope?.service || service)"
     >
-      <OIcon name="account-tree" size="xs" class="me-1" />
       {{ t("serviceVersions.correlation.versionsAndDeploys") }}
     </OButton>
   </div>

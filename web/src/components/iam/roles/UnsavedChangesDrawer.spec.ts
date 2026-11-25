@@ -168,7 +168,8 @@ describe("UnsavedChangesDrawer - Not added yet", () => {
     expect(find(wrapper, "edit-role-companion-needs-destination").text()).toBe(
       "Needed by Alert Folders",
     );
-    expect(tooltipOf(wrapper, "content")).toBe(
+    const list = wrapper.find("#edit-role-companions-list");
+    expect(list.findAllComponents(OTooltip).map((tip) => tip.props("content"))).toContain(
       "Alert Folders needs it to choose where alerts send.",
     );
   });

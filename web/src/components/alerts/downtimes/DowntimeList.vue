@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #title>
         <span class="inline-flex max-w-full min-w-0 items-center gap-2">
           <span class="truncate">{{ t("alerts.downtimes.title") }}</span>
-          <BetaBadge class="shrink-0" />
+          <OBetaBadge class="shrink-0" />
         </span>
       </template>
       <template v-if="!forbidden" #actions>
@@ -641,7 +641,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OBetaBadge from "@/lib/core/Badge/OBetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";

@@ -1,8 +1,14 @@
 ﻿<template>
   <ODropdown v-model:open="showUserGuide" side="left" align="start" :side-offset="8">
     <template #trigger>
-      <OButton variant="ghost" size="icon-sm" class="ms-2" data-test="cross-link-help-btn">
-        <OIcon name="help" size="sm" class="size-4" />
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        class="ms-2"
+        data-test="cross-link-help-btn"
+        icon-left="help"
+        :aria-label="t('crossLinks.userGuide')"
+      >
         <OTooltip :content="t('crossLinks.userGuide')" side="bottom" align="center" />
       </OButton>
     </template>
@@ -85,12 +91,11 @@ import { useStore } from "vuex";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 export default {
   name: "CrossLinkUserGuide",
-  components: { OButton, OTooltip, OIcon, ODropdown },
+  components: { OButton, OTooltip, ODropdown },
   setup() {
     const store = useStore();
     const { t } = useI18nTyped();

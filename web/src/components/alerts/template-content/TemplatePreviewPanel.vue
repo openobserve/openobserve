@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ activeChannelLabel }}
           </div>
-          <div class="text-sm font-bold" data-test="template-preview-panel-title">
+          <div class="text-sm font-semibold" data-test="template-preview-panel-title">
             {{ previewModel.title }}
           </div>
           <!-- `prose` is load-bearing, not decoration: Tailwind's preflight

@@ -196,9 +196,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-chip"
               class="ms-0.5"
               :data-test="`service-graph-filter-chip-remove-${chip.key}`"
+              icon-left="close"
               @click="removeLocalRangeFilter(chip.key)"
             >
-              <OIcon name="close" size="xs" />
+              <OTooltip :content="t('common.remove')" />
             </OButton>
           </div>
 
@@ -213,10 +214,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 disabled
                 data-test="service-graph-side-panel-view-in-traces-btn"
+                icon-left="lock"
               >
-                <template #icon-left>
-                  <OIcon name="lock" class="text-icon-locked" size="xs" />
-                </template>
                 {{ t("traces.serviceGraphNodeSidePanel.viewTraces") }}
               </OButton>
             </span>
@@ -226,11 +225,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost-primary"
             size="sm"
             data-test="service-graph-side-panel-view-in-traces-btn"
+            icon-left="search"
             @click="viewInTraces"
           >
-            <template #icon-left>
-              <OIcon name="search" size="xs" />
-            </template>
             {{ t("traces.serviceGraphNodeSidePanel.viewTraces") }}
           </OButton>
         </div>
@@ -346,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="onTabChange"
             dense
             align="left"
-            class="w-[calc(100%-2rem)]! flex-1 font-bold"
+            class="w-[calc(100%-2rem)]! flex-1 font-semibold"
             data-test="service-graph-node-panel-tabs"
           >
             <OTab
@@ -413,8 +410,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   data-test="service-graph-node-panel-workload-fields-btn"
+                  icon-left="tune"
+                  :aria-label="t('common.resources')"
                 >
-                  <OIcon name="tune" size="sm" />
                   <OTooltip :content="t('common.resources')" />
                 </OButton>
               </template>
@@ -550,8 +548,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       disabled
                       :aria-label="t('traces.serviceGraphNodeSidePanel.viewInTraces')"
                       data-test="service-graph-side-panel-view-traces-btn"
+                      icon-left="lock"
                     >
-                      <OIcon name="lock" class="text-icon-locked" size="sm" />
+                      <OTooltip :content="t('traces.serviceGraphNodeSidePanel.viewInTraces')" />
                     </OButton>
                     <OTooltip :content="tracesLockedReason" />
                   </span>
@@ -560,6 +559,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon"
                     data-test="service-graph-side-panel-view-traces-btn"
+                    icon-left="search"
+                    :aria-label="t('traces.serviceGraphNodeSidePanel.viewInTraces')"
                     @click.stop="
                       navigateToTraces({
                         operationName: row.operation,
@@ -571,7 +572,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                     "
                   >
-                    <OIcon name="search" size="xs" />
                     <OTooltip :content="t('traces.serviceGraphNodeSidePanel.viewInTraces')" />
                   </OButton>
                 </template>
@@ -677,8 +677,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       disabled
                       :aria-label="t('traces.serviceGraphNodeSidePanel.viewInTraces')"
                       :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
+                      icon-left="lock"
                     >
-                      <OIcon name="lock" class="text-icon-locked" size="sm" />
+                      <OTooltip :content="t('traces.serviceGraphNodeSidePanel.viewInTraces')" />
                     </OButton>
                     <OTooltip :content="tracesLockedReason" />
                   </span>
@@ -687,6 +688,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon"
                     :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
+                    icon-left="search"
+                    :aria-label="t('traces.serviceGraphNodeSidePanel.viewInTraces')"
                     @click.stop="
                       navigateToTraces({
                         resourceFilter: cfg.fields
@@ -697,7 +700,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                     "
                   >
-                    <OIcon name="search" size="xs" />
                     <OTooltip :content="t('traces.serviceGraphNodeSidePanel.viewInTraces')" />
                   </OButton>
                 </template>
