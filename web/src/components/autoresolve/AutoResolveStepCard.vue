@@ -112,11 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODescriptionList dense label-width="narrow">
       <ODescriptionItem :label="t('autoresolve.step.reason')">
-        <span
-          class="text-compact wrap-anywhere whitespace-pre-wrap"
+        <AutoResolveModelText
+          :text="step.reason"
+          class="text-compact"
           data-test="autoresolve-step-card-reason"
-          >{{ step.reason }}</span
-        >
+        />
       </ODescriptionItem>
       <ODescriptionItem v-if="step.dry_run_after_approval" :label="t('autoresolve.step.preview')">
         <span class="text-compact" data-test="autoresolve-step-card-dry-run-after">
@@ -187,6 +187,7 @@ import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import AutoResolveRemovedConnection from "@/components/autoresolve/AutoResolveRemovedConnection.vue";
 import AutoResolveStepResultText from "@/components/autoresolve/AutoResolveStepResultText.vue";
+import AutoResolveModelText from "@/components/autoresolve/AutoResolveModelText.vue";
 import type { AutoResolveStep } from "@/services/autoresolve";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {

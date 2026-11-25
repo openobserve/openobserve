@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <h2 class="m-0 text-lg font-semibold" :class="TITLE_CLASS[tone]">{{ verdictLabel }}</h2>
       <span v-if="checkedAtUs" class="text-text-secondary text-xs">
-        {{ t("autoresolve.run.outcome.checkedAt", { time: autoresolveTime(checkedAtUs) }) }}
+        {{ t("autoresolve.run.outcome.checkedAt", { time: autoresolveWhen(checkedAtUs).text }) }}
       </span>
     </div>
     <p
@@ -34,14 +34,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ outcome.system_summary }}
     </p>
-    <OText
-      v-if="outcome.explanation && !hideExplanation"
-      variant="body"
-      wrap
-      class="text-text-body wrap-anywhere whitespace-pre-wrap"
-      data-test="autoresolve-outcome-explanation"
-      >{{ explanation }}</OText
-    >
+    <template v-if="outcome.explanation && !hideExplanation">
+      <OText
+        v-if="needs"
+        variant="body"
+        wrap
+        class="text-text-body wrap-anywhere"
+        data-test="autoresolve-outcome-explanation"
+        >{{ needs }}</OText
+      >
+      <AutoResolveModelText
+        v-else
+        :text="outcome.explanation"
+        class="text-sm"
+        data-test="autoresolve-outcome-explanation"
+      />
+    </template>
     <OInlineNotice
       v-if="error"
       variant="error"
@@ -58,10 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
+import AutoResolveModelText from "@/components/autoresolve/AutoResolveModelText.vue";
 import type { AutoResolveOutcome } from "@/services/autoresolve";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
-  autoresolveTime,
+  autoresolveWhen,
   needsText,
   OUTCOME_TITLE_CLASS as TITLE_CLASS,
   OUTCOME_TONE_CLASS as TONE_CLASS,
@@ -91,9 +100,7 @@ const tone = computed<OutcomeTone>(() => {
   return verdict === "worked" ? "positive" : "neutral";
 });
 
-const explanation = computed(
-  () => needsText(props.outcome.explanation, t) ?? raw(props.outcome.explanation),
-);
+const needs = computed(() => needsText(props.outcome.explanation, t));
 
 const verdictLabel = computed(() => {
   switch (props.outcome.verdict) {

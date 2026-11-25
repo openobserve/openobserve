@@ -19,8 +19,9 @@ import i18n from "@/locales";
 import AutoResolveOutcome from "./AutoResolveOutcome.vue";
 
 describe("AutoResolveOutcome", () => {
-  it("renders the explanation as text and the run's error apart from it, in red", () => {
-    const explanation = "<img src=x onerror=alert(1)> *b*\n<script>alert(2)</script>";
+  it("renders the explanation's markdown, sanitized, and the run's error apart from it, in red", () => {
+    const explanation =
+      "<img src=https://x.test/p.png onerror=alert(1)> **b** and `idx`\n<script>alert(2)</script>";
     const w = mount(AutoResolveOutcome, {
       props: {
         outcome: { verdict: "worked", system_summary: "Step 1 done.", explanation },
@@ -30,8 +31,11 @@ describe("AutoResolveOutcome", () => {
       global: { plugins: [i18n] },
     });
 
-    expect(w.find("img, script, strong, em").exists()).toBe(false);
-    expect(w.find('[data-test="autoresolve-outcome-explanation"]').text()).toBe(explanation);
+    const shown = w.find('[data-test="autoresolve-outcome-explanation"]');
+    expect(shown.find("img, script").exists()).toBe(false);
+    expect(shown.html()).not.toContain("onerror");
+    expect(shown.find("strong").text()).toBe("b");
+    expect(shown.find("code").text()).toBe("idx");
     const error = w.find('[data-test="autoresolve-outcome-error"]');
     expect(error.attributes("role")).toBe("alert");
     expect(error.text()).toContain("The check query timed out.");

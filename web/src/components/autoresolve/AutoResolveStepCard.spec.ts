@@ -34,12 +34,11 @@ const mountCard = (step: AutoResolveStep, nowUs?: number) => {
 afterEach(() => wrapper?.unmount());
 
 describe("AutoResolveStepCard", () => {
-  it("step_card_renders_reason_as_text", () => {
+  it("step_card_sanitizes_reason", () => {
     const w = mountCard(autoresolveStep({ reason: MARKUP }));
 
-    expect(w.find("img").exists()).toBe(false);
-    expect(w.find("strong, em").exists()).toBe(false);
-    expect(w.find('[data-test="autoresolve-step-card-reason"]').text()).toBe(MARKUP);
+    expect(w.find("img, script").exists()).toBe(false);
+    expect(w.find('[data-test="autoresolve-step-card-reason"]').html()).not.toContain("onerror");
   });
 
   it("step_card_caps_long_arguments", async () => {

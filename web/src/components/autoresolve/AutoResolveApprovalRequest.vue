@@ -81,9 +81,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
               />
             </span>
-            <span class="text-text-body text-compact font-normal wrap-anywhere whitespace-pre-wrap">
-              {{ option.tradeoffs }}
-            </span>
+            <AutoResolveModelText
+              v-if="option.tradeoffs"
+              :text="option.tradeoffs"
+              class="text-compact font-normal"
+            />
           </span>
         </template>
       </ORadio>
@@ -91,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODescriptionList v-if="recommended?.reason" dense label-width="narrow">
       <ODescriptionItem :label="t('autoresolve.step.reason')" data-test="autoresolve-approval-why">
-        <span class="text-compact wrap-anywhere whitespace-pre-wrap">{{ recommended.reason }}</span>
+        <AutoResolveModelText :text="recommended.reason" class="text-compact" />
       </ODescriptionItem>
     </ODescriptionList>
 
@@ -437,6 +439,7 @@ import type { InlineNoticeVariant } from "@/lib/feedback/InlineNotice/OInlineNot
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import AutoResolveCorrectionPanel from "@/components/autoresolve/AutoResolveCorrectionPanel.vue";
+import AutoResolveModelText from "@/components/autoresolve/AutoResolveModelText.vue";
 import AutoResolveCorrectionsUsed from "@/components/autoresolve/AutoResolveCorrectionsUsed.vue";
 import AutoResolveRemovedConnection from "@/components/autoresolve/AutoResolveRemovedConnection.vue";
 import AutoResolveStepCard from "@/components/autoresolve/AutoResolveStepCard.vue";

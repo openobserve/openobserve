@@ -557,7 +557,7 @@ const approvedLine = computed(() => {
   if (!current?.approved_by || !current.approved_at_us) return null;
   return t("autoresolve.run.approvedBy", {
     name: raw(current.approved_by),
-    time: autoresolveTime(current.approved_at_us),
+    time: evidenceTime(current.approved_at_us),
   });
 });
 
