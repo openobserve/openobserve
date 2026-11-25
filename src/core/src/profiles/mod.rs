@@ -388,7 +388,7 @@ pub async fn handle_otlp_request(
         let mut req_stats = write_file(&writer, org_id, &stream_name, write_buf, false)
             .await
             .map_err(|e| ProfilesExportError::Internal(e.into()))?;
-        req_stats.response_time = start.elapsed().as_secs_f64();
+        req_stats.response_time = start.elapsed().as_secs_f64() * 1000.0;
         let email_str = user.to_email();
         req_stats.user_email = if email_str.is_empty() {
             None

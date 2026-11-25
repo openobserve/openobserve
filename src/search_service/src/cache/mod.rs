@@ -312,7 +312,7 @@ pub async fn search(
         let mut results = match joined {
             Ok(results) => results,
             Err((e, done)) => {
-                let took_time = start.elapsed().as_secs_f64();
+                let took_ms = start.elapsed().as_secs_f64() * 1000.0;
                 report_failed_deltas_usage(
                     &done,
                     trace_id,
@@ -322,7 +322,7 @@ pub async fn search(
                     &req,
                     &all_streams,
                     started_at,
-                    took_time,
+                    took_ms,
                 )
                 .await;
                 return Err(e);
@@ -421,7 +421,7 @@ pub async fn search(
     let num_fn = req.query.query_fn.is_some() as u16;
     let req_stats = RequestStats {
         records: res.hits.len() as i64,
-        response_time: took_time,
+        response_time: took_time * 1000.0,
         size: res.scan_size as f64,
         scan_files: if res.scan_files > 0 {
             Some(res.scan_files as i64)
@@ -809,12 +809,12 @@ async fn report_failed_deltas_usage(
     req: &search::Request,
     all_streams: &str,
     started_at: i64,
-    took_time: f64,
+    took_ms: f64,
 ) {
     if done.is_empty() {
         return;
     }
-    let req_stats = failed_deltas_stats(done, trace_id, user_id, req, took_time);
+    let req_stats = failed_deltas_stats(done, trace_id, user_id, req, took_ms);
     report_request_usage_stats(
         req_stats,
         org_id,
@@ -832,12 +832,12 @@ fn failed_deltas_stats(
     trace_id: &str,
     user_id: Option<String>,
     req: &search::Request,
-    took_time: f64,
+    took_ms: f64,
 ) -> RequestStats {
     let scan_files: usize = done.iter().map(|res| res.scan_files).sum();
     RequestStats {
         records: done.iter().map(|res| res.hits.len() as i64).sum(),
-        response_time: took_time,
+        response_time: took_ms,
         size: done.iter().map(|res| res.scan_size).sum::<usize>() as f64,
         scan_files: (scan_files > 0).then_some(scan_files as i64),
         request_body: Some(req.query.sql.clone()),
@@ -2315,12 +2315,12 @@ mod tests {
         b.took_detail.wait_in_queue = 3;
         b.peak_memory_usage = Some(4.0);
         let req = search::Request::default();
-        let stats = failed_deltas_stats(&[a, b], "t", None, &req, 1.5);
+        let stats = failed_deltas_stats(&[a, b], "t", None, &req, 1500.0);
         assert_eq!(stats.size, 100.0);
         assert_eq!(stats.records, 3);
         assert_eq!(stats.scan_files, Some(2));
         assert_eq!(stats.took_wait_in_queue, Some(7));
-        assert_eq!(stats.response_time, 1.5);
+        assert_eq!(stats.response_time, 1500.0);
         assert_eq!(stats.peak_memory_usage, Some(4.0));
     }
 

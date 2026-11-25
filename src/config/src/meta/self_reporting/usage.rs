@@ -599,6 +599,7 @@ pub struct UsageData {
     pub size: f64,
     pub unit: String,
     pub user_email: String,
+    /// Milliseconds.
     pub response_time: f64,
     pub stream_type: StreamType,
     pub num_records: i64,
@@ -979,6 +980,7 @@ pub struct RequestStats {
     pub records: i64,
     #[serde(default)]
     pub dropped_records: i64,
+    /// Milliseconds.
     pub response_time: f64,
     #[serde(default)]
     pub request_body: Option<String>,
