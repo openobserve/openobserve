@@ -22,17 +22,18 @@ use config::meta::{
     self_reporting::ai_chat::is_protected_ai_chat_stream,
 };
 use infra::{
-    db::{Event, get_orm_client_rw},
+    db::{Event, get_orm_client_ro, get_orm_client_rw},
     table::folders::folder_type_from_i16,
 };
 use sea_orm::{ConnectionTrait, FromQueryResult, Statement, Value};
 use serde::Deserialize;
 use tokio::sync::mpsc;
 
-const MAX_PAGE_SIZE: usize = 1000;
+const MAX_PAGE_SIZE: usize = 10_000;
 // Alert attributes are read only to derive the SIEM marker.
 const MAX_ROW_TEXT: usize = 256 * 1024;
-pub const PAGE_SIZE: usize = 512;
+// Each page re-sorts the whole projection, so cold-build time grows with the page count.
+pub const PAGE_SIZE: usize = 10_000;
 // Key prefixes parse_event_key maps to catalog changes.
 const EVENT_PREFIXES: [&str; 12] = [
     "/alert_composites/",
@@ -289,18 +290,24 @@ pub async fn load_page(
         );
         return Ok(stream_page(org, ids));
     }
-    require_sql_store()?;
-    load_page_with(get_orm_client_rw().await, org, kind, after, limit).await
+    let conn = match sql_store()? {
+        // SQLite's RW pool is the one connection every metadata write waits on; WAL readers don't.
+        MetaStore::Sqlite => get_orm_client_ro().await,
+        // The RO DSN may be a lagging replica, and a rebuild must see the write its event
+        // announced.
+        _ => get_orm_client_rw().await,
+    };
+    load_page_with(conn, org, kind, after, limit).await
 }
 
-fn require_sql_store() -> Result<()> {
+fn sql_store() -> Result<MetaStore> {
     let cfg = config::get_config();
     let store = MetaStore::from_str(&cfg.common.meta_store).map_err(anyhow::Error::msg)?;
     ensure!(
         matches!(store, MetaStore::Sqlite | MetaStore::PostgreSQL),
         "resource catalog requires a SQL metadata store"
     );
-    Ok(())
+    Ok(store)
 }
 
 async fn load_page_with<C: ConnectionTrait>(
