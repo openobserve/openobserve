@@ -39,8 +39,10 @@ use o2_enterprise::enterprise::{
         decisions::{
             self, Access, BODY_INVALID, CAN_ACT_SHOWN, Caller, Change, Ctx, DecideBody,
             DecisionError, DecisionResult, DecisionView, Family, ListQuery, Owners, OwnersScope,
-            PreviewQuery, QUERY_INVALID, RefusalReason, Source, SubjectInfo, UndoRequest,
+            Permission, PreviewQuery, QUERY_INVALID, RefusalReason, Source, SubjectInfo,
+            UndoRequest,
         },
+        fixes::types::ActionKind,
         names::{dims, kinds},
     },
 };
@@ -56,7 +58,9 @@ use openobserve_core::{
 use serde::Serialize;
 use svix_ksuid::Ksuid;
 
-use super::{LiveDigest, alert_allows, may_change_mark, readable_subjects};
+use super::{
+    LiveDigest, alert_allows, changes_every_mark, fix_ports, may_change_mark, readable_subjects,
+};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     request::{
@@ -95,7 +99,7 @@ impl Access for LiveAccess<'_> {
     async fn may_decide(&self, family: Family, subject: &EntityRef) -> bool {
         match family {
             Family::AlertFinding => may_dismiss(self.org_id, self.user_id).await,
-            Family::Suggestion | Family::Issue => {
+            Family::Suggestion | Family::Issue | Family::Fix => {
                 let id = subject
                     .key_dims
                     .get(dims::ENTITY_ID)
@@ -108,9 +112,12 @@ impl Access for LiveAccess<'_> {
     async fn reads_notes(&self, family: Family) -> bool {
         match family {
             Family::AlertFinding => may_dismiss(self.org_id, self.user_id).await,
-            Family::Suggestion | Family::Issue => {
+            Family::Suggestion | Family::Issue | Family::Fix => {
                 !rbac_enforced().await
-                    || org_wide_allows(self.org_id, self.user_id, "alerts", "PUT").await
+                    || changes_every_mark(|resource, method| {
+                        org_wide_allows(self.org_id, self.user_id, resource, method)
+                    })
+                    .await
             }
         }
     }
@@ -129,13 +136,7 @@ impl Access for LiveAccess<'_> {
 
     /// The checks the alert PUT route makes, so a change here needs what the editor's Save does.
     async fn may_edit_alert(&self, alert_id: &str) -> bool {
-        let may_put = !rbac_enforced().await
-            || alert_allows(self.org_id, self.user_id, alert_id, "PUT").await == Some(true);
-        let detection = security::is_siem_alert(self.org_id, alert_id).await;
-        may_put
-            && security::guard_siem(self.org_id, self.user_id, "POST", detection)
-                .await
-                .is_ok()
+        alert_edit(self.org_id, self.user_id, alert_id).await == Permission::Allowed
     }
 
     /// Only a caller the folder already lets edit is refused for Security alone.
@@ -168,6 +169,28 @@ impl Access for LiveAccess<'_> {
         now: i64,
     ) -> anyhow::Result<Option<SuggestedChange>> {
         Ok(finding_change(self.org_id, self.user_id, id, now).await?)
+    }
+
+    /// The target's own route check run as `user_id`; a kind without one is never approved.
+    async fn may_apply_fix(
+        &self,
+        user_id: &str,
+        kind: &ActionKind,
+        target: &EntityRef,
+    ) -> Permission {
+        let alert_id = (target.kind == kinds::ALERT)
+            .then(|| target.key_dims.get(dims::ENTITY_ID))
+            .flatten();
+        let Some(alert_id) = alert_id else {
+            return Permission::Denied(RefusalReason::Org);
+        };
+        match kind {
+            ActionKind::Snooze => fix_ports::may_snooze(self.org_id, user_id, alert_id).await,
+            ActionKind::AddDestination | ActionKind::CalibrationFix => {
+                alert_edit(self.org_id, user_id, alert_id).await
+            }
+            _ => Permission::Denied(RefusalReason::Org),
+        }
     }
 }
 
@@ -522,6 +545,16 @@ async fn describe(org_id: &str, subject: &EntityRef) -> SubjectInfo {
     }
 }
 
+/// The alert PUT route's checks, Security included for a detection, run as `user_id`.
+async fn alert_edit(org_id: &str, user_id: &str, alert_id: &str) -> Permission {
+    let may_put = !rbac_enforced().await
+        || alert_allows(org_id, user_id, alert_id, "PUT").await == Some(true);
+    if !may_put {
+        return Permission::Denied(RefusalReason::Folder);
+    }
+    fix_ports::security_permission(org_id, user_id, alert_id).await
+}
+
 async fn alert_folder_id(org_id: &str, subject: &EntityRef) -> Option<String> {
     let id = (subject.kind == kinds::ALERT)
         .then(|| subject.key_dims.get(dims::ENTITY_ID))
@@ -735,6 +768,7 @@ mod tests {
             via: None,
             undone_at: None,
             undone_by: None,
+            fix: None,
         }
     }
 
@@ -844,6 +878,7 @@ mod tests {
             undo: UndoRequest {
                 expected_revision: 1,
                 request_id: Some("3f2c9a1e-undo".into()),
+                target: None,
             },
             preview_locked: Preview {
                 may: false,
@@ -1126,6 +1161,15 @@ mod tests {
             ) -> anyhow::Result<Option<SuggestedChange>> {
                 Ok(Some(self.change.clone()))
             }
+
+            async fn may_apply_fix(
+                &self,
+                user_id: &str,
+                kind: &ActionKind,
+                target: &EntityRef,
+            ) -> Permission {
+                self.live.may_apply_fix(user_id, kind, target).await
+            }
         }
 
         #[derive(Default)]
@@ -1397,6 +1441,7 @@ mod tests {
             let ask = UndoRequest {
                 expected_revision: done.decision.revision,
                 request_id: None,
+                target: None,
             };
             let decision_id = done.decision.decision_id.clone();
             let refused = decisions::undo(&ctx, &decision_id, &ask, now_micros()).await;

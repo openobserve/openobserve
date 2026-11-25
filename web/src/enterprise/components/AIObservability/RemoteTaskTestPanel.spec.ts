@@ -18,7 +18,6 @@ import RemoteTaskTestPanel from "./RemoteTaskTestPanel.vue";
 
 const report = {
   rawRequest: '{"input":"hi"}',
-  rawResponse: '{"output":"there"}',
   statusCode: 200,
   latencyMs: 42,
 };
@@ -107,9 +106,9 @@ describe("RemoteTaskTestPanel", () => {
     expect(wrapper.find('[data-test="ai-remote-task-test-result"]').exists()).toBe(false);
   });
 
-  // The raw exchange is what actually helps when someone else's service says no,
+  // The sent request is what helps when someone else's service says no,
   // so it is present on failure, not only on success.
-  it("shows the exchange and the reason on a failure", async () => {
+  it("shows the request and the reason on a failure", async () => {
     const wrapper = mountPanel({
       state: "failed",
       report,
@@ -118,9 +117,6 @@ describe("RemoteTaskTestPanel", () => {
     await flushPromises();
     expect(wrapper.get('[data-test="ai-remote-task-test-error"]').text()).toContain("$.output");
     expect(wrapper.get('[data-test="ai-remote-task-test-raw-request"]').text()).toContain("input");
-    expect(wrapper.get('[data-test="ai-remote-task-test-raw-response"]').text()).toContain(
-      "output",
-    );
   });
 
   it("shows the extracted output and the latency on a pass", async () => {

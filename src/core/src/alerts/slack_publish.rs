@@ -54,6 +54,18 @@ pub const MAX_CONTENT_BYTES: usize = 16 * 1024;
 /// A predicted single-row firing start older than this belongs to a run that never persisted.
 const PENDING_START_TTL_MICROS: i64 = 60 * 60 * 1_000_000;
 
+/// Slack codes whose failed-test detail is our hint plus the code, as enterprise maps them.
+#[cfg(any(feature = "enterprise", test))]
+const HINTED_SLACK_CODES: [&str; 7] = [
+    "not_in_channel",
+    "channel_not_found",
+    "is_archived",
+    "invalid_auth",
+    "token_revoked",
+    "account_inactive",
+    "not_authed",
+];
+
 /// Single-row firing starts handed to a send before the run's state commit writes them.
 static PENDING_STARTS: LazyLock<DashMap<String, i64>> = LazyLock::new(DashMap::new);
 
@@ -662,10 +674,16 @@ async fn test_outcome(
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     if outcome.posted {
-        Ok(outcome.detail)
-    } else {
-        Err(anyhow::anyhow!(outcome.detail))
+        return Ok(outcome.detail);
     }
+    log::warn!(
+        "[SLACK] test post for org {org_id} failed: {}",
+        outcome.detail
+    );
+    Err(anyhow::anyhow!(failed_post_message(
+        outcome.error.as_deref(),
+        outcome.detail
+    )))
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -675,6 +693,16 @@ async fn test_outcome(
     _wire: RenderedWire,
 ) -> anyhow::Result<String> {
     Err(anyhow::anyhow!("Slack app needs Enterprise"))
+}
+
+/// Keeps the detail only for a hinted Slack code; other details can carry raw transport text.
+#[cfg(any(feature = "enterprise", test))]
+fn failed_post_message(slack_code: Option<&str>, detail: String) -> String {
+    if slack_code.is_some_and(|code| HINTED_SLACK_CODES.contains(&code)) {
+        detail
+    } else {
+        "Couldn't post the test message to Slack".to_string()
+    }
 }
 
 fn post_target<'a>(
@@ -1638,5 +1666,24 @@ mod tests {
             "{err}"
         );
         assert!(rec.sent.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_failed_test_post_keeps_only_a_hinted_slack_detail() {
+        let detail = "not_in_channel: invite the OpenObserve app to #ops";
+        for (code, want) in [
+            (Some("not_in_channel"), detail),
+            (
+                Some("transport: error sending request"),
+                "Couldn't post the test message to Slack",
+            ),
+            (None, "Couldn't post the test message to Slack"),
+        ] {
+            assert_eq!(
+                failed_post_message(code, detail.to_string()),
+                want,
+                "{code:?}"
+            );
+        }
     }
 }

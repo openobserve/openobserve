@@ -24,7 +24,7 @@ env:
   # coverage mapping needs no DWARF; dropping debuginfo (test inherits dev) cuts compile and link time
   CARGO_PROFILE_DEV_DEBUG: "0"
   # PR UI tests: shadow = full suite, picked set only reported; on = run only the picked specs and gate changed lines.
-  UI_TEST_SELECTION: shadow
+  UI_TEST_SELECTION: on
 
 jobs:
   check_changes:
@@ -181,7 +181,7 @@ jobs:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2.90.6
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -250,7 +250,7 @@ jobs:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2.90.6
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:

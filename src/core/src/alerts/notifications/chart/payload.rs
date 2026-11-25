@@ -64,6 +64,9 @@ pub const MAX_RESERVED_POINTS: usize = 10;
 /// secret. Versioned so a future payload format can rotate keys.
 const KEY_DERIVATION_LABEL: &[u8] = b"o2-alert-chart-sign-v1";
 
+/// 128-bit truncated HMAC-SHA256 tag: standard truncation, keeps the URL short.
+const TAG_LEN: usize = 16;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChartPayload {
     /// Payload format version.
@@ -110,8 +113,7 @@ fn signature(key: &[u8], org_id: &str, d: &str) -> Vec<u8> {
     mac.update(org_id.as_bytes());
     mac.update(b"\0");
     mac.update(d.as_bytes());
-    // 128-bit truncated tag: standard for HMAC-SHA256, keeps the URL short.
-    mac.finalize().into_bytes()[..16].to_vec()
+    mac.finalize().into_bytes()[..TAG_LEN].to_vec()
 }
 
 /// Encode + sign. Returns the two query components `(d, s)`.
@@ -136,8 +138,7 @@ pub fn encode(payload: &ChartPayload, key: &[u8], org_id: &str) -> Option<(Strin
 pub enum DecodeError {
     /// Signature missing/invalid — indistinguishable 404 to callers.
     BadSignature,
-    /// Payload malformed (encoding/inflate/JSON) — only reachable with a
-    /// valid signature, i.e. never attacker-controlled.
+    /// Payload malformed (encoding/inflate/JSON) — only reachable with a valid signature.
     Malformed,
     Expired,
 }
@@ -154,6 +155,10 @@ pub fn decode(
     let provided = URL_SAFE_NO_PAD
         .decode(s)
         .map_err(|_| DecodeError::BadSignature)?;
+    // verify_truncated_left accepts any length from 1 byte, so a short tag would be guessable.
+    if provided.len() != TAG_LEN {
+        return Err(DecodeError::BadSignature);
+    }
     let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("HMAC accepts any key length");
     mac.update(org_id.as_bytes());
     mac.update(b"\0");
@@ -308,6 +313,28 @@ mod tests {
         let (d, s) = encode(&p, &key, "org-a").unwrap();
         assert_eq!(
             decode(&d, &s, &key, "org-b", 0).unwrap_err(),
+            DecodeError::BadSignature
+        );
+    }
+
+    #[test]
+    fn truncated_or_extended_tag_is_rejected() {
+        let key = derive_signing_key(KEY_SECRET, "salt");
+        let (d, s) = encode(&sample(10), &key, "default").unwrap();
+        let tag = URL_SAFE_NO_PAD.decode(&s).unwrap();
+        for short in [&tag[..1], &tag[..8], &tag[..TAG_LEN - 1]] {
+            let s = URL_SAFE_NO_PAD.encode(short);
+            assert_eq!(
+                decode(&d, &s, &key, "default", 0).unwrap_err(),
+                DecodeError::BadSignature
+            );
+        }
+        let mut full = Hmac::<Sha256>::new_from_slice(&key).unwrap();
+        full.update(b"default\0");
+        full.update(d.as_bytes());
+        let long = URL_SAFE_NO_PAD.encode(full.finalize().into_bytes());
+        assert_eq!(
+            decode(&d, &long, &key, "default", 0).unwrap_err(),
             DecodeError::BadSignature
         );
     }

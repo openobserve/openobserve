@@ -218,12 +218,18 @@ pub async fn delete_by_id<C: ConnectionTrait + TransactionTrait>(
         .await
         .map_err(|e| anyhow::anyhow!("Error deleting report: {}", e))?;
     if !id.is_empty() {
-        let _ = db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, &id)
-            .await
-            .inspect_err(|e| log::error!("Failed to delete trigger: {e}"));
-        #[cfg(feature = "enterprise")]
-        super_cluster::emit_delete_event(org_id, "", &id).await?;
+        forget_deleted(org_id, &id).await?;
     }
+    Ok(())
+}
+
+/// Removes the trigger and super-cluster copy of a report whose row is already deleted.
+pub async fn forget_deleted(org_id: &str, report_id: &str) -> Result<(), anyhow::Error> {
+    let _ = db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, report_id)
+        .await
+        .inspect_err(|e| log::error!("Failed to delete trigger: {e}"));
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_delete_event(org_id, "", report_id).await?;
     Ok(())
 }
 

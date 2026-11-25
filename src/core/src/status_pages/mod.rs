@@ -142,8 +142,13 @@ pub async fn update_page(
 /// chip and component count.
 pub async fn list_pages_view(
     org_id: &str,
+    permitted: Option<&[String]>,
 ) -> Result<config::meta::status_pages::PageListResponse, anyhow::Error> {
-    let models = table::list_pages(org_id).await?;
+    let models: Vec<_> = table::list_pages(org_id)
+        .await?
+        .into_iter()
+        .filter(|m| page_visible(org_id, &m.id, permitted))
+        .collect();
     let total = models.len() as i64;
     let mut pages = Vec::with_capacity(models.len());
     for m in models {
@@ -735,6 +740,10 @@ fn is_valid_hex_color(s: &str) -> bool {
     s.len() == 7 && s.starts_with('#') && s[1..].bytes().all(|b| b.is_ascii_hexdigit())
 }
 
+fn page_visible(org_id: &str, page_id: &str, permitted: Option<&[String]>) -> bool {
+    crate::auth::is_ofga_object_visible(org_id, "status_page", page_id, permitted)
+}
+
 fn to_admin_view(
     m: page_entity::Model,
     health: Option<config::meta::status_pages::ComponentStatus>,
@@ -819,5 +828,33 @@ mod tests {
                 .verify_password("wrong".as_bytes(), &parsed)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn list_shows_only_permitted_pages() {
+        let grants = |ids: &[&str]| ids.iter().map(|id| id.to_string()).collect::<Vec<_>>();
+
+        assert!(page_visible("org-1", "p1", None));
+        assert!(page_visible(
+            "org-1",
+            "p1",
+            Some(grants(&["status_page:p1"]).as_slice())
+        ));
+        assert!(page_visible(
+            "org-1",
+            "p1",
+            Some(grants(&["status_page:_all_org-1"]).as_slice())
+        ));
+        assert!(!page_visible(
+            "org-1",
+            "p1",
+            Some(grants(&["status_page:p2", "status_page:_all_org-2"]).as_slice())
+        ));
+        assert!(!page_visible(
+            "org-1",
+            "p1",
+            Some(grants(&["status_pages:p1"]).as_slice())
+        ));
+        assert!(!page_visible("org-1", "p1", Some(&[])));
     }
 }

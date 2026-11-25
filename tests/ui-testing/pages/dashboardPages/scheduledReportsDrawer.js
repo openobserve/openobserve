@@ -77,6 +77,9 @@ export class ScheduledReportsDrawerPage {
    *          so a test can assert the query contract (no `folder_id=`).
    */
   async openDrawer() {
+    // After closeDrawer the pointer rests on the header avatar; its tooltip covers the More-options button.
+    await this.page.mouse.move(0, 0);
+    await expect(this.page.locator(SELECTORS.TOOLTIP_CONTENT)).toHaveCount(0);
     const listResponse = this.page.waitForResponse(
       (response) =>
         /\/api\/[^/]+\/reports(\?|$)/.test(response.url()) &&

@@ -140,6 +140,10 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import {
+  isCustomQueryVariable,
+  type QueryVariableOption,
+} from "@/utils/dashboard/variables/queryVariableUtils";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
@@ -163,7 +167,12 @@ export default defineComponent({
     const selectRef = ref(null);
     const isOpen = ref(false);
 
-    const availableOptions = computed(() => props.variableItem?.options || []);
+    // A query variable's server search answers one typed text; its loaded options stay what "All" stands for.
+    const availableOptions = computed(() => {
+      const search = props.variableItem?.querySearch;
+      const term = currentSearchTerm.value.trim();
+      return (term && search?.text === term ? search.options : props.variableItem?.options) || [];
+    });
 
     // Options with (Custom) label transformation — OSelect handles local filtering
     const computedOptions = computed(() => {
@@ -338,7 +347,32 @@ export default defineComponent({
       emit("update:modelValue", selectedValue.value);
     };
 
+    // A query variable can show a label that differs from the value it sends to panels.
+    const optionLabel = (value: string) => {
+      const option: QueryVariableOption | undefined = availableOptions.value.find(
+        (opt: QueryVariableOption) => opt.value === value,
+      );
+      return option?.label || value;
+    };
+
+    // "All" over an empty list stands for nothing, so a query variable shows the no-values state instead.
+    const isAllOverNoOptions = computed(() => {
+      const value = selectedValue.value;
+      const holdsAll = Array.isArray(value)
+        ? value.includes(SELECT_ALL_VALUE)
+        : value === SELECT_ALL_VALUE;
+      return (
+        isCustomQueryVariable(props.variableItem) &&
+        holdsAll &&
+        !props.variableItem?.isLoading &&
+        !(props.variableItem?.options?.length > 0)
+      );
+    });
+
     const displayValue = computed(() => {
+      if (isAllOverNoOptions.value) {
+        return t("dashboard.variableQueryValueSelector.noDataFoundParen");
+      }
       if (selectedValue.value || selectedValue.value === "") {
         if (Array.isArray(selectedValue.value)) {
           if (selectedValue.value.length > 2) {
@@ -352,7 +386,7 @@ export default defineComponent({
                   return t("dashboard.variableQueryValueSelector.customValue", {
                     value: it.replace(new RegExp(`${CUSTOM_VALUE}$`), ""),
                   });
-                return it;
+                return optionLabel(it);
               })
               .join(", ");
             const remainingCount = selectedValue.value.length - 2;
@@ -375,7 +409,7 @@ export default defineComponent({
                   return t("dashboard.variableQueryValueSelector.customValue", {
                     value: it.replace(new RegExp(`${CUSTOM_VALUE}$`), ""),
                   });
-                return it;
+                return optionLabel(it);
               })
               .join(", ");
           }
@@ -399,7 +433,7 @@ export default defineComponent({
             value: selectedValue.value.replace(new RegExp(`${CUSTOM_VALUE}$`), ""),
           });
         } else {
-          return selectedValue.value;
+          return optionLabel(selectedValue.value);
         }
       } else {
         return t("dashboard.variableQueryValueSelector.noDataFoundParen");

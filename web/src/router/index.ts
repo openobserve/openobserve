@@ -18,6 +18,8 @@ import { getDecodedUserInfo, getPath, mergeRoutes } from "@/utils/zincutils";
 import { gt } from "@/types/i18n";
 import { openobserveRum } from "@openobserve/browser-rum";
 import config from "@/aws-exports";
+import { buildDocumentTitle } from "@/utils/orgSwitcherList";
+import { noteLanding } from "@/composables/useOrgSwitcherPrefs";
 
 import userCloudRoutes from "@/enterprise/composables/router";
 import userRoutes from "@/composables/shared/router";
@@ -77,19 +79,6 @@ export default function (store: any) {
   const router = createRouter(routerMap);
 
   router.beforeEach((to: any, from: any, next: any) => {
-    // Resolve the i18n titleKey per navigation (module-scope route tables would freeze the locale); `gt` works outside setup.
-    const titleKey =
-      to.meta?.titleKeyByTab?.[to.query?.tab] ??
-      to.meta?.titleKeyByFolder?.[to.query?.folder] ??
-      to.meta?.titleKey;
-    const routeTitle = titleKey ? gt(titleKey) : to.meta?.title;
-    if (routeTitle) {
-      // The brand prefix is a product noun, never translated; the page name is.
-      document.title = `OpenObserve - ${routeTitle}`;
-    } else {
-      document.title = "OpenObserve";
-    }
-
     const isAuthenticated = store.state.loggedIn;
 
     // Public routes (unauthenticated viewer plane) opt out of the auth guard
@@ -163,8 +152,34 @@ export default function (store: any) {
   });
 
   // Route names keep RUM view names low-cardinality; paths embed entity ids.
-  router.afterEach((to: any, _from: any, failure: any) => {
+  router.afterEach((to: any, from: any, failure: any) => {
     if (!failure && to.name) openobserveRum.setViewName(String(to.name));
+    if (failure) return;
+    const organizations = store.state.organizations ?? [];
+    applyDocumentTitle(to, organizations);
+    // Recents come from confirmed landings, so links, reloads and logins count, and declined switches do not.
+    const orgId = to.query?.org_identifier;
+    if (typeof orgId === "string" && orgId && orgId !== from.query?.org_identifier) {
+      noteLanding(
+        orgId,
+        organizations.map((o: { identifier: string }) => o.identifier),
+      );
+    }
   });
   return router;
+}
+
+/** Sets the tab title from the route's page name and the org it is scoped to. */
+export function applyDocumentTitle(
+  to: { meta?: Record<string, any>; query?: Record<string, any> },
+  organizations: readonly { identifier: string; name?: string }[],
+): void {
+  // Resolve the i18n titleKey per navigation (module-scope route tables would freeze the locale); `gt` works outside setup.
+  const titleKey =
+    to.meta?.titleKeyByTab?.[to.query?.tab] ??
+    to.meta?.titleKeyByFolder?.[to.query?.folder] ??
+    to.meta?.titleKey;
+  const routeTitle: string | undefined = titleKey ? gt(titleKey) : to.meta?.title;
+  const orgName = organizations.find((o) => o.identifier === to.query?.org_identifier)?.name;
+  document.title = buildDocumentTitle(orgName || undefined, routeTitle || undefined);
 }

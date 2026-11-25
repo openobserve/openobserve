@@ -352,3 +352,84 @@ fn t25_first_run_with_start_at() {
     assert!(!plan.skip && !plan.catch_up);
     assert_eq!(next_after_run(&ds, hm(10, 10), &plan), hm(11, 10));
 }
+
+#[test]
+fn t26_a_retry_of_the_same_window_skips_the_destinations_already_written() {
+    let ledger = WindowLedger {
+        end: hm(11, 0),
+        destinations: vec!["logs/a".to_string()],
+    };
+    let a = ["logs/a".to_string()];
+    let ab = ["logs/a".to_string(), "logs/b".to_string()];
+    let none: &[String] = &[];
+    // (prior, end, written this run, window advanced) -> skipped this run, ledger left behind
+    let cases = [
+        (None, hm(11, 0), &a[..], false, none, Some(ledger.clone())),
+        (
+            Some(&ledger),
+            hm(11, 0),
+            &ab[1..],
+            false,
+            &a[..],
+            Some(WindowLedger {
+                end: hm(11, 0),
+                destinations: ab.to_vec(),
+            }),
+        ),
+        (Some(&ledger), hm(12, 0), none, false, none, None),
+        (Some(&ledger), hm(11, 0), &ab[1..], true, &a[..], None),
+        // a failure at max retries does not advance the window, so the ledger stays
+        (
+            Some(&ledger),
+            hm(11, 0),
+            none,
+            false,
+            &a[..],
+            Some(ledger.clone()),
+        ),
+        (None, hm(11, 0), none, false, none, None),
+    ];
+    for (prior, end, written, advanced, skipped, left) in cases {
+        assert_eq!(written_for_window(prior, end), skipped, "{prior:?} {end}");
+        assert_eq!(
+            next_window_ledger(prior, end, written, advanced),
+            left,
+            "{prior:?} {end}"
+        );
+    }
+}
+
+#[test]
+fn t27_the_ledger_round_trips_and_is_absent_from_rows_without_one() {
+    let data = ScheduledTriggerData {
+        period_end_time: Some(1),
+        written_destinations: Some(WindowLedger {
+            end: 2,
+            destinations: vec!["logs/a".to_string()],
+        }),
+        ..Default::default()
+    };
+    let stored = data.to_json_string();
+    let read = ScheduledTriggerData::from_json_string(&stored).unwrap();
+    assert_eq!(read.written_destinations, data.written_destinations);
+    let old_row = ScheduledTriggerData::from_json_string(r#"{"period_end_time":1}"#).unwrap();
+    assert_eq!(old_row.written_destinations, None);
+    assert!(
+        !ScheduledTriggerData::default()
+            .to_json_string()
+            .contains("written")
+    );
+}
+
+#[test]
+fn t28_reset_forgets_the_written_destinations() {
+    let mut data = ScheduledTriggerData {
+        written_destinations: Some(WindowLedger {
+            end: 2,
+            destinations: vec!["logs/a".to_string()],
+        }),
+        ..Default::default()
+    };
+    data.reset();
+    assert_eq!(data.written_destinations, None);
+}

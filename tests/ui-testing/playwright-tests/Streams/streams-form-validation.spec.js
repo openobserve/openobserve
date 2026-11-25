@@ -3,30 +3,15 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { deleteStream } = require('../utils/traces-api.js');
 
-// Static stream name used for happy-path creation.
-// The prefix "e2e_streamfv_" is used for targeted cleanup.
 const VALID_STREAM_NAME = 'e2e_streamfv_001';
 const INHERITED_RETENTION_VALUES = ['', '0'];
 
 test.describe('Streams Add Stream form validation', { tag: ['@streams-form-validation', '@smoke', '@P0'] }, () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
-
-    test.beforeAll(async ({ request }) => {
-        const org   = process.env.ORGNAME || 'default';
-        // API calls go to INGESTION_URL (backend) not ZO_BASE_URL (Vite dev server)
-        const base  = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
-        const email = process.env.ZO_ROOT_USER_EMAIL;
-        const pass  = process.env.ZO_ROOT_USER_PASSWORD;
-        const creds = Buffer.from(`${email}:${pass}`).toString('base64');
-        for (const retention of INHERITED_RETENTION_VALUES) {
-            await request.delete(
-                `${base}/api/${org}/streams/${VALID_STREAM_NAME}_${retention || 'empty'}?type=logs&delete_all=false`,
-                { headers: { Authorization: `Basic ${creds}` } }
-            );
-        }
-    });
+    const createdStreams = [];
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -40,6 +25,12 @@ test.describe('Streams Add Stream form validation', { tag: ['@streams-form-valid
     test.afterEach(async ({}, testInfo) => {
         if (testInfo.status) {
             testLogger.testEnd(testInfo.title, testInfo.status, testInfo.duration);
+        }
+    });
+
+    test.afterAll(async ({ request }) => {
+        for (const streamName of createdStreams) {
+            await deleteStream(request, streamName, { type: 'logs' });
         }
     });
 
@@ -116,7 +107,9 @@ test.describe('Streams Add Stream form validation', { tag: ['@streams-form-valid
         test(`should inherit retention when the value is ${retention || 'empty'}`, {
             tag: ['@streams-form-validation', '@P0', '@smoke']
         }, async ({ page }) => {
-            const streamName = `${VALID_STREAM_NAME}_${retention || 'empty'}`;
+            // A deleted stream's name is rejected until the compactor finishes, so names are never reused.
+            const streamName = `${VALID_STREAM_NAME}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+            createdStreams.push(streamName);
             await pm.streamsFormValidation.fillStreamName(streamName);
             await pm.streamsFormValidation.selectStreamType('Logs');
             await pm.streamsFormValidation.fillDataRetention(retention);
@@ -128,7 +121,7 @@ test.describe('Streams Add Stream form validation', { tag: ['@streams-form-valid
             );
             await pm.streamsFormValidation.clickSave();
             const response = await responsePromise;
-            expect(response.ok()).toBe(true);
+            expect(response.ok(), response.ok() ? undefined : await response.text()).toBe(true);
             expect(response.request().postDataJSON().settings).not.toHaveProperty('data_retention');
 
             await expect(pm.streamsFormValidation.getDialogLocator()).not.toBeVisible({ timeout: 15000 });

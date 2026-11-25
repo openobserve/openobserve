@@ -981,6 +981,19 @@ pub static QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::
     )
     .expect("Metric created")
 });
+pub static QUERY_PARQUET_METADATA_CACHE_REREAD_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_parquet_metadata_cache_reread_miss_total",
+            "Querier parquet metadata cache misses on keys this cache evicted earlier.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
 pub static QUERY_PARQUET_METADATA_CACHE_GC_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -1870,6 +1883,19 @@ pub static TANTIVY_RESULT_CACHE_HITS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static TANTIVY_RESULT_CACHE_REREAD_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "tantivy_result_cache_reread_miss_total",
+            "Total number of misses of tantivy result cache on keys it evicted earlier",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
 pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -1957,6 +1983,19 @@ pub static BYTES_CACHE_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
         Opts::new(
             "bytes_cache_miss_total",
             "Total number of misses of a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
+pub static BYTES_CACHE_REREAD_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bytes_cache_reread_miss_total",
+            "Total number of misses of a bytes cache on keys it evicted earlier",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -3416,6 +3455,11 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(
+            QUERY_PARQUET_METADATA_CACHE_REREAD_MISS_TOTAL.clone(),
+        ))
+        .expect("Metric registered");
+    registry
         .register(Box::new(QUERY_PARQUET_METADATA_CACHE_GC_COUNT.clone()))
         .expect("Metric registered");
     registry
@@ -3661,6 +3705,9 @@ pub(crate) fn register(registry: &Registry) {
     registry
         .register(Box::new(TANTIVY_RESULT_CACHE_HITS_TOTAL.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(TANTIVY_RESULT_CACHE_REREAD_MISS_TOTAL.clone()))
+        .expect("Metric registered");
 
     // metrics for generic bytes cache
     registry
@@ -3680,6 +3727,9 @@ pub(crate) fn register(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(BYTES_CACHE_MISS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BYTES_CACHE_REREAD_MISS_TOTAL.clone()))
         .expect("Metric registered");
 
     // tokio runtime metrics
@@ -3996,6 +4046,7 @@ mod tests {
         let _ = QUERY_PARQUET_METADATA_CACHE_USED_BYTES.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_HITS_TOTAL.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL.clone();
+        let _ = QUERY_PARQUET_METADATA_CACHE_REREAD_MISS_TOTAL.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_GC_COUNT.clone();
         let _ = QUERY_PARQUET_METADATA_CACHE_GC_TIME.clone();
         let _ = QUERY_DISK_CACHE_HIT_COUNT.clone();
@@ -4099,12 +4150,14 @@ mod tests {
         let _ = TANTIVY_RESULT_CACHE_GC_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_REQUESTS_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_HITS_TOTAL.clone();
+        let _ = TANTIVY_RESULT_CACHE_REREAD_MISS_TOTAL.clone();
         let _ = BYTES_CACHE_MEMORY_SIZE.clone();
         let _ = BYTES_CACHE_ENTRY_COUNT.clone();
         let _ = BYTES_CACHE_GC_TIME.clone();
         let _ = BYTES_CACHE_GC_COUNT.clone();
         let _ = BYTES_CACHE_HITS_TOTAL.clone();
         let _ = BYTES_CACHE_MISS_TOTAL.clone();
+        let _ = BYTES_CACHE_REREAD_MISS_TOTAL.clone();
         let _ = TOKIO_RUNTIME_TASKS.clone();
         let _ = TOKIO_RUNTIME_TASKS_TOTAL.clone();
         let _ = TOKIO_RUNTIME_WORKER_METRICS.clone();

@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Unit tests for the AddAiToolset Zod schema — the always-on name/kind rules
-// and the kind-conditional mcp.url / cli.command requireds (superRefine). This
+// and the kind-conditional mcp.url / skill.content requireds (superRefine). This
 // is the BEFORE validation baseline re-encoded as Zod
 // ("4 blocks → 6 sub-rules").
 
@@ -99,17 +99,6 @@ describe("AddAiToolset.schema", () => {
       ).not.toContain("mcp.url");
     });
 
-    it("is NOT required when kind is cli", () => {
-      expect(
-        errorPaths({
-          ...base(),
-          kind: "cli",
-          mcp: { url: "", timeout_seconds: 30 },
-          cli: { ...addAiToolsetDefaults().cli, command: "kubectl" },
-        }),
-      ).not.toContain("mcp.url");
-    });
-
     it("is NOT required when kind is skill", () => {
       expect(
         errorPaths({
@@ -118,40 +107,6 @@ describe("AddAiToolset.schema", () => {
           mcp: { url: "", timeout_seconds: 30 },
         }),
       ).not.toContain("mcp.url");
-    });
-  });
-
-  describe("cli.command (required only when kind === cli)", () => {
-    it("is required when kind is cli", () => {
-      const msgs = messagesFor(
-        {
-          ...base(),
-          kind: "cli",
-          cli: { ...addAiToolsetDefaults().cli, command: "" },
-        },
-        "cli.command",
-      );
-      expect(msgs).toContain("aiToolset.cliCommandRequired");
-    });
-
-    it("accepts a whitespace-only command (BEFORE baseline used a bare !command check)", () => {
-      expect(
-        errorPaths({
-          ...base(),
-          kind: "cli",
-          cli: { ...addAiToolsetDefaults().cli, command: "   " },
-        }),
-      ).not.toContain("cli.command");
-    });
-
-    it("is NOT required when kind is mcp", () => {
-      expect(
-        errorPaths({
-          ...base(),
-          kind: "mcp",
-          cli: { ...addAiToolsetDefaults().cli, command: "" },
-        }),
-      ).not.toContain("cli.command");
     });
   });
 
@@ -200,11 +155,9 @@ describe("AddAiToolset.schema", () => {
     it("defaults the arrays to empty", () => {
       const d = addAiToolsetDefaults();
       expect(d.mcp.headers).toEqual([]);
-      expect(d.cli.env).toEqual([]);
-      expect(d.cli.credFiles).toEqual([]);
     });
 
-    it("accepts populated header / env / cred rows", () => {
+    it("accepts populated header rows", () => {
       const res = schema.safeParse({
         ...base(),
         mcp: {
@@ -238,15 +191,6 @@ describe("AddAiToolset.schema", () => {
         kind: "mcp",
         description: "",
         mcp: { url: "", timeout_seconds: 30, headers: [] },
-        cli: {
-          command: "",
-          allowed_subcommands_raw: "",
-          timeout_seconds: 30,
-          max_output_bytes: 100000,
-          requires_confirmation: false,
-          env: [],
-          credFiles: [],
-        },
         skill: { content: "" },
       });
     });

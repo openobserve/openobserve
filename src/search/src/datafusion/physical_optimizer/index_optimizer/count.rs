@@ -94,6 +94,7 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use datafusion::{
         common::Result,
+        physical_plan::empty::EmptyExec,
         prelude::{SessionConfig, SessionContext},
     };
 
@@ -171,14 +172,12 @@ mod tests {
 
     #[test]
     fn test_is_simple_count_returns_none_for_empty_exec() {
-        use datafusion::physical_plan::empty::EmptyExec;
         let schema = Arc::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
             "a",
             arrow_schema::DataType::Int32,
             false,
         )]));
-        let plan: Arc<dyn datafusion::physical_plan::ExecutionPlan> =
-            Arc::new(EmptyExec::new(schema));
+        let plan: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
         assert!(is_simple_count(plan).is_none());
     }
 }

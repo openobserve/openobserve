@@ -10,6 +10,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 
+// The app's url-safe base64 (b64EncodeUnicode in web/src/utils/formatters.ts): '+/=' become '-_.'.
+export const encodeUrlSafeBase64 = (text) =>
+    Buffer.from(text, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '.');
+export const decodeUrlSafeBase64 = (text) =>
+    Buffer.from(text.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '='), 'base64').toString('utf8');
+
 // Import testLogger for proper logging
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment, authedRequest } = require('../../playwright-tests/utils/cloud-auth.js');
@@ -517,6 +523,7 @@ export class LogsPage {
         this.searchSettledStates = `${this.logsSearchResultTableRows}, ${this.noResultsFoundText}, [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"], [data-test="logs-search-cancelled-state"], [data-test="logs-auto-run-guard"]`;
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.queryPlanDialog = '[data-test="query-plan-dialog"]';
+        this.queryPlanCloseBtn = `${this.queryPlanDialog} [data-test="o-dialog-close-btn"]`;
         this.queryPlanView = `${this.queryPlanDialog} [data-test="query-plan-view"]`;
         this.queryPlanTileOperators = `${this.queryPlanDialog} [data-test="query-plan-tile-operators"]`;
         this.queryPlanOperatorCards = `${this.queryPlanDialog} [data-profile-card]`;
@@ -2031,6 +2038,33 @@ export class LogsPage {
         }
     }
 
+    // Polling can miss a fast run's loading state, and the previous run's "complete" state and rows stay up until it.
+    async armRunLoadingObserver() {
+        await this.page.evaluate(([runBtn, title]) => {
+            const run = { clicked: false, loading: false };
+            window.__o2LogsRun?.observer.disconnect();
+            run.observer = new MutationObserver(() => {
+                if (!run.clicked || run.loading) return;
+                run.loading = [...document.querySelectorAll(title)].some(
+                    el => el.getClientRects().length > 0 && el.getAttribute('data-search-state') === 'loading'
+                );
+                if (run.loading) run.observer.disconnect();
+            });
+            document.addEventListener('click', e => {
+                if (e.target.closest?.(runBtn)) run.clicked = true;
+            }, { capture: true, once: true });
+            run.observer.observe(document.body, {
+                subtree: true, childList: true, attributes: true, attributeFilter: ['data-search-state'],
+            });
+            window.__o2LogsRun = run;
+        }, [this.queryButton, this.paginationRowCountTitle]);
+    }
+
+    /** Wait until the run clicked after armRunLoadingObserver() has entered its loading state. */
+    async expectRunLoadingObserved(timeout = 30000) {
+        await this.page.waitForFunction(() => window.__o2LogsRun?.loading === true, null, { timeout });
+    }
+
     async clickRunQueryButtonAndVerifyStreamingResponse() {
         const orgName = getOrgIdentifier() || 'default';
         testLogger.debug("[DEBUG] Setting up response listener before clicking run query button");
@@ -2041,6 +2075,7 @@ export class LogsPage {
             return url.includes(`/api/${orgName}/_search`) && method === 'POST';
         });
         
+        await this.armRunLoadingObserver();
         await this.clickRunQueryButton();
         
         const searchResponse = await searchPromise;
@@ -2051,10 +2086,9 @@ export class LogsPage {
         const responseUrl = searchResponse.url();
         if (responseUrl.includes('_search_stream')) {
             testLogger.debug("[DEBUG] Received streaming response (SSE format)");
-            const responseText = await searchResponse.text();
-            testLogger.debug("[DEBUG] Streaming response text (first 200 chars):", responseText.substring(0, 200));
-            expect(responseText).toBeDefined();
-            expect(responseText.length).toBeGreaterThan(0);
+            // The page aborts the SSE fetch, so CDP may drop its body; prove this run settled with rows on screen.
+            await this.expectRunLoadingObserved();
+            expect(await this.getResultHitsCount()).toBeGreaterThan(0);
         } else {
             testLogger.debug("[DEBUG] Received JSON response");
             const searchData = await searchResponse.json();
@@ -2203,6 +2237,21 @@ export class LogsPage {
         await option.click({ force: true });
         await expect(this.page.locator(this.paginationRowCountTitle))
             .toContainText(`1 to ${size}`, { timeout: 30000 });
+    }
+
+    /** Run the query and return its histogram's total event count; needs captureHistogramFrames() before the page loads. */
+    async runQueryAndSumHistogram() {
+        await this.page.evaluate(() => { /** @type {any} */ (window).__histFrames = []; });
+        await this.clickRefreshButton();
+        let totals = [];
+        await expect.poll(async () => {
+            totals = (await this.getHistogramFrames())
+                .map((frame) => frame.hits ?? frame.results?.hits ?? [])
+                .filter((hits) => hits.some((hit) => hit.zo_sql_num !== undefined))
+                .map((hits) => hits.reduce((sum, hit) => sum + Number(hit.zo_sql_num || 0), 0));
+            return totals.length;
+        }, { timeout: 30000, message: 'the histogram must return its buckets' }).toBeGreaterThan(0);
+        return totals[totals.length - 1];
     }
 
     /**
@@ -2895,6 +2944,21 @@ export class LogsPage {
             testLogger.debug('Ingestion API error', { error: e.message });
             return { error: e.message };
         }
+    }
+
+    /** Poll the search API until the last hour of `streamName` holds exactly `expected` rows. */
+    async waitForStreamRowCount(orgId, streamName, expected, timeout = 60000) {
+        const baseUrl = process.env.INGESTION_URL.replace(/\/$/, '');
+        const sql = `SELECT count(*) AS c FROM "${streamName}"`;
+        await expect.poll(async () => {
+            const end = Date.now() * 1000;
+            const response = await this.page.request.post(`${baseUrl}/api/${orgId}/_search?type=logs`, {
+                headers: getAuthHeaders(),
+                data: { query: { sql, start_time: end - 3600 * 1e6, end_time: end + 60 * 1e6, from: 0, size: 1 } },
+            });
+            if (!response.ok()) return -1;
+            return (await response.json()).hits?.[0]?.c ?? 0;
+        }, { timeout, intervals: [1000] }).toBe(expected);
     }
 
     // Management methods - delegate to ManagementPage
@@ -3863,6 +3927,13 @@ export class LogsPage {
     async includeLogDetailFieldValue(field) {
         await this.page.locator(this.logDetailDialog).locator(`[data-test="log-details-include-exclude-field-btn-${field}"]`).click();
         await this.page.locator(this.includeFieldButton).filter({ hasText: 'Include Search Term' }).click();
+    }
+
+    /** Include Search Term from a field's menu in the detail drawer's JSON tab (the default tab). */
+    async includeLogDetailJsonFieldValue(field) {
+        const row = this.page.locator(this.logDetailDialog).locator(`[data-test="log-detail-row-${field}"]`);
+        await row.locator('[data-test="log-details-include-exclude-field-btn"]').click();
+        await this.page.locator(`${this.includeFieldButton}:visible`).first().click();
     }
 
     async clickCloseDialog() {
@@ -9119,6 +9190,12 @@ export class LogsPage {
         // Saved views list is now opened via the utilities ("More") dropdown menu.
         // Ensure any previously open dropdown is closed before opening fresh.
         const listMenuItem = this.page.locator(this.menuListSavedViewsBtn);
+        // Escape closes only the submenu, so the re-open click below would toggle the still-open root menu shut.
+        if (await this.page.locator(this.savedViewSearchInput).isVisible()
+            && (await listMenuItem.getAttribute('aria-expanded', { timeout: 5000 })) === 'true') {
+            testLogger.info('Saved views submenu already open, reusing it');
+            return;
+        }
         await this.page.keyboard.press('Escape').catch(() => {});
         await listMenuItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
         // After navigation the Vue component may need an extra render cycle before its
@@ -10215,16 +10292,16 @@ export class LogsPage {
     }
 
     /** Assert the Build tab's stream type. Retries — the model settles a tick late. */
-    async expectBuildStreamType(type) {
+    async expectBuildStreamType(type, timeout = 20000) {
         await expect(this.page.locator(this.buildStreamTypeTrigger))
-            .toHaveAttribute('data-test-selected-value', type, { timeout: 20000 });
+            .toHaveAttribute('data-test-selected-value', type, { timeout });
         testLogger.info(`Verified Build tab stream type: ${type}`);
     }
 
     /** Assert which stream the Build tab's field list has selected. */
-    async expectBuildStreamSelected(name) {
+    async expectBuildStreamSelected(name, timeout = 20000) {
         await expect(this.page.locator(this.buildStreamTrigger))
-            .toHaveAttribute('data-test-selected-value', name, { timeout: 20000 });
+            .toHaveAttribute('data-test-selected-value', name, { timeout });
         testLogger.info(`Verified Build tab selected stream: ${name}`);
     }
 
@@ -10642,11 +10719,12 @@ export class LogsPage {
      * page.reload() actually exercises URL restoration instead of reloading a URL
      * that has not been synced yet (updateUrlQueryParams runs asynchronously after
      * the chart renders).
-     * @param {{ requireVisualizationData?: boolean, requireFunctionContent?: boolean, timeout?: number }} options
+     * @param {{ requireVisualizationData?: boolean, requireFunctionContent?: boolean, requireQuery?: boolean, timeout?: number }} options
      */
     async waitForVisualizeUrlState({
         requireVisualizationData = true,
         requireFunctionContent = false,
+        requireQuery = false,
         timeout = 20000,
     } = {}) {
         await expect
@@ -10660,13 +10738,16 @@ export class LogsPage {
                     // AND tempFunctionContent is non-empty, so requiring it proves a VRL
                     // body really is part of the restorable state before we reload.
                     const hasVrl = !requireFunctionContent || url.includes('functionContent=');
-                    return hasToggle && hasConfig && hasVrl;
+                    // query is only written once the shown inputs hold it; a reload without it restores an empty editor
+                    const hasQuery = !requireQuery || !!new URL(url).searchParams.get('query');
+                    return hasToggle && hasConfig && hasVrl && hasQuery;
                 },
                 {
                     timeout,
                     message:
                         'URL never picked up logs_visualize_toggle=visualize / visualization_data' +
-                        (requireFunctionContent ? ' / functionContent' : ''),
+                        (requireFunctionContent ? ' / functionContent' : '') +
+                        (requireQuery ? ' / query' : ''),
                 }
             )
             .toBe(true);
@@ -11505,6 +11586,15 @@ export class LogsPage {
         testLogger.info('Query plan dialog is hidden');
     }
 
+    async closeQueryPlanDialog() {
+        // The closing More options menu holds focus, and its refocused trigger opens a tooltip over the dialog.
+        await expect(this.page.locator(this.explainQueryMenuBtn)).toBeHidden({ timeout: 10000 });
+        const closeBtn = this.page.locator(this.queryPlanCloseBtn);
+        await closeBtn.focus();
+        await closeBtn.click();
+        testLogger.info('Closed the query plan dialog with its close button');
+    }
+
     /** Click Run and wait for the hits request of `stream`, skipping the histogram call. */
     async runQueryAndWaitForStreamSearch(stream) {
         const searched = this.page.waitForResponse(
@@ -11516,6 +11606,53 @@ export class LogsPage {
         );
         await this.clickRunQueryButton();
         return await searched;
+    }
+
+    /** Wait until a picked stream's fields are loaded and the auto-run the pick may start has ended. */
+    async waitForPickedStreamSettled(stream, timeout = 60000) {
+        await expect.poll(() => this._mutateSearchObj((searchObj, skeleton) => ({
+            streams: [...searchObj.data.stream.selectedStream],
+            fieldsLoaded: searchObj.data.stream.selectedStreamFields.length > 0,
+            loadingStream: searchObj.loadingStream,
+            running: searchObj.loading || searchObj.loadingHistogram,
+            // loadingStream clears before the auto-run starts; the skeleton goes only after it has.
+            switching: document.querySelector(skeleton) !== null,
+        }), this.logsQueryPage.streamSwitchSkeleton), { timeout }).toEqual({
+            streams: [stream],
+            fieldsLoaded: true,
+            loadingStream: false,
+            running: false,
+            switching: false,
+        });
+        testLogger.info(`Stream ${stream} is loaded and no search is running`);
+    }
+
+    /** Set the editor to a SQL query and wait until the app holds it in SQL mode with the streams it names loaded. */
+    async fillSqlQueryAndWaitForSqlMode(sql) {
+        await this.clearAndFillQueryEditor(sql);
+        await this.waitForSearchQueryCommitted(sql);
+        await expect.poll(() => this._isSqlModeEnabledViaVue(), { timeout: 15000 }).toBe(true);
+        // A run started while a stream is still loading is cancelled.
+        await expect.poll(() => this._mutateSearchObj((searchObj) => searchObj.loadingStream), { timeout: 30000 }).toBe(false);
+    }
+
+    /** Run the query and wait for the hits request of `stream` to be answered and its results applied. */
+    async runQueryAndWaitForSearchEnd(stream) {
+        const response = await this.runQueryAndWaitForStreamSearch(stream);
+        expect(response.status()).toBe(200);
+        await expect.poll(() => this._mutateSearchObj((searchObj) => searchObj.loading), { timeout: 60000 }).toBe(false);
+    }
+
+    /** Record the size of every Logs UI hits request whose SQL contains `sqlPart`, from this call on. */
+    recordRequestedSizes(sqlPart) {
+        const sizes = [];
+        this.page.on('request', (req) => {
+            const url = new URL(req.url());
+            if (!/\/_search(_stream)?$/.test(url.pathname) || url.searchParams.get('search_type') !== 'ui' || url.searchParams.has('is_ui_histogram')) return;
+            const query = req.postDataJSON()?.query;
+            if (query?.sql?.includes(sqlPart)) sizes.push(query.size);
+        });
+        return sizes;
     }
 
     /** Open the Explain query dialog from the More options menu. */
@@ -13235,6 +13372,300 @@ export class LogsPage {
         return await this.page.evaluate(() => /** @type {any} */ (window).__aroundCalls || []);
     }
 
+    /** Start recording `_search_stream` histogram requests (`is_ui_histogram=true`); returns a getter. */
+    trackHistogramRequests() {
+        const urls = [];
+        this.page.on('request', (req) => {
+            if (req.method() === 'POST' && req.url().includes('/_search_stream') && req.url().includes('is_ui_histogram=true')) {
+                urls.push(req.url());
+            }
+        });
+        return () => [...urls];
+    }
+
+    async expectShareLinkButtonEnabled(timeout = 30000) {
+        await expect(this.page.locator(this.shareLinkButton)).toBeEnabled({ timeout });
+    }
+
+    // utils/traces-api.js createSavedView posts to ZO_BASE_URL, which is not the API when the UI is served separately.
+    async createSavedViewViaApi(viewName, data) {
+        const orgId = getOrgIdentifier() || 'default';
+        const res = await this.page.request.post(`${process.env.INGESTION_URL.replace(/\/$/, '')}/api/${orgId}/savedviews`, {
+            headers: getAuthHeaders(),
+            data: { view_name: viewName, view_type: 'logs', data },
+        });
+        expect(res.ok(), `create saved view ${viewName} -> ${res.status()}`).toBe(true);
+        return (await res.json()).view_id;
+    }
+
+    async deleteSavedViewViaApi(viewId) {
+        const orgId = getOrgIdentifier() || 'default';
+        await this.page.request.delete(`${process.env.INGESTION_URL.replace(/\/$/, '')}/api/${orgId}/savedviews/${viewId}`, { headers: getAuthHeaders() });
+    }
+
+    async findSavedViewIdViaApi(viewName, timeout = 30000) {
+        const orgId = getOrgIdentifier() || 'default';
+        let id;
+        await expect.poll(async () => {
+            const res = await this.page.request.get(`${process.env.INGESTION_URL.replace(/\/$/, '')}/api/${orgId}/savedviews`, { headers: getAuthHeaders() });
+            id = res.ok() ? ((await res.json()).views ?? []).find((v) => v.view_name === viewName)?.view_id : undefined;
+            return Boolean(id);
+        }, { timeout, message: `saved view ${viewName} never listed` }).toBe(true);
+        return id;
+    }
+
+    async setStreamMaxQueryRangeViaApi(streamName, hours) {
+        const orgId = getOrgIdentifier() || 'default';
+        const base = process.env.INGESTION_URL.replace(/\/$/, '');
+        const res = await this.page.request.put(`${base}/api/${orgId}/streams/${streamName}/settings?type=logs`, {
+            headers: getAuthHeaders(),
+            data: { max_query_range: hours },
+        });
+        expect(res.ok(), `set max_query_range=${hours} on ${streamName} -> ${res.status()}`).toBe(true);
+        await expect.poll(async () => {
+            const schema = await this.page.request.get(`${base}/api/${orgId}/streams/${streamName}/schema?type=logs`, { headers: getAuthHeaders() });
+            return schema.ok() ? (await schema.json())?.settings?.max_query_range ?? 0 : null;
+        }, { timeout: 15000 }).toBe(hours);
+    }
+
+    async applySavedViewByName(viewName) {
+        await this.clickSavedViewsExpand();
+        await this.clickSavedViewSearchInput();
+        await this.fillSavedViewSearchInput(viewName);
+        await this.clickSavedViewByTitle(viewName);
+    }
+
+    toastByVariant(variant) {
+        return this.page.locator(`[data-test-variant="${variant}"]`).first();
+    }
+
+    async openLogsWithParams(stream, params) {
+        const orgId = getOrgIdentifier() || 'default';
+        const query = new URLSearchParams({ org_identifier: orgId, stream_type: 'logs', stream, ...params });
+        await this.page.goto(`${process.env.ZO_BASE_URL}/web/logs?${query.toString()}`);
+        await this.page.locator(this.shareLinkButton).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    /** Start recording the time window of every non-histogram search request; returns a getter. */
+    trackSearchWindows() {
+        const windows = [];
+        this.page.on('request', (req) => {
+            if (req.method() !== 'POST' || !req.url().includes('/_search') || req.url().includes('is_ui_histogram')) return;
+            const q = req.postDataJSON()?.query;
+            if (q?.start_time && q?.end_time) windows.push({ start: Number(q.start_time), end: Number(q.end_time) });
+        });
+        return () => [...windows];
+    }
+
+    /** Resolves to the URL the next Share click asks the server to shorten. */
+    waitForShortUrlTarget(timeout = 30000) {
+        return this.page
+            .waitForRequest((req) => req.method() === 'POST' && /\/api\/[^/]+\/short$/.test(new URL(req.url()).pathname), { timeout })
+            .then((req) => req.postDataJSON().original_url);
+    }
+
+    /** Poll the `_values` API over the last `windowUs` until `field` offers `value`. */
+    async waitForFieldValueViaApi(streamName, field, value, windowUs, timeout = 60000) {
+        const orgId = getOrgIdentifier() || 'default';
+        const base = process.env.INGESTION_URL.replace(/\/$/, '');
+        await expect.poll(async () => {
+            const end = Date.now() * 1000;
+            const res = await this.page.request.get(
+                `${base}/api/${orgId}/${streamName}/_values?fields=${field}&size=10&start_time=${end - windowUs}&end_time=${end}&type=logs`,
+                { headers: getAuthHeaders() },
+            );
+            const body = await res.json().catch(() => ({}));
+            return (body?.hits?.[0]?.values ?? []).map((v) => v.zo_sql_key);
+        }, { message: `${field} never offered ${value}`, timeout }).toContain(value);
+    }
+
+    async expectPatternsToggleOff(timeout = 15000) {
+        const toggle = this.page.locator('[data-test="logs-patterns-toggle"]');
+        await expect(toggle).toBeVisible({ timeout });
+        await expect(toggle).toHaveAttribute('data-state', 'off');
+    }
+
+    /** Live list of `/patterns/extract` request URLs sent from now on. */
+    trackPatternsExtractRequests() {
+        const sent = [];
+        this.page.on('request', (req) => {
+            if (/\/patterns\/extract/.test(req.url())) sent.push(req.url());
+        });
+        return sent;
+    }
+
+    // An extract call follows the toggle within a second when it is made, so `timeout` without one means none.
+    /** Resolves to the next `/patterns/extract` URL, or null if none is sent within `timeout`. */
+    waitForPatternsExtract(timeout = 10000) {
+        return this.page
+            .waitForRequest((req) => /\/patterns\/extract/.test(req.url()), { timeout })
+            .then((req) => req.url())
+            .catch(() => null);
+    }
+
+    /** Clicks Patterns even when it is disabled, so a toggle that should refuse is still tried. */
+    async tryPatternsToggle() {
+        await selectLogsViewMode(this.page, 'patterns', 20000, { force: true });
+    }
+
+    /** `/web/logs` link for `stream` with `params` appended; `query` text is url-safe base64 encoded as the app does. */
+    logsLink(stream, { streamType = 'logs', query, ...params } = {}) {
+        const search = new URLSearchParams({
+            org_identifier: getOrgIdentifier() || 'default',
+            stream,
+            stream_type: streamType,
+            ...params,
+        });
+        if (query !== undefined) search.set('query', encodeUrlSafeBase64(query));
+        return `/web/logs?${search.toString()}`;
+    }
+
+    /** Opens Logs on `stream` with `queryText` in the editor, sent as plain base64 the way the share link writes it. */
+    async openLogsWithQueryText(stream, queryText, period = '1h') {
+        await this.openLogsWithParams(stream, {
+            period,
+            sql_mode: 'false',
+            quick_mode: 'false',
+            query: Buffer.from(queryText, 'utf8').toString('base64'),
+        });
+    }
+
+    async getQueryEditorTextCollapsed() {
+        return ((await this.getQueryEditorText()) || '').replace(/\s+/g, ' ').trim();
+    }
+
+    /**
+     * Live list of every POST `_search`/`_search_stream` sent from now on, optionally only those whose SQL names `stream`.
+     * Each entry: `{ type, searchType, histogram, size, sql, done }`, with the SQL decoded and whitespace-collapsed.
+     */
+    trackSearchRequests({ stream } = {}) {
+        const sent = [];
+        const settle = (req) => {
+            const entry = sent.find((r) => r.req === req);
+            if (entry) entry.done = true;
+        };
+        this.page.on('requestfinished', settle);
+        this.page.on('requestfailed', settle);
+        this.page.on('request', (req) => {
+            const url = new URL(req.url());
+            if (req.method() !== 'POST' || !/\/_search(_stream)?$/.test(url.pathname)) return;
+            let sql = '';
+            let size;
+            try {
+                const body = JSON.parse(req.postData() || '{}');
+                const q = body.query && typeof body.query === 'object' ? body.query : body;
+                size = q.size;
+                sql = body.encoding === 'base64' ? decodeUrlSafeBase64(String(q.sql ?? '')) : String(q.sql ?? '');
+            } catch {
+                /* non-JSON body */
+            }
+            sql = sql.replace(/\s+/g, ' ').trim();
+            if (stream && !sql.includes(stream)) return;
+            sent.push({
+                req,
+                done: false,
+                type: url.searchParams.get('type'),
+                searchType: url.searchParams.get('search_type'),
+                histogram: url.searchParams.get('is_ui_histogram') === 'true',
+                size,
+                sql,
+            });
+        });
+        return sent;
+    }
+
+    // The histogram and the size-0 count searches carry the same SQL as the hits search, so they are left out.
+    /** SQL of the UI hits searches among trackSearchRequests() entries. */
+    hitSearchSql(sent) {
+        return sent.filter((r) => r.searchType === 'ui' && !r.histogram && r.size !== 0).map((r) => r.sql);
+    }
+
+    async expectTrackedSearchesSettled(sent, timeout = 60000) {
+        await expect
+            .poll(() => sent.filter((r) => !r.done).length, { timeout, message: 'every tracked search must finish' })
+            .toBe(0);
+    }
+
+    /** Polls until the grid shows exactly `count` rows and every one contains `text`. */
+    async expectResultRowsAllContain(text, count, timeout = 60000) {
+        await expect
+            .poll(
+                async () => {
+                    const rows = await this.getResultRowTexts();
+                    return { count: rows.length, allMatch: rows.every((r) => r.includes(text)) };
+                },
+                { timeout, message: `the grid must show ${count} rows containing ${text}` },
+            )
+            .toEqual({ count, allMatch: true });
+    }
+
+    /** Resolves once a successful POST `/query_history` (a run saved as a recent search) has been answered. */
+    waitForQueryHistoryRecorded(timeout = 60000) {
+        return this.page.waitForResponse(
+            (r) => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/query_history') && r.ok(),
+            { timeout },
+        );
+    }
+
+    async closeLogDetailIfOpen() {
+        const close = this.page.locator(this.closeDialog);
+        if (await close.isVisible()) await close.click();
+        await expect(this.page.locator(this.logDetailDialog)).toBeHidden();
+    }
+
+    buildIncompleteFilterNotice() {
+        return this.page.locator('[data-test="logs-build-incomplete-filter-notice"]');
+    }
+
+    async clickVisualizeRefresh() {
+        await this.page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]:visible').first().click();
+    }
+
+    drillDownNoDimensionsState() {
+        return this.page.locator('[data-test="traces-analysis-dashboard-no-dimensions"]');
+    }
+
+    drillDownStreamRow() {
+        return this.page.locator('[data-test="logs-drill-down-stream-row"]');
+    }
+
+    // The Selected chip has no data-test or role; it renders only when a brushed range is compared.
+    drillDownSelectedRangeChip() {
+        return this.page.locator('.time-range-chip.selected-chip');
+    }
+
+    async expectDateTimeButtonText(text, timeout = 15000) {
+        await expect(this.page.locator(this.dateTimeButton)).toContainText(text, { timeout });
+    }
+
+    searchStreamNotFoundMessage() {
+        return this.page.getByText('Search stream not found');
+    }
+
+    /** The no-events copy for a filtered query, an unfiltered one, or a window with no stream data. */
+    noEventsCopy(kind) {
+        const text = {
+            withFilters: /Nothing matched/,
+            noFilters: /No events were found in/,
+            outOfRange: /time window doesn.t contain any data/,
+        }[kind];
+        return this.page.getByText(text);
+    }
+
+    async expectRunPending(timeout = 10000) {
+        await expect(this.page.locator(this.runQueryPending)).toBeVisible({ timeout });
+    }
+
+    async expectNoResultPage(pageNumber) {
+        await expect(this.page.locator(this.resultPaginationPageBtn(pageNumber))).toHaveCount(0);
+    }
+
+    /** Visible text of the results title (records chip or the plain title), whitespace-collapsed. */
+    async getVisibleResultTitleText() {
+        const title = this.page.locator(`${this.paginationRowCountTitle}:visible`).first();
+        return ((await title.textContent().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
+    }
+
     // Scoped to the visible title: Visualize renders a second, stale copy of SearchResult.
     /** Hits currently held by the results grid, from the title's `data-hits-count`. */
     async getResultHitsCount() {
@@ -13316,6 +13747,10 @@ export class LogsPage {
         // The tooltip opens on the anchor's mouseenter, which never re-fires if the
         // pointer is already inside it — park the mouse elsewhere so the hover is real.
         await this.page.mouse.move(0, 0);
+        // Focus returns to the date button after its picker closes, and OTooltip stays open until blur.
+        await this.page.evaluate(() => document.activeElement?.blur());
+        await this.page.locator('[data-test="o-tooltip-content"]:visible').first()
+            .waitFor({ state: 'hidden', timeout: 5000 });
         await trigger.hover();
         const bubble = this.page.locator('[data-test="o-tooltip-content"]:visible').first();
         const appeared = await bubble

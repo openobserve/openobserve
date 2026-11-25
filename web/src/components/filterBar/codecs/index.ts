@@ -20,5 +20,6 @@ export * from "./dashboardFilterCodec";
 export * from "./flatCodec";
 export * from "./listCodecs";
 export * from "./anomalyCodec";
+export * from "./dashboardVariableFilterCodec";
 export * from "./modelPricingCodec";
 export * from "./sqlCodec";

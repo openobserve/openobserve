@@ -24,7 +24,9 @@ use std::{
 use async_trait::async_trait;
 use config::{meta::stream::StreamType, spawn_pausable_job};
 use infra::{
-    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION},
+    coordinator::org_status::{
+        STATUS_ACTIVE, STATUS_BLOCKED, STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION,
+    },
     db::{get_orm_client_ro, get_orm_client_rw},
     dist_lock,
     org_lifecycle::OrgLifecycleGuard,
@@ -68,14 +70,31 @@ const LATE_ROW_SLACK_MICROS: i64 = 3600 * 1_000_000;
 const FILE_ROWS_BATCH: i64 = 10_000;
 // A blocked org's due triggers wait on an hourly grid from `deleted_at`, so a resurrect finds them.
 const PARK_MICROS: i64 = 3600 * 1_000_000;
+// The statuses the promotion tick re-sends, for nodes that missed their broadcast.
+const RESENT_STATUS_SET: [&str; 3] = [STATUS_PENDING_DELETION, STATUS_DELETING, STATUS_BLOCKED];
 
 // Per process, so each compactor alerts at most once per org until the org recovers.
 static FAILED_ORGS: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
-// Status and `deleted_at` last re-sent per blocked org; a resurrect and re-delete moves the latter.
+// The state last re-sent per blocked org; a re-delete moves `deleted_at`, a re-block `updated_at`.
 static RESENT_STATUSES: LazyLock<Mutex<HashMap<String, BlockedState>>> =
     LazyLock::new(Default::default);
 
-type BlockedState = (String, Option<i64>);
+type BlockedState = (String, Option<i64>, i64);
+
+/// Why an unblock failed; the two eviction failures are the server's, the rest are not retried.
+#[derive(Debug, thiserror::Error)]
+pub enum UnblockError {
+    #[error("Organization is not blocked (cannot unblock)")]
+    NotBlocked,
+    #[error("Organization stays blocked: the unblock did not reach every node, try again: {0}")]
+    StillBlocked(String),
+    #[error(
+        "Organization is unblocked but other nodes may still refuse it; block and unblock it again: {0}"
+    )]
+    PartlyUnblocked(String),
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
 
 /// Deletes the physical data for a stream during organization cleanup.
 ///
@@ -1258,7 +1277,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::table::trial_quota_usage;
     use infra::table::{
         ai_chat_sessions, ai_chat_shares, ai_chat_turns, alert_acks, alert_calibration,
-        alert_incidents, anomaly_detection, compactor_manual_jobs, distinct_values,
+        alert_incidents, alert_leases, anomaly_detection, compactor_manual_jobs, distinct_values,
         external_alerts, gen_ai_agents, incident_events, incident_integrations, llm_eval,
         llm_prompts, llm_secrets, oncall_teams, online_eval_jobs, org_ai_toolsets, org_telephony,
         providers, query_history, ratelimit, rca_runs, rca_steering, re_pattern,
@@ -1319,6 +1338,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     alert_acks::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_acks: {e}"))?;
+    alert_leases::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_leases: {e}"))?;
     // downtimes.folder_id has a FK (downtimes_folder_fk) → folders.id.
     delete_org_downtimes(org_id)
         .await
@@ -1729,6 +1751,11 @@ async fn announce_removed_member(
 
 #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
 async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
+    #[cfg(test)]
+    tests::STATUS_AUDITS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .push([org_id, actor, from, to].map(String::from));
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::common::auditor;
@@ -1845,6 +1872,36 @@ pub async fn resurrect_org(org_id: &str, actor: &str) -> Result<(), anyhow::Erro
     Ok(())
 }
 
+/// Operator block: active → blocked, and every node refuses the org until it is unblocked.
+pub async fn block_org(org_id: &str, actor: &str) -> Result<(), anyhow::Error> {
+    if org_id == config::DEFAULT_ORG || org_id == config::META_ORG_ID {
+        return Err(anyhow::anyhow!("Cannot block this organization"));
+    }
+    // Under the lock, so a status re-send or a deletion cannot interleave with the flip.
+    let guard = OrgLifecycleGuard::acquire(org_id).await?;
+    let blocked = set_blocked(org_id).await;
+    guard.release().await;
+    blocked?;
+    emit_status_audit(org_id, actor, STATUS_ACTIVE, STATUS_BLOCKED).await;
+    log::info!("[org_cleanup] blocked org={org_id} by {actor}");
+    Ok(())
+}
+
+/// Lifts an operator block: blocked → active, and every node serves the org again.
+pub async fn unblock_org(org_id: &str, actor: &str) -> Result<(), UnblockError> {
+    // Under the lock, so a status re-send that read `blocked` cannot re-block the org.
+    let guard = OrgLifecycleGuard::acquire(org_id).await?;
+    let unblocked = set_unblocked(org_id).await;
+    guard.release().await;
+    // A partial unblock left the row active, so the flip it audits did happen.
+    if matches!(unblocked, Ok(()) | Err(UnblockError::PartlyUnblocked(_))) {
+        emit_status_audit(org_id, actor, STATUS_BLOCKED, STATUS_ACTIVE).await;
+    }
+    unblocked?;
+    log::info!("[org_cleanup] unblocked org={org_id} by {actor}");
+    Ok(())
+}
+
 /// A blocked org's due trigger runs next at the first point of its deletion's hourly grid.
 pub fn parked_run_at(deleted_at: Option<i64>, now: i64) -> i64 {
     match deleted_at {
@@ -1941,10 +1998,11 @@ pub async fn run_promotion_scheduler() -> Result<(), anyhow::Error> {
 /// Re-sends a blocked org's status once per status and deletion, for nodes that missed it.
 pub async fn resend_blocked_statuses() -> Result<Vec<String>, anyhow::Error> {
     let mut current: HashMap<String, BlockedState> = HashMap::new();
-    for status in [STATUS_PENDING_DELETION, STATUS_DELETING] {
-        for (org_id, deleted_at) in organizations::list_ids_and_deleted_at_by_status(status).await?
+    for status in RESENT_STATUS_SET {
+        for (org_id, deleted_at, updated_at) in
+            organizations::list_ids_and_times_by_status(status).await?
         {
-            current.insert(org_id, (status.to_string(), deleted_at));
+            current.insert(org_id, (status.to_string(), deleted_at, updated_at));
         }
     }
     let changed: Vec<String> = {
@@ -2135,10 +2193,10 @@ async fn broadcast_status(org_id: &str, status: &str) {
 }
 
 async fn send_status(org_id: &str, status: &str) -> Result<(), infra::errors::Error> {
-    if status == STATUS_PENDING_DELETION {
-        crate::db::org_status::broadcast_pending_deletion(org_id).await
-    } else {
-        crate::db::org_status::broadcast_deleting(org_id).await
+    match status {
+        STATUS_PENDING_DELETION => crate::db::org_status::broadcast_pending_deletion(org_id).await,
+        STATUS_BLOCKED => crate::db::org_status::broadcast_blocked(org_id).await,
+        _ => crate::db::org_status::broadcast_deleting(org_id).await,
     }
 }
 
@@ -2169,10 +2227,10 @@ where
 
 /// Re-sends the row's status while it still blocks and returns it; the caller holds the org lock.
 async fn resend_status(org_id: &str) -> Result<Option<String>, anyhow::Error> {
-    let Some(status) = organizations::get_status_uncached(org_id).await? else {
+    let Some(status) = organizations::get_status_on_writer(org_id).await? else {
         return Ok(None);
     };
-    if status != STATUS_PENDING_DELETION && status != STATUS_DELETING {
+    if !RESENT_STATUS_SET.contains(&status.as_str()) {
         return Ok(None);
     }
     broadcast_with_retry(org_id, 1, || send_status(org_id, &status)).await?;
@@ -2286,6 +2344,66 @@ async fn evict_unless_reused(
         store.broadcast_eviction(org_id).await?;
     }
     Ok(!reused)
+}
+
+/// Flips an active org to blocked and broadcasts it; the caller holds the org's lifecycle lock.
+async fn set_blocked(org_id: &str) -> Result<(), anyhow::Error> {
+    if !organizations::set_status_if(org_id, STATUS_ACTIVE, STATUS_BLOCKED).await? {
+        return Err(anyhow::anyhow!("Organization is not active (cannot block)"));
+    }
+    broadcast_status(org_id, STATUS_BLOCKED).await;
+    Ok(())
+}
+
+/// Flips a blocked org back to active and evicts it everywhere; the caller holds the lock.
+async fn set_unblocked(org_id: &str) -> Result<(), UnblockError> {
+    let flipped = organizations::set_status_if(org_id, STATUS_BLOCKED, STATUS_ACTIVE)
+        .await
+        .map_err(anyhow::Error::from)?;
+    if !flipped {
+        return Err(UnblockError::NotBlocked);
+    }
+    let evicted =
+        broadcast_with_retry(org_id, BROADCAST_ATTEMPTS, || evict_unblocked(org_id)).await;
+    keep_block_unless_evicted(org_id, evicted).await
+}
+
+/// Evicts an unblocked org from every node's status cache.
+async fn evict_unblocked(org_id: &str) -> Result<(), infra::errors::Error> {
+    #[cfg(test)]
+    if tests::FAILING_EVICTIONS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .contains(org_id)
+    {
+        return Err(infra::errors::Error::Message(
+            "test eviction failure".into(),
+        ));
+    }
+    crate::db::org_status::set_active(org_id).await
+}
+
+/// Re-blocks the row after a failed eviction, so it matches the nodes still refusing the org and
+/// the re-send tick and a retried unblock both apply; the caller holds the org's lifecycle lock.
+async fn keep_block_unless_evicted(
+    org_id: &str,
+    evicted: Result<(), anyhow::Error>,
+) -> Result<(), UnblockError> {
+    let Err(evict_error) = evicted else {
+        return Ok(());
+    };
+    let reason = match organizations::set_status_if(org_id, STATUS_ACTIVE, STATUS_BLOCKED).await {
+        Ok(true) => {
+            broadcast_status(org_id, STATUS_BLOCKED).await;
+            return Err(UnblockError::StillBlocked(evict_error.to_string()));
+        }
+        Ok(false) => format!("{evict_error}; the row was no longer active to block again"),
+        Err(e) => format!("{evict_error}; blocking the row again failed: {e}"),
+    };
+    log::error!(
+        "[org_cleanup] org={org_id} is active but other nodes may still refuse it; block and unblock it again: {reason}"
+    );
+    Err(UnblockError::PartlyUnblocked(reason))
 }
 
 /// Makes the org's parked triggers due again, so a restored org's alerts resume on their schedule.
@@ -2738,6 +2856,13 @@ mod tests {
     ];
     /// The membership and user deletes step 600 runs, each in one transaction.
     const INFRA_ORG_USERS_SOURCE: &str = include_str!("../../../infra/src/table/org_users.rs");
+
+    // Every status audit this test binary emitted, as `[org, actor, from, to]`.
+    pub(super) static STATUS_AUDITS: LazyLock<Mutex<Vec<[String; 4]>>> =
+        LazyLock::new(Default::default);
+    // Orgs whose unblock eviction a test makes fail; per org, so parallel tests stay independent.
+    pub(super) static FAILING_EVICTIONS: LazyLock<Mutex<HashSet<String>>> =
+        LazyLock::new(Default::default);
 
     struct FailingStreamDataCleanup;
 
@@ -4142,6 +4267,282 @@ mod tests {
             "tombstoned outside the lock: {tombstoned:?}"
         );
         assert_eq!(status.as_deref(), Some("pending_deletion"));
+    }
+
+    async fn active_org_row(prefix: &str) -> String {
+        let org_id = format!("{prefix}_{}", config::utils::time::now_micros());
+        organizations::add(
+            &org_id,
+            &org_id,
+            config::meta::organization::OrganizationType::Custom,
+        )
+        .await
+        .unwrap();
+        org_id
+    }
+
+    /// The value the coordinator holds on the org's status key, `None` once it is evicted.
+    async fn status_key_value(org_id: &str) -> Option<String> {
+        let key = format!(
+            "{}{org_id}",
+            infra::coordinator::org_status::ORG_STATUS_KEY_PREFIX
+        );
+        infra::db::get_coordinator()
+            .await
+            .get_if_exists(&key)
+            .await
+            .unwrap()
+            .map(|value| String::from_utf8_lossy(&value).to_string())
+    }
+
+    fn cached_status(org_id: &str) -> Option<common::meta::organization::OrgStatus> {
+        common::infra::config::ORG_STATUS_CACHE
+            .get(org_id)
+            .map(|status| status.clone())
+    }
+
+    fn audits_of(org_id: &str) -> Vec<[String; 4]> {
+        STATUS_AUDITS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .iter()
+            .filter(|audit| audit[0] == org_id)
+            .cloned()
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_block_and_unblock_flip_the_row_the_cache_and_the_status_key() {
+        use common::meta::organization::OrgStatus;
+        if !meta_store().await {
+            return;
+        }
+        let org_id = active_org_row("t_block_cycle").await;
+        let blocked = block_org(&org_id, "ops@example.com").await;
+        let row_blocked = organizations::get_from_db(&org_id).await.unwrap();
+        let while_blocked = (cached_status(&org_id), status_key_value(&org_id).await);
+        let unblocked = unblock_org(&org_id, "ops@example.com").await;
+        let row_active = organizations::get_from_db(&org_id).await.unwrap();
+        let after = (cached_status(&org_id), status_key_value(&org_id).await);
+        let audits = audits_of(&org_id);
+        drop_org_row(&org_id).await;
+
+        blocked.unwrap();
+        unblocked.unwrap();
+        assert_eq!(
+            (row_blocked.status.as_str(), row_blocked.deleted_at),
+            ("blocked", None)
+        );
+        assert_eq!(
+            while_blocked,
+            (Some(OrgStatus::Blocked), Some("blocked".to_string()))
+        );
+        assert_eq!(
+            (row_active.status.as_str(), row_active.deleted_at),
+            ("active", None)
+        );
+        assert_eq!(after, (None, None));
+        let audit =
+            |from: &str, to: &str| [org_id.as_str(), "ops@example.com", from, to].map(String::from);
+        assert_eq!(
+            audits,
+            [audit("active", "blocked"), audit("blocked", "active")]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_block_and_unblock_refuse_every_other_status() {
+        if !meta_store().await {
+            return;
+        }
+        let mut refused = vec![];
+        for org in [config::META_ORG_ID, config::DEFAULT_ORG] {
+            let err = block_org(org, "ops@example.com").await.unwrap_err();
+            refused.push((org.to_string(), err.to_string()));
+        }
+        let mut statuses = vec![];
+        for status in ["blocked", "pending_deletion", "deleting", "deleted"] {
+            let org_id = org_row_with_status("t_block_refused", status).await;
+            let result = block_org(&org_id, "ops@example.com").await;
+            statuses.push((status, result.is_err(), status_of(&org_id).await));
+            drop_org_row(&org_id).await;
+        }
+        for status in ["active", "pending_deletion", "deleting", "deleted"] {
+            let org_id = org_row_with_status("t_unblock_refused", status).await;
+            let result = unblock_org(&org_id, "ops@example.com").await;
+            let refused = matches!(result, Err(UnblockError::NotBlocked));
+            statuses.push((status, refused, status_of(&org_id).await));
+            drop_org_row(&org_id).await;
+        }
+        let missing = block_org("t_block_missing_org", "ops@example.com").await;
+
+        let system = "Cannot block this organization".to_string();
+        assert_eq!(
+            refused,
+            [
+                (config::META_ORG_ID.to_string(), system.clone()),
+                (config::DEFAULT_ORG.to_string(), system),
+            ]
+        );
+        for (status, failed, after) in statuses {
+            assert!(failed, "{status} was not refused");
+            assert_eq!(after.as_deref(), Some(status), "{status} changed");
+        }
+        assert!(missing.is_err());
+    }
+
+    async fn status_of(org_id: &str) -> Option<String> {
+        organizations::get_status_uncached(org_id).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_block_and_unblock_wait_for_lifecycle_lock() {
+        if !meta_store().await {
+            return;
+        }
+        let org_id = active_org_row("t_block_lifecycle").await;
+        let wait = std::time::Duration::from_millis(200);
+        let guard = OrgLifecycleGuard::acquire(&org_id).await.unwrap();
+        let blocked = tokio::time::timeout(wait, block_org(&org_id, "ops@example.com")).await;
+        guard.release().await;
+        let after_block = status_of(&org_id).await;
+        organizations::set_status(&org_id, "blocked").await.unwrap();
+        let guard = OrgLifecycleGuard::acquire(&org_id).await.unwrap();
+        let unblocked = tokio::time::timeout(wait, unblock_org(&org_id, "ops@example.com")).await;
+        guard.release().await;
+        let after_unblock = status_of(&org_id).await;
+        drop_org_row(&org_id).await;
+
+        assert!(blocked.is_err(), "blocked outside the lock: {blocked:?}");
+        assert!(
+            unblocked.is_err(),
+            "unblocked outside the lock: {unblocked:?}"
+        );
+        assert_eq!(after_block.as_deref(), Some("active"));
+        assert_eq!(after_unblock.as_deref(), Some("blocked"));
+    }
+
+    #[tokio::test]
+    async fn test_an_unblock_whose_eviction_fails_stays_blocked_and_can_be_retried() {
+        use common::meta::organization::OrgStatus;
+        if !meta_store().await {
+            return;
+        }
+        let org_id = active_org_row("t_unblock_evict_failed").await;
+        block_org(&org_id, "ops@example.com").await.unwrap();
+        let failing = || {
+            FAILING_EVICTIONS
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+        };
+        failing().insert(org_id.clone());
+        let failed = unblock_org(&org_id, "ops@example.com").await;
+        failing().remove(&org_id);
+        let after_failure = (
+            status_of(&org_id).await,
+            cached_status(&org_id),
+            status_key_value(&org_id).await,
+        );
+        let audits_after_failure = audits_of(&org_id).len();
+        let retried = unblock_org(&org_id, "ops@example.com").await;
+        let after_retry = (
+            status_of(&org_id).await,
+            cached_status(&org_id),
+            status_key_value(&org_id).await,
+        );
+        let audits = audits_of(&org_id);
+        drop_org_row(&org_id).await;
+
+        assert!(
+            matches!(failed, Err(UnblockError::StillBlocked(_))),
+            "{failed:?}"
+        );
+        let blocked = Some("blocked".to_string());
+        assert_eq!(
+            after_failure,
+            (blocked.clone(), Some(OrgStatus::Blocked), blocked)
+        );
+        assert_eq!(audits_after_failure, 1, "an undone unblock was audited");
+        retried.unwrap();
+        assert_eq!(after_retry, (Some("active".to_string()), None, None));
+        let audit =
+            |from: &str, to: &str| [org_id.as_str(), "ops@example.com", from, to].map(String::from);
+        assert_eq!(
+            audits,
+            [audit("active", "blocked"), audit("blocked", "active")]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_a_failed_eviction_that_cannot_block_again_is_a_partial_unblock() {
+        if !meta_store().await {
+            return;
+        }
+        // No row to flip back, the same answer a failing re-block gives.
+        let missing = format!("t_unblock_partial_{}", config::utils::time::now_micros());
+        let partial =
+            keep_block_unless_evicted(&missing, Err(anyhow::anyhow!("coordinator down"))).await;
+        let evicted = keep_block_unless_evicted(&missing, Ok(())).await;
+        common::infra::config::ORG_STATUS_CACHE.remove(&missing);
+
+        match partial {
+            Err(UnblockError::PartlyUnblocked(reason)) => {
+                assert!(reason.contains("coordinator down"), "{reason}")
+            }
+            other => panic!("expected a partial unblock, got {other:?}"),
+        }
+        evicted.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_status_resend_repeats_after_an_unblock_and_reblock() {
+        use sea_orm::ConnectionTrait;
+        if !meta_store().await {
+            return;
+        }
+        let org = org_row_with_status("t_resend_reblock", "blocked").await;
+        let first = resend_blocked_statuses().await.unwrap();
+        let unchanged = resend_blocked_statuses().await.unwrap();
+        // An unblock and a new block between two ticks leave the status and `deleted_at` alike.
+        get_orm_client_rw()
+            .await
+            .execute_unprepared(&format!(
+                "UPDATE organizations SET updated_at = updated_at + 1 WHERE identifier = '{org}'"
+            ))
+            .await
+            .unwrap();
+        let reblocked = resend_blocked_statuses().await.unwrap();
+        drop_org_row(&org).await;
+        assert!(first.contains(&org), "{first:?}");
+        assert!(!unchanged.contains(&org), "{unchanged:?}");
+        assert!(
+            reblocked.contains(&org),
+            "a second block with the same status was not re-sent: {reblocked:?}"
+        );
+    }
+
+    #[test]
+    fn test_status_resend_reads_the_row_on_the_writer() {
+        // Under the lock only a writer read sees an unblock that just committed.
+        assert!(fn_body(SOURCE, "resend_status").contains("get_status_on_writer"));
+    }
+
+    #[tokio::test]
+    async fn test_status_resend_reblocks_an_operator_block() {
+        use common::meta::organization::OrgStatus;
+        if !meta_store().await {
+            return;
+        }
+        let org_id = org_row_with_status("t_resend_operator_block", "blocked").await;
+        let sent = resend_blocked_statuses().await.unwrap();
+        let cached = cached_status(&org_id);
+        let key = status_key_value(&org_id).await;
+        drop_org_row(&org_id).await;
+        assert!(sent.contains(&org_id), "{sent:?}");
+        assert_eq!(
+            (cached, key.as_deref()),
+            (Some(OrgStatus::Blocked), Some("blocked"))
+        );
     }
 
     #[tokio::test]

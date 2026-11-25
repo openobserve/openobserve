@@ -20,11 +20,17 @@ use config::get_config;
 use infra::table::org_storage_providers::{
     AwsCredentials, AwsRoleArn, AzureCredentials, GcpCredentials,
 };
-use object_store::{ObjectStore, ObjectStoreExt};
+use object_store::{
+    ObjectStore, ObjectStoreExt,
+    aws::{AmazonS3, AmazonS3Builder},
+    azure::{MicrosoftAzure, MicrosoftAzureBuilder},
+    gcp::{GoogleCloudStorage, GoogleCloudStorageBuilder},
+    path::Path,
+};
 
 const TEST_FILE: &str = "o2_test/check.txt";
 
-pub fn get_aws(config: AwsCredentials) -> object_store::Result<object_store::aws::AmazonS3> {
+pub fn get_aws(config: AwsCredentials) -> object_store::Result<AmazonS3> {
     let cfg = get_config();
     let mut opts = object_store::ClientOptions::default()
         .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
@@ -49,7 +55,7 @@ pub fn get_aws(config: AwsCredentials) -> object_store::Result<object_store::aws
         retry_timeout: Duration::from_secs(3 * 60),
         backoff: object_store::BackoffConfig::default(),
     };
-    let mut builder = object_store::aws::AmazonS3Builder::from_env()
+    let mut builder = AmazonS3Builder::from_env()
         .with_client_options(opts)
         .with_bucket_name(&config.bucket_name)
         .with_retry(retry_config)
@@ -65,11 +71,9 @@ pub fn get_aws(config: AwsCredentials) -> object_store::Result<object_store::aws
     builder.build()
 }
 
-pub fn get_azure(
-    config: AzureCredentials,
-) -> object_store::Result<object_store::azure::MicrosoftAzure> {
+pub fn get_azure(config: AzureCredentials) -> object_store::Result<MicrosoftAzure> {
     let cfg = get_config();
-    let mut builder = object_store::azure::MicrosoftAzureBuilder::from_env()
+    let mut builder = MicrosoftAzureBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
@@ -85,11 +89,9 @@ pub fn get_azure(
     builder.build()
 }
 
-pub fn get_gcp(
-    config: GcpCredentials,
-) -> object_store::Result<object_store::gcp::GoogleCloudStorage> {
+pub fn get_gcp(config: GcpCredentials) -> object_store::Result<GoogleCloudStorage> {
     let cfg = get_config();
-    let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
+    let mut builder = GoogleCloudStorageBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
@@ -108,7 +110,7 @@ pub fn get_gcp(
 
 pub async fn test_provider(provider: &dyn ObjectStore) -> Result<(), anyhow::Error> {
     // Test upload
-    let path = object_store::path::Path::parse(TEST_FILE)?;
+    let path = Path::parse(TEST_FILE)?;
     let data = Bytes::from("Hello, OpenObserve!");
     if let Err(e) = provider.put(&path, data.into()).await {
         return Err(anyhow::anyhow!("upload test failed: {e}"));

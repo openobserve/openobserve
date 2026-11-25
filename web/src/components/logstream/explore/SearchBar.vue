@@ -77,13 +77,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineAsyncComponent, defineComponent, ref, onBeforeMount } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import useLogs from "@/composables/useLogs";
+import { searchState } from "@/composables/useLogs/searchState";
 import type { IDateTime } from "@/ts/interfaces";
 
 export default defineComponent({
@@ -120,7 +120,7 @@ export default defineComponent({
     const store = useStore();
     const btnRefreshInterval = ref(null);
 
-    const { searchObj } = useLogs(t);
+    const { searchObj } = searchState();
     const queryEditorRef = ref(null);
 
     const functionOptions = ref(searchObj.data.transforms);

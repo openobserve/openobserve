@@ -373,7 +373,8 @@ export class AlertsFormValidationPage {
    */
   async addFilterCondition(position = 0, operator = '=', value = 'e2e') {
     testLogger.info('Adding a condition through the condition builder', { position, operator });
-    await this.conditions.addConditionOnListedField(position, operator, value);
+    // A text field: a number field refuses text such as 'e2e' for `=`.
+    await this.conditions.addConditionOnListedField(position, operator, value, { type: 'Text' });
   }
 
   // ── Alert wizard helpers ───────────────────────────────────────────────────

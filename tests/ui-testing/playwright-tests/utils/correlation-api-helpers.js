@@ -162,6 +162,25 @@ async function ingestLogs(page, org, stream, records) {
   return body;
 }
 
+/** A log stream whose fields map to three semantic groups (environment, version, host), so Detection Rules offers them. */
+async function seedDetectionRuleCandidates(page, org) {
+  const stream = `corr_rule_candidates_${Date.now()}`;
+  await ingestLogs(page, org, stream, [
+    { environment: "ovn-staging", app_version: "1.2.3", hostname: "ovn-host-1", message: "detection rule candidates" },
+  ]);
+  return stream;
+}
+
+/** Best-effort log stream teardown — never throws. */
+async function deleteLogStream(page, org, stream) {
+  if (!stream) return;
+  try {
+    await authedRequest(page, "delete", `${BASE}/api/${org}/streams/${stream}?type=logs`);
+  } catch {
+    /* cleanup must not fail the test */
+  }
+}
+
 /** records: [{__name__, value, ...labels}]; _timestamp (millis) added if missing. */
 async function ingestMetrics(page, org, records) {
   const ts = Date.now();
@@ -431,6 +450,8 @@ module.exports = {
   createCorrelationOrg,
   deleteOrg,
   ingestLogs,
+  seedDetectionRuleCandidates,
+  deleteLogStream,
   ingestMetrics,
   ingestTraces,
   listServices,

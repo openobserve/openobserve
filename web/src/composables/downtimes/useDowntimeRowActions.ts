@@ -132,6 +132,12 @@ export function useDowntimeRowActions() {
   // Only the latest open may fill the dialog; an earlier read can answer after it.
   let latestOpen = 0;
 
+  const resetExtendUntil = () => {
+    latestOpen++;
+    extendUntilOpen.value = false;
+    extendUntilRow.value = null;
+  };
+
   const readStored = (downtime: ActiveDowntime, org: string) =>
     queryClient.fetchQuery({
       ...downtimeDetailQuery(org, downtime.id, downtime.folder_id || undefined),
@@ -166,5 +172,13 @@ export function useDowntimeRowActions() {
     }
   };
 
-  return { end, extendBy, extendUntil, openExtendUntil, extendUntilOpen, extendUntilRow };
+  return {
+    end,
+    extendBy,
+    extendUntil,
+    openExtendUntil,
+    resetExtendUntil,
+    extendUntilOpen,
+    extendUntilRow,
+  };
 }

@@ -186,6 +186,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.llmProviders",
       "shortcuts.pages.aiToolsets",
       "shortcuts.pages.orgManagement",
+      "shortcuts.pages.userManagement",
     ],
   },
   {
@@ -242,6 +243,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     shortcuts: [
       { id: "openCheatsheet", key: "shift+?", descriptionKey: "shortcuts.actions.openCheatsheet" },
       { id: "closeDialog", key: "escape", descriptionKey: "shortcuts.actions.closeDialog" },
+      { id: "openOrgSwitcher", key: "g o", descriptionKey: "shortcuts.actions.openOrgSwitcher" },
+      { id: "timeRangeOpen", key: "t", descriptionKey: "shortcuts.actions.timeRangeOpen" },
       {
         id: "aiChatToggle",
         keyForWindows: "ctrl+b",
@@ -1207,6 +1210,20 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "orgManagementRefresh",
         key: "r",
         descriptionKey: "shortcuts.actions.orgManagementRefresh",
+      },
+    ],
+  },
+
+  // ── User Management ─────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.userManagement",
+    scope: "user-management",
+    visible: cloudMetaAdmin,
+    shortcuts: [
+      {
+        id: "userManagementRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.userManagementRefresh",
       },
     ],
   },

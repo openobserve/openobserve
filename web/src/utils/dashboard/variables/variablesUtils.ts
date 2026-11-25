@@ -1,3 +1,4 @@
+import { escapeRegExp } from "@/utils/query/promQLUtils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 /** List formats, for multi-value variables. */
@@ -326,8 +327,6 @@ const resolveVariablesWithPrecedence = (
 
   return resolvedVariables;
 };
-
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const buildPlaceholderRegex = (
   names: Iterable<string>,

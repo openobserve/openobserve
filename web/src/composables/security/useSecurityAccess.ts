@@ -34,6 +34,9 @@ const NO_ACCESS: SecurityAccess = { read: false, triage: false, author: false, a
 export const isSecurityGated = (): boolean =>
   config.isEnterprise === "true" || config.isCloud === "true";
 
+/** Self-hosted Enterprise deliberately shows no stage tag. */
+export const isSecurityAlpha = (): boolean => config.isCloud === "true";
+
 export const securityFeatureState = (features: FeatureStates | undefined): FeatureState =>
   isSecurityGated() ? featureState(features, "security") : "hidden";
 

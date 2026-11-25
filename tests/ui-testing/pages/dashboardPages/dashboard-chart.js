@@ -929,11 +929,13 @@ export default class ChartTypeSelector {
 
   /**
    * Wait until the custom SQL has been parsed into these axis fields; Apply validates the panel state, which lags the editor.
-   * @param {string} xAlias
+   * @param {string|null} xAlias - null for a query with no GROUP BY, whose columns all land on the Y well
    * @param {string} yAlias
    */
   async waitForCustomQueryAxes(xAlias, yAlias) {
-    await this.page.locator(`[data-test="dashboard-x-item-${xAlias}"]`).first().waitFor({ state: "attached", timeout: 15000 });
+    if (xAlias) {
+      await this.page.locator(`[data-test="dashboard-x-item-${xAlias}"]`).first().waitFor({ state: "attached", timeout: 15000 });
+    }
     await this.page.locator(`[data-test="dashboard-y-item-${yAlias}"]`).first().waitFor({ state: "attached", timeout: 15000 });
   }
 
@@ -1085,6 +1087,19 @@ export default class ChartTypeSelector {
       if (enabled) await expect(button).toBeEnabled({ timeout: 1000 });
       else await expect(button).toBeDisabled({ timeout: 1000 });
     }).toPass({ timeout: 15000 });
+    await this.clearFieldSearch();
+  }
+
+  /** Assert a field row offers no add-to-axis button for `target` at all, e.g. +B on a chart type without a breakdown. */
+  async expectAddFieldButtonAbsent(fieldName, target) {
+    if (!["x", "y", "b"].includes(target)) throw new Error(`Invalid target type: ${target}`);
+    await this.searchField(fieldName);
+    const row = this.fieldListRow(fieldName);
+    await row.waitFor({ state: "visible", timeout: 10000 });
+    await row.hover();
+    // The sibling +X button proves the hover revealed the row's add buttons before counting the missing one.
+    await expect(this.fieldAddButton(fieldName, "x")).toBeVisible();
+    await expect(this.fieldAddButton(fieldName, target)).toHaveCount(0);
     await this.clearFieldSearch();
   }
 }

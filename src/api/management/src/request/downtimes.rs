@@ -697,9 +697,12 @@ mod tests {
         let hour = 3_600_000_000;
         let conn = infra::db::get_orm_client_rw().await;
         let mut versions = std::collections::HashMap::new();
-        for id in ["stale", "current", "absent"] {
+        // Rows are keyed by id alone, so a fixed id would move another test's row into this org.
+        let id_of = |name: &str| format!("{org}_{name}");
+        for name in ["stale", "current", "absent"] {
+            let id = id_of(name);
             let row: Downtime = serde_json::from_value(serde_json::json!({
-                "id": id, "org": org, "name": id,
+                "id": id, "org": org, "name": name,
                 "targets": [{ "module": "alerts", "folders": { "kind": "all" } }],
                 "schedule": { "repeat": "none", "starts_at": now - hour, "ends_at": now + hour,
                               "timezone": "UTC", "duration_secs": 7200 },
@@ -707,25 +710,25 @@ mod tests {
             }))
             .unwrap();
             infra::table::downtimes::put_with(conn, &row).await.unwrap();
-            let stored = infra::table::downtimes::get_rw(&org, id)
+            let stored = infra::table::downtimes::get_rw(&org, &id)
                 .await
                 .unwrap()
                 .unwrap();
-            versions.insert(id, stored.version);
+            versions.insert(name, stored.version);
         }
-        let cancel = |id: &'static str, version: Option<i64>| {
+        let cancel = |name: &'static str, version: Option<i64>| {
             cancel_downtime(
-                Path((org.clone(), id.to_string())),
+                Path((org.clone(), id_of(name))),
                 Query(CancelDowntimeQuery { version }),
                 Headers(UserEmail {
                     user_id: root.to_string(),
                 }),
             )
         };
-        let cancelled = |id: &'static str| {
-            let org = org.clone();
+        let cancelled = |name: &'static str| {
+            let (org, id) = (org.clone(), id_of(name));
             async move {
-                let stored = infra::table::downtimes::get_rw(&org, id)
+                let stored = infra::table::downtimes::get_rw(&org, &id)
                     .await
                     .unwrap()
                     .unwrap();

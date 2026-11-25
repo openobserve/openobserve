@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
+import { NULL_BREAKDOWN_VALUE, OTHERS_BREAKDOWN_VALUE } from "@/utils/dashboard/sqlProcessData";
 import {
   correlationConfigured,
   fieldPredicate,
@@ -176,8 +177,42 @@ describe("pointGroupFilters", () => {
     };
     const panel = { type: "bar", config: { top_results_others: true } };
     expect(
-      pointGroupFilters(query, panel, "category", { name: "cart", seriesValue: "others" }, []),
+      pointGroupFilters(
+        query,
+        panel,
+        "category",
+        { name: "cart", seriesValue: OTHERS_BREAKDOWN_VALUE },
+        [],
+      ),
     ).toEqual([]);
+  });
+
+  it("a breakdown series named 'others' is a real value; a NULL series filters IS NULL", () => {
+    const query = {
+      fields: {
+        x: [builder("x_axis_1", "service")],
+        breakdown: [builder("breakdown_1", "region")],
+      },
+    };
+    const panel = { type: "bar", config: { top_results_others: true } };
+    expect(
+      pointGroupFilters(query, panel, "category", { name: "cart", seriesValue: "others" }, []),
+    ).toEqual([
+      { field: "service", value: "cart" },
+      { field: "region", value: "others" },
+    ]);
+    const nullSeries = pointGroupFilters(
+      query,
+      panel,
+      "category",
+      { name: "cart", seriesValue: NULL_BREAKDOWN_VALUE },
+      [],
+    );
+    expect(nullSeries).toEqual([
+      { field: "service", value: "cart" },
+      { field: "region", value: null },
+    ]);
+    expect(filtersWhere("", nullSeries)).toBe("service = 'cart' AND region IS NULL");
   });
 
   it("custom SQL: resolves each alias to the column the query reads, skipping unknown ones", () => {

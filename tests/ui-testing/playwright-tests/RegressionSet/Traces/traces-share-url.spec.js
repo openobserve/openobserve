@@ -22,7 +22,7 @@ test.describe("Traces shared URL", () => {
   });
   test("a shared Traces link should restore its filter and load data on arrival", {
     tag: ['@bug-11392', '@P1', '@regression', '@tracesRegression', '@tracesRegressionShareUrl']
-  }, async ({ page, context }) => {
+  }, async ({ context }) => {
     testLogger.info('Test: shared traces link auto-applies (Bug #11392)');
 
     await pm.tracesPage.navigateToTraces();
@@ -35,6 +35,9 @@ test.describe("Traces shared URL", () => {
     ).toBe(true);
     await pm.tracesPage.toggleErrorOnlyFilter();
     // Share stays disabled until the toggled filter has run.
+    await pm.tracesPage.expectShareLinkDisabled(
+      "Share must stay disabled while the shown results are not the toggled filter's",
+    );
     await pm.tracesPage.runSearch();
     await pm.tracesPage.waitForTraceSearchResults();
 

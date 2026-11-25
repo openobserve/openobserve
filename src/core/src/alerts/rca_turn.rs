@@ -64,7 +64,7 @@ use o2_enterprise::enterprise::{
             spawn_headless_turn,
         },
         client::{QueryRequest, RCA_AGENT_TYPE, SESSION_ID_HEADER, get_agent_client},
-        toolsets::{CliEntry, McpEntry, SkillEntry, push::load_agent_tools},
+        toolsets::{McpEntry, SkillEntry, push::load_agent_tools},
     },
     alerts::rca_service,
     common::config::get_config as get_o2_config,
@@ -388,13 +388,13 @@ async fn start_turn(
         }
     }
     let prompt = prompt.render();
-    let (mcps, clis, skills) = load_agent_tools(&run.org_id).await;
+    let (mcps, skills) = load_agent_tools(&run.org_id).await;
 
     let session_id = match run.session_id.clone() {
         Some(session_id) => session_id,
         None => {
             let mut patch = RunUpdate {
-                context_used: Some(context_used(&run.context, &mcps, &clis, &skills)),
+                context_used: Some(context_used(&run.context, &mcps, &skills)),
                 ..Default::default()
             };
             let session_id = match fork {
@@ -478,7 +478,6 @@ async fn start_turn(
     }
     let mut request = QueryRequest::new(prompt, context);
     request.mcps = (!mcps.is_empty()).then_some(mcps);
-    request.clis = (!clis.is_empty()).then_some(clis);
     request.skills = (!skills.is_empty()).then_some(skills);
     admission::apply_admission(&mut request, &admitted);
     let AdmittedTurn {
@@ -551,12 +550,7 @@ async fn probe_health<T, E: std::fmt::Display>(
 }
 
 /// Expose only the context actually provided to this run.
-fn context_used(
-    context: &Value,
-    mcps: &[McpEntry],
-    clis: &[CliEntry],
-    skills: &[SkillEntry],
-) -> Value {
+fn context_used(context: &Value, mcps: &[McpEntry], skills: &[SkillEntry]) -> Value {
     let past_causes: Vec<Value> = context
         .get("past_causes")
         .and_then(Value::as_array)
@@ -566,11 +560,7 @@ fn context_used(
         .filter_map(past_cause)
         .collect();
     let skills: Vec<&str> = skills.iter().map(|s| s.name.as_str()).collect();
-    let toolsets: Vec<&str> = mcps
-        .iter()
-        .map(|m| m.name.as_str())
-        .chain(clis.iter().map(|c| c.name.as_str()))
-        .collect();
+    let toolsets: Vec<&str> = mcps.iter().map(|m| m.name.as_str()).collect();
     json!({ "past_causes": past_causes, "skills": skills, "toolsets": toolsets })
 }
 
@@ -660,6 +650,7 @@ async fn finalize(
             .find(|turn| turn.turn_id == turn_id)
             .and_then(|turn| turn.error_code.clone()),
         turn_message: end.error_message,
+        usage: events.as_deref().map(RunUsage::of).unwrap_or_default(),
         org_id,
         run,
         item,
@@ -724,6 +715,7 @@ struct RunEnd {
     turn_error: Option<String>,
     /// The message of the turn's last error, when the turn ended on this node.
     turn_message: Option<String>,
+    usage: RunUsage,
 }
 
 impl RunEnd {
@@ -935,6 +927,8 @@ impl RunEnd {
                 steps: Some(thread.steps),
                 tool_calls: Some(thread.tool_calls),
                 tokens: serde_json::to_value(&thread.tokens).ok(),
+                credits: self.usage.credits,
+                model: self.usage.model.clone(),
                 ..Default::default()
             }),
             summary: Some(RunSummaryPatch {
@@ -1564,6 +1558,46 @@ impl Tokens {
     }
 }
 
+/// What a session's model calls cost, as the agent reported them, and the model that made them.
+#[derive(Debug, Default, PartialEq)]
+struct RunUsage {
+    credits: Option<f64>,
+    model: Option<String>,
+}
+
+impl RunUsage {
+    fn of(events: &[DurableEvent]) -> Self {
+        // A part is updated many times; its last update holds the step's cost.
+        let mut costs: HashMap<&str, Option<f64>> = HashMap::new();
+        let mut model = None;
+        for event in events {
+            if let Some(part) = updated_part(event) {
+                if part.get("type").and_then(Value::as_str) == Some("step-finish")
+                    && let Some(id) = part.get("id").and_then(Value::as_str)
+                {
+                    costs.insert(id, part.get("cost").and_then(Value::as_f64));
+                }
+            } else if event.event_type.starts_with("message.updated") {
+                let info = &event.data["info"];
+                let text = |k: &str| info[k].as_str().filter(|v| !v.is_empty());
+                if text("role") == Some("assistant")
+                    && let Some(id) = text("modelID")
+                {
+                    model = Some(match text("providerID") {
+                        Some(provider) => format!("{provider}/{id}"),
+                        None => id.to_string(),
+                    });
+                }
+            }
+        }
+        let priced = !costs.is_empty() && costs.values().all(Option::is_some);
+        Self {
+            credits: priced.then(|| costs.values().flatten().sum()),
+            model,
+        }
+    }
+}
+
 /// What one committed batch adds, keyed by part id: parts are updated many times.
 #[derive(Default)]
 struct Progress {
@@ -2054,6 +2088,7 @@ async fn end_at_deadline(org_id: &str, run_id: &str) -> bool {
         reusable_steps: fork::reusable_steps(&events),
         turn_error: None,
         turn_message: None,
+        usage: RunUsage::of(&events),
         run,
         item,
     };
@@ -2128,6 +2163,7 @@ async fn sweep_run(run: RunRow, now: i64, timeout_secs: u64) -> anyhow::Result<b
         reusable_steps: None,
         turn_error: None,
         turn_message: None,
+        usage: RunUsage::default(),
     };
     if !rca_runs::fail_run(
         &ending.org_id,
@@ -2394,6 +2430,7 @@ mod tests {
             reusable_steps: fork::reusable_steps(events),
             turn_error: None,
             turn_message: None,
+            usage: RunUsage::of(events),
         }
     }
 
@@ -2437,13 +2474,82 @@ mod tests {
         !status.may_still_answer()
     }
 
+    fn usage_event(seq: i64, event_type: &str, data: Value) -> DurableEvent {
+        DurableEvent {
+            id: format!("evt_u{seq}"),
+            aggregate_id: "ses_rca".to_string(),
+            seq,
+            event_type: event_type.to_string(),
+            data,
+        }
+    }
+
+    fn model_event(seq: i64, message_id: &str, provider: &str, model: &str) -> DurableEvent {
+        let info = json!({"id": message_id, "role": "assistant", "providerID": provider, "modelID": model});
+        usage_event(seq, "message.updated.1", json!({ "info": info }))
+    }
+
+    fn step_event(seq: i64, id: &str, cost: Option<f64>) -> DurableEvent {
+        let mut part =
+            json!({"id": id, "messageID": "msg_a1", "type": "step-finish", "tokens": {"input": 1}});
+        if let Some(cost) = cost {
+            part["cost"] = json!(cost);
+        }
+        usage_event(seq, "message.part.updated.1", json!({ "part": part }))
+    }
+
+    #[test]
+    fn run_usage_sums_priced_steps_and_names_the_last_model() {
+        let cases = [
+            (
+                "every step priced, the last model wins",
+                vec![
+                    model_event(0, "msg_a1", "bedrock", "small"),
+                    step_event(1, "s1", Some(0.25)),
+                    model_event(2, "msg_a2", "anthropic", "claude-x"),
+                    step_event(3, "s2", Some(0.5)),
+                ],
+                Some(0.75),
+                Some("anthropic/claude-x"),
+            ),
+            (
+                "an unpriced step leaves the cost unknown",
+                vec![
+                    model_event(0, "msg_a1", "", "claude-x"),
+                    step_event(1, "s1", Some(0.25)),
+                    step_event(2, "s2", None),
+                ],
+                None,
+                Some("claude-x"),
+            ),
+            (
+                "a step updated twice counts once",
+                vec![
+                    step_event(0, "s1", Some(0.1)),
+                    step_event(1, "s1", Some(0.2)),
+                ],
+                Some(0.2),
+                None,
+            ),
+            ("no model call", vec![], None, None),
+        ];
+        for (name, events, credits, model) in cases {
+            let usage = RunUsage::of(&events);
+            assert_eq!(usage.credits, credits, "{name}");
+            assert_eq!(usage.model.as_deref(), model, "{name}");
+        }
+    }
+
     #[tokio::test]
     async fn the_last_submitted_report_completes_the_run_once() {
         let _db = db().await;
         let (org, inc) = new_incident(None).await;
         let run_id = start(&org, &inc, RunTrigger::Manual).await;
         let record = hold_page(&org, &inc).await;
-        let events = rca_session();
+        let mut events = rca_session();
+        let mut model = model_event(10_000, "msg_a1", "anthropic", "claude-x");
+        model.data["info"]["time"] = json!({"created": T + 100});
+        events.push(model);
 
         assert!(end(&org, &run_id, &events, TurnResult::Persisted).await);
 
@@ -2459,6 +2565,8 @@ mod tests {
             stats.tokens,
             Some(json!({"input": 3_000, "output": 600, "reasoning": 50, "cache_read": 400}))
         );
+        assert_eq!(stats.model.as_deref(), Some("anthropic/claude-x"));
+        assert_eq!(stats.credits, None, "the fixture's steps carry no cost");
         assert_eq!(completes(&timeline(&org, &inc).await), 1);
         assert!(
             released(hold_status(&org, &record).await),

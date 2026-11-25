@@ -49,7 +49,8 @@ export class RumPage {
         // The sidebar click can be swallowed by the nav flyout under load, so retry until the RUM route loads.
         await expect(async () => {
             await this.rumPageMenu.click();
-            await this.page.waitForURL('**/rum**', { timeout: 5000 });
+            // RUM redirects to /rum/performance/overview, which a `**/rum**` glob never matches.
+            await expect(this.page).toHaveURL(/\/web\/rum(\/|\?|$)/, { timeout: 5000 });
         }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
     }
 

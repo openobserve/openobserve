@@ -305,6 +305,8 @@ import { isPaywalledDestination } from "@/utils/auth";
 import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { notifyTrialBlocked } from "@/utils/trialPaywallNotice";
 import { runBeforeAppReloadHooks } from "@/utils/beforeAppReload";
+import { flushPendingLanding, noteLanding, prune } from "@/composables/useOrgSwitcherPrefs";
+import { applyDocumentTitle } from "@/router";
 
 import {
   ref,
@@ -393,6 +395,7 @@ import {
   registerFullConfigLoader,
 } from "@/composables/useFullConfigLoad";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import { openPrimaryTimeRangePicker } from "@/utils/timeRangeShortcut";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 // Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
@@ -1972,6 +1975,7 @@ export default defineComponent({
     if (config.isEnterprise == "true") {
       useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
     }
+    useShortcuts([{ id: "timeRangeOpen", handler: openPrimaryTimeRangePicker }]);
 
     return {
       signOutDraftsOpen,
@@ -2066,8 +2070,27 @@ export default defineComponent({
         if (snapshot === this.orgListSnapshot.value) return;
         this.orgListSnapshot.value = snapshot;
         this.setSelectedOrganization();
+        const list = Array.isArray(orgs) ? orgs : [];
+        const ids = list.map((o: { identifier: string }) => o.identifier);
+        flushPendingLanding(ids);
+        prune(ids);
+        applyDocumentTitle(this.router.currentRoute.value, list);
       },
       deep: true,
+      immediate: true,
+    },
+    // A login lands on `/` with no org in the URL, so the router never sees it; the first resolved org is that landing.
+    // With an org in the URL the router already noted it, and the store's first value is the stale localStorage org.
+    "store.state.selectedOrganization.identifier": {
+      handler(identifier: string | undefined, previous: string | undefined) {
+        if (!identifier || previous) return;
+        if (typeof this.router.currentRoute.value.query?.org_identifier === "string") return;
+        const orgs = this.store?.state?.organizations;
+        noteLanding(
+          identifier,
+          (Array.isArray(orgs) ? orgs : []).map((o: { identifier: string }) => o.identifier),
+        );
+      },
       immediate: true,
     },
     async changeOrganizationIdentifier(_next: string, previous: string) {

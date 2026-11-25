@@ -76,6 +76,52 @@ export function getTokens(span: any): number {
   return Number(span?.gen_ai_usage_total_tokens) || Number(span?.llm_usage_tokens_total) || 0;
 }
 
+export interface CacheUse {
+  state: "hit" | "miss" | "cold";
+  readTokens: number;
+  writeTokens: number;
+}
+
+/**
+ * Prompt-cache outcome per LLM call, keyed by span id. A miss is a call that read
+ * nothing after the same model had already used the cache (`warmBefore`: before these spans).
+ */
+export function classifyCacheUse(
+  llmSpans: any[],
+  warmBefore: string[] = [],
+): Map<string, CacheUse> {
+  const out = new Map<string, CacheUse>();
+  const warmModels = new Set<string>(warmBefore);
+  const ordered = [...llmSpans].sort((a, b) => Number(a.start_time) - Number(b.start_time));
+  for (const span of ordered) {
+    const readTokens = Number(span?.gen_ai_usage_cache_read_input_tokens) || 0;
+    const writeTokens = Number(span?.gen_ai_usage_cache_creation_input_tokens) || 0;
+    const model = getModel(span);
+    const warm = warmModels.has(model);
+    // A call that reported no tokens at all failed before the provider could use the cache.
+    if (!readTokens && !writeTokens && (!warm || !getTokens(span))) continue;
+    const state = readTokens ? "hit" : warm ? "miss" : "cold";
+    warmModels.add(model);
+    out.set(String(span.span_id), { state, readTokens, writeTokens });
+  }
+  return out;
+}
+
+/** Cache outcome of one rendered turn: the LLM calls it merges, summed. */
+export interface TurnCacheUse {
+  misses: number;
+  readTokens: number;
+  writeTokens: number;
+}
+
+export function addCacheUse(sum: TurnCacheUse | undefined, use: CacheUse): TurnCacheUse {
+  return {
+    misses: (sum?.misses ?? 0) + (use.state === "miss" ? 1 : 0),
+    readTokens: (sum?.readTokens ?? 0) + use.readTokens,
+    writeTokens: (sum?.writeTokens ?? 0) + use.writeTokens,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Span classification
 // ---------------------------------------------------------------------------

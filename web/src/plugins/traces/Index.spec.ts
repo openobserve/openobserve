@@ -26,9 +26,10 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
-import { b64DecodeUnicode } from "@/utils/zincutils";
+import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
 import { isMacOS } from "@/utils/keyboardShortcuts";
+import { createTracesSqlTexts } from "@/utils/traces/tracesSqlTexts";
 import analytics from "@/services/product_analytics";
 import queryHistory from "@/services/query_history";
 import type { QueryHistoryEntry } from "@/services/query_history";
@@ -169,6 +170,7 @@ const mockSearchObj = {
     showQuery: true,
     showHistogram: true,
     sqlMode: false,
+    groupBy: "",
     searchMode: "traces" as "traces" | "spans" | "service-graph" | "services-catalog",
     resultGrid: {
       rowsPerPage: 25,
@@ -199,9 +201,11 @@ const mockSearchObj = {
       selectedStreamFields: [],
       selectedFields: [],
       functions: [],
+      sqlFieldConditions: {} as Record<string, any>,
     },
     streamResults: { list: [] },
     queryResults: { hits: [] },
+    groupsRequest: null as any,
     sortedQueryResults: [],
     histogram: {
       layout: {},
@@ -224,6 +228,19 @@ const mockSearchObj = {
   runQuery: false,
 };
 
+// The RED strip has its own spec; here only its mount point and event wiring matter.
+vi.mock("@/plugins/traces/metrics/TracesMetricsDashboard.vue", async () => {
+  const { defineComponent, h } = await import("vue");
+  return {
+    __esModule: true,
+    default: defineComponent({
+      name: "TracesMetricsDashboard",
+      emits: ["time-range-selected", "editor-filter-set", "editor-filter-run", "send-to-ai-chat"],
+      setup: () => () => h("div", { "data-test": "traces-metrics-dashboard-stub" }),
+    }),
+  };
+});
+
 vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
 }));
@@ -241,9 +258,26 @@ vi.mock("@/composables/useTraces", () => ({
     loadLocalLogFilterField: mockLoadLocalLogFilterField,
     updatedLocalLogFilterField: mockUpdatedLocalLogFilterField,
     loadTracesParser: vi.fn().mockResolvedValue(undefined),
-    tracesParser: { value: trackTracesParser({ astify: vi.fn(() => ({ where: null })) }) },
+    tracesParser: {
+      value: trackTracesParser({
+        astify: vi.fn((sql: string) =>
+          realTracesParser.current ? realTracesParser.current.astify(sql) : { where: null },
+        ),
+      }),
+    },
+    ...mockSqlTexts(),
+    resetSqlTexts: mockSqlTexts().reset,
   }),
 }));
+
+// A search calls getDashboardData once results show, and the shrinking query bar re-renders them into view.
+const SearchResultStub = { template: "<div />", methods: { getDashboardData: () => {} } };
+
+// The real two-text state over the mock searchObj, shared like the module singleton it stands for.
+let sharedSqlTexts: ReturnType<typeof createTracesSqlTexts> | null = null;
+const mockSqlTexts = () =>
+  (sharedSqlTexts ??= createTracesSqlTexts(mockSearchObj as any, mockSqlTextsParser));
+const mockSqlTextsParser: { value: any } = { value: null };
 
 vi.mock("@/utils/streamPersist", () => ({
   saveTracesStream: vi.fn(),
@@ -280,6 +314,9 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
 }));
 
 // Each mount gets its own parser, so a spy call's parser argument identifies which test's mount made it.
+// Set by a test that reads real SQL, so parsers made after that point (the kept line's) read it too.
+const realTracesParser = vi.hoisted(() => ({ current: null as any }));
+
 const { createdTracesParsers, trackTracesParser } = vi.hoisted(() => {
   const createdTracesParsers: unknown[] = [];
   return {
@@ -432,6 +469,9 @@ describe("Index.vue (Main Traces Page)", () => {
     mockSearchObj.data.queryResults = { hits: [] };
     mockSearchObj.data.errorMsg = "";
     mockSearchObj.data.editorValue = "";
+    mockSqlTexts().reset();
+    mockSqlTextsParser.value = null;
+    realTracesParser.current = null;
     createdTracesParsers.length = 0;
 
     // Reset hoisted mocks to safe defaults for each test
@@ -758,6 +798,40 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(wrapper.findComponent({ name: "service-graph" }).exists()).toBe(true);
       expect(wrapper.findComponent({ name: "services-catalog" }).exists()).toBe(false);
+    });
+
+    it("passes the graph's last load time and loading state to the search bar", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
+      } as any);
+      const ServiceGraphStub = defineComponent({
+        name: "service-graph",
+        setup(_, { expose }) {
+          expose({ lastRunAt: 123, loading: true, refresh: vi.fn() });
+          return () => h("div");
+        },
+      });
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": ServiceGraphStub,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+
+      // SearchBar is an async component, so its stub declares no props and the values land as attributes.
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      expect(searchBarEl.attributes("refresh-last-run-at")).toBe("123");
+      expect(searchBarEl.attributes("refresh-loading")).toBe("true");
     });
 
     it("should render the ServicesCatalog stub inline in services-catalog mode", async () => {
@@ -2106,6 +2180,45 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.queryResults.hits).toEqual([]);
     });
 
+    it("carries a landed count only into a re-run of the same query, never a placeholder total", async () => {
+      await mountPage();
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      Object.assign(mockSearchObj.data.queryResults, { total: 600, countLanded: true });
+
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.lastTotal).toBe(600);
+
+      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.lastTotal).toBeUndefined();
+
+      mockSearchObj.data.editorValue = "";
+      mockSearchObj.data.queryResults = { hits: [], total: 0 };
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.lastTotal).toBeUndefined();
+    });
+
+    it("never carries a landed count into a run with another Spans scope", async () => {
+      await mountPage();
+      const before = { mode: mockSearchObj.meta.searchMode, scope: mockSearchObj.meta.scope };
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.meta.scope = "all";
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      Object.assign(mockSearchObj.data.queryResults, { total: 600, countLanded: true });
+
+      mockSearchObj.meta.scope = "entrypoint";
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.lastTotal).toBeUndefined();
+      mockSearchObj.meta.searchMode = before.mode;
+      mockSearchObj.meta.scope = before.scope;
+    });
+
     // Logs shows its error banner over the last results rather than blanking; traces matches it.
     it("keeps the previous rows when a page fails before writing any", async () => {
       await mountPage();
@@ -2348,6 +2461,25 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.splitterModel).toBe(90);
     });
 
+    it("should keep one pane height when the builder changes in the same tick as leaving the Spans view", async () => {
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+      const bar = wrapper.findComponent('[data-test="logs-search-bar"]');
+      bar.vm.$emit("filterBuilderGrowth", 0);
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(90);
+      bar.vm.$emit("filterBuilderGrowth", 18);
+      mockSearchObj.meta.searchMode = "traces";
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(90 + 18);
+      bar.vm.$emit("filterBuilderGrowth", null);
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(90);
+      mockSearchObj.meta.searchMode = "spans";
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(90);
+    });
+
     it("should render the drill-down target in the search tab", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
@@ -2527,7 +2659,6 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      // splitterModel is initialized to 90 (horizontal px height for the search-bar panel)
       expect(wrapper.vm.splitterModel).toBe(90);
     });
 
@@ -4076,6 +4207,96 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Shared toolbar refresh for Service Graph / Services Catalog
+  // ---------------------------------------------------------------------------
+  describe("shared toolbar refresh", () => {
+    const graph = { refresh: vi.fn(), loading: ref(false), lastRunAt: ref<number | null>(null) };
+    const catalog = { refresh: vi.fn(), loading: ref(false), lastRunAt: ref<number | null>(null) };
+
+    function mountWithViews() {
+      const view = (name: string, state: typeof graph) =>
+        defineComponent({
+          name,
+          emits: ["request:stream-change", "view-traces", "jump-to-stream-data"],
+          setup(_p, { expose }) {
+            expose(state);
+            return () => h("div");
+          },
+        });
+      return mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": {
+              name: "search-bar",
+              props: ["refreshLoading", "refreshLastRunAt"],
+              template: "<div />",
+            },
+            "index-list": true,
+            "search-result": true,
+            "service-graph": view("service-graph", graph),
+            "services-catalog": view("services-catalog", catalog),
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    }
+
+    async function openTab(mode: string) {
+      mockSearchObj.meta.searchMode = mode;
+      await flushPromises();
+    }
+
+    beforeEach(() => {
+      graph.loading.value = true;
+      graph.lastRunAt.value = 111;
+      catalog.loading.value = false;
+      catalog.lastRunAt.value = 222;
+    });
+
+    it("follows the open tab's own loading and last-run time, live, across tab switches", async () => {
+      wrapper = mountWithViews();
+      await flushPromises();
+      const bar = () => wrapper.findComponent({ name: "search-bar" });
+
+      await openTab("service-graph");
+      expect(bar().props()).toMatchObject({ refreshLoading: true, refreshLastRunAt: 111 });
+      graph.loading.value = false;
+      graph.lastRunAt.value = 333;
+      await flushPromises();
+      expect(bar().props()).toMatchObject({ refreshLoading: false, refreshLastRunAt: 333 });
+
+      await openTab("services-catalog");
+      expect(bar().props()).toMatchObject({ refreshLoading: false, refreshLastRunAt: 222 });
+      catalog.loading.value = true;
+      await flushPromises();
+      expect(bar().props("refreshLoading")).toBe(true);
+
+      await openTab("service-graph");
+      expect(bar().props()).toMatchObject({ refreshLoading: false, refreshLastRunAt: 333 });
+      // Switching tabs is not a toolbar refresh.
+      expect(graph.refresh).not.toHaveBeenCalled();
+      expect(catalog.refresh).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["service-graph", "service-graph-refresh", graph],
+      ["services-catalog", "services-catalog-refresh", catalog],
+    ])("refreshes the %s tab when the toolbar asks", async (mode, event, view) => {
+      wrapper = mountWithViews();
+      await flushPromises();
+      await openTab(mode);
+
+      wrapper.findComponent({ name: "search-bar" }).vm.$emit(event);
+      await flushPromises();
+
+      expect(view.refresh).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Stream Change Confirmation Dialog
   // ---------------------------------------------------------------------------
   describe("Stream Change Confirmation Dialog", () => {
@@ -4206,6 +4427,21 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.streamChangeDialog.show).toBe(false);
     });
 
+    it("forgets the old stream's filter on a stream change, so SQL off later shows an empty editor", async () => {
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "default"`;
+      mockSqlTexts().sqlTexts.filter = "service_name = 'svc'";
+
+      await wrapper.vm.applyStreamChange("target-stream");
+      await flushPromises();
+      mockSqlTexts().leaveSql();
+
+      expect(mockSearchObj.data.editorValue).toBe("");
+      mockSearchObj.meta.sqlMode = false;
+    });
+
     it("loads the new stream's own columns on a stream change, before any search", async () => {
       store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: true };
       wrapper = mountIndexStubbed();
@@ -4290,7 +4526,7 @@ describe("Index.vue (Main Traces Page)", () => {
           stubs: {
             "search-bar": searchBar,
             "index-list": indexList,
-            "search-result": true,
+            "search-result": SearchResultStub,
             "service-graph": true,
             "services-catalog": true,
             SanitizedHtmlRenderer: true,
@@ -4363,6 +4599,49 @@ describe("Index.vue (Main Traces Page)", () => {
       ]);
       expect(mockGetStream).not.toHaveBeenCalled();
       expect(mockUpdatedLocalLogFilterField).toHaveBeenCalledWith("spans");
+    });
+
+    it.each([
+      ["a version 2 view with sqlMode", { version: 2, sqlMode: true }],
+      ["a version 1 view whose text is a statement", { version: 1 }],
+    ])("opens %s in Spans whatever view it was saved from, with the filter empty", async (_, v) => {
+      await mountPage();
+      const sql = `SELECT service_name, count(*) AS n FROM "default" GROUP BY service_name`;
+      await applyViewAndWaitForSearch(
+        savedView({ ...v, searchMode: "traces", editorValue: sql, sortBy: "start_time" }),
+      );
+      expect(mockSearchObj.meta.searchMode).toBe("spans");
+      expect(mockSearchObj.meta.sqlMode).toBe(true);
+      expect(mockSearchObj.data.editorValue).toBe(sql);
+      expect(mockSqlTexts().sqlTexts.filter).toBe("");
+      expect(mockUpdatedLocalLogFilterField).toHaveBeenCalledWith("spans");
+      expect(routerReplaceSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ tab: "spans" }) }),
+      );
+      mockSearchObj.meta.sqlMode = false;
+    });
+
+    it("restores a version 2 view's Group by, and reads a view without one as None", async () => {
+      await mountPage();
+      await applyViewAndWaitForSearch(savedView({ version: 2, groupBy: "service_name" }));
+      expect(mockSearchObj.meta.groupBy).toBe("service_name");
+      await applyViewAndWaitForSearch(savedView({ version: 2 }));
+      expect(mockSearchObj.meta.groupBy).toBe("");
+      mockSearchObj.meta.groupBy = "http_method";
+      await applyViewAndWaitForSearch(savedView({ version: 1, groupBy: "service_name" }));
+      expect(mockSearchObj.meta.groupBy).toBe("");
+      mockSearchObj.data.groupsRequest = null;
+    });
+
+    it("restores a version 2 view's scope, and reads a view without one as All spans", async () => {
+      await mountPage();
+      await applyViewAndWaitForSearch(savedView({ version: 2, scope: "entrypoint" }));
+      expect(mockSearchObj.meta.scope).toBe("entrypoint");
+      await applyViewAndWaitForSearch(savedView({ version: 2 }));
+      expect(mockSearchObj.meta.scope).toBe("all");
+      mockSearchObj.meta.scope = "root";
+      await applyViewAndWaitForSearch(savedView({ version: 1, scope: "root" }));
+      expect(mockSearchObj.meta.scope).toBe("all");
     });
 
     describe("restores the picker's date type", () => {
@@ -4551,12 +4830,35 @@ describe("Index.vue (Main Traces Page)", () => {
       const before = mockSearchObj.data.editorValue;
       const modeBefore = mockSearchObj.meta.searchMode;
 
-      await applyView(savedView({ version: 2 }));
+      await applyView(savedView({ version: 3 }));
 
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
       expect(mockSearchObj.data.editorValue).toBe(before);
       expect(mockSearchObj.meta.searchMode).toBe(modeBefore);
       expect(ownSearches()).toHaveLength(0);
+    });
+
+    it("restores SQL mode from a version 2 view", async () => {
+      await mountPage();
+      const sql = `SELECT * FROM "default" WHERE a = 1`;
+      await applyViewAndWaitForSearch(savedView({ version: 2, sqlMode: true, editorValue: sql }));
+      expect(mockSearchObj.meta.sqlMode).toBe(true);
+      expect(mockSearchObj.data.editorValue).toBe(sql);
+      mockSearchObj.meta.sqlMode = false;
+    });
+
+    it("loads a version 2 view saved in filter mode as chips", async () => {
+      await mountPage();
+      mockSearchObj.meta.sqlMode = true;
+      await applyViewAndWaitForSearch(savedView({ version: 2, sqlMode: false }));
+      expect(mockSearchObj.meta.sqlMode).toBe(false);
+    });
+
+    it("loads a version 1 view as chips", async () => {
+      await mountPage();
+      mockSearchObj.meta.sqlMode = true;
+      await applyViewAndWaitForSearch(savedView());
+      expect(mockSearchObj.meta.sqlMode).toBe(false);
     });
 
     it("toasts and leaves state unchanged when the stream no longer exists", async () => {
@@ -4845,6 +5147,95 @@ describe("Index.vue (Main Traces Page)", () => {
       err.mockRestore();
       mockSearchObj.data.queryPayload = null;
     });
+
+    it.each([
+      ["keeps the last count of the query and reports a failed refresh", 200, { total: 200 }],
+      [
+        "has no count and no failed refresh when none was kept",
+        undefined,
+        { total: null, countFailed: true },
+      ],
+    ])("on a failed count %s", async (_name, lastTotal, expected) => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.queryPayload = { query: { start_time: 1, end_time: 2 } };
+      const results = { hits: new Array(25).fill({}), total: null, countPending: true, lastTotal };
+      mockSearchObj.data.queryResults = results;
+      mockSearchObj.meta.refreshFailedAt = null;
+      mockFetchQueryDataWithHttpStream.mockClear();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      wrapper.vm.fetchTracesCount();
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      handlers.error({}, { content: { message: "network error" } });
+
+      expect(results).toMatchObject({ ...expected, countPending: false });
+      expect(!!(results as any).countFailed).toBe(lastTotal === undefined);
+      expect(mockSearchObj.meta.refreshFailedAt).toEqual(
+        lastTotal === undefined ? null : expect.any(Number),
+      );
+      warn.mockRestore();
+      mockSearchObj.data.queryPayload = null;
+      mockSearchObj.meta.refreshFailedAt = null;
+    });
+
+    it("keeps a count that landed when the stream errors after it", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.queryPayload = { query: { start_time: 1, end_time: 2 } };
+      mockSearchObj.meta.searchMode = "spans";
+      const results = {
+        hits: new Array(25).fill({}),
+        total: null,
+        countPending: true,
+        lastTotal: 600,
+      };
+      mockSearchObj.data.queryResults = results;
+      mockSearchObj.meta.refreshFailedAt = null;
+      mockFetchQueryDataWithHttpStream.mockClear();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      wrapper.vm.fetchTracesCount();
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      handlers.data({}, { content: { results: { hits: [{ span_count: 531, error_count: 0 }] } } });
+      handlers.error({}, { content: { message: "late error" } });
+
+      expect(results).toMatchObject({ total: 531, errorCount: 0, countPending: false });
+      expect((results as any).countFailed).toBeUndefined();
+      expect(mockSearchObj.meta.refreshFailedAt).toBeNull();
+      warn.mockRestore();
+      mockSearchObj.data.queryPayload = null;
+    });
   });
 
   describe("URL writes around leaving Traces", () => {
@@ -5028,6 +5419,1338 @@ describe("Index.vue (Main Traces Page)", () => {
       await leaving;
       await flushPromises();
       expect(appRouter.currentRoute.value.fullPath).toBe("/logs");
+    });
+  });
+
+  describe("SQL mode", () => {
+    const grouped = `SELECT service_name, count(*) AS n FROM "default" WHERE a = 1 GROUP BY service_name`;
+
+    const mountSql = async () => {
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": SearchResultStub,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.resultGrid.currentPage = 0;
+      mockSearchObj.meta.resultGrid.rowsPerPage = 25;
+      mockFetchQueryDataWithHttpStream.mockClear();
+    };
+
+    const runSql = async (sql: string) => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = sql;
+      wrapper.vm.searchData();
+      await flushPromises();
+      const [request, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      return { request, handlers, sql: b64DecodeUnicode(request.queryReq.query.sql) };
+    };
+
+    const finish = async (handlers: any, hits: any[], extra: Record<string, unknown> = {}) => {
+      handlers.data(
+        {},
+        { type: "search_response_metadata", content: { results: { hits: [], ...extra } } },
+      );
+      handlers.data({}, { type: "search_response_hits", content: { results: { hits } } });
+      handlers.complete({});
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.meta.showHistogram = true;
+      mockSearchObj.data.editorValue = "";
+      mockSearchObj.data.queryPayload = null;
+    });
+
+    const batch = async (handlers: any, hits: any[]) => {
+      handlers.data({}, { type: "search_response_hits", content: { results: { hits } } });
+      await flushPromises();
+    };
+
+    it("shows aggregate rows only when the stream ends, as early groups can still change", async () => {
+      await mountSql();
+      const { handlers } = await runSql(grouped);
+      await batch(handlers, [{ service_name: "api", n: 3 }]);
+      expect(mockSearchObj.data.queryResults.hits).toEqual([]);
+      expect(mockSearchObj.loading).toBe(true);
+      await batch(handlers, [{ service_name: "db", n: 1 }]);
+      expect(mockSearchObj.data.queryResults.hits).toEqual([]);
+      handlers.complete({});
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.hits).toEqual([
+        { service_name: "api", n: 3 },
+        { service_name: "db", n: 1 },
+      ]);
+      expect(mockSearchObj.loading).toBe(false);
+    });
+
+    describe("a streaming aggregate over several partitions", () => {
+      const meta = () => ({
+        type: "search_response_metadata",
+        content: { streaming_aggs: true, results: { hits: [] } },
+      });
+      const hits = (rows: any[]) => ({
+        type: "search_response_hits",
+        content: { results: { hits: rows } },
+      });
+
+      it("shows the last running answer, and counts its rows", async () => {
+        await mountSql();
+        const { handlers } = await runSql(grouped);
+        handlers.data({}, meta());
+        handlers.data({}, hits([{ service_name: "api", n: 3 }]));
+        handlers.data({}, meta());
+        handlers.data(
+          {},
+          hits([
+            { service_name: "api", n: 5 },
+            { service_name: "db", n: 1 },
+          ]),
+        );
+        handlers.data({}, meta());
+        handlers.data({}, hits([]));
+        handlers.complete({});
+        await flushPromises();
+        expect(mockSearchObj.data.queryResults.hits).toEqual([
+          { service_name: "api", n: 5 },
+          { service_name: "db", n: 1 },
+        ]);
+        expect(mockSearchObj.data.queryResults.total).toBe(2);
+      });
+
+      it("replaces with each later chunk of one partition, and counts its rows", async () => {
+        await mountSql();
+        const { handlers } = await runSql(grouped);
+        handlers.data({}, meta());
+        handlers.data({}, hits([{ service_name: "api", n: 3 }]));
+        handlers.data({}, hits([{ service_name: "db", n: 1 }]));
+        handlers.complete({});
+        await flushPromises();
+        expect(mockSearchObj.data.queryResults.hits).toEqual([{ service_name: "db", n: 1 }]);
+        expect(mockSearchObj.data.queryResults.total).toBe(1);
+      });
+    });
+
+    it("still shows span rows as they stream in", async () => {
+      await mountSql();
+      const { handlers } = await runSql(`SELECT * FROM "default" WHERE a = 1`);
+      await batch(handlers, [{ trace_id: "t", span_id: "s" }]);
+      expect(mockSearchObj.data.queryResults.hits).toEqual([{ trace_id: "t", span_id: "s" }]);
+    });
+
+    it.each([
+      ["an aggregate", grouped],
+      ["a row query", `SELECT * FROM "default" WHERE a = 1`],
+    ])("shows the error state, not the rows, when %s fails after some rows", async (_, sql) => {
+      await mountSql();
+      const { handlers } = await runSql(sql);
+      await batch(handlers, [{ trace_id: "t", span_id: "s", service_name: "api", n: 3 }]);
+      handlers.error({}, { content: { code: 20009, message: "querier went away" } });
+      handlers.complete({});
+      await flushPromises();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+      expect(wrapper.find('[data-test="traces-search-error-message"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-search-result"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "TracesSqlErrorState" }).props("errorMsg")).toBe(
+        "querier went away",
+      );
+    });
+
+    it("keeps the out-of-memory card with Use last 1 hour for a trace question", async () => {
+      await mountSql();
+      const range = { ...mockSearchObj.data.datetime };
+      Object.assign(mockSearchObj.data.datetime, {
+        type: "relative",
+        relativeTimePeriod: "6h",
+      });
+      try {
+        const { handlers } = await runSql(
+          `SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200`,
+        );
+        handlers.error({}, { content: { code: 20008, message: "Resources exhausted" } });
+        await flushPromises();
+        for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+        await nextTick();
+        const state = wrapper.findComponent({ name: "TracesSqlErrorState" });
+        expect(state.props("errorCode")).toBe(20008);
+        expect(state.find('[data-test="traces-sql-fix-last-hour-card"]').exists()).toBe(true);
+      } finally {
+        Object.assign(mockSearchObj.data.datetime, range);
+      }
+    });
+
+    it("sends the typed SQL as written to the spans search", async () => {
+      await mountSql();
+      const typed = `SELECT * FROM "default" WHERE duration > '5ms' AND span_kind = 'Server'`;
+      const { request, sql } = await runSql(typed);
+      expect(request.type).toBe("search");
+      expect(sql).toBe(typed);
+      expect(request.queryReq.query.from).toBe(0);
+      expect(request.queryReq.query.size).toBe(25);
+    });
+
+    it("asks for every row of a GROUP BY query with size -1", async () => {
+      await mountSql();
+      const { request, sql } = await runSql(grouped);
+      expect(sql).toBe(grouped);
+      expect(request.queryReq.query.size).toBe(-1);
+      expect(request.queryReq.query.from).toBe(0);
+    });
+
+    it("uses the LIMIT as the size", async () => {
+      await mountSql();
+      const { request } = await runSql(`SELECT * FROM "default" LIMIT 40`);
+      expect(request.queryReq.query.size).toBe(40);
+    });
+
+    it("counts a grouped query's rows instead of requesting a count", async () => {
+      await mountSql();
+      const { handlers } = await runSql(grouped);
+      await finish(handlers, [
+        { service_name: "api", n: 3 },
+        { service_name: "db", n: 1 },
+      ]);
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+      expect(mockSearchObj.data.queryResults.total).toBe(2);
+      expect(mockSearchObj.data.queryResults.countPending).toBe(false);
+      expect(mockSearchObj.data.queryResults.sql).toBe(grouped);
+    });
+
+    it("counts a row query over the typed WHERE, as typed", async () => {
+      await mountSql();
+      const { handlers } = await runSql(
+        `SELECT * FROM "default" WHERE a = 1 ORDER BY start_time DESC`,
+      );
+      await finish(handlers, [{ trace_id: "t", span_id: "s" }]);
+      const [countRequest] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      const countSql = b64DecodeUnicode(countRequest.queryReq.query.sql);
+      expect(countSql).toContain(`FROM "default" WHERE a = 1`);
+      expect(countSql).not.toContain("ORDER BY");
+    });
+
+    it("keeps the typed FROM alias in the count of a row query", async () => {
+      await mountSql();
+      const { handlers } = await runSql(`SELECT * FROM "default" AS d WHERE d.duration > 1`);
+      await finish(handlers, [{ trace_id: "t", span_id: "s" }]);
+      const [countRequest] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      const countSql = b64DecodeUnicode(countRequest.queryReq.query.sql);
+      expect(countSql).toContain(`FROM "default" AS d WHERE d.duration > 1`);
+    });
+
+    it("clears SQL results once SQL mode is switched off", async () => {
+      await mountSql();
+      const { handlers } = await runSql(
+        `SELECT trace_id, count(*) AS spans FROM "default" GROUP BY trace_id`,
+      );
+      await finish(handlers, [{ trace_id: "t", spans: 2 }]);
+      expect(mockSearchObj.data.queryResults.sql).toBeTruthy();
+
+      mockSearchObj.meta.sqlMode = false;
+      await flushPromises();
+
+      expect(mockSearchObj.data.queryResults.sql).toBeUndefined();
+      expect(mockSearchObj.data.queryResults.hits ?? []).toEqual([]);
+    });
+
+    it("does not copy the server's histogram eligibility, which no longer gates the RED charts", async () => {
+      await mountSql();
+      const { handlers } = await runSql(`SELECT * FROM "default" LIMIT 5`);
+      await finish(handlers, [{ trace_id: "t", span_id: "s" }], { is_histogram_eligible: false });
+      expect(mockSearchObj.data.queryResults.is_histogram_eligible).toBeUndefined();
+    });
+
+    const useRealParser = async () => {
+      const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
+      const real = new mod.default.Parser();
+      realTracesParser.current = real;
+      for (const created of createdTracesParsers as any[]) {
+        created.astify.mockImplementation((sql: string) => real.astify(sql));
+      }
+    };
+
+    it("ticks sidebar values only from the conditions the page wrote into the SQL", async () => {
+      await useRealParser();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.stream.sqlFieldConditions = {
+        http_route: {
+          text: "json_get_str(_all, 'http_route') IN ('/a','/b')",
+          values: ["/a", "/b"],
+          exclude: false,
+        },
+        peer: { text: "peer IS NOT NULL", values: ["null"], exclude: true },
+        gone: { text: "gone = 'x'", values: ["x"], exclude: false },
+      };
+      mockSearchObj.data.editorValue = `SELECT * FROM "default" WHERE service_name = 'typed' AND json_get_str(_all, 'http_route') IN ('/a','/b') AND peer IS NOT NULL`;
+      try {
+        await mountSql();
+        const vm = wrapper.vm as any;
+        expect(vm.activeIncludeFilterValues).toEqual({ http_route: ["/a", "/b"] });
+        expect(vm.activeExcludeFilterValues).toEqual({ peer: ["null"] });
+      } finally {
+        mockSearchObj.data.stream.sqlFieldConditions = {};
+      }
+    });
+
+    const big = `SELECT trace_id FROM "default" GROUP BY trace_id HAVING count(*) > 200`;
+    const redraw = async () => {
+      await flushPromises();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+    };
+    const statementCard = () => wrapper.find('[data-test="traces-statement-in-traces"]');
+
+    // Spans SQL run with `sql`, over the filter `filter`, then the view switch to Traces.
+    const leaveForTraces = async (sql: string, filter = "duration > 1") => {
+      await mountSql();
+      await useRealParser();
+      mockSqlTextsParser.value = createdTracesParsers[0];
+      mockSearchObj.data.editorValue = filter;
+      mockSqlTexts().turnSqlOn();
+      const { handlers } = await runSql(sql);
+      await finish(handlers, [{ service_name: "api" }]);
+      mockFetchQueryDataWithHttpStream.mockClear();
+      wrapper.vm.onSearchModeChange("traces");
+      await redraw();
+      const [tracesRequest] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      mockFetchQueryDataWithHttpStream.mockClear();
+      return tracesRequest;
+    };
+
+    it("cancels the run still streaming when the next SQL run is blocked", async () => {
+      await mountSql();
+      await useRealParser();
+      const { request } = await runSql(`SELECT * FROM "default"`);
+      expect(mockSearchObj.loading).toBe(true);
+      mockCancelStreamQueryBasedOnRequestId.mockClear();
+      mockSearchObj.data.editorValue = "  ";
+      wrapper.vm.searchData();
+      await flushPromises();
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith(
+        expect.objectContaining({ trace_id: request.traceId }),
+      );
+      expect(mockSearchObj.loading).toBe(false);
+    });
+
+    describe("a statement typed in the Traces view", () => {
+      const runInTraces = async (text: string) => {
+        await mountSql();
+        await useRealParser();
+        mockSearchObj.meta.searchMode = "traces";
+        mockSearchObj.searchApplied = true;
+        mockSqlTexts().noteFilterText("service_name = 'api'", true);
+        mockSearchObj.data.editorValue = text;
+        wrapper.vm.searchData();
+        await redraw();
+      };
+
+      it("sends no request on Run and shows the card, counting the run as applied", async () => {
+        mockSearchObj.meta.lastRunSignature = null;
+        await runInTraces(grouped);
+        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+        expect(statementCard().text()).toContain("The Traces view takes a filter, not a SELECT");
+        expect(statementCard().text()).toContain("SQL runs in the Spans view.");
+        expect(mockSearchObj.data.appliedEditorValue).toBe(grouped);
+        expect(mockSearchObj.meta.lastRunSignature).toBe(tracesSearchRunSignature(mockSearchObj));
+      });
+
+      it("Open in Spans view carries the text with SQL on, not run, and keeps the filter from before", async () => {
+        await runInTraces(grouped);
+        statementCard().findComponent({ name: "OEmptyState" }).vm.$emit("action");
+        await redraw();
+        expect(mockSearchObj.meta.searchMode).toBe("spans");
+        expect(mockSearchObj.meta.sqlMode).toBe(true);
+        expect(mockSearchObj.data.editorValue).toBe(grouped);
+        expect(mockSqlTexts().sqlTexts.filter).toBe("service_name = 'api'");
+        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+        expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(true);
+      });
+
+      it("blocks a filter holding IN (SELECT ...) with its own card, and opens it in Spans", async () => {
+        const subquery = `trace_id IN (SELECT trace_id FROM "default" WHERE span_status = 'ERROR')`;
+        await runInTraces(subquery);
+        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+        expect(statementCard().text()).toContain("The Traces view cannot run a subquery");
+        expect(statementCard().text()).toContain("SQL runs in the Spans view.");
+        statementCard().findComponent({ name: "OEmptyState" }).vm.$emit("action");
+        await redraw();
+        expect(mockSearchObj.meta.searchMode).toBe("spans");
+        expect(mockSearchObj.meta.sqlMode).toBe(true);
+        expect(mockSearchObj.data.editorValue).toContain(`WHERE ${subquery}`);
+        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      });
+
+      it("runs a filter with SELECT only inside a string", async () => {
+        await runInTraces(`db_statement = 'id IN (SELECT 1)'`);
+        expect(statementCard().exists()).toBe(false);
+        const [request] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+        expect(request.type).toBe("traces");
+      });
+
+      it.each([
+        "db_statement LIKE 'SELECT%FROM orders%'",
+        "operation_name = 'SELECT'",
+        "selected_region = 'eu'",
+        "explain = 'x'",
+      ])("reads only the start of the text, so %s runs as a filter", async (filter) => {
+        await runInTraces(filter);
+        expect(statementCard().exists()).toBe(false);
+        const [request] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+        expect(request.type).toBe("traces");
+      });
+    });
+
+    describe("leaving Spans SQL for the Traces view", () => {
+      it("runs the shared filter with no dialog and keeps the SQL text", async () => {
+        const request = await leaveForTraces(grouped);
+        expect(mockSearchObj.meta.searchMode).toBe("traces");
+        expect(mockSearchObj.meta.sqlMode).toBe(false);
+        expect(mockSearchObj.data.editorValue).toBe("duration > 1");
+        expect(request.type).toBe("traces");
+        expect(request.queryReq.filter).toContain("duration > 1");
+        expect(mockSqlTexts().sqlTexts.sql).toBe(grouped);
+      });
+
+      it.each([
+        ["the SQL switch", () => wrapper.vm.onOpenSpansSql()],
+        ["a Spans click back to the stored SQL", () => wrapper.vm.onSearchModeChange("spans")],
+        ["Open in Spans view", () => wrapper.vm.onOpenStatementInSpans()],
+      ])("%s cancels the Traces search still streaming", async (_name, open) => {
+        const tracesRequest = await leaveForTraces(grouped);
+        mockCancelStreamQueryBasedOnRequestId.mockClear();
+        open();
+        await redraw();
+        expect(mockSearchObj.meta.searchMode).toBe("spans");
+        expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith(
+          expect.objectContaining({ trace_id: tracesRequest.traceId }),
+        );
+        expect(mockSearchObj.loading).toBe(false);
+      });
+
+      it("the SQL switch opens Spans with SQL on and the stored text, and runs nothing until Run", async () => {
+        await leaveForTraces(grouped);
+        mockSearchObj.data.editorValue = "span_status = 'ERROR'";
+        wrapper.vm.onOpenSpansSql();
+        await redraw();
+        expect(mockSearchObj.meta.searchMode).toBe("spans");
+        expect(mockSearchObj.meta.sqlMode).toBe(true);
+        expect(mockSearchObj.data.editorValue).toBe(grouped);
+        expect(mockSqlTexts().sqlTexts.filter).toBe("span_status = 'ERROR'");
+        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+        expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(true);
+      });
+
+      it("the SQL switch brings the stored SQL, never a SELECT typed in the Traces filter", async () => {
+        await leaveForTraces(grouped);
+        const typed = `SELECT trace_id FROM "default"`;
+        mockSearchObj.data.editorValue = typed;
+        wrapper.vm.onOpenSpansSql();
+        await redraw();
+        expect(mockSearchObj.meta.sqlMode).toBe(true);
+        expect(mockSearchObj.data.editorValue).toBe(grouped);
+        expect(mockSqlTexts().sqlTexts.sql).toBe("");
+        expect(mockSqlTexts().sqlTexts.filter).toBe(typed);
+      });
+
+      it("the SQL switch waits with a run prompt and no chart frames", async () => {
+        await leaveForTraces(grouped);
+        wrapper.vm.onOpenSpansSql();
+        await redraw();
+        const waiting = wrapper.find('[data-test="traces-sql-awaiting-run"]');
+        expect(waiting.find('[data-test="traces-sql-awaiting-run-charts"]').exists()).toBe(false);
+        expect(waiting.text()).toContain("Run the query to see results");
+      });
+
+      it("a plain click back on Spans also opens the stored SQL", async () => {
+        await leaveForTraces(grouped);
+        wrapper.vm.onSearchModeChange("spans");
+        await redraw();
+        expect(mockSearchObj.meta.sqlMode).toBe(true);
+        expect(mockSearchObj.data.editorValue).toBe(grouped);
+        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      });
+
+      it("a handoff clears the SQL text", async () => {
+        await leaveForTraces(grouped);
+        wrapper.vm.handleServiceGraphViewTraces({ mode: "traces", serviceName: "checkout" });
+        await redraw();
+        expect(mockSqlTexts().sqlTexts.sql).toBe("");
+      });
+    });
+
+    describe("the SQL switch in the Traces view", () => {
+      it("moves to Spans with SQL on and the pre-fill, runs nothing, and offers Back to Traces", async () => {
+        await mountSql();
+        mockSearchObj.meta.searchMode = "traces";
+        mockSearchObj.data.editorValue = "service_name = 'api'";
+        mockToast.mockClear();
+        wrapper.vm.onOpenSpansSql();
+        await redraw();
+        expect(mockSearchObj.meta.searchMode).toBe("spans");
+        expect(mockSearchObj.meta.sqlMode).toBe(true);
+        expect(mockSearchObj.data.editorValue).toBe(
+          `SELECT * FROM "default" WHERE service_name = 'api' ORDER BY start_time DESC`,
+        );
+        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+        const [options] = mockToast.mock.calls.at(-1) as any[];
+        expect(options.message).toBe("SQL runs in the Spans view");
+        expect(options.action.label).toBe("Back to Traces");
+
+        options.action.handler();
+        await redraw();
+        expect(mockSearchObj.meta.searchMode).toBe("traces");
+        expect(mockSearchObj.meta.sqlMode).toBe(false);
+        expect(mockSearchObj.data.editorValue).toBe("service_name = 'api'");
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      });
+    });
+
+    it("keeps one pane height for Spans with SQL off, Spans with SQL on, and the Traces view", async () => {
+      await mountSql();
+      // Only meta is reactive in this mock, so each text is set with SQL off and shown by turning SQL on.
+      const showSql = async (text: string, sqlMode = true) => {
+        mockSearchObj.meta.sqlMode = false;
+        await flushPromises();
+        mockSearchObj.data.editorValue = text;
+        mockSearchObj.meta.sqlMode = sqlMode;
+        await flushPromises();
+      };
+      await showSql("a = 1\nAND b = 2\nAND c = 3", false);
+      expect(wrapper.vm.splitterModel).toBe(90);
+      await showSql(`SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200`);
+      expect(wrapper.vm.splitterModel).toBe(90);
+      await showSql(Array.from({ length: 13 }, (_, i) => `-- ${i}`).join("\n"));
+      expect(wrapper.vm.splitterModel).toBe(90);
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.meta.searchMode = "traces";
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(90);
+      mockSearchObj.meta.searchMode = "spans";
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(90);
+    });
+
+    it("keeps a dragged pane height across SQL and view toggles", async () => {
+      await mountSql();
+      wrapper.vm.splitterModel = 250;
+      mockSearchObj.data.editorValue = Array.from({ length: 13 }, (_, i) => `-- ${i}`).join("\n");
+      mockSearchObj.meta.sqlMode = true;
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(250);
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.meta.searchMode = "traces";
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(250);
+      mockSearchObj.meta.searchMode = "spans";
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(250);
+    });
+
+    it("keeps the pane height when SQL turns on and off", async () => {
+      await mountSql();
+      mockSearchObj.data.editorValue = "SELECT 1";
+      expect(wrapper.vm.splitterModel).toBe(90);
+      mockSearchObj.meta.sqlMode = true;
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(90);
+      mockSearchObj.meta.sqlMode = false;
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(90);
+
+      wrapper.vm.splitterModel = 220;
+      mockSearchObj.meta.sqlMode = true;
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(220);
+      mockSearchObj.meta.sqlMode = false;
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(220);
+    });
+
+    it("in the spans view, unrun SQL shows a Run prompt instead of results, until Run", async () => {
+      await mountSql();
+      mockSearchObj.searchApplied = true;
+      mockSearchObj.data.editorValue = big;
+      mockSearchObj.meta.sqlMode = true;
+      await redraw();
+
+      const prompt = wrapper.find('[data-test="traces-sql-awaiting-run"]');
+      expect(prompt.exists()).toBe(true);
+      expect(prompt.text()).toContain(i18n.global.t("traces.sqlMode.awaitingRun.spansTitle"));
+      expect(wrapper.find('[data-test="logs-search-search-result"]').exists()).toBe(false);
+
+      wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action");
+      await redraw();
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="logs-search-search-result"]').exists()).toBe(true);
+    });
+
+    it("asks for Run again when SQL is turned off and on", async () => {
+      await mountSql();
+      const { handlers } = await runSql(big);
+      await finish(handlers, [{ trace_id: "t" }]);
+      await redraw();
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(false);
+
+      mockSearchObj.meta.sqlMode = false;
+      await flushPromises();
+      mockSearchObj.meta.sqlMode = true;
+      await redraw();
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(true);
+    });
+
+    it.each(["service-graph", "services-catalog"] as const)(
+      "runs Spans SQL that ran again on a return from %s, never an empty table",
+      async (view) => {
+        await mountSql();
+        mockSearchObj.searchApplied = true;
+        const { handlers } = await runSql(big);
+        await finish(handlers, [{ trace_id: "t" }]);
+        mockFetchQueryDataWithHttpStream.mockClear();
+        wrapper.vm.onSearchModeChange(view);
+        wrapper.vm.onSearchModeChange("spans");
+        await redraw();
+        expect(mockSearchObj.meta.sqlMode).toBe(true);
+        const [request] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+        expect(b64DecodeUnicode(request.queryReq.query.sql)).toContain("FROM");
+        expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(false);
+      },
+    );
+
+    it("runs Spans SQL again on a return when only trailing whitespace was added since its run", async () => {
+      await mountSql();
+      mockSearchObj.searchApplied = true;
+      const { handlers } = await runSql(big);
+      await finish(handlers, [{ trace_id: "t" }]);
+      mockFetchQueryDataWithHttpStream.mockClear();
+      mockSearchObj.data.editorValue = `${big}\n `;
+      wrapper.vm.onSearchModeChange("service-graph");
+      wrapper.vm.onSearchModeChange("spans");
+      await redraw();
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(false);
+    });
+
+    it("keeps Spans SQL edited since its run waiting for Run on a return from the service graph", async () => {
+      await mountSql();
+      mockSearchObj.searchApplied = true;
+      const { handlers } = await runSql(big);
+      await finish(handlers, [{ trace_id: "t" }]);
+      mockFetchQueryDataWithHttpStream.mockClear();
+      mockSearchObj.data.editorValue = `SELECT trace_id FROM "default" GROUP BY trace_id`;
+      wrapper.vm.onSearchModeChange("service-graph");
+      wrapper.vm.onSearchModeChange("spans");
+      await redraw();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(true);
+    });
+
+    it("shows a history entry's own SQL over staged SQL on a return to Spans, waiting for Run", async () => {
+      await mountSql();
+      mockSearchObj.searchApplied = true;
+      const { handlers } = await runSql(big);
+      await finish(handlers, [{ trace_id: "t" }]);
+      mockFetchQueryDataWithHttpStream.mockClear();
+      mockSearchObj.data.editorValue = `SELECT trace_id FROM "default" GROUP BY trace_id`;
+      wrapper.vm.onSearchModeChange("service-graph");
+      wrapper.vm.onSearchModeChange("spans", grouped);
+      await redraw();
+      expect(mockSearchObj.data.editorValue).toBe(grouped);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(true);
+    });
+
+    it("keeps unrun Spans SQL waiting for Run on a return from the service graph", async () => {
+      await mountSql();
+      mockSearchObj.searchApplied = true;
+      mockSearchObj.data.editorValue = big;
+      mockSearchObj.meta.sqlMode = true;
+      await redraw();
+      wrapper.vm.onSearchModeChange("service-graph");
+      wrapper.vm.onSearchModeChange("spans");
+      await redraw();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(true);
+    });
+
+    it("never shows the SQL Run prompt in filter mode", async () => {
+      await mountSql();
+      mockSearchObj.meta.searchMode = "traces";
+      mockSearchObj.searchApplied = true;
+      mockSearchObj.data.editorValue = "duration > 1";
+      mockSearchObj.meta.sqlMode = false;
+      await flushPromises();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(false);
+    });
+
+    it("shows the Run prompt, not a template gallery, for an empty SQL editor", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = "";
+      wrapper.vm.searchData();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="traces-sql-template-gallery"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(true);
+    });
+
+    it("adds trace_id to the SQL in the editor, not the SQL that last ran", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT service_name FROM "default" WHERE a = 1`;
+      mockSearchObj.data.queryResults = { hits: [], sql: `SELECT service_name FROM "default"` };
+      wrapper.vm.onSqlAddTraceId();
+      await flushPromises();
+      expect(mockSearchObj.data.editorValue).toBe(
+        `SELECT trace_id, service_name FROM "default" WHERE a = 1`,
+      );
+    });
+
+    it("adds trace_id to the select list and runs", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT service_name FROM "default"`;
+      mockSearchObj.data.queryResults = { hits: [], sql: `SELECT service_name FROM "default"` };
+      wrapper.vm.onSqlAddTraceId();
+      await flushPromises();
+      expect(mockSearchObj.data.editorValue).toBe(`SELECT trace_id, service_name FROM "default"`);
+      const [request] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      expect(b64DecodeUnicode(request.queryReq.query.sql)).toBe(
+        `SELECT trace_id, service_name FROM "default"`,
+      );
+    });
+
+    it("restores SQL mode from a link only when it carries a query", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          name: "traces",
+          path: "/traces",
+          query: {
+            stream: "default",
+            tab: "spans",
+            query: b64EncodeUnicode(grouped),
+            sql_mode: "true",
+          },
+        },
+      } as any);
+      await mountSql();
+      expect(mockSearchObj.meta.sqlMode).toBe(true);
+      wrapper.unmount();
+
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          name: "traces",
+          path: "/traces",
+          query: { stream: "default", tab: "spans", query: b64EncodeUnicode("a = 1") },
+        },
+      } as any);
+      await mountSql();
+      expect(mockSearchObj.meta.sqlMode).toBe(false);
+    });
+
+    it("opens a Traces link that carries SQL in the Spans view, with SQL on", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          name: "traces",
+          path: "/traces",
+          query: {
+            stream: "default",
+            tab: "traces",
+            query: b64EncodeUnicode(grouped),
+            sql_mode: "true",
+          },
+        },
+      } as any);
+      mockSearchObj.meta.searchMode = "traces";
+      await mountSql();
+      expect(mockSearchObj.meta.searchMode).toBe("spans");
+      expect(mockSearchObj.meta.sqlMode).toBe(true);
+      expect(mockSearchObj.data.editorValue).toBe(grouped);
+    });
+
+    it("reloads a service graph link that carries SQL on the service graph, with SQL on for Spans", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          name: "traces",
+          path: "/traces",
+          query: {
+            stream: "default",
+            tab: "service-graph",
+            query: b64EncodeUnicode(grouped),
+            sql_mode: "true",
+          },
+        },
+      } as any);
+      await mountSql();
+      expect(mockSearchObj.meta.searchMode).toBe("service-graph");
+      expect(mockSearchObj.meta.sqlMode).toBe(true);
+      expect(mockSearchObj.data.editorValue).toBe(grouped);
+    });
+
+    it("opens a Traces URL with a stream and no query with SQL off and the editor cleared", async () => {
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.data.editorValue = "duration > 1";
+      mockSqlTexts().turnSqlOn();
+      mockSearchObj.data.editorValue = grouped;
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { name: "traces", path: "/traces", query: { stream: "default", tab: "traces" } },
+      } as any);
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: { "search-bar": true, "index-list": true, "search-result": true },
+        },
+      });
+      await flushPromises();
+      expect(mockSearchObj.meta.searchMode).toBe("traces");
+      expect(mockSearchObj.meta.sqlMode).toBe(false);
+      expect(mockSearchObj.data.editorValue).toBe("");
+      expect(mockSqlTexts().sqlTexts.sql).toBe("");
+    });
+
+    const failRun = async (sql: string, error: Record<string, unknown>) => {
+      const { handlers } = await runSql(sql);
+      handlers.error({}, { content: error });
+      await flushPromises();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+    };
+
+    it("shows a SQL-mode error with the server's own message and its suggestions", async () => {
+      await mountSql();
+      await failRun(`SELECT servce_name FROM "default"`, {
+        code: 20004,
+        message: "unknown field 'servce_name'",
+        suggestions: ["service_name"],
+      });
+      const state = wrapper.findComponent({ name: "TracesSqlErrorState" });
+      expect(state.props("errorMsg")).toBe("unknown field 'servce_name'");
+      expect(state.props("suggestions")).toEqual(["service_name"]);
+      expect(state.props("query")).toBe(`SELECT servce_name FROM "default"`);
+    });
+
+    it("keeps the RED strip above a failed query and handles its events like the results do", async () => {
+      await mountSql();
+      await failRun(`SELECT servce_name FROM "default"`, {
+        code: 20004,
+        message: "unknown field 'servce_name'",
+      });
+      await vi.waitFor(async () => {
+        for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+        await nextTick();
+        expect(
+          wrapper
+            .find('[data-test="traces-search-error-message"]')
+            .findComponent({ name: "TracesMetricsDashboard" })
+            .exists(),
+        ).toBe(true);
+      });
+      const dashboard = wrapper.findComponent({ name: "TracesMetricsDashboard" });
+      const handoff = { message: "why slow" };
+      dashboard.vm.$emit("send-to-ai-chat", handoff);
+      expect(wrapper.emitted("sendToAiChat")?.at(-1)).toEqual([handoff, true]);
+      dashboard.vm.$emit("editor-filter-set", "duration > 5");
+      expect(mockSearchObj.data.editorValue).toBe("duration > 5");
+      mockSearchObj.meta.showHistogram = false;
+      await nextTick();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+      const hidden = wrapper.findComponent({ name: "TracesMetricsDashboard" });
+      expect(hidden.vm).toBe(dashboard.vm);
+      expect(hidden.isVisible()).toBe(false);
+    });
+
+    it("binds no stream fields to the RED strip, which reads none", async () => {
+      await mountSql();
+      await failRun(`SELECT servce_name FROM "default"`, { code: 20004, message: "x" });
+      await vi.waitFor(() =>
+        expect(wrapper.findComponent({ name: "TracesMetricsDashboard" }).exists()).toBe(true),
+      );
+      const dashboard = wrapper.findComponent({ name: "TracesMetricsDashboard" });
+      expect(dashboard.vm.$.vnode.props).not.toHaveProperty("stream-fields");
+    });
+
+    it("keeps the filter-mode error as it was", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.data.editorValue = "servce_name = 'a'";
+      wrapper.vm.searchData();
+      await flushPromises();
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      handlers.error({}, { content: { code: 20004, message: "unknown field 'servce_name'" } });
+      await flushPromises();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+      expect(wrapper.findComponent({ name: "TracesSqlErrorState" }).exists()).toBe(false);
+      expect(mockSearchObj.data.errorMsg).toBe(i18n.global.t("message.SearchFieldNotFound"));
+    });
+
+    it("runs the rewritten SQL a fix card sends", async () => {
+      await mountSql();
+      await failRun(`SELECT servce_name FROM "default"`, {
+        code: 20004,
+        message: "unknown field 'servce_name'",
+      });
+      mockFetchQueryDataWithHttpStream.mockClear();
+      wrapper
+        .findComponent({ name: "TracesSqlErrorState" })
+        .vm.$emit("run-sql", `SELECT service_name FROM "default"`);
+      await flushPromises();
+      expect(mockSearchObj.data.editorValue).toBe(`SELECT service_name FROM "default"`);
+      const [request] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      expect(b64DecodeUnicode(request.queryReq.query.sql)).toBe(
+        `SELECT service_name FROM "default"`,
+      );
+    });
+
+    it("opens the stream settings from a SQL-mode Configure resource card", async () => {
+      await mountSql();
+      await failRun(`SELECT * FROM "default"`, {
+        code: 20003,
+        message: "no full text search fields",
+      });
+      routerPushSpy.mockClear();
+      wrapper.findComponent({ name: "TracesSqlErrorState" }).vm.$emit("configure-resource");
+      expect(routerPushSpy).toHaveBeenCalledWith("/streams?dialog=default");
+    });
+
+    it("narrows to the last hour and runs for Use last 1 hour", async () => {
+      await mountSql();
+      await failRun(`SELECT * FROM "default" c JOIN "default" p ON c.t = p.t`, {
+        code: 500,
+        message: "Search SQL execute error: Resources exhausted: Failed to allocate",
+      });
+      mockFetchQueryDataWithHttpStream.mockClear();
+      wrapper.findComponent({ name: "TracesSqlErrorState" }).vm.$emit("use-last-hour");
+      await flushPromises();
+      expect(mockSearchObj.data.datetime.type).toBe("relative");
+      expect(mockSearchObj.data.datetime.relativeTimePeriod).toBe("1h");
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("tells the field list when the stream packs extra fields into _all", async () => {
+      await mountSql();
+      const base = mockStreamList.list.find((st: any) => st.name === "default");
+      mockGetStream.mockResolvedValueOnce({
+        ...base,
+        settings: { ...base.settings, defined_schema_fields: ["service_name"] },
+      });
+      await wrapper.vm.extractFields();
+      await flushPromises();
+      expect(wrapper.vm.storesExtraFieldsInAll).toBe(true);
+      await wrapper.vm.extractFields();
+      await flushPromises();
+      expect(wrapper.vm.storesExtraFieldsInAll).toBe(false);
+    });
+
+    it("marks the result partial when the server says it was cut", async () => {
+      await mountSql();
+      const { handlers } = await runSql(grouped);
+      await finish(handlers, [{ service_name: "api", n: 3 }], { is_partial: true });
+      expect(mockSearchObj.data.queryResults.is_partial).toBe(true);
+    });
+
+    describe("Scope select", () => {
+      const ROOT = "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
+
+      const ownCalls = () => {
+        const { calls, contexts } = mockFetchQueryDataWithHttpStream.mock;
+        return calls.filter((_c, i) => contexts[i] === wrapper.vm.$) as any[][];
+      };
+
+      const runChips = async (editorValue = "") => {
+        mockSearchObj.meta.sqlMode = false;
+        mockSearchObj.data.editorValue = editorValue;
+        wrapper.vm.searchData();
+        await flushPromises();
+        const [request, handlers] = ownCalls().at(-1)!;
+        return { request, handlers };
+      };
+
+      const countSqlAfter = async (handlers: any) => {
+        await finish(handlers, [{ trace_id: "t", span_id: "s" }]);
+        const [countRequest] = ownCalls().at(-1)!;
+        return b64DecodeUnicode(countRequest.queryReq.query.sql);
+      };
+
+      const mountScoped = async (scope: string) => {
+        await mountSql();
+        mockSearchObj.meta.scope = scope;
+        mockSearchObj.data.stream.hasParentColumn = true;
+      };
+
+      afterEach(() => {
+        mockSearchObj.meta.scope = "all";
+        mockSearchObj.data.stream.hasParentColumn = false;
+      });
+
+      it("narrows the Spans list and its count to the scope", async () => {
+        await mountScoped("root");
+        const { request, handlers } = await runChips();
+        expect(b64DecodeUnicode(request.queryReq.query.sql)).toBe(
+          `SELECT * FROM "default" WHERE ${ROOT} ORDER BY _timestamp DESC`,
+        );
+        expect(await countSqlAfter(handlers)).toContain(`FROM "default" WHERE ${ROOT}`);
+      });
+
+      it("adds the scope after the filter, bracketing the filter", async () => {
+        await mountScoped("root");
+        const { request, handlers } = await runChips("service_name = 'a'");
+        expect(b64DecodeUnicode(request.queryReq.query.sql)).toContain(
+          `WHERE (service_name = 'a') AND ${ROOT} ORDER BY`,
+        );
+        expect(await countSqlAfter(handlers)).toMatch(/WHERE \(service_name\s+=\s*'a'\) AND /);
+      });
+
+      it("sends All spans requests as before", async () => {
+        await mountScoped("all");
+        const { request, handlers } = await runChips();
+        expect(b64DecodeUnicode(request.queryReq.query.sql)).toBe(
+          `SELECT * FROM "default" ORDER BY _timestamp DESC`,
+        );
+        expect(await countSqlAfter(handlers)).toBe(
+          `select count(*) as span_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count FROM "default"`,
+        );
+      });
+
+      it("leaves the Traces view request and count alone", async () => {
+        await mountScoped("root");
+        mockSearchObj.meta.searchMode = "traces";
+        const { request, handlers } = await runChips();
+        expect(request.queryReq.filter).toBe("");
+        expect(await countSqlAfter(handlers)).not.toContain("reference_parent_span_id");
+      });
+
+      it("sends typed SQL as written whatever the scope", async () => {
+        await mountScoped("entrypoint");
+        const typed = `SELECT * FROM "default" WHERE a = 1`;
+        const { sql, handlers } = await runSql(typed);
+        expect(sql).toBe(typed);
+        expect(await countSqlAfter(handlers)).not.toContain("span_kind");
+      });
+
+      it("runs the Spans view again from page 1 when the scope is picked", async () => {
+        await mountScoped("all");
+        mockSearchObj.data.resultGrid.currentPage = 3;
+        wrapper.findComponent(SearchResultStub).vm.$emit("update:scope", "root");
+        await flushPromises();
+        expect(mockSearchObj.meta.scope).toBe("root");
+        expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
+        const [request] = ownCalls().at(-1)!;
+        expect(b64DecodeUnicode(request.queryReq.query.sql)).toContain(`WHERE ${ROOT}`);
+      });
+
+      it("reads whether the stream records reference_parent_span_id", async () => {
+        await mountSql();
+        const base = mockStreamList.list.find((st: any) => st.name === "default")!;
+        mockGetStream.mockResolvedValueOnce({
+          ...base,
+          schema: [...base.schema, { name: "reference_parent_span_id", type: "Utf8" }],
+        });
+        await wrapper.vm.extractFields();
+        await flushPromises();
+        expect(mockSearchObj.data.stream.hasParentColumn).toBe(true);
+        await wrapper.vm.extractFields();
+        await flushPromises();
+        expect(mockSearchObj.data.stream.hasParentColumn).toBe(false);
+      });
+    });
+
+    describe("Groups view", () => {
+      const ROOT = "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
+
+      const ownSqls = () =>
+        mockFetchQueryDataWithHttpStream.mock.calls
+          .filter((_c, i) => mockFetchQueryDataWithHttpStream.mock.contexts[i] === wrapper.vm.$)
+          .map(([request]: any[]) => b64DecodeUnicode(request.queryReq.query.sql));
+
+      const runGrouped = async (editorValue = "") => {
+        mockSearchObj.meta.sqlMode = false;
+        mockSearchObj.data.editorValue = editorValue;
+        wrapper.vm.searchData();
+        await flushPromises();
+      };
+
+      afterEach(() => {
+        mockSearchObj.meta.groupBy = "";
+        mockSearchObj.meta.scope = "all";
+        mockSearchObj.data.stream.hasParentColumn = false;
+        mockSearchObj.data.groupsRequest = null;
+        mockSearchObj.meta.chartRefreshFailed = false;
+        mockSearchObj.meta.refreshFailedAt = null;
+        mockSearchObj.meta.lastRunAt = undefined;
+      });
+
+      it("hands the Groups table the filter, scope and window, runs no span list, and still counts", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        mockSearchObj.meta.scope = "root";
+        mockSearchObj.data.stream.hasParentColumn = true;
+        await runGrouped("service_name = 'a'");
+        expect(mockSearchObj.data.groupsRequest).toMatchObject({
+          stream: "default",
+          key: "service_name",
+          filter: "service_name = 'a'",
+          scope: ROOT,
+        });
+        const request = mockSearchObj.data.groupsRequest!;
+        expect(request.startTime).toBeGreaterThan(0);
+        expect(request.endTime).toBeGreaterThan(request.startTime);
+        const sqls = ownSqls();
+        expect(sqls.some((sql) => sql.startsWith("SELECT * FROM"))).toBe(false);
+        expect(sqls.at(-1)).toMatch(/^select count\(\*\) as span_count/);
+        expect(mockSearchObj.loading).toBe(false);
+      });
+
+      it("marks a text key so the table folds empty into (no value), and not a number key", async () => {
+        await mountSql();
+        const fields = mockSearchObj.data.stream.selectedStreamFields;
+        mockSearchObj.data.stream.selectedStreamFields = [
+          { name: "service_name", dataType: "Utf8" },
+          { name: "duration", dataType: "Int64" },
+        ];
+        mockSearchObj.meta.groupBy = "service_name";
+        await runGrouped();
+        expect(mockSearchObj.data.groupsRequest?.textKey).toBe(true);
+        mockSearchObj.meta.groupBy = "duration";
+        await runGrouped();
+        expect(mockSearchObj.data.groupsRequest?.textKey).toBe(false);
+        mockSearchObj.data.stream.selectedStreamFields = fields;
+      });
+
+      it("dates a grouped run and clears an earlier failed-refresh notice", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        mockSearchObj.meta.lastRunAt = 1;
+        mockSearchObj.meta.refreshFailedAt = 5;
+        mockSearchObj.meta.chartRefreshFailed = false;
+        await runGrouped();
+        expect(mockSearchObj.meta.lastRunAt).toBeGreaterThan(1);
+        expect(mockSearchObj.meta.refreshFailedAt).toBeNull();
+      });
+
+      it("keeps the notice of a grouped run whose charts failed to refresh", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        mockSearchObj.meta.refreshFailedAt = 5;
+        mockSearchObj.meta.chartRefreshFailed = true;
+        await runGrouped();
+        expect(mockSearchObj.meta.refreshFailedAt).toBe(5);
+      });
+
+      it("gives every grouped run a new request, so the table reloads", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        await runGrouped();
+        const first = mockSearchObj.data.groupsRequest!.runId;
+        await runGrouped();
+        expect(mockSearchObj.data.groupsRequest!.runId).toBeGreaterThan(first);
+      });
+
+      it("runs at once from page 1 when a field is picked, and back to the list on None", async () => {
+        await mountSql();
+        mockSearchObj.data.resultGrid.currentPage = 2;
+        wrapper.findComponent(SearchResultStub).vm.$emit("update:groupBy", "http_method");
+        await flushPromises();
+        expect(mockSearchObj.meta.groupBy).toBe("http_method");
+        expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
+        expect(mockSearchObj.data.groupsRequest?.key).toBe("http_method");
+
+        mockFetchQueryDataWithHttpStream.mockClear();
+        wrapper.findComponent(SearchResultStub).vm.$emit("update:groupBy", "");
+        await flushPromises();
+        expect(mockSearchObj.data.groupsRequest).toBeNull();
+        expect(ownSqls()[0]).toMatch(/^SELECT \* FROM "default"/);
+      });
+
+      it("groups by a field picked from the field list", async () => {
+        await mountSql();
+        mockSearchObj.data.resultGrid.currentPage = 2;
+        wrapper.findComponent({ name: "index-list" }).vm.$emit("group-by", "http_method");
+        await flushPromises();
+        expect(mockSearchObj.meta.groupBy).toBe("http_method");
+        expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
+        expect(mockSearchObj.data.groupsRequest?.key).toBe("http_method");
+      });
+
+      it("opening a group runs the filtered span list at once, even with auto-run off", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        await runGrouped("http_method = 'GET'");
+        mockFetchQueryDataWithHttpStream.mockClear();
+        wrapper.vm.onOpenGroup("service_name = 'cart'");
+        await flushPromises();
+        expect(mockSearchObj.meta.groupBy).toBe("");
+        expect(mockSearchObj.data.groupsRequest).toBeNull();
+        expect(mockSearchObj.data.editorValue).toBe(
+          "http_method = 'GET' and service_name = 'cart'",
+        );
+        expect(ownSqls()[0]).toMatch(/^SELECT \* FROM "default" WHERE .*service_name = 'cart'/);
+      });
+
+      it("records no recent search for a grouped run, as a recent entry holds no Group by", async () => {
+        const record = vi.spyOn(queryHistory, "record").mockResolvedValue({ data: {} } as never);
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        record.mockClear();
+        await runGrouped("service_name = 'a'");
+        expect(mockSearchObj.data.groupsRequest).not.toBeNull();
+        expect(record).not.toHaveBeenCalled();
+        record.mockRestore();
+      });
+
+      it("restores a recent search as the span list, not the current Groups view", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        await runGrouped();
+        mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+        mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+        const entry: QueryHistoryEntry = {
+          id: "t1",
+          source: "traces",
+          query: "service_name = 'cart'",
+          query_key: "k",
+          streams: ["default"],
+          context: { page: { stream: "default", tab: "spans" } },
+          status: "ok",
+          starred: false,
+          run_count: 1,
+          created_at: 1,
+          updated_at: 2,
+        };
+        mockFetchQueryDataWithHttpStream.mockClear();
+        wrapper
+          .findComponent({ name: "search-bar" })
+          .vm.$emit("recent-restore", entry, "now", true);
+        await flushPromises();
+        expect(mockSearchObj.meta.groupBy).toBe("");
+        expect(mockSearchObj.data.groupsRequest).toBeNull();
+        expect(ownSqls()[0]).toMatch(/^SELECT \* FROM "default"/);
+      });
+
+      it("loads a recent search without running and drops the shown Groups table", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        await runGrouped();
+        expect(mockSearchObj.data.groupsRequest).not.toBeNull();
+        mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+        mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+        const entry: QueryHistoryEntry = {
+          id: "t1",
+          source: "traces",
+          query: "service_name = 'cart'",
+          query_key: "k",
+          streams: ["default"],
+          context: { page: { stream: "default", tab: "spans" } },
+          status: "ok",
+          starred: false,
+          run_count: 1,
+          created_at: 1,
+          updated_at: 2,
+        };
+        mockFetchQueryDataWithHttpStream.mockClear();
+        wrapper
+          .findComponent({ name: "search-bar" })
+          .vm.$emit("recent-restore", entry, "now", false);
+        await flushPromises();
+        expect(mockSearchObj.meta.groupBy).toBe("");
+        expect(mockSearchObj.data.groupsRequest).toBeNull();
+        expect(ownSqls()).toEqual([]);
+      });
+
+      it("keeps the span list in SQL mode and in the Traces view", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        await runSql(`SELECT * FROM "default"`);
+        expect(mockSearchObj.data.groupsRequest).toBeNull();
+
+        mockSearchObj.meta.searchMode = "traces";
+        await runGrouped();
+        expect(mockSearchObj.data.groupsRequest).toBeNull();
+        mockSearchObj.meta.searchMode = "spans";
+      });
+    });
+
+    it("drops a Group by the picked stream has no field for, and keeps one it has", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.meta.groupBy = "service_name";
+      mockSearchObj.data.stream.selectedStream = { label: "test-stream", value: "test-stream" };
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockSearchObj.meta.groupBy).toBe("service_name");
+
+      mockSearchObj.meta.groupBy = "http_method";
+      mockSearchObj.data.stream.selectedStream = { label: "test-stream", value: "test-stream" };
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockSearchObj.meta.groupBy).toBe("");
+    });
+
+    it("clears the Groups table when the picked stream has no Group by field, without a search on auto-run off", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = false;
+      localStorage.setItem("oo_toggle_auto_run", "false");
+      store.state.zoConfig.auto_query_enabled = true;
+      await flushPromises();
+      mockSearchObj.meta.groupBy = "http_method";
+      mockSearchObj.data.groupsRequest = { key: "http_method" } as any;
+      mockFetchQueryDataWithHttpStream.mockClear();
+      mockSearchObj.data.stream.selectedStream = { label: "test-stream", value: "test-stream" };
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockSearchObj.meta.groupBy).toBe("");
+      expect(mockSearchObj.data.groupsRequest).toBeNull();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      delete store.state.zoConfig.auto_query_enabled;
+      localStorage.removeItem("oo_toggle_auto_run");
+    });
+
+    it("runs nothing when a stream is picked from the list in SQL mode, even with auto-run on", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.meta.liveMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "test-stream"`;
+      mockSearchObj.data.stream.selectedStream = { label: "test-stream", value: "test-stream" };
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("waits for Run when the stream changes in SQL mode, even with auto-run on", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.meta.liveMode = true;
+      store.state.zoConfig.auto_query_enabled = true;
+      await wrapper.vm.onSqlStreamChange("test-stream");
+      await flushPromises();
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("test-stream");
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      delete store.state.zoConfig.auto_query_enabled;
     });
   });
 });

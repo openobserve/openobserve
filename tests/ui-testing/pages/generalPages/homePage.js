@@ -29,7 +29,7 @@ export class HomePage {
         // Use this to deterministically click the freshly-created org instead of
         // relying on `.first()` racing against the OInput debounce + OTable filter.
         this.getOrgMenuItemByIdentifier = (identifier) =>
-            page.locator(`[data-test-org-identifier="${identifier}"]`);
+            page.locator(`[data-test="organization-menu-item-label-item-label"][data-test-org-identifier="${identifier}"]`);
 
         this.slackButton = page.locator('[data-test="menu-link-slack-item"]');
         this.helpButton = page.locator('[data-test="menu-link-help-item"]');
@@ -70,6 +70,7 @@ export class HomePage {
         this.homePageIndicator = page.locator('[data-test="home-page"]').first();
         this.homeOverviewPanel = page.locator('[data-test="home-overview-panel"]').first();
         this.pinnedDashboardRefreshBtn = page.locator('[data-test="pinned-dashboard-refresh-btn"]');
+        this.homeRefreshButton = page.locator('[data-test="home-page"] [data-test="refresh-button"]');
 
         // ===== FAVICON SELECTOR (Bug #9217) =====
         this.faviconLink = page.locator('link#favicon');
@@ -935,5 +936,14 @@ export class HomePage {
         }
 
         return result;
+    }
+
+    async clickHomeRefresh() {
+        await this.homeRefreshButton.click();
+    }
+
+    async openPinnedDashboardTab(title) {
+        await this.homePageMenu.click();
+        await this.page.getByRole('tab', { name: title }).click();
     }
 }

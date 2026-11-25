@@ -120,6 +120,7 @@ impl PartitionSqlContext {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
     use config::meta::stream::StreamType;
 
     use super::*;
@@ -135,7 +136,6 @@ mod tests {
         timezone: Option<&str>,
         streaming_output: bool,
     ) -> PartitionSqlContext {
-        use arrow_schema::{DataType, Field, Schema};
         let schema = Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("service", DataType::Utf8, true),
@@ -164,6 +164,7 @@ mod tests {
             sampling_ratio: None,
             search_type: None,
             timezone: timezone.map(str::to_string),
+            raw_streams: None,
         };
         PartitionSqlContext::new(&req, "ranked_hist_test", StreamType::Logs)
             .await
@@ -304,11 +305,18 @@ mod tests {
             sampling_ratio: None,
             search_type: None,
             timezone: Some("Asia/Kolkata".to_string()),
+            raw_streams: None,
         };
         let (streaming_aggs, streaming_id, strategy) =
-            crate::partition::aggregate::prepare_streaming_aggregate("t", &req, &ctx, true)
-                .await
-                .unwrap();
+            crate::partition::aggregate::prepare_streaming_aggregate(
+                "t",
+                &req,
+                &ctx,
+                &Default::default(),
+                true,
+            )
+            .await
+            .unwrap();
         assert!(!streaming_aggs);
         assert!(streaming_id.is_none());
         assert!(strategy.is_none());

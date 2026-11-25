@@ -484,6 +484,7 @@ pub async fn delete_fields(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 409, description = "Enrichment table is read by a pipeline function", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"})),
@@ -553,6 +554,7 @@ pub async fn delete(
         ("offset" = Option<u32>, Query, description = "Offset"),
         ("limit" = Option<u32>, Query, description = "Limit"),
         ("sort" = Option<String>, Query, description = "Sort"),
+        ("fetchSchema" = Option<bool>, Query, description = "Include each stream's fields (name and type). Defaults to false."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(ListStream)),
@@ -561,9 +563,9 @@ pub async fn delete(
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "list"})),
         ("x-o2-mcp" = json!({
-            "description": "List all streams in the organization, you can filter by type and keyword. is_internal marks streams OpenObserve writes itself and is omitted when false.",
+            "description": "List all streams in the organization, you can filter by type and keyword. is_internal marks streams OpenObserve writes itself and is omitted when false. With fetchSchema=true each stream also lists its fields (name and type).",
             "category": "streams",
-            "summary_fields": ["name", "stream_type", "stats.storage_size", "is_internal"],
+            "summary_fields": ["name", "stream_type", "stats.storage_size", "is_internal", "schema"],
             "pinned": true
         }))
     )

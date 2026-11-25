@@ -23,21 +23,45 @@ export function passPlan(agentKeys, passes) {
   return plan;
 }
 
-export async function runPooled(items, limit, worker) {
+// How long the rest of the pool waits for the primer's first model response before starting anyway.
+export const PRIMER_WAIT_MS = 90_000;
+
+// With `primer`, the first item runs alone until its worker calls hooks.onFirstResponse, settles, or waitMs passes; then the pool
+// is released as usual. Lanes of later items hold their slot meanwhile, so the limit still bounds what runs at once.
+export async function runPooled(items, limit, worker, { primer = false, waitMs = PRIMER_WAIT_MS } = {}) {
   const results = new Array(items.length);
+  let release = () => {};
+  const released = primer ? new Promise(resolve => { release = resolve; }) : null;
+  const timer = primer ? setTimeout(() => release(), waitMs) : null;
+  const run = async i => {
+    if (!primer) return worker(items[i], i);
+    if (i > 0) {
+      await released;
+      return worker(items[i], i, {});
+    }
+    try {
+      return await worker(items[i], i, { onFirstResponse: () => release() });
+    } finally {
+      release();
+    }
+  };
   let next = 0;
   const lane = async () => {
     while (next < items.length) {
       const i = next;
       next += 1;
       try {
-        results[i] = { status: "fulfilled", value: await worker(items[i], i) };
+        results[i] = { status: "fulfilled", value: await run(i) };
       } catch (reason) {
         results[i] = { status: "rejected", reason };
       }
     }
   };
-  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, lane));
+  try {
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, lane));
+  } finally {
+    clearTimeout(timer);
+  }
   return results;
 }
 

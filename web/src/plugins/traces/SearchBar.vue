@@ -78,33 +78,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
 
-          <OButton
-            v-if="showDrillDown"
-            data-test="insights-button"
-            variant="outline"
-            size="xs"
-            :disabled="searchObj.loading"
-            focusable-unavailable
-            @click="$emit('drill-down')"
-          >
-            <template #icon-left>
-              <OIcon name="timeline" size="sm" class="shrink-0" />
-            </template>
-            <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
-            <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
-          </OButton>
-          <span
-            v-else-if="drillDownSlot"
-            class="invisible inline-flex"
-            aria-hidden="true"
-            inert
-            data-test="insights-button-placeholder"
-          >
-            <OButton variant="outline" size="xs" tabindex="-1">
+          <span v-if="drillDownSlot" class="inline-flex" data-test="insights-button-wrap">
+            <!-- First child, so the tooltip binds to the wrapper: the disabled button takes no pointer events. -->
+            <OTooltip v-if="drillDownBlockedReason" :content="drillDownBlockedReason" />
+            <OButton
+              data-test="insights-button"
+              variant="outline"
+              size="sm-toolbar"
+              :disabled="
+                !!drillDownBlockedReason ||
+                searchObj.loading ||
+                !(searchObj.data.queryResults?.total || searchObj.data.queryResults?.hits?.length)
+              "
+              :class="{ 'pointer-events-none': drillDownBlockedReason }"
+              :focusable-unavailable="!drillDownBlockedReason"
+              @click="$emit('drill-down')"
+            >
               <template #icon-left>
                 <OIcon name="timeline" size="sm" class="shrink-0" />
               </template>
               <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
+              <OTooltip
+                v-if="!drillDownBlockedReason"
+                :content="t('volumeInsights.analyzeTooltipTraces')"
+              />
             </OButton>
           </span>
 
@@ -120,12 +117,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-search-bar-reset-filters-btn"
               variant="outline"
               size="sm-toolbar"
+              :aria-label="t('common.reset')"
               @click="resetFilters"
             >
               <template #icon-left>
                 <OIcon name="restart-alt" size="sm" class="shrink-0" />
               </template>
               <span v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</span>
+              <OTooltip v-else :content="t('common.reset')" />
             </OButton>
           </template>
 
@@ -139,6 +138,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSwitch v-model="searchObj.meta.showHistogram" size="md" @click.stop />
             <OIcon name="bar-chart" size="sm" class="shrink-0" />
             <OTooltip :content="t('traces.redMetrics')" />
+          </OButton>
+
+          <OButton
+            v-if="showPinnedSqlMode"
+            as="div"
+            data-test="traces-search-bar-sql-mode-pinned-btn"
+            size="sm-toolbar"
+            variant="outline"
+            @click="setSqlMode(!searchObj.meta.sqlMode)"
+          >
+            <OSwitch
+              :key="sqlSwitchKey"
+              :model-value="searchObj.meta.sqlMode"
+              :aria-label="t('search.sqlModeLabel')"
+              size="md"
+              @click.stop="setSqlMode(!searchObj.meta.sqlMode)"
+            />
+            <OIcon name="code" size="sm" class="shrink-0" />
+            <OTooltip :content="t('search.sqlModeLabel')" />
           </OButton>
 
           <OButtonGroup
@@ -255,6 +273,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop="togglePin('histogram')"
                 >
                   <OIcon :name="isPinned('histogram') ? 'keep' : 'keep-outline'" size="sm" />
+                </OButton>
+              </span>
+            </template>
+          </ODropdownItem>
+
+          <ODropdownItem
+            v-if="isSearchMode"
+            data-test="traces-search-bar-menu-sql-mode-toggle-btn"
+            @select.prevent="setSqlMode(!searchObj.meta.sqlMode)"
+          >
+            <template #icon-left>
+              <span
+                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+              >
+                <OIcon name="code" size="sm" />
+              </span>
+            </template>
+            {{ t("search.sqlModeLabel") }}
+            <template #icon-right>
+              <span class="ms-auto flex items-center gap-1">
+                <OSwitch
+                  :key="sqlSwitchKey"
+                  :model-value="searchObj.meta.sqlMode"
+                  size="md"
+                  data-test="traces-search-bar-sql-mode-toggle"
+                  @click.stop="setSqlMode(!searchObj.meta.sqlMode)"
+                />
+                <OButton
+                  data-test="traces-search-bar-menu-pin-sql-mode-btn"
+                  variant="ghost-neutral"
+                  size="icon-sm"
+                  :title="
+                    isPinned('sqlMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
+                  "
+                  @click.stop="togglePin('sqlMode')"
+                >
+                  <OIcon :name="isPinned('sqlMode') ? 'keep' : 'keep-outline'" size="sm" />
                 </OButton>
               </span>
             </template>
@@ -549,15 +604,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-8.5!"
               @on:date-change="updateDateTime"
             />
-            <OButton
+            <ORefreshButton
               data-test="service-graph-refresh-btn"
+              layout="inline"
               variant="outline"
-              size="icon-md"
+              size="header"
+              :loading="refreshLoading"
+              :last-run-at="refreshLastRunAt"
               @click="$emit('service-graph-refresh')"
-            >
-              <OIcon name="refresh" size="sm" />
-              <OTooltip :content="t('common.refresh')" />
-            </OButton>
+            />
             <OToggleGroup
               :model-value="searchObj.meta.serviceGraphVisualizationType"
               @update:model-value="onServiceGraphVisualizationChange($event)"
@@ -602,6 +657,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               calendar-presets
               class="h-8.5!"
               @on:date-change="updateDateTime"
+            />
+            <ORefreshButton
+              data-test="services-catalog-refresh-btn"
+              layout="inline"
+              variant="outline"
+              size="header"
+              :loading="refreshLoading"
+              :last-run-at="refreshLastRunAt"
+              @click="$emit('services-catalog-refresh')"
             />
           </div>
         </div>
@@ -762,11 +826,26 @@ import {
   computed,
   toRef,
   shallowRef,
+  type PropType,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { activeScopePredicate, isTracesScope, withScope } from "@/utils/traces/tracesScope";
+import {
+  analyzeTracesSql,
+  fieldHasOtherCondition,
+  fieldValuesCondition,
+  insertWhereCondition,
+  replaceOwnCondition,
+  withAllFieldRefs,
+  withFieldUnits,
+} from "@/utils/traces/tracesSql";
+import { allFieldRef, withAllFieldInserts } from "@/utils/traces/tracesAllFields";
+import { offsetRange, tracesSqlGuards } from "@/utils/traces/tracesSqlErrors";
+import { isAuthoredStatement, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
+import { isKeywordBeingTyped } from "@/utils/traces/tracesSqlTexts";
 import { nlSqlToTracesFilter } from "@/plugins/traces/utils/nlSqlToTracesFilter";
 import { chartInterval } from "./metrics/latencyHeatmap";
 import { buildTracesRedPanels, tracesBucketNotice } from "./metrics/tracesRedPanels";
@@ -779,6 +858,7 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -809,10 +889,10 @@ import { useToolbarPins } from "@/composables/useToolbarPins";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { pageValuesSetting, pageValuesWindow } from "@/composables/fieldValueStore";
-import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import {
   isDatetimeChanged,
+  tracesEditorIsStaged,
   tracesQueryNotRun,
   tracesRunIsStaged,
   tracesToolbarLayout,
@@ -865,6 +945,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     OButtonGroup,
+    ORefreshButton,
     OIcon,
     ODropdown,
     ODropdownItem,
@@ -898,6 +979,8 @@ export default defineComponent({
     "apply-saved-view",
     "drill-down",
     "recent-restore",
+    "sql-stream-change",
+    "open-spans-sql",
   ],
   props: {
     fieldValues: {
@@ -910,6 +993,15 @@ export default defineComponent({
     isLoading: {
       type: Boolean,
       default: false,
+    },
+    // The active Service Graph / Services Catalog tab's own load state, for the shared refresh button.
+    refreshLoading: {
+      type: Boolean,
+      default: false,
+    },
+    refreshLastRunAt: {
+      type: Number as PropType<number | null>,
+      default: null,
     },
   },
   methods: {
@@ -928,7 +1020,18 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
 
-    const { searchObj, tracesShareURL, tracesParser } = useTraces();
+    const {
+      searchObj,
+      tracesShareURL,
+      tracesParser,
+      sqlTexts,
+      noteFilterText,
+      deleteSqlText,
+      resetSqlTexts,
+      leaveSql,
+      turnSqlOn,
+      takeTypedSql,
+    } = useTraces();
     const queryEditorRef = ref(null);
 
     const nlpMode = ref(false);
@@ -936,6 +1039,7 @@ export default defineComponent({
       () => config.isEnterprise === "true" && Boolean(store.state.zoConfig.ai_enabled),
     );
     const toTracesFilter = (sql: string): string | null => {
+      if (searchObj.meta.sqlMode) return sql;
       const filter = nlSqlToTracesFilter(sql, tracesParser.value);
       if (filter === null) toast({ message: t("traces.nlNeedsSql"), variant: "warning" });
       return filter;
@@ -951,6 +1055,17 @@ export default defineComponent({
       query: computed(() => searchObj.data.editorValue ?? ""),
       streamName: computed(() => searchObj.data.stream.selectedStream?.value),
       externalErrors: toRef(searchObj.data, "sqlSyntaxErrorRanges"),
+      sqlChecks: (text) => {
+        const { startTime, endTime } = searchObj.data.datetime;
+        return tracesSqlGuards(text, endTime - startTime).map((guard) => ({
+          ...offsetRange(text, guard.start, guard.end),
+          error:
+            guard.kind === "strayKeyword"
+              ? t("traces.sqlMode.strayKeyword", { word: guard.word })
+              : t("traces.sqlMode.joinLongRange"),
+          ...(guard.kind === "joinLongRange" ? { severity: "warning" as const } : {}),
+        }));
+      },
     });
 
     const queryEditorBoxRef = ref<HTMLElement | null>(null);
@@ -960,9 +1075,7 @@ export default defineComponent({
     // Pending when auto-run is off and the state differs from the last Run, or the editor differs from the last applied query.
     const showRunQueryPending = computed(() => {
       if (tracesRunIsStaged(searchObj, store.state.zoConfig?.auto_query_enabled)) return true;
-      const applied: unknown = searchObj.data.appliedEditorValue;
-      if (typeof applied !== "string") return false;
-      return String(searchObj.data.editorValue ?? "").trim() !== applied.trim();
+      return tracesEditorIsStaged(searchObj);
     });
     // The URL already carries the staged edit, so a link before Run would share a query nobody ran.
     const shareReason = computed(() =>
@@ -1046,10 +1159,7 @@ export default defineComponent({
       await _sqlOnBlur();
     };
 
-    let streamName = "";
     const dateTimeRef = ref(null);
-
-    const { getStream } = useStreams(t);
 
     const {
       autoCompleteData,
@@ -1123,10 +1233,108 @@ export default defineComponent({
       }
     });
 
+    const allFieldsColumn = (): string => store.state.zoConfig?.all_fields_name || "_all";
+
+    const allFieldRefs = () => {
+      const column = allFieldsColumn();
+      return new Map(
+        Object.entries(searchObj.data.stream.fieldsInAll ?? {}).map(([name, type]) => [
+          name,
+          allFieldRef(name, type, column),
+        ]),
+      );
+    };
+
+    // Writes the edited SQL, runs it, and offers Undo that puts the exact previous text back.
+    const applySqlEdit = (before: string, after: string, message: string, onUndo?: () => void) => {
+      const write = (text: string) => {
+        writeEditor(text);
+        emit("searchdata");
+      };
+      write(after);
+      toast({
+        variant: "info",
+        message,
+        action: {
+          label: t("traces.sqlMode.undo"),
+          handler: () => {
+            onUndo?.();
+            write(before);
+          },
+        },
+      });
+    };
+
+    const insertSqlCondition = (term: string) => {
+      const before = String(searchObj.data.editorValue ?? "");
+      const condition = withAllFieldRefs(term, allFieldRefs());
+      const after = insertWhereCondition(before, condition);
+      if (after === null) {
+        toast({ message: t("traces.sqlMode.putConditionInWhere"), variant: "info" });
+        return;
+      }
+      applySqlEdit(before, after, t("traces.sqlMode.conditionAdded", { condition }));
+    };
+
+    // A sidebar tick rewrites only the one condition it wrote for the field; typed conditions are never touched.
+    const setSqlFieldValues = (field: string, values: string[], exclude: boolean) => {
+      const before = String(searchObj.data.editorValue ?? "");
+      const ref = allFieldRefs().get(field);
+      const owned = searchObj.data.stream.sqlFieldConditions;
+      const previous = owned[field];
+      const next = fieldValuesCondition(ref ?? field, values, exclude);
+      let after = previous ? replaceOwnCondition(before, previous.text, next) : null;
+      if (after === null && next) after = insertWhereCondition(before, next);
+      if (after === null) {
+        const message = next
+          ? t("traces.sqlMode.putConditionInWhere")
+          : t("traces.sqlMode.editWhereToRemove", { field });
+        toast({ message, variant: "info" });
+        return;
+      }
+      if (next) owned[field] = { text: next, values: [...values], exclude };
+      else delete owned[field];
+      const restore = () => {
+        if (previous) owned[field] = previous;
+        else delete owned[field];
+      };
+      const message = next
+        ? t("traces.sqlMode.conditionAdded", { condition: next })
+        : t("traces.sqlMode.conditionRemoved", { field });
+      applySqlEdit(before, after, message, restore);
+      if (next && fieldHasOtherCondition(after, field, next, ref)) {
+        toast({ message: t("traces.sqlMode.editWhereToRemove", { field }), variant: "info" });
+      }
+    };
+
     watch(
-      () => searchObj.data.stream.selectedStreamFields,
-      (fields) => {
-        if (fields.length) updateFieldKeywords(fields);
+      () => searchObj.data.stream.sqlFieldFilter,
+      (change) => {
+        if (!change) return;
+        searchObj.data.stream.sqlFieldFilter = null;
+        if (searchObj.meta.sqlMode) setSqlFieldValues(change.field, change.values, change.exclude);
+      },
+    );
+
+    watch(
+      () =>
+        [
+          searchObj.data.stream.selectedStreamFields,
+          searchObj.meta.sqlMode,
+          searchObj.data.stream.fieldsInAll,
+        ] as const,
+      ([fields, sqlMode]) => {
+        if (!fields.length) return;
+        if (!sqlMode) return updateFieldKeywords(fields);
+        const column = allFieldsColumn();
+        updateFieldKeywords(
+          withAllFieldInserts(
+            withFieldUnits(fields),
+            searchObj.data.stream.fieldsInAll ?? {},
+            column,
+            t("traces.sqlMode.inAllColumn", { column }),
+          ),
+        );
       },
       { immediate: true, deep: true },
     );
@@ -1167,50 +1375,83 @@ export default defineComponent({
       getSuggestions();
     };
 
-    const updateQueryValue = async (value: string) => {
+    const sqlStreamLookup = {
+      hasStream: (name: string) =>
+        searchObj.data.stream.streamLists.some((stream: any) => stream.value === name),
+      fieldsOf: (name: string) =>
+        name === searchObj.data.stream.selectedStream?.value
+          ? new Set<string>(searchObj.data.stream.selectedStreamFields.map((f: any) => f.name))
+          : undefined,
+    };
+
+    const updateQueryValue = (value: string) => {
       _sqlOnQueryChange();
       updateAutoComplete(value);
-      if (searchObj.meta.sqlMode == true) {
-        try {
-          searchObj.data.parsedQuery = tracesParser.value?.astify(value);
-        } catch {
-          // Half-typed SQL does not parse; keep the last good parse until it does.
-          return;
-        }
-        if (searchObj.data.parsedQuery?.from?.length > 0) {
-          if (
-            searchObj.data.parsedQuery.from[0].table !==
-              searchObj.data.stream.selectedStream.value &&
-            searchObj.data.parsedQuery.from[0].table !== streamName
-          ) {
-            let streamFound = false;
-            streamName = searchObj.data.parsedQuery.from[0].table;
-            await getStream(streamName, "traces", true).then((streamResponse) => {
-              streamFound = true;
-              let itemObj = {
-                label: streamResponse.name,
-                value: streamResponse.name,
-              };
-              searchObj.data.stream.selectedStream = itemObj;
-              streamResponse.schema.forEach((field) => {
-                searchObj.data.stream.selectedStreamFields.push({
-                  name: field.name,
-                });
-              });
-            });
-
-            if (streamFound == false) {
-              searchObj.data.stream.selectedStream = { label: "", value: "" };
-              searchObj.data.stream.selectedStreamFields = [];
-              toast({
-                message: t("traces.searchBar.streamNotFound"),
-                variant: "warning",
-              });
-            }
-          }
-        }
+      // Deleting the SELECT turns SQL off, and what is left becomes the filter.
+      if (
+        searchObj.meta.sqlMode &&
+        value.trim() !== "" &&
+        !isAuthoredStatement(value) &&
+        !isKeywordBeingTyped(value)
+      ) {
+        deleteSqlText();
+        return;
+      }
+      // The Traces view takes no SQL, so a statement typed there waits for Run and its card.
+      if (
+        !searchObj.meta.sqlMode &&
+        searchObj.meta.searchMode === "spans" &&
+        looksLikeSqlStatement(value, sqlStreamLookup)
+      ) {
+        takeTypedSql(value);
+      }
+      if (!searchObj.meta.sqlMode) {
+        noteFilterText(value);
+        return;
+      }
+      const stream = analyzeTracesSql(value, tracesParser.value).stream;
+      if (
+        stream &&
+        stream !== searchObj.data.stream.selectedStream?.value &&
+        sqlStreamLookup.hasStream(stream)
+      ) {
+        emit("sql-stream-change", stream);
       }
     };
+
+    const writeEditor = (text: string) => {
+      searchObj.data.editorValue = text;
+      setEditorValue(text);
+    };
+
+    // OSwitch flips its own state on click; in the Traces view SQL never shows on, so the switch remounts.
+    const sqlSwitchKey = ref(0);
+
+    // In the Traces view the switch moves to Spans; off keeps the SQL text and runs the filter at once.
+    const setSqlMode = (on: boolean) => {
+      if (on === searchObj.meta.sqlMode) return;
+      if (on && searchObj.meta.searchMode !== "spans") {
+        sqlSwitchKey.value++;
+        moreMenuOpen.value = false;
+        emit("open-spans-sql");
+        return;
+      }
+      if (on) {
+        turnSqlOn();
+        setEditorValue(searchObj.data.editorValue);
+        return;
+      }
+      leaveSql();
+      setEditorValue(searchObj.data.editorValue);
+      emit("searchdata");
+      if (sqlTexts.sql) toast({ message: t("traces.sqlMode.sqlKept"), variant: "info" });
+    };
+
+    // Typed SQL always waits for Run, so auto-run never fires in SQL mode.
+    const autoRunOn = () =>
+      !!store.state.zoConfig?.auto_query_enabled &&
+      searchObj.meta.liveMode &&
+      !searchObj.meta.sqlMode;
 
     // Debounced query trigger for absolute time when auto-run is enabled.
     // Gives the user 2.5s to finish typing start/end time before firing.
@@ -1223,9 +1464,7 @@ export default defineComponent({
         });
       }
 
-      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
-        emit("searchdata");
-      }
+      if (autoRunOn()) emit("searchdata");
     }, 2500);
 
     const updateDateTime = async (value: object) => {
@@ -1286,8 +1525,7 @@ export default defineComponent({
 
       if (
         value.valueType === "absolute" &&
-        searchObj.meta.liveMode &&
-        store.state.zoConfig?.auto_query_enabled &&
+        autoRunOn() &&
         value.userChangedValue === true &&
         datetimeChanged
       ) {
@@ -1302,12 +1540,7 @@ export default defineComponent({
       // `false` and must never auto-run, since they are owned by an explicit
       // trigger elsewhere. `datetimeChanged` additionally filters a user toggling
       // the type tab without actually changing the range.
-      if (
-        store.state.zoConfig?.auto_query_enabled &&
-        searchObj.meta.liveMode &&
-        value.userChangedValue === true &&
-        datetimeChanged
-      ) {
+      if (autoRunOn() && value.userChangedValue === true && datetimeChanged) {
         emit("searchdata");
       }
 
@@ -1333,6 +1566,7 @@ export default defineComponent({
     // Apply multiple filter terms independently (replace-or-append per field).
     // Used by parent (Index.vue) for metrics brush selections and error toggle.
     const applyFilters = (terms: string[], skipSearch = false) => {
+      if (searchObj.meta.sqlMode) return;
       let current = searchObj.data.editorValue;
       for (const term of terms) {
         current = applyFilterTerm(term, current);
@@ -1361,9 +1595,16 @@ export default defineComponent({
 
     const {
       createAlert,
-      disabledReason: createAlertDisabledReason,
+      disabledReason: alertDisabledReason,
       queryNotRun,
     } = useTracesAlertAction();
+    // Both prefill from filter text, which typed SQL is not.
+    const sqlModeUnavailable = computed(() =>
+      searchObj.meta.sqlMode ? t("traces.sqlMode.actionUnavailable") : null,
+    );
+    const createAlertDisabledReason = computed(
+      () => sqlModeUnavailable.value ?? alertDisabledReason.value,
+    );
     const createAlertIcon = getAlertSource("traces").icon;
     const createAlertNote = computed(() =>
       queryNotRun.value ? t("search.queryActions.usesUnrunQuery") : null,
@@ -1377,7 +1618,7 @@ export default defineComponent({
     const redDashboardNotice = ref(undefined);
     const redDashboardDisabledReason = computed(() =>
       searchObj.data.stream.selectedStream?.value
-        ? null
+        ? sqlModeUnavailable.value
         : t("alerts.prefill.sources.traces.noStream"),
     );
     const openRedDashboardDialog = () => {
@@ -1392,7 +1633,10 @@ export default defineComponent({
       const editorText = searchObj.data.editorValue ?? "";
       redDashboardPanels.value = buildTracesRedPanels({
         streamName: stream,
-        filter: resolveTracesFilter(editorText, tracesParser.value, stream),
+        filter: withScope(
+          resolveTracesFilter(editorText, tracesParser.value, stream),
+          activeScopePredicate(searchObj),
+        ),
         filterText: editorText,
         view,
         interval,
@@ -1409,6 +1653,11 @@ export default defineComponent({
 
     const resetFilters = () => {
       appliedSavedView.value = null;
+      resetSqlTexts();
+      searchObj.meta.sqlMode = false;
+      searchObj.meta.scope = "all";
+      searchObj.meta.groupBy = "";
+      searchObj.data.groupsRequest = null;
       searchObj.data.editorValue = "";
       searchObj.data.advanceFiltersQuery = "";
       Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
@@ -1478,8 +1727,19 @@ export default defineComponent({
     };
 
     const _traceStreamFields = computed(() => searchObj.data.stream.selectedStreamFields ?? []);
+
+    // Group by is chip mode only, so however SQL mode turns on, the Groups view ends.
+    watch(
+      () => searchObj.meta.sqlMode,
+      (on) => {
+        if (!on) return;
+        searchObj.meta.groupBy = "";
+        searchObj.data.groupsRequest = null;
+      },
+      { flush: "sync" },
+    );
     const _traceFieldValues = computed(() => props.fieldValues ?? {});
-    const _traceSqlMode = computed(() => false);
+    const _traceSqlMode = computed(() => !!searchObj.meta.sqlMode);
     // The typewriter keeps typing while hidden, so "Select a stream first" must not start before the stream list could pick one.
     const _traceNoStream = computed(
       () => !searchObj.loadingStream && !searchObj.data.stream.selectedStream?.value,
@@ -1544,7 +1804,10 @@ export default defineComponent({
     const buildSavedViewData = () => {
       const { datetime, stream } = searchObj.data;
       return {
-        version: 1,
+        version: 2,
+        sqlMode: !!searchObj.meta.sqlMode,
+        scope: isTracesScope(searchObj.meta.scope) ? searchObj.meta.scope : "all",
+        groupBy: searchObj.meta.groupBy ?? "",
         stream: { label: stream.selectedStream.label, value: stream.selectedStream.value },
         editorValue: searchObj.data.editorValue,
         datetime: {
@@ -1694,10 +1957,12 @@ export default defineComponent({
     );
 
     const metricsPinned = computed(() => isSearchMode.value && isPinned("histogram"));
+    const sqlModePinned = computed(() => isSearchMode.value && isPinned("sqlMode"));
     const savedViewsPinned = computed(() => isSearchMode.value && isPinned("savedViews"));
     const pinnedGroupWidth = computed(
       () =>
         (metricsPinned.value ? TRACES_TOOLBAR_WIDTHS.metricsPinned : 0) +
+        (sqlModePinned.value ? TRACES_TOOLBAR_WIDTHS.sqlModePinned : 0) +
         (savedViewsPinned.value ? TRACES_TOOLBAR_WIDTHS.savedViewsPinned : 0),
     );
 
@@ -1716,6 +1981,11 @@ export default defineComponent({
         isSearchMode.value &&
         (searchObj.loadingStream || searchObj.data.stream.streamLists.length > 0),
     );
+    const drillDownBlockedReason = computed(() => {
+      if (searchObj.meta.sqlMode) return t("traces.sqlMode.drillDownDisabled");
+      if (!showDrillDown.value) return t("search.drillDownRunTitle");
+      return "";
+    });
     const serviceGraphAccess = useLockedAffordance("enterprise");
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
@@ -1746,16 +2016,26 @@ export default defineComponent({
     const toolbarMoveResetToMenu = computed(() => toolbarStage.value === "resetInMenu");
 
     const pinnedFit = computed(() => {
-      if (!lgUp.value) return { metrics: metricsPinned.value, savedViews: savedViewsPinned.value };
+      if (!lgUp.value) {
+        return {
+          metrics: metricsPinned.value,
+          sqlMode: sqlModePinned.value,
+          savedViews: savedViewsPinned.value,
+        };
+      }
       let budget = toolbarLayout.value.pinnedBudget;
       const metrics = metricsPinned.value && budget >= TRACES_TOOLBAR_WIDTHS.metricsPinned;
       if (metrics) budget -= TRACES_TOOLBAR_WIDTHS.metricsPinned;
+      const sqlMode = sqlModePinned.value && budget >= TRACES_TOOLBAR_WIDTHS.sqlModePinned;
+      if (sqlMode) budget -= TRACES_TOOLBAR_WIDTHS.sqlModePinned;
       return {
         metrics,
+        sqlMode,
         savedViews: savedViewsPinned.value && budget >= TRACES_TOOLBAR_WIDTHS.savedViewsPinned,
       };
     });
     const showPinnedMetrics = computed(() => pinnedFit.value.metrics);
+    const showPinnedSqlMode = computed(() => pinnedFit.value.sqlMode);
     const showPinnedSavedViews = computed(() => pinnedFit.value.savedViews);
 
     return {
@@ -1838,11 +2118,18 @@ export default defineComponent({
       toolbarMoveResetToMenu,
       showDrillDown,
       drillDownSlot,
+      drillDownBlockedReason,
       isSearchMode,
       isPinned,
       togglePin,
       showPinnedMetrics,
+      showPinnedSqlMode,
+      sqlSwitchKey,
       showPinnedSavedViews,
+      setSqlMode,
+      writeEditor,
+      insertSqlCondition,
+      setSqlFieldValues,
       tracesSavedViews,
       isSavingView,
       saveViewDialogOpen,
@@ -1875,6 +2162,12 @@ export default defineComponent({
   },
   watch: {
     addSearchTerm() {
+      if (this.searchObj.data.stream.addToFilter !== "" && this.searchObj.meta.sqlMode) {
+        const term = this.searchObj.data.stream.addToFilter;
+        this.searchObj.data.stream.addToFilter = "";
+        this.insertSqlCondition(term);
+        return;
+      }
       if (this.searchObj.data.stream.addToFilter !== "") {
         const newValue = applyFilterTerm(
           this.searchObj.data.stream.addToFilter,
@@ -1890,6 +2183,11 @@ export default defineComponent({
     },
     removeFieldTerm(fieldName: string) {
       if (!fieldName) return;
+      if (this.searchObj.meta.sqlMode) {
+        this.searchObj.data.stream.removeFilterField = "";
+        this.setSqlFieldValues(fieldName, [], false);
+        return;
+      }
       const newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);
       this.searchObj.data.editorValue = newValue;
       this.searchObj.data.stream.removeFilterField = "";

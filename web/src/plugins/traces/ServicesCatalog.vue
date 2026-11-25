@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.healthy") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-label"
+              class="text-3xs text-text-label"
               >&lt;&nbsp;1%</span
             >
           </div>
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.degraded") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-label"
+              class="text-3xs text-text-label"
               >1&nbsp;–&nbsp;5%</span
             >
           </div>
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.warning") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-label"
+              class="text-3xs text-text-label"
               >5&nbsp;–&nbsp;10%</span
             >
           </div>
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.critical") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-label"
+              class="text-3xs text-text-label"
               >&gt;&nbsp;10%</span
             >
           </div>
@@ -310,27 +310,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OPopover>
         </span>
       </div>
-      <!-- Column-visibility toggle + refresh — pinned to the right end of the
-           filter bar so the catalog matches the other list pages (column
-           toggle, then refresh). Wrapped in a real element with ms-2 because
-           OTableColumnToggle's root is a reka-ui DropdownMenuRoot that renders
-           no DOM node, so a fallthrough class on it would be dropped. -->
+      <!-- A real wrapper carries ms-2: OTableColumnToggle's root is a reka-ui
+           DropdownMenuRoot that renders no DOM node, so a class on it is dropped. -->
       <div class="ms-2 flex shrink-0 items-center gap-2">
         <OTableColumnToggle
           :columns="tableColumns"
           :column-visibility="columnVisibility"
           @update:column-visibility="setColumnVisibility"
         />
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="isLoading || isSearching"
-          data-test="services-catalog-refresh-btn"
-          @click="refreshCatalog"
-        >
-          <OTooltip side="bottom" :content="t('common.refresh')" />
-        </OButton>
       </div>
     </div>
 
@@ -796,6 +783,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
+import { entrypointPredicate } from "@/utils/traces/tracesScope";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
 import { useScrollEndFade } from "./useScrollEndFade";
 import { placeholderLineKey } from "@/types/serviceRef";
@@ -1011,7 +999,7 @@ const isLoading = ref(true);
 // A search in flight with results still on screen — the spinner, not the
 // empty state.
 const isSearching = ref(false);
-// Epoch-ms of the last completed load, shown on the page header's refresh control.
+// Epoch-ms of the last completed load, shown on the catalog's refresh control.
 const lastRunAt = ref<number | null>(null);
 const services = ref<ServiceRow[]>([]);
 // The failed search's server message; shown instead of the empty state so a broken query never reads as "no services".
@@ -1264,20 +1252,8 @@ const selectedServiceNode = computed(() => {
 
 const emptyGraphData = { nodes: [], edges: [] };
 
-// Stored relative start/end go stale, so the panel resolves "now" when it opens or the range changes.
+// The panel shows the window the rows were loaded with, so both always cover the same span.
 const timeRange = ref(getEffectiveTimeRange(searchObj.data.datetime));
-watch(
-  () => [
-    selectedServiceRow.value,
-    searchObj.data.datetime.type,
-    searchObj.data.datetime.relativeTimePeriod,
-    searchObj.data.datetime.startTime,
-    searchObj.data.datetime.endTime,
-  ],
-  () => {
-    if (selectedServiceRow.value) timeRange.value = getEffectiveTimeRange(searchObj.data.datetime);
-  },
-);
 
 let currentTraceId: string | null = null;
 const versionTraffic = ref(new Map<string, VersionTraffic>());
@@ -1919,13 +1895,6 @@ async function fetchSchemaFlags(org: string, stream: string): Promise<StreamSche
   }
 }
 
-function requestPredicate(hasParentColumn: boolean): string {
-  const kinds = "CAST(span_kind AS VARCHAR) IN ('2','5')";
-  if (!hasParentColumn) return `(${kinds})`;
-  // Any root counts, whatever its kind: a trace that starts at a client span still entered the system there.
-  return `(${kinds} OR (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))`;
-}
-
 // Conditional aggregation, not WHERE, so services with no request spans still get a row.
 function redAggregates(pred: string): string {
   const requests = `COUNT(*) FILTER (WHERE ${pred})`;
@@ -1946,7 +1915,7 @@ function redAggregates(pred: string): string {
 }
 
 function catalogSql(streamName: string, flags: StreamSchemaFlags): string {
-  const requestPred = requestPredicate(flags.hasParentColumn);
+  const requestPred = entrypointPredicate(flags.hasParentColumn);
   // Spellings of one service share a registry key, so they are one row named by one of its spellings.
   const key = serviceKeySql("service_name");
   if (!flags.hasInferColumns) {
@@ -2145,7 +2114,7 @@ async function loadVersionTraffic(
 ) {
   const sql = servingHealthSql(
     stream,
-    requestPredicate(flags.hasParentColumn),
+    entrypointPredicate(flags.hasParentColumn),
     flags.hasInferColumns,
     flags.hasImageColumn,
   );
@@ -2341,6 +2310,7 @@ async function loadServicesCatalog() {
         publish();
         rowsCapped.value = rows.size >= CATALOG_ROWS;
         loadedFor.value = { stream: streamName, period, rows: services.value };
+        timeRange.value = { startTime: start_time, endTime: end_time };
         syncSelectedRow();
         isLoading.value = false;
         isSearching.value = false;
@@ -2361,8 +2331,8 @@ async function loadServicesCatalog() {
 defineExpose({
   loadServicesCatalog,
   streamFilter,
-  refresh: loadServicesCatalog,
-  loading: isLoading,
+  refresh: refreshCatalog,
+  loading: computed(() => isLoading.value || isSearching.value),
   lastRunAt,
 });
 

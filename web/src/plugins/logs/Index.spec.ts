@@ -302,7 +302,9 @@ vi.mock("@/plugins/traces/metrics/TracesAnalysisDashboard.vue", () => ({
       streamFields: null,
       logSamples: null,
       analysisType: null,
+      initialDimensions: null,
     },
+    emits: ["update:dimensions"],
     template: '<div data-test="drill-down-dashboard-stub"><slot name="header-start" /></div>',
   },
 }));
@@ -1654,6 +1656,74 @@ describe("Logs Index", async () => {
     });
   });
 
+  describe("empty-org state when the org holds only internal streams", () => {
+    const setStreams = async (
+      streamLists: { label: string; value: string; internal: boolean }[],
+      { drillDown = false, selectedStream = [] as string[] } = {},
+    ) => {
+      const { searchObj } = wrapper.vm;
+      searchObj.meta.sqlMode = false;
+      searchObj.meta.logsVisualizeToggle = drillDown ? "drilldown" : "logs";
+      searchObj.data.stream.streamType = "logs";
+      searchObj.data.stream.streamLists = streamLists;
+      searchObj.data.stream.selectedStream = selectedStream;
+      searchObj.data.filterErrMsg = "";
+      searchObj.loadingStream = false;
+      searchObj.loading = false;
+      await flushPromises();
+    };
+    const calibration = {
+      label: "_o2_alert_calibration_digests",
+      value: "_o2_alert_calibration_digests",
+      internal: true,
+    };
+    const emptyOrg = () => wrapper.find('[data-test="logs-search-no-streams-in-org-text"]');
+    const noStreamSelected = () =>
+      wrapper.find('[data-test="logs-search-no-stream-selected-text"]');
+    const drillDownEmptyOrg = () =>
+      wrapper.find('[data-test="logs-drill-down-no-streams-in-org-text"]');
+
+    it("shows the empty-org state when the only stream is internal", async () => {
+      await setStreams([calibration]);
+
+      expect(wrapper.vm.noUserStreamsInOrg).toBe(true);
+      expect(emptyOrg().exists()).toBe(true);
+      expect(noStreamSelected().exists()).toBe(false);
+    });
+
+    it("shows the drill-down empty-org state when the only stream is internal", async () => {
+      await setStreams([calibration], { drillDown: true });
+
+      expect(drillDownEmptyOrg().exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-drill-down-no-stream-selected-text"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("shows the pick-a-stream state when a user stream exists", async () => {
+      await setStreams([calibration, { label: "app_logs", value: "app_logs", internal: false }]);
+
+      expect(wrapper.vm.noUserStreamsInOrg).toBe(false);
+      expect(emptyOrg().exists()).toBe(false);
+      expect(noStreamSelected().exists()).toBe(true);
+    });
+
+    it("counts a user-sourced internal stream like _rumdata as user data", async () => {
+      await setStreams([calibration, { label: "_rumdata", value: "_rumdata", internal: true }]);
+
+      expect(wrapper.vm.noUserStreamsInOrg).toBe(false);
+      expect(emptyOrg().exists()).toBe(false);
+      expect(noStreamSelected().exists()).toBe(true);
+    });
+
+    it("keeps an explicitly selected internal stream out of the empty-org state", async () => {
+      await setStreams([calibration], { selectedStream: [calibration.value] });
+
+      expect(wrapper.vm.noUserStreamsInOrg).toBe(false);
+      expect(emptyOrg().exists()).toBe(false);
+    });
+  });
+
   describe("Drill down mode", () => {
     const hits = [
       { _timestamp: 1, level: "info" },
@@ -1725,6 +1795,23 @@ describe("Logs Index", async () => {
       await enterDrillDown();
 
       expect(wrapper.find("#thirdLevel").attributes("style")).toContain("display: none");
+    });
+
+    it("hands the picked dimensions back to the dashboard each time it remounts", async () => {
+      await enterDrillDown();
+      const { searchObj } = wrapper.vm;
+      expect(dashboard().props("initialDimensions")).toBeNull();
+
+      dashboard().vm.$emit("update:dimensions", ["service_name", "level"]);
+      await flushPromises();
+      expect(searchObj.meta.drillDownDimensions).toEqual(["service_name", "level"]);
+
+      searchObj.loading = true;
+      await flushPromises();
+      expect(dashboard().exists()).toBe(false);
+      searchObj.loading = false;
+      await flushPromises();
+      expect(dashboard().props("initialDimensions")).toEqual(["service_name", "level"]);
     });
 
     it("unmounts the dashboard while a search runs so it rebuilds from the new results", async () => {
@@ -1874,6 +1961,29 @@ describe("Logs Index", async () => {
       await flushPromises();
 
       expect(dashboard().props("baseFilter")).toBe("level = 'warn'");
+    });
+
+    it("keeps the picked dimensions when the time range changes and the search re-runs", async () => {
+      await enterDrillDown();
+      const { searchObj } = wrapper.vm;
+      wrapper.vm.searchResultRef = null;
+      searchObj.data.datetime.startTime = 10;
+      searchObj.data.datetime.endTime = 20;
+      dashboard().vm.$emit("update:dimensions", ["service_name", "k8s_deployment_name"]);
+      await flushPromises();
+
+      searchObj.data.datetime.startTime = 5;
+      searchObj.data.datetime.endTime = 20;
+      searchObj.loading = true;
+      await flushPromises();
+      searchObj.loading = false;
+      await flushPromises();
+
+      expect(dashboard().props("timeRange")).toEqual({ startTime: 5, endTime: 20 });
+      expect(dashboard().props("initialDimensions")).toEqual([
+        "service_name",
+        "k8s_deployment_name",
+      ]);
     });
 
     it("re-runs the Search tab activation flow on keep-alive reactivation", async () => {

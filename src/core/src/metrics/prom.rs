@@ -663,7 +663,7 @@ pub async fn remote_write(
 
     let step_start = std::time::Instant::now();
     for (stream_name, mut json_data) in json_data_by_stream {
-        #[cfg(feature = "vectorscan")]
+        #[cfg(feature = "enterprise")]
         apply_redaction(org_id, &stream_name, &mut json_data).await;
         finish_identity_columns(&mut json_data);
         let has_uds = matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)));
@@ -887,6 +887,7 @@ fn metadata_search_request(sql: String, start: i64, end: i64) -> config::meta::s
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     }
 }
 
@@ -1218,7 +1219,7 @@ fn metadata_sql(
 
 /// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
 /// Redacts a stream's pending records and drops the series hash computed from the raw labels.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut [PendingRecord]) {
     if json_data.is_empty()
         || config::meta::self_reporting::redaction::is_self_reporting_stream(
@@ -1574,6 +1575,20 @@ async fn prom_ha_handler(
 #[cfg(test)]
 mod tests {
     use config::utils::flatten::format_label_name_owned;
+    use datafusion::{
+        arrow::{
+            array::StringArray,
+            datatypes::{DataType, Field},
+            record_batch::RecordBatch,
+        },
+        common::TableReference,
+        prelude::SessionContext,
+        sql::sqlparser::{
+            ast::{Expr, Value, visit_expressions_mut},
+            dialect::{Dialect, GenericDialect, PostgreSqlDialect},
+            parser::Parser,
+        },
+    };
     use promql_parser::{
         label::{MatchOp, Matcher, Matchers},
         parser::VectorSelector,
@@ -1583,17 +1598,7 @@ mod tests {
 
     #[test]
     fn metadata_sql_round_trips_matcher_values() {
-        use datafusion::sql::sqlparser::{
-            ast::{Expr, Value, visit_expressions_mut},
-            dialect::{Dialect, GenericDialect, PostgreSqlDialect},
-            parser::Parser,
-        };
-
-        let schema = Schema::new(vec![datafusion::arrow::datatypes::Field::new(
-            "job",
-            datafusion::arrow::datatypes::DataType::Utf8,
-            true,
-        )]);
+        let schema = Schema::new(vec![Field::new("job", DataType::Utf8, true)]);
         let values = [
             "worker's",
             r"worker\\path",
@@ -1661,11 +1666,6 @@ mod tests {
     async fn metadata_sql_executes_matchers_without_changing_selected_rows() {
         use std::sync::Arc;
 
-        use datafusion::{
-            arrow::{array::StringArray, record_batch::RecordBatch},
-            common::TableReference,
-            prelude::SessionContext,
-        };
         use search::datafusion::udf::regex::regexp::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
 
         for (op, pattern, matching) in [
@@ -1731,10 +1731,6 @@ mod tests {
     async fn metadata_sql_reads_null_label_as_empty() {
         use std::sync::Arc;
 
-        use datafusion::{
-            arrow::{array::StringArray, record_batch::RecordBatch},
-            prelude::SessionContext,
-        };
         use search::datafusion::udf::regex::regexp::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
 
         let ctx = SessionContext::new();
@@ -1790,10 +1786,6 @@ mod tests {
     async fn metadata_sql_anchors_regex_matchers_to_the_whole_value() {
         use std::sync::Arc;
 
-        use datafusion::{
-            arrow::{array::StringArray, record_batch::RecordBatch},
-            prelude::SessionContext,
-        };
         use search::datafusion::udf::regex::regexp::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
 
         let values = [
@@ -1866,11 +1858,6 @@ mod tests {
 
     #[test]
     fn metadata_sql_quotes_identifiers_and_preserves_field_selection() {
-        use datafusion::{
-            arrow::datatypes::{DataType, Field},
-            sql::sqlparser::{dialect::GenericDialect, parser::Parser},
-        };
-
         let parser::Expr::VectorSelector(selector) = parser::parse(
             r#"{__name__='metric"name',job="ok",missing="skip",_timestamp="skip",value="skip"}"#,
         )
@@ -1918,8 +1905,6 @@ mod tests {
 
     #[test]
     fn selector_on_absent_label_matches_nothing_unless_empty_passes() {
-        use datafusion::arrow::datatypes::{DataType, Field};
-
         let schema = Schema::new(vec![Field::new("job", DataType::Utf8, true)]);
         for (query, nothing) in [
             (r#"m{uuid="x"}"#, true),
@@ -2267,8 +2252,6 @@ mod tests {
 
     #[test]
     fn test_sample_cell_keeps_a_stale_marker_only_for_a_stream_with_a_value_column() {
-        use datafusion::arrow::datatypes::{DataType, Field};
-
         let stale = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
         let with_value = SchemaCache::new(Schema::new(vec![
             Field::new(NAME_LABEL, DataType::Utf8, true),

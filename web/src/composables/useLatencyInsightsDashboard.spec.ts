@@ -87,3 +87,40 @@ describe("useLatencyInsightsDashboard — logs Drill down", () => {
     expect(dashboard.tabs[0].panels[0].config.decimals).toBe(0);
   });
 });
+
+describe("useLatencyInsightsDashboard — top values across Baseline and Selected", () => {
+  // A LIMIT applied to the UNION counts a Baseline and a Selected row as two values, so Selected
+  // bars (or whole values) drop out. The top values must be picked first, then both series kept.
+  const expectTopValuesFirst = (sql: string) => {
+    expect(sql).not.toMatch(/\bUNION\b[^]*\bORDER BY trace_count DESC LIMIT 5$/);
+    expect(sql).toContain("MAX(trace_count) OVER (PARTITION BY value)");
+    expect(sql).toContain("DENSE_RANK() OVER (ORDER BY mx DESC, value)");
+    expect(sql).toMatch(/WHERE rk <= 5 ORDER BY trace_count DESC$/);
+    expect(sql.match(/LIMIT/g)).toBeNull();
+  };
+
+  it("does not cap the combined rows of a brushed comparison", () => {
+    const sql = sqlOf(logsConfig(BRUSH, "level = 'error'"));
+    expectTopValuesFirst(sql);
+    expect(sql).toContain("'Baseline' AS series");
+    expect(sql).toContain("'Selected' AS series");
+  });
+
+  it("does not cap the combined rows of a brushed comparison over a custom SQL query", () => {
+    const sql = sqlOf(
+      logsConfig(
+        BRUSH,
+        `SELECT * FROM "app_logs" WHERE level = 'error' AND _timestamp >= 1 AND _timestamp <= 2`,
+      ),
+    );
+    expectTopValuesFirst(sql);
+    expect(sql).toContain("baseline_query");
+    expect(sql).toContain("selected_query");
+  });
+
+  it("keeps the plain LIMIT 5 when there is no brush", () => {
+    expect(sqlOf(logsConfig(null, "level = 'error'"))).toMatch(
+      /ORDER BY trace_count DESC LIMIT 5$/,
+    );
+  });
+});

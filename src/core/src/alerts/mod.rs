@@ -58,6 +58,7 @@ pub mod external_alerts;
 pub mod incident_title;
 #[cfg(feature = "enterprise")]
 pub mod incidents;
+pub mod leases;
 pub mod lifecycle;
 #[cfg(feature = "enterprise")]
 pub mod membership_provider;
@@ -67,6 +68,8 @@ pub mod notifications;
 mod prom_rule;
 #[cfg(feature = "enterprise")]
 pub mod rca_live;
+#[cfg(feature = "enterprise")]
+pub mod rca_recheck;
 #[cfg(feature = "enterprise")]
 pub mod rca_resume;
 #[cfg(feature = "enterprise")]
@@ -603,6 +606,7 @@ impl QueryConditionExt for QueryCondition {
                 clear_cache: false,
                 local_mode: None,
                 agent_options: None,
+                raw_streams: None,
             };
             log::debug!(
                 "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search, {req:?}"
@@ -921,6 +925,7 @@ async fn run_alert_count_query(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     };
     let resp = SearchService::grpc_search::grpc_search(
         trace_id,
@@ -2106,6 +2111,7 @@ fn unsupported_operator(cond: &Condition, field_type: &DataType) -> anyhow::Erro
 
 #[cfg(test)]
 mod tests {
+    use arrow::{array::StringArray, record_batch::RecordBatch};
     use arrow_schema::{DataType, Field, Schema};
     use config::{
         meta::alerts::{
@@ -2114,6 +2120,8 @@ mod tests {
         },
         utils::json::Value,
     };
+    use datafusion::{datasource::MemTable, prelude::SessionContext};
+    use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
     use super::*;
 
@@ -2640,8 +2648,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_condition_group_to_sql_complex_with_nested_group() {
-        use arrow_schema::{DataType, Field, Schema};
-
         use crate::alerts::ConditionGroupExt;
 
         let schema = Schema::new(vec![
@@ -4032,7 +4038,6 @@ mod tests {
     #[test]
     fn test_build_expr_string_literals_survive_reserialisation() {
         use config::utils::json::json;
-        use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
         let parse = |sql: &str| Parser::parse_sql(&PostgreSqlDialect {}, sql).unwrap();
         for value in [r"x\' OR 1=1 --", "a''b"] {
@@ -4090,9 +4095,6 @@ mod tests {
     #[tokio::test]
     async fn test_like_escapes_are_honoured_by_datafusion() {
         use std::sync::Arc;
-
-        use arrow::{array::StringArray, record_batch::RecordBatch};
-        use datafusion::{datasource::MemTable, prelude::SessionContext};
 
         let schema = Arc::new(Schema::new(vec![Field::new("c", DataType::Utf8, true)]));
         let batch = RecordBatch::try_new(
@@ -4159,9 +4161,6 @@ mod tests {
     #[tokio::test]
     async fn test_regex_sql_agrees_with_in_memory_evaluation() {
         use std::sync::Arc;
-
-        use arrow::{array::StringArray, record_batch::RecordBatch};
-        use datafusion::{datasource::MemTable, prelude::SessionContext};
 
         let texts = [Some("an error here"), Some("berrorb"), Some("a\tb"), None];
         let schema = Arc::new(Schema::new(vec![Field::new("c", DataType::Utf8, true)]));

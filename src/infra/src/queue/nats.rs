@@ -24,9 +24,14 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_cluster_name, get_config};
 use futures::TryStreamExt;
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::sync::mpsc;
 
-use crate::{db::nats::get_nats_client, errors::*, queue, queue::format_key};
+use crate::{
+    db::nats::{get_nats_client, try_get_nats_client},
+    errors::*,
+    queue,
+    queue::format_key,
+};
 
 pub async fn init() -> Result<()> {
     crate::db::nats::init().await
@@ -94,7 +99,7 @@ impl NatsQueue {
         deliver_policy: Option<queue::DeliverPolicy>,
     ) -> Result<NatsPullConsumer> {
         let stream_name = format!("{}{}", self.prefix, format_key(topic));
-        let client = get_nats_client().await.clone();
+        let client = try_get_nats_client().await?.clone();
         let jetstream = jetstream::new(client);
         let stream = jetstream
             .get_stream(&stream_name)
@@ -206,45 +211,15 @@ impl super::Queue for NatsQueue {
         topic: &str,
         deliver_policy: Option<queue::DeliverPolicy>,
     ) -> Result<Arc<mpsc::Receiver<super::Message>>> {
-        let (tx, rx) = mpsc::channel(1024);
+        let consumer = self.pull_consumer(topic, deliver_policy).await?;
         let stream_name = format!("{}{}", self.prefix, format_key(topic));
-        let consumer_name = self.consumer_name.clone();
-        let is_durable = self.is_durable;
-        let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-            let client = get_nats_client().await.clone();
-            let jetstream = jetstream::new(client);
-            let stream = jetstream.get_stream(&stream_name).await.map_err(|e| {
-                log::error!("Failed to get nats stream {stream_name}: {e}");
-                Error::Message(format!("Failed to get nats stream {stream_name}: {e}"))
-            })?;
-            let config = jetstream::consumer::pull::Config {
-                name: Some(consumer_name.to_string()),
-                durable_name: if is_durable {
-                    Some(consumer_name.to_string())
-                } else {
-                    None
-                },
-                deliver_policy: get_deliver_policy(deliver_policy),
-                ..Default::default()
-            };
-            let consumer = stream
-                .get_or_create_consumer(&consumer_name, config)
-                .await
-                .map_err(|e| {
-                    log::error!(
-                        "Failed to get_or_create_consumer for nats stream {stream_name}: {e}"
-                    );
-                    Error::Message(format!(
-                        "Failed to get_or_create_consumer for nats stream {stream_name}: {e}"
-                    ))
-                })?;
-            // Consume messages from the consumer
-            let mut messages = consumer.messages().await.map_err(|e| {
-                log::error!("Failed to get nats consumer messages for stream {stream_name}: {e}");
-                Error::Message(format!(
-                    "Failed to get nats consumer messages for stream {stream_name}: {e}"
-                ))
-            })?;
+        let mut messages = consumer.consumer.messages().await.map_err(|error| {
+            Error::Message(format!(
+                "failed to start NATS consumer for {stream_name}: {error}"
+            ))
+        })?;
+        let (tx, rx) = mpsc::channel(1024);
+        tokio::task::spawn(async move {
             loop {
                 let message = match messages.try_next().await {
                     Ok(Some(message)) => message,
@@ -265,14 +240,11 @@ impl super::Queue for NatsQueue {
                     }
                 };
                 let message = super::Message::from_nats(message);
-                tx.send(message).await.map_err(|e| {
-                    log::error!("Failed to send nats message for stream {stream_name}: {e}");
-                    Error::Message(format!(
-                        "Failed to send nats message for stream {stream_name}: {e}"
-                    ))
-                })?;
+                if let Err(error) = tx.send(message).await {
+                    log::error!("Failed to send NATS message for {stream_name}: {error}");
+                    break;
+                }
             }
-            Ok(())
         });
         Ok(Arc::new(rx))
     }
@@ -378,6 +350,41 @@ fn get_deliver_policy(deliver_policy: Option<queue::DeliverPolicy>) -> DeliverPo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn live_consume_is_established_before_new_policy_publish() {
+        if std::env::var("O2_TEST_NATS").as_deref() != Ok("true") {
+            return;
+        }
+        use crate::queue::Queue;
+        let queue = NatsQueue::new(&format!(
+            "consume_ready_{}_",
+            config::utils::time::now_micros()
+        ));
+        queue.create("events").await.unwrap();
+        let mut receiver = queue
+            .consume("events", Some(queue::DeliverPolicy::New))
+            .await
+            .unwrap();
+        queue
+            .publish("events", Bytes::from_static(b"after-consume"))
+            .await
+            .unwrap();
+        let message = tokio::time::timeout(
+            Duration::from_secs(5),
+            Arc::get_mut(&mut receiver).unwrap().recv(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(message.message().as_ref(), b"after-consume");
+        message.ack().await.unwrap();
+        let stream_name = format!("{}events", queue.prefix);
+        jetstream::new(try_get_nats_client().await.unwrap().clone())
+            .delete_stream(stream_name)
+            .await
+            .unwrap();
+    }
 
     #[test]
     fn test_nats_queue_new_strips_trailing_slash() {

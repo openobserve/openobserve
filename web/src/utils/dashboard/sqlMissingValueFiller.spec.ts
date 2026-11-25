@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fillMissingValues } from "./sqlMissingValueFiller";
+import { NULL_BREAKDOWN_VALUE } from "./sqlProcessData";
 
 // Mock date-fns-tz: toZonedTime shifts the date so its local representation
 // equals the requested timezone. For "UTC", local getHours() = UTC hours.
@@ -289,6 +290,29 @@ describe("fillMissingValues", () => {
       service: "frontend",
       value: 200,
     });
+  });
+
+  it("keeps the NULL and empty breakdown rows of one time slot apart", () => {
+    const processedData = [
+      { ts: "2024-01-15T10:00:00", service: NULL_BREAKDOWN_VALUE, value: 8 },
+      { ts: "2024-01-15T10:00:00", service: "", value: 4 },
+    ];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeResultMetaData(60),
+      makeMetadata(),
+      ["ts"],
+      ["value"],
+      [],
+      ["service"],
+      null,
+    );
+
+    expect(result.map((row: Record<string, unknown>) => [row.service, row.value])).toEqual([
+      [NULL_BREAKDOWN_VALUE, 8],
+      ["", 4],
+    ]);
   });
 
   it("inserts null entry with breakdown when data is missing for the time slot", () => {
@@ -807,5 +831,47 @@ describe("fillMissingValues", () => {
     const catB = result.find((r: any) => r.category === "b");
     expect(catA).toBeDefined();
     expect(catB).toBeDefined();
+  });
+
+  it("returns the rows unfilled when an in-range row falls between slots (no breakdown)", () => {
+    const start = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const processedData = [
+      { ts: "2024-01-15T10:00:30", value: 7 },
+      { ts: "2024-01-15T10:01:00", value: 2 },
+    ];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("bar"),
+      makeResultMetaData(60),
+      makeMetadata({ startTime: start * 1000, endTime: (start + 120000) * 1000 }),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      null,
+    );
+
+    expect(result).toEqual(processedData);
+  });
+
+  it("returns the rows unfilled when an in-range row falls between slots (with breakdown)", () => {
+    const start = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const processedData = [
+      { ts: "2024-01-15T10:00:00", service: "api", value: 1 },
+      { ts: "2024-01-15T10:00:30", service: "api", value: 9 },
+    ];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("stacked"),
+      makeResultMetaData(60),
+      makeMetadata({ startTime: start * 1000, endTime: (start + 60000) * 1000 }),
+      ["ts"],
+      ["value"],
+      [],
+      ["service"],
+      null,
+    );
+
+    expect(result).toEqual(processedData);
   });
 });

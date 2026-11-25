@@ -276,6 +276,8 @@ mod m20261219_000001_add_historical_to_alert_incidents;
 mod m20261220_000001_create_service_identity_tables;
 mod m20261221_000001_add_last_detection_at_to_alert_incidents;
 mod m20261222_000001_incident_membership_and_catalog_cleanup;
+mod m20261223_000001_create_alert_leases;
+mod m20261224_000001_delete_cli_ai_toolsets;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -602,6 +604,11 @@ pub(crate) fn alert_slack_migrations_for_test() -> Vec<Box<dyn MigrationTrait>> 
     ]
 }
 
+#[cfg(test)]
+pub(crate) fn alert_leases_migration_for_test() -> m20261223_000001_create_alert_leases::Migration {
+    m20261223_000001_create_alert_leases::Migration
+}
+
 /// Run the v1 run-pointer backfill over the current rows, for tests in any crate.
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn backfill_v1_rca_pointer(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
@@ -915,6 +922,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261220_000001_create_service_identity_tables::Migration),
             Box::new(m20261221_000001_add_last_detection_at_to_alert_incidents::Migration),
             Box::new(m20261222_000001_incident_membership_and_catalog_cleanup::Migration),
+            Box::new(m20261223_000001_create_alert_leases::Migration),
+            Box::new(m20261224_000001_delete_cli_ai_toolsets::Migration),
         ]
     }
 }
@@ -1052,6 +1061,8 @@ mod tests {
             157,
             "m20261222_000001_incident_membership_and_catalog_cleanup",
         ),
+        (158, "m20261223_000001_create_alert_leases"),
+        (159, "m20261224_000001_delete_cli_ai_toolsets"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1265,6 +1276,10 @@ mod tests {
             (
                 "m20260720_000001_create_workflow_run_data_table",
                 "m20261102_000001_add_workflow_run_data_run_id_index",
+            ),
+            (
+                "m20260414_000002_create_org_ai_toolsets",
+                "m20261224_000001_delete_cli_ai_toolsets",
             ),
         ] {
             assert!(

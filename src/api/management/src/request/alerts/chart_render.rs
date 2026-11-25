@@ -145,12 +145,12 @@ pub async fn render_chart(
 
     // Bounded render capacity: at the cap this sheds load with a 404 rather
     // than queueing — charts must never pile work onto a busy node.
-    let Ok(_permit) = chart::render_semaphore().try_acquire() else {
+    let Ok(permit) = chart::render_semaphore().try_acquire() else {
         event("over_capacity");
         return MetaHttpResponse::not_found("not found");
     };
 
-    match chart::render::render_png(&payload) {
+    match chart::render_png_bounded(payload, permit).await {
         Ok(png) => {
             event("rendered_fetch");
             let png = Arc::new(png);
@@ -158,8 +158,6 @@ pub async fn render_chart(
             png_response(png)
         }
         Err(e) => {
-            // Only reachable with a validly signed payload — our own bug, not
-            // attacker input; log it, still answer 404.
             log::warn!("[ALERT_CHART] fetch-time render failed: {e}");
             MetaHttpResponse::not_found("not found")
         }

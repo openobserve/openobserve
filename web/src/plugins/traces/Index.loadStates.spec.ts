@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { createTracesSqlTexts } from "@/utils/traces/tracesSqlTexts";
 import { defineComponent, h, KeepAlive, nextTick, reactive, ref, watch } from "vue";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import Index from "@/plugins/traces/Index.vue";
@@ -143,8 +144,13 @@ vi.mock("@/composables/useTraces", () => ({
     updatedLocalLogFilterField: vi.fn(),
     loadTracesParser: mockLoadTracesParser,
     tracesParser: { value: { astify: vi.fn(() => ({ where: null })) } },
+    ...sqlTexts(),
   }),
 }));
+
+// The real two-text state over the mock searchObj, like the module singleton it stands for.
+let sharedSqlTexts: ReturnType<typeof createTracesSqlTexts> | null = null;
+const sqlTexts = () => (sharedSqlTexts ??= createTracesSqlTexts(searchObj as any, { value: null }));
 
 vi.mock("@/utils/streamPersist", () => ({
   saveTracesStream: vi.fn(),
@@ -366,12 +372,29 @@ describe("Traces page load states", () => {
         expect(searchObj.meta.resultGrid.showPagination).toBe(false);
       });
 
-      it("drops the kept error count and pager when the re-run's count fails", async () => {
+      it("keeps the last count, error count and pager when the same query's re-run count fails", async () => {
         vi.spyOn(console, "warn").mockImplementation(() => {});
         await settleFirstRun();
         lastCall("main")[1].complete(null);
         lastCall("count")[1].error(null, new Error("boom"));
 
+        expect(searchObj.data.queryResults.total).toBe(42);
+        expect(searchObj.data.queryResults.errorCount).toBe(1);
+        expect(searchObj.meta.resultGrid.showPagination).toBe(true);
+      });
+
+      it("drops the kept error count and pager when another query's count fails", async () => {
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+        await mountSearching();
+        lastCall("main")[1].complete(null);
+        lastCall("count")[1].data(null, countHits(42));
+        lastCall("count")[1].complete(null);
+        searchObj.data.editorValue = "span_status = 'ERROR'";
+        await wrapper!.vm.getQueryData();
+        lastCall("main")[1].complete(null);
+        lastCall("count")[1].error(null, new Error("boom"));
+
+        expect(searchObj.data.queryResults.total).toBeNull();
         expect(searchObj.data.queryResults.errorCount).toBeUndefined();
         expect(searchObj.meta.resultGrid.showPagination).toBe(false);
       });

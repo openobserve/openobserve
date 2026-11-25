@@ -32,6 +32,7 @@ use lettre::{
         client::{Tls, TlsParameters},
     },
 };
+use parquet::basic::Compression;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 
@@ -157,7 +158,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
 // 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
 //      service_streams rows named by the metric-name label that list no trace stream.
-pub const DB_SCHEMA_VERSION: u64 = 157;
+// 159: delete org_ai_toolsets rows of the removed cli kind.
+pub const DB_SCHEMA_VERSION: u64 = 159;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -842,8 +844,11 @@ async fn init_sns_client() -> aws_sdk_sns::Client {
     let cfg = get_config();
     let shared_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
 
-    let sns_config = aws_sdk_sns::config::Builder::from(&shared_config)
-        .endpoint_url(cfg.sns.endpoint.clone())
+    let mut builder = aws_sdk_sns::config::Builder::from(&shared_config);
+    if !cfg.sns.endpoint.is_empty() {
+        builder = builder.endpoint_url(cfg.sns.endpoint.clone());
+    }
+    let sns_config = builder
         .timeout_config(
             aws_config::timeout::TimeoutConfig::builder()
                 .connect_timeout(std::time::Duration::from_secs(cfg.sns.connect_timeout))
@@ -1260,7 +1265,7 @@ pub struct DatabaseMonitoring {
 pub struct ServiceVersions {
     #[env_config(
         name = "ZO_SERVICE_VERSIONS_ENABLED",
-        default = true,
+        default = false,
         help = "Enable Service Versions: span stamping at ingest, the version registry flush and the service signals processor. false pauses all three and keeps every stored row and cursor; true resumes from the saved cursors."
     )]
     pub enabled: bool,
@@ -2629,7 +2634,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_SDR_FAIL_CLOSED",
         default = false,
-        help = "Refuse rather than keep unredacted data when sensitive-data redaction cannot run. Logs and traces ingestion is rejected with 503 while the pattern manager is unavailable or a stream's ingestion pattern failed to build, and a search on a stream with search-time patterns errors when its redaction step cannot run. Off by default: data is stored and returned unredacted and the evidence row records a fail-open."
+        help = "Refuse rather than keep unredacted data when ingestion-time redaction cannot run. Logs and traces ingestion is rejected with 503 while the pattern manager is unavailable or a stream's ingestion pattern failed to build. Off by default: data is stored unredacted and the evidence row records a fail-open. Search-time redaction ignores this setting and always fails closed."
     )]
     pub sdr_fail_closed: bool,
     #[env_config(
@@ -3777,7 +3782,7 @@ pub struct Nats {
     #[env_config(
         name = "ZO_NATS_KV_WATCH_MODULES",
         help = "Set the modules which need to use kv watcher",
-        default = ""
+        default = "/nodes/,/user_sessions/"
     )]
     pub kv_watch_modules: String,
 }
@@ -3975,7 +3980,7 @@ pub struct Pipeline {
     #[env_config(
         name = "ZO_PIPELINE_REMOTE_REQUEST_MAX_RETRY_TIME",
         default = 86400,
-        help = "pipeline exporter client request max retry times, default 1440 minutes(24 hours)， unit is seconds"
+        help = "seconds one export keeps retrying before the file goes back to the retry queue, default 86400 (24 hours)"
     )]
     pub remote_request_max_retry_time: u64,
     #[env_config(
@@ -5455,15 +5460,15 @@ pub fn get_cluster_name() -> String {
 }
 
 #[inline]
-pub fn get_parquet_compression(compression: &str) -> parquet::basic::Compression {
+pub fn get_parquet_compression(compression: &str) -> Compression {
     match compression.to_lowercase().as_str() {
-        "none" | "uncompressed" => parquet::basic::Compression::UNCOMPRESSED,
-        "snappy" => parquet::basic::Compression::SNAPPY,
-        "gzip" => parquet::basic::Compression::GZIP(Default::default()),
-        "brotli" => parquet::basic::Compression::BROTLI(Default::default()),
-        "lz4" | "lz4_raw" => parquet::basic::Compression::LZ4_RAW,
-        "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
-        _ => parquet::basic::Compression::ZSTD(Default::default()),
+        "none" | "uncompressed" => Compression::UNCOMPRESSED,
+        "snappy" => Compression::SNAPPY,
+        "gzip" => Compression::GZIP(Default::default()),
+        "brotli" => Compression::BROTLI(Default::default()),
+        "lz4" | "lz4_raw" => Compression::LZ4_RAW,
+        "zstd" => Compression::ZSTD(Default::default()),
+        _ => Compression::ZSTD(Default::default()),
     }
 }
 
@@ -6157,6 +6162,58 @@ mod tests {
     }
 
     #[test]
+    fn test_sns_endpoint_builder_and_resolution() {
+        use aws_sdk_sns::config::endpoint::ResolveEndpoint;
+
+        let shared_config = aws_config::SdkConfig::builder()
+            .region(aws_config::Region::new("eu-central-1"))
+            .build();
+
+        let empty_endpoint = "";
+        let mut builder_default = aws_sdk_sns::config::Builder::from(&shared_config);
+        if !empty_endpoint.is_empty() {
+            builder_default = builder_default.endpoint_url(empty_endpoint);
+        }
+        let _client = aws_sdk_sns::Client::from_conf(builder_default.build());
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let resolver = aws_sdk_sns::config::endpoint::DefaultResolver::new();
+        let params_default = aws_sdk_sns::config::endpoint::Params::builder()
+            .region("eu-central-1".to_string())
+            .build()
+            .unwrap();
+        let endpoint = rt
+            .block_on(resolver.resolve_endpoint(&params_default))
+            .unwrap();
+        assert_eq!(endpoint.url(), "https://sns.eu-central-1.amazonaws.com");
+
+        let params_empty = aws_sdk_sns::config::endpoint::Params::builder()
+            .region("eu-central-1".to_string())
+            .endpoint("".to_string())
+            .build()
+            .unwrap();
+        assert!(
+            std::panic::catch_unwind(|| {
+                let _ = rt.block_on(resolver.resolve_endpoint(&params_empty));
+            })
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn test_init_sns_client_succeeds_with_default_config() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let _client = rt.block_on(init_sns_client());
+    }
+
+    #[test]
     fn test_file_format_display() {
         assert_eq!(FileFormat::Parquet.to_string(), "parquet");
         assert_eq!(FileFormat::Vortex.to_string(), "vortex");
@@ -6406,7 +6463,6 @@ mod tests {
 
     #[test]
     fn test_get_parquet_compression() {
-        use parquet::basic::Compression;
         assert_eq!(get_parquet_compression("snappy"), Compression::SNAPPY);
         assert_eq!(
             get_parquet_compression("uncompressed"),

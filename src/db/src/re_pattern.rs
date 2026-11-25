@@ -22,7 +22,10 @@ use infra::{
     errors,
     table::{
         re_pattern::PatternEntry,
-        re_pattern_stream_map::{ApplyPolicy, PatternAssociationEntry, PatternPolicy},
+        re_pattern_stream_map::{
+            self, ApplyPolicy, PatternAssociationEntry, PatternPolicy, is_search_rewrite,
+            search_association_conflict,
+        },
     },
 };
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
@@ -246,7 +249,7 @@ pub async fn process_association_changes(
         })
         .collect();
 
-    infra::table::re_pattern_stream_map::batch_process(added, removed).await?;
+    re_pattern_stream_map::batch_process(added, removed).await?;
     // Before the put, so a coordinator failure still invalidates; the watchers bump again.
     invalidate_public_dashboards(org).await;
 
@@ -294,7 +297,7 @@ pub async fn remove_stream_associations_after_deletion(
     let mgr = get_pattern_manager().await?;
     mgr.remove_stream_associations(org, stype, stream);
 
-    infra::table::re_pattern_stream_map::remove_associations_by_stream(org, stream, stype).await?;
+    re_pattern_stream_map::remove_associations_by_stream(org, stream, stype).await?;
 
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
@@ -309,6 +312,44 @@ pub async fn remove_stream_associations_after_deletion(
     // we do not need to trigger for super cluster, because the stream deletion handler
     // for super cluster takes care of calling this function
     Ok(())
+}
+
+/// Associations saved before the scan-level redaction that it cannot honour: a non-string field
+/// is skipped by the scan, and a partition key carries its raw value in the file path.
+pub async fn warn_unenforceable_search_associations() {
+    let entries = match re_pattern_stream_map::list_all().await {
+        Ok(entries) => entries,
+        Err(e) => {
+            log::warn!("[SDR] could not list pattern associations to check them: {e}");
+            return;
+        }
+    };
+    for entry in entries
+        .iter()
+        .filter(|e| is_search_rewrite(e.apply_at, e.policy))
+    {
+        let Ok(schema) = infra::schema::get(&entry.org, &entry.stream, entry.stream_type).await
+        else {
+            continue;
+        };
+        let settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();
+        let partition_keys: Vec<&str> = settings
+            .partition_keys
+            .iter()
+            .filter(|p| !p.disabled)
+            .map(|p| p.field.as_str())
+            .collect();
+        if let Some(conflict) = search_association_conflict(&schema, &partition_keys, &entry.field)
+        {
+            log::warn!(
+                "[SDR] search-time pattern {} on {}/{}/{} is not fully enforced: {conflict}",
+                entry.pattern_id,
+                entry.org,
+                entry.stream_type,
+                entry.stream
+            );
+        }
+    }
 }
 
 pub async fn watch_patterns() -> Result<(), anyhow::Error> {

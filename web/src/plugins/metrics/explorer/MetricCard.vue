@@ -118,9 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="inline-grid shrink-0 items-center justify-items-start"
           :data-test="`metrics-explorer-card-age-slot-${card.name}`"
         >
-          <ODataAgeFailedReserve class="ms-1.5 [grid-area:1/1] @max-md/panelbar:hidden" />
+          <ODataAgeFailedReserve class="ms-1.5 [grid-area:1/1] @max-3xl/panelbar:hidden" />
           <ODataAge
-            class="ms-1.5 shrink-0 [grid-area:1/1] @max-md/panelbar:hidden"
+            class="ms-1.5 shrink-0 [grid-area:1/1] @max-3xl/panelbar:hidden"
             :class="!ageShown && !failedMarker && 'invisible'"
             :at="preview?.lastTriggeredAt ?? null"
             :failed-at="failedMarker ? (preview?.failedAt ?? null) : null"
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </span>
         <ODataAge
-          class="ms-1.5 shrink-0 @md/panelbar:hidden"
+          class="ms-1.5 shrink-0 @3xl/panelbar:hidden"
           :class="!ageShown && !failedMarker && 'invisible'"
           :at="preview?.lastTriggeredAt ?? null"
           :failed-at="failedMarker ? (preview?.failedAt ?? null) : null"

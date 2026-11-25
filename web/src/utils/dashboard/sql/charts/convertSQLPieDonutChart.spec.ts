@@ -219,13 +219,35 @@ describe.each(["pie", "donut"])("applyPieDonutChart - %s slice percent precision
   });
 
   it.each([
-    [2, 14.4, "14.40%"],
-    [0, 52, "52%"],
-    [3, 7.25, "7.250%"],
-  ])("labels a slice with %i fixed decimals, as the legend does", (decimals, percent, label) => {
-    const ctx = contextWithDecimals(decimals);
+    [2, [144, 856], "14.40%"],
+    [0, [52, 48], "52%"],
+    [3, [29, 371], "7.250%"],
+  ])("labels a slice with %i fixed decimals, as the legend does", (decimals, values, label) => {
+    const ctx = contextWithDecimals(decimals, values);
     applyPieDonutChart(ctx);
-    expect(ctx.options.series[0].label.formatter({ name: "slice-0", percent })).toBe(label);
+    const slice = ctx.options.series[0].data[0];
+    // ECharts' own rounded percent is ignored, so the label and legend share one value.
+    expect(ctx.options.series[0].label.formatter({ ...slice, percent: 99 })).toBe(label);
+  });
+
+  it("labels an uneven share by its own rounding, not ECharts' largest-remainder seats", () => {
+    const values = [2, 2, 5, 291];
+    expect(echartsNumber.getPercentWithPrecision(values, 1, 2)).toBe(0.66);
+    const ctx = contextWithDecimals(2, values);
+    applyPieDonutChart(ctx);
+    const series = ctx.options.series[0];
+    expect(series.label.formatter(series.data[1])).toBe("0.67%");
+    expect(series.label.formatter(series.data[2])).toBe("1.67%");
+  });
+
+  it("reads the slices when called, so a series whose data is replaced later stays right", () => {
+    const ctx = contextWithDecimals(0, [1, 1]);
+    applyPieDonutChart(ctx);
+    ctx.options.series[0].data = [
+      { name: "slice-0", value: 1 },
+      { name: "slice-1", value: 3 },
+    ];
+    expect(ctx.options.series[0].label.formatter({ name: "slice-0", value: 1 })).toBe("25%");
   });
 
   it("hides colliding and sliver labels", () => {

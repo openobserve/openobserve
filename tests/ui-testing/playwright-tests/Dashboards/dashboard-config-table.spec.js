@@ -13,6 +13,15 @@ import {
   reopenPanelConfig,
 } from "./utils/configPanelHelpers.js";
 const testLogger = require('../utils/test-logger.js');
+const { DashboardPanelTablePage } = require("../../pages/dashboardPages/dashboard-panel-table.js");
+const {
+  orgIdentifier,
+  ingestLogRows,
+  createDashboard,
+  deleteSeededTablePanel,
+  statusRows,
+  uniqueValueColorDashboard,
+} = require("../utils/dashboard-seed-api.js");
 
 test.describe.configure({ mode: "parallel" });
 test.describe.configure({ retries: 1 });
@@ -126,5 +135,44 @@ test.describe("ConfigPanel — Table Settings", () => {
     await expect(pm.dashboardPanelConfigs.rowsPerPageWrapper).not.toBeVisible();
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
+  });
+});
+
+test.describe("Table — unique value color (ENT#702)", { tag: ["@dashboards", "@regression", "@P2"] }, () => {
+  const STATUSES = ["active", "active", "active", "inactive", "inactive", "pending"];
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    await navigateToBase(page);
+  });
+
+  test("each distinct status renders its own background, equal values share one", async ({ page }) => {
+    const stamp = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const stream = `ovn_c702_${stamp}`;
+    let dashboardId = null;
+    try {
+      await ingestLogRows(page, stream, statusRows(STATUSES));
+      dashboardId = await createDashboard(page, uniqueValueColorDashboard(stamp, stream));
+
+      const panelTable = new DashboardPanelTablePage(page);
+      await panelTable.gotoDashboardView(dashboardId, { org: orgIdentifier(), period: "15m" });
+      await expect(panelTable.cell(/^pending$/)).toBeVisible({ timeout: 60000 });
+
+      const active = await panelTable.cellBackgrounds("active");
+      const inactive = await panelTable.cellBackgrounds("inactive");
+      const pending = await panelTable.cellBackgrounds("pending");
+      expect(active).toHaveLength(3);
+      expect(inactive).toHaveLength(2);
+      expect(pending).toHaveLength(1);
+
+      const svcBg = await panelTable.cellBackground("svc0");
+      for (const colors of [active, inactive, pending]) {
+        expect(new Set(colors).size, `one colour per value, got ${colors}`).toBe(1);
+        expect(colors[0], "a coloured status cell differs from an uncoloured cell").not.toBe(svcBg);
+      }
+      expect(new Set([active[0], inactive[0], pending[0]]).size, "each distinct value gets its own colour").toBe(3);
+    } finally {
+      await deleteSeededTablePanel(page, { stream, dashboardId });
+    }
   });
 });

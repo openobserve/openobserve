@@ -29,7 +29,7 @@ use config::{
     metrics,
     utils::json,
 };
-use datafusion::physical_plan::visit_execution_plan;
+use datafusion::physical_plan::{collect, visit_execution_plan};
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes, Result},
@@ -259,7 +259,7 @@ async fn run_datafusion(
     }
     // run datafusion
     let datafusion_start = std::time::Instant::now();
-    let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
+    let ret = collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
     if let Err(e) = ret {

@@ -4,7 +4,7 @@
     {
       "label": "default",
       "_comment": "Files that need no server env of their own.",
-      "target": "tests/regression/test_histogram_bucket_count_matches_total.py tests/regression/test_grpc_ingest_org_binding.py tests/regression/test_topk_aggregate_error_reported.py tests/regression/test_fractional_epoch_timestamp.py tests/regression/test_user_folder_default_name_refused.py tests/regression/test_sourcemap_upload_limits.py tests/regression/test_timestamp_text_variants.py tests/regression/test_bulk_non_string_id.py tests/regression/test_metrics_ingest_window.py tests/regression/test_promql_late_wal_sample.py tests/regression/test_pipeline_cron_seconds.py tests/regression/test_remote_write_written_headers.py tests/regression/test_mcp_tool_errors.py tests/regression/test_pipeline_destination_name_format.py tests/regression/test_pipeline_schedule_delay.py tests/regression/test_vrl_network_functions_denied.py tests/regression/test_auth_invites_preauth_mount.py tests/regression/test_cross_org_organizations_path.py tests/regression/test_short_url_target_guards.py tests/regression/test_search_page_out_of_32_bits.py tests/regression/test_oss_enterprise_write_refusals.py tests/regression/alerts/ --ignore=tests/regression/alerts/test_alert_jira_conversion_and_composite_delivery.py",
+      "target": "tests/regression/test_histogram_bucket_count_matches_total.py tests/regression/test_grpc_ingest_org_binding.py tests/regression/test_topk_aggregate_error_reported.py tests/regression/test_fractional_epoch_timestamp.py tests/regression/test_user_folder_default_name_refused.py tests/regression/test_sourcemap_upload_limits.py tests/regression/test_timestamp_text_variants.py tests/regression/test_bulk_non_string_id.py tests/regression/test_metrics_ingest_window.py tests/regression/test_promql_late_wal_sample.py tests/regression/test_pipeline_cron_seconds.py tests/regression/test_remote_write_written_headers.py tests/regression/test_mcp_tool_errors.py tests/regression/test_pipeline_destination_name_format.py tests/regression/test_pipeline_schedule_delay.py tests/regression/test_vrl_network_functions_denied.py tests/regression/test_auth_invites_preauth_mount.py tests/regression/test_cross_org_organizations_path.py tests/regression/test_short_url_target_guards.py tests/regression/test_search_page_out_of_32_bits.py tests/regression/test_oss_enterprise_write_refusals.py tests/regression/test_nonequi_cross_join.py tests/regression/test_vrl_query_fn_row_failures_reported.py tests/regression/alerts/ tests/regression/test_model_pricing_writes.py --ignore=tests/regression/alerts/test_alert_jira_conversion_and_composite_delivery.py",
       "server_env": "",
       "category": "api_integration_tests"
     },
@@ -82,6 +82,13 @@
       "category": "api_integration_tests"
     },
     {
+      "label": "streaming_aggs_cache",
+      "_comment": "openobserve#16950 seeds rows 27 h old and needs the streaming-aggregation cache, which the planner skips for small data unless ZO_AGGS_MIN_NUM_PARTITIONS_SECS=0 and the rows reach the file list (ZO_MAX_FILE_RETENTION_TIME=10).",
+      "target": "tests/regression/test_streaming_agg_cache_mixed_file_sizes.py",
+      "server_env": "ZO_INGEST_ALLOWED_UPTO=48 ZO_AGGS_MIN_NUM_PARTITIONS_SECS=0 ZO_MAX_FILE_RETENTION_TIME=10",
+      "category": "api_integration_tests"
+    },
+    {
       "label": "uds_enabled",
       "_comment": "openobserve#16307 and openobserve#16861 only reproduce once a user-defined schema is saved, which needs the flag on; the #16861 file skips on OSS (service identity stamping is enterprise-only).",
       "target": "tests/regression/test_uds_late_required_columns.py tests/regression/test_uds_traces_service_identity.py",
@@ -99,7 +106,7 @@
       "label": "streaming_aggs_limit",
       "_comment": "ENT#826 and ENT#571 only reproduce on the multi-partition streaming-aggs path: a 0s threshold, and files must leave the WAL because the planner sizes the query from the file list.",
       "target": "tests/regression/test_streaming_aggs_group_by.py",
-      "server_env": "ZO_AGGS_MIN_NUM_PARTITIONS_SECS=0 ZO_MAX_FILE_RETENTION_TIME=10 ZO_FILE_PUSH_INTERVAL=2",
+      "server_env": "ZO_INGEST_ALLOWED_UPTO=48 ZO_AGGS_MIN_NUM_PARTITIONS_SECS=0 ZO_MAX_FILE_RETENTION_TIME=10 ZO_FILE_PUSH_INTERVAL=2",
       "category": "api_integration_tests"
     },
     {

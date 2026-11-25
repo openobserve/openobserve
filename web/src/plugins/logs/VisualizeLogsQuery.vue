@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @addToDashboard="addToDashboard"
       @chartApiError="handleChartApiError"
       @searchRequestTraceIdsUpdated="handleSearchRequestTraceIdsUpdated"
+      @loadEndedWithoutFetch="$emit('loadEndedWithoutFetch', $event)"
     />
 
     <!-- Add to Dashboard Dialog -->
@@ -109,7 +110,7 @@ export default defineComponent({
     AddToDashboard,
     PanelEditor,
   },
-  emits: ["handleChartApiError", "searchRequestTraceIdsUpdated"],
+  emits: ["handleChartApiError", "searchRequestTraceIdsUpdated", "loadEndedWithoutFetch"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "logs");
     const { t } = useI18nTyped();

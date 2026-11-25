@@ -41,7 +41,7 @@ use datafusion::{
         runtime_env::{RuntimeEnv, RuntimeEnvBuilder},
         session_state::SessionStateBuilder,
     },
-    logical_expr::AggregateUDF,
+    logical_expr::{AggregateUDF, Documentation, WindowUDF},
     optimizer::{AnalyzerRule, OptimizerRule},
     physical_expr_adapter::DefaultPhysicalExprAdapterFactory,
     physical_optimizer::PhysicalOptimizerRule,
@@ -347,7 +347,7 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::sequence::SequenceStepTimes::new(),
     ));
-    ctx.register_udwf(datafusion::logical_expr::WindowUDF::from(
+    ctx.register_udwf(WindowUDF::from(
         super::udaf::sequence::SequenceStepMatch::new(),
     ));
     ctx.register_udf(super::udf::time::cast_to_timestamp::CAST_TO_TIMESTAMP_UDF.clone());
@@ -413,7 +413,7 @@ pub struct CatalogFunction {
 /// so DataFusion's own documentation is the only source of a readable argument
 /// list: prefer its named arguments, fall back to the paren group of its syntax
 /// example, and finally to an opaque placeholder.
-fn describe_registry_fn(doc: Option<&datafusion::logical_expr::Documentation>) -> (String, String) {
+fn describe_registry_fn(doc: Option<&Documentation>) -> (String, String) {
     let Some(d) = doc else {
         return ("(...)".to_string(), String::new());
     };
@@ -729,7 +729,7 @@ impl TableBuilder {
         let prefix = match ListingTableUrl::parse(prefix) {
             Ok(url) => url,
             Err(e) => {
-                return Err(datafusion::error::DataFusionError::Execution(format!(
+                return Err(DataFusionError::Execution(format!(
                     "ListingTableUrl error: {e}",
                 )));
             }

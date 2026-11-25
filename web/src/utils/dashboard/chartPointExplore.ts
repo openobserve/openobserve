@@ -15,6 +15,7 @@
 
 import { formatInTimeZone } from "date-fns-tz";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
+import { NULL_BREAKDOWN_VALUE, OTHERS_BREAKDOWN_VALUE } from "@/utils/dashboard/sqlProcessData";
 import type { I18nText } from "@/types/i18n";
 
 /** One `field = value` condition; a null value matches rows where the field is empty. */
@@ -318,7 +319,9 @@ const rowValue = (rows: any[] | undefined, alias: string, label: unknown): unkno
 };
 
 const toFilterValue = (value: unknown): string | number | null => {
-  if (value === null || value === undefined || value === "") return null;
+  // A NULL breakdown series is named by its stand-in, never a value of the field.
+  if (value === null || value === undefined || value === "" || value === NULL_BREAKDOWN_VALUE)
+    return null;
   return typeof value === "number" ? value : String(value);
 };
 
@@ -398,8 +401,7 @@ export const pointGroupFilters = (
               ? click.seriesValue
               : undefined;
       // The aggregate of every series past the top N is not a value of the field.
-      const isOthers =
-        breakdown.includes(field) && panel.config?.top_results_others && label === "others";
+      const isOthers = breakdown.includes(field) && label === OTHERS_BREAKDOWN_VALUE;
       if (!isOthers) pairs.push([field, label]);
     });
   }

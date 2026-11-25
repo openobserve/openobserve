@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use config::meta::{
     downtimes::{Downtime, DowntimeSchedule, MuteSource, Repeat},
     folder::{DEFAULT_FOLDER, FolderType},
+    triggers::TriggerModule,
 };
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, NotSet, PaginatorTrait, QueryFilter,
@@ -60,6 +61,16 @@ pub enum Guard<'a> {
         parent_id: &'a str,
         parent_updated_at: i64,
     },
+    /// [Guard::Unchanged], committed only while the alert's scheduler row stays as `run` read it.
+    UnchangedWhileIdle { updated_at: i64, run: IdleRun<'a> },
+}
+
+/// An alert's scheduler row as read: no run claimed since `claim_epoch`, none due in `margin_us`.
+#[derive(Clone, Copy, Debug)]
+pub struct IdleRun<'a> {
+    pub alert_id: &'a str,
+    pub claim_epoch: i64,
+    pub margin_us: i64,
 }
 
 /// The version of a stored row, soft-deleted or not, for ordering replicated writes.
@@ -313,6 +324,10 @@ pub async fn write_with<C: ConnectionTrait + TransactionTrait>(
     remeasures: &[Remeasure],
     now: i64,
 ) -> Result<bool, errors::Error> {
+    let idle = match guard {
+        Guard::UnchangedWhileIdle { run, .. } => Some(run),
+        _ => None,
+    };
     let txn = conn.begin().await?;
     let written = match guard {
         Guard::None => {
@@ -331,12 +346,28 @@ pub async fn write_with<C: ConnectionTrait + TransactionTrait>(
         } => {
             update_follow_up_with(&txn, downtime, updated_at, parent_id, parent_updated_at).await?
         }
+        Guard::UnchangedWhileIdle { updated_at, .. } => {
+            put_if_unchanged_with(&txn, downtime, updated_at).await?
+        }
     };
     if !written {
         txn.rollback().await?;
         return Ok(false);
     }
     queue_remeasures(&txn, remeasures, now).await?;
+    // The hold is the last statement before the commit, so its margin covers only the commit.
+    if let Some(run) = idle
+        && !crate::scheduler::hold_idle_in_transaction(
+            &txn,
+            (&downtime.org, TriggerModule::Alert, run.alert_id),
+            run.claim_epoch,
+            run.margin_us,
+        )
+        .await?
+    {
+        txn.rollback().await?;
+        return Ok(false);
+    }
     txn.commit().await?;
     Ok(true)
 }
@@ -1805,5 +1836,56 @@ mod tests {
             .await
             .unwrap();
         assert!(queued.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_run_guarded_unmute_commits_only_while_no_run_of_the_alert_can_race_it() {
+        use config::meta::triggers::TriggerStatus::{Processing, Waiting};
+        const SEC: i64 = 1_000_000;
+        let far = config::utils::time::now_micros() + DAY;
+        let due = config::utils::time::now_micros() + SEC;
+        // (case, epoch the guard read, row status, row next run, written)
+        let cases = [
+            ("idle", 4, Waiting, far, true),
+            ("a run claimed since the read", 3, Waiting, far, false),
+            ("a run in progress", 4, Processing, far, false),
+            ("a run due within the margin", 4, Waiting, due, false),
+        ];
+        for (case, seen, status, next_run_at, want) in cases {
+            let db = db().await;
+            db.execute_unprepared(
+                "CREATE TABLE scheduled_jobs (id INTEGER PRIMARY KEY, org TEXT NOT NULL, \
+                 module INT NOT NULL, module_key TEXT NOT NULL, status INT NOT NULL, \
+                 next_run_at BIGINT NOT NULL, claim_epoch BIGINT NOT NULL)",
+            )
+            .await
+            .unwrap();
+            db.execute_unprepared(&format!(
+                "INSERT INTO scheduled_jobs (org, module, module_key, status, next_run_at, \
+                 claim_epoch) VALUES ('acme', {}, 'a1', {}, {next_run_at}, 4)",
+                TriggerModule::Alert as i32,
+                status as i32
+            ))
+            .await
+            .unwrap();
+            let before = downtime("d1", Repeat::None, Some(11 * DAY));
+            put_with(&db, &before).await.unwrap();
+            let mut ended = before.clone();
+            ended.cancelled_at = Some(2);
+            ended.updated_at = 2;
+            let guard = Guard::UnchangedWhileIdle {
+                updated_at: before.updated_at,
+                run: IdleRun {
+                    alert_id: "a1",
+                    claim_epoch: seen,
+                    margin_us: 30 * SEC,
+                },
+            };
+
+            let written = write_with(&db, &ended, guard, &[], 100).await.unwrap();
+            assert_eq!(written, want, "{case}");
+            let stored = get_with(&db, "acme", "d1").await.unwrap();
+            assert_eq!(stored, Some(if want { ended } else { before }), "{case}");
+        }
     }
 }

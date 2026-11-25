@@ -75,7 +75,7 @@ impl JsonColumnar {
         time_range: (i64, i64),
     ) -> Option<Self> {
         // pattern associations rewrite the JSON records after they are prepared
-        if cfg!(feature = "vectorscan") {
+        if cfg!(feature = "enterprise") {
             return None;
         }
         let schema = infra::schema::get_cache(org_id, stream_name, StreamType::Logs)

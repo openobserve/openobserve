@@ -14,7 +14,21 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { processData } from "@/utils/dashboard/sqlProcessData";
+import {
+  NULL_BREAKDOWN_VALUE,
+  OTHERS_BREAKDOWN_VALUE,
+  breakdownValueLabel,
+  processData,
+} from "@/utils/dashboard/sqlProcessData";
+import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
+import { fillMissingValues } from "@/utils/dashboard/sqlMissingValueFiller";
+import {
+  buildDataLookupMap,
+  createSeriesBuilders,
+} from "@/utils/dashboard/sql/shared/seriesBuilder";
+
+type Row = Record<string, unknown>;
+type Extras = { seriesLimit?: SeriesLimitInfo; limitNumberOfSeriesWarningMessage?: string };
 
 const makeStore = (maxDashboardSeries = 100) => ({
   state: {
@@ -118,7 +132,29 @@ describe("sqlProcessData - processData", () => {
         {},
       );
       const categories = result.map((r: any) => r.category);
-      expect(categories).toContain("others");
+      expect(categories).toContain(OTHERS_BREAKDOWN_VALUE);
+    });
+
+    it("keeps a real value named others apart from the others bucket", () => {
+      const rows = [
+        { category: "others", time: "2024-01", value: 100 },
+        { category: "B", time: "2024-01", value: 50 },
+        { category: "C", time: "2024-01", value: 10 },
+      ];
+      const result = processData(
+        [rows],
+        makeSchema(2, true),
+        makeStore(100),
+        ["value"],
+        ["category"],
+        ["time"],
+        {},
+      );
+      expect(result.map((row: Row) => [row.category, row.value])).toEqual([
+        ["others", 100],
+        ["B", 50],
+        [OTHERS_BREAKDOWN_VALUE, 10],
+      ]);
     });
 
     it("aggregates others by x-axis key", () => {
@@ -131,12 +167,14 @@ describe("sqlProcessData - processData", () => {
         ["time"],
         {},
       );
-      const othersEntry = result.find((r: any) => r.category === "others" && r.time === "2024-01");
+      const othersEntry = result.find(
+        (r: any) => r.category === OTHERS_BREAKDOWN_VALUE && r.time === "2024-01",
+      );
       expect(othersEntry).toBeDefined();
       expect(othersEntry?.value).toBe(10); // C's value at 2024-01
     });
 
-    it("handles null breakdown values by treating them as empty string", () => {
+    it("keeps rows whose breakdown value is null", () => {
       const dataWithNull = [
         { category: null, time: "2024-01", value: 50 },
         { category: "A", time: "2024-01", value: 100 },
@@ -153,7 +191,7 @@ describe("sqlProcessData - processData", () => {
       expect(result.length).toBe(2);
     });
 
-    it("handles undefined breakdown values by treating them as empty string", () => {
+    it("keeps rows that have no breakdown value", () => {
       const dataWithUndefined = [
         { time: "2024-01", value: 50 }, // no category key
         { category: "A", time: "2024-01", value: 100 },
@@ -271,7 +309,7 @@ describe("sqlProcessData - processData", () => {
       );
     });
 
-    it("counts per-axis series against the per-axis cap on multi y-axis charts", () => {
+    it("counts every y-axis copy of a series on multi y-axis charts", () => {
       const bigData = Array.from({ length: 9 }, (_, i) => ({
         category: `cat${i}`,
         time: "2024-01",
@@ -288,7 +326,7 @@ describe("sqlProcessData - processData", () => {
         ["time"],
         extras,
       );
-      expect(extras.seriesLimit).toEqual({ shown: 4, total: 9, cap: 4 });
+      expect(extras.seriesLimit).toEqual({ shown: 8, total: 18, cap: 8 });
     });
 
     it("leaves seriesLimit unset when nothing was dropped", () => {
@@ -363,6 +401,157 @@ describe("sqlProcessData - processData", () => {
       expect(categories).toContain("High");
       expect(categories).not.toContain("Low");
       expect(categories).not.toContain("Medium");
+    });
+  });
+
+  describe("NULL and empty breakdown values", () => {
+    const times = ["2024-01-15T10:00:00", "2024-01-15T10:01:00"];
+    const nullRows = times.map((time) => ({ time, svc: null, cnt: 8 }));
+    const emptyRows = times.map((time) => ({ time, svc: "", cnt: 4 }));
+    const panelSchema = {
+      type: "line",
+      config: {},
+      queries: [{ fields: { y: [{ alias: "cnt" }], breakdown: [{ alias: "svc" }] } }],
+    };
+
+    const seriesFor = (rows: Record<string, unknown>[]) => {
+      const processed = processData(
+        [rows],
+        panelSchema,
+        makeStore(),
+        ["cnt"],
+        ["svc"],
+        ["time"],
+        {},
+      );
+      const filled = fillMissingValues(
+        processed,
+        panelSchema,
+        [{ histogram_interval: 60 }],
+        {
+          queries: [
+            {
+              startTime: Date.UTC(2024, 0, 15, 10, 0) * 1000,
+              endTime: Date.UTC(2024, 0, 15, 10, 1) * 1000,
+            },
+          ],
+        },
+        ["time"],
+        ["cnt"],
+        [],
+        ["svc"],
+        null,
+      );
+      const { getSeries } = createSeriesBuilders({
+        options: { xAxis: [{ data: times }] },
+        panelSchema,
+        store: { state: { timezone: "UTC", theme: "light" } },
+        missingValueData: filled,
+        xAxisKeys: ["time"],
+        yAxisKeys: ["cnt"],
+        breakDownKeys: ["svc"],
+        defaultSeriesProps: {},
+        chartMin: 0,
+        chartMax: 10,
+        dataLookupMap: buildDataLookupMap(filled, ["svc"], ["time"]),
+        annotations: { value: [] },
+        getMarkLineData: () => [],
+        getAxisDataFromKey: () => [],
+      });
+      return getSeries().map((series) => [series.name, series.data]);
+    };
+
+    it.each([
+      ["NULL rows first", [...nullRows, ...emptyRows]],
+      ["empty rows first", [...emptyRows, ...nullRows]],
+    ])("draws NULL and empty as two series of 8 and 4 with %s", (_order, rows) => {
+      expect(Object.fromEntries(seriesFor(rows))).toEqual({
+        "(null)": [8, 8],
+        "(empty)": [4, 4],
+      });
+    });
+
+    it("keeps the NULL stand-in as the row's breakdown value", () => {
+      const result = processData(
+        [[...nullRows, ...emptyRows]],
+        makeSchema(),
+        makeStore(),
+        ["cnt"],
+        ["svc"],
+        ["time"],
+        {},
+      );
+      expect(result.map((row: Row) => row.svc)).toEqual([
+        NULL_BREAKDOWN_VALUE,
+        NULL_BREAKDOWN_VALUE,
+        "",
+        "",
+      ]);
+    });
+
+    it("labels the NULL and empty series apart from real values", () => {
+      expect(breakdownValueLabel(NULL_BREAKDOWN_VALUE)).toBe("(null)");
+      expect(breakdownValueLabel("")).toBe("(empty)");
+      expect(breakdownValueLabel("null")).toBe("null");
+      expect(breakdownValueLabel(OTHERS_BREAKDOWN_VALUE)).toBe("others");
+    });
+  });
+
+  describe("multi y-axis series cap", () => {
+    const hosts = Array.from({ length: 80 }, (_, i) => ({
+      host: `h${i}`,
+      time: "2024-01",
+      a: 100 - i,
+      b: i,
+    }));
+    const keptHosts = (result: Row[]) => new Set(result.map((row) => row.host)).size;
+
+    it("warns when two y-axes halve the cap below the breakdown count", () => {
+      const extras: Extras = {};
+      const result = processData(
+        [hosts],
+        makeSchema(),
+        makeStore(100),
+        ["a", "b"],
+        ["host"],
+        ["time"],
+        extras,
+      );
+      expect(keptHosts(result)).toBe(50);
+      expect(extras.seriesLimit).toEqual({ shown: 100, total: 160, cap: 100 });
+      expect(extras.limitNumberOfSeriesWarningMessage).toBe(
+        "Showing 100 of 160 series to keep the chart fast",
+      );
+    });
+
+    it("keeps a user's Top N per y-axis without warning", () => {
+      const extras: Extras = {};
+      const result = processData(
+        [hosts],
+        makeSchema(10),
+        makeStore(100),
+        ["a", "b"],
+        ["host"],
+        ["time"],
+        extras,
+      );
+      expect(keptHosts(result)).toBe(10);
+      expect(extras.seriesLimit).toBeUndefined();
+    });
+
+    it("warns when the cap, not a larger Top N, cut the series", () => {
+      const extras: Extras = {};
+      const result = processData(
+        [hosts],
+        makeSchema(70),
+        makeStore(100),
+        ["a", "b"],
+        ["host"],
+        ["time"],
+        extras,
+      );
+      expect(keptHosts(result)).toBe(50);
+      expect(extras.seriesLimit).toEqual({ shown: 100, total: 160, cap: 100 });
     });
   });
 });

@@ -33,10 +33,13 @@ import {
 } from "./__fixtures__/securityFixtures";
 
 const sourceNames = ref<string[]>([]);
+const awsConfig = vi.hoisted(() => ({ isCloud: "false" }) as Record<string, string>);
 
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/aws-exports")>();
-  return { default: { ...actual.default, isEnterprise: "true" } };
+  return {
+    default: Object.assign(awsConfig, actual.default, { isEnterprise: "true", isCloud: "false" }),
+  };
 });
 vi.mock("@/services/alerts", async (importOriginal) => {
   const { automockService } = await import("@/test/unit/helpers/mockService");
@@ -106,6 +109,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  awsConfig.isCloud = "false";
   wrapper?.unmount();
   wrapper = null;
   vi.clearAllMocks();
@@ -187,6 +191,19 @@ describe("SecurityOverview", () => {
         }),
       }),
     );
+  });
+
+  it("tags the header as alpha on Cloud only", async () => {
+    awsConfig.isCloud = "true";
+    const cloud = await mountView();
+    expect(cloud.get('[data-test="alpha-badge"]').text()).toBe("Alpha");
+    expect(cloud.get('[data-test="security-overview-title"]').text()).toContain("SOC Overview");
+    cloud.unmount();
+
+    awsConfig.isCloud = "false";
+    const selfHosted = await mountView();
+    expect(selfHosted.get('[data-test="security-overview-title"]').text()).toBe("SOC Overview");
+    expect(selfHosted.find('[data-test="alpha-badge"]').exists()).toBe(false);
   });
 
   it("re-queries a wider window when the range switches to 7 days", async () => {

@@ -50,6 +50,7 @@ message SearchRequest {
     string          stream_type = 3;
     optional string     user_id = 4;
     bytes               request = 5;
+    repeated string raw_streams = 6;
 }
 
 message SearchResponse {
@@ -63,6 +64,7 @@ message SearchPartitionRequest {
     string          stream_type = 3;
     bytes               request = 5;
     bool   skip_max_query_range = 6;
+    repeated string raw_streams = 7;
 }
 
 message SearchPartitionResponse {

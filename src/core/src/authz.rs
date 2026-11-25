@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(feature = "enterprise")]
 use std::collections::HashMap;
 #[cfg(any(feature = "enterprise", test))]
 use std::collections::HashSet;
@@ -32,6 +32,7 @@ use config::meta::{
     service_streams::{RelatedStreams, StreamInfo},
     stream::StreamType,
 };
+use datafusion::common::TableReference;
 #[cfg(feature = "enterprise")]
 use db::user::is_root_user;
 #[cfg(any(feature = "enterprise", test))]
@@ -325,6 +326,7 @@ impl StreamAccessChecker for FakeStreamChecker {
 
     async fn can_read_stream(&self, user_id: &str, stream: &TypedStream) -> bool {
         self.count(user_id, |calls| calls.streams += 1);
+        tokio::task::yield_now().await;
         let key = format!("{}/{}/{}", stream.org_id, stream.stream_type, stream.name);
         self.granted(user_id, key) || self.reads_all(user_id, &stream.org_id, stream.stream_type)
     }
@@ -336,6 +338,7 @@ impl StreamAccessChecker for FakeStreamChecker {
         wanted: &[StreamType],
     ) -> HashSet<StreamType> {
         self.count(user_id, |calls| calls.org_wide.push(wanted.to_vec()));
+        tokio::task::yield_now().await;
         if write_set(&self.org_wide_failures).remove(user_id) {
             return HashSet::new();
         }
@@ -403,8 +406,9 @@ impl StreamAccessChecker for OpenFgaStreamChecker {
         let model = OFGA_MODELS
             .get(type_str)
             .map_or(type_str, |model| model.key);
+        // the stored email, as `auth::check_permissions` uses, in case the header differs in case
         check_permissions(
-            user_id,
+            &user.email,
             AuthExtractor {
                 auth: "".to_string(),
                 method: "GET".to_string(),
@@ -451,9 +455,13 @@ impl StreamAccessChecker for OpenFgaStreamChecker {
                     .map_or(type_str, |model| model.key)
             })
             .collect();
-        let readable =
-            o2_openfga::authorizer::authz::org_wide_readable_types(org_id, user_id, &role, &models)
-                .await;
+        let readable = o2_openfga::authorizer::authz::org_wide_readable_types(
+            org_id,
+            &user.email,
+            &role,
+            &models,
+        )
+        .await;
         wanted
             .iter()
             .zip(models)
@@ -491,6 +499,89 @@ impl StreamAccessChecker for OpenFgaStreamChecker {
     }
 }
 
+/// One answer per key, shared by every reader of that key while it is still in flight.
+#[cfg(feature = "enterprise")]
+type SharedAnswers<K> = std::sync::Mutex<HashMap<K, Arc<tokio::sync::OnceCell<bool>>>>;
+
+/// One request's stream reads for one user and org, so a stream named on many rows is checked once.
+#[cfg(feature = "enterprise")]
+#[derive(Default)]
+pub struct StreamReadMemo {
+    unrestricted: tokio::sync::OnceCell<bool>,
+    org_wide: SharedAnswers<StreamType>,
+    streams: SharedAnswers<(StreamType, String)>,
+}
+
+#[cfg(feature = "enterprise")]
+impl StreamReadMemo {
+    /// Answers as [`readable_streams`] does for one stream.
+    pub async fn can_read(
+        &self,
+        checker: &dyn StreamAccessChecker,
+        user_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        name: &str,
+    ) -> bool {
+        let unrestricted = *self
+            .unrestricted
+            .get_or_init(|| async {
+                !checker.enforces_rbac().await
+                    || checker.is_root(user_id).await
+                    || checker.is_root_or_admin(org_id, user_id).await
+            })
+            .await;
+        if unrestricted {
+            return true;
+        }
+        let shortcut = org_wide_shortcut_covers(stream_type, name);
+        let (cell, first_of_type) = {
+            let mut cells = self.streams.lock().unwrap_or_else(|e| e.into_inner());
+            let first = !cells
+                .keys()
+                .any(|(t, n)| *t == stream_type && org_wide_shortcut_covers(*t, n));
+            let cell = cells.entry((stream_type, name.to_string())).or_default();
+            (cell.clone(), first)
+        };
+        // A lone stream's own Check already counts the org-wide grants.
+        *cell
+            .get_or_init(|| async {
+                (!first_of_type
+                    && shortcut
+                    && self.org_wide(checker, user_id, org_id, stream_type).await)
+                    || checker
+                        .can_read_stream(
+                            user_id,
+                            &TypedStream {
+                                org_id: org_id.to_string(),
+                                stream_type,
+                                name: name.to_string(),
+                            },
+                        )
+                        .await
+            })
+            .await
+    }
+
+    async fn org_wide(
+        &self,
+        checker: &dyn StreamAccessChecker,
+        user_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+    ) -> bool {
+        let cell = shared_cell(&self.org_wide, stream_type);
+        *cell
+            .get_or_init(|| async {
+                checker
+                    .org_wide_readable(user_id, org_id, &[stream_type])
+                    .await
+                    .contains(&stream_type)
+            })
+            .await
+    }
+}
+
 /// Checks stream permissions, returning `Some(forbidden response)` when the
 /// user is not permitted and `None` when access is allowed.
 #[cfg(feature = "enterprise")]
@@ -505,10 +596,7 @@ pub async fn check_stream_permissions(
         return None;
     }
 
-    use o2_openfga::{
-        config::get_config,
-        meta::mapping::{LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, OFGA_MODELS},
-    };
+    use o2_openfga::{config::get_config, meta::mapping::OFGA_MODELS};
 
     // A user can hit this with an org they are not a member of (e.g. the search
     // profile endpoint always checks against _meta), so a missing user is a
@@ -517,52 +605,43 @@ pub async fn check_stream_permissions(
         return Some(MetaHttpResponse::forbidden("Unauthorized Access"));
     };
     let stream_type_str = stream_type.as_str();
-    let config = get_config();
-    let mut o2_model_type = "";
+    let stream_model = OFGA_MODELS
+        .get(stream_type_str)
+        .map_or(stream_type_str, |model| model.key);
+    let models = stream_permission_models(
+        permission_resource_type,
+        get_config().logs_pattern_rbac_enabled,
+        stream_model,
+    );
 
-    match permission_resource_type {
-        StreamPermissionResourceType::PatternExtract if config.logs_pattern_rbac_enabled => {
-            o2_model_type = LOGS_PATTERN_KEY;
+    for model in models {
+        let allowed = check_permissions(
+            user_id,
+            AuthExtractor {
+                auth: "".to_string(),
+                method: "GET".to_string(),
+                o2_type: format!(
+                    "{}:{}",
+                    model,
+                    crate::auth::into_ofga_supported_format(stream_name)
+                ),
+                org_id: org_id.to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+                use_all_org: false,
+                use_self_context: false,
+                use_self_parent: true,
+                feature: None,
+            },
+            user.role.clone(),
+            user.is_external,
+        )
+        .await;
+        if !allowed {
+            return Some(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
-        StreamPermissionResourceType::Insights if config.logs_pattern_rbac_enabled => {
-            o2_model_type = LOGS_INSIGHTS_KEY;
-        }
-        _ => {}
     }
-
-    if o2_model_type.is_empty() {
-        o2_model_type = OFGA_MODELS
-            .get(stream_type_str)
-            .map_or(stream_type_str, |model| model.key);
-    }
-
-    if check_permissions(
-        user_id,
-        AuthExtractor {
-            auth: "".to_string(),
-            method: "GET".to_string(),
-            o2_type: format!(
-                "{}:{}",
-                o2_model_type,
-                crate::auth::into_ofga_supported_format(stream_name)
-            ),
-            org_id: org_id.to_string(),
-            bypass_check: false,
-            parent_id: "".to_string(),
-            use_all_org: false,
-            use_self_context: false,
-            use_self_parent: true,
-            feature: None,
-        },
-        user.role,
-        user.is_external,
-    )
-    .await
-    {
-        None
-    } else {
-        Some(MetaHttpResponse::forbidden("Unauthorized Access"))
-    }
+    None
 }
 
 /// Requires GET permission on every cipher key the SQL references; `None` means allowed.
@@ -741,9 +820,7 @@ pub fn resolve_query_sources(sources: &[QuerySource]) -> ResolvedSources {
 }
 
 /// Every table `sql` reads, after the custom-pattern rewrite the search engine applies first.
-pub fn resolve_sql_tables(
-    sql: &str,
-) -> Result<Vec<datafusion::common::TableReference>, anyhow::Error> {
+pub fn resolve_sql_tables(sql: &str) -> Result<Vec<TableReference>, anyhow::Error> {
     config::meta::sql::resolve_stream_names_with_type(&search_rewritten_sql(sql))
 }
 
@@ -1028,6 +1105,17 @@ pub fn stream_access_forbidden(request_org: &str, denied: &StreamAccessDenied) -
     (StatusCode::FORBIDDEN, Json(body)).into_response()
 }
 
+/// [`readable_streams`] with the live checker, for callers outside this crate.
+#[cfg(feature = "enterprise")]
+pub async fn readable_org_streams(
+    user_id: &str,
+    org_id: &str,
+    streams: HashSet<(StreamType, String)>,
+) -> Option<HashSet<(StreamType, String)>> {
+    let checker = active_checker();
+    readable_streams(checker.as_ref(), user_id, org_id, streams).await
+}
+
 /// The streams of `org_id` the user can read, or `None` when RBAC lets them read every stream.
 #[cfg(any(feature = "enterprise", test))]
 pub(crate) async fn readable_streams(
@@ -1036,17 +1124,24 @@ pub(crate) async fn readable_streams(
     org_id: &str,
     streams: HashSet<(StreamType, String)>,
 ) -> Option<HashSet<(StreamType, String)>> {
-    use futures::stream::StreamExt;
-
     if !checker.enforces_rbac().await
         || checker.is_root(user_id).await
         || checker.is_root_or_admin(org_id, user_id).await
     {
         return None;
     }
-    let (covered, mut to_check): (Vec<_>, Vec<_>) = streams
-        .into_iter()
-        .partition(|(_, name)| org_wide_grant_covers(name));
+    let mut per_type: std::collections::HashMap<StreamType, usize> = Default::default();
+    for (stream_type, name) in &streams {
+        if org_wide_shortcut_covers(*stream_type, name) {
+            *per_type.entry(*stream_type).or_default() += 1;
+        }
+    }
+    // A lone stream's own Check already counts the org-wide grants, so asking first costs more.
+    let (covered, mut to_check): (Vec<_>, Vec<_>) =
+        streams.into_iter().partition(|(stream_type, name)| {
+            org_wide_shortcut_covers(*stream_type, name)
+                && per_type.get(stream_type).is_some_and(|n| *n > 1)
+        });
     let mut readable = HashSet::new();
     if !covered.is_empty() {
         let mut types: Vec<StreamType> = Vec::new();
@@ -1064,7 +1159,21 @@ pub(crate) async fn readable_streams(
             }
         }
     }
-    let checked: Vec<(StreamType, String)> = futures::stream::iter(to_check)
+    readable.extend(check_each(checker, user_id, org_id, to_check).await);
+    Some(readable)
+}
+
+/// One Check per stream, 16 at a time; the streams that pass.
+#[cfg(any(feature = "enterprise", test))]
+pub(crate) async fn check_each(
+    checker: &dyn StreamAccessChecker,
+    user_id: &str,
+    org_id: &str,
+    streams: Vec<(StreamType, String)>,
+) -> HashSet<(StreamType, String)> {
+    use futures::stream::StreamExt;
+
+    futures::stream::iter(streams)
         .map(|(stream_type, name)| async move {
             let stream = TypedStream {
                 org_id: org_id.to_string(),
@@ -1077,9 +1186,7 @@ pub(crate) async fn readable_streams(
         .buffer_unordered(16)
         .filter_map(std::future::ready)
         .collect()
-        .await;
-    readable.extend(checked);
-    Some(readable)
+        .await
 }
 
 /// In `_meta` the cached membership names the role, whatever role the request carries.
@@ -1094,6 +1201,33 @@ fn effective_role(org_id: &str, user_id: &str, role: String) -> String {
         Some(user) => user.role.to_string(),
         None => role,
     }
+}
+
+/// OFGA models needing GET: the stream's, plus the feature's when its RBAC is on. [pure]
+#[cfg(feature = "enterprise")]
+fn stream_permission_models(
+    resource: StreamPermissionResourceType,
+    feature_rbac_enabled: bool,
+    stream_model: &str,
+) -> Vec<&str> {
+    use StreamPermissionResourceType::{Insights, PatternExtract, Search};
+    use o2_openfga::meta::mapping::{LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY};
+
+    match (resource, feature_rbac_enabled) {
+        (PatternExtract, true) => vec![stream_model, LOGS_PATTERN_KEY],
+        (Insights, true) => vec![stream_model, LOGS_INSIGHTS_KEY],
+        (Search, _) | (PatternExtract, false) | (Insights, false) => vec![stream_model],
+    }
+}
+
+/// The one cell of `key`, so concurrent readers of a key wait on a single Check.
+#[cfg(feature = "enterprise")]
+fn shared_cell<K: Eq + std::hash::Hash>(
+    cells: &SharedAnswers<K>,
+    key: K,
+) -> Arc<tokio::sync::OnceCell<bool>> {
+    let mut cells = cells.lock().unwrap_or_else(|e| e.into_inner());
+    cells.entry(key).or_default().clone()
 }
 
 #[cfg(feature = "enterprise")]
@@ -1137,6 +1271,20 @@ fn org_wide_grant_covers(stream_name: &str) -> bool {
         && id
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'=' | b'-'))
+}
+
+/// True when an org-wide grant decides the stream; `stream:_all_` never reaches enrichment tables.
+#[cfg(any(feature = "enterprise", test))]
+fn org_wide_shortcut_covers(stream_type: StreamType, name: &str) -> bool {
+    matches!(
+        stream_type,
+        StreamType::Logs
+            | StreamType::Metrics
+            | StreamType::Traces
+            | StreamType::Profiles
+            | StreamType::Index
+            | StreamType::Metadata
+    ) && org_wide_grant_covers(name)
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -1674,6 +1822,27 @@ mod tests {
         }
     }
 
+    // o2-enterprise#3642: DB monitoring's `?stream=` reads `{type}:_all_` through selfParent.
+    #[test]
+    fn the_live_stream_check_counts_per_type_all_grants() {
+        let source = include_str!("authz.rs");
+        let start = source
+            .find(concat!(
+                "impl StreamAccessChecker for ",
+                "OpenFgaStreamChecker"
+            ))
+            .unwrap();
+        let body = &source[start..];
+        let check = &body[body.find("async fn can_read_stream(").unwrap()..];
+        let check = &check[..check.find("async fn org_wide_readable(").unwrap()];
+        assert!(check.contains("use_self_parent: true"));
+        assert!(check.contains("use_self_context: false"));
+        assert!(
+            check.contains("&user.email,"),
+            "OpenFGA must get the stored email"
+        );
+    }
+
     fn related(logs: &[&str], traces: &[&str], metrics: &[&str]) -> RelatedStreams {
         let infos = |names: &[&str]| -> Vec<StreamInfo> {
             names
@@ -1816,6 +1985,138 @@ mod tests {
             .collect()
     }
 
+    // o2-enterprise#3642: a stream on many rows costs one Check, a wide type one question.
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn stream_read_memo_checks_each_stream_and_type_once() {
+        let checker = FakeStreamChecker::default();
+        let stream = |name: &str| TypedStream {
+            org_id: "o1".to_string(),
+            stream_type: StreamType::Traces,
+            name: name.to_string(),
+        };
+        checker.grant_read("u1", &stream("a"));
+        let memo = StreamReadMemo::default();
+        for _ in 0..10 {
+            assert!(
+                memo.can_read(&checker, "u1", "o1", StreamType::Traces, "a")
+                    .await
+            );
+            assert!(
+                !memo
+                    .can_read(&checker, "u1", "o1", StreamType::Traces, "b")
+                    .await
+            );
+        }
+        let calls = checker.calls("u1");
+        assert_eq!(calls.streams, 2);
+        assert_eq!(calls.org_wide, vec![vec![StreamType::Traces]]);
+
+        checker.grant_read_all("u2", "o1", StreamType::Logs);
+        let memo = StreamReadMemo::default();
+        for name in ["x", "y", "z"] {
+            assert!(
+                memo.can_read(&checker, "u2", "o1", StreamType::Logs, name)
+                    .await
+            );
+        }
+        let calls = checker.calls("u2");
+        assert_eq!(calls.streams, 1, "only the first stream of the type");
+        assert_eq!(calls.org_wide.len(), 1);
+
+        checker.grant_admin("o1", "u3");
+        let memo = StreamReadMemo::default();
+        assert!(
+            memo.can_read(&checker, "u3", "o1", StreamType::Logs, "x")
+                .await
+        );
+        assert_eq!(checker.calls("u3"), CheckCalls::default());
+    }
+
+    // Concurrent readers of one stream share the Check still in flight.
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn stream_read_memo_shares_checks_in_flight() {
+        let checker = FakeStreamChecker::default();
+        let memo = StreamReadMemo::default();
+        let reads = (0..16).map(|_| memo.can_read(&checker, "u1", "o1", StreamType::Logs, "a"));
+        assert!(futures::future::join_all(reads).await.iter().all(|ok| !ok));
+        let calls = checker.calls("u1");
+        assert_eq!(calls.streams, 1);
+        assert!(
+            calls.org_wide.is_empty(),
+            "a lone stream needs no org-wide question"
+        );
+
+        let reads = ["b", "c", "d"]
+            .into_iter()
+            .flat_map(|name| (0..4).map(move |_| name))
+            .map(|name| memo.can_read(&checker, "u1", "o1", StreamType::Logs, name));
+        futures::future::join_all(reads).await;
+        let calls = checker.calls("u1");
+        assert_eq!(calls.streams, 4);
+        assert_eq!(calls.org_wide.len(), 1);
+    }
+
+    // A `stream:_all_` grant does not reach enrichment tables, so their own Check always decides.
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn enrichment_tables_never_take_the_org_wide_shortcut() {
+        let checker = FakeStreamChecker::default();
+        let wanted: HashSet<(StreamType, String)> = ["t1", "t2", "t3"]
+            .into_iter()
+            .map(|name| (StreamType::EnrichmentTables, name.to_string()))
+            .chain([
+                (StreamType::Logs, "app".to_string()),
+                (StreamType::Logs, "a b/c".repeat(200)),
+            ])
+            .collect();
+        let kept = readable_streams(&checker, "u1", "o1", wanted).await;
+        assert_eq!(kept, Some(HashSet::new()));
+        let calls = checker.calls("u1");
+        assert!(calls.org_wide.is_empty(), "{:?}", calls.org_wide);
+        assert_eq!(calls.streams, 5);
+
+        let memo = StreamReadMemo::default();
+        for name in ["t1", "t2"] {
+            assert!(
+                !memo
+                    .can_read(&checker, "u2", "o1", StreamType::EnrichmentTables, name)
+                    .await
+            );
+        }
+        assert!(checker.calls("u2").org_wide.is_empty());
+    }
+
+    // The shortcut's types are OpenFGA's stream resources, whose GET reads its parent.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn org_wide_shortcut_types_are_the_openfga_stream_resources() {
+        use o2_openfga::meta::mapping::{OFGA_MODELS, is_stream_resource};
+
+        for stream_type in [
+            StreamType::Logs,
+            StreamType::Metrics,
+            StreamType::Traces,
+            StreamType::Profiles,
+            StreamType::ServiceGraph,
+            StreamType::EnrichmentTables,
+            StreamType::Filelist,
+            StreamType::Metadata,
+            StreamType::Index,
+        ] {
+            let type_str = stream_type.as_str();
+            let model = OFGA_MODELS
+                .get(type_str)
+                .map_or(type_str, |model| model.key);
+            assert_eq!(
+                org_wide_shortcut_covers(stream_type, "s"),
+                is_stream_resource(model),
+                "{type_str}"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn service_records_keep_only_readable_streams_and_drop_emptied_services() {
         let all = || {
@@ -1900,8 +2201,11 @@ mod tests {
             (Logs, "app"),
             (Logs, "audit"),
             (Metrics, "cpu"),
+            (Metrics, "mem"),
             (Traces, "default"),
+            (Traces, "other"),
             (Profiles, "heap"),
+            (Profiles, "cpu"),
         ]);
         let checker = [Logs, Metrics, Traces, Profiles]
             .into_iter()
@@ -1957,6 +2261,21 @@ mod tests {
         }
     }
 
+    // o2-enterprise#3642: one stream of a type costs its own Check and no org-wide question.
+    #[tokio::test]
+    async fn a_lone_stream_of_a_type_skips_the_org_wide_question() {
+        use StreamType::{Logs, Traces};
+
+        let checker = FakeChecker::default()
+            .reads("u1", "o1/traces/default")
+            .reads("u1", "o1/logs/app");
+        let all = wanted(&[(Logs, "app"), (Logs, "audit"), (Traces, "default")]);
+        let kept = readable_streams(&checker, "u1", "o1", all).await;
+        assert_eq!(kept, Some(wanted(&[(Logs, "app"), (Traces, "default")])));
+        assert_eq!(checker.org_wide_asked(), [vec![Logs]]);
+        assert_eq!(checker.stream_checks(), 3);
+    }
+
     #[tokio::test]
     async fn a_user_who_reads_everything_is_asked_nothing() {
         let all = || wanted(&[(StreamType::Logs, "app")]);
@@ -1995,11 +2314,12 @@ mod tests {
         let longest = "a".repeat(MAX_SHORTCUT_ID_LEN);
         let too_long = "a".repeat(MAX_SHORTCUT_ID_LEN + 1);
         let refused = [too_long.as_str(), "", "*", "a\u{1}b", "caf\u{e9}"];
-        let mut all = wanted(&[(Logs, longest.as_str())]);
+        let shortcut = wanted(&[(Logs, longest.as_str()), (Logs, "app")]);
+        let mut all = shortcut.clone();
         all.extend(wanted(&refused.map(|name| (Logs, name))));
         let checker = FakeChecker::default().reads_all("u1", "o1", Logs);
         let kept = readable_streams(&checker, "u1", "o1", all).await;
-        assert_eq!(kept, Some(wanted(&[(Logs, longest.as_str())])));
+        assert_eq!(kept, Some(shortcut));
         assert_eq!(checker.stream_checks(), refused.len());
 
         let only_refused = FakeChecker::default().reads_all("u1", "o1", Logs);
@@ -2011,7 +2331,7 @@ mod tests {
     #[tokio::test]
     async fn a_covered_stream_keeps_its_own_name() {
         let checker = FakeChecker::default().reads_all("u1", "o1", StreamType::Metrics);
-        let all = wanted(&[(StreamType::Metrics, "a:b")]);
+        let all = wanted(&[(StreamType::Metrics, "a:b"), (StreamType::Metrics, "c")]);
         let kept = readable_streams(&checker, "u1", "o1", all.clone()).await;
         assert_eq!(kept, Some(all));
         assert_eq!(checker.stream_checks(), 0);
@@ -2093,5 +2413,28 @@ mod tests {
             rbac_enforced().await,
             o2_openfga::config::get_config().enabled
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_feature_grant_adds_to_stream_read_and_never_replaces_it() {
+        use StreamPermissionResourceType::{Insights, PatternExtract, Search};
+        use o2_openfga::meta::mapping::{LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY};
+
+        let cases = [
+            (Search, false, vec!["logs"]),
+            (Search, true, vec!["logs"]),
+            (PatternExtract, false, vec!["logs"]),
+            (PatternExtract, true, vec!["logs", LOGS_PATTERN_KEY]),
+            (Insights, false, vec!["logs"]),
+            (Insights, true, vec!["logs", LOGS_INSIGHTS_KEY]),
+        ];
+        for (resource, rbac_on, expected) in cases {
+            assert_eq!(
+                stream_permission_models(resource, rbac_on, "logs"),
+                expected,
+                "rbac_on={rbac_on}"
+            );
+        }
     }
 }
