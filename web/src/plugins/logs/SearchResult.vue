@@ -786,7 +786,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
         >
           <div
-            v-if="!patternsState?.loading && patternsWarnings.length"
+            v-if="!patternsState?.loading && !patternsStale && patternsWarnings.length"
+            role="status"
             data-test="logs-patterns-partial-warning"
             class="px-page-edge bg-status-warning-bg text-status-warning-text py-2 text-xs"
           >
@@ -794,6 +795,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="patternsStale"
+            role="status"
             data-test="logs-patterns-stale"
             class="text-text-secondary flex flex-1 items-center justify-center py-10 text-sm"
           >
