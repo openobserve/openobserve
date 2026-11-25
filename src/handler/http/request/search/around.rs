@@ -256,7 +256,7 @@ pub(crate) async fn around(
 
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
-        response_time: time,
+        response_time: time * 1000.0,
         size: resp.scan_size as f64,
         scan_files: if resp.scan_files > 0 {
             Some(resp.scan_files as i64)
