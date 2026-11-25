@@ -279,6 +279,7 @@ mod m20261222_000001_incident_membership_and_catalog_cleanup;
 mod m20261223_000001_create_alert_leases;
 mod m20261224_000001_delete_cli_ai_toolsets;
 mod m20261225_000001_add_agent_to_ai_chat_turns;
+mod m20261225_000001_create_autoresolve_tables;
 mod m20261225_000002_add_first_event_at_to_ai_chat_turns;
 mod m20261225_000003_add_health_to_org_ai_toolsets;
 mod m20261225_000004_create_ai_grants;
@@ -296,6 +297,7 @@ mod m20261225_000015_ai_chat_sessions_branched_from;
 mod m20261225_000016_add_approval_scope_to_ai_actions;
 mod m20261225_000017_add_oncall_policy_saved_by_person;
 mod m20261226_000001_add_oncall_team_to_incident_integrations;
+mod m20261226_000001_create_autoresolve_corrections;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -626,6 +628,18 @@ pub(crate) fn alert_slack_migrations_for_test() -> Vec<Box<dyn MigrationTrait>> 
 #[cfg(test)]
 pub(crate) fn alert_leases_migration_for_test() -> m20261223_000001_create_alert_leases::Migration {
     m20261223_000001_create_alert_leases::Migration
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) fn autoresolve_migration_for_test()
+-> m20261225_000001_create_autoresolve_tables::Migration {
+    m20261225_000001_create_autoresolve_tables::Migration
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) fn autoresolve_corrections_migration_for_test()
+-> m20261226_000001_create_autoresolve_corrections::Migration {
+    m20261226_000001_create_autoresolve_corrections::Migration
 }
 
 /// Run the v1 run-pointer backfill over the current rows, for tests in any crate.
@@ -961,6 +975,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261225_000016_add_approval_scope_to_ai_actions::Migration),
             Box::new(m20261225_000017_add_oncall_policy_saved_by_person::Migration),
             Box::new(m20261226_000001_add_oncall_team_to_incident_integrations::Migration),
+            Box::new(m20261225_000001_create_autoresolve_tables::Migration),
+            Box::new(m20261226_000001_create_autoresolve_corrections::Migration),
         ]
     }
 }
@@ -1113,6 +1129,8 @@ mod tests {
             169,
             "m20261226_000001_add_oncall_team_to_incident_integrations",
         ),
+        (170, "m20261225_000001_create_autoresolve_tables"),
+        (171, "m20261226_000001_create_autoresolve_corrections"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1234,6 +1252,10 @@ mod tests {
             (
                 "m20251204_000001_create_alert_incidents_table",
                 "m20261221_000001_add_last_detection_at_to_alert_incidents",
+            ),
+            (
+                "m20261225_000001_create_autoresolve_tables",
+                "m20261226_000001_create_autoresolve_corrections",
             ),
             (
                 "m20251204_000001_create_alert_incidents_table",

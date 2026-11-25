@@ -18,8 +18,10 @@ import type { I18nText } from "@/types/i18n";
 export type InlineNoticeVariant = "warning" | "error";
 
 export interface InlineNoticeProps {
-  /** The sentence; cut with "…" in tight space, full text in its tooltip. */
+  /** The sentence; cut with "…" in tight space, full text in its tooltip, unless `wrap` is set. */
   text: I18nText;
+  /** Run the sentence onto more lines instead of cutting it, for text the reader must see whole. */
+  wrap?: boolean;
   /** `error` is red and an alert, for a check that failed; `warning` is amber and a status. */
   variant?: InlineNoticeVariant;
   /** Label of the one text action after the sentence; never cut. */

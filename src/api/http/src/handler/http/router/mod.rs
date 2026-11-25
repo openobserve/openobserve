@@ -82,9 +82,9 @@ use {
     openobserve_api_common::auth::delegation::DelegatedCaller,
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, autoobserve,
-        datasets, discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys,
-        license, oncall, playground, prompts, providers, quality, remote_tasks, score_configs,
-        scorers, workflows,
+        autoresolve, datasets, discovery, domain_management, eval_jobs, experiments, fleet, gen_ai,
+        keys, license, oncall, playground, prompts, providers, quality, remote_tasks,
+        score_configs, scorers, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1453,6 +1453,31 @@ fn autoobserve_routes(router: Router) -> Router {
         .route("/v2/{org_id}/autoobserve/settings/paging", get(autoobserve::paging::get_paging_settings).put(autoobserve::paging::put_paging_settings))
 }
 
+#[cfg(feature = "enterprise")]
+#[rustfmt::skip]
+fn autoresolve_routes(router: Router) -> Router {
+    router
+        .route("/v2/{org_id}/autoresolve/summary", get(autoresolve::runs::get_summary))
+        .route("/v2/{org_id}/autoresolve/runs", get(autoresolve::runs::list_runs).post(autoresolve::runs::start_run))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}", get(autoresolve::runs::get_run))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/live_stream", get(autoresolve::runs::get_run_live_stream))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/approve", post(autoresolve::runs::approve_run))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/decline", post(autoresolve::runs::decline_run))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/replan", post(autoresolve::runs::replan_run))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/verdict", post(autoresolve::runs::post_verdict))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/add_connection", post(autoresolve::runs::add_connection))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/plan", post(autoresolve::internal::post_plan))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/outcome", post(autoresolve::internal::post_outcome))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/consume", post(autoresolve::internal::consume_step))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/steps/{step_id}/result", post(autoresolve::internal::post_step_result))
+        .route("/v2/{org_id}/autoresolve/saved", get(autoresolve::saved::list_saved).post(autoresolve::saved::create_saved))
+        .route("/v2/{org_id}/autoresolve/saved/{autoresolve_id}", get(autoresolve::saved::get_saved).put(autoresolve::saved::update_saved).delete(autoresolve::saved::delete_saved))
+        .route("/v2/{org_id}/autoresolve/saved/{autoresolve_id}/trigger", post(autoresolve::saved::set_saved_trigger))
+        .route("/v2/{org_id}/autoresolve/saved/{autoresolve_id}/run", post(autoresolve::saved::run_saved))
+        .route("/v2/{org_id}/autoresolve/saved/{autoresolve_id}/corrections", get(autoresolve::saved::list_corrections))
+        .route("/v2/{org_id}/autoresolve/saved/{autoresolve_id}/corrections/{correction_id}", delete(autoresolve::saved::remove_correction))
+}
+
 #[rustfmt::skip]
 fn service_route_table() -> Router {
     // Downtimes, Slack, search and service streams live in their own tables to keep this function under the line limit.
@@ -2199,6 +2224,10 @@ fn service_route_table() -> Router {
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
         router = ai_chat_routes(router);
+        // The licence can load after the router is built, so each handler checks the full gate.
+        if get_o2_config().autoresolve.enabled {
+            router = autoresolve_routes(router);
+        }
 
         if get_o2_config().common.workflows_enabled {
             // workflows
@@ -6547,31 +6576,104 @@ mod tests {
             "GET /v2/{org_id}/autoobserve/decisions/preview",
             "POST /v2/{org_id}/autoobserve/decisions",
             "POST /v2/{org_id}/autoobserve/decisions/{decision_id}/undo",
+            "POST /v2/{org_id}/autoresolve/runs/{run_id}/approve",
+            "POST /v2/{org_id}/autoresolve/runs/{run_id}/decline",
         ]);
         assert_eq!(scope_allows(in_slack_action_scope), sorted(&expected));
     }
 
-    /// A pattern parameter must not admit a path that axum hands to a more specific route.
     #[test]
-    fn assistant_scope_agrees_with_axum_dispatch() {
-        use openobserve_api_common::auth::delegation::in_assistant_scope;
+    fn autoresolve_scope_is_exactly_these_router_routes() {
+        use openobserve_api_common::auth::delegation::in_autoresolve_scope;
 
-        let wrong = dispatch_disagreements(in_assistant_scope);
-        assert!(
-            wrong.is_empty(),
-            "add the literal to RESERVED_STREAM_SLOTS in api/common auth/delegation.rs: {wrong:#?}"
-        );
+        #[allow(unused_mut)]
+        let mut expected = vec![
+            "GET /v2/{org_id}/alerts",
+            "GET /v2/{org_id}/alerts/incidents",
+            "GET /v2/{org_id}/alerts/incidents/stats",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}",
+            "GET /v2/{org_id}/alerts/{alert_id}",
+            "GET /{org_id}/mcp",
+            "GET /{org_id}/prometheus/api/v1/query",
+            "GET /{org_id}/prometheus/api/v1/query_range",
+            "GET /{org_id}/streams",
+            "GET /{org_id}/streams/{stream_name}/schema",
+            "GET /{org_id}/{stream_name}/_around",
+            "GET /{org_id}/{stream_name}/_values",
+            "GET /{org_id}/{stream_name}/traces/latest_stream",
+            "POST /{org_id}/_search_multi_stream",
+            "POST /{org_id}/_search_stream",
+            "POST /{org_id}/mcp",
+            "POST /{org_id}/prometheus/api/v1/query",
+            "POST /{org_id}/prometheus/api/v1/query_range",
+        ];
+        #[cfg(feature = "enterprise")]
+        expected.extend([
+            "POST /v2/{org_id}/autoresolve/runs/{run_id}/consume",
+            "POST /v2/{org_id}/autoresolve/runs/{run_id}/outcome",
+            "POST /v2/{org_id}/autoresolve/runs/{run_id}/plan",
+            "POST /v2/{org_id}/autoresolve/runs/{run_id}/steps/{step_id}/result",
+        ]);
+        assert_eq!(scope_allows(in_autoresolve_scope), sorted(&expected));
     }
 
+    /// A pattern parameter must not admit a path that axum hands to a more specific route.
     #[test]
-    fn slack_action_scope_agrees_with_axum_dispatch() {
-        use openobserve_api_common::auth::delegation::in_slack_action_scope;
+    fn scopes_agree_with_axum_dispatch() {
+        use openobserve_api_common::auth::delegation::{
+            in_assistant_scope, in_autoresolve_scope, in_slack_action_scope,
+        };
 
-        let wrong = dispatch_disagreements(in_slack_action_scope);
+        let assistant: fn(&Method, &str) -> bool = in_assistant_scope;
+        let cases = [
+            ("assistant", assistant, "RESERVED_STREAM_SLOTS"),
+            ("slack_action", in_slack_action_scope, "ALERT_ID_LITERALS"),
+            (
+                "autoresolve",
+                in_autoresolve_scope,
+                "RESERVED_STREAM_SLOTS or ALERT_ID_LITERALS",
+            ),
+        ];
+        for (scope, in_scope, fix) in cases {
+            let wrong = dispatch_disagreements(in_scope);
+            assert!(
+                wrong.is_empty(),
+                "{scope}: add the literal to {fix} in api/common auth/delegation.rs: {wrong:#?}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn autoresolve_routes_are_absent_with_the_flag_off() {
         assert!(
-            wrong.is_empty(),
-            "add the literal to ALERT_ID_LITERALS in api/common auth/delegation.rs: {wrong:#?}"
+            !get_o2_config().autoresolve.enabled,
+            "the routes mount only with O2_AUTORESOLVE_ENABLED on"
         );
+        let app = Router::new().nest("/api", service_route_table());
+        for (method, path) in [
+            (Method::GET, "/api/v2/default/autoresolve/summary"),
+            (Method::POST, "/api/v2/default/autoresolve/runs"),
+            (Method::POST, "/api/v2/default/autoresolve/runs/r1/consume"),
+        ] {
+            let req = Request::builder()
+                .method(method.clone())
+                .uri(path)
+                .header("user_id", "root@example.com")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from("{}"))
+                .unwrap();
+            let response = app.clone().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{method} {path}");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            // A handler's 404 carries a JSON message; only an unmatched route has no body.
+            assert!(
+                bytes.is_empty(),
+                "{method} {path} reached a handler: {bytes:?}"
+            );
+        }
     }
 
     // Router-role pods merge basic_routes the same way, so this covers both node shapes.
@@ -6762,11 +6864,15 @@ mod tests {
     #[tokio::test]
     async fn every_openapi_operation_reaches_the_route_it_documents() {
         // On-call is mounted only when enabled at runtime; the spec documents it regardless.
-        let routes = if get_o2_config().oncall.enabled {
+        let mut routes = if get_o2_config().oncall.enabled {
             local_routes()
         } else {
             local_routes().nest("/api", oncall_routes(Router::new()))
         };
+        // AutoResolve is mounted only when its flag is on; the spec documents it regardless.
+        if !get_o2_config().autoresolve.enabled {
+            routes = routes.nest("/api", autoresolve_routes(Router::new()));
+        }
         let app = routes.route_layer(middleware::from_fn(
             |req: Request<Body>, _next: Next| async move {
                 let matched = req

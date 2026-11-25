@@ -4422,6 +4422,8 @@ async fn handle_alert_triggers(
         && delivery.should_deliver()
     {
         #[cfg(feature = "enterprise")]
+        crate::autoresolve::triggers::on_alert_fired(&alert, triggered_at);
+        #[cfg(feature = "enterprise")]
         let unmuted_rows = unmuted_group_rows(&alert, &folder_id, &data, now).await;
         #[cfg(feature = "enterprise")]
         let correlation_rows = unmuted_rows.as_deref().unwrap_or(data.as_slice());

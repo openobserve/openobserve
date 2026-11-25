@@ -527,7 +527,9 @@
       "linkedDomains": "linked domains",
       "domainMappings": "domain mappings",
       "domainRequests": "link requests",
-      "blockedUsers": "blocked users"
+      "blockedUsers": "blocked users",
+      "autoresolveRuns": "runs",
+      "savedAutoResolve": "saved AutoResolves"
     },
     "demo": {
       "pageTitle": "Empty states — full set for review",
@@ -652,6 +654,23 @@
     "noOncallUnrouted": {
       "title": "Nothing needs an owner",
       "description": "Every alert that fired reached a team."
+    },
+    "noAutoResolveRuns": {
+      "title": "No runs yet",
+      "description": "Runs you and your team start appear here."
+    },
+    "noAutoResolveConnections": {
+      "title": "Add an MCP first",
+      "description": "An AutoResolve acts through the MCPs your organization has added, such as a code host, a deploy tool or a cluster. This organization has none yet."
+    },
+    "noUsable": {
+      "mcps": "No MCPs you can use",
+      "aiToolsets": "No AI toolsets you can use",
+      "askAdmin": "Ask an admin for access in IAM › Roles."
+    },
+    "noSavedAutoResolve": {
+      "title": "No saved AutoResolves yet",
+      "description": "Open a finished run and choose Save as AutoResolve to run its goal again, or to start it when an alert fires."
     }
   },
   "accessBoundary": {
@@ -2075,6 +2094,7 @@
   },
   "menu": {
     "alertCalibration": "Alert Calibration",
+    "autoresolve": "AutoResolve",
     "autoobserve": "AutoObserve",
     "upgradeToProPlan": "Upgrade to PRO Plan",
     "home": "Home",
@@ -34638,6 +34658,427 @@
     "fixedToNow": "Ends now, won't move",
     "gateOrder": "Start must be before end.",
     "gateInvalid": "Not a valid range."
+  },
+  "autoresolve": {
+    "title": "AutoResolve",
+    "runTitle": "AutoResolve run",
+    "runNotFound": "This run was not found",
+    "runNotFoundHint": "It may have been removed, or the link may be wrong.",
+    "runForbidden": "You don't have access to this run",
+    "namesMore": "{count} more | {count} more",
+    "mcp": {
+      "count": "{count} MCP | {count} MCPs",
+      "the": "the {names} MCP | the {names} MCPs",
+      "theDescribed": "the {name} MCP ({description})",
+      "described": "{name} ({description})"
+    },
+    "stage": {
+      "investigate": "Investigate",
+      "ask": "Ask",
+      "proceed": "Proceed",
+      "check": "Check",
+      "outcome": "Outcome"
+    },
+    "state": {
+      "investigating": "Investigating",
+      "waitingApproval": "Waiting for approval",
+      "proceeding": "Proceeding",
+      "checking": "Checking",
+      "worked": "Worked",
+      "noChange": "No change",
+      "worse": "Worse",
+      "declined": "Declined",
+      "lapsed": "Lapsed",
+      "stepFailed": "Step failed",
+      "outcomeUnknown": "Outcome unknown",
+      "failed": "Failed",
+      "proposed": "Proposed",
+      "approved": "Approved",
+      "running": "Running",
+      "done": "Done",
+      "held": "Held",
+      "notRun": "Not run",
+      "superseded": "Superseded"
+    },
+    "subtitle": "Type what you want done. It investigates, asks before any change, proceeds and checks.",
+    "tabs": {
+      "home": "Home",
+      "runs": "Runs",
+      "saved": "Saved"
+    },
+    "home": {
+      "examplesTitle": "Try one of these",
+      "examples": {
+        "checkout": "Find why the checkout service returns 5xx errors and fix it",
+        "payment": "Which recent changes touched the payment service?",
+        "ingestion": "Why did ingestion lag rise in the last hour?"
+      },
+      "startFailed": "The run could not start. Try again."
+    },
+    "goalBox": {
+      "heading": "What should be done?",
+      "placeholder": "Describe the outcome you want, for example: find why a service is failing and fix it",
+      "productData": "{product} data",
+      "canUse": "{mcps} and {data} | {mcps}, and {data}",
+      "start": "Start",
+      "asksFirst": "It can look freely. It asks you before it changes anything.",
+      "addConnection": "Add an MCP",
+      "connectionsLabel": "MCPs this run can use"
+    },
+    "connectionPicker": {
+      "chooseOne": "Choose at least one MCP.",
+      "upTo": "Up to {mcps}",
+      "noneYouCanUse": "No MCPs you can use. Ask an admin for access in IAM › Roles.",
+      "noneYet": "This organization has no MCPs yet. Add one in Settings › AI Toolsets first."
+    },
+    "runs": {
+      "regionNote": "Runs and saved AutoResolves belong to the region where they were created.",
+      "recent": "Recent runs",
+      "viewAll": "View all runs",
+      "search": "Search goals",
+      "stateGroup": {
+        "live": "Live",
+        "waiting": "Waiting",
+        "ended": "Ended"
+      },
+      "startedBy": "Started by",
+      "anyone": "Anyone",
+      "me": "Me",
+      "connection": "MCP",
+      "column": {
+        "started": "Started",
+        "goal": "Goal",
+        "state": "State",
+        "startedBy": "Started by",
+        "connections": "MCPs",
+        "took": "Took"
+      },
+      "tookSoFar": "{time} so far"
+    },
+    "orgAdmins": "Org admins",
+    "approvers": {
+      "roles": "role {names} | roles {names}",
+      "groups": "group {names} | groups {names}",
+      "separator": "; "
+    },
+    "connection": {
+      "removeConnection": "Remove {name}",
+      "removedChip": "{name} (removed)",
+      "moreRemoved": "and {count} more removed | and {count} more removed",
+      "writeCredential": "Credential for approved changes (optional)",
+      "writeCredentialHelp": "Used only for steps a person approved. When empty, approved steps use the MCP's headers above.",
+      "writeValueSet": "Set. Type a new value to replace it.",
+      "writeValueRequired": "Enter a value",
+      "addWriteHeader": "Add credential header",
+      "draftWriteHeader": "Approved-change header {name}"
+    },
+    "duration": {
+      "minutesSeconds": "{minutes} min {seconds} s"
+    },
+    "run": {
+      "reconnecting": "Reconnecting…",
+      "working": "Working…",
+      "investigating": "Investigating",
+      "investigatingNote": "Calls that only look go straight through. The run asks you before the first change.",
+      "investigated": "Investigated",
+      "investigatedMeta": "{count} call, {duration} | {count} calls, {duration}",
+      "calls": "Calls",
+      "approvedBy": "Approved by {name} at {time}",
+      "stepCount": "{count} step | {count} steps",
+      "stepLabel": "step {seq}",
+      "proceedingNote": "Only the approved calls go through, in order, once each. Any other change pauses the run and asks again.",
+      "checking": "Checking the result for {elapsed}",
+      "checkingAgain": "Checking the result again for {elapsed}",
+      "investigatingFor": "Investigating for {elapsed}",
+      "proceedingFor": "Proceeding for {elapsed}",
+      "silent": "The AI model hasn't answered for {quiet}. It will retry or stop at {time}.",
+      "silentOn": "The AI model hasn't answered for {quiet}. It will retry or stop on {time}.",
+      "revertHint": "Raising a revert asks for approval again before anything changes.",
+      "raiseRevert": "Raise a revert",
+      "revertNote": "The check says worse. Propose a change that reverts the approved steps.",
+      "planChanged": "The plan changed; review it again",
+      "approveFailed": "The approval could not be saved. Try again.",
+      "declineFailed": "The request could not be declined. Try again.",
+      "replanFailed": "A new plan could not be requested. Try again.",
+      "notice": {
+        "stepFailed": "Step {step} failed. Ran: {ran}. Did not run: {notRun}.",
+        "noSteps": "none",
+        "outcomeUnknown": "A step was sent but no answer came back. It will not be retried.",
+        "failed": "The run failed and stopped.",
+        "failedWith": "The run failed and stopped. {reason}",
+        "stepFailedWith": "{reason} Ran: {ran}. Did not run: {notRun}.",
+        "outcomeUnknownWith": "A step was sent but no answer came back. It will not be retried. {reason}",
+        "held": "The run paused: it tried a call that was not approved, so that call was held."
+      },
+      "outcome": {
+        "checkedAt": "Checked at {time}",
+        "error": "The run reported an error: {reason}"
+      },
+      "evidence": {
+        "title": "Evidence",
+        "started": "Started by {name}",
+        "approved": "{name} approved {option}",
+        "approvedPlan": "{name} approved the plan",
+        "stepSent": "Step {seq} sent: {tool}",
+        "stepDone": "Step {seq} done: {tool}",
+        "stepDoneWith": "Step {seq} done: {detail}",
+        "stepFailed": "Step {seq} failed: {tool}",
+        "stepFailedWith": "Step {seq} failed: {detail}",
+        "span": "{from} to {to}",
+        "ended": "Run ended",
+        "correction": "Correction sent by {name}: {kind}",
+        "planAgain": "Plan again requested by {name}",
+        "notFixedNote": "Didn't fix it: {note}",
+        "remembered": "{time} · Remembered for future runs",
+        "connectionAdded": "{name} added {mcp} to this AutoResolve and asked for a new plan",
+        "connectionAddedRun": "{name} added {mcp} to this run and asked for a new plan",
+        "triggerOff": "The alert trigger is off until someone re-approves it.",
+        "planningAgain": "Planning again",
+        "markedFixed": "Marked fixed by {name}"
+      },
+      "facts": {
+        "title": "This run",
+        "startedBy": "Started by",
+        "started": "Started",
+        "canUse": "Can use",
+        "canApprove": "Can approve",
+        "option": "Option",
+        "approval": "Approval",
+        "check": "Check",
+        "outcome": "Outcome",
+        "notChosen": "Not chosen yet",
+        "noneChosen": "None chosen",
+        "notAsked": "Not asked yet",
+        "approvedAt": "{name}, {time}",
+        "waitingForYou": "Waiting for you. Lapses at {time}",
+        "waitingForYouOn": "Waiting for you. Lapses {time}",
+        "waitingFor": "Waiting for {names}. Lapses at {time}",
+        "waitingForOn": "Waiting for {names}. Lapses {time}",
+        "lapsedAt": "Lapsed at {time}",
+        "lapsedOn": "Lapsed {time}",
+        "checkNotRun": "Not run yet",
+        "checkRunning": "In progress",
+        "checkMet": "Met",
+        "checkNotMet": "Not met",
+        "checkDidNotRun": "Did not run",
+        "notKnown": "Not known yet",
+        "evidenceNote": "Every call is kept as evidence, with its arguments and result.",
+        "notInAutoResolve": "Not in this AutoResolve: {mcps}"
+      }
+    },
+    "approval": {
+      "optionsLabel": "Options",
+      "recommended": "Recommended",
+      "stepSummary": "{count} step through {mcps} | {count} steps through {mcps}",
+      "omitted": "{count} other option was left out: {reason} | {count} other options were left out: {reason}",
+      "omittedNoReason": "{count} other option was left out. | {count} other options were left out.",
+      "missingCapability": "None of this run's MCPs can do this: {capability}",
+      "inFull": "{title} in full",
+      "changes": "Approving changes {mcps}.",
+      "canApprove": "Can approve: {names}",
+      "lapsesAt": "Lapses at {time}",
+      "lapsesOn": "Lapses {time}",
+      "decline": "Decline",
+      "askDifferent": "Ask for a different plan",
+      "approve": "Approve and proceed",
+      "noteLabel": "What should the new plan do differently?",
+      "notePlaceholder": "For example: keep the change in a pull request",
+      "sendNote": "Ask for a new plan",
+      "cannotApprove": "You can't approve changes through {mcps}. Can approve: {approvers}.",
+      "connectionRemoved": "{mcps} was removed after this plan was made, so this option cannot be approved. | {mcps} were removed after this plan was made, so this option cannot be approved.",
+      "connectionRemovedOther": "{mcps} was removed after this plan was made, so this option cannot be approved. Choose another option or ask for a different plan. | {mcps} were removed after this plan was made, so this option cannot be approved. Choose another option or ask for a different plan.",
+      "aRemovedConnection": "An MCP of this option",
+      "removedNote": "Make a plan that does not use {mcps}; it was removed. | Make a plan that does not use {mcps}; they were removed.",
+      "lapsedAt": "This request lapsed at {time}.",
+      "lapsedOn": "This request lapsed on {time}.",
+      "lapsed": "This request lapsed.",
+      "lapsedBody": "Nobody approved it in time, so nothing was changed. The target may have changed since; start again to get a current plan.",
+      "startAgain": "Start again",
+      "startAgainFailed": "The run could not start again. Try again.",
+      "connectionsGone": "The MCP this run used was removed. | The MCPs this run used were removed.",
+      "chooseConnections": "Choose MCPs",
+      "heldCall": "{tool} through {mcp}",
+      "heldWhilePlanning": "While investigating it tried a change, so that call was held and not run: {tools}. | While investigating it tried {count} changes, so those calls were held and not run: {tools}.",
+      "declined": "This request was declined. Nothing was changed.",
+      "correctPlan": "Correct this plan",
+      "partialFix": "Partial fix",
+      "partialFixLeaves": "Leaves undone: {text}"
+    },
+    "step": {
+      "runningFor": "Running for {elapsed}",
+      "reason": "Agent's reason",
+      "arguments": "Arguments",
+      "preview": "Preview",
+      "dryRunAfter": "Dry run runs after you approve; the run stops if it fails.",
+      "result": "Result",
+      "error": "Error",
+      "held": "Not in the approved plan",
+      "showAll": "Show the full arguments",
+      "showFullResult": "Show the full result",
+      "showLess": "Show less",
+      "refChip": "{arg} from step {step}",
+      "refNote": "Filled in by the system from step {steps}'s result, not by the agent. | Filled in by the system from the results of steps {steps}, not by the agent."
+    },
+    "savedTitle": "Saved AutoResolve",
+    "saved": {
+      "back": "Saved AutoResolves",
+      "newTitle": "Save as AutoResolve",
+      "saveAsAutoResolve": "Save as AutoResolve",
+      "runNow": "Run now",
+      "deleteTitle": "Delete this AutoResolve?",
+      "deleteMessage": "Its trigger stops and it can no longer be run. Its past runs stay.",
+      "deleted": "AutoResolve deleted",
+      "deleteFailed": "The AutoResolve was not deleted. Try again.",
+      "runFailed": "The AutoResolve could not start. Try again.",
+      "saveFailed": "The AutoResolve was not saved. Try again.",
+      "notFoundHint": "It may have been deleted.",
+      "runNotLoaded": "The run to save could not be loaded",
+      "field": {
+        "goal": "Goal",
+        "connections": "MCPs",
+        "runsWhen": "Runs when",
+        "trigger": "Trigger",
+        "approval": "Approval",
+        "savedBy": "Saved by"
+      },
+      "kind": {
+        "person": "A person starts it",
+        "alert": "An alert fires",
+        "incident": "An incident opens"
+      },
+      "runsWhenAlert": "An alert fires: {alert}",
+      "runsWhenIncident": "An incident opens from {alert}",
+      "runsWhenAlertGone": "An alert fires, but its alert was deleted",
+      "runsWhenIncidentGone": "An incident opens, but its alert was deleted",
+      "triggerSwitch": "Start runs from this trigger",
+      "triggerApproved": "Approved by {name} on {time}",
+      "paused": "Paused until re-approved: an edit turned this trigger off. Turning it on approves it as you.",
+      "approval": "Asked in the {slack} channel for approvals.",
+      "savedBy": "{name} on {time}",
+      "openSourceRun": "Open the run it was saved from",
+      "regionNotice": "This region does not run alerts and incidents, so this trigger will not fire here.",
+      "connectionsRemoved": "{mcps} was removed. Take it out of this AutoResolve or add it again. | {mcps} were removed. Take them out of this AutoResolve or add them again.",
+      "slackUnavailable": "Slack approval is not available on this deployment, so alert and incident triggers cannot be turned on.",
+      "slackUnavailableOn": "Slack approval is not available on this deployment, so this trigger's runs cannot be approved in Slack. Turn it off or approve them on screen.",
+      "lastRuns": "Last runs",
+      "lastRunsMore": "Showing the {shown} newest of {total} runs.",
+      "lastRunsEmpty": "Runs of this AutoResolve appear here, whether a person or its trigger started them.",
+      "triggerState": {
+        "on": "On",
+        "off": "Off",
+        "paused": "Paused until re-approved"
+      },
+      "form": {
+        "name": "Name",
+        "goal": "Goal",
+        "connections": "MCPs",
+        "connectionsHelp": "Its runs can use only these MCPs.",
+        "connectionsPlaceholder": "Add MCPs",
+        "connectionsNotFilled": "This run used {mcps}, which was removed, so it is not filled in. | This run used {mcps}, which were removed, so they are not filled in.",
+        "runsWhen": "Runs when",
+        "alert": "Alert",
+        "incidentAlert": "Alert that opens the incident",
+        "alertPlaceholder": "Choose an alert",
+        "alertGone": "Deleted alert",
+        "alertsForbidden": "You don't have access to alerts, so none can be listed here.",
+        "alertsFailed": "Alerts could not be loaded. Reopen this form to try again.",
+        "connectionsFailed": "MCPs could not be loaded. Reopen this form to try again.",
+        "alertsNone": "This organization has no alerts yet. Create one in Alerts first.",
+        "createTriggerHelp": "Saving turns this trigger on. Each run asks for approval in the {slack} channel for approvals.",
+        "editPausesHelp": "Changing the goal, MCPs or trigger turns the trigger off until someone who can approve turns it on again.",
+        "nameRequired": "Enter a name.",
+        "goalRequired": "Enter a goal.",
+        "tooLong": "Use {max} characters or fewer.",
+        "alertRequired": "Choose an alert.",
+        "save": "Save AutoResolve",
+        "saveChanges": "Save changes"
+      },
+      "list": {
+        "search": "Search saved AutoResolves",
+        "column": {
+          "name": "Name",
+          "runsWhen": "Runs when",
+          "trigger": "Trigger",
+          "connections": "MCPs",
+          "savedBy": "Saved by",
+          "updated": "Updated"
+        }
+      },
+      "loadFailed": "The AutoResolve could not be loaded"
+    },
+    "andMore": "and {count} more | and {count} more",
+    "correction": {
+      "title": "What's wrong with this plan?",
+      "kindsLabel": "What's wrong",
+      "kind": {
+        "wrongCause": "Wrong cause",
+        "wrongFix": "Wrong fix",
+        "outOfScope": "Goes beyond this AutoResolve",
+        "notFixed": "Didn't fix it"
+      },
+      "help": {
+        "none": "Pick what is wrong, then say it in the note.",
+        "wrongCause": "Wrong cause: the agent blamed the wrong thing, so its fix aims at the wrong place.",
+        "wrongFix": "Wrong fix: the cause is right, but the change is not what you want.",
+        "outOfScope": "Goes beyond this AutoResolve: the plan changes things this AutoResolve should leave alone."
+      },
+      "draft": {
+        "wrongCause": "\"{option}\" aims at the wrong cause.",
+        "wrongFix": "\"{option}\" is not the change I want.",
+        "outOfScope": "\"{option}\" changes more than this AutoResolve should."
+      },
+      "noteLabel": "Note",
+      "noteHelp": "The agent reads this before it plans again.",
+      "notePickFirst": "Pick what is wrong first",
+      "remember": "Remember for future runs of \"{name}\"",
+      "rememberHelp": "Later runs see this note. You can remove it from the AutoResolve.",
+      "send": "Send correction"
+    },
+    "correctionsUsed": {
+      "chip": "Used {count} correction | Used {count} corrections",
+      "title": "Corrections this plan used",
+      "thisRun": "{name}, this run, {time}",
+      "earlierRun": "{name}, an earlier run, {time}",
+      "manage": "Manage corrections on the AutoResolve"
+    },
+    "missing": {
+      "title": "This fix needs {mcp}, which this AutoResolve doesn't have",
+      "titleRun": "This fix needs {mcp}, which this run doesn't have",
+      "add": "Add {mcp} and plan again",
+      "orPartial": "Or approve the partial fix below. | Or approve one of the partial fixes below.",
+      "nothingChanged": "The run ended as No change. Nothing was changed.",
+      "cannotAdd": "Only people who can approve changes through {mcp} can add it.",
+      "dialogAutoResolve": "AutoResolve",
+      "dialogConnection": "MCP to add",
+      "dialogTriggerOff": "Adding an MCP turns the AutoResolve's alert trigger off until someone re-approves it.",
+      "dialogThen": "This run then plans again with {mcp}. Nothing changes until someone approves the new plan.",
+      "dialogConfirm": "Add and plan again",
+      "addFailed": "Could not add {mcp}. Try again.",
+      "needs": "This fix needs {mcp}: {action}"
+    },
+    "verdict": {
+      "question": "Did this fix it?",
+      "yes": "Yes",
+      "no": "No, it didn't",
+      "noteLabel": "What still isn't right?",
+      "stillFiring": "{trigger} is still firing",
+      "filledFrom": "Filled in from {trigger}.",
+      "planAgain": "Plan again",
+      "agent": "Agent",
+      "fixed": "Fixed",
+      "notFixed": "Didn't fix it",
+      "byAt": "{name}, {time}",
+      "noteAt": "{note} · {time}",
+      "failed": "Your answer was not saved. Try again."
+    },
+    "corrections": {
+      "title": "Corrections",
+      "help": "Each new run of this AutoResolve reads these. They never approve anything.",
+      "source": "From {run} by {name}",
+      "runOf": "run of {time}",
+      "sourceGone": "From a run that no longer exists, {time} by {name}",
+      "removeFailed": "The correction was not removed. Try again."
+    }
   },
   "autobotInvestigate": {
     "greeting": "What should we investigate?",

@@ -227,6 +227,38 @@ pub async fn get_by_name(org: &str, name: &str) -> Result<Option<OrgToolset>, er
     }
 }
 
+/// `(id, name)` of the org's toolsets of `kind`, oldest first; their data is never read.
+pub async fn list_names(org: &str, kind: &str) -> Result<Vec<(String, String)>, errors::Error> {
+    Ok(Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::Name)
+        .filter(Column::Org.eq(org))
+        .filter(Column::Kind.eq(kind))
+        .order_by(Column::CreatedAt, Order::Asc)
+        .into_tuple()
+        .all(get_orm_client_ro().await)
+        .await?)
+}
+
+/// Id, name and description of every toolset of `kind`, oldest first; `data` is never read.
+pub async fn list_described(
+    org: &str,
+    kind: &str,
+) -> Result<Vec<(String, String, Option<String>)>, errors::Error> {
+    Ok(Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::Name)
+        .column(Column::Description)
+        .filter(Column::Org.eq(org))
+        .filter(Column::Kind.eq(kind))
+        .order_by(Column::CreatedAt, Order::Asc)
+        .into_tuple()
+        .all(get_orm_client_ro().await)
+        .await?)
+}
+
 /// List toolsets for an org with optional filtering and limit.
 ///
 /// Results are ordered by `created_at` descending.

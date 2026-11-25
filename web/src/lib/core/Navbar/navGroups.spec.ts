@@ -28,8 +28,8 @@ function keysOf(entries: RailEntry[]): string[] {
  */
 const oncallOff = (gate: string) => gate !== "oncall";
 const oncallOn = () => true;
-// OSS serves neither on-call nor alert calibration, which are both enterprise-gated.
-const ossGates = (gate: string) => gate !== "oncall" && gate !== "alertCalibration";
+// OSS serves none of on-call, alert calibration and AutoResolve, which are enterprise-gated.
+const ossGates = (gate: string) => !["oncall", "alertCalibration", "autoresolve"].includes(gate);
 
 /**
  * `keysOf` minus the Infra tile. Infra is `standalone` — it absorbs nothing and
@@ -301,6 +301,7 @@ describe("groupNavLinks", () => {
       "sloList",
       "autobotInvestigate",
       "incidentList",
+      "autoresolve",
       "alertCalibration",
     ]);
   });
@@ -342,7 +343,7 @@ describe("groupNavLinks", () => {
     const response = reliability?.children
       .filter((c) => c.categoryKey === "menu.response")
       .map((c) => c.name);
-    expect(response).toEqual(["sloList", "autobotInvestigate", "incidentList", "alertCalibration"]);
+    expect(response).toEqual(["sloList", "autobotInvestigate", "incidentList", "autoresolve", "alertCalibration"]);
     expect(reliability?.children.filter((c) => !c.categoryKey)).toEqual([]);
   });
 
@@ -380,6 +381,7 @@ describe("groupNavLinks", () => {
       "alertTemplates",
       "alertLibrary",
       "autobotInvestigate",
+      "autoresolve",
       "alertCalibration",
     ]);
   });
@@ -868,6 +870,7 @@ describe("ship guards (AC-15, AC-22, D-27)", () => {
       "sloList",
       "autobotInvestigate",
       "incidentList",
+      "autoresolve",
       "downtimes",
       "alertCalibration",
       "onCallResponses",
@@ -922,6 +925,7 @@ describe("GATE_PREDICATES", () => {
     downtimesEnabled: false,
     alertCalibrationEnabled: false,
     fleetEnabled: false,
+    autoresolveEnabled: false,
     hiddenMenus: new Set<string>(),
     features: {},
     ...over,
@@ -1015,7 +1019,7 @@ describe("GATE_PREDICATES", () => {
     ]);
   });
 
-  it("puts Downtimes after Incidents when the rail carries a downtimes item", () => {
+  it("puts AutoResolve, then Downtimes, after Incidents when the rail carries a downtimes item", () => {
     const entries = groupNavLinks(
       [link("home"), link("alertList"), link("incidentList"), link("downtimes")],
       undefined,
@@ -1026,7 +1030,8 @@ describe("GATE_PREDICATES", () => {
         e.type === "linkGroup" && e.item.name === "reliability",
     );
     const names = reliability?.children.map((c) => c.name) ?? [];
-    expect(names.indexOf("downtimes")).toBe(names.indexOf("incidentList") + 1);
+    const at = names.indexOf("incidentList");
+    expect(names.slice(at, at + 3)).toEqual(["incidentList", "autoresolve", "downtimes"]);
     expect(keysWithoutInfra(entries)).toEqual(["link:home", "linkGroup:reliability"]);
   });
 

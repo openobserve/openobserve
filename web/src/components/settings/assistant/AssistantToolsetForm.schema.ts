@@ -60,6 +60,8 @@ export const makeToolsetFormSchema = (t: Translate, options: ToolsetSchemaOption
         url: z.string(),
         timeout_seconds: z.coerce.number().int(whole).positive(whole),
         headers: z.array(secretRow),
+        /** AutoResolve's write credential; the server never returns its values. */
+        writeHeaders: z.array(secretRow),
       }),
       skill: z.object({ content: z.string() }),
     })
@@ -73,13 +75,15 @@ export const makeToolsetFormSchema = (t: Translate, options: ToolsetSchemaOption
       if (val.kind === "skill" && !val.skill.content.trim())
         issue(["skill", "content"], t("aiToolset.skillContentRequired"));
       if (val.kind !== "mcp") return;
-      val.mcp.headers.forEach((row, i) => {
-        if (!row.key.trim() || row.state === "unchanged") return;
-        if (!row.value)
-          issue(["mcp", "headers", i, "value"], t("assistant.toolsets.form.enterAgain"));
-        else if (row.value === SECRET_MASK)
-          issue(["mcp", "headers", i, "value"], t("assistant.toolsets.form.maskValue"));
-      });
+      for (const field of ["headers", "writeHeaders"] as const) {
+        val.mcp[field].forEach((row, i) => {
+          if (!row.key.trim() || row.state === "unchanged") return;
+          if (!row.value)
+            issue(["mcp", field, i, "value"], t("assistant.toolsets.form.enterAgain"));
+          else if (row.value === SECRET_MASK)
+            issue(["mcp", field, i, "value"], t("assistant.toolsets.form.maskValue"));
+        });
+      }
     });
 };
 
@@ -89,7 +93,7 @@ export const toolsetFormDefaults = (): ToolsetFormValues => ({
   name: "",
   kind: "mcp",
   description: "",
-  mcp: { url: "", timeout_seconds: 30, headers: [] },
+  mcp: { url: "", timeout_seconds: 30, headers: [], writeHeaders: [] },
   skill: { content: "" },
 });
 
@@ -103,6 +107,15 @@ function secretRowsOf(value: unknown, mergeSecrets: boolean): SecretRow[] {
   return Object.keys(value)
     .slice(0, 100)
     .map((key) => ({ key, value: mergeSecrets ? null : "", state, stored: key }));
+}
+
+/** The server always keeps a write header sent as the mask, so each stored name starts unchanged. */
+function writeRowsOf(names: unknown): SecretRow[] {
+  if (!Array.isArray(names)) return [];
+  return names
+    .filter((name): name is string => typeof name === "string")
+    .slice(0, 100)
+    .map((key) => ({ key, value: null, state: "unchanged", stored: key }));
 }
 
 /** The form for a stored record; the server's masked values are dropped, never shown or sent back. */
@@ -120,6 +133,7 @@ export function toolsetFormOf(record: unknown, mergeSecrets: boolean): ToolsetFo
       url: typeof data.url === "string" ? data.url : "",
       timeout_seconds: num(data.timeout_seconds, 30),
       headers: secretRowsOf(data.headers, mergeSecrets),
+      writeHeaders: writeRowsOf(data.write_header_names),
     };
   } else {
     values.skill = { content: typeof data.content === "string" ? data.content : "" };
@@ -142,15 +156,18 @@ function secretMap(rows: SecretRow[], mergeSecrets: boolean): Record<string, str
   return out;
 }
 
+/** `writeHeaders`: AutoResolve is on, so the body carries its write credential; otherwise the server keeps the stored one. */
 export function toolsetDataOf(
   values: ToolsetFormValues,
   mergeSecrets: boolean,
+  writeHeaders = false,
 ): NonNullable<ToolsetCreateRequest["data"]> {
   if (values.kind === "mcp")
     return {
       url: values.mcp.url,
       headers: secretMap(values.mcp.headers, mergeSecrets),
       timeout_seconds: Number(values.mcp.timeout_seconds),
+      ...(writeHeaders ? { write_headers: secretMap(values.mcp.writeHeaders, true) } : {}),
     };
   return { content: values.skill.content };
 }

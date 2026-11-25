@@ -617,6 +617,77 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
+  // AutoResolve run and step states; both groups share the `autoresolve.state` wording.
+  autoresolveRunState: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      investigating: { variant: "blue-soft", labelKey: "autoresolve.state.investigating" },
+      waitingapproval: { variant: "warning-soft", labelKey: "autoresolve.state.waitingApproval" },
+      proceeding: { variant: "blue-soft", labelKey: "autoresolve.state.proceeding" },
+      checking: { variant: "blue-soft", labelKey: "autoresolve.state.checking" },
+      worked: { variant: "success-soft", labelKey: "autoresolve.state.worked" },
+      nochange: { variant: "default-soft", labelKey: "autoresolve.state.noChange" },
+      worse: { variant: "error-soft", labelKey: "autoresolve.state.worse" },
+      declined: { variant: "default-soft", labelKey: "autoresolve.state.declined" },
+      lapsed: { variant: "warning-soft", labelKey: "autoresolve.state.lapsed" },
+      stepfailed: { variant: "error-soft", labelKey: "autoresolve.state.stepFailed" },
+      outcomeunknown: { variant: "warning-soft", labelKey: "autoresolve.state.outcomeUnknown" },
+      failed: { variant: "error-soft", labelKey: "autoresolve.state.failed" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  autoresolvePersonVerdict: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      fixed: { variant: "success-soft", labelKey: "autoresolve.verdict.fixed" },
+      notfixed: { variant: "warning-soft", labelKey: "autoresolve.verdict.notFixed" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  autoresolveCorrectionKind: {
+    mode: "plain",
+    shape: "pill",
+    values: {
+      wrongcause: { variant: "default-soft", labelKey: "autoresolve.correction.kind.wrongCause" },
+      wrongfix: { variant: "default-soft", labelKey: "autoresolve.correction.kind.wrongFix" },
+      outofscope: { variant: "default-soft", labelKey: "autoresolve.correction.kind.outOfScope" },
+      notfixed: { variant: "default-soft", labelKey: "autoresolve.correction.kind.notFixed" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  autoresolveTriggerState: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      on: { variant: "success-soft", labelKey: "autoresolve.saved.triggerState.on" },
+      off: { variant: "default-soft", labelKey: "autoresolve.saved.triggerState.off" },
+      paused: { variant: "warning-soft", labelKey: "autoresolve.saved.triggerState.paused" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  autoresolveStepState: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      proposed: { variant: "default-soft", labelKey: "autoresolve.state.proposed" },
+      approved: { variant: "blue-soft", labelKey: "autoresolve.state.approved" },
+      running: { variant: "blue-soft", labelKey: "autoresolve.state.running" },
+      done: { variant: "success-soft", labelKey: "autoresolve.state.done" },
+      failed: { variant: "error-soft", labelKey: "autoresolve.state.failed" },
+      held: { variant: "warning-soft", labelKey: "autoresolve.state.held" },
+      notrun: { variant: "default-soft", labelKey: "autoresolve.state.notRun" },
+      superseded: { variant: "default-soft", labelKey: "autoresolve.state.superseded" },
+      outcomeunknown: { variant: "warning-soft", labelKey: "autoresolve.state.outcomeUnknown" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Service / node health — dot.
   serviceStatus: {
     mode: "dot",

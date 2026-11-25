@@ -1827,10 +1827,12 @@ mod tests {
     #[test]
     fn feature_writers_pass_the_rollup_guard_and_sdr_fail_closed() {
         use config::meta::{
-            alerts::alert_calibration::DIGEST_STREAM, self_reporting::redaction::is_platform_write,
+            alerts::alert_calibration::DIGEST_STREAM, autoresolve::AUTORESOLVE_RUNS_STREAM,
+            self_reporting::redaction::is_platform_write,
         };
         for job in [
             SystemJobType::AlertCalibration,
+            SystemJobType::AutoResolve,
             SystemJobType::AutoObserve,
             SystemJobType::SessionReplay,
         ] {
@@ -1838,6 +1840,7 @@ mod tests {
             assert!(is_internal_writer(&writer, false), "{job:?}");
             for stream in [
                 DIGEST_STREAM,
+                AUTORESOLVE_RUNS_STREAM,
                 "_o2_autoobserve_health",
                 "_o2_sessionreplay_resources",
             ] {
