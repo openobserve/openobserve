@@ -62,6 +62,30 @@ describe("buildTracingQueryPrompt", () => {
     });
   });
 
+  it("names an SQL-mode query as SQL and attaches it as an sql Query block", () => {
+    const sql = "SELECT * FROM default WHERE service_name = 'checkout'";
+    const build = buildTracingQueryPrompt({ ...base, filter: sql, sqlMode: true, error: "boom" });
+    expect(build.text).toContain("The SQL query is in the attached Query block.");
+    expect(build.text).toContain("Can you help me adjust the query to get results?");
+    expect(build.text).not.toContain("WHERE-clause filter");
+    expect(build.chips.map((c) => c.kind)).toEqual(["query_error", "query"]);
+    expect(build.chips[0]).toMatchObject({ data: { language: "sql" } });
+    expect(build.chips[1]).toMatchObject({ data: { language: "sql", query: sql } });
+    expectPromptRules(build);
+  });
+
+  it("keeps filter language in the chips outside SQL mode", () => {
+    const build = buildTracingQueryPrompt({ ...base, error: "boom" });
+    expect(build.chips[0]).toMatchObject({ data: { language: "filter" } });
+    expect(build.chips[1]).toMatchObject({ data: { language: "filter" } });
+  });
+
+  it("says no query is set for an empty SQL-mode editor", () => {
+    expect(buildTracingQueryPrompt({ ...base, filter: "", sqlMode: true }).text).toContain(
+      "No query is set.",
+    );
+  });
+
   it("says no filter is set for an empty filter", () => {
     expect(buildTracingQueryPrompt({ ...base, filter: " " }).text).toContain("No filter is set.");
   });

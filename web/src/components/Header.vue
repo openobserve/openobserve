@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
     </div>
 
-    <div class="flex min-w-0 flex-1 justify-center px-3 max-md:px-1">
+    <div class="flex min-w-0 flex-1 justify-center px-3 max-md:min-w-auto max-md:px-1">
       <OButton
         variant="outline"
         size="xs"
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- HEADER MENU: Contains all header navigation and user controls -->
-      <div class="header-menu flex items-center gap-x-2 max-xl:min-w-0">
+      <div class="header-menu flex items-center gap-x-2 max-xl:min-w-0 max-md:gap-x-1">
         <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ingestion_quota_used >= 85"

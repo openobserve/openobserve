@@ -26,10 +26,11 @@ export interface TracesDoorBase {
   timeZone: string;
   filter: string;
   mode: "spans" | "traces";
+  sqlMode: boolean;
 }
 
 interface TracesSearchShape {
-  meta?: { searchMode?: string };
+  meta?: { searchMode?: string; sqlMode?: boolean };
   data?: {
     editorValue?: unknown;
     stream?: { selectedStream?: { value?: string } };
@@ -56,6 +57,7 @@ export function tracesDoorBase(searchObj: TracesSearchShape, state: StoreShape):
     timeZone: state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     filter: String(data.editorValue ?? ""),
     mode: searchObj.meta?.searchMode === "spans" ? "spans" : "traces",
+    sqlMode: !!searchObj.meta?.sqlMode,
   };
 }
 

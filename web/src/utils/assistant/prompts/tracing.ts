@@ -31,8 +31,9 @@ import { errorPlainText } from "./queryError";
 export interface TracingQueryInput {
   org: string;
   mode: "spans" | "traces";
-  /** The WHERE-clause filter as written; empty means none. */
+  /** The editor text as written: a WHERE-clause filter, or full SQL in SQL mode; empty means none. */
   filter: string;
+  sqlMode?: boolean;
   stream: string;
   range: PromptRange;
   timeZone: string;
@@ -56,6 +57,7 @@ export function buildTracingQueryPrompt(
   t: TranslateFn = gt,
 ): PromptBuild {
   const error = input.error ? errorPlainText(input.error) : "";
+  const language = input.sqlMode ? "sql" : "filter";
   const errorChips = error
     ? [
         doorChip({
@@ -70,7 +72,7 @@ export function buildTracingQueryPrompt(
             from: input.range.from,
             to: input.range.to,
           },
-          data: { error, language: "filter" },
+          data: { error, language },
           sent: "serialized",
         }),
       ]
@@ -80,7 +82,7 @@ export function buildTracingQueryPrompt(
         {
           org: input.org,
           query: input.filter,
-          language: "filter",
+          language,
           stream: input.stream,
           range: input.range,
         },
@@ -94,13 +96,19 @@ export function buildTracingQueryPrompt(
       ? "The traces query produced an error; it is in the attached Query error block."
       : "The traces query ran successfully but returned no results.",
     `I am searching ${input.mode}.`,
-    filter
-      ? "The filter expression is in the attached Query block. It is a WHERE-clause filter, not a full SQL query."
-      : "No filter is set.",
+    queryLine(!!filter, !!input.sqlMode),
     `${stream ? `Stream: \`${stream}\`. ` : ""}Time range: ${promptRange(input.range, input.timeZone)}.`,
-    "Can you help me adjust the filter to get results?",
+    `Can you help me adjust ${input.sqlMode ? "the query" : "the filter"} to get results?`,
   ]);
   const title =
     chips[0]?.label ?? t("assistant.entry.title.emptyResult", { name: raw(input.stream) });
   return { text, chips, title };
+}
+
+function queryLine(hasQuery: boolean, sqlMode: boolean): string {
+  if (sqlMode)
+    return hasQuery ? "The SQL query is in the attached Query block." : "No query is set.";
+  return hasQuery
+    ? "The filter expression is in the attached Query block. It is a WHERE-clause filter, not a full SQL query."
+    : "No filter is set.";
 }
