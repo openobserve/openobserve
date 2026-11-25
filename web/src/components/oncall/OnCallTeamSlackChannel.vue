@@ -70,7 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </i18n-t>
         </OText>
-        <OText variant="meta">{{ t("oncall.slackChannelLinkHint") }}</OText>
+        <OText variant="meta">{{
+          t("oncall.slackChannelLinkHint", { command: raw(slackCommand) })
+        }}</OText>
       </div>
 
       <OBanner
@@ -147,7 +149,8 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
 
-const hereCommand = computed(() => `/o2 oncall here ${props.teamName}`);
+const slackCommand = computed(() => props.channel.slack_command || "/o2");
+const hereCommand = computed(() => `${slackCommand.value} oncall here ${props.teamName}`);
 
 const webhooks = computed(() => props.channel.destinations);
 const webhookOptions = computed(() =>
