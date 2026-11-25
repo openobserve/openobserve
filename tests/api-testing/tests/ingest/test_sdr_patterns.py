@@ -12,9 +12,8 @@ the Detect policy cannot be authored unless the node opts in. If any of them reg
 an association can reach a state where the fail-closed path refuses ingestion for a
 whole org, so they are worth pinning even though each is only a 400.
 
-ENTERPRISE ONLY, and needs the `vectorscan` feature. On a build without it
-`POST /re_patterns` answers 403 "not supported", so every assertion here would pass
-vacuously — the suite skips rather than report a false green.
+ENTERPRISE ONLY. A build without it has no `re_patterns` routes, so the suite skips
+rather than report a false green.
 
 All artifacts are namespaced `sdr_auto_*` and torn down by fixtures.
 """
@@ -39,11 +38,9 @@ def _suffix():
 
 
 @pytest.fixture(scope="module", autouse=True)
-def _require_vectorscan(create_session, base_url):
+def _require_enterprise(create_session, base_url):
     """Skip unless this build can actually compile patterns."""
     resp = create_session.get(f"{base_url}api/{ORG_ID}/re_patterns")
-    if resp.status_code == 403:
-        pytest.skip("re_patterns unavailable: build lacks the vectorscan feature")
     if resp.status_code != 200:
         pytest.skip(f"re_patterns unavailable ({resp.status_code}); not an enterprise build")
 

@@ -137,7 +137,7 @@ impl DestinationSettings<'_> {
 }
 
 /// No association names `_all_values`, so the scan leaves its stale pre-redaction text.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub fn snapshot_derived_sources(records: &[(i64, Map<String, Value>)]) -> Vec<String> {
     let max_len = get_config().limit.index_all_max_value_length;
     records
@@ -153,7 +153,7 @@ pub fn snapshot_derived_sources(records: &[(i64, Map<String, Value>)]) -> Vec<St
 }
 
 /// `_original` is redacted in place by the engine; only `_all_values` needs rebuilding here.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub fn refresh_derived_columns(before: &[String], records: &mut [(i64, Map<String, Value>)]) {
     let max_len = get_config().limit.index_all_max_value_length;
     for (stale, (_, record)) in before.iter().zip(records.iter_mut()) {
@@ -336,7 +336,17 @@ async fn write_logs_by_stream(
         {
             log::warn!("stream [{org_id}/{stream_name}] is being deleted");
             stream_skipped = true;
-            continue; // skip
+            let columnar = columnar.take_if(|c| c.stream_name() == stream_name);
+            reject_stream_rows(
+                &stream_name,
+                &json_data,
+                columnar,
+                status,
+                bulk::STREAM_BEING_DELETED,
+                "stream is being deleted",
+                response_order.as_deref_mut(),
+            );
+            continue;
         }
         // before the new-stream hooks, so a stream that cannot be stored is never announced
         if let Err(e) = schema::check_stream_key_len(org_id, StreamType::Logs, &stream_name) {
@@ -990,6 +1000,67 @@ mod tests {
         assert_eq!(error.reason, "too long");
     }
 
+    #[tokio::test]
+    async fn test_rows_of_a_deleting_stream_count_as_failed() {
+        let (org_id, stream) = ("deleting_org", "deleting_stream");
+        let key = infra::cache::deleting_streams::key(org_id, StreamType::Logs, stream, None);
+        infra::cache::deleting_streams::insert(key.clone(), 0);
+        let rows = vec![(0, Map::new()), (0, Map::new())];
+        let mut status = IngestionStatus::Record(ingestion_common::RecordStatus::default());
+        let skipped = write_logs_by_stream(
+            0,
+            org_id,
+            "",
+            (0, &Instant::now()),
+            UsageType::Json,
+            &mut status,
+            HashMap::from([(stream.to_string(), (rows, None))]),
+            HashMap::new(),
+            HashSet::new(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        infra::cache::deleting_streams::remove(&key);
+        assert!(skipped);
+        let IngestionStatus::Record(status) = status else {
+            unreachable!()
+        };
+        assert_eq!((status.successful, status.failed), (0, 2));
+        assert_eq!(status.error, "stream is being deleted");
+
+        infra::cache::deleting_streams::insert(key.clone(), 0);
+        let rows = vec![(0, Map::new())];
+        let mut status = IngestionStatus::Bulk(ingestion_common::BulkResponse {
+            took: 0,
+            errors: false,
+            items: vec![],
+        });
+        let skipped = write_logs_by_stream(
+            0,
+            org_id,
+            "",
+            (0, &Instant::now()),
+            UsageType::Bulk,
+            &mut status,
+            HashMap::from([(stream.to_string(), (rows, None))]),
+            HashMap::new(),
+            HashSet::new(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        infra::cache::deleting_streams::remove(&key);
+        assert!(skipped);
+        let IngestionStatus::Bulk(bulk) = status else {
+            unreachable!()
+        };
+        let error = bulk.items[0]["index"].error.as_ref().unwrap();
+        assert_eq!(error.err_type, bulk::STREAM_BEING_DELETED);
+    }
+
     #[test]
     fn test_bulk_columnar_positions_follow_response_mode() {
         let schema =
@@ -1208,7 +1279,7 @@ mod tests {
         assert!(val.get(TIMESTAMP_COL_NAME).is_some());
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     fn record_with(pairs: &[(&str, &str)]) -> (i64, Map<String, Value>) {
         let mut record = Map::new();
         for (k, v) in pairs {
@@ -1218,7 +1289,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     fn refresh_rebuilds_all_values_from_the_redacted_fields() {
         let mut records = vec![record_with(&[
             ("email", "bob@x.com"),
@@ -1236,7 +1307,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     fn refresh_keeps_original_the_engine_already_redacted() {
         let mut records = vec![record_with(&[
             ("email", "[REDACTED]"),
@@ -1253,7 +1324,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     fn a_record_without_all_values_is_left_alone() {
         let mut records = vec![record_with(&[
             ("email", "[REDACTED]"),

@@ -176,6 +176,7 @@ pub fn process_partial_err(partial_err: Arc<Mutex<String>>, e: tonic::Status) {
 mod tests {
     use std::sync::Arc;
 
+    use arrow::datatypes::{DataType, Field, Schema};
     use parking_lot::Mutex;
 
     use super::*;
@@ -254,8 +255,6 @@ mod tests {
 
     #[test]
     fn test_empty_stream_new_and_with_error() {
-        use arrow::datatypes::{DataType, Field, Schema};
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let partial_err = Arc::new(Mutex::new(String::new()));
 

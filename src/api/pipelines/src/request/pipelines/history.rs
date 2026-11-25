@@ -613,6 +613,8 @@ async fn get_organization_pipeline_ids(org_id: &str) -> Result<Vec<String>, anyh
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
+
     use super::*;
 
     #[test]
@@ -865,8 +867,6 @@ mod tests {
 
     #[test]
     fn the_history_query_reads_is_partial_once_the_stream_has_it() {
-        use arrow_schema::{DataType, Field, Schema};
-
         let mut fields: Vec<Field> = trigger_stream::HISTORY_COLUMNS
             .into_iter()
             .map(|name| Field::new(name, DataType::Utf8, true))

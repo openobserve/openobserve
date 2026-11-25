@@ -1677,6 +1677,7 @@ pub async fn report_to_audit(
 #[cfg(test)]
 mod tests {
 
+    use arrow_schema::{DataType, Field, Schema};
     use axum::{
         extract::{Path, Query},
         http::{HeaderMap, StatusCode},
@@ -2430,7 +2431,6 @@ mod tests {
         })
         .await;
         {
-            use arrow_schema::{DataType, Field, Schema};
             use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
             let schema = Schema::new(vec![

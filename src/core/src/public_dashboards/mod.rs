@@ -73,6 +73,11 @@ use infra::{
 };
 use materialize::{Capture, Class, Engine, PanelRun, Run};
 use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
+use sqlparser::{
+    ast::{Expr, LimitClause, Statement, Value, ValueWithSpan},
+    dialect::PostgreSqlDialect,
+    parser::Parser,
+};
 use store::{ExecutedQuery, ManifestPanel, ValuesDependency};
 use variables::{PanelVars, QueryVars};
 
@@ -1778,11 +1783,6 @@ fn dedup(sources: Vec<crate::authz::QuerySource>) -> Vec<crate::authz::QuerySour
 
 /// The outermost explicit LIMIT of a SQL query; None without one or when it does not parse.
 fn explicit_limit(sql: &str) -> Option<i64> {
-    use sqlparser::{
-        ast::{Expr, LimitClause, Statement, Value, ValueWithSpan},
-        dialect::PostgreSqlDialect,
-        parser::Parser,
-    };
     let sql = replace_o2_custom_patterns(sql).unwrap_or_else(|_| sql.to_string());
     let Statement::Query(query) = Parser::parse_sql(&PostgreSqlDialect {}, &sql).ok()?.pop()?
     else {

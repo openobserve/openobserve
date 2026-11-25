@@ -135,7 +135,7 @@ pub async fn list_alert_leases(
     tag = "Alerts",
     operation_id = "SetAlertCreatesIncident",
     summary = "Turn incident creation on or off, optionally for a window",
-    description = "Changes only the alert's `creates_incident`. With `until_us` (at most 7 days ahead) and a `reason`, the prior value returns at `until_us`, unless someone edits the alert first, in which case their edit stays. `expected_version` is the alert version the caller saw; any other stored version answers 409 `version_changed`, as does an edit landing during the call.",
+    description = "Changes only the alert's `creates_incident`. With `until_us` (at most 7 days ahead) and a `reason`, the prior value returns at `until_us`, unless someone edits the alert first, in which case their edit stays. `expected_version` is the alert version the caller saw; any other stored version answers 409 `version_changed`, as does an edit landing during the call. Turning incidents on for a per-group alert answers 400, as a save does; turning them off is never refused.",
     security(
         ("Authorization"= [])
     ),
@@ -146,7 +146,7 @@ pub async fn list_alert_leases(
     request_body(content = CreatesIncidentRequest, description = "The value, and the window if timed", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = CreatesIncidentResponse),
-        (status = 400, description = "Invalid window or reason", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid window or reason, or incidents turned on for a per-group alert", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 409, description = "The alert changed, a timed change is already active or still being applied, or a multi-region deployment", content_type = "application/json", body = LeaseConflict),
         (status = 503, description = "The change could not be finished and will be undone; try again", content_type = "application/json", body = ()),

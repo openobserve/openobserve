@@ -35,7 +35,7 @@ pub(super) struct ScanRedaction {
 impl ScanRedaction {
     /// Fails closed: a protected stream whose patterns cannot be applied is not scanned at all.
     /// A `raw` stream is scanned as if unprotected, raw-copy columns included.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     pub(super) async fn load(
         org_id: &str,
         stream_type: StreamType,
@@ -83,7 +83,7 @@ impl ScanRedaction {
         })
     }
 
-    #[cfg(not(feature = "vectorscan"))]
+    #[cfg(not(feature = "enterprise"))]
     pub(super) async fn load(
         _org_id: &str,
         _stream_type: StreamType,
@@ -112,7 +112,7 @@ impl ScanRedaction {
     }
 }
 
-#[cfg(all(test, feature = "vectorscan"))]
+#[cfg(all(test, feature = "enterprise"))]
 mod tests {
     use arrow_schema::{DataType, Field};
     use config::meta::stream::PatternAssociation;
