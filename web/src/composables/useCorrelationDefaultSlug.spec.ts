@@ -652,5 +652,37 @@ describe("useCorrelationFilters", () => {
       restore();
       expect(setQuery).not.toHaveBeenCalled();
     });
+
+    it("skipRestore true leaves the query empty", () => {
+      saveCorrelationFilters("org1", "logs", "mystream", [{ field: "host", value: "web-01" }]);
+      const setQuery = vi.fn();
+      const opts = makeOpts({
+        getQuery: () => "",
+        setQuery,
+        skipRestore: (n: string) => n === "mystream",
+      });
+      useCorrelationFilters(opts).restore();
+      expect(setQuery).not.toHaveBeenCalled();
+    });
+
+    it("a later restore does not restore a key consumed by skipRestore", () => {
+      saveCorrelationFilters("org1", "logs", "mystream", [{ field: "host", value: "web-01" }]);
+      const setQuery = vi.fn();
+      let skip = true;
+      const opts = makeOpts({ getQuery: () => "", setQuery, skipRestore: () => skip });
+      const { restore } = useCorrelationFilters(opts);
+      restore();
+      skip = false;
+      restore();
+      expect(setQuery).not.toHaveBeenCalled();
+    });
+
+    it("restores when skipRestore returns false", () => {
+      saveCorrelationFilters("org1", "logs", "mystream", [{ field: "host", value: "web-01" }]);
+      const setQuery = vi.fn();
+      const opts = makeOpts({ getQuery: () => "", setQuery, skipRestore: () => false });
+      useCorrelationFilters(opts).restore();
+      expect(setQuery).toHaveBeenCalledWith("host = 'web-01'");
+    });
   });
 });

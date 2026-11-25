@@ -455,6 +455,7 @@ const availableDimensions = computed(() => {
 
   return (props.streamFields || [])
     .filter((f: any) => f?.label !== true) // field-group headers (e.g. "AWS"), not fields
+    .filter((f: any) => f?.isSchemaField !== false) // UI-only fields (e.g. _end_time_ns) are unknown to the search backend
     .map((f: any) => ({
       label: f.name || f,
       value: f.name || f,

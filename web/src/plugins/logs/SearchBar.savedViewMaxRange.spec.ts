@@ -73,7 +73,11 @@ const START = END - 3 * HOUR;
 const NOW_MS = Date.UTC(2026, 0, 16, 9, 30, 0);
 
 const shortenedToast = {
-  message: i18n.global.t("logs.searchBar.viewAppliedRangeShortened", { name: "My view", hours: 2 }),
+  message: i18n.global.t(
+    "logs.searchBar.viewAppliedRangeShortened",
+    { name: "My view", hours: 2 },
+    2,
+  ),
   variant: "warning",
 };
 
@@ -124,6 +128,19 @@ describe("SearchBar: saved view over the stream max query range", { timeout: 30_
     expect(Number(applied.endTime)).toBe(END);
     expect(Number(applied.startTime)).toBe(END - 2 * HOUR);
     expect(shortenedToast.message).toContain("2 hours");
+  });
+
+  it("says 1 hour, not 1 hours, when the limit is one hour", async () => {
+    streamSettings.max_query_range = 1;
+    await applyView(
+      { type: "absolute", startTime: START, endTime: END },
+      {
+        message:
+          "My view view applied. The time range was shortened to the last 1 hour of the saved range, the maximum query range for this stream.",
+        variant: "warning",
+      },
+    );
+    expect(Number(applied.startTime)).toBe(END - HOUR);
   });
 
   it("ends a relative view at now and starts max hours earlier", async () => {

@@ -38,6 +38,12 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
   }),
 }));
 
+let routeQuery: Record<string, string> = {};
+vi.mock("vue-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vue-router")>()),
+  useRouter: () => ({ currentRoute: { value: { query: routeQuery } } }),
+}));
+
 const i18n = createI18n({ legacy: false, locale: "en", messages: { en: {} } });
 
 const Consumer = defineComponent({
@@ -117,6 +123,8 @@ beforeEach(() => {
   queryClient.removeQueries({ queryKey: serviceStreamKeys.semanticGroups(org()) });
   searchObj.data.query = "";
   searchObj.data.errorMsg = "";
+  searchObj.data.editorValue = "";
+  routeQuery = {};
 });
 
 afterEach(() => {
@@ -410,5 +418,34 @@ describe("field list on a cold semantic-groups load", () => {
     wrapper.vm.prefetchSelectedStreamFields();
 
     expect(loadSemanticGroups).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("saved correlation filter restore on extractFields", () => {
+  const extractWithSavedFilter = async () => {
+    seedStream();
+    loadSemanticGroups.mockResolvedValue([]);
+    localStorage.setItem(
+      `oo_correlation_filters_${org()}_logs_app`,
+      JSON.stringify([{ field: "host", value: "web-01" }]),
+    );
+    await mountConsumer().vm.extractFields({ reuseLoadedSchema: true });
+  };
+
+  it("skips the restore when the route carries an explicit query key", async () => {
+    routeQuery = { query: "", stream: "app" };
+    await extractWithSavedFilter();
+    expect(searchObj.data.query).toBe("");
+  });
+
+  it("restores the saved filter when the route carries a non-empty query for another stream", async () => {
+    routeQuery = { query: "aG9zdD0nYSc=", stream: "other" };
+    await extractWithSavedFilter();
+    expect(searchObj.data.query).toBe("host = 'web-01'");
+  });
+
+  it("restores the saved filter when the route has no query key", async () => {
+    await extractWithSavedFilter();
+    expect(searchObj.data.query).toBe("host = 'web-01'");
   });
 });

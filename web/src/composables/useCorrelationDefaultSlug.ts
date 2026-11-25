@@ -256,6 +256,8 @@ export interface CorrelationFiltersOptions {
   setQuery: (whereClause: string) => void;
   /** Reactive source to watch for query changes (e.g. () => searchObj.data.query) */
   querySource?: WatchSource<string>;
+  /** When true for a stream, restore() consumes its key but loads nothing. */
+  skipRestore?: (streamName: string) => boolean;
 }
 
 export function useCorrelationFilters(opts: CorrelationFiltersOptions) {
@@ -313,6 +315,7 @@ export function useCorrelationFilters(opts: CorrelationFiltersOptions) {
       if (restoredKeys.has(key)) return;
       restoredKeys.add(key);
 
+      if (opts.skipRestore?.(streamName)) return;
       if (opts.getQuery()) return;
 
       const saved = loadCorrelationFilters(orgId, streamType, streamName);
