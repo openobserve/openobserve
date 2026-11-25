@@ -42,6 +42,28 @@ const LEGEND_TEXT_FONT = "12px";
 // Legend padding (30) plus the default icon (25) and its gap (5) beside each entry's text.
 const LEGEND_ITEM_CHROME_WIDTH = 60;
 const LEGEND_MIN_TEXT_WIDTH = 60;
+const LEGEND_NAME_TAIL = 5;
+// A values legend widens for names up to the width a names-only legend gives them.
+const LEGEND_NAME_CAP = 120;
+// The fewest name characters, head and tail, a squeezed right legend keeps beside its values.
+const LEGEND_MIN_NAME_KEEP = 6;
+// A hovered or clicked entry is drawn bold, so names are measured bold to keep the values in view.
+const LEGEND_NAME_WEIGHT = "bold";
+// ECharts' legend padding [10, 20, 10, 10], 25px icon plus 5px gap, 14px item height, 8px item gap,
+// and a scroll legend's 15px page controller set 8px below the rows.
+const LEGEND_PAD_X = 30;
+const LEGEND_PAD_Y = 20;
+const LEGEND_ICON_AND_GAP = 30;
+const LEGEND_ITEM_HEIGHT = 14;
+const LEGEND_ITEM_GAP = 8;
+const LEGEND_ROW_HEIGHT = LEGEND_ITEM_HEIGHT + LEGEND_ITEM_GAP;
+const LEGEND_PAGER_HEIGHT = 15 + LEGEND_ITEM_GAP;
+// A right legend never takes more than this share of the panel, so the pie keeps the rest.
+const PIE_MIN_WIDTH_SHARE = 0.5;
+const PIE_EDGE_GAP = 8;
+const PIE_MIN_RADIUS = 10;
+// The name floor may push a legend past half the panel, but never below this pie radius.
+const PIE_FLOOR_RADIUS = 40;
 // ECharts' largest-remainder percent loops forever once 100 * 10^precision passes 2^53.
 export const MAX_SEATS_PRECISION = 13;
 // Shared so the sizing pass and the first formatter call hit the same cached legend entries.
@@ -49,6 +71,7 @@ const ALL_SLICES_SELECTED: Readonly<Record<string, boolean>> = Object.freeze({})
 
 interface PieLegendEntry {
   name: string;
+  fullName: string;
   valueText: string;
 }
 
@@ -518,6 +541,75 @@ export const pieLegendPercentDecimals = (decimals: unknown): number => {
 export const piePercentPrecision = (config: Record<string, any> | null | undefined): number =>
   Math.min(pieLegendPercentDecimals(config?.decimals), MAX_SEATS_PRECISION);
 
+/** The digits of a slice's share of the shown total; every pie surface prints this, so they never disagree. */
+export const pieSharePercent = (value: unknown, total: number, decimals: number): string => {
+  const numeric = Number(value);
+  const share = total > 0 && Number.isFinite(numeric) ? (Math.max(numeric, 0) / total) * 100 : 0;
+  return share.toFixed(decimals);
+};
+
+const isSliceShown = (selected: Readonly<Record<string, boolean>> | undefined, name: unknown) =>
+  selected?.[String(name ?? "")] !== false;
+
+const visibleTotals = new WeakMap<
+  readonly PieSlice[],
+  { selected: Readonly<Record<string, boolean>> | undefined; total: number }
+>();
+
+// ECharts draws neither negative nor legend-hidden slices, so neither counts toward a share.
+const visiblePieTotal = (
+  data: readonly PieSlice[],
+  selected: Readonly<Record<string, boolean>> | undefined,
+): number => {
+  const cached = visibleTotals.get(data);
+  if (cached && cached.selected === selected) return cached.total;
+  const total = data.reduce((sum, item) => {
+    const numeric = Number(item?.value);
+    return isSliceShown(selected, item?.name) && Number.isFinite(numeric) && numeric > 0
+      ? sum + numeric
+      : sum;
+  }, 0);
+  visibleTotals.set(data, { selected, total });
+  return total;
+};
+
+const pieSeriesLegends = new WeakMap<object, { selected?: Readonly<Record<string, boolean>> }>();
+
+/** Lets slice labels read the legend selection, which ChartRenderer replaces on every toggle. */
+export const linkPieSeriesToLegend = (options: any): void => {
+  const legend = options?.legend;
+  if (!legend || typeof legend !== "object" || !Array.isArray(options.series)) return;
+  for (const series of options.series) {
+    if (series?.type === "pie") pieSeriesLegends.set(series, legend);
+  }
+};
+
+const createPiePercent = (config: Record<string, any> | null | undefined) => {
+  const lookup = createSeriesOverrideLookup(config);
+  const panelDecimals = piePercentPrecision(config);
+  return (
+    data: readonly PieSlice[],
+    selected: Readonly<Record<string, boolean>> | undefined,
+    slice: PieSlice,
+  ): string => {
+    const overrideDecimals = lookup.get(slice?.name)?.decimals;
+    const decimals =
+      overrideDecimals === undefined ? panelDecimals : pieLegendPercentDecimals(overrideDecimals);
+    return pieSharePercent(slice?.value, visiblePieTotal(data, selected), decimals);
+  };
+};
+
+/** The percent digits a slice label shows, which its legend entry also prints; reads the series data lazily. */
+export const createPieSlicePercent = (config: Record<string, any> | null | undefined) => {
+  const percentOf = createPiePercent(config);
+  return (series: { data?: unknown } | null | undefined, slice: PieSlice): string =>
+    percentOf(
+      Array.isArray(series?.data) ? (series.data as PieSlice[]) : [],
+      series ? pieSeriesLegends.get(series)?.selected : undefined,
+      slice,
+    );
+};
+
 const hasExplicitLegendWidth = (panelSchema: PieLegendPanelSchema): boolean =>
   !!panelSchema.config?.legend_width && !isNaN(parseFloat(panelSchema.config.legend_width.value));
 
@@ -534,29 +626,29 @@ const truncateLegendName = (text: string, maxWidth: number): string => {
   return low > 0 ? `${text.slice(0, low)}...` : "";
 };
 
-// Mirrors applyPieOverrides: a slice with its own decimals gets a plain share of the positive total.
-const overridePercentText = (value: number, positiveTotal: number, decimals: number): string =>
-  `${(positiveTotal > 0 ? (Math.max(value, 0) / positiveTotal) * 100 : 0).toFixed(decimals)}%`;
+const middleCut = (text: string, keep: number): string => {
+  const tail = Math.min(LEGEND_NAME_TAIL, Math.ceil(keep * 0.4));
+  return `${text.slice(0, keep - tail)}…${text.slice(text.length - tail)}`;
+};
 
-// ECharts' largest-remainder percent rounding (number.getPercentSeats, not exported), in units of 10^-precision %.
-const percentSeats = (values: number[], precision: number): number[] => {
-  const sum = values.reduce((acc, value) => acc + (isNaN(value) ? 0 : value), 0);
-  if (sum === 0) return [];
-  const digits = Math.pow(10, precision);
-  const votes = values.map((value) => ((isNaN(value) ? 0 : value) / sum) * digits * 100);
-  const targetSeats = digits * 100;
-  const seats = votes.map((vote) => Math.floor(vote));
-  let currentSum = seats.reduce((acc, seat) => acc + seat, 0);
-  const remainder = votes.map((vote, index) => vote - seats[index]);
-  // ECharts picks the largest remainder, first index on ties, then the first slice once all are spent.
-  const order = remainder
-    .map((_, index) => index)
-    .filter((index) => remainder[index] > 0)
-    .sort((a, b) => remainder[b] - remainder[a] || a - b);
-  for (let next = 0; currentSum < targetSeats; next++, currentSum++) {
-    seats[next < order.length ? order[next] : 0]++;
+const nameWidthOf = (text: string): number =>
+  calculateWidthText(text, LEGEND_TEXT_FONT, LEGEND_NAME_WEIGHT);
+
+// The shortest a right legend name is cut to while room allows; names that short stay whole.
+const legendNameFloor = (text: string): string =>
+  text.length > LEGEND_MIN_NAME_KEEP + 1 ? middleCut(text, LEGEND_MIN_NAME_KEEP) : text;
+
+// Keeps the tail too, so pod-style names that differ only at the end stay apart.
+const truncateLegendNameMiddle = (text: string, maxWidth: number): string => {
+  if (nameWidthOf(text) <= maxWidth) return text;
+  let low = 0;
+  let high = text.length - 1;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (nameWidthOf(middleCut(text, mid)) <= maxWidth) low = mid;
+    else high = mid - 1;
   }
-  return seats;
+  return low > 1 ? middleCut(text, low) : truncateLegendName(text, maxWidth);
 };
 
 // Keyed by name like the legend itself, so slices that share a name (merged queries) show their sum.
@@ -568,49 +660,30 @@ const buildPieLegendEntries = (
   selected: Readonly<Record<string, boolean>>,
 ): Map<string, PieLegendEntry> => {
   const lookup = createSeriesOverrideLookup(panelSchema?.config);
-  // The slice labels cap their precision here too, so the legend never prints digits they do not.
-  const panelDecimals = piePercentPrecision(panelSchema?.config);
+  const percentOf = createPiePercent(panelSchema?.config);
+  const truncate =
+    panelSchema?.config?.legends_position === "right"
+      ? truncateLegendNameMiddle
+      : truncateLegendName;
   const sums = new Map<string, number>();
   const measured = new Set<string>();
   const shares = new Map<string, number>();
-  // ECharts drops negative and legend-hidden slices, then rounds each drawn slice's percent on its own.
-  const itemShares = data.map((item) => {
+  data.forEach((item) => {
     const numeric = Number(item?.value);
     const value = Number.isFinite(numeric) ? numeric : 0;
     const name = String(item?.name ?? "");
     sums.set(name, (sums.get(name) ?? 0) + value);
     if (Number.isFinite(numeric)) measured.add(name);
-    const share = value > 0 && selected[name] !== false ? value : 0;
-    shares.set(name, (shares.get(name) ?? 0) + share);
-    return share;
+    shares.set(name, (shares.get(name) ?? 0) + (value > 0 ? value : 0));
   });
   const names = [...sums.keys()];
   const values = [...sums.values()];
-  const seatValues = [...shares.values()];
-  const positiveTotal = seatValues.reduce((acc, value) => acc + value, 0);
-  let seatSums: Map<string, number> | undefined;
-  const sumSeatsByName = () => {
-    const seats = percentSeats(itemShares, panelDecimals);
-    const byName = new Map<string, number>();
-    data.forEach((item, index) => {
-      const name = String(item?.name ?? "");
-      if (itemShares[index] > 0) byName.set(name, (byName.get(name) ?? 0) + (seats[index] ?? 0));
-    });
-    return byName;
-  };
   const entries = new Map<string, PieLegendEntry>();
   names.forEach((name, index) => {
-    const overrideDecimals = lookup.get(name)?.decimals;
     const percentText = () => {
       // A hidden slice has no share of what is drawn, and "0%" would read as an empty slice.
       if (selected[name] === false) return "-";
-      if (overrideDecimals !== undefined) {
-        const decimals = pieLegendPercentDecimals(overrideDecimals);
-        return overridePercentText(seatValues[index], positiveTotal, decimals);
-      }
-      seatSums ??= sumSeatsByName();
-      const percent = (seatSums.get(name) ?? 0) / Math.pow(10, panelDecimals);
-      return `${percent.toFixed(panelDecimals)}%`;
+      return `${percentOf(data, selected, { name, value: shares.get(name) })}%`;
     };
     // A slice with no finite sample has no value or share to show; "0" would read as a real zero.
     const valueText = keys
@@ -621,10 +694,8 @@ const buildPieLegendEntries = (
       .join("  ");
     // The values win the room; the name keeps as many letters as still fit beside them.
     const nameWidth = textWidth - calculateWidthText(`  ${valueText}`, LEGEND_TEXT_FONT);
-    entries.set(name, {
-      name: truncateLegendName(String(lookup.displayName(name)), nameWidth),
-      valueText,
-    });
+    const fullName = String(lookup.displayName(name));
+    entries.set(name, { name: truncate(fullName, nameWidth), fullName, valueText });
   });
   return entries;
 };
@@ -667,7 +738,15 @@ const pieLegendSizingData = (
   data?: PieSlice[] | null,
 ): PieSlice[] => {
   const keys = pieLegendValueKeys(panelSchema);
-  if (!keys.length || !Array.isArray(data)) return data ?? [];
+  if (!Array.isArray(data)) return data ?? [];
+  if (!keys.length) {
+    // The legend prints display names, so a renamed slice is sized by its new name.
+    const lookup = createSeriesOverrideLookup(panelSchema?.config);
+    const shownName = (item: PieSlice) => String(lookup.displayName(String(item?.name ?? "")));
+    return data.some((item) => shownName(item) !== String(item?.name ?? ""))
+      ? data.map((item) => ({ ...item, name: shownName(item) }))
+      : data;
+  }
   return [...getPieLegendEntries(panelSchema, data, keys).values()].map((entry) => ({
     name: entry.name ? `${entry.name}  ${entry.valueText}` : entry.valueText,
   }));
@@ -675,6 +754,9 @@ const pieLegendSizingData = (
 
 const pieLegendTextWidth = (panelSchema: PieLegendPanelSchema): number =>
   pieLegendValueKeys(panelSchema).length ? LEGEND_VALUES_TEXT_WIDTH : remToPx(7.5);
+
+// Legends the fitting step widened past the values cap, for whole names or each name's floor.
+const widenedPieLegends = new WeakSet<object>();
 
 // Reads the series lazily: multi-query SQL merges the slices after the legend is configured.
 const applyPieLegendValues = (
@@ -688,9 +770,10 @@ const applyPieLegendValues = (
     const data = options.series?.[0]?.data;
     // Right-legend sizing resets textStyle.width after this point; only an explicit Legend Width may exceed the cap.
     const fittedWidth = options.legend.textStyle?.width ?? LEGEND_VALUES_TEXT_WIDTH;
-    const width = hasExplicitLegendWidth(panelSchema)
-      ? fittedWidth
-      : Math.min(LEGEND_VALUES_TEXT_WIDTH, fittedWidth);
+    const width =
+      hasExplicitLegendWidth(panelSchema) || widenedPieLegends.has(options.legend)
+        ? fittedWidth
+        : Math.min(LEGEND_VALUES_TEXT_WIDTH, fittedWidth);
     // ChartRenderer replaces legend.selected on every toggle, so the percents follow the visible slices.
     const entries = Array.isArray(data)
       ? getPieLegendEntries(panelSchema, data, keys, width, options.legend.selected)
@@ -1302,6 +1385,193 @@ export const applyPieDonutChartAlignment = (
   }
 };
 
+/** Places a pie's legend, centres the pie beside it, then fits both inside the panel. */
+export const applyPieDonutLegendLayout = (panelSchema: any, options: any, chartPanelRef: any) => {
+  applyPieDonutLegendPositioning(panelSchema, options, chartPanelRef);
+  const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
+  applyPieDonutChartAlignment(panelSchema, options, chartWidth, chartHeight);
+  fitPieBesideRightLegend(panelSchema, options, chartPanelRef);
+};
+
+const lengthToPixels = (value: unknown, base: number, fallback: number): number => {
+  const text = String(value ?? "").trim();
+  const number = parseFloat(text);
+  if (!Number.isFinite(number)) return fallback;
+  return text.endsWith("%") ? (number / 100) * base : number;
+};
+
+const scaleLength = (value: unknown, share: number): unknown => {
+  if (typeof value === "number") return Number((value * share).toFixed(2));
+  const text = String(value ?? "").trim();
+  const number = parseFloat(text);
+  if (!Number.isFinite(number)) return value;
+  const scaled = Number((number * share).toFixed(2));
+  return text.endsWith("%") ? `${scaled}%` : scaled;
+};
+
+// The pie's own radius, kept so a second layout pass over merged slices starts from it, not from a shrunk one.
+const pieSourceRadius = new WeakMap<object, unknown>();
+
+/** Shrinks and moves the pie only when it would run under the right legend; a pie that fits is left as it is. */
+const shrinkPieBesideLegend = (
+  series: any,
+  chartWidth: number,
+  chartHeight: number,
+  legendWidth: number,
+) => {
+  if (!pieSourceRadius.has(series)) pieSourceRadius.set(series, series.radius ?? "75%");
+  const radius = pieSourceRadius.get(series);
+  series.radius = radius;
+  const half = Math.min(chartWidth, chartHeight) / 2;
+  const outer = lengthToPixels(Array.isArray(radius) ? radius[1] : radius, half, half * 0.75);
+  const center: PieLength[] = Array.isArray(series.center) ? series.center : ["50%", "50%"];
+  const cx = lengthToPixels(center[0], chartWidth, chartWidth / 2);
+  const room = chartWidth - legendWidth;
+  if (outer <= 0 || (cx - outer >= 0 && cx + outer <= room)) return;
+  const nextOuter = Math.max(Math.min(outer, room / 2 - PIE_EDGE_GAP), PIE_MIN_RADIUS);
+  const nextCx = Math.max(
+    Math.min(cx, room - PIE_EDGE_GAP - nextOuter),
+    Math.min(nextOuter + PIE_EDGE_GAP, room / 2),
+  );
+  const share = nextOuter / outer;
+  series.radius = Array.isArray(radius)
+    ? radius.map((value) => scaleLength(value, share))
+    : scaleLength(radius, share);
+  series.center = [`${Number(((nextCx / chartWidth) * 100).toFixed(2))}%`, center[1] ?? "50%"];
+};
+
+// ECharts sizes every legend text box to textStyle.width, so the columns a plain legend wraps into are predictable.
+const plainLegendColumnsOverflow = (
+  legend: any,
+  entryCount: number,
+  legendWidth: number,
+  chartHeight: number,
+): boolean => {
+  if (legend.type !== "plain" || legend.orient !== "vertical") return false;
+  const rows = Math.max(
+    1,
+    Math.floor((chartHeight - LEGEND_PAD_Y + LEGEND_ITEM_GAP) / LEGEND_ROW_HEIGHT),
+  );
+  const columns = Math.ceil(entryCount / rows);
+  if (columns <= 1) return false;
+  const columnWidth = LEGEND_ICON_AND_GAP + (Number(legend.textStyle?.width) || 0);
+  return columns * columnWidth + (columns - 1) * LEGEND_ITEM_GAP + LEGEND_PAD_X > legendWidth;
+};
+
+// Text widths a right legend wants: names whole up to LEGEND_NAME_CAP, and names at their floor, beside the values.
+const pieLegendTextNeeds = (panelSchema: PieLegendPanelSchema, data: PieSlice[]) => {
+  const keys = pieLegendValueKeys(panelSchema);
+  if (!keys.length) {
+    const lookup = createSeriesOverrideLookup(panelSchema?.config);
+    const names = [
+      ...new Set(data.map((item) => String(lookup.displayName(String(item?.name ?? ""))))),
+    ];
+    const floor = Math.max(0, ...names.map((name) => nameWidthOf(legendNameFloor(name))));
+    return { whole: 0, floor };
+  }
+  let whole = 0;
+  let floor = 0;
+  for (const entry of getPieLegendEntries(panelSchema, data, keys).values()) {
+    const values = calculateWidthText(`  ${entry.valueText}`, LEGEND_TEXT_FONT);
+    whole = Math.max(whole, Math.min(nameWidthOf(entry.fullName), LEGEND_NAME_CAP) + values);
+    floor = Math.max(floor, nameWidthOf(legendNameFloor(entry.fullName)) + values);
+  }
+  return { whole, floor };
+};
+
+// Rule: the legend grows to show whole names up to half the panel, and past half only to keep each
+// name's floor, never shrinking the pie below PIE_FLOOR_RADIUS; anything wider is capped this render.
+const fitPieLegendWidth = (
+  panelSchema: PieLegendPanelSchema,
+  legend: any,
+  data: PieSlice[],
+  chartWidth: number,
+  legendWidth: number,
+): number => {
+  const textNow = Number(legend.textStyle?.width) || 0;
+  const explicit = hasExplicitLegendWidth(panelSchema);
+  const hasValues = pieLegendValueKeys(panelSchema).length > 0;
+  const shown = hasValues && !explicit ? Math.min(LEGEND_VALUES_TEXT_WIDTH, textNow) : textNow;
+  const chrome = Math.max(legendWidth - shown, 0);
+  const needs = pieLegendTextNeeds(panelSchema, data);
+  const shareLimit = chartWidth * (1 - PIE_MIN_WIDTH_SHARE);
+  const pieLimit = chartWidth - 2 * (PIE_FLOOR_RADIUS + PIE_EDGE_GAP);
+  const floorWidth = chrome + needs.floor;
+  let width = legendWidth;
+  if (hasValues && !explicit) {
+    const wholeWidth = chrome + needs.whole;
+    if (wholeWidth > width) width = Math.min(wholeWidth, Math.max(width, shareLimit));
+  }
+  if (hasValues && floorWidth > width) width = Math.min(floorWidth, Math.max(width, pieLimit));
+  width = Math.min(width, Math.max(shareLimit, Math.min(floorWidth, pieLimit)));
+  // Capping never squeezes the text below its minimum; past that the names and values vanish.
+  width = Math.max(width, Math.min(legendWidth, chrome + Math.min(shown, LEGEND_MIN_TEXT_WIDTH)));
+  if (width === legendWidth) return width;
+  const text = Math.max(shown + width - legendWidth, 0);
+  legend.textStyle = { ...legend.textStyle, width: text };
+  if (text > LEGEND_VALUES_TEXT_WIDTH) widenedPieLegends.add(legend);
+  return width;
+};
+
+// Plain legends this layout turned into scroll ones, with the height they had before.
+const scrolledPlainLegends = new WeakMap<object, { height: unknown }>();
+
+// A pie centred beside its legend stays centred in the room left when the legend width changes.
+const centerPieInRoom = (
+  panelSchema: PieLegendPanelSchema,
+  series: any,
+  room: number,
+  chartWidth: number,
+) => {
+  if (panelSchema.config?.chart_align === "left" || room <= 0) return;
+  const center: PieLength[] = Array.isArray(series.center) ? series.center : ["50%", "50%"];
+  series.center = [`${Number(((room / 2 / chartWidth) * 100).toFixed(2))}%`, center[1] ?? "50%"];
+};
+
+// A plain legend that would wrap past the panel edge scrolls, its width follows fitPieLegendWidth,
+// and the pie shrinks into what is left.
+const fitPieBesideRightLegend = (
+  panelSchema: PieLegendPanelSchema,
+  options: any,
+  chartPanelRef: any,
+) => {
+  const { containerWidth: chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
+  const series = options.series?.[0];
+  const legend = options.legend;
+  if (!chartWidth || series?.type !== "pie" || !legend?.show) return;
+  if (typeof legend.left !== "number" || panelSchema.config?.legends_position !== "right") return;
+  // A second pass (merged multi-query slices) re-sizes the legend as plain, so it decides again.
+  const scrolled = scrolledPlainLegends.get(legend);
+  if (scrolled) {
+    legend.type = "plain";
+    legend.height = scrolled.height;
+    scrolledPlainLegends.delete(legend);
+  }
+  const placedWidth = chartWidth - legend.left;
+  if (placedWidth <= 0) return;
+  let legendWidth = placedWidth;
+  const data: PieSlice[] = Array.isArray(series.data) ? series.data : [];
+  const entryCount = new Set(data.map((item) => String(item?.name ?? ""))).size;
+  if (plainLegendColumnsOverflow(legend, entryCount, legendWidth, chartHeight)) {
+    scrolledPlainLegends.set(legend, { height: legend.height });
+    legend.type = "scroll";
+    const textWidth = Number(legend.textStyle?.width) || 0;
+    legendWidth = Math.min(legendWidth, LEGEND_PAD_X + LEGEND_ICON_AND_GAP + textWidth);
+    // ECharts clips a page at any height, so a page sized to whole rows never shows half a row.
+    const rows = Math.floor(
+      (chartHeight - LEGEND_PAD_Y - LEGEND_PAGER_HEIGHT + LEGEND_ITEM_GAP) / LEGEND_ROW_HEIGHT,
+    );
+    if (rows >= 1) legend.height = rows * LEGEND_ROW_HEIGHT - LEGEND_ITEM_GAP + LEGEND_PAGER_HEIGHT;
+  }
+  legendWidth = fitPieLegendWidth(panelSchema, legend, data, chartWidth, legendWidth);
+  if (legendWidth !== placedWidth) {
+    legend.left = chartWidth - legendWidth;
+    legend.right = 0;
+    centerPieInRoom(panelSchema, series, chartWidth - legendWidth, chartWidth);
+  }
+  shrinkPieBesideLegend(series, chartWidth, chartHeight, legendWidth);
+};
+
 // ECharts fits outside labels into the series box, so ending the box at a right legend keeps them off it.
 const fitPieBoxBesideRightLegend = (
   panelSchema: PieLegendPanelSchema,
@@ -1343,8 +1613,10 @@ const calculatePieDonutScrollLegendWidth = (
 ): number => {
   // Get the longest pie/donut label name to calculate appropriate width
   const legendData = pieLegendSizingData(panelSchema, options.series?.[0]?.data);
-  const maxValue = legendData.reduce((max: any, it: any) => {
-    return max.length < (it?.name?.length || 0) ? it?.name : max;
+  // The widest entry, not the longest: equal-length names differ in glyph width.
+  const maxValue = legendData.reduce((max: string, it: any) => {
+    const name = String(it?.name ?? "");
+    return calculateWidthText(name) > calculateWidthText(max) ? name : max;
   }, "");
 
   // Calculate legend width based on content, with constraints for different container sizes
@@ -1513,12 +1785,13 @@ export const applyLegendConfiguration = (
 
   // Apply special positioning for pie and donut charts
   if (["pie", "donut"].includes(panelSchema.type)) {
-    applyPieDonutLegendPositioning(panelSchema, options, chartPanelRef);
-
-    // Adjust center positioning for pie/donut charts with chart alignment support
+    applyPieDonutLegendLayout(panelSchema, options, chartPanelRef);
     const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
-    applyPieDonutChartAlignment(panelSchema, options, chartWidth, chartHeight);
     fitPieBoxBesideRightLegend(panelSchema, options, chartWidth, chartHeight);
+    linkPieSeriesToLegend(options);
+    // Slice labels take their share of the shown slices, so ChartRenderer must keep the selection current.
+    if (options.legend?.show && !options.legend.selected)
+      options.legend.selected = ALL_SLICES_SELECTED;
   }
 
   // truncate the rotated y-axis name to the final plot height so it never spills past the plot

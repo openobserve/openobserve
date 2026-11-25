@@ -18,6 +18,7 @@ import { buildSQLContext } from "@/utils/dashboard/sql/shared/contextBuilder";
 
 vi.mock("@/utils/dashboard/sqlProcessData", () => ({
   processData: vi.fn((data) => data[0] || []),
+  breakdownValueLabel: vi.fn((value) => value),
 }));
 vi.mock("@/utils/dashboard/sqlMissingValueFiller", () => ({
   fillMissingValues: vi.fn((data) => data),

@@ -96,7 +96,9 @@ export default class DashboardZoomDrag {
       .waitForResponse((r) => r.url().includes("/_search"), { timeout })
       .catch(() => null);
     await this.expandedRefreshBtn.click();
+    // The request is only sent once this refresh has marked the panel loading, so the idle wait below cannot pass on the pre-click state.
     await searched;
+    await this.waitForExpandedPanelIdle(timeout);
     // The re-render keeps the same geometry, so a stale dwell count would pass instantly.
     await this.page.evaluate(() => {
       window.__o2ChartBox = null;
@@ -109,9 +111,7 @@ export default class DashboardZoomDrag {
   // the chart. Position matters as much as size, and the reflow outlasts a
   // couple of frames — hence the dwell.
   async waitForChartMounted(timeout = 30000) {
-    if (this.chartHostSelector === GRID_CHART_HOST) {
-      await this.waitForPanelsIdle(timeout);
-    }
+    await this.waitForQueriesIdle(timeout);
     await this.page.waitForFunction(
       (selector) => {
         const host = document.querySelector(selector);
@@ -131,6 +131,16 @@ export default class DashboardZoomDrag {
       this.chartHostSelector,
       { timeout, polling: 100 }
     );
+    // The panel reads as idle until its first query starts, so the first check can pass too early.
+    await this.waitForQueriesIdle(timeout);
+  }
+
+  async waitForQueriesIdle(timeout = 30000) {
+    if (this.chartHostSelector === GRID_CHART_HOST) {
+      await this.waitForPanelsIdle(timeout);
+    } else {
+      await this.waitForExpandedPanelIdle(timeout);
+    }
   }
 
   // A streamed chunk landing mid-gesture re-renders the chart and drops the in-progress brush.
@@ -139,6 +149,22 @@ export default class DashboardZoomDrag {
       () => {
         if (document.querySelector('[data-test="dashboard-cancel-btn"]')) return false;
         const refresh = document.querySelector('[data-test="dashboard-refresh-btn"]');
+        if (!refresh) return false;
+        return !refresh.disabled && refresh.getAttribute("aria-disabled") !== "true";
+      },
+      null,
+      { timeout, polling: 200 }
+    );
+  }
+
+  // The expanded view swaps refresh for cancel (enterprise) or disables it (OSS) until its last chunk renders.
+  async waitForExpandedPanelIdle(timeout = 30000) {
+    await this.page.waitForFunction(
+      () => {
+        if (document.querySelector('[data-test="dashboard-viewpanel-cancel-btn"]')) return false;
+        const refresh = document.querySelector(
+          '[data-test="dashboard-viewpanel-refresh-data-btn"]'
+        );
         if (!refresh) return false;
         return !refresh.disabled && refresh.getAttribute("aria-disabled") !== "true";
       },

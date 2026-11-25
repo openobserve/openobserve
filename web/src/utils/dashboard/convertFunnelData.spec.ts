@@ -103,7 +103,7 @@ describe("funnel", () => {
   });
 
   it("sums each stage and measures percent against the widest stage when sorted", () => {
-    const stages = buildFunnelStages(panel(), [rows]);
+    const { stages } = buildFunnelStages(panel(), [rows]);
     expect(stages.map((stage) => [stage.name, stage.value, stage.percent])).toEqual([
       ["search", 50, 25],
       ["visit", 200, 100],
@@ -112,7 +112,7 @@ describe("funnel", () => {
   });
 
   it("measures percent against the largest stage in query order too, so no stage passes 100%", () => {
-    const stages = buildFunnelStages(panel({ funnel_sort: "none" }), [rows]);
+    const { stages } = buildFunnelStages(panel({ funnel_sort: "none" }), [rows]);
     expect(stages.map((stage) => stage.percent)).toEqual([25, 100, 5]);
   });
 
@@ -236,6 +236,119 @@ describe("funnel", () => {
     expect(inside.length).toBeGreaterThan(0);
     inside.forEach((stage: any) => expect(["#ffffff", "#000000"]).toContain(stage.label.color));
     expect(series.label.textBorderWidth).toBe(0);
+  });
+
+  const twoQueries = (hideFirst = false) => {
+    const schema: any = panel();
+    const [query] = schema.queries;
+    schema.queries = [
+      { ...query, config: { limit: 0, hide: hideFirst } },
+      { ...query, config: { limit: 0 } },
+    ];
+    return schema;
+  };
+
+  it("draws only the first visible query, so a second query never adds to its stages", async () => {
+    const first = [
+      { x_axis_1: "visit", y_axis_1: 200 },
+      { x_axis_1: "paid", y_axis_1: 10 },
+    ];
+    const second = [
+      { x_axis_1: "visit", y_axis_1: 200 },
+      { x_axis_1: "refund", y_axis_1: -3 },
+    ];
+    const drawn = (schema: any) => {
+      const { stages, skippedRows } = buildFunnelStages(schema, [first, second]);
+      return [stages.map((stage) => [stage.name, stage.value]), skippedRows];
+    };
+    expect(drawn(twoQueries())).toEqual([
+      [
+        ["visit", 200],
+        ["paid", 10],
+      ],
+      0,
+    ]);
+    expect(drawn(twoQueries(true))).toEqual([[["visit", 200]], 1]);
+    const notice = async (schema: any) =>
+      (await convert(schema, [first, second])).extras.funnelNotice.ignoredQueries;
+    expect(await notice(twoQueries())).toBe(1);
+    expect(await notice(twoQueries(true))).toBe(0);
+  });
+
+  it('names a missing stage "(null)" and an empty one "(empty)", apart from a real "(null)"', async () => {
+    const data = [
+      { x_axis_1: null, y_axis_1: 40 },
+      { y_axis_1: 2 },
+      { x_axis_1: "", y_axis_1: 30 },
+      { x_axis_1: "(null)", y_axis_1: 20 },
+    ];
+    const { stages } = buildFunnelStages(panel(), [data]);
+    expect(stages.map(({ name, value, rawName }) => [name, value, rawName])).toEqual([
+      ["(null)", 42, null],
+      ["(empty)", 30, ""],
+      ["(null)", 20, undefined],
+    ]);
+    const out = await convert(panel(), [data]);
+    const series = out.options.series[0];
+    expect(series.data.map((item: any) => [item.name, item.rawName])).toEqual([
+      ["(null)", null],
+      ["(empty)", ""],
+      ["(null)", undefined],
+    ]);
+    const missing = series.data[0];
+    expect(series.label.formatter({ name: missing.name, value: 42, data: missing })).toBe(
+      "(null)  42",
+    );
+    expect(out.options.tooltip.formatter({ name: missing.name, value: 42, data: missing })).toBe(
+      "(null): <strong>42</strong>",
+    );
+  });
+
+  it("draws an all-zero funnel as slivers, the same as a zero stage beside real ones", async () => {
+    const echarts = await import("echarts");
+    const topWidths = async (data: any[]) => {
+      const chart = echarts.init(null, null, {
+        renderer: "svg",
+        ssr: true,
+        width: 800,
+        height: 400,
+      });
+      chart.setOption((await convert(panel(), [data])).options);
+      const drawn = (chart as any).getModel().getSeriesByIndex(0).getData();
+      const widths = data.map((_, index) => {
+        const [left, right] = drawn.getItemLayout(index).points;
+        return right[0] - left[0];
+      });
+      chart.dispose();
+      return widths;
+    };
+    const [, sliver] = await topWidths([
+      { x_axis_1: "visit", y_axis_1: 100 },
+      { x_axis_1: "paid", y_axis_1: 0 },
+    ]);
+    expect(sliver).toBeLessThan(800 * 0.05);
+    const zeros = await topWidths([
+      { x_axis_1: "visit", y_axis_1: 0 },
+      { x_axis_1: "search", y_axis_1: 0 },
+      { x_axis_1: "paid", y_axis_1: 0 },
+    ]);
+    zeros.forEach((width) => expect(width).toBeCloseTo(sliver));
+  });
+
+  it("reports the rows it leaves out for a value that is missing, not a number or negative, even when none are left", async () => {
+    expect((await convert(panel(), [rows])).extras.funnelNotice).toEqual({
+      skippedRows: 1,
+      ignoredQueries: 0,
+    });
+    const negative = [
+      { x_axis_1: "visit", y_axis_1: -98 },
+      { x_axis_1: "paid", y_axis_1: -99 },
+      { x_axis_1: "cart", y_axis_1: null },
+    ];
+    const out = await convert(panel(), [negative]);
+    expect(out.options.series).toEqual([]);
+    expect(out.extras.funnelNotice).toEqual({ skippedRows: 3, ignoredQueries: 0 });
+    expect((await convert(panel(), [tail])).extras.funnelNotice.skippedRows).toBe(0);
   });
 
   it("falls back to the defaults for values it does not know", async () => {

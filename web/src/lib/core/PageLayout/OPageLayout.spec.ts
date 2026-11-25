@@ -98,3 +98,18 @@ describe("OPageLayout entrance", () => {
     wrapper.unmount();
   });
 });
+
+describe("OPageLayout heading levels", () => {
+  it("keeps one h1 when a page renders inside another page's body", () => {
+    const Inner = defineComponent({
+      render: () => h(OPageLayout, { title: "Inner" }, { default: () => h("div") }),
+    });
+    const wrapper = mount(OPageLayout, {
+      props: { title: "Outer" },
+      slots: { default: () => h(Inner) },
+      global: { plugins: [i18n] },
+    });
+    expect(wrapper.findAll("h1").map((el) => el.text())).toEqual(["Outer"]);
+    expect(wrapper.findAll("h2").map((el) => el.text())).toContain("Inner");
+  });
+});

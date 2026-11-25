@@ -1453,7 +1453,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Without this the test passes even when the dialog never opens.
     await pm.logsPage.expectQueryPlanDialogVisible();
 
-    await page.keyboard.press('Escape');
+    await pm.logsPage.closeQueryPlanDialog();
     await pm.logsPage.expectQueryPlanDialogHidden();
 
     await pm.logsPage.expectResultsGridSettledWithRows();

@@ -15,7 +15,7 @@
 
 //! Variable substitution ported from the live panel loader, so public results run the same SQL.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use config::meta::dashboards::Dashboard;
 use regex::{Captures, Regex};
@@ -74,7 +74,7 @@ impl QueryVars {
         let Some(re) = placeholder_regex(&names) else {
             return vec![];
         };
-        let used: std::collections::BTreeSet<String> = texts
+        let used: BTreeSet<String> = texts
             .iter()
             .flat_map(|t| {
                 re.captures_iter(&normalize_syntax(t))
@@ -94,6 +94,7 @@ impl QueryVars {
     pub fn for_panel(&self, tab_id: &str, panel_id: &str) -> PanelVars {
         let mut values = BTreeMap::new();
         let mut dates = BTreeMap::new();
+        let mut data_values = BTreeMap::new();
         for var in &self.vars {
             let Some(value) = var
                 .key_for(tab_id, panel_id)
@@ -107,10 +108,15 @@ impl QueryVars {
                 Some(spec) => dates.insert(var.name.clone(), spec.clone()),
                 None => dates.remove(&var.name),
             };
+            match &var.data_values {
+                Some(kept) => data_values.insert(var.name.clone(), kept.clone()),
+                None => data_values.remove(&var.name),
+            };
         }
         PanelVars {
             values,
             dates,
+            data_values,
             scrape_secs: self.scrape_secs,
         }
     }
@@ -121,6 +127,8 @@ struct ScopedVar {
     name: String,
     scope: Scope,
     date: Option<DateSpec>,
+    /// For a `query_values` variable, its author-written custom defaults, which may be regex.
+    data_values: Option<BTreeSet<String>>,
 }
 
 /// How a date variable prints when its placeholder names no date format.
@@ -193,6 +201,13 @@ impl From<&config::meta::dashboards::v8::VariableList> for ScopedVar {
             name: v.name.clone(),
             scope,
             date: DateSpec::of(v),
+            data_values: (v.type_field == "query_values").then(|| {
+                v.custom_multi_select_value
+                    .iter()
+                    .flatten()
+                    .cloned()
+                    .collect()
+            }),
         }
     }
 }
@@ -207,6 +222,8 @@ enum Scope {
 pub struct PanelVars {
     values: BTreeMap<String, serde_json::Value>,
     dates: BTreeMap<String, DateSpec>,
+    /// Values picked from data are literals; custom and textbox values may be regex on purpose.
+    data_values: BTreeMap<String, BTreeSet<String>>,
     scrape_secs: f64,
 }
 
@@ -245,12 +262,60 @@ impl PanelVars {
             let Some(v) = self.values.get(name) else {
                 return caps[0].to_string();
             };
+            let slot = (query_type == "promql").then(|| {
+                let offset = caps.get(0).map_or(0, |m| m.start());
+                PromqlSlot::at(&query, offset, self.data_values.get(name))
+            });
             match self.dates.get(name).and_then(|spec| spec.format(v, format)) {
-                Some(date) => escape(&date),
-                None => format_value(v, format, query_type),
+                Some(date) => slot.map_or_else(|| escape(&date), |slot| slot.write(&date)),
+                None => format_value(v, format, query_type, slot.unwrap_or_default()),
             }
         })
         .into_owned()
+    }
+}
+
+/// Where a PromQL placeholder sits: the string it is in, and whether that string is a regex.
+#[derive(Clone, Copy, Default)]
+struct PromqlSlot<'a> {
+    quote: Option<u8>,
+    /// In a regex matcher, a data variable's values to regex-escape, all but these kept ones.
+    regex_literal: Option<&'a BTreeSet<String>>,
+}
+
+impl<'a> PromqlSlot<'a> {
+    /// The live UI's `promqlStringContextAt`: tracks the string the placeholder opens inside.
+    fn at(text: &str, offset: usize, data_values: Option<&'a BTreeSet<String>>) -> Self {
+        let bytes = text.as_bytes();
+        let (mut quote, mut opening, mut i) = (None, 0, 0);
+        while i < offset {
+            match (quote, bytes[i]) {
+                (None, c @ (b'"' | b'\'' | b'`')) => (quote, opening) = (Some(c), i),
+                (None, b'#') => i = text[i..].find('\n').map_or(offset, |end| i + end),
+                (Some(q), b'\\') if q != b'`' => i += 1,
+                (Some(q), c) if c == q => quote = None,
+                _ => {}
+            }
+            i += 1;
+        }
+        let before = text[..opening].trim_end();
+        let in_regex = quote.is_some() && (before.ends_with("=~") || before.ends_with("!~"));
+        Self {
+            quote,
+            regex_literal: data_values.filter(|_| in_regex),
+        }
+    }
+
+    /// The value as written; backtick strings and bare text get no string escapes.
+    fn write(self, s: &str) -> String {
+        let literal = match self.regex_literal {
+            Some(kept) if s != SELECT_ALL_VALUE && !kept.contains(s) => regex_escape(s),
+            _ => s.to_string(),
+        };
+        match self.quote {
+            Some(q @ (b'"' | b'\'')) => promql_escape(&literal, char::from(q)),
+            _ => literal,
+        }
     }
 }
 
@@ -289,10 +354,17 @@ pub(super) fn normalize_syntax(query: &str) -> String {
 }
 
 /// `formatPanelVariableValue`: scalars escaped, lists by format (SQL quoted, else `a|b`).
-fn format_value(value: &serde_json::Value, format: Option<&str>, query_type: &str) -> String {
+fn format_value(
+    value: &serde_json::Value,
+    format: Option<&str>,
+    query_type: &str,
+    slot: PromqlSlot<'_>,
+) -> String {
+    let promql = query_type == "promql";
     let serde_json::Value::Array(list) = value else {
         return match value {
             serde_json::Value::Null => SELECT_ALL_VALUE.to_string(),
+            other if promql => slot.write(&js_string(other)),
             other => escape(&js_string(other)),
         };
     };
@@ -310,11 +382,23 @@ fn format_value(value: &serde_json::Value, format: Option<&str>, query_type: &st
         Some("pipe") => js_join(values, "|"),
         Some("doublequote") => values
             .iter()
-            .map(|v| format!("\"{}\"", js_string(v)))
+            .map(|v| match js_string(v) {
+                s if promql => format!("\"{}\"", promql_escape(&s, '"')),
+                s => format!("\"{s}\""),
+            })
             .collect::<Vec<_>>()
             .join(","),
         Some("singlequote") => single_quoted(),
         _ if query_type == "sql" => single_quoted(),
+        _ if promql => values
+            .iter()
+            .map(|v| match v {
+                // A null entry joins as "", the way Array.join writes it.
+                serde_json::Value::Null => String::new(),
+                v => slot.write(&js_string(v)),
+            })
+            .collect::<Vec<_>>()
+            .join("|"),
         _ => js_join(values, "|"),
     }
 }
@@ -332,6 +416,25 @@ pub(super) fn js_string(value: &serde_json::Value) -> String {
         serde_json::Value::Object(_) => "[object Object]".to_string(),
         other => other.to_string(),
     }
+}
+
+/// The live UI's `promqlEscape`: `\`, the string's quote and newline as PromQL escapes.
+fn promql_escape(s: &str, quote: char) -> String {
+    s.replace('\\', "\\\\")
+        .replace(quote, &format!("\\{quote}"))
+        .replace('\n', "\\n")
+}
+
+/// The live UI's `escapeRegExp`, which escapes fewer characters than `regex::escape`.
+fn regex_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if ".*+?^${}()|[]\\".contains(c) {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
 }
 
 /// JavaScript's `Array.prototype.join`, which writes null as an empty string.
@@ -478,8 +581,19 @@ mod tests {
                 .map(|(k, v)| (k.to_string(), v.clone()))
                 .collect(),
             dates: BTreeMap::new(),
+            data_values: Default::default(),
             scrape_secs: 15.0,
         }
+    }
+
+    /// Like `qv`, with every variable a `query_values` one whose values come from data.
+    fn qv_data(pairs: &[(&str, serde_json::Value)]) -> PanelVars {
+        let mut vars = qv(pairs);
+        vars.data_values = pairs
+            .iter()
+            .map(|(k, _)| (k.to_string(), BTreeSet::new()))
+            .collect();
+        vars
     }
 
     const HOUR: i64 = 3_600_000_000;
@@ -615,6 +729,108 @@ mod tests {
         assert_eq!(sub(&v, "{{h:pipe}}", "sql"), "a|b'c");
         assert_eq!(sub(&v, "${h:doublequote}", "sql"), "\"a\",\"b'c\"");
         assert_eq!(sub(&v, "${h : singlequote}", "promql"), "'a','b''c'");
+    }
+
+    #[test]
+    fn promql_scalars_use_promql_string_escapes() {
+        let v = qv(&[
+            ("q", json!("o'neil")),
+            ("d", json!("a\"b")),
+            ("b", json!("a\\b")),
+            ("n", json!("a\nb")),
+        ]);
+        assert_eq!(sub(&v, r#"m{l="$q"}"#, "promql"), r#"m{l="o'neil"}"#);
+        assert_eq!(sub(&v, r#"m{l="$d"}"#, "promql"), r#"m{l="a\"b"}"#);
+        assert_eq!(sub(&v, r#"m{l="$b"}"#, "promql"), r#"m{l="a\\b"}"#);
+        assert_eq!(sub(&v, r#"m{l="$n"}"#, "promql"), r#"m{l="a\nb"}"#);
+        assert_eq!(sub(&v, "l='$q'", "sql"), "l='o''neil'");
+    }
+
+    #[test]
+    fn promql_lists_are_regex_then_string_escaped() {
+        let run = |list: serde_json::Value, q: &str| sub(&qv_data(&[("v", list)]), q, "promql");
+        assert_eq!(run(json!(["a.b"]), r#"m{l=~"$v"}"#), r#"m{l=~"a\\.b"}"#);
+        assert_eq!(run(json!(["a|b"]), r#"m{l=~"$v"}"#), r#"m{l=~"a\\|b"}"#);
+        assert_eq!(run(json!(["f(x)"]), r#"m{l=~"$v"}"#), r#"m{l=~"f\\(x\\)"}"#);
+        assert_eq!(
+            run(json!(["a.b", "c"]), r#"m{l=~"$v"}"#),
+            r#"m{l=~"a\\.b|c"}"#
+        );
+        assert_eq!(run(json!(["a.b"]), r#"m{l!~"$v"}"#), r#"m{l!~"a\\.b"}"#);
+        assert_eq!(
+            run(json!(["a.b"]), r#"m{l =~ "${v}"}"#),
+            r#"m{l =~ "a\\.b"}"#
+        );
+        // An `=` matcher only string-escapes, so IP/host values keep matching.
+        assert_eq!(
+            run(json!(["10.0.0.1:9100", "a\"b"]), r#"m{instance="$v"}"#),
+            r#"m{instance="10.0.0.1:9100|a\"b"}"#
+        );
+        assert_eq!(
+            run(json!(["_o2_all_"]), r#"m{l=~"$v"}"#),
+            r#"m{l=~"_o2_all_"}"#
+        );
+        assert_eq!(
+            run(json!(["a\"b", "o'neil"]), "m{l=~${v:doublequote}}"),
+            r#"m{l=~"a\"b","o'neil"}"#
+        );
+        assert_eq!(run(json!(["a.b"]), "${v:pipe}"), "a.b");
+        let sql = sub(&qv(&[("v", json!(["a.b"]))]), "in ($v)", "sql");
+        assert_eq!(sql, "in ('a.b')");
+    }
+
+    #[test]
+    fn promql_regex_escaping_follows_the_enclosing_string() {
+        let data = |list: serde_json::Value, q: &str| sub(&qv_data(&[("v", list)]), q, "promql");
+        assert_eq!(
+            data(json!(["a.b"]), r#"m{l=~"x|$v"}"#),
+            r#"m{l=~"x|a\\.b"}"#
+        );
+        let both = qv_data(&[("a", json!(["a.b"])), ("b", json!(["c(d)"]))]);
+        assert_eq!(
+            sub(&both, r#"m{l=~"$a|$b"}"#, "promql"),
+            r#"m{l=~"a\\.b|c\\(d\\)"}"#
+        );
+        // A single-select data value is a literal too.
+        assert_eq!(data(json!("a.b"), r#"m{l=~"$v"}"#), r#"m{l=~"a\\.b"}"#);
+        // A single-quoted string escapes its own quote; backticks and bare text do not.
+        assert_eq!(
+            data(json!(["o'neil", "a\"b", "c.d"]), "m{l=~'$v'}"),
+            r#"m{l=~'o\'neil|a"b|c\\.d'}"#
+        );
+        assert_eq!(
+            sub(&qv(&[("v", json!("o'neil"))]), "m{l='$v'}", "promql"),
+            r#"m{l='o\'neil'}"#
+        );
+        assert_eq!(
+            data(json!("a\"b"), "# don't\nm{l=\"$v\"}"),
+            "# don't\nm{l=\"a\\\"b\"}"
+        );
+        assert_eq!(data(json!(["a", null]), r#"m{l=~"$v"}"#), r#"m{l=~"a|"}"#);
+        assert_eq!(
+            data(json!(["a\"b", "c.d"]), "m{l=~`$v`}"),
+            r#"m{l=~`a"b|c\.d`}"#
+        );
+        assert_eq!(data(json!(["c.d"]), "m{l=`$v`}"), "m{l=`c.d`}");
+        assert_eq!(data(json!("5"), "topk($v, m)"), "topk(5, m)");
+    }
+
+    #[test]
+    fn custom_values_stay_regex_in_a_regex_matcher() {
+        let custom = |v: serde_json::Value| sub(&qv(&[("v", v)]), r#"m{l=~"$v"}"#, "promql");
+        assert_eq!(custom(json!([".*", "api-.*"])), r#"m{l=~".*|api-.*"}"#);
+        assert_eq!(custom(json!("api-.*")), r#"m{l=~"api-.*"}"#);
+    }
+
+    #[test]
+    fn custom_defaults_of_a_data_variable_stay_regex() {
+        let mut vars = qv(&[("v", json!([".*", "prod-.*", "a.b"]))]);
+        let kept = [".*", "prod-.*"].map(String::from).into_iter().collect();
+        vars.data_values.insert("v".to_string(), kept);
+        assert_eq!(
+            sub(&vars, r#"m{l=~"$v"}"#, "promql"),
+            r#"m{l=~".*|prod-.*|a\\.b"}"#
+        );
     }
 
     #[test]

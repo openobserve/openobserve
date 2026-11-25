@@ -1559,6 +1559,16 @@ mod tests {
                 false,
             ),
             (
+                "SELECT histogram(_timestamp + 28800000000, '1 day') AS ts, count(DISTINCT k) AS c FROM t GROUP BY ts ORDER BY ts",
+                // Enterprise names no time column for a histogram over a shifted _timestamp.
+                if cfg!(feature = "enterprise") {
+                    ""
+                } else {
+                    "ts"
+                },
+                false,
+            ),
+            (
                 "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM t GROUP BY ts",
                 "ts",
                 true,

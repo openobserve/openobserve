@@ -880,6 +880,64 @@ describe("BuildQueryPage Component", () => {
       expect(mockDashboardPanelData.data.queries[0].config.limit).toBe(7);
     });
 
+    it("drops funnel settings from the URL once a later toggle re-derives another chart type", async () => {
+      const { decodeBuildConfig } = await import("@/composables/useLogs/logsVisualization");
+      vi.mocked(decodeBuildConfig).mockReturnValueOnce({
+        type: "funnel",
+        config: { funnel_sort: "none", funnel_orient: "horizontal", funnel_show_percent: true },
+        customQuery: true,
+      });
+      mockRouter.currentRoute.value.query = { build_data: "encoded" };
+
+      try {
+        wrapper = createWrapper({
+          isFirstToggle: false,
+          searchQuery: 'SELECT * FROM "test_stream"',
+          selectedStream: "test_stream",
+        });
+        await flushPromises();
+      } finally {
+        mockRouter.currentRoute.value.query = {};
+      }
+
+      expect(mockDashboardPanelData.data.type).not.toBe("funnel");
+      expect(
+        Object.keys(mockDashboardPanelData.data.config).filter((key) => key.startsWith("funnel_")),
+      ).toEqual([]);
+    });
+
+    it("keeps the funnel settings of a funnel restored from a shared link", async () => {
+      const { decodeBuildConfig } = await import("@/composables/useLogs/logsVisualization");
+      const settings = {
+        funnel_sort: "none",
+        funnel_orient: "horizontal",
+        funnel_show_percent: true,
+      };
+      vi.mocked(decodeBuildConfig).mockReturnValueOnce({
+        type: "funnel",
+        config: settings,
+        customQuery: true,
+      });
+      mockRouter.currentRoute.value.query = { build_data: "encoded" };
+
+      try {
+        wrapper = createWrapper({
+          isFirstToggle: true,
+          searchQuery: 'SELECT * FROM "test_stream"',
+          selectedStream: "test_stream",
+        });
+        await flushPromises();
+      } finally {
+        mockRouter.currentRoute.value.query = {};
+      }
+
+      expect(mockDashboardPanelData.data.type).toBe("funnel");
+      expect(mockDashboardPanelData.data.config).toMatchObject(settings);
+      for (const key of Object.keys(settings))
+        delete (mockDashboardPanelData.data.config as any)[key];
+      mockDashboardPanelData.data.type = "line";
+    });
+
     it("should drop a parse result that resolves after a newer initialisation", async () => {
       const { parsedQueryToPanelFields, shouldUseCustomMode, parseSQL } =
         await import("@/utils/query/sqlQueryParser");

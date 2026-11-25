@@ -6,7 +6,7 @@ import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { VueFlow, Position, Handle } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
-import { Controls } from "@vue-flow/controls";
+import FlowControls from "@/components/flow/FlowControls.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -113,7 +113,7 @@ function onNodeClick({ node }: { node: { data?: RiskNode } }) {
         @node-click="onNodeClick"
       >
         <Background />
-        <Controls />
+        <FlowControls />
         <template #node-risk="{ data }">
           <Handle type="target" :position="Position.Left" class="opacity-0" />
           <div

@@ -141,7 +141,7 @@ export class DashboardPage {
       '[data-test="navbar-organizations-select-trigger"]',
     );
     this.orgOptionDefaultTestMulti = page.locator(
-      '[data-test-org-identifier="defaulttestmulti"]',
+      '[data-test="organization-menu-item-label-item-label"][data-test-org-identifier="defaulttestmulti"]',
     );
 
     // Custom chart locators

@@ -29,7 +29,7 @@ export class HomePage {
         // Use this to deterministically click the freshly-created org instead of
         // relying on `.first()` racing against the OInput debounce + OTable filter.
         this.getOrgMenuItemByIdentifier = (identifier) =>
-            page.locator(`[data-test-org-identifier="${identifier}"]`);
+            page.locator(`[data-test="organization-menu-item-label-item-label"][data-test-org-identifier="${identifier}"]`);
 
         this.slackButton = page.locator('[data-test="menu-link-slack-item"]');
         this.helpButton = page.locator('[data-test="menu-link-help-item"]');

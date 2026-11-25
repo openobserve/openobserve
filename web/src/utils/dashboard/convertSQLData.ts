@@ -44,14 +44,14 @@ import {
   heatmapColorScale,
 } from "./heatmapDefaults";
 import { sharedHeatmapTimeAxis } from "./heatmapTimeAxis";
-import {
-  applyPieDonutChartAlignment,
-  applyPieDonutLegendPositioning,
-  getChartDimensions,
-} from "./legendConfiguration";
+import { applyPieDonutLegendLayout } from "./legendConfiguration";
 import { isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { fitStackedAxisBounds } from "./stackTotals";
 import { mergeBarTrackMax } from "./barTrack";
+import { breakdownValueLabel } from "./sqlProcessData";
+import type { SeriesLimitInfo } from "./panelDiagnostics";
+import { gt } from "@/types/i18n";
+import { addCommasToNumber } from "@/utils/formatters";
 
 /**
  * Re-applies trellis layout on merged multi-query data.
@@ -180,7 +180,7 @@ function reapplyTrellisLayout(
       // --- Title label above this subplot ---
       if (gridData.gridArray[gridIdx]) {
         opts.title.push({
-          text: groupName,
+          text: breakdownValueLabel(groupName),
           textStyle: {
             fontSize: 12,
             width:
@@ -214,6 +214,42 @@ function reapplyTrellisLayout(
     console.error("Trellis re-application on merged data failed:", err?.message);
   }
 }
+
+interface QueryChartResult {
+  extras?: { seriesLimit?: SeriesLimitInfo };
+  options?: { series?: { name?: string }[] };
+}
+
+/** One series-cap notice over every run's drawn series; null when no run dropped any. */
+const mergeSeriesLimits = (
+  options: QueryChartResult[],
+  maxSeries: number,
+  panelQueryIndexes: number[],
+): { seriesLimit: SeriesLimitInfo; limitNumberOfSeriesWarningMessage: string } | null => {
+  if (!options.some((opt) => opt?.extras?.seriesLimit)) return null;
+  // Time-shift runs are copies of one panel query that the chart draws side by side, each up to the cap.
+  const perQuery = new Set(panelQueryIndexes).size > 1;
+  const seriesLimit: SeriesLimitInfo = {
+    shown: 0,
+    total: 0,
+    cap: perQuery ? maxSeries : maxSeries * options.length,
+    ...(perQuery && { perQuery }),
+  };
+  options.forEach((opt) => {
+    const limit = opt?.extras?.seriesLimit;
+    // An uncapped query draws all of its series; unnamed ones are annotations.
+    const drawn = limit ? 0 : (opt?.options?.series ?? []).filter((series) => series?.name).length;
+    seriesLimit.shown += limit ? limit.shown : drawn;
+    seriesLimit.total += limit ? limit.total : drawn;
+  });
+  return {
+    seriesLimit,
+    limitNumberOfSeriesWarningMessage: gt("dashboard.utils.seriesLimitWarningCounts", {
+      shown: addCommasToNumber(seriesLimit.shown),
+      total: addCommasToNumber(seriesLimit.total),
+    }),
+  };
+};
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -338,11 +374,7 @@ export const convertMultiSQLData = async (
     if (merged?.series?.[0]) {
       merged.series[0].data = mergedData;
       // Query 0 sized the legend and placed the pie from its own slices; size them for every query's.
-      if (merged.legend?.show) {
-        applyPieDonutLegendPositioning(panelSchema, merged, chartPanelRef);
-        const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
-        applyPieDonutChartAlignment(panelSchema, merged, chartWidth, chartHeight);
-      }
+      if (merged.legend?.show) applyPieDonutLegendLayout(panelSchema, merged, chartPanelRef);
     }
 
     applySeriesColorMappings(
@@ -587,6 +619,16 @@ export const convertMultiSQLData = async (
     return options[0];
   }
 
+  // Each query caps its own series, and the panel reads only options[0]'s extras.
+  const mergedSeriesLimit =
+    options.length > 1
+      ? mergeSeriesLimits(
+          options,
+          store.state?.zoConfig?.max_dashboard_series ?? 100,
+          options.map((_: unknown, i: number) => metadata?.queries?.[i]?.panelQueryIndex ?? i),
+        )
+      : null;
+
   // An empty query 1 builds a category axis; take the chart frame from the first query that has rows.
   const baseIdx = options.findIndex((opt: any) =>
     opt?.options?.series?.some((s: any) => Array.isArray(s.data) && s.data.length > 0),
@@ -596,6 +638,9 @@ export const convertMultiSQLData = async (
       ...options[baseIdx],
       options: { ...options[baseIdx].options, series: options[0].options.series },
     };
+  }
+  if (mergedSeriesLimit && options[0]) {
+    options[0].extras = { ...options[0].extras, ...mergedSeriesLimit };
   }
 
   // C3: X-axis merge + reindex for time-series charts
