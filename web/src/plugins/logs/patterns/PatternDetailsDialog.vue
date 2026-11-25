@@ -167,11 +167,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? t('logs.patternList.exactCountTooltip', {
                               count: volumeCount.toLocaleString(),
                             })
-                          : volumeUnavailableTitle
+                          : undefined
                       "
                       data-test="pattern-detail-occurrences"
                     >
-                      {{ occurrencesLabel }}
+                      <span
+                        v-if="volumeUnavailableTitle"
+                        class="cursor-help underline decoration-dotted underline-offset-4"
+                      >
+                        {{ occurrencesLabel }}
+                        <OTooltip :content="volumeUnavailableTitle" max-width="22rem" />
+                      </span>
+                      <template v-else>{{ occurrencesLabel }}</template>
                     </div>
                   </OCardSection>
                 </OCard>
@@ -414,7 +421,7 @@ import useWildcardHover from "./useWildcardHover";
 import analytics from "@/services/product_analytics";
 import { extractStatusFromTemplate } from "@/utils/logs/statusParser";
 import { compactCount, FILTER_BLOCKED_MESSAGE } from "./patternUtils";
-import { PATTERN_VOLUME_CACHE, type PatternVolumeCache } from "./usePatternVolume";
+import { PATTERN_VOLUME_CACHE, volumeIssueKey, type PatternVolumeCache } from "./usePatternVolume";
 
 const props = withDefaults(
   defineProps<{
@@ -465,8 +472,8 @@ watch(
 );
 
 const volumeUnavailableTitle = computed(() => {
-  const reason = volumeEntry.value?.unavailableReason;
-  return reason && volumeCount.value === null ? t(FILTER_BLOCKED_MESSAGE[reason]) : undefined;
+  const issue = volumeIssueKey(volumeEntry.value);
+  return issue ? t(issue) : undefined;
 });
 
 const occurrencesLabel = computed(() => {

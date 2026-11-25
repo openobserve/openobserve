@@ -191,6 +191,7 @@ describe("PatternDetailsDialog", () => {
         props: { modelValue: true, selectedPattern: mockSelectedPattern, totalPatterns },
         global: {
           ...globalConfig,
+          stubs: { ...globalConfig.stubs, OTooltip: ContentTooltipStub },
           provide: {
             store,
             [PATTERN_VOLUME_CACHE as symbol]: {
@@ -208,7 +209,10 @@ describe("PatternDetailsDialog", () => {
       });
       const occurrences = w.find('[data-test="pattern-detail-occurrences"]');
       expect(occurrences.text()).toBe("—");
-      expect(occurrences.attributes("title")).toBe(enUS.logs.patternList.noMatchTerms);
+      expect(occurrences.attributes("title")).toBeUndefined();
+      expect(occurrences.find('[data-test-stub="o-tooltip"]').attributes("data-content")).toBe(
+        enUS.logs.patternList.noMatchTerms,
+      );
       w.unmount();
     });
 

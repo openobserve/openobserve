@@ -19,75 +19,34 @@ import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { stripSqlComments } from "@/utils/query/sqlComments";
 
 /**
- * Extract constant (non-variable) string segments from a pattern template.
- *
- * Pattern templates contain variable placeholders like <*>, <:TIMESTAMP>, etc.
- * This splits on those placeholders and returns segments longer than 10 chars,
- * which are the pattern's *invariant* text. They are distinctive only when no
- * other pattern shares them; use resolvePatternMatchTerms to check that.
- *
- * NOTE: we deliberately do NOT fall back to wildcard sample values for
- * all-wildcard templates. Those values are per-log *examples*, not invariants —
- * `match_all('alice')` for `User <*> logged in` would return only Alice's logs
- * (and combining values across slots can yield a combination that never
- * occurred), so such patterns simply have no reliable Include/Exclude filter.
+ * Constant text segments longer than 10 chars, between a template's placeholders.
+ * Display only: the terms that count a pattern come from the extractor, via resolvePatternMatchTerms.
  */
 export const extractConstantsFromPattern = (template: string): string[] =>
-  splitTemplate(template).filter((part) => part.length > 10);
-
-const PLACEHOLDER = /<[*:][^>]*>/;
-
-const splitTemplate = (template: string): string[] =>
   template
-    .split(PLACEHOLDER)
+    .split(/<[*:][^>]*>/)
     .map((p) => p.trim())
-    .filter(Boolean);
+    .filter((part) => part.length > 10);
 
-const splitConstants = (template: string): string[] =>
-  splitTemplate(template).filter((p) => /[\p{L}\p{N}]/u.test(p));
+/** The extractor's view of a pattern: its template and the terms that select only it. */
+export interface PatternTerms {
+  template: string;
+  match_terms?: string[] | null;
+  /** Term sets of other patterns that `match_terms` also returns, subtracted from the count. */
+  exclude_terms?: string[][] | null;
+  match_block?: "no_text" | "shared" | null;
+}
 
-const GAP = "\u0001";
+const findPattern = (template: string, patterns?: PatternTerms[]) =>
+  patterns?.find((p) => p.template === template);
 
-// The backend runs match_all(t) as a case-insensitive ILIKE '%t%' with the term unescaped, after
-// dropping a leading `re:` and edge `*`; so `_` and `%` in a term are wildcards, not literals.
-const termMatcher = (term: string): RegExp => {
-  const core = term
-    .replace(/^(re:)+/, "")
-    .replace(/^\*+/, "")
-    .replace(/\*+$/, "");
-  const source = [...core]
-    .map((ch) => (ch === "_" ? "." : ch === "%" ? ".*" : ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
-    .join("");
-  return new RegExp(source, "isu");
-};
-
-// A placeholder can hold any value, so it becomes a gap only a wildcard term can match across.
-const sharedWith = (matchers: RegExp[], other: string): boolean => {
-  const text = other.split(PLACEHOLDER).join(GAP);
-  return matchers.every((m) => m.test(text));
-};
-
-/**
- * `match_all()` terms selecting only this pattern: long constants, else every
- * constant. Null when there is no constant text or no term set separates it.
- */
+/** `match_all()` terms that select only this pattern, or null when the extractor found none. */
 export const resolvePatternMatchTerms = (
   template: string,
-  allTemplates?: string[],
+  patterns?: PatternTerms[],
 ): string[] | null => {
-  const long = extractConstantsFromPattern(template);
-  // Without the other templates nothing can vouch for short words, so only long constants are trusted.
-  if (!allTemplates) return long.length ? long : null;
-  const others = allTemplates.filter((t) => t !== template);
-  const unique = (terms: string[]) => {
-    if (!terms.length) return false;
-    const matchers = terms.map(termMatcher);
-    return !others.some((o) => sharedWith(matchers, o));
-  };
-
-  if (unique(long)) return long;
-  const all = splitConstants(template);
-  return unique(all) ? all : null;
+  const terms = findPattern(template, patterns)?.match_terms;
+  return terms?.length ? terms : null;
 };
 
 export type PatternFilterBlock = "none" | "shared";
@@ -97,13 +56,13 @@ export const FILTER_BLOCKED_MESSAGE = {
   shared: "logs.patternList.noDistinctTextTooltip",
 } as const satisfies Record<PatternFilterBlock, string>;
 
-/** Why a pattern cannot be filtered on: it has no constant text, or every piece is shared. */
+/** Why a pattern cannot be filtered on: it has no constant text, or its terms also match another pattern. */
 export const patternFilterBlockedReason = (
   template: string,
-  allTemplates?: string[],
+  patterns?: PatternTerms[],
 ): PatternFilterBlock | null => {
-  if (splitConstants(template).length === 0) return "none";
-  return resolvePatternMatchTerms(template, allTemplates) === null ? "shared" : null;
+  if (resolvePatternMatchTerms(template, patterns)) return null;
+  return findPattern(template, patterns)?.match_block === "shared" ? "shared" : "none";
 };
 
 export type PatternSeverityKey = "error" | "warning" | "info" | "debug" | "uncategorized";
@@ -297,16 +256,21 @@ export const compactCount = (n: number): string => {
 // PostgreSqlDialect doesn't support backslash escapes, so doubling ' is the only escaping match_all('...') needs.
 export const escapeForMatchAll = (str: string): string => escapeSingleQuotes(str);
 
-/**
- * One pattern's clause: the terms that select it are ANDed. A pattern nothing
- * separates from the others (wildcards are per-log samples) yields null.
- */
-const patternClause = (template: string, allTemplates?: string[]): string | null => {
-  const constants = resolvePatternMatchTerms(template, allTemplates);
-  if (!constants) return null;
+const matchAll = (terms: string[]): string =>
+  terms.map((c) => `match_all('${escapeForMatchAll(c)}')`).join(" AND ");
 
-  return constants.map((c) => `match_all('${escapeForMatchAll(c)}')`).join(" AND ");
+/** The WHERE fragment that counts only this pattern's logs, or null when the extractor found none. */
+export const patternWhere = (pattern?: PatternTerms): string | null => {
+  const include = pattern?.match_terms;
+  if (!include?.length) return null;
+  const subtract = (pattern?.exclude_terms ?? [])
+    .filter((terms) => terms.length)
+    .map((terms) => (terms.length > 1 ? `NOT (${matchAll(terms)})` : `NOT ${matchAll(terms)}`));
+  return [matchAll(include), ...subtract].join(" AND ");
 };
+
+const patternClause = (template: string, patterns?: PatternTerms[]): string | null =>
+  patternWhere(findPattern(template, patterns));
 
 /**
  * Parenthesise only where precedence demands it. A lone pattern sits among ANDs,
@@ -325,8 +289,8 @@ export interface PatternSetSqlOptions {
   excludes?: string[];
   /** The current search's WHERE fragment, ANDed in front of the pattern terms. */
   baseFilter?: string;
-  /** Every extracted template, used to keep a pattern's terms from matching the others. */
-  allTemplates?: string[];
+  /** The extracted patterns, which carry each template's terms. */
+  patterns?: PatternTerms[];
   /** "count" emits `count(*) AS cnt` for threshold-on-number alerts. */
   select?: "rows" | "count";
 }
@@ -350,16 +314,16 @@ export const buildPatternSetSqlQuery = (options: PatternSetSqlOptions): string =
     includes = [],
     excludes = [],
     baseFilter,
-    allTemplates,
+    patterns,
     select = "rows",
   } = options;
 
   const projection = select === "count" ? "count(*) AS cnt" : "*";
   const includeClauses = includes
-    .map((t) => patternClause(t, allTemplates))
+    .map((t) => patternClause(t, patterns))
     .filter(Boolean) as string[];
   const excludeClauses = excludes
-    .map((t) => patternClause(t, allTemplates))
+    .map((t) => patternClause(t, patterns))
     .filter(Boolean) as string[];
 
   const terms: string[] = [];
@@ -389,8 +353,8 @@ export const buildPatternSetSqlQuery = (options: PatternSetSqlOptions): string =
  * Kept as its own name because that is how the rest of the pattern UI refers to
  * it, but there is only one code path underneath.
  */
-export const buildPatternSqlQuery = (template: string, streamName: string): string =>
-  buildPatternSetSqlQuery({ streamName, includes: [template] });
+export const buildPatternSqlQuery = (pattern: PatternTerms, streamName: string): string =>
+  buildPatternSetSqlQuery({ streamName, includes: [pattern.template], patterns: [pattern] });
 
 /**
  * Derive a human-readable alert name from a pattern template and stream name.
@@ -440,7 +404,7 @@ export const buildPatternAlertData = (
   return {
     streamName,
     streamType: "logs",
-    sqlQuery: buildPatternSqlQuery(pattern.template, streamName),
+    sqlQuery: buildPatternSqlQuery(pattern, streamName),
     patternTemplate: pattern.template,
     alertName: buildAlertNameFromPattern(pattern.template, streamName, isAnomaly),
     periodMinutes,

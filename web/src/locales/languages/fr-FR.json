@@ -22015,7 +22015,10 @@
       "excludeFromQuery": "Exclure",
       "createAlertAction": "Créer une alerte",
       "noMatchTerms": "Ce motif n'a pas de texte distinctif pour filtrer.",
-      "noDistinctTextTooltip": "Chaque élément de texte fixe de ce motif apparaît aussi dans un autre motif ; un filtre correspondrait donc aussi à leurs journaux.",
+      "noDistinctTextTooltip": "Un autre motif a le même texte avec un niveau de journal différent ; un filtre ne peut donc pas compter celui-ci seul.",
+      "volumeUnsupported": "Le volume n'est pas disponible pour les recherches utilisant WITH, JOIN, UNION, un alias de table ou une sous-requête.",
+      "volumeFailedRetry": "Impossible de charger le volume. Le serveur est peut-être occupé, réessayez.",
+      "volumeFailed": "Impossible de charger le volume de ce modèle.",
       "noStreamSelected": "Aucun flux sélectionné. Veuillez sélectionner un flux avant de créer une alerte.",
       "alertBroadMatch": "Ce motif n'a pas de texte constant distinctif — la requête d'alerte correspondra largement. Envisagez d'ajouter des filtres manuels."
     },

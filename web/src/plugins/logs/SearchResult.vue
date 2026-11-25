@@ -1439,7 +1439,6 @@ export default defineComponent({
         streamName: searchObj.data.stream.selectedStream[0],
         window: props.queryWindowUs as { start: number; end: number } | undefined,
         lastQuery: patternsState.value?.lastQuery,
-        allTemplates: (patternsState.value?.patterns?.patterns ?? []).map((p: any) => p.template),
       });
     });
 
@@ -1455,6 +1454,7 @@ export default defineComponent({
     const patternVolumeCache = usePatternVolumeCache(patternVolumeContext);
     provide(PATTERN_VOLUME_CACHE, {
       request: patternVolumeCache.request,
+      retry: patternVolumeCache.retry,
       get: patternVolumeCache.get,
     });
 

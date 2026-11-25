@@ -143,7 +143,10 @@ describe("PatternCard", () => {
       });
       const frequency = w.find('[data-test="pattern-card-0-frequency"]');
       expect(frequency.text()).toBe("—");
-      expect(frequency.attributes("title")).toBe(enUS.logs.patternList.noDistinctTextTooltip);
+      expect(frequency.attributes("title")).toBeUndefined();
+      expect(frequency.findComponent(OTooltipStub).props("content")).toBe(
+        enUS.logs.patternList.noDistinctTextTooltip,
+      );
       w.unmount();
     });
   });

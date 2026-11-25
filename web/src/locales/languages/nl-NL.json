@@ -22015,7 +22015,10 @@
       "excludeFromQuery": "Uitsluiten",
       "createAlertAction": "Alarm maken",
       "noMatchTerms": "Dit patroon heeft geen onderscheidende tekst om op te filteren.",
-      "noDistinctTextTooltip": "Elk vast stuk tekst in dit patroon komt ook voor in een ander patroon, dus een filter zou ook hun logs matchen.",
+      "noDistinctTextTooltip": "Een ander patroon heeft dezelfde tekst met een ander logniveau, dus een filter kan dit patroon niet apart tellen.",
+      "volumeUnsupported": "Het volume is niet beschikbaar voor zoekopdrachten met WITH, JOIN, UNION, een tabelalias of een subquery.",
+      "volumeFailedRetry": "Het volume kon niet worden geladen. De server is mogelijk bezet, probeer het opnieuw.",
+      "volumeFailed": "Het volume voor dit patroon kon niet worden geladen.",
       "noStreamSelected": "Geen stream geselecteerd. Selecteer een stream voordat u een alarm maakt.",
       "alertBroadMatch": "Dit patroon heeft geen onderscheidende constante tekst — de alarmquery zal breed matchen. Overweeg handmatige filters toe te voegen."
     },

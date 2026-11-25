@@ -22015,7 +22015,10 @@
       "excludeFromQuery": "Hariç tut",
       "createAlertAction": "Uyarı oluştur",
       "noMatchTerms": "Bu desenin filtrelenecek ayırt edici metni yok.",
-      "noDistinctTextTooltip": "Bu desendeki sabit metnin her parçası başka bir desende de geçiyor, bu nedenle bir filtre onların günlüklerini de eşleştirir.",
+      "noDistinctTextTooltip": "Başka bir desen aynı metne farklı bir günlük düzeyinde sahip, bu nedenle bir filtre bu deseni tek başına sayamaz.",
+      "volumeUnsupported": "WITH, JOIN, UNION, tablo takma adı veya alt sorgu kullanan aramalarda hacim gösterilemez.",
+      "volumeFailedRetry": "Hacim yüklenemedi. Sunucu meşgul olabilir, tekrar deneyin.",
+      "volumeFailed": "Bu desenin hacmi yüklenemedi.",
       "noStreamSelected": "Akış seçilmedi. Uyarı oluşturmadan önce lütfen bir akış seçin.",
       "alertBroadMatch": "Bu desenin ayırt edici sabit metni yok — uyarı sorgusu geniş bir şekilde eşleşecek. Manuel filtre eklemeyi düşünün."
     },

@@ -22015,7 +22015,10 @@
       "excludeFromQuery": "Escludi",
       "createAlertAction": "Crea avviso",
       "noMatchTerms": "Questo pattern non ha testo distintivo su cui filtrare.",
-      "noDistinctTextTooltip": "Ogni parte di testo fisso di questo pattern compare anche in un altro pattern, quindi un filtro corrisponderebbe anche ai loro log.",
+      "noDistinctTextTooltip": "Un altro pattern ha lo stesso testo con un livello di log diverso, quindi un filtro non può contare questo da solo.",
+      "volumeUnsupported": "Il volume non è disponibile per le ricerche che usano WITH, JOIN, UNION, un alias di tabella o una sottoquery.",
+      "volumeFailedRetry": "Impossibile caricare il volume. Il server potrebbe essere occupato, riprova.",
+      "volumeFailed": "Impossibile caricare il volume di questo pattern.",
       "noStreamSelected": "Nessuno stream selezionato. Seleziona uno stream prima di creare un avviso.",
       "alertBroadMatch": "Questo pattern non ha testo costante distintivo — la query dell'avviso corrisponderà ampiamente. Considera di aggiungere filtri manuali."
     },
