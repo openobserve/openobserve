@@ -22,7 +22,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value};
-use config::meta::stream::{StreamParams, StreamType};
+use config::meta::{
+    pipeline::PipelineDependencyItem,
+    stream::{StreamParams, StreamType},
+};
 
 #[tracing::instrument(skip(cleanup_enrichment_table_resources))]
 pub async fn delete_stream<E, EFut>(
@@ -36,6 +39,11 @@ where
     E: FnOnce(String, String, StreamType) -> EFut,
     EFut: Future<Output = ()>,
 {
+    if stream_type == StreamType::EnrichmentTables
+        && let Some(refusal) = enrichment_table_delete_refusal(org_id, stream_name).await
+    {
+        return Ok(refusal);
+    }
     ::stream::delete_stream_with_cleanup(
         org_id,
         stream_name,
@@ -95,6 +103,34 @@ async fn cleanup_related_resources(
     Ok(())
 }
 
+/// The 409 refusing a delete of an enrichment table that pipelines read, if any read it.
+async fn enrichment_table_delete_refusal(org_id: &str, table_name: &str) -> Option<Response> {
+    // As for functions: an unreadable pipeline list must not block a delete.
+    let readers = crate::pipeline::db::enrichment_table_readers(org_id, table_name)
+        .await
+        .unwrap_or_default();
+    let message = enrichment_table_in_use(table_name, &readers)?;
+    Some(
+        (
+            http::StatusCode::CONFLICT,
+            Json(MetaHttpResponse::error(http::StatusCode::CONFLICT, message)),
+        )
+            .into_response(),
+    )
+}
+
+/// Why an enrichment table the given pipelines read cannot be deleted, if any read it. [pure]
+fn enrichment_table_in_use(table_name: &str, readers: &[PipelineDependencyItem]) -> Option<String> {
+    if readers.is_empty() {
+        return None;
+    }
+    let pipelines = serde_json::to_string(readers).unwrap_or_else(|_| "[]".to_string());
+    Some(format!(
+        "Enrichment table '{table_name}' is read by {} pipeline(s). Please remove it from these pipelines first: {pipelines}",
+        readers.len()
+    ))
+}
+
 fn alert_cleanup_error(error: crate::alerts::alert::AlertError) -> Response {
     use crate::alerts::alert::AlertError;
     match error {
@@ -125,5 +161,23 @@ fn alert_cleanup_error(error: crate::alerts::alert::AlertError) -> Response {
             )),
         )
             .into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_table_read_by_pipelines_is_refused_naming_them() {
+        assert_eq!(enrichment_table_in_use("geo", &[]), None);
+        let readers = [PipelineDependencyItem {
+            id: "p1".to_string(),
+            name: "enrich_logs".to_string(),
+        }];
+        let message = enrichment_table_in_use("geo", &readers).expect("refused");
+        assert!(message.contains("'geo'"), "{message}");
+        assert!(message.contains("1 pipeline(s)"), "{message}");
+        assert!(message.contains("enrich_logs"), "{message}");
     }
 }
