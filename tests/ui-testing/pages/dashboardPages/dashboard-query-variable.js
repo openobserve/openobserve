@@ -205,6 +205,8 @@ export default class DashboardQueryVariable {
   async fillQuery(text) {
     await this.monaco.waitForReady(this.queryEditor);
     const input = this.monaco.getInputArea(this.queryEditor).first();
+    const stalePreview = this.previewCount.or(this.previewEmpty).or(this.previewError);
+    const clearsPreview = (await stalePreview.count()) > 0 && (await this.queryText()) !== text;
     await expect
       .poll(async () => {
         if ((await this.queryText()) === text) return true;
@@ -213,6 +215,8 @@ export default class DashboardQueryVariable {
         return (await this.queryText()) === text;
       }, { timeout: 15000, intervals: [250, 500, 1000] })
       .toBe(true);
+    // The editor commits after a debounce and the commit drops the old preview, shifting the Run button mid-click.
+    if (clearsPreview) await expect(stalePreview).toHaveCount(0, { timeout: 10000 });
   }
 
   async clearQuery() {
