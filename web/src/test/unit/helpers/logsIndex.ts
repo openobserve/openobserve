@@ -32,6 +32,7 @@ vi.mock("@/utils/query/sqlUtils", () => ({
   isExplainQuery: vi.fn(() => false),
   buildSqlQuery: vi.fn(),
   getFieldsFromQuery: vi.fn(),
+  getStreamFromQuery: vi.fn(),
   isSimpleSelectAllQuery: vi.fn((query) => {
     if (!query || typeof query !== "string") return false;
     const normalizedQuery = query.trim().replace(/\s+/g, " ");
