@@ -190,6 +190,7 @@ fn referenced_streams(expression: &str) -> anyhow::Result<Vec<String>> {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
     use config::meta::promql::value::{InstantValue, Label, Sample};
 
     use super::*;
@@ -359,7 +360,6 @@ mod tests {
     }
     #[tokio::test]
     async fn rule_inference_chooses_existing_referenced_metrics_and_never_an_unrelated_stream() {
-        use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
         let org = "rule-inference-test";
         let key = |name: &str| format!("{org}/metrics/{name}");

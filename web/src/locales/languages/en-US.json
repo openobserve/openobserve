@@ -6337,6 +6337,8 @@
     "fieldRequired": "Field is required!",
     "sqlQuery": "Sql Query",
     "promqlQuery": "PromQL Query",
+    "queryRowLimitNote": "Each run processes at most {limit} rows unless the query sets its own LIMIT.",
+    "queryRowLimitNoteNoLimit": "Each run processes at most the default number of rows unless the query sets its own LIMIT.",
     "output": "Output",
     "validating": "Validating...",
     "validateAndClose": "Validate and Close",
@@ -16102,8 +16104,10 @@
         "searchSuffixesAria": "Search suffix filters",
         "searchTypesAria": "Search type filters",
         "facetAria": "{label}, {count} metrics",
+        "facetAriaUnchecked": "{label}, {count} with data, {unchecked} not checked yet",
         "noPrefixMatch": "No prefixes match.",
         "noSuffixMatch": "No suffixes match.",
+        "uncheckedTooltip": "{count} with data · {unchecked} not checked yet",
         "noTypeMatch": "No types match."
       },
       "views": {

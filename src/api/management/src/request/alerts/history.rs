@@ -1451,6 +1451,8 @@ pub(crate) fn outcome_predicate(raw: &str) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field};
+    use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
     use svix_ksuid::KsuidLike as _;
 
     use super::*;
@@ -2057,8 +2059,6 @@ mod tests {
 
     #[test]
     fn downtime_filters_survive_reserialisation() {
-        use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
-
         let parse = |sql: &str| Parser::parse_sql(&PostgreSqlDialect {}, sql).unwrap();
         let payload = r"x\' OR 1=1 --";
         for (downtime_id, status) in [(Some(payload), None), (None, Some(payload))] {
@@ -2088,8 +2088,6 @@ mod tests {
 
     #[test]
     fn a_stream_from_before_downtimes_reads_without_downtime_id() {
-        use arrow_schema::{DataType, Field};
-
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
         let upgraded: Vec<Field> = HISTORY_COLUMNS.into_iter().map(field).collect();
         let columns = history_columns(&Schema::new(upgraded.clone()));
@@ -2103,8 +2101,6 @@ mod tests {
 
     #[test]
     fn ack_columns_are_read_once_the_stream_has_them() {
-        use arrow_schema::{DataType, Field};
-
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
         let mut fields: Vec<Field> = HISTORY_COLUMNS.into_iter().map(field).collect();
         fields.push(field("acked_by"));
@@ -2125,8 +2121,6 @@ mod tests {
 
     #[test]
     fn the_repeat_suppressed_column_is_read_once_the_stream_has_it() {
-        use arrow_schema::{DataType, Field};
-
         let mut fields: Vec<Field> = HISTORY_COLUMNS
             .into_iter()
             .map(|name| Field::new(name, DataType::Utf8, true))
@@ -2151,8 +2145,6 @@ mod tests {
 
     #[test]
     fn the_destination_send_result_is_read_once_the_stream_has_it() {
-        use arrow_schema::{DataType, Field};
-
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
         let mut fields: Vec<Field> = HISTORY_COLUMNS.into_iter().map(field).collect();
         assert!(!history_columns(&Schema::new(fields.clone())).contains("success_response"));
@@ -2165,8 +2157,6 @@ mod tests {
 
     #[test]
     fn the_siem_severity_column_is_read_once_the_stream_has_it() {
-        use arrow_schema::{DataType, Field};
-
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
         let mut fields: Vec<Field> = HISTORY_COLUMNS.into_iter().map(field).collect();
         assert!(!history_columns(&Schema::new(fields.clone())).contains("severity"));
@@ -2178,8 +2168,6 @@ mod tests {
 
     #[test]
     fn a_recreated_triggers_stream_reads_only_the_columns_it_has() {
-        use arrow_schema::{DataType, Field};
-
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
         let mut fields: Vec<Field> = HISTORY_COLUMNS.into_iter().map(field).collect();
         for name in [
@@ -2211,8 +2199,6 @@ mod tests {
 
     #[test]
     fn a_full_triggers_stream_reads_every_history_column() {
-        use arrow_schema::{DataType, Field};
-
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
         let fields: Vec<Field> = HISTORY_COLUMNS
             .into_iter()
@@ -2229,8 +2215,6 @@ mod tests {
 
     #[test]
     fn anomaly_reads_skip_the_columns_the_stream_lacks() {
-        use arrow_schema::{DataType, Field};
-
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
         let bare = Schema::new(vec![field("_timestamp"), field("key"), field("status")]);
         assert_eq!(
@@ -2260,8 +2244,6 @@ mod tests {
 
     #[test]
     fn a_sort_on_a_column_the_stream_lacks_falls_back_to_timestamp() {
-        use arrow_schema::{DataType, Field};
-
         let field = |name: &str| Field::new(name, DataType::Utf8, true);
         let bare = Schema::new(HISTORY_COLUMNS.into_iter().map(field).collect::<Vec<_>>());
         let sortable = trigger_stream::sortable_column;

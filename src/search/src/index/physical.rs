@@ -254,8 +254,6 @@ mod tests {
 
     #[test]
     fn test_disjunction_single() {
-        use datafusion::{physical_expr::expressions::Literal, scalar::ScalarValue};
-
         let expr = Arc::new(Literal::new(ScalarValue::Boolean(Some(true))));
         let result = disjunction(vec![expr.clone()]);
         assert_eq!(result.as_ref() as *const _, expr.as_ref() as *const _);
@@ -270,8 +268,6 @@ mod tests {
 
     #[test]
     fn test_balanced_binary_is_logarithmic_and_ordered() {
-        use datafusion::physical_expr::expressions::Literal;
-
         let exprs = (0..1000)
             .map(|i| Arc::new(Literal::new(ScalarValue::Int64(Some(i)))) as Arc<dyn PhysicalExpr>)
             .collect::<Vec<_>>();
@@ -296,8 +292,6 @@ mod tests {
 
     #[test]
     fn test_conjunction_empty_is_true() {
-        use datafusion::physical_expr::expressions::Literal;
-
         let result = conjunction(vec![]);
         let lit = result.downcast_ref::<Literal>().unwrap();
         assert_eq!(*lit.value(), ScalarValue::Boolean(Some(true)));

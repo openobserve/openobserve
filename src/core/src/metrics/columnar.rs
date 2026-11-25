@@ -303,7 +303,10 @@ mod tests {
     use std::sync::Arc;
 
     use config::{meta::promql::NAME_LABEL, utils::json};
-    use datafusion::arrow::datatypes::Field;
+    use datafusion::arrow::{
+        array::{Array, AsArray},
+        datatypes::{Field, Float64Type},
+    };
     use infra::schema::get_partition_time_level;
 
     use super::*;
@@ -337,11 +340,6 @@ mod tests {
 
     #[test]
     fn test_append_writes_a_stale_marker_as_a_null_value() {
-        use datafusion::arrow::{
-            array::{Array, AsArray},
-            datatypes::Float64Type,
-        };
-
         let schema = columnar_schema(&[NAME_LABEL]);
         let mut columnar = ColumnarStream::for_schema(&schema).unwrap();
         let labels = vec![(NAME_LABEL.to_string(), "up".to_string())];

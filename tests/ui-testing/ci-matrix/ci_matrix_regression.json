@@ -166,7 +166,8 @@
       "metrics-regression.spec.js",
       "metrics-14238-stale-nodata.spec.js",
       "metrics-16290-search-skips-empty-page.spec.js",
-      "metrics-16405-label-values-by-prefix.spec.js"
+      "metrics-16405-label-values-by-prefix.spec.js",
+      "metrics-17163-prefix-counts.spec.js"
     ],
     "disabled": []
   },
