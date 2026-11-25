@@ -17,6 +17,7 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import i18n from "@/locales";
+import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
 
 i18n.global.mergeLocaleMessage("en-us", {
@@ -360,7 +361,7 @@ describe("ConfirmDialog", () => {
         message: undefined,
         messageKeypath: "confirmDialogSpec.withCommand",
         messageName: "#sre-prod",
-        messageValues: { command: "/staging-o2" },
+        messageValues: { command: raw("/staging-o2") },
       });
       expect(wrapper.find('[data-test="dialog-box"]').text()).toContain(
         "Remove #sre-prod? Run /staging-o2 org to change it.",

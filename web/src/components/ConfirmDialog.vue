@@ -78,7 +78,7 @@ export default defineComponent({
     messageKeypath: { type: String as PropType<I18nKey> },
     messageName: { type: String },
     // Plain-text values for the keypath's other placeholders, such as {command}.
-    messageValues: { type: Object as PropType<Record<string, string>> },
+    messageValues: { type: Object as PropType<Record<string, I18nText>> },
     warningMessage: { type: String as unknown as PropType<I18nText> },
     modelValue: { type: Boolean, default: false },
     // No `default: ""` — an empty-string default would need a cast to I18nText,

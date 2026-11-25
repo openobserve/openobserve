@@ -180,9 +180,11 @@ function chipOf(c: ChannelReadiness): Chip {
 
 /// DM-7: a person links their own Slack account from Slack, so only their own "not linked" chip says how. [pure]
 function ownFixTip(c: ChannelReadiness, reason: I18nText): I18nText {
-  return props.own && c.channel === "slack" && isUnlinkedSlack(c)
-    ? t("oncall.channelLinkSlack", { reason, command: slackCommand.value })
-    : reason;
+  // Until links/me answers, a guessed `/o2` could name another app's command.
+  if (!props.own || c.channel !== "slack" || !isUnlinkedSlack(c) || !myLinks.data.value) {
+    return reason;
+  }
+  return t("oncall.channelLinkSlack", { reason, command: slackCommand.value });
 }
 
 function isUnlinkedSlack(c: ChannelReadiness): boolean {

@@ -20,7 +20,7 @@ import { defineComponent } from "vue";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import slack from "@/services/slack";
-import { makeSlackStore, ok } from "@/test/unit/helpers/slack";
+import { axiosError, makeSlackStore, ok } from "@/test/unit/helpers/slack";
 import type { ChannelReadiness } from "@/ts/interfaces/oncall";
 import OnCallChannelChips from "./OnCallChannelChips.vue";
 
@@ -70,6 +70,22 @@ describe("OnCallChannelChips", () => {
     await flushPromises();
 
     expect(w.find('[data-test-stub="tooltip"]').text()).toBe("not linked. Run /o2 link in Slack");
+  });
+
+  it("names no command while links/me is still loading", async () => {
+    vi.mocked(slack.getMyLinks).mockReturnValue(new Promise(() => {}) as any);
+    const w = render(true);
+    await flushPromises();
+
+    expect(w.find('[data-test-stub="tooltip"]').text()).toBe("not linked");
+  });
+
+  it("names no command when links/me fails", async () => {
+    vi.mocked(slack.getMyLinks).mockReturnValue(Promise.reject(axiosError(500)) as any);
+    const w = render(true);
+    await flushPromises();
+
+    expect(w.find('[data-test-stub="tooltip"]').text()).toBe("not linked");
   });
 
   it("does not read the caller's links for another person's row", async () => {
