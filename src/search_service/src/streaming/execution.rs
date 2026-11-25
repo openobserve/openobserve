@@ -516,12 +516,12 @@ fn can_slice_extraction(sql: &str) -> bool {
         && !config::utils::sql::has_limit_clause(sql)
 }
 
-/// Removes slices whose response carries `function_error`, counts them as failed and
-/// returns the distinct messages.
+/// Removes slices that returned no rows and carry `function_error`, counts them as failed and
+/// returns the distinct messages. A partial slice that still has rows is kept.
 fn drop_failed_slices(responses: &mut Vec<Response>, failed: &mut usize) -> Vec<String> {
     let mut errors: Vec<String> = Vec::new();
     responses.retain(|r| {
-        if r.function_error.is_empty() {
+        if r.function_error.is_empty() || !r.hits.is_empty() {
             return true;
         }
         *failed += 1;
@@ -1078,6 +1078,16 @@ mod tests {
         let errors = drop_failed_slices(&mut slices, &mut failed);
         assert_eq!((slices.len(), failed), (1, 2));
         assert_eq!(errors, vec!["cast error".to_string()]);
+    }
+
+    #[test]
+    fn test_drop_failed_slices_keeps_partial_slice_with_rows() {
+        let mut partial = slice_with(3);
+        partial.function_error = vec!["partial".into()];
+        let mut slices = vec![partial];
+        let mut failed = 0;
+        assert!(drop_failed_slices(&mut slices, &mut failed).is_empty());
+        assert_eq!((slices.len(), failed), (1, 0));
     }
 
     #[test]
