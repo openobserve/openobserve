@@ -33,6 +33,7 @@ use super::{
     merge::cache_buf::{CacheBuf, CacheStream},
     stream::{cached_file_stream::CachedFileStream, monitor_stream::MonitorStream},
 };
+use crate::datafusion::distributed::remote_scan::remote_scan_exec::RemoteScanExec;
 
 #[derive(Debug)]
 pub struct StreamingAggsExec {
@@ -297,19 +298,34 @@ impl ExecutionPlan for StreamingAggsExec {
         }
 
         // Execute input for missing data
-        Ok(Box::pin(MonitorStream::new(
-            self.id.clone(),
-            self.start_time,
-            self.end_time,
-            self.input.schema(),
-            self.cache_buf.clone(),
-            self.input
-                .execute(partition - self.cached_partition_num, context)?,
-            self.overwrite_cache,
-        )))
+        Ok(Box::pin(
+            MonitorStream::new(
+                self.id.clone(),
+                self.start_time,
+                self.end_time,
+                self.input.schema(),
+                self.cache_buf.clone(),
+                self.input
+                    .execute(partition - self.cached_partition_num, context)?,
+                self.overwrite_cache,
+            )
+            .with_remote_partial_errs(collect_remote_partial_errs(&self.input)),
+        ))
     }
 
     fn benefits_from_input_partitioning(&self) -> Vec<bool> {
         vec![false; self.children().len()]
     }
+}
+
+fn collect_remote_partial_errs(plan: &Arc<dyn ExecutionPlan>) -> Vec<Arc<Mutex<String>>> {
+    let mut errs = Vec::new();
+    let mut stack = vec![plan];
+    while let Some(node) = stack.pop() {
+        if let Some(remote) = node.downcast_ref::<RemoteScanExec>() {
+            errs.push(remote.state.partial_err.clone());
+        }
+        stack.extend(node.children());
+    }
+    errs
 }
