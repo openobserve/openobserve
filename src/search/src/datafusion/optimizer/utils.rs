@@ -387,8 +387,6 @@ mod tests {
 
     #[test]
     fn test_get_int_from_expr_with_int64() {
-        use datafusion::{prelude::Expr, scalar::ScalarValue};
-
         let expr = Expr::Literal(ScalarValue::Int64(Some(42)), None);
         let result = get_int_from_expr(&Some(Box::new(expr)));
         assert_eq!(result, 42);
@@ -402,8 +400,6 @@ mod tests {
 
     #[test]
     fn test_get_int_from_expr_null_int64() {
-        use datafusion::{prelude::Expr, scalar::ScalarValue};
-
         let expr = Expr::Literal(ScalarValue::Int64(None), None);
         let result = get_int_from_expr(&Some(Box::new(expr)));
         assert_eq!(result, 0);
@@ -411,8 +407,6 @@ mod tests {
 
     #[test]
     fn test_get_int_from_expr_non_int_literal() {
-        use datafusion::{prelude::Expr, scalar::ScalarValue};
-
         let expr = Expr::Literal(ScalarValue::Utf8(Some("hello".to_string())), None);
         let result = get_int_from_expr(&Some(Box::new(expr)));
         assert_eq!(result, 0);
@@ -420,13 +414,6 @@ mod tests {
 
     #[test]
     fn test_is_complex_query_and_is_not_complex() {
-        use std::sync::Arc;
-
-        use datafusion::{
-            common::DFSchema,
-            logical_expr::{EmptyRelation, LogicalPlan},
-        };
-
         let schema = Arc::new(DFSchema::empty());
         let plan = LogicalPlan::EmptyRelation(EmptyRelation {
             produce_one_row: false,

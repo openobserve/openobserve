@@ -28,7 +28,7 @@ use config::{
             usage::{RunOutcome, TriggerData, TriggerDataType},
         },
         stream::{StreamParams, StreamType},
-        triggers::ScheduledTriggerData,
+        triggers::{ScheduledTriggerData, WindowLedger},
     },
     utils::{
         json,
@@ -3764,6 +3764,7 @@ async fn handle_alert_triggers(
             last_notified_level: None,
             backfill_job: None,
             notified_destinations: vec![],
+            written_destinations: None,
             chart_id: None,
             #[cfg(feature = "enterprise")]
             siem: None,
@@ -5825,6 +5826,7 @@ async fn handle_derived_stream_triggers(
     }
     trigger_data_stream.end_time = end;
 
+    let mut written_now = Vec::new();
     // evaluate trigger and configure trigger next run time
     match derived_stream
         .evaluate(
@@ -5930,64 +5932,18 @@ async fn handle_derived_stream_triggers(
                     },
                 };
 
-                // Ingest result into destination stream
                 if ingestion_error_msg.is_none() {
-                    for (dest_stream, records) in json_data_by_stream {
-                        // need to get the metadata from the destination node with the same
-                        // stream_params since this is a scheduled
-                        // pipeline, only the destination node can be of stream node.
-                        let mut request_metadata = pipeline
-                            .get_metadata_by_stream_params(&dest_stream)
-                            .map(|meta| {
-                                let mut meta = meta;
-                                meta.insert("is_derived".to_string(), "true".to_string());
-                                cluster_rpc::IngestRequestMetadata { data: meta }
-                            });
-                        if request_metadata.is_none() {
-                            let mut metadata = HashMap::new();
-                            metadata.insert("is_derived".to_string(), "true".to_string());
-                            request_metadata =
-                                Some(cluster_rpc::IngestRequestMetadata { data: metadata });
-                        }
-                        let (org_id, stream_name, stream_type): (String, String, String) = {
-                            (
-                                dest_stream.org_id.into(),
-                                dest_stream.stream_name.into(),
-                                dest_stream.stream_type.to_string(),
-                            )
-                        };
-                        let records_len = records.len();
-
-                        let req = cluster_rpc::IngestionRequest {
-                            org_id: org_id.clone(),
-                            stream_name: stream_name.clone(),
-                            stream_type: stream_type.clone(),
-                            data: Some(cluster_rpc::IngestionData::from(records)),
-                            ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
-                            metadata: request_metadata,
-                        };
-                        match ingestion_service::ingest(req).await {
-                            Ok(resp) if resp.status_code == 200 => {
-                                log::info!(
-                                    "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}, records: {records_len}"
-                                );
-                            }
-                            error => {
-                                let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
-                                log::error!(
-                                    "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to ingest processed results to destination {}/{}/{}, caused by {}",
-                                    pipeline.org,
-                                    pipeline.name,
-                                    org_id,
-                                    stream_name,
-                                    stream_type,
-                                    err
-                                );
-                                ingestion_error_msg = Some(err);
-                                break;
-                            }
-                        };
-                    }
+                    let written =
+                        written_for_window(new_trigger_data.written_destinations.as_ref(), end);
+                    let (error, wrote) = ingest_derived_stream_results(
+                        &pipeline,
+                        json_data_by_stream,
+                        written,
+                        &scheduler_trace_id,
+                    )
+                    .await;
+                    ingestion_error_msg = error;
+                    written_now = wrote;
                 }
 
                 if let Some(err) = ingestion_error_msg {
@@ -6034,15 +5990,26 @@ async fn handle_derived_stream_triggers(
         }
     };
 
+    let advanced = trigger_data_stream.status != RunOutcome::Error;
+    let ledger = next_window_ledger(
+        new_trigger_data.written_destinations.as_ref(),
+        end,
+        &written_now,
+        advanced,
+    );
     // configure next run time before exiting the loop
     // Store the last used derived stream period end time
     if let Some(start_time) = start {
         new_trigger.data = json::to_string(&ScheduledTriggerData {
             // updated start_time as end_time
             period_end_time: Some(start_time),
+            written_destinations: ledger,
             ..Default::default()
         })
         .unwrap();
+    } else if ledger != new_trigger_data.written_destinations {
+        new_trigger_data.written_destinations = ledger;
+        new_trigger.data = new_trigger_data.to_json_string();
     }
 
     // If the trigger has failed and is not at the max retries, no need to update the next
@@ -6226,6 +6193,106 @@ fn next_run_after(
             Some(next_run_at),
         ),
     }
+}
+
+/// Writes destinations not in `written`. [weak: earlier writes stay; a window retry skips them]
+async fn ingest_derived_stream_results(
+    pipeline: &config::meta::pipeline::Pipeline,
+    json_data_by_stream: HashMap<StreamParams, Vec<json::Value>>,
+    written: &[String],
+    scheduler_trace_id: &str,
+) -> (Option<String>, Vec<String>) {
+    let mut first_error = None;
+    let mut wrote = Vec::new();
+    for (dest_stream, records) in json_data_by_stream {
+        let key = destination_key(&dest_stream);
+        if written.contains(&key) {
+            log::info!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream destination {key} already written for this window, skipped"
+            );
+            continue;
+        }
+        // need to get the metadata from the destination node with the same
+        // stream_params since this is a scheduled
+        // pipeline, only the destination node can be of stream node.
+        let mut request_metadata =
+            pipeline
+                .get_metadata_by_stream_params(&dest_stream)
+                .map(|meta| {
+                    let mut meta = meta;
+                    meta.insert("is_derived".to_string(), "true".to_string());
+                    cluster_rpc::IngestRequestMetadata { data: meta }
+                });
+        if request_metadata.is_none() {
+            let mut metadata = HashMap::new();
+            metadata.insert("is_derived".to_string(), "true".to_string());
+            request_metadata = Some(cluster_rpc::IngestRequestMetadata { data: metadata });
+        }
+        let (org_id, stream_name, stream_type): (String, String, String) = (
+            dest_stream.org_id.into(),
+            dest_stream.stream_name.into(),
+            dest_stream.stream_type.to_string(),
+        );
+        let records_len = records.len();
+
+        let req = cluster_rpc::IngestionRequest {
+            org_id: org_id.clone(),
+            stream_name: stream_name.clone(),
+            stream_type: stream_type.clone(),
+            data: Some(cluster_rpc::IngestionData::from(records)),
+            ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+            metadata: request_metadata,
+        };
+        match ingestion_service::ingest(req).await {
+            Ok(resp) if resp.status_code == 200 => {
+                log::info!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}, records: {records_len}"
+                );
+                wrote.push(key);
+            }
+            error => {
+                let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to ingest processed results to destination {}/{}/{}, caused by {}",
+                    pipeline.org,
+                    pipeline.name,
+                    org_id,
+                    stream_name,
+                    stream_type,
+                    err
+                );
+                first_error.get_or_insert(err);
+            }
+        };
+    }
+    (first_error, wrote)
+}
+
+/// The ledger key of a scheduled pipeline's destination stream. [pure]
+fn destination_key(stream: &StreamParams) -> String {
+    format!("{}/{}", stream.stream_type, stream.stream_name)
+}
+
+/// The destinations already written for the window ending at `end`; none for another window. [pure]
+fn written_for_window(ledger: Option<&WindowLedger>, end: i64) -> &[String] {
+    match ledger {
+        Some(ledger) if ledger.end == end => &ledger.destinations,
+        _ => &[],
+    }
+}
+
+/// The ledger a run of the window ending at `end` leaves: none once the window advances. [pure]
+fn next_window_ledger(
+    prior: Option<&WindowLedger>,
+    end: i64,
+    written: &[String],
+    advanced: bool,
+) -> Option<WindowLedger> {
+    if advanced {
+        return None;
+    }
+    let destinations = merge_ledger(written_for_window(prior, end), written);
+    (!destinations.is_empty()).then_some(WindowLedger { end, destinations })
 }
 
 /// Compares full keys, because a parsed key holds only the first part of a name with a slash.

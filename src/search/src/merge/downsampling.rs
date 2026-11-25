@@ -318,8 +318,9 @@ fn get_min_timestamp(record_batch: &RecordBatch) -> i64 {
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Int64Array, RecordBatch, StringArray};
+    use arrow::array::{AsArray, Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{datasource::MemTable, prelude::SessionContext};
 
     use super::*;
 
@@ -426,7 +427,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_downsampling_skips_stale_markers() {
-        use arrow::array::{Float64Array, UInt64Array};
         use config::meta::promql::{DownsamplingRule, Function};
 
         let schema = Arc::new(Schema::new(vec![
@@ -474,7 +474,6 @@ mod tests {
     /// second pass must not change any value.
     #[tokio::test]
     async fn test_downsampling_is_reapplicable() {
-        use arrow::array::{Float64Array, UInt64Array};
         use config::meta::promql::{DownsamplingRule, Function};
 
         let schema = Arc::new(Schema::new(vec![
@@ -524,8 +523,6 @@ mod tests {
         rule: &DownsamplingRule,
         batches: Vec<RecordBatch>,
     ) -> Vec<RecordBatch> {
-        use datafusion::{datasource::MemTable, prelude::SessionContext};
-
         let schema = batches[0].schema();
         let ctx = SessionContext::new();
         let table = MemTable::try_new(schema.clone(), vec![batches]).unwrap();
@@ -539,8 +536,6 @@ mod tests {
     }
 
     fn values_of(batches: &[RecordBatch]) -> Vec<Option<f64>> {
-        use arrow::array::AsArray;
-
         batches
             .iter()
             .flat_map(|batch| {

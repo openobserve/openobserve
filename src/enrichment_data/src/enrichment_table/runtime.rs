@@ -13,13 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 
 use config::{QUERY_WITH_NO_LIMIT, ider, meta::stream::StreamType};
 use infra::db as infra_db;
 use transform::enrichment::{ENRICHMENT_TABLES, StreamTable};
 
-pub async fn watch() -> Result<(), anyhow::Error> {
+/// Keeps `ENRICHMENT_TABLES` in sync, calling `on_put(org, table)` after each local put.
+pub async fn watch<F, Fut>(on_put: F) -> Result<(), anyhow::Error>
+where
+    F: Fn(String, String) -> Fut,
+    Fut: Future<Output = ()>,
+{
     let key = "/enrichment_table/";
     let cluster_coordinator = infra_db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
@@ -73,6 +78,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         data,
                     },
                 );
+                on_put(org_id.to_string(), stream_name.to_string()).await;
             }
             infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
