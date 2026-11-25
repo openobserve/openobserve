@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { parseRawDiff, sizeReasons } from "../src/auto-approve.mjs";
-import { diffFingerprint, fetchDiff, fetchPinnedDiff, hunksLocatable, localDiff, pinDiff, prefixDiffPaths } from "../src/pr-diff.mjs";
+import { diffFingerprint, fetchDiff, fetchPinnedDiff, gitEnvForRun, hunksLocatable, localDiff, pinDiff, prefixDiffPaths, safeGitEnv } from "../src/pr-diff.mjs";
 
 const DIFF = [
   "diff --git a/src/lib.rs b/src/lib.rs",
@@ -309,4 +309,55 @@ test("a changed binary file or trailing space on the last line changes the finge
 test("a file mode change keeps a different fingerprint", () => {
   const d = mode => `diff --git a/l b/l\nindex 1111111..2222222 ${mode}\n--- a/l\n+++ b/l\n@@ -1 +1 @@\n-old-target\n\\ No newline at end of file\n+new-target\n\\ No newline at end of file\n`;
   assert.notEqual(diffFingerprint(d("100644")), diffFingerprint(d("120000")));
+});
+
+// A dry run: the two named commits in the checkout and nothing live.
+test("a dry run diffs the two pinned commits locally and never calls gh", t => {
+  const { dir, base, head } = repoWithCommits(t);
+  const commands = [];
+  const run = (cmd, args, options) => { commands.push(cmd); return execFileSync(cmd, args, { encoding: "utf-8", ...options }); };
+  const result = fetchPinnedDiff({ dryRun: true, repo: "o/r", prNumber: 1, prDir: dir, mergeBase: base, head, run, env: {} });
+  assert.equal(result.pinned, true);
+  assert.match(result.diff, /\+fn a\(\) \{ b\(\) \}/);
+  assert.equal(result.diff.includes("pushed_later"), false, "the commit pushed after the head is not in it");
+  assert.deepEqual([...new Set(commands)], ["git"]);
+  assert.equal(result.diff, localDiff(dir, base, head), "the same diff the pinned CI path takes");
+});
+
+test("a dry run has no live-diff fallback: a missing checkout, a missing or abbreviated SHA, or a failing local diff stops it", t => {
+  const { dir, base, head } = repoWithCommits(t);
+  const calls = [];
+  const run = (cmd, ...rest) => { calls.push(cmd); throw new Error("diff failed"); };
+  const params = { dryRun: true, repo: "o/r", prNumber: 1, prDir: dir, mergeBase: base, head, run };
+  assert.throws(() => fetchPinnedDiff({ ...params, prDir: "" }), /pinned commits/);
+  assert.throws(() => fetchPinnedDiff({ ...params, mergeBase: "" }), /pinned commits/);
+  assert.throws(() => fetchPinnedDiff({ ...params, head: head.slice(0, 12) }), /pinned commits/);
+  assert.throws(() => fetchPinnedDiff({ ...params, head: "main" }), /pinned commits/);
+  assert.throws(() => fetchPinnedDiff({ ...params, head: "--output=/tmp/x".padEnd(40, "0") }), /pinned commits/);
+  assert.deepEqual(calls, [], "nothing ran for an input that is not a full SHA");
+  assert.throws(() => fetchPinnedDiff(params), /diff failed/, "a local diff that fails is an error, not a cue to ask the API");
+  assert.deepEqual(calls, ["git"], "and gh was never tried");
+  // Without dryRun the same failing run asks the API first, then falls back to the local diff, as before.
+  assert.throws(() => fetchPinnedDiff({ ...params, dryRun: false }), /diff failed/);
+  assert.deepEqual(calls.slice(1), ["gh", "git"]);
+});
+
+test("a dry run's git children get an environment without the model key, the trace credential or any token; other runs inherit as before", t => {
+  const secrets = { OPENROUTER_REVIEW_API_KEY: "sk-or-secret", O2_TRACE_AUTH: "Basic x", OPENOBSERVE_AUTH_TOKEN: "Basic y", GH_TOKEN: "ghp_z", HOME: "/h", PATH: "/usr/bin" };
+  assert.deepEqual(safeGitEnv(secrets), { PATH: "/usr/bin", HOME: "/h", LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" });
+  assert.equal(gitEnvForRun({ ...secrets, REVIEW_DRY_RUN: "true" }).OPENROUTER_REVIEW_API_KEY, undefined);
+  assert.deepEqual(Object.keys(gitEnvForRun({ ...secrets, REVIEW_DRY_RUN: "true" })).sort(), ["GIT_TERMINAL_PROMPT", "HOME", "LC_ALL", "PATH"]);
+  assert.equal(gitEnvForRun({ ...secrets, REVIEW_DRY_RUN: "false" }), undefined, "no env of its own: the child inherits, as in production");
+  assert.equal(gitEnvForRun(secrets), undefined);
+  // The pinned diff of a dry run is run with that environment.
+  const { dir, base, head } = repoWithCommits(t);
+  const seen = [];
+  const run = (cmd, args, options) => { seen.push(options?.env); return execFileSync(cmd, args, { encoding: "utf-8", ...options }); };
+  fetchPinnedDiff({ dryRun: true, repo: "o/r", prNumber: 1, prDir: dir, mergeBase: base, head, run });
+  assert.equal(seen.length, 1);
+  assert.deepEqual(Object.keys(seen[0]).sort(), ["GIT_TERMINAL_PROMPT", "HOME", "LC_ALL", "PATH"]);
+  // The CI path, which has no dry run, passes no environment at all.
+  seen.length = 0;
+  pinDiff({ diff: "", prDir: dir, mergeBase: base, head, run });
+  assert.deepEqual(seen, [undefined]);
 });

@@ -674,7 +674,7 @@ pub fn schema_records_to_entries(
 }
 
 /// All streams while the pattern manager is down, else those whose pattern failed to build.
-#[cfg(any(feature = "vectorscan", test))]
+#[cfg(any(feature = "enterprise", test))]
 fn unscannable_streams<'a>(
     streams: &[(&'a str, u64)],
     manager_up: bool,
@@ -688,7 +688,7 @@ fn unscannable_streams<'a>(
 }
 
 /// Each stream plus its pipelines' fixed same-type destinations, with the source's record count.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub async fn with_pipeline_destinations(
     org_id: &str,
     stream_type: StreamType,
@@ -714,7 +714,7 @@ pub async fn with_pipeline_destinations(
 }
 
 /// `ZO_SDR_FAIL_CLOSED`: why a write must be refused before any pipeline runs.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub async fn sdr_fail_closed_refusal(
     org_id: &str,
     stream_type: StreamType,
@@ -762,7 +762,7 @@ pub async fn sdr_fail_closed_refusal(
 }
 
 /// The fail-closed redaction refusal, as opposed to an overload or another resource error.
-#[cfg(any(feature = "vectorscan", test))]
+#[cfg(any(feature = "enterprise", test))]
 pub fn is_sdr_fail_closed_refusal(e: &Error) -> bool {
     matches!(e, Error::ResourceError(reason)
         if config::meta::self_reporting::redaction::is_fail_closed_rejection(reason))

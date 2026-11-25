@@ -18,7 +18,6 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
-#[cfg(feature = "vectorscan")]
 use db::authz::{remove_ownership, set_ownership};
 use infra::table::re_pattern::PatternEntry;
 use openobserve_api_common::extractors::Headers;
@@ -26,9 +25,10 @@ use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[cfg(feature = "vectorscan")]
-use crate::{common::meta::authz::Authz, request::BulkDeleteResponse};
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, request::BulkDeleteRequest};
+use crate::{
+    common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+    request::{BulkDeleteRequest, BulkDeleteResponse},
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct PatternCreateRequest {
@@ -147,45 +147,35 @@ pub async fn save(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<PatternCreateRequest>,
 ) -> Response {
-    #[cfg(feature = "vectorscan")]
-    {
-        use infra::table::{re_pattern::PatternEntry, re_pattern_stream_map::PatternPolicy};
-        use o2_enterprise::enterprise::re_patterns::PatternManager;
+    use infra::table::{re_pattern::PatternEntry, re_pattern_stream_map::PatternPolicy};
+    use o2_enterprise::enterprise::re_patterns::PatternManager;
 
-        if req.name.contains(":") {
-            return MetaHttpResponse::bad_request("Pattern name cannot have ':' in it");
-        }
-
-        let user_id = &user_email.user_id;
-
-        if let Err(e) =
-            PatternManager::test_pattern(req.pattern.clone(), "".to_string(), PatternPolicy::Redact)
-        {
-            return MetaHttpResponse::bad_request(e);
-        }
-
-        match db::re_pattern::add(PatternEntry::new(
-            &org_id,
-            &req.name,
-            &req.description,
-            &req.pattern,
-            user_id,
-        ))
-        .await
-        {
-            Ok(entry) => {
-                set_ownership(&org_id, "re_patterns", Authz::new(&entry.id)).await;
-                MetaHttpResponse::ok("Pattern created successfully")
-            }
-            Err(e) => MetaHttpResponse::bad_request(e),
-        }
+    if req.name.contains(":") {
+        return MetaHttpResponse::bad_request("Pattern name cannot have ':' in it");
     }
-    #[cfg(not(feature = "vectorscan"))]
+
+    let user_id = &user_email.user_id;
+
+    if let Err(e) =
+        PatternManager::test_pattern(req.pattern.clone(), "".to_string(), PatternPolicy::Redact)
     {
-        drop(org_id);
-        drop(user_email);
-        drop(req);
-        MetaHttpResponse::forbidden("not supported")
+        return MetaHttpResponse::bad_request(e);
+    }
+
+    match db::re_pattern::add(PatternEntry::new(
+        &org_id,
+        &req.name,
+        &req.description,
+        &req.pattern,
+        user_id,
+    ))
+    .await
+    {
+        Ok(entry) => {
+            set_ownership(&org_id, "re_patterns", Authz::new(&entry.id)).await;
+            MetaHttpResponse::ok("Pattern created successfully")
+        }
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
@@ -218,39 +208,28 @@ pub async fn save(
     )
 )]
 pub async fn get(Path((org_id, id)): Path<(String, String)>) -> Response {
-    #[cfg(feature = "vectorscan")]
-    {
-        use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
+    use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 
-        match get_pattern_manager().await {
-            Ok(mgr) if mgr.get_pattern_org(&id).as_deref() == Some(org_id.as_str()) => {}
-            Ok(_) => {
-                return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
-            }
-            Err(e) => {
-                return MetaHttpResponse::internal_error(format!(
-                    "Cannot get pattern manager : {e:?}"
-                ));
-            }
+    match get_pattern_manager().await {
+        Ok(mgr) if mgr.get_pattern_org(&id).as_deref() == Some(org_id.as_str()) => {}
+        Ok(_) => {
+            return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
         }
-
-        let pattern = match infra::table::re_pattern::get(&id).await {
-            Ok(Some(k)) => k,
-            Ok(None) => {
-                return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
-            }
-            Err(e) => return MetaHttpResponse::internal_error(e),
-        };
-
-        let res: PatternGetResponse = pattern.into();
-        MetaHttpResponse::json(res)
+        Err(e) => {
+            return MetaHttpResponse::internal_error(format!("Cannot get pattern manager : {e:?}"));
+        }
     }
-    #[cfg(not(feature = "vectorscan"))]
-    {
-        drop(org_id);
-        drop(id);
-        MetaHttpResponse::forbidden("not supported")
-    }
+
+    let pattern = match infra::table::re_pattern::get(&id).await {
+        Ok(Some(k)) => k,
+        Ok(None) => {
+            return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
+        }
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+
+    let res: PatternGetResponse = pattern.into();
+    MetaHttpResponse::json(res)
 }
 
 /// list all patterns for given org
@@ -280,23 +259,15 @@ pub async fn get(Path((org_id, id)): Path<(String, String)>) -> Response {
     )
 )]
 pub async fn list(Path(org_id): Path<String>) -> Response {
-    #[cfg(feature = "vectorscan")]
-    {
-        let patterns = match infra::table::re_pattern::list_by_org(&org_id).await {
-            Ok(list) => list,
-            Err(e) => return MetaHttpResponse::internal_error(e),
-        };
+    let patterns = match infra::table::re_pattern::list_by_org(&org_id).await {
+        Ok(list) => list,
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
 
-        let patterns = patterns.into_iter().map(|p| p.into()).collect::<Vec<_>>();
+    let patterns = patterns.into_iter().map(|p| p.into()).collect::<Vec<_>>();
 
-        let res = PatternListResponse { patterns };
-        MetaHttpResponse::json(res)
-    }
-    #[cfg(not(feature = "vectorscan"))]
-    {
-        drop(org_id);
-        MetaHttpResponse::forbidden("not supported")
-    }
+    let res = PatternListResponse { patterns };
+    MetaHttpResponse::json(res)
 }
 
 /// delete pattern with given id
@@ -322,49 +293,38 @@ pub async fn list(Path(org_id): Path<String>) -> Response {
     )
 )]
 pub async fn delete(Path((org_id, id)): Path<(String, String)>) -> Response {
-    #[cfg(feature = "vectorscan")]
-    {
-        use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
+    use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 
-        let mgr = match get_pattern_manager().await {
-            Ok(m) => m,
-            Err(e) => {
-                return MetaHttpResponse::internal_error(format!(
-                    "Cannot get pattern manager : {e:?}"
-                ));
-            }
-        };
+    let mgr = match get_pattern_manager().await {
+        Ok(m) => m,
+        Err(e) => {
+            return MetaHttpResponse::internal_error(format!("Cannot get pattern manager : {e:?}"));
+        }
+    };
 
-        if mgr.get_pattern_org(&id).as_deref() != Some(org_id.as_str()) {
-            return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
-        }
-        let pattern_usage = mgr.get_pattern_usage(&id);
-        let (pattern_streams, extra) = if pattern_usage.len() > 5 {
-            (
-                &pattern_usage[0..5],
-                format!(" and {} more", pattern_usage.len() - 5),
-            )
-        } else {
-            (&pattern_usage[0..], "".to_string())
-        };
-        if !pattern_usage.is_empty() {
-            return MetaHttpResponse::bad_request(format!(
-                "Cannot delete pattern, associated with {pattern_streams:?}{extra}",
-            ));
-        }
-        match db::re_pattern::remove(&org_id, &id).await {
-            Ok(_) => {
-                remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
-                MetaHttpResponse::ok("Pattern removed successfully")
-            }
-            Err(e) => MetaHttpResponse::internal_error(e),
-        }
+    if mgr.get_pattern_org(&id).as_deref() != Some(org_id.as_str()) {
+        return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
     }
-    #[cfg(not(feature = "vectorscan"))]
-    {
-        drop(org_id);
-        drop(id);
-        MetaHttpResponse::forbidden("not supported")
+    let pattern_usage = mgr.get_pattern_usage(&id);
+    let (pattern_streams, extra) = if pattern_usage.len() > 5 {
+        (
+            &pattern_usage[0..5],
+            format!(" and {} more", pattern_usage.len() - 5),
+        )
+    } else {
+        (&pattern_usage[0..], "".to_string())
+    };
+    if !pattern_usage.is_empty() {
+        return MetaHttpResponse::bad_request(format!(
+            "Cannot delete pattern, associated with {pattern_streams:?}{extra}",
+        ));
+    }
+    match db::re_pattern::remove(&org_id, &id).await {
+        Ok(_) => {
+            remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
+            MetaHttpResponse::ok("Pattern removed successfully")
+        }
+        Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
 
@@ -399,109 +359,98 @@ pub async fn delete_bulk(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<BulkDeleteRequest>,
 ) -> Response {
-    #[cfg(feature = "vectorscan")]
-    {
-        use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
-        use openobserve_core::auth::check_permissions;
+    use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
+    use openobserve_core::auth::check_permissions;
 
-        let user_id = user_email.user_id;
-        let mgr = match get_pattern_manager().await {
-            Ok(m) => m,
-            Err(e) => {
-                return MetaHttpResponse::internal_error(format!(
-                    "Cannot get pattern manager : {e:?}",
-                ));
+    let user_id = user_email.user_id;
+    let mgr = match get_pattern_manager().await {
+        Ok(m) => m,
+        Err(e) => {
+            return MetaHttpResponse::internal_error(
+                format!("Cannot get pattern manager : {e:?}",),
+            );
+        }
+    };
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for id in &req.ids {
+        if !check_permissions(
+            id,
+            &org_id,
+            &user_id,
+            "re_patterns",
+            "DELETE",
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+
+        match mgr.get_pattern_org(id) {
+            None => {
+                unsuccessful.push(id.to_string());
+                err = Some(format!("pattern with id {id} not found in current org"));
+                continue;
             }
-        };
-
-        let mut successful = Vec::with_capacity(req.ids.len());
-        let mut unsuccessful = Vec::with_capacity(req.ids.len());
-        let mut err = None;
-
-        for id in &req.ids {
-            if !check_permissions(
-                id,
-                &org_id,
-                &user_id,
-                "re_patterns",
-                "DELETE",
-                None,
-                false,
-                false,
-                true,
-            )
-            .await
-            {
-                return MetaHttpResponse::forbidden("Unauthorized Access");
-            }
-
-            match mgr.get_pattern_org(id) {
-                None => {
+            Some(v) => {
+                if v != org_id {
                     unsuccessful.push(id.to_string());
                     err = Some(format!("pattern with id {id} not found in current org"));
                     continue;
                 }
-                Some(v) => {
-                    if v != org_id {
-                        unsuccessful.push(id.to_string());
-                        err = Some(format!("pattern with id {id} not found in current org"));
-                        continue;
-                    }
-                }
-            }
-
-            let pattern_usage = mgr.get_pattern_usage(id);
-            let (pattern_streams, extra) = if pattern_usage.len() > 5 {
-                (
-                    &pattern_usage[0..5],
-                    format!(" and {} more", pattern_usage.len() - 5),
-                )
-            } else {
-                (&pattern_usage[0..], "".to_string())
-            };
-            if !pattern_usage.is_empty() {
-                unsuccessful.push(id.to_string());
-                err = Some(format!(
-                    "Cannot delete pattern, associated with {pattern_streams:?}{extra}"
-                ));
-            }
-        }
-        if !unsuccessful.is_empty() {
-            return MetaHttpResponse::json(BulkDeleteResponse {
-                successful,
-                unsuccessful,
-                err,
-            });
-        }
-
-        for id in req.ids {
-            match db::re_pattern::remove(&org_id, &id).await {
-                Ok(_) => {
-                    remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
-                    successful.push(id);
-                }
-                Err(e) => {
-                    log::error!("error while deleting pattern {org_id}/{id} : {e}");
-                    unsuccessful.push(id);
-                    err = Some(e.to_string());
-                }
             }
         }
 
-        MetaHttpResponse::json(BulkDeleteResponse {
+        let pattern_usage = mgr.get_pattern_usage(id);
+        let (pattern_streams, extra) = if pattern_usage.len() > 5 {
+            (
+                &pattern_usage[0..5],
+                format!(" and {} more", pattern_usage.len() - 5),
+            )
+        } else {
+            (&pattern_usage[0..], "".to_string())
+        };
+        if !pattern_usage.is_empty() {
+            unsuccessful.push(id.to_string());
+            err = Some(format!(
+                "Cannot delete pattern, associated with {pattern_streams:?}{extra}"
+            ));
+        }
+    }
+    if !unsuccessful.is_empty() {
+        return MetaHttpResponse::json(BulkDeleteResponse {
             successful,
             unsuccessful,
             err,
-        })
+        });
     }
 
-    #[cfg(not(feature = "vectorscan"))]
-    {
-        drop(org_id);
-        drop(user_email);
-        drop(req);
-        MetaHttpResponse::forbidden("not supported")
+    for id in req.ids {
+        match db::re_pattern::remove(&org_id, &id).await {
+            Ok(_) => {
+                remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
+                successful.push(id);
+            }
+            Err(e) => {
+                log::error!("error while deleting pattern {org_id}/{id} : {e}");
+                unsuccessful.push(id);
+                err = Some(e.to_string());
+            }
+        }
     }
+
+    MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    })
 }
 
 /// update the pattern for given id
@@ -536,45 +485,29 @@ pub async fn update(
     Path((org_id, id)): Path<(String, String)>,
     Json(req): Json<PatternCreateRequest>,
 ) -> Response {
-    #[cfg(feature = "vectorscan")]
-    {
-        use infra::table::re_pattern_stream_map::PatternPolicy;
-        use o2_enterprise::enterprise::re_patterns::{PatternManager, get_pattern_manager};
+    use infra::table::re_pattern_stream_map::PatternPolicy;
+    use o2_enterprise::enterprise::re_patterns::{PatternManager, get_pattern_manager};
 
-        match get_pattern_manager().await {
-            Ok(mgr) if mgr.get_pattern_org(&id).as_deref() == Some(org_id.as_str()) => {}
-            Ok(_) => {
-                return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
-            }
-            Err(e) => {
-                return MetaHttpResponse::internal_error(format!(
-                    "Cannot get pattern manager : {e:?}"
-                ));
-            }
+    match get_pattern_manager().await {
+        Ok(mgr) if mgr.get_pattern_org(&id).as_deref() == Some(org_id.as_str()) => {}
+        Ok(_) => {
+            return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
         }
-
-        match PatternManager::test_pattern(
-            req.pattern.clone(),
-            "".to_string(),
-            PatternPolicy::Redact,
-        ) {
-            Ok(_) => {}
-            Err(e) => return MetaHttpResponse::bad_request(e),
-        }
-
-        // we can be fairly certain that in db we have proper json
-
-        match db::re_pattern::update(&id, &req.pattern).await {
-            Ok(_) => MetaHttpResponse::ok("Pattern updated successfully"),
-            Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => {
+            return MetaHttpResponse::internal_error(format!("Cannot get pattern manager : {e:?}"));
         }
     }
-    #[cfg(not(feature = "vectorscan"))]
-    {
-        drop(org_id);
-        drop(id);
-        drop(req);
-        MetaHttpResponse::forbidden("not supported")
+
+    match PatternManager::test_pattern(req.pattern.clone(), "".to_string(), PatternPolicy::Redact) {
+        Ok(_) => {}
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    }
+
+    // we can be fairly certain that in db we have proper json
+
+    match db::re_pattern::update(&id, &req.pattern).await {
+        Ok(_) => MetaHttpResponse::ok("Pattern updated successfully"),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
@@ -609,42 +542,34 @@ pub async fn update(
     )
 )]
 pub async fn test(Json(req): Json<PatternTestRequest>) -> Response {
-    #[cfg(feature = "vectorscan")]
-    {
-        use infra::table::re_pattern_stream_map::PatternPolicy;
-        use o2_enterprise::enterprise::re_patterns::PatternManager;
+    use infra::table::re_pattern_stream_map::PatternPolicy;
+    use o2_enterprise::enterprise::re_patterns::PatternManager;
 
-        let pattern = req.pattern;
-        let inputs = req.test_records;
-        // Default to Redact if policy not specified for backward compatibility
-        let policy = req.policy.as_deref().unwrap_or("Redact");
-        // Strict here: a lossy coercion would preview a redaction the caller did not ask for.
-        let policy = match PatternPolicy::parse_strict(policy) {
-            Ok(policy) => policy,
-            Err(e) => return MetaHttpResponse::bad_request(format!("invalid policy: {e}")),
-        };
+    let pattern = req.pattern;
+    let inputs = req.test_records;
+    // Default to Redact if policy not specified for backward compatibility
+    let policy = req.policy.as_deref().unwrap_or("Redact");
+    // Strict here: a lossy coercion would preview a redaction the caller did not ask for.
+    let policy = match PatternPolicy::parse_strict(policy) {
+        Ok(policy) => policy,
+        Err(e) => return MetaHttpResponse::bad_request(format!("invalid policy: {e}")),
+    };
 
-        let mut ret = Vec::with_capacity(inputs.len());
-        for i in inputs {
-            match PatternManager::test_pattern(pattern.clone(), i, policy) {
-                Ok(v) => {
-                    ret.push(v);
-                }
-                Err(e) => {
-                    return MetaHttpResponse::bad_request(format!(
-                        "Error in testing pattern for input : {e}"
-                    ));
-                }
+    let mut ret = Vec::with_capacity(inputs.len());
+    for i in inputs {
+        match PatternManager::test_pattern(pattern.clone(), i, policy) {
+            Ok(v) => {
+                ret.push(v);
+            }
+            Err(e) => {
+                return MetaHttpResponse::bad_request(format!(
+                    "Error in testing pattern for input : {e}"
+                ));
             }
         }
+    }
 
-        MetaHttpResponse::json(PatternTestResponse { results: ret })
-    }
-    #[cfg(not(feature = "vectorscan"))]
-    {
-        drop(req);
-        MetaHttpResponse::forbidden("not supported")
-    }
+    MetaHttpResponse::json(PatternTestResponse { results: ret })
 }
 
 /// Get built-in patterns from GitHub (pyWhat)
