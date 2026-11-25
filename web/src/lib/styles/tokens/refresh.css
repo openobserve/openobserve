@@ -331,7 +331,7 @@
   --color-field-hover-border: var(--color-input-border-hover);
 
   /* Switch and checkbox */
-  --color-switch-track-on: var(--color-accent);
+  --color-switch-track-on: var(--color-button-primary);
   --color-switch-track-off: var(--color-border-control);
   --color-checkbox-bg: var(--color-surface-raised);
   --color-checkbox-border: var(--color-border-control);
