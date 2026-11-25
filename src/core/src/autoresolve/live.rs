@@ -799,7 +799,11 @@ impl Loaded {
         self.state().filter(RunState::is_terminal)?;
         Some(AutoResolveOutcome {
             verdict: run.outcome_verdict.clone(),
-            system_summary: evidence::system_summary(&self.steps, run.prior_verdict.as_deref()),
+            system_summary: evidence::system_summary(
+                &self.steps,
+                run.prior_verdict.as_deref(),
+                evidence::cannot_act(&run.state, run.plan.as_deref()),
+            ),
             explanation: run.outcome_explanation.clone(),
             error: run.error.clone(),
             prior_verdict: run.prior_verdict.clone(),

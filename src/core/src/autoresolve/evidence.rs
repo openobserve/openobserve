@@ -19,7 +19,7 @@
 use std::collections::BTreeMap;
 
 use config::meta::autoresolve::{
-    AUTORESOLVE_RUNS_STREAM, RunState, StepState, Verdict, name_list, redacted_text,
+    AUTORESOLVE_RUNS_STREAM, PlanInput, RunState, StepState, Verdict, name_list, redacted_text,
 };
 use infra::table::entity::{autoresolve_runs, autoresolve_steps};
 use sea_orm::ConnectionTrait;
@@ -29,6 +29,8 @@ use crate::ingestion::feature_writer::{self, FeatureWriter, GrpcTransport};
 
 /// One long tool name must not crowd the other steps out of a Slack line.
 const MAX_NAME_CHARS: usize = 60;
+const CANNOT_ACT: &str = "None of this run's MCPs can do this, so nothing was changed.";
+const CANNOT_ACT_AFTER_STEPS: &str = "None of this run's MCPs can do what is still needed.";
 
 /// The step rows are the record, so a failed write is only logged. `result_raw` and the
 /// connection fingerprint never leave the row.
@@ -40,12 +42,17 @@ pub(crate) async fn write_step(
     write_record(org, step_record(run, step)).await;
 }
 
-/// "2 of 3 approved steps ran: a and b. Failed: c.", naming failed, held and not-run steps.
+/// "2 of 3 approved steps ran: a and b. Failed: c.", naming failed, held and not-run steps;
+/// `cannot_act` says no MCP of the run could make the fix its last plan needed.
 pub(crate) fn system_summary(
     steps: &[autoresolve_steps::Model],
     prior_verdict: Option<&str>,
+    cannot_act: bool,
 ) -> String {
     let approved = approved_steps(steps);
+    if cannot_act && approved.is_empty() {
+        return CANNOT_ACT.to_string();
+    }
     let named: Vec<_> = counted_names(&approved)
         .into_iter()
         .zip(approved.iter().map(|s| outcome_label(s)))
@@ -79,10 +86,22 @@ pub(crate) fn system_summary(
             parts.push(format!("{label}: {}.", name_list(&group)));
         }
     }
+    if cannot_act {
+        parts.push(CANNOT_ACT_AFTER_STEPS.to_string());
+    }
     if prior_verdict == Some(Verdict::Worse.as_str()) {
         parts.push("An earlier attempt in this run made things worse.".to_string());
     }
     parts.join(" ")
+}
+
+/// A run that ended `no_change` on a plan with no option, only a missing capability.
+pub(crate) fn cannot_act(state: &str, plan: Option<&str>) -> bool {
+    if state != RunState::NoChange.as_str() {
+        return false;
+    }
+    plan.and_then(|p| serde_json::from_str::<PlanInput>(p).ok())
+        .is_some_and(|p| p.options.is_empty() && p.missing_capability.is_some())
 }
 
 pub(crate) async fn finish_run(org: &str, run_id: &str) {
@@ -116,7 +135,8 @@ pub(crate) async fn finish_run_with<C: ConnectionTrait>(conn: &C, org: &str, run
             return;
         }
     };
-    let summary = system_summary(&steps, run.prior_verdict.as_deref());
+    let cannot = cannot_act(&run.state, run.plan.as_deref());
+    let summary = system_summary(&steps, run.prior_verdict.as_deref(), cannot);
     write_record(org, run_end_record(&run, &summary)).await;
 }
 
@@ -331,6 +351,7 @@ mod tests {
             (
                 "all done",
                 None,
+                false,
                 vec![
                     step(1, a, 1, "create_branch", Done),
                     step(1, a, 2, "open_pull_request", Done),
@@ -342,6 +363,7 @@ mod tests {
             (
                 "step 2 failed",
                 None,
+                false,
                 vec![
                     step(1, a, 1, "create_branch", Done),
                     step(1, a, 2, "open_pull_request", Failed),
@@ -359,6 +381,7 @@ mod tests {
             (
                 "one held",
                 None,
+                false,
                 vec![
                     step(1, a, 1, "create_branch", Done),
                     step(1, a, 2, "open_pull_request", Superseded),
@@ -378,6 +401,7 @@ mod tests {
             (
                 "hold then declined",
                 None,
+                false,
                 [
                     held_rev1(),
                     vec![
@@ -398,6 +422,7 @@ mod tests {
             (
                 "hold then re-approved",
                 None,
+                false,
                 [
                     held_rev1(),
                     vec![
@@ -414,6 +439,7 @@ mod tests {
             (
                 "revert after worse",
                 Some("worse"),
+                false,
                 vec![
                     step(1, a, 1, "create_branch", Done),
                     step(1, a, 2, "open_pull_request", Done),
@@ -430,6 +456,7 @@ mod tests {
             (
                 "declined unapproved",
                 None,
+                false,
                 vec![
                     unapproved(step(1, a, 1, "create_branch", NotRun)),
                     unapproved(step(1, a, 2, "merge", NotRun)),
@@ -440,6 +467,7 @@ mod tests {
             (
                 "same tool twice",
                 None,
+                false,
                 vec![
                     step(1, a, 1, "restart_pod", Done),
                     step(1, a, 2, "restart_pod", Done),
@@ -450,13 +478,34 @@ mod tests {
             (
                 "zero steps",
                 None,
+                false,
                 vec![],
                 vec!["No", "steps"],
                 vec![" of ", ":"],
             ),
+            (
+                "no option: no MCP can make the fix",
+                None,
+                true,
+                vec![unapproved(step(1, a, 1, "analyze_table", Superseded))],
+                vec!["None of this run's MCPs can do this, so nothing was changed."],
+                vec!["No approved steps ran", "analyze table"],
+            ),
+            (
+                "no option after an earlier fix ran",
+                None,
+                true,
+                vec![step(1, a, 1, "restart_pod", Done)],
+                vec![
+                    "1 of 1",
+                    "restart pod",
+                    "None of this run's MCPs can do what is still needed.",
+                ],
+                vec!["nothing was changed"],
+            ),
         ];
-        for (label, prior, rows, present, absent) in cases {
-            let summary = system_summary(&rows, prior);
+        for (label, prior, cannot_act, rows, present, absent) in cases {
+            let summary = system_summary(&rows, prior, cannot_act);
             for word in present {
                 assert!(
                     summary.contains(word),
@@ -466,6 +515,28 @@ mod tests {
             for word in absent {
                 assert!(!summary.contains(word), "{label}: {word:?} in {summary:?}");
             }
+        }
+    }
+
+    #[test]
+    fn only_a_no_change_end_on_a_plan_without_an_option_cannot_act() {
+        let option = json!({"title": "analyze orders", "recommended": true,
+            "changes_production_directly": true, "tradeoffs": "", "reason": "", "steps": []});
+        let plan = |options: Value, missing: Option<&str>| {
+            json!({"options": options, "omitted_count": 0, "omitted_reason": null,
+                "missing_capability": missing})
+            .to_string()
+        };
+        let vacuum = Some("VACUUM public.orders");
+        #[rustfmt::skip]
+        let cases = [
+            ("no option, a missing capability", "no_change", Some(plan(json!([]), vacuum)), true),
+            ("the model's answer, no plan", "no_change", None, false),
+            ("a plan with an option", "no_change", Some(plan(json!([option]), vacuum)), false),
+            ("its replan failed", "failed", Some(plan(json!([]), vacuum)), false),
+        ];
+        for (label, state, plan, want) in cases {
+            assert_eq!(cannot_act(state, plan.as_deref()), want, "{label}");
         }
     }
 }
