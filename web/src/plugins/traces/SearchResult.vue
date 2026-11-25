@@ -300,16 +300,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="$emit('run-sql', matchAllFix.sql)"
             />
           </template>
-          <template v-if="aiEnabled" #extra>
+          <template v-if="$slots['ai-door']" #extra>
             <div class="flex justify-center">
-              <OButton
-                variant="ghost"
-                size="sm"
-                data-test="traces-sql-match-all-ask-ai-btn"
-                @click="$emit('ask-ai')"
-              >
-                {{ t("queryError.askAi") }}
-              </OButton>
+              <slot name="ai-door" />
             </div>
           </template>
         </OEmptyState>

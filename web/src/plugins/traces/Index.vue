@@ -319,7 +319,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @open-group="onOpenGroup"
                         @update:scope="onScopeChange"
                         @update:groupBy="onGroupByChange"
-                      />
+                      >
+                        <template #ai-door>
+                          <AiEntryButton v-bind="tracesErrorDoor" appearance="chip" />
+                        </template>
+                      </SearchResult>
                     </div>
                   </div>
                 </template>
