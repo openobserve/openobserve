@@ -106,4 +106,17 @@ describe("usePatterns partial warning", () => {
     expect(patternsState.value.errorStatus).toBe(400);
     expect(patternsState.value.error).toBe("Search stream not found");
   });
+
+  it("prefers the error detail over the generic message", async () => {
+    vi.mocked(patternsService.extractPatterns).mockRejectedValue({
+      response: {
+        status: 400,
+        data: { message: "Search SQL not valid", error_detail: "Field 'x' not found" },
+      },
+    });
+    await expect(
+      usePatterns(((k: string) => k) as never).extractPatterns("org", "s", {} as never),
+    ).rejects.toBeDefined();
+    expect(patternsState.value.error).toBe("Field 'x' not found");
+  });
 });

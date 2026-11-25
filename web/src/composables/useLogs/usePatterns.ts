@@ -172,7 +172,9 @@ export default function usePatterns(t: TranslateFn) {
       patternsState.value.error =
         error?.response?.status === 403
           ? t("search.patternsNoReadPermission")
-          : error?.response?.data?.message || t("search.errorExtractingPatterns");
+          : error?.response?.data?.error_detail ||
+            error?.response?.data?.message ||
+            t("search.errorExtractingPatterns");
       throw error;
     } finally {
       if (isLatest()) {
