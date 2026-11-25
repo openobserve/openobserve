@@ -4530,7 +4530,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         0 => 100,
         v => v,
     }
-    .saturating_mul(1024 * 1024);
+    .saturating_mul(SIZE_IN_MB as usize);
     cfg.limit.sourcemap_file_max_size = match cfg.limit.sourcemap_file_max_size {
         0 => 50,
         v => v,
