@@ -728,6 +728,7 @@ mod tests {
         TIMESTAMP_COL_NAME,
         meta::promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
     };
+    use datafusion::arrow::datatypes::Field;
 
     use super::*;
     use crate::ingestion::get_write_partition_key;
@@ -741,7 +742,6 @@ mod tests {
     }
 
     fn value_schema(value_type: Option<DataType>) -> SchemaCache {
-        use datafusion::arrow::datatypes::Field;
         let mut fields = vec![Field::new(NAME_LABEL, DataType::Utf8, true)];
         if let Some(value_type) = value_type {
             fields.push(Field::new(VALUE_LABEL, value_type, true));

@@ -491,6 +491,8 @@ mod tests {
         array::{BooleanArray, Int64Array, RecordBatch, StringArray},
         datatypes::{DataType, Field, Schema},
     };
+    use datafusion::prelude::{ParquetReadOptions, SessionContext};
+    use parquet::arrow::ArrowWriter;
 
     use super::*;
 
@@ -1106,8 +1108,6 @@ mod tests {
     }
     #[tokio::test]
     async fn mindex_size_dump_legacy_null_and_mixed_parquet_roundtrip() {
-        use datafusion::prelude::{ParquetReadOptions, SessionContext};
-        use parquet::arrow::ArrowWriter;
         let old = create_test_record_batch();
         assert!(
             record_batch_to_file_record(old.clone())

@@ -19,9 +19,13 @@ use std::{
 };
 
 use config::TIMESTAMP_COL_NAME;
-use sqlparser::ast::{
-    BinaryOperator, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr,
-    Query, SelectItem, SetExpr, Statement, TableFactor, Visitor,
+use sqlparser::{
+    ast::{
+        BinaryOperator, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArguments,
+        GroupByExpr, Query, SelectItem, SetExpr, Statement, TableFactor, Visitor,
+    },
+    dialect::GenericDialect,
+    parser::Parser,
 };
 
 use super::utils::get_object_name_value;
@@ -846,8 +850,6 @@ impl Visitor for CacheAggregationVisitor {
 
 /// Returns whether the SQL matches a supported streaming-aggregation pattern.
 pub fn matches_streaming_aggregate_pattern(sql: &str) -> Result<bool, String> {
-    use sqlparser::{dialect::GenericDialect, parser::Parser};
-
     let dialect = GenericDialect {};
     let mut statements =
         Parser::parse_sql(&dialect, sql).map_err(|e| format!("Parse error: {e}"))?;

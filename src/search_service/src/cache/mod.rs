@@ -1321,11 +1321,12 @@ fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::sea
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
+
     use super::*;
 
     #[tokio::test]
     async fn test_prepare_histogram_response_ordering() {
-        use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
         let org_id = "histogram_response_ordering";
@@ -1416,7 +1417,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_prepare_skips_queries_not_ordered_by_time() {
-        use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
         let org_id = "ranked_order_eligibility";
@@ -1505,7 +1505,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_prepare_needs_time_column_and_time_splittable_sql() {
-        use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
         let org_id = "time_split_eligibility";
@@ -1637,7 +1636,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_prepare_writes_only_when_mode_and_query_allow_it() {
-        use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
         let org_id = "cache_mode_write_gate";
