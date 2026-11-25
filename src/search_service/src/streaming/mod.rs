@@ -844,6 +844,13 @@ pub async fn process_search_stream_request(
             log::info!(
                 "[HTTP2_STREAM trace_id {trace_id}] No logs accumulated for pattern extraction"
             );
+            if let Some(patterns) = execution::empty_partial_patterns(&accumulated_results) {
+                let _ = sender
+                    .send(Ok(
+                        config::meta::search::StreamResponses::PatternExtractionResult { patterns },
+                    ))
+                    .await;
+            }
         }
     }
 

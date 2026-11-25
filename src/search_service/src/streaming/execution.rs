@@ -620,6 +620,25 @@ pub(super) fn tag_partial_extraction(
     }
 }
 
+#[cfg(feature = "enterprise")]
+/// An empty Patterns body carrying the partial reasons, so a window cut or failed slice is
+/// not lost when the surviving slices returned no rows. None when nothing was partial.
+pub(super) fn empty_partial_patterns(
+    results: &[SearchResultType],
+) -> Option<config::utils::json::Value> {
+    let mut body = serde_json::json!({
+        "patterns": [],
+        "statistics": {
+            "total_logs_analyzed": 0,
+            "total_patterns_found": 0,
+            "coverage_percentage": 0.0,
+            "extraction_time_ms": 0
+        }
+    });
+    tag_partial_extraction(&mut body, results);
+    body.get("is_partial").is_some().then_some(body)
+}
+
 /// Get partitions for search
 pub async fn get_partitions(
     trace_id: &str,
@@ -1106,6 +1125,18 @@ mod tests {
         assert!(r.is_partial);
         assert_eq!(r.function_error, vec!["clamped".to_string()]);
         assert_eq!((r.new_start_time, r.new_end_time), (Some(5), Some(9)));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_empty_partial_patterns_keeps_warning_without_rows() {
+        let mut r = slice_with(0);
+        apply_range_warning(&mut r, "clamped", 5, 9);
+        let body = empty_partial_patterns(&[SearchResultType::Search(r)]).unwrap();
+        assert_eq!(body["is_partial"], true);
+        assert_eq!(body["function_error"][0], "clamped");
+        assert_eq!(body["patterns"].as_array().unwrap().len(), 0);
+        assert!(empty_partial_patterns(&[SearchResultType::Search(slice_with(0))]).is_none());
     }
 
     #[test]
