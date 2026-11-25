@@ -110,6 +110,11 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
 
+    // Report folders from the Reports specs; they stay empty once the reports above are gone.
+    await pm.apiCleanup.cleanupReportFolders(
+      ['test_folder_a_', 'test_folder_b_', 'test_special_chars_', 'test_folder_sched_', 'bulk_test_folder_', 'cancel_folder_']
+    );
+
     // Clean up all dashboards owned by automation user
     // This includes: Joins_Test_* (dashboard joins parallel tests), and other test dashboards
     await pm.apiCleanup.cleanupDashboards();

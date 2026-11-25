@@ -849,6 +849,12 @@ class APICleanup {
                 }
             });
 
+            // The by-name endpoint only sees the default folder, so a report moved elsewhere is deleted by id.
+            if (response.status === 404) {
+                const moved = (await this.fetchReports()).find(r => r.name === reportName && r.report_id);
+                if (moved) return await this.deleteReportById(moved.report_id);
+            }
+
             if (!response.ok) {
                 testLogger.error('Failed to delete report', { reportName, status: response.status });
                 return { code: response.status, message: 'Failed to delete report' };
@@ -858,6 +864,23 @@ class APICleanup {
             return result;
         } catch (error) {
             testLogger.error('Failed to delete report', { reportName, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    async deleteReportById(reportId) {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/reports/${reportId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': this.authHeader }
+            });
+            if (!response.ok) {
+                testLogger.error('Failed to delete report by id', { reportId, status: response.status });
+                return { code: response.status, message: 'Failed to delete report' };
+            }
+            return await response.json();
+        } catch (error) {
+            testLogger.error('Failed to delete report by id', { reportId, error: error.message });
             return { code: 500, error: error.message };
         }
     }

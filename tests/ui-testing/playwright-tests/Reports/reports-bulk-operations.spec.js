@@ -1,11 +1,13 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const APICleanup = require('../../pages/apiCleanup.js');
 const { createDashboardViaApi } = require('../../pages/dashboardPages/dashCreation.js');
 const { createDashboardReportViaApi } = require('../../pages/reportsPages/reportCreation.js');
 
 const timestamp = Date.now();
 const BULK_FOLDER = `bulk_test_folder_${timestamp}`;
+const CANCEL_FOLDER = `cancel_folder_${timestamp}`;
 const REPORT_1 = `bulk_report_1_${timestamp}`;
 const REPORT_2 = `bulk_report_2_${timestamp}`;
 const REPORT_3 = `bulk_report_3_${timestamp}`;
@@ -121,10 +123,8 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.clickFolderTab('default');
     await pm.reportFoldersPage.expectReportNotVisibleInTable(`${REPORT_1}_move`);
 
-    // Cleanup
     await pm.apiCleanup.deleteReport(`${REPORT_1}_move`);
     await pm.apiCleanup.deleteReport(`${REPORT_2}_move`);
-    await pm.reportFoldersPage.deleteFolderIfExists(BULK_FOLDER);
   });
 
   test("P1: Bulk delete selected reports with confirmation", {
@@ -188,9 +188,8 @@ test.describe("Report Bulk Operations", () => {
     tag: ['@reportBulkOps', '@edge', '@P2']
   }, async ({ page }) => {
     testLogger.info('Creating test folder and report');
-    const cancelFolder = `cancel_folder_${timestamp}`;
-    await pm.reportFoldersPage.createFolder(cancelFolder);
-    await pm.reportFoldersPage.expectFolderTabVisible(cancelFolder);
+    await pm.reportFoldersPage.createFolder(CANCEL_FOLDER);
+    await pm.reportFoldersPage.expectFolderTabVisible(CANCEL_FOLDER);
 
     const r1 = await createReport(`${REPORT_1}_cancel_move`);
     if (!r1.success) {
@@ -211,22 +210,25 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.clickFolderTab('default');
     await pm.reportFoldersPage.expectReportVisibleInTable(`${REPORT_1}_cancel_move`);
 
-    // Cleanup
     await pm.apiCleanup.deleteReport(`${REPORT_1}_cancel_move`);
-    await pm.reportFoldersPage.deleteFolderIfExists(cancelFolder);
   });
 
-  // ===== CLEANUP =====
-
-  test("Cleanup: Remove the dashboard this spec created", {
-    tag: ['@reportBulkOps', '@cleanup']
-  }, async ({ page }) => {
-    const dashboards = await pm.apiCleanup.fetchDashboardsInFolder('default');
-    const ourDashboards = dashboards.filter(d => d.title && d.title.startsWith(DASH_PREFIX));
-    for (const dash of ourDashboards) {
-      await pm.apiCleanup.deleteDashboard(dash.dashboard_id, dash.folder_id || 'default');
+  // afterAll runs even when a serial test fails, so a failed run still removes its folders, reports and dashboard.
+  test.afterAll(async () => {
+    const apiCleanup = new APICleanup();
+    // Reports go first: a folder that still holds one cannot be deleted, and dropping its dashboard orphans it.
+    const reports = await apiCleanup.fetchReports();
+    for (const report of (reports || []).filter(r => r.name && r.name.startsWith('bulk_report_'))) {
+      const result = await apiCleanup.deleteReport(report.name);
+      testLogger.info(`Deleted/already gone test report: ${report.name} (${result.code})`);
+    }
+    // A folder left behind is removed by the next run's pre-run cleanup, so it must not fail this run's last test.
+    await apiCleanup.cleanupReportFolders(['bulk_test_folder_', 'cancel_folder_'])
+      .catch(e => testLogger.warn(`Report folder cleanup incomplete: ${e.message}`));
+    const dashboards = await apiCleanup.fetchDashboardsInFolder('default');
+    for (const dash of dashboards.filter(d => d.title && d.title.startsWith(DASH_PREFIX))) {
+      await apiCleanup.deleteDashboard(dash.dashboard_id, dash.folder_id || 'default');
       testLogger.info(`Deleted test dashboard: ${dash.title}`);
     }
-    testLogger.info('Cleanup completed');
   });
 });

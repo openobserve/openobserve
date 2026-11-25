@@ -8,6 +8,8 @@ const SHIFT_SUFFIX = ' (10 Minutes ago)';
 
 test.describe('Metrics editor — PromQL time shift', () => {
   test.beforeAll(async ({ request }) => {
+    // The seed waits up to 4 min for the back-filled rows to flush.
+    test.setTimeout(330_000);
     await seedTimeShiftMetric(request);
   });
 
@@ -29,16 +31,18 @@ test.describe('Metrics editor — PromQL time shift', () => {
     await pm.dashboardPanelConfigs.addTimeShift();
     await pm.dashboardPanelConfigs.setTimeShiftOffset(0, 10, 'm');
 
-    await pm.metricsPage.clickApplyButton();
-    await pm.metricsPage.waitForMetricsResults();
-
     let names = [];
-    await expect
-      .poll(async () => (names = await pm.dashboardPanelActions.getChartSeriesNames()), {
-        timeout: 30000,
-        message: 'the editor chart should draw a shifted series',
-      })
-      .toContainEqual(expect.stringMatching(/ \(10 Minutes ago\)$/));
+    // A run that reached the back-filled window before it was readable never redraws, so each retry re-runs the query.
+    await expect(async () => {
+      await pm.metricsPage.clickApplyButton();
+      await pm.metricsPage.waitForMetricsResults();
+      await expect
+        .poll(async () => (names = await pm.dashboardPanelActions.getChartSeriesNames()), {
+          timeout: 20000,
+          message: 'the editor chart should draw a shifted series',
+        })
+        .toContainEqual(expect.stringMatching(/ \(10 Minutes ago\)$/));
+    }).toPass({ timeout: 90000, intervals: [2000] });
     testLogger.info('Editor time-shift series', { names });
 
     // Every shifted series has its current twin, and nothing else is shifted.
