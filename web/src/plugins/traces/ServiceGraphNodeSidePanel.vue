@@ -1933,13 +1933,10 @@ export default defineComponent({
     };
 
     // Reset correlation data when node changes
-    watch(
-      () => props.selectedNode?.id,
-      () => {
-        correlationData.value = null;
-        correlationError.value = null;
-      },
-    );
+    watch([() => props.selectedNode?.id, () => props.streamFilter], () => {
+      correlationData.value = null;
+      correlationError.value = null;
+    });
 
     // The latest span only enriches the metric chips, so a failed read degrades to no span.
     const fetchLatestSpan = async (): Promise<Record<string, any> | null> => {
@@ -1964,9 +1961,10 @@ export default defineComponent({
     const correlateSelectedService = async () => {
       const node = props.selectedNode;
       const serviceName = node?.name || node?.label || node?.id || "";
-      const [latestSpan] = await Promise.all([fetchLatestSpan(), loadOrgSemanticGroups()]);
       const org = store.state.selectedOrganization.identifier;
       const base = { source_stream: props.streamFilter || "default", source_type: "traces" };
+      const { startTime, endTime } = props.timeRange;
+      const [latestSpan] = await Promise.all([fetchLatestSpan(), loadOrgSemanticGroups()]);
       if (node?.service_type) {
         const response = await correlateStreams(org, {
           ...base,
@@ -1986,8 +1984,8 @@ export default defineComponent({
         available_dimensions: dimensions,
         source_dimensions: dimensions,
         resolve_from_source: true,
-        start_time: props.timeRange.startTime,
-        end_time: props.timeRange.endTime,
+        start_time: startTime,
+        end_time: endTime,
       });
       return { data: response.data, latestSpan };
     };
@@ -2910,6 +2908,17 @@ export default defineComponent({
       },
       // A tab restored from the route may see no later dependency change, e.g. Metrics after a failed schema read.
       { immediate: true },
+    );
+
+    // Correlation reads the window's latest span, so a new window needs a new answer.
+    watch(
+      () => [props.timeRange.startTime, props.timeRange.endTime],
+      () => {
+        correlationData.value = null;
+        metricsCorrelationLoaded.value = false;
+        if (props.visible && props.streamFilter !== "all" && activeTab.value === "metrics")
+          fetchMetricsCorrelation();
+      },
     );
 
     // Declared before discovery so the reset runs first; one source per value, so a refreshed row of the same node keeps its tab.

@@ -1065,6 +1065,23 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
     });
 
+    it("asks again for the Metrics tab when the time range changes", async () => {
+      wrapper = mountPanel({ streamFilter: "otel_demo" });
+      await flushPromises();
+      (wrapper.vm as any).activeTab = "metrics";
+      await flushPromises();
+      vi.mocked(correlateStreams).mockClear();
+
+      const later = { startTime: NOW, endTime: NOW + 3_600_000_000 };
+      await wrapper.setProps({ timeRange: later });
+      await flushPromises();
+
+      expect(correlateStreams).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({ start_time: later.startTime, end_time: later.endTime }),
+      );
+    });
+
     it("opens the log stream named like the source stream before other matches", async () => {
       vi.mocked(correlateStreams).mockResolvedValue({
         data: {
