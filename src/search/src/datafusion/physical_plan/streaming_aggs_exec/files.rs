@@ -237,7 +237,9 @@ pub fn get_record_batches(
         let mut options = RecordBatchOptions::new();
         options = options.with_row_count(Some(batch.num_rows()));
         let batch = RecordBatch::try_new_with_options(schema.clone(), new_columns, &options)
-            .expect("Failed to re-create the record batch");
+            .map_err(|e| {
+                std::io::Error::other(format!("cached file does not match the schema: {e}"))
+            })?;
 
         batches.push(batch);
     }
@@ -510,8 +512,9 @@ pub fn get_aggregation_cache_key_from_request(
     histogram_interval: Option<i64>,
     redaction_digest: Option<&str>,
 ) -> u64 {
-    // Keep UTC entries separate from caches written before timezone eligibility was enforced.
-    let mut hash_body = vec!["aggregation-v2".to_string(), req.sql.clone()];
+    // Bump whenever cached partial states can change shape, e.g. on a DataFusion upgrade:
+    // files are read back by column position and an older layout no longer lines up.
+    let mut hash_body = vec!["aggregation-v3".to_string(), req.sql.clone()];
     // `histogram(_timestamp)` buckets by the time range, so equal SQL can hold different buckets.
     if let Some(interval) = histogram_interval {
         hash_body.push(format!("histogram_interval={interval}"));
@@ -534,7 +537,7 @@ pub fn get_aggregation_cache_key_from_request(
 #[cfg(test)]
 mod tests {
     use arrow::{
-        array::{BinaryArray, Int32Array, ListArray, StringArray, StructArray},
+        array::{BinaryArray, Float64Array, Int32Array, ListArray, StringArray, StructArray},
         buffer::OffsetBuffer,
         datatypes::{Fields, Schema},
     };
@@ -624,6 +627,30 @@ mod tests {
 
         let _ = std::fs::remove_file(&path);
         assert!(ret.is_err(), "invalid IPC file was accepted");
+    }
+
+    #[test]
+    fn test_get_record_batches_rejects_older_state_layout() {
+        let old = Arc::new(Schema::new(vec![Field::new("p", DataType::Float64, true)]));
+        let batch = RecordBatch::try_new(
+            old.clone(),
+            vec![Arc::new(Float64Array::from(vec![Some(1.0)]))],
+        )
+        .unwrap();
+        let data = serialize_record_batches(old, vec![Arc::new(batch)]).unwrap();
+        let key = "aggregations/org_a/logs/older_layout/0_1.arrow";
+        let path = disk::get_file_path(key).unwrap();
+        std::fs::create_dir_all(Path::new(&path).parent().unwrap()).unwrap();
+        std::fs::write(&path, data).unwrap();
+        let new = Arc::new(Schema::new(vec![
+            Field::new("p", DataType::Float64, true),
+            Field::new("percentile", DataType::Float64, true),
+        ]));
+
+        let ret = get_record_batches("older_layout", key, new);
+
+        let _ = std::fs::remove_file(&path);
+        assert!(ret.is_err(), "a file with fewer state columns was accepted");
     }
 
     #[test]
