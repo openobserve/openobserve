@@ -279,6 +279,10 @@ async fn send_test_request(
             (res, OutboundOutcome::Status(status.as_u16()))
         }
         Err(e) => {
+            // A connect-time or redirect refusal surfaces as a plain connect or redirect error.
+            if let Some(refusal) = config::utils::ssrf_guard::find_ssrf_refusal(&e) {
+                return failed(refusal.to_string(), OutboundOutcome::Blocked);
+            }
             let (error, outcome) = if e.is_timeout() {
                 (
                     "The destination did not respond in time",
@@ -1090,15 +1094,11 @@ mod tests {
         (serde_json::from_slice(&bytes).unwrap(), target)
     }
 
-    /// What a destination test returns for a GET to a local server that answers `status_line`
-    /// with the body `secret`, and the server's origin.
-    async fn tested_secret_server(
-        status_line: &str,
-    ) -> (serde_json::Value, Option<OutboundAudit>, String) {
+    /// The port of a local server that answers every request with `reply`.
+    async fn local_server(reply: String) -> u16 {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
-        let reply = format!("HTTP/1.1 {status_line}\r\nContent-Length: 6\r\n\r\nsecret");
         tokio::spawn(async move {
             while let Ok((mut sock, _)) = listener.accept().await {
                 let mut buf = [0u8; 4096];
@@ -1106,6 +1106,18 @@ mod tests {
                 let _ = sock.write_all(reply.as_bytes()).await;
             }
         });
+        port
+    }
+
+    /// What a destination test returns for a GET to a local server that answers `status_line`
+    /// with the body `secret`, and the server's origin.
+    async fn tested_secret_server(
+        status_line: &str,
+    ) -> (serde_json::Value, Option<OutboundAudit>, String) {
+        let port = local_server(format!(
+            "HTTP/1.1 {status_line}\r\nContent-Length: 6\r\n\r\nsecret"
+        ))
+        .await;
         let (res, target) = tested(format!("http://user:pw@127.0.0.1:{port}/x?token=abc")).await;
         (res, target, format!("http://127.0.0.1:{port}"))
     }
@@ -1160,6 +1172,31 @@ mod tests {
                 );
                 let (_, target) = tested(String::new()).await;
                 assert_eq!(target, None, "an empty URL calls nothing");
+            },
+        );
+    }
+
+    #[test]
+    fn a_guard_refusal_after_the_first_check_is_recorded_as_blocked() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_guard_refusal_after_the_first_check_is_recorded_as_blocked"
+            ),
+            &[&[("ZO_SSRF_ALLOW_LOOPBACK", "true")]],
+            || async {
+                let port = local_server(
+                    "HTTP/1.1 302 Found\r\nLocation: http://169.254.169.254/latest\r\n\
+                     Content-Length: 0\r\n\r\n"
+                        .to_string(),
+                )
+                .await;
+                let (res, target) = tested(format!("http://127.0.0.1:{port}/")).await;
+                assert_eq!(res["success"], false, "{res}");
+                assert_eq!(
+                    target,
+                    Some(OutboundAudit(format!("http://127.0.0.1:{port} blocked")))
+                );
             },
         );
     }

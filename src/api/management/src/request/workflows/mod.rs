@@ -1596,7 +1596,8 @@ fn reached_destinations(
     outputs: &HashMap<String, Vec<Value>>,
 ) -> Vec<(String, OutboundOutcome)> {
     let mut reached = Vec::new();
-    for node in nodes {
+    // A disabled node passes its records through as output without sending them.
+    for node in nodes.iter().filter(|node| !node.is_disabled) {
         let NodeData::Destination(destination) = &node.data else {
             continue;
         };
@@ -1666,6 +1667,11 @@ mod tests {
             node("err", dest("d-err")),
             node("unreached", dest("d-unreached")),
             node("unset", dest("")),
+            serde_json::from_value(serde_json::json!({
+                "id": "disabled", "data": dest("d-disabled"), "position": {"x": 0, "y": 0},
+                "io_type": "output", "is_disabled": true,
+            }))
+            .unwrap(),
         ];
         let errors = HashMap::from([(
             "err".to_string(),
@@ -1675,6 +1681,7 @@ mod tests {
             ("trigger".to_string(), vec![Value::Null]),
             ("ok".to_string(), vec![Value::Null]),
             ("unset".to_string(), vec![Value::Null]),
+            ("disabled".to_string(), vec![Value::Null]),
         ]);
         assert_eq!(
             reached_destinations(&nodes, &errors, &outputs),
