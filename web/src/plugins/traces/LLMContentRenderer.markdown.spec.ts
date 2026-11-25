@@ -167,6 +167,16 @@ describe.each([
     },
   );
 
+  it.each(["<br>", "<img src='https://example.com/image.png'>"])(
+    "keeps quoted pre-block terminators and %s inside unknown tags literal",
+    (markup) => {
+      const content = `<instructions title="</pre>\n${markup}">unknown</instructions>`;
+      const message = renderMessage(`<pre>${content}</pre>`);
+      expect(message.querySelector("pre")?.textContent).toBe(content);
+      expect(message.querySelector("br, img, instructions")).toBeNull();
+    },
+  );
+
   it("keeps indented HTML examples as code outside HTML blocks", () => {
     const content = "<table><tr><td>Alice</td></tr></table>";
     const message = renderMessage(`<div>before</div>\n\n    ${content}`);

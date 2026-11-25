@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { Marked } from "marked";
+import { Marked, Tokenizer } from "marked";
 import DOMPurify from "dompurify";
 import { SAFE_HTML_TAGS } from "@/utils/safeHtml";
 
@@ -24,20 +24,32 @@ function startsWithSafeTag(source: string): boolean {
   return !!name && safeHtmlTags.has(name.toLowerCase());
 }
 
-function escapeUnknownTags(html: string): string {
+function replaceUnknownTags(html: string, replace: (tag: string) => string): string {
   // Match quoted attributes with their outer tag so embedded markup stays literal.
   return html.replace(
     /<\/?([a-zA-Z][\w:-]*)(?=[\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*>/g,
-    (tag, name: string) =>
-      safeHtmlTags.has(name.toLowerCase()) ? tag : tag.replace(/</g, "&lt;").replace(/>/g, "&gt;"),
+    (tag, name: string) => (safeHtmlTags.has(name.toLowerCase()) ? tag : replace(tag)),
   );
+}
+
+function escapeUnknownTags(html: string): string {
+  return replaceUnknownTags(html, (tag) => tag.replace(/</g, "&lt;").replace(/>/g, "&gt;"));
 }
 
 const markdown = new Marked({
   gfm: true,
   breaks: false,
   // Unknown wrappers use inline parsing so their Markdown still renders.
-  tokenizer: { html: (source) => (startsWithSafeTag(source) ? false : undefined) },
+  tokenizer: {
+    html(source) {
+      if (!startsWithSafeTag(source)) return;
+      // Mask complete unknown tags without shifting offsets or exposing quoted block terminators.
+      const masked = replaceUnknownTags(source, (tag) => "x".repeat(tag.length));
+      const token = Tokenizer.prototype.html.call(this, masked);
+      if (token) token.raw = token.text = source.slice(0, token.raw.length);
+      return token;
+    },
+  },
   renderer: {
     html: ({ text }) => escapeUnknownTags(text),
     // Marked skips text escaping inside raw pre/code elements.
