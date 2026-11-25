@@ -12,7 +12,7 @@ recurring class of bug or drift in this codebase.
 
 **What.** The top of any routed view or module screen (title + icon + actions,
 optionally peer tabs and a back button) is rendered by `OPageHeader`, never a
-hand-rolled `<div class="header">…<h1>…` or a bespoke `q-toolbar`.
+hand-rolled `<div class="header">…<h1>…` or a bespoke toolbar row.
 
 ```vue
 <script setup lang="ts">

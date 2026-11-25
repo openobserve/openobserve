@@ -6,6 +6,7 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 
 - [OBadge](#obadge)
 - [OTag](#otag)
+- [OBetaBadge](#obetabadge) — the one Beta / Alpha tag
 - [ODimensionChip](#odimensionchip)
 - [OCard](#ocard)
 - [OCardSection](#ocardsection)
@@ -54,6 +55,26 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 ```
 
 **Family:** Rendered internally by `OTag`. Standalone otherwise.
+
+---
+
+### OBetaBadge
+
+**Import:** `@/lib/core/Badge/OBetaBadge.vue`
+
+The only way to mark a feature as beta or alpha: page titles (`#title-trail` or inside the title
+line), nav items (`OSidebarItem :beta`), tabs, cards and feature lists. One look everywhere: a
+16px-tall pill, `text-2xs` medium, sentence case, accent-tinted (`bg-accent/12 text-selected-fg`),
+`leading-none` so it centres on any label line.
+
+| Prop | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `stage` | `"beta" \| "alpha"` | `"beta"` | Text and default `data-test` (`beta-badge` / `alpha-badge`) |
+
+- No size or colour props, and do not restyle it with classes: layout classes only (`shrink-0`,
+  `max-md:hidden`, a margin). A host can override `data-test` through attrs.
+- Never spell "Beta" with `OBadge` / `OTag` / a text span; the `featureFlag` badge group has no
+  `beta` value for this reason.
 
 ---
 

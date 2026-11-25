@@ -26,7 +26,7 @@ Pick by **persistence** and **whether the thing is data that is still loading**:
 | Situation                                                                                                  | Use                              | Why                                                                |
 | ---------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------ |
 | Persistent message that stays inline in the layout (validation summary, config hint, inline error/insight) | **OBanner**                      | Sits in the flow, does not auto-dismiss, semantic variant colors   |
-| Transient popup confirming an action or reporting a background result ("Saved", "Query failed")            | **Toast** (`useToast().toast()`) | Auto-dismisses, floats over app, replaces `q-notify`               |
+| Transient popup confirming an action or reporting a background result ("Saved", "Query failed")            | **Toast** (`useToast().toast()`) | Auto-dismisses, floats over app                                     |
 | A whole container/panel is loading and you want to dim it with a centered spinner overlay                  | **OInnerLoading**                | Absolute overlay over a `relative` parent; blocks the region       |
 | Content whose _shape_ is known but not yet loaded (rows, cards, avatars)                                   | **OSkeleton**                    | Placeholder that mimics final layout — less jarring than a spinner |
 | A small, bare inline "working…" indicator (inside a button, next to text, an AI typing state)              | **OSpinner**                     | Just the spinner, no overlay, no layout                            |
@@ -154,7 +154,7 @@ Sizing is done with utility classes on the element (it renders a `span`) — set
 - Provider: `@/lib/feedback/Toast/OToastProvider.vue`
 - Composable: `import { useToast } from "@/lib/feedback/Toast/useToast"` (also exports a bare `toast` for use outside the Vue tree — services, `main.ts`)
 
-**Use when:** You need a transient, floating notification confirming an action or reporting a background result. This is the O2 replacement for `q-notify`.
+**Use when:** You need a transient, floating notification confirming an action or reporting a background result. 
 **Don't use for:** Persistent inline messages tied to a spot in the layout — use [OBanner](#obanner).
 
 **Setup — mount the provider once at the app root.** `OToastProvider` reads a module-level singleton store, so it must appear exactly once near the top of the app; every `toast()` call anywhere renders through it.

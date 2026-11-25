@@ -29,7 +29,7 @@ rule 7 has its own [references/responsive.md](references/responsive.md) —
 read it once, it is the backbone of everything below.
 
 1. **Every page/module header is `OPageHeader`** — never a hand-rolled
-   `<div class="header">…<h1>` or a `q-toolbar`. One header contract keeps the
+   `<div class="header">…<h1>` or a bespoke toolbar row. One header contract keeps the
    title in the same place across list → detail → edit. Peer/section tabs need
    **`tabs-below`** (the slot alone renders them inline beside the title), and the
    header `icon` must be the SAME `IconName` the page's nav entry declares. The
@@ -151,6 +151,8 @@ read it once, it is the backbone of everything below.
      Default to `text-sm` for body. Go smaller only for genuinely dense/secondary UI,
      larger only for titles. If a design needs a size not on the scale, snap to the
      nearest step — do **not** reintroduce an arbitrary `text-[..]`.
+   - **Type roles, weights and icon size/stroke/colour** are fixed per role in
+     [references/typography-and-icons.md](references/typography-and-icons.md) — pick by role.
    - **Casing — never uppercase anywhere in the app, except an established short
      form.** This is app-wide and strict. No shouting: don't bake caps into a string
      (`"FIRST APPEARED AT {time}"`, `"NEW TO THIS LIST"`) and don't force it with the
@@ -489,17 +491,25 @@ read it once, it is the backbone of everything below.
      `max-md:hidden` + `md:hidden` kebab mirror with `<data-test>-menu` items.
    - **The table footer is never hand-built.** `OTable` draws the one bar every
      list shares: the pager on the end edge and, on the start edge, nothing —
-     unless rows are selected (the "N of M selected" count plus the page's bulk
-     actions from `#selection-actions`) or the page has something the pager cannot
-     say (`#footer-note`). There is no total label; the pager's "x – y of z" is the
-     count. Below md the count and actions take a row above the pager and a note
+     unless the page has something the pager cannot say (`#footer-note`). There
+     is no total label; the pager's "x – y of z" is the count. Below md a note
      takes its own row; a note whose root is `max-md:hidden` leaves no row.
+   - **Bulk actions appear at the top.** While rows are selected, `OTable` covers
+     its toolbar with an accent-tinted selection bar: "N of M selected", the
+     page's `#selection-actions` buttons and "Clear selection".
    - **Nothing clipped, nothing hover-only.** Popups use library components and
      `min(<w>, calc(100vw - 1.5rem))` widths; an `h-full` pane beside a stacked
      sibling gets `max-md:h-auto max-md:min-h-0`; hover-revealed controls get
      `max-md:opacity-100`.
    - **Verify** at 375 / 360 / 768 / 1280 in the in-app browser, and at 1280 compare
      against main — identical is the bar.
+
+## The finalized look
+
+The shell, toolbars, toggles, menus, sidebar and badges follow
+[references/visual-system.md](references/visual-system.md); buttons carry
+icons per [references/buttons-and-icons.md](references/buttons-and-icons.md)
+(one verb, one glyph). Read both before styling any control.
 
 ## Structural decisions
 
@@ -692,7 +702,8 @@ considering the UI done:
       (`:persist-columns` + `table-id` + a `hideable` column). Non-essential
       columns hidden by default via `:column-visibility`.
 - [ ] **The table footer is `OTable`'s, never hand-built** — bulk actions on
-      selected rows are in `#selection-actions` (the buttons only: no wrapper, no
+      selected rows are in `#selection-actions`, which `OTable` shows in its
+      selection bar above the table (the buttons only: no wrapper, no
       `v-if` on the selection length, no margin/height/padding classes, every
       button `size="sm"`, a destructive action last, no count in a label); a line
       the pager cannot say (a cap, partial data, "filtered x of y") is in

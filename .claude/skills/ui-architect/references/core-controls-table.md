@@ -500,26 +500,29 @@ arrow, the rows re-order, and the order is wrong.
 
 **Always supply `#error` when `error` can be set.** Without the slot, OTable falls back to a solid red banner carrying the raw server string — a different failure look on every page. Use `<template #error="{ message }"><OEmptyState preset="load-error" :description="raw(message)" @action="onRefresh()" /></template>`, with Retry wired to the page's own refresh handler.
 
-**Main slots:** `cell` (scoped `{ row, column, value, table }`), `top`, `toolbar` (inside the frame, above header), `toolbar-trailing`, `header-actions`, `selection-actions` (bulk-action buttons for the footer), `footer-note` (a footer line the pager cannot say), `pagination-bar` (a caller-drawn pager, scoped with pagination state/actions), `loading`, `loading-banner`, `empty`, `error` (`{ message }`), `expansion` (`{ row }`), `tree-warning` (`{ row }`)
+**Main slots:** `cell` (scoped `{ row, column, value, table }`), `top`, `toolbar` (inside the frame, above header), `toolbar-trailing`, `header-actions`, `selection-actions` (bulk-action buttons for the selection bar above the table), `footer-note` (a footer line the pager cannot say), `pagination-bar` (a caller-drawn pager, scoped with pagination state/actions), `loading`, `loading-banner`, `empty`, `error` (`{ message }`), `expansion` (`{ row }`), `tree-warning` (`{ row }`)
 
-#### Footer
+#### Selection bar and footer
+
+**Bulk actions sit at the top, never in the footer.** While rows are selected
+and `#selection-actions` is provided, `OTable` draws its selection bar above the
+table in the accent tint (`bg-selected-bg` / `text-selected-fg`): "N of M
+selected", a divider, the slot, and a "Clear selection" action on the end edge. M
+is `data.length` in client mode and `totalCount` in server mode, with a `+` when
+`totalCountExact` is false; when N exceeds M the text is "N selected". With a
+`#toolbar` the bar covers the toolbar row (the toolbar stays mounted, so search
+and filters keep their state and the rows do not move); without one it takes its
+own row above the header. It works with any `pagination` mode and never renders
+while the table is cold-loading.
 
 **A footer is never hand-built.** Every paginated `OTable` draws the same bar, the
-same one-row height in every state: the pager ("Showing x – y of z", page size,
-page buttons) on the end edge, and on the start edge the first of these that
-applies — otherwise nothing, not even a wrapper:
-
-1. **Rows selected and `#selection-actions` provided** → "N of M selected", a
-   divider, then the slot. M is `data.length` in client mode and `totalCount` in
-   server mode, with a `+` when `totalCountExact` is false; when N exceeds M the
-   text is "N selected".
-2. **`#footer-note` provided** → the note, in the bar's small secondary text, in
-   the width left of the pager.
-
-Neither renders while the table is loading, and both live in the built-in bar:
-with `pagination="none"` or a `#pagination-bar` there is no bar, so they render
-nothing. There is **no total label** — the `footerTitle` prop and the bare row
-count are gone, and so are `#bottom` and `customPaginationBar`.
+same one-row height in every state: the pager (range, page size, page buttons)
+on the end edge, and on the start edge the `#footer-note` when provided —
+otherwise nothing, not even a wrapper. The note does not render while the table
+is loading, and it lives in the built-in bar: with `pagination="none"` or a
+`#pagination-bar` there is no bar, so it renders nothing. There is **no total
+label** — the `footerTitle` prop and the bare row count are gone, and so are
+`#bottom` and `customPaginationBar`.
 
 - **`#selection-actions`** takes the bulk-action buttons and nothing else: no
   wrapper, no `v-if` on the selection length, no margin / height / padding
@@ -537,11 +540,11 @@ count are gone, and so are `#bottom` and `customPaginationBar`.
   (`TableRenderer.vue`) needs it — a list page never does.
 
 The slot content adds no padding, height or typography: the bar owns all three.
-Below md the count and actions take a full row above the pager and a note takes
-its own row. A leftover `#bottom` fails `npm run type-check:app`; because vue-tsc
+Below md the selection bar wraps onto extra rows and a note takes its own row
+under the pager. A leftover `#bottom` fails `npm run type-check:app`; because vue-tsc
 never reads a `// @ts-nocheck` file, `OTable.callSites.spec.ts` also scans every
 SFC for the removed `#bottom`, `footer-title` and `custom-pagination-bar`, and for
-footer slots on a table without the built-in bar (`pagination="none"` or
+a `#footer-note` on a table without the built-in bar (`pagination="none"` or
 `#pagination-bar`).
 
 **Exposed (template ref):** `table` (TanStack instance), `toggleAllRows`, `clearSelection`, `resetColumnSizes`, `resetColumnOrder`, `resetPersistedColumns`, `scrollToTop`, `getRows`
@@ -599,7 +602,7 @@ const columns: OTableColumnDef[] = [
       </template>
     </template>
 
-    <!-- The footer shows "N of M selected" and these buttons only while rows are selected. -->
+    <!-- The selection bar above the table shows "N of M selected" and these buttons only while rows are selected. -->
     <template #selection-actions>
       <OButton variant="outline" size="sm" icon-left="download" @click="exportSelected">
         {{ t("common.export") }}

@@ -12,7 +12,7 @@ markup — don't guess a prop name.
 
 | File                                                        | Covers                                                                                                                                                                                                              |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [references/core-display.md](core-display.md)               | Badge/Tag/DimensionChip, Card, Code, Collapsible, EmptyState, Icon, Separator, Shortcut, **Text (typography)**, **TruncatedText (cut text)**, VirtualScroll                                                         |
+| [references/core-display.md](core-display.md)               | Badge/Tag/DimensionChip/BetaBadge, Card, Code, Collapsible, EmptyState, Icon, Separator, Shortcut, **Text (typography)**, **TruncatedText (cut text)**, VirtualScroll                                                         |
 | [references/core-controls-table.md](core-controls-table.md) | **Button**/ButtonGroup, Navbar, RefreshButton, Splitter, ToggleGroup, **Table** (+ cell renderers)                                                                                                                  |
 | [references/forms-inputs.md](forms-inputs.md)               | Input/Textarea, Select, Combobox, SearchInput, Checkbox, Radio, Switch, OptionGroup                                                                                                                                 |
 | [references/forms-specialized.md](forms-specialized.md)     | **Form + useOForm**, Color, Date, DateTimeRange, Time, File, Range, Slider                                                                                                                                          |
@@ -39,6 +39,7 @@ markup — don't guess a prop name.
 | Show a page/module header                            | `OPageHeader` (rule 1)                                                                                               | —                       |
 | Render tabular data                                  | `OTable` + `OTableColumnDef[]`                                                                                       | core-controls-table     |
 | Show a status label / count / tag                    | `OBadge`, `OTag`, `ODimensionChip`                                                                                   | core-display            |
+| Mark a feature as beta / alpha                       | `OBetaBadge` (`stage="alpha"` for alpha) — never an `OBadge`/`OTag` spelled "Beta", never restyled with classes       | core-display            |
 | Group content in a surface                           | `OCard` (+ `OCardSection`, `OCardActions`)                                                                           | core-display            |
 | Body / heading / muted text                          | `OText` (pick the `variant`)                                                                                         | core-display            |
 | Text that may not fit (cut with "…")                 | `OTruncatedText` — full text on hover only when cut; `:tooltip="false"` for secrets / text shown elsewhere           | **core-display**        |
@@ -76,7 +77,7 @@ markup — don't guess a prop name.
 | Multi-step wizard                                    | `OStepper` (+ `OStep`)                                                                                               | overlay-navigation      |
 | Paginate a list                                      | `OPagination`                                                                                                        | overlay-navigation      |
 | Persistent inline message                            | `OBanner`                                                                                                            | feedback-data           |
-| Transient notification (replaces `q-notify`)         | `useToast()` (+ `OToastProvider` at root)                                                                            | feedback-data           |
+| Transient notification                               | `useToast()` (+ `OToastProvider` at root)                                                                            | feedback-data           |
 | Loading state                                        | `OSkeleton` (placeholder) / `OSpinner` (bare) / `OInnerLoading` (over a container)                                   | feedback-data           |
 | Progress indicator                                   | `OProgressBar`                                                                                                       | feedback-data           |
 | Segmented proportion / capacity bar with ticks       | `OSegmentedBar`                                                                                                      | feedback-data           |
