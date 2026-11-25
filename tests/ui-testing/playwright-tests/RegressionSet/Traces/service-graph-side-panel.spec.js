@@ -102,8 +102,10 @@ test.describe('Service Graph Side Panel Regression', () => {
 
     expect(descRatios, 'second click must reverse the latency order')
       .toEqual([...descRatios].sort((a, b) => b - a));
-    expect(descOperations, 'descending rows must be the ascending rows reversed')
-      .toEqual([...ascOperations].reverse());
+    // Rows with the same latency keep their order in both directions, so the rows are compared as pairs, not reversed.
+    const pairs = (operations, ratios) => operations.map((operation, i) => `${ratios[i]} ${operation}`).sort();
+    expect(pairs(descOperations, descRatios), 'each operation must keep its own latency when the order flips')
+      .toEqual(pairs(ascOperations, ascRatios));
   });
 
   test('Operations table exposes request, error and latency columns', {
