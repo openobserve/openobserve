@@ -318,6 +318,11 @@ function createLogsAutoRun() {
       obj.loadingProgressPercentage = 0;
       obj.loadingHistogramProgressPercentage = 0;
     },
+    resetHistogramLoading: () => {
+      const obj = searchObj();
+      obj.loadingHistogram = false;
+      obj.loadingHistogramProgressPercentage = 0;
+    },
     clearResults: () => {
       if (skipClearResults) return;
       const data = searchObj().data;

@@ -108,6 +108,8 @@ export const DEFAULT_LOGS_CONFIG = {
   },
   meta: {
     logsVisualizeToggle: "logs" as const,
+    // Drill down picks; the dashboard remounts on every search and reads them back.
+    drillDownDimensions: null as string[] | null,
     buildModeQueryEditorDisabled: false, // true when in build mode and customQuery is false
     // One-shot hand-off of a saved view's builder chart to BuildQueryPage; not persisted.
     savedBuildConfig: null as any,

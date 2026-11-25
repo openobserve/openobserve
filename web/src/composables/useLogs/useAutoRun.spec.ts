@@ -186,6 +186,7 @@ function makeHarness(options: HarnessOptions = {}) {
   const abortTrace = vi.fn();
   const serverCancel = vi.fn(async (_orgId: string, _ids: string[]) => undefined);
   const resetLoading = vi.fn();
+  const resetHistogramLoading = vi.fn();
   const rearmRefresh = vi.fn();
   const clearResults = vi.fn();
   const log = vi.fn();
@@ -204,6 +205,7 @@ function makeHarness(options: HarnessOptions = {}) {
     abortTrace,
     serverCancel: options.serverCancel === false ? undefined : serverCancel,
     resetLoading,
+    resetHistogramLoading,
     rearmRefresh,
     clearResults,
     readPanelConfigSignature: () => panelConfigSignature(state.panelConfig, signatureOf(live)),
@@ -235,6 +237,7 @@ function makeHarness(options: HarnessOptions = {}) {
     abortTrace,
     serverCancel,
     resetLoading,
+    resetHistogramLoading,
     rearmRefresh,
     clearResults,
     log,
@@ -776,6 +779,29 @@ describe("failure and child lifecycle (round 2)", () => {
     expect(h.store.meta.executed?.complete).toBe(false);
     expect(h.store.meta.runOutcome?.logs).toBe("partial");
     expect(h.engine.canPersistOrShare("logs").ok).toBe(false);
+  });
+
+  it("a full run that replaces one still waiting on its histogram clears the stale histogram loading", () => {
+    const h = makeHarness();
+    h.engine.requestRun("run");
+    h.engine.registerTrace(h.lastGen(), "hist-a", "histogram");
+
+    h.engine.requestRun("run");
+
+    expect(h.abortTrace).toHaveBeenCalledWith("hist-a");
+    expect(h.resetHistogramLoading).toHaveBeenCalledTimes(1);
+    expect(h.resetLoading).not.toHaveBeenCalled();
+  });
+
+  it("a page change that adopts the in-flight histogram keeps its loading state", () => {
+    const h = makeHarness();
+    h.engine.requestRun("run");
+    h.engine.registerTrace(h.lastGen(), "hist-a", "histogram");
+
+    h.engine.requestRun("pagination");
+
+    expect(h.abortTrace).not.toHaveBeenCalledWith("hist-a");
+    expect(h.resetHistogramLoading).not.toHaveBeenCalled();
   });
 
   it("a rejection from a replaced generation leaves the new one untouched", async () => {

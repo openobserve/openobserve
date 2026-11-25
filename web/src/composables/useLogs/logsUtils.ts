@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { isOffsetOnlyLimit } from "@/utils/logs/sqlOffset";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { b64EncodeUnicode, useLocalLogFilterField } from "@/utils/zincutils";
@@ -43,6 +44,7 @@ import {
   DEFAULT_ROWS_PER_PAGE,
   VIEW_STATE_PARAMS,
   bindLogsUrlRouter,
+  currentLogsQuery,
   encodeColumns,
   shownEntryFor,
   shownSearch,
@@ -318,7 +320,10 @@ export const logsUtils = () => {
    */
   const isLimitQuery = (parsedSQL: ExtendedParsedSQLResult | null = null): boolean => {
     const limit = getOuterLimit(parsedSQL);
-    return Boolean(limit?.value && Array.isArray(limit.value) && limit.value.length > 0);
+    return (
+      Boolean(limit?.value && Array.isArray(limit.value) && limit.value.length > 0) &&
+      !isOffsetOnlyLimit(limit)
+    );
   };
 
   /**
@@ -602,6 +607,15 @@ export const logsUtils = () => {
       query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
     }
 
+    if (
+      searchObj.meta.logsVisualizeToggle === "drilldown" &&
+      Array.isArray(searchObj.meta.drillDownDimensions)
+    ) {
+      query["drilldown_dims"] = searchObj.meta.drillDownDimensions
+        .map(encodeURIComponent)
+        .join(",");
+    }
+
     // Preserve visualization data in URL
     // - If in visualize mode and panel data is provided, encode the dashboardPanelData
     if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
@@ -667,14 +681,14 @@ export const logsUtils = () => {
     if (!isLogsRoute()) return;
     const query = generateURLQuery(false, dashboardPanelData, buildPanelData);
     dropTransientType(query);
-    const writeMode = mode === "auto" ? urlWriteMode(router.currentRoute.value.query, query) : mode;
+    const writeMode = mode === "auto" ? urlWriteMode(currentLogsQuery(), query) : mode;
     return writeLogsUrl(writeMode, query);
   };
 
   const patchUrlViewState = (dashboardPanelData: any = null, buildPanelData: any = null) => {
     if (!isLogsRoute()) return;
     const next = generateURLQuery(false, dashboardPanelData, buildPanelData);
-    const query: any = { ...router.currentRoute.value.query };
+    const query: any = { ...currentLogsQuery() };
     dropTransientType(query);
     for (const key of VIEW_STATE_PARAMS) {
       if (key in next) query[key] = next[key];

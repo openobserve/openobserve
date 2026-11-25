@@ -808,7 +808,11 @@ pub async fn process_search_stream_request(
                 Ok(patterns_response) => {
                     // Convert to JSON and send
                     match config::utils::json::to_value(&patterns_response) {
-                        Ok(patterns_json) => {
+                        Ok(mut patterns_json) => {
+                            execution::tag_partial_extraction(
+                                &mut patterns_json,
+                                &accumulated_results,
+                            );
                             log::info!(
                                 "[HTTP2_STREAM trace_id {trace_id}] Sending {} patterns",
                                 patterns_response.patterns.len()
