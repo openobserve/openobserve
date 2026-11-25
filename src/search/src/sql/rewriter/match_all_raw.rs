@@ -48,14 +48,14 @@ impl VisitorMut for MatchAllRawVisitor {
 
 #[cfg(test)]
 mod tests {
-    use sqlparser::{ast::VisitMut, dialect::GenericDialect};
+    use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
 
     use super::*;
 
     #[test]
     fn test_match_all_raw1() {
         let sql = "SELECT * FROM t WHERE match_all_raw('test')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -69,7 +69,7 @@ mod tests {
     fn test_match_all_raw2() {
         let sql =
             "SELECT * FROM t WHERE match_all_raw_ignore_case('test') group by name order by name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -82,7 +82,7 @@ mod tests {
     #[test]
     fn test_match_all_raw3() {
         let sql = "SELECT t1.name, t2.name from t1 join t2 on t1.name = t2.name where match_all_raw('capture') group by t1.name, t2.name order by t1.name, t2.name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn test_match_all_raw4() {
         let sql = "SELECT match_all_raw_ignore_case('fine') from t1";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -108,7 +108,7 @@ mod tests {
     #[test]
     fn test_match_all_raw5() {
         let sql = "SELECT match_all_raw('fine') from t1";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();

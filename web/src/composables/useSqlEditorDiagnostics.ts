@@ -57,6 +57,8 @@ interface Options {
    * When provided, the composable watches it and forwards ranges to the editor.
    */
   externalErrors?: Ref<SqlErrorRange[]>;
+  /** Page checks on SQL that parses, run on blur in SQL mode only. */
+  sqlChecks?: (query: string) => SqlErrorRange[];
 }
 
 export function useSqlEditorDiagnostics({
@@ -65,6 +67,7 @@ export function useSqlEditorDiagnostics({
   query,
   streamName,
   externalErrors,
+  sqlChecks,
 }: Options) {
   // ── Push ranges into Monaco ──────────────────────────────────────────────────
   function pushToEditor(ranges: SqlErrorRange[]) {
@@ -151,7 +154,7 @@ export function useSqlEditorDiagnostics({
       range = await validateSql(prefix + q, 0, prefix.length);
     }
 
-    const ranges = range ? [range] : [];
+    const ranges = range ? [range] : sqlMode.value && sqlChecks ? sqlChecks(rawQuery()) : [];
 
     // Write back to externalErrors so response-handler code stays in sync,
     // then push to editor (watcher fires too but the double-push is a no-op).

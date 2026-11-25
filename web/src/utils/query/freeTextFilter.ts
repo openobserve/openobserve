@@ -445,6 +445,7 @@ export function appendConjunct(
   if (materialized === null) return `${filter} and ${predicate}`;
   if (materialized === filter && isGroupedConjunction(filter))
     return `${filter.trimEnd()} AND ${predicate}`;
+  if (!needsGrouping(materialized)) return `${materialized.trimEnd()} AND ${predicate}`;
   return `(\n${materialized}\n) AND ${predicate}`;
 }
 
@@ -1498,6 +1499,33 @@ function isGroupedConjunction(filter: string): boolean {
   }
   const rest = tail.trim();
   return depth === 0 && (rest === "" || (/^AND\b/i.test(rest) && !/\bOR\b/i.test(rest)));
+}
+
+// OR is the only operator looser than AND, and a comment can swallow the appended text;
+// unbalanced parens, open quotes and `;` are grouped too rather than guessed at.
+function needsGrouping(filter: string): boolean {
+  let depth = 0;
+  let top = "";
+  let i = 0;
+  while (i < filter.length) {
+    const end = maskedSpanEnd(filter, i);
+    if (end !== null) {
+      const quote = filter[i];
+      const isLiteral = quote === "'" || quote === '"';
+      if (!isLiteral || end - i < 2 || filter[end - 1] !== quote) return true;
+      top += " ";
+      i = end;
+      continue;
+    }
+    const ch = filter[i];
+    if (ch === "(" || ch === ")") {
+      depth += ch === "(" ? 1 : -1;
+      if (depth < 0) return true;
+      top += " ";
+    } else if (depth === 0) top += ch;
+    i++;
+  }
+  return depth !== 0 || /\bOR\b|;/i.test(top);
 }
 
 function isBlankFilter(filter: string): boolean {

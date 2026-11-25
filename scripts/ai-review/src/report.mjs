@@ -149,12 +149,12 @@ export function toKeptFinding(f) {
 
 const TITLE_STOPWORDS = new Set(["the", "and", "for", "not", "but", "with", "from", "that", "this", "are", "was", "when", "can", "its", "into", "than", "then", "will", "has", "have"]);
 
-function titleWords(summary) {
+export function titleWords(summary) {
   const words = (String(summary || "").toLowerCase().match(/[a-z0-9_]{3,}/g) ?? []).filter(w => !TITLE_STOPWORDS.has(w));
   return new Set(words.map(w => (w.length > 4 ? w.replace(/(?:ing|ed|es|s)$/, "") : w)));
 }
 
-function normalizedTitle(summary) {
+export function normalizedTitle(summary) {
   return (String(summary || "").toLowerCase().match(/[a-z0-9_]+/g) ?? []).join(" ");
 }
 

@@ -89,10 +89,10 @@ exports[`synthetic check form without an AutoObserve prefill > renders the confi
   <div class="flex flex-col gap-4 px-3 py-2">
     <div class="flex flex-wrap items-end gap-8">
       <div><label class="text-text-body mb-1 block text-sm font-medium">synthetics.scheduleAlert.frequency</label>
-        <o-toggle-group-stub type="single" modelvalue="5min" disabled="false" orientation="horizontal" variant="default" labelposition="left" reorderable="false" mobiledropdown="false" data-test="synthetics-check-schedule-frequency-toggle"></o-toggle-group-stub>
+        <o-toggle-group-stub type="single" modelvalue="5min" disabled="false" orientation="horizontal" variant="default" labelposition="left" reorderable="false" mobiledropdown="false" deselectable="false" data-test="synthetics-check-schedule-frequency-toggle"></o-toggle-group-stub>
       </div>
       <div class="flex items-center gap-2">
-        <o-toggle-group-stub type="single" modelvalue="now" disabled="false" orientation="horizontal" variant="default" labelposition="left" reorderable="false" mobiledropdown="false" data-test="synthetics-check-schedule-start-type-toggle"></o-toggle-group-stub>
+        <o-toggle-group-stub type="single" modelvalue="now" disabled="false" orientation="horizontal" variant="default" labelposition="left" reorderable="false" mobiledropdown="false" deselectable="false" data-test="synthetics-check-schedule-start-type-toggle"></o-toggle-group-stub>
         <o-icon-stub name="info-outline" size="sm" class="text-text-muted cursor-pointer"></o-icon-stub>
       </div>
     </div>

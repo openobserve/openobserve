@@ -21,7 +21,7 @@ use sqlparser::{
         Visitor,
     },
     dialect::GenericDialect,
-    parser::Parser,
+    parser::{Parser, ParserError},
 };
 
 use crate::meta::stream::StreamType;
@@ -53,7 +53,7 @@ impl Visitor for CrossSliceVisitor {
 }
 
 /// True when every output row depends only on input rows of its own time slice.
-pub fn is_time_splittable(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
+pub fn is_time_splittable(query: &str) -> Result<bool, ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     Ok(match ast.as_slice() {
         [Statement::Query(query)] => {

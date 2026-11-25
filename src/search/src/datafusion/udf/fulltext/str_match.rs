@@ -191,7 +191,7 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
 mod tests {
     use std::fs::File;
 
-    use arrow::array::StringArray;
+    use arrow::array::{Array, StringArray};
     use datafusion::{
         arrow::{
             array::Int64Array,
@@ -300,7 +300,6 @@ mod tests {
 
     #[test]
     fn test_str_match_impl_direct_match() {
-        use datafusion::common::ScalarValue;
         let haystack = Arc::new(StringArray::from(vec!["hello world", "foo bar"]));
         let args = [
             ColumnarValue::Array(haystack),
@@ -308,7 +307,6 @@ mod tests {
         ];
         let result = str_match_impl(&args, false).unwrap();
         if let ColumnarValue::Array(out) = result {
-            use arrow::array::{Array, BooleanArray};
             let out = out.as_any().downcast_ref::<BooleanArray>().unwrap();
             assert!(out.value(0));
             assert!(!out.value(1));
@@ -319,7 +317,6 @@ mod tests {
 
     #[test]
     fn test_str_match_impl_case_insensitive() {
-        use datafusion::common::ScalarValue;
         let haystack = Arc::new(StringArray::from(vec!["Hello World"]));
         let args = [
             ColumnarValue::Array(haystack),
@@ -327,7 +324,6 @@ mod tests {
         ];
         let result = str_match_impl(&args, true).unwrap();
         if let ColumnarValue::Array(out) = result {
-            use arrow::array::{Array, BooleanArray};
             let out = out.as_any().downcast_ref::<BooleanArray>().unwrap();
             assert!(out.value(0));
         } else {

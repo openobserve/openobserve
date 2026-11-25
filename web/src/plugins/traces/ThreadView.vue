@@ -301,6 +301,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="payments" size="xs" />
                   {{ formatCost(getCost(turn.span)) }}
                 </span>
+                <LLMCacheChip
+                  v-if="cacheByTurn.get(String(turn.span.span_id))"
+                  data-test="thread-turn-cache"
+                  class="thread-metric"
+                  :cache="cacheByTurn.get(String(turn.span.span_id))!"
+                />
                 <span
                   v-if="turn.span.span_status === 'ERROR'"
                   class="thread-metric thread-metric--error rounded-default text-error-600 dark:text-error-400 text-2xs border-error-600/25 bg-error-600/8 dark:border-error-400/30 dark:bg-error-400/12 inline-flex shrink-0 items-center gap-1 border px-2 py-[0.18rem] leading-none font-medium whitespace-nowrap"
@@ -346,6 +352,8 @@ export interface Props {
    * view passes true so it reads like the Collapsed summary.
    */
   condenseTurns?: boolean;
+  /** Models that used the prompt cache earlier in the session, before `spans`. */
+  warmCacheModels?: string[];
 }
 const props = withDefaults(defineProps<Props>(), {
   showSummary: true,
@@ -359,15 +367,19 @@ import {
   getModel,
   getCost,
   getTokens,
+  addCacheUse,
+  classifyCacheUse,
   buildTraceGroup,
   spanTimeBounds,
   type Message,
   type Turn,
   type TraceGroup,
+  type TurnCacheUse,
 } from "./threadView.utils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
+import LLMCacheChip from "./LLMCacheChip.vue";
 import BehindThisStep from "./BehindThisStep.vue";
 import { REQUEST_TIMELINE_KEY, stepToExplain } from "./timeAttribution";
 import { renderMarkdown } from "./markdown";
@@ -448,6 +460,26 @@ const displayGroups = computed<TraceGroup[]>(() => {
       turns: [{ span: mergedSpan, toolCalls: allTools, assistant, followupUsers }],
     };
   });
+});
+
+// Keyed by the rendered turn's span id; a condensed turn sums the calls it merged.
+const cacheByTurn = computed<Map<string, TurnCacheUse>>(() => {
+  const byCall = classifyCacheUse(
+    traceGroups.value.flatMap((g) => g.turns.map((t) => t.span)),
+    props.warmCacheModels,
+  );
+  const out = new Map<string, TurnCacheUse>();
+  for (const g of traceGroups.value) {
+    const merged = props.condenseTurns && g.turns.length > 1;
+    const lastId = String(g.turns[g.turns.length - 1].span.span_id);
+    for (const turn of g.turns) {
+      const use = byCall.get(String(turn.span.span_id));
+      if (!use) continue;
+      const key = merged ? lastId : String(turn.span.span_id);
+      out.set(key, addCacheUse(out.get(key), use));
+    }
+  }
+  return out;
 });
 
 /** Single-trace shortcuts for the existing template (back-compat). */

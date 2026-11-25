@@ -204,25 +204,26 @@ async fn test_run_vrl_function(
             return Ok(MetaHttpResponse::bad_request(err));
         }
 
-        ret_val
-            .as_array()
-            .unwrap()
-            .iter()
-            .for_each(|record| match record {
-                Value::Object(hit) => transformed_events.push(VRLResult::new(
-                    "",
-                    config::utils::flatten::flatten(Value::Object(hit.clone())).unwrap(),
-                )),
-                Value::Array(hits) => hits.iter().for_each(|hit| {
-                    if let Value::Object(hit) = hit {
-                        transformed_events.push(VRLResult::new(
-                            "",
-                            config::utils::flatten::flatten(Value::Object(hit.clone())).unwrap(),
-                        ))
-                    }
-                }),
-                _ => {}
-            });
+        let Some(records) = ret_val.as_array() else {
+            return Ok(MetaHttpResponse::bad_request(
+                "the function must return an array",
+            ));
+        };
+        records.iter().for_each(|record| match record {
+            Value::Object(hit) => transformed_events.push(VRLResult::new(
+                "",
+                config::utils::flatten::flatten(Value::Object(hit.clone())).unwrap(),
+            )),
+            Value::Array(hits) => hits.iter().for_each(|hit| {
+                if let Value::Object(hit) = hit {
+                    transformed_events.push(VRLResult::new(
+                        "",
+                        config::utils::flatten::flatten(Value::Object(hit.clone())).unwrap(),
+                    ))
+                }
+            }),
+            _ => {}
+        });
     } else {
         events.into_iter().for_each(|event| {
             let (ret_val, err) = transform::apply_vrl_fn(
@@ -679,6 +680,22 @@ mod tests {
             body.results[0].event,
             json! {{"nested_key":42,"new_field":"new_value"}}
         );
+    }
+
+    #[tokio::test]
+    async fn test_result_array_vrl_returning_a_non_array_is_a_bad_request() {
+        let function = "#ResultArray#\n. = {\"a\": 1}\n.".to_string();
+        let events = vec![serde_json::json!({"b": 2})];
+        let response = test_run_function("test_org", function, events, Some(0))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
+        let body = http_body_util::BodyExt::collect(response.into_body())
+            .await
+            .unwrap()
+            .to_bytes();
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains("the function must return an array"), "{body}");
     }
 
     #[tokio::test]

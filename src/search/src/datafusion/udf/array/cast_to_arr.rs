@@ -115,7 +115,6 @@ mod tests {
         let args = [ColumnarValue::Array(Arc::new(arr))];
         let result = cast_to_arr_impl(&args).unwrap();
         if let ColumnarValue::Array(out) = result {
-            use arrow::array::Array;
             assert!(out.is_null(0));
         } else {
             panic!("expected array result");

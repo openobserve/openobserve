@@ -359,11 +359,14 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::datatypes::{DataType, Field, Schema};
-    use datafusion::physical_plan::{
-        aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-        empty::EmptyExec,
-        expressions::col,
-        repartition::RepartitionExec,
+    use datafusion::{
+        error::DataFusionError,
+        physical_plan::{
+            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
+            empty::EmptyExec,
+            expressions::col,
+            repartition::RepartitionExec,
+        },
     };
 
     use super::*;
@@ -413,7 +416,7 @@ mod tests {
         };
 
         let result = add_region_remote_scan_partial_reduce(true, physical_plan, remote_scan_node)
-            .map_err(|e| datafusion::error::DataFusionError::Internal(e.to_string()))?;
+            .map_err(|e| DataFusionError::Internal(e.to_string()))?;
         let result_agg = result
             .downcast_ref::<AggregateExec>()
             .expect("region leader should add an outer PartialReduce aggregate");

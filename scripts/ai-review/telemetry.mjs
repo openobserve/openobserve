@@ -41,7 +41,20 @@ export function genAiProviderName(providerId) {
   const id = String(providerId ?? "").toLowerCase();
   if (id.includes("anthropic")) return "anthropic";
   if (id.includes("deepseek")) return "deepseek";
+  if (id.includes("openrouter")) return "openrouter";
   return providerId;
+}
+
+// Experiment coordinates ride on every span so a trace can be joined to its experiment slot; trial_index is zero-based like the slot's.
+export function experimentAttributes(env = process.env) {
+  const text = name => String(env[name] ?? "").trim();
+  const trial = text("REVIEW_EXPERIMENT_TRIAL");
+  return cleanAttributes({
+    "openobserve.experiment.id": text("REVIEW_EXPERIMENT_ID"),
+    "openobserve.experiment.arm": text("REVIEW_EXPERIMENT_ARM"),
+    "openobserve.experiment.row_id": text("REVIEW_EXPERIMENT_ROW_ID"),
+    "openobserve.experiment.trial_index": /^\d+$/.test(trial) ? Number(trial) : undefined,
+  });
 }
 
 export function genAiRequestAttributes(systemInstructions, userMessage) {

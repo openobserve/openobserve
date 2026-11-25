@@ -635,7 +635,7 @@ pub async fn handle_otlp_request(
 
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     for (local_metric_name, json_data) in json_data_by_stream {
-        #[cfg(feature = "vectorscan")]
+        #[cfg(feature = "enterprise")]
         let json_data = {
             let mut json_data = json_data;
             ingest::apply_redaction(org_id, &local_metric_name, &mut json_data).await;
@@ -1449,7 +1449,10 @@ mod tests {
     use std::{collections::HashMap, sync::Arc};
 
     use config::meta::promql::{Metadata, MetricType};
-    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::{
+        array::{Array, Float64Array, Int64Array, StringArray, UInt64Array},
+        datatypes::{DataType, Field, Schema},
+    };
     use opentelemetry_proto::tonic::metrics::v1::{
         AggregationTemporality, Exemplar, HistogramDataPoint, Metric, NumberDataPoint,
     };
@@ -2070,7 +2073,6 @@ mod tests {
     }
 
     fn batch_rows(entries: Vec<ingester::Entry>) -> Vec<json::Map<String, json::Value>> {
-        use datafusion::arrow::array::{Array, Float64Array, Int64Array, StringArray, UInt64Array};
         let mut rows = Vec::new();
         for entry in entries {
             let batch = entry.batch.unwrap();
@@ -3692,6 +3694,10 @@ mod tests {
     /// ingest and storage. NaN is the way a null gets in: `serde_json` maps a non-finite f64
     /// to `Value::Null`. So: NaN means no record, infinities clamp.
     mod value_policy {
+        use arrow::{
+            array::{Array, AsArray},
+            datatypes::Float64Type,
+        };
         use opentelemetry_proto::tonic::{
             common::v1::{AnyValue, KeyValue, any_value},
             metrics::v1::{
@@ -3995,11 +4001,6 @@ mod tests {
 
         #[test]
         fn test_append_number_points_writes_a_stale_marker_as_a_null_value() {
-            use arrow::{
-                array::{Array, AsArray},
-                datatypes::Float64Type,
-            };
-
             let rec = json!({"__name__": "requests"});
             let stale = NumberDataPoint {
                 flags: DataPointFlags::NoRecordedValueMask as u32,

@@ -609,7 +609,7 @@ async fn publish_url_job_delete(org_id: &str, table_name: &str) {
 
 #[cfg(test)]
 mod tests {
-
+    use arrow::datatypes::{Field, Schema};
     use transform::{convert_from_vrl, convert_to_vrl};
 
     use super::*;
@@ -915,11 +915,6 @@ mod tests {
 
     #[test]
     fn test_convert_recordbatch_to_vrl() {
-        use arrow::{
-            array::{BooleanArray, Float64Array, Int64Array, StringArray},
-            datatypes::{DataType, Field, Schema},
-        };
-
         // Create a simple RecordBatch
         let schema = Arc::new(Schema::new(vec![
             Field::new("name", DataType::Utf8, false),
@@ -933,7 +928,7 @@ mod tests {
         let score_array = Float64Array::from(vec![95.5, 88.3]);
         let active_array = BooleanArray::from(vec![true, false]);
 
-        let batch = arrow::array::RecordBatch::try_new(
+        let batch = RecordBatch::try_new(
             Arc::clone(&schema),
             vec![
                 Arc::new(name_array),

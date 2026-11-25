@@ -196,7 +196,8 @@ mod tests {
     use arrow::array::{Int64Array, StringArray};
     use arrow_schema::{DataType, Field};
     use config::TIMESTAMP_COL_NAME;
-    use vortex::file::OpenOptionsSessionExt;
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+    use vortex::{buffer::Buffer, file::OpenOptionsSessionExt};
 
     use super::*;
 
@@ -234,10 +235,7 @@ mod tests {
 
         let bytes = std::fs::read(&data_path).unwrap();
         assert_eq!(meta.records, 3);
-        let reader = parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder::try_new(
-            bytes::Bytes::from(bytes),
-        )
-        .unwrap();
+        let reader = ParquetRecordBatchReaderBuilder::try_new(bytes::Bytes::from(bytes)).unwrap();
         let footer = reader
             .metadata()
             .file_metadata()
@@ -298,7 +296,7 @@ mod tests {
         let vxf = session
             .open_options()
             .include_metadata()
-            .open_buffer(vortex::buffer::Buffer::from(buf))
+            .open_buffer(Buffer::from(buf))
             .unwrap();
         let segment = vxf.metadata_segment(VORTEX_FILE_META_KEY).unwrap();
         let file_meta: config::utils::json::Value =

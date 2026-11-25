@@ -345,7 +345,7 @@ async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
     if !LOCAL_NODE.is_scheduler() {
         return Ok(None);
     }
-    use infra::{cluster::get_node_by_uuid, dist_lock};
+    use infra::{cluster::is_node_alive, dist_lock};
 
     let db = infra::db::get_db().await;
     let node = db
@@ -354,7 +354,7 @@ async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
         .ok()
         .unwrap_or_default();
     let node = String::from_utf8_lossy(&node);
-    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && is_node_alive(&node).await {
         log::info!("[o2::ENT] metering is locked by node {node}");
         return Ok(None); // other node is processing
     }
@@ -368,8 +368,7 @@ async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
             .ok()
             .unwrap_or_default();
         let node = String::from_utf8_lossy(&node);
-        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
-        {
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && is_node_alive(&node).await {
             dist_lock::unlock(&locker).await?;
             return Ok(None); // other node is processing
         }
@@ -871,7 +870,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::session::watch());
     }
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_scheduler() {
-        tokio::task::spawn(enrichment_data::enrichment_table::runtime::watch());
+        tokio::task::spawn(enrichment_data::enrichment_table::runtime::watch(
+            openobserve_core::pipeline::db::recompile_enrichment_table_readers,
+        ));
     }
 
     tokio::task::yield_now().await;
@@ -1680,7 +1681,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         tokio::task::spawn(db::re_pattern::watch_patterns());
         tokio::task::spawn(db::re_pattern::watch_pattern_associations());

@@ -18,12 +18,12 @@ use std::ops::ControlFlow;
 use sqlparser::{
     ast::{Expr, GroupByExpr, Query, SetExpr, Statement, TableFactor, Visit, Visitor},
     dialect::PostgreSqlDialect,
-    parser::Parser,
+    parser::{Parser, ParserError},
 };
 
 use super::AGGREGATE_UDF_LIST;
 
-pub fn is_complex_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
+pub fn is_complex_query(query: &str) -> Result<bool, ParserError> {
     let ast = Parser::parse_sql(&PostgreSqlDialect {}, query)?;
     Ok(ast.iter().any(is_complex_query_stmt))
 }

@@ -32,6 +32,7 @@ use config::meta::{
     service_streams::{RelatedStreams, StreamInfo},
     stream::StreamType,
 };
+use datafusion::common::TableReference;
 #[cfg(feature = "enterprise")]
 use db::user::is_root_user;
 #[cfg(any(feature = "enterprise", test))]
@@ -595,10 +596,7 @@ pub async fn check_stream_permissions(
         return None;
     }
 
-    use o2_openfga::{
-        config::get_config,
-        meta::mapping::{LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, OFGA_MODELS},
-    };
+    use o2_openfga::{config::get_config, meta::mapping::OFGA_MODELS};
 
     // A user can hit this with an org they are not a member of (e.g. the search
     // profile endpoint always checks against _meta), so a missing user is a
@@ -607,52 +605,43 @@ pub async fn check_stream_permissions(
         return Some(MetaHttpResponse::forbidden("Unauthorized Access"));
     };
     let stream_type_str = stream_type.as_str();
-    let config = get_config();
-    let mut o2_model_type = "";
+    let stream_model = OFGA_MODELS
+        .get(stream_type_str)
+        .map_or(stream_type_str, |model| model.key);
+    let models = stream_permission_models(
+        permission_resource_type,
+        get_config().logs_pattern_rbac_enabled,
+        stream_model,
+    );
 
-    match permission_resource_type {
-        StreamPermissionResourceType::PatternExtract if config.logs_pattern_rbac_enabled => {
-            o2_model_type = LOGS_PATTERN_KEY;
+    for model in models {
+        let allowed = check_permissions(
+            user_id,
+            AuthExtractor {
+                auth: "".to_string(),
+                method: "GET".to_string(),
+                o2_type: format!(
+                    "{}:{}",
+                    model,
+                    crate::auth::into_ofga_supported_format(stream_name)
+                ),
+                org_id: org_id.to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+                use_all_org: false,
+                use_self_context: false,
+                use_self_parent: true,
+                feature: None,
+            },
+            user.role.clone(),
+            user.is_external,
+        )
+        .await;
+        if !allowed {
+            return Some(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
-        StreamPermissionResourceType::Insights if config.logs_pattern_rbac_enabled => {
-            o2_model_type = LOGS_INSIGHTS_KEY;
-        }
-        _ => {}
     }
-
-    if o2_model_type.is_empty() {
-        o2_model_type = OFGA_MODELS
-            .get(stream_type_str)
-            .map_or(stream_type_str, |model| model.key);
-    }
-
-    if check_permissions(
-        user_id,
-        AuthExtractor {
-            auth: "".to_string(),
-            method: "GET".to_string(),
-            o2_type: format!(
-                "{}:{}",
-                o2_model_type,
-                crate::auth::into_ofga_supported_format(stream_name)
-            ),
-            org_id: org_id.to_string(),
-            bypass_check: false,
-            parent_id: "".to_string(),
-            use_all_org: false,
-            use_self_context: false,
-            use_self_parent: true,
-            feature: None,
-        },
-        user.role,
-        user.is_external,
-    )
-    .await
-    {
-        None
-    } else {
-        Some(MetaHttpResponse::forbidden("Unauthorized Access"))
-    }
+    None
 }
 
 /// Requires GET permission on every cipher key the SQL references; `None` means allowed.
@@ -831,9 +820,7 @@ pub fn resolve_query_sources(sources: &[QuerySource]) -> ResolvedSources {
 }
 
 /// Every table `sql` reads, after the custom-pattern rewrite the search engine applies first.
-pub fn resolve_sql_tables(
-    sql: &str,
-) -> Result<Vec<datafusion::common::TableReference>, anyhow::Error> {
+pub fn resolve_sql_tables(sql: &str) -> Result<Vec<TableReference>, anyhow::Error> {
     config::meta::sql::resolve_stream_names_with_type(&search_rewritten_sql(sql))
 }
 
@@ -1213,6 +1200,23 @@ fn effective_role(org_id: &str, user_id: &str, role: String) -> String {
     match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
         Some(user) => user.role.to_string(),
         None => role,
+    }
+}
+
+/// OFGA models needing GET: the stream's, plus the feature's when its RBAC is on. [pure]
+#[cfg(feature = "enterprise")]
+fn stream_permission_models(
+    resource: StreamPermissionResourceType,
+    feature_rbac_enabled: bool,
+    stream_model: &str,
+) -> Vec<&str> {
+    use StreamPermissionResourceType::{Insights, PatternExtract, Search};
+    use o2_openfga::meta::mapping::{LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY};
+
+    match (resource, feature_rbac_enabled) {
+        (PatternExtract, true) => vec![stream_model, LOGS_PATTERN_KEY],
+        (Insights, true) => vec![stream_model, LOGS_INSIGHTS_KEY],
+        (Search, _) | (PatternExtract, false) | (Insights, false) => vec![stream_model],
     }
 }
 
@@ -2409,5 +2413,28 @@ mod tests {
             rbac_enforced().await,
             o2_openfga::config::get_config().enabled
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_feature_grant_adds_to_stream_read_and_never_replaces_it() {
+        use StreamPermissionResourceType::{Insights, PatternExtract, Search};
+        use o2_openfga::meta::mapping::{LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY};
+
+        let cases = [
+            (Search, false, vec!["logs"]),
+            (Search, true, vec!["logs"]),
+            (PatternExtract, false, vec!["logs"]),
+            (PatternExtract, true, vec!["logs", LOGS_PATTERN_KEY]),
+            (Insights, false, vec!["logs"]),
+            (Insights, true, vec!["logs", LOGS_INSIGHTS_KEY]),
+        ];
+        for (resource, rbac_on, expected) in cases {
+            assert_eq!(
+                stream_permission_models(resource, rbac_on, "logs"),
+                expected,
+                "rbac_on={rbac_on}"
+            );
+        }
     }
 }

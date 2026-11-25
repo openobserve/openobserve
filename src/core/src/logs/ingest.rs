@@ -48,7 +48,7 @@ use ingestion_common::{
     IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
     IngestionValueType, KinesisFHIngestionResponse, KinesisFHRequest, RecordStatus, StreamStatus,
 };
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
@@ -186,7 +186,7 @@ fn is_internal_writer(user: &IngestUser, is_derived: bool) -> bool {
 }
 
 /// Keyed on the destination: gRPC relabels forwarded customer writes as `InternalGrpc`.
-#[cfg(any(feature = "vectorscan", test))]
+#[cfg(any(feature = "enterprise", test))]
 fn should_apply_sdr(org_id: &str, stream_name: &str) -> bool {
     !config::meta::self_reporting::redaction::is_self_reporting_stream(
         org_id,
@@ -298,12 +298,12 @@ async fn ingest_inner(
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
     // Usage counts only from a server-side identity; a user credential cannot claim it.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     let usage_request =
         matches!(in_req, IngestionRequest::Usage(_)) && matches!(user, IngestUser::SystemJob(_));
     let log_ingestion_errors = ingestion_log_enabled().await;
     // A scanner outage must never fail ingestion; the evidence row says it failed open.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     let pattern_manager = match get_pattern_manager().await {
         Ok(manager) => Some(manager),
         Err(_) if !should_apply_sdr(org_id, in_stream_name) => None,
@@ -323,7 +323,7 @@ async fn ingest_inner(
         return Err(Error::IngestionError("Stream name is empty".to_string()));
     }
     // Internal writers pass the same test as the rollup write guard below.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     let platform_write = {
         let internal_writer = is_internal_writer(&user, is_derived);
         let source = stream_name.clone();
@@ -337,7 +337,7 @@ async fn ingest_inner(
         }
     };
     // Refused here, before any pipeline runs: a remote-stream destination writes inside it.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
         org_id,
         StreamType::Logs,
@@ -384,7 +384,7 @@ async fn ingest_inner(
         bulk_plan,
     )
     .await;
-    // JsonColumnar::plan already refuses the fast path under vectorscan, before this is consulted.
+    // JsonColumnar::plan already refuses the fast path under enterprise, before this is consulted.
     let needs_json_records = extend_json.is_some() || needs.json_records(&stream_name);
     let StreamRecordNeeds {
         executable_pipelines,
@@ -795,7 +795,7 @@ async fn ingest_inner(
     drop(user_defined_schema_map);
 
     // Pipeline destinations, which the check before the pipelines could not see.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         let streams: Vec<(&str, u64)> = json_data_by_stream
             .iter()
@@ -813,7 +813,7 @@ async fn ingest_inner(
         }
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     if pattern_manager.is_none() {
         // One row per destination stream: a pipeline fans a request out to several.
         for (stream, data) in json_data_by_stream.iter() {
@@ -837,7 +837,7 @@ async fn ingest_inner(
         }
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     if let Some(pattern_manager) = pattern_manager.as_ref() {
         for (stream, data) in json_data_by_stream.iter_mut() {
             if !should_apply_sdr(org_id, stream) {

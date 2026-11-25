@@ -263,8 +263,23 @@ async fn run() -> Result<(), anyhow::Error> {
 
             // flush WAL cache to disk
             _ = ingester::flush_all().await;
+            #[cfg(feature = "enterprise")]
+            if let Err(e) =
+                openobserve_core::pipeline::batch_execution::flush_all_buffers(true).await
+            {
+                log::error!(
+                    "[Pipeline] failed to flush remote destination buffers on shutdown: {e}"
+                );
+            }
             // flush compact offset cache to disk disk
             _ = db::compact::files::sync_cache_to_db().await;
+
+            // the NATS connection task lives on this runtime, so leave before it is dropped
+            if let Err(e) = cluster::leave().await {
+                log::error!("Failed to leave cluster: {e}");
+            } else {
+                log::info!("Node left cluster");
+            }
         });
     });
 
@@ -454,10 +469,6 @@ async fn run() -> Result<(), anyhow::Error> {
 
     let db = infra::db::get_db().await;
     _ = db.close().await;
-
-    // leave the cluster
-    _ = cluster::leave().await;
-    log::info!("Node left cluster");
 
     // stop telemetry
     if cfg.common.telemetry_enabled {

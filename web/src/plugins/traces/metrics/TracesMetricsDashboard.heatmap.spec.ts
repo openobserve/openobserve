@@ -18,7 +18,6 @@ import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { reactive } from "vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
-import searchService from "@/services/search";
 
 vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   default: { template: '<div data-test="render-dashboard-charts"></div>' },
@@ -45,7 +44,22 @@ vi.mock("./TracesComparison.vue", () => ({
   },
 }));
 
-vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
+const heatmapHits = vi.hoisted(() => ({ value: [] as unknown[] }));
+
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    // The stream answers after the request goes out, as the real one does.
+    fetchQueryDataWithHttpStream: (payload: any, handlers: any) =>
+      Promise.resolve().then(() => {
+        handlers.data(payload, {
+          type: "search_response_hits",
+          content: { results: { hits: heatmapHits.value } },
+        });
+        handlers.complete(payload, {});
+      }),
+    cancelStreamQueryBasedOnRequestId: vi.fn(),
+  }),
+}));
 
 const S = 1_000_000;
 const START = Date.UTC(2026, 9, 6, 10, 0, 0) * 1000;
@@ -104,15 +118,10 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-const HEATMAP_DATA = {
-  data: {
-    hits: [
-      { x_axis: "2026-10-06T10:00:10", duration_bucket: 16, span_count: 40, error_count: 4 },
-      { x_axis: "2026-10-06T10:00:20", duration_bucket: 18, span_count: 3, error_count: 0 },
-    ],
-    histogram_interval: 10,
-  },
-};
+const HEATMAP_HITS = [
+  { x_axis: "2026-10-06T10:00:10", duration_bucket: 16, span_count: 40, error_count: 4 },
+  { x_axis: "2026-10-06T10:00:20", duration_bucket: 18, span_count: 3, error_count: 0 },
+];
 const item = (name: string) =>
   document.body.querySelector<HTMLElement>(
     `[data-test="traces-latency-heatmap-selection-${name}"]`,
@@ -120,7 +129,7 @@ const item = (name: string) =>
 
 describe("TracesMetricsDashboard with the real latency heatmap", () => {
   it("keeps a filtered box through Drill down, so Clear still restores the editor", async () => {
-    vi.mocked(searchService.search).mockResolvedValue(HEATMAP_DATA as any);
+    heatmapHits.value = HEATMAP_HITS;
     wrapper = mount(TracesMetricsDashboard, {
       props: { streamName: "default", show: true },
       attachTo: document.body,
@@ -155,15 +164,7 @@ describe("TracesMetricsDashboard with the real latency heatmap", () => {
   });
 
   it("erases the drawn box on Drill down while the page still opens on that selection", async () => {
-    vi.mocked(searchService.search).mockResolvedValue({
-      data: {
-        hits: [
-          { x_axis: "2026-10-06T10:00:10", duration_bucket: 16, span_count: 40, error_count: 4 },
-          { x_axis: "2026-10-06T10:00:20", duration_bucket: 18, span_count: 3, error_count: 0 },
-        ],
-        histogram_interval: 10,
-      },
-    } as any);
+    heatmapHits.value = HEATMAP_HITS;
     wrapper = mount(TracesMetricsDashboard, {
       props: { streamName: "default", show: true },
       attachTo: document.body,
@@ -197,7 +198,7 @@ describe("TracesMetricsDashboard with the real latency heatmap", () => {
   });
 
   it("renders Drill down inside the page target, not in place", async () => {
-    vi.mocked(searchService.search).mockResolvedValue(HEATMAP_DATA as any);
+    heatmapHits.value = HEATMAP_HITS;
     wrapper = mount(TracesMetricsDashboard, {
       props: { streamName: "default", show: true },
       attachTo: document.body,

@@ -149,6 +149,15 @@ export function tracesRunIsStaged(
   return !autoRunOn && !!lastRun && tracesSearchRunSignature(searchObj) !== lastRun;
 }
 
+/** True when the editor holds an edit since the last applied query; whitespace at either end is not an edit. */
+export function tracesEditorIsStaged(searchObj: {
+  data: { editorValue?: string | null; appliedEditorValue?: unknown };
+}): boolean {
+  const applied = searchObj.data.appliedEditorValue;
+  if (typeof applied !== "string") return false;
+  return String(searchObj.data.editorValue ?? "").trim() !== applied.trim();
+}
+
 export type TracesToolbarStage = "full" | "compactButtons" | "iconToggle" | "resetInMenu";
 
 // Approximate rendered widths of the left-section items; the only width table the toolbar collapse reads.
@@ -160,6 +169,7 @@ export const TRACES_TOOLBAR_WIDTHS = {
   reset: { text: 72, icon: 36 },
   more: 70,
   metricsPinned: 78,
+  sqlModePinned: 78,
   savedViewsPinned: 93,
 };
 

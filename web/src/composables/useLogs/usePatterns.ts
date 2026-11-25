@@ -14,8 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
-import type { TranslateFn } from "@/types/i18n";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, type TranslateFn } from "@/types/i18n";
 import patternsService from "@/services/patterns";
+import { partialDownloadReason } from "@/utils/logs/downloadRange";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 
 // A single UI-shaped pattern (raw backend fields + values derived in extractPatterns)
@@ -134,6 +136,14 @@ export default function usePatterns(t: TranslateFn) {
         ...response.data,
         patterns: transformedPatterns,
       };
+
+      const reasons = partialDownloadReason(response.data);
+      if (reasons !== null) {
+        toast({
+          message: reasons ? raw(reasons) : t("search.patternsPartialResult"),
+          variant: "warning",
+        });
+      }
 
       // console.log(
       //   "[Patterns] Extraction complete:",

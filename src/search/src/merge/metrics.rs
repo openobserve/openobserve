@@ -598,14 +598,16 @@ mod tests {
 
     use std::sync::Arc;
 
-    use arrow::array::{Float64Array, Int64Array, StringViewArray, UInt64Array};
+    use arrow::array::{Float64Array, Int64Array, StringArray, StringViewArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema};
     use config::{
         PARQUET_MAX_ROW_GROUP_SIZE,
         meta::promql::{HASH_LABEL, VALUE_LABEL},
     };
+    use datafusion::datasource::MemTable;
     use futures::TryStreamExt;
-    use vortex::file::OpenOptionsSessionExt;
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+    use vortex::{buffer::Buffer, file::OpenOptionsSessionExt};
 
     use super::*;
 
@@ -635,10 +637,10 @@ mod tests {
             Arc::new(Float64Array::from_iter(
                 rows.iter().map(|row| row.2.map(f64::from_bits)),
             )),
-            Arc::new(arrow::array::StringArray::from(vec![Some("x"); rows.len()])),
+            Arc::new(StringArray::from(vec![Some("x"); rows.len()])),
         ];
         if schema.fields().len() == 5 {
-            columns.push(Arc::new(arrow::array::StringArray::from_iter_values(
+            columns.push(Arc::new(StringArray::from_iter_values(
                 (0..rows.len()).map(|i| {
                     if i % 2 == 0 {
                         "per-point-a"
@@ -655,7 +657,6 @@ mod tests {
         bytes: bytes::Bytes,
         parent: metrics_index::block::ParentMetadata,
     ) -> anyhow::Result<Vec<u8>> {
-        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         anyhow::ensure!(
             bytes.len() as u64 == parent.compressed_size,
             "source size mismatch"
@@ -747,7 +748,6 @@ mod tests {
     }
 
     fn sample_rows(bytes: bytes::Bytes) -> Vec<SourceRow> {
-        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         ParquetRecordBatchReaderBuilder::try_new(bytes)
             .unwrap()
             .build()
@@ -836,7 +836,7 @@ mod tests {
             .map(|row| (1, 10 + row * 10, Some((row as f64).to_bits())))
             .collect::<Vec<_>>();
         let mut columns = block_batch(&schema, &rows).columns().to_vec();
-        columns[3] = Arc::new(arrow::array::StringArray::from(vec![
+        columns[3] = Arc::new(StringArray::from(vec![
             Some("a"),
             Some("b"),
             Some("b"),
@@ -844,9 +844,7 @@ mod tests {
             Some(""),
             Some("b"),
         ]));
-        columns[4] = Arc::new(arrow::array::StringArray::from(vec![
-            "x", "x", "y", "y", "y", "y",
-        ]));
+        columns[4] = Arc::new(StringArray::from(vec!["x", "x", "y", "y", "y", "y"]));
         let batch = RecordBatch::try_new(Arc::clone(&schema), columns).unwrap();
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let mut output = block_output();
@@ -907,7 +905,6 @@ mod tests {
     #[tokio::test]
     async fn configured_metrics_index_dispatch_controls_block_generation() {
         use config::meta::stream::StreamType;
-        use datafusion::datasource::MemTable;
 
         use super::super::{MergeMode, MergeOutput, merge_parquet_files};
 
@@ -1462,7 +1459,7 @@ mod tests {
                     let vxf = session
                         .open_options()
                         .include_metadata()
-                        .open_buffer(vortex::buffer::Buffer::from(bytes.to_vec()))
+                        .open_buffer(Buffer::from(bytes.to_vec()))
                         .unwrap();
                     assert!(
                         vxf.metadata_segment(config::utils::parquet::VORTEX_FILE_META_KEY)

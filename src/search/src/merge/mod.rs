@@ -215,7 +215,10 @@ pub fn append_metadata<W: AsyncFileWriter>(
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Array, Int64Array, StringArray};
+    use arrow::{
+        array::{Array, Int64Array, StringArray},
+        compute::concat_batches,
+    };
     use arrow_schema::{DataType, Field, Schema};
     use config::{FileFormat, TIMESTAMP_COL_NAME, meta::stream::StreamType};
     use datafusion::datasource::MemTable;
@@ -342,7 +345,7 @@ mod tests {
             .unwrap()
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-        let batch = arrow::compute::concat_batches(&batches[0].schema(), &batches).unwrap();
+        let batch = concat_batches(&batches[0].schema(), &batches).unwrap();
         assert_eq!(batch.num_rows(), 2);
 
         let trace_ids = batch

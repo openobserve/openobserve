@@ -23,6 +23,13 @@ export const COMPARISON_COLORS = {
 } as const;
 
 /**
+ * Keeps both series of the five largest values. A LIMIT on the UNION itself would count a
+ * Baseline and a Selected row as two values and drop Selected bars or whole values.
+ */
+const limitToTopValues = (unionSql: string) =>
+  `SELECT value, series, trace_count FROM (SELECT value, series, trace_count, DENSE_RANK() OVER (ORDER BY mx DESC, value) AS rk FROM (SELECT value, series, trace_count, MAX(trace_count) OVER (PARTITION BY value) AS mx FROM (${unionSql}) AS u1) AS u2) AS u3 WHERE rk <= 5 ORDER BY trace_count DESC`;
+
+/**
  * Composable for generating dashboard JSON for Latency Insights
  * Transforms DimensionAnalysis results into OpenObserve dashboard schema
  */
@@ -154,7 +161,7 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
       `.trim();
 
       // Combine with UNION
-      return `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 5`;
+      return limitToTopValues(`${baselineQuery} UNION ${selectedQuery}`);
     }
 
     // Normal mode: Build queries with WHERE clauses
@@ -236,7 +243,7 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
       GROUP BY ${dimensionName}
     `.trim();
 
-    const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 5`;
+    const unionQuery = limitToTopValues(`${baselineQuery} UNION ${selectedQuery}`);
 
     return unionQuery;
   };
