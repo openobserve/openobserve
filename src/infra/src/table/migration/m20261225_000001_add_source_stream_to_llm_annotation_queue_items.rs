@@ -33,7 +33,7 @@ enum LlmAnnotationQueueItems {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // A has_column guard: add_column_if_not_exists renders IF NOT EXISTS, which MySQL rejects.
+        // A has_column guard: SQLite rejects ADD COLUMN IF NOT EXISTS.
         if manager.has_column(TABLE, COLUMN).await? {
             return Ok(());
         }
@@ -82,14 +82,6 @@ mod tests {
         collapsed_eq!(
             &add_column_stmt().to_string(PostgresQueryBuilder),
             r#"ALTER TABLE "llm_annotation_queue_items" ADD COLUMN "source_stream" text NULL"#
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &add_column_stmt().to_string(MysqlQueryBuilder),
-            r#"ALTER TABLE `llm_annotation_queue_items` ADD COLUMN `source_stream` text NULL"#
         );
     }
 

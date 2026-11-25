@@ -278,7 +278,7 @@ async fn hide_previews_for_user(
     ))
 }
 
-/// Nulls each preview whose source stream `permitted` does not name; `None` permits all. [pure]
+/// Nulls each preview whose source stream `permitted` does not cover; `None` permits all. [pure]
 fn hide_unreadable_previews(
     org_id: &str,
     mut items: Vec<AnnotationQueueItem>,
@@ -288,14 +288,13 @@ fn hide_unreadable_previews(
         return items;
     };
     for item in &mut items {
-        let readable = item.source_stream.as_deref().is_some_and(|stream| {
-            is_ofga_object_visible(
-                org_id,
-                traces_ofga_key(),
-                &into_ofga_supported_format(stream),
-                Some(permitted),
-            )
-        });
+        // An unresolved stream is readable only under the org-wide traces grant.
+        let object_id = item
+            .source_stream
+            .as_deref()
+            .map_or_else(|| format!("_all_{org_id}"), into_ofga_supported_format);
+        let readable =
+            is_ofga_object_visible(org_id, traces_ofga_key(), &object_id, Some(permitted));
         if !readable {
             item.input_preview = None;
         }
@@ -874,13 +873,14 @@ mod tests {
         let own = vec![format!("{key}:s1")];
         let other = vec![format!("{key}:s2")];
         let all = vec![format!("{key}:_all_org-1")];
-        let cases: [PreviewCase; 6] = [
+        let cases: [PreviewCase; 7] = [
             ("root or RBAC off", None, Some("s1"), true),
             ("root or RBAC off, legacy row", None, None, true),
             ("permitted stream", Some(&own), Some("s1"), true),
             ("unpermitted stream", Some(&other), Some("s1"), false),
             ("org-wide traces grant", Some(&all), Some("s1"), true),
-            ("legacy row without stream", Some(&all), None, false),
+            ("legacy row, org-wide traces grant", Some(&all), None, true),
+            ("legacy row, single-stream grant", Some(&own), None, false),
         ];
         for (case, permitted, source_stream, shown) in cases {
             let items = hide_unreadable_previews("org-1", vec![item(source_stream)], permitted);
