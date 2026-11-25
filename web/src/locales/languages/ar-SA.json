@@ -1423,7 +1423,6 @@
     "selectOrganization": "يرجى اختيار مؤسسة"
   },
   "search": {
-    "noValue": "(لا توجد قيمة)",
     "valueTypesDiffer": "تختلف الأنواع بين التدفقات المحددة، لذا لا يمكن التصفية حسب القيم",
     "queryFailed": "فشل الاستعلام",
     "unknownError": "خطأ غير معروف",

@@ -403,7 +403,7 @@ describe("FieldValuesPanel.vue", () => {
       expect(wrapper.emitted("set-value-filters")?.[0]).toEqual(["body_kind", ["\u0000null"], []]);
     });
 
-    it("labels a selected missing value apart from the text null when the API returns no values", () => {
+    it("shows a selected missing value blank, apart from the text null, when the API returns no values", () => {
       wrapper = createWrapper({
         fieldName: "body_kind",
         fieldValues: { isLoading: false, values: [] },
@@ -412,11 +412,7 @@ describe("FieldValuesPanel.vue", () => {
       const texts = wrapper
         .findAll('[data-test="field-values-panel-value-text"]')
         .map((el) => el.text());
-      expect(texts).toEqual(["(no value)", "null"]);
-      const italic = wrapper
-        .findAll('[data-test="field-values-panel-value-text"]')
-        .map((el) => el.classes().includes("italic"));
-      expect(italic).toEqual([true, false]);
+      expect(texts).toEqual(["", "null"]);
       expect(texts.some((text) => text.includes("\u0000"))).toBe(false);
       expect(wrapper.find('[data-test="field-values-panel-no-count-msg"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="field-values-panel-value-count"]').exists()).toBe(false);

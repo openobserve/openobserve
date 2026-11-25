@@ -1423,7 +1423,6 @@
     "selectOrganization": "请选择一个组织"
   },
   "search": {
-    "noValue": "（无值）",
     "valueTypesDiffer": "所选数据流中的类型不同，因此无法按值筛选",
     "queryFailed": "查询失败",
     "unknownError": "未知错误",

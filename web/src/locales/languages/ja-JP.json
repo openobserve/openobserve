@@ -1423,7 +1423,6 @@
     "selectOrganization": "組織を選択してください"
   },
   "search": {
-    "noValue": "（値なし）",
     "valueTypesDiffer": "選択したストリーム間で型が異なるため、値でフィルターできません",
     "queryFailed": "クエリが失敗しました",
     "unknownError": "不明なエラー",

@@ -205,7 +205,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 fit-parent
                 tooltip-class="whitespace-pre-wrap break-all"
                 class="text-field-list-label-text min-w-0 shrink ps-1"
-                :class="isNullValue(value.key) ? 'italic' : ''"
                 data-test="field-values-panel-value-text"
               />
               <OButton
@@ -291,7 +290,7 @@ import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import { isNullValue, valueKeyLabel } from "@/components/common/fieldPanel/valueFilterExpression";
+import { valueKeyLabel } from "@/components/common/fieldPanel/valueFilterExpression";
 
 type FilterMode = "include" | "exclude";
 

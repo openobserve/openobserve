@@ -1442,7 +1442,6 @@
     "selectOrganization": "Please select an organization"
   },
   "search": {
-    "noValue": "(no value)",
     "valueTypesDiffer": "Types differ across the selected streams, so values cannot be filtered",
     "queryFailed": "Query failed",
     "unknownError": "Unknown error",

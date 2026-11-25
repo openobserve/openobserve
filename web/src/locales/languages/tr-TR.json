@@ -1423,7 +1423,6 @@
     "selectOrganization": "Lütfen bir kuruluş seçin"
   },
   "search": {
-    "noValue": "(değer yok)",
     "valueTypesDiffer": "Türler seçili akışlar arasında farklı olduğundan değerler filtrelenemez",
     "queryFailed": "Sorgu başarısız oldu",
     "unknownError": "Bilinmeyen hata",

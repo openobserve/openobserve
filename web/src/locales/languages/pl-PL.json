@@ -1423,7 +1423,6 @@
     "selectOrganization": "Proszę wybrać organizację"
   },
   "search": {
-    "noValue": "(brak wartości)",
     "valueTypesDiffer": "Typy różnią się w wybranych strumieniach, więc nie można filtrować według wartości",
     "queryFailed": "Zapytanie nie powiodło się",
     "unknownError": "Nieznany błąd",

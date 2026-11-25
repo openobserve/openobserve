@@ -1423,7 +1423,6 @@
     "selectOrganization": "Vui lòng chọn tổ chức"
   },
   "search": {
-    "noValue": "(không có giá trị)",
     "valueTypesDiffer": "Kiểu dữ liệu khác nhau giữa các luồng đã chọn nên không thể lọc theo giá trị",
     "queryFailed": "Truy vấn thất bại",
     "unknownError": "Lỗi không xác định",

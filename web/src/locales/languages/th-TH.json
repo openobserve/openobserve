@@ -1423,7 +1423,6 @@
     "selectOrganization": "Please select an organization"
   },
   "search": {
-    "noValue": "(ไม่มีค่า)",
     "valueTypesDiffer": "ประเภทข้อมูลในสตรีมที่เลือกไม่ตรงกัน จึงไม่สามารถกรองตามค่าได้",
     "queryFailed": "การค้นหาคิวรีล้มเหลว",
     "unknownError": "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ",

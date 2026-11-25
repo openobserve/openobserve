@@ -1423,7 +1423,6 @@
     "selectOrganization": "請選擇一個組織"
   },
   "search": {
-    "noValue": "(無值)",
     "valueTypesDiffer": "所選資料流中的類型不同，因此無法依值篩選",
     "queryFailed": "查詢失敗",
     "unknownError": "未知錯誤",

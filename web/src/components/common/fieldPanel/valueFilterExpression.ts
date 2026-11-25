@@ -1,13 +1,13 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { gt, type I18nText } from "@/types/i18n";
+import { raw, type I18nText } from "@/types/i18n";
 
 /** Key of the row of missing values; it starts with NUL, which no stored text the values list keys can collide with. */
 export const MISSING_VALUE_KEY = "\u0000null";
 
-/** What a value row shows for its key: the missing value has its own label so it never reads like the text "null"; any other key is its own text. */
+/** What a value row shows for its key: the missing value is blank so it never reads like the text "null"; any other key is its own text. */
 export const valueKeyLabel = (key: string): I18nText | undefined =>
-  key === MISSING_VALUE_KEY ? gt("search.noValue") : undefined;
+  key === MISSING_VALUE_KEY ? raw("") : undefined;
 
 /** One field's picked values as one condition: includes OR together, excludes AND onto them, wrapped so the page replaces it whole. */
 export const joinValueConditions = (

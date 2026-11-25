@@ -1423,7 +1423,6 @@
     "selectOrganization": "Seleziona un'organizzazione"
   },
   "search": {
-    "noValue": "(nessun valore)",
     "valueTypesDiffer": "I tipi differiscono tra gli stream selezionati, quindi i valori non possono essere filtrati",
     "queryFailed": "Query non riuscita",
     "unknownError": "Errore sconosciuto",

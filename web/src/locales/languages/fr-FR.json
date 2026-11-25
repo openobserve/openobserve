@@ -1423,7 +1423,6 @@
     "selectOrganization": "Veuillez sélectionner une organisation"
   },
   "search": {
-    "noValue": "(aucune valeur)",
     "valueTypesDiffer": "Les types diffèrent entre les flux sélectionnés, les valeurs ne peuvent donc pas être filtrées",
     "queryFailed": "Échec de la requête",
     "unknownError": "Erreur inconnue",

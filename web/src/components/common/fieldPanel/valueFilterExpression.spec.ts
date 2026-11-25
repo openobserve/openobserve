@@ -1,12 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, expect, it } from "vitest";
-import i18n from "@/locales";
 import { MISSING_VALUE_KEY, isNullValue, valueKeyLabel } from "./valueFilterExpression";
 
 describe("valueKeyLabel", () => {
   it("labels the missing value apart from the stored text null", () => {
-    expect(valueKeyLabel(MISSING_VALUE_KEY)).toBe(i18n.global.t("search.noValue"));
+    expect(valueKeyLabel(MISSING_VALUE_KEY)).toBe("");
     expect(valueKeyLabel(MISSING_VALUE_KEY)).not.toBe("null");
     expect(valueKeyLabel("null")).toBeUndefined();
     expect(valueKeyLabel("")).toBeUndefined();

@@ -330,7 +330,7 @@ describe("logs request parity", () => {
       content: { results: { hits: [{ values: [hit("", 7), hit("null", 3), hit("a", 1)] }] } },
     });
     expect(fieldValues.value.level.values).toEqual([
-      { key: MISSING_VALUE_KEY, label: "(no value)", count: 7 },
+      { key: MISSING_VALUE_KEY, label: "", count: 7 },
       { key: "null", count: 3 },
       { key: "a", count: 1 },
     ]);

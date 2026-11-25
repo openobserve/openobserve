@@ -1423,7 +1423,6 @@
     "selectOrganization": "Selecteer een organisatie"
   },
   "search": {
-    "noValue": "(geen waarde)",
     "valueTypesDiffer": "De typen verschillen tussen de geselecteerde streams, dus waarden kunnen niet worden gefilterd",
     "queryFailed": "Query mislukt",
     "unknownError": "Onbekende fout",

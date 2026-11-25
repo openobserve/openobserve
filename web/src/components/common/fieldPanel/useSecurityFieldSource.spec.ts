@@ -275,7 +275,7 @@ describe("useSecurityFieldSource", () => {
       await flush();
       const state = harness.source.fieldValues.value.actor_user_name;
       expect(state.values.slice(0, 4)).toEqual([
-        { key: NULL, label: "(no value)", count: 5 },
+        { key: NULL, label: "", count: 5 },
         { key: "null", count: 4 },
         { key: "root", count: 3 },
         { key: "", label: '""', count: 2 },
@@ -305,7 +305,7 @@ describe("useSecurityFieldSource", () => {
       harness.source.openField(fieldRow(harness, "actor_user_name"));
       await flush();
       const [missing, shaped] = harness.source.fieldValues.value.actor_user_name.values;
-      expect(missing).toEqual({ key: NULL, label: "(no value)", count: 5 });
+      expect(missing).toEqual({ key: NULL, label: "", count: 5 });
       expect(shaped).toEqual({ key: `\u0000${NULL}`, label: NULL, count: 3 });
       harness.source.addValueFilters("actor_user_name", [shaped.key], [missing.key]);
       expect(harness.fieldFilters.value).toEqual([
