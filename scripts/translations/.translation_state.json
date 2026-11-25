@@ -1293,21 +1293,21 @@
       }
     },
     "discovery": {
-      "addError": "29d100f36b75f5a4",
-      "addSuccess": "e2987efe156002d9",
-      "addToQueue": "67e64116e5021705",
+      "addError": "79011d92bab0e8a3",
+      "addSuccess": "0cce28d459c73bc4",
+      "addToQueue": "6a9590e42a2d6e4a",
       "addToQueueMenu": {
         "accepts": "752edc9a6c7c7a6a",
         "dimensions": "69a6155c1816c3db",
-        "loading": "99330714126e6783",
-        "manageQueues": "f617c18948ace41e",
-        "noQueues": "a48218ebf18357ac",
-        "sectionTitle": "67e64116e5021705"
+        "loading": "3af065d94093898d",
+        "manageQueues": "a2aa34cbab921f44",
+        "noQueues": "5715114edf34616b",
+        "sectionTitle": "6a9590e42a2d6e4a"
       },
       "columns": {
         "actions": "ff8059dc6752afdd",
         "duration": "4fc52a3c4c558b51",
-        "inQueue": "80bc2efdd8c2b136",
+        "inQueue": "43651f3bd2300c9a",
         "input": "36ecb4f8669133ce",
         "kind": "f5387f9bb6ed7031",
         "quality": "1b2c08a8733d7ff1",
@@ -1322,26 +1322,26 @@
         "type": "baaddf70fb5d432b"
       },
       "inQueue": {
-        "multiple": "3aa35c67215ff2fc",
+        "multiple": "ceaf4d4d979b9723",
         "none": "52b0a6c08d08f36e",
         "reviewed": "f2bebfdb61997ad0"
       },
       "inQueueFilter": {
-        "all": "603f98078872948f",
-        "enqueued": "1ff4b935fbc80220",
-        "label": "d733026fcf93d102",
-        "notEnqueued": "584503acc0bf8027",
-        "pending": "fa8ab18feff9d129",
-        "reviewed": "fb5acf2ec88d7b6e"
+        "all": "51107686754a31d2",
+        "enqueued": "4ac85342fd5f0c05",
+        "label": "ee373c7b730cc043",
+        "notEnqueued": "47ff25cc9662036b",
+        "pending": "f1c45f3f1314dadd",
+        "reviewed": "fad6057bb5403e59"
       },
       "loadError": "515b3b244c7f1401",
-      "openQueue": "c4c44f08ccf74012",
+      "openQueue": "1983e104703da865",
       "quality": {
         "issue": "48dc76dfa23ae03f",
         "issueCount": "ae7cbb64a0123148",
         "multiple": "14070fdb5ff79759"
       },
-      "queuesError": "9744a56aa3cd3f8e",
+      "queuesError": "0aa2dea69f1ac4b5",
       "scope": {
         "session": "6fa3cbf451b2a1d5",
         "span": "b3393bfb2a55adff",
@@ -1763,7 +1763,7 @@
       "playground": "a6273fb551f223ce",
       "prompts": "5f2e66e6539797d0",
       "quality": "1b2c08a8733d7ff1",
-      "queues": "be77db1156d1f1b5",
+      "queues": "66cbc31a59d9944b",
       "remoteTasks": "ba919f290695b762",
       "scoreConfigs": "8c70f1c12bd720da",
       "scorers": "d8598427499abb65",
@@ -2242,15 +2242,15 @@
         "addCondition": "eda8d185447924a9",
         "addScoreConfig": "73a7eb0a88eab936",
         "allScoreConfigsAdded": "b8a54f3585e17901",
-        "autoRoutingEmpty": "327c0855ef4ebbf0",
-        "autoRoutingHint": "dcbc3a49ab2a43b5",
+        "autoRoutingEmpty": "c5b794fcf4b1b3f0",
+        "autoRoutingHint": "c401ca87c57889d3",
         "autoRoutingLabel": "0778a84ce22f5b66",
         "conditionAnd": "bd972cc4f15d8c17",
         "conditionScorePlaceholder": "84039a14d5ad9a94",
         "conditionValuePlaceholder": "8e37953d23daca5f",
         "descriptionLabel": "526e0087cc3f254d",
-        "descriptionPlaceholder": "7c05287ce5640a47",
-        "error": "9e6dbcd4d891c17b",
+        "descriptionPlaceholder": "dd4cef00919f3dad",
+        "error": "ebcadf46261ca104",
         "errors": {
           "name": "604fd1b2e29c688a",
           "scoreConfigs": "d49d8ceed2a1fecd"
@@ -2263,13 +2263,13 @@
         "operatorIsNot": "e1bf1560b1c24336",
         "pin": "38da17d11c270963",
         "scoreConfigsEmpty": "a9fbab30dd4380e6",
-        "scoreConfigsHint": "78bee8d7543748f0",
+        "scoreConfigsHint": "4d60ac0eb3f7de92",
         "scoreConfigsLabel": "8c70f1c12bd720da",
-        "success": "3da657dc97c82854",
-        "targetDatasetHint": "ec0c9ce178895318",
+        "success": "4ad68755213b1f82",
+        "targetDatasetHint": "ea5d3a26d0544fc0",
         "targetDatasetLabel": "dd912156bcc78d0f",
         "targetDatasetNone": "2e689bf842aca91e",
-        "title": "118b76239861fac3",
+        "title": "dda8128760b18ad5",
         "versionLatest": "1cedd0e3705f5018"
       },
       "detail": {
@@ -2281,11 +2281,11 @@
           "refType": "9b6e88e8943a8f9c",
           "status": "920e413c7d411b61"
         },
-        "emptyBody": "352acbf085d7256b",
+        "emptyBody": "d3cf4235d0cf05be",
         "emptyTitle": "6b2d587de56f2a96",
-        "fallbackTitle": "3b2fe03e36893916",
+        "fallbackTitle": "4599d2f991b4f2df",
         "inTrace": "9148de2b5c39c1c0",
-        "loadError": "bbad7a24f0d58d7d",
+        "loadError": "4680eef65ac0d974",
         "noTargetDataset": "73a7b1a478ee9767",
         "reviewAgain": "823d9ee053762f38",
         "scoreConfigs": "2a5d200221de20b6",
@@ -2297,14 +2297,14 @@
         },
         "targetDataset": "dd912156bcc78d0f"
       },
-      "loadError": "9744a56aa3cd3f8e",
-      "newButton": "118b76239861fac3",
+      "loadError": "0aa2dea69f1ac4b5",
+      "newButton": "dda8128760b18ad5",
       "optionsLoadError": "d7c6745e1e832cd3",
       "review": "aff0766a5290e117",
       "reviewedCount": "75b4a6d75b51678a",
-      "searchPlaceholder": "145f4f95e23ddb2c",
+      "searchPlaceholder": "a22b3623aa7aa90d",
       "workbench": {
-        "allReviewedBody": "57a13d2a0914975f",
+        "allReviewedBody": "29b0d69a8f4b8801",
         "allReviewedTitle": "af8fb964f828000e",
         "appendOnlyNote": "18efdd7c0091b0b2",
         "collapseNav": "9047b661e6afc6f6",
@@ -2712,15 +2712,15 @@
     "title": "207a795d37dc4181",
     "traceActions": {
       "annotate": {
-        "button": "c0bffcde8443bd47",
-        "confirm": "67e64116e5021705",
-        "error": "ccc01b0ddec764b5",
-        "hint": "b6ae162bd7a505a3",
-        "noQueues": "a281320f799df19e",
-        "queueLabel": "3b2fe03e36893916",
-        "queuePlaceholder": "a6c1d90f725ea071",
+        "button": "6a9590e42a2d6e4a",
+        "confirm": "6a9590e42a2d6e4a",
+        "error": "57f65c2af5866d0b",
+        "hint": "a6c202bc86544244",
+        "noQueues": "90a76e23cc68c86d",
+        "queueLabel": "4599d2f991b4f2df",
+        "queuePlaceholder": "2586b98e6e32f82d",
         "success": "91af2d3b27c2f435",
-        "title": "c0bffcde8443bd47"
+        "title": "6a9590e42a2d6e4a"
       },
       "dataset": {
         "button": "f6838a789315a729",
@@ -9006,6 +9006,25 @@
     "typeTitle": "340f463033e0fd5d",
     "variablesLabel": "29802f417657a871"
   },
+  "commandPalette": {
+    "actions": "4759498ac2a719c6",
+    "clearRecent": "4cf1529e6f624067",
+    "emptyHelp": "1acfcac58d315783",
+    "failed": "0e4b48c490e81d95",
+    "globalShortcut": "90d31a87a719a155",
+    "historyStorageUnavailable": "f210033cbc7d85ee",
+    "loading": "c31723ab330289fe",
+    "localHistory": "151e228bad8b98d0",
+    "moreTypes": "653343c34ccf999e",
+    "offline": "f7e4c01da1172611",
+    "pages": "9046da16aea909ba",
+    "partial": "58a07f199f47d552",
+    "placeholder": "84611f88e904dc2d",
+    "recent": "38ef8405e1625c8f",
+    "recentUnavailable": "39da35d2f133e47b",
+    "sourceUnavailable": "d5c6942375701062",
+    "title": "e7608f20367d6e18"
+  },
   "common": {
     "absolute": "f288738f604233a7",
     "actionDetails": "7adbedfc26d02542",
@@ -14053,7 +14072,7 @@
       "title": "d5b92370055151f3"
     },
     "noDiscoveryItems": {
-      "description": "58946c6145c03a73",
+      "description": "ed74615fe1f5a102",
       "title": "29b0352f2dc58297"
     },
     "noDomainMappings": {
@@ -14278,10 +14297,10 @@
       "title": "e6bfbea360e31f6f"
     },
     "noQueues": {
-      "action": "511d0c8f805eb931",
-      "actionDesc": "e58187c57afe0db5",
-      "description": "df9325918b326e47",
-      "title": "d80d4c5156bd77ed"
+      "action": "dda8128760b18ad5",
+      "actionDesc": "1b684ccfe85c53c6",
+      "description": "c76629b04485574a",
+      "title": "a897b512ebdd155b"
     },
     "noRegexPatterns": {
       "action": "c6fbcde46fa9a9d2",
@@ -19924,6 +19943,7 @@
       "facets": {
         "clearFilters": "7179ea0035fca783",
         "facetAria": "5ab6e1b320e5d596",
+        "facetAriaUnchecked": "80d7d42151a6232f",
         "noPrefixMatch": "7a44d517e7d74621",
         "noSuffixMatch": "4ad790c24d5aef64",
         "noTypeMatch": "1e20de172df2dab2",
@@ -19933,7 +19953,8 @@
         "searchSuffixesAria": "d76c1241ae131936",
         "searchTypes": "8b89333be09379c2",
         "searchTypesAria": "d77a3065bc8e5f08",
-        "selectedCount": "529aacfdfd2b17bf"
+        "selectedCount": "529aacfdfd2b17bf",
+        "uncheckedTooltip": "5f6adced4f6b81d8"
       },
       "filterByPrefix": "936797619f25c760",
       "filterBySuffix": "433c2b241082fb2a",
@@ -24227,6 +24248,8 @@
     "query": "7f1d5fe0ce5e9284",
     "queryEditorPlaceholder": "8ad129c1b0e2a91f",
     "queryNode": "b80a37564fbb3c07",
+    "queryRowLimitNote": "c586b4521f209d36",
+    "queryRowLimitNoteNoLimit": "dfa4d7b30bb0308f",
     "queryTimeInMs": "0e5786bc64744963",
     "queryTimeLabel": "ce6c7979494088af",
     "remoteDestination": "51fbc108850d981c",
@@ -25153,8 +25176,8 @@
     "aiMonitoring": "7ad3da3366b4ec83",
     "aiPromptCreate": "c0053129dc166e79",
     "aiPromptVersionCreate": "c07f4ea33fdfb8ef",
-    "aiQueueDetail": "3b2fe03e36893916",
-    "aiQueueReview": "ceda6a4b4115fffd",
+    "aiQueueDetail": "4599d2f991b4f2df",
+    "aiQueueReview": "c614d90dcc46da25",
     "aiRemoteTaskCreate": "f1dc03177854ed04",
     "aiRemoteTaskDetail": "955cc13f4aca422f",
     "aiRemoteTaskEdit": "2f3a1381b4eb8572",
@@ -35332,6 +35355,7 @@
         "actualCost": "07d43e8be3f75691",
         "cacheCreationCost": "bd3f35f6a6d41501",
         "cacheEstimate": "c8d2cfadf4619e77",
+        "cacheHits": "372482463662f555",
         "cacheImpact": "785942fa7785ef0e",
         "cacheImpactTooltipTitle": "01d67123726032a3",
         "costLead": "5464f56df3f3c0fe",
@@ -35421,13 +35445,9 @@
       "noAgentsTitle": "0033e6efa2b5ae49",
       "retry": "942087cc2d41e013",
       "search": {
-        "clear": "3b7ea51793e9d906",
-        "clearUser": "d7e9f5f5c37506e5",
-        "noResultsDescription": "d7f474f58e1453e4",
-        "noResultsTitle": "5da0df2b26ae4e06",
-        "placeholder": "dfdf19300240d7e4",
-        "title": "86d34e63ba95a339",
-        "user": "753a700de3bec998"
+        "clear": "ba59e2d4a5e39a42",
+        "noResultsDescription": "356e6add03263bd2",
+        "noResultsTitle": "5da0df2b26ae4e06"
       },
       "stream": "1eec3071dd26e224",
       "streamLabel": "1eec3071dd26e224",
@@ -35542,6 +35562,11 @@
       "toolCalls": "b102cdc6032df9ca"
     },
     "threadView": {
+      "cacheDetail": "3b1f8f67772f8dce",
+      "cacheHit": "20451f0861c19556",
+      "cacheMiss": "b0d1262b97bc7bda",
+      "cacheMissCount": "6097db5c21ed593e",
+      "cacheWrite": "83d707dba27bcba0",
       "cost": "204a5eb2cd28bcfd",
       "duration": "4fc52a3c4c558b51",
       "error": "54a0e8c17ebb21a1",

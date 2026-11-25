@@ -21,6 +21,7 @@ const props = withDefaults(defineProps<ToggleGroupProps>(), {
   labelPosition: "left",
   reorderable: false,
   mobileDropdown: false,
+  deselectable: false,
 });
 
 const emit = defineEmits<ToggleGroupEmits>();
@@ -105,8 +106,9 @@ const measure = (animated: boolean) => {
   const trackStyle = getComputedStyle(track);
   const borderLeft = parseFloat(trackStyle.borderLeftWidth) || 0;
   const borderTop = parseFloat(trackStyle.borderTopWidth) || 0;
-  const x = activeRect.left - trackRect.left - borderLeft;
-  const y = activeRect.top - trackRect.top - borderTop;
+  // A scrolling track places absolute children in scrolled content, not on screen.
+  const x = activeRect.left - trackRect.left - borderLeft + track.scrollLeft;
+  const y = activeRect.top - trackRect.top - borderTop + track.scrollTop;
 
   // Transition only when asked AND we already had a valid position (i.e. the group
   // was already visible). The very first placement always snaps. Setting the flag
@@ -348,7 +350,10 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       v-bind="dragListeners"
       @update:model-value="
         (v) => {
-          if (type === 'single' && (v === null || v === undefined || v === '')) return;
+          if (type === 'single' && (v === null || v === undefined || v === '')) {
+            if (deselectable) emit('update:modelValue', null);
+            return;
+          }
           emit('update:modelValue', v);
         }
       "
@@ -384,7 +389,10 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
     v-bind="dragListeners"
     @update:model-value="
       (v) => {
-        if (type === 'single' && (v === null || v === undefined || v === '')) return;
+        if (type === 'single' && (v === null || v === undefined || v === '')) {
+          if (deselectable) emit('update:modelValue', null);
+          return;
+        }
         emit('update:modelValue', v);
       }
     "
