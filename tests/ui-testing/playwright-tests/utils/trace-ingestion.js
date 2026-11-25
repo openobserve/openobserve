@@ -332,7 +332,7 @@ async function seedSearchableTraces(browser, traceCount, options = {}) {
     }
     await waitForSearch(page.request, `SELECT trace_id FROM "default" WHERE trace_id = '${seeded.traceIds.at(-1)}'`, {
       expected: true,
-      pick: (result) => result.hits.length > 0,
+      pick: (result) => (result.status === 200 ? result.hits.length > 0 : result.status),
       message: 'seeded traces must be searchable',
     });
   } finally {

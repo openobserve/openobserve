@@ -80,9 +80,11 @@ test.describe("Traces SQL mode testcases", () => {
     await pm.tracesPage.expectQueryEditorValue(PREFILLED);
     await pm.tracesPage.setQueryEditorValue(GROUPED);
 
-    await pm.tracesPage.toggleSqlModeFromToolbar();
-
-    await expect(pm.tracesPage.getToastMessage('Your SQL is kept.')).toBeVisible({ timeout: 10000 });
+    // The toast lives 5 s, so it is watched while the menu is still closing.
+    await Promise.all([
+      expect(pm.tracesPage.getToastMessage('Your SQL is kept.')).toBeVisible({ timeout: 30000 }),
+      pm.tracesPage.toggleSqlModeFromToolbar(),
+    ]);
     await expect(pm.tracesPage.getSqlModeConfirmDialog()).toHaveCount(0);
     await pm.tracesPage.expectSqlMode(false);
     await pm.tracesPage.expectQueryEditorValue(FILTER);

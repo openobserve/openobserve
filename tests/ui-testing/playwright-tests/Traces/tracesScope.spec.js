@@ -35,6 +35,7 @@ test.describe("Traces scope select testcases", () => {
   test("P1: Root spans narrows the list request, and the link restores the select", {
     tag: ['@tracesScope', '@traces', '@query', '@P1', '@all']
   }, async ({ page }) => {
+    await pm.tracesPage.setQueryEditorValue('');
     await expect(pm.tracesPage.getScopeValue()).toHaveAttribute('aria-label', 'All spans');
     const capture = pm.tracesPage.captureSearchRequests();
 
