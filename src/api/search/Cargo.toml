@@ -70,3 +70,4 @@ vector-enrichment.workspace = true
 
 [dev-dependencies]
 datafusion.workspace = true
+openobserve-core = { workspace = true, features = ["test-utils"] }
