@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OToggleGroup
             v-else
+            class="[&_span.cursor-not-allowed]:flex"
             :model-value="searchObj.meta.logsVisualizeToggle"
             @update:model-value="onLogsVisualizeToggleUpdate($event)"
           >
@@ -188,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
             <OSwitch
-              class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
+              class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
               v-model="searchObj.meta.showHistogram"
               :aria-label="t('search.showHistogramLabel')"
               size="sm"
@@ -209,11 +210,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
           >
             <OSwitch
-              class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
+              class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
               :model-value="searchObj.meta.sqlMode"
               :aria-label="t('search.sqlModeLabel')"
               :disabled="isSqlModeDisabled"
-              :size="toolbarToggleIconOnly ? 'sm' : 'md'"
+              size="sm"
               @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
             />
             <OIcon name="code" size="sm" class="shrink-0" />
@@ -231,10 +232,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleQuickMode"
           >
             <OSwitch
-              class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
+              class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
               :model-value="searchObj.meta.quickMode"
               :aria-label="t('search.quickModeLabel')"
-              :size="toolbarToggleIconOnly ? 'sm' : 'md'"
+              size="sm"
               @click.stop="handleQuickMode"
             />
             <!-- The switch gets its own tooltip; the button-level one stays closed while the switch is hovered. -->
@@ -358,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
-                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
+                    class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
                     :model-value="searchObj.meta.sqlMode"
                     :disabled="isSqlModeDisabled"
                     size="sm"
@@ -416,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
-                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
+                    class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
                     v-model="searchObj.meta.showHistogram"
                     size="sm"
                     data-test="logs-search-bar-show-histogram-toggle-btn"
@@ -456,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
-                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
+                    class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
                     :model-value="searchObj.meta.quickMode"
                     size="sm"
                     data-test="logs-search-bar-quick-mode-switch"
@@ -494,7 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
-                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
+                    class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
                     data-test="logs-search-bar-show-query-toggle-btn"
                     v-model="searchObj.meta.showTransformEditor"
                     size="sm"
@@ -606,10 +607,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
         >
           <OSwitch
-            class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
+            class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
             v-model="searchObj.meta.showTransformEditor"
             :aria-label="t('search.functionEditorLabel')"
-            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
+            size="sm"
             @click.stop
           />
           <span class="text-accent shrink-0 font-mono text-sm font-bold italic">fx</span>
@@ -973,6 +974,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <AutoRefreshInterval
+                class="ms-1.5"
                 variant="ghost"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
@@ -1459,7 +1461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !showFilterBuilder &&
                   !recentFocusOpen
                 "
-                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
+                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_1.55rem] select-none"
               >
                 <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
               </div>
@@ -1505,7 +1507,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.meta.functionEditorPlaceholderFlag &&
                         !isVrlEditorDisabled
                       "
-                      class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
+                      class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_1.55rem] select-none"
                     >
                       <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
                     </div>
