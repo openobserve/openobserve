@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { enableAutoUnmount, mount } from "@vue/test-utils";
 import { Marked, marked } from "marked";
 import DOMPurify from "dompurify";
@@ -84,6 +84,35 @@ describe("LLM content Markdown with real parsing and sanitization", () => {
     expect(message.querySelector("pre code")?.textContent).toBe(`${token}\n`);
     expect(message.querySelector("a")?.getAttribute("href")).toBe("https://example.com");
   });
+
+  it("scales across many separate native HTML blocks", () => {
+    const native = new Marked({ gfm: true, breaks: false });
+    const block = "<div>hello</div>\n\n";
+    for (const count of [500, 1000, 2000, 4000]) {
+      const content = block.repeat(count);
+      const actual = renderMarkdown(content);
+      expect(actual).toBe(DOMPurify.sanitize(native.parse(content) as string));
+    }
+
+    // Count tag scans rather than asserting a machine-dependent timing threshold.
+    const count = 200;
+    let tagScans = 0;
+    const originalExec = RegExp.prototype.exec;
+    const exec = vi.spyOn(RegExp.prototype, "exec").mockImplementation(function (
+      this: RegExp,
+      source: string,
+    ) {
+      const match = originalExec.call(this, source);
+      if ((this.global || this.sticky) && match?.[1] === "div") tagScans++;
+      return match;
+    });
+    try {
+      renderMarkdown(block.repeat(count));
+    } finally {
+      exec.mockRestore();
+    }
+    expect(tagScans).toBeLessThan(count * 20);
+  }, 30000);
 });
 
 describe.each([
