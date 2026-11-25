@@ -541,13 +541,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ turnNumberOf(trace.traceId) }}
                         </span>
                         <div class="flex min-w-0 flex-col gap-[0.15rem]">
-                          <OTruncatedText
-                            as="div"
-                            :tooltip="false"
-                            class="text-compact text-text-heading font-semibold"
-                          >
-                            {{ turnTitle(trace) }}
-                          </OTruncatedText>
+                          <div class="flex min-w-0 items-center gap-2">
+                            <OTruncatedText
+                              as="div"
+                              :tooltip="false"
+                              class="text-compact text-text-heading font-semibold"
+                            >
+                              {{ turnTitle(trace) }}
+                            </OTruncatedText>
+                            <LLMCacheChip
+                              v-if="cacheByTrace[trace.traceId]"
+                              :cache="cacheByTrace[trace.traceId]"
+                              :data-test="`session-turn-cache-${trace.traceId}`"
+                            />
+                          </div>
                           <OTruncatedText
                             as="div"
                             :tooltip="false"
@@ -1080,7 +1087,15 @@ import {
   type SessionTraceRow,
   type TurnDetail,
 } from "./composables/useSessions";
-import { buildTurnDetail, classify, getOutputRaw, toolCallParts } from "./threadView.utils";
+import {
+  addCacheUse,
+  buildTurnDetail,
+  classify,
+  classifyCacheUse,
+  getOutputRaw,
+  toolCallParts,
+  type TurnCacheUse,
+} from "./threadView.utils";
 import { patternsForAgent, type HarnessPatternRule, type HarnessStripped } from "./harnessText";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1101,6 +1116,7 @@ import TurnPreviewCard from "./TurnPreviewCard.vue";
 import SessionRibbon from "./SessionRibbon.vue";
 import ThreadView from "./ThreadView.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
+import LLMCacheChip from "./LLMCacheChip.vue";
 import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
@@ -1505,9 +1521,30 @@ const kpiCards = computed<
         tokens: formatTokens(s.cachedTokens),
       }),
       subTurns: [],
-      subTail: "",
+      subTail: cacheCalls.value.calls
+        ? t("traces.sessionDetail.kpiSub.cacheHits", cacheCalls.value)
+        : "",
     },
   ];
+});
+
+// Classified across the loaded turns, so an earlier turn's cache use makes a later turn's a miss.
+const cacheUses = computed(() =>
+  classifyCacheUse(sessionSpans.value.filter((s) => classify(s) === "llm_turn")),
+);
+// Counts the calls whose spans are loaded; empty until then or when the session never caches.
+const cacheCalls = computed(() => {
+  const uses = [...cacheUses.value.values()];
+  return { calls: uses.length, hits: uses.filter((u) => u.state === "hit").length };
+});
+// A collapsed row sums its turn's calls, as the Pretty view's condensed turn does.
+const cacheByTrace = computed<Record<string, TurnCacheUse>>(() => {
+  const out: Record<string, TurnCacheUse> = {};
+  for (const s of sessionSpans.value) {
+    const use = cacheUses.value.get(String(s.span_id));
+    if (use) out[String(s.trace_id)] = addCacheUse(out[String(s.trace_id)], use);
+  }
+  return out;
 });
 
 // ── Conversation: filters, sort, expand. All client-side over `traces`. ──
@@ -1790,11 +1827,17 @@ async function loadSessionSpans() {
   spanLoads.value++;
   try {
     // The details endpoint widens the window to the whole session, so turns can start before `from`.
+    // A non-zero session total proves the stream has that column; selecting a missing one fails.
+    const cacheColumns = [
+      detail.value?.cacheReadInputTokens && "gen_ai_usage_cache_read_input_tokens",
+      detail.value?.cacheCreationInputTokens && "gen_ai_usage_cache_creation_input_tokens",
+    ].filter((c): c is string => !!c);
     const rows = await fetchSessionSpans(
       streamName.value,
       pending,
       sessionEvaluationRange.value.startTime,
       sessionEvaluationRange.value.endTime,
+      cacheColumns,
     );
     sessionSpans.value = [...sessionSpans.value, ...rows].sort(
       (a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0),

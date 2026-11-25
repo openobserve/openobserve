@@ -40,6 +40,7 @@ describe("parseSqlFilter", () => {
     const samples = [
       "level = 'error' AND status >= 500 AND ok = false",
       `"k8s-pod" = 'o''brien'`,
+      "level = ('o''' || '''brien')",
       "str_match(level, 'x')",
       "level NOT LIKE '%x%'",
       "level LIKE 'x%'",

@@ -58,7 +58,7 @@ beforeEach(() => {
   s.loadedOrg.value = null;
   s.currentPage.value = 1;
   s.rowsPerPage.value = 20;
-  s.searchKeyword.value = "";
+  s.searchFilter.value = "";
   s.sortBy.value = "end_time";
   s.sortOrder.value = "desc";
   s.agents.value = [];
@@ -252,36 +252,13 @@ describe("useSessions — fetchPage: sorting", () => {
   });
 });
 
-describe("useSessions — fetchPage: search", () => {
-  it("sends the term as keyword", async () => {
+describe("useSessions — fetchPage: filters", () => {
+  it("sends the applied filter with the page request", async () => {
     mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
     const { fetchPage } = useSessions();
-    await fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "  luis " });
-    expect(mockSessionsList).toHaveBeenCalledWith(expect.objectContaining({ keyword: "luis" }));
-  });
-
-  it("treats a blank term as no search", async () => {
-    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
-    const { fetchPage } = useSessions();
-    await fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "   " });
-    expect(mockSessionsList).toHaveBeenCalledWith(expect.objectContaining({ keyword: undefined }));
-  });
-
-  it("caps the term at 256 characters", async () => {
-    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
-    const { fetchPage } = useSessions();
-    await fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "x".repeat(300) });
-    expect(mockSessionsList.mock.calls[0][0].keyword).toHaveLength(256);
-  });
-
-  // The Users page's "Sessions" link: that user only, not a substring match.
-  it("sends an exact user as userId, apart from the keyword", async () => {
-    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
-    const { fetchPage } = useSessions();
-    await fetchPage("qa_stream", 1000, 2000, 0, 25, "", { user: " qa-u1 " });
-    expect(mockSessionsList).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: "qa-u1", keyword: undefined }),
-    );
+    const filter = "user_id = 'qa-u1'";
+    await fetchPage("stream", 1000, 2000, 0, 25, filter);
+    expect(mockSessionsList).toHaveBeenCalledWith(expect.objectContaining({ filter }));
   });
 
   it("drops a late response from a superseded run (last request wins)", async () => {
@@ -294,8 +271,8 @@ describe("useSessions — fetchPage: search", () => {
       });
 
     const { sessions, loading, fetchPage } = useSessions();
-    const p1 = fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "a" });
-    const p2 = fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "ab" });
+    const p1 = fetchPage("stream", 1000, 2000, 0, 25, "user_id = 'a'");
+    const p2 = fetchPage("stream", 1000, 2000, 0, 25, "user_id = 'ab'");
     await p2;
     expect(sessions.value.map((r) => r.sessionId)).toEqual(["second"]);
     expect(loading.value).toBe(false);

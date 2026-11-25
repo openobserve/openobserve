@@ -17759,13 +17759,9 @@
       "noAgentsDescription": "No GenAI agents were detected for the selected time window. Try a wider range or switch back to stream view.",
       "viewByStream": "View by Stream",
       "search": {
-        "placeholder": "Search by user or message",
-        "title": "Match sessions whose user ID or conversation text contains the text",
         "noResultsTitle": "No sessions match your search",
-        "noResultsDescription": "Try a different term, or a wider time range.",
-        "clear": "Clear search",
-        "user": "ผู้ใช้: {user}",
-        "clearUser": "แสดงผู้ใช้ทั้งหมด"
+        "noResultsDescription": "Try a different filter or a wider time range.",
+        "clear": "Clear filter"
       }
     },
     "sessionDetail": {
@@ -17826,6 +17822,7 @@
         "costLead": "Peak {peak} ·",
         "tokens": "{ratio}% Cached",
         "cacheImpact": "{ratio}% Reused · {tokens} Tok Read",
+        "cacheHits": "· แคชตรง {hits} จาก {calls} ครั้ง",
         "cacheEstimate": "Net impact includes cache reads and cache creation costs.",
         "cacheImpactTooltipTitle": "Cache Cost Breakdown",
         "actualCost": "Actual Cost",
@@ -18108,6 +18105,11 @@
       "unknown": "unknown",
       "tokens": "Tokens",
       "tokensSuffix": "tokens",
+      "cacheHit": "แคช {tokens}",
+      "cacheWrite": "เขียนแคช {tokens}",
+      "cacheMiss": "แคชพลาด",
+      "cacheMissCount": "แคชพลาด {n} ครั้ง",
+      "cacheDetail": "อ่านจากแคช {read} โทเค็น เขียน {written} โทเค็น",
       "error": "ข้อผิดพลาด",
       "viewSpan": "View span"
     },
