@@ -49,6 +49,8 @@ impl SearchWork {
             hits: Vec::new(),
             sources: Vec::new(),
             took_ms: 0,
+            rbac_ms: 0,
+            catalog_ms: 0,
         };
         for &kind in &self.query.types {
             let snapshot = snapshots

@@ -100,10 +100,17 @@ pub async fn search(
     if !explicit_types {
         query.types.retain(|kind| permissions::enabled(*kind));
     }
+    let rbac_start = Instant::now();
     let access = permissions::resolve(&org, &subject.user_id, &query.types).await;
-    match resources::search(&org, query, access).await {
+    let rbac_ms = millis(rbac_start);
+    let catalog_start = Instant::now();
+    let result = resources::search(&org, query, access).await;
+    let catalog_ms = millis(catalog_start);
+    match result {
         Ok(mut result) => {
-            result.took_ms = start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
+            result.took_ms = millis(start);
+            result.rbac_ms = rbac_ms;
+            result.catalog_ms = catalog_ms;
             ([(header::CACHE_CONTROL, "private, no-store")], Json(result)).into_response()
         }
         Err(SearchError::InvalidQuery(error)) => {
@@ -120,6 +127,10 @@ pub async fn search(
             "Search unavailable",
         ),
     }
+}
+
+fn millis(start: Instant) -> u64 {
+    start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64
 }
 
 fn failure(status: StatusCode, code: &'static str, message: impl Into<String>) -> Response {

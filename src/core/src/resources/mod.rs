@@ -82,6 +82,8 @@ pub async fn search(
                 })
                 .collect(),
             took_ms: 0,
+            rbac_ms: 0,
+            catalog_ms: 0,
         });
     }
     let catalog = CATALOG

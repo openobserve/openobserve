@@ -232,6 +232,8 @@ pub struct SearchResponse {
     pub hits: Vec<ResourceHit>,
     pub sources: Vec<SourceResult>,
     pub took_ms: u64,
+    pub rbac_ms: u64,
+    pub catalog_ms: u64,
 }
 
 #[derive(Debug)]
