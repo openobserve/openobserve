@@ -477,6 +477,13 @@ async fn publish_merged_output(
 #[cfg(test)]
 mod tests {
     use config::meta::stream::FileMeta;
+    use datafusion::{
+        arrow::{
+            array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+            datatypes::{DataType, Field, Schema},
+        },
+        datasource::MemTable,
+    };
     use object_store::memory::InMemory;
 
     use super::*;
@@ -488,13 +495,6 @@ mod tests {
     }
 
     async fn produced_metrics_output(format: FileFormat, kind: &str) -> MergedFile {
-        use datafusion::{
-            arrow::{
-                array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
-                datatypes::{DataType, Field, Schema},
-            },
-            datasource::MemTable,
-        };
         let schema = Arc::new(Schema::new(vec![
             Field::new("__hash__", DataType::UInt64, false),
             Field::new("_timestamp", DataType::Int64, false),

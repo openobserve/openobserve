@@ -194,7 +194,11 @@ mod tests {
 
     use arrow::array::{Int64Array, RecordBatch, StringArray};
     use arrow_schema::{DataType, Field, Schema};
-    use datafusion::{catalog::MemTable, physical_plan::get_plan_string, prelude::SessionContext};
+    use datafusion::{
+        catalog::MemTable,
+        physical_plan::{empty::EmptyExec, get_plan_string},
+        prelude::SessionContext,
+    };
 
     use super::*;
     use crate::datafusion::udf::fulltext::str_match;
@@ -324,7 +328,6 @@ mod tests {
 
     #[test]
     fn test_is_simple_distinct_returns_none_for_empty_exec() {
-        use datafusion::physical_plan::empty::EmptyExec;
         let schema = Arc::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
             "a",
             arrow_schema::DataType::Int32,

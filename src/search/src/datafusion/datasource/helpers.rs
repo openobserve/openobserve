@@ -582,7 +582,6 @@ mod tests {
 
     #[test]
     fn test_apply_combined_filter_timestamp_only_wraps_filter() {
-        use arrow_schema::{Field, Schema};
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("col", DataType::Utf8, false),
@@ -596,7 +595,6 @@ mod tests {
 
     #[test]
     fn test_apply_projection_with_diff_rules_produces_projection() {
-        use arrow_schema::{Field, Schema};
         use hashbrown::HashMap;
         let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
         let exec = Arc::new(EmptyExec::new(schema.clone())) as Arc<dyn ExecutionPlan>;

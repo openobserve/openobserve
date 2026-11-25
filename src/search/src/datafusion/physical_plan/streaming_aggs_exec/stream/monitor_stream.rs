@@ -180,11 +180,13 @@ mod tests {
 
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::{
+        error::DataFusionError,
         execution::SendableRecordBatchStream,
         physical_plan::{
             aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
             empty::EmptyExec,
             memory::MemoryStream,
+            stream::RecordBatchStreamAdapter,
         },
     };
     use tokio::sync::mpsc;
@@ -250,15 +252,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_failed_partition_does_not_complete_cache() {
-        use datafusion::{
-            error::DataFusionError,
-            physical_plan::{
-                aggregates::{AggregateMode, PhysicalGroupBy},
-                empty::EmptyExec,
-                stream::RecordBatchStreamAdapter,
-            },
-        };
-
         let schema = Arc::new(Schema::empty());
         let aggregate = Arc::new(
             AggregateExec::try_new(

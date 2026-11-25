@@ -118,7 +118,11 @@ pub fn try_encode(
 #[cfg(test)]
 mod tests {
     use datafusion::{
-        arrow::datatypes::{DataType, Field, Schema},
+        arrow::{
+            array::{Int32Array, RecordBatch},
+            datatypes::{DataType, Field, Schema},
+            ipc::writer::FileWriter,
+        },
         common::config::ConfigOptions,
         functions_aggregate::count::count_udaf,
         physical_expr::{
@@ -128,6 +132,7 @@ mod tests {
         },
         physical_plan::{
             aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
+            collect,
             empty::EmptyExec,
             filter::FilterExec,
         },
@@ -351,14 +356,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_decoded_cached_files_traversal_fails_closed() -> Result<()> {
-        use datafusion::{
-            arrow::{
-                array::{Int32Array, RecordBatch},
-                ipc::writer::FileWriter,
-            },
-            physical_plan::collect,
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let outside = tempfile::tempdir().unwrap();
         let planted = outside.path().join("planted.arrow");

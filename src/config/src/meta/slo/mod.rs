@@ -43,7 +43,15 @@
 //! | Computation-affecting edits rebuild; reverts rebuild too (D59) | [`generation`] |
 
 use serde::{Deserialize, Serialize};
-use sqlparser::ast::{Expr, UnaryOperator};
+use sqlparser::{
+    ast::{
+        BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr,
+        SelectItem, SetExpr, Statement, UnaryOperator, Value,
+    },
+    dialect::GenericDialect,
+    parser::Parser,
+    tokenizer::Token,
+};
 use utoipa::ToSchema;
 
 use super::alerts::Operator;
@@ -618,8 +626,6 @@ pub fn parse_predicate(
     field: &'static str,
     fragment: &str,
 ) -> Result<ValidatedPredicate, QuerySafetyError> {
-    use sqlparser::{dialect::GenericDialect, parser::Parser, tokenizer::Token};
-
     if fragment.trim().is_empty() {
         // An empty scope means "all rows" to the caller; it must not be
         // forced through here and become an empty predicate.
@@ -697,13 +703,17 @@ fn check_expr(field: &'static str, expr: &Expr) -> Result<(), QuerySafetyError> 
 /// column is not a predicate — accepting one would silently filter on
 /// truthiness.
 fn is_boolean_shaped(expr: &Expr) -> bool {
-    use sqlparser::ast::BinaryOperator as Op;
     match expr {
         Expr::BinaryOp { op, left, right } => {
             matches!(
                 op,
-                Op::Eq | Op::NotEq | Op::Gt | Op::GtEq | Op::Lt | Op::LtEq
-            ) || (matches!(op, Op::And | Op::Or)
+                BinaryOperator::Eq
+                    | BinaryOperator::NotEq
+                    | BinaryOperator::Gt
+                    | BinaryOperator::GtEq
+                    | BinaryOperator::Lt
+                    | BinaryOperator::LtEq
+            ) || (matches!(op, BinaryOperator::And | BinaryOperator::Or)
                 && is_boolean_shaped(left)
                 && is_boolean_shaped(right))
         }
@@ -751,12 +761,6 @@ pub fn validate_count_query(
     group_by: &[String],
     slice_interval_secs: i64,
 ) -> Result<Vec<String>, QuerySafetyError> {
-    use sqlparser::{
-        ast::{GroupByExpr, SelectItem, SetExpr, Statement},
-        dialect::GenericDialect,
-        parser::Parser,
-    };
-
     let statements = Parser::parse_sql(&GenericDialect {}, &query.sql)
         .map_err(|_| QuerySafetyError::Unparseable { field })?;
     let [Statement::Query(q)] = statements.as_slice() else {
@@ -872,8 +876,6 @@ fn check_histogram_interval(
     expr: &Expr,
     slice_interval_secs: i64,
 ) -> Result<(), QuerySafetyError> {
-    use sqlparser::ast::{FunctionArg, FunctionArgExpr, FunctionArguments, Value};
-
     let Expr::Function(f) = expr else {
         return Err(QuerySafetyError::ProjectionMismatch {
             field,

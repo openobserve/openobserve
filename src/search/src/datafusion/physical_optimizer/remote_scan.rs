@@ -531,10 +531,13 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
 mod tests {
     use datafusion::{
         arrow::datatypes::{DataType, Field, Schema},
-        common::JoinType,
+        common::{JoinType, ScalarValue},
         execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
+        physical_expr::expressions::Literal,
         physical_optimizer::{PhysicalOptimizerRule, sanity_checker::SanityCheckPlan},
-        physical_plan::{displayable, empty::EmptyExec, expressions::col},
+        physical_plan::{
+            displayable, empty::EmptyExec, expressions::col, windows::BoundedWindowAggExec,
+        },
         prelude::{SessionConfig, SessionContext},
     };
     use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
@@ -823,10 +826,6 @@ mod tests {
     // the NULL sentinel with the actual column value during ROLLUP/CUBE aggregation.
     #[test]
     fn test_wrap_partial_reduce_null_exprs_preserved_for_grouping_sets() -> Result<()> {
-        use datafusion::{
-            arrow::datatypes::DataType, common::ScalarValue, physical_expr::expressions::Literal,
-        };
-
         let schema = Arc::new(Schema::new(vec![
             Field::new("a", DataType::Int64, false),
             Field::new("b", DataType::Utf8, false),
@@ -1027,7 +1026,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_cluster_window_partitioned_by_filtered_constants_executes() {
-        use datafusion::physical_plan::windows::BoundedWindowAggExec;
         let latest = "SELECT event_name, _timestamp FROM (SELECT event_name, _timestamp, \
             ROW_NUMBER() OVER (PARTITION BY k8s_cluster, k8s_resource_name, \
             COALESCE(k8s_namespace_name, ''), event_name ORDER BY _timestamp DESC) AS rn \

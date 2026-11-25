@@ -6463,7 +6463,6 @@ mod tests {
 
     #[test]
     fn test_get_parquet_compression() {
-        use parquet::basic::Compression;
         assert_eq!(get_parquet_compression("snappy"), Compression::SNAPPY);
         assert_eq!(
             get_parquet_compression("uncompressed"),

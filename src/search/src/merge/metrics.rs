@@ -604,7 +604,9 @@ mod tests {
         PARQUET_MAX_ROW_GROUP_SIZE,
         meta::promql::{HASH_LABEL, VALUE_LABEL},
     };
+    use datafusion::datasource::MemTable;
     use futures::TryStreamExt;
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     use vortex::{buffer::Buffer, file::OpenOptionsSessionExt};
 
     use super::*;
@@ -655,7 +657,6 @@ mod tests {
         bytes: bytes::Bytes,
         parent: metrics_index::block::ParentMetadata,
     ) -> anyhow::Result<Vec<u8>> {
-        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         anyhow::ensure!(
             bytes.len() as u64 == parent.compressed_size,
             "source size mismatch"
@@ -747,7 +748,6 @@ mod tests {
     }
 
     fn sample_rows(bytes: bytes::Bytes) -> Vec<SourceRow> {
-        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         ParquetRecordBatchReaderBuilder::try_new(bytes)
             .unwrap()
             .build()
@@ -905,7 +905,6 @@ mod tests {
     #[tokio::test]
     async fn configured_metrics_index_dispatch_controls_block_generation() {
         use config::meta::stream::StreamType;
-        use datafusion::datasource::MemTable;
 
         use super::super::{MergeMode, MergeOutput, merge_parquet_files};
 

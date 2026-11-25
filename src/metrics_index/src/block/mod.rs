@@ -329,6 +329,10 @@ mod tests {
         datatypes::{DataType, Field, Float64Type, Int64Type, Schema, SchemaRef},
     };
     use bytes::Bytes;
+    use parquet::{
+        arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder},
+        file::properties::WriterProperties,
+    };
 
     use super::*;
 
@@ -372,7 +376,6 @@ mod tests {
         bytes: bytes::Bytes,
         parent: super::ParentMetadata,
     ) -> anyhow::Result<Vec<u8>> {
-        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         anyhow::ensure!(
             bytes.len() as u64 == parent.compressed_size,
             "source size mismatch"
@@ -498,7 +501,6 @@ mod tests {
     }
 
     fn parquet_bytes(input: &RecordBatch, row_group_size: usize) -> Bytes {
-        use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
         let properties = WriterProperties::builder()
             .set_max_row_group_row_count(Some(row_group_size))
             .build();
@@ -1067,7 +1069,6 @@ mod tests {
 
     #[test]
     fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
-        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         let input = batch(&rows());
         let original = parquet_bytes(&input, 3);
         let parent = ParentMetadata {
@@ -1107,7 +1108,6 @@ mod tests {
 
     #[test]
     fn pending_writer_requires_source_metadata_and_verifies_final_parquet_rows() {
-        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         let input = batch(&rows());
         let bytes = parquet_bytes(&input, 3);
         let reader = ParquetRecordBatchReaderBuilder::try_new(bytes.clone()).unwrap();
@@ -1308,7 +1308,6 @@ mod tests {
 
     #[test]
     fn renamed_parquet_and_sidecar_pair_uses_numeric_source_metadata() {
-        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         let directory = tempfile::tempdir().unwrap();
         let data_path = directory.path().join("indexed-v1-before.parquet");
         let midx_path = directory.path().join("indexed-v1-before.midx");

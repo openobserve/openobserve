@@ -229,7 +229,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{RecordBatch, StringArray};
+    use arrow::array::{ListArray, RecordBatch, StringArray};
     use arrow_schema::Schema;
     use datafusion::{
         assert_batches_eq, datasource::MemTable, logical_expr::ScalarUDFImpl,
@@ -250,7 +250,6 @@ mod tests {
         let pattern = StringArray::from(vec!["(\\d+)"]);
         let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
         let result = regexp_matches::<i32>(&args).unwrap();
-        use arrow::array::{Array, ListArray};
         let list = result.as_any().downcast_ref::<ListArray>().unwrap();
         assert!(!list.is_null(0));
     }
@@ -261,7 +260,6 @@ mod tests {
         let pattern = StringArray::from(vec![r#"(")"#]);
         let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
         let result = regexp_matches::<i32>(&args).unwrap();
-        use arrow::array::{Array, ListArray};
         let list = result.as_any().downcast_ref::<ListArray>().unwrap();
         assert!(!list.is_null(0));
     }
@@ -272,7 +270,6 @@ mod tests {
         let pattern = StringArray::from(vec!["(\\d+)"]);
         let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
         let result = regexp_matches::<i32>(&args).unwrap();
-        use arrow::array::{Array, ListArray};
         let list = result.as_any().downcast_ref::<ListArray>().unwrap();
         assert!(list.is_null(0));
     }

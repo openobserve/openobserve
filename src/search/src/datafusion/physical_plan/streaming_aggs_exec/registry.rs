@@ -364,9 +364,15 @@ pub(crate) fn get_cache_file_path_from_streaming_id(streaming_id: &str) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use datafusion::physical_plan::{
-        ChildrenPropertiesMode, ExecutionPlan, Partitioning, ReplaceChildrenOptions,
-        StatisticsArgs, StatisticsContext, empty::EmptyExec,
+    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::{
+        execution::context::TaskContext,
+        physical_plan::{
+            ChildrenPropertiesMode, ExecutionPlan, Partitioning, ReplaceChildrenOptions,
+            StatisticsArgs, StatisticsContext,
+            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
+            empty::EmptyExec,
+        },
     };
 
     use super::*;
@@ -631,12 +637,6 @@ mod tests {
     fn test_streaming_aggs_exec_execution_plan_trait_simple_methods() {
         use std::sync::Arc;
 
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
             DataType::Int64,
@@ -686,12 +686,6 @@ mod tests {
     fn test_streaming_aggs_exec_with_new_children() {
         use std::sync::Arc;
 
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
             DataType::Int64,
@@ -740,12 +734,6 @@ mod tests {
     #[test]
     fn test_display_as_trait() {
         use std::sync::Arc;
-
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
 
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
@@ -817,8 +805,6 @@ mod tests {
     #[test]
     fn test_compute_properties() {
         use std::sync::Arc;
-
-        use arrow::datatypes::{DataType, Field, Schema};
 
         let schema = Arc::new(Schema::new(vec![Field::new(
             "test_col",
@@ -926,12 +912,6 @@ mod tests {
     fn test_streaming_aggs_exec_constructor_variations() {
         use std::sync::Arc;
 
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
             DataType::Int64,
@@ -1000,15 +980,6 @@ mod tests {
     async fn test_execute_method_error_cases() {
         use std::sync::Arc;
 
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::{
-            execution::context::TaskContext,
-            physical_plan::{
-                aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-                empty::EmptyExec,
-            },
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
             DataType::Int64,
@@ -1049,12 +1020,6 @@ mod tests {
     #[test]
     fn test_display_as_fmt_as_method() {
         use std::sync::Arc;
-
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
 
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
@@ -1209,12 +1174,6 @@ mod tests {
     fn test_streaming_aggs_exec_aggregate_plan() {
         use std::sync::Arc;
 
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",
             DataType::Int64,
@@ -1258,12 +1217,6 @@ mod tests {
     #[test]
     fn test_streaming_aggs_exec_with_new_children_error_cases() {
         use std::sync::Arc;
-
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-        };
 
         let schema = Arc::new(Schema::new(vec![Field::new(
             "col1",

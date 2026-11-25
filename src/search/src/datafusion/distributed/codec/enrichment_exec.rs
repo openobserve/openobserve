@@ -79,13 +79,17 @@ fn is_plain_name(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use datafusion::{
-        arrow::datatypes::{DataType, Field, Schema},
+        arrow::{
+            array::{Int32Array, RecordBatch},
+            datatypes::{DataType, Field, Schema},
+        },
         physical_plan::collect,
         prelude::SessionContext,
     };
     use datafusion_proto::bytes::{
         physical_plan_from_bytes_with_extension_codec, physical_plan_to_bytes_with_extension_codec,
     };
+    use parquet::arrow::ArrowWriter;
 
     use super::*;
 
@@ -123,8 +127,6 @@ mod tests {
     #[tokio::test]
     async fn test_decoded_names_escaping_table_dir_are_error() -> Result<()> {
         use config::utils::enrichment_local_cache::get_table_dir;
-        use datafusion::arrow::array::{Int32Array, RecordBatch};
-        use parquet::arrow::ArrowWriter;
 
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let outside = tempfile::tempdir().unwrap();

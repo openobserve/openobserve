@@ -646,6 +646,9 @@ async fn consume_segments(
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field};
+    use datafusion::arrow::array::{Int64Array, StringArray};
+
     use super::*;
 
     fn pending_stream(
@@ -665,8 +668,6 @@ mod tests {
 
     #[test]
     fn test_build_union_schema_widens_type_conflicts_deterministically() {
-        use arrow_schema::{DataType, Field};
-
         let s1 = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("value", DataType::Int64, true),
@@ -703,11 +704,6 @@ mod tests {
 
     #[test]
     fn test_adapt_batch_to_schema_aligns_order_and_fills_missing() {
-        use datafusion::arrow::{
-            array::{Int64Array, StringArray},
-            record_batch::RecordBatch,
-        };
-
         // batch 1: fields in one order, no "scan_files"
         let schema1 = Arc::new(Schema::new(vec![
             arrow_schema::Field::new("_timestamp", arrow_schema::DataType::Int64, false),

@@ -278,12 +278,14 @@ mod tests {
     use arrow_schema::DataType;
     use datafusion::{
         arrow::{
+            array::TimestampMicrosecondArray,
             datatypes::{Field, Schema},
             record_batch::RecordBatch,
         },
         assert_batches_eq,
+        config::ConfigOptions,
         datasource::MemTable,
-        optimizer::OptimizerRule,
+        optimizer::{OptimizerRule, optimizer::ApplyOrder},
         prelude::SessionContext,
     };
 
@@ -408,7 +410,6 @@ mod tests {
     /// Run a single-row, single-column histogram query and return the bucket value
     /// in microseconds.
     async fn run_histogram_micros(ctx: &SessionContext, sql: &str) -> i64 {
-        use datafusion::arrow::array::TimestampMicrosecondArray;
         let data = ctx.sql(sql).await.unwrap().collect().await.unwrap();
         data[0]
             .column(0)
@@ -620,7 +621,6 @@ mod tests {
 
     #[test]
     fn test_rewrite_histogram_new_stores_fields() {
-        use datafusion::optimizer::{OptimizerRule, optimizer::ApplyOrder};
         let rule = RewriteHistogram::new(100, 200, 50, None);
         assert_eq!(rule.name(), "rewrite_histogram");
         assert_eq!(rule.apply_order(), Some(ApplyOrder::BottomUp));
@@ -628,7 +628,6 @@ mod tests {
 
     #[test]
     fn test_histogram_to_datebin_new_stores_fields() {
-        use datafusion::config::ConfigOptions;
         let options = Arc::new(ConfigOptions::default());
         let rewriter = super::HistogramToDatebin::new(0, 1000, 60, None, options);
         let _ = rewriter;

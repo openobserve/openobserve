@@ -1585,6 +1585,12 @@ async fn emit_changes(
 mod tests {
     use std::collections::BTreeSet;
 
+    use arrow::{
+        array::{Array, StringArray},
+        compute::cast,
+        datatypes::DataType,
+    };
+
     #[test]
     fn every_baseline_switch_reason_restores() {
         for reason in [
@@ -2312,11 +2318,6 @@ mod tests {
 
     /// Two builds of checkout 2.4.0 sent over OTLP, each span row read back as ingest stored it.
     async fn ingested_image_spans(org: &str, stream: &str) -> Vec<serde_json::Value> {
-        use arrow::{
-            array::{Array, StringArray},
-            compute::cast,
-            datatypes::DataType,
-        };
         use opentelemetry_proto::tonic::{
             collector::trace::v1::ExportTraceServiceRequest,
             common::v1::{AnyValue, KeyValue, any_value::Value},

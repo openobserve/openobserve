@@ -223,10 +223,11 @@ mod tests {
 
     use arrow::{
         array::{
-            ArrayRef, BinaryArray, Int32Array, ListArray, StringArray, StringViewArray, StructArray,
+            ArrayRef, BinaryArray, DictionaryArray, Int32Array, ListArray, StringArray,
+            StringViewArray, StructArray, types::Int32Type,
         },
-        buffer::OffsetBuffer,
-        ipc::{CompressionType, root_as_message, writer::IpcWriteOptions},
+        buffer::{Buffer, OffsetBuffer},
+        ipc::{CompressionType, reader::read_dictionary, root_as_message, writer::IpcWriteOptions},
     };
     use arrow_schema::{DataType, Field, Fields, Schema};
     use config::meta::search::ScanStats;
@@ -298,11 +299,6 @@ mod tests {
     ) -> Vec<RecordBatch> {
         use std::collections::HashMap;
 
-        use arrow::{
-            buffer::Buffer,
-            ipc::{MessageHeader, reader::read_dictionary, root_as_message},
-        };
-
         let mut dictionaries: HashMap<i64, ArrayRef> = HashMap::new();
         let mut out = Vec::new();
         for data in fds {
@@ -341,8 +337,6 @@ mod tests {
     // chunk. Verify the sequential decoder still reconstructs every row correctly.
     #[test]
     fn test_parallel_chunks_roundtrip_with_dictionary() {
-        use arrow::array::{DictionaryArray, Int32Array, types::Int32Type};
-
         let n = 20_000i32;
         let values: ArrayRef = Arc::new(StringArray::from(vec!["red", "green", "blue"]));
         let keys = Int32Array::from((0..n).map(|i| i % 3).collect::<Vec<_>>());

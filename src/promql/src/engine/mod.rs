@@ -225,7 +225,14 @@ fn scalar_operand(value: Value, expr: &PromExpr, eval_ctx: &EvalContext) -> Valu
 pub(crate) mod tests {
     use std::{sync::Arc, time::Duration};
 
-    use datafusion::{arrow::datatypes::Schema, datasource::MemTable, prelude::SessionContext};
+    use datafusion::{
+        arrow::{
+            array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+            datatypes::{DataType, Field, Schema},
+        },
+        datasource::MemTable,
+        prelude::SessionContext,
+    };
     use promql_parser::{
         label::Matchers,
         parser::{
@@ -384,7 +391,6 @@ pub(crate) mod tests {
 
     fn two_instance_schema() -> Arc<Schema> {
         use config::meta::promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL};
-        use datafusion::arrow::datatypes::{DataType, Field};
         Arc::new(Schema::new(vec![
             Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new(HASH_LABEL, DataType::UInt64, false),
@@ -396,9 +402,6 @@ pub(crate) mod tests {
     }
 
     fn two_instance_provider() -> TwoInstanceProvider {
-        use datafusion::arrow::array::{
-            Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array,
-        };
         let rows: Vec<(i64, u64, &str, f64)> = (0..5)
             .flat_map(|minute| {
                 let ts = T0 - minute * 60_000_000;

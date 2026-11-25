@@ -1791,6 +1791,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::DataType as ArrowDT;
+
     use super::*;
 
     #[test]
@@ -2065,7 +2067,6 @@ mod tests {
 
     #[test]
     fn test_data_type_into_arrow() {
-        use arrow_schema::DataType as ArrowDT;
         assert_eq!(ArrowDT::from(DataType::Utf8), ArrowDT::Utf8);
         assert_eq!(ArrowDT::from(DataType::LargeUtf8), ArrowDT::LargeUtf8);
         assert_eq!(ArrowDT::from(DataType::Int64), ArrowDT::Int64);

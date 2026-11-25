@@ -471,6 +471,7 @@ mod tests {
         datasource::MemTable,
         prelude::{SessionConfig, SessionContext},
     };
+    use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
 
     use super::*;
     use crate::datafusion::exec::register_builtin_udfs;
@@ -748,8 +749,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_sql_ungrouped_aggregate_plans_and_runs_after_the_search_rewrite() {
-        use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
-
         use crate::sql::rewriter::add_timestamp::AddTimestampVisitor;
 
         let schema = Arc::new(Schema::new(vec![

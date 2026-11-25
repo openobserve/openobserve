@@ -592,7 +592,7 @@ pub async fn get_result_schema(
 mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::{search::LogicalOperator, stream::StreamType};
-    use datafusion::logical_expr::Operator;
+    use datafusion::{common::Column, logical_expr::Operator};
     use proto::cluster_rpc::SearchQuery;
 
     use super::*;
@@ -653,14 +653,12 @@ mod tests {
 
     #[test]
     fn test_get_col_name_column_expr() {
-        use datafusion::common::Column;
         let col_expr = Expr::Column(Column::new_unqualified("myfield"));
         assert_eq!(get_col_name(&col_expr), "myfield");
     }
 
     #[test]
     fn test_get_expr_string_column_expr() {
-        use datafusion::common::Column;
         let col_expr = Expr::Column(Column::new_unqualified("myfield"));
         assert_eq!(get_expr_string(&col_expr), "myfield");
     }

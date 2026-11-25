@@ -1240,7 +1240,7 @@ fn append_null_optimized(builder: &mut Box<dyn ArrayBuilder>, data_type: &DataTy
 #[cfg(test)]
 mod test {
     use arrow::{
-        array::{Array, StringViewArray},
+        array::{Array, BinaryArray, StringViewArray},
         util::pretty::pretty_format_batches,
     };
     use arrow_schema::Field;
@@ -1935,7 +1935,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_utf8view_to_utf8() {
-        use arrow::array::StringViewArray;
         let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
         let src_schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8View, true)]));
         let arr: ArrayRef = Arc::new(StringViewArray::from(vec!["hello", "world"]));
@@ -1952,7 +1951,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_large_utf8_to_utf8() {
-        use arrow::array::LargeStringArray;
         let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
         let src_schema = Arc::new(Schema::new(vec![Field::new(
             "s",
@@ -2275,7 +2273,6 @@ mod test {
             Arc::new(serde_json::json!({"msg": [1, 2]})), // array → ""
         ];
         let batch = convert_json_to_record_batch(&schema, &data).unwrap();
-        use arrow::array::LargeStringArray;
         let col = batch
             .column(0)
             .as_any()
@@ -2377,7 +2374,6 @@ mod test {
         // "deadbeef" is a valid hex string
         let data = vec![Arc::new(serde_json::json!({"data": "deadbeef"}))];
         let batch = convert_json_to_record_batch(&schema, &data).unwrap();
-        use arrow::array::BinaryArray;
         let col = batch
             .column(0)
             .as_any()
@@ -2581,7 +2577,6 @@ mod test {
             DataType::LargeUtf8,
             true,
         )]));
-        use arrow::array::LargeStringArray;
         let data = vec![
             vrl::value::Value::Object(
                 [("s".into(), vrl::value::Value::from("world"))]
@@ -2826,7 +2821,6 @@ mod test {
                 .unwrap()
                 .is_null(0)
         );
-        use arrow::array::LargeStringArray;
         assert!(
             batch
                 .column(2)
@@ -2851,7 +2845,6 @@ mod test {
                 .unwrap()
                 .is_null(0)
         );
-        use arrow::array::BinaryArray;
         assert!(
             batch
                 .column(5)
@@ -2898,7 +2891,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_large_utf8_to_utf8view() {
-        use arrow::array::LargeStringArray;
         let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8View, true)]));
         let src_schema = Arc::new(Schema::new(vec![Field::new(
             "s",
@@ -2949,7 +2941,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_utf8_to_large_utf8() {
-        use arrow::array::LargeStringArray;
         let target = Arc::new(Schema::new(vec![Field::new(
             "s",
             DataType::LargeUtf8,
@@ -2969,7 +2960,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_utf8view_to_large_utf8() {
-        use arrow::array::LargeStringArray;
         let target = Arc::new(Schema::new(vec![Field::new(
             "s",
             DataType::LargeUtf8,
@@ -2989,7 +2979,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_int64_to_large_utf8() {
-        use arrow::array::LargeStringArray;
         let target = Arc::new(Schema::new(vec![Field::new(
             "n",
             DataType::LargeUtf8,
@@ -3024,7 +3013,6 @@ mod test {
 
     #[test]
     fn test_format_recordbatch_large_utf8_to_int64() {
-        use arrow::array::LargeStringArray;
         let target = Arc::new(Schema::new(vec![Field::new("n", DataType::Int64, true)]));
         let src_schema = Arc::new(Schema::new(vec![Field::new(
             "n",

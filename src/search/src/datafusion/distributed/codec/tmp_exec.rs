@@ -81,7 +81,7 @@ mod tests {
     use std::io::Cursor;
 
     use arrow::{
-        array::{Int32Array, RecordBatch},
+        array::{Array, BinaryArray, Int32Array, RecordBatch, StringArray},
         ipc::writer::FileWriter,
     };
     use datafusion::{
@@ -142,8 +142,6 @@ mod tests {
     }
 
     fn invalid_utf8_ipc() -> (Arc<Schema>, Vec<u8>) {
-        use arrow::array::{Array, BinaryArray, StringArray};
-
         let schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
         let binary = BinaryArray::from_iter_values([b"ok".as_slice(), &[0xff, 0xfe, 0xfd]]);
         // SAFETY: deliberately invalid UTF-8 to exercise the reader's validation

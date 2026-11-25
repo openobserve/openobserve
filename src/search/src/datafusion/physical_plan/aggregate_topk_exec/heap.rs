@@ -299,7 +299,10 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::{
-        array::{Array, Int64Array, StringArray},
+        array::{
+            Array, BooleanArray, Float32Array, Int32Array, Int64Array, StringArray,
+            TimestampMillisecondArray,
+        },
         datatypes::{DataType, Field, Schema, TimeUnit},
         util::pretty::pretty_format_batches,
     };
@@ -568,8 +571,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_complex_schema_final_row_construction() {
-        use arrow::array::{BooleanArray, Float32Array, Int32Array, TimestampMillisecondArray};
-
         // Test with a very complex schema including different data types
         let schema = Arc::new(Schema::new(vec![
             Field::new("user_name", DataType::Utf8, false),

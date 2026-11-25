@@ -21,6 +21,8 @@ use sqlparser::{
         FunctionArguments, Ident, ObjectName, ObjectNamePart, Query, Select, SetExpr, Statement,
         TableFactor, Value, ValueWithSpan, VisitorMut,
     },
+    dialect::GenericDialect,
+    parser::Parser,
     tokenizer::Span,
 };
 
@@ -298,8 +300,6 @@ pub fn replace_o2_custom_patterns(sql: &str) -> Result<String, String> {
     if !sql.contains(O2_CUSTOM_SUFFIX) {
         return Ok(sql.to_string());
     }
-    use sqlparser::{dialect::GenericDialect, parser::Parser};
-
     let dialect = GenericDialect {};
     let mut statements =
         Parser::parse_sql(&dialect, sql).map_err(|e| format!("Parse error: {e}"))?;
@@ -328,8 +328,6 @@ pub fn replace_o2_custom_patterns(sql: &str) -> Result<String, String> {
 /// Like `replace_o2_custom_patterns` but also returns the parsed AST so callers
 /// can run additional visitors without a second `Parser::parse_sql` call.
 pub fn parse_and_replace_o2_custom_patterns(sql: &str) -> Result<(String, Vec<Statement>), String> {
-    use sqlparser::{dialect::GenericDialect, parser::Parser};
-
     let mut statements =
         Parser::parse_sql(&GenericDialect {}, sql).map_err(|e| format!("Parse error: {e}"))?;
 

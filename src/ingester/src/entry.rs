@@ -378,6 +378,9 @@ impl std::ops::AddAssign for PersistStat {
 mod tests {
     use std::sync::Arc;
 
+    use arrow::array::StringArray;
+    use arrow_schema::{DataType, Field};
+
     use super::*;
 
     fn make_entry(org: &str, stream: &str, schema_key: &str, partition_key: &str) -> Entry {
@@ -426,8 +429,6 @@ mod tests {
 
     #[test]
     fn test_entry_arrow_roundtrip() {
-        use arrow::array::StringArray;
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(Schema::new(vec![
             Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("msg", DataType::Utf8, true),
@@ -464,7 +465,6 @@ mod tests {
 
     #[test]
     fn test_entry_arrow_roundtrip_empty_batch() {
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(Schema::new(vec![Field::new(
             config::TIMESTAMP_COL_NAME,
             DataType::Int64,
@@ -481,8 +481,6 @@ mod tests {
 
     #[test]
     fn test_entry_arrow_roundtrip_unicode_fields() {
-        use arrow::array::StringArray;
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(Schema::new(vec![Field::new("消息", DataType::Utf8, true)]));
         let batch =
             RecordBatch::try_new(schema, vec![Arc::new(StringArray::from(vec!["日志内容"]))])
@@ -589,8 +587,6 @@ mod tests {
     }
 
     fn make_ts_batch(values: Vec<i64>) -> RecordBatch {
-        use arrow::array::Int64Array;
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
             config::TIMESTAMP_COL_NAME,
             DataType::Int64,
@@ -618,8 +614,6 @@ mod tests {
 
     #[test]
     fn test_pop_time_range_column_not_found() {
-        use arrow::array::Int64Array;
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
             "other_col",
             DataType::Int64,
@@ -634,8 +628,6 @@ mod tests {
 
     #[test]
     fn test_pop_time_range_wrong_column_type() {
-        use arrow::array::StringArray;
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
             config::TIMESTAMP_COL_NAME,
             DataType::Utf8,
@@ -650,8 +642,6 @@ mod tests {
 
     #[test]
     fn test_pop_time_range_separate_min_max_columns() {
-        use arrow::array::Int64Array;
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(arrow_schema::Schema::new(vec![
             Field::new("ts_min", DataType::Int64, false),
             Field::new("ts_max", DataType::Int64, false),
@@ -666,8 +656,6 @@ mod tests {
 
     #[test]
     fn test_pop_time_range_separate_missing_min_col() {
-        use arrow::array::Int64Array;
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
             "ts_max",
             DataType::Int64,

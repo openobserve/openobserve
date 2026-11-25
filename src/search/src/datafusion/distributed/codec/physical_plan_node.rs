@@ -101,6 +101,12 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
 mod tests {
     use datafusion::{
         arrow::datatypes::{DataType, Field, Schema},
+        logical_expr::JoinType,
+        physical_expr::expressions::Column,
+        physical_plan::{
+            empty::EmptyExec,
+            joins::{HashJoinExecBuilder, NestedLoopJoinExec},
+        },
         prelude::SessionContext,
     };
     use datafusion_proto::bytes::{
@@ -112,15 +118,6 @@ mod tests {
 
     #[test]
     fn join_projection_presence_survives_roundtrip() -> Result<()> {
-        use datafusion::{
-            logical_expr::JoinType,
-            physical_expr::expressions::Column,
-            physical_plan::{
-                empty::EmptyExec,
-                joins::{HashJoinExecBuilder, NestedLoopJoinExec},
-            },
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
         let ctx = SessionContext::new();

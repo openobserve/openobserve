@@ -411,8 +411,6 @@ mod tests {
 
     #[test]
     fn test_execution_plan_name() {
-        use datafusion::physical_plan::ExecutionPlan;
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let exec = NewEmptyExec::new(
             "t",
@@ -428,8 +426,6 @@ mod tests {
 
     #[test]
     fn test_children_is_empty() {
-        use datafusion::physical_plan::ExecutionPlan;
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let exec = NewEmptyExec::new(
             "t",
@@ -461,8 +457,6 @@ mod tests {
 
     #[test]
     fn test_properties_boundedness() {
-        use datafusion::physical_plan::{ExecutionPlan, execution_plan::Boundedness};
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let exec = NewEmptyExec::new(
             "t",
