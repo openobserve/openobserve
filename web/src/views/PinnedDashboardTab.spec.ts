@@ -24,6 +24,11 @@ vi.mock("@/utils/commons", () => ({
   getDashboard: vi.fn(async () => ({ title: "Pinned", tabs: [{ tabId: "t1", panels: [] }] })),
 }));
 
+const notifications = vi.hoisted(() => ({ showErrorNotification: vi.fn() }));
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({ showErrorNotification: notifications.showErrorNotification }),
+}));
+
 describe("PinnedDashboardTab", () => {
   let wrapper: VueWrapper<any>;
   let store: any;
@@ -102,6 +107,19 @@ describe("PinnedDashboardTab", () => {
     await mountTab();
 
     expect(wrapper.emitted("unavailable")).toEqual([["d1", "default"]]);
+  });
+
+  it.each([
+    ["a 502", { response: { status: 502 } }],
+    ["a timeout", { code: "ECONNABORTED" }],
+    ["a non-license 403", { response: { status: 403, data: {} } }],
+  ])("keeps the pin and shows the error for %s", async (_name, error) => {
+    notifications.showErrorNotification.mockClear();
+    vi.mocked(getDashboard).mockRejectedValueOnce(error);
+    await mountTab();
+
+    expect(wrapper.emitted("unavailable")).toBeUndefined();
+    expect(notifications.showErrorNotification).toHaveBeenCalledTimes(1);
   });
 
   it("drops the dashboard and shows the license state when the lock arrives late", async () => {

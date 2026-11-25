@@ -31,11 +31,6 @@ export interface RetryOptions {
   wait?: (ms: number) => Promise<void>;
 }
 
-export interface ActivityTimer {
-  touch: () => void;
-  clear: () => void;
-}
-
 export const SEGMENT_BATCH = 25;
 export const MAX_ATTEMPTS = 3;
 export const RETRY_DELAYS_MS = [1000, 2000];
@@ -164,26 +159,6 @@ export async function withRetries<T>(
       options.onRetry?.(attempt + 1);
     }
   }
-}
-
-// A stream can stay open without sending anything, so a request with no first byte or a long silence is given up.
-export function createActivityTimer(
-  onTimeout: () => void,
-  firstByteMs = FIRST_BYTE_TIMEOUT_MS,
-  idleMs = IDLE_TIMEOUT_MS,
-): ActivityTimer {
-  let handle: ReturnType<typeof setTimeout> | null = setTimeout(onTimeout, firstByteMs);
-  return {
-    touch() {
-      if (handle === null) return;
-      clearTimeout(handle);
-      handle = setTimeout(onTimeout, idleMs);
-    },
-    clear() {
-      if (handle !== null) clearTimeout(handle);
-      handle = null;
-    },
-  };
 }
 
 // Search error codes 20xxx that describe the query itself; cancel, timeout, rate limit and execution errors can pass next time.

@@ -370,6 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @show-legends="showLegendsDialog = true"
                         @is-partial-data-update="handleIsPartialDataUpdate"
                         @loading-state-change="handleLoadingStateChange"
+                        @load-ended-without-fetch="emit('loadEndedWithoutFetch', $event)"
                         @is-cached-data-differ-with-current-time-range-update="
                           handleIsCachedDataDifferWithCurrentTimeRangeUpdate
                         "

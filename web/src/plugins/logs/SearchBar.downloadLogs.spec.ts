@@ -74,4 +74,31 @@ describe("SearchBar — logs_downloaded analytics", () => {
 
     expect(analytics.track).not.toHaveBeenCalledWith("logs_downloaded", expect.anything());
   });
+
+  const capturedBytes = async () => {
+    const file = vi.mocked((URL as any).createObjectURL).mock.calls[0][0] as Blob;
+    return new Promise<Uint8Array>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  it("prefixes the CSV with a UTF-8 BOM so Excel reads non-ASCII text", async () => {
+    await wrapper!.vm.downloadLogs([{ body: "ünïcödé 日本語" }], "csv");
+
+    const bytes = await capturedBytes();
+    expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+    expect(new TextDecoder().decode(bytes)).toContain("ünïcödé 日本語");
+  });
+
+  it("does not add a BOM to the JSON file", async () => {
+    await wrapper!.vm.downloadLogs([{ body: "x" }], "json");
+
+    expect(Array.from((await capturedBytes()).slice(0, 3))).not.toEqual([0xef, 0xbb, 0xbf]);
+  });
+
+  it("labels the menu item as the current page only", () => {
+    expect(i18n.global.t("search.downloadTable")).toBe("Download current page");
+  });
 });

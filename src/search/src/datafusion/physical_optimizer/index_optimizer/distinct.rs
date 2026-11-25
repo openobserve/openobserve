@@ -194,7 +194,11 @@ mod tests {
 
     use arrow::array::{Int64Array, RecordBatch, StringArray};
     use arrow_schema::{DataType, Field, Schema};
-    use datafusion::{catalog::MemTable, prelude::SessionContext};
+    use datafusion::{
+        catalog::MemTable,
+        physical_plan::{empty::EmptyExec, get_plan_string},
+        prelude::SessionContext,
+    };
 
     use super::*;
     use crate::datafusion::udf::fulltext::str_match;
@@ -301,7 +305,7 @@ mod tests {
                 expected,
                 is_simple_distinct(physical_plan.clone(), index_fields),
                 "{sql}: {:?}",
-                datafusion::physical_plan::get_plan_string(&physical_plan)
+                get_plan_string(&physical_plan)
             );
         }
     }
@@ -324,14 +328,12 @@ mod tests {
 
     #[test]
     fn test_is_simple_distinct_returns_none_for_empty_exec() {
-        use datafusion::physical_plan::empty::EmptyExec;
         let schema = Arc::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
             "a",
             arrow_schema::DataType::Int32,
             false,
         )]));
-        let plan: Arc<dyn datafusion::physical_plan::ExecutionPlan> =
-            Arc::new(EmptyExec::new(schema));
+        let plan: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
         let index_fields = HashSet::from(["a".to_string()]);
         assert!(is_simple_distinct(plan, index_fields).is_none());
     }

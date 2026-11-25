@@ -67,6 +67,9 @@ pub struct ManifestQuery {
     pub name: Option<String>,
     /// Adds the channel-history scopes and events.
     pub channel_history: Option<bool>,
+    /// The app's slash command, such as `/o2-dev`; empty is `/o2` for the default name, else
+    /// one made from the name.
+    pub command: Option<String>,
 }
 
 /// A JSON body, or `{}` when the request has no body at all, as `curl -X POST` sends it.

@@ -316,8 +316,10 @@ blocks auto-approval. Sessions shorter than 6 minutes, and the coordinator, get 
 wrap-up.
 
 The binary is pinned in `opencode-pin.env` and installed by `install-opencode.sh`, which verifies
-the release asset's SHA-256. Bump both lines together, to a release at least 14 days old (waived
-once, for 2.2.0).
+the release asset's SHA-256: `OPENCODE_SHA256` for `opencode-linux-x64.tar.gz`, and
+`OPENCODE_SHA256_ARM64` for `opencode-linux-arm64.tar.gz`, which the installer takes on Linux
+aarch64 (the o2o containers on Apple silicon). Bump all three lines together, to a release at least
+14 days old (waived once, for 2.2.0).
 
 ## Setup: the `ai-review` environment (admin, one-time)
 
@@ -473,6 +475,215 @@ runs only on non-draft PRs labelled `ready-for-ci`, and it is advisory. Removing
 converting the PR to draft cancels a review in progress. An audited
 `/review skip` command arrives with v2 (WP-14).
 
+## Dry runs and cost experiments
+
+Everything here is for measuring what a review costs and finds; none of it changes a review that
+sets none of these variables. `run-review.mjs` has a dry-run mode and four experiment arm flags;
+`run-experiment.mjs` drives them over an OpenObserve dataset and reports to the Experiments UI. The
+workflows are untouched, and nothing here runs in GitHub Actions.
+
+### Dry run
+
+`REVIEW_DRY_RUN=true` (exactly `true`) runs a whole review against two pinned commits and writes
+nothing to GitHub: no comment create or patch, no pass tag, no inline review, no approval or
+dismissal, no paired pointer, no failure notice. It does not look for a previous review, so the
+dedupe, unchanged-diff and pass-limit skips never apply and every invocation reviews. It still
+filters, tiers, selects reviewers and runs them and the coordinator, and keeps the empty-diff and
+all-reviewers-failed handling (the first ends the run as `skipped`, the second as an error).
+
+It refuses to start unless all of these hold, before any model or GitHub call:
+
+- `PR_DIR` is an existing scratch directory, apart from the engine checkout, with no instruction
+  file (`AGENTS.md`, `CLAUDE.md`, `.opencode`, ...) or credential file (`.netrc`, `.npmrc`,
+  `.git-credentials`, `.env`) in any ancestor directory, since opencode reads ancestors.
+- `PR_DIR` (and the paired directory inside it, if any) is the root of its own git checkout, at
+  exactly the pinned head, whole (no sparse checkout, skip-worktree or assume-unchanged entry) and with no changed, untracked or git-ignored file (the paired directory is not counted
+  as an extra file of the outer one). A checkout of another revision, or a dirty one, would be
+  reviewed as if it were the pinned commit. Every git the engine starts in a dry run gets an
+  environment of only `PATH`, `HOME`, `LC_ALL` and `GIT_TERMINAL_PROMPT`; `gh` gets only `PATH`,
+  `HOME`, `GH_TOKEN`, `GH_HOST` and `GH_CONFIG_DIR`.
+- `MERGE_BASE_SHA` and `HEAD_SHA` (and the paired side, if any) are full 40-character SHAs, and
+  `PR_NUMBER` and `GITHUB_REPOSITORY` are well formed. The diff is the local diff of exactly those
+  two commits; there is no live-diff fallback.
+- `REVIEW_ARTIFACT_DIR` is an absolute path outside `PR_DIR`.
+- The opencode config is the read-only one (`REVIEW_OPENCODE_CONFIG` unset or `default`).
+- `O2_TRACE_STREAM`, if set, is not a production stream. Spans go to `ai_code_review_experiments`
+  unless it names another.
+- `REVIEW_PROVIDER_ID`, `REVIEW_MODEL_ID` and `REVIEW_API_KEY_ENV` name a registered provider and
+  model, and that provider reads its key from that variable.
+
+The tree goes through the same `sanitizePrTree` as CI before opencode starts. `gh` is only ever
+asked for PR metadata (`pr view --json ...`, with the existing fallback if that fails); any other
+`gh` command throws. The auto-approve gate is forced off. Logs, errors, trace strings and
+artifacts pass the secret scrubber.
+
+opencode serves a private copy of `opencode.jsonc` derived at start: the model defaults and the
+provider policy are replaced by the one selected provider and every other provider is denied.
+The copy lives in the fresh `HOME` and is removed with it; the shipped files and the production
+config path do not change. Only the selected provider's key variable reaches opencode.
+
+A dry run writes two files to `REVIEW_ARTIFACT_DIR`: `review-findings.json` (as in CI) and
+`review-run-summary.json`, on every exit including errors and the overall timeout:
+`trace_id`, `duration_ms`, `outcome`, `tier`, `agents` (after any fold), `kept_findings`,
+`sessions[]` (`agent`, `pass`, `attempt`, `duration_ms`, `outcome`, `tokens`, `cost`) and `totals`.
+Every attempt is its own session, so retried and failed attempts count. `tokens` is the session's
+own total (opencode's session totals); when that read fails the session's usage is unknown, not the
+last message's counts. It has `input`
+(uncached), `output` (visible), `reasoning`, `cache_read` and `cache_write`. A count the provider
+did not report is `null`, never `0`, and a total is only stated when every session reported it
+(`totals.complete`). A session still running at the timeout is recorded as `interrupted` with
+unknown usage. `REVIEW_TOKEN_PRICES` is JSON in USD per million tokens
+(`{"input":3,"output":15,"cache_read":0.3,"cache_write":3.75}`; reasoning is priced as output);
+a cost is computed only when every count and price it needs is known.
+
+`REVIEW_EXPERIMENT_ID`, `REVIEW_EXPERIMENT_ARM`, `REVIEW_EXPERIMENT_ROW_ID` and
+`REVIEW_EXPERIMENT_TRIAL` (zero-based) become `openobserve.experiment.{id,arm,row_id,trial_index}`
+on every span.
+
+### Experiment arms
+
+Each flag is off unless exactly `true`. A, B and C also run outside a dry run (C refuses without B); E refuses to,
+before any model or GitHub call. Nothing in the workflows sets C.
+
+| Arm | Setting | What changes |
+|---|---|---|
+| baseline | none | Current behaviour. |
+| A | `REVIEW_ARM_STAGGER` | The first reviewer pass runs alone. The pool is released on its first completed assistant response (opencode's `session.step.ended`, not the end of the session), when that pass fails or is skipped, or after 90 seconds. Nothing else is staggered. |
+| B | A + `REVIEW_ARM_SHARED_PREFIX` | Every reviewer's system prompt is the same bytes (shared rules and repo rules). The agent prompt and checklist lead the user turn, outside the task's own character budget. The coordinator is unchanged. |
+| C | B + `REVIEW_ARM_SHARED_CONTEXT` | The PR context, one common unfocused filtered diff and the impact map follow the trusted rules in the shared system prompt as `<untrusted_pr_data>` (closers escaped), so every reviewer after the first reads rules and PR data from the provider cache. The block gets the user-turn budget (`MAX_USER_PROMPT_CHARS`, the same limit the baseline task has) whatever the rules' length; description first, then the diff, then the map; truncation is marked and the closing marker is kept. `callOpencode` cuts the rules at 100,000 characters as before and appends the block uncut. Each reviewer's own focus stays in its user turn as a `<focus_files>` list (at most 500 paths) with a note to concentrate on them within its remit, so system and block are the same bytes for all; no list when the focus selects every file, none, or the run is a gate candidate. A diff cut in the block records no diff fingerprint. Frontend, QA and Release are still decided from the full diff. PR text sits in the system prompt (see the note below the table). |
+| D | `REVIEW_MODEL_VARIANT=medium` | Plain configuration; the coordinator follows. |
+| E | `REVIEW_ARM_FOLD` | Security folds into Correctness, Performance and Documentation into Code Quality, only where the host was selected (a CI-only PR keeps Security). The remits and file focus are combined, the checklist is written once, and each finding keeps the category of its own remit. |
+
+The `ready-for-ci` label is the workflow's trigger policy for automatic runs, and a manual `workflow_dispatch`
+on `main` bypasses it; the C flag itself checks no label, repository or author, so whoever sets it accepts PR text in the system prompt.
+The `<focus_files>` list is also budgeted in characters (20,000, whole paths only) so that its omission count, closing tag and instruction always arrive.
+
+With every flag off the prompts sent to the model are byte-identical to the unflagged runner
+(`test/arms.test.mjs` compares them with the old templates).
+
+### Providers
+
+`opencode.jsonc` and `opencode.ci.jsonc` also register `openrouter-review` with model
+`anthropic/claude-sonnet-5.5` (Anthropic Messages at `https://openrouter.ai/api/v1`, key in
+`OPENROUTER_REVIEW_API_KEY`, the same five effort variants). The static policies still allow only
+`anthropic-review`, so only a dry run's derived config can select it:
+`REVIEW_PROVIDER_ID=openrouter-review REVIEW_MODEL_ID=anthropic/claude-sonnet-5.5 REVIEW_API_KEY_ENV=OPENROUTER_REVIEW_API_KEY`.
+Every request to it carries `"provider": {"order": ["anthropic"], "allow_fallbacks": false}` (the
+provider block's `body`): OpenRouter's sticky routing keys on the first system and first user message,
+which differ per reviewer, so unpinned sessions can land on different upstreams with separate prompt caches.
+
+### Cost experiments
+
+`run-experiment.mjs` runs the engine as a dry run once per dataset row and trial and reports each
+result to an SDK experiment. Run it in the o2o container (Node 24), never in a workflow:
+
+```bash
+OPENOBSERVE_URL=... OPENOBSERVE_ORG=... OPENOBSERVE_AUTH_TOKEN='Basic ...' OPENROUTER_REVIEW_API_KEY=... \
+  node run-experiment.mjs --dataset ai-code-review-prs-v1 --arm b --trials 3 --tag cost-small
+```
+
+| Option | |
+|---|---|
+| `--dataset <name\|id>` | The dataset (required). |
+| `--arm <baseline\|a\|b\|c\|d\|e>` | The arm (required). |
+| `--trials <n>` | Trials per row, 1 to 50 (required). |
+| `--tag <tag>` | Only rows carrying the tag; the same tag goes into the experiment's `datasetFilter.tags`. |
+| `--rows <id,...>` | Only the rows with these dataset logical ids (for example `pr-16317,pr-16893`; each must exist in the snapshot); goes into `datasetFilter.logicalIds`. Not with `--tag`; a resume must pass the same ids. |
+| `--resume <id>` | Continue an experiment. |
+| `--row-gap-min <min>` | Cooldown between runs (default 6). |
+| `--gap-scope all\|row` | The cooldown follows any run (default) or only a run of the same row. |
+| `--plan` | Read only: print what would run (rows, slots, fingerprint, pricing, preflight) and start nothing. |
+
+`OPENOBSERVE_AUTH_TOKEN` is sent verbatim as the `Authorization` header. It is the only
+credential for the OpenObserve API; the trace exporter reuses it when it is a Basic credential
+(or `O2_TRACE_AUTH` if set). The model key stays out of git and logs; the harness scrubs everything
+it prints. Optionally `REVIEW_EXPERIMENT_GH_TOKEN` supplies a read-only GitHub token for the PR
+metadata read (without it that read falls back); give it nothing that can write. The engine is
+started with an allowlisted environment, so none of the harness's other variables reach it.
+
+`REVIEW_COLD_PASSES` (set in the harness's environment; it passes it to every engine) must equal production's
+repository variable `AI_REVIEW_COLD_PASSES`, which is `1` (since 2026-11-03, per production traces'
+`review_cold_passes`); the engine's own default is `2`, so an experiment that leaves it unset runs twice the passes.
+
+What it does, in order:
+
+1. Pages `GET /datasets/{id}/rows` at one pinned `snapshotVersion` and keeps the tagged rows.
+2. Checks the numeric score configs `ai_review_cache_write_tokens`, `ai_review_cache_read_tokens`,
+   `ai_review_recall` and `ai_review_new_findings` exist (it never creates one) and stops if not.
+3. For a new experiment, reads OpenRouter's public `/api/v1/models` price for the model, converts it
+   to USD per million tokens and freezes it in the experiment's config; a resume reuses the frozen
+   prices. It creates the experiment with `task: {type: "sdk", taskFingerprint, config}`, the pinned
+   `datasetVersion`, `trialCount` and no scorers. The fingerprint hashes the engine commit, the arm
+   and the effective model, effort and cold-pass count, so a resume under other code is refused. An
+   engine with any changed, staged or untracked file under `scripts/ai-review`, `opencode*.jsonc`,
+   `AGENTS.md` or the skill references `src/sanitize.mjs` copies into the review's tree is refused
+   (commit it first), since the commit would not name the code that runs. Files marked assume-unchanged or
+   skip-worktree under those paths are refused too (status hides their edits). Ignored files inside the
+   skill-reference paths are refused, since `sanitize` copies the trees whole; ignored files elsewhere
+   under `scripts/ai-review` (`node_modules`) are allowed.
+4. Pages `/experiments/{id}/slots` and runs them trial by trial. Each row's repository and both full
+   SHAs are validated, then fetched (public repositories, `git` from argument vectors with no config
+   files, hooks, filters, submodules or credentials) into a fresh scratch checkout. The trusted
+   engine reviews it under the harness's permissions (the read-only config, not `ci-full`). The
+   row's `expectedOutput` and `metadata` are never given to the engine or put in its tree; the
+   harness reads the expectation only after the engine exits, to score.
+5. Posts `{records, scores}` for each slot to `/experiments/{id}/records`: the fingerprint, `ok`,
+   `error` or `skipped`, the kept findings and outcome on `ok`, latency, tokens in (cache included)
+   and out (reasoning included) when known, the estimated cost when known and the trace id, plus
+   the four scores (`recall` and `new_findings` only where the row has an expectation; a count that
+   is unknown is left out). A `null` expectation is scored on cost and tokens only; an empty one has
+   recall 1.
+6. Finalizes only after every part of every report was accepted. The first refused part stops the
+   run, so no later review is paid for, and nothing is finalized.
+
+Recall pairs kept and expected findings one to one so that as many pairs as possible form (a best
+assignment, not first come first served), preferring the same title and then the nearer line. A pair
+is the same file, lines within 5 (a line either side lacks is not held against it), and the same
+normalized title or at least two shared content words covering at least half of the longer title.
+Only findings that are eligible for each other are assigned, in groups that share an eligible pair,
+so an empty side or a set with nothing eligible costs nothing. Every kept finding left unpaired is new.
+
+Resuming (`--resume <id>`) takes the lock, then loads the experiment and checks its fingerprint,
+dataset, trial count and tag (pass the `--tag` it was created with, or none). It plans from the
+experiment's own pinned snapshot version and slots and does not read the dataset's current rows, so
+retagging or editing the dataset in between changes nothing. It pages the experiment's results and skips every
+slot that is already `ok` or `skipped`. An experiment in `failed` is retried through `/retry`
+first, and only then are its failed slots done again; a slot that errored inside a still-running
+experiment stays as it is, since the server refuses to replace it. Each slot's report is saved
+before it is posted and kept until accepted, so a report the server could not take is replayed
+without reviewing the slot again. An interrupted run (Ctrl-C) is never finalized.
+
+Runs are serialized by a lock the operating system holds: a loopback TCP port derived from the real
+path of the work directory, so a symlink to it is the same lock (a second run finds it taken and
+stops, whatever the timing, and a run that dies at any point releases it at once). The lock closes
+every connection made to it, so no client can keep a release waiting. A plan takes no lock. The
+cooldown (default 6 minutes after any
+run ended) survives across arms and resumes, because the provider's cache lives about five minutes
+and a closer second run would read the first one's cache and look cheaper than production. A run
+cut off before it ended still holds its cooldown. The work directory is
+`REVIEW_EXPERIMENT_STATE_DIR` (default `<tmpdir>/o2-ai-review-experiments`); it holds
+`cooldown.json` and the report outbox, and the harness refuses a directory that is, or is an
+ancestor of, where review checkouts are made. Every git the harness runs gets the same minimal
+environment, and the engine runs in its own process group, which is ended whole when a slot is
+cancelled or the engine exits. The engine's stdin is a pipe only the harness holds (`REVIEW_EXIT_WITH_PARENT`):
+the engine does no work until it reads one "go" byte, which the harness sends only after the group is recorded,
+and if the harness dies, even by `kill -9`, the engine sees EOF (before or after "go") and ends its group, opencode included.
+The harness keeps its SIGINT/SIGTERM handler until cleanup is done, so a repeated signal cannot skip it.
+It records each engine's process-group id in `engine-group.json` in the work directory before that byte
+and removes it once the group is gone; a group still there after the sweep stops the run, record kept. A harness killed outright leaves the record; the next
+run takes the lock, counts the record's row (and the all-rows clock) as active from the moment it looks, and
+stops naming the group if it is still alive, so no second review can start while the first one's tree is running.
+
+opencode's own git probes (project detection) run inside the model process with the model key in
+their environment: opencode needs the key, production has the same exposure, and the experiments run
+under the read-only config, where the model has no shell to reach them.
+
+Not verified: the OpenRouter endpoint's actual acceptance of the `x-api-key` header the Anthropic
+provider sends, its cache breakpoints and its cache read/write accounting, and the experiment
+endpoints on the introspection organisation. Arms A to C depend on the cache accounting being
+right, so confirm it on a first small run before reading any cost comparison. No paid run was made
+while this was built.
+
 ## Testing
 
 ```bash
@@ -484,6 +695,10 @@ OPENCODE_BIN=/path/to/opencode npm run test:integration   # real pinned opencode
 `.github/workflows/ai-review-tests.yml` runs both on PRs that touch the engine. Because the
 review itself always runs `main`'s copy, a PR cannot exercise its own workflow or engine edits
 end to end: validate those in a sandbox repo, or dispatch the workflow from `main` after merge.
+
+The harness and the dry run have their own tests: `test/arms.test.mjs`, `test/experiment.test.mjs`
+(a local fake OpenObserve and OpenRouter, local git remotes and a fake engine) and, with the real
+binary, an end-to-end dry run in `test/integration/opencode-sandbox.test.mjs`.
 
 ## Notes
 

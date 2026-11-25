@@ -291,7 +291,7 @@ pub(super) mod tests {
         include_index_field: bool,
     ) -> RecordBatch {
         let mut fields = Vec::new();
-        let mut columns: Vec<Arc<dyn arrow::array::Array>> = Vec::new();
+        let mut columns: Vec<Arc<dyn Array>> = Vec::new();
 
         if include_timestamp {
             fields.push(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false));

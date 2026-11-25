@@ -302,7 +302,9 @@ vi.mock("@/plugins/traces/metrics/TracesAnalysisDashboard.vue", () => ({
       streamFields: null,
       logSamples: null,
       analysisType: null,
+      initialDimensions: null,
     },
+    emits: ["update:dimensions"],
     template: '<div data-test="drill-down-dashboard-stub"><slot name="header-start" /></div>',
   },
 }));
@@ -1795,6 +1797,23 @@ describe("Logs Index", async () => {
       expect(wrapper.find("#thirdLevel").attributes("style")).toContain("display: none");
     });
 
+    it("hands the picked dimensions back to the dashboard each time it remounts", async () => {
+      await enterDrillDown();
+      const { searchObj } = wrapper.vm;
+      expect(dashboard().props("initialDimensions")).toBeNull();
+
+      dashboard().vm.$emit("update:dimensions", ["service_name", "level"]);
+      await flushPromises();
+      expect(searchObj.meta.drillDownDimensions).toEqual(["service_name", "level"]);
+
+      searchObj.loading = true;
+      await flushPromises();
+      expect(dashboard().exists()).toBe(false);
+      searchObj.loading = false;
+      await flushPromises();
+      expect(dashboard().props("initialDimensions")).toEqual(["service_name", "level"]);
+    });
+
     it("unmounts the dashboard while a search runs so it rebuilds from the new results", async () => {
       await enterDrillDown({ loading: true });
 
@@ -1942,6 +1961,29 @@ describe("Logs Index", async () => {
       await flushPromises();
 
       expect(dashboard().props("baseFilter")).toBe("level = 'warn'");
+    });
+
+    it("keeps the picked dimensions when the time range changes and the search re-runs", async () => {
+      await enterDrillDown();
+      const { searchObj } = wrapper.vm;
+      wrapper.vm.searchResultRef = null;
+      searchObj.data.datetime.startTime = 10;
+      searchObj.data.datetime.endTime = 20;
+      dashboard().vm.$emit("update:dimensions", ["service_name", "k8s_deployment_name"]);
+      await flushPromises();
+
+      searchObj.data.datetime.startTime = 5;
+      searchObj.data.datetime.endTime = 20;
+      searchObj.loading = true;
+      await flushPromises();
+      searchObj.loading = false;
+      await flushPromises();
+
+      expect(dashboard().props("timeRange")).toEqual({ startTime: 5, endTime: 20 });
+      expect(dashboard().props("initialDimensions")).toEqual([
+        "service_name",
+        "k8s_deployment_name",
+      ]);
     });
 
     it("re-runs the Search tab activation flow on keep-alive reactivation", async () => {

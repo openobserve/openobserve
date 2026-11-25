@@ -159,7 +159,10 @@ fn is_frame_kind(kind: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::{StringArray, StringViewArray};
+    use arrow::{
+        array::{StringArray, StringViewArray},
+        datatypes::Field,
+    };
     use datafusion::common::config::ConfigOptions;
 
     use super::*;
@@ -226,17 +229,9 @@ mod tests {
             let data_type = input.data_type().clone();
             let args = ScalarFunctionArgs {
                 args: vec![ColumnarValue::Array(input)],
-                arg_fields: vec![Arc::new(arrow::datatypes::Field::new(
-                    "stack",
-                    data_type.clone(),
-                    true,
-                ))],
+                arg_fields: vec![Arc::new(Field::new("stack", data_type.clone(), true))],
                 number_rows: 2,
-                return_field: Arc::new(arrow::datatypes::Field::new(
-                    "stack",
-                    data_type.clone(),
-                    true,
-                )),
+                return_field: Arc::new(Field::new("stack", data_type.clone(), true)),
                 config_options: Arc::new(ConfigOptions::default()),
             };
             let ColumnarValue::Array(out) = udf.invoke_with_args(args).unwrap() else {

@@ -954,7 +954,8 @@ mod tests {
     };
     use object_store::{
         CopyOptions, GetOptions, GetRange, GetResult, ListResult, MultipartUpload, ObjectMeta,
-        ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, path::Path,
+        ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult,
+        local::LocalFileSystem, memory::InMemory, path::Path,
     };
     use promql_parser::label::{MatchOp, Matcher, Matchers};
     use tokio::sync::Notify;
@@ -979,7 +980,7 @@ mod tests {
 
     #[derive(Debug)]
     struct TrackingStore {
-        inner: Arc<object_store::memory::InMemory>,
+        inner: Arc<InMemory>,
         sample_ends: HashMap<String, u64>,
         metadata_calls: Arc<AtomicUsize>,
         metadata_blocked: Arc<AtomicBool>,
@@ -1119,7 +1120,7 @@ mod tests {
                 })
                 .collect();
             let store = TrackingStore {
-                inner: Arc::new(object_store::memory::InMemory::new()),
+                inner: Arc::new(InMemory::new()),
                 sample_ends,
                 metadata_calls: Arc::new(AtomicUsize::new(0)),
                 metadata_blocked: Arc::new(AtomicBool::new(metadata_blocked)),
@@ -1697,9 +1698,7 @@ mod tests {
         let id = config::ider::uuid();
         infra::storage::add_account(
             &id,
-            Box::new(
-                object_store::local::LocalFileSystem::new_with_prefix(directory.path()).unwrap(),
-            ),
+            Box::new(LocalFileSystem::new_with_prefix(directory.path()).unwrap()),
         )
         .await;
         file.account = format!("{id}:default");

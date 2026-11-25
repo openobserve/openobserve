@@ -17,7 +17,7 @@ use std::{fmt::Formatter, sync::Arc};
 
 use arrow::{
     array::{Array, AsArray, Int64Array, LargeStringArray, RecordBatch, StructArray},
-    datatypes::{FieldRef, Fields},
+    datatypes::{FieldRef, Fields, Int64Type},
 };
 use datafusion::{
     arrow::{
@@ -79,7 +79,7 @@ impl AggregateUDFImpl for ApproxTopK {
         APPROX_TOPK
     }
 
-    fn signature(&self) -> &datafusion::logical_expr::Signature {
+    fn signature(&self) -> &Signature {
         &self.0
     }
 
@@ -327,7 +327,7 @@ impl ApproxTopKAccumulator {
 
     /// Convert int64 array to vector of counts
     fn convert_to_counts(values: &ArrayRef) -> Result<Vec<i64>> {
-        let array = values.as_primitive::<arrow::datatypes::Int64Type>();
+        let array = values.as_primitive::<Int64Type>();
         Ok(array.iter().map(|v| v.unwrap_or_default()).collect())
     }
 }
@@ -449,7 +449,10 @@ impl Accumulator for ApproxTopKAccumulator {
 #[cfg(test)]
 mod tests {
     use arrow::array::StringArray;
-    use datafusion::{datasource::MemTable, logical_expr::AggregateUDF, prelude::SessionContext};
+    use datafusion::{
+        datasource::MemTable, logical_expr::AggregateUDF, physical_expr::expressions::Literal,
+        prelude::SessionContext,
+    };
 
     use super::*;
 
@@ -588,19 +591,17 @@ mod tests {
 
     #[test]
     fn test_validate_k_parameter_rejects_huge_value() {
-        let expr: Arc<dyn PhysicalExpr> =
-            Arc::new(datafusion::physical_expr::expressions::Literal::new(
-                ScalarValue::Int64(Some(2_500_000_000_000_000)),
-            ));
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Int64(Some(
+            2_500_000_000_000_000,
+        ))));
         assert!(validate_k_parameter(&expr).is_err());
     }
 
     #[test]
     fn test_validate_cap_parameter_rejects_huge_value() {
-        let expr: Arc<dyn PhysicalExpr> =
-            Arc::new(datafusion::physical_expr::expressions::Literal::new(
-                ScalarValue::Int64(Some(2_500_000_000_000_000)),
-            ));
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Int64(Some(
+            2_500_000_000_000_000,
+        ))));
         assert!(validate_cap_parameter(&expr).is_err());
     }
 

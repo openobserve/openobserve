@@ -11,6 +11,7 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
+    "dep:o2_enterprise",
     "common/enterprise",
     "config/enterprise",
     "db/enterprise",
@@ -21,11 +22,6 @@ cloud = [
     "common/cloud",
     "db/cloud",
     "infra/cloud",
-]
-vectorscan = [
-    "dep:o2_enterprise",
-    "db/vectorscan",
-    "o2_enterprise/vectorscan",
 ]
 
 [dependencies]

@@ -135,7 +135,8 @@ export default class DashboardQueryVariable {
   async fieldOptions() {
     await this.fieldTrigger.click();
     const options = this.page.locator(tid("dashboard-variable-field-select-option"));
-    await options.first().waitFor({ state: "visible", timeout: 15000 });
+    // `$variable` rows render at once; the stream's schema fields arrive later.
+    await expect(this.page.locator(`${tid("dashboard-variable-field-select-option")}:not([data-test-value^="$"])`).first()).toBeVisible({ timeout: 15000 });
     const values = await options.evaluateAll((els) => els.map((e) => e.getAttribute("data-test-value")));
     await this.page.keyboard.press("Escape");
     await this.page.locator(tid("dashboard-variable-field-select-popover")).waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
@@ -204,6 +205,8 @@ export default class DashboardQueryVariable {
   async fillQuery(text) {
     await this.monaco.waitForReady(this.queryEditor);
     const input = this.monaco.getInputArea(this.queryEditor).first();
+    const stalePreview = this.previewCount.or(this.previewEmpty).or(this.previewError);
+    const clearsPreview = (await stalePreview.count()) > 0 && (await this.queryText()) !== text;
     await expect
       .poll(async () => {
         if ((await this.queryText()) === text) return true;
@@ -212,6 +215,8 @@ export default class DashboardQueryVariable {
         return (await this.queryText()) === text;
       }, { timeout: 15000, intervals: [250, 500, 1000] })
       .toBe(true);
+    // The editor commits after a debounce and the commit drops the old preview, shifting the Run button mid-click.
+    if (clearsPreview) await expect(stalePreview).toHaveCount(0, { timeout: 10000 });
   }
 
   async clearQuery() {

@@ -40,3 +40,26 @@ test("buildImpactContext lists outside uses and same-language parallel definitio
 test("buildImpactContext is empty without a PR tree", () => {
   assert.equal(buildImpactContext(diff, ""), "");
 });
+
+test("the impact grep of a dry run runs git without the model key or any token, and any other run inherits as before", () => {
+  const before = { dry: process.env.REVIEW_DRY_RUN, key: process.env.OPENROUTER_REVIEW_API_KEY };
+  const envs = [];
+  const run = (cmd, args, options) => { envs.push(options.env); return ""; };
+  try {
+    process.env.OPENROUTER_REVIEW_API_KEY = "sk-or-secret";
+    process.env.REVIEW_DRY_RUN = "true";
+    buildImpactContext(diff, "/pr", { run });
+    assert.ok(envs.length >= 1);
+    for (const env of envs) assert.deepEqual(Object.keys(env).sort(), ["GIT_TERMINAL_PROMPT", "HOME", "LC_ALL", "PATH"]);
+    envs.length = 0;
+    delete process.env.REVIEW_DRY_RUN;
+    buildImpactContext(diff, "/pr", { run });
+    assert.ok(envs.length >= 1);
+    for (const env of envs) assert.equal(env, undefined);
+  } finally {
+    for (const [name, value] of [["REVIEW_DRY_RUN", before.dry], ["OPENROUTER_REVIEW_API_KEY", before.key]]) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});

@@ -19,6 +19,7 @@ use arrow::array::{ArrayRef, Int64Array, RecordBatch, UInt64Array};
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     common::{Result, internal_err, tree_node::TreeNodeRecursion},
+    error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning, PhysicalExpr},
     physical_plan::{
@@ -71,7 +72,7 @@ impl MetadataCountExec {
 
         RecordBatch::try_new(self.schema.clone(), vec![array])
             .map(|batch| vec![batch])
-            .map_err(|e| datafusion::error::DataFusionError::Internal(e.to_string()))
+            .map_err(|e| DataFusionError::Internal(e.to_string()))
     }
 }
 
@@ -137,7 +138,7 @@ mod tests {
 
     use datafusion::{
         arrow::datatypes::{DataType, Field, Schema},
-        physical_plan::ExecutionPlan,
+        physical_plan::{ExecutionPlan, displayable},
     };
 
     use super::*;
@@ -183,10 +184,7 @@ mod tests {
         )]));
         let exec = Arc::new(MetadataCountExec::new(schema, 7, 2));
 
-        let display = format!(
-            "{}",
-            datafusion::physical_plan::displayable(exec.as_ref()).indent(false)
-        );
+        let display = format!("{}", displayable(exec.as_ref()).indent(false));
         assert!(display.contains("MetadataCountExec: files: 2, records: 7"));
     }
 }

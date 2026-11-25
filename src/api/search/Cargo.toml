@@ -24,11 +24,6 @@ cloud = [
     "openobserve-core/cloud",
     "openobserve-api-common/cloud",
 ]
-vectorscan = [
-    "openobserve-core/vectorscan",
-    "promql-service/vectorscan",
-    "search_service/vectorscan",
-]
 
 [dependencies]
 common.workspace = true
@@ -70,3 +65,4 @@ vector-enrichment.workspace = true
 
 [dev-dependencies]
 datafusion.workspace = true
+openobserve-core = { workspace = true, features = ["test-utils"] }
