@@ -17,6 +17,7 @@ pub struct Model {
     pub delivered: Option<bool>,
     #[sea_orm(column_type = "Text", nullable)]
     pub templates: Option<String>,
+    pub updated_at: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

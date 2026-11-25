@@ -15,6 +15,8 @@
 
 //! `/instances` — the scope picker's instance identity source.
 
+pub(crate) use openobserve_core::db_monitoring::views::build_dbm_instances_sql_at;
+
 use super::{super::models::*, *};
 
 /// The distinct identities, as [`get_dbm_instances`] returns them.
@@ -122,57 +124,6 @@ pub(crate) fn build_dbm_instances_sql(
     present: &HashSet<String>,
 ) -> Option<String> {
     build_dbm_instances_sql_at(stream_name, system, present, now_micros())
-}
-
-/// [`build_dbm_instances_sql`] with the grid anchor passed in, so the stamping
-/// is testable without a clock.
-pub(crate) fn build_dbm_instances_sql_at(
-    stream_name: &str,
-    system: Option<&str>,
-    present: &HashSet<String>,
-    anchor_micros: i64,
-) -> Option<String> {
-    if !present.contains(server_vantage::O2_DBM_ENGINE) {
-        return None;
-    }
-    let engine = server_vantage::O2_DBM_ENGINE;
-    // The instance column can be absent on a partially-upgraded cluster.
-    // Project a literal NULL so the row shape is stable either way.
-    let instance_col = if present.contains(server_vantage::O2_DBM_INSTANCE) {
-        server_vantage::O2_DBM_INSTANCE.to_string()
-    } else {
-        format!(
-            "CAST(NULL AS VARCHAR) AS {}",
-            server_vantage::O2_DBM_INSTANCE
-        )
-    };
-    // `escape_ident`, not raw interpolation: a stream name carrying a double
-    // quote would otherwise terminate the identifier. Same helper every
-    // sibling builder uses.
-    let mut sql = format!(
-        "SELECT {engine}, {instance_col}, {grid} AS {ts} \
-         FROM \"{stream}\" WHERE {engine} IS NOT NULL",
-        grid = rollup::floor_to_grid(anchor_micros),
-        ts = config::TIMESTAMP_COL_NAME,
-        stream = escape_ident(stream_name),
-    );
-    if let Some(system) = system.map(str::trim).filter(|s| !s.is_empty()) {
-        // Same escaping rule the sibling builders use for a user-supplied
-        // literal: double any quote so it cannot terminate the string.
-        sql.push_str(&format!(" AND {engine} = '{}'", system.replace('\'', "''")));
-    }
-    // GROUP BY names the STORAGE columns: `instance_col` may be a
-    // `CAST(NULL AS VARCHAR) AS ...` projection on a partially-upgraded
-    // stream, and a literal cannot be grouped by.
-    let group_instance = if present.contains(server_vantage::O2_DBM_INSTANCE) {
-        format!(", {}", server_vantage::O2_DBM_INSTANCE)
-    } else {
-        String::new()
-    };
-    sql.push_str(&format!(
-        " GROUP BY {engine}{group_instance} ORDER BY {engine}"
-    ));
-    Some(sql)
 }
 
 #[cfg(test)]

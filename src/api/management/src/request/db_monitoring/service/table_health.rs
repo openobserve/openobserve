@@ -18,6 +18,9 @@
 // The models these pull in are named only from enterprise-gated bodies, so the
 // glob is genuinely unused on OSS. Keep the import (enterprise needs it) and
 // silence the OSS-only lint rather than splitting it behind a cfg.
+#[cfg(feature = "enterprise")]
+pub(crate) use openobserve_core::db_monitoring::views::build_dbm_table_health_sql;
+
 #[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
 use super::{super::models::*, *};
 
@@ -56,82 +59,6 @@ pub(crate) fn table_health_engine_support(engine: &str) -> &'static str {
         // engine we are certain about.
         _ => "unsupported",
     }
-}
-
-/// The newest snapshot of every relation in the window.
-///
-/// **A GROUP BY, never a row fetch folded in Rust.** The recipe re-emits every
-/// table every 60 s, so an hour's window holds ~60 rows per table and a raw
-/// fetch would render the same table sixty times — making "the 20 largest
-/// tables" a list of one table repeated.
-///
-/// **`MAX`, never `SUM` or `AVG`.** Every measurement here is a point-in-time
-/// state of a relation. Summing sixty snapshots of a 13 MB table reports a
-/// 780 MB table; averaging a cumulative counter across a window in which it grew
-/// reports a number that was true at no instant. `MAX` is honest for both cases
-/// at once: it is the latest value for a size that fluctuates, and the latest
-/// value for a lifetime counter that only rises.
-///
-/// Returns `None` when the stream's schema lacks the relation column — naming an
-/// absent column in a `GROUP BY` fails the WHOLE query with a schema error, and
-/// the exposed case is the common one: no deployment has shipped this recipe
-/// yet.
-#[cfg(feature = "enterprise")]
-pub(crate) fn build_dbm_table_health_sql(
-    stream_name: &str,
-    preds: &str,
-    limit: usize,
-    present: &HashSet<String>,
-) -> Option<String> {
-    if !present.contains(server_vantage::O2_DBM_RELATION)
-        || !present.contains(server_vantage::O2_DBM_SCHEMA)
-    {
-        return None;
-    }
-    // Optional columns: a partially-upgraded cluster can have written the
-    // relation without the rest. Project only what exists, so one missing
-    // column degrades a cell instead of failing the page.
-    let mut cols = Vec::new();
-    for (storage, wire) in [
-        (server_vantage::O2_DBM_TOTAL_BYTES, "total_bytes"),
-        (server_vantage::O2_DBM_HEAP_BYTES, "heap_bytes"),
-        (server_vantage::O2_DBM_LIVE_TUPLES, "live_tuples"),
-        (server_vantage::O2_DBM_DEAD_TUPLES, "dead_tuples"),
-        (server_vantage::O2_DBM_DEAD_TUP_PCT, "dead_tup_pct"),
-        (
-            server_vantage::O2_DBM_MOD_SINCE_ANALYZE,
-            "mod_since_analyze",
-        ),
-        (server_vantage::O2_DBM_SEQ_SCAN_COUNT, "seq_scan_count"),
-        (server_vantage::O2_DBM_SEQ_TUP_READ, "seq_tup_read"),
-        (server_vantage::O2_DBM_IDX_SCAN_COUNT, "idx_scan_count"),
-        (server_vantage::O2_DBM_AUTOVACUUM_COUNT, "autovacuum_count"),
-        (server_vantage::O2_DBM_FROZEN_XID_AGE, "frozen_xid_age"),
-        (server_vantage::O2_DBM_LAST_VACUUM, "last_vacuum"),
-        (server_vantage::O2_DBM_LAST_AUTOVACUUM, "last_autovacuum"),
-        (server_vantage::O2_DBM_LAST_ANALYZE, "last_analyze"),
-        (server_vantage::O2_DBM_INSTANCE, "instance"),
-        (server_vantage::O2_DBM_ENGINE, "engine"),
-    ] {
-        if present.contains(storage) {
-            cols.push(format!("MAX({storage}) AS {wire}"));
-        } else {
-            cols.push(format!("NULL AS {wire}"));
-        }
-    }
-    let projected = cols.join(", ");
-    Some(format!(
-        "SELECT {schema} AS schema_name, {relation} AS relation, {projected}, \
-         MAX(_timestamp) AS last_seen FROM \"{stream}\"\n\
-         WHERE {kind} = '{kind_val}'{preds}\n\
-         GROUP BY {schema}, {relation}\n\
-         ORDER BY total_bytes DESC NULLS LAST\nLIMIT {limit}",
-        schema = server_vantage::O2_DBM_SCHEMA,
-        relation = server_vantage::O2_DBM_RELATION,
-        stream = escape_ident(stream_name),
-        kind = server_vantage::O2_DBM_KIND,
-        kind_val = escape_sq(server_vantage::KIND_TABLE_STATS),
-    ))
 }
 
 // ─── W11 · Index health read API ─────────────────────────────────────────────

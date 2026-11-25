@@ -244,6 +244,13 @@ pub async fn report_request_usage_stats(
         metrics::INGEST_RECORDS
             .with_label_values(&[org_id, stream_type.as_str()])
             .inc_by(stats.records as u64);
+        #[cfg(feature = "enterprise")]
+        config::meta::autoobserve::ingest_counts::add(
+            org_id,
+            stream_type,
+            stream_name,
+            stats.records.max(0) as u64,
+        );
         metrics::INGEST_BYTES
             .with_label_values(&[org_id, stream_type.as_str()])
             .inc_by((stats.size * SIZE_IN_MB) as u64);

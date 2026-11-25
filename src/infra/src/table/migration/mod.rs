@@ -278,6 +278,7 @@ mod m20261221_000001_add_last_detection_at_to_alert_incidents;
 mod m20261222_000001_incident_membership_and_catalog_cleanup;
 mod m20261223_000001_create_alert_leases;
 mod m20261224_000001_delete_cli_ai_toolsets;
+mod m20261225_000001_add_listener_poll_indexes;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -924,6 +925,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261222_000001_incident_membership_and_catalog_cleanup::Migration),
             Box::new(m20261223_000001_create_alert_leases::Migration),
             Box::new(m20261224_000001_delete_cli_ai_toolsets::Migration),
+            Box::new(m20261225_000001_add_listener_poll_indexes::Migration),
         ]
     }
 }
@@ -1063,6 +1065,7 @@ mod tests {
         ),
         (158, "m20261223_000001_create_alert_leases"),
         (159, "m20261224_000001_delete_cli_ai_toolsets"),
+        (160, "m20261225_000001_add_listener_poll_indexes"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

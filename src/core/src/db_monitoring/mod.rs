@@ -27,6 +27,7 @@
 
 pub mod rollup;
 pub mod server_vantage;
+pub mod views;
 
 /// The hits of a search, or an error when the read was PARTIAL.
 ///
