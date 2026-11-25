@@ -1,9 +1,11 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { stripJsonc } from "./jsonc.mjs";
 
 export const REVIEW_AGENT_PREFIX = "ai-review-";
 
@@ -73,11 +75,13 @@ export function resolveOpencodeConfig(name) {
 }
 
 export class OpencodeServer {
-  constructor({ binary = process.env.OPENCODE_BIN || "opencode", cwd, configPath, providerKeyVars = [], parentEnv = process.env, startTimeoutMs = 30_000, readOnly = true }) {
+  constructor({ binary = process.env.OPENCODE_BIN || "opencode", cwd, configPath, providerKeyVars = [], parentEnv = process.env, startTimeoutMs = 30_000, readOnly = true, selection = null }) {
     this.binary = binary;
     this.readOnly = readOnly;
     this.cwd = cwd;
     this.configPath = configPath;
+    // { providerId, modelId, keyEnv }: serve a private copy of the config that registers only this provider (dry runs).
+    this.selection = selection;
     this.providerKeyVars = providerKeyVars;
     this.parentEnv = parentEnv;
     this.startTimeoutMs = startTimeoutMs;
@@ -96,11 +100,12 @@ export class OpencodeServer {
 
   async start() {
     this.home = mkdtempSync(join(tmpdir(), "ai-review-opencode-"));
+    const configPath = this.selection ? this.writeSelectedConfig() : this.configPath;
     const password = randomBytes(24).toString("hex");
     const env = buildServerEnv({
       parentEnv: this.parentEnv,
       home: this.home,
-      configPath: this.configPath,
+      configPath,
       password,
       providerKeyVars: this.providerKeyVars,
     });
@@ -126,6 +131,16 @@ export class OpencodeServer {
     });
     this.client = new OpencodeClient({ baseUrl, password, readOnly: this.readOnly });
     return this.client;
+  }
+
+  // A dry run serves a private copy of the trusted config that names one provider and denies the rest; it lives in the fresh HOME and goes with it.
+  writeSelectedConfig() {
+    const trusted = JSON.parse(stripJsonc(readFileSync(this.configPath, "utf-8")));
+    const path = join(this.home, "review-opencode.json");
+    writeFileSync(path, JSON.stringify(deriveSelectedConfig(trusted, this.selection)), { mode: 0o600 });
+    const home = this.home;
+    process.once("exit", () => rmSync(home, { recursive: true, force: true }));
+    return path;
   }
 
   stop() {
@@ -204,7 +219,8 @@ export class OpencodeClient {
     }
     const waiter = props.sessionID ? this.waiters.get(props.sessionID) : null;
     if (!waiter) return;
-    if (event.type === "session.execution.succeeded") waiter.onIdle();
+    if (event.type === "session.step.ended") waiter.onStepEnded();
+    else if (event.type === "session.execution.succeeded") waiter.onIdle();
     else if (event.type === "session.execution.failed") waiter.onError(props.error);
     else if (event.type === "session.execution.interrupted") waiter.onError(INTERRUPTED_ERROR);
   }
@@ -222,7 +238,7 @@ export class OpencodeClient {
   }
 
   // Sends the prompt (2.x admits it and returns at once) and waits on the event stream, so no request ever blocks for the length of an agent run (undici's 300 s headersTimeout killed every long review).
-  async prompt({ agent, model, variant, system, text, title, timeoutMs, wrapUp = null }) {
+  async prompt({ agent, model, variant, system, text, title, timeoutMs, wrapUp = null, onFirstResponse = null }) {
     await this.ensureEventStream();
     // 2.x binds agent, model and variant to the session; the prompt itself carries only text.
     const session = (await this.json("POST", "/api/session", {
@@ -231,6 +247,7 @@ export class OpencodeClient {
       ...(model?.modelID ? { model: { providerID: model.providerID, id: model.modelID, ...(variant ? { variant } : {}) } } : {}),
     })).data;
     const waiter = new SessionWaiter(this, session.id);
+    waiter.firstResponse = onFirstResponse;
     this.waiters.set(session.id, waiter);
     let totals = null;
     try {
@@ -296,6 +313,18 @@ class SessionWaiter {
     this.rejectedPermissions = 0;
     this.settle = null;
     this.ignoreInterrupted = false;
+    this.firstResponse = null;
+  }
+
+  // The first completed model response of the session, which is when the provider has its prompt cached (the session itself runs on).
+  onStepEnded() {
+    const callback = this.firstResponse;
+    this.firstResponse = null;
+    try {
+      callback?.();
+    } catch {
+      // A hook must never end the session it observes.
+    }
   }
 
   wait(timeoutMs) {
@@ -464,6 +493,33 @@ export function modelVariantIds(config, providerId, modelId) {
   return Array.isArray(variants) ? variants.map(v => v?.id).filter(Boolean) : [];
 }
 
+// A dry run's private config: the trusted one with the model defaults and the provider policy replaced by the one selected provider,
+// every other provider denied. Agent permissions and everything else stay as the trusted config has them, so no agent config is duplicated.
+export function deriveSelectedConfig(trusted, { providerId, modelId, keyEnv }) {
+  const provider = trusted?.providers?.[providerId];
+  if (!provider) {
+    throw new OpencodeError(`provider "${providerId}" is not registered in the trusted opencode config (registered: ${Object.keys(trusted?.providers ?? {}).join(", ") || "none"})`);
+  }
+  if (!provider.models?.[modelId]) {
+    throw new OpencodeError(`model "${modelId}" is not registered for provider "${providerId}" (registered: ${Object.keys(provider.models ?? {}).join(", ") || "none"})`);
+  }
+  const keyVars = Array.isArray(provider.env) ? provider.env : [];
+  if (!keyVars.includes(keyEnv)) {
+    throw new OpencodeError(`provider "${providerId}" reads its key from ${keyVars.join(", ") || "no variable"}, not ${keyEnv}`);
+  }
+  const model = `${providerId}/${modelId}`;
+  return {
+    ...trusted,
+    providers: { [providerId]: provider },
+    policies: [
+      { action: "provider.use", resource: "*", effect: "deny" },
+      { action: "provider.use", resource: providerId, effect: "allow" },
+    ],
+    model,
+    agents: Object.fromEntries(Object.entries(trusted.agents ?? {}).map(([name, agent]) => [name, { ...agent, model }])),
+  };
+}
+
 // A retry must leave room for its own full timeout plus whatever still has to run after it (the coordinator).
 export function shouldRetry({ err, attempt, maxRetries, remainingMs, timeoutMs, reserveMs = 0 }) {
   return attempt <= maxRetries && isTransientError(err) && remainingMs > timeoutMs + reserveMs;
@@ -495,7 +551,9 @@ function finalAssistantResult(messages, totals, streamError, rejectedPermissions
       id: last.id,
       modelID: last.model?.id,
       finish: last.finish,
+      // `tokens` keeps its fallback to the last message for the span; `sessionTokens` is the session's own total, or nothing, and is what accounting reads.
       tokens: totals?.tokens ?? last.tokens,
+      sessionTokens: totals?.tokens,
     },
     text: extractText(last.content),
     structured: undefined,

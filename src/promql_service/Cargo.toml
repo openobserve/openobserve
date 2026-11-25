@@ -16,7 +16,6 @@ enterprise = [
     "search/enterprise",
     "search_service/enterprise",
 ]
-vectorscan = ["search/vectorscan", "search_service/vectorscan"]
 
 [dependencies]
 arrow.workspace = true

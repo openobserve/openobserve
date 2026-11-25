@@ -52,7 +52,7 @@ use tracing::Instrument;
 use transform::{get_all_transform_keys, init_vrl_runtime};
 use usage_reporting::{http_report_metrics, report_request_usage_stats};
 
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use crate::datafusion::physical_optimizer::sdr_redact::redaction_digest;
 use crate::{
     self as SearchService,
@@ -594,7 +594,7 @@ pub async fn prepare_cache_response(
     }
     // An unresolved request is pinned to redaction, so its search matches this key.
     req.raw_streams.get_or_insert_with(Default::default);
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     if let Some(digest) = redaction_digest(
         org_id,
         stream_type,

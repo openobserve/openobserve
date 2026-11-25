@@ -137,7 +137,7 @@ impl DestinationSettings<'_> {
 }
 
 /// No association names `_all_values`, so the scan leaves its stale pre-redaction text.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub fn snapshot_derived_sources(records: &[(i64, Map<String, Value>)]) -> Vec<String> {
     let max_len = get_config().limit.index_all_max_value_length;
     records
@@ -153,7 +153,7 @@ pub fn snapshot_derived_sources(records: &[(i64, Map<String, Value>)]) -> Vec<St
 }
 
 /// `_original` is redacted in place by the engine; only `_all_values` needs rebuilding here.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub fn refresh_derived_columns(before: &[String], records: &mut [(i64, Map<String, Value>)]) {
     let max_len = get_config().limit.index_all_max_value_length;
     for (stale, (_, record)) in before.iter().zip(records.iter_mut()) {
@@ -1279,7 +1279,7 @@ mod tests {
         assert!(val.get(TIMESTAMP_COL_NAME).is_some());
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     fn record_with(pairs: &[(&str, &str)]) -> (i64, Map<String, Value>) {
         let mut record = Map::new();
         for (k, v) in pairs {
@@ -1289,7 +1289,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     fn refresh_rebuilds_all_values_from_the_redacted_fields() {
         let mut records = vec![record_with(&[
             ("email", "bob@x.com"),
@@ -1307,7 +1307,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     fn refresh_keeps_original_the_engine_already_redacted() {
         let mut records = vec![record_with(&[
             ("email", "[REDACTED]"),
@@ -1324,7 +1324,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     fn a_record_without_all_values_is_left_alone() {
         let mut records = vec![record_with(&[
             ("email", "[REDACTED]"),
