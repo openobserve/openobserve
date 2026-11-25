@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { computed, defineComponent, nextTick, ref } from "vue";
+import { computed, defineComponent, h, nextTick, ref } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 
 // Mock all the heavy dependencies
@@ -1992,6 +1992,17 @@ describe("PanelSchemaRenderer", () => {
       ]);
     });
 
+    it("forwards a load that ended without querying as load-ended-without-fetch", () => {
+      wrapper = createWrapper();
+      const loaderArgs = vi.mocked(usePanelDataLoader).mock.lastCall!;
+      const onLoadEndedWithoutFetch = loaderArgs[loaderArgs.length - 1] as (shown: boolean) => void;
+
+      onLoadEndedWithoutFetch(true);
+      onLoadEndedWithoutFetch(false);
+
+      expect(wrapper.emitted("load-ended-without-fetch")).toEqual([[true], [false]]);
+    });
+
     it("should emit update:initialVariableValues during drilldown navigation", () => {
       wrapper = createWrapper();
 
@@ -2683,6 +2694,103 @@ describe("PanelSchemaRenderer", () => {
       const { data, metadata } = lastConversion();
       expect(data.map((d: any) => d.result[0].metric.q)).toEqual(["B", "B1d"]);
       expect(metadata.queries.map((m: any) => m.panelQueryIndex)).toEqual([1, 1]);
+    });
+  });
+
+  describe("capped table download", () => {
+    const rowsOf = (tag: string) => [{ tag }];
+    const mountForExport = async (exported: Record<string, unknown>) => {
+      const fetchExportRows = vi.fn().mockResolvedValue({
+        capped: false,
+        partial: false,
+        heldIndexes: [],
+        rowLimit: 100000,
+        ...exported,
+      });
+      const saveCsv = vi.fn((_title: string, table?: { rows: unknown[] }) => table?.rows.length);
+      const meta = (query: string) => ({ query, startTime: 1, endTime: 2 });
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: ref([rowsOf("a"), rowsOf("b"), rowsOf("c")]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [meta("qa"), meta("qb"), meta("qc")] }),
+        resultMetaData: ref([[], [], []]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+        panelDiagnostics: ref({
+          queries: [{ rowsCapped: true }, { rowsCapped: false }, { rowsCapped: false }],
+        }),
+        fetchExportRows,
+      } as unknown as ReturnType<typeof usePanelDataLoader>);
+      const query = (sql: string, hide = false) => ({ query: sql, fields: {}, config: { hide } });
+
+      wrapper = mount(PanelSchemaRenderer, {
+        props: {
+          ...defaultProps,
+          panelSchema: {
+            id: "panel-table-export",
+            type: "table",
+            queryType: "sql",
+            queries: [query("qa"), query("qb", true), query("qc")],
+            config: {},
+          },
+        },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            LoadingProgress: { template: "<div></div>" },
+            AddAnnotation: { template: "<div></div>" },
+            TableRenderer: defineComponent({
+              setup(_props, { expose }) {
+                expose({ downloadTableAsCSV: saveCsv });
+                return () => h("div");
+              },
+            }),
+          },
+        },
+      });
+      await flushPromises();
+      vi.mocked(convertPanelData).mockClear();
+      await (
+        wrapper.vm as unknown as { downloadDataAsCSV: (t: string) => Promise<void> }
+      ).downloadDataAsCSV("t");
+      return { fetchExportRows, saveCsv };
+    };
+
+    it("re-fetches only shown queries and converts their rows in panel order", async () => {
+      const { fetchExportRows } = await mountForExport({
+        data: [rowsOf("A"), [], rowsOf("C")],
+      });
+
+      expect(fetchExportRows).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(Array),
+        expect.any(Number),
+        [0, 2],
+      );
+      expect(vi.mocked(convertPanelData).mock.calls[0][1]).toEqual([rowsOf("A"), rowsOf("C")]);
+    });
+
+    it("marks the file partial when a capped query kept its on-screen rows", async () => {
+      const { saveCsv } = await mountForExport({
+        data: [rowsOf("a"), [], rowsOf("C")],
+        heldIndexes: [0],
+      });
+
+      expect(saveCsv).toHaveBeenCalledWith("t", expect.objectContaining({ partial: true }));
     });
   });
 

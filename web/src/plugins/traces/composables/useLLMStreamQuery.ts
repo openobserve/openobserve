@@ -18,6 +18,7 @@ import { gt } from "@/types/i18n";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
+import { createStreamingHits, mergeHits } from "@/utils/traces/streamingHits";
 
 interface StreamErrorBody {
   message?: string;
@@ -138,12 +139,15 @@ export function useLLMStreamQuery() {
      * backwards compatibility with LLM Insights; pass `"logs"` for log streams
      * (e.g. `_llm_scores`), `"metrics"` for metric streams, etc. */
     pageType: "traces" | "logs" | "metrics" = "traces",
+    /** `replaceStreamingAggs`: every batch with rows of a streaming aggregate is the running answer, so it replaces. */
+    options: { replaceStreamingAggs?: boolean } = {},
   ): Promise<any[]> {
     return new Promise((resolve, reject) => {
       const traceId = generateTraceContext().traceId;
       activeTraceIds.add(traceId);
-      const accumulated: any[] = [];
+      let accumulated: any[] = [];
       const metadataHits: any[] = [];
+      const step = options.replaceStreamingAggs ? createStreamingHits() : null;
 
       // SQL's own LIMIT becomes `size` so the backend doesn't scan more rows than needed.
       const size = querySize(sql);
@@ -178,9 +182,11 @@ export function useLLMStreamQuery() {
             // Metadata hits are kept separately as a fallback for responses
             // that never emit a hits event.
             const hits: any[] = response.content?.results?.hits || [];
+            const merge = step?.(response);
             if (hits.length === 0) return;
             if (response.type === "search_response_hits") {
-              accumulated.push(...hits);
+              if (merge) accumulated = mergeHits(accumulated, hits, merge);
+              else accumulated.push(...hits);
             } else {
               metadataHits.push(...hits);
             }

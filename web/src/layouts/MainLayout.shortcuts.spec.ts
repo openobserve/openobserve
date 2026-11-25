@@ -89,6 +89,21 @@ describe("MainLayout — AI chat shortcut gate", () => {
     expect(ctrlB()).toBeUndefined();
   });
 
+  it.each(["false", "true"])(
+    "should bind t to the time range picker once on every build (isEnterprise=%s)",
+    async (isEnterprise) => {
+      config.isEnterprise = isEnterprise;
+
+      wrapper = mountMainLayout();
+      await flushPromises();
+
+      const entries = getManager()!
+        .getAll()
+        .filter((s) => s.key === "t");
+      expect(entries.map((s) => s.id)).toEqual(["timeRangeOpen"]);
+    },
+  );
+
   it("should register ctrl+b on enterprise builds", async () => {
     config.isEnterprise = "true";
 
@@ -120,5 +135,58 @@ describe("MainLayout — AI chat shortcut gate", () => {
 
     ctrlB()!.handler();
     expect(store.state.isAiChatEnabled).toBe(true);
+  });
+});
+
+describe("MainLayout — global resource search shortcut", () => {
+  let wrapper: VueWrapper | undefined;
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = undefined;
+    resetManager();
+    document.querySelector('[data-test="other-panel"]')?.remove();
+    document.querySelector('[data-test="o-dialog-overlay"]')?.remove();
+  });
+  it("registers global Command K, toggles it from an editor and skips composition or open modals", async () => {
+    resetManager();
+    wrapper = mountMainLayout();
+    await flushPromises();
+    const shortcut = getManager()?.getById("commandPalette");
+    expect(shortcut?.key).toBe("ctrl+k");
+    expect(shortcut?.allowInInput).toBe(true);
+    const palette = () => wrapper!.findComponent({ name: "CommandPalette" }).props("open");
+    const press = async (init: KeyboardEventInit = {}) => {
+      getManager()!.handleKeyDown(
+        new KeyboardEvent("keydown", { key: "k", ctrlKey: true, ...init }),
+      );
+      await flushPromises();
+    };
+    const editor = document.createElement("div");
+    editor.className = "monaco-editor";
+    editor.innerHTML = '<textarea class="inputarea"></textarea>';
+    document.body.append(editor);
+    editor.querySelector("textarea")!.focus();
+    await press();
+    expect(palette()).toBe(true);
+    await press();
+    expect(palette()).toBe(false);
+    editor.remove();
+    await press({ isComposing: true });
+    expect(palette()).toBe(false);
+    const panel = document.createElement("div");
+    panel.role = "dialog";
+    panel.dataset.test = "other-panel";
+    document.body.append(panel);
+    await press();
+    expect(palette()).toBe(true);
+    await press();
+    panel.remove();
+    const overlay = document.createElement("div");
+    overlay.dataset.test = "o-dialog-overlay";
+    overlay.dataset.state = "open";
+    document.body.append(overlay);
+    await press();
+    expect(palette()).toBe(false);
+    overlay.remove();
   });
 });

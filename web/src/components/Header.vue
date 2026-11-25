@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
             <img
               data-test="header-openobserve-logo"
-              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
+              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80 max-md:h-6"
               :src="
                 getImageURL(
                   isDark
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <img
             data-test="header-openobserve-logo"
-            class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
+            class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80 max-md:h-6"
             :src="
               getImageURL(
                 isDark
@@ -146,17 +146,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="securityAccess.canOpen.value"
-      class="ms-3 flex shrink-0 items-center md:max-xl:min-w-0 md:max-xl:shrink"
+      class="ms-3 flex shrink-0 items-center max-xl:min-w-0 max-xl:shrink max-md:ms-1 max-md:min-w-12"
     >
       <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
     </div>
 
-    <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
-    <div class="min-w-0 flex-1" />
+    <div class="flex min-w-0 flex-1 justify-center px-3 max-md:px-1">
+      <OButton
+        variant="outline"
+        size="xs"
+        class="w-full max-w-112 justify-start max-md:w-auto"
+        data-test="header-command-palette"
+        :aria-label="t('commandPalette.title')"
+        @click="$emit('open-command-palette')"
+      >
+        <OIcon name="search" size="sm" />
+        <span class="min-w-0 flex-1 text-start max-md:hidden">{{ t("commandPalette.title") }}</span>
+        <OShortcut id="commandPalette" class="max-md:hidden" />
+      </OButton>
+    </div>
 
     <!-- RIGHT SIDE: Controls -->
     <div
-      class="flex shrink-0 items-center justify-end gap-1 pe-3 md:max-xl:min-w-0 md:max-xl:shrink"
+      class="flex shrink-0 items-center justify-end gap-1 pe-3 max-xl:min-w-0 max-xl:shrink max-md:pe-1.5"
     >
       <!-- SAMPLE DATA: stays visible while the org holds sample data -->
       <SampleDataHeaderChip class="me-2" />
@@ -182,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- HEADER MENU: Contains all header navigation and user controls -->
-      <div class="header-menu flex items-center gap-x-2 md:max-xl:min-w-0">
+      <div class="header-menu flex items-center gap-x-2 max-xl:min-w-0">
         <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ingestion_quota_used >= 85"
@@ -513,6 +525,7 @@ import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -540,6 +553,7 @@ export default defineComponent({
     SampleDataHeaderChip,
     LinkedAccountsDialog,
     OButton,
+    OShortcut,
     OIcon,
     OLockBadge,
     OTooltip,
@@ -628,6 +642,7 @@ export default defineComponent({
     "changeLanguage",
     "openPredefinedThemes",
     "openShortcuts",
+    "open-command-palette",
     "toggle-mobile-nav",
     "signout",
   ],

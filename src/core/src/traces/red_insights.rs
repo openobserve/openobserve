@@ -471,6 +471,14 @@ fn stream_name_is_error_restricted(stream: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{
+        config::ConfigOptions,
+        physical_optimizer::PhysicalOptimizerRule,
+        physical_plan::displayable,
+        prelude::{SessionConfig, SessionContext},
+    };
+
     use super::*;
 
     const ALL_COLS: StreamColumns = StreamColumns {
@@ -1226,13 +1234,6 @@ mod tests {
     async fn volume_sql_plans_through_the_topk_rule() {
         use std::sync::Arc;
 
-        use arrow_schema::{DataType, Field, Schema};
-        use datafusion::{
-            config::ConfigOptions,
-            physical_optimizer::PhysicalOptimizerRule,
-            physical_plan::displayable,
-            prelude::{SessionConfig, SessionContext},
-        };
         use search::datafusion::{
             datasource::empty_table::NewEmptyTable,
             physical_optimizer::aggregate_topk::AggregateTopkRule,

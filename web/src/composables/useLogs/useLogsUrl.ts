@@ -46,6 +46,7 @@ export const VIEW_STATE_PARAMS = new Set([
   "visualization_data",
   "build_data",
   "logs_visualize_toggle",
+  "drilldown_dims",
   "cmp_pin",
   ...LINE_LINK_PARAMS,
 ]);
@@ -66,6 +67,8 @@ export const sharedPage = ref<number | null>(null);
 export const sharedPageNotice = ref<{ page: number; lastPage: number | null } | null>(null);
 
 let boundRouter: Router | null = null;
+
+let inFlightQuery: LocationQueryRaw | null = null;
 
 const guardedRouters = new WeakSet<Router>();
 
@@ -282,13 +285,20 @@ export function writeLogsUrl(mode: LogsUrlMode, query: LocationQueryRaw): Promis
   if (!router) return Promise.resolve();
   // A relative write while leaving Logs supersedes that navigation and keeps the user on Logs.
   if (isLeavingRoute("logs")) return Promise.resolve();
-  if (changedParams(currentQuery(), query).length === 0) return Promise.resolve();
+  if (changedParams(currentLogsQuery(), query).length === 0) return Promise.resolve();
   const target = { query, state: { ...historyStateProvider() } as Record<string, any> };
-  return mode === "replace" ? router.replace(target) : router.push(target);
+  const pending = { ...query };
+  inFlightQuery = pending;
+  const navigation = mode === "replace" ? router.replace(target) : router.push(target);
+  const settle = () => {
+    if (inFlightQuery === pending) inFlightQuery = null;
+  };
+  Promise.resolve(navigation).then(settle, settle);
+  return navigation;
 }
 
 export function dropLineLinkParams(): Promise<unknown> {
-  const query: LocationQueryRaw = { ...currentQuery() };
+  const query: LocationQueryRaw = { ...currentLogsQuery() };
   let changed = false;
   for (const key of LINE_LINK_PARAMS) {
     if (key in query) {
@@ -305,6 +315,7 @@ export function routeHasLineLink(query: LocationQuery | Record<string, unknown>)
 
 export function resetLogsUrlForTests(): void {
   boundRouter = null;
+  inFlightQuery = null;
   resetPendingNavigationForTests();
   arrivalPending = false;
   resetShownSearch();
@@ -362,6 +373,7 @@ function normalized(value: unknown): string {
   return value === undefined || value === null ? "" : String(value);
 }
 
-function currentQuery(): LocationQuery {
-  return boundRouter?.currentRoute.value?.query ?? {};
+/** The address bar's query, or the one a Logs write is still navigating to, so a later write never builds on a stale route. */
+export function currentLogsQuery(): LocationQuery | LocationQueryRaw {
+  return inFlightQuery ?? boundRouter?.currentRoute.value?.query ?? {};
 }

@@ -1547,6 +1547,20 @@ defineExpose({
     if (rowModelWindowed.value) return [...tableData.value];
     return table.getRowModel().rows.map((r) => r.original);
   },
+  // Same filters the row model applies: a filter on a missing or non-filterable column is ignored.
+  filterRows: (rows: TData[]) => {
+    if (props.filterMode === "server") return rows;
+    const active = columnFilters.value.flatMap((f) => {
+      const column = table.getAllLeafColumns().find((c) => c.id === f.id);
+      if (!column?.getCanFilter() || !column.accessorFn) return [];
+      if (!Array.isArray(f.value) || f.value.length === 0) return [];
+      return [{ accessor: column.accessorFn, values: f.value as unknown[] }];
+    });
+    if (!active.length) return rows;
+    return rows.filter((row, index) =>
+      active.every(({ accessor, values }) => values.includes(accessor(row, index))),
+    );
+  },
 });
 </script>
 

@@ -63,11 +63,11 @@ pub static QUERY_FUNCTIONS: LazyLock<RwHashMap<String, Transform>> =
 static GLOBAL_ENRICHMENT_TABLES: LazyLock<RwHashMap<String, Box<dyn Table + Send + Sync>>> =
     LazyLock::new(Default::default);
 
-/// VRL functions that reach the network; allowed only when `ZO_SKIP_SSRF_CHECKS` is set.
-const NETWORK_VRL_FUNCTIONS: &[&str] = &["http_request", "dns_lookup", "reverse_dns"];
-
-/// VRL functions that reach the environment or host files; denied regardless of SSRF settings.
+/// VRL functions that reach the network, environment or host files; denied whatever the flags.
 const DENIED_VRL_FUNCTIONS: &[&str] = &[
+    "http_request",
+    "dns_lookup",
+    "reverse_dns",
     "get_env_var",
     "get_hostname",
     "parse_proto",
@@ -162,6 +162,16 @@ pub struct VrlFailure {
     detail: String,
     reason: String,
     aborted: bool,
+}
+
+impl VrlFailure {
+    pub fn is_aborted(&self) -> bool {
+        self.aborted
+    }
+
+    pub fn into_detail(self) -> String {
+        self.detail
+    }
 }
 
 /// Tallies rows on which a query function failed at runtime, so a search can report
@@ -375,14 +385,17 @@ pub fn apply_vrl_fn_checked(
             }
         },
         Err(err) => {
-            metrics::INGEST_ERRORS
-                .with_label_values(&[
-                    org_id,
-                    StreamType::Logs.as_str(),
-                    &format!("{stream_name:?}"),
-                    TRANSFORM_FAILED,
-                ])
-                .inc();
+            let aborted = matches!(err, vrl::compiler::runtime::Terminate::Abort(_));
+            if !aborted {
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.as_str(),
+                        &format!("{stream_name:?}"),
+                        TRANSFORM_FAILED,
+                    ])
+                    .inc();
+            }
             // Log full error with record for debugging
             log::debug!(
                 "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row."
@@ -392,7 +405,7 @@ pub fn apply_vrl_fn_checked(
             let failure = VrlFailure {
                 detail,
                 reason: first_line(&err.to_string()),
-                aborted: matches!(err, vrl::compiler::runtime::Terminate::Abort(_)),
+                aborted,
             };
             (row, Some(failure))
         }
@@ -466,16 +479,9 @@ fn org_enrichment_tables(org_id: &str) -> HashMap<String, enrichment::StreamTabl
 }
 
 fn vrl_stdlib_functions() -> Vec<Box<dyn Function>> {
-    vrl_stdlib_functions_inner(config::get_config().common.skip_ssrf_checks)
-}
-
-fn vrl_stdlib_functions_inner(skip_ssrf: bool) -> Vec<Box<dyn Function>> {
     vrl::stdlib::all()
         .into_iter()
-        .filter(|f| {
-            !DENIED_VRL_FUNCTIONS.contains(&f.identifier())
-                && (skip_ssrf || !NETWORK_VRL_FUNCTIONS.contains(&f.identifier()))
-        })
+        .filter(|f| !DENIED_VRL_FUNCTIONS.contains(&f.identifier()))
         .map(|f| {
             match DENIED_VRL_FILE_ARGUMENTS
                 .iter()
@@ -700,19 +706,16 @@ mod tests {
     }
 
     #[test]
-    fn default_config_rejects_network_functions() {
-        if config::get_config().common.skip_ssrf_checks {
-            return;
-        }
+    fn rejects_network_functions_whatever_the_ssrf_flag() {
         for source in NETWORK_SOURCES {
             let error = compile_error(source);
             assert!(error.contains("call to undefined function"), "{error}");
         }
     }
 
-    fn is_undefined_function(source: &str, skip_ssrf: bool) -> bool {
+    fn is_undefined_function(source: &str) -> bool {
         let external = vrl::prelude::state::ExternalEnv::default();
-        let functions = vrl_stdlib_functions_inner(skip_ssrf);
+        let functions = vrl_stdlib_functions();
         let config = vrl::compiler::CompileConfig::default();
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             vrl::compiler::compile_with_external(source, &functions, &external, config)
@@ -731,21 +734,7 @@ mod tests {
         let allowed: Vec<&str> = NETWORK_SOURCES
             .into_iter()
             .chain(HOST_SOURCES)
-            .filter(|source| !is_undefined_function(source, false))
-            .collect();
-        assert!(allowed.is_empty(), "still callable: {allowed:?}");
-    }
-
-    #[test]
-    fn skip_ssrf_checks_allows_only_network_functions() {
-        let denied: Vec<&str> = NETWORK_SOURCES
-            .into_iter()
-            .filter(|source| is_undefined_function(source, true))
-            .collect();
-        assert!(denied.is_empty(), "still denied: {denied:?}");
-        let allowed: Vec<&str> = HOST_SOURCES
-            .into_iter()
-            .filter(|source| !is_undefined_function(source, true))
+            .filter(|source| !is_undefined_function(source))
             .collect();
         assert!(allowed.is_empty(), "still callable: {allowed:?}");
     }
@@ -875,5 +864,34 @@ mod tests {
     fn apply_vrl_fn_does_not_flag_an_intentional_abort() {
         let errors = run_rows("if .m == \"skip\" { abort }\n.", &["skip", "keep"]);
         assert_eq!(errors.message(), None);
+    }
+
+    #[test]
+    fn an_intentional_abort_is_not_counted_as_a_transform_failure() {
+        let org = "vrl_abort_metric_org";
+        let streams = vec!["abort_metric_stream".to_string()];
+        let failed = || {
+            metrics::INGEST_ERRORS
+                .with_label_values(&[
+                    org,
+                    StreamType::Logs.as_str(),
+                    &format!("{streams:?}"),
+                    TRANSFORM_FAILED,
+                ])
+                .get()
+        };
+        let mut runtime = init_vrl_runtime();
+        for (code, counted) in [("abort\n.", 0), (".x = parse_json!(.m)\n.", 1)] {
+            let program = compile_vrl_function(code, org).unwrap();
+            let resolver = VRLResultResolver {
+                program: program.program,
+                fields: program.fields,
+            };
+            let before = failed();
+            let row = json::json!({ "m": "not json" });
+            let (_, f) = apply_vrl_fn_checked(&mut runtime, &resolver, row, org, &streams);
+            assert!(f.is_some(), "{code}");
+            assert_eq!(failed() - before, counted, "{code}");
+        }
     }
 }

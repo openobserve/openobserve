@@ -1231,6 +1231,12 @@ where
 
 #[cfg(test)]
 mod tests {
+    use arrow::{
+        array::{Array, ArrayRef, Int64Array, StringArray, StringViewArray},
+        record_batch::RecordBatch,
+    };
+    use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{datasource::MemTable, prelude::SessionContext};
     use serde_json::json;
 
     use super::*;
@@ -1425,13 +1431,6 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
     #[tokio::test]
     async fn test_totals_sql_measures_numeric_and_string_row_columns_alike() {
         use std::sync::Arc;
-
-        use arrow::{
-            array::{Array, ArrayRef, Int64Array, StringArray, StringViewArray},
-            record_batch::RecordBatch,
-        };
-        use arrow_schema::{DataType, Field, Schema};
-        use datafusion::{datasource::MemTable, prelude::SessionContext};
 
         async fn measure(rows: ArrayRef) -> (i64, i64) {
             let n = rows.len();

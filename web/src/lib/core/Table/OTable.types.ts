@@ -822,4 +822,6 @@ export interface OTableExposed<TData = any> {
   scrollToTop: () => void;
   /** Get all currently visible rows as plain objects */
   getRows: () => TData[];
+  /** Apply the active column filters to rows the table does not hold */
+  filterRows: (rows: TData[]) => TData[];
 }

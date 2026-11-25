@@ -30,7 +30,10 @@ use config::{
     metrics,
     utils::{json, time::now_micros, took_watcher::TookWatcher},
 };
-use datafusion::{common::TableReference, physical_plan::visit_execution_plan};
+use datafusion::{
+    common::TableReference,
+    physical_plan::{collect, visit_execution_plan},
+};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cluster,
@@ -418,7 +421,7 @@ pub async fn run_datafusion(
     }
     // run datafusion
     let datafusion_start = std::time::Instant::now();
-    let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
+    let ret = collect(physical_plan.clone(), ctx.task_ctx()).await;
     let peak_memory = get_peak_memory_from_ctx(&ctx).load(Ordering::Relaxed);
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);

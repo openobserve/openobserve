@@ -19,6 +19,9 @@ import type { RouteRecordNameGeneric } from "vue-router";
 /** True while an org switch is leaving an org-scoped page, so editor guards treat the leave as forced. */
 export const orgSwitchPending = ref(false);
 
+/** One-shot request from the org switcher's "+" for the organizations page to open its create dialog. */
+export const orgCreatePending = ref(false);
+
 /** Detail and edit routes whose id belongs to one org, mapped to the list route to land on after an org switch. */
 const ORG_SCOPED_DETAIL_ROUTES: Record<string, string> = {
   viewDashboard: "dashboards",

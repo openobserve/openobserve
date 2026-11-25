@@ -425,7 +425,10 @@ mod tests {
         physical_expr::{LexOrdering, PhysicalExpr, PhysicalSortExpr},
         physical_plan::{
             DisplayAs, DisplayFormatType, PlanProperties,
-            coalesce_partitions::CoalescePartitionsExec, empty::EmptyExec,
+            coalesce_partitions::CoalescePartitionsExec,
+            displayable,
+            empty::EmptyExec,
+            statistics::{StatisticsArgs, StatisticsContext},
         },
         prelude::{ParquetReadOptions, SessionConfig},
     };
@@ -711,11 +714,8 @@ mod tests {
                     partitions
                 );
                 assert!(hash_ordered(&scan));
-                let stats = datafusion::physical_plan::statistics::StatisticsContext::new()
-                    .compute(
-                        scan.as_ref(),
-                        &datafusion::physical_plan::statistics::StatisticsArgs::new(),
-                    )
+                let stats = StatisticsContext::new()
+                    .compute(scan.as_ref(), &StatisticsArgs::new())
                     .unwrap();
                 let hash_index = scan.schema().index_of(HASH_LABEL).unwrap();
                 assert!(stats.column_statistics[hash_index].is_singleton());
@@ -732,7 +732,7 @@ mod tests {
                     plan_contains_sort(&plan),
                     plan.downcast_ref::<SortPreservingMergeExec>().is_some(),
                     plan.properties().output_ordering(),
-                    datafusion::physical_plan::displayable(plan.as_ref()).indent(false)
+                    displayable(plan.as_ref()).indent(false)
                 );
                 assert!(!plan_contains_sort(&plan));
                 assert!(plan.downcast_ref::<CoalescePartitionsExec>().is_some());

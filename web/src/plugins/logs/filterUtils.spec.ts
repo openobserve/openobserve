@@ -21,6 +21,7 @@ import {
   hasFieldCondition,
   removeFieldCondition,
   replaceExistingFieldCondition,
+  splitUnion,
 } from "./filterUtils";
 
 // ---------------------------------------------------------------------------
@@ -619,5 +620,39 @@ describe("appendSqlFilter trailing line break", () => {
     expect(appendSqlFilter("SELECT 1 FROM t -- c\n", "b = 2")).toBe(
       "SELECT 1 FROM t where b = 2 -- c\n",
     );
+  });
+});
+
+describe("splitUnion", () => {
+  it("splits at UNION and UNION ALL and keeps each operator", () => {
+    expect(splitUnion("select 1 union select 2 UNION ALL select 3")).toEqual({
+      parts: ["select 1 ", " select 2 ", " select 3"],
+      ops: ["UNION", "UNION ALL"],
+    });
+  });
+
+  it("returns the query whole when there is no UNION", () => {
+    expect(splitUnion("select * from t")).toEqual({ parts: ["select * from t"], ops: [] });
+  });
+
+  it("ignores a UNION inside a string literal, a quoted name, a comment or brackets", () => {
+    for (const sql of [
+      "select * from t where note = 'a union b'",
+      "select * from t where note = 'it''s a union all'",
+      'select "union" from t',
+      "select * from t -- union select 2",
+      "select * from t /* union */ where x = 1",
+      "select * from t where x in (select 1 union select 2)",
+      "select 1 as reunion, unionized from t",
+    ]) {
+      expect(splitUnion(sql)).toEqual({ parts: [sql], ops: [] });
+    }
+  });
+
+  it("keeps UNION ALL BY NAME's trailing words with the next branch", () => {
+    expect(splitUnion('select * from "a" UNION ALL BY NAME select * from "b"')).toEqual({
+      parts: ['select * from "a" ', ' BY NAME select * from "b"'],
+      ops: ["UNION ALL"],
+    });
   });
 });

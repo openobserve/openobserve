@@ -133,14 +133,14 @@ fn wrap_in_count_subquery(query: &mut Query) {
 
 #[cfg(test)]
 mod tests {
-    use sqlparser::{ast::VisitMut, dialect::GenericDialect};
+    use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
 
     use super::*;
 
     #[test]
     fn test_track_total_hits1() {
         let sql = "SELECT * FROM t WHERE name = 'a'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -153,7 +153,7 @@ mod tests {
     #[test]
     fn test_track_total_hits2() {
         let sql = "SELECT name, count(*) FROM t WHERE name = 'a' group by name order by name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn test_track_total_hits3() {
         let sql = "SELECT t1.name, t2.name from t1 join t2 on t1.name = t2.name where t1.name = 'openobserve' group by t1.name, t2.name order by t1.name, t2.name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -179,7 +179,7 @@ mod tests {
     #[test]
     fn test_track_total_hits4() {
         let sql = "SELECT name from t1 where name not in (select name from t2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn test_track_total_hits5() {
         let sql = "SELECT name from t1 union select name from t2";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn test_track_total_hits6() {
         let sql = "(SELECT name from t1) union (select name from t2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn test_track_total_hits7() {
         let sql = "SELECT name from t1 union select name from t2 union select name from t3";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn test_track_total_hits_distinct_single_column() {
         let sql = "SELECT DISTINCT name FROM t WHERE name = 'a'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -248,7 +248,7 @@ mod tests {
     #[test]
     fn test_track_total_hits_distinct_multiple_columns() {
         let sql = "SELECT DISTINCT unique_id, continent FROM oly WHERE continent = 'ASI'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -263,7 +263,7 @@ mod tests {
     fn test_track_total_hits_distinct_three_columns() {
         let sql =
             "SELECT DISTINCT unique_id, continent, bronze_medals FROM oly WHERE continent = 'ASI'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();

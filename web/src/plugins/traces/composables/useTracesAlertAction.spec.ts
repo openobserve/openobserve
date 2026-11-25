@@ -136,6 +136,29 @@ describe("useTracesAlertAction", () => {
     expect(alertCreationDialog.value?.prefill.meta?.view).toBe("spans");
   });
 
+  it("narrows a Spans view alert to the scope", async () => {
+    Object.assign(state.searchObj.meta, { searchMode: "spans", scope: "root" });
+    state.searchObj.data.stream.hasParentColumn = true;
+    markRun();
+    respond({ matches: 10 });
+    mountHost();
+    await action.createAlert("matches");
+    expect(search.mock.calls[0][0].query.query.sql).toBe(
+      "SELECT count(*) AS matches FROM \"default\" WHERE (service_name = 'checkout') AND (reference_parent_span_id IS NULL OR reference_parent_span_id = '')",
+    );
+    expect(alertCreationDialog.value?.prefill.sql).toContain("reference_parent_span_id IS NULL");
+  });
+
+  it("adds no scope to a Traces view alert", async () => {
+    state.searchObj.meta.scope = "root";
+    state.searchObj.data.stream.hasParentColumn = true;
+    markRun();
+    respond({ errors: 1 });
+    mountHost();
+    await action.createAlert("errors");
+    expect(search.mock.calls[0][0].query.query.sql).not.toContain("reference_parent_span_id");
+  });
+
   it("uses the editor's filter with a 'not run yet' note when the query has not run", async () => {
     state.searchObj.data.editorValue = "duration > '500ms'";
     respond({ matches: 3 });

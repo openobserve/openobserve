@@ -263,6 +263,8 @@ export interface SlackManifestParams {
   mode: SlackMode;
   name?: string;
   channel_history?: boolean;
+  /** The app's slash command; the server derives one from the name when it is empty. */
+  command?: string;
 }
 
 /** The server-built manifest (section 8.2); only its outer shape is relied on. */
@@ -276,6 +278,7 @@ export interface SlackCreateFromTokenRequest {
   config_refresh_token: string;
   app_name?: string;
   channel_history?: boolean;
+  command?: string;
 }
 
 /** Set up manually; `signing_secret` is required for HTTP mode. */
@@ -285,6 +288,10 @@ export interface SlackCreateManualRequest {
   client_secret: string;
   signing_secret?: string;
   app_token?: string;
+  /** What the manifest the app was made from had, so O2 replies with the same command. */
+  app_name?: string;
+  channel_history?: boolean;
+  command?: string;
 }
 
 export type SlackCreateInstallationRequest = SlackCreateFromTokenRequest | SlackCreateManualRequest;

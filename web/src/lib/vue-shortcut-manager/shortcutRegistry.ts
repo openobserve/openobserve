@@ -241,8 +241,17 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.global",
     shortcuts: [
+      {
+        id: "commandPalette",
+        keyForWindows: "ctrl+k",
+        keyForMac: "meta+k",
+        descriptionKey: "commandPalette.globalShortcut",
+        allowInInput: true,
+      },
       { id: "openCheatsheet", key: "shift+?", descriptionKey: "shortcuts.actions.openCheatsheet" },
       { id: "closeDialog", key: "escape", descriptionKey: "shortcuts.actions.closeDialog" },
+      { id: "openOrgSwitcher", key: "g o", descriptionKey: "shortcuts.actions.openOrgSwitcher" },
+      { id: "timeRangeOpen", key: "t", descriptionKey: "shortcuts.actions.timeRangeOpen" },
       {
         id: "aiChatToggle",
         keyForWindows: "ctrl+b",
@@ -704,8 +713,9 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     shortcuts: [
       {
         id: "k8sPalette",
-        keyForWindows: "ctrl+k",
-        keyForMac: "meta+k",
+        // Ctrl+Shift+K opens Firefox's Web Console on Windows and Linux.
+        keyForWindows: "ctrl+alt+k",
+        keyForMac: "meta+shift+k",
         descriptionKey: "shortcuts.actions.k8sPalette",
         allowInInput: true,
       },

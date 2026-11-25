@@ -46,6 +46,7 @@ use stream::save_stream_settings;
 
 use super::{db::distinct_values, folders};
 use crate::common::meta::authz::Authz;
+pub mod prom_variables;
 pub mod reports;
 pub mod timed_annotations;
 
@@ -305,6 +306,9 @@ async fn update_distinct_variables(
 
 macro_rules! _get_variables {
     ($map:ident, $dash:ident) => {
+        _get_variables!($map, $dash, |_qd| false)
+    };
+    ($map:ident, $dash:ident, $runs_own_query:expr) => {
         if let Some(vars) = &$dash.variables {
             for v in vars.list.iter() {
                 if let Some(ref qd) = v.query_data {
@@ -312,6 +316,9 @@ macro_rules! _get_variables {
                     // stream name itself can come from variable
                     // so we skip it if it starts with $
                     if qd.stream.starts_with("$") {
+                        continue;
+                    }
+                    if $runs_own_query(qd) || qd.stream.is_empty() || qd.field.is_empty() {
                         continue;
                     }
                     $map.entry((qd.stream.clone(), qd.stream_type))
@@ -363,7 +370,11 @@ pub fn get_query_variables(
         }
         8 => {
             let dash = dashboard.v8.as_ref().unwrap();
-            _get_variables!(map, dash);
+            // A custom query variable never reads the distinct values of its stream/field.
+            _get_variables!(map, dash, |qd: &v8::QueryData| qd
+                .query
+                .as_deref()
+                .is_some_and(|q| !q.trim().is_empty()));
         }
         _ => {
             unreachable!("we only have 8 dashboard versions")
@@ -631,7 +642,11 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
     else {
         return Err(DashboardError::DashboardNotFound);
     };
-    table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    let orphaned_reports =
+        table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    for (report_id, report_folder_id) in orphaned_reports {
+        reports::forget_deleted(org_id, &report_id, &report_folder_id).await;
+    }
     // Keep the org's "pin to Home" setting from dangling on a deleted dashboard.
     reconcile_home_dashboard_on_delete(org_id, dashboard_id).await;
     // A public link must not outlive its dashboard; a failure shows it as "dashboard deleted".
@@ -695,7 +710,12 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), DashboardError> {
         &broadcast,
         |(dashboard_id, folder_id): (String, String)| async move {
             forget_dashboard(org_id, &dashboard_id, &folder_id).await?;
-            table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
+            let orphaned =
+                table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
+            // Deleted before the reports step lists rows, so their tuples go here.
+            for (report_id, report_folder_id) in orphaned {
+                reports::forget_deleted(org_id, &report_id, &report_folder_id).await;
+            }
             Ok(())
         },
     )
@@ -1727,6 +1747,46 @@ mod tests {
         let v = serde_json::json!("not-an-object");
         assert_eq!(home_pin_move_target(&v, "abc", "A"), None);
         assert!(!home_pin_should_clear(&v, "abc"));
+    }
+
+    #[test]
+    fn get_query_variables_skips_custom_query_and_empty_stream() {
+        let dash: v8::Dashboard = serde_json::from_value(serde_json::json!({
+            "version": 8,
+            "title": "t",
+            "description": "",
+            "variables": {"list": [
+                {"type": "query_values", "name": "a", "label": "a",
+                 "query_data": {"stream_type": "logs", "stream": "default", "field": "host"}},
+                {"type": "query_values", "name": "b", "label": "b",
+                 "query_data": {"stream_type": "logs", "stream": "default", "field": "pod",
+                                "query": "SELECT 1 AS v", "value_field": "v"}},
+                {"type": "query_values", "name": "e", "label": "e",
+                 "query_data": {"stream_type": "logs", "stream": "other", "field": "pod",
+                                "query": "  "}},
+                {"type": "query_values", "name": "c", "label": "c",
+                 "query_data": {"stream_type": "logs", "stream": "", "field": ""}},
+                {"type": "query_values", "name": "d", "label": "d",
+                 "query_data": {"stream_type": "metrics", "stream": "up", "field": "job",
+                                "query_type": "promql"}}
+            ]}
+        }))
+        .unwrap();
+        let dashboard: Dashboard = dash.into();
+        let map = get_query_variables(Some(&dashboard));
+        assert_eq!(map.len(), 3);
+        assert_eq!(
+            map.get(&("other".to_string(), StreamType::Logs)),
+            Some(&vec!["pod".to_string()])
+        );
+        assert_eq!(
+            map.get(&("default".to_string(), StreamType::Logs)),
+            Some(&vec!["host".to_string()])
+        );
+        assert_eq!(
+            map.get(&("up".to_string(), StreamType::Metrics)),
+            Some(&vec!["job".to_string()])
+        );
     }
 
     fn dashboard_with_sources(count: usize) -> Dashboard {

@@ -3,7 +3,6 @@
 
 [advisories]
 yanked = "deny"
-git-fetch-with-cli = true
 ignore = [
   "RUSTSEC-2023-0071", # from rsa, transitive dep of sqlx
   "RUSTSEC-2021-0139", # from ansi_term, transitive dep of vrl

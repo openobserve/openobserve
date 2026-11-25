@@ -429,6 +429,25 @@ pub fn inferred_column_type(key: &str, value: &Value) -> Option<DataType> {
     }
 }
 
+/// The `ZO_COLS_PER_RECORD_LIMIT` rule on one record; the caller reads `limit` once per batch.
+pub fn check_record_columns_limit(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    record: &Map<String, Value>,
+    limit: usize,
+) -> std::result::Result<(), anyhow::Error> {
+    // a column count never exceeds the entry count, so the cheap bound settles most records
+    if record.len() <= limit {
+        return Ok(());
+    }
+    let columns = record
+        .iter()
+        .filter(|(key, value)| inferred_column_type(key, value).is_some())
+        .count();
+    check_request_columns_limit(org_id, stream_type, stream_name, columns)
+}
+
 /// Whether a value of `inferred` type lands in an `existing` column without a cast or evolution.
 pub fn column_accepts(existing: &DataType, inferred: &DataType) -> bool {
     existing == inferred
@@ -655,7 +674,7 @@ pub fn schema_records_to_entries(
 }
 
 /// All streams while the pattern manager is down, else those whose pattern failed to build.
-#[cfg(any(feature = "vectorscan", test))]
+#[cfg(any(feature = "enterprise", test))]
 fn unscannable_streams<'a>(
     streams: &[(&'a str, u64)],
     manager_up: bool,
@@ -669,7 +688,7 @@ fn unscannable_streams<'a>(
 }
 
 /// Each stream plus its pipelines' fixed same-type destinations, with the source's record count.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub async fn with_pipeline_destinations(
     org_id: &str,
     stream_type: StreamType,
@@ -695,7 +714,7 @@ pub async fn with_pipeline_destinations(
 }
 
 /// `ZO_SDR_FAIL_CLOSED`: why a write must be refused before any pipeline runs.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub async fn sdr_fail_closed_refusal(
     org_id: &str,
     stream_type: StreamType,
@@ -743,7 +762,7 @@ pub async fn sdr_fail_closed_refusal(
 }
 
 /// The fail-closed redaction refusal, as opposed to an overload or another resource error.
-#[cfg(any(feature = "vectorscan", test))]
+#[cfg(any(feature = "enterprise", test))]
 pub fn is_sdr_fail_closed_refusal(e: &Error) -> bool {
     matches!(e, Error::ResourceError(reason)
         if config::meta::self_reporting::redaction::is_fail_closed_rejection(reason))

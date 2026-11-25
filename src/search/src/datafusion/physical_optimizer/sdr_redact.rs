@@ -20,7 +20,11 @@ use std::{
     sync::Arc,
 };
 
+#[cfg(feature = "enterprise")]
+use config::meta::{search::RawStreams, sql::TableReferenceExt, stream::StreamType};
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, meta::search::SDR_REDACT_UDF_NAME};
+#[cfg(feature = "enterprise")]
+use datafusion::common::TableReference;
 use datafusion::{
     common::{
         Result, ScalarValue,
@@ -44,6 +48,8 @@ use datafusion::{
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
 use crate::datafusion::udf::fulltext::match_all::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME};
 
@@ -75,13 +81,13 @@ impl PhysicalOptimizerRule for LiftRedaction {
 
 /// Columns of a stream whose index terms or values hold raw protected data; empty when the
 /// stream is unprotected or the pattern manager is not ready, which the scanning node rechecks.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub fn protected_columns(
     org_id: &str,
-    stream_type: config::meta::stream::StreamType,
+    stream_type: StreamType,
     stream_name: &str,
 ) -> HashSet<String> {
-    let Some(manager) = o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER.get() else {
+    let Some(manager) = PATTERN_MANAGER.get() else {
         return HashSet::new();
     };
     match manager.search_protection(org_id, stream_type, stream_name) {
@@ -96,16 +102,14 @@ pub fn protected_columns(
 
 /// Part of a cache key: results are stored redacted, so a pattern change must miss them. `None`
 /// when no stream read is redacted; a raw stream reads like an unprotected one and shares its key.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub fn redaction_digest(
     org_id: &str,
-    stream_type: config::meta::stream::StreamType,
-    streams: &[datafusion::common::TableReference],
-    raw_streams: Option<&config::meta::search::RawStreams>,
+    stream_type: StreamType,
+    streams: &[TableReference],
+    raw_streams: Option<&RawStreams>,
 ) -> Option<String> {
-    use config::meta::sql::TableReferenceExt;
-
-    let Some(manager) = o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER.get() else {
+    let Some(manager) = PATTERN_MANAGER.get() else {
         return Some("sdr=unavailable".to_string());
     };
     let parts: Vec<String> = streams
@@ -297,8 +301,11 @@ mod tests {
         },
         catalog::Session,
         common::cast::as_string_array,
-        datasource::{MemTable, TableProvider, TableType},
-        logical_expr::{ColumnarValue, TableProviderFilterPushDown, Volatility, create_udf},
+        datasource::{MemTable, TableProvider, TableType, memory::MemorySourceConfig},
+        logical_expr::{
+            ColumnarValue, TableProviderFilterPushDown, Volatility, col, create_udf,
+            expr::ScalarFunction, lit,
+        },
         physical_plan::displayable,
         prelude::SessionContext,
     };
@@ -498,20 +505,17 @@ mod tests {
 
     #[test]
     fn test_scan_filters_drop_redacted_and_match_all() {
-        use datafusion::logical_expr::{col, lit};
-
         let redacted = redacted_columns(&protected());
-        let match_all =
-            Expr::ScalarFunction(datafusion::logical_expr::expr::ScalarFunction::new_udf(
-                Arc::new(create_udf(
-                    MATCH_ALL_UDF_NAME,
-                    vec![DataType::Utf8],
-                    DataType::Boolean,
-                    Volatility::Immutable,
-                    Arc::new(|_: &[ColumnarValue]| unreachable!()),
-                )),
-                vec![lit("x")],
-            ));
+        let match_all = Expr::ScalarFunction(ScalarFunction::new_udf(
+            Arc::new(create_udf(
+                MATCH_ALL_UDF_NAME,
+                vec![DataType::Utf8],
+                DataType::Boolean,
+                Volatility::Immutable,
+                Arc::new(|_: &[ColumnarValue]| unreachable!()),
+            )),
+            vec![lit("x")],
+        ));
         let filters = vec![
             col("level").eq(lit("info")),
             col("msg").like(lit("%a%")),
@@ -524,8 +528,6 @@ mod tests {
 
     #[test]
     fn test_wrap_keeps_the_schema_and_skips_a_scan_without_redacted_columns() {
-        use datafusion::datasource::memory::MemorySourceConfig;
-
         let options = Arc::new(ConfigOptions::default());
         let scan: Arc<dyn ExecutionPlan> =
             MemorySourceConfig::try_new_exec(&[vec![test_batch()]], test_schema(), None).unwrap();
@@ -601,7 +603,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_digest_separates_raw_and_redacted_readers() {
         use config::meta::{search::RawStreams, stream::StreamType};
@@ -636,7 +638,7 @@ mod tests {
         )
         .unwrap();
 
-        let streams = [datafusion::common::TableReference::from("app")];
+        let streams = [TableReference::from("app")];
         let digest = |raw: Option<&RawStreams>| {
             redaction_digest("sdr_digest", StreamType::Logs, &streams, raw)
         };
@@ -646,7 +648,7 @@ mod tests {
         assert!(redacted.is_some());
         assert_eq!(digest(None), redacted);
 
-        let unprotected = [datafusion::common::TableReference::from("plain")];
+        let unprotected = [TableReference::from("plain")];
         let plain = redaction_digest("sdr_digest", StreamType::Logs, &unprotected, None);
         assert_eq!(plain, None);
         assert_eq!(digest(Some(&raw)), plain);

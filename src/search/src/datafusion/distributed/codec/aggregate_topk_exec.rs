@@ -75,6 +75,7 @@ mod tests {
             empty::EmptyExec,
             expressions::{col, lit},
         },
+        prelude::SessionContext,
     };
     use datafusion_proto::bytes::{
         physical_plan_from_bytes_with_extension_codec, physical_plan_to_bytes_with_extension_codec,
@@ -120,7 +121,7 @@ mod tests {
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
         let plan2 =
             physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.downcast_ref::<AggregateTopkExec>().unwrap();
@@ -156,7 +157,7 @@ mod tests {
         }
         .encode_to_vec();
         let codec = super::super::get_physical_extension_codec();
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
 
         let ret = physical_plan_from_bytes_with_extension_codec(&bytes, &ctx.task_ctx(), &codec);
 

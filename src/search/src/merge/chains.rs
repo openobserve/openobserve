@@ -134,12 +134,13 @@ async fn list_file_chains(
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::{Int64Array, RecordBatch, UInt64Array};
+    use arrow::array::{Array, Int64Array, RecordBatch, UInt64Array};
     use arrow_schema::{DataType, Field};
     use config::{
         TIMESTAMP_COL_NAME,
         meta::{promql::HASH_LABEL, stream::FileMeta},
     };
+    use object_store::memory::InMemory;
     use parquet::{
         arrow::ArrowWriter,
         file::properties::{EnabledStatistics, WriterProperties},
@@ -155,7 +156,7 @@ mod tests {
     }
 
     async fn put_file(account: &str, name: &str, hashes: [u64; 2], stats: bool) -> FileKey {
-        let columns: Vec<Arc<dyn arrow::array::Array>> = vec![
+        let columns: Vec<Arc<dyn Array>> = vec![
             Arc::new(UInt64Array::from(hashes.to_vec())),
             Arc::new(Int64Array::from(vec![10, 50])),
         ];
@@ -189,7 +190,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_read_chains() {
         let id = ider::uuid();
-        infra::storage::add_account(&id, Box::new(object_store::memory::InMemory::new())).await;
+        infra::storage::add_account(&id, Box::new(InMemory::new())).await;
         let account = format!("{id}:default");
         let mut rounds = Vec::new();
         let mut bare = Vec::new();

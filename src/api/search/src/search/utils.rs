@@ -226,6 +226,7 @@ impl Drop for SearchStreamGuard {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
     use hashbrown::HashMap;
 
     use super::*;
@@ -287,7 +288,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_validate_query_fields_join_with_mixed_uds() {
-        use arrow_schema::{DataType, Field, Schema};
         use config::meta::stream::{StreamSettings, StreamType};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
@@ -379,7 +379,6 @@ JOIN "test1" AS b"#;
 
     #[tokio::test]
     async fn test_validate_query_fields_uds_hint_lists_real_fields_sorted() {
-        use arrow_schema::{DataType, Field, Schema};
         use config::meta::stream::{StreamSettings, StreamType};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
@@ -419,7 +418,6 @@ JOIN "test1" AS b"#;
 
     #[tokio::test]
     async fn test_validate_query_fields_join_enrichment_table() {
-        use arrow_schema::{DataType, Field, Schema};
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
         let org_id = "test_org_join_enrich";
@@ -477,7 +475,6 @@ JOIN "test1" AS b"#;
     }
 
     async fn check_same_name_join_uds(restricted_type: StreamType, sql: &str) {
-        use arrow_schema::{DataType, Field, Schema};
         use config::meta::stream::StreamSettings;
         use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 

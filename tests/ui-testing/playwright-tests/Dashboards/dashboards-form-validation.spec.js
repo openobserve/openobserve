@@ -902,7 +902,8 @@ test.describe("Dashboard AddCondition form validation", () => {
         await conditionColumn.click();
         const suggest = page.locator('[data-test="dashboard-filter-builder-suggest"]');
         await suggest.waitFor({ state: 'visible', timeout: 10000 });
-        await suggest.getByRole('option').nth(1).click();
+        // Another text field: the value "e2e" only stays when the new field takes text.
+        await pm.dashboardsFormValidation.getTextFieldOptions(suggest).nth(1).click();
 
         await expect(conditionColumn).not.toHaveText(before, { timeout: 5000 });
         await expect(pm.dashboardsFormValidation.getConditionConditionLocator()).toHaveText('=');

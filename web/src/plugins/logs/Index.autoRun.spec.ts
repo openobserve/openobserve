@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 
 import { initializeLogsIndexDom } from "@/test/unit/helpers/logsIndex";
 import Index from "@/plugins/logs/Index.vue";
@@ -33,11 +34,12 @@ const router = createRouter({
     { path: "/logs", name: "logs", component: { template: "<div />" } },
   ],
 });
-import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
+import { getFieldsFromQuery, getStreamFromQuery } from "@/utils/query/sqlUtils";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { REFRESH_QUERY_ORIGIN } from "@/composables/useLogs/logsRowNav";
 import { urlWriteMode } from "@/composables/useLogs/useLogsUrl";
 import { saveLogsStreamType } from "@/utils/streamPersist";
+import searchService from "@/services/search";
 
 initializeLogsIndexDom();
 
@@ -578,6 +580,207 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
       expect(visualize.mock.calls[0][0]).toMatchObject({
         reason: "visualize-restore",
         kind: "entry",
+      });
+    });
+
+    describe("toggling to Visualize with no reusable Logs results (o2-enterprise#3701)", () => {
+      const toggleToVisualize = async () => {
+        await ready();
+        vi.spyOn(searchService, "result_schema").mockResolvedValue({
+          data: { group_by: [], projections: ["_timestamp"], timeseries_field: null },
+        } as any);
+        const engine = wrapper.vm.autoRun.engine;
+        const landed = engine.currentGeneration("grid");
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "visualize";
+        await vi.waitFor(() => expect(engine.currentGeneration("grid").id).not.toBe(landed.id));
+        return engine.currentGeneration("grid");
+      };
+      // The Visualize chart mounts lazily and reads the stream too, so call counts do not mark the copy.
+      const copied = () =>
+        vi.waitFor(() => expect(wrapper.vm.visualizeChartData.queries?.[0]?.query).toBeTruthy());
+
+      afterEach(() => {
+        (getStreamFromQuery as Mock).mockReset();
+      });
+
+      it("records the chart load the toggle starts once it ends", async () => {
+        (getStreamFromQuery as Mock).mockResolvedValue("k8s_json");
+        const run = await toggleToVisualize();
+        expect(run.op).toBe("visualize");
+        expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(true);
+        await copied();
+        await flushPromises();
+
+        const loading = wrapper.vm.$.provides.variablesAndPanelsDataLoadingState;
+        loading.panels = { ...loading.panels, chart: true };
+        await nextTick();
+        expect(wrapper.vm.searchObj.meta.runOutcome.visualize).toBe("running");
+        loading.panels = { ...loading.panels, chart: false };
+        await nextTick();
+
+        expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(false);
+        expect(wrapper.vm.searchObj.meta.runOutcome.visualize).toBe("complete");
+        expect(wrapper.vm.searchObj.meta.executedPanel).toMatchObject({
+          surface: "visualize",
+          generation: run.id,
+          complete: true,
+        });
+      });
+
+      it("closes the run as failed when the toggle flow throws after opening it", async () => {
+        (getStreamFromQuery as Mock)
+          .mockResolvedValueOnce("k8s_json")
+          .mockRejectedValueOnce(new Error("stream lookup failed"));
+        const run = await toggleToVisualize();
+        expect(run.op).toBe("visualize");
+        await vi.waitFor(() =>
+          expect(wrapper.vm.searchObj.meta.runOutcome.visualize).toBe("failed"),
+        );
+        expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(false);
+        expect(run.settled).toBe(true);
+        expect(wrapper.vm.searchObj.meta.executedPanel).toBeNull();
+      });
+
+      it("records the config the toggle handed the chart, not one edited before its load starts", async () => {
+        (getStreamFromQuery as Mock).mockResolvedValue("k8s_json");
+        const run = await toggleToVisualize();
+        await copied();
+        await flushPromises();
+        const handed = wrapper.vm.autoRun.panelSignature("visualize");
+
+        const config = wrapper.vm.dashboardPanelData.data.config;
+        config.connect_nulls = !config.connect_nulls;
+        await nextTick();
+        expect(wrapper.vm.autoRun.panelSignature("visualize")).not.toBe(handed);
+        const loading = wrapper.vm.$.provides.variablesAndPanelsDataLoadingState;
+        loading.panels = { ...loading.panels, chart: true };
+        await nextTick();
+        loading.panels = { ...loading.panels, chart: false };
+        await nextTick();
+
+        expect(wrapper.vm.searchObj.meta.executedPanel).toMatchObject({
+          generation: run.id,
+          configSignature: handed,
+        });
+      });
+
+      describe("a chart load that ends without querying, while the user stays on Visualize", () => {
+        const mountChart = async () => {
+          (getStreamFromQuery as Mock).mockResolvedValue("k8s_json");
+          const run = await toggleToVisualize();
+          await vi.waitFor(
+            () =>
+              expect(wrapper.findComponent({ name: "PanelSchemaRenderer" }).exists()).toBe(true),
+            { timeout: 10000 },
+          );
+          await copied();
+          await flushPromises();
+          expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(true);
+          return run;
+        };
+
+        it("cancels the run when the chart's loader finds no query to run", async () => {
+          const run = await mountChart();
+
+          wrapper.vm.visualizeChartData.queries[0].query = "";
+          await vi.waitFor(() => expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(false));
+
+          expect(run.settled).toBe(true);
+          expect(wrapper.vm.searchObj.meta.runOutcome.visualize).toBe("cancelled");
+          expect(wrapper.vm.searchObj.meta.executedPanel).toBeNull();
+        });
+
+        it("cancels a Run's chart load that finds no query to run, so the grid lane goes idle", async () => {
+          const setExecutors = vi.spyOn(useLogsAutoRun(), "setExecutors");
+          try {
+            const toggle = await mountChart();
+            const engine = wrapper.vm.autoRun.engine;
+            // ready() stubs the visualize executor, so the Run needs Index's real one back.
+            const executePanelRun = setExecutors.mock.calls.find(
+              (c) => c[0].logs && c[0].visualize,
+            )?.[0].visualize;
+            expect(executePanelRun).toBeTypeOf("function");
+            wrapper.vm.autoRun.setExecutors({ visualize: executePanelRun });
+            const toggleChart = wrapper.vm.visualizeChartData;
+
+            wrapper.vm.searchBarRef.handleRunQueryFn();
+            await vi.waitFor(() => expect(engine.currentGeneration("grid").id).not.toBe(toggle.id));
+            const run = engine.currentGeneration("grid");
+            expect(run).toMatchObject({ op: "visualize", reason: "run" });
+            await vi.waitFor(() => {
+              expect(wrapper.vm.visualizeChartData).not.toBe(toggleChart);
+              expect(wrapper.vm.visualizeChartData.queries?.[0]?.query).toBeTruthy();
+            });
+            await flushPromises();
+            expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(true);
+            expect(run.settled).toBe(false);
+
+            wrapper.vm.visualizeChartData.queries[0].query = "";
+            await vi.waitFor(() => expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(false));
+
+            // These are the terms of the engine's private isBusy(), which defers auto-refresh while true.
+            expect(run.settled).toBe(true);
+            expect(engine.currentGeneration("grid").id).toBe(run.id);
+            const patterns = engine.currentGeneration("patterns");
+            expect(!patterns || patterns.settled || patterns.cancelled).toBe(true);
+            expect(engine.hasPendingRequest()).toBe(false);
+            expect(wrapper.vm.searchObj.meta.runOutcome.visualize).toBe("cancelled");
+            expect(wrapper.vm.searchObj.meta.executedPanel).toBeNull();
+          } finally {
+            setExecutors.mockRestore();
+          }
+        });
+
+        it("records the handed config when the chart shows a result it already had", async () => {
+          const run = await mountChart();
+          const handed = wrapper.vm.autoRun.panelSignature("visualize");
+
+          wrapper
+            .findComponent({ name: "PanelSchemaRenderer" })
+            .vm.$emit("load-ended-without-fetch", true);
+          await nextTick();
+
+          expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(false);
+          expect(wrapper.vm.searchObj.meta.runOutcome.visualize).toBe("complete");
+          expect(wrapper.vm.searchObj.meta.executedPanel).toMatchObject({
+            surface: "visualize",
+            generation: run.id,
+            configSignature: handed,
+          });
+        });
+
+        it("ignores the hidden Visualize chart while Build has a run open", async () => {
+          await mountChart();
+          wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+          await flushPromises();
+          const build = wrapper.vm.autoRun.openPanelRun();
+          wrapper.vm.autoRun.markPanelDispatched(build);
+          const chart = wrapper
+            .findComponent({ name: "VisualizeLogsQuery" })
+            .findComponent({ name: "PanelSchemaRenderer" });
+          expect(chart.exists()).toBe(true);
+
+          chart.vm.$emit("load-ended-without-fetch", false);
+          await nextTick();
+
+          expect(wrapper.vm.autoRun.hasPanelRun(build)).toBe(true);
+          expect(wrapper.vm.searchObj.meta.runOutcome.build).toBe("running");
+        });
+      });
+
+      it("cancels the run when the user leaves Visualize before the chart starts loading", async () => {
+        (getStreamFromQuery as Mock).mockResolvedValue("k8s_json");
+        const run = await toggleToVisualize();
+        await copied();
+        await flushPromises();
+        expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(true);
+
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+        await nextTick();
+
+        expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(false);
+        expect(run.settled).toBe(true);
+        expect(wrapper.vm.searchObj.meta.runOutcome.visualize).toBe("cancelled");
       });
     });
 

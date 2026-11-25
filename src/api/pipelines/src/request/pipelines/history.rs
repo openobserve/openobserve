@@ -29,8 +29,6 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_openfga::{config::get_config as get_openfga_config, meta::mapping::OFGA_MODELS};
-#[cfg(feature = "enterprise")]
-use openobserve_api_common::auth::validator::list_objects_for_user;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::UserEmail, pipeline::list_user_pipelines,
@@ -303,7 +301,15 @@ pub async fn get_pipeline_history(
                     .get("pipelines")
                     .map_or("pipelines", |model| model.key);
 
-                match list_objects_for_user(&org_id, user_id, "GET", pipeline_object_type).await {
+                // Run rows expose pipeline data, so the list-all switch must not unhide them.
+                match db::authz::list_permitted_objects(
+                    &org_id,
+                    user_id,
+                    "GET",
+                    pipeline_object_type,
+                )
+                .await
+                {
                     Ok(Some(permitted)) => {
                         // Check if user has access to all pipelines
                         let all_pipelines_key = format!("{pipeline_object_type}:_all_{org_id}");
@@ -607,6 +613,8 @@ async fn get_organization_pipeline_ids(org_id: &str) -> Result<Vec<String>, anyh
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
+
     use super::*;
 
     #[test]
@@ -859,8 +867,6 @@ mod tests {
 
     #[test]
     fn the_history_query_reads_is_partial_once_the_stream_has_it() {
-        use arrow_schema::{DataType, Field, Schema};
-
         let mut fields: Vec<Field> = trigger_stream::HISTORY_COLUMNS
             .into_iter()
             .map(|name| Field::new(name, DataType::Utf8, true))
@@ -870,5 +876,18 @@ mod tests {
         fields.push(Field::new("is_partial", DataType::Boolean, true));
         let with = history_columns(&Schema::new(fields));
         assert!(with.ends_with(", is_partial"), "{with}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn history_without_a_pipeline_lists_only_permitted_ones_whatever_the_list_switch() {
+        let text = include_str!("history.rs");
+        let start = text
+            .find("pub async fn get_pipeline_history(")
+            .expect("handler");
+        let body = &text[start..];
+        let body = &body[..body.find("\n}\n").expect("handler end")];
+        assert!(body.contains("db::authz::list_permitted_objects("));
+        assert!(!body.contains("list_objects_for_user("));
     }
 }

@@ -355,6 +355,32 @@ export async function setupDistributionPanelWithConfig(page, pm, dashboardName, 
   testLogger.info("Distribution panel with config ready", { dashboardName, panelName, yField, breakdownField });
 }
 
+// The bar's histogram(_timestamp) X can survive the switch and Value seeds the first numeric column, so both are
+// cleared first. categoryField = null draws one box; valueField = null leaves Value empty for validation tests.
+export async function setupBoxplotPanelWithConfig(page, pm, dashboardName, {
+  panelName = "Test Panel",
+  valueField = "took",
+  categoryField = null,
+} = {}) {
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType("boxplot");
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream("e2e_automate");
+  await pm.chartTypeSelector.removeFieldIfPresent("x_axis_1", "x");
+  await pm.chartTypeSelector.removeFieldIfPresent("y_axis_1", "y");
+  if (categoryField) {
+    await pm.chartTypeSelector.searchAndAddField(categoryField, "x");
+  }
+  if (valueField) {
+    await pm.chartTypeSelector.searchAndAddField(valueField, "y");
+  }
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Box plot panel with config ready", { dashboardName, panelName, valueField, categoryField });
+}
+
 // Sunburst panel with the config sidebar open; Size keeps the seeded count. The editor opens as a bar and
 // seeds histogram(_timestamp) on X, which the switch to sunburst keeps, so it is removed first.
 export async function setupSunburstPanelWithConfig(page, pm, dashboardName, {

@@ -18,6 +18,25 @@ import { gt } from "@/types/i18n";
 import { getDataValue } from "./aliasUtils";
 import { addCommasToNumber } from "@/utils/formatters";
 
+/** Stands in for a NULL breakdown value, which must stay a separate series from "". */
+export const NULL_BREAKDOWN_VALUE = "\u0000null";
+
+/** Stands in for the folded "others" bucket, so a real value "others" stays a separate series. */
+export const OTHERS_BREAKDOWN_VALUE = "\u0000others";
+
+/** The series name for a breakdown value, with stand-in names for NULL, "" and the others bucket. */
+export const breakdownValueLabel = (value: string): string => {
+  // Series names key saved colours, overrides and ${series.__name}, so they must not vary by locale.
+  if (value === NULL_BREAKDOWN_VALUE) return "(null)";
+  if (value === OTHERS_BREAKDOWN_VALUE) return "others";
+  return value === "" ? "(empty)" : value;
+};
+
+const breakdownValueOf = (item: Record<string, unknown>, breakdownKey: string): string | number => {
+  const value = getDataValue(item, breakdownKey);
+  return value === null || value === undefined ? NULL_BREAKDOWN_VALUE : value;
+};
+
 /**
  * Process the SQL data and convert it into a format suitable for the echarts
  * library.
@@ -52,16 +71,13 @@ export const processData = (
 
   const { top_results, top_results_others } = panelSchema.config;
 
-  // get the limit series from the config
-  let limitSeries = top_results
-    ? (Math.min(top_results, store.state?.zoConfig?.max_dashboard_series ?? 100) ?? 100)
-    : (store.state?.zoConfig?.max_dashboard_series ?? 100);
-
-  // For multi y-axis charts, divide the limit by number of y-axes
-  // to keep total series count at or below max_dashboard_series
-  if (yAxisKeys.length > 1 && breakDownKeys.length > 0) {
-    limitSeries = Math.floor(limitSeries / yAxisKeys.length);
-  }
+  // Each y-axis draws its own copy of every breakdown series, so the panel cap is shared between them.
+  const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+  const cap =
+    yAxisKeys.length > 1 && breakDownKeys.length > 0
+      ? Math.floor(maxSeries / yAxisKeys.length)
+      : maxSeries;
+  const limitSeries = top_results ? Math.min(top_results, cap) : cap;
 
   const innerDataArray = data[0];
 
@@ -73,15 +89,9 @@ export const processData = (
   const yAxisKey = yAxisKeys[0];
   const xAxisKey = xAxisKeys[0];
 
-  // Step 1: Aggregate y_axis values by breakdown, ensuring missing values are set to empty string
+  // Step 1: Aggregate y_axis values by breakdown
   const breakdown = innerDataArray.reduce((acc: any, item: any) => {
-    let breakdownValue = getDataValue(item, breakdownKey);
-
-    // Convert null, undefined, and empty string to a default empty string
-    if (breakdownValue == null || breakdownValue === "" || breakdownValue === undefined) {
-      breakdownValue = "";
-    }
-
+    const breakdownValue = breakdownValueOf(item, breakdownKey);
     const yAxisValue = getDataValue(item, yAxisKey);
 
     acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
@@ -91,19 +101,15 @@ export const processData = (
   // Step 2: Sort and extract the top keys based on the configured number of top results
   const allKeys = Object.entries(breakdown).sort(([, a]: any, [, b]: any) => b - a);
 
-  // if top_results is enabled and the number of unique breakdown values is greater than the limit, add a warning message
-  // if top_results is not enabled and the number of unique breakdown values is greater than the max_dashboard_series, add a warning message
-  if (
-    (top_results &&
-      top_results > (store.state?.zoConfig?.max_dashboard_series ?? 100) &&
-      allKeys.length > top_results) ||
-    (!top_results && allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
-  ) {
-    const shown = Math.min(limitSeries, allKeys.length);
-    extras.seriesLimit = { shown, total: allKeys.length, cap: limitSeries };
+  // A user's Top N cutting series is their choice; only the panel cap cutting them warns.
+  if (allKeys.length > cap && (!top_results || top_results > cap)) {
+    const seriesPerKey = yAxisKeys.length || 1;
+    const shown = Math.min(limitSeries, allKeys.length) * seriesPerKey;
+    const total = allKeys.length * seriesPerKey;
+    extras.seriesLimit = { shown, total, cap: maxSeries };
     extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarningCounts", {
       shown: addCommasToNumber(shown),
-      total: addCommasToNumber(allKeys.length),
+      total: addCommasToNumber(total),
     });
   }
 
@@ -114,12 +120,7 @@ export const processData = (
   const othersObj: any = {};
 
   innerDataArray.forEach((item: any) => {
-    let breakdownValue = getDataValue(item, breakdownKey);
-
-    // Ensure missing breakdown values are treated as empty strings
-    if (breakdownValue == null || breakdownValue === "" || breakdownValue === undefined) {
-      breakdownValue = "";
-    }
+    const breakdownValue = breakdownValueOf(item, breakdownKey);
 
     if (topKeys.includes(breakdownValue.toString())) {
       resultArray.push({ ...item, [breakdownKey]: breakdownValue });
@@ -133,7 +134,7 @@ export const processData = (
   if (top_results_others) {
     Object.entries(othersObj).forEach(([xAxisValue, yAxisValue]) => {
       resultArray.push({
-        [breakdownKey]: "others",
+        [breakdownKey]: OTHERS_BREAKDOWN_VALUE,
         [xAxisKey]: xAxisValue,
         [yAxisKey]: yAxisValue,
       });

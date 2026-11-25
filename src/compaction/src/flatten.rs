@@ -16,8 +16,12 @@
 use std::sync::{Arc, LazyLock as Lazy};
 
 use ::datafusion::arrow::datatypes::Schema;
-use arrow::array::{
-    ArrayBuilder, ArrayRef, RecordBatch, StringArray, StringBuilder, make_builder, new_null_array,
+use arrow::{
+    array::{
+        ArrayBuilder, ArrayRef, RecordBatch, StringArray, StringBuilder, make_builder,
+        new_null_array,
+    },
+    compute::concat_batches,
 };
 use arrow_schema::{DataType, Field};
 use config::{
@@ -217,7 +221,7 @@ fn generate_vertical_partition_recordbatch(
         return Ok(Vec::new());
     }
     let schema = batches.first().unwrap().schema();
-    let batches = arrow::compute::concat_batches(&schema, batches)?;
+    let batches = concat_batches(&schema, batches)?;
     let records_len = batches.num_rows();
     if records_len == 0 {
         return Ok(Vec::new());
@@ -306,7 +310,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::{
-        array::{Array, ArrayRef, StringArray},
+        array::{Array, ArrayRef, Int64Array, StringArray},
         record_batch::RecordBatch,
     };
     use arrow_schema::{DataType, Field, Schema};
@@ -663,7 +667,7 @@ mod tests {
         let schema = Arc::new(Schema::new(fields));
 
         let columns: Vec<ArrayRef> = vec![
-            Arc::new(arrow::array::Int64Array::from(vec![Some(1), Some(2)])),
+            Arc::new(Int64Array::from(vec![Some(1), Some(2)])),
             Arc::new(StringArray::from(vec![Some("a"), Some("b")])),
         ];
 

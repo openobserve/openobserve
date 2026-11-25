@@ -29,8 +29,8 @@ use std::{
 
 use anyhow::{Result, bail, ensure};
 use arrow::{
-    array::{Array, AsArray, RecordBatch},
-    datatypes::{DataType, Schema, UInt8Type, UInt16Type, UInt32Type},
+    array::{Array, AsArray, RecordBatch, RecordBatchOptions},
+    datatypes::{DataType, Field, Schema, UInt8Type, UInt16Type, UInt32Type},
 };
 pub use config::meta::promql::index::{MIDX_MAGIC, MIDX_TRAILER_LEN, MIDX_VERSION, MidxTrailer};
 pub use directory::{BlockDirectory, BlockIter};
@@ -160,10 +160,7 @@ impl Index {
         let mut fields = Vec::new();
         let mut columns = Vec::new();
         for name in names {
-            if fields
-                .iter()
-                .any(|field: &Arc<arrow::datatypes::Field>| field.name() == name)
-            {
+            if fields.iter().any(|field: &Arc<Field>| field.name() == name) {
                 continue;
             }
             if let Ok(index) = schema.index_of(name) {
@@ -176,7 +173,7 @@ impl Index {
             labels: RecordBatch::try_new_with_options(
                 Arc::new(Schema::new(fields)),
                 columns,
-                &arrow::array::RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
+                &RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
             )?,
         })
     }
@@ -209,7 +206,7 @@ impl Index {
             labels: RecordBatch::try_new_with_options(
                 Arc::new(Schema::new(fields)),
                 columns,
-                &arrow::array::RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
+                &RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
             )?,
         })
     }
@@ -328,9 +325,14 @@ mod tests {
 
     use arrow::{
         array::{Float64Array, Int64Array, RecordBatch, StringArray, StringViewArray, UInt64Array},
-        datatypes::{DataType, Field, Schema, SchemaRef},
+        compute::concat_batches,
+        datatypes::{DataType, Field, Float64Type, Int64Type, Schema, SchemaRef},
     };
     use bytes::Bytes;
+    use parquet::{
+        arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder},
+        file::properties::WriterProperties,
+    };
 
     use super::*;
 
@@ -374,7 +376,6 @@ mod tests {
         bytes: bytes::Bytes,
         parent: super::ParentMetadata,
     ) -> anyhow::Result<Vec<u8>> {
-        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         anyhow::ensure!(
             bytes.len() as u64 == parent.compressed_size,
             "source size mismatch"
@@ -500,7 +501,6 @@ mod tests {
     }
 
     fn parquet_bytes(input: &RecordBatch, row_group_size: usize) -> Bytes {
-        use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
         let properties = WriterProperties::builder()
             .set_max_row_group_row_count(Some(row_group_size))
             .build();
@@ -1069,7 +1069,6 @@ mod tests {
 
     #[test]
     fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
-        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         let input = batch(&rows());
         let original = parquet_bytes(&input, 3);
         let parent = ParentMetadata {
@@ -1098,20 +1097,17 @@ mod tests {
             .unwrap()
             .collect::<std::result::Result<Vec<_>, _>>()
             .unwrap();
-        let sql = arrow::compute::concat_batches(&input.schema(), &sql_batches).unwrap();
+        let sql = concat_batches(&input.schema(), &sql_batches).unwrap();
         assert_eq!(sql.num_rows(), input.num_rows());
         for (row, expected) in actual.iter().enumerate() {
-            let times = sql.column(1).as_primitive::<arrow::datatypes::Int64Type>();
-            let values = sql
-                .column(2)
-                .as_primitive::<arrow::datatypes::Float64Type>();
+            let times = sql.column(1).as_primitive::<Int64Type>();
+            let values = sql.column(2).as_primitive::<Float64Type>();
             assert_eq!((times.value(row), values.value(row).to_bits()), *expected);
         }
     }
 
     #[test]
     fn pending_writer_requires_source_metadata_and_verifies_final_parquet_rows() {
-        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         let input = batch(&rows());
         let bytes = parquet_bytes(&input, 3);
         let reader = ParquetRecordBatchReaderBuilder::try_new(bytes.clone()).unwrap();
@@ -1312,7 +1308,6 @@ mod tests {
 
     #[test]
     fn renamed_parquet_and_sidecar_pair_uses_numeric_source_metadata() {
-        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         let directory = tempfile::tempdir().unwrap();
         let data_path = directory.path().join("indexed-v1-before.parquet");
         let midx_path = directory.path().join("indexed-v1-before.midx");

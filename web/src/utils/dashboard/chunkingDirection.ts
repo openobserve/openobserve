@@ -51,3 +51,16 @@ export const detectChunkingDirection = (
 export const shouldPrependChunk = (isLTR: boolean, orderAsc: boolean): boolean => {
   return isLTR !== orderAsc;
 };
+
+/** Merges one streamed hits chunk into the held rows; an empty chunk keeps them, streaming aggs replace them. */
+export const mergeHitsChunk = <T>(
+  held: T[],
+  chunk: T[],
+  options: { streamingAggs: boolean; isLTR: boolean; orderAsc: boolean },
+): T[] => {
+  if (chunk.length === 0) return held;
+  if (options.streamingAggs) return [...chunk];
+  return shouldPrependChunk(options.isLTR, options.orderAsc)
+    ? [...chunk, ...held]
+    : [...held, ...chunk];
+};

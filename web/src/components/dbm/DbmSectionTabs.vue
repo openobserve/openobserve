@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ><span>{{ section.count }}</span
           ><span
             v-if="section.vantageLabel"
-            class="text-3xs font-normal opacity-80"
+            class="text-3xs font-normal"
             :data-test="`dbm-section-tab-vantage-${section.key}`"
             >{{ section.vantageLabel }}</span
           ></span

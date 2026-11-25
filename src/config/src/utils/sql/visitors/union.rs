@@ -18,7 +18,7 @@ use std::ops::ControlFlow;
 use sqlparser::{
     ast::{Query, SetExpr, SetQuantifier, Statement, Visit, Visitor},
     dialect::GenericDialect,
-    parser::Parser,
+    parser::{Parser, ParserError},
 };
 
 pub(crate) fn has_union(query: &Query) -> bool {
@@ -33,9 +33,7 @@ fn has_union_all(query: &Query) -> bool {
     visitor.has_union_all
 }
 
-pub(crate) fn is_multi_search_eligible_for_histogram(
-    query: &str,
-) -> Result<bool, sqlparser::parser::ParserError> {
+pub(crate) fn is_multi_search_eligible_for_histogram(query: &str) -> Result<bool, ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
         if let Statement::Query(query) = statement

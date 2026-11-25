@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { detectChunkingDirection, shouldPrependChunk } from "./chunkingDirection";
+import { detectChunkingDirection, mergeHitsChunk, shouldPrependChunk } from "./chunkingDirection";
 
 describe("detectChunkingDirection", () => {
   it("returns true (LTR) when first chunk start matches user start", () => {
@@ -95,5 +95,23 @@ describe("shouldPrependChunk", () => {
 
   it("LTR + desc → prepend (true)", () => {
     expect(shouldPrependChunk(true, false)).toBe(true);
+  });
+});
+
+describe("mergeHitsChunk", () => {
+  const ordered = { streamingAggs: false, isLTR: true, orderAsc: true };
+
+  it("appends or prepends by chunking direction", () => {
+    expect(mergeHitsChunk([1], [2], ordered)).toEqual([1, 2]);
+    expect(mergeHitsChunk([1], [2], { ...ordered, isLTR: false })).toEqual([2, 1]);
+  });
+
+  it("replaces the held rows for streaming aggregations", () => {
+    expect(mergeHitsChunk([1, 2], [3], { ...ordered, streamingAggs: true })).toEqual([3]);
+  });
+
+  it("keeps the held rows on an empty chunk", () => {
+    const held = [1, 2];
+    expect(mergeHitsChunk(held, [], { ...ordered, streamingAggs: true })).toBe(held);
   });
 });
