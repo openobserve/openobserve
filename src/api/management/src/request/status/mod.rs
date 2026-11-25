@@ -1688,7 +1688,7 @@ pub async fn refresh_token_with_dex(
         target: None,
     };
 
-    let (token, login) = if let Some(cookie) = cookies.get("auth_tokens") {
+    let (token, login, old_session) = if let Some(cookie) = cookies.get("auth_tokens") {
         let decoded_cookie = config::utils::base64::decode(cookie.value()).unwrap_or_default();
         let auth_tokens: AuthTokens = json::from_str(&decoded_cookie).unwrap_or_default();
         // Carried into the new cookie, so racing refreshes of one login still name the same login.
@@ -1699,13 +1699,11 @@ pub async fn refresh_token_with_dex(
             None => false,
         };
         let login = crate::request::ai::chats::cookie_login(&auth_tokens, live);
+        // The old session stays until the new one is stored, so a racing sign-out can still find
+        // it.
+        let old_session = auth_tokens.session_id().map(|id| (id.to_string(), live));
 
-        // remove old session id from cluster co-ordinator
-        if let Some(session_id) = auth_tokens.session_id() {
-            openobserve_core::session::remove_session(session_id).await;
-        }
-
-        (auth_tokens.refresh_token, login)
+        (auth_tokens.refresh_token, login, old_session)
     } else {
         return Response::builder()
             .status(StatusCode::UNAUTHORIZED)
@@ -1758,43 +1756,19 @@ pub async fn refresh_token_with_dex(
                     audit_message.response_meta.http_response_code = 401;
                     audit_message._timestamp = now_micros();
                     audit(audit_message).await;
-
-                    let conf = get_config();
-                    let cleared = base64::encode(&json::to_string(&AuthTokens::default()).unwrap());
-                    let mut auth_cookie = Cookie::new("auth_tokens", cleared);
-                    auth_cookie.set_expires(
-                        time::OffsetDateTime::now_utc()
-                            + time::Duration::seconds(
-                                db::password_policy::cookie_max_age_secs().await,
-                            ),
-                    );
-                    auth_cookie.set_http_only(true);
-                    auth_cookie.set_secure(conf.auth.cookie_secure_only);
-                    auth_cookie.set_path("/");
-                    if conf.auth.cookie_same_site_lax {
-                        auth_cookie.set_same_site(SameSite::Lax);
-                    } else {
-                        auth_cookie.set_same_site(SameSite::None);
-                    }
-                    return Response::builder()
-                        .status(StatusCode::UNAUTHORIZED)
-                        .header(header::SET_COOKIE, auth_cookie.to_string())
-                        .body(Body::empty())
-                        .unwrap();
+                    return signed_out_refresh_response().await;
                 }
             }
 
-            // store session_id in cluster co-ordinator
-            if openobserve_core::session::set_session(&session_id, &access_token)
-                .await
-                .is_none()
-            {
-                log::error!(
-                    "Failed to store session {} in cluster coordinator",
-                    session_id
-                );
-            }
             let login = login.unwrap_or_else(ider::uuid);
+            let old = old_session.as_ref().map(|(id, live)| (id.as_str(), *live));
+            if !rotate_session(&login, old, &session_id, &access_token).await {
+                log::warn!("Session refresh refused: the login signed out while it refreshed");
+                audit_message.response_meta.http_response_code = 401;
+                audit_message._timestamp = now_micros();
+                audit(audit_message).await;
+                return signed_out_refresh_response().await;
+            }
             let login_id =
                 crate::request::ai::chats::bound_login_id(&login, &session_id, &refresh_token_str);
             let access_token = format!("session {session_id}");
@@ -1855,6 +1829,114 @@ pub async fn refresh_token_with_dex(
                 .unwrap()
         }
     }
+}
+
+/// How long a refreshed login's old session stays valid, so a sign-out racing the new cookie finds
+/// it.
+#[cfg(feature = "enterprise")]
+const ROTATED_SESSION_GRACE_MICROS: i64 = 60 * 1_000_000;
+
+/// Stores the refreshed session; false, minting nothing, when a sign-out took the old one
+/// meanwhile.
+#[cfg(feature = "enterprise")]
+async fn rotate_session(
+    login: &str,
+    old: Option<(&str, bool)>,
+    new_session: &str,
+    access_token: &str,
+) -> bool {
+    under_login_lock(login, async {
+        let current = match old {
+            Some((id, _)) => openobserve_core::session::get_session(id).await,
+            None => None,
+        };
+        if !refresh_may_mint(old.map(|(_, live)| live), current.is_some()) {
+            return false;
+        }
+        if openobserve_core::session::set_session(new_session, access_token)
+            .await
+            .is_none()
+        {
+            log::error!("Failed to store session {new_session} in cluster coordinator");
+        }
+        if let (Some((id, _)), Some(token)) = (old, current) {
+            openobserve_core::session::retire_session(id, &token, ROTATED_SESSION_GRACE_MICROS)
+                .await;
+        }
+        true
+    })
+    .await
+}
+
+/// A refresh whose old session was live when it began may only mint while that session still is.
+#[cfg(feature = "enterprise")]
+fn refresh_may_mint(old_was_live: Option<bool>, old_is_live: bool) -> bool {
+    old_was_live != Some(true) || old_is_live
+}
+
+/// Runs `work` while holding the login's lock, so a refresh and a sign-out of it never interleave.
+#[cfg(feature = "enterprise")]
+async fn under_login_lock<T>(login: &str, work: impl std::future::Future<Output = T>) -> T {
+    static NODE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    let _node = NODE_LOCK.lock().await;
+    let key = format!("/auth/login/{login}");
+    // Without the cluster lock the login still works; only the race this lock closes reopens.
+    let locker = infra::dist_lock::lock(&key, 0).await.unwrap_or_else(|e| {
+        log::warn!("[AUTH] cannot lock a login for its session refresh or sign-out: {e}");
+        None
+    });
+    let out = work.await;
+    if let Err(e) = infra::dist_lock::unlock(&locker).await {
+        log::warn!("[AUTH] cannot unlock a login after its session refresh or sign-out: {e}");
+    }
+    out
+}
+
+/// A 401 that clears the auth cookie, so the refresh-and-retry loop ends at the login page.
+#[cfg(feature = "enterprise")]
+async fn signed_out_refresh_response() -> Response {
+    let conf = get_config();
+    let cleared = base64::encode(&json::to_string(&AuthTokens::default()).unwrap());
+    let mut auth_cookie = Cookie::new("auth_tokens", cleared);
+    auth_cookie.set_expires(
+        time::OffsetDateTime::now_utc()
+            + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
+    );
+    auth_cookie.set_http_only(true);
+    auth_cookie.set_secure(conf.auth.cookie_secure_only);
+    auth_cookie.set_path("/");
+    if conf.auth.cookie_same_site_lax {
+        auth_cookie.set_same_site(SameSite::Lax);
+    } else {
+        auth_cookie.set_same_site(SameSite::None);
+    }
+    Response::builder()
+        .status(StatusCode::UNAUTHORIZED)
+        .header(header::SET_COOKIE, auth_cookie.to_string())
+        .body(Body::empty())
+        .unwrap()
+}
+
+/// Removes a signed-out session; a live one first signs its login out, under the login's lock so a
+/// racing refresh cannot revive it. A stale or edited cookie signs nothing out.
+async fn sign_out_session(tokens: &AuthTokens, session_id: &str) {
+    #[cfg(feature = "enterprise")]
+    if let Some(login) = crate::request::ai::chats::cookie_login(tokens, true) {
+        under_login_lock(&login, async {
+            if openobserve_core::session::get_session(session_id)
+                .await
+                .is_some()
+            {
+                o2_enterprise::enterprise::ai::chat::lease::cancel_auth_session(&login).await;
+            }
+            openobserve_core::session::remove_session(session_id).await;
+        })
+        .await;
+        return;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = tokens;
+    openobserve_core::session::remove_session(session_id).await;
 }
 
 /// `max_age_secs` is passed in rather than read here: the policy read is async and this is not, and
@@ -2028,18 +2110,8 @@ pub async fn logout(
         let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
         let auth_tokens: AuthTokens =
             json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
-        // Only a live session signs its login out, so a stale or edited cookie stops nothing.
-        #[cfg(feature = "enterprise")]
-        if let Some(session_id) = auth_tokens.session_id()
-            && openobserve_core::session::get_session(session_id)
-                .await
-                .is_some()
-            && let Some(login) = crate::request::ai::chats::cookie_login(&auth_tokens, true)
-        {
-            o2_enterprise::enterprise::ai::chat::lease::cancel_auth_session(&login).await;
-        }
         if let Some(session_id) = auth_tokens.session_id() {
-            openobserve_core::session::remove_session(session_id).await;
+            sign_out_session(&auth_tokens, session_id).await;
         }
     };
     let max_age_secs = db::password_policy::cookie_max_age_secs().await;
@@ -2343,6 +2415,44 @@ mod tests {
     use serde_json;
 
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_refresh_mints_nothing_once_a_sign_out_took_its_live_session() {
+        assert!(refresh_may_mint(Some(true), true));
+        assert!(!refresh_may_mint(Some(true), false));
+        // An expired session proved no login, so neither does its absence now.
+        assert!(refresh_may_mint(Some(false), false));
+        assert!(refresh_may_mint(None, false));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_sign_out_waits_for_a_refresh_of_the_same_login() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+        let rotating = Arc::new(AtomicBool::new(false));
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let refresh = {
+            let rotating = rotating.clone();
+            tokio::spawn(async move {
+                under_login_lock("login-a", async {
+                    rotating.store(true, Ordering::SeqCst);
+                    let _ = started_tx.send(());
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                    rotating.store(false, Ordering::SeqCst);
+                })
+                .await;
+            })
+        };
+        started_rx.await.unwrap();
+        let overlapped =
+            under_login_lock("login-a", async { rotating.load(Ordering::SeqCst) }).await;
+        refresh.await.unwrap();
+        assert!(!overlapped, "a sign-out ran inside a refresh of its login");
+    }
 
     #[cfg(not(feature = "enterprise"))]
     #[test]

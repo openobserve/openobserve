@@ -90,6 +90,19 @@ pub async fn remove_session(session_id: &str) {
     let _ = db::session::delete(session_id).await;
 }
 
+/// Keeps a rotated session valid for at most `grace_micros` more, never past its own token's
+/// expiry.
+pub async fn retire_session(session_id: &str, val: &str, grace_micros: i64) {
+    let expires_at = retired_expiry(val, chrono::Utc::now().timestamp_micros(), grace_micros);
+    if let Err(e) = db::session::set_with_expiry(session_id, val, expires_at).await {
+        log::error!("Failed to shorten rotated session {session_id}: {e}");
+    }
+}
+
+fn retired_expiry(val: &str, now: i64, grace_micros: i64) -> i64 {
+    extract_jwt_expiry(val).min(now + grace_micros)
+}
+
 #[cfg(test)]
 mod tests {
     use base64::Engine;
@@ -105,6 +118,18 @@ mod tests {
         let payload_b64 = base64::engine::general_purpose::URL_SAFE.encode(payload);
 
         format!("{}.{}.fake_signature", header_b64, payload_b64)
+    }
+
+    #[test]
+    fn test_retired_session_ends_at_the_grace_or_its_token_expiry() {
+        let now = chrono::Utc::now().timestamp_micros();
+        let late = create_jwt_token(now / 1_000_000 + 3600);
+        assert_eq!(retired_expiry(&late, now, 60_000_000), now + 60_000_000);
+        let soon = create_jwt_token(now / 1_000_000 + 10);
+        assert_eq!(
+            retired_expiry(&soon, now, 60_000_000),
+            (now / 1_000_000 + 10) * 1_000_000
+        );
     }
 
     #[test]
