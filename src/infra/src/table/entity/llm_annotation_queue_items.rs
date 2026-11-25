@@ -20,6 +20,8 @@ pub struct Model {
     pub ref_trace_start_time: i64,
     /// Bounded plain-text excerpt of the first user turn, captured at enqueue.
     pub input_preview: Option<String>,
+    /// Traces stream the ref resolved to; NULL on rows enqueued before it was stored.
+    pub source_stream: Option<String>,
     pub status: String,
     pub reviewed_at: Option<i64>,
     pub archived_at: Option<i64>,
