@@ -16,9 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <aside
-    class="bg-surface-panel border-border-default flex h-full min-h-0 flex-col justify-between gap-10 overflow-y-auto border-e px-14 py-12"
+    class="bg-surface-panel bg-gradient-login-hero border-border-default relative flex h-full min-h-0 flex-col justify-between gap-10 overflow-y-auto border-e px-14 py-12"
     data-test="login-brand-panel"
   >
+    <span class="bg-gradient-brand-ribbon absolute inset-x-0 top-0 h-1" aria-hidden="true" />
     <a href="https://openobserve.ai/" target="_blank" rel="noopener noreferrer" class="w-fit">
       <img
         class="h-9 w-auto"
@@ -33,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex max-w-120 flex-col gap-10">
       <div class="flex flex-col gap-3">
-        <h2 class="text-text-heading text-3xl leading-tight font-semibold">
+        <h2 class="text-text-heading text-4xl leading-tight font-semibold tracking-tight">
           {{ t("login.brand.headline") }}
         </h2>
         <p class="text-text-secondary text-base">{{ t("login.brand.tagline") }}</p>
@@ -47,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`login-brand-feature-${feature.icon}`"
         >
           <span
-            class="bg-selected-bg text-selected-fg rounded-default flex size-9 shrink-0 items-center justify-center"
+            class="bg-surface-raised/70 border-border-default text-selected-fg rounded-default flex size-10 shrink-0 items-center justify-center border shadow-sm backdrop-blur-sm"
           >
             <OIcon :name="feature.icon" size="md" />
           </span>

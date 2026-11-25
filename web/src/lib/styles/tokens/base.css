@@ -516,6 +516,13 @@
     rgba(236, 72, 153, 0.05) 100%
   );
   --color-gradient-brand-ribbon: linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff);
+  /* Login product panel: a top sheen over brand-coloured glows; dark.css deepens it. */
+  --color-gradient-login-hero:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 30%),
+    radial-gradient(55% 45% at 95% 5%, rgba(139, 92, 246, 0.24) 0%, rgba(139, 92, 246, 0) 70%),
+    radial-gradient(60% 50% at 5% 100%, rgba(236, 72, 153, 0.16) 0%, rgba(236, 72, 153, 0) 70%),
+    radial-gradient(70% 60% at 35% 45%, rgba(90, 100, 219, 0.16) 0%, rgba(90, 100, 219, 0) 75%),
+    linear-gradient(160deg, #f6f7fc 0%, #eceef8 100%);
   --color-gradient-notification: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
   --color-gradient-danger: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
   --color-gradient-danger-hover: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
