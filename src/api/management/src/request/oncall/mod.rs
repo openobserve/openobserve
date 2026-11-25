@@ -2185,6 +2185,7 @@ async fn acker_name(record: &config::meta::oncall::Response) -> Option<String> {
     responses(
         (status = 200, description = "Where the page now stands", content_type = "text/html"),
         (status = 401, description = "The link no longer works", content_type = "text/html"),
+        (status = 403, description = "This link may not acknowledge the page", content_type = "text/html"),
     ),
 )]
 pub async fn acknowledge(
