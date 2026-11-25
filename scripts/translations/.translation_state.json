@@ -11597,6 +11597,7 @@
     "pointSize": "11f33bb761764d05",
     "pointSizeDefault": "1f6bdacb343e160b",
     "pointSizeInvalid": "0b255c96bd6b1a0e",
+    "preparingTableDownload": "53774ff0f8e37efa",
     "print": "447ce30a1c39c584",
     "promQLChartConfig": {
       "aggAvgDesc": "3784448275b7d95b",
@@ -12233,6 +12234,9 @@
     "tableDensityComfortable": "459a23a5980fd5c6",
     "tableDensityCompact": "99452646e34b6970",
     "tableDensityStandard": "ef6691545d2c5523",
+    "tableDownloadPartial": "6e90739ea50d507d",
+    "tableDownloadServerPartial": "56debfdf73cc9dca",
+    "tableDownloadWaitForLoad": "46c98b2a11cbeaad",
     "tableDynamicColumns": "a398e5b03d72ee0c",
     "tableExpandableRows": "635cf0994fbe3838",
     "tableExpandableRowsTooltip": "e4acd91249353b38",
