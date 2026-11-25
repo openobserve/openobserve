@@ -1295,6 +1295,7 @@ mod tests {
         NAME_LABEL,
         value::{Label, RangeValue, Sample},
     };
+    use datafusion::prelude::SessionContext;
     use o2_enterprise::enterprise::{
         agent_signals::compare::CiKind,
         search::datafusion::udaf::ddsketch::{encode_tagged, sketch_config},
@@ -1973,7 +1974,7 @@ mod tests {
             "SELECT * FROM (SELECT {} AS _timestamp, 'Checkout.service' AS service) WHERE {filter}",
             arm.start
         );
-        let batches = datafusion::prelude::SessionContext::new()
+        let batches = SessionContext::new()
             .sql(&sql)
             .await
             .unwrap()

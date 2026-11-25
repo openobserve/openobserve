@@ -16,13 +16,13 @@
 import { describe, expect, it } from "vitest";
 import {
   compileLabelFilters,
-  escapeRegexLiteral,
   filterGroupsOf,
   hasFilterGroups,
   MAX_FILTER_BRANCHES,
   MAX_GROUPED_MATCHERS,
   type BooleanLabelMatch,
 } from "./labelBoolean";
+import { escapeRegExp } from "@/utils/query/promQLUtils";
 
 const m = (
   label: string,
@@ -154,7 +154,7 @@ describe("compileLabelFilters", () => {
 
 describe("helpers", () => {
   it("escapes every RE2 metacharacter", () => {
-    expect(escapeRegexLiteral("a.b*c+d?e^f$g|h(i)j[k]l{m}n\\")).toBe(
+    expect(escapeRegExp("a.b*c+d?e^f$g|h(i)j[k]l{m}n\\")).toBe(
       "a\\.b\\*c\\+d\\?e\\^f\\$g\\|h\\(i\\)j\\[k\\]l\\{m\\}n\\\\",
     );
   });

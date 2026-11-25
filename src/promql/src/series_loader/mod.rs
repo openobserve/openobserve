@@ -40,7 +40,8 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     physical_plan::{
-        Partitioning, execute_stream_partitioned, expressions::Column, repartition::RepartitionExec,
+        Partitioning, SendableRecordBatchStream, execute_stream_partitioned, expressions::Column,
+        repartition::RepartitionExec,
     },
     prelude::{DataFrame, SessionContext, col},
 };
@@ -439,10 +440,7 @@ where
 async fn partition_streams(
     trace_id: &str,
     df: DataFrame,
-) -> Result<(
-    Arc<Schema>,
-    Vec<datafusion::physical_plan::SendableRecordBatchStream>,
-)> {
+) -> Result<(Arc<Schema>, Vec<SendableRecordBatchStream>)> {
     let ctx = Arc::new(df.task_ctx());
     let target_partitions = ctx.session_config().target_partitions();
     let plan = df.create_physical_plan().await?;

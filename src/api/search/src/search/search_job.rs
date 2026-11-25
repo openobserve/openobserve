@@ -197,6 +197,15 @@ pub async fn submit_job(
         if let Some(res) = check_cipher_key_permissions(&org_id, &user_id, &req.query.sql).await {
             return res;
         }
+        if let Some(res) = crate::search::check_query_fn_permissions(
+            &org_id,
+            &user_id,
+            req.query.query_fn.as_deref().as_slice(),
+        )
+        .await
+        {
+            return res;
+        }
 
         // add stream_names for rbac
         let stream_names = json::to_string(&stream_names).unwrap();
@@ -771,13 +780,22 @@ fn check_license(job: &JobModel) -> Option<Response> {
 async fn check_permissions(job: &JobModel, org_id: &str, user_id: &str) -> Option<Response> {
     let stream_type = StreamType::from(job.stream_type.as_str());
     if let Ok(req) = json::from_str::<Request>(&job.payload) {
-        return crate::search::check_sql_stream_permissions(
+        if let Some(res) = crate::search::check_sql_stream_permissions(
             &req.query.sql,
             org_id,
             user_id,
             stream_type,
             StreamPermissionResourceType::Search,
             &job.trace_id,
+        )
+        .await
+        {
+            return Some(res);
+        }
+        return crate::search::check_query_fn_permissions(
+            org_id,
+            user_id,
+            req.query.query_fn.as_deref().as_slice(),
         )
         .await;
     }

@@ -26,6 +26,7 @@ import {
   HOSTMAP_MAX_GROUP_LEVELS,
 } from "@/utils/dashboard/convertHostmapData";
 import { TREEMAP_MAX_LEVELS, TREEMAP_SIZE_FUNCTIONS } from "@/utils/dashboard/convertTreemapData";
+import { dropFunnelConfig } from "@/utils/dashboard/convertFunnelData";
 import { isAdditiveSizeField, SUNBURST_MAX_LEVELS } from "@/utils/dashboard/convertSunburstData";
 
 // Types that reset their own queries on a switch, so no builder state carries into them.
@@ -156,6 +157,7 @@ export const usePanelAggregation = ({
   };
 
   const resetAggregationFunction = () => {
+    dropFunnelConfig(dashboardPanelData.data);
     // Skip resetting fields for PromQL mode to preserve the query
     if (dashboardPanelData.data.queryType === "promql") {
       // A state timeline has no comparison window; a shift left over from another type must not run.

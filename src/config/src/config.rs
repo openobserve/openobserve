@@ -32,6 +32,7 @@ use lettre::{
         client::{Tls, TlsParameters},
     },
 };
+use parquet::basic::Compression;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 
@@ -3781,7 +3782,7 @@ pub struct Nats {
     #[env_config(
         name = "ZO_NATS_KV_WATCH_MODULES",
         help = "Set the modules which need to use kv watcher",
-        default = ""
+        default = "/nodes/,/user_sessions/"
     )]
     pub kv_watch_modules: String,
 }
@@ -5459,15 +5460,15 @@ pub fn get_cluster_name() -> String {
 }
 
 #[inline]
-pub fn get_parquet_compression(compression: &str) -> parquet::basic::Compression {
+pub fn get_parquet_compression(compression: &str) -> Compression {
     match compression.to_lowercase().as_str() {
-        "none" | "uncompressed" => parquet::basic::Compression::UNCOMPRESSED,
-        "snappy" => parquet::basic::Compression::SNAPPY,
-        "gzip" => parquet::basic::Compression::GZIP(Default::default()),
-        "brotli" => parquet::basic::Compression::BROTLI(Default::default()),
-        "lz4" | "lz4_raw" => parquet::basic::Compression::LZ4_RAW,
-        "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
-        _ => parquet::basic::Compression::ZSTD(Default::default()),
+        "none" | "uncompressed" => Compression::UNCOMPRESSED,
+        "snappy" => Compression::SNAPPY,
+        "gzip" => Compression::GZIP(Default::default()),
+        "brotli" => Compression::BROTLI(Default::default()),
+        "lz4" | "lz4_raw" => Compression::LZ4_RAW,
+        "zstd" => Compression::ZSTD(Default::default()),
+        _ => Compression::ZSTD(Default::default()),
     }
 }
 
@@ -6462,7 +6463,6 @@ mod tests {
 
     #[test]
     fn test_get_parquet_compression() {
-        use parquet::basic::Compression;
         assert_eq!(get_parquet_compression("snappy"), Compression::SNAPPY);
         assert_eq!(
             get_parquet_compression("uncompressed"),

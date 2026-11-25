@@ -576,7 +576,7 @@ export class DashboardsFormValidationPage {
     }
 
     /**
-     * Add a complete condition (first listed field = "e2e") in the panel editor's Filters section:
+     * Add a complete condition (first listed text field = "e2e") in the panel editor's Filters section:
      * the bar opens its field list, then the operator and value lists follow.
      */
     async addConditionRow() {
@@ -585,12 +585,18 @@ export class DashboardsFormValidationPage {
         await input.click();
         const suggest = this.page.locator('[data-test="dashboard-filter-builder-suggest"]');
         await suggest.waitFor({ state: 'visible', timeout: 10000 });
-        await suggest.getByRole('option').first().click();
+        // A text field: a number field refuses text such as "e2e" for `=`.
+        await this.getTextFieldOptions(suggest).first().click();
         await this.page.locator('[data-test="dashboard-filter-builder-suggest-item-eq"]').click();
         await input.fill('e2e');
         await suggest.getByRole('option', { name: 'Use "e2e"' }).click();
         await this.page.keyboard.press('Escape');
         await this.getConditionChipLocator(0).waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    /** The field rows of an open field list whose type is Text. */
+    getTextFieldOptions(suggest) {
+        return suggest.getByRole('option').filter({ hasText: /Text\s*$/ });
     }
 
     /** Opens the value list of condition chip `index` and waits for it. */

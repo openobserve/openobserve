@@ -135,24 +135,18 @@ class MonacoEditorHelper {
         const editorCall = (action) => container.evaluate((node, act) => {
             const editor = window.monaco?.editor?.getEditors?.().find((e) => node.contains(e.getDomNode()));
             if (!editor) return null;
-            if (act === 'select-all') {
+            if (act.type !== undefined) {
                 editor.focus();
                 editor.setSelection(editor.getModel().getFullModelRange());
-                return editor.hasTextFocus();
+                editor.trigger('keyboard', 'deleteLeft', null);
+                editor.trigger('keyboard', 'type', { text: act.type });
             }
             return editor.getValue();
         }, action);
-        // The keyboard select-all can miss the editor's input, so the selection goes through the editor; the text is still typed.
+        // Typed through the editor's own keyboard command: page-level keys can land outside Monaco (bare "s" opens Save View on logs).
         await expect.poll(async () => {
-            if ((await editorCall('read')) === content) return true;
-            if (!(await editorCall('select-all'))) {
-                // Keys typed outside the editor hit page shortcuts (bare "s" opens Save View on logs).
-                await this.focus(container);
-                if (!(await editorCall('select-all'))) return false;
-            }
-            await this.page.keyboard.press('Backspace');
-            await this.page.keyboard.type(content);
-            return (await editorCall('read')) === content;
+            if ((await editorCall({})) === content) return true;
+            return (await editorCall({ type: content })) === content;
         }, { timeout, intervals: [500, 1000, 2000] }).toBe(true);
     }
 

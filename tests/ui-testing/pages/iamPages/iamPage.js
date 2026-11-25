@@ -12,10 +12,12 @@ export class IamPage {
         // ============================================================
         this.serviceAccountsTab = page.locator('[data-test="iam-service-accounts-tab"]');
 
-        // Org selector (navbar combobox + popover option matched by data-test-value)
+        // Org switcher (navbar trigger + popover rows matched by data-test-org-identifier)
         this.orgSelect = page.locator('[data-test="navbar-organizations-select"]');
-        this.orgSelectDefaultOption = page.locator('[data-test="navbar-organizations-select-popover"] [data-test-value="default"]');
-        this.orgSelectMultiOption = page.locator('[data-test="navbar-organizations-select-popover"] [data-test-value="defaulttestmulti"]');
+        this.orgSelectDefaultOption = page.locator('[data-test="organization-menu-item-label-item-label"][data-test-org-identifier="default"]');
+        this.orgSelectMultiOption = page.locator('[data-test="organization-menu-item-label-item-label"][data-test-org-identifier="defaulttestmulti"]');
+        this.orgMenuList = page.locator('[data-test="organization-menu-list"]');
+        this.orgMenuCreateButton = page.locator('[data-test="organization-menu-create-btn"]');
 
         // Add / Update service account ODrawer (carries the dialog title)
         this.addServiceAccountDialog = page.locator('[data-test="add-service-account-dialog"]');
@@ -130,6 +132,27 @@ export class IamPage {
     async iamPageDefaultMultiOrg() {
         await this.orgSelect.click();
         await this.orgSelectMultiOption.first().click();
+    }
+
+    async favoriteOrg(identifier) {
+        await this.orgSelect.click();
+        const star = this.page.locator(`[data-test="organization-menu-item-favorite"][data-test-org-identifier="${identifier}"]`);
+        await this.page.locator(`[data-test="organization-menu-item-label-item-label"][data-test-org-identifier="${identifier}"]`).hover();
+        if ((await star.getAttribute('aria-pressed')) !== 'true') await star.click();
+        await expect(star).toHaveAttribute('aria-pressed', 'true');
+    }
+
+    async openSwitcherWithShortcut() {
+        await this.page.evaluate(() => document.activeElement?.blur());
+        await this.page.keyboard.press('g');
+        await this.page.keyboard.press('o');
+        await expect(this.orgMenuList).toBeVisible();
+    }
+
+    async openCreateFromSwitcher() {
+        await this.orgSelect.click();
+        await this.orgMenuCreateButton.click();
+        await expect(this.page).toHaveURL(/\/iam\/organizations/, { timeout: 15000 });
     }
 
     async iamPageURLValidation() {

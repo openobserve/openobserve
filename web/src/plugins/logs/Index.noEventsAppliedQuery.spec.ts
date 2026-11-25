@@ -66,11 +66,17 @@ describe("Logs Index: the no-events copy follows the query that ran", { timeout:
   const searchHits = () => sent.filter((s) => s.payload.type === "search");
   const runButton = () => wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
   const noEvents = () => wrapper.find('[data-test="logs-search-no-events-found-text"]');
-  const deliverNothing = async () => {
+  const deliverNothing = async (functionError?: string) => {
     const { payload, handlers } = searchHits()[searchHits().length - 1];
     handlers.data(payload, {
       type: "search_response_metadata",
-      content: { results: { total: 0, hits: [] } },
+      content: {
+        results: {
+          total: 0,
+          hits: [],
+          ...(functionError ? { function_error: functionError } : {}),
+        },
+      },
     });
     handlers.data(payload, { type: "search_response_hits", content: { results: { hits: [] } } });
     handlers.complete(payload, {});
@@ -148,5 +154,20 @@ describe("Logs Index: the no-events copy follows the query that ran", { timeout:
 
     expect(noEvents().text()).toContain("doesn't contain any data");
     expect(wrapper.find('[data-test="logs-no-events-jump-to-data-card"]').exists()).toBe(true);
+  });
+
+  it("shows a zero-hit run's server error and drops it after the next clean run", async () => {
+    const queryError = () => wrapper.find('[data-test="logs-no-events-query-error"]');
+    await runButton().trigger("click");
+    await vi.waitFor(() => expect(searchHits()).toHaveLength(1));
+    await deliverNothing("regex parse error: unclosed group");
+    await vi.waitFor(() => expect(noEvents().exists()).toBe(true));
+    expect(queryError().text()).toContain("regex parse error: unclosed group");
+
+    await runButton().trigger("click");
+    await vi.waitFor(() => expect(searchHits()).toHaveLength(2));
+    await deliverNothing();
+    await vi.waitFor(() => expect(noEvents().exists()).toBe(true));
+    expect(queryError().exists()).toBe(false);
   });
 });

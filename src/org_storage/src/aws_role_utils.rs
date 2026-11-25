@@ -25,7 +25,7 @@ use aws_config::{BehaviorVersion, Region};
 use aws_credential_types::{Credentials, provider::ProvideCredentials};
 use hashbrown::HashMap;
 use infra::table::org_storage_providers::AwsRoleArn;
-use object_store::aws::AwsCredential;
+use object_store::aws::{AmazonS3, AmazonS3Builder, AwsCredential};
 use tokio::sync::{Mutex, RwLock};
 
 // The sts setup takes only 'static string as region name, and we need it to be dynamic-ish
@@ -65,7 +65,7 @@ pub struct CredentialProvider {
 
 #[async_trait::async_trait]
 impl object_store::CredentialProvider for CredentialProvider {
-    type Credential = object_store::aws::AwsCredential;
+    type Credential = AwsCredential;
     async fn get_credential(&self) -> object_store::Result<std::sync::Arc<Self::Credential>> {
         let expiry = self.expiry.load(Ordering::Relaxed);
         let now = chrono::Utc::now().timestamp();
@@ -169,10 +169,7 @@ async fn get_sts_credentials(
     Ok((expiry, creds))
 }
 
-pub async fn get_aws_from_role(
-    org_id: &str,
-    config: AwsRoleArn,
-) -> object_store::Result<object_store::aws::AmazonS3> {
+pub async fn get_aws_from_role(org_id: &str, config: AwsRoleArn) -> object_store::Result<AmazonS3> {
     let opts = object_store::ClientOptions::default()
         .with_connect_timeout(std::time::Duration::from_secs(30))
         .with_timeout(std::time::Duration::from_secs(30))
@@ -224,7 +221,7 @@ pub async fn get_aws_from_role(
         cache: RwLock::new(Arc::new(creds)),
     };
 
-    let builder = object_store::aws::AmazonS3Builder::new()
+    let builder = AmazonS3Builder::new()
         .with_client_options(opts)
         .with_bucket_name(&config.bucket_name)
         .with_region(&config.region)

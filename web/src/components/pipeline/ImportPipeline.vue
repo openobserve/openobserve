@@ -434,6 +434,29 @@ import {
 } from "@/utils/alerts/alertDataTransforms";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
+// A backend `Condition` leaf; unary operators may omit the value.
+const isConditionLeaf = (c: any): boolean =>
+  !!c &&
+  typeof c === "object" &&
+  !!c.column &&
+  !!c.operator &&
+  (c.value !== undefined || isUnaryOperator(c.operator));
+
+// Whether a v1 backend tree holds a `not` anywhere; v2 has no NOT to convert it to.
+const hasNotNode = (c: any): boolean => {
+  if (!c || typeof c !== "object") return false;
+  if (c.not) return true;
+  return [c.and, c.or].some((list) => Array.isArray(list) && list.some(hasNotNode));
+};
+
+// The backend's `Condition.value` has no serde default, so unary leaves need an explicit "".
+const fillUnaryValuesV1 = (c: any): void => {
+  if (!c || typeof c !== "object") return;
+  if (c.value === undefined && isUnaryOperator(c.operator)) c.value = "";
+  [c.and, c.or].forEach((list) => Array.isArray(list) && list.forEach(fillUnaryValuesV1));
+  fillUnaryValuesV1(c.not);
+};
+
 export default defineComponent({
   name: "ImportPipeline",
   components: {
@@ -1118,13 +1141,9 @@ export default defineComponent({
             };
 
             const validateV1Condition = (condition: any): boolean => {
-              if (
-                condition.column &&
-                condition.operator &&
-                (condition.value !== undefined || isUnaryOperator(condition.operator))
-              ) {
-                return true;
-              }
+              if (isConditionLeaf(condition)) return true;
+              if (!condition || typeof condition !== "object") return false;
+              if (condition.not) return validateV1Condition(condition.not);
               if (condition.and || condition.or) {
                 const conditions = condition.and || condition.or;
                 if (!Array.isArray(conditions)) {
@@ -1138,6 +1157,12 @@ export default defineComponent({
               }
               return false;
             };
+
+            const validateV1FrontendGroup = (group: any): boolean =>
+              Array.isArray(group?.items) &&
+              group.items.every((item: any) =>
+                Array.isArray(item?.items) ? validateV1FrontendGroup(item) : isConditionLeaf(item),
+              );
 
             let conditionsToValidate = node.data.conditions;
 
@@ -1163,9 +1188,23 @@ export default defineComponent({
               if (!validateV2Condition(conditionsToValidate)) {
                 hasErrors = true;
               }
-            } else if (conditionsToValidate.and || conditionsToValidate.or) {
-              // V1 format
+            } else if (
+              conditionsToValidate.and ||
+              conditionsToValidate.or ||
+              conditionsToValidate.not ||
+              conditionsToValidate.column !== undefined
+            ) {
+              // V1 backend format, including a bare condition
               if (!validateV1Condition(conditionsToValidate)) {
+                pipelineErrors.push({
+                  message: t("pipeline.importErrors.v1ConditionInvalid", { index, nodeIndex }),
+                  field: "condition_format",
+                });
+                hasErrors = true;
+              }
+            } else if (conditionsToValidate.label && conditionsToValidate.items) {
+              // V1 frontend format
+              if (!validateV1FrontendGroup(conditionsToValidate)) {
                 pipelineErrors.push({
                   message: t("pipeline.importErrors.v1ConditionInvalid", { index, nodeIndex }),
                   field: "condition_format",
@@ -1488,6 +1527,12 @@ export default defineComponent({
       if (input.nodes && Array.isArray(input.nodes)) {
         input.nodes.forEach((node: any) => {
           if (node.data?.node_type === "condition" && node.data?.conditions) {
+            if (hasNotNode(node.data.conditions)) {
+              // Without a version the backend deserializes the tree as v1 ConditionParams.
+              delete node.data.version;
+              fillUnaryValuesV1(node.data.conditions);
+              return;
+            }
             let convertedConditions = node.data.conditions;
 
             // Check if version field is already present (V2)
@@ -1495,8 +1540,10 @@ export default defineComponent({
               const version = detectConditionsVersion(convertedConditions);
 
               if (version === 0) {
-                // V0: Flat array format - convert to V2
-                convertedConditions = convertV0ToV2(convertedConditions);
+                // V0 flat array, or a bare condition that is its one-item case
+                convertedConditions = convertV0ToV2(
+                  Array.isArray(convertedConditions) ? convertedConditions : [convertedConditions],
+                );
               } else if (version === 1) {
                 // V1: Tree-based format - convert to V2
                 if (convertedConditions.and || convertedConditions.or) {

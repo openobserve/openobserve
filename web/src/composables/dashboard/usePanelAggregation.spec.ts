@@ -853,6 +853,30 @@ describe("usePanelAggregation", () => {
         expect(stages.y.map((item: any) => item.functionName)).toEqual(["count"]);
         expect(stages.breakdown).toEqual([]);
       });
+
+      const funnelSettings = {
+        unit: "bytes",
+        funnel_sort: "none",
+        funnel_orient: "horizontal",
+        funnel_show_percent: true,
+      };
+
+      it.each(["bar", "pie", "table"])(
+        "drops the funnel settings once the panel's type is %s",
+        (type) => {
+          const panelData: any = makePanelData(type);
+          panelData.data.config = { ...funnelSettings };
+          makeAggregation(panelData).resetAggregationFunction();
+          expect(panelData.data.config).toEqual({ unit: "bytes" });
+        },
+      );
+
+      it("keeps the funnel settings on a funnel", () => {
+        const panelData: any = makePanelData("funnel");
+        panelData.data.config = { ...funnelSettings };
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(panelData.data.config).toEqual(funnelSettings);
+      });
     });
 
     describe("flame graph and starter queries", () => {

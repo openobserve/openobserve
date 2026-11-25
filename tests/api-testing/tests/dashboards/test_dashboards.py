@@ -311,7 +311,6 @@ def test_dashboard_with_custom_folder(create_session, base_url):
         session.delete(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
 
 
-@pytest.mark.xfail(reason="backend currently panics with 500 for missing required fields instead of returning 400/422; remove xfail when backend is fixed")
 def test_dashboard_missing_required_fields(create_session, base_url):
     """Test creating dashboard without required fields"""
     session = create_session
@@ -324,9 +323,6 @@ def test_dashboard_missing_required_fields(create_session, base_url):
     }
 
     resp = session.post(url, json=dashboard_data)
-    # Correct behavior: 400 (bad request) or 422 (unprocessable entity).
-    # If backend returns 500 (server panic), this assert fails — but the xfail
-    # marker converts that into an XFAIL (visible in CI) instead of a silent pass.
     assert resp.status_code in [400, 422], f"Should fail without required fields: {resp.status_code}"
 
 

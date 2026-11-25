@@ -127,11 +127,13 @@ test.describe('Pages before data', () => {
             expect(metric.ok()).toBeTruthy();
             await ep.setPick(orgId, 'kubernetes');
 
+            const probed = ep.waitForStreamProbe(orgId, 'logs');
             await ep.open('logs', orgId);
             await ep.expectNoRedirect('logs');
             await expect(ep.panelFor('logs')).toBeVisible({ timeout: 20000 });
             await expect(ep.status).toHaveAttribute('data-state', 'waiting');
             const loadsBefore = ep.loads;
+            await probed;
 
             const logs = await request.post(`${ingestBase(ingestionBase())}/api/${orgId}/default/_json`, {
                 headers: getAuthHeaders(),

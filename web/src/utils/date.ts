@@ -191,13 +191,22 @@ export const getDurationObjectFromParams = (params: any) => {
   return obj;
 };
 
-export const RELATIVE_PERIOD_PATTERN = /(\d+)([smhdwM])/;
+/** Longest typed, pasted or host-supplied range text read, in UTF-16 units; the range parser has the same cap. */
+export const MAX_RANGE_TEXT_UNITS = 1024;
+
+// Anchored, so a long digit run without a unit fails once instead of being retried from every digit.
+const RELATIVE_PERIOD_PATTERN = /^(\d+)([smhdwM])/;
+
+export const matchRelativePeriod = (period: unknown): RegExpMatchArray | null =>
+  typeof period === "string" && period.length <= MAX_RANGE_TEXT_UNITS
+    ? period.match(RELATIVE_PERIOD_PATTERN)
+    : null;
 
 export const getConsumableRelativeTime = (period: string, timezone?: string | null) => {
   const calendarRange = resolveCalendarPeriod(period, timezone);
   if (calendarRange) return calendarRange;
 
-  const periodString = period?.match(RELATIVE_PERIOD_PATTERN);
+  const periodString = matchRelativePeriod(period);
   if (periodString) {
     let periodValue: number = parseInt(periodString[1]);
     let periodUnit: string = periodString[2];

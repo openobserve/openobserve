@@ -2347,10 +2347,14 @@ async fn run_values(ctx: &Ctx<'_>, q: &ValuesQuery) -> Result<Vec<String>, Strin
             None,
         )
         .await?;
+    let columns = ValuesQuery::result_columns(&resp.hits);
+    let Some(column) = q.value_column(&columns) else {
+        return Ok(vec![]);
+    };
     Ok(resp
         .hits
         .iter()
-        .filter_map(|hit| hit.get("zo_sql_key"))
+        .filter_map(|hit| hit.get(column))
         .filter(|key| !key.is_null())
         .map(variables::js_string)
         .collect())

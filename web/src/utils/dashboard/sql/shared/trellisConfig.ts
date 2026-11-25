@@ -17,6 +17,7 @@ import { calculateWidthText, calculateDynamicNameGap } from "../../chartDimensio
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { formatAxisTickValue } from "../../axisTickFormat";
 import { getTrellisGrid } from "../../calculateGridForSubPlot";
+import { breakdownValueLabel } from "../../sqlProcessData";
 import { deepCopy } from "@/utils/zincutils";
 import { chartAxisTextColor } from "@/utils/chartTheme";
 
@@ -301,7 +302,10 @@ export function createTrellisHelpers(deps: TrellisDeps) {
         // Add title for each chart
         if (existingSeriesIndex === -1) {
           options.title.push({
-            text: group_by_y_axis ? series.originalSeriesName || series.name : series.name,
+            text:
+              group_by_y_axis && series.originalSeriesName !== undefined
+                ? breakdownValueLabel(series.originalSeriesName)
+                : series.name,
             textStyle: {
               fontSize: 12,
               width:

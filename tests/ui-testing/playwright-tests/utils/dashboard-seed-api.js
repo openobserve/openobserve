@@ -1,38 +1,54 @@
 // REST seeding and cleanup for dashboard regression specs: log rows, dashboards, folders and the Home pin.
+const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { waitForStreamData } = require('./data-ingestion.js');
+const { ingestBase } = require('./ingest-url.js');
 
 const BASE = (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
 const HOME_PIN_KEY = 'home_dashboard';
 
 const orgIdentifier = () => getOrgIdentifier() || process.env.ORGNAME || 'default';
-const jsonHeaders = () => ({ ...getAuthHeaders(), 'Content-Type': 'application/json' });
 
-async function dashboardApi(method, path, body) {
-  const res = await fetch(`${BASE}${path}`, {
+// Cloud refuses the ingestion passcode outside ingest routes; page.request sends the session cookie, which the server reads before the header.
+async function dashboardApi(page, method, path, body) {
+  const res = await page.request.fetch(`${BASE}${path}`, {
     method,
-    headers: jsonHeaders(),
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    headers: getAuthHeaders(),
+    ...(body ? { data: body } : {}),
   });
-  return { status: res.status, body: await res.json().catch(() => ({})) };
+  return { status: res.status(), body: await res.json().catch(() => ({})) };
 }
 
-async function ingestLogRows(stream, rows) {
-  const res = await fetch(`${BASE}/api/${orgIdentifier()}/${stream}/_json`, { method: 'POST', headers: jsonHeaders(), body: JSON.stringify(rows) });
+async function deleteOrWarn(page, path) {
+  try {
+    const { status, body } = await dashboardApi(page, 'DELETE', path);
+    if (status >= 400 && status !== 404) testLogger.warn(`cleanup DELETE ${path} -> ${status}`, { body });
+  } catch (e) {
+    testLogger.warn(`cleanup DELETE ${path} failed`, { error: e.message });
+  }
+}
+
+async function ingestLogRows(page, stream, rows) {
+  const res = await fetch(`${ingestBase(BASE)}/api/${orgIdentifier()}/${stream}/_json`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(rows) });
   if (!res.ok) throw new Error(`ingest ${res.status}`);
+  // A panel queries once on open, so rows that are not searchable yet would leave it empty.
+  if (!(await waitForStreamData(page, stream, rows.length, 60000))) throw new Error(`${stream}: ${rows.length} rows not searchable after 60s`);
 }
 
-async function createDashboard(payload, folder = 'default') {
-  const { status, body } = await dashboardApi('POST', `/api/${orgIdentifier()}/dashboards?folder=${folder}`, payload);
+async function createDashboard(page, payload, folder = 'default') {
+  const { status, body } = await dashboardApi(page, 'POST', `/api/${orgIdentifier()}/dashboards?folder=${folder}`, payload);
   if (status >= 400) throw new Error(`create dashboard ${status}: ${JSON.stringify(body)}`);
   const inner = body[`v${body.version}`] || body;
   return inner.dashboardId || inner.dashboard_id;
 }
 
-const deleteDashboard = (dashboardId, folder = 'default') => dashboardApi('DELETE', `/api/${orgIdentifier()}/dashboards/${dashboardId}?folder=${folder}`);
+const deleteDashboard = (page, dashboardId, folder = 'default') => deleteOrWarn(page, `/api/${orgIdentifier()}/dashboards/${dashboardId}?folder=${folder}`);
 
-async function deleteSeededTablePanel({ stream, dashboardId }) {
-  if (dashboardId) await deleteDashboard(dashboardId).catch(() => {});
-  await fetch(`${BASE}/api/${orgIdentifier()}/streams/${stream}?type=logs`, { method: 'DELETE', headers: getAuthHeaders() }).catch(() => {});
+const deleteLogStream = (page, stream) => deleteOrWarn(page, `/api/${orgIdentifier()}/streams/${stream}?type=logs`);
+
+async function deleteSeededTablePanel(page, { stream, dashboardId }) {
+  if (dashboardId) await deleteDashboard(page, dashboardId);
+  await deleteLogStream(page, stream);
 }
 
 function formatInZone(ms, timeZone) {
@@ -78,16 +94,16 @@ function timezoneTableDashboard(stamp, stream) {
   };
 }
 
-async function seedTimezoneTablePanel(stamp) {
+async function seedTimezoneTablePanel(page, stamp) {
   const stream = `ovn_c_tz_${stamp}`;
   // a whole minute 10 minutes ago, so the 1-minute histogram bucket equals the row time
   const rowMs = Math.floor((Date.now() - 10 * 60 * 1000) / 60000) * 60000;
   try {
-    await ingestLogRows(stream, [{ _timestamp: rowMs * 1000, msg: 'tz' }]);
-    return { stream, rowMs, dashboardId: await createDashboard(timezoneTableDashboard(stamp, stream)) };
+    await ingestLogRows(page, stream, [{ _timestamp: rowMs * 1000, msg: 'tz' }]);
+    return { stream, rowMs, dashboardId: await createDashboard(page, timezoneTableDashboard(stamp, stream)) };
   } catch (e) {
     // the caller's finally never sees a seed that threw, so drop the ingested stream here
-    await deleteSeededTablePanel({ stream });
+    await deleteSeededTablePanel(page, { stream });
     throw e;
   }
 }
@@ -166,41 +182,47 @@ function pinnedCountDashboard(title) {
   };
 }
 
-async function createDashboardFolder(name, description) {
-  const { status, body } = await dashboardApi('POST', `/api/v2/${orgIdentifier()}/folders/dashboards`, { name, description });
+async function createDashboardFolder(page, name, description) {
+  const { status, body } = await dashboardApi(page, 'POST', `/api/v2/${orgIdentifier()}/folders/dashboards`, { name, description });
   if (status >= 400) throw new Error(`create folder ${name} -> ${status}`);
   return body.folderId || body.folder_id;
 }
 
-const deleteDashboardFolder = (folderId) => dashboardApi('DELETE', `/api/v2/${orgIdentifier()}/folders/dashboards/${folderId}`);
+const deleteDashboardFolder = (page, folderId) => deleteOrWarn(page, `/api/v2/${orgIdentifier()}/folders/dashboards/${folderId}`);
 
-async function dashboardsInFolder(folderId) {
-  const { body } = await dashboardApi('GET', `/api/${orgIdentifier()}/dashboards?folder=${folderId}`);
+async function dashboardsInFolder(page, folderId) {
+  const { status, body } = await dashboardApi(page, 'GET', `/api/${orgIdentifier()}/dashboards?folder=${folderId}`);
+  if (status >= 400) testLogger.warn(`list dashboards in folder ${folderId} -> ${status}`, { body });
   return (body.dashboards || body.list || []).map((d) => {
     const inner = d[`v${d.version}`] || d;
     return { id: inner.dashboardId || d.dashboard_id, title: inner.title || d.title };
   });
 }
 
-async function deleteDashboardsTitled(folderId, title) {
-  for (const d of await dashboardsInFolder(folderId)) {
-    if (d.title === title) await deleteDashboard(d.id, folderId);
+async function deleteDashboardsTitled(page, folderId, title) {
+  try {
+    for (const d of await dashboardsInFolder(page, folderId)) {
+      if (d.title === title) await deleteDashboard(page, d.id, folderId);
+    }
+  } catch (e) {
+    testLogger.warn(`cleanup of dashboards titled ${title} failed`, { error: e.message });
   }
 }
 
-const readHomePin = () => dashboardApi('GET', `/api/${orgIdentifier()}/settings/v2/${HOME_PIN_KEY}`);
+const readHomePin = (page) => dashboardApi(page, 'GET', `/api/${orgIdentifier()}/settings/v2/${HOME_PIN_KEY}`);
 
-async function pinnedHomeDashboardId() {
-  const { body } = await readHomePin();
+async function pinnedHomeDashboardId(page) {
+  const { body } = await readHomePin(page);
   return body?.setting_value?.dashboardId ?? body?.dashboardId;
 }
 
-async function restoreHomePin(before) {
+async function restoreHomePin(page, before) {
   const priorValue = (before.status < 400 ? before.body : null)?.setting_value ?? null;
   if (priorValue) {
-    await dashboardApi('POST', `/api/${orgIdentifier()}/settings/v2`, { setting_key: HOME_PIN_KEY, setting_value: priorValue, setting_category: 'ui' });
+    const { status, body } = await dashboardApi(page, 'POST', `/api/${orgIdentifier()}/settings/v2`, { setting_key: HOME_PIN_KEY, setting_value: priorValue, setting_category: 'ui' });
+    if (status >= 400) testLogger.warn(`restoring the home pin -> ${status}`, { body });
   } else {
-    await dashboardApi('DELETE', `/api/${orgIdentifier()}/settings/v2/${HOME_PIN_KEY}`);
+    await deleteOrWarn(page, `/api/${orgIdentifier()}/settings/v2/${HOME_PIN_KEY}`);
   }
 }
 
@@ -209,6 +231,7 @@ module.exports = {
   ingestLogRows,
   createDashboard,
   deleteDashboard,
+  deleteLogStream,
   deleteSeededTablePanel,
   formatInZone,
   seedTimezoneTablePanel,

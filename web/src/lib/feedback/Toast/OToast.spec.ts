@@ -117,6 +117,26 @@ describe("OToast", () => {
     expect(handler).toHaveBeenCalledOnce();
   });
 
+  it("keeps the default action data-test id unless the action names its own", async () => {
+    mountToast({
+      id: "1",
+      open: true,
+      message: "Saved",
+      action: { label: "Undo", handler: vi.fn() },
+    });
+    mountToast({
+      id: "2",
+      open: true,
+      message: "Created",
+      action: { label: "Switch", handler: vi.fn(), dataTest: "custom-action" },
+    });
+    await vueNextTick();
+    expect(document.body.querySelectorAll('[data-test="o-toast-action-btn"]')).toHaveLength(1);
+    expect(document.body.querySelector('[data-test="custom-action"]')?.textContent).toContain(
+      "Switch",
+    );
+  });
+
   it("emits openChange(false) when close button is clicked", async () => {
     const wrapper = mountToast({ id: "1", open: true, message: "Hello" });
     await vueNextTick();

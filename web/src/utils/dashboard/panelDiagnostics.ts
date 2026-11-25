@@ -20,6 +20,8 @@ export interface SeriesLimitInfo {
   cap: number;
   /** Set when the chart capped what it draws itself; shown as written, and Top N cannot lift it. */
   displayCapMessage?: string;
+  /** Set when several queries each drew up to the cap, so the cap is per query, not per chart. */
+  perQuery?: boolean;
 }
 
 /** One query's server-side stats and notices, merged over its partitions. */

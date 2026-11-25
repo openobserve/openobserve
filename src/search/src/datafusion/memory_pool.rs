@@ -22,6 +22,7 @@ use std::{
 };
 
 use datafusion::{
+    error::DataFusionError,
     execution::memory_pool::{MemoryConsumer, MemoryLimit, MemoryPool, MemoryReservation},
     prelude::SessionContext,
 };
@@ -81,7 +82,7 @@ impl MemoryPool for PeakMemoryPool {
         &self,
         reservation: &MemoryReservation,
         additional: usize,
-    ) -> Result<(), datafusion::error::DataFusionError> {
+    ) -> Result<(), DataFusionError> {
         let result = self.inner.try_grow(reservation, additional);
         if result.is_ok() {
             let current = self.inner.reserved();

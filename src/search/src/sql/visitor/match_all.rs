@@ -18,7 +18,9 @@ use std::{ops::ControlFlow, sync::Arc};
 use datafusion::{common::TableReference, sql::planner::object_name_to_table_reference};
 use hashbrown::HashMap;
 use infra::schema::{SchemaCache, get_stream_setting_fts_fields};
-use sqlparser::ast::{Expr, FunctionArguments, Query, TableFactor, VisitorMut, visit_expressions};
+use sqlparser::ast::{
+    Expr, FunctionArguments, Query, SetExpr, TableFactor, VisitorMut, visit_expressions,
+};
 
 use crate::datafusion::udf::fulltext::{
     match_all::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
@@ -93,7 +95,7 @@ impl VisitorMut for MatchVisitor {
     //    2. select * from t1 where id in (select id from t2 where match_all('error')) and
     //       match_all('critical')
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+        if let SetExpr::Select(select) = query.body.as_ref() {
             let has_match_all = select.selection.as_ref().is_some_and(has_match_all);
 
             // if from clause has more than one table, where clause should not have match_all
@@ -162,7 +164,7 @@ pub fn has_match_all(expr: &Expr) -> bool {
 #[cfg(test)]
 mod tests {
 
-    use sqlparser::{ast::VisitMut, dialect::GenericDialect};
+    use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
 
     use super::*;
 
@@ -177,7 +179,7 @@ mod tests {
     #[test]
     fn test_match_visitor() {
         let sql = "SELECT * FROM logs WHERE match_all('error') AND match_all('critical')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -193,7 +195,7 @@ mod tests {
     #[test]
     fn test_is_multi_stream_subquery() {
         let sql = "SELECT * FROM logs WHERE col IN (SELECT id FROM users)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -209,7 +211,7 @@ mod tests {
     #[test]
     fn test_is_multi_stream_exists() {
         let sql = "SELECT * FROM logs WHERE EXISTS (SELECT 1 FROM users)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -225,7 +227,7 @@ mod tests {
     #[test]
     fn test_is_multi_stream_join() {
         let sql = "SELECT * FROM logs l JOIN users u ON l.user_id = u.id";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -241,7 +243,7 @@ mod tests {
     #[test]
     fn test_is_multi_stream_multiple_from() {
         let sql = "SELECT * FROM logs, users WHERE logs.user_id = users.id";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -257,7 +259,7 @@ mod tests {
     #[test]
     fn test_is_multi_stream_derived_table() {
         let sql = "SELECT * FROM (SELECT id FROM users) u";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -273,7 +275,7 @@ mod tests {
     #[test]
     fn test_is_single_stream() {
         let sql = "SELECT * FROM logs WHERE timestamp > '2023-01-01'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -290,7 +292,7 @@ mod tests {
     #[test]
     fn test_is_multi_stream_with_match_all() {
         let sql = "SELECT * FROM logs l JOIN users u ON l.user_id = u.id WHERE match_all('error')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -308,7 +310,7 @@ mod tests {
     #[test]
     fn test_is_multi_from_with_match_all_unsupported() {
         let sql = "SELECT * FROM logs, users WHERE match_all('error')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -326,7 +328,7 @@ mod tests {
     #[test]
     fn test_derived_table_with_outer_match_all_unsupported() {
         let sql = "SELECT * FROM (SELECT id FROM users) u WHERE match_all('error')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -344,7 +346,7 @@ mod tests {
     #[test]
     fn test_inner_derived_match_all_supported() {
         let sql = "SELECT * FROM (SELECT * FROM logs WHERE match_all('error')) t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -361,7 +363,7 @@ mod tests {
     #[test]
     fn test_cte_with_match_all_unsupported() {
         let sql = "WITH cte AS (SELECT id FROM users) SELECT * FROM cte WHERE match_all('error')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -379,7 +381,7 @@ mod tests {
     #[test]
     fn test_cte_with_match_all_supported() {
         let sql = "WITH cte AS (SELECT id FROM users WHERE match_all('error')) SELECT * FROM cte";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -396,7 +398,7 @@ mod tests {
     #[test]
     fn test_cte_with_match_all_supported2() {
         let sql = "WITH cte AS (SELECT id FROM logs WHERE match_all('error')) SELECT * FROM users where id in (select id from cte)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -413,7 +415,7 @@ mod tests {
     #[test]
     fn test_cte_with_match_all_supported3() {
         let sql = "WITH cte AS (SELECT id FROM logs WHERE match_all('error')) SELECT * FROM users where id in (select id from cte)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -430,7 +432,7 @@ mod tests {
     #[test]
     fn test_cte_with_match_all_supported4() {
         let sql = "WITH cte AS (SELECT id FROM users where log like '%error%') SELECT * FROM users where id in (select id from cte)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();

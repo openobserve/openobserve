@@ -189,7 +189,7 @@ mod tests {
         common::Result,
         datasource::MemTable,
         execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
-        optimizer::OptimizerRule,
+        optimizer::{OptimizerRule, optimizer::ApplyOrder},
         physical_plan::get_plan_string,
         prelude::{SessionConfig, SessionContext},
     };
@@ -207,7 +207,6 @@ mod tests {
 
     #[test]
     fn test_limit_join_right_side_apply_order() {
-        use datafusion::optimizer::optimizer::ApplyOrder;
         let rule = LimitJoinRightSide::new(10, StreamType::Logs);
         assert_eq!(rule.apply_order(), Some(ApplyOrder::TopDown));
     }
@@ -451,12 +450,8 @@ mod tests {
 
     #[test]
     fn test_limit_join_right_side_rule_metadata() {
-        use datafusion::optimizer::OptimizerRule;
         let rule = LimitJoinRightSide::new(100, StreamType::Logs);
         assert_eq!(rule.name(), "limit_join_right_side");
-        assert_eq!(
-            rule.apply_order(),
-            Some(datafusion::optimizer::optimizer::ApplyOrder::TopDown)
-        );
+        assert_eq!(rule.apply_order(), Some(ApplyOrder::TopDown));
     }
 }

@@ -294,6 +294,7 @@ import {
   generateTraceContext,
   addSpacesToOperators,
 } from "../../utils/zincutils";
+import { quoteFieldNames } from "@/utils/query/quoteFieldNames";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -1140,17 +1141,10 @@ export default defineComponent({
           if (whereClause.trim() != "") {
             whereClause = addSpacesToOperators(whereClause);
 
-            const parsedSQL = whereClause.split(" ");
-            searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-              parsedSQL.forEach((node: any, index: any) => {
-                if (node == field.name) {
-                  node = node.replaceAll('"', "");
-                  parsedSQL[index] = '"' + node + '"';
-                }
-              });
-            });
-
-            whereClause = parsedSQL.join(" ");
+            whereClause = quoteFieldNames(
+              whereClause,
+              searchObj.data.stream.selectedStreamFields.map((field: any) => field.name),
+            );
 
             // query_context = query_context.replace(
             //   "[WHERE_CLAUSE]",
