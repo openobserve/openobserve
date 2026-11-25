@@ -22,6 +22,7 @@ use arrow::{
         NullBuilder, RecordBatchOptions, StringArray, StringBuilder, StringViewArray,
         StringViewBuilder, UInt64Array, UInt64Builder, new_null_array,
     },
+    compute::{SortOptions, concat, sort_to_indices, take},
     record_batch::RecordBatch,
 };
 use arrow_schema::{ArrowError, DataType, Schema};
@@ -808,7 +809,7 @@ pub fn concat_batches(
     let field_num = schema.fields().len();
     let mut arrays = Vec::with_capacity(field_num);
     for i in 0..field_num {
-        let array = arrow::compute::concat(
+        let array = concat(
             &batches
                 .iter()
                 .map(|batch| batch.column(i).as_ref())
@@ -876,13 +877,13 @@ pub fn sort_record_batch_by_column(
     }
 
     // Create sort options
-    let sort_options = arrow::compute::SortOptions {
+    let sort_options = SortOptions {
         descending,
         nulls_first: false,
     };
 
     // Get sorted indices
-    let indices = arrow::compute::sort_to_indices(
+    let indices = sort_to_indices(
         batch.column_by_name(column_name).ok_or_else(|| {
             DataFusionError::Execution(format!(
                 "No {column_name} column found in sort record batch",
@@ -896,7 +897,7 @@ pub fn sort_record_batch_by_column(
     let sorted_columns: Result<Vec<_>, _> = batch
         .columns()
         .iter()
-        .map(|col| arrow::compute::take(col, &indices, None))
+        .map(|col| take(col, &indices, None))
         .collect();
 
     // Create new RecordBatch with sorted data
@@ -3170,7 +3171,7 @@ mod test {
         // Source column is Null type → Null arm fills builder with nulls
         let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
         let src_schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Null, true)]));
-        let arr: ArrayRef = arrow::array::new_null_array(&DataType::Null, 2);
+        let arr: ArrayRef = new_null_array(&DataType::Null, 2);
         let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
         let result = format_recordbatch_by_schema(target, batch);
         let col = result

@@ -21,7 +21,10 @@ use datafusion::{
     arrow::datatypes::DataType::{self, *},
     common::{ScalarValue, cast::as_generic_string_array, exec_err},
     error::{DataFusionError, Result},
-    logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature, Volatility},
+    logical_expr::{
+        ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature,
+        Volatility,
+    },
 };
 use regex::Regex;
 
@@ -92,17 +95,14 @@ impl ScalarUDFImpl for RegexpMatchesFunc {
         &self.signature
     }
 
-    fn return_type(&self, arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
+    fn return_type(&self, arg_types: &[DataType]) -> Result<DataType> {
         Ok(match &arg_types[0] {
             Null => Null,
             other => List(Arc::new(Field::new("item", other.clone(), true))),
         })
     }
 
-    fn invoke_with_args(
-        &self,
-        args: datafusion::logical_expr::ScalarFunctionArgs,
-    ) -> datafusion::common::Result<ColumnarValue> {
+    fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
         let len = args
             .args
             .iter()

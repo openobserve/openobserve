@@ -30,7 +30,10 @@ use config::{
     metrics,
     utils::{parquet::generate_filename_with_time_range, time::now_micros},
 };
-use datafusion::datasource::{MemTable, TableProvider};
+use datafusion::{
+    arrow::{array::new_null_array, compute::cast, record_batch::RecordBatch},
+    datasource::{MemTable, TableProvider},
+};
 use db;
 use hashbrown::HashSet;
 use infra::{
@@ -596,9 +599,9 @@ fn build_union_schema(schemas: &[Arc<Schema>]) -> Arc<Schema> {
 /// Align a record batch to the target schema: reorder columns, fill missing
 /// fields with nulls, cast mismatched types.
 fn adapt_batch_to_schema(
-    batch: &datafusion::arrow::record_batch::RecordBatch,
+    batch: &RecordBatch,
     schema: &Arc<Schema>,
-) -> Result<datafusion::arrow::record_batch::RecordBatch, anyhow::Error> {
+) -> Result<RecordBatch, anyhow::Error> {
     let batch_schema = batch.schema();
     let mut cols = Vec::with_capacity(schema.fields().len());
     for field in schema.fields() {
@@ -608,19 +611,13 @@ fn adapt_batch_to_schema(
                 if col.data_type() == field.data_type() {
                     cols.push(col.clone());
                 } else {
-                    cols.push(datafusion::arrow::compute::cast(col, field.data_type())?);
+                    cols.push(cast(col, field.data_type())?);
                 }
             }
-            Err(_) => cols.push(datafusion::arrow::array::new_null_array(
-                field.data_type(),
-                batch.num_rows(),
-            )),
+            Err(_) => cols.push(new_null_array(field.data_type(), batch.num_rows())),
         }
     }
-    Ok(datafusion::arrow::record_batch::RecordBatch::try_new(
-        schema.clone(),
-        cols,
-    )?)
+    Ok(RecordBatch::try_new(schema.clone(), cols)?)
 }
 
 /// Remove segments from the index and release their wal usage bytes.

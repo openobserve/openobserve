@@ -16,7 +16,8 @@
 use std::{collections::HashSet, sync::Arc};
 
 use arrow::array::{
-    Array, Int64Array, TimestampMicrosecondArray, TimestampNanosecondArray, UInt64Array,
+    Array, BooleanArray, Float64Array, Int32Array, Int64Array, LargeStringArray, StringArray,
+    StringViewArray, TimestampMicrosecondArray, TimestampNanosecondArray, UInt32Array, UInt64Array,
 };
 use config::{
     get_batch_size,
@@ -225,7 +226,7 @@ fn create_histogram_arrow_array(
     min_value: i64,
     bucket_width: u64,
     num_buckets: usize,
-) -> Result<Vec<Arc<dyn arrow::array::Array>>, DataFusionError> {
+) -> Result<Vec<Arc<dyn Array>>, DataFusionError> {
     // Validate inputs
     if bucket_width == 0 {
         return Err(DataFusionError::Internal(
@@ -337,7 +338,7 @@ fn create_histogram_arrow_array(
 fn create_multi_histogram_arrow_array(
     schema: &SchemaRef,
     multi_histogram: &[(i64, String, u64)],
-) -> Result<Vec<Arc<dyn arrow::array::Array>>, DataFusionError> {
+) -> Result<Vec<Arc<dyn Array>>, DataFusionError> {
     // Validate schema has 3 fields
     if schema.fields().len() != 3 {
         return Err(DataFusionError::Internal(format!(
@@ -411,7 +412,7 @@ fn create_multi_histogram_arrow_array(
 fn create_top_n_arrow_array(
     schema: &SchemaRef,
     top_n: Vec<(Vec<String>, u64)>,
-) -> Result<Vec<Vec<Arc<dyn arrow::array::Array>>>, DataFusionError> {
+) -> Result<Vec<Vec<Arc<dyn Array>>>, DataFusionError> {
     // schema is the group fields plus a trailing count field
     let schema_fields = schema.fields().len();
     if !(2..=MAX_SIMPLE_TOPN_FIELDS + 1).contains(&schema_fields) {
@@ -464,7 +465,7 @@ fn create_top_n_arrow_array(
 fn create_distinct_arrow_array(
     schema: &SchemaRef,
     distinct_values: HashSet<String>,
-) -> Result<Vec<Arc<dyn arrow::array::Array>>, DataFusionError> {
+) -> Result<Vec<Arc<dyn Array>>, DataFusionError> {
     // Validate inputs
     if schema.fields().len() != 1 {
         return Err(DataFusionError::Internal(format!(
@@ -489,13 +490,13 @@ fn create_field_array(
 ) -> Result<Arc<dyn Array>, DataFusionError> {
     match field.data_type() {
         arrow_schema::DataType::Utf8 => {
-            Ok(Arc::new(arrow::array::StringArray::from(field_values)) as Arc<dyn Array>)
+            Ok(Arc::new(StringArray::from(field_values)) as Arc<dyn Array>)
         }
         arrow_schema::DataType::Utf8View => {
-            Ok(Arc::new(arrow::array::StringViewArray::from(field_values)) as Arc<dyn Array>)
+            Ok(Arc::new(StringViewArray::from(field_values)) as Arc<dyn Array>)
         }
         arrow_schema::DataType::LargeUtf8 => {
-            Ok(Arc::new(arrow::array::LargeStringArray::from(field_values)) as Arc<dyn Array>)
+            Ok(Arc::new(LargeStringArray::from(field_values)) as Arc<dyn Array>)
         }
         arrow_schema::DataType::Int64 => parse_i64_array(&field_values),
         arrow_schema::DataType::UInt64 => parse_u64_array(&field_values),
@@ -524,11 +525,11 @@ fn create_count_array(
         }
         arrow_schema::DataType::Int32 => {
             let i32_values = count_values.iter().map(|&c| c as i32).collect::<Vec<_>>();
-            Ok(Arc::new(arrow::array::Int32Array::from(i32_values)) as Arc<dyn Array>)
+            Ok(Arc::new(Int32Array::from(i32_values)) as Arc<dyn Array>)
         }
         arrow_schema::DataType::UInt32 => {
             let u32_values = count_values.iter().map(|&c| c as u32).collect::<Vec<_>>();
-            Ok(Arc::new(arrow::array::UInt32Array::from(u32_values)) as Arc<dyn Array>)
+            Ok(Arc::new(UInt32Array::from(u32_values)) as Arc<dyn Array>)
         }
         // Add other numeric types as needed
         _ => Err(DataFusionError::Internal(format!(
@@ -552,7 +553,7 @@ fn parse_i64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusion
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| DataFusionError::Internal(format!("Failed to parse i64 in topn: {e}")))?;
 
-    Ok(Arc::new(arrow::array::Int64Array::from(parsed_values)) as Arc<dyn Array>)
+    Ok(Arc::new(Int64Array::from(parsed_values)) as Arc<dyn Array>)
 }
 
 /// Parse string values into u64 array
@@ -569,7 +570,7 @@ fn parse_u64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusion
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| DataFusionError::Internal(format!("Failed to parse u64 in topn: {e}")))?;
 
-    Ok(Arc::new(arrow::array::UInt64Array::from(parsed_values)) as Arc<dyn Array>)
+    Ok(Arc::new(UInt64Array::from(parsed_values)) as Arc<dyn Array>)
 }
 
 /// Parse string values into f64 array
@@ -586,7 +587,7 @@ fn parse_f64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusion
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| DataFusionError::Internal(format!("Failed to parse f64 in topn: {e}")))?;
 
-    Ok(Arc::new(arrow::array::Float64Array::from(parsed_values)) as Arc<dyn Array>)
+    Ok(Arc::new(Float64Array::from(parsed_values)) as Arc<dyn Array>)
 }
 
 /// Parse string values into bool array
@@ -603,17 +604,22 @@ fn parse_bool_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusio
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| DataFusionError::Internal(format!("Failed to parse bool in topn: {e}")))?;
 
-    Ok(Arc::new(arrow::array::BooleanArray::from(parsed_values)) as Arc<dyn Array>)
+    Ok(Arc::new(BooleanArray::from(parsed_values)) as Arc<dyn Array>)
 }
 
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
 
-    use arrow::array::{BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema, TimeUnit};
     use config::meta::stream::FileMeta;
-    use datafusion::physical_plan::{ChildrenPropertiesMode, ReplaceChildrenOptions};
+    use datafusion::{
+        common::stats::Precision,
+        physical_plan::{
+            ChildrenPropertiesMode, ReplaceChildrenOptions, StatisticsArgs, StatisticsContext,
+            collect, displayable,
+        },
+    };
 
     use super::*;
 
@@ -794,10 +800,7 @@ mod tests {
         let field = Field::new("count", DataType::Int32, false);
         let count_values = vec![123, 456];
         let array = create_count_array(&field, count_values).unwrap();
-        let array_values = array
-            .as_any()
-            .downcast_ref::<arrow::array::Int32Array>()
-            .unwrap();
+        let array_values = array.as_any().downcast_ref::<Int32Array>().unwrap();
         assert_eq!(array_values.len(), 2);
         assert_eq!(array_values.value(0), 123);
         assert_eq!(array_values.value(1), 456);
@@ -808,10 +811,7 @@ mod tests {
         let field = Field::new("count", DataType::UInt32, false);
         let count_values = vec![123, 456];
         let array = create_count_array(&field, count_values).unwrap();
-        let array_values = array
-            .as_any()
-            .downcast_ref::<arrow::array::UInt32Array>()
-            .unwrap();
+        let array_values = array.as_any().downcast_ref::<UInt32Array>().unwrap();
         assert_eq!(array_values.len(), 2);
         assert_eq!(array_values.value(0), 123);
         assert_eq!(array_values.value(1), 456);
@@ -1149,10 +1149,7 @@ mod tests {
             .unwrap(),
         );
 
-        let display = format!(
-            "{}",
-            datafusion::physical_plan::displayable(exec.as_ref()).indent(false)
-        );
+        let display = format!("{}", displayable(exec.as_ref()).indent(false));
         assert!(display.contains("TantivyOptimizeExec: files: 6"));
         assert!(display.contains("optimize_mode: SimpleCount"));
         assert!(display.contains(
@@ -1266,14 +1263,10 @@ mod tests {
         )
         .unwrap();
 
-        let stats = datafusion::physical_plan::StatisticsContext::new()
-            .compute(&exec, &datafusion::physical_plan::StatisticsArgs::new());
+        let stats = StatisticsContext::new().compute(&exec, &StatisticsArgs::new());
         assert!(stats.is_ok());
         let stats = stats.unwrap();
-        assert!(matches!(
-            stats.num_rows,
-            datafusion::common::stats::Precision::Absent
-        ));
+        assert!(matches!(stats.num_rows, Precision::Absent));
     }
 
     #[tokio::test]
@@ -1297,10 +1290,9 @@ mod tests {
         );
 
         for _ in 0..2 {
-            let batches =
-                datafusion::physical_plan::collect(exec.clone(), Arc::new(TaskContext::default()))
-                    .await
-                    .unwrap();
+            let batches = collect(exec.clone(), Arc::new(TaskContext::default()))
+                .await
+                .unwrap();
             let counts = batches[0]
                 .column(0)
                 .as_any()

@@ -264,9 +264,7 @@ pub fn apply_projection(
         Vec::with_capacity(projected_schema.fields().len());
     for (idx, field) in projected_schema.fields().iter().enumerate() {
         let name = field.name().to_string();
-        let col = Arc::new(datafusion::physical_expr::expressions::Column::new(
-            &name, idx,
-        ));
+        let col = Arc::new(Column::new(&name, idx));
         if let Some(data_type) = diff_rules.get(&name) {
             exprs.push((Arc::new(CastExpr::new(col, data_type.clone(), None)), name));
         } else {
@@ -379,7 +377,10 @@ pub(crate) fn file_scan_config(plan: &Arc<dyn ExecutionPlan>) -> Option<&FileSca
 mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use config::meta::stream::FileKey;
-    use datafusion::{common::Statistics, parquet::arrow::arrow_reader::RowSelector};
+    use datafusion::{
+        common::Statistics, parquet::arrow::arrow_reader::RowSelector,
+        physical_plan::empty::EmptyExec,
+    };
     use vortex::scan::selection::Selection;
     use vortex_datafusion::VortexAccessPlan;
 
@@ -551,7 +552,7 @@ mod tests {
 
     fn make_exec() -> Arc<dyn ExecutionPlan> {
         let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
-        Arc::new(datafusion::physical_plan::empty::EmptyExec::new(schema))
+        Arc::new(EmptyExec::new(schema))
     }
 
     #[test]
@@ -586,9 +587,7 @@ mod tests {
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("col", DataType::Utf8, false),
         ]));
-        let exec = Arc::new(datafusion::physical_plan::empty::EmptyExec::new(
-            schema.clone(),
-        )) as Arc<dyn ExecutionPlan>;
+        let exec = Arc::new(EmptyExec::new(schema.clone())) as Arc<dyn ExecutionPlan>;
         let schema_ref: arrow_schema::Schema = schema.as_ref().clone();
         let result = apply_combined_filter(None, Some((1000, 2000)), &schema_ref, &[], exec, None);
         assert!(result.is_ok());
@@ -600,9 +599,7 @@ mod tests {
         use arrow_schema::{Field, Schema};
         use hashbrown::HashMap;
         let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
-        let exec = Arc::new(datafusion::physical_plan::empty::EmptyExec::new(
-            schema.clone(),
-        )) as Arc<dyn ExecutionPlan>;
+        let exec = Arc::new(EmptyExec::new(schema.clone())) as Arc<dyn ExecutionPlan>;
         let mut diff_rules: HashMap<String, DataType> = HashMap::new();
         diff_rules.insert("col".to_string(), DataType::LargeUtf8);
         let result = apply_projection(&schema, &diff_rules, None, exec);

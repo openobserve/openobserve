@@ -479,25 +479,17 @@ mod tests {
 
     #[derive(Debug)]
     struct MockExecPlan;
-    impl datafusion::physical_plan::DisplayAs for MockExecPlan {
-        fn fmt_as(
-            &self,
-            _: datafusion::physical_plan::DisplayFormatType,
-            _: &mut std::fmt::Formatter,
-        ) -> std::fmt::Result {
+    impl DisplayAs for MockExecPlan {
+        fn fmt_as(&self, _: DisplayFormatType, _: &mut std::fmt::Formatter) -> std::fmt::Result {
             Ok(())
         }
     }
     impl ExecutionPlan for MockExecPlan {
         fn apply_expressions(
             &self,
-            _f: &mut dyn FnMut(
-                &Arc<dyn datafusion::physical_expr::PhysicalExpr>,
-            ) -> datafusion::common::Result<
-                datafusion::common::tree_node::TreeNodeRecursion,
-            >,
-        ) -> datafusion::common::Result<datafusion::common::tree_node::TreeNodeRecursion> {
-            Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
+            _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+        ) -> Result<TreeNodeRecursion> {
+            Ok(TreeNodeRecursion::Continue)
         }
 
         fn name(&self) -> &'static str {
@@ -512,14 +504,10 @@ mod tests {
         fn with_new_children(
             self: Arc<Self>,
             _: Vec<Arc<dyn ExecutionPlan>>,
-        ) -> datafusion::common::Result<Arc<dyn ExecutionPlan>> {
+        ) -> Result<Arc<dyn ExecutionPlan>> {
             Ok(self)
         }
-        fn execute(
-            &self,
-            _: usize,
-            _: Arc<datafusion::execution::TaskContext>,
-        ) -> datafusion::common::Result<datafusion::execution::SendableRecordBatchStream> {
+        fn execute(&self, _: usize, _: Arc<TaskContext>) -> Result<SendableRecordBatchStream> {
             panic!("not needed")
         }
     }

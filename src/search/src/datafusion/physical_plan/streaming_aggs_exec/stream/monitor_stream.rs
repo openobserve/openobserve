@@ -181,7 +181,11 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::{
         execution::SendableRecordBatchStream,
-        physical_plan::{aggregates::AggregateExec, memory::MemoryStream},
+        physical_plan::{
+            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
+            empty::EmptyExec,
+            memory::MemoryStream,
+        },
     };
     use tokio::sync::mpsc;
 
@@ -215,13 +219,11 @@ mod tests {
                 1,
                 Arc::new(
                     AggregateExec::try_new(
-                        datafusion::physical_plan::aggregates::AggregateMode::Partial,
-                        datafusion::physical_plan::aggregates::PhysicalGroupBy::new_single(vec![]),
+                        AggregateMode::Partial,
+                        PhysicalGroupBy::new_single(vec![]),
                         vec![],
                         vec![],
-                        Arc::new(datafusion::physical_plan::empty::EmptyExec::new(
-                            schema.clone(),
-                        )),
+                        Arc::new(EmptyExec::new(schema.clone())),
                         schema.clone(),
                     )
                     .unwrap(),

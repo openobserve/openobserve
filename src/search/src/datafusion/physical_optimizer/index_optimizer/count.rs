@@ -177,8 +177,7 @@ mod tests {
             arrow_schema::DataType::Int32,
             false,
         )]));
-        let plan: Arc<dyn datafusion::physical_plan::ExecutionPlan> =
-            Arc::new(EmptyExec::new(schema));
+        let plan: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
         assert!(is_simple_count(plan).is_none());
     }
 }

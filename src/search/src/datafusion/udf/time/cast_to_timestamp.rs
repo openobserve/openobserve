@@ -212,6 +212,6 @@ mod tests {
         use datafusion::logical_expr::ScalarUDFImpl as _;
         let udf = CastToTimestampUdf::new();
         let ret = udf.return_type(&[]).unwrap();
-        assert_eq!(ret, arrow::datatypes::DataType::Int64);
+        assert_eq!(ret, DataType::Int64);
     }
 }

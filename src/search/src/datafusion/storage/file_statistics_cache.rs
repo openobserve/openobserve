@@ -429,9 +429,7 @@ mod tests {
             &key(&meta.location),
             CachedFileMetadata::new(
                 meta,
-                Arc::new(
-                    datafusion::execution::cache::SchemaFingerprint::from_schema(&Schema::empty()),
-                ),
+                Arc::new(SchemaFingerprint::from_schema(&Schema::empty())),
                 stats,
                 None,
             ),
@@ -704,7 +702,7 @@ mod tests {
         let entry = |stats: Statistics| {
             CachedFileMetadata::new(
                 object_meta("f", 1),
-                Arc::new(datafusion::execution::cache::SchemaFingerprint::from_schema(&schema)),
+                Arc::new(SchemaFingerprint::from_schema(&schema)),
                 Arc::new(stats),
                 None,
             )
@@ -763,9 +761,7 @@ mod tests {
         let value = |name: &str| {
             CachedFileMetadata::new(
                 object_meta(name, 64),
-                Arc::new(
-                    datafusion::execution::cache::SchemaFingerprint::from_schema(&Schema::empty()),
-                ),
+                Arc::new(SchemaFingerprint::from_schema(&Schema::empty())),
                 stats.clone(),
                 None,
             )

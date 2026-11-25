@@ -343,13 +343,10 @@ mod tests {
 
     #[test]
     fn test_add_sort_and_limit_rule_new_metadata() {
-        use datafusion::optimizer::OptimizerRule;
+        use datafusion::optimizer::{OptimizerRule, optimizer::ApplyOrder};
         let rule = AddSortAndLimitRule::new(10, 5, StreamType::Logs);
         assert_eq!(rule.name(), "add_sort_and_limit");
-        assert_eq!(
-            rule.apply_order(),
-            Some(datafusion::optimizer::optimizer::ApplyOrder::TopDown)
-        );
+        assert_eq!(rule.apply_order(), Some(ApplyOrder::TopDown));
     }
 
     #[test]

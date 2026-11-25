@@ -64,10 +64,7 @@ mod tests {
         // Test that the UDF has the correct signature (accepts one string argument)
         let signature = MATCH_ALL_HASH_UDF.signature();
         // Just verify the signature exists
-        assert_eq!(
-            signature.volatility,
-            datafusion::logical_expr::Volatility::Immutable
-        );
+        assert_eq!(signature.volatility, Volatility::Immutable);
     }
 
     #[test]

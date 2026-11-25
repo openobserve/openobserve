@@ -365,7 +365,8 @@ pub(crate) fn get_cache_file_path_from_streaming_id(streaming_id: &str) -> Resul
 #[cfg(test)]
 mod tests {
     use datafusion::physical_plan::{
-        ChildrenPropertiesMode, ExecutionPlan, ReplaceChildrenOptions,
+        ChildrenPropertiesMode, ExecutionPlan, Partitioning, ReplaceChildrenOptions,
+        StatisticsArgs, StatisticsContext, empty::EmptyExec,
     };
 
     use super::*;
@@ -674,11 +675,8 @@ mod tests {
         assert_eq!(exec.children().len(), 1);
         assert_eq!(exec.benefits_from_input_partitioning(), vec![false]);
         // Test statistics method (returns Statistics with unknown values)
-        let _stats = datafusion::physical_plan::StatisticsContext::new()
-            .compute(
-                &exec,
-                &datafusion::physical_plan::StatisticsArgs::new().with_partition(Some(0)),
-            )
+        let _stats = StatisticsContext::new()
+            .compute(&exec, &StatisticsArgs::new().with_partition(Some(0)))
             .unwrap();
         // Just verify statistics() method doesn't panic - we can't easily test Precision enum
         // values
@@ -809,7 +807,7 @@ mod tests {
         let partitioning = StreamingAggsExec::output_partitioning_helper(5);
 
         // Should return UnknownPartitioning with correct count
-        if let datafusion::physical_plan::Partitioning::UnknownPartitioning(count) = partitioning {
+        if let Partitioning::UnknownPartitioning(count) = partitioning {
             assert_eq!(count, 5);
         } else {
             panic!("Expected UnknownPartitioning");
@@ -828,15 +826,12 @@ mod tests {
             false,
         )]));
 
-        let input: Arc<dyn datafusion::physical_plan::ExecutionPlan> =
-            Arc::new(datafusion::physical_plan::empty::EmptyExec::new(schema));
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
         let properties = StreamingAggsExec::compute_properties(&input, 3);
 
         // Verify the properties are set correctly - we can't access schema() directly but we can
         // verify partitioning Check partitioning
-        if let datafusion::physical_plan::Partitioning::UnknownPartitioning(count) =
-            properties.output_partitioning()
-        {
+        if let Partitioning::UnknownPartitioning(count) = properties.output_partitioning() {
             assert_eq!(*count, 3);
         } else {
             panic!("Expected UnknownPartitioning");

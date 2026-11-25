@@ -332,7 +332,7 @@ mod tests {
     fn test_disjunction_empty_returns_true_literal() {
         let result = disjunction(vec![]);
         // empty → lit(true)
-        let lit = result.downcast_ref::<datafusion::physical_plan::expressions::Literal>();
+        let lit = result.downcast_ref::<Literal>();
         assert!(lit.is_some());
     }
 

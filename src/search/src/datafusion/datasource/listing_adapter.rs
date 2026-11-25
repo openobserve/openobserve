@@ -307,7 +307,10 @@ fn handler_tantivy_index(
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Float64Array, Int64Array, RecordBatch, UInt64Array};
+    use arrow::{
+        array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
+        compute::cast,
+    };
     use arrow_schema::{DataType, Field, Schema};
     use config::{FileFormat, meta::promql::HASH_LABEL};
     use datafusion::{
@@ -796,7 +799,7 @@ mod tests {
                     let columns: Vec<_> = b
                         .columns()
                         .iter()
-                        .map(|c| arrow::compute::cast(c, &DataType::Utf8).unwrap())
+                        .map(|c| cast(c, &DataType::Utf8).unwrap())
                         .collect();
                     (0..b.num_rows())
                         .map(|i| {

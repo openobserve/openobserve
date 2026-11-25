@@ -4072,7 +4072,7 @@ mod tests {
     #[tokio::test]
     async fn test_handle_otlp_request_llm_processing_sees_span_name_and_error_status() {
         use arrow::{
-            array::{Array, StringArray},
+            array::{Array, ArrayRef, StringArray},
             compute::cast,
             datatypes::DataType,
         };
@@ -4171,7 +4171,7 @@ mod tests {
                     .column_by_name(name)
                     .map(|c| cast(c, &DataType::Utf8).unwrap())
             };
-            let value = |col: &Option<arrow::array::ArrayRef>, row: usize| {
+            let value = |col: &Option<ArrayRef>, row: usize| {
                 col.as_ref().and_then(|c| {
                     let c = c.as_any().downcast_ref::<StringArray>().unwrap();
                     (!c.is_null(row)).then(|| c.value(row).to_string())

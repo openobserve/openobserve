@@ -642,7 +642,7 @@ mod tests {
         )
         .unwrap();
 
-        let streams = [datafusion::common::TableReference::from("app")];
+        let streams = [TableReference::from("app")];
         let digest = |raw: Option<&RawStreams>| {
             redaction_digest("sdr_digest", StreamType::Logs, &streams, raw)
         };
@@ -652,7 +652,7 @@ mod tests {
         assert!(redacted.is_some());
         assert_eq!(digest(None), redacted);
 
-        let unprotected = [datafusion::common::TableReference::from("plain")];
+        let unprotected = [TableReference::from("plain")];
         let plain = redaction_digest("sdr_digest", StreamType::Logs, &unprotected, None);
         assert_eq!(plain, None);
         assert_eq!(digest(Some(&raw)), plain);

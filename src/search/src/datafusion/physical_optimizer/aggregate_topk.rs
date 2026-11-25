@@ -247,7 +247,7 @@ mod tests {
     use datafusion::{
         datasource::MemTable,
         physical_plan::{collect, displayable},
-        prelude::SessionConfig,
+        prelude::{SessionConfig, SessionContext},
     };
 
     use super::*;
@@ -274,9 +274,7 @@ mod tests {
             Field::new("name", DataType::Utf8, false),
             Field::new("v", DataType::Int64, false),
         ]));
-        let ctx = datafusion::prelude::SessionContext::new_with_config(
-            SessionConfig::new().with_target_partitions(2),
-        );
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
         ctx.register_table("t", Arc::new(NewEmptyTable::new("t", schema)))
             .unwrap();
         let sql = format!(
@@ -372,9 +370,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let ctx = datafusion::prelude::SessionContext::new_with_config(
-            SessionConfig::new().with_target_partitions(2),
-        );
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
         ctx.register_table(
             "t",
             Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
@@ -424,9 +420,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let ctx = datafusion::prelude::SessionContext::new_with_config(
-            SessionConfig::new().with_target_partitions(2),
-        );
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
         ctx.register_table(
             "t",
             Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),

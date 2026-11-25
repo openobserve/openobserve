@@ -477,6 +477,7 @@ async fn publish_merged_output(
 #[cfg(test)]
 mod tests {
     use config::meta::stream::FileMeta;
+    use object_store::memory::InMemory;
 
     use super::*;
 
@@ -545,7 +546,7 @@ mod tests {
 
     async fn memory_storage_account() -> String {
         let id = ider::uuid();
-        storage::add_account(&id, Box::new(object_store::memory::InMemory::new())).await;
+        storage::add_account(&id, Box::new(InMemory::new())).await;
         format!("{id}:default")
     }
 

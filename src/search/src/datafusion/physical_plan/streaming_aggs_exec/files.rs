@@ -533,7 +533,7 @@ pub fn get_aggregation_cache_key_from_request(
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::StringArray;
+    use arrow::{array::StringArray, buffer::OffsetBuffer};
 
     use super::*;
 
@@ -670,7 +670,7 @@ mod tests {
 
         // Create a List<Utf8> array
         let values = StringArray::from(vec!["a", "b", "c", "d"]);
-        let offsets = arrow::buffer::OffsetBuffer::new(vec![0, 2, 4].into());
+        let offsets = OffsetBuffer::new(vec![0, 2, 4].into());
         let field = Arc::new(Field::new("item", DataType::Utf8, true));
         let list_array = ListArray::new(field.clone(), offsets, Arc::new(values), None);
         let array: ArrayRef = Arc::new(list_array);
@@ -696,7 +696,7 @@ mod tests {
 
         // Create a List<List<Utf8>> structure
         let inner_values = StringArray::from(vec!["x", "y"]);
-        let inner_offsets = arrow::buffer::OffsetBuffer::new(vec![0, 1, 2].into());
+        let inner_offsets = OffsetBuffer::new(vec![0, 1, 2].into());
         let inner_field = Arc::new(Field::new("item", DataType::Utf8, true));
         let inner_list = ListArray::new(
             inner_field.clone(),
@@ -705,7 +705,7 @@ mod tests {
             None,
         );
 
-        let outer_offsets = arrow::buffer::OffsetBuffer::new(vec![0, 2].into());
+        let outer_offsets = OffsetBuffer::new(vec![0, 2].into());
         let outer_field = Arc::new(Field::new(
             "item",
             DataType::List(inner_field.clone()),

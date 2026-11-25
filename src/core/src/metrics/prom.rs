@@ -1584,17 +1584,16 @@ mod tests {
 
     #[test]
     fn metadata_sql_round_trips_matcher_values() {
-        use datafusion::sql::sqlparser::{
-            ast::{Expr, Value, visit_expressions_mut},
-            dialect::{Dialect, GenericDialect, PostgreSqlDialect},
-            parser::Parser,
+        use datafusion::{
+            arrow::datatypes::{DataType, Field},
+            sql::sqlparser::{
+                ast::{Expr, Value, visit_expressions_mut},
+                dialect::{Dialect, GenericDialect, PostgreSqlDialect},
+                parser::Parser,
+            },
         };
 
-        let schema = Schema::new(vec![datafusion::arrow::datatypes::Field::new(
-            "job",
-            datafusion::arrow::datatypes::DataType::Utf8,
-            true,
-        )]);
+        let schema = Schema::new(vec![Field::new("job", DataType::Utf8, true)]);
         let values = [
             "worker's",
             r"worker\\path",

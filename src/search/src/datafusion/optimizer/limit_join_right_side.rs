@@ -451,12 +451,9 @@ mod tests {
 
     #[test]
     fn test_limit_join_right_side_rule_metadata() {
-        use datafusion::optimizer::OptimizerRule;
+        use datafusion::optimizer::{OptimizerRule, optimizer::ApplyOrder};
         let rule = LimitJoinRightSide::new(100, StreamType::Logs);
         assert_eq!(rule.name(), "limit_join_right_side");
-        assert_eq!(
-            rule.apply_order(),
-            Some(datafusion::optimizer::optimizer::ApplyOrder::TopDown)
-        );
+        assert_eq!(rule.apply_order(), Some(ApplyOrder::TopDown));
     }
 }

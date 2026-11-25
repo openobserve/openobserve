@@ -620,13 +620,10 @@ mod tests {
 
     #[test]
     fn test_rewrite_histogram_new_stores_fields() {
-        use datafusion::optimizer::OptimizerRule;
+        use datafusion::optimizer::{OptimizerRule, optimizer::ApplyOrder};
         let rule = RewriteHistogram::new(100, 200, 50, None);
         assert_eq!(rule.name(), "rewrite_histogram");
-        assert_eq!(
-            rule.apply_order(),
-            Some(datafusion::optimizer::optimizer::ApplyOrder::BottomUp)
-        );
+        assert_eq!(rule.apply_order(), Some(ApplyOrder::BottomUp));
     }
 
     #[test]

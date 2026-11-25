@@ -29,8 +29,8 @@ use std::{
 
 use anyhow::{Result, bail, ensure};
 use arrow::{
-    array::{Array, AsArray, RecordBatch},
-    datatypes::{DataType, Schema, UInt8Type, UInt16Type, UInt32Type},
+    array::{Array, AsArray, RecordBatch, RecordBatchOptions},
+    datatypes::{DataType, Field, Schema, UInt8Type, UInt16Type, UInt32Type},
 };
 pub use config::meta::promql::index::{MIDX_MAGIC, MIDX_TRAILER_LEN, MIDX_VERSION, MidxTrailer};
 pub use directory::{BlockDirectory, BlockIter};
@@ -160,10 +160,7 @@ impl Index {
         let mut fields = Vec::new();
         let mut columns = Vec::new();
         for name in names {
-            if fields
-                .iter()
-                .any(|field: &Arc<arrow::datatypes::Field>| field.name() == name)
-            {
+            if fields.iter().any(|field: &Arc<Field>| field.name() == name) {
                 continue;
             }
             if let Ok(index) = schema.index_of(name) {
@@ -176,7 +173,7 @@ impl Index {
             labels: RecordBatch::try_new_with_options(
                 Arc::new(Schema::new(fields)),
                 columns,
-                &arrow::array::RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
+                &RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
             )?,
         })
     }
@@ -209,7 +206,7 @@ impl Index {
             labels: RecordBatch::try_new_with_options(
                 Arc::new(Schema::new(fields)),
                 columns,
-                &arrow::array::RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
+                &RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
             )?,
         })
     }
@@ -328,7 +325,8 @@ mod tests {
 
     use arrow::{
         array::{Float64Array, Int64Array, RecordBatch, StringArray, StringViewArray, UInt64Array},
-        datatypes::{DataType, Field, Schema, SchemaRef},
+        compute::concat_batches,
+        datatypes::{DataType, Field, Float64Type, Int64Type, Schema, SchemaRef},
     };
     use bytes::Bytes;
 
@@ -1098,13 +1096,11 @@ mod tests {
             .unwrap()
             .collect::<std::result::Result<Vec<_>, _>>()
             .unwrap();
-        let sql = arrow::compute::concat_batches(&input.schema(), &sql_batches).unwrap();
+        let sql = concat_batches(&input.schema(), &sql_batches).unwrap();
         assert_eq!(sql.num_rows(), input.num_rows());
         for (row, expected) in actual.iter().enumerate() {
-            let times = sql.column(1).as_primitive::<arrow::datatypes::Int64Type>();
-            let values = sql
-                .column(2)
-                .as_primitive::<arrow::datatypes::Float64Type>();
+            let times = sql.column(1).as_primitive::<Int64Type>();
+            let values = sql.column(2).as_primitive::<Float64Type>();
             assert_eq!((times.value(row), values.value(row).to_bits()), *expected);
         }
     }

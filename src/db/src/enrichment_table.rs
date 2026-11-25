@@ -916,7 +916,7 @@ mod tests {
     #[test]
     fn test_convert_recordbatch_to_vrl() {
         use arrow::{
-            array::{BooleanArray, Float64Array, Int64Array, StringArray},
+            array::{BooleanArray, Float64Array, Int64Array, RecordBatch, StringArray},
             datatypes::{DataType, Field, Schema},
         };
 
@@ -933,7 +933,7 @@ mod tests {
         let score_array = Float64Array::from(vec![95.5, 88.3]);
         let active_array = BooleanArray::from(vec![true, false]);
 
-        let batch = arrow::array::RecordBatch::try_new(
+        let batch = RecordBatch::try_new(
             Arc::clone(&schema),
             vec![
                 Arc::new(name_array),

@@ -180,6 +180,7 @@ mod tests {
     use config::{meta::stream::StreamSettings, utils::time::BASE_TIME};
     use datafusion::{
         execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
+        physical_plan::displayable,
         prelude::SessionConfig,
     };
 
@@ -330,9 +331,7 @@ mod tests {
     }
 
     fn plan_text(plan: &Arc<dyn ExecutionPlan>) -> String {
-        datafusion::physical_plan::displayable(plan.as_ref())
-            .indent(false)
-            .to_string()
+        displayable(plan.as_ref()).indent(false).to_string()
     }
 
     #[tokio::test]

@@ -21,6 +21,7 @@ use config::{
 };
 use datafusion::{
     common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
+    error::DataFusionError,
     logical_expr::{LogicalPlan, Operator},
     prelude::Expr,
 };
@@ -341,10 +342,7 @@ fn extract_having_fields_recursive(node: &HavingNode, fields: &mut HashSet<Strin
 impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
     type Node = LogicalPlan;
 
-    fn f_up(
-        &mut self,
-        node: &'n Self::Node,
-    ) -> Result<TreeNodeRecursion, datafusion::error::DataFusionError> {
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion, DataFusionError> {
         match node {
             LogicalPlan::Projection(proj) => {
                 // Store projections for alias resolution in HAVING

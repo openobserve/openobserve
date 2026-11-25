@@ -99,7 +99,10 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
 
 #[cfg(test)]
 mod tests {
-    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema},
+        prelude::SessionContext,
+    };
     use datafusion_proto::bytes::{
         physical_plan_from_bytes_with_extension_codec, physical_plan_to_bytes_with_extension_codec,
     };
@@ -120,7 +123,7 @@ mod tests {
 
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
         let codec = super::super::get_physical_extension_codec();
         // COUNT(*) needs an empty projection to remain distinct from an absent projection.
         for projection in [None, Some(vec![]), Some(vec![0])] {
@@ -171,7 +174,7 @@ mod tests {
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
         let plan2 =
             physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.downcast_ref::<NewEmptyExec>().unwrap();

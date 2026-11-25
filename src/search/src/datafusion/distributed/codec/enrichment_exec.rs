@@ -78,7 +78,11 @@ fn is_plain_name(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema},
+        physical_plan::collect,
+        prelude::SessionContext,
+    };
     use datafusion_proto::bytes::{
         physical_plan_from_bytes_with_extension_codec, physical_plan_to_bytes_with_extension_codec,
     };
@@ -101,7 +105,7 @@ mod tests {
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
         let plan2 =
             physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.downcast_ref::<EnrichmentExec>().unwrap();
@@ -159,13 +163,13 @@ mod tests {
             ));
             let codec = super::super::get_physical_extension_codec();
             let bytes = physical_plan_to_bytes_with_extension_codec(plan, &codec)?;
-            let ctx = datafusion::prelude::SessionContext::new();
+            let ctx = SessionContext::new();
             let ret = match physical_plan_from_bytes_with_extension_codec(
                 &bytes,
                 &ctx.task_ctx(),
                 &codec,
             ) {
-                Ok(decoded) => datafusion::physical_plan::collect(decoded, ctx.task_ctx())
+                Ok(decoded) => collect(decoded, ctx.task_ctx())
                     .await
                     .map(|b| b.iter().map(|b| b.num_rows()).sum::<usize>()),
                 Err(e) => Err(e),

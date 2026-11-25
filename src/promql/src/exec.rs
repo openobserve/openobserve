@@ -352,9 +352,12 @@ mod tests {
             _filters: &mut [(String, Vec<String>)],
             _streaming: bool,
         ) -> Result<Vec<crate::ScanContext>> {
-            use datafusion::arrow::{
-                array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
-                datatypes::{DataType, Field, Schema},
+            use datafusion::{
+                arrow::{
+                    array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+                    datatypes::{DataType, Field, Schema},
+                },
+                prelude::SessionContext,
             };
             let schema = Arc::new(Schema::new(vec![
                 Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
@@ -391,7 +394,7 @@ mod tests {
                 ],
             )
             .unwrap();
-            let ctx = datafusion::prelude::SessionContext::new();
+            let ctx = SessionContext::new();
             ctx.register_batch(stream_name, batch).unwrap();
             Ok(vec![crate::ScanContext::table(
                 ctx,

@@ -165,7 +165,7 @@ mod tests {
         requested: &[String],
     ) -> MetricsIndexData {
         use arrow::array::{Float64Array, Int64Array, UInt64Array};
-        use object_store::{ObjectStore, PutOptions};
+        use object_store::{ObjectStore, PutOptions, memory::InMemory};
         let rows = counts.iter().map(|n| *n as usize).sum::<usize>();
         let mut fields = vec![
             Field::new("__hash__", DataType::UInt64, false),
@@ -212,7 +212,7 @@ mod tests {
         let account = format!("{id}:default");
         let path = format!("files/test/mindex/m/2026/09/22/00/indexed-v1-{id}.midx");
         let data_path = format!("files/test/metrics/m/2026/09/22/00/indexed-v1-{id}.vortex");
-        let store = object_store::memory::InMemory::new();
+        let store = InMemory::new();
         store
             .put_opts(
                 &path.clone().into(),
