@@ -892,7 +892,10 @@ import {
   buildChipDimensionsFromFilters,
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
-import { buildStreamFilterCondition } from "@/utils/telemetryCorrelation";
+import {
+  buildStreamFilterCondition,
+  extractSemanticDimensions,
+} from "@/utils/telemetryCorrelation";
 import { serviceNamesSql } from "@/utils/serviceCount";
 import {
   escapeSingleQuotes,
@@ -1898,19 +1901,7 @@ export default defineComponent({
       correlationError.value = null;
 
       try {
-        const org = store.state.selectedOrganization.identifier;
-        await loadOrgSemanticGroups();
-        const serviceName =
-          props.selectedNode.name || props.selectedNode.label || props.selectedNode.id;
-
-        // Send service name directly to _correlate
-        const correlateResponse = await correlateStreams(org, {
-          source_stream: props.streamFilter || "default",
-          source_type: "traces",
-          available_dimensions: { service: serviceName },
-        });
-
-        const data = correlateResponse.data;
+        const { data } = await correlateSelectedService();
         if (!data) {
           correlationError.value = t("traces.serviceGraphNodeSidePanel.noCorrelatedStreams");
           correlationData.value = null;
@@ -1968,6 +1959,31 @@ export default defineComponent({
       }
     };
 
+    // Under service_optional the backend drops a bare service name, so send the latest span's
+    // dimensions and let it resolve the span's own service.
+    const correlateSelectedService = async () => {
+      const node = props.selectedNode;
+      const serviceName = node?.name || node?.label || node?.id || "";
+      const [latestSpan] = await Promise.all([fetchLatestSpan(), loadOrgSemanticGroups()]);
+      const dimensions = {
+        ...extractSemanticDimensions(
+          { timestamp: 0, fields: latestSpan ?? {} },
+          orgSemanticGroups.value,
+        ),
+        service: serviceName,
+      };
+      const response = await correlateStreams(store.state.selectedOrganization.identifier, {
+        source_stream: props.streamFilter || "default",
+        source_type: "traces",
+        available_dimensions: dimensions,
+        source_dimensions: dimensions,
+        resolve_from_source: true,
+        start_time: props.timeRange.startTime,
+        end_time: props.timeRange.endTime,
+      });
+      return { data: response.data, latestSpan };
+    };
+
     // Fetch correlated metric streams for the Metrics tab
     const fetchMetricsCorrelation = async (force = false) => {
       if (!props.selectedNode || correlationLocked.value) return;
@@ -1978,22 +1994,7 @@ export default defineComponent({
       metricsCorrelationData.value = null;
 
       try {
-        const org = store.state.selectedOrganization.identifier;
-        const serviceName = buildServiceName();
-
-        // Fetch latest span to extract richer semantic dimensions
-        const latestSpan = await fetchLatestSpan();
-        const spanDimensions = {
-          service: serviceName,
-        };
-
-        const correlateResponse = await correlateStreams(org, {
-          source_stream: props.streamFilter || "default",
-          source_type: "traces",
-          available_dimensions: spanDimensions,
-        });
-
-        const data = correlateResponse.data;
+        const { data, latestSpan } = await correlateSelectedService();
         if (!data) {
           metricsCorrelationData.value = null;
           return;
@@ -3068,15 +3069,12 @@ export default defineComponent({
       let filterQuery = `${serviceNameField.value}='${serviceName}'`;
 
       try {
-        const correlateResponse = await correlateStreams(org, {
-          source_stream: props.streamFilter || "default",
-          source_type: "traces",
-          available_dimensions: { service: serviceName },
-        });
-
-        const logStreams = correlateResponse.data?.related_streams?.logs || [];
+        const { data } = await correlateSelectedService();
+        const logStreams = data?.related_streams?.logs || [];
         if (logStreams.length > 0) {
-          const firstLogStream = logStreams[0];
+          const sourceStream = props.streamFilter || "default";
+          const firstLogStream =
+            logStreams.find((s) => s.stream_name === sourceStream) ?? logStreams[0];
           streamName = firstLogStream.stream_name;
 
           // Build filter from the stream's resolved field names
