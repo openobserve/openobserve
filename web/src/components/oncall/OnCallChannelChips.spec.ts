@@ -13,18 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mount } from "@vue/test-utils";
+import { describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
 
-import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
-import slack from "@/services/slack";
-import { axiosError, makeSlackStore, ok } from "@/test/unit/helpers/slack";
+import { makeSlackStore } from "@/test/unit/helpers/slack";
 import type { ChannelReadiness } from "@/ts/interfaces/oncall";
 import OnCallChannelChips from "./OnCallChannelChips.vue";
 
-vi.mock("@/services/slack", () => ({ default: { getMyLinks: vi.fn() } }));
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 const TooltipStub = defineComponent({
@@ -33,66 +30,34 @@ const TooltipStub = defineComponent({
   template: `<span data-test-stub="tooltip">{{ content }}</span>`,
 });
 
-const unlinkedSlack: ChannelReadiness = {
+const unlinkedSlack = (over: Partial<ChannelReadiness> = {}): ChannelReadiness => ({
   channel: "slack",
   deliverable: false,
   configured_but_unverified: false,
   blocked_because: "not linked",
-};
-
-const render = (own: boolean) =>
-  mount(OnCallChannelChips, {
-    props: { email: "ana@acme.example", channels: [unlinkedSlack], own },
-    global: { plugins: [i18n, makeSlackStore()], stubs: { OTooltip: TooltipStub } },
-  });
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  queryClient.clear();
+  ...over,
 });
 
-describe("OnCallChannelChips", () => {
-  it("names the serving app's own slash command on the caller's unlinked Slack chip", async () => {
-    vi.mocked(slack.getMyLinks).mockReturnValue(
-      ok({ links: [], slack_serves_org: true, command: "/staging-o2" }) as any,
-    );
-    const w = render(true);
-    await flushPromises();
+const tip = (channel: ChannelReadiness, own = true) =>
+  mount(OnCallChannelChips, {
+    props: { email: "ana@acme.example", channels: [channel], own },
+    global: { plugins: [i18n, makeSlackStore()], stubs: { OTooltip: TooltipStub } },
+  })
+    .find('[data-test-stub="tooltip"]')
+    .text();
 
-    expect(w.find('[data-test-stub="tooltip"]').text()).toBe(
+describe("OnCallChannelChips", () => {
+  it("names the team's own Slack app command on the caller's unlinked chip", () => {
+    expect(tip(unlinkedSlack({ slack_command: "/staging-o2" }))).toBe(
       "not linked. Run /staging-o2 link in Slack",
     );
   });
 
-  it("falls back to /o2 when the server names no command", async () => {
-    vi.mocked(slack.getMyLinks).mockReturnValue(ok({ links: [], slack_serves_org: true }) as any);
-    const w = render(true);
-    await flushPromises();
-
-    expect(w.find('[data-test-stub="tooltip"]').text()).toBe("not linked. Run /o2 link in Slack");
+  it("falls back to /o2 when the server names no command", () => {
+    expect(tip(unlinkedSlack())).toBe("not linked. Run /o2 link in Slack");
   });
 
-  it("names no command while links/me is still loading", async () => {
-    vi.mocked(slack.getMyLinks).mockReturnValue(new Promise(() => {}) as any);
-    const w = render(true);
-    await flushPromises();
-
-    expect(w.find('[data-test-stub="tooltip"]').text()).toBe("not linked");
-  });
-
-  it("names no command when links/me fails", async () => {
-    vi.mocked(slack.getMyLinks).mockReturnValue(Promise.reject(axiosError(500)) as any);
-    const w = render(true);
-    await flushPromises();
-
-    expect(w.find('[data-test-stub="tooltip"]').text()).toBe("not linked");
-  });
-
-  it("does not read the caller's links for another person's row", async () => {
-    const w = render(false);
-    await flushPromises();
-
-    expect(slack.getMyLinks).not.toHaveBeenCalled();
-    expect(w.find('[data-test-stub="tooltip"]').text()).toBe("not linked");
+  it("names no command on another person's row", () => {
+    expect(tip(unlinkedSlack({ slack_command: "/staging-o2" }), false)).toBe("not linked");
   });
 });
