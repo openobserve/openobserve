@@ -54,7 +54,7 @@ pub use crate::alerts::notifications::render::RenderedMessage;
 
 /// Marker prepended to every test-send title/subject. Never remove or make
 /// conditional — it is the entire reason a test-send is safe to build.
-pub const TEST_MARKER: &str = "[TEST] ";
+pub const TEST_MARKER: &str = config::meta::slack::TEST_MARKER;
 
 /// Per-user fixed 60s window, kept in this node's memory: `(window_start_unix_secs, count)`.
 static RATE_LIMITER: LazyLock<RwLock<HashMap<String, (i64, u32)>>> =
@@ -354,7 +354,7 @@ mod tests {
     }
 
     #[test]
-    fn a_test_send_of_o2_default_reads_the_sample_alert_with_its_dot() {
+    fn a_test_send_of_o2_default_reads_the_sample_alert_without_its_dot_above_the_bar() {
         let spec = crate::alerts::notifications::default_template::compiled_default_content();
         let RenderedMessage::Http { body } = build_test_message(&slack_dest(), &spec).unwrap()
         else {
@@ -365,7 +365,7 @@ mod tests {
         );
         let title = value["blocks"][0]["text"]["text"].as_str().unwrap();
         assert!(
-            title.ends_with("|[TEST] 🔴 Sample CPU alert firing>*"),
+            title.ends_with("|[TEST] Sample CPU alert firing>*"),
             "{title}"
         );
         let fields = value["blocks"][2]["fields"].to_string();

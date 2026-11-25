@@ -126,7 +126,22 @@ fn rendered(spec: &ContentSpec, ctx: &NotificationContext) -> serde_json::Value 
                         .iter()
                         .all(|a| a["color"] == bar)
                 );
-                super::render::slack::flat_blocks(&raw)
+                let mut flat = super::render::slack::flat_blocks(&raw);
+                // The title sits above the bar without the dot; put main's dot back to compare.
+                let shown = config::meta::slack::without_status_dot(&content.title);
+                if shown != content.title {
+                    let text = flat["blocks"][0]["text"]["text"]
+                        .as_str()
+                        .unwrap()
+                        .to_string();
+                    assert!(
+                        text.contains(&shown) && !text.contains(&content.title),
+                        "{text}"
+                    );
+                    flat["blocks"][0]["text"]["text"] =
+                        text.replacen(&shown, &content.title, 1).into();
+                }
+                flat
             }
             Ok(RenderedMessage::Http { body }) => serde_json::from_str(&body).unwrap(),
             Ok(RenderedMessage::Email {

@@ -15,6 +15,7 @@
 
 //! Slack Block Kit renderer (§5.2).
 
+use config::meta::slack::without_status_dot;
 use serde_json::{Value, json};
 
 use super::{
@@ -39,40 +40,6 @@ const MAX_CONTEXT_LINKS: usize = 9;
 
 pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     let mut blocks: Vec<Value> = Vec::new();
-
-    // Datadog-style clickable title: a bold mrkdwn link section that opens
-    // the alert (user-picked over the plain header in a live A/B on a real
-    // channel). mrkdwn link syntax breaks on `|` (terminates the label) and
-    // `>` (terminates the link), so a title containing either — and an
-    // undispatchable alert URL — falls back to the plain `header` block.
-    // The label is escape_mrkdwn'd (entity-encoding `&`/`<`/`>`); the URL must
-    // be an absolute http(s) one (`dispatchable_url`), which also rules out the
-    // blocked placeholder, an empty `ZO_WEB_URL` and relative paths.
-    let title_url = dispatchable_url(&ctx.alert_url).unwrap_or_default();
-    let linked = format!(
-        "*<{}|{}>*",
-        title_url,
-        escape_mrkdwn(&clamp(&c.title, HEADER_MAX)),
-    );
-    // Slack refuses the whole message for a section over its limit; the data button keeps the URL.
-    if !title_url.is_empty()
-        && !title_url.contains(['|', '>', '<'])
-        && !c.title.contains('|')
-        && linked.chars().count() <= SECTION_TEXT_MAX
-    {
-        blocks.push(json!({
-            "type": "section",
-            "text": {"type": "mrkdwn", "text": linked}
-        }));
-    } else {
-        // `plain_text` is not mrkdwn — Slack renders it literally, so the
-        // title's `&`/`<`/`>` need no entity encoding here and must NOT be
-        // encoded or the user would see the entities themselves.
-        blocks.push(json!({
-            "type": "header",
-            "text": {"type": "plain_text", "text": clamp(&c.title, HEADER_MAX), "emoji": true}
-        }));
-    }
 
     if !c.body_markdown.is_empty() {
         let text = clamp(&markdown_to_mrkdwn(&c.body_markdown), SECTION_TEXT_MAX);
@@ -195,13 +162,56 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
         }));
     }
 
-    // The bar repeats the title dot's color; Slack drops an attachment whose blocks are empty.
+    // Slack drops an attachment whose blocks are empty, so an empty part is not sent.
     let color = status_color(ctx);
-    let mut attachments = vec![json!({"color": color, "blocks": blocks})];
-    if !tail_blocks.is_empty() {
-        attachments.push(json!({"color": color, "blocks": tail_blocks}));
+    let attachments: Vec<Value> = [blocks, tail_blocks]
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .map(|part| json!({"color": color, "blocks": part}))
+        .collect();
+    // The title sits above the bar; with a bar it drops the dot, which shows the same severity.
+    let title = if attachments.is_empty() {
+        c.title.clone()
+    } else {
+        without_status_dot(&c.title)
+    };
+    json!({ "blocks": [title_block(&title, ctx)], "attachments": attachments })
+}
+
+fn title_block(title: &str, ctx: &NotificationContext) -> Value {
+    // Datadog-style clickable title: a bold mrkdwn link section that opens
+    // the alert (user-picked over the plain header in a live A/B on a real
+    // channel). mrkdwn link syntax breaks on `|` (terminates the label) and
+    // `>` (terminates the link), so a title containing either — and an
+    // undispatchable alert URL — falls back to the plain `header` block.
+    // The label is escape_mrkdwn'd (entity-encoding `&`/`<`/`>`); the URL must
+    // be an absolute http(s) one (`dispatchable_url`), which also rules out the
+    // blocked placeholder, an empty `ZO_WEB_URL` and relative paths.
+    let title_url = dispatchable_url(&ctx.alert_url).unwrap_or_default();
+    let linked = format!(
+        "*<{}|{}>*",
+        title_url,
+        escape_mrkdwn(&clamp(title, HEADER_MAX)),
+    );
+    // Slack refuses the whole message for a section over its limit; the data button keeps the URL.
+    if !title_url.is_empty()
+        && !title_url.contains(['|', '>', '<'])
+        && !title.contains('|')
+        && linked.chars().count() <= SECTION_TEXT_MAX
+    {
+        json!({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": linked}
+        })
+    } else {
+        // `plain_text` is not mrkdwn — Slack renders it literally, so the
+        // title's `&`/`<`/`>` need no entity encoding here and must NOT be
+        // encoded or the user would see the entities themselves.
+        json!({
+            "type": "header",
+            "text": {"type": "plain_text", "text": clamp(title, HEADER_MAX), "emoji": true}
+        })
     }
-    json!({ "attachments": attachments })
 }
 
 /// Authored links that found no button slot, one mrkdwn element each, never cut.
@@ -374,14 +384,19 @@ pub fn strip_image_blocks_with_base(msg: &str, web_url_base: &str) -> Option<Str
     })
 }
 
-/// Test view of a rendered body: every attachment's blocks in order, as one `blocks` list.
+/// Test view of a rendered body: top-level blocks, then every attachment's blocks, in order.
 #[cfg(test)]
 pub(crate) fn flat_blocks(v: &Value) -> Value {
-    let blocks: Vec<Value> = v["attachments"]
-        .as_array()
+    let top = v["blocks"].as_array().cloned().unwrap_or_default();
+    let blocks: Vec<Value> = top
         .into_iter()
-        .flatten()
-        .flat_map(|a| a["blocks"].as_array().cloned().unwrap_or_default())
+        .chain(
+            v["attachments"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .flat_map(|a| a["blocks"].as_array().cloned().unwrap_or_default()),
+        )
         .collect();
     json!({ "blocks": blocks })
 }
@@ -496,13 +511,13 @@ mod tests {
     }
 
     #[test]
-    fn the_bar_wraps_the_head_and_the_buttons_in_the_dot_color() {
+    fn the_title_sits_above_a_bar_in_the_dot_color_and_drops_the_dot() {
         use config::meta::alerts::notification_kind::NotificationEvent;
 
         use super::{Link, RenderedContent};
-        let content = |links: Vec<Link>| RenderedContent {
+        let content = |body: &str, links: Vec<Link>| RenderedContent {
             title: "🟠 cpu".into(),
-            body_markdown: String::new(),
+            body_markdown: body.into(),
             fields: vec![],
             links,
             rows: vec![],
@@ -515,20 +530,29 @@ mod tests {
             ..Default::default()
         };
         let v = render_slack(
-            &content(vec![Link::authored("Runbook", "https://rb.example/x")]),
+            &content(
+                "cpu high",
+                vec![Link::authored("Runbook", "https://rb.example/x")],
+            ),
             &ctx,
         );
-        assert!(v.get("blocks").is_none(), "{v}");
+        let top = v["blocks"].as_array().unwrap();
+        assert_eq!(top.len(), 1, "{v}");
+        assert_eq!(top[0]["text"]["text"], "cpu", "{v}");
         let attachments = v["attachments"].as_array().unwrap();
         assert_eq!(attachments.len(), 2, "{v}");
         assert!(attachments.iter().all(|a| a["color"] == "#F2952F"), "{v}");
+        assert_eq!(attachments[0]["blocks"][0]["text"]["text"], "cpu high");
         assert_eq!(attachments[1]["blocks"][0]["type"], "actions");
 
         let resolved = NotificationContext {
             event: NotificationEvent::Resolved,
-            ..ctx
+            ..ctx.clone()
         };
-        let v = render_slack(&content(vec![]), &resolved);
+        let v = render_slack(
+            &content("", vec![Link::authored("Runbook", "https://rb.example/x")]),
+            &resolved,
+        );
         let attachments = v["attachments"].as_array().unwrap();
         assert_eq!(
             attachments.len(),
@@ -536,5 +560,24 @@ mod tests {
             "an attachment with no blocks is never sent: {v}"
         );
         assert_eq!(attachments[0]["color"], "#2EB67D");
+        assert_eq!(attachments[0]["blocks"][0]["type"], "actions");
+    }
+
+    #[test]
+    fn a_title_with_no_bar_keeps_its_dot() {
+        use super::RenderedContent;
+        let c = RenderedContent {
+            title: "🔴 cpu".into(),
+            body_markdown: String::new(),
+            fields: vec![],
+            links: vec![],
+            rows: vec![],
+            row_lines: None,
+            severity: None,
+            unknown_variables: vec![],
+        };
+        let v = render_slack(&c, &NotificationContext::default());
+        assert_eq!(v["attachments"], json!([]), "{v}");
+        assert_eq!(v["blocks"][0]["text"]["text"], "🔴 cpu", "{v}");
     }
 }

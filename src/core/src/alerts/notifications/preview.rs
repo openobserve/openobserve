@@ -408,6 +408,30 @@ mod tests {
     }
 
     #[test]
+    fn the_slack_payload_puts_the_title_above_the_bar_and_the_card_keeps_the_dot() {
+        let req = PreviewRequest {
+            definition: ContentSpec {
+                title: "{status_dot} {alert_name} fired".into(),
+                ..sample_spec()
+            },
+            channel: "slack".into(),
+            severity: Some("critical".into()),
+            sample: None,
+            kind: Default::default(),
+        };
+        let resp = preview(&req).unwrap();
+        let title = resp.payload["blocks"][0]["text"]["text"].as_str().unwrap();
+        assert!(!title.contains('🔴'), "{title}");
+        assert!(!resp.payload["attachments"].as_array().unwrap().is_empty());
+        // The card draws no bar, so the dot is its only severity sign.
+        assert!(
+            resp.preview_model.title.starts_with("🔴 "),
+            "{}",
+            resp.preview_model.title
+        );
+    }
+
+    #[test]
     fn preview_names_the_data_button_and_returns_the_object_button() {
         let req = |kind| PreviewRequest {
             definition: sample_spec(),

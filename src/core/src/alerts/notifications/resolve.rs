@@ -1311,6 +1311,11 @@ mod tests {
             };
             assert_eq!(status_dot(&ctx), expected, "{kind:?} {event:?} {level:?}");
             assert_eq!(status_color(&ctx), bar, "bar {kind:?} {event:?} {level:?}");
+            // A Slack title drops exactly this marker, so the shared list must hold every value.
+            assert!(
+                config::meta::slack::STATUS_DOTS.contains(&expected),
+                "{expected}"
+            );
         }
     }
 
