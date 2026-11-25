@@ -25,6 +25,16 @@ import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import type { FieldAlias } from "@/services/service_streams";
 
 const loadSemanticGroups = vi.fn<() => Promise<FieldAlias[]>>();
+const { updateFieldKeywords } = vi.hoisted(() => ({
+  updateFieldKeywords: vi.fn<(fields: { name: string; label?: boolean }[]) => void>(),
+}));
+
+vi.mock("@/composables/useSuggestions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/useSuggestions")>();
+  return {
+    default: () => ({ ...actual.default(), updateFieldKeywords }),
+  };
+});
 
 vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true", isCloud: "false" },
@@ -410,5 +420,25 @@ describe("field list on a cold semantic-groups load", () => {
     wrapper.vm.prefetchSelectedStreamFields();
 
     expect(loadSemanticGroups).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("SQL field suggestions from the grouped field list", () => {
+  it("suggests only fields, never the group header rows", async () => {
+    seedStream();
+    queryClient.setQueryData(groupsKey(), [infraGroup()]);
+    const land = pendingGroupsLoad();
+    updateFieldKeywords.mockClear();
+    const wrapper = mountConsumer();
+
+    await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+
+    expect(
+      searchObj.data.stream.selectedStreamFields.some((f: { label?: unknown }) => f.label),
+    ).toBe(true);
+    const suggested = updateFieldKeywords.mock.calls.at(-1)?.[0] ?? [];
+    expect(suggested.map((f) => f.name).sort()).toEqual(["_timestamp", "host", "message"]);
+    expect(suggested.some((f) => f.label)).toBe(false);
+    land([infraGroup()]);
   });
 });

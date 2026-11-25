@@ -28,8 +28,8 @@ export class LogsFieldValuesPage {
     return `[data-test="log-search-expand-${field}-field-btn"]`;
   }
 
-  loadMoreButton(field) {
-    return `[data-test="log-search-subfield-load-more-${field}"]`;
+  valuesScroller(field) {
+    return `[data-test="o-field-list-expansion-${field}"] [data-test="field-values-panel-scroll"]`;
   }
 
   valueRowPrefix(field) {
@@ -69,14 +69,30 @@ export class LogsFieldValuesPage {
     return this.valueKeys(field);
   }
 
-  async expectLoadMoreVisible(field) {
-    await expect(this.page.locator(this.loadMoreButton(field))).toBeVisible({ timeout: 30000 });
+  /** Waits until the rendered value count holds still, since pages that do not fill the list load on their own. */
+  async waitForStableValues(field, timeout = 60000) {
+    let previous = -1;
+    await expect
+      .poll(
+        async () => {
+          const count = (await this.valueKeys(field)).length;
+          const stable = count > 0 && count === previous;
+          previous = count;
+          return stable;
+        },
+        { timeout, intervals: [1000] },
+      )
+      .toBe(true);
+    return this.valueKeys(field);
   }
 
-  async clickLoadMore(field) {
-    const button = this.page.locator(this.loadMoreButton(field));
-    await button.waitFor({ state: 'visible', timeout: 30000 });
-    await button.click();
+  /** Scrolls the field's values list to its end, which loads the next page. */
+  async scrollValuesToEnd(field) {
+    const scroller = this.page.locator(this.valuesScroller(field));
+    await scroller.waitFor({ state: 'visible', timeout: 30000 });
+    await scroller.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
   }
 
   async waitForMoreThan(field, count, timeout = 60000) {

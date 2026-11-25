@@ -11,6 +11,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeQuerySchema } from "./Query.schema";
+import { MISSING_VALUE_KEY } from "@/components/common/fieldPanel/valueFilterExpression";
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
@@ -24,6 +25,17 @@ vi.mock("@/services/search", async (importOriginal) => {
       search: vi.fn(),
     },
   });
+});
+
+vi.mock("@/composables/useFieldGrouping", async () => {
+  const { ref } = await import("vue");
+  return {
+    default: () => ({
+      contextLoaded: ref(false),
+      loadGroupingContext: vi.fn().mockResolvedValue(undefined),
+      groupFields: (fields) => fields,
+    }),
+  };
 });
 
 vi.mock("@/composables/useStreams", () => ({
@@ -157,7 +169,7 @@ describe("ScheduledPipeline Component", () => {
         stubs: {
           OIcon: true,
           DateTime: true,
-          FieldList: true,
+          StreamFieldPanel: true,
           QueryEditor: true,
           UnifiedQueryEditor: {
             template: '<div data-test="scheduled-pipeline-sql-editor" />',
@@ -262,10 +274,17 @@ describe("ScheduledPipeline Component", () => {
       expect(child.filteredStreams.length).toBe(2);
     });
 
-    it("filters streams based on search input", async () => {
-      await child.filterStreams("stream1", (fn) => fn());
-      expect(child.filteredStreams.length).toBe(1);
-      expect(child.filteredStreams[0].value).toBe("stream1");
+    it("hands the loaded streams to the field panel picker", async () => {
+      expect(child.fieldSource.streams.value.map((s) => s.value)).toEqual(["stream1", "stream2"]);
+    });
+
+    it("writes the picker's choice into the form-owned stream fields", async () => {
+      child.fieldSource.changeStreamType("traces");
+      await flushPromises();
+      expect(form.state.values.stream_type).toBe("traces");
+      child.fieldSource.selectStreams(["stream2"]);
+      await flushPromises();
+      expect(form.state.values.stream_name).toBe("stream2");
     });
 
     it("updates stream fields when stream is selected", async () => {
@@ -387,20 +406,180 @@ describe("ScheduledPipeline Component", () => {
   });
 
   describe("Field Management", () => {
-    it("updates cursor position correctly", async () => {
-      // Mock the editor reference
-      const mockEditorRef = {
-        getCursorIndex: vi.fn().mockReturnValue(7),
-        getValue: vi.fn().mockReturnValue("SELECT "),
+    // Models the editor's own selection: insertAtCursor writes at the caret and moves it past the text.
+    const caretEditor = (text, caret) => {
+      const state = { text, caret };
+      return {
+        state,
+        getValue: vi.fn(() => state.text),
         setValue: vi.fn(),
-        replaceRange: vi.fn(),
+        getCursorIndex: vi.fn(() => state.caret - 1),
+        insertAtCursor: vi.fn((inserted) => {
+          state.text = state.text.slice(0, state.caret) + inserted + state.text.slice(state.caret);
+          state.caret += inserted.length;
+          return true;
+        }),
       };
-      child.pipelineEditorRef = mockEditorRef;
+    };
+
+    it("inserts a field at the editor caret on the custom tab", async () => {
+      const editor = caretEditor("SELECT ", 7);
+      child.pipelineEditorRef = editor;
       child.tab = "custom";
 
       await child.handleSidebarEvent("click", "field1");
+      expect(editor.state.text).toBe("SELECT  field1 ");
+      expect(child.query).toBe("SELECT  field1 ");
+    });
+
+    it("inserts the bare field name at the editor caret for the + action on the SQL tab", async () => {
+      const editor = caretEditor(`SELECT * FROM "stream1" WHERE `, 30);
+      child.pipelineEditorRef = editor;
+      child.tab = "sql";
+
+      await child.handleSidebarEvent("add-field", "service=''");
+      expect(editor.insertAtCursor).toHaveBeenCalledWith(" service ");
+      expect(editor.setValue).not.toHaveBeenCalled();
+      expect(child.query).toBe(`SELECT * FROM "stream1" WHERE  service `);
+    });
+
+    it("leaves the field's existing condition untouched when the + action inserts its name", async () => {
+      const base = `SELECT * FROM "stream1" WHERE service='api'`;
+      const editor = caretEditor(base, base.length);
+      child.pipelineEditorRef = editor;
+      child.tab = "sql";
+
+      await child.handleSidebarEvent("add-field", "service=''");
+      expect(child.query).toBe(`${base} service `);
+    });
+
+    it("appends the bare field name when the SQL editor is not ready to insert", async () => {
+      const editor = {
+        getValue: vi.fn(() => `SELECT * FROM "stream1"`),
+        setValue: vi.fn(),
+        getCursorIndex: vi.fn(() => -1),
+        insertAtCursor: vi.fn(() => false),
+      };
+      child.pipelineEditorRef = editor;
+      child.tab = "sql";
+
+      await child.handleSidebarEvent("add-field", "service=''");
+      expect(editor.setValue).toHaveBeenCalledWith(`SELECT * FROM "stream1" service `);
+    });
+
+    it("replaces the field's condition with a picked value", async () => {
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi.fn().mockReturnValue(`SELECT * FROM "stream1" WHERE service='api'`),
+        setValue: vi.fn(),
+      };
+      child.pipelineEditorRef = mockEditorRef;
+      child.tab = "sql";
+
+      await child.handleSidebarEvent("add-field", "service='web'");
+
+      expect(mockEditorRef.setValue).toHaveBeenCalledWith(
+        `SELECT * FROM "stream1" WHERE service='web'`,
+      );
+    });
+
+    it.each([
+      ["start", 0, " service foo{}"],
+      ["middle", 4, "foo{ service }"],
+      ["end", 5, "foo{} service "],
+    ])(
+      "inserts the bare label name at a caret at the %s on the PromQL tab",
+      async (_where, caret, expected) => {
+        const editor = caretEditor("foo{}", caret);
+        child.pipelineEditorRef = editor;
+        child.tab = "promql";
+
+        await child.handleSidebarEvent("add-field", "service=''");
+        expect(editor.insertAtCursor).toHaveBeenCalledWith(" service ");
+        expect(editor.setValue).not.toHaveBeenCalled();
+        expect(editor.state.text).toBe(expected);
+        expect(child.query).toBe(expected);
+      },
+    );
+
+    it("inserts at a caret moved to the start after an earlier insert on the PromQL tab", async () => {
+      const editor = caretEditor("foo{}", 4);
+      child.tab = "promql";
+      // A re-render rebinds the template ref to the stub, so each event gets the fake again.
+      const add = async (value) => {
+        child.pipelineEditorRef = editor;
+        await child.handleSidebarEvent("add-field", value);
+      };
+
+      await add("service=''");
+      await add("env=''");
+      expect(editor.state.text).toBe("foo{ service  env }");
+
+      editor.state.caret = 0;
+      await add("job=''");
+      expect(editor.state.text).toBe(" job foo{ service  env }");
+    });
+
+    it("appends the label name when the editor is not ready to insert on the PromQL tab", async () => {
+      const editor = {
+        getValue: vi.fn(() => "up"),
+        setValue: vi.fn(),
+        getCursorIndex: vi.fn(() => -1),
+        insertAtCursor: vi.fn(() => false),
+      };
+      child.pipelineEditorRef = editor;
+      child.tab = "promql";
+
+      await child.handleSidebarEvent("add-field", "service=''");
+      expect(editor.setValue).toHaveBeenCalledWith("up service ");
+      expect(child.query).toBe("up service ");
+    });
+
+    it("ignores remove-field on the PromQL tab", async () => {
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi.fn().mockReturnValue('sum(up{service="api"})'),
+        setValue: vi.fn(),
+      };
+      child.pipelineEditorRef = mockEditorRef;
+      child.tab = "promql";
+
+      await child.handleSidebarEvent("remove-field", "service");
+      expect(mockEditorRef.setValue).not.toHaveBeenCalled();
+    });
+
+    it("turns value filters off for the field panel on the PromQL tab only", async () => {
+      child.tab = "sql";
       await nextTick();
-      expect(child.cursorPosition).toBe(15);
+      expect(child.fieldPanelCapabilities.valueFilters).toBe(true);
+      child.tab = "promql";
+      await nextTick();
+      expect(child.fieldPanelCapabilities.valueFilters).toBe(false);
+      expect(child.fieldPanelCapabilities.values).toBe(true);
+    });
+
+    it("scopes field values by the WHERE only when the bare stream can resolve it", async () => {
+      child.tab = "sql";
+      child.query = `SELECT * FROM "a" WHERE level='x'`;
+      await nextTick();
+      expect(child.fieldPanelSql).toBe(`SELECT * FROM "a" WHERE level='x'`);
+      child.query = `SELECT * FROM "a" AS t WHERE t.level='x'`;
+      await nextTick();
+      expect(child.fieldPanelSql).toBe("");
+      child.query = `SELECT * FROM "a" WHERE b.level='x'`;
+      await nextTick();
+      expect(child.fieldPanelSql).toBe("");
+    });
+
+    it.each([
+      ["an unaliased sub-select", `SELECT * FROM (SELECT level AS lv FROM "a") WHERE lv='x'`],
+      ["an aliased sub-select", `SELECT * FROM (SELECT level AS lv FROM "a") AS s WHERE lv='x'`],
+      ["a CTE", `WITH c AS (SELECT level AS lv FROM "a") SELECT * FROM c WHERE lv='x'`],
+    ])("sends no WHERE for field values when the query reads %s", async (_kind, sql) => {
+      child.tab = "sql";
+      child.query = sql;
+      await nextTick();
+      expect(child.fieldPanelSql).toBe("");
     });
 
     it("inserts SQL filters before GROUP BY", async () => {
@@ -479,6 +658,44 @@ describe("ScheduledPipeline Component", () => {
       await child.handleSidebarEvent("add-field", filter);
 
       expect(mockEditorRef.setValue).toHaveBeenCalledWith(`${base} AND ${filter}`);
+    });
+
+    it.each([
+      ["keeps the text 'null' a literal", "level='null'", "level='null'"],
+      ["writes the missing row as is null", "level IS NULL", "level IS NULL"],
+      ["writes an excluded missing row as is not null", "level IS NOT NULL", "level IS NOT NULL"],
+    ])("%s", async (_, filter, written) => {
+      const base = `SELECT * FROM "qa" WHERE service='api'`;
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi.fn().mockReturnValue(base),
+        setValue: vi.fn(),
+      };
+      child.pipelineEditorRef = mockEditorRef;
+      child.tab = "sql";
+
+      await child.handleSidebarEvent("add-field", filter);
+
+      expect(mockEditorRef.setValue).toHaveBeenCalledWith(`${base} AND ${written}`);
+    });
+
+    it("turns the panel's missing-value pick into missing-or-empty and its negation", async () => {
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi.fn().mockReturnValue(`SELECT * FROM "qa"`),
+        setValue: vi.fn(),
+      };
+      child.pipelineEditorRef = mockEditorRef;
+      child.tab = "sql";
+
+      child.fieldSource.addValueFilters("level", [MISSING_VALUE_KEY], []);
+      expect(mockEditorRef.setValue).toHaveBeenLastCalledWith(
+        `SELECT * FROM "qa" where (level is null or level = '')`,
+      );
+      child.fieldSource.addValueFilters("level", [], [MISSING_VALUE_KEY]);
+      expect(mockEditorRef.setValue).toHaveBeenLastCalledWith(
+        `SELECT * FROM "qa" where (level is not null and level != '')`,
+      );
     });
 
     it("still replaces the exact field's value next to the longer field", async () => {
@@ -1056,21 +1273,18 @@ describe("ScheduledPipeline Component", () => {
     });
 
     it("group 4 — stream type/name bind stream_type / stream_name", async () => {
-      // form → view: setting the form-owned stream_type renders on the select
+      // form → view: the form-owned stream_type is what the field panel's picker shows
       form.setFieldValue("stream_type", "traces");
       await nextTick();
-      const typeSel = formSelectByName(wrapper, "stream_type");
-      expect(typeSel).toBeTruthy();
-      expect(typeSel.findComponent(OSelect).props("modelValue")).toBe("traces");
+      expect(child.fieldSource.streamType.value).toBe("traces");
 
-      // view → form: choosing a stream writes stream_name back to the form, and
+      // view → form: a pick in the panel writes stream_name back to the form, and
       // the component's read-view tracks that same single source of truth.
-      const nameSel = formSelectByName(wrapper, "stream_name");
-      expect(nameSel).toBeTruthy();
-      nameSel.findComponent(OSelect).vm.$emit("update:model-value", "stream1");
+      child.fieldSource.selectStreams(["stream1"]);
       await nextTick();
       expect(form.state.values.stream_name).toBe("stream1");
       expect(child.selectedStreamName).toBe("stream1");
+      expect(child.fieldSource.selectedStreams.value).toEqual(["stream1"]);
     });
 
     it("groups 2 & 3 — aggregation function/having + trigger operator/threshold are OForm* (disableThreshold=false)", async () => {

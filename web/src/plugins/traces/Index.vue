@@ -139,21 +139,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #before>
                   <div class="border-border-default bg-surface-panel h-full border-e">
-                    <IndexList
-                      v-show="searchObj.meta.showFields && !isMobile"
-                      ref="indexListRef"
-                      :field-list="searchObj.data.stream.selectedStreamFields"
-                      :active-include-field-values="activeIncludeFilterValues"
-                      :active-exclude-field-values="activeExcludeFilterValues"
-                      :stores-extra-fields-in-all="storesExtraFieldsInAll"
+                    <StreamFieldPanel
+                      v-if="!isMobile"
+                      v-show="searchObj.meta.showFields"
+                      :capabilities="FIELD_PANEL_CAPABILITIES"
+                      :source="fieldSource"
+                      test-id-prefix="traces-page"
                       data-test="traces-search-index-list"
                       class="h-full"
-                      @update:changeStream="onChangeStream"
-                      @update:selectedFields="updateFieldVisibility"
-                      :assistant-set="assistantSet"
-                      @assistant-set-cleared="onAssistantSetCleared"
-                      @group-by="onGroupByChange"
-                    />
+                    >
+                      <template v-if="assistantSet.has('stream')" #picker-after>
+                        <OTag
+                          variant="primary-soft"
+                          size="sm"
+                          :icon="assistantGlyph.assistant"
+                          :label="t('traces.assistantSet.label')"
+                          role="note"
+                          :aria-label="
+                            t('traces.assistantSet.name', {
+                              field: t('traces.assistantSet.field.stream'),
+                            })
+                          "
+                          class="shrink-0"
+                          data-test="traces-assistant-set-stream"
+                        />
+                      </template>
+                      <template v-if="showAllFieldsNote" #before-list>
+                        <p
+                          class="px-page-edge text-text-secondary m-0 py-1 text-xs"
+                          data-test="traces-sql-all-fields-note"
+                        >
+                          {{ allFieldsNote }}
+                        </p>
+                      </template>
+                    </StreamFieldPanel>
                   </div>
                 </template>
                 <template #after>
@@ -345,20 +364,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="traces-mobile-fields-drawer"
     >
       <div class="flex h-full flex-col overflow-hidden pt-2.5">
-        <IndexList
-          ref="mobileIndexListRef"
-          :field-list="searchObj.data.stream.selectedStreamFields"
-          :active-include-field-values="activeIncludeFilterValues"
-          :active-exclude-field-values="activeExcludeFilterValues"
-          :stores-extra-fields-in-all="storesExtraFieldsInAll"
+        <StreamFieldPanel
+          :capabilities="FIELD_PANEL_CAPABILITIES"
+          :source="fieldSource"
+          test-id-prefix="traces-page"
           data-test="traces-search-index-list-mobile"
           class="h-full"
-          @update:changeStream="onChangeStream"
-          @update:selectedFields="updateFieldVisibility"
-          :assistant-set="assistantSet"
-          @assistant-set-cleared="onAssistantSetCleared"
-          @group-by="onGroupByChange"
-        />
+        >
+          <template v-if="assistantSet.has('stream')" #picker-after>
+            <OTag
+              variant="primary-soft"
+              size="sm"
+              :icon="assistantGlyph.assistant"
+              :label="t('traces.assistantSet.label')"
+              role="note"
+              :aria-label="
+                t('traces.assistantSet.name', {
+                  field: t('traces.assistantSet.field.stream'),
+                })
+              "
+              class="shrink-0"
+              data-test="traces-assistant-set-stream"
+            />
+          </template>
+          <template v-if="showAllFieldsNote" #before-list>
+            <p
+              class="px-page-edge text-text-secondary m-0 py-1 text-xs"
+              data-test="traces-sql-all-fields-note"
+            >
+              {{ allFieldsNote }}
+            </p>
+          </template>
+        </StreamFieldPanel>
       </div>
     </ODrawer>
 
@@ -404,6 +441,8 @@ import {
   encodeAssistantSet,
   type AssistantSetField,
 } from "@/composables/assistant/pure";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { HOME_RETURN_QUERY_KEY } from "@/composables/goto/homeReturn";
 
 import useTraces from "@/composables/useTraces";
@@ -434,12 +473,6 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
-import { applyFieldGrouping, buildSemanticIndex, type FieldObj } from "@/utils/fieldCategories";
-import {
-  useServiceCorrelation,
-  type KeyFieldsConfig,
-  type FieldGroupingConfig,
-} from "@/composables/useServiceCorrelation";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { applyFilterTerm } from "@/utils/traces/filterUtils";
 import {
@@ -451,7 +484,6 @@ import {
   analyzeTracesSql,
   buildTracesSql,
   filterHasSubquery,
-  hasOwnCondition,
   insertTraceIdColumn,
   isRowQuery,
   mergesAcrossPartitions,
@@ -470,7 +502,10 @@ import {
 } from "@/utils/traces/tracesScope";
 import { isTextType } from "@/utils/traces/tracesGroups";
 import { isAuthoredStatement } from "@/utils/query/freeTextFilter";
-import { logsUtils } from "@/composables/useLogs/logsUtils";
+import useTracesFieldSource, {
+  buildTracesFieldList,
+} from "@/components/common/fieldPanel/useTracesFieldSource";
+import type { FieldPanelCapabilities } from "@/components/common/fieldPanel/fieldPanel.types";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
@@ -523,13 +558,24 @@ interface TracesSavedView {
 defineOptions({ name: "AppTraces" });
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
-const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
+const StreamFieldPanel = defineAsyncComponent(
+  () => import("@/components/common/fieldPanel/StreamFieldPanel.vue"),
+);
 const SearchResult = defineAsyncComponent(() => import("./SearchResult.vue"));
 const TracesMetricsDashboard = defineAsyncComponent(
   () => import("./metrics/TracesMetricsDashboard.vue"),
 );
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 const ServicesCatalog = defineAsyncComponent(() => import("./ServicesCatalog.vue"));
+
+const FIELD_PANEL_CAPABILITIES: FieldPanelCapabilities = {
+  streamPicker: "single",
+  values: true,
+  drag: false,
+  actions: ["add-filter", "toggle-column"],
+  footerToggles: [],
+  highlightColumns: true,
+};
 
 const supportedTraceSearchMode = (value: unknown): TraceSearchMode =>
   resolveTraceSearchMode(value, config.isEnterprise === "true");
@@ -569,7 +615,6 @@ const {
   clearSqlText,
   normalizeTracesView,
 } = useTraces();
-const { fnParsedSQL } = logsUtils();
 
 const correlationFilters = useCorrelationFilters({
   orgId: () => store.state.selectedOrganization.identifier,
@@ -647,15 +692,17 @@ watch(
   { immediate: true },
 );
 const { showErrorNotification } = useNotifications();
-const indexListRef = ref<{ refreshOpenFieldValues?: () => void } | null>(null);
-const mobileIndexListRef = ref<{ refreshOpenFieldValues?: () => void } | null>(null);
+const fieldSource = useTracesFieldSource({
+  onStreamChangeRequest: (name: string) => onChildStreamChangeRequest(name),
+  onColumnsChange: async () => {
+    await nextTick();
+    rebuildColumns();
+  },
+  onGroupByChange: (field: string) => onGroupByChange(field),
+});
 // Only once the new stream's fields and query are final, or open fields fetch from a half-applied state.
-const refreshOpenFieldValues = () => {
-  indexListRef.value?.refreshOpenFieldValues?.();
-  mobileIndexListRef.value?.refreshOpenFieldValues?.();
-};
+const refreshOpenFieldValues = () => fieldSource.refreshOpenFieldValues();
 const { getStreams, getStream } = useStreams(t);
-const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const chartRedrawTimeout = ref(null);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 // AI copilot context provider for traces page
@@ -1641,20 +1688,6 @@ function noteTracesPageLoad(requestId: string, reason: PageLoadReason) {
   recordPageLoad(searchObj.data.resultGrid, { requestId, ok: reason === "done", reason });
 }
 
-const updateFieldVisibility = async (field: any) => {
-  const idx = searchObj.data.stream.selectedFields.indexOf(field.name);
-  if (idx === -1) {
-    searchObj.data.stream.selectedFields.push(field.name);
-  } else {
-    searchObj.data.stream.selectedFields.splice(idx, 1);
-  }
-
-  updatedLocalLogFilterField(searchObj.meta.searchMode);
-
-  await nextTick();
-  rebuildColumns();
-};
-
 const rebuildColumns = () => {
   searchObj.data.resultGrid.columns = buildColumns(
     isLLMSpanPresent.value,
@@ -1720,6 +1753,7 @@ async function extractFields() {
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.stream.hasParentColumn = false;
       searchObj.data.stream.fieldsInAll = {};
+      searchObj.data.stream.userDefinedSchema = [];
       selectedStreamStats.value = null;
       storesExtraFieldsInAll.value = false;
     }
@@ -1730,20 +1764,6 @@ async function extractFields() {
     }
 
     if (searchObj.data.streamResults.list.length > 0) {
-      const schema = [];
-      const ignoreFields = [
-        store.state.zoConfig.timestamp_column,
-        "_start_time_ns",
-        "_end_time_ns",
-      ];
-      let ftsKeys;
-      // The rail's grouping config needs no schema, so it loads alongside it; the rail is swapped once, never emptied.
-      const railMetadata = loadRailMetadata().catch((groupErr) => {
-        console.warn("Field grouping failed for traces, using flat list", groupErr);
-        return null;
-      });
-      const fieldList: any[] = [];
-
       const stream = await getStream(searchObj.data.stream.selectedStream.value, "traces", true);
       if (superseded()) return;
       // Mirror the real stats (doc_time_min/max) into streamResults so that
@@ -1778,73 +1798,21 @@ async function extractFields() {
               : searchObj.data.datetime.queryRangeRestrictionInHour + " hour",
         });
       }
-      schema.push(...stream.schema);
-      ftsKeys = new Set([...stream.settings.full_text_search_keys]);
       // Ingestion packs fields outside a user-defined schema into the _all column.
       storesExtraFieldsInAll.value = (stream.settings?.defined_schema_fields?.length ?? 0) > 0;
       searchObj.data.stream.fieldsInAll = Object.fromEntries(
         fieldsStoredInAll(stream.schema ?? [], stream.settings?.defined_schema_fields ?? []),
       );
-
-      const idFields = {
-        trace_id: 1,
-        span_id: 1,
-        reference_parent_span_id: 1,
-        reference_parent_trace_id: 1,
-        start_time: 1,
-        end_time: 1,
-      };
-
-      const importantFields = {
-        duration: 1,
-        service_name: 1,
-        span_status: 1,
-        operation_name: 1,
-        span_kind: 1,
-        trace_id: 1,
-        span_id: 1,
-        reference_parent_span_id: 1,
-        reference_parent_trace_id: 1,
-        start_time: 1,
-      };
-
-      // Ignoring timestamp as start time is present
-      let fields: any = {};
-      const schemaTypeMap = new Map(schema.map((row: any) => [row.name, row.type]));
       // The field list always lists reference_parent_span_id, so the schema says whether it exists.
-      searchObj.data.stream.hasParentColumn = schemaTypeMap.has("reference_parent_span_id");
-      Object.keys(importantFields).forEach((rowName) => {
-        fields[rowName] = {};
-        fieldList.push({
-          name: rowName,
-          ftsKey: ftsKeys.has(rowName),
-          showValues: !idFields[rowName],
-          dataType: schemaTypeMap.get(rowName),
-          isSchemaField: true,
-        });
-      });
-
-      schema.forEach((row: any) => {
-        if (!importantFields[row.name] && !ignoreFields.includes(row.name)) {
-          if (fields[row.name] == undefined) {
-            fields[row.name] = {};
-            fieldList.push({
-              name: row.name,
-              ftsKey: ftsKeys.has(row.name),
-              showValues: !idFields[row.name],
-              dataType: row.type,
-              isSchemaField: true,
-            });
-          }
-        }
-      });
-
-      // Apply field grouping
-      const metadata = await railMetadata;
-      if (superseded()) return;
-      searchObj.data.stream.selectedStreamFields = metadata
-        ? groupRailFields(fieldList, metadata)
-        : fieldList;
+      searchObj.data.stream.hasParentColumn = (stream.schema ?? []).some(
+        (row: { name: string }) => row.name === "reference_parent_span_id",
+      );
+      searchObj.data.stream.selectedStreamFields = buildTracesFieldList(
+        stream.schema,
+        new Set(stream.settings.full_text_search_keys),
+        store.state.zoConfig.timestamp_column,
+      );
+      searchObj.data.stream.userDefinedSchema = [...(stream.settings?.defined_schema_fields ?? [])];
       fieldsOwner = owner;
     }
   } catch (e) {
@@ -1852,39 +1820,6 @@ async function extractFields() {
     console.error("Error while extracting fields", e);
   } finally {
     if (!superseded()) searchObj.meta.loadingFields = false;
-  }
-}
-
-/** The rail's grouping config (semantic groups, key fields, field grouping); cached and de-duplicated per org. */
-function loadRailMetadata() {
-  const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
-  return Promise.all([
-    isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
-    loadKeyFields(),
-    loadFieldGrouping(),
-  ]);
-}
-
-function groupRailFields(
-  fieldList: FieldObj[],
-  [semanticAliases, keyFieldsConfig, fieldGrouping]: Awaited<ReturnType<typeof loadRailMetadata>>,
-): FieldObj[] {
-  try {
-    const grouping = (fieldGrouping as FieldGroupingConfig).prefix_aliases
-      ? (fieldGrouping as FieldGroupingConfig)
-      : null;
-    const semanticIndex =
-      semanticAliases.length > 0 ? buildSemanticIndex(semanticAliases, grouping) : null;
-    const keySpec = (keyFieldsConfig as KeyFieldsConfig)["traces"] ?? {
-      fields: [],
-      groups: [],
-    };
-    const keyFieldSet = new Set(keySpec.fields.map((f: string) => f.toLowerCase()));
-    const keyGroupSet = new Set(keySpec.groups.map((g: string) => g.toLowerCase()));
-    return applyFieldGrouping(fieldList, semanticIndex, keyFieldSet, keyGroupSet);
-  } catch (groupErr) {
-    console.warn("Field grouping failed for traces, using flat list", groupErr);
-    return fieldList;
   }
 }
 
@@ -1961,16 +1896,6 @@ const beginStreamLoad = () => {
   }
 };
 
-/** The stream a load will most likely open, before the stream list confirms it. */
-const namedStream = () => {
-  const fromUrl = router.currentRoute.value.query.stream;
-  return (
-    (typeof fromUrl === "string" && fromUrl) ||
-    searchObj.data.stream.selectedStream.value ||
-    restoreTracesStream(store.state.selectedOrganization.identifier)
-  );
-};
-
 // Only a non-time sort column is checked against the schema, so only then must the search wait for it.
 const sortNeedsSchema = () => {
   const sortBy = searchObj.meta.resultGrid.sortBy;
@@ -2019,8 +1944,6 @@ async function loadPageData({ leftOrg = "" } = {}) {
 
   searchObj.data.errorMsg = "";
 
-  // Cached per org, so starting it beside the stream list costs no extra request when a stream is named.
-  if (namedStream()) loadRailMetadata().catch(() => {});
   const fields = await getStreamList();
   if (generation !== pageGeneration) return;
   const forcedRun = await consumeRunQueryFlag();
@@ -2726,163 +2649,10 @@ const onFirstDataDetected = async (result: FirstEventResult) => {
   await loadPageData();
 };
 
-/**
- * Extracts a plain column name from a DataFusion SQL AST column node.
- * The parser can represent column names as either a plain string or a nested
- * object ({ expr: { value: "name" } }), so we handle both shapes.
- */
-const extractTracesColName = (col: any): string | null => {
-  if (typeof col === "string") return col.replace(/^"|"$/g, "");
-  if (col?.expr?.value != null) return String(col.expr.value);
-  return null;
-};
-
-const JSON_GET_FUNCTIONS = new Set([
-  "json_get_str",
-  "json_get_int",
-  "json_get_float",
-  "json_get_bool",
-]);
-
-// Click-to-filter writes a field stored in _all as json_get_*(_all, 'field'), so the sidebar reads it back by that name.
-const filterFieldName = (node: any): string | null => {
-  if (node?.type === "column_ref") return extractTracesColName(node.column);
-  if (node?.type !== "function") return null;
-  const fn = String(node.name?.name?.[0]?.value ?? "").toLowerCase();
-  const [column, key] = node.args?.value ?? [];
-  const allColumn = store.state.zoConfig?.all_fields_name || "_all";
-  if (!JSON_GET_FUNCTIONS.has(fn) || column?.type !== "column_ref") return null;
-  if (extractTracesColName(column.column) !== allColumn) return null;
-  return typeof key?.value === "string" ? key.value : null;
-};
-
-/**
- * Wraps the traces WHERE clause (stored in editorValue) into a full SQL
- * statement so that fnParsedSQL can parse it.
- *
- * The traces query editor stores the WHERE portion of the query in full, so the
- * whole editor value is the where clause. It is never split on "|" — the split is
- * quote-unaware and would truncate a term such as match_all('text | error').
- * fnParsedSQL requires a complete SELECT statement, so we synthesise one.
- *
- * Returns an empty string when there is no active WHERE clause.
- */
-const buildTracesWhereSQL = (): string => {
-  const query = searchObj.data.editorValue?.trim();
-  if (!query) return "";
-  const typed = searchObj.meta.sqlMode ? analyzeTracesSql(query, tracesParser.value) : null;
-  const whereClause = typed ? typed.where : query;
-  if (!whereClause) return "";
-  const streamName = searchObj.data.stream.selectedStream?.value || "stream";
-  return `SELECT * FROM ${typed?.fromClause || `"${streamName}"`} WHERE ${whereClause}`;
-};
-
-// In SQL mode a tick shows only the conditions the sidebar wrote; typed ones are the user's.
-const ownSqlFieldValues = (exclude: boolean): Record<string, string[]> => {
-  const sql = String(searchObj.data.editorValue ?? "");
-  const result: Record<string, string[]> = {};
-  for (const [field, own] of Object.entries(searchObj.data.stream.sqlFieldConditions ?? {})) {
-    if (own.exclude === exclude && hasOwnCondition(sql, own.text)) result[field] = [...own.values];
-  }
-  return result;
-};
-
-/**
- * Derives which field values are currently *included* in the active query.
- * Returns a map of { fieldName: [value, ...] } by walking the SQL WHERE AST
- * and collecting:
- *   - equality conditions  (field = 'value')
- *   - IS NULL conditions   (field IS NULL  → sentinel key "null")
- *
- * Used to pre-check the corresponding checkboxes (blue) in the field sidebar.
- */
-const activeIncludeFilterValues = computed((): Record<string, string[]> => {
-  if (searchObj.meta.sqlMode) return ownSqlFieldValues(false);
-  const result: Record<string, string[]> = {};
-  try {
-    const fullSql = buildTracesWhereSQL();
-    if (!fullSql) return result;
-    const parsed = fnParsedSQL(fullSql);
-    if (!parsed?.where) return result;
-    const walkNode = (node: any) => {
-      if (!node) return;
-      const op = node.operator?.toUpperCase();
-      if (op === "OR" || op === "AND") {
-        walkNode(node.left);
-        walkNode(node.right);
-      } else if (op === "=") {
-        const colName = filterFieldName(node.left);
-        if (colName && node.right?.value != null) {
-          const val = unescapeSqlLiteral(node.right.value);
-          if (!result[colName]) result[colName] = [];
-          if (!result[colName].includes(val)) result[colName].push(val);
-        }
-      } else if (op === "IS") {
-        // IS NULL — the field values API returns null rows with key "null"
-        const colName = filterFieldName(node.left);
-        if (colName) {
-          if (!result[colName]) result[colName] = [];
-          if (!result[colName].includes("null")) result[colName].push("null");
-        }
-      }
-    };
-    walkNode(parsed.where);
-  } catch {
-    // ignore parse errors
-  }
-  return result;
-});
-
-/**
- * Derives which field values are currently *excluded* from the active query.
- * Returns a map of { fieldName: [value, ...] } by walking the SQL WHERE AST
- * and collecting:
- *   - inequality conditions  (field != 'value' / field <> 'value')
- *   - IS NOT NULL conditions (field IS NOT NULL → sentinel key "null")
- *
- * Used to pre-check the corresponding checkboxes (red) in the field sidebar.
- */
-const activeExcludeFilterValues = computed((): Record<string, string[]> => {
-  if (searchObj.meta.sqlMode) return ownSqlFieldValues(true);
-  const result: Record<string, string[]> = {};
-  try {
-    const fullSql = buildTracesWhereSQL();
-    if (!fullSql) return result;
-    const parsed = fnParsedSQL(fullSql);
-    if (!parsed?.where) return result;
-    const walkNode = (node: any) => {
-      if (!node) return;
-      const op = node.operator?.toUpperCase();
-      if (op === "OR" || op === "AND") {
-        walkNode(node.left);
-        walkNode(node.right);
-      } else if (op === "!=" || op === "<>") {
-        const colName = filterFieldName(node.left);
-        if (colName && node.right?.value != null) {
-          const val = unescapeSqlLiteral(node.right.value);
-          if (!result[colName]) result[colName] = [];
-          if (!result[colName].includes(val)) result[colName].push(val);
-        }
-      } else if (op === "IS NOT") {
-        // IS NOT NULL — the field values API returns null rows with key "null"
-        const colName = filterFieldName(node.left);
-        if (colName) {
-          if (!result[colName]) result[colName] = [];
-          if (!result[colName].includes("null")) result[colName].push("null");
-        }
-      }
-    };
-    walkNode(parsed.where);
-  } catch {
-    // ignore parse errors
-  }
-  return result;
-});
-
 // Errors-only means every result is an error, so a span_status = 'ERROR' under an OR does not count.
 const showErrorOnly = computed(() =>
   searchObj.meta.sqlMode
-    ? (activeIncludeFilterValues.value["span_status"]?.includes("ERROR") ?? false)
+    ? (fieldSource.activeIncludeValues.value["span_status"]?.includes("ERROR") ?? false)
     : isRequiredCondition(searchObj.data.editorValue ?? "", "span_status", "'ERROR'"),
 );
 
@@ -2951,6 +2721,11 @@ const onSqlAddTraceId = () => {
 
 const sqlErrorSuggestions = ref<string[]>([]);
 const storesExtraFieldsInAll = ref(false);
+const allFieldsColumn = computed(() => store.state.zoConfig?.all_fields_name || "_all");
+const showAllFieldsNote = computed(() => !!searchObj.meta.sqlMode && storesExtraFieldsInAll.value);
+const allFieldsNote = computed(() =>
+  t("traces.sqlMode.allFieldsNote", { column: allFieldsColumn.value }),
+);
 
 const onSqlRewriteRun = (sql: string) => {
   searchObj.data.editorValue = sql;
@@ -3109,13 +2884,16 @@ const onRecentRestore = (entry: QueryHistoryEntry, when: RestoreTime, run: boole
 const streamChangeDialog = ref({ show: false, pendingStream: "" });
 
 const applyStreamChange = async (newStream: string) => {
+  onAssistantSetCleared("stream");
   searchObj.data.stream.selectedStream = {
     label: newStream,
     value: newStream,
   };
+  searchObj.data.query = "";
   searchObj.data.editorValue = "";
   clearSqlText();
   sqlTexts.filter = "";
+  searchObj.data.resultGrid.currentPage = 0;
   streamChangeDialog.value.show = false;
   // With auto-run off no search writes the URL, and the catalog's Back and Forward follow the URL's stream.
   if (isAutoRunOff() && activeTab.value === "services-catalog" && canWriteTracesUrl()) {
@@ -3386,28 +3164,19 @@ useShortcuts(tracesShortcuts, undefined, { active: pageActive });
 </script>
 
 <style scoped>
-/* keep(scrollbar): native ::-webkit-scrollbar sizing/shadows on the child field-list
-   & result-grid scrollers, plus a field-label font-size override on child FieldRow
-   DOM — all reached through child components, so not expressible as utilities here. */
-.tracePage :deep(.index-table :hover::-webkit-scrollbar),
+/* keep(scrollbar): a child component's native scrollbar cannot be styled with utilities. */
 .tracePage :deep(#tracesSearchGridComponent:hover::-webkit-scrollbar) {
   height: 0.8125rem;
   width: 0.8125rem;
 }
 
-.tracePage :deep(.index-table ::-webkit-scrollbar-track),
 .tracePage :deep(#tracesSearchGridComponent::-webkit-scrollbar-track) {
   -webkit-box-shadow: inset 0 0 0.375rem color-mix(in srgb, var(--color-black) 30%, transparent);
   border-radius: 0.625rem;
 }
 
-.tracePage :deep(.index-table ::-webkit-scrollbar-thumb),
 .tracePage :deep(#tracesSearchGridComponent::-webkit-scrollbar-thumb) {
   border-radius: 0.625rem;
   -webkit-box-shadow: inset 0 0 0.375rem color-mix(in srgb, var(--color-black) 50%, transparent);
-}
-
-.tracePage :deep(.index-menu .field_list .field_overlay .field_label) {
-  font-size: var(--text-xs) !important;
 }
 </style>

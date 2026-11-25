@@ -4457,10 +4457,9 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
      * callback) from SearchBar.vue. Given a single query part (pre-split by
      * UNION), applies the filter with the same branches as production:
      *
-     *   1. NULL filter conversion (isFilterValueNull)
-     *   2. SQL mode: existing WHERE → replace or AND-insert
-     *   3. SQL mode: no WHERE → WHERE-insert before earliest clause
-     *   4. Non-SQL mode: replace existing or append with "and"
+     *   1. SQL mode: existing WHERE → replace or AND-insert
+     *   2. SQL mode: no WHERE → WHERE-insert before earliest clause
+     *   3. Non-SQL mode: replace existing or append with "and"
      *
      * Uses the real queryIndexSplit from zincutils (imported at top of file).
      */
@@ -4512,25 +4511,15 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
       filter: string,
       options: {
         sqlMode?: boolean;
-        isNullFilter?: boolean;
       } = {},
     ): string => {
-      const { sqlMode = true, isNullFilter = false } = options;
-
-      let effectiveFilter = filter;
-
-      // NULL filter conversion (mirrors isFilterValueNull branch)
-      if (isNullFilter) {
-        effectiveFilter = effectiveFilter
-          .replace(/=|!=/, (m) => (m === "=" ? " is " : " is not "))
-          .replace(/'null'/, "null");
-      }
+      const { sqlMode = true } = options;
 
       if (sqlMode) {
         if (query.toLowerCase().includes("where")) {
-          const fieldName = getFieldFromExpression(effectiveFilter);
+          const fieldName = getFieldFromExpression(filter);
           if (fieldName && hasFieldCondition(query, fieldName)) {
-            return replaceExistingFieldCondition(query, fieldName, effectiveFilter);
+            return replaceExistingFieldCondition(query, fieldName, filter);
           }
           // AND insertion before earliest terminating clause
           const clauses = ["group by", "having", "order by", "limit"];
@@ -4546,9 +4535,9 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           }
           if (firstClause) {
             const [before, after] = queryIndexSplit(query, firstClause);
-            return before.trim() + " AND " + effectiveFilter + " " + firstClause + after;
+            return before.trim() + " AND " + filter + " " + firstClause + after;
           }
-          return query + " AND " + effectiveFilter;
+          return query + " AND " + filter;
         }
         // WHERE insertion before earliest terminating clause (the bug fix)
         const clauses = ["group by", "having", "order by", "limit"];
@@ -4564,16 +4553,16 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
         }
         if (firstClause) {
           const [before, after] = queryIndexSplit(query, firstClause);
-          return before.trim() + " where " + effectiveFilter + " " + firstClause + after;
+          return before.trim() + " where " + filter + " " + firstClause + after;
         }
-        return query + " where " + effectiveFilter;
+        return query + " where " + filter;
       }
       // Non-SQL mode
-      const fieldName = getFieldFromExpression(effectiveFilter);
+      const fieldName = getFieldFromExpression(filter);
       if (fieldName && hasFieldCondition(query, fieldName)) {
-        return replaceExistingFieldCondition(query, fieldName, effectiveFilter);
+        return replaceExistingFieldCondition(query, fieldName, filter);
       }
-      return query.length === 0 ? effectiveFilter : query + " and " + effectiveFilter;
+      return query.length === 0 ? filter : query + " and " + filter;
     };
 
     // ── SQL mode: no existing WHERE (the bug-fix path) ─────────────
@@ -4693,47 +4682,6 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           "level = 'warn'",
         );
         expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'warn'");
-      });
-    });
-
-    // ── NULL filter handling ───────────────────────────────────────
-
-    describe("NULL filter conversion (isFilterValueNull)", () => {
-      it("should convert = 'null' to is null in SQL mode", () => {
-        const result = applyFilterToQueryPart(
-          'SELECT * FROM "logs" GROUP BY level',
-          "field = 'null'",
-          { isNullFilter: true },
-        );
-        // The production regex replaces = with " is " (with surrounding spaces),
-        // and the original filter already has spaces around =, producing double
-        // spaces. SQL ignores extra whitespace so this is functionally correct.
-        expect(result).toMatch(/SELECT \* FROM "logs" where field\s+is\s+null group by level/i);
-      });
-
-      it("should convert != 'null' to is not null in SQL mode", () => {
-        const result = applyFilterToQueryPart(
-          'SELECT * FROM "logs" GROUP BY level',
-          "field != 'null'",
-          { isNullFilter: true },
-        );
-        expect(result).toMatch(/SELECT \* FROM "logs" where field\s+is not\s+null group by level/i);
-      });
-
-      it("should convert = 'null' to is null in non-SQL mode", () => {
-        const result = applyFilterToQueryPart("existing query text", "field = 'null'", {
-          sqlMode: false,
-          isNullFilter: true,
-        });
-        expect(result).toMatch(/existing query text and field\s+is\s+null/);
-      });
-
-      it("should convert != 'null' to is not null in non-SQL mode", () => {
-        const result = applyFilterToQueryPart("existing query text", "field != 'null'", {
-          sqlMode: false,
-          isNullFilter: true,
-        });
-        expect(result).toMatch(/existing query text and field\s+is not\s+null/);
       });
     });
 

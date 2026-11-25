@@ -59,9 +59,7 @@ export class DashboardPage {
     this.shareButton = page.locator('[data-test="dashboard-share-btn"]');
 
     // Stream & field selection locators
-    // `index-dropdown-stream` is an OSelect (PanelFieldList.vue) — clicking the
-    // wrapper opens a popover that exposes `${parent}-popover`, `${parent}-search`
-    // (the filter input), and `${parent}-option` (with `data-test-value="<value>"`).
+    // `index-dropdown-stream` is the OSelect in StreamPicker.vue; its popover exposes `-popover`, `-search` and `-option` ids.
     this.streamDropdown = page.locator('[data-test="index-dropdown-stream"]');
     // OSelect popover surface — wait for visibility before interacting with the
     // search input or option list.
@@ -79,11 +77,7 @@ export class DashboardPage {
     this.streamOptionE2eAutomate = page
       .locator('[data-test="index-dropdown-stream-option"][data-test-value="e2e_automate"]')
       .first();
-    // OFieldList (PanelFieldList.vue → OFieldList.vue) exposes its search box via an
-    // OInput wrapper: `o-field-list-search` is the wrapper, `o-field-list-search-field`
-    // is the inner native <input> (auto-derived `-field` suffix per AGENT_RULES §4 —
-    // always fill the `-field` variant). The legacy `index-field-search-input`
-    // / `data-cy` Cypress attribute no longer exists post-revamp.
+    // `o-field-list-search` is the OInput wrapper in OFieldList.vue; fill its inner `-field` input.
     this.fieldSearchInput = page.locator('[data-test="o-field-list-search-field"]');
     // Field-list "add to Y-axis / breakdown" buttons resolved by per-field
     // `data-test` prefix/suffix patterns (no element/text predicates).

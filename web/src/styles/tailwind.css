@@ -110,6 +110,11 @@ html.theme-switching *::after {
   pointer-events: auto !important;
 }
 
+/* A tooltip that closes on trigger leave must never catch the click meant for what lies under it. */
+[data-reka-popper-content-wrapper]:has(> [data-o-tooltip-passive]) {
+  pointer-events: none !important;
+}
+
 /*
  * Query editor placeholder — the ONE definition for every page that overlays
  * a placeholder on the Monaco query editor (logs, traces, RUM sessions,

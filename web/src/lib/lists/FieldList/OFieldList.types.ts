@@ -1,10 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type { InjectionKey } from "vue";
 import type { I18nText } from "@/types/i18n";
-
-/** A row that hosts its own action buttons reports it, so the list stops naming rows buttons. */
-export const FIELD_ROW_HAS_ACTIONS_KEY: InjectionKey<() => void> = Symbol("fieldRowHasActions");
 
 export interface FieldItem {
   name: string;
@@ -33,6 +29,8 @@ export interface OFieldListProps {
   sortFn?: (a: FieldItem, b: FieldItem) => number;
   /** Rows take focus and Enter or Space picks them, for a list that is a picker. */
   keyboard?: boolean;
+  /** With an `expansion` slot, a row click toggles only rows this accepts. */
+  expandableFn?: (row: FieldItem) => boolean;
 }
 
 export interface OFieldListEmits {
@@ -48,6 +46,7 @@ export interface OFieldListEmits {
 
 export interface OFieldListSlots {
   "before-list"?: (props: Record<string, never>) => any;
+  "after-search"?: (props: Record<string, never>) => any;
   "after-list"?: (props: {
     currentPage: number;
     pageSize: number;
@@ -66,6 +65,7 @@ export interface OFieldListSlots {
     index: number;
     draggable: boolean;
     isDragEnabled: boolean;
+    armDrag: () => void;
   }) => any;
   "field-actions"?: (props: { row: FieldItem; index: number }) => any;
   "group-header"?: (props: { row: FieldItem; groupName: string }) => any;

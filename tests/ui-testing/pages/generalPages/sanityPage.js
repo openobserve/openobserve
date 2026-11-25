@@ -155,7 +155,6 @@ export class SanityPage {
         this.schemaFirstPageButton = page.locator('[data-test="logs-page-fields-list-pagination-firstpage-button"]');
         this.schemaPage2Button = page.locator('[data-test="logs-page-fields-list-pagination-page-2-button"]');
         this.schemaPage3Button = page.locator('[data-test="logs-page-fields-list-pagination-page-3-button"]');
-        this.schemaPage4Button = page.locator('[data-test="logs-page-fields-list-pagination-page-4-button"]');
         // OSelect (multiple) renders the wrapper div with the consumer-supplied
         // data-test and the clickable PopoverTrigger as `${parent}-trigger`.
         // Click the `-trigger` to actually open the popover.
@@ -843,19 +842,11 @@ export class SanityPage {
         });
         await this.schemaPage2Button.click({ timeout: 10000 });
 
-        // Click page 3 button
         testLogger.debug('Navigating to page 3 of schema fields');
         await this.page.waitHelpers.waitForElementClickable(this.schemaPage3Button, {
             description: 'schema pagination page 3 button'
         });
         await this.schemaPage3Button.click({ timeout: 10000 });
-
-        // Click page 4 button
-        testLogger.debug('Navigating to page 4 of schema fields');
-        await this.page.waitHelpers.waitForElementClickable(this.schemaPage4Button, {
-            description: 'schema pagination page 4 button'
-        });
-        await this.schemaPage4Button.click({ timeout: 10000 });
 
         // Click first page button
         testLogger.debug('Navigating back to first page of schema fields');

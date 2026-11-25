@@ -75,24 +75,27 @@ test.describe('Logs field-value paging and in-field search', () => {
     await fieldValues.openLogs(ORG, STREAM);
   });
 
-  test('"load more" fetches additional distinct values from the backend', {
+  test('scrolling to the end of the values list fetches additional distinct values from the backend', {
     tag: ['@fieldValuePaging', '@all', '@logs'],
   }, async () => {
     await fieldValues.expandField(FIELD);
-    const firstPage = await fieldValues.waitForValues(FIELD);
-    await fieldValues.expectLoadMoreVisible(FIELD);
+    await fieldValues.waitForValues(FIELD);
+    const loaded = await fieldValues.waitForStableValues(FIELD);
+    // 24 distinct hosts in pages of 10: whatever filled the list on its own, a page is still left for the scroll.
+    expect(loaded.length).toBeGreaterThanOrEqual(10);
+    expect(loaded.length).toBeLessThan(24);
 
-    await fieldValues.clickLoadMore(FIELD);
-    const afterLoadMore = await fieldValues.waitForMoreThan(FIELD, firstPage.length);
+    await fieldValues.scrollValuesToEnd(FIELD);
+    const afterScroll = await fieldValues.waitForMoreThan(FIELD, loaded.length);
 
     // A backend ignoring the larger `size` would answer the same page and leave the list unchanged, so the delta is the whole assertion.
-    const added = afterLoadMore.filter((key) => !firstPage.includes(key));
+    const added = afterScroll.filter((key) => !loaded.includes(key));
     expect(added.length).toBeGreaterThan(0);
-    expect(new Set(afterLoadMore).size).toBe(afterLoadMore.length);
-    for (const key of firstPage) expect(afterLoadMore).toContain(key);
+    expect(new Set(afterScroll).size).toBe(afterScroll.length);
+    expect(afterScroll.slice(0, loaded.length)).toEqual(loaded);
 
-    testLogger.info('Load more appended distinct values', {
-      firstPage: firstPage.length,
+    testLogger.info('Scrolling to the end appended distinct values', {
+      loaded: loaded.length,
       added: added.length,
     });
   });

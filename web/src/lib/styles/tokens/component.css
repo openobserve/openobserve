@@ -235,6 +235,12 @@
   --color-field-list-empty-text: var(--color-text-muted);
   --color-field-list-actions-bg: var(--color-primary-100);
   --color-field-list-actions-border: var(--color-border-default);
+  /* The row action strip fades in over the field name, so a long name is not cut mid-letter. */
+  --color-gradient-field-list-actions: linear-gradient(
+    to right,
+    transparent,
+    var(--color-field-list-row-hover-bg) 1.5rem
+  );
   --color-field-list-expansion-bg: var(--color-surface-subtle);
   --color-field-list-expansion-border: var(--color-border-default);
 

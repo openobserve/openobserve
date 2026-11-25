@@ -40,6 +40,146 @@ const colors = [
   "#c4ccd3",
 ];
 
+export type PanelAxis = "x" | "y" | "z" | "breakdown";
+
+export type AxisFields = Partial<Record<PanelAxis, unknown[] | undefined>>;
+
+/** One cap on an axis: the axis is full once `count` reaches `max`; a `max` of 0 means the chart never takes it. */
+export interface AxisLimit {
+  count: number;
+  max: number;
+}
+
+const UNLIMITED = Number.POSITIVE_INFINITY;
+
+const ONE_X_CHARTS = new Set([
+  "pie",
+  "donut",
+  "heatmap",
+  "gauge",
+  "bar-gauge",
+  "state-timeline",
+  "funnel",
+  "boxplot",
+  "hostmap",
+  "area",
+  "bar",
+  "h-bar",
+  "line",
+  "scatter",
+  "area-stacked",
+  "stacked",
+  "h-stacked",
+]);
+
+const NO_X_CHARTS = new Set([
+  "metric",
+  "distribution",
+  "node-graph",
+  "alert-list",
+  "flame-graph",
+  "logs",
+]);
+
+const ONE_BREAKDOWN_CHARTS = new Set([
+  "area",
+  "bar",
+  "h-bar",
+  "line",
+  "scatter",
+  "area-stacked",
+  "stacked",
+  "h-stacked",
+  "state-timeline",
+  "distribution",
+]);
+
+const NO_BREAKDOWN_CHARTS = new Set([
+  "funnel",
+  "node-graph",
+  "alert-list",
+  "flame-graph",
+  "boxplot",
+  "logs",
+]);
+
+const ONE_Y_CHARTS = new Set([
+  "pie",
+  "donut",
+  "gauge",
+  "bar-gauge",
+  "treemap",
+  "sunburst",
+  "funnel",
+  "boxplot",
+  "metric",
+  "area-stacked",
+  "heatmap",
+  "state-timeline",
+  "hostmap",
+]);
+
+const NO_Y_CHARTS = new Set(["node-graph", "alert-list", "flame-graph", "logs"]);
+
+// Treemap groups and sunburst rings are fed by x and breakdown together, so their level cap counts both.
+const levelCount = (fields: AxisFields) =>
+  (fields.x?.length ?? 0) + (fields.breakdown?.length ?? 0);
+
+function xLimits(chartType: string, fields: AxisFields): AxisLimit[] {
+  const count = fields.x?.length ?? 0;
+  if (ONE_X_CHARTS.has(chartType)) return [{ count, max: 1 }];
+  if (NO_X_CHARTS.has(chartType)) return [{ count, max: 0 }];
+  if (chartType === "sunburst") return [{ count: levelCount(fields), max: SUNBURST_MAX_LEVELS }];
+  if (chartType === "treemap") return [{ count: levelCount(fields), max: TREEMAP_MAX_LEVELS }];
+  if (chartType === "table") return [{ count, max: UNLIMITED }];
+  return [{ count, max: 2 }];
+}
+
+function breakdownLimits(chartType: string, fields: AxisFields): AxisLimit[] {
+  const count = fields.breakdown?.length ?? 0;
+  if (ONE_BREAKDOWN_CHARTS.has(chartType)) return [{ count, max: 1 }];
+  if (NO_BREAKDOWN_CHARTS.has(chartType)) return [{ count, max: 0 }];
+  if (chartType === "treemap") {
+    return [
+      { count, max: 1 },
+      { count: levelCount(fields), max: TREEMAP_MAX_LEVELS },
+    ];
+  }
+  if (chartType === "sunburst") {
+    return [
+      { count, max: 1 },
+      { count: levelCount(fields), max: SUNBURST_MAX_LEVELS },
+    ];
+  }
+  if (chartType === "hostmap") return [{ count, max: HOSTMAP_MAX_GROUP_LEVELS }];
+  if (chartType === "table") return [{ count, max: 3 }];
+  return [{ count, max: UNLIMITED }];
+}
+
+function yLimits(chartType: string, fields: AxisFields): AxisLimit[] {
+  const count = fields.y?.length ?? 0;
+  if (ONE_Y_CHARTS.has(chartType)) return [{ count, max: 1 }];
+  if (NO_Y_CHARTS.has(chartType)) return [{ count, max: 0 }];
+  return [{ count, max: UNLIMITED }];
+}
+
+function zLimits(chartType: string, fields: AxisFields): AxisLimit[] {
+  const count = fields.z?.length ?? 0;
+  return [{ count, max: chartType === "heatmap" ? 1 : UNLIMITED }];
+}
+
+/** The caps a chart type puts on one axis of the current query; the add guards and the chip reasons both read them. */
+export function axisLimits(chartType: string, axis: PanelAxis, fields: AxisFields): AxisLimit[] {
+  if (axis === "x") return xLimits(chartType, fields);
+  if (axis === "breakdown") return breakdownLimits(chartType, fields);
+  if (axis === "y") return yLimits(chartType, fields);
+  return zLimits(chartType, fields);
+}
+
+export const isAxisFull = (limits: AxisLimit[]) => limits.some(({ count, max }) => count >= max);
+
+export const isAxisUnsupported = (limits: AxisLimit[]) => limits.some(({ max }) => max === 0);
+
 export const usePanelFields = ({
   dashboardPanelData,
   store,
@@ -62,163 +202,22 @@ export const usePanelFields = ({
     );
   });
 
-  // Every group field and the sub-group each add one nesting level.
-  const treemapLevels = computed(() => {
-    const fields =
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields;
-    return (fields?.x?.length ?? 0) + (fields?.breakdown?.length ?? 0);
-  });
-  // Every x field and the breakdown add one ring, so the cap counts both wells together.
-  const sunburstLevelCount = () => {
-    const fields =
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
-    return (fields?.x?.length ?? 0) + (fields?.breakdown?.length ?? 0);
-  };
+  const currentFields = (): AxisFields =>
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields ?? {};
+  const limitsOf = (axis: PanelAxis) =>
+    axisLimits(dashboardPanelData.data.type, axis, currentFields());
 
-  const isAddXAxisNotAllowed = computed(() => {
-    switch (dashboardPanelData.data.type) {
-      case "pie":
-      case "donut":
-      case "heatmap":
-      case "gauge":
-      case "bar-gauge":
-      case "state-timeline":
-      case "funnel":
-      case "boxplot":
-      case "hostmap":
-      case "area":
-      case "bar":
-      case "h-bar":
-      case "line":
-      case "scatter":
-      case "area-stacked":
-      case "stacked":
-      case "h-stacked":
-        return (
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
-            .length >= 1
-        );
-      case "sunburst":
-        return sunburstLevelCount() >= SUNBURST_MAX_LEVELS;
-      case "metric":
-      case "distribution":
-      case "node-graph":
-      case "alert-list":
-      case "flame-graph":
-      case "logs":
-        return (
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
-            .length >= 0
-        );
-      case "treemap":
-        return treemapLevels.value >= TREEMAP_MAX_LEVELS;
-      case "table":
-        return false;
-      default:
-        return (
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
-            .length >= 2
-        );
-    }
-  });
+  const isAddXAxisNotAllowed = computed(() => isAxisFull(limitsOf("x")));
+  const isAddBreakdownNotAllowed = computed(() => isAxisFull(limitsOf("breakdown")));
+  const isAddYAxisNotAllowed = computed(() => isAxisFull(limitsOf("y")));
+  const isAddZAxisNotAllowed = computed(() => isAxisFull(limitsOf("z")));
 
-  const isAddBreakdownNotAllowed = computed(() => {
-    switch (dashboardPanelData.data.type) {
-      case "area":
-      case "bar":
-      case "h-bar":
-      case "line":
-      case "scatter":
-      case "area-stacked":
-      case "stacked":
-      case "h-stacked":
-      case "state-timeline":
-      case "distribution":
-        return (
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-            .breakdown?.length >= 1
-        );
-      case "treemap":
-        return (
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-            .breakdown?.length >= 1 || treemapLevels.value >= TREEMAP_MAX_LEVELS
-        );
-      case "sunburst":
-        return (
-          (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-            .breakdown?.length ?? 0) >= 1 || sunburstLevelCount() >= SUNBURST_MAX_LEVELS
-        );
-      case "funnel":
-      case "node-graph":
-      case "alert-list":
-      case "flame-graph":
-      case "boxplot":
-      case "logs":
-        return true;
-      case "hostmap":
-        return (
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-            .breakdown?.length >= HOSTMAP_MAX_GROUP_LEVELS
-        );
-      case "table":
-        // Allow up to 3 breakdown fields for table charts
-        return (
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-            .breakdown?.length >= 3
-        );
-      default:
-        return false;
-    }
-  });
-
-  const isAddYAxisNotAllowed = computed(() => {
-    switch (dashboardPanelData.data.type) {
-      case "pie":
-      case "donut":
-      case "gauge":
-      case "bar-gauge":
-      case "treemap":
-      case "sunburst":
-      case "funnel":
-      case "boxplot":
-        return (
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
-            .length >= 1
-        );
-      case "node-graph":
-      case "alert-list":
-      case "flame-graph":
-      case "logs":
-        return true;
-      case "metric":
-        return (
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
-            .length >= 1
-        );
-      case "area-stacked":
-      case "heatmap":
-      case "state-timeline":
-      case "hostmap":
-        return (
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
-            .length >= 1
-        );
-      default:
-        return false;
-    }
-  });
-
-  const isAddZAxisNotAllowed = computed(() => {
-    switch (dashboardPanelData.data.type) {
-      case "heatmap":
-        return (
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z
-            .length >= 1
-        );
-      default:
-        return false;
-    }
-  });
+  const unsupportedAxes = computed<Record<PanelAxis, boolean>>(() => ({
+    x: isAxisUnsupported(limitsOf("x")),
+    y: isAxisUnsupported(limitsOf("y")),
+    z: isAxisUnsupported(limitsOf("z")),
+    breakdown: isAxisUnsupported(limitsOf("breakdown")),
+  }));
 
   const checkIsDerivedField = (fieldName: string) => {
     // if given fieldName is from vrlFunctionFields, then it is a derived field
@@ -959,6 +958,7 @@ export const usePanelFields = ({
     isAddBreakdownNotAllowed,
     isAddYAxisNotAllowed,
     isAddZAxisNotAllowed,
+    unsupportedAxes,
     generateLabelFromName,
     checkIsDerivedField,
     getNewColorValue,

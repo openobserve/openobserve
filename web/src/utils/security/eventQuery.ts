@@ -5,7 +5,7 @@
 import { toneOfSeverityId, type SeverityTone } from "./severity";
 import { quoteIdent, quoteString } from "./sql";
 
-export type FilterOp = "=" | "!=" | "contains" | "not_contains";
+export type FilterOp = "=" | "!=" | "contains" | "not_contains" | "is_null" | "is_not_null";
 
 export interface FieldFilter {
   field: string;
@@ -40,6 +40,10 @@ export function filterClause(filter: FieldFilter): string {
       return `CAST(${field} AS VARCHAR) LIKE ${likePattern(filter.value)}`;
     case "not_contains":
       return `(CAST(${field} AS VARCHAR) NOT LIKE ${likePattern(filter.value)} OR ${field} IS NULL)`;
+    case "is_null":
+      return `${field} IS NULL`;
+    case "is_not_null":
+      return `${field} IS NOT NULL`;
     default:
       return `${field} = ${quoteString(filter.value)}`;
   }
@@ -53,13 +57,33 @@ export function severityClause(f: EventFilters): string | null {
   return values.length === 1 ? `${expr} = ${values[0]}` : `${expr} IN (${values.join(", ")})`;
 }
 
+const INCLUDE_OPS = new Set<string>(["=", "is_null"]);
+
 /** WHERE parts for the current filters; `withSeverity: false` drops the severity facet. */
 export function whereParts(f: EventFilters, withSeverity = true): string[] {
-  const parts: string[] = [];
+  const parts: (string | string[])[] = [];
   const severity = withSeverity ? severityClause(f) : null;
   if (severity) parts.push(severity);
-  for (const filter of f.filters) parts.push(filterClause(filter));
-  return parts;
+  // A row holds one value per field, so two included values of a field can only mean either.
+  const included = new Map<string, string[]>();
+  for (const filter of f.filters) {
+    const clause = filterClause(filter);
+    if (!INCLUDE_OPS.has(filter.op)) {
+      parts.push(clause);
+      continue;
+    }
+    const group = included.get(filter.field);
+    if (group) {
+      group.push(clause);
+      continue;
+    }
+    const fresh = [clause];
+    included.set(filter.field, fresh);
+    parts.push(fresh);
+  }
+  return parts.map((part) =>
+    typeof part === "string" ? part : part.length === 1 ? part[0] : `(${part.join(" OR ")})`,
+  );
 }
 
 const whereOf = (parts: string[]) => (parts.length ? ` WHERE ${parts.join(" AND ")}` : "");
@@ -122,6 +146,11 @@ export function histogramSql(
     `SELECT histogram(_timestamp, '${interval}') AS zo_ts${sev}, COUNT(*) AS zo_n ` +
     `FROM ${quoteIdent(stream)}${whereOf(parts)} GROUP BY zo_ts${groupSev} ORDER BY zo_ts`
   );
+}
+
+/** Case-insensitive substring match on any column type, for the value search of a field. */
+export function textMatchClause(field: string, text: string): string {
+  return `CAST(${quoteIdent(field)} AS VARCHAR) ILIKE ${likePattern(text)}`;
 }
 
 export function topValuesSql(stream: string, parts: string[], field: string, limit = 10): string {

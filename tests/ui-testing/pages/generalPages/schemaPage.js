@@ -1,6 +1,7 @@
 const logData = require("../../fixtures/log.json");
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { clickFieldRowAction } = require('../commonActions.js');
 
 class SchemaPage {
     constructor(page) {
@@ -405,7 +406,7 @@ class SchemaPage {
     async configureUserDefinedFields() {
         testLogger.debug('Configuring user defined fields');
         await this.logsUserDefinedFieldsBtn.click();
-        await this.logSearchIndexAllFieldBtn.last().click({ force: true });
+        await clickFieldRowAction(this.page, '_all', this.schemaLocators.logSearchIndexAllFieldBtn, { last: true });
     }
 
     // Expand all dropdown and search fields

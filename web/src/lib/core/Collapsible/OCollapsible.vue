@@ -225,8 +225,7 @@ watch(
    @keyframes and the `animation:` shorthands together and stays consistent.
    That is also why they do NOT belong in styles/keyframes.css.
    `.o-collapsible-content` sits on reka's CollapsibleContent in THIS
-   component's template, so it carries this scope id. FieldExpansion.vue reaches
-   the same class through its own `:deep()`, which is unaffected. */
+   component's template, so it carries this scope id. */
 .o-collapsible-content[data-state="open"] {
   animation: o-collapsible-open 200ms ease-out;
 }

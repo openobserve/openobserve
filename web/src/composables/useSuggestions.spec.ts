@@ -131,6 +131,19 @@ describe("updateFieldKeywords", () => {
     expect(labels).not.toContain("_timestamp");
   });
 
+  it("never suggests a group header row as a column", () => {
+    const c = useSqlSuggestions();
+    c.updateFieldKeywords([
+      { name: "Key fields", label: true },
+      { name: "String", isGroup: true },
+      { name: "status" },
+    ]);
+    const labels = c.autoCompleteKeywords.value.map((k: { label: string }) => k.label);
+    expect(labels).toContain("status");
+    expect(labels).not.toContain("Key fields");
+    expect(labels).not.toContain("String");
+  });
+
   it("sets kind = Field for all field keywords", () => {
     const c = useSqlSuggestions();
     c.updateFieldKeywords([{ name: "status" }, { name: "env" }]);

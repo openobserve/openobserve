@@ -122,16 +122,12 @@ export interface StreamData {
   streamType: string;
   interestingFieldList: string[];
   userDefinedSchema: unknown[];
-  expandGroupRows: { [key: string]: boolean };
-  expandGroupRowsFieldCount: { [key: string]: number };
   filteredField: { expr: { value: string } }[];
   missingStreamMultiStreamFilter: string[];
   pipelineQueryStream: string[];
   // Holds grouped field-row objects at runtime; left as any[] for the same
   // conflicting-StreamField-shape reason as selectedStreamFields above.
   selectedInterestingStreamFields: any[];
-  interestingExpandedGroupRows: { [key: string]: boolean };
-  interestingExpandedGroupRowsFieldCount: { [key: string]: number };
 }
 
 export interface ResultGrid {
