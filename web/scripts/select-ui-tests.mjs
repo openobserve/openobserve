@@ -346,17 +346,19 @@ export function select({ repo, base, head }) {
       changed,
     };
   }
-  // The graph stops at web/, so a changed file outside it counts as a change to each web file naming it.
+  // The graph stops at web/: outside JSON counts as a change to each web file naming it; outside code runs everything.
   const outside = new Set(changed.filter((p) => !p.startsWith("web/")));
   const outsideUsers = [];
   if (outside.size)
     for (const [f, t] of texts)
-      for (const m of t.matchAll(/["'](\.\.?\/[^"'\s]+)["']/g)) {
-        const p = posix.join("web", posix.dirname(f), m[1].replace(/[?#].*$/, ""));
+      for (const m of t.matchAll(/(["'`])(\.\.?\/[^"'`\s]+)\1/g)) {
+        const p = posix.join("web", posix.dirname(f), m[2].replace(/[?#].*$/, ""));
         const hit = [p, ...EXTS.map((e) => p + e), ...EXTS.map((e) => `${p}/index${e}`)].find(
           (c) => outside.has(c),
         );
         if (!hit) continue;
+        if (!hit.endsWith(".json"))
+          return { ...full(`web/ imports a changed file outside web/: ${hit}`), changed };
         if (inSetup(f)) return { ...full(`setupTests loads ${f}, which names ${hit}`), changed };
         outsideUsers.push([hit, f]);
       }

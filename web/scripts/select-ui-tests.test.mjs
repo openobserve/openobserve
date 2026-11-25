@@ -55,6 +55,8 @@ write({
   "web/src/utils/q.ts": `export const q = 1;\nconst cfg = "../../../src/config/setup.json";`,
   "src/config/setup.json": "{}",
   "src/config/state.json": "{}",
+  "src/config/tpl.json": "{}",
+  "web/src/utils/tpl.spec.ts": "const t = await import(`../../../src/config/tpl.json`);",
   "web/src/utils/state.ts": `export const st = "../../../src/config/state.json";`,
   "web/src/utils/state.spec.ts": `import { st } from "./state";`,
   "web/src/test/helper.ts": "export const h = 1;",
@@ -130,9 +132,14 @@ test("a changed file outside web/ picks the spec that imports it", () => {
   assert.deepEqual(graphSpecs(r), ["src/utils/parity.spec.ts"]);
 });
 
-test("an extensionless import of a changed file outside web/ picks its importer", () => {
+test("a changed code file outside web/ runs everything, since it can re-export other files", () => {
   const r = run({ "src/config/shared.ts": "export const s = 2;", "web/.prettierignore": "x" });
-  assert.deepEqual(graphSpecs(r), ["src/utils/shared.spec.ts"]);
+  assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/shared.ts");
+});
+
+test("a template-literal import of a changed file outside web/ picks its importer", () => {
+  const r = run({ "src/config/tpl.json": `{"a":1}`, "web/.prettierignore": "x" });
+  assert.deepEqual(graphSpecs(r), ["src/utils/tpl.spec.ts"]);
 });
 
 test("a changed file outside web/ picks the specs that reach the web file naming it", () => {
