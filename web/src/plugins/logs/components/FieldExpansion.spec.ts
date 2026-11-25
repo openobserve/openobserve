@@ -376,4 +376,27 @@ describe("FieldExpansion", () => {
       expect(wrapper.exists()).toBe(true);
     });
   });
+
+  describe("Group by shortcut", () => {
+    const groupByBtn = (wrapper: ReturnType<typeof createWrapper>) =>
+      wrapper.find(`[data-test="log-search-index-list-group-by-${defaultField.name}-field-btn"]`);
+
+    it("is off unless the caller opts in", () => {
+      expect(groupByBtn(createWrapper()).exists()).toBe(false);
+    });
+
+    it("emits the field name when opted in", async () => {
+      const wrapper = createWrapper({ showGroupBy: true });
+      expect(groupByBtn(wrapper).attributes("aria-label")).toBe("search.groupByThisField");
+      await groupByBtn(wrapper).trigger("click");
+      expect(wrapper.emitted("group-by")).toEqual([[defaultField.name]]);
+    });
+
+    it("marks the grouped field's row with the accent, not the selected-field highlight", () => {
+      const wrapper = createWrapper({ grouped: true });
+      const row = wrapper.find(".o-field-row").classes();
+      expect(row).toContain("bg-accent/10!");
+      expect(row).not.toContain("bg-field-list-row-hover-bg!");
+    });
+  });
 });

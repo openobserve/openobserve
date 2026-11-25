@@ -46,12 +46,15 @@ vi.mock("@/utils/traces/constants", () => ({
 }));
 
 import {
+  buildResultColumns,
+  resultColumnFormat,
   useTracesTableColumns,
   fillLastColumn,
   LLM_COLUMN_IDS,
   SPAN_DERIVED_COLUMN_IDS,
 } from "./useTracesTableColumns";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
+import { raw } from "@/types/i18n";
 
 // Default ordered field lists (mirror DEFAULT_TRACE_COLUMNS in useTraces.ts)
 const DEFAULT_SPANS_FIELDS = [
@@ -122,6 +125,17 @@ describe("useTracesTableColumns", () => {
       expect(ids).not.toContain("output_tokens");
       expect(ids).not.toContain("cost");
     });
+  });
+
+  describe("Columns button", () => {
+    it.each(["spans", "traces"] as const)(
+      "lets every %s column but the pinned timestamp be hidden",
+      (mode) => {
+        const fields = mode === "spans" ? DEFAULT_SPANS_FIELDS : DEFAULT_TRACES_FIELDS;
+        const cols = buildCols(true, mode, [...fields]);
+        expect(cols.filter((c) => !c.hideable).map((c) => c.id)).toEqual(["_timestamp"]);
+      },
+    );
   });
 
   describe("spans mode — user removes status_code", () => {
@@ -621,6 +635,66 @@ describe("useTracesTableColumns", () => {
       expect(fillIds(cols)).toEqual(["duration"]);
       expect(cols[0].minSize).toBeUndefined();
       expect((cols[0].meta as Record<string, unknown>).autoWidth).toBeUndefined();
+    });
+  });
+
+  describe("buildResultColumns — typed SQL results", () => {
+    it("makes one column per returned key, in order, headed by the key", () => {
+      const cols = buildResultColumns(["service_service_version", "spans", "p95_ms"]);
+      expect(cols.map((c) => c.id)).toEqual(["service_service_version", "spans", "p95_ms"]);
+      expect(cols.map((c) => String(c.header))).toEqual([
+        "service_service_version",
+        "spans",
+        "p95_ms",
+      ]);
+    });
+
+    it("reads each cell by key and shows objects as JSON", () => {
+      const [plain, nested] = buildResultColumns(["n", "attrs"]);
+      expect((plain as any).accessorFn({ n: 4 })).toBe(4);
+      expect((nested as any).accessorFn({ attrs: { a: 1 } })).toBe('{"a":1}');
+    });
+
+    it("adds a hint icon and tooltip to the hinted columns only", () => {
+      const [plain, hinted] = buildResultColumns(["a", "b"], { b: raw("tip") });
+      expect(plain.meta?.headerTooltip).toBeUndefined();
+      expect(String(hinted.meta?.headerTooltip)).toBe("tip");
+      expect(typeof hinted.header).toBe("function");
+    });
+
+    it("lets the last column fill the row", () => {
+      const cols = buildResultColumns(["a", "b"]);
+      expect((cols[1].meta as Record<string, unknown>).fillRemaining).toBe(true);
+    });
+  });
+
+  describe("resultColumnFormat — typed SQL cell display", () => {
+    it("shows µs durations with a unit for duration and percentile names", () => {
+      for (const key of ["duration", "trace_duration", "p95", "p99_duration"])
+        expect(resultColumnFormat(key, "UTC")?.(854178798)).toBe("14.24m");
+      expect(resultColumnFormat("p95", "UTC")?.(2500)).toBe("2.50ms");
+    });
+
+    it("shows µs epoch timestamps as a date in the given timezone", () => {
+      for (const key of ["_timestamp", "first_seen", "last_seen"])
+        expect(resultColumnFormat(key, "Asia/Kolkata")?.(1795024510361017)).toBe(
+          "formatted:1795024510361.017",
+        );
+    });
+
+    it("leaves other names, and non-numeric values, as they are", () => {
+      for (const key of [
+        "spans",
+        "errors",
+        "p95_ms",
+        "durations",
+        "avg_duration",
+        "t",
+        "service_name",
+      ])
+        expect(resultColumnFormat(key, "UTC")).toBeUndefined();
+      expect(resultColumnFormat("trace_duration", "UTC")?.(null)).toBeNull();
+      expect(resultColumnFormat("first_seen", "UTC")?.("2026-01-01")).toBe("2026-01-01");
     });
   });
 });

@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading-reset-key="rowsKey"
                 :progress-line="false"
                 :active-row-index="activeRowIndex"
-                sorting="server"
+                :sorting="headerSorting"
                 :sort-by="props.sortBy"
                 :sort-order="props.sortOrder"
                 :sort-field-map="sortFieldMap"
@@ -436,7 +436,7 @@ const addSearchTerm = (
     const displayValue =
       exactNsValue !== undefined
         ? String(exactNsValue)
-        : field === "span_kind"
+        : field === "span_kind" && !searchObj.meta.sqlMode
           ? (SPAN_KIND_MAP[String(fieldValue)] ?? String(fieldValue))
           : String(fieldValue);
     searchObj.data.stream.addToFilter = `${field} ${operator} '${escapeSingleQuotes(displayValue)}'`;
@@ -485,6 +485,11 @@ const toSearchTermValue = (value: unknown): string | number | boolean => {
   if (value === null || value === undefined) return "null";
   return JSON.stringify(value);
 };
+
+// Typed SQL in the Spans view is sent as written, so its ORDER BY, not a header click, orders the rows.
+const headerSorting = computed(() =>
+  searchObj.meta.sqlMode && props.searchMode === "spans" ? "none" : "server",
+);
 
 const contextCellIsStreamField = computed(() => {
   const columnId = contextCell.value?.columnId;

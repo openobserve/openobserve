@@ -1320,6 +1320,8 @@ export interface FieldLike {
   /** Raw stream-schema payloads. */
   data_type?: string;
   field_type?: string;
+  /** What picking the field inserts, when that is not its bare name. */
+  insertText?: string;
 }
 
 export const buildFieldEntry = (field: FieldLike): SqlCompletionEntry => {
@@ -1327,7 +1329,7 @@ export const buildFieldEntry = (field: FieldLike): SqlCompletionEntry => {
     name: field.name,
     label: field.name,
     kind: "Field",
-    insertText: field.name,
+    insertText: field.insertText ?? field.name,
     sortText: SORT_LANE.field + field.name,
   };
   // The column type reaches us under four different keys depending on which

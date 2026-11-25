@@ -321,13 +321,23 @@ const SHORTHAND_OPERATORS: Record<string, FilterOperatorId> = {
   "!~": "not_regex",
 };
 
+// Only `\"` and `\\` are escapes here; a regex's `\d` or a path's `\t` keeps its backslash.
+const shorthandValue = (rawValue: string): string => {
+  const quoted = /^"((?:[^"\\]|\\.)*)"$/.exec(rawValue);
+  if (quoted) return quoted[1].replace(/\\(["\\])/g, "$1");
+  return rawValue.replace(/^(['"])(.*)\1$/, "$2");
+};
+
+export interface ShorthandFilter {
+  field: string;
+  operator: FilterOperatorId;
+  value: string;
+}
+
 /** Reads `field=value`, `field>=10` or `field:value` typed into the bar; null when the text is not that shape. */
-export const parseShorthand = (
-  text: string,
-): { field: string; operator: FilterOperatorId; value: string } | null => {
+export const parseShorthand = (text: string): ShorthandFilter | null => {
   const match = SHORTHAND_PATTERN.exec(text);
   if (!match) return null;
   const [, field, op, rawValue] = match;
-  const value = rawValue.replace(/^(['"])(.*)\1$/, "$2");
-  return { field, operator: SHORTHAND_OPERATORS[op], value };
+  return { field, operator: SHORTHAND_OPERATORS[op], value: shorthandValue(rawValue) };
 };

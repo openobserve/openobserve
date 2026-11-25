@@ -295,6 +295,7 @@
       "sanity.spec.js",
       "landingPage.spec.js",
       "datetime-picker-copy-paste.spec.js",
+      "datetime-typed-bar.spec.js",
       "dateTime.spec.js",
       "dateTimeCustomRange.spec.js",
       "otableSelectCell.spec.js",
