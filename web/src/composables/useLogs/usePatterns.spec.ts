@@ -39,4 +39,49 @@ describe("usePatterns partial warning", () => {
       "Query duration is modified due to query range restriction of 1 hours",
     ]);
   });
+
+  it("a superseded request that lands last does not replace the newer result", async () => {
+    const { extractPatterns, cancelPatterns } = usePatterns(((k: string) => k) as never);
+    const resolvers: Array<(v: unknown) => void> = [];
+    vi.mocked(patternsService.extractPatterns).mockImplementation(
+      () => new Promise((resolve) => resolvers.push(resolve)) as never,
+    );
+    const body = (tid: string) => ({
+      data: { patterns: [{ template: tid, frequency: 1 }], statistics: { total_logs_analyzed: 1 } },
+    });
+
+    const first = extractPatterns("org", "s", { tid: "T1" } as never);
+    cancelPatterns();
+    const second = extractPatterns("org", "s", { tid: "T2" } as never);
+
+    resolvers[1](body("T2"));
+    await second;
+    resolvers[0](body("T1"));
+    await first;
+
+    expect(patternsState.value.patterns?.patterns[0].template).toBe("T2");
+  });
+
+  it("a superseded request settling does not clear the newer request's abort controller", async () => {
+    const { extractPatterns, cancelPatterns } = usePatterns(((k: string) => k) as never);
+    const signals: AbortSignal[] = [];
+    const rejecters: Array<(e: unknown) => void> = [];
+    vi.mocked(patternsService.extractPatterns).mockImplementation(((args: {
+      signal: AbortSignal;
+    }) => {
+      signals.push(args.signal);
+      return new Promise((_, reject) => rejecters.push(reject));
+    }) as never);
+
+    const first = extractPatterns("org", "s", {} as never);
+    cancelPatterns();
+    const second = extractPatterns("org", "s", {} as never);
+    rejecters[0]({ name: "CanceledError" });
+    await first;
+
+    cancelPatterns();
+    expect(signals[1].aborted).toBe(true);
+    rejecters[1]({ name: "CanceledError" });
+    await second;
+  });
 });

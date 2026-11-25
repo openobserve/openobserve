@@ -66,6 +66,8 @@ export const patternsState = ref<{
 
 // Module-level abort controller — one in-flight request at a time
 let patternAbortController: AbortController | null = null;
+// Guards the store against a superseded request that settles after a newer one.
+let patternRequestId = 0;
 
 /**
  * Composable for pattern extraction - completely separate from logs flow
@@ -85,7 +87,10 @@ export default function usePatterns(t: TranslateFn) {
       return;
     }
 
-    patternAbortController = new AbortController();
+    const controller = new AbortController();
+    patternAbortController = controller;
+    const requestId = ++patternRequestId;
+    const isLatest = () => requestId === patternRequestId;
 
     try {
       patternsState.value.loading = true;
@@ -98,10 +103,10 @@ export default function usePatterns(t: TranslateFn) {
         org_identifier,
         stream_name,
         query: queryReq,
-        signal: patternAbortController.signal,
+        signal: controller.signal,
       });
 
-      // console.log("[Patterns] API Response:", response.data);
+      if (!isLatest()) return;
 
       // Transform patterns to match UI expectations
       const transformedPatterns = response.data.patterns.map((pattern: any) => ({
@@ -152,7 +157,7 @@ export default function usePatterns(t: TranslateFn) {
       // );
     } catch (error: any) {
       // Axios wraps AbortSignal cancellations as CanceledError
-      if (error?.name === "CanceledError" || error?.name === "AbortError") {
+      if (error?.name === "CanceledError" || error?.name === "AbortError" || !isLatest()) {
         return;
       }
       console.error("[Patterns] Error extracting patterns:", error);
@@ -164,8 +169,10 @@ export default function usePatterns(t: TranslateFn) {
         error?.response?.data?.message || t("search.errorExtractingPatterns");
       throw error;
     } finally {
-      patternsState.value.loading = false;
-      patternAbortController = null;
+      if (isLatest()) {
+        patternsState.value.loading = false;
+        patternAbortController = null;
+      }
     }
   };
 
@@ -173,6 +180,7 @@ export default function usePatterns(t: TranslateFn) {
    * Cancel an in-flight pattern extraction request
    */
   const cancelPatterns = () => {
+    patternRequestId++;
     if (patternAbortController) {
       patternAbortController.abort();
       patternAbortController = null;
