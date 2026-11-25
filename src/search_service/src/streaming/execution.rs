@@ -388,7 +388,7 @@ async fn fetch_extraction_sample(
     let (w_start, w_end) = window;
     let span = w_end - w_start;
     // A window too narrow to slice (or inverted) stays a single fetch.
-    let slices = if span > EXTRACTION_TIME_SLICES as i64 {
+    let slices = if span > EXTRACTION_TIME_SLICES as i64 && can_slice_extraction(&req.query.sql) {
         EXTRACTION_TIME_SLICES
     } else {
         1
@@ -515,6 +515,13 @@ async fn fetch_extraction_sample(
         "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: fetched {fetched} rows from {slices} time slices"
     );
     Ok(())
+}
+
+/// A LIMIT or a subquery/join/window changes meaning per slice, so such SQL runs once over the
+/// window.
+fn can_slice_extraction(sql: &str) -> bool {
+    config::utils::sql::is_time_splittable(sql).unwrap_or(false)
+        && !config::utils::sql::has_limit_clause(sql)
 }
 
 /// Removes slices whose response carries `function_error` and returns the
@@ -1056,6 +1063,15 @@ mod tests {
             total: n,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn test_can_slice_extraction() {
+        assert!(can_slice_extraction("SELECT * FROM t WHERE a = 1"));
+        assert!(!can_slice_extraction("SELECT * FROM t LIMIT 10"));
+        assert!(!can_slice_extraction(
+            "SELECT * FROM t WHERE k IN (SELECT k FROM t WHERE b = 1)"
+        ));
     }
 
     #[test]
