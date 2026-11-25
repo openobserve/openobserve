@@ -141,7 +141,7 @@
           data-test="alerts-anomalysummarystrip-open"
           @click="emit('open', response.url)"
         >
-          {{ raw(response.label) || t("alerts.anomaly.stripOpenData") }}
+          {{ openLabel }}
         </OButton>
       </div>
     </template>
@@ -282,6 +282,20 @@ const secondary = computed(() => facts.value.secondary);
 const isAbsence = computed(
   () => view.value?.state === "ongoing" && view.value.summary?.kind === "absence",
 );
+
+// The endpoint's `label` is English, so the button names the target in the user's language.
+const openLabel = computed(() => {
+  switch (props.response?.target) {
+    case "logs":
+      return t("alerts.anomaly.stripViewLogs");
+    case "traces":
+      return t("alerts.anomaly.stripViewTraces");
+    case "metrics":
+      return t("alerts.anomaly.stripViewMetrics");
+    default:
+      return t("alerts.anomaly.stripOpenData");
+  }
+});
 
 const measureLine = computed<I18nText | null>(() => {
   const res = props.response;

@@ -16,7 +16,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  MAX_TIMER_DELAY_MS,
   anomalyIntervalMs,
+  rootFontPx,
+  timerDelayMs,
   buildAnomalyBandOptions,
   formatReading,
   latestBandK,
@@ -286,6 +289,22 @@ describe("buildAnomalyBandOptions", () => {
     expect(anomalyIntervalMs("1h")).toBe(3_600_000);
     expect(anomalyIntervalMs(undefined)).toBeNull();
     expect(anomalyIntervalMs("5 minutes")).toBeNull();
+  });
+
+  it("keeps a 30 day schedule's refresh timer inside the browser's delay range", () => {
+    const thirtyDays = anomalyIntervalMs("30d")!;
+    expect(thirtyDays).toBeGreaterThan(MAX_TIMER_DELAY_MS);
+    expect(timerDelayMs(thirtyDays)).toBe(MAX_TIMER_DELAY_MS);
+    expect(timerDelayMs(300_000)).toBe(300_000);
+  });
+
+  it("reads the root font size for rem offsets, 16 when it cannot", () => {
+    const root = document.createElement("div");
+    root.style.fontSize = "20px";
+    document.body.appendChild(root);
+    expect(rootFontPx(root)).toBe(20);
+    root.remove();
+    expect(rootFontPx(document.createElement("div"))).toBe(16);
   });
 
   it("shows a value and the bound it crossed at a precision that tells them apart", () => {

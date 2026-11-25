@@ -214,6 +214,8 @@ import {
   buildAnomalyBandOptions,
   latestBandK,
   toAnomalyBandRows,
+  rootFontPx,
+  timerDelayMs,
   type AnomalyBandRow,
 } from "@/utils/alerts/anomalyBandChart";
 import {
@@ -527,11 +529,14 @@ const pointRow = ref<AnomalyBandRow | null>(null);
 const pointLoading = ref(false);
 const pointAnchor = ref<HTMLElement | null>(null);
 const pointAt = ref({ x: 0, y: 0 });
-// rem from the pixel offset ECharts reports, so the anchor follows the clicked point.
-const pointAnchorStyle = computed(() => ({
-  left: `${pointAt.value.x / 16}rem`,
-  top: `${pointAt.value.y / 16}rem`,
-}));
+// rem from the pixel offset ECharts reports, at the page's root font size, so the anchor follows the point.
+const pointAnchorStyle = computed(() => {
+  const rootPx = rootFontPx();
+  return {
+    left: `${pointAt.value.x / rootPx}rem`,
+    top: `${pointAt.value.y / rootPx}rem`,
+  };
+});
 const pointIsCurrent = computed(
   () =>
     loadedModel.value !== 0 &&
@@ -604,7 +609,7 @@ function armSummaryTimer() {
   if (summaryTimer) clearInterval(summaryTimer);
   summaryTimer = null;
   const ms = anomalyIntervalMs(props.alert?.schedule_interval);
-  if (ms) summaryTimer = setInterval(() => void loadSummary(true), ms);
+  if (ms) summaryTimer = setInterval(() => void loadSummary(true), timerDelayMs(ms));
 }
 
 /** By timestamp, not dataIndex: gap rows shift the series indices. */

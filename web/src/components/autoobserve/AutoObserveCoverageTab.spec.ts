@@ -744,7 +744,8 @@ describe("AutoObserveCoverageTab in live mode", () => {
       await wrapper.find('[data-test="autoobserve-coverage-map-more-table"]').trigger("click");
       await flushPromises();
       expect(wrapper.findComponent(OTable).props("data")).toHaveLength(205);
-    });
+      // 205 services timed out at the 5 s default on a loaded CI runner (run 44557722469).
+    }, 20_000);
 
     it("writes every count on the screen with the locale's separator", async () => {
       // 1,200 watched and 5 gaps: counts pass a thousand while Needs action keeps the table short.
