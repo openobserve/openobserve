@@ -67,6 +67,7 @@ import { SyntheticsCreatePage } from "./syntheticsPages/syntheticsCreatePage.js"
 import { SyntheticsResultsPage } from "./syntheticsPages/syntheticsResultsPage.js";
 import { SyntheticsSettingsPage } from "./syntheticsPages/syntheticsSettingsPage.js";
 import { SyntheticsRegressionPage } from "./syntheticsPages/syntheticsRegressionPage.js";
+import { StarterPacksPage } from "./starterPacksPages/starterPacksPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -285,6 +286,7 @@ class PageManager {
     this.syntheticsResultsPage = new SyntheticsResultsPage(page);
     this.syntheticsSettingsPage = new SyntheticsSettingsPage(page);
     this.syntheticsRegressionPage = new SyntheticsRegressionPage(page);
+    this.starterPacksPage = new StarterPacksPage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);
