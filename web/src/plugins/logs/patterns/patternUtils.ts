@@ -357,6 +357,26 @@ export const buildPatternSqlQuery = (pattern: PatternTerms, streamName: string):
   buildPatternSetSqlQuery({ streamName, includes: [pattern.template], patterns: [pattern] });
 
 /**
+ * Rows of one pattern, newest first, for opening it in Logs. Null when the
+ * extractor found no terms that select only it.
+ */
+export const buildPatternLogsSql = (
+  template: string,
+  streamName: string,
+  patterns?: PatternTerms[],
+  baseFilter?: string,
+): string | null => {
+  if (patternFilterBlockedReason(template, patterns)) return null;
+  const sql = buildPatternSetSqlQuery({
+    streamName,
+    includes: [template],
+    patterns,
+    baseFilter,
+  });
+  return `${sql} ORDER BY _timestamp DESC`;
+};
+
+/**
  * Derive a human-readable alert name from a pattern template and stream name.
  * Prefixes with "Anomaly" or "Alert", includes stream name, caps at 60 chars.
  */

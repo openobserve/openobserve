@@ -21,6 +21,7 @@ import {
   escapeForMatchAll,
   buildPatternSqlQuery,
   buildPatternSetSqlQuery,
+  buildPatternLogsSql,
   buildAlertNameFromPattern,
   buildPatternAlertData,
   compactCount,
@@ -495,5 +496,30 @@ describe("pattern clauses use the extractor's terms", () => {
     expect(
       buildPatternSetSqlQuery({ streamName: "s", includes: [SHARED], patterns: PATTERNS }),
     ).toBe("SELECT * FROM 's'");
+  });
+});
+
+describe("buildPatternLogsSql", () => {
+  const T = "Payment <*> failed for order <*>";
+  const terms = [{ template: T, match_terms: ["failed for order"] }];
+
+  it("matches the extractor's terms, never _all or a raw <*>", () => {
+    const sql = buildPatternLogsSql(T, "app", terms);
+    expect(sql).toBe(
+      "SELECT * FROM 'app' WHERE match_all('failed for order') ORDER BY _timestamp DESC",
+    );
+    expect(sql).not.toContain("_all LIKE");
+    expect(sql).not.toContain("<*>");
+  });
+
+  it("keeps the scope the patterns were mined under", () => {
+    expect(buildPatternLogsSql(T, "app", terms, "level = 'error'")).toBe(
+      "SELECT * FROM 'app' WHERE (level = 'error') AND match_all('failed for order') ORDER BY _timestamp DESC",
+    );
+  });
+
+  it("returns null when the extractor found no terms for the pattern", () => {
+    expect(buildPatternLogsSql(T, "app", [{ template: T, match_block: "shared" }])).toBeNull();
+    expect(buildPatternLogsSql(T, "app")).toBeNull();
   });
 });

@@ -590,5 +590,57 @@ describe("usePatternActions", () => {
       expect(prefill.patternFilter?.mode).toBe("include");
       expect(prefill.meta?.appliedPatterns).toEqual([ERR]);
     });
+
+    it("keeps the active search filter on a single-pattern alert", () => {
+      mockSearchObj.data.query = "code = 500";
+
+      const prefill = usePatternActions().buildSinglePatternAlertPrefill({
+        template: ERR,
+        pattern_id: "p1",
+      });
+
+      expect(prefill.sql).toBe(
+        "SELECT count(*) AS cnt FROM 'test-stream' WHERE (code = 500) AND match_all('Connection refused to upstream')",
+      );
+    });
+
+    it("says so when a SQL-mode query cannot be folded into a single-pattern alert", () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.query = 'SELECT * FROM "test-stream"';
+
+      const prefill = usePatternActions().buildSinglePatternAlertPrefill({
+        template: ERR,
+        pattern_id: "p1",
+      });
+
+      expect(prefill.warnings.map((w: any) => w.key)).toContain("sqlModeFilterDropped");
+    });
+
+    it("adds no filter to a single-pattern alert when the search has none", () => {
+      const prefill = usePatternActions().buildSinglePatternAlertPrefill({
+        template: ERR,
+        pattern_id: "p1",
+      });
+
+      expect(prefill.sql).toBe(
+        "SELECT count(*) AS cnt FROM 'test-stream' WHERE match_all('Connection refused to upstream')",
+      );
+      expect(prefill.warnings.map((w: any) => w.key)).not.toContain("sqlModeFilterDropped");
+    });
+
+    it("renders a bare word as match_all and warns on a held filter for a single pattern", () => {
+      const single = () =>
+        usePatternActions().buildSinglePatternAlertPrefill({ template: ERR, pattern_id: "p1" });
+      withStatusStream("timeout", () => {
+        expect(single().sql).toBe(
+          "SELECT count(*) AS cnt FROM 'test-stream' WHERE (match_all('timeout')) AND match_all('Connection refused to upstream')",
+        );
+      });
+      withStatusStream("status=500 -404 AND is_error", () => {
+        const prefill = single();
+        expect(prefill.warnings.map((w: any) => w.key)).toContain("heldFilterDropped");
+        expect(prefill.sql).not.toContain("404");
+      });
+    });
   });
 });

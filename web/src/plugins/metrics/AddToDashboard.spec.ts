@@ -904,6 +904,28 @@ describe("AddToDashboard — getPanelId integration", () => {
     // After execute, the data id was mutated to the generated id
     expect(panelData.data.id).toBe("generated-id-456");
   });
+
+  it("keeps what addPanel writes (the layout) out of the editor's panel data", async () => {
+    mockAddPanel.mockImplementationOnce(async (_store: any, _dash: any, data: any) => {
+      data.layout = { x: 0, y: 0, w: 96, h: 18, i: 1 };
+    });
+    const panelData = {
+      data: { id: "", title: "", type: "line", queries: [] },
+      meta: { dateTime: {} },
+    };
+    const wrapper = createWrapper({ dashboardPanelData: panelData });
+    await flushPromises();
+
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "Test" });
+    await flushPromises();
+
+    expect(mockAddPanel.mock.calls[0][2]).not.toBe(panelData.data);
+    expect(mockAddPanel.mock.calls[0][2].title).toBe("Test");
+    expect(panelData.data).not.toHaveProperty("layout");
+  });
 });
 
 // ---------------------------------------------------------------------------

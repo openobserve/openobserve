@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Ainda nenhum canal tem uma organização predefinida",
-      "description": "As perguntas num canal sem predefinição vão para a organização predefinida de cada pessoa (podem alterá-la com {command} org)."
+      "description": "As perguntas num canal sem uma predefinição são encaminhadas para a organização predefinida de cada pessoa (podem alterá-la com {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Ainda ninguém nesta organização associou o Slack"
@@ -1920,6 +1920,7 @@
     "patternCount": "Contagem",
     "errorConstructingSearchQuery": "Erro ao construir a consulta de pesquisa.",
     "errorExtractingPatterns": "Erro ao extrair padrões. Tente novamente.",
+    "patternsNoReadPermission": "Não tem permissão para ler este stream.",
     "errorWhileApplyingSavedView": "Erro ao aplicar a visualização guardada.",
     "errorWhileExtractingStreamFields": "Erro ao extrair campos do stream.",
     "errorWhileGeneratingHistogramData": "Erro ao gerar dados do histograma.",
@@ -31088,7 +31089,7 @@
       "editDefault": "Editar predefinição do canal",
       "removeConfirm": "Remover predefinição",
       "removeTitle": "Remover a predefinição de #{channel}?",
-      "removeMessage": "As perguntas em {name} passam então a ir para a organização predefinida de cada pessoa (pode alterá-la com {command} org).",
+      "removeMessage": "As perguntas em {name} passam então a ser encaminhadas para a organização predefinida de cada pessoa (podem alterá-la com {command} org).",
       "instanceAdminOnly": "Apenas administrador da instância",
       "ownOrgOnlyHint": "Num espaço de trabalho de instância, associa os canais à sua própria organização",
       "claimableHint": "Canais por atribuir e canais pertencentes a {org}",

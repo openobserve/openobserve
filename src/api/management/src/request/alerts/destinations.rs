@@ -223,8 +223,7 @@ async fn send_test_request(
         return failed(error_msg, OutboundOutcome::Blocked);
     }
 
-    // Build HTTP client through the SSRF-aware factory so redirect targets
-    // and any DNS resolution that happens at connect time are re-validated.
+    // The client real sends use: connect-time DNS is re-checked and a 3xx is not followed.
     let mut client_builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
 
     if skip_tls_verify {
@@ -1177,26 +1176,39 @@ mod tests {
     }
 
     #[test]
-    fn a_guard_refusal_after_the_first_check_is_recorded_as_blocked() {
+    fn test_destination_test_reports_a_redirect_without_following_it() {
         isolated(
             concat!(
                 module_path!(),
-                "::a_guard_refusal_after_the_first_check_is_recorded_as_blocked"
+                "::test_destination_test_reports_a_redirect_without_following_it"
             ),
-            &[&[("ZO_SSRF_ALLOW_LOOPBACK", "true")]],
+            &[
+                &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+                &[("ZO_SKIP_SSRF_CHECKS", "true")],
+                &[("ZO_SSRF_ALLOW_LOOPBACK", "true")],
+            ],
             || async {
-                let port = local_server(
-                    "HTTP/1.1 302 Found\r\nLocation: http://169.254.169.254/latest\r\n\
-                     Content-Length: 0\r\n\r\n"
-                        .to_string(),
-                )
-                .await;
-                let (res, target) = tested(format!("http://127.0.0.1:{port}/")).await;
-                assert_eq!(res["success"], false, "{res}");
-                assert_eq!(
-                    target,
-                    Some(OutboundAudit(format!("http://127.0.0.1:{port} blocked")))
-                );
+                let ok = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".to_string();
+                let reachable = format!("http://127.0.0.1:{}/", local_server(ok).await);
+                let metadata = "http://169.254.169.254/latest".to_string();
+                for (code, location) in [
+                    (301, &reachable),
+                    (302, &metadata),
+                    (307, &reachable),
+                    (308, &reachable),
+                ] {
+                    let status_line = format!("{code} Redirect\r\nLocation: {location}");
+                    let (res, target, origin) = tested_secret_server(&status_line).await;
+                    assert_eq!(
+                        target,
+                        Some(OutboundAudit(format!("{origin} HTTP {code}"))),
+                        "{res}"
+                    );
+                    assert_eq!(res["statusCode"], code, "{res}");
+                    assert_eq!(res["success"], false, "{res}");
+                    let expected = format!("The destination answered with HTTP {code}");
+                    assert_eq!(res["error"], expected.as_str(), "{res}");
+                }
             },
         );
     }

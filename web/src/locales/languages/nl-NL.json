@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Nog geen enkel kanaal heeft een standaardorganisatie",
-      "description": "Vragen in een kanaal zonder standaard gaan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met {command} org)."
+      "description": "Vragen in een kanaal zonder standaardorganisatie gaan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nog niemand in deze organisatie heeft Slack gekoppeld"
@@ -1920,6 +1920,7 @@
     "patternCount": "Aantal",
     "errorConstructingSearchQuery": "Er is een fout opgetreden bij het opstellen van de zoekopdracht.",
     "errorExtractingPatterns": "Fout bij het extraheren van patronen. Probeer het opnieuw.",
+    "patternsNoReadPermission": "U hebt geen toestemming om deze stream te lezen.",
     "errorWhileApplyingSavedView": "Fout bij het toepassen van opgeslagen weergave.",
     "errorWhileExtractingStreamFields": "Fout bij het extraheren van streamvelden.",
     "errorWhileGeneratingHistogramData": "Fout bij het genereren van histogramgegevens.",
@@ -29288,7 +29289,7 @@
     "channelUnavailable": "{channel} — er is geen provider aan gekoppeld",
     "channelUnverified": "{channel} — opgeslagen, maar niemand heeft het geverifieerd",
     "channelAddPhone": "{reason}. Voeg je telefoonnummer toe bij Mijn piket",
-    "channelLinkSlack": "{reason}. Voer {command} link uit in Slack",
+    "channelLinkSlack": "{reason}. Voer {command} link in Slack uit",
     "loadUneven": "{name} ontving {factor}× het mediane aantal meldingen in de afgelopen {days} dagen",
     "loadUnevenLabel": "De werklast is onevenwichtig:",
     "membersUnreachableMore": "{name} zit in dit team, maar geen melding kan hen bereiken — {why}. {count} ander lid verkeert in dezelfde situatie. | {name} zit in dit team, maar geen melding kan hen bereiken — {why}. {count} andere leden verkeren in dezelfde situatie.",

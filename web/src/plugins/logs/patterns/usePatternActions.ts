@@ -170,11 +170,20 @@ export const usePatternActions = () => {
     return rendered === null ? { filter: "", dropped: "noFts" } : { filter: rendered };
   };
 
-  const buildPatternsAlertPrefill = (options: AlertBuildOptions = {}) => {
-    const dt = (searchObj.data as any).datetime;
+  const currentBaseFilterInput = () => {
     const sqlMode = !!searchObj.meta.sqlMode;
     const rawQuery = (searchObj.data.query ?? "").trim();
     const base = sqlMode ? null : patternsBaseFilter(rawQuery);
+    return {
+      baseFilter: base?.filter,
+      baseFilterDropped: sqlMode && !!rawQuery,
+      textFilterDropped: base?.dropped === "noFts",
+      heldFilterDropped: base?.dropped === "held",
+    };
+  };
+
+  const buildPatternsAlertPrefill = (options: AlertBuildOptions = {}) => {
+    const dt = (searchObj.data as any).datetime;
 
     const all = patternsState.value.patterns?.patterns ?? [];
     const visible = visiblePatterns(all);
@@ -187,10 +196,7 @@ export const usePatternActions = () => {
       totalCount: all.length,
       filtered: visible.length !== all.length,
       mode: options.patternMode ?? "exclude",
-      baseFilter: base?.filter,
-      baseFilterDropped: sqlMode && !!rawQuery,
-      textFilterDropped: base?.dropped === "noFts",
-      heldFilterDropped: base?.dropped === "held",
+      ...currentBaseFilterInput(),
       datetime: dt
         ? {
             type: dt.type,
@@ -217,6 +223,7 @@ export const usePatternActions = () => {
       // The user named this pattern; falling back to an alert on the whole
       // stream would not be what they asked for.
       requirePatterns: true,
+      ...currentBaseFilterInput(),
       datetime: dt
         ? {
             type: dt.type,

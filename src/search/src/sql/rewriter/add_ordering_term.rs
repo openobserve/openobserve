@@ -19,7 +19,8 @@ use config::{TIMESTAMP_COL_NAME, utils::sql::is_complex_query_stmt};
 use infra::errors::Error;
 use sqlparser::{
     ast::{
-        Expr, Ident, OrderBy, OrderByExpr, OrderByKind, OrderByOptions, Query, VisitMut, VisitorMut,
+        Expr, Ident, OrderBy, OrderByExpr, OrderByKind, OrderByOptions, OrderBySort, Query,
+        VisitMut, VisitorMut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -60,7 +61,11 @@ impl VisitorMut for AddOrderingTermVisitor {
                     expr: Expr::Identifier(Ident::new(self.field.clone())),
                     with_fill: None,
                     options: OrderByOptions {
-                        asc: Some(self.is_asc),
+                        sort: Some(if self.is_asc {
+                            OrderBySort::Asc
+                        } else {
+                            OrderBySort::Desc
+                        }),
                         nulls_first: None,
                     },
                 }]),

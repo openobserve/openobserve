@@ -253,7 +253,7 @@ fn exact_num_rows(file: &PartitionedFile) -> Option<usize> {
 pub fn apply_projection(
     schema: &SchemaRef,
     diff_rules: &HashMap<String, DataType>,
-    projection: Option<&Vec<usize>>,
+    projection: Option<&[usize]>,
     memory_exec: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     if diff_rules.is_empty() {
@@ -280,7 +280,7 @@ pub fn apply_combined_filter(
     schema: &arrow_schema::Schema,
     fst_fields: &[String],
     exec_plan: Arc<dyn ExecutionPlan>,
-    filter_projection: Option<&Vec<usize>>,
+    filter_projection: Option<&[usize]>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     if index_condition.is_none() && timestamp_filter.is_none() {
         return Ok(exec_plan);
@@ -322,7 +322,7 @@ pub fn apply_combined_filter(
 
     Ok(Arc::new(
         FilterExecBuilder::new(combined_expr, exec_plan)
-            .apply_projection(filter_projection.cloned())?
+            .apply_projection(filter_projection.map(<[usize]>::to_vec))?
             .build()?,
     ))
 }

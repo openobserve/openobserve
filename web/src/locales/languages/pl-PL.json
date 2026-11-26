@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Żaden kanał nie ma jeszcze domyślnej organizacji",
-      "description": "Pytania w kanale bez domyślnej organizacji trafiają do domyślnej organizacji każdej osoby (można ją zmienić za pomocą {command} org)."
+      "description": "Pytania w kanale bez domyślnego ustawienia trafiają do domyślnej organizacji każdej osoby (można ją zmienić za pomocą {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nikt w tej organizacji nie połączył jeszcze Slacka"
@@ -1920,6 +1920,7 @@
     "patternCount": "Liczba",
     "errorConstructingSearchQuery": "Wystąpił błąd podczas konstruowania zapytania wyszukiwania.",
     "errorExtractingPatterns": "Błąd podczas wyodrębniania wzorców. Spróbuj ponownie.",
+    "patternsNoReadPermission": "Nie masz uprawnień do odczytu tego strumienia.",
     "errorWhileApplyingSavedView": "Błąd podczas stosowania zapisanego widoku.",
     "errorWhileExtractingStreamFields": "Błąd podczas wyodrębniania pól strumienia.",
     "errorWhileGeneratingHistogramData": "Błąd podczas generowania danych histogramu.",
@@ -31074,7 +31075,7 @@
         "settings": "Ustawienia",
         "install": "Przy instalacji",
         "destination": "Z miejsca docelowego alertu",
-        "oncall": "Z {command} oncall w tym kanale"
+        "oncall": "Z {command} oncall tutaj"
       },
       "channel": "Kanał",
       "channelPlaceholder": "Szukaj kanałów",
@@ -31088,7 +31089,7 @@
       "editDefault": "Edytuj domyślny kanał",
       "removeConfirm": "Usuń domyślny",
       "removeTitle": "Usunąć domyślną organizację dla #{channel}?",
-      "removeMessage": "Pytania w kanale {name} trafiają następnie do domyślnej organizacji każdej osoby (można ją zmienić za pomocą {command} org).",
+      "removeMessage": "Pytania w {name} trafiają wtedy do domyślnej organizacji każdej osoby (można ją zmienić za pomocą {command} org).",
       "instanceAdminOnly": "Tylko administrator instancji",
       "ownOrgOnlyHint": "W obszarze roboczym instancji mapujesz kanały na własną organizację",
       "claimableHint": "Nieprzypisane kanały i kanały należące do {org}",
