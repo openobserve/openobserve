@@ -54,6 +54,23 @@ pub struct GroupPlanWrite {
     pub reaped: Vec<ReapedGroup>,
 }
 
+/// What [`persist_from_current`] read, and the update and ledger it wrote from that read.
+#[derive(Debug)]
+pub struct Rewrite {
+    pub prev: Option<AlertState>,
+    pub update: StateUpdate,
+    pub ledger: Option<EvalLedgerWrite>,
+}
+
+/// How [`write_evaluation`] stores the state row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RowWrite {
+    /// The upsert, which never rewrites the delivery columns.
+    Upsert,
+    /// Every column, into the empty row this transaction inserted to hold the key.
+    Fill,
+}
+
 /// What one [`delete_transitions_batch_before_with`] call removed.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TransitionBatch {
@@ -306,12 +323,60 @@ pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
     }
 
     let txn = conn.begin().await?;
-    write_update(&txn, update).await?;
-    if let Some(write) = ledger {
-        crate::table::alert_eval_intervals::record_evaluation_with(&txn, write).await?;
-    }
+    write_evaluation(&txn, update, ledger, RowWrite::Upsert).await?;
     txn.commit().await?;
     Ok(())
+}
+
+/// [`persist`] of the update `plan` builds from the row as the write's own transaction reads it.
+pub async fn persist_from_current<F>(
+    alert_id: &str,
+    group_key: &str,
+    plan: F,
+) -> Result<Rewrite, errors::Error>
+where
+    F: FnOnce(Option<&AlertState>) -> (StateUpdate, Option<EvalLedgerWrite>),
+{
+    let client = get_orm_client_rw().await;
+    persist_from_current_with(client, alert_id, group_key, plan).await
+}
+
+/// [`persist_from_current`] against a caller-supplied connection. [strong]
+pub async fn persist_from_current_with<C, F>(
+    conn: &C,
+    alert_id: &str,
+    group_key: &str,
+    plan: F,
+) -> Result<Rewrite, errors::Error>
+where
+    C: sea_orm::ConnectionTrait + TransactionTrait,
+    F: FnOnce(Option<&AlertState>) -> (StateUpdate, Option<EvalLedgerWrite>),
+{
+    let key = (alert_id.to_string(), group_key.to_string());
+    let txn = conn.begin().await?;
+    let (prev, claimed) = lock_or_claim(&txn, &key).await?;
+    let (update, ledger) = plan(prev.as_ref());
+    let fills_claim = claimed
+        && update
+            .state
+            .as_ref()
+            .is_some_and(|s| s.alert_id == key.0 && s.group_key == key.1);
+    // An empty claim that no state fills must never commit for readers to see.
+    if claimed && !fills_claim {
+        alert_states::Entity::delete_by_id(key).exec(&txn).await?;
+    }
+    let row = if fills_claim {
+        RowWrite::Fill
+    } else {
+        RowWrite::Upsert
+    };
+    write_evaluation(&txn, &update, ledger.as_ref(), row).await?;
+    txn.commit().await?;
+    Ok(Rewrite {
+        prev,
+        update,
+        ledger,
+    })
 }
 
 /// Applies a replicated [`StateTouch`]; false when the rollup row is missing or already newer.
@@ -335,6 +400,56 @@ pub async fn touch_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
     }
     txn.commit().await?;
     Ok(true)
+}
+
+/// Starts the row's firing at `at` unless one is open: the row it opened, else `None`. [strong]
+pub async fn open_firing(
+    alert_id: &str,
+    group_key: &str,
+    at: i64,
+) -> Result<Option<AlertState>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    open_firing_with(client, alert_id, group_key, at).await
+}
+
+/// [`open_firing`] against a caller-supplied connection.
+pub async fn open_firing_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    alert_id: &str,
+    group_key: &str,
+    at: i64,
+) -> Result<Option<AlertState>, errors::Error> {
+    use sea_orm::sea_query::{Expr, OnConflict};
+
+    let row = alert_states::ActiveModel {
+        alert_id: Set(alert_id.to_string()),
+        group_key: Set(group_key.to_string()),
+        firing_started_at: Set(Some(at)),
+        ..Default::default()
+    };
+    let txn = conn.begin().await?;
+    // One guarded statement: a read-then-upsert would overwrite a write landing between the two.
+    let opened = alert_states::Entity::insert(row)
+        .on_conflict(
+            OnConflict::columns([
+                alert_states::Column::AlertId,
+                alert_states::Column::GroupKey,
+            ])
+            .update_column(alert_states::Column::FiringStartedAt)
+            .action_and_where(
+                Expr::col((alert_states::Entity, alert_states::Column::FiringStartedAt)).is_null(),
+            )
+            .to_owned(),
+        )
+        .exec_without_returning(&txn)
+        .await?;
+    let state = if opened > 0 {
+        get_with(&txn, alert_id, group_key).await?
+    } else {
+        None
+    };
+    txn.commit().await?;
+    Ok(state)
 }
 
 /// Persist one grouped evaluation's entire [`GroupPlan`] in a **single
@@ -1078,9 +1193,79 @@ async fn apply_delivery_outcome<C: sea_orm::ConnectionTrait>(
     Ok(affected > 0)
 }
 
+/// Locks the row, else inserts an empty one so the key is held until commit; true when it inserted.
+async fn lock_or_claim(
+    txn: &sea_orm::DatabaseTransaction,
+    key: &(String, String),
+) -> Result<(Option<AlertState>, bool), errors::Error> {
+    use sea_orm::sea_query::OnConflict;
+
+    // A row deleted after a lost claim is neither locked nor claimed, so the pair runs again.
+    loop {
+        if let Some(row) = locked_row(txn, key).await? {
+            return Ok((Some(row), false));
+        }
+        let claim = alert_states::ActiveModel {
+            alert_id: Set(key.0.clone()),
+            group_key: Set(key.1.clone()),
+            ..Default::default()
+        };
+        // A missing row cannot be locked; a racing insert waits on this one until it commits.
+        let claimed = alert_states::Entity::insert(claim)
+            .on_conflict(
+                OnConflict::columns([
+                    alert_states::Column::AlertId,
+                    alert_states::Column::GroupKey,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
+            .exec_without_returning(txn)
+            .await?
+            > 0;
+        if claimed {
+            return Ok((None, true));
+        }
+        #[cfg(test)]
+        tests::after_lost_claim(&key.0);
+    }
+}
+
+async fn locked_row(
+    txn: &sea_orm::DatabaseTransaction,
+    key: &(String, String),
+) -> Result<Option<AlertState>, errors::Error> {
+    let row = alert_states::Entity::find_by_id(key.clone())
+        .lock_exclusive()
+        .one(txn)
+        .await?;
+    Ok(row.map(Into::into))
+}
+
+/// The state write and the availability-ledger extension, in the caller's transaction.
+async fn write_evaluation(
+    txn: &sea_orm::DatabaseTransaction,
+    update: &StateUpdate,
+    ledger: Option<&EvalLedgerWrite>,
+    row: RowWrite,
+) -> Result<(), errors::Error> {
+    write_state(txn, update, row).await?;
+    if let Some(write) = ledger {
+        crate::table::alert_eval_intervals::record_evaluation_with(txn, write).await?;
+    }
+    Ok(())
+}
+
 /// One state upsert plus its optional transition, inside a caller-owned
 /// transaction. Split out so a whole plan can share one transaction.
 async fn write_update<C>(txn: &C, update: &StateUpdate) -> Result<(), errors::Error>
+where
+    C: sea_orm::ConnectionTrait,
+{
+    write_state(txn, update, RowWrite::Upsert).await
+}
+
+async fn write_state<C>(txn: &C, update: &StateUpdate, row: RowWrite) -> Result<(), errors::Error>
 where
     C: sea_orm::ConnectionTrait,
 {
@@ -1143,20 +1328,33 @@ where
         ]);
     }
 
-    // Upsert on the composite primary key — rows are created lazily on an
-    // alert's first evaluation, so there is no backfill.
-    alert_states::Entity::insert(model)
-        .on_conflict(
-            sea_orm::sea_query::OnConflict::columns([
-                alert_states::Column::AlertId,
-                alert_states::Column::GroupKey,
-            ])
-            // Never the delivery columns (§5.5 MN-2): an evaluation's copies are stale by then.
-            .update_columns(columns)
-            .to_owned(),
-        )
-        .exec(txn)
-        .await?;
+    match row {
+        // Upsert on the composite primary key — rows are created lazily on an
+        // alert's first evaluation, so there is no backfill.
+        RowWrite::Upsert => {
+            alert_states::Entity::insert(model)
+                .on_conflict(
+                    sea_orm::sea_query::OnConflict::columns([
+                        alert_states::Column::AlertId,
+                        alert_states::Column::GroupKey,
+                    ])
+                    // Never the delivery columns (§5.5 MN-2): an evaluation's copies are stale by
+                    // then.
+                    .update_columns(columns)
+                    .to_owned(),
+                )
+                .exec(txn)
+                .await?;
+        }
+        RowWrite::Fill => {
+            alert_states::Entity::update_many()
+                .set(model)
+                .filter(alert_states::Column::AlertId.eq(state.alert_id.as_str()))
+                .filter(alert_states::Column::GroupKey.eq(state.group_key.as_str()))
+                .exec(txn)
+                .await?;
+        }
+    }
 
     if let Some(t) = update.transition.as_ref() {
         write_transition(txn, t).await?;
@@ -1514,6 +1712,20 @@ mod tests {
     const SEEN: &str = "host=seen";
     const GONE: &str = "host=gone";
     const AHEAD: &str = "host=ahead";
+
+    static LOST_CLAIM: std::sync::Mutex<Option<(String, LostClaimHook)>> =
+        std::sync::Mutex::new(None);
+
+    type LostClaimHook = Box<dyn FnOnce() + Send>;
+
+    pub(super) fn after_lost_claim(alert_id: &str) {
+        let mut slot = LOST_CLAIM.lock().unwrap();
+        if slot.as_ref().is_some_and(|(id, _)| id == alert_id) {
+            let (_, hook) = slot.take().unwrap();
+            drop(slot);
+            hook();
+        }
+    }
 
     /// One database a retention test runs against; a Postgres arm drops its schema when done.
     struct Backend {
@@ -3397,23 +3609,262 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn opening_a_firing_sets_only_its_start_and_only_when_none_is_open() {
+        // (group, a row is stored, its start, opened, the start after, last_outcome_at after)
+        let cases = [
+            ("no-row", false, None, true, Some(2_000), None),
+            ("no-start", true, None, true, Some(2_000), Some(1_000)),
+            ("open", true, Some(500), false, Some(500), Some(1_000)),
+        ];
+        for backend in touch_backends().await {
+            for (group, stored, before, opened, start, outcome_at) in cases {
+                if stored {
+                    let mut state = state_row("alert-1", group, 1_000);
+                    state.firing_started_at = before;
+                    let update = StateUpdate {
+                        state: Some(state),
+                        transition: None,
+                    };
+                    persist_with(&backend.conn, &update, None).await.unwrap();
+                }
+                let wrote = open_firing_with(&backend.conn, "alert-1", group, 2_000)
+                    .await
+                    .unwrap();
+                let stored = get_with(&backend.conn, "alert-1", group)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let case = format!("{} {group}", backend.name);
+                assert_eq!(wrote, opened.then(|| stored.clone()), "{case}");
+                assert_eq!(
+                    (stored.firing_started_at, stored.last_outcome_at),
+                    (start, outcome_at),
+                    "{case}"
+                );
+            }
+            backend.done().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn a_rewrite_is_planned_from_the_row_its_own_transaction_reads() {
+        // (case, a firing is open before, the plan writes a state, the start after)
+        let cases = [
+            ("open", true, true, Some(1_000)),
+            ("no row", false, true, Some(2_000)),
+            ("no row, no state", false, false, None),
+        ];
+        for backend in touch_backends().await {
+            for (n, (case, open, writes, start)) in cases.into_iter().enumerate() {
+                let id = format!("alert-{n}");
+                let opened = if open {
+                    open_firing_with(&backend.conn, &id, ROLLUP_GROUP_KEY, 1_000)
+                        .await
+                        .unwrap()
+                } else {
+                    None
+                };
+                let plan = |prev: Option<&AlertState>| {
+                    if !writes {
+                        let update = StateUpdate {
+                            state: None,
+                            transition: None,
+                        };
+                        return (update, None);
+                    }
+                    let level = Some(AlertLevel::Critical);
+                    let mut update = config::meta::alerts::state::apply_outcome(
+                        &id,
+                        ROLLUP_GROUP_KEY,
+                        prev,
+                        RunOutcome::Firing,
+                        level,
+                        2_000,
+                    );
+                    // A column the upsert never rewrites, so a first write must store the whole
+                    // row.
+                    let state = update.state.as_mut().unwrap();
+                    state.silenced_until = prev.is_none().then_some(3_000);
+                    (update, None)
+                };
+                let written = persist_from_current_with(&backend.conn, &id, ROLLUP_GROUP_KEY, plan)
+                    .await
+                    .unwrap();
+                let stored = get_with(&backend.conn, &id, ROLLUP_GROUP_KEY)
+                    .await
+                    .unwrap();
+                let case = format!("{} {case}", backend.name);
+                assert_eq!(written.prev, opened, "{case}");
+                assert_eq!(stored, written.update.state, "{case}");
+                let got = stored.and_then(|s| s.firing_started_at);
+                assert_eq!(got, start, "{case}: the open firing keeps its start");
+            }
+            backend.done().await;
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_first_write_holds_a_concurrent_open_until_it_commits() {
+        let Some((admin, schema, mut pools)) = postgres_pools(2).await else {
+            return;
+        };
+        create_touch_tables(&pools[0]).await;
+        let other = pools.pop().unwrap();
+        let (writer_pid, opener_pid) = (backend_pid(&pools[0]).await, backend_pid(&other).await);
+        let opener = std::sync::Mutex::new(None);
+        let plan = |prev: Option<&AlertState>| {
+            assert_eq!(prev, None);
+            let open = async move {
+                let opened = open_firing_with(&other, "alert-1", ROLLUP_GROUP_KEY, 1_000).await;
+                (opened.unwrap(), other)
+            };
+            *opener.lock().unwrap() = Some(tokio::spawn(open));
+            wait_in_plan(blocked_by(&admin, opener_pid, writer_pid));
+            let update = StateUpdate {
+                state: Some(state_row("alert-1", ROLLUP_GROUP_KEY, 2_000)),
+                transition: None,
+            };
+            (update, None)
+        };
+        persist_from_current_with(&pools[0], "alert-1", ROLLUP_GROUP_KEY, plan)
+            .await
+            .unwrap();
+        let opener = opener.lock().unwrap().take().unwrap();
+        let (opened, other) = opener.await.unwrap();
+        pools.push(other);
+        let stored = get_with(&pools[0], "alert-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            opened.as_ref(),
+            Some(&stored),
+            "the open ran after the write"
+        );
+        assert_eq!(
+            (stored.firing_started_at, stored.last_outcome_at),
+            (Some(1_000), Some(2_000))
+        );
+        drop_schema(admin, &schema, pools).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
+    async fn a_claim_lost_to_a_row_deleted_before_its_lock_claims_again() {
+        use sea_orm::TransactionTrait;
+
+        const ID: &str = "alert-lost";
+        let Some((admin, schema, mut pools)) = postgres_pools(5).await else {
+            return;
+        };
+        create_touch_tables(&pools[0]).await;
+        let (watcher, opener) = (pools.pop().unwrap(), pools.pop().unwrap());
+        let (deleter, inserter) = (pools.pop().unwrap(), pools.pop().unwrap());
+        let writer = pools.pop().unwrap();
+        let writer_pid = backend_pid(&writer).await;
+        let (inserter_pid, opener_pid) = (backend_pid(&inserter).await, backend_pid(&opener).await);
+        // Uncommitted when the write first looks, so its claim waits on this insert and then loses.
+        let insert = inserter.begin().await.unwrap();
+        let row = alert_states::ActiveModel {
+            alert_id: Set(ID.to_string()),
+            group_key: Set(ROLLUP_GROUP_KEY.to_string()),
+            ..Default::default()
+        };
+        alert_states::Entity::insert(row)
+            .exec_without_returning(&insert)
+            .await
+            .unwrap();
+        let delete = move || {
+            let handle = tokio::runtime::Handle::current();
+            tokio::task::block_in_place(|| {
+                handle.block_on(async {
+                    let key = (ID.to_string(), ROLLUP_GROUP_KEY.to_string());
+                    let gone = alert_states::Entity::delete_by_id(key).exec(&deleter);
+                    assert_eq!(gone.await.unwrap().rows_affected, 1);
+                })
+            })
+        };
+        *LOST_CLAIM.lock().unwrap() = Some((ID.to_string(), Box::new(delete)));
+        let open = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let opening = open.clone();
+        let plan = move |_: Option<&AlertState>| {
+            let open = async move {
+                let opened = open_firing_with(&opener, ID, ROLLUP_GROUP_KEY, 1_000).await;
+                (opened.unwrap(), opener)
+            };
+            *opening.lock().unwrap() = Some(tokio::spawn(open));
+            wait_in_plan(blocked_by(&watcher, opener_pid, writer_pid));
+            let update = StateUpdate {
+                state: Some(state_row(ID, ROLLUP_GROUP_KEY, 2_000)),
+                transition: None,
+            };
+            (update, None)
+        };
+        let write = tokio::spawn(async move {
+            persist_from_current_with(&writer, ID, ROLLUP_GROUP_KEY, plan)
+                .await
+                .unwrap();
+            writer
+        });
+        blocked_by(&admin, writer_pid, inserter_pid).await;
+        insert.commit().await.unwrap();
+        let writer = write.await.unwrap();
+        let open = open.lock().unwrap().take().unwrap();
+        let (_, opener) = open.await.unwrap();
+
+        assert!(LOST_CLAIM.lock().unwrap().is_none(), "the claim lost");
+        let stored = get_with(&writer, ID, ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (stored.firing_started_at, stored.last_outcome_at),
+            (Some(1_000), Some(2_000)),
+            "the open waited for the write"
+        );
+        drop_schema(admin, &schema, vec![writer, inserter, opener]).await;
+    }
+
+    async fn backend_pid(conn: &sea_orm::DatabaseConnection) -> i32 {
+        use sea_orm::{ConnectionTrait, Statement};
+
+        let sql = "SELECT pg_backend_pid() AS pid";
+        let query = Statement::from_string(conn.get_database_backend(), sql);
+        let row = conn.query_one(query).await.unwrap().unwrap();
+        row.try_get("", "pid").unwrap()
+    }
+
+    async fn blocked_by(watcher: &sea_orm::DatabaseConnection, pid: i32, holder: i32) {
+        use sea_orm::{ConnectionTrait, Statement};
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let sql = format!("SELECT {holder} = ANY(pg_blocking_pids({pid})) AS blocked");
+        loop {
+            let query = Statement::from_string(watcher.get_database_backend(), sql.clone());
+            let row = watcher.query_one(query).await.unwrap().unwrap();
+            if row.try_get::<bool>("", "blocked").unwrap() {
+                return;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "{pid} never waited on {holder}"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+    }
+
+    /// A plan is synchronous; block_in_place lets the worker's queued tasks run while it waits.
+    fn wait_in_plan(wait: impl std::future::Future<Output = ()>) {
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::block_in_place(|| handle.block_on(wait));
+    }
+
     /// PostgreSQL (when `ZO_META_POSTGRES_DSN` is set) and SQLite, with every table a touch uses.
     async fn touch_backends() -> Vec<Backend> {
-        use sea_orm::{ConnectionTrait, Schema};
-
         let mut out = Vec::new();
         if let Some((admin, schema, mut pools)) = postgres_pools(1).await {
             let conn = pools.remove(0);
-            let backend = conn.get_database_backend();
-            let tables = Schema::new(backend);
-            for stmt in [
-                tables.create_table_from_entity(alert_states::Entity),
-                tables.create_table_from_entity(crate::table::entity::folders::Entity),
-                tables.create_table_from_entity(alerts::Entity),
-                tables.create_table_from_entity(crate::table::entity::alert_eval_intervals::Entity),
-            ] {
-                conn.execute(backend.build(&stmt)).await.unwrap();
-            }
+            create_touch_tables(&conn).await;
             out.push(Backend {
                 name: "postgres",
                 conn,
@@ -3426,6 +3877,22 @@ mod tests {
             pg: None,
         });
         out
+    }
+
+    /// Every table a touch uses, beside the transition table [`postgres_pools`] creates.
+    async fn create_touch_tables(conn: &sea_orm::DatabaseConnection) {
+        use sea_orm::{ConnectionTrait, Schema};
+
+        let backend = conn.get_database_backend();
+        let tables = Schema::new(backend);
+        for stmt in [
+            tables.create_table_from_entity(alert_states::Entity),
+            tables.create_table_from_entity(crate::table::entity::folders::Entity),
+            tables.create_table_from_entity(alerts::Entity),
+            tables.create_table_from_entity(crate::table::entity::alert_eval_intervals::Entity),
+        ] {
+            conn.execute(backend.build(&stmt)).await.unwrap();
+        }
     }
 
     /// A rollup and four group rows at 1_000, except `AHEAD`, which a later evaluation wrote.

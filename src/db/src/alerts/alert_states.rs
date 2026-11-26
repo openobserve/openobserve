@@ -29,11 +29,11 @@
 use config::meta::alerts::{
     dispatch::DeliveryEpisode,
     grouping::GroupPlan,
-    state::{EvalLedgerWrite, ROLLUP_GROUP_KEY, StateUpdate},
+    state::{AlertState, EvalLedgerWrite, ROLLUP_GROUP_KEY, StateUpdate},
 };
 use infra::{
     errors::Result,
-    table::alert_states::{DeliveryAdvance, DeliveryOutcome, GroupPlanWrite, PlanApply},
+    table::alert_states::{DeliveryAdvance, DeliveryOutcome, GroupPlanWrite, PlanApply, Rewrite},
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
@@ -71,6 +71,27 @@ pub async fn persist(update: &StateUpdate, ledger: Option<&EvalLedgerWrite>) -> 
     Ok(())
 }
 
+/// [`persist`] of the update `plan` builds from the row as the write's own transaction reads it.
+#[inline]
+pub async fn persist_from_current<F>(alert_id: &str, group_key: &str, plan: F) -> Result<Rewrite>
+where
+    F: FnOnce(Option<&AlertState>) -> (StateUpdate, Option<EvalLedgerWrite>),
+{
+    let written =
+        infra::table::alert_states::persist_from_current(alert_id, group_key, plan).await?;
+
+    #[cfg(feature = "enterprise")]
+    if written.update.state.is_some() || written.ledger.is_some() {
+        publish(AlertStateMessage::Persist {
+            update: written.update.clone(),
+            ledger: written.ledger.clone(),
+        })
+        .await;
+    }
+
+    Ok(written)
+}
+
 /// Writes `update` in `txn` and commits it; the write is published only once the commit succeeded.
 pub async fn persist_and_commit(txn: DatabaseTransaction, update: &StateUpdate) -> Result<()> {
     infra::table::alert_states::persist_update_in_transaction(&txn, update).await?;
@@ -86,6 +107,26 @@ pub async fn persist_and_commit(txn: DatabaseTransaction, update: &StateUpdate) 
     }
 
     Ok(())
+}
+
+/// Starts the row's firing unless one is open, and replicates the row it opened.
+#[inline]
+pub async fn open_firing(alert_id: &str, group_key: &str, at: i64) -> Result<Option<AlertState>> {
+    let opened = infra::table::alert_states::open_firing(alert_id, group_key, at).await?;
+
+    #[cfg(feature = "enterprise")]
+    if let Some(state) = opened.as_ref() {
+        publish(AlertStateMessage::Persist {
+            update: StateUpdate {
+                state: Some(state.clone()),
+                transition: None,
+            },
+            ledger: None,
+        })
+        .await;
+    }
+
+    Ok(opened)
 }
 
 /// Returns the closes and reaps that matched, so the caller emits only those.

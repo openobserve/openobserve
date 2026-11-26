@@ -162,18 +162,18 @@ async fn persist_alert_run_state(
     rule_value: Option<&str>,
     episode: &config::meta::alerts::recovery::EpisodeInput,
 ) -> bool {
-    let Some(recoveries) = persist_alert_run_state_deferred(
+    let Some(commit) = persist_alert_run_state_deferred(
         alert, alert_id, outcome, level, grouped, rule_value, episode,
     )
     .await
     else {
         return false;
     };
-    crate::alerts::recovery::dispatch_group_recoveries(alert, recoveries).await;
+    crate::alerts::recovery::dispatch_group_recoveries(alert, commit.recoveries).await;
     true
 }
 
-/// [`persist_alert_run_state`] that hands back the group recoveries its write committed, unsent.
+/// [`persist_alert_run_state`] that hands back what its write committed, recoveries unsent.
 #[must_use]
 async fn persist_alert_run_state_deferred(
     alert: &config::meta::alerts::alert::Alert,
@@ -183,7 +183,7 @@ async fn persist_alert_run_state_deferred(
     grouped: Option<&config::meta::alerts::grouping::GroupClassification>,
     rule_value: Option<&str>,
     episode: &config::meta::alerts::recovery::EpisodeInput,
-) -> Option<Vec<config::meta::alerts::recovery::RecoveryEvent>> {
+) -> Option<StateCommit> {
     use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
 
     // Every delivery path persists here.
@@ -206,19 +206,6 @@ async fn persist_alert_run_state_deferred(
         return persist_group_run_state(alert, alert_id, classification).await;
     }
 
-    // `Skipped` runs are dropped by `apply_outcome` so a silenced evaluation
-    // cannot erase a real firing state.
-    let prev = match infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY).await {
-        Ok(p) => p,
-        Err(e) => {
-            log::warn!(
-                "[SCHEDULER] could not read alert state for {}/{alert_id}: {e}",
-                alert.org_id
-            );
-            return None;
-        }
-    };
-
     // One instant for both writes: `level_at` and the ledger's `to_us` describe
     // the same evaluation, and two `now_micros()` calls would let the coverage
     // record and the freshness clock disagree about when it happened.
@@ -231,55 +218,6 @@ async fn persist_alert_run_state_deferred(
         RunOutcome::Suppressed => RunOutcome::Firing,
         other => other.clone(),
     };
-    let mut update = if alert.query_condition.promql_rule_mode {
-        config::meta::alerts::prom_rule::apply_rule_rollup_outcome(
-            alert_id,
-            prev.as_ref(),
-            state_outcome,
-            level,
-            now,
-            rule_value,
-        )
-    } else {
-        let mut update = apply_outcome(
-            alert_id,
-            ROLLUP_GROUP_KEY,
-            prev.as_ref(),
-            state_outcome,
-            level,
-            now,
-        );
-        // A multi-alert rollup's `last_seen` is its last group observation, which the reaper needs.
-        if alert.query_condition.multi_alert_enabled()
-            && let Some(state) = update.state.as_mut()
-        {
-            state.last_seen = prev.as_ref().and_then(|p| p.last_seen);
-        }
-        update
-    };
-
-    // A Slack app send of this run already published the start it predicted for the new firing.
-    let pending_start = crate::alerts::slack_publish::take_pending_start(alert_id, now);
-    if let (Some(started), Some(state)) = (pending_start, update.state.as_mut())
-        && prev.as_ref().and_then(|p| p.firing_started_at).is_none()
-        && state.firing_started_at == Some(now)
-    {
-        state.firing_started_at = Some(started);
-    }
-
-    // Emitted only once `persist` committed, or consumers hear of an unrecorded recovery.
-    let recovered = update.state.as_mut().and_then(|state| {
-        let firing = state.level.is_some_and(|l| l.is_firing());
-        let closed =
-            config::meta::alerts::recovery::apply_episode(state, firing, episode, now, || {
-                episode
-                    .episode_id
-                    .clone()
-                    .unwrap_or_else(config::ider::uuid)
-            });
-        config::meta::alerts::recovery::hold_firing_cycle(prev.as_ref(), state);
-        closed
-    });
 
     // ── Availability ledger (S-16) ──────────────────────────────────────────
     // Fleet-wide from the day this ships, deliberately: a lazy
@@ -306,16 +244,79 @@ async fn persist_alert_run_state_deferred(
         now,
     );
 
-    if update.is_noop() && ledger.is_none() {
-        return Some(vec![]);
+    // `Skipped` runs are dropped by `apply_outcome` so a silenced evaluation
+    // cannot erase a real firing state.
+    if !config::meta::alerts::state::should_persist(&state_outcome) && ledger.is_none() {
+        return Some(StateCommit::default());
     }
-    if let Err(e) = db::alerts::alert_states::persist(&update, ledger.as_ref()).await {
-        log::error!(
-            "[SCHEDULER] could not persist alert state for {}/{alert_id}: {e}",
-            alert.org_id
-        );
-        return None;
-    }
+
+    let mut recovered = None;
+    // Read in the write's own transaction: a lagging replica would restamp the firing an ack holds.
+    let written =
+        db::alerts::alert_states::persist_from_current(alert_id, ROLLUP_GROUP_KEY, |prev| {
+            let mut update = if alert.query_condition.promql_rule_mode {
+                config::meta::alerts::prom_rule::apply_rule_rollup_outcome(
+                    alert_id,
+                    prev,
+                    state_outcome,
+                    level,
+                    now,
+                    rule_value,
+                )
+            } else {
+                let mut update =
+                    apply_outcome(alert_id, ROLLUP_GROUP_KEY, prev, state_outcome, level, now);
+                // A multi-alert rollup's `last_seen` is its last group observation, which the
+                // reaper needs.
+                if alert.query_condition.multi_alert_enabled()
+                    && let Some(state) = update.state.as_mut()
+                {
+                    state.last_seen = prev.and_then(|p| p.last_seen);
+                }
+                update
+            };
+
+            // A Slack app send of this run already published the start it predicted for the new
+            // firing.
+            let pending_start = crate::alerts::slack_publish::take_pending_start(alert_id, now);
+            if let (Some(started), Some(state)) = (pending_start, update.state.as_mut())
+                && prev.and_then(|p| p.firing_started_at).is_none()
+                && state.firing_started_at == Some(now)
+            {
+                state.firing_started_at = Some(started);
+            }
+
+            // Emitted only once `persist` committed, or consumers hear of an unrecorded recovery.
+            recovered = update.state.as_mut().and_then(|state| {
+                let firing = state.level.is_some_and(|l| l.is_firing());
+                let closed = config::meta::alerts::recovery::apply_episode(
+                    state,
+                    firing,
+                    episode,
+                    now,
+                    || {
+                        episode
+                            .episode_id
+                            .clone()
+                            .unwrap_or_else(config::ider::uuid)
+                    },
+                );
+                config::meta::alerts::recovery::hold_firing_cycle(prev, state);
+                closed
+            });
+            (update, ledger)
+        })
+        .await;
+    let infra::table::alert_states::Rewrite { prev, update, .. } = match written {
+        Ok(written) => written,
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER] could not persist alert state for {}/{alert_id}: {e}",
+                alert.org_id
+            );
+            return None;
+        }
+    };
 
     // The clear hook ran before this commit; marking again keeps a render that raced it honest.
     if let Some(close) = config::meta::alerts::recovery::closes_firing_cycle(
@@ -358,7 +359,7 @@ async fn persist_alert_run_state_deferred(
     if transition_changed || stale_to_fresh {
         nudge_composite_parents(&alert.org_id, alert_id, now).await;
     }
-    Some(vec![])
+    Some(StateCommit::default())
 }
 
 /// The grouped branch of [`persist_alert_run_state_deferred`]: one plan, its closes as events.
@@ -366,7 +367,7 @@ async fn persist_group_run_state(
     alert: &config::meta::alerts::alert::Alert,
     alert_id: &str,
     classification: &config::meta::alerts::grouping::GroupClassification,
-) -> Option<Vec<config::meta::alerts::recovery::RecoveryEvent>> {
+) -> Option<StateCommit> {
     use config::meta::alerts::state::ROLLUP_GROUP_KEY;
 
     let prev = match load_tracked_group_states(alert_id).await {
@@ -443,19 +444,67 @@ async fn persist_group_run_state(
     if transition_changed || stale_to_fresh {
         nudge_composite_parents(&alert.org_id, alert_id, at).await;
     }
-    Some(
-        write
+    #[cfg(feature = "enterprise")]
+    let firing_groups = plan
+        .updates
+        .iter()
+        .filter(|_| write.written)
+        .filter_map(|update| update.state.as_ref())
+        .filter(|state| state.group_key != ROLLUP_GROUP_KEY && state.firing_started_at.is_some())
+        .map(|state| state.group_key.clone())
+        .collect();
+    Some(StateCommit {
+        recoveries: write
             .closed
             .iter()
             .map(|close| close.recovery_event(&alert.org_id, alert_id, at))
             .collect(),
-    )
+        #[cfg(feature = "enterprise")]
+        firing_groups,
+    })
 }
 
 /// Whether the alert's firing cycle lives on its rollup row: every alert but a multi-alert,
 /// which clears per group. [pure]
 fn closes_single_row_cycle(query: &config::meta::alerts::QueryCondition) -> bool {
     !query.multi_alert_enabled()
+}
+
+/// Writes the firing an ack names before the page opens or anything is sent.
+async fn commit_firing_first(
+    alert: &config::meta::alerts::alert::Alert,
+    classification: Option<&config::meta::alerts::grouping::GroupClassification>,
+) -> FiringFirst {
+    let Some(alert_id) = alert.id.as_ref().map(ToString::to_string) else {
+        return FiringFirst::Row;
+    };
+    let Some(classification) = classification else {
+        if closes_single_row_cycle(&alert.query_condition)
+            && let Err(e) = open_rollup_firing(&alert_id).await
+        {
+            log::error!(
+                "[SCHEDULER] could not open the firing of {}/{alert_id}: {e}",
+                alert.org_id
+            );
+        }
+        return FiringFirst::Row;
+    };
+    // The mute is left to whichever delivery follows: per-group dispatch or an incident's.
+    match persist_group_run_state(alert, &alert_id, classification).await {
+        Some(commit) => FiringFirst::Plan(commit),
+        None => FiringFirst::PlanFailed,
+    }
+}
+
+/// Starts the rollup row's firing unless one is open; the post-send write keeps it, fills the rest.
+async fn open_rollup_firing(alert_id: &str) -> Result<(), anyhow::Error> {
+    db::alerts::alert_states::open_firing(
+        alert_id,
+        config::meta::alerts::state::ROLLUP_GROUP_KEY,
+        now_micros(),
+    )
+    .await?;
+    Ok(())
 }
 
 /// The cycle a single-row clear closes, and whether that close resolves a delivered episode. [pure]
@@ -609,6 +658,26 @@ impl GroupDispatchOutcome {
     }
 }
 
+/// What [`commit_firing_first`] wrote before anything paged or was sent.
+enum FiringFirst {
+    /// A single-row alert: its firing is open, or the failed open was logged.
+    Row,
+    /// The group plan committed; its recoveries are owed after the sends.
+    Plan(StateCommit),
+    /// The group plan did not commit, so nothing may page or send.
+    PlanFailed,
+}
+
+/// What one evaluation's state write committed.
+#[derive(Default)]
+struct StateCommit {
+    /// The recoveries its group closes owe, unsent.
+    recoveries: Vec<config::meta::alerts::recovery::RecoveryEvent>,
+    /// The groups the committed plan leaves firing: the only ones a page may name.
+    #[cfg(feature = "enterprise")]
+    firing_groups: std::collections::HashSet<String>,
+}
+
 /// Per-group notification dispatch (§5.5 MN-1..MN-8) — the OSS tail.
 ///
 /// Returns what each group's send did for a multi-alert, and `None` when it is
@@ -619,18 +688,17 @@ impl GroupDispatchOutcome {
 /// both would page the worst group twice per incident — once as itself and
 /// once as the rollup.
 ///
-/// Order is load-bearing: the group plan is committed BEFORE anything is sent,
-/// so `plan_dispatch` reads back this evaluation's own level axis, and a send
-/// that fails leaves durable state describing what was observed.
+/// Order is load-bearing: the caller commits the plan (`recoveries` are its closes) before any page
+/// or send, so `plan_dispatch` reads this evaluation's own levels and a failed send is on record.
 #[allow(clippy::too_many_arguments)]
 async fn dispatch_per_group(
     alert: &config::meta::alerts::alert::Alert,
     folder_id: &str,
     trace_id: &str,
     classification: Option<&config::meta::alerts::grouping::GroupClassification>,
+    recoveries: Vec<config::meta::alerts::recovery::RecoveryEvent>,
     records: &[config::utils::json::Map<String, config::utils::json::Value>],
     rows_end_time: i64,
-    rollup_level: Option<config::meta::alerts::level::AlertLevel>,
     start_time: Option<i64>,
     triggered_at: i64,
     handler_started_at: i64,
@@ -639,6 +707,12 @@ async fn dispatch_per_group(
 
     let classification = classification?;
     let alert_id = alert.id.as_ref()?.to_string();
+    #[cfg(feature = "enterprise")]
+    if clears_recorded_mute(&config::meta::alerts::grouping::group_outcome(
+        classification.rollup,
+    )) {
+        clear_recorded_mute(&alert.org_id, &alert_id).await;
+    }
     // How this alert's rows carry their group identity. A PromQL alert has no
     // `group_by` at all — feeding its rows to the column-list extractor would
     // hand every series the SAME empty label set, so all of them would collapse
@@ -650,44 +724,6 @@ async fn dispatch_per_group(
         .as_ref()
         .and_then(|a| a.group_by.clone())
         .unwrap_or_default();
-
-    // Durable state first (MN-1), then read it back: the delivery decision is
-    // made against the rows this evaluation just committed.
-    // The rollup outcome follows the classification, not an assumption: an
-    // evaluation can reach dispatch with every group healthy.
-    let rollup_outcome = config::meta::alerts::grouping::group_outcome(classification.rollup);
-    let Some(recoveries) = persist_alert_run_state_deferred(
-        alert,
-        &alert_id,
-        &rollup_outcome,
-        rollup_level,
-        Some(classification),
-        None,
-        &config::meta::alerts::recovery::EpisodeInput::undelivered(alert.keep_firing_for),
-    )
-    .await
-    else {
-        // MN-1: dispatch only AFTER the plan commits. Sending against stale
-        // state would page a group under the previous episode and its delivery
-        // callback would be rejected as stale — a page with nothing recording
-        // that it went out. The next evaluation retries cleanly.
-        log::error!(
-            "[SCHEDULER trace_id {trace_id}] alert {alert_id}: group plan did not commit; \
-             skipping per-group dispatch this evaluation"
-        );
-        return Some(GroupDispatchOutcome {
-            failed: 0,
-            fired: 0,
-            pending: 0,
-            errors: vec!["group state did not commit".to_string()],
-            undelivered: Vec::new(),
-            attempted: false,
-            state_failed: true,
-            downtime_id: None,
-            acked_by: None,
-            repeated: false,
-        });
-    };
 
     let states = match load_tracked_group_states(&alert_id).await {
         Ok(s) => s,
@@ -3194,6 +3230,20 @@ async fn unmuted_group_rows(
     )
 }
 
+/// The rows of the committed plan's firing groups; a pending group has no firing to ack.
+#[cfg(feature = "enterprise")]
+fn firing_group_rows(
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    firing: &std::collections::HashSet<String>,
+) -> Vec<config::utils::json::Map<String, config::utils::json::Value>> {
+    let group_by = alert_group_by(alert);
+    rows.iter()
+        .filter(|row| firing.contains(&downtime_row_key(alert, &group_by, row)))
+        .cloned()
+        .collect()
+}
+
 #[cfg(not(feature = "enterprise"))]
 pub(crate) async fn downtime_decision(
     _alert: &config::meta::alerts::alert::Alert,
@@ -3515,6 +3565,23 @@ async fn clear_recorded_mute(org: &str, alert_id: &str) {
     }
 }
 
+/// Clears the mute when an incident took a plan committed before the page: no dispatch cleared it.
+#[cfg(feature = "enterprise")]
+async fn clear_mute_after_incident(
+    alert: &config::meta::alerts::alert::Alert,
+    plan_committed: bool,
+    incident_id: Option<&str>,
+    outcome: &RunOutcome,
+) {
+    if let Some(alert_id) = alert.id.as_ref()
+        && plan_committed
+        && incident_id.is_some()
+        && clears_recorded_mute(outcome)
+    {
+        clear_recorded_mute(&alert.org_id, &alert_id.to_string()).await;
+    }
+}
+
 /// Records a failed incident page; the returned pre-failure outcome is what the alert state keeps.
 #[cfg(feature = "enterprise")]
 fn record_incident_notify_failure(row: &mut TriggerData, error: String) -> RunOutcome {
@@ -3524,6 +3591,40 @@ fn record_incident_notify_failure(row: &mut TriggerData, error: String) -> RunOu
         Some(error),
     ));
     durable
+}
+
+/// Nothing was sent because the group state is unavailable: record an error and retry soon.
+async fn retry_without_group_state(
+    mut row: TriggerData,
+    trigger: db::scheduler::Trigger,
+    retries: i32,
+    error: String,
+    trace_ids: (&str, &str),
+) -> Result<(), anyhow::Error> {
+    let (scheduler_trace_id, query_trace_id) = trace_ids;
+    // An evaluation failure, not a completed run: the retry path comes back soon instead of a full
+    // interval later with the firing silently unpaged.
+    row.status = RunOutcome::Error;
+    row.error = Some(error);
+    log::error!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] alert {}/{}: per-group state unavailable, \
+         nothing dispatched; retrying",
+        trigger.org,
+        trigger.module_key
+    );
+    db::scheduler::update_status(
+        &trigger.org,
+        trigger.module,
+        &trigger.module_key,
+        db::scheduler::TriggerStatus::Waiting,
+        retries + 1,
+        None,
+        true,
+        query_trace_id,
+    )
+    .await?;
+    publish_triggers_usage(row);
+    Ok(())
 }
 
 #[allow(clippy::cognitive_complexity, clippy::too_many_lines)]
@@ -3898,10 +3999,8 @@ async fn handle_alert_triggers(
 
     let mut should_store_last_end_time =
         alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);
-    // Set when per-group dispatch handled delivery (§5.5 MN-1): it commits the
-    // group plan itself, before sending, so the alert-level state write at the
-    // end of this function must not run and clobber the delivery callbacks.
-    let mut multi_alert_dispatched = false;
+    // Set when the group plan committed before delivery, so the end write must not redo it.
+    let mut plan_committed = false;
     let mut trigger_data_stream: TriggerData = TriggerData {
         _timestamp: now,
         org: trigger.org.clone(),
@@ -4421,6 +4520,31 @@ async fn handle_alert_triggers(
         // notification is skipped.
         && delivery.should_deliver()
     {
+        // An ack that lands while the page or a send is out must find the firing it names.
+        let mut committed = match commit_firing_first(
+            &alert,
+            trigger_results.group_classification.as_ref(),
+        )
+        .await
+        {
+            FiringFirst::Row => None,
+            FiringFirst::Plan(commit) => {
+                plan_committed = true;
+                Some(commit)
+            }
+            FiringFirst::PlanFailed => {
+                let error = "group state did not commit".to_string();
+                let trace_ids = (scheduler_trace_id.as_str(), query_trace_id.as_str());
+                return retry_without_group_state(
+                    trigger_data_stream,
+                    new_trigger,
+                    trigger.retries,
+                    error,
+                    trace_ids,
+                )
+                .await;
+            }
+        };
         #[cfg(feature = "enterprise")]
         let unmuted_rows = unmuted_group_rows(&alert, &folder_id, &data, now).await;
         #[cfg(feature = "enterprise")]
@@ -4484,8 +4608,16 @@ async fn handle_alert_triggers(
         // Asked after correlation, not predicted: a prediction suppresses a page nobody made.
         #[cfg(feature = "enterprise")]
         if o2_enterprise::enterprise::oncall::is_enabled() && !incident_handled_notification {
-            let identity = unmuted_identity(&alert, &folder_id, &data, now).await;
-            if !identity.is_empty() {
+            let firing_rows;
+            let page_rows = match committed.as_ref() {
+                Some(commit) => {
+                    firing_rows = firing_group_rows(&alert, &data, &commit.firing_groups);
+                    firing_rows.as_slice()
+                }
+                None => data.as_slice(),
+            };
+            let identity = unmuted_identity(&alert, &folder_id, page_rows, now).await;
+            if !page_rows.is_empty() && !identity.is_empty() {
                 page_for_alert_identity(&scheduler_trace_id, &alert, &identity).await;
             }
         }
@@ -4508,6 +4640,12 @@ async fn handle_alert_triggers(
             incident_notify_error,
             unlicensed_reason,
         );
+
+        // When an incident took delivery, no per-group dispatch sends the plan's recoveries.
+        if incident_handled_notification && let Some(commit) = committed.as_mut() {
+            let recoveries = std::mem::take(&mut commit.recoveries);
+            crate::alerts::recovery::dispatch_group_recoveries(&alert, recoveries).await;
+        }
 
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
@@ -4550,9 +4688,12 @@ async fn handle_alert_triggers(
                 &folder_id,
                 &scheduler_trace_id,
                 trigger_results.group_classification.as_ref(),
+                committed
+                    .as_mut()
+                    .map(|commit| std::mem::take(&mut commit.recoveries))
+                    .unwrap_or_default(),
                 &data,
                 trigger_results.end_time,
-                eval_level,
                 Some(start_time),
                 triggered_at,
                 now,
@@ -4561,38 +4702,16 @@ async fn handle_alert_triggers(
         {
             // Per-group dispatch REPLACES the alert-level send (§5.5 MN-1):
             // sending both would page the worst group twice per incident.
-            // Durable state was already committed inside, before anything was
-            // sent, so the later `persist_alert_run_state` call is skipped for
-            // this path.
-            multi_alert_dispatched = true;
             if dispatch.state_failed {
-                // Nothing was sent and nothing can be: the group plan is the
-                // input to every delivery decision. Treated as an evaluation
-                // failure rather than a completed run — record `error`, leave
-                // the silence window and last-notified level alone, and take
-                // the retry path so the next attempt comes soon instead of a
-                // full interval later with the firing silently unpaged.
-                trigger_data_stream.status = RunOutcome::Error;
-                trigger_data_stream.error = Some(dispatch.errors.join("; "));
-                log::error!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] alert {}/{}: per-group state \
-                     unavailable, nothing dispatched; retrying",
-                    new_trigger.org,
-                    new_trigger.module_key
-                );
-                db::scheduler::update_status(
-                    &new_trigger.org,
-                    new_trigger.module,
-                    &new_trigger.module_key,
-                    db::scheduler::TriggerStatus::Waiting,
-                    trigger.retries + 1,
-                    None,
-                    true,
-                    &query_trace_id,
+                let trace_ids = (scheduler_trace_id.as_str(), query_trace_id.as_str());
+                return retry_without_group_state(
+                    trigger_data_stream,
+                    new_trigger,
+                    trigger.retries,
+                    dispatch.errors.join("; "),
+                    trace_ids,
                 )
-                .await?;
-                publish_triggers_usage(trigger_data_stream);
-                return Ok(());
+                .await;
             }
             trigger_data_stream.delivery_attempted = Some(dispatch.attempted);
             // MN-7: one record (D8) for the evaluation; per-group detail lives on each group's row.
@@ -4944,13 +5063,22 @@ async fn handle_alert_triggers(
         trigger_data_stream.end_time = trigger_results.end_time;
     }
 
+    #[cfg(feature = "enterprise")]
+    clear_mute_after_incident(
+        &alert,
+        plan_committed,
+        episode_incident_id.as_deref(),
+        durable_outcome
+            .as_ref()
+            .unwrap_or(&trigger_data_stream.status),
+    )
+    .await;
     // Persist durable run state BEFORE the lossy stream publish (Part IV of
     // alerts.md). `alert.id` is the ksuid the state rows are keyed on.
     //
-    // Skipped when per-group dispatch ran: it committed the group plan itself,
-    // before sending, and re-running it here would overwrite the delivery
-    // state those callbacks just recorded.
-    if let Some(alert_id) = alert.id.as_ref().filter(|_| !multi_alert_dispatched) {
+    // Skipped when the group plan committed before delivery: re-running it here
+    // would overwrite the delivery state those callbacks just recorded.
+    if let Some(alert_id) = alert.id.as_ref().filter(|_| !plan_committed) {
         let _ = persist_alert_run_state(
             &alert,
             &alert_id.to_string(),
@@ -7897,6 +8025,15 @@ mod tests {
         destinations: &[&str],
         pending_period_sec: i64,
     ) -> Option<config::meta::alerts::alert::Alert> {
+        stored_alert(name, destinations, pending_period_sec, true).await
+    }
+
+    async fn stored_alert(
+        name: &str,
+        destinations: &[&str],
+        pending_period_sec: i64,
+        multi_alert: bool,
+    ) -> Option<config::meta::alerts::alert::Alert> {
         use config::meta::alerts::Aggregation;
         use svix_ksuid::KsuidLike;
 
@@ -7936,7 +8073,7 @@ mod tests {
                 "group_by": ["host"],
                 "function": "count",
                 "having": {"column": "value", "operator": ">", "value": 1},
-                "multi_alert": true,
+                "multi_alert": multi_alert,
             }))
             .unwrap(),
         );
@@ -7991,15 +8128,19 @@ mod tests {
         classification: &config::meta::alerts::grouping::GroupClassification,
         records: &[config::utils::json::Map<String, config::utils::json::Value>],
     ) -> GroupDispatchOutcome {
+        let FiringFirst::Plan(commit) = commit_firing_first(alert, Some(classification)).await
+        else {
+            panic!("the plan commits");
+        };
         let now = now_micros();
         dispatch_per_group(
             alert,
             "default",
             "trace",
             Some(classification),
+            commit.recoveries,
             records,
             now,
-            Some(config::meta::alerts::level::AlertLevel::Critical),
             None,
             now,
             now,
@@ -8084,6 +8225,228 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_ack_while_the_page_and_sends_are_out_holds_the_firing() {
+        use config::meta::alerts::{
+            ack::AckSource, level::AlertLevel, recovery::EpisodeInput, state::ROLLUP_GROUP_KEY,
+        };
+
+        use crate::alerts::ack;
+
+        const BY: &str = "oncall@example.com";
+        let level = Some(AlertLevel::Critical);
+        // (case, multi-alert, the ack lands before the post-send write, the send's outcome)
+        let cases = [
+            ("single, ack first", false, true, RunOutcome::Firing),
+            (
+                "single, ack first, send failed",
+                false,
+                true,
+                RunOutcome::NotifyFailed,
+            ),
+            ("single, write first", false, false, RunOutcome::Firing),
+            ("multi, ack first", true, true, RunOutcome::Firing),
+            (
+                "multi, ack first, send failed",
+                true,
+                true,
+                RunOutcome::NotifyFailed,
+            ),
+            ("multi, write first", true, false, RunOutcome::Firing),
+        ];
+        for (n, (case, multi, ack_first, sent)) in cases.into_iter().enumerate() {
+            let Some(alert) = stored_alert(&format!("firing_first_{n}"), &[], 0, multi).await
+            else {
+                return;
+            };
+            let alert_id = alert.id.unwrap().to_string();
+            let classification = multi.then(|| critical_hosts(&["a"]));
+            let target = ack::resolve_target(&alert.org_id, &alert_id).await.unwrap();
+            // The page route acks every group; the alert route's empty body names the rollup row.
+            let groups = if multi {
+                ack::Groups::All
+            } else {
+                ack::Groups::One {
+                    group_key: ROLLUP_GROUP_KEY.to_string(),
+                    firing_started_at: None,
+                }
+            };
+            let problem = ack::problem_of_target(target.clone(), groups)
+                .await
+                .unwrap();
+            let episode = EpisodeInput::undelivered(0);
+            let first = commit_firing_first(&alert, classification.as_ref()).await;
+            let plan_committed = matches!(first, FiringFirst::Plan(_));
+            // What the handler writes once the page is open: main's plan, then the rollup row.
+            let after_page = || async {
+                if multi && !plan_committed {
+                    let planned = persist_alert_run_state(
+                        &alert,
+                        &alert_id,
+                        &RunOutcome::Firing,
+                        level,
+                        classification.as_ref(),
+                        None,
+                        &episode,
+                    );
+                    assert!(planned.await, "{case}: the plan commits");
+                }
+                if !multi || sent == RunOutcome::NotifyFailed {
+                    let written = persist_alert_run_state(
+                        &alert, &alert_id, &sent, level, None, None, &episode,
+                    );
+                    assert!(written.await, "{case}: the state commits");
+                }
+            };
+            let acked = if ack_first {
+                let acked = ack::acknowledge(&problem, BY, AckSource::Api).await;
+                after_page().await;
+                acked
+            } else {
+                after_page().await;
+                ack::acknowledge(&problem, BY, AckSource::Api).await
+            };
+
+            let acks = ack::list_in_force(&target).await.unwrap();
+            let held: Vec<_> = acks
+                .iter()
+                .map(|a| (a.acked_by.as_str(), a.ack_source))
+                .collect();
+            assert_eq!(
+                (acked.is_ok(), held),
+                (true, vec![(BY, AckSource::Api)]),
+                "{case}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_committed_plan_pages_only_its_firing_groups() {
+        // (case, pending period of the second evaluation, hosts it observes, hosts it pages)
+        let cases: [(&str, i64, &[&str], &[&str]); 3] = [
+            ("every group fires", 0, &["a", "b"], &["a", "b"]),
+            ("a new group is pending", 60, &["a", "b"], &["a"]),
+            ("every observed group is pending", 60, &["b"], &[]),
+        ];
+        for (n, (case, pending, hosts, paged)) in cases.into_iter().enumerate() {
+            let Some(mut alert) = stored_host_alert(&format!("firing_pages_{n}"), &[], 0).await
+            else {
+                return;
+            };
+            let first = commit_firing_first(&alert, Some(&critical_hosts(&["a"]))).await;
+            assert!(matches!(first, FiringFirst::Plan(_)), "{case}");
+            alert.pending_period_sec = pending;
+            let second = commit_firing_first(&alert, Some(&critical_hosts(hosts))).await;
+            let FiringFirst::Plan(commit) = second else {
+                panic!("{case}: the plan commits");
+            };
+
+            let rows = firing_group_rows(&alert, &host_rows(hosts), &commit.firing_groups);
+            let got: Vec<_> = rows.iter().filter_map(|r| r["host"].as_str()).collect();
+            assert_eq!(got, paged, "{case}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_plan_committed_before_the_page_leaves_the_mute_to_its_delivery() {
+        // (the delivery after the pre-page commit, the incident that took it, the mute stays
+        // recorded)
+        let cases = [
+            ("none", None, true),
+            ("per-group dispatch", None, false),
+            ("an incident", Some("incident-1"), false),
+        ];
+        for (n, (case, incident, kept)) in cases.into_iter().enumerate() {
+            let Some(alert) = stored_host_alert(&format!("plan_mute_{n}"), &[], 0).await else {
+                return;
+            };
+            let alert_id = alert.id.unwrap().to_string();
+            record_ended_mute(&alert).await;
+            let classification = critical_hosts(&["a"]);
+            if case == "per-group dispatch" {
+                dispatch_critical(&alert, &classification, &host_rows(&["a"])).await;
+            } else {
+                let first = commit_firing_first(&alert, Some(&classification)).await;
+                assert!(matches!(first, FiringFirst::Plan(_)), "{case}");
+            }
+            // As the end of the evaluation does, after any delivery.
+            clear_mute_after_incident(&alert, true, incident, &RunOutcome::Firing).await;
+            let recorded =
+                infra::table::alert_states::last_downtime_ids(std::slice::from_ref(&alert_id))
+                    .await
+                    .unwrap();
+            assert_eq!(recorded.contains_key(&alert_id), kept, "{case}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_incident_that_takes_a_committed_plan_clears_the_recorded_mute() {
+        use config::meta::alerts::{TriggerEvalResults, level::AlertLevel};
+
+        let Some(mut alert) = stored_host_alert("incident_mute", &[], 0).await else {
+            return;
+        };
+        alert.enabled = true;
+        alert.creates_incident = true;
+        alert.trigger_condition.period = 1;
+        alert.trigger_condition.frequency = 60;
+        let org = alert.org_id.clone();
+        let client = infra::db::get_orm_client_rw().await;
+        let alert = infra::table::alerts::update(client, &org, None, alert)
+            .await
+            .unwrap();
+        let alert_id = alert.id.unwrap().to_string();
+        record_ended_mute(&alert).await;
+        let results = TriggerEvalResults {
+            data: Some(host_rows(&["a"])),
+            end_time: now_micros(),
+            level: Some(AlertLevel::Critical),
+            group_classification: Some(critical_hosts(&["a"])),
+            ..Default::default()
+        };
+        crate::alerts::alert::evaluation_stub::set(&alert_id, results);
+        let job = claimed_job(&org, db::scheduler::TriggerModule::Alert, &alert_id, 0).await;
+
+        handle_alert_triggers("t", job).await.unwrap();
+
+        let all = infra::table::alert_incidents::CaseFilter::All;
+        let (_, incidents) =
+            crate::alerts::incidents::list_incidents_filtered(&org, None, all, 10, 0)
+                .await
+                .unwrap();
+        assert_eq!(incidents, 1, "an incident took the delivery");
+        let recorded =
+            infra::table::alert_states::last_downtime_ids(std::slice::from_ref(&alert_id))
+                .await
+                .unwrap();
+        assert!(!recorded.contains_key(&alert_id), "{recorded:?}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn record_ended_mute(alert: &config::meta::alerts::alert::Alert) {
+        use svix_ksuid::KsuidLike;
+
+        let folder = config::meta::folder::Folder {
+            folder_id: "default".to_string(),
+            name: "default".to_string(),
+            ..Default::default()
+        };
+        let downtimes = config::meta::folder::FolderType::Downtimes;
+        infra::table::folders::get_or_create(&alert.org_id, folder, downtimes)
+            .await
+            .unwrap();
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let downtime = ended_downtime(&id, &alert.org_id);
+        db::downtimes::set(&downtime, &[]).await.unwrap();
+        let alert_id = alert.id.unwrap().to_string();
+        infra::table::alert_states::set_last_downtime_id(&alert_id, Some(&downtime.id))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
     async fn a_rollup_rewrite_after_dispatch_keeps_the_observation_clock() {
         use config::meta::alerts::{level::AlertLevel, state::ROLLUP_GROUP_KEY};
 
@@ -8145,7 +8508,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_firing_past_its_deadline_sends_nothing_and_opens_no_silence_window() {
-        use config::meta::alerts::{grouping::group_key, level::AlertLevel};
+        use config::meta::alerts::grouping::group_key;
 
         let Some(alert) = stored_host_alert("deadline", &["deadline-dest"], 0).await else {
             return;
@@ -8154,15 +8517,19 @@ mod tests {
         let hosts = ["a", "b"];
         let classification = critical_hosts(&hosts);
         let records = host_rows(&hosts);
+        let FiringFirst::Plan(commit) = commit_firing_first(&alert, Some(&classification)).await
+        else {
+            panic!("the plan commits");
+        };
         let now = now_micros();
         let outcome = dispatch_per_group(
             &alert,
             "default",
             "trace",
             Some(&classification),
+            commit.recoveries,
             &records,
             now,
-            Some(AlertLevel::Critical),
             None,
             now,
             now - 1_801 * 1_000_000,
@@ -10254,9 +10621,26 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn a_firing_after_an_ended_one_time_window_still_clears_its_mute() {
-        let ended: config::meta::downtimes::Downtime = serde_json::from_value(serde_json::json!({
-            "id": "d1",
-            "org": "acme",
+        let ended = ended_downtime("d1", "acme");
+        let rows = std::slice::from_ref(&ended);
+        let now = 2 * 3_600_000_000_i64;
+        assert!(!crate::alerts::downtimes::enterprise::any_live_target(
+            rows,
+            config::meta::downtimes::TargetModule::Alerts,
+            now
+        ));
+        assert!(mute_may_linger(rows));
+        let mut cancelled = ended;
+        cancelled.cancelled_at = Some(1);
+        assert!(!mute_may_linger(&[cancelled]));
+    }
+
+    /// A one-time alert downtime that ended an hour after the epoch.
+    #[cfg(feature = "enterprise")]
+    fn ended_downtime(id: &str, org: &str) -> config::meta::downtimes::Downtime {
+        serde_json::from_value(serde_json::json!({
+            "id": id,
+            "org": org,
             "name": "deploy",
             "targets": [{"module": "alerts", "folders": {"kind": "all"}}],
             "schedule": {
@@ -10272,18 +10656,7 @@ mod tests {
             "updated_by": "lin",
             "updated_at": 0
         }))
-        .unwrap();
-        let rows = std::slice::from_ref(&ended);
-        let now = 2 * 3_600_000_000_i64;
-        assert!(!crate::alerts::downtimes::enterprise::any_live_target(
-            rows,
-            config::meta::downtimes::TargetModule::Alerts,
-            now
-        ));
-        assert!(mute_may_linger(rows));
-        let mut cancelled = ended;
-        cancelled.cancelled_at = Some(1);
-        assert!(!mute_may_linger(&[cancelled]));
+        .unwrap()
     }
 
     #[cfg(feature = "enterprise")]
@@ -10940,12 +11313,20 @@ mod tests {
         )
         .await
         .unwrap();
-        let module = db::scheduler::TriggerModule::CompositeAlert;
+        claimed_job(org, db::scheduler::TriggerModule::CompositeAlert, id, 1).await
+    }
+
+    async fn claimed_job(
+        org: &str,
+        module: db::scheduler::TriggerModule,
+        id: &str,
+        next_run_at: i64,
+    ) -> db::scheduler::Trigger {
         infra::scheduler::push(db::scheduler::Trigger {
             org: org.to_string(),
             module: module.clone(),
             module_key: id.to_string(),
-            next_run_at: 1,
+            next_run_at,
             ..Default::default()
         })
         .await
