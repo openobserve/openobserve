@@ -18296,7 +18296,8 @@
     "resync": "Resynchroniser les réglages IA",
     "resyncMessage": "Renvoyer les ensembles d'outils IA de cette organisation et les suppressions récentes vers les autres régions ? Rien n'est supprimé si une autre région le possède encore.",
     "resynced": "{count} mises à jour envoyées aux autres régions",
-    "resyncFailed": "Impossible de resynchroniser les réglages IA"
+    "resyncFailed": "Impossible de resynchroniser les réglages IA",
+    "skillContent": "Définition de la compétence (Markdown)"
   },
   "cipherKey": {
     "configuration": "Configuration",

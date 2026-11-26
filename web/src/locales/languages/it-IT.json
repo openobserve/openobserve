@@ -18296,7 +18296,8 @@
     "resync": "Risincronizza le impostazioni AI",
     "resyncMessage": "Inviare di nuovo alle altre regioni i toolset AI di questa organizzazione e le eliminazioni recenti? Nulla viene eliminato se un'altra regione lo possiede ancora.",
     "resynced": "Inviati {count} aggiornamenti alle altre regioni",
-    "resyncFailed": "Impossibile risincronizzare le impostazioni AI"
+    "resyncFailed": "Impossibile risincronizzare le impostazioni AI",
+    "skillContent": "Definizione delle abilità (Markdown)"
   },
   "cipherKey": {
     "configuration": "Configurazione",

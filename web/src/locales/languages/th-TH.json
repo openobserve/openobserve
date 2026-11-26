@@ -18294,7 +18294,8 @@
     "resync": "ซิงค์การตั้งค่า AI ใหม่",
     "resyncMessage": "ส่งชุดเครื่องมือ AI และรายการที่ลบล่าสุดขององค์กรนี้ไปยังภูมิภาคอื่นอีกครั้งหรือไม่? ระบบจะไม่ลบสิ่งที่ภูมิภาคอื่นยังมีอยู่",
     "resynced": "ส่งการอัปเดต {count} รายการไปยังภูมิภาคอื่นแล้ว",
-    "resyncFailed": "ไม่สามารถซิงค์การตั้งค่า AI ใหม่ได้"
+    "resyncFailed": "ไม่สามารถซิงค์การตั้งค่า AI ใหม่ได้",
+    "skillContent": "Skill definition (Markdown)"
   },
   "cipherKey": {
     "configuration": "Configuration",

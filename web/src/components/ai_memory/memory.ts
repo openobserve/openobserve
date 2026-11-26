@@ -76,10 +76,13 @@ export function authorLabel(author: string | null | undefined): string {
 
 export type MemoryLineKind = "saved" | "pending" | "refused";
 
+export interface MemoryLine {
+  kind: MemoryLineKind;
+  text: string;
+}
+
 /** The compact chat line for an `update_memory` result, from the text the tool returns. */
-export function memoryLine(
-  text: string | undefined,
-): { kind: MemoryLineKind; text: string } | null {
+export function memoryLine(text: string | undefined): MemoryLine | null {
   const first = (text ?? "").trim().split("\n")[0]?.trim() ?? "";
   if (!first) return null;
   if (first.startsWith("Saved to") || first.startsWith("Already in")) {

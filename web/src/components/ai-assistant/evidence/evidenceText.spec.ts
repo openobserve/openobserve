@@ -32,6 +32,16 @@ const lineOf = (block: Partial<ContentBlock>) =>
   );
 
 describe("stepLine / stepVerb", () => {
+  it("shows an update_memory result as its own one line", () => {
+    const memory = (resultMessage: string) =>
+      lineOf({ tool: "update_memory", stepState: "done", resultMessage });
+    expect(memory("Saved to org memory · rev 4\nUse it.")).toBe("Saved to org memory · rev 4");
+    expect(memory("Sent for approval: org memory changes need approval.")).toBe(
+      "Sent for approval",
+    );
+    expect(memory("Not saved: too long; trim it")).toBe("Not saved: too long");
+  });
+
   it("reads a CLI step's exit code and stdout and stderr line counts from its summary", () => {
     const summary = { return_code: 1, stdout_lines: 4, stderr_lines: 2 } as any;
     expect(

@@ -8496,12 +8496,7 @@
     "typeText": "文字",
     "sectionValueFormatting": "數值格式化",
     "sectionFieldType": "欄位類型",
-    "configSectionFieldOverridesAliases": [
-      "欄位覆寫",
-      "覆寫設定",
-      "覆寫",
-      "欄位格式化"
-    ],
+    "configSectionFieldOverridesAliases": ["欄位覆寫", "覆寫設定", "覆寫", "欄位格式化"],
     "sectionAlignment": "對齊",
     "alignLeft": "靠左",
     "alignCenter": "置中",
@@ -18296,7 +18291,8 @@
     "resync": "重新同步 AI 設定",
     "resyncMessage": "要再次將此組織的 AI 工具組和最近的刪除項目傳送到其他區域嗎？其他區域仍保留的項目不會被刪除。",
     "resynced": "已將 {count} 項更新傳送到其他區域",
-    "resyncFailed": "無法重新同步 AI 設定"
+    "resyncFailed": "無法重新同步 AI 設定",
+    "skillContent": "技能定義 (Markdown)"
   },
   "cipherKey": {
     "configuration": "設定",

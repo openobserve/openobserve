@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { memoryLine, type MemoryLine } from "@/components/ai_memory/memory";
 import type { ChatMessage, ContentBlock, NavigationAction } from "@/ts/interfaces/chat";
 import {
   epochMs,
@@ -133,6 +134,8 @@ export interface StepFacts {
   suggestion: string | null;
   result: StepResult | null;
   command: string | null;
+  /** An `update_memory` call's own one-line outcome, which the trail shows as is. */
+  memory?: MemoryLine | null;
 }
 
 /** A fence of the answer as a runnable query. */
@@ -620,6 +623,7 @@ function stepFacts(block: ContentBlock, n: number, org: string): StepFacts {
     suggestion: failed ? bounded(block.suggestion) : null,
     result,
     command: kind === "cli" ? (text(args.command) ?? null) : null,
+    memory: tool === "update_memory" && !failed ? memoryLine(block.resultMessage) : null,
   };
 }
 

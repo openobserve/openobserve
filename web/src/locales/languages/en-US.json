@@ -18320,7 +18320,8 @@
     "resync": "Re-sync AI settings",
     "resyncMessage": "Send this org's AI toolsets and recent deletes to the other regions again? Nothing is deleted that another region still has.",
     "resynced": "Sent {count} updates to the other regions",
-    "resyncFailed": "Could not re-sync AI settings"
+    "resyncFailed": "Could not re-sync AI settings",
+    "skillContent": "Skill definition (Markdown)"
   },
   "cipherKey": {
     "configuration": "Configuration",

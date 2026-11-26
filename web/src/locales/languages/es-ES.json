@@ -18296,7 +18296,8 @@
     "resync": "Volver a sincronizar la configuración de IA",
     "resyncMessage": "¿Enviar de nuevo los conjuntos de herramientas de IA de esta organización y las eliminaciones recientes a las demás regiones? No se elimina nada que otra región siga teniendo.",
     "resynced": "Se enviaron {count} actualizaciones a las demás regiones",
-    "resyncFailed": "No se pudo volver a sincronizar la configuración de IA"
+    "resyncFailed": "No se pudo volver a sincronizar la configuración de IA",
+    "skillContent": "Definición de habilidad (Markdown)"
   },
   "cipherKey": {
     "configuration": "Configuración",

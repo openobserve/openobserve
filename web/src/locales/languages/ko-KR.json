@@ -18296,7 +18296,8 @@
     "resync": "AI 설정 다시 동기화",
     "resyncMessage": "이 조직의 AI 도구 세트와 최근 삭제 내역을 다른 리전으로 다시 보낼까요? 다른 리전에 아직 남아 있는 항목은 삭제되지 않습니다.",
     "resynced": "다른 리전에 업데이트 {count}개를 보냈습니다",
-    "resyncFailed": "AI 설정을 다시 동기화할 수 없습니다"
+    "resyncFailed": "AI 설정을 다시 동기화할 수 없습니다",
+    "skillContent": "스킬 정의 (마크다운)"
   },
   "cipherKey": {
     "configuration": "구성",

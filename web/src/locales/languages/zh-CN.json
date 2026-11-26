@@ -18296,7 +18296,8 @@
     "resync": "重新同步 AI 设置",
     "resyncMessage": "是否再次将此组织的 AI 工具集和最近的删除操作发送到其他区域？其他区域仍保留的内容不会被删除。",
     "resynced": "已向其他区域发送 {count} 项更新",
-    "resyncFailed": "无法重新同步 AI 设置"
+    "resyncFailed": "无法重新同步 AI 设置",
+    "skillContent": "技能定义（Markdown）"
   },
   "cipherKey": {
     "configuration": "配置",

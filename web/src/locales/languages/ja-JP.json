@@ -18296,7 +18296,8 @@
     "resync": "AI 設定を再同期",
     "resyncMessage": "この組織の AI ツールセットと最近の削除を他のリージョンに再度送信しますか？他のリージョンにまだ存在するものが削除されることはありません。",
     "resynced": "他のリージョンに {count} 件の更新を送信しました",
-    "resyncFailed": "AI 設定を再同期できませんでした"
+    "resyncFailed": "AI 設定を再同期できませんでした",
+    "skillContent": "スキル定義 (マークダウン)"
   },
   "cipherKey": {
     "configuration": "構成",

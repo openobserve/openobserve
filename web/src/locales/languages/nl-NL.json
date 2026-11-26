@@ -18296,7 +18296,8 @@
     "resync": "AI-instellingen opnieuw synchroniseren",
     "resyncMessage": "De AI-toolsets en recente verwijderingen van deze organisatie opnieuw naar de andere regio's sturen? Niets wordt verwijderd dat een andere regio nog heeft.",
     "resynced": "{count} updates naar de andere regio's verzonden",
-    "resyncFailed": "Kon AI-instellingen niet opnieuw synchroniseren"
+    "resyncFailed": "Kon AI-instellingen niet opnieuw synchroniseren",
+    "skillContent": "Definitie van vaardigheden (Markdown)"
   },
   "cipherKey": {
     "configuration": "Configuratie",

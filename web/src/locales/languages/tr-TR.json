@@ -18296,7 +18296,8 @@
     "resync": "Yapay zeka ayarlarını yeniden eşitle",
     "resyncMessage": "Bu kuruluşun yapay zeka araç setleri ve son silmeler diğer bölgelere yeniden gönderilsin mi? Başka bir bölgede hâlâ bulunan hiçbir şey silinmez.",
     "resynced": "Diğer bölgelere {count} güncelleme gönderildi",
-    "resyncFailed": "Yapay zeka ayarları yeniden eşitlenemedi"
+    "resyncFailed": "Yapay zeka ayarları yeniden eşitlenemedi",
+    "skillContent": "Beceri tanımı (Markdown)"
   },
   "cipherKey": {
     "configuration": "Yapılandırma",

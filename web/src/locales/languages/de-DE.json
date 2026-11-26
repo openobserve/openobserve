@@ -18296,7 +18296,8 @@
     "resync": "KI-Einstellungen erneut synchronisieren",
     "resyncMessage": "Die KI-Toolsets dieser Organisation und aktuelle Löschungen erneut an die anderen Regionen senden? Es wird nichts gelöscht, was eine andere Region noch hat.",
     "resynced": "{count} Aktualisierungen an die anderen Regionen gesendet",
-    "resyncFailed": "KI-Einstellungen konnten nicht erneut synchronisiert werden"
+    "resyncFailed": "KI-Einstellungen konnten nicht erneut synchronisiert werden",
+    "skillContent": "Definition der Fähigkeit (Markdown)"
   },
   "cipherKey": {
     "configuration": "Konfiguration",

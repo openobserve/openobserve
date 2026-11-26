@@ -18296,7 +18296,8 @@
     "resync": "Đồng bộ lại cài đặt AI",
     "resyncMessage": "Gửi lại bộ công cụ AI của tổ chức này và các mục đã xóa gần đây tới các vùng khác? Không có gì bị xóa nếu vùng khác vẫn còn.",
     "resynced": "Đã gửi {count} bản cập nhật tới các vùng khác",
-    "resyncFailed": "Không thể đồng bộ lại cài đặt AI"
+    "resyncFailed": "Không thể đồng bộ lại cài đặt AI",
+    "skillContent": "Định nghĩa kỹ năng (Markdown)"
   },
   "cipherKey": {
     "configuration": "Cấu hình",

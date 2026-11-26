@@ -114,6 +114,8 @@ export function stepLine(step: StepFacts, t: TranslateFn): I18nText {
       : t("assistant.steps.step.toolFailed", { tool: raw(upperFirst(toolWords(step.tool))) });
     return joined([head, step.error ? raw(step.error) : null]);
   }
+  if (step.memory)
+    return step.memory.kind === "pending" ? t("aiMemory.sentForApproval") : raw(step.memory.text);
   const verb = stepVerb(step, t);
   if (step.state === "interrupted") return joined([verb, t("assistant.steps.stoppedBeforeFinish")]);
   return joined([verb, ...stepFactsText(step, t)]);

@@ -18296,7 +18296,8 @@
     "resync": "Ressincronizar definições de IA",
     "resyncMessage": "Enviar novamente os conjuntos de ferramentas de IA desta organização e as eliminações recentes para as outras regiões? Nada é eliminado que outra região ainda tenha.",
     "resynced": "Enviadas {count} atualizações para as outras regiões",
-    "resyncFailed": "Não foi possível ressincronizar as definições de IA"
+    "resyncFailed": "Não foi possível ressincronizar as definições de IA",
+    "skillContent": "Definição de competência (Markdown)"
   },
   "cipherKey": {
     "configuration": "Configuração",

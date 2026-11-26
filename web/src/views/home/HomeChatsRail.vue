@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @shared-links="sharesOpen = true"
     >
       <template #actions>
+        <AiMemoryPanel trigger-variant="ghost-muted" trigger-size="icon" />
         <AssistantIconButton
           :label="t('assistant.thread.newChat')"
           :icon="assistantGlyph.newChat"
@@ -48,6 +49,7 @@ import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconB
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantHistoryList from "@/components/ai-assistant/history/AssistantHistoryList.vue";
 import AssistantShareManager from "@/components/ai-assistant/share/AssistantShareManager.vue";
+import AiMemoryPanel from "@/components/ai_memory/AiMemoryPanel.vue";
 import { useAssistantStore } from "@/composables/assistant";
 import { startOverOnHost } from "@/composables/assistant/pure";
 import { requestOverviewFocus } from "@/composables/goto/goToRequests";

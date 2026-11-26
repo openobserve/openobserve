@@ -59,6 +59,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </div>
+    <div v-else-if="step === 1" class="flex flex-col gap-4" data-test="ai-toolset-type-step">
+      <AiToolsetTypeTiles
+        v-model="pickedTile"
+        :tiles="typeTiles"
+        :label="t('aiToolset.selectType')"
+      />
+      <div class="flex flex-wrap gap-2">
+        <OButton
+          variant="primary"
+          size="sm-action"
+          class="max-md:min-h-11"
+          :disabled="!pickedTile"
+          data-test="ai-toolset-continue-btn"
+          @click="continueToForm"
+          >{{ t("alerts.continue") }}</OButton
+        >
+        <OButton
+          variant="outline"
+          size="sm-action"
+          class="max-md:min-h-11"
+          data-test="ai-toolset-step1-cancel-btn"
+          @click="close"
+          >{{ t("common.cancel") }}</OButton
+        >
+      </div>
+    </div>
     <OForm v-else :form="form" class="flex flex-col gap-4" v-slot="{ isSubmitting }">
       <p v-if="needsRetype" class="text-text-body text-sm" data-test="ai-toolset-retype-notice">
         {{ t("assistant.toolsets.form.retypeNotice") }}
@@ -88,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </p>
       </div>
       <OFormSelect
+        v-if="isEdit"
         name="kind"
         :label="t('aiToolset.kind')"
         required
@@ -105,11 +132,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :help-text="t('assistant.toolsets.form.descriptionHelp')"
         data-test="ai-toolset-description-input"
       />
+      <div v-if="superCluster" class="flex flex-col gap-1">
+        <OFormSwitch
+          name="region_only"
+          :label="t('aiToolset.regionOnly')"
+          data-test="ai-toolset-region-only"
+        />
+        <p class="text-text-secondary text-xs">{{ t("aiToolset.regionOnlyHint") }}</p>
+      </div>
 
       <template v-if="kind === 'mcp'">
         <h3 class="text-text-heading text-sm font-semibold">
           {{ t("assistant.toolsets.form.mcpSection") }}
         </h3>
+        <p v-if="preset?.help" class="text-text-secondary text-xs">{{ raw(preset.help) }}</p>
+        <template v-for="param in preset?.params ?? []" :key="param.name">
+          <OFormSelect
+            v-if="param.options?.length"
+            :name="`mcp.preset_params.${param.name}`"
+            :label="raw(param.label)"
+            required
+            :options="param.options"
+            :data-test="`ai-toolset-preset-param-${param.name}`"
+            @update:model-value="(v: string) => setPresetParam(param.name, v)"
+          />
+          <OFormInput
+            v-else
+            :name="`mcp.preset_params.${param.name}`"
+            :label="raw(param.label)"
+            required
+            :placeholder="param.placeholder ? raw(param.placeholder) : undefined"
+            data-o2-privacy="mask"
+            :data-test="`ai-toolset-preset-param-${param.name}`"
+            @update:model-value="(v: string) => setPresetParam(param.name, v)"
+          />
+        </template>
         <OFormInput
           name="mcp.url"
           :label="t('aiToolset.mcpUrl')"
@@ -124,6 +181,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="ai-toolset-mcp-timeout"
         />
         <AssistantToolsetSecretRows :form="form" :rows="headers" />
+        <fieldset
+          ref="connectionAnchor"
+          class="flex flex-col gap-3"
+          aria-describedby="ai-toolset-oauth-hint"
+          data-test="ai-toolset-oauth"
+        >
+          <legend class="text-text-heading mb-1 text-sm font-medium">
+            {{ t("aiToolset.oauthClientCredentials") }}
+          </legend>
+          <p id="ai-toolset-oauth-hint" class="text-text-secondary text-xs">
+            {{ t("aiToolset.oauthHint") }}
+          </p>
+          <OFormInput
+            name="mcp.auth.token_url"
+            :label="t('aiToolset.tokenUrl')"
+            data-o2-privacy="mask"
+            data-test="ai-toolset-token-url"
+          />
+          <OFormInput
+            name="mcp.auth.client_id"
+            :label="t('aiToolset.clientId')"
+            autocomplete="off"
+            data-test="ai-toolset-client-id"
+          />
+          <OFormSecretInput
+            name="mcp.auth.secret.value"
+            :state="clientSecret.state"
+            :label="t('aiToolset.clientSecret')"
+            :unchanged-label="t('assistant.toolsets.secret.unchanged')"
+            :replace-label="t('assistant.toolsets.secret.replace')"
+            :keep-label="t('assistant.toolsets.secret.keep')"
+            :will-replace-label="t('assistant.toolsets.secret.willReplace')"
+            :show-label="t('assistant.toolsets.secret.show')"
+            :hide-label="t('assistant.toolsets.secret.hide')"
+            data-test="ai-toolset-client-secret"
+            @update:state="(state) => form.setFieldValue('mcp.auth.secret.state', state)"
+          />
+          <OFormInput
+            name="mcp.auth.scope"
+            :label="t('aiToolset.scope')"
+            data-test="ai-toolset-scope"
+          />
+        </fieldset>
+        <section
+          ref="toolPickerAnchor"
+          class="flex flex-col gap-2"
+          data-test="ai-toolset-section-tools"
+        >
+          <h3 class="text-text-heading text-sm font-semibold">{{ t("aiToolset.tools") }}</h3>
+          <AiToolsetToolPicker
+            :lists="tools.lists.value"
+            :tools="tools.tools.value"
+            :status="tools.status.value"
+            :error="tools.error.value"
+            :can-refresh="!!mcpValues.url.trim()"
+            :preset-tools="preset ? (tools.lists.value.allowed ?? []).length : undefined"
+            :preset-name="preset?.label"
+            @update:lists="setToolLists"
+            @remove="tools.remove"
+            @refresh="connect"
+            @go-connection="focusConnection"
+          />
+        </section>
       </template>
 
       <template v-if="kind === 'skill'">
@@ -149,6 +269,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p v-if="skillError" class="text-status-error-text text-xs">
           {{ t("aiToolset.skillContentRequired") }}
         </p>
+        <p
+          v-else-if="skillLong"
+          class="text-status-warning-text text-xs"
+          data-test="ai-toolset-skill-long"
+        >
+          {{ t("aiToolset.skillContentLong", { chars: skillContent.length }) }}
+        </p>
       </template>
 
       <div
@@ -172,6 +299,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="close"
           >{{ t("common.cancel") }}</OButton
         >
+        <OButton
+          v-if="!isEdit"
+          variant="ghost"
+          size="sm-action"
+          class="max-md:min-h-11"
+          :disabled="isSubmitting"
+          data-test="ai-toolset-step-back-btn"
+          @click="backToTypes"
+          >{{ t("common.back") }}</OButton
+        >
       </div>
     </OForm>
   </section>
@@ -180,7 +317,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
-import { onBeforeRouteUpdate } from "vue-router";
+import { onBeforeRouteUpdate, useRouter } from "vue-router";
+import { useStore } from "vuex";
+
+import AiToolsetToolPicker from "@/components/ai_toolsets/AiToolsetToolPicker.vue";
+import AiToolsetTypeTiles, {
+  type ToolsetTypeTile,
+} from "@/components/ai_toolsets/AiToolsetTypeTiles.vue";
+import {
+  defaultParams,
+  paramsFromUrl,
+  presetData,
+  renderUrl,
+  stripPresetName,
+  type Preset,
+} from "@/components/ai_toolsets/presets";
+import { CLIENT_CREDENTIALS, sameUrl } from "@/components/ai_toolsets/toolsetAuth";
+import type { ToolLists } from "@/components/ai_toolsets/toolPicker";
 
 import { askLeaveGuard, useAssistantLeaveGuard, type LeaveGuard } from "@/composables/assistant";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -191,15 +344,20 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OFormSecretInput from "@/lib/forms/SecretInput/OFormSecretInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import { aiToolsetPresetsQuery } from "@/services/ai_toolsets.queries";
 import {
   createToolsetMutation,
   toolsetQuery,
   updateToolsetMutation,
 } from "@/services/assistant_settings.queries";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { getImageURL } from "@/utils/queryUtils";
 
 import {
+  emptyFormAuth,
   keptSecretPaths,
   makeToolsetFormSchema,
   reenterReason,
@@ -213,6 +371,7 @@ import {
 import AssistantToolsetSecretRows from "./AssistantToolsetSecretRows.vue";
 import { agentNameOf, type ToolsetRow } from "./assistantToolsets";
 import { useAssistantSettingsPage } from "./useAssistantSettingsPage";
+import { readyToDiscover, useToolsetTools } from "./useToolsetTools";
 
 const REENTER_COPY: Record<ReenterReason | "refused", I18nKey> = {
   destination: "assistant.toolsets.form.reenterDestination",
@@ -221,6 +380,16 @@ const REENTER_COPY: Record<ReenterReason | "refused", I18nKey> = {
 };
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+// About 10k tokens, as much again as a normal chat turn.
+const SKILL_LONG_CHARS = 40_000;
+const CUSTOM_MCP = "custom-mcp";
+const SKILL = "skill";
+// The server's preset has no logo field, so known ones are mapped by id.
+const PRESET_LOGOS: Record<string, string> = {
+  datadog: "datadog",
+  dynatrace: "dynatrace",
+  grafana: "grafana",
+};
 
 const props = withDefaults(
   defineProps<{
@@ -235,6 +404,9 @@ const emit = defineEmits<{ (e: "done"): void; (e: "forbidden"): void }>();
 
 const { t } = useI18nTyped();
 const page = useAssistantSettingsPage();
+const router = useRouter();
+// Replication exists only on a super cluster, so the switch means nothing elsewhere.
+const superCluster = !!useStore()?.state?.zoConfig?.super_cluster_enabled;
 // The org the form opened in is the one every request goes to.
 const org = page.org.value;
 const orgName = page.orgName.value;
@@ -257,6 +429,8 @@ const taken = computed(
     new Set(props.existing.filter((row) => row.id !== props.editId).map((row) => row.agentName)),
 );
 const loaded = ref<ToolsetFormValues | null>(null);
+// A row replicated without this region's secrets; it saves without them while its URLs stay.
+const needsCredentials = ref(false);
 const formError = ref<I18nText | string>("");
 // Kept once the kept secrets were turned into fields, so the reason stays next to them.
 const forced = ref<ReenterReason | "refused" | null>(null);
@@ -267,6 +441,16 @@ const form = useOForm<ToolsetFormValues>({
     isTaken: (agent) => taken.value.has(agent),
     editing: isEdit,
     mergeSecrets: props.mergeSecrets,
+    missingSecretOk: () => {
+      const stored = loaded.value?.mcp;
+      const mcp = values.value.mcp;
+      return (
+        needsCredentials.value &&
+        !!stored &&
+        sameUrl(mcp.url, stored.url) &&
+        sameUrl(mcp.auth.token_url, stored.auth.token_url)
+      );
+    },
   }),
   onSubmit: save,
 });
@@ -283,6 +467,68 @@ const agentName = computed(() => (typedName.value ? agentNameOf(typedName.value)
 const skillError = computed(
   () => submitted.value && kind.value === "skill" && !skillContent.value.trim(),
 );
+// A warning only: the whole skill goes into every turn, so a long one costs every turn.
+const skillLong = computed(() => skillContent.value.length > SKILL_LONG_CHARS);
+const mcpValues = computed(() => values.value.mcp);
+const clientSecret = computed(() => values.value.mcp.auth.secret);
+
+const presetList = useQuery(computed(() => aiToolsetPresetsQuery(org)));
+const mcpPresets = computed<Preset[]>(() =>
+  (presetList.data.value ?? []).filter((p: Preset) => p.kind === "mcp"),
+);
+const presetById = (id: unknown) => mcpPresets.value.find((p) => p.id === id) ?? null;
+const preset = ref<Preset | null>(null);
+
+const typeTiles = computed<ToolsetTypeTile[]>(() => [
+  ...mcpPresets.value.map((p) => {
+    const full = p.description ? stripPresetName(p.description, p.label) : "";
+    const short = full.split(/(?<=\.)\s/)[0];
+    const fallback = t("aiToolset.addMcpDesc", { name: p.label });
+    const logo = PRESET_LOGOS[p.id];
+    return {
+      id: p.id,
+      name: raw(p.label),
+      short: short ? raw(short) : fallback,
+      tip: full ? raw(full) : fallback,
+      // Without a logo the theme-coloured MCP icon stands in, so it reads in dark mode too.
+      ...(logo
+        ? { image: getImageURL(`images/ai_toolsets/${logo}.svg`) }
+        : { icon: "mcp" as const }),
+    };
+  }),
+  {
+    id: CUSTOM_MCP,
+    name: t("aiToolset.addCustomMcp"),
+    short: t("aiToolset.addCustomMcpDesc"),
+    tip: t("aiToolset.addCustomMcpDesc"),
+    icon: "mcp",
+  },
+  {
+    id: SKILL,
+    name: t("aiToolset.addCustomSkill"),
+    short: t("aiToolset.addSkillDesc"),
+    tip: t("aiToolset.addSkillDesc"),
+    icon: "menu-book",
+  },
+]);
+
+// `?preset=` or `?kind=` opens the form on that type, so a link skips the type step.
+const routeTile = (() => {
+  const query = router.currentRoute.value.query;
+  if (query.preset) return String(query.preset);
+  if (query.kind === "skill") return SKILL;
+  return query.kind === "mcp" ? CUSTOM_MCP : null;
+})();
+const step = ref(isEdit || routeTile ? 2 : 1);
+const pickedTile = ref<string | null>(routeTile ?? null);
+const filledTile = ref<string | null>(null);
+
+const tools = useToolsetTools({
+  org,
+  editId: () => props.editId,
+  mcp: mcpValues,
+  setLists: setToolLists,
+});
 const needsRetype = computed(() => isEdit && !props.mergeSecrets && headers.value.length > 0);
 const reenter = computed<ReenterReason | "refused" | null>(
   () => reenterReason(values.value, loaded.value, props.mergeSecrets) ?? forced.value,
@@ -290,14 +536,39 @@ const reenter = computed<ReenterReason | "refused" | null>(
 
 watch(
   () => record.data.value,
-  (data) => {
+  async (data) => {
     if (!data) return;
     const next = toolsetFormOf(data, props.mergeSecrets);
+    needsCredentials.value = (data as { needs_credentials?: unknown }).needs_credentials === true;
+    preset.value = presetById((next.mcp.extra.preset as { id?: unknown } | undefined)?.id);
     loaded.value = structuredClone(next);
     form.reset(next);
+    syncPresetParams();
+    // A saved toolset already has its credentials, so its tools load on open.
+    if (next.kind === "mcp" && next.mcp.url) {
+      await nextTick();
+      void tools.discover();
+    }
+    if (router.currentRoute.value.query.section === "tools") {
+      await nextTick();
+      toolPickerAnchor.value?.scrollIntoView?.({ block: "start" });
+    }
   },
   { immediate: true },
 );
+
+// The presets arrive after a `?preset=` link opened the form, so it is filled once they do.
+watch(
+  mcpPresets,
+  () => {
+    if (!isEdit && step.value === 2 && routeTile && filledTile.value !== routeTile)
+      applyTile(routeTile);
+    if (isEdit && !preset.value)
+      preset.value = presetById((values.value.mcp.extra.preset as { id?: unknown })?.id);
+  },
+  { immediate: true },
+);
+watch(() => values.value.mcp.url, syncPresetParams);
 
 const leaveGuard: LeaveGuard = {
   host: "settings",
@@ -320,6 +591,96 @@ onBeforeRouteUpdate((to, from) => {
 
 function close() {
   emit("done");
+}
+
+function setToolLists(lists: ToolLists) {
+  form.setFieldValue("mcp.allowed_tools", lists.allowed);
+  form.setFieldValue("mcp.blocked_tools", lists.blocked);
+  form.setFieldValue("mcp.write_tools", lists.write);
+}
+
+/** A new type's own fields start fresh; a name or description the last preset filled goes too. */
+function applyTile(tile: string) {
+  if (tile === filledTile.value) return;
+  const previous = preset.value;
+  const current = values.value;
+  if (previous && current.name === previous.id) form.setFieldValue("name", "");
+  if (
+    previous &&
+    current.description === stripPresetName(previous.description ?? "", previous.label)
+  )
+    form.setFieldValue("description", "");
+  filledTile.value = tile;
+  preset.value = null;
+  form.setFieldValue("mcp", toolsetFormDefaults().mcp);
+  const chosen = presetById(tile);
+  if (chosen) applyPreset(chosen);
+  else form.setFieldValue("kind", tile === SKILL ? "skill" : "mcp");
+}
+
+function applyPreset(chosen: Preset) {
+  preset.value = chosen;
+  const params = defaultParams(chosen);
+  const data = presetData(chosen, params);
+  form.setFieldValue("kind", "mcp");
+  if (!values.value.name) form.setFieldValue("name", chosen.id);
+  form.setFieldValue("description", stripPresetName(chosen.description ?? "", chosen.label));
+  form.setFieldValue("mcp.preset_params", params);
+  form.setFieldValue("mcp.url", data.url);
+  form.setFieldValue(
+    "mcp.headers",
+    (chosen.headers ?? []).map((h) => ({ key: h.name, value: "", state: "new" as const })),
+  );
+  const tokenUrl = chosen.auth?.type === CLIENT_CREDENTIALS ? (chosen.auth.token_url ?? "") : "";
+  form.setFieldValue("mcp.auth", { ...emptyFormAuth(), token_url: tokenUrl });
+  setToolLists({ allowed: data.allowed_tools, blocked: null, write: data.write_tools ?? null });
+  form.setFieldValue("mcp.extra", { tool_classes: data.tool_classes, preset: data.preset });
+}
+
+/** A template field rewrites the URL only; the values are never stored apart from it. */
+function setPresetParam(name: string, value: string) {
+  if (!preset.value) return;
+  const params = { ...values.value.mcp.preset_params, [name]: value };
+  form.setFieldValue("mcp.url", renderUrl(preset.value.url_template ?? "", params));
+}
+
+/** A URL typed by hand or loaded sets the fields; one that doesn't fit the template needs none. */
+function syncPresetParams() {
+  const chosen = preset.value;
+  if (!chosen) return;
+  const { url, preset_params } = values.value.mcp;
+  const template = chosen.url_template ?? "";
+  if (Object.keys(preset_params).length && url === renderUrl(template, preset_params)) return;
+  const defaults = defaultParams(chosen);
+  form.setFieldValue(
+    "mcp.preset_params",
+    url === renderUrl(template, defaults) ? defaults : (paramsFromUrl(template, url) ?? {}),
+  );
+}
+
+function continueToForm() {
+  if (!pickedTile.value) return;
+  applyTile(pickedTile.value);
+  step.value = 2;
+}
+
+function backToTypes() {
+  pickedTile.value = filledTile.value;
+  step.value = 1;
+}
+
+const connectionAnchor = ref<HTMLElement | null>(null);
+const toolPickerAnchor = ref<HTMLElement | null>(null);
+
+function focusConnection() {
+  connectionAnchor.value?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+  connectionAnchor.value?.querySelector<HTMLElement>("input, button, textarea")?.focus();
+}
+
+/** Half-typed credentials can't be listed with, so Connect leads back to them. */
+function connect() {
+  if (readyToDiscover(values.value.mcp)) void tools.discover();
+  else focusConnection();
 }
 
 function setSkill(value: string) {
@@ -348,15 +709,17 @@ async function save(values: ToolsetFormValues) {
     await requireKeptSecrets(keptSecretPaths(values));
     return;
   }
-  const data = toolsetDataOf(values, props.mergeSecrets);
+  const data = savedData(values);
+  const region_only = values.region_only;
   try {
     if (props.editId) {
-      const body = { description: values.description, data };
+      const body = { description: values.description, data, region_only };
       await update.mutateAsync({ id: props.editId, body });
       toast({ variant: "success", message: t("assistant.toolsets.form.updated") });
     } else {
       const description = values.description || undefined;
-      await create.mutateAsync({ name: values.name, kind: values.kind, description, data });
+      const body = { name: values.name, kind: values.kind, description, data, region_only };
+      await create.mutateAsync(body);
       toast({ variant: "success", message: t("assistant.toolsets.form.added") });
     }
     form.reset(values);
@@ -364,6 +727,22 @@ async function save(values: ToolsetFormValues) {
   } catch (err) {
     await showSaveError(err, values);
   }
+}
+
+/** The lists a current discovery shows are the ones saved, with when they were listed. */
+function savedData(values: ToolsetFormValues) {
+  if (values.kind !== "mcp") return toolsetDataOf(values, props.mergeSecrets);
+  const lists = tools.lists.value;
+  const mcp = {
+    ...values.mcp,
+    allowed_tools: lists.allowed,
+    blocked_tools: lists.blocked,
+    write_tools: lists.write,
+  };
+  const data: Record<string, unknown> = toolsetDataOf({ ...values, mcp }, props.mergeSecrets);
+  const at = tools.verifiedAt(values.mcp);
+  if (at) data.tools_verified_at = at;
+  return data;
 }
 
 /** A 403 is already toasted by the transport; a refused kept secret and a named field get their own message. */
