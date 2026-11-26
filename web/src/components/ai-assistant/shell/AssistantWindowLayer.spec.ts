@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { config, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, nextTick } from "vue";
 
@@ -21,6 +21,9 @@ import { runEscapeLadder } from "@/composables/assistant";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantWindowLayer from "./AssistantWindowLayer.vue";
+
+// setupTests stubs the shell for the layout specs; this spec renders the real one.
+delete config.global.stubs.AssistantWindowLayer;
 
 const { fake, lg, track, toast } = vi.hoisted(() => ({
   toast: vi.fn(),

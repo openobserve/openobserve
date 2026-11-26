@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
+import { config, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, ref } from "vue";
 
@@ -29,6 +29,9 @@ import {
 } from "@/components/ai-assistant/shell/rcaFollow";
 
 import brandLocale from "@/locales/languages/en-US.json";
+
+// setupTests stubs the shell for the layout specs; this spec renders the real one.
+delete config.global.stubs.AssistantSidebarHost;
 
 const brandNames = brandLocale.brand;
 
