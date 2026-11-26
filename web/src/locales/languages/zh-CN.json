@@ -10953,13 +10953,13 @@
       "morning": "早上好",
       "afternoon": "下午好",
       "evening": "晚上好",
-      "night": "还在工作"
+      "night": "还在加班"
     },
     "greetingNamed": {
       "morning": "早上好，{name}",
       "afternoon": "下午好，{name}",
       "evening": "晚上好，{name}",
-      "night": "还在工作，{name}"
+      "night": "还在加班，{name}"
     },
     "aiChat": {
       "unexpectedError": "发生意外错误",

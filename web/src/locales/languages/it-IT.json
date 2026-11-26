@@ -10953,13 +10953,13 @@
       "morning": "Buongiorno",
       "afternoon": "Buon pomeriggio",
       "evening": "Buonasera",
-      "night": "Lavori fino a tardi"
+      "night": "Al lavoro fino a tardi"
     },
     "greetingNamed": {
       "morning": "Buongiorno, {name}",
       "afternoon": "Buon pomeriggio, {name}",
       "evening": "Buonasera, {name}",
-      "night": "Lavori fino a tardi, {name}"
+      "night": "Al lavoro fino a tardi, {name}"
     },
     "aiChat": {
       "unexpectedError": "Si è verificato un errore imprevisto",

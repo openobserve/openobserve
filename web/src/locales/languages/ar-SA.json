@@ -10953,13 +10953,13 @@
       "morning": "صباح الخير",
       "afternoon": "طاب مساؤك",
       "evening": "مساء الخير",
-      "night": "تعمل حتى وقت متأخر"
+      "night": "العمل لوقت متأخر"
     },
     "greetingNamed": {
       "morning": "صباح الخير، {name}",
       "afternoon": "طاب مساؤك، {name}",
       "evening": "مساء الخير، {name}",
-      "night": "تعمل حتى وقت متأخر، {name}"
+      "night": "العمل لوقت متأخر، {name}"
     },
     "aiChat": {
       "unexpectedError": "حدث خطأ غير متوقع",

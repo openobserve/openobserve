@@ -10953,13 +10953,13 @@
       "morning": "Chào buổi sáng",
       "afternoon": "Chào buổi chiều",
       "evening": "Chào buổi tối",
-      "night": "Làm việc muộn"
+      "night": "Làm việc khuya"
     },
     "greetingNamed": {
       "morning": "Chào buổi sáng, {name}",
       "afternoon": "Chào buổi chiều, {name}",
       "evening": "Chào buổi tối, {name}",
-      "night": "Làm việc muộn, {name}"
+      "night": "Làm việc khuya, {name}"
     },
     "aiChat": {
       "unexpectedError": "Đã xảy ra lỗi không mong muốn",

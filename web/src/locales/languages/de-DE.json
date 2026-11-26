@@ -10917,7 +10917,7 @@
     },
     "capabilities": {
       "query": {
-        "title": "Abfrage erstellen",
+        "title": "Abfrage schreiben",
         "description": "SQL für Logs, Traces, RUM oder PromQL für Metriken.",
         "prompt": "Hilf mir, eine Anfrage zu schreiben"
       },
@@ -10953,13 +10953,13 @@
       "morning": "Guten Morgen",
       "afternoon": "Guten Tag",
       "evening": "Guten Abend",
-      "night": "Sie arbeiten spät"
+      "night": "Späte Arbeit"
     },
     "greetingNamed": {
       "morning": "Guten Morgen, {name}",
       "afternoon": "Guten Tag, {name}",
       "evening": "Guten Abend, {name}",
-      "night": "Sie arbeiten spät, {name}"
+      "night": "Späte Arbeit, {name}"
     },
     "aiChat": {
       "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten",
@@ -12760,7 +12760,7 @@
         "composerTitleLive": "Diesen Lauf steuern",
         "composerTitlePaused": "Dem Agenten antworten",
         "agentAsks": "Agent fragt",
-        "placeholderPaused": "Antworten Sie dem Agenten oder fügen Sie Kontext hinzu",
+        "placeholderPaused": "Antworten Sie dem Agenten oder ergänzen Sie Kontext",
         "suggestions": "Vorschläge",
         "chipCheck": "Prüfen …",
         "chipIgnore": "Ignorieren …",

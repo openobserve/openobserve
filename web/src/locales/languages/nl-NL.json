@@ -10953,13 +10953,13 @@
       "morning": "Goedemorgen",
       "afternoon": "Goedemiddag",
       "evening": "Goedenavond",
-      "night": "Nog laat aan het werk"
+      "night": "Nog aan het werk"
     },
     "greetingNamed": {
       "morning": "Goedemorgen, {name}",
       "afternoon": "Goedemiddag, {name}",
       "evening": "Goedenavond, {name}",
-      "night": "Nog laat aan het werk, {name}"
+      "night": "Nog aan het werk, {name}"
     },
     "aiChat": {
       "unexpectedError": "Er is een onverwachte fout opgetreden",
@@ -12760,7 +12760,7 @@
         "composerTitleLive": "Deze run aansturen",
         "composerTitlePaused": "Beantwoord de agent",
         "agentAsks": "Agent vraagt",
-        "placeholderPaused": "Antwoord de agent of voeg context toe",
+        "placeholderPaused": "Beantwoord de agent of voeg context toe",
         "suggestions": "Suggesties",
         "chipCheck": "Controleer …",
         "chipIgnore": "Negeer …",

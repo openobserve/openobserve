@@ -10922,7 +10922,7 @@
         "prompt": "Bir sorgu yazmama yardım et"
       },
       "incident": {
-        "title": "Sorunları incele",
+        "title": "Sorunları araştır",
         "description": "Günlükler, izler ve uyarılar arasında kök neden analizi — ör. \"gateway-5xx neden tetiklendi?\"",
         "prompt": "Bir vakayı araştırmama yardım et"
       },
@@ -10951,15 +10951,15 @@
     },
     "greeting": {
       "morning": "Günaydın",
-      "afternoon": "İyi günler",
+      "afternoon": "İyi öğleden sonralar",
       "evening": "İyi akşamlar",
-      "night": "Geç saatlere kadar çalışıyorsunuz"
+      "night": "Geç saate kadar çalışıyorsunuz"
     },
     "greetingNamed": {
       "morning": "Günaydın, {name}",
-      "afternoon": "İyi günler, {name}",
+      "afternoon": "İyi öğleden sonralar, {name}",
       "evening": "İyi akşamlar, {name}",
-      "night": "Geç saatlere kadar çalışıyorsunuz, {name}"
+      "night": "Geç saate kadar çalışıyorsunuz, {name}"
     },
     "aiChat": {
       "unexpectedError": "Beklenmeyen bir hata oluştu",

@@ -10953,13 +10953,13 @@
       "morning": "おはようございます",
       "afternoon": "こんにちは",
       "evening": "こんばんは",
-      "night": "遅くまでお疲れさまです"
+      "night": "夜遅くまでお疲れさまです"
     },
     "greetingNamed": {
       "morning": "おはようございます、{name}",
       "afternoon": "こんにちは、{name}",
       "evening": "こんばんは、{name}",
-      "night": "遅くまでお疲れさまです、{name}"
+      "night": "夜遅くまでお疲れさまです、{name}"
     },
     "aiChat": {
       "unexpectedError": "予期しないエラーが発生しました",

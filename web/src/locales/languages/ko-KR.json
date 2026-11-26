@@ -10917,12 +10917,12 @@
     },
     "capabilities": {
       "query": {
-        "title": "쿼리 작성",
+        "title": "쿼리 작성하기",
         "description": "로그, 트레이스, RUM용 SQL 또는 메트릭용 PromQL.",
         "prompt": "쿼리 작성을 도와주세요"
       },
       "incident": {
-        "title": "문제 조사",
+        "title": "문제 조사하기",
         "description": "로그, 트레이스, 알림 전반의 근본 원인 분석 — 예: \"gateway-5xx가 왜 발생했나?\"",
         "prompt": "인시던트 조사를 도와주세요"
       },
@@ -10953,13 +10953,13 @@
       "morning": "좋은 아침입니다",
       "afternoon": "좋은 오후입니다",
       "evening": "좋은 저녁입니다",
-      "night": "늦게까지 작업 중이시군요"
+      "night": "늦게까지 작업 중이시네요"
     },
     "greetingNamed": {
       "morning": "좋은 아침입니다, {name}",
       "afternoon": "좋은 오후입니다, {name}",
       "evening": "좋은 저녁입니다, {name}",
-      "night": "늦게까지 작업 중이시군요, {name}"
+      "night": "늦게까지 작업 중이시네요, {name}"
     },
     "aiChat": {
       "unexpectedError": "예기치 않은 오류 발생",
@@ -12760,7 +12760,7 @@
         "composerTitleLive": "이 실행 조정",
         "composerTitlePaused": "에이전트에게 답변",
         "agentAsks": "에이전트 질문",
-        "placeholderPaused": "에이전트에 답변하거나 컨텍스트 추가",
+        "placeholderPaused": "에이전트에 답변하거나 컨텍스트를 추가하세요",
         "suggestions": "제안",
         "chipCheck": "확인 …",
         "chipIgnore": "무시 …",
