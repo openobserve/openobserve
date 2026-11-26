@@ -294,6 +294,7 @@ mod m20261225_000013_create_paid_overage_attribution;
 mod m20261225_000014_create_ai_approvals;
 mod m20261225_000015_ai_chat_sessions_branched_from;
 mod m20261225_000016_add_approval_scope_to_ai_actions;
+mod m20261225_000017_add_oncall_policy_saved_by_person;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -957,6 +958,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261225_000014_create_ai_approvals::Migration),
             Box::new(m20261225_000015_ai_chat_sessions_branched_from::Migration),
             Box::new(m20261225_000016_add_approval_scope_to_ai_actions::Migration),
+            Box::new(m20261225_000017_add_oncall_policy_saved_by_person::Migration),
         ]
     }
 }
@@ -1104,6 +1106,7 @@ mod tests {
         (165, "m20261225_000001_add_agent_to_ai_chat_turns"),
         (166, "m20261225_000015_ai_chat_sessions_branched_from"),
         (167, "m20261225_000016_add_approval_scope_to_ai_actions"),
+        (168, "m20261225_000017_add_oncall_policy_saved_by_person"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

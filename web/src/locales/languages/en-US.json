@@ -28009,8 +28009,8 @@
     "awayMark": "Mark away",
     "awayClear": "Clear away",
     "awayClearConfirm": "Clear",
-    "awayClearMessage": "Clear {name}'s away, {range}? It applies on every team.",
-    "awayConsequence": "Applies on every team {name} is on. Their shifts go to the next person on each rotation, if there is one.",
+    "awayClearMessage": "Clear {name}'s away, {range}? It applies on every team in this org.",
+    "awayConsequence": "Applies on every team {name} is on in this org. Their shifts go to the next person on each rotation, if there is one.",
     "awayNextWeek": "Next week, Mon–Sun",
     "awayTitle": "Mark away",
     "membersAddOpen": "Add members",
@@ -34585,7 +34585,15 @@
     "offline": "You are offline. Recent visits are still available.",
     "sourceUnavailable": "This resource type is currently unavailable",
     "emptyHelp": "Enter a name or ID to search resources",
-    "globalShortcut": "Open global search"
+    "globalShortcut": "Open global search",
+    "trigger": "Search or jump to…",
+    "allTypes": "All",
+    "capped": "Showing the first match. | Showing the first {count} matches.",
+    "hintNavigate": "Navigate",
+    "hintOpen": "Open",
+    "hintNewTab": "Open in new tab",
+    "hintTypes": "Filter by type",
+    "hintClose": "Close"
   },
   "timeRangeInput": {
     "label": "Type a time range",

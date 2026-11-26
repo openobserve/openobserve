@@ -723,10 +723,10 @@ describe("ChartRenderer", () => {
       vi.mocked(mockChart.convertFromPixel).mockReturnValue(12345 as any);
       const zr = mockChart.getZr();
       // The zr listener must be in place before the first setOption so it precedes the tooltip's.
-      const registered = zr.on.mock.invocationCallOrder.at(-1);
+      const move = zr.on.mock.calls.map(([name]: unknown[]) => name).lastIndexOf("mousemove");
+      const registered = zr.on.mock.invocationCallOrder[move];
       expect(registered).toBeLessThan(mockChart.setOption.mock.invocationCallOrder.at(-1));
-      const [event, onMove] = zr.on.mock.calls.at(-1);
-      expect(event).toBe("mousemove");
+      const [, onMove] = zr.on.mock.calls[move];
 
       onMove({ offsetX: 100 });
 
@@ -2079,6 +2079,171 @@ describe("ChartRenderer motion", () => {
     for (const option of await drawn()) {
       expect(option).toMatchObject({ animation: false, animationDuration: 0 });
     }
+    wrapper.unmount();
+  });
+});
+
+describe("ChartRenderer node graph drag", () => {
+  const at = (x: number, y: number) => ({
+    series: [{ type: "graph", layout: "none", data: [{ name: "web", x, y }] }],
+  });
+  const graph = (nodeLayout: string, placeNodes: (moved: Map<string, number[]>) => unknown) => ({
+    chartType: "node-graph",
+    options: at(100, 50),
+    extras: { panelId: "graph-1", nodeGraph: { layout: nodeLayout, placeNodes } },
+  });
+  const drawnWeb = (chart: any) =>
+    vi.mocked(chart.setOption).mock.calls.at(-1)?.[0]?.series?.[0]?.data?.[0];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("skips a same-size redraw for a node graph, and only for a node graph", async () => {
+    const line = {
+      chartType: "line",
+      options: { series: [{ type: "line", data: [[1609459200000, 1]] }] },
+      extras: { panelId: "line-1" },
+    };
+    for (const [first, resizes] of [
+      [graph("force", vi.fn()), false],
+      [line, true],
+    ] as const) {
+      const data = ref<any>(first);
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(ChartRenderer, { data: data.value, renderType: "canvas", height: "100%" }),
+        }),
+        {
+          global: {
+            plugins: [i18n],
+            provide: { store, hoveredSeriesState: ref({ panelId: null }) },
+          },
+        },
+      );
+      await flushPromises();
+      const chart = vi.mocked(echartsInit).mock.results.at(-1)?.value as any;
+      // jsdom lays the box out at 0 × 0, the size the chart already has.
+      chart.getWidth = () => 0;
+      chart.getHeight = () => 0;
+      vi.mocked(chart.resize).mockClear();
+      data.value = { ...first, options: { ...first.options } };
+      await flushPromises();
+      expect(vi.mocked(chart.resize).mock.calls.length > 0).toBe(resizes);
+      // A box that changed size always resizes.
+      chart.getWidth = () => 100;
+      vi.mocked(chart.resize).mockClear();
+      data.value = { ...first, options: { ...first.options } };
+      await flushPromises();
+      expect(chart.resize).toHaveBeenCalled();
+      wrapper.unmount();
+    }
+  });
+
+  it("keeps a dropped node where it was dropped across re-renders, until the layout changes", async () => {
+    const placeNodes = vi.fn(() => at(640, 80));
+    const data = ref(graph("force", placeNodes));
+    const hover = ref<any>({ panelId: null, seriesIndex: -1, dataIndex: -1, hoveredTime: null });
+    const wrapper = mount(
+      defineComponent({
+        setup: () => () =>
+          h(ChartRenderer, { data: data.value, renderType: "canvas", height: "100%" }),
+      }),
+      {
+        global: { plugins: [i18n], provide: { store, hoveredSeriesState: hover } },
+      },
+    );
+    await flushPromises();
+    const chart = vi.mocked(echartsInit).mock.results.at(-1)?.value as any;
+    let layout = [100, 50];
+    let nameAtIndex = "web";
+    chart.getModel = () => ({
+      getSeriesByIndex: () => ({
+        getData: () => ({ getItemLayout: () => layout, getName: () => nameAtIndex }),
+      }),
+    });
+    chart.getWidth = () => 800;
+    chart.getHeight = () => 400;
+    const onChart = (event: string) =>
+      vi
+        .mocked(chart.on)
+        .mock.calls.filter(([name]: unknown[]) => name === event)
+        .at(-1)?.[1];
+    const onZr = (event: string) =>
+      vi
+        .mocked(chart.getZr().on)
+        .mock.calls.filter(([name]: unknown[]) => name === event)
+        .at(-1)?.[1];
+    const press = { dataType: "node", seriesIndex: 0, dataIndex: 0, name: "web" };
+
+    // A click that moves nothing keeps no position.
+    onChart("mousedown")(press);
+    onZr("mouseup")();
+    expect(placeNodes).not.toHaveBeenCalled();
+
+    // A refresh mid-drag can put another node at the pressed index; nothing is kept for it.
+    onChart("mousedown")(press);
+    layout = [640, 80];
+    nameAtIndex = "api";
+    onZr("mouseup")();
+    expect(placeNodes).not.toHaveBeenCalled();
+    nameAtIndex = "web";
+    layout = [100, 50];
+
+    onChart("mousedown")(press);
+    // Leaving the panel mid-drag must not restore the chart, or the node would jump back.
+    vi.mocked(chart.dispatchAction).mockClear();
+    hover.value = { ...hover.value, panelId: "graph-1" };
+    await flushPromises();
+    hover.value = {
+      ...hover.value,
+      panelId: -1,
+      seriesIndex: -1,
+      dataIndex: -1,
+      hoveredTime: null,
+    };
+    await flushPromises();
+    expect(chart.dispatchAction).not.toHaveBeenCalledWith({ type: "restore" });
+    layout = [640, 80];
+    onZr("mouseup")();
+    expect(placeNodes).toHaveBeenLastCalledWith(
+      expect.objectContaining({ series: expect.any(Array) }),
+      new Map([["web", [0.8, 0.2]]]),
+    );
+    expect(vi.mocked(chart.setOption).mock.calls.at(-1)?.[1]).toEqual({
+      notMerge: true,
+      lazyUpdate: true,
+    });
+    expect(drawnWeb(chart)).toEqual({ name: "web", x: 640, y: 80 });
+    // With no node held, leaving restores the chart as before.
+    hover.value = { ...hover.value, panelId: "graph-1" };
+    await flushPromises();
+    hover.value = { ...hover.value, panelId: -1 };
+    await flushPromises();
+    expect(chart.dispatchAction).toHaveBeenCalledWith({ type: "restore" });
+
+    // A refresh draws the new options with the node still where it was dropped.
+    data.value = graph("force", placeNodes);
+    await flushPromises();
+    expect(drawnWeb(chart)).toEqual({ name: "web", x: 640, y: 80 });
+
+    // Another layout, or another chart type, places every node afresh.
+    placeNodes.mockClear();
+    data.value = graph("circular", placeNodes);
+    await flushPromises();
+    expect(placeNodes).not.toHaveBeenCalled();
+    expect(drawnWeb(chart)).toEqual({ name: "web", x: 100, y: 50 });
+    onChart("mousedown")(press);
+    layout = [400, 200];
+    onZr("mouseup")();
+    expect(placeNodes).toHaveBeenCalledTimes(1);
+    placeNodes.mockClear();
+    data.value = { ...graph("circular", placeNodes), extras: { panelId: "graph-1" } } as any;
+    await flushPromises();
+    data.value = graph("circular", placeNodes);
+    await flushPromises();
+    expect(placeNodes).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 });

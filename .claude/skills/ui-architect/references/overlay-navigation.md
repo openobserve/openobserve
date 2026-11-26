@@ -15,6 +15,7 @@ O2 overlay primitives (Dialog, Drawer, Dropdown, Popover, Tooltip) and navigatio
   - [OPagination](#opagination)
   - [OStepper](#ostepper) · [OStep](#ostep)
   - [OTabs](#otabs) · [OTab](#otab) · [ORouteTab](#oroutetab) · [OTabPanels](#otabpanels) · [OTabPanel](#otabpanel)
+  - [OListboxOption](#olistboxoption)
 
 ---
 
@@ -500,3 +501,29 @@ const activeTab = ref("logs");
 ```
 
 **Family:** OTabs, OTab, ORouteTab, OTabPanels.
+
+### OListboxOption
+
+**Import:** `@/lib/navigation/Listbox/OListboxOption.vue`
+**Use when:** A row in a result list whose keyboard focus stays in a search field (a combobox with `aria-activedescendant`), e.g. a command palette. Pass `href` for rows that navigate, so middle-click and "open in new tab" work.
+**Don't use for:** Menus (`ODropdownItem`), form pickers (`OSelect` / `OCombobox`), or a list the user tabs through.
+**Key props:** `href` (string — renders an anchor) · `highlighted` (boolean — the row the arrows or pointer are on; sets `aria-selected`) · `disabled` (boolean — no link, no `select`) · `icon` (`IconName`)
+**Slots:** `default` (label) · `meta` (secondary text at the end) · `trailing` (glyphs such as a lock)
+**Emits:** `select` (`MouseEvent`) — a click on an enabled row
+**Notes:** rows are `tabindex="-1"`; the owning field moves the highlight, sets `aria-activedescendant` to the row `id`, and scrolls it into view. Bind the highlight on `@pointermove`, not `mouseenter`, so rows sliding under a still pointer do not steal it. The highlight switches without a colour transition on purpose: a fade leaves several rows half-lit while ↓ auto-repeats, which reads as flicker. When filter chips sit between the field and the list, make the listbox itself a tab stop (`tabindex="0"` + its own `aria-activedescendant`) so ↓ from the chips lands in the results, ↑ from the first row climbs back, and typing returns to the field (see CommandPalette.vue).
+
+```vue
+<RouterLink v-for="entry in entries" :key="entry.id" :to="entry.route" custom v-slot="{ href, navigate }">
+  <OListboxOption
+    :id="optionId(entry)"
+    :href="href"
+    :icon="entry.icon"
+    :highlighted="optionId(entry) === activeId"
+    @pointermove="activeKey = entry.id"
+    @select="navigate"
+  >
+    {{ entry.name }}
+    <template #meta>{{ entry.folder }}</template>
+  </OListboxOption>
+</RouterLink>
+```
