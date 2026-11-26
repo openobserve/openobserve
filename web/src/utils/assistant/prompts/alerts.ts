@@ -15,6 +15,7 @@
 
 import type { RouteTarget } from "@/composables/assistant";
 import { gt, raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { formatOrgRange } from "@/utils/formatters";
 
 import {
   count,
@@ -23,9 +24,12 @@ import {
   ident,
   inline,
   num,
+  promptClock,
+  promptRange,
   promptTime,
   zoneOf,
   type PromptBuild,
+  type PromptRange,
 } from "./format";
 
 const OPERATORS: ReadonlySet<string> = new Set(["=", "!=", ">", ">=", "<", "<="]);
@@ -182,4 +186,115 @@ function firedAtMs(value: AlertRecord["last_triggered_at"]): number | null {
     return Number.isFinite(ms) ? ms : null;
   }
   return null;
+}
+
+/** One evaluation that fired: a row of the alert groups table or the history drawer. */
+export interface AlertFiringInput extends Pick<AlertInput, "org" | "alertId" | "name" | "route"> {
+  firedAt: number;
+  observed?: { value: number; unit?: string };
+  threshold?: { op: string; value: number; unit?: string };
+  /** The window the evaluation read. */
+  window?: PromptRange;
+  stream?: string;
+  query?: string;
+  timeZone: string;
+}
+
+/** Troubleshoot this alert firing: the observed number, threshold and windows in the text; name, stream and query in the Alert block. */
+export function buildAlertFiringPrompt(input: AlertFiringInput, t: TranslateFn = gt): PromptBuild {
+  const unit = input.observed?.unit ? ident(input.observed.unit) : null;
+  const observed = input.observed
+    ? `observed ${num(input.observed.value)}${unit ? ` ${unit}` : ""}`
+    : null;
+  const threshold = input.threshold ? thresholdText(input.threshold) : null;
+  const window = input.window
+    ? `over the evaluated window ${promptRange(input.window, input.timeZone)}`
+    : null;
+  const measured = [observed, threshold && `against threshold ${threshold}`, window]
+    .filter(Boolean)
+    .join(" ");
+  const text = finish([
+    `The alert in the attached Alert block fired at ${promptTime(input.firedAt, input.timeZone)} ${zoneOf(input.timeZone)}${measured ? `: ${measured}` : ""}.`,
+    "The block holds its name, stream and query.",
+    "Why did it fire and what changed?",
+  ]);
+  const clock = promptClock(input.firedAt, input.timeZone).slice(0, 5);
+  const name = inline(input.name, 60);
+  const chip = alertChip(
+    { ...input, ...(input.query && { condition: input.query }) },
+    {
+      label: t("assistant.entry.chip.alertFired", { name: raw(name), time: raw(clock) }),
+      type: "alert_firing",
+      id: `${input.alertId ?? input.name}:${input.firedAt}`,
+    },
+  );
+  const title = t("assistant.context.chip.alert", { name: raw(`${name} · ${clock}`) });
+  return { text, chips: [chip], title };
+}
+
+/** The report body sent with "Ask about this report"; longer reports are cut, never dropped. */
+export const MAX_REPORT_CHARS = 32_000;
+
+/** An incident and the report of one of its analysis runs. */
+export interface IncidentReportInput {
+  org: string;
+  incidentId: string;
+  /** The run whose report is attached; the Report chip is keyed by it, and absent before any analysis finished. */
+  runId?: string;
+  title: string;
+  severity?: string;
+  status?: string;
+  report?: string;
+  /** "Run 2 · Oct 16, 14:09 · 4 KB": the run and size the Report chip names. */
+  reportLabel?: I18nText;
+  /** The incident's alert window (ms); the Time chip. */
+  window?: { from: number; to: number };
+}
+
+/** Explain this incident analysis report: the incident and the run's report as blocks, the question in the text. */
+export function buildIncidentReportPrompt(
+  input: IncidentReportInput,
+  t: TranslateFn = gt,
+): PromptBuild {
+  const name = inline(input.title || input.incidentId, 60);
+  // The composer shows exactly this; the chips carry the incident and the report.
+  const reported = !!input.runId && !!input.report;
+  const text = t(reported ? "assistant.rca.prompt" : "assistant.rca.incidentPrompt");
+  const incident = doorChip({
+    kind: "incident",
+    key: `${input.org}|incident|${input.incidentId}`,
+    label: t("assistant.context.chip.incident", { name: raw(name) }),
+    short: raw(name),
+    ref: { type: "incident", id: input.incidentId, org: input.org },
+    data: {
+      title: input.title,
+      ...(input.severity && { severity: input.severity }),
+      ...(input.status && { status: input.status }),
+    },
+    sent: "serialized",
+  });
+  const report = reported
+    ? doorChip({
+        kind: "report",
+        key: `${input.org}|incident_report|${input.runId}`,
+        label: input.reportLabel ?? t("assistant.rca.tag"),
+        ref: { type: "incident_report", id: input.runId, org: input.org },
+        data: { report: (input.report ?? "").slice(0, MAX_REPORT_CHARS) },
+        sent: "serialized",
+      })
+    : null;
+  const time = input.window
+    ? doorChip({
+        kind: "time",
+        key: `${input.org}|time|${input.window.from}-${input.window.to}`,
+        label: raw(formatOrgRange(input.window.from, input.window.to)),
+        ref: { type: "time", org: input.org, from: input.window.from, to: input.window.to },
+        sent: "whitelist",
+      })
+    : null;
+  return {
+    text,
+    chips: [time, incident, report].filter((chip) => chip !== null),
+    title: t("assistant.context.chip.incident", { name: raw(name) }),
+  };
 }

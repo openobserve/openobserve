@@ -22,11 +22,12 @@ import {
   finish,
   ident,
   inline,
+  num,
   promptRange,
   type PromptBuild,
   type PromptRange,
 } from "./format";
-import { fieldValueOf } from "./logField";
+import { fieldValueOf } from "./logs";
 
 /** A dashboard panel in any of the 16 `RenderDashboardCharts` hosts, with the host's own range and variables. */
 export interface PanelInput {
@@ -90,4 +91,69 @@ export function buildPanelPrompt(input: PanelInput, t: TranslateFn = gt): Prompt
     name: raw(inline(input.dashboardTitle ?? input.panelTitle, 60)),
   });
   return { text, chips: [chip], title: thread };
+}
+
+/** One series of the Metrics explorer legend. */
+export interface MetricSeriesInput {
+  org: string;
+  metric: string;
+  labels?: Record<string, string>;
+  query?: string;
+  language?: "PromQL" | "SQL";
+  aggregation?: string;
+  range: PromptRange;
+  timeZone: string;
+  lastValue?: number;
+  unit?: string;
+}
+
+// A series with dozens of labels keeps the first ones, so the closing question survives.
+const MAX_LABELS = 12;
+
+/** `{a="1", b="2"}`, the label set as PromQL writes it; empty when there are none. */
+export function labelSet(labels: Record<string, string> = {}): string {
+  const pairs = Object.entries(labels)
+    .slice(0, MAX_LABELS)
+    .map(([name, value]) => `${inline(name, 40)}="${inline(value, 60).replace(/"/g, "'")}"`);
+  return pairs.length ? `{${pairs.join(", ")}}` : "";
+}
+
+/** Explain this series: the metric name if it is an identifier, numbers and the window in the text; label values and the query in the Query block. */
+export function buildMetricSeriesPrompt(
+  input: MetricSeriesInput,
+  t: TranslateFn = gt,
+): PromptBuild {
+  const series = `${inline(input.metric, 60)}${labelSet(input.labels)}`;
+  const metric = ident(input.metric);
+  const aggregation = input.aggregation ? ident(input.aggregation) : null;
+  const window = promptRange(input.range, input.timeZone);
+  const unit = input.unit ? ident(input.unit) : null;
+  const last =
+    input.lastValue === undefined
+      ? null
+      : `Last value ${num(input.lastValue)}${unit ? ` ${unit}` : ""}.`;
+  const chip = doorChip({
+    kind: "query",
+    key: `${input.org}|series|${series}|${input.query ?? ""}`,
+    label: t("assistant.entry.chip.series", { name: raw(inline(series, 80)) }),
+    short: raw(inline(input.metric, 60)),
+    ref: { type: "metric_series", org: input.org, from: input.range.from, to: input.range.to },
+    data: {
+      metric: input.metric,
+      labels: input.labels ?? {},
+      ...(input.query && { query: input.query, language: input.language ?? "PromQL" }),
+      ...(input.aggregation && { aggregation: input.aggregation }),
+    },
+    sent: "serialized",
+  });
+  const text = finish([
+    `Explain the series of ${metric ? `metric \`${metric}\`` : "the metric"} over ${window}${aggregation ? `, aggregated with ${aggregation}` : ""}.`,
+    `Its labels${input.query ? ", the query that plotted it" : ""} and its metric name are in the attached Query block.`,
+    last,
+    "What drives it and what changed?",
+  ]);
+  const title = t("assistant.entry.chip.series", {
+    name: raw(`${inline(input.metric, 60)} · ${window}`),
+  });
+  return { text, chips: [chip], title };
 }

@@ -27,7 +27,7 @@ export {
   type PromptBuild,
   type PromptRange,
 } from "./format";
-export { buildLogRowPrompt, logRowChip, modeText, type LogRowInput } from "./logRow";
+export { buildLogRowPrompt, logRowChip, modeText, type LogRowInput } from "./logs";
 export {
   MAX_EXPLAIN_BYTES,
   MAX_EXPLAIN_ROWS,
@@ -35,31 +35,27 @@ export {
   reproducingQuery,
   rowsOverCap,
   type LogRowsInput,
-} from "./logRows";
-export { buildLogFieldPrompt, fieldValueOf, logFieldChip, type LogFieldInput } from "./logField";
-export { buildRegexFieldPrompt, regexFieldChip, type RegexFieldInput } from "./regexField";
-export { buildQueryErrorPrompt, errorPlainText, type QueryErrorInput } from "./queryError";
-export { buildEmptyResultPrompt, type EmptyResultInput } from "./emptyResult";
-export { buildNoStreamPrompt, type NoStreamInput } from "./emptyResult";
-export { buildTracePrompt, type TraceInput } from "./trace";
-export { MAX_SPAN_ATTRIBUTES, buildSpanPrompt, spanHasError, type SpanInput } from "./span";
-export {
-  buildTracingQueryPrompt,
-  buildTracingSetupPrompt,
-  type TracingQueryInput,
-} from "./tracing";
-export { buildPanelPrompt, type PanelInput } from "./panel";
+} from "./logs";
+export { buildLogFieldPrompt, fieldValueOf, logFieldChip, type LogFieldInput } from "./logs";
+export { buildRegexFieldPrompt, regexFieldChip, type RegexFieldInput } from "./logs";
+export { buildQueryErrorPrompt, errorPlainText, type QueryErrorInput } from "./logs";
+export { buildEmptyResultPrompt, type EmptyResultInput } from "./logs";
+export { buildNoStreamPrompt, type NoStreamInput } from "./logs";
+export { buildTracePrompt, type TraceInput } from "./traces";
+export { MAX_SPAN_ATTRIBUTES, buildSpanPrompt, spanHasError, type SpanInput } from "./traces";
+export { buildTracingQueryPrompt, buildTracingSetupPrompt, type TracingQueryInput } from "./traces";
+export { buildPanelPrompt, type PanelInput } from "./metrics";
 export {
   alertInputOf,
   buildAlertPrompt,
   thresholdText,
   type AlertInput,
   type AlertRecord,
-} from "./alert";
-export { buildAlertFiringPrompt, type AlertFiringInput } from "./alertFiring";
-export { buildMetricSeriesPrompt, labelSet, type MetricSeriesInput } from "./metricSeries";
-export { buildServiceEdgePrompt, type ServiceEdgeInput } from "./serviceEdge";
-export { buildIncidentReportPrompt, MAX_REPORT_CHARS, type IncidentReportInput } from "./incident";
+} from "./alerts";
+export { buildAlertFiringPrompt, type AlertFiringInput } from "./alerts";
+export { buildMetricSeriesPrompt, labelSet, type MetricSeriesInput } from "./metrics";
+export { buildServiceEdgePrompt, type ServiceEdgeInput } from "./traces";
+export { buildIncidentReportPrompt, MAX_REPORT_CHARS, type IncidentReportInput } from "./alerts";
 export { buildAutoObserveAskPrompt, MAX_ASK_CHARS, type AutoObserveAskInput } from "./autoobserve";
 export { askAiQuery, buildIngestionPrompt, englishT, type AskAiContext } from "./ingestion";
 export {
