@@ -308,7 +308,6 @@ fn retirement_events(new_files: Vec<FileKey>, retire_files: &[FileKey]) -> Vec<F
     events.extend(retire_files.iter().map(|file| FileKey {
         deleted: true,
         selection: None,
-        row_group_size: None,
         ..file.clone()
     }));
     events.sort_by(|a, b| a.key.cmp(&b.key));
@@ -340,7 +339,6 @@ mod tests {
             },
             deleted: false,
             selection: None,
-            row_group_size: None,
         }
     }
 
