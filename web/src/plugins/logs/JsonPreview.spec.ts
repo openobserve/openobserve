@@ -253,6 +253,34 @@ describe("JsonPreview Component", () => {
     }
   });
 
+  describe("telling empty, the text null and a real null apart", () => {
+    const rowOf = (key: string) => wrapper.find(`[data-test="log-expand-detail-key-${key}"]`);
+
+    beforeEach(async () => {
+      await wrapper.setProps({
+        value: { empty: "", text_null: "null", real_null: null, count: 5, label: "ok" },
+      });
+    });
+
+    it("quotes string values, so an empty string and the text null are visible", () => {
+      for (const key of ["empty", "text_null", "label"]) {
+        const view = rowOf(key).findComponent({ name: "LogsHighLighting" });
+        expect(view.props("showQuotes")).toBe(true);
+      }
+    });
+
+    it("leaves numbers unquoted", () => {
+      const view = rowOf("count").findComponent({ name: "LogsHighLighting" });
+      expect(view.props("showQuotes")).toBe(false);
+    });
+
+    it("draws a real null as an unquoted null of its own colour", () => {
+      const row = rowOf("real_null");
+      expect(row.find(".log-null").text()).toBe("null");
+      expect(row.findComponent({ name: "LogsHighLighting" }).exists()).toBe(false);
+    });
+  });
+
   describe("Component Initialization", () => {
     it("should let a field's value shrink so long values wrap inside the row", () => {
       const valueCell = wrapper.find('[data-test="log-expand-detail-key-field1"]');

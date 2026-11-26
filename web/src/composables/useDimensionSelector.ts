@@ -31,6 +31,7 @@ interface FieldStats {
   occurrences: number;
   totalLength: number;
   nullCount: number;
+  numericCount: number;
 }
 
 interface ScoredField {
@@ -168,6 +169,19 @@ function matchesGoodPattern(name: string): boolean {
 }
 
 /**
+ * Check if a numeric field is a continuous measure (latency, size...) rather than a category
+ */
+function isMeasurePattern(name: string): boolean {
+  return /(latency|duration|elapsed|took|response_?time|_(ms|us|ns|sec|secs|seconds|millis|bytes|size))$|^(bytes|size)(_|$)/i.test(
+    name,
+  );
+}
+
+function isNumericType(type?: string): boolean {
+  return !!type && /^(u?int|float|double|decimal|number|numeric)/i.test(type);
+}
+
+/**
  * Check if field is a system/internal field
  */
 function isSystemField(name: string): boolean {
@@ -183,6 +197,7 @@ function analyzeFieldFromSamples(fieldName: string, logSamples: any[]): FieldSta
     occurrences: 0,
     totalLength: 0,
     nullCount: 0,
+    numericCount: 0,
   };
 
   logSamples.forEach((log) => {
@@ -193,6 +208,7 @@ function analyzeFieldFromSamples(fieldName: string, logSamples: any[]): FieldSta
       return;
     }
 
+    if (typeof value === "number") stats.numericCount++;
     const stringValue = String(value);
     stats.uniqueValues.add(stringValue);
     stats.occurrences++;
@@ -242,6 +258,24 @@ function scoreField(
       coverage,
       avgLength,
       reason: "High-cardinality pattern (IDs, timestamps, etc.)",
+    };
+  }
+
+  // A continuous number charted as categories gives one bar per value, each with count 1.
+  const isNumeric =
+    isNumericType(fieldMeta?.type) ||
+    (stats.occurrences > 0 && stats.numericCount === stats.occurrences);
+  if (
+    isNumeric &&
+    (isMeasurePattern(fieldName) || (cardinality > 10 && !matchesGoodPattern(fieldName)))
+  ) {
+    return {
+      fieldName,
+      score: -1000,
+      cardinality,
+      coverage,
+      avgLength,
+      reason: "Continuous numeric measure",
     };
   }
 
@@ -443,6 +477,7 @@ function selectDimensionsFromSchema(
       (f) =>
         !selected.includes(f.name) &&
         available.includes(f.name) &&
+        !(isNumericType(f.type) && isMeasurePattern(f.name)) &&
         (f.isInteresting || f.isIndexed),
     )
     .map((f) => f.name);

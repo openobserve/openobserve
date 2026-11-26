@@ -24,6 +24,9 @@ import * as zincutils from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
 
 // Mock the shortURL service
+const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
+
 vi.mock("@/services/short_url", () => ({
   default: {
     get: vi.fn(),
@@ -470,5 +473,47 @@ describe("ShortUrl", () => {
 
   it("should match snapshot", () => {
     expect(wrapper.html()).toMatchSnapshot();
+  });
+
+  describe("tells the user when the link cannot be opened", () => {
+    beforeEach(() => {
+      toastMock.mockClear();
+      mockReplace.mockClear();
+      vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    it("says the link is invalid or expired when it is not found", async () => {
+      mockShortURLGet.mockRejectedValue({ response: { status: 404 } });
+      await wrapper.vm.fetchAndRedirect();
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: "This link is invalid or has expired",
+        }),
+      );
+      expect(mockReplace).toHaveBeenCalledWith({ name: "home" });
+    });
+
+    it("says the link is invalid or expired when no target comes back", async () => {
+      mockShortURLGet.mockResolvedValue({ data: {} });
+      await wrapper.vm.fetchAndRedirect();
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "This link is invalid or has expired" }),
+      );
+    });
+
+    it("gives a different message when the lookup itself failed", async () => {
+      mockShortURLGet.mockRejectedValue(new Error("Network error"));
+      await wrapper.vm.fetchAndRedirect();
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "Could not open this link" }),
+      );
+    });
+
+    it("does not toast when the link resolves", async () => {
+      mockShortURLGet.mockResolvedValue({ data: "/web/logs?stream=a" });
+      await wrapper.vm.fetchAndRedirect();
+      expect(toastMock).not.toHaveBeenCalled();
+    });
   });
 });

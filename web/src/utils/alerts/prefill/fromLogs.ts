@@ -28,6 +28,7 @@ import {
   type AlertPrefill,
   type AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
+import { parseSqlFilter } from "@/utils/query/filterBarParser";
 import {
   firstAggregateAlias,
   hasHistogramBucketing,
@@ -123,7 +124,12 @@ export const buildPrefillFromLogs = (input: LogsPrefillInput): AlertPrefill => {
   let sql = input.sqlMode ? input.rawQuery : input.resolvedSql;
   if (input.heldFilterDropped) {
     warnings.push(warn("heldFilterDropped", "warning"));
-  } else if (!input.sqlMode && (input.rawQuery ?? "").trim()) {
+  } else if (
+    !input.sqlMode &&
+    (input.rawQuery ?? "").trim() &&
+    // A filter the condition builder can draw is not "converted"; only the rest changes shape.
+    !parseSqlFilter(input.rawQuery)
+  ) {
     warnings.push(warn("convertedToSql", "info"));
   }
 

@@ -1082,7 +1082,8 @@ export default defineComponent({
         selectedIds.value = [];
         // A folder switch starts a new list (page 1 in table and URL alike); the landing run has no previous folder and is the Back restore, which keeps the page.
         const switching = previousFolder !== null;
-        const navigate = replaceFolderRoute ? router.replace : router.push;
+        // The landing stamp is not a user move, so it takes the entry the user arrived on instead of adding one.
+        const navigate = replaceFolderRoute || !switching ? router.replace : router.push;
         replaceFolderRoute = false;
         if (switching) currentPage.value = 1;
         const { page: _page, ...carriedQuery } = route.query;

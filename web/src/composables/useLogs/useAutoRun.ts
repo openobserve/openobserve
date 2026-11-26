@@ -1420,6 +1420,19 @@ export function createAutoRun(deps: AutoRunDeps) {
     return true;
   }
 
+  // A chart drawn from the Logs run's own rows has no load of its own, so it borrows that run's record.
+  function recordReusedPanel(configSignature: string): boolean {
+    const executed = meta.executed;
+    if (!executed || !gridPersistOk()) return false;
+    meta.executedPanel = {
+      surface: "visualize",
+      configSignature,
+      generation: executed.generation,
+      complete: true,
+    };
+    return true;
+  }
+
   function recordPanelFailure(generationId: number, cancelled = false): boolean {
     const gen = panelGeneration(generationId);
     if (!gen) return false;
@@ -1547,6 +1560,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     recordPatternsFailure,
     recordPanelDispatch,
     recordPanelComplete,
+    recordReusedPanel,
     recordPanelFailure,
     invalidateExecuted,
     clearSearchAroundInvalidation,

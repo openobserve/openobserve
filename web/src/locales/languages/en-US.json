@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "No saved views match your search",
     "savedViewApplied": "Currently applied",
     "favoriteViewNamed": "Favorite {name}",
+    "unfavoriteViewNamed": "Unfavorite {name}",
     "deleteViewNamed": "Delete {name}",
     "overwriteSavedViewNamed": "Overwrite {name} with current query",
     "searchSavedFunction": "Search",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "Please enable SQL mode to use timechart",
     "drillDown": "Drill down",
     "drillDownUnavailableInSqlMode": "Drill down is not available in SQL mode",
+    "drillDownSqlModeDescription": "Drill down compares dimension values across the events of your search. Turn off SQL mode to use it; the SQL query is cleared.",
+    "drillDownTurnOffSqlMode": "Turn off SQL mode",
     "drillDownRunTitle": "Run a query to start Drill down",
     "drillDownRunDescription": "Drill down compares dimension values across the events of your search. Run a query to load them.",
     "patternsLogsOnly": "Patterns are available for logs streams only",
@@ -25117,6 +25120,8 @@
       "endpointUrlCopied": "Endpoint URL copied"
     },
     "views": {
+      "shortUrlInvalid": "This link is invalid or has expired",
+      "shortUrlFailed": "Could not open this link",
       "youAreNotAuthorizedToManage": "You are not authorized to manage the license.",
       "copiedToClipboard": "Copied to clipboard",
       "errorWhilePullingDestinations": "Error while pulling destinations.",

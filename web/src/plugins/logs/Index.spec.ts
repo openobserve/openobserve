@@ -1841,6 +1841,21 @@ describe("Logs Index", async () => {
       expect(wrapper.find('[data-test="logs-drill-down-sql-mode-text"]').exists()).toBe(true);
     });
 
+    it("offers a button that turns SQL mode off so Drill down can show its panels", async () => {
+      await enterDrillDown({ sqlMode: true });
+
+      const button = wrapper.find('[data-test="o2-empty-state-action-turn-off-sql-mode"]');
+      expect(button.exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-drill-down-sql-mode-text"]').text()).toContain(
+        "the SQL query is cleared",
+      );
+      await button.trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.searchObj.meta.sqlMode).toBe(false);
+      expect(wrapper.find('[data-test="logs-drill-down-sql-mode-text"]').exists()).toBe(false);
+    });
+
     it("asks to run a query when no search has been applied yet", async () => {
       await enterDrillDown({ withHits: false, searchApplied: false });
 

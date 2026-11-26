@@ -135,6 +135,28 @@ describe("SearchResult Component", () => {
     await flushPromises();
   });
 
+  describe("query function warning", () => {
+    const warningText = async (functionError: unknown) => {
+      wrapper.vm.searchObj.loading = false;
+      wrapper.vm.searchObj.data.functionError = functionError;
+      wrapper.vm.isFunctionErrorOpen = true;
+      await flushPromises();
+      return wrapper.find('[data-test="log-search-result-function-error"] pre').text();
+    };
+
+    it("shows a list of messages as text, not as escaped JSON", async () => {
+      const text = await warningText(['error[E203]: syntax error\n  "x" is not valid']);
+      expect(text).toBe('error[E203]: syntax error\n  "x" is not valid');
+      expect(text).not.toContain("\\n");
+      expect(text).not.toContain('\\"');
+    });
+
+    it("unwraps a message that arrives as JSON text", async () => {
+      const text = await warningText(JSON.stringify(["bad\nfunction"]));
+      expect(text).toBe("bad\nfunction");
+    });
+  });
+
   afterEach(() => {
     if (wrapper) {
       wrapper.unmount();

@@ -78,8 +78,8 @@ async function type(text: string) {
   await flushPromises();
 }
 
-async function press(key: string) {
-  input()!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+async function press(key: string, init: KeyboardEventInit = {}) {
+  input()!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, ...init }));
   await flushPromises();
   await nextTick();
 }
@@ -195,6 +195,88 @@ describe("QueryFilterBar", () => {
     await type("level=warn");
     await press("Enter");
     expect(sql(state)).toBe("level = 'warn'");
+  });
+
+  it("maps a dotted or dashed shorthand field to the stored name the stream flattens it to", async () => {
+    const stored = [...fields, { name: "http_req_id", type: "string" as const }];
+    const state = mountBar({ fields: stored });
+    await openBar();
+    await type("http.req-id=abc");
+    await vi.waitFor(() => expect(rowKeys()[0]).toBe("\u0000shorthand"));
+    await press("Enter");
+    expect(sql(state, stored)).toBe("http_req_id = 'abc'");
+  });
+
+  it("maps an upper-case shorthand field to its lower-case stored name", async () => {
+    const stored = [...fields, { name: "http_req_id", type: "string" as const }];
+    const state = mountBar({ fields: stored });
+    await openBar();
+    await type("HTTP.Req_ID=abc");
+    await press("Enter");
+    expect(sql(state, stored)).toBe("http_req_id = 'abc'");
+  });
+
+  it("offers no shorthand row for a dotted name that matches no stored field", async () => {
+    mountBar();
+    await openBar();
+    await type("no.such-field=abc");
+    expect(rowKeys()).not.toContain("\u0000shorthand");
+  });
+
+  it("reads an empty-string value on its chip as (empty), not as nothing", async () => {
+    mountBar({ modelValue: parseSqlFilter("level = ''")! });
+    await flushPromises();
+    expect(segment("level", "value").text()).toBe("(empty)");
+  });
+
+  it("marks an empty string inside a list value too", async () => {
+    mountBar({ modelValue: parseSqlFilter("level IN ('', 'warn')")! });
+    await flushPromises();
+    expect(segment("level", "value").text()).toBe("(empty), warn");
+  });
+
+  it("tells the host when Enter itself turned the text into a chip, after the tree update", async () => {
+    const order: string[] = [];
+    const state = mountBar({
+      "onUpdate:modelValue": async (next: FilterGroup) => {
+        order.push("update");
+        state.tree = next;
+        await wrapper!.setProps({ modelValue: next });
+      },
+      onEnterCommit: () => order.push("enter-commit"),
+    });
+    await openBar();
+    await type("level=warn");
+    await press("Enter");
+    expect(order).toEqual(["update", "enter-commit"]);
+  });
+
+  it("tells the host when Ctrl+Enter applies ticked values from an any-of list", async () => {
+    const onEnterCommit = vi.fn();
+    mountBar({ onEnterCommit });
+    await openBar();
+    await type("level");
+    await press("Enter");
+    await type("any");
+    await press("Enter");
+    await vi.waitFor(() => expect(rowKeys()).toContain("warn"));
+    await press("Enter");
+    await press("ArrowDown");
+    await press("ArrowDown");
+    await press("Enter");
+    expect(onEnterCommit).not.toHaveBeenCalled();
+    await press("Enter", { ctrlKey: true });
+    expect(onEnterCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not report a click on a row as an Enter commit", async () => {
+    const onEnterCommit = vi.fn();
+    mountBar({ onEnterCommit });
+    await openBar();
+    await clickRow("level");
+    await clickRow(rowKeys()[0]);
+    await clickRow(rowKeys()[0]);
+    expect(onEnterCommit).not.toHaveBeenCalled();
   });
 
   it("picks several values for is any of and applies on Enter", async () => {

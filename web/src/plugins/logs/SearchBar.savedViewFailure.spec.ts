@@ -57,7 +57,12 @@ vi.mock("@/composables/useStreams", async () => {
     ...actual,
     default: (...args: any[]) => ({
       ...actual.default(...args),
-      getStreams: vi.fn(async () => ({ list: [{ name: "app_logs", schema: [] }] })),
+      getStreams: vi.fn(async () => ({
+        list: [
+          { name: "app_logs", schema: [] },
+          { name: "web_logs", schema: [] },
+        ],
+      })),
       getStream: vi.fn(async () => ({ name: "app_logs", schema: [], settings: {} })),
     }),
   };
@@ -88,9 +93,10 @@ describe("SearchBar - applying a saved view that fails to load", () => {
     return searchObj;
   };
 
-  const viewFor = (stream: string, sqlMode: boolean) => {
+  const viewFor = (stream: string | string[], sqlMode: boolean, streamType = "logs") => {
     const legacy = JSON.parse(JSON.stringify(wrapper!.vm.getSearchObj()));
-    legacy.data.stream.selectedStream = [stream];
+    legacy.data.stream.selectedStream = Array.isArray(stream) ? stream : [stream];
+    legacy.data.stream.streamType = streamType;
     legacy.data.resultGrid = { ...(legacy.data.resultGrid ?? {}), colOrder: {}, colSizes: {} };
     legacy.meta.sqlMode = sqlMode;
     return { status: 200, data: { data: legacy } };
@@ -159,5 +165,29 @@ describe("SearchBar - applying a saved view that fails to load", () => {
     await vi.waitFor(() => expect(searchObj.meta.sqlMode).toBe(false), { timeout: 4000 });
     await flushPromises();
     expect(searchObj.data.query).toBe("status = 500");
+  });
+
+  it("leaves the page unchanged when a cross-type view's stream is missing", async () => {
+    const searchObj = await setup();
+    const query = searchObj.data.query;
+    getViewDetail.mockResolvedValueOnce(viewFor("deleted_stream", false, "metrics"));
+    await wrapper!.vm.applySavedView({ view_id: "v1", view_name: "view" });
+    await flushPromises();
+    expect(searchObj.data.stream.streamType).toBe("logs");
+    expect(searchObj.data.stream.selectedStream).toEqual(["app_logs"]);
+    expect(searchObj.meta.sqlMode).toBe(true);
+    expect(searchObj.data.query).toBe(query);
+    expect(toastMock.mock.calls[0][0].message).toContain("deleted_stream");
+  });
+
+  it("selects every stream of a cross-type view as a flat list", async () => {
+    const searchObj = await setup();
+    wrapper!.vm.dateTimeRef = { setSavedDate: vi.fn() };
+    getViewDetail.mockResolvedValueOnce(viewFor(["app_logs", "web_logs"], false, "metrics"));
+    await wrapper!.vm.applySavedView({ view_id: "v1", view_name: "view" });
+    await vi.waitFor(() => expect(searchObj.data.stream.streamType).toBe("metrics"), {
+      timeout: 4000,
+    });
+    expect(searchObj.data.stream.selectedStream).toEqual(["app_logs", "web_logs"]);
   });
 });

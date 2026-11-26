@@ -512,7 +512,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="searchObj.meta.sqlMode"
                 size="hero"
                 :title="t('search.drillDownUnavailableInSqlMode')"
+                :description="t('search.drillDownSqlModeDescription')"
+                :action-label="t('search.drillDownTurnOffSqlMode')"
+                action-id="turn-off-sql-mode"
                 data-test="logs-drill-down-sql-mode-text"
+                @action="searchObj.meta.sqlMode = false"
               />
               <LogsNoDataState
                 v-else-if="
@@ -3049,6 +3053,7 @@ export default defineComponent({
             autoRun.notePanelScopeApplied();
             // run query
             await copyDashboardDataToVisualize(togglePanelRun);
+            if (togglePanelRun === null && hasReusableData) autoRun.noteReusedPanelResult();
 
             // Clear the restoration flag after all operations are complete
             await nextTick();

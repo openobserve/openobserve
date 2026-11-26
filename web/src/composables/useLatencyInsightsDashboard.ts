@@ -298,6 +298,8 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
             rotate: 45,
           },
           axis_label_rotate: 30,
+          // Top-N panels have few bars; the automatic interval drops labels the bars still show.
+          axis_label_show_all: true,
           axis_label_truncate_width: 80,
           color: isComparisonMode
             ? {

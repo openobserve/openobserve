@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { inferResultFieldType } from "@/utils/logs/resultFieldType";
 import { CancelledError } from "@tanstack/vue-query";
 import { effectScope, getCurrentScope, nextTick, onScopeDispose, ref, type EffectScope } from "vue";
 import { byString } from "@/utils/json";
@@ -33,7 +34,6 @@ import {
   useLocalLogFilterField,
   timestampToTimezoneDate,
   useLocalInterestingFields,
-  convertToCamelCase,
   deepCopy,
 } from "@/utils/zincutils";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
@@ -328,7 +328,7 @@ export const useStreamFields = () => {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
             if (searchObj.data.stream.selectedStream.length > 1) {
               schemaMaps.push({
-                name: convertToCamelCase(stream.name),
+                name: stream.name,
                 label: true,
                 ftsKey: false,
                 isSchemaField: false,
@@ -534,7 +534,9 @@ export const useStreamFields = () => {
                 name: field,
                 ftsKey: ftsKeySet.has(field),
                 isSchemaField: true,
-                group: semanticGroup,
+                // Under a stream header the field belongs to that stream, which is what the header counts.
+                group:
+                  searchObj.data.stream.selectedStream.length > 1 ? stream.name : semanticGroup,
                 streams: [stream.name],
                 showValues: field !== timestampField && field !== allField,
                 isInterestingField: interestingFieldSet.has(field),
@@ -817,11 +819,13 @@ export const useStreamFields = () => {
                   !commonSchemaFields.includes(key) &&
                   key != "_stream_name"
                 ) {
+                  const resultType = inferResultFieldType(searchObj.data.queryResults.hits, key);
                   fieldObj = {
                     name: key,
-                    type: "Utf8",
+                    type: resultType,
+                    dataType: resultType,
                     ftsKey: false,
-                    group: resolveFieldGroup(key, "Utf8", semanticIndex, dynamicPrefixes),
+                    group: resolveFieldGroup(key, resultType, semanticIndex, dynamicPrefixes),
                     isSchemaField: false,
                     showValues: false,
                     // Never interesting: a persisted entry would be re-added on every extract.

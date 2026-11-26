@@ -280,6 +280,13 @@ describe("Schema Component Tests", () => {
     // Test 7: closeDialog function
 
     // Test 8: hasUserDefinedSchema computed property
+    it("shows the stream's first and last event times as plain date and time, without a stray colon", () => {
+      const { doc_time_min, doc_time_max } = wrapper.vm.indexData.stats;
+      const plain = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+      expect(doc_time_min).toMatch(plain);
+      expect(doc_time_max).toMatch(plain);
+    });
+
     it("should compute hasUserDefinedSchema correctly", () => {
       // Initially false
       expect(wrapper.vm.hasUserDefinedSchema).toBe(false);

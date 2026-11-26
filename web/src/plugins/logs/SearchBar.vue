@@ -1361,6 +1361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-filter-builder"
                   @update:query="onFilterBuilderQuery"
                   @submit="handleRunQueryFn()"
+                  @enter-commit="onFilterBuilderEnterCommit"
                   @exit="toggleFilterBuilder"
                   @focus="onFilterBuilderFocus"
                   @extra-select="pickRecentFilterRow"
@@ -2475,6 +2476,10 @@ export default defineComponent({
       searchObj.data.editorValue = sql;
       (queryEditorRef.value as { setValue?: (v: string) => void } | null)?.setValue?.(sql);
       autoRun.request("filter");
+    };
+    // With auto-run off nothing else follows the new chip, so the Enter that made it also runs.
+    const onFilterBuilderEnterCommit = () => {
+      if (!isAutoRunActive(store.state.zoConfig ?? {}, searchObj.meta)) handleRunQueryFn();
     };
     const syntaxGuideRef = ref(null);
 
@@ -4131,6 +4136,31 @@ export default defineComponent({
               if (leftViewOrg()) return;
             } else {
               // ----- Here we are explicitly handling stream change -----
+              let selectedStreams = [];
+              if (typeof extractedObj.data.stream.selectedStream == "object") {
+                if (
+                  Object.prototype.hasOwnProperty.call(
+                    extractedObj.data.stream.selectedStream,
+                    "value",
+                  )
+                ) {
+                  selectedStreams.push(extractedObj.data.stream.selectedStream.value);
+                } else {
+                  selectedStreams.push(...extractedObj.data.stream.selectedStream);
+                }
+              } else {
+                selectedStreams.push(extractedObj.data.stream.selectedStream);
+              }
+              // Validate against the target type's streams before any state is touched.
+              const targetType = extractedObj.data.stream.streamType;
+              const targetStreamData = await getStreams(targetType, true);
+              if (leftViewOrg()) return;
+              const targetStreams = new Set((targetStreamData?.list ?? []).map((s) => s.name));
+              const streamNotExist = selectedStreams.filter((n) => !targetStreams.has(n));
+              if (streamNotExist.length > 0) {
+                let errMsg = t("search.streamNotExist").replace("[STREAM_NAME]", streamNotExist);
+                throw Object.assign(new Error(errMsg), { userFacing: true });
+              }
               searchObj.meta.sqlMode = false;
               await nextTick();
               if (leftViewOrg()) return;
@@ -4148,22 +4178,6 @@ export default defineComponent({
               // const selectedStream = cloneDeep(
               //   extractedObj.data.stream.selectedStream
               // );
-              let selectedStreams = [];
-              if (typeof extractedObj.data.stream.selectedStream == "object") {
-                if (
-                  Object.prototype.hasOwnProperty.call(
-                    extractedObj.data.stream.selectedStream,
-                    "value",
-                  )
-                ) {
-                  selectedStreams.push(extractedObj.data.stream.selectedStream.value);
-                } else {
-                  selectedStreams.push(...extractedObj.data.stream.selectedStream);
-                }
-              } else {
-                selectedStreams.push(extractedObj.data.stream.selectedStream);
-              }
-
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.histogram = {
                 xData: [],
@@ -4190,20 +4204,12 @@ export default defineComponent({
               }
               await restoreBuildData(extractedObj.data.buildData ?? null);
 
+              // resetStreamData() cleared the store, so reload the list into it.
               const streamData = await getStreams(searchObj.data.stream.streamType, true);
               if (leftViewOrg()) return;
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
-              searchObj.data.stream.selectedStream = [selectedStreams];
-
-              const streamValues = searchObj.data.stream.streamLists.map((item) => item.value);
-              const streamNotExist = selectedStreams.filter(
-                (stream_str) => !streamValues.includes(stream_str),
-              );
-              if (streamNotExist.length > 0) {
-                let errMsg = t("search.streamNotExist").replace("[STREAM_NAME]", streamNotExist);
-                throw Object.assign(new Error(errMsg), { userFacing: true });
-              }
+              searchObj.data.stream.selectedStream = selectedStreams;
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
@@ -4493,8 +4499,11 @@ export default defineComponent({
             }
           })
           .catch((err) => {
+            const detail = err?.response?.data?.message;
             toast({
-              message: t("search.errorCreatingSavedView"),
+              message: detail
+                ? t("search.errorCreatingSavedViewDetail", { detail })
+                : t("search.errorCreatingSavedView"),
               variant: "error",
             });
             console.log("Error while creating saved view", err);
@@ -4557,8 +4566,11 @@ export default defineComponent({
           })
           .catch((err) => {
             dismiss();
+            const detail = err?.response?.data?.message;
             toast({
-              message: t("search.errorUpdatingSavedView"),
+              message: detail
+                ? t("search.errorUpdatingSavedViewDetail", { detail })
+                : t("search.errorUpdatingSavedView"),
               variant: "error",
             });
             console.log("Error while updating saved view", err);
@@ -4626,22 +4638,29 @@ export default defineComponent({
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL = fnParsedSQL();
         if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 0) {
-          if (Object.hasOwn(parsedSQL, "where") && parsedSQL.where != "") {
-            parsedSQL.where = null;
-          }
+          // Re-printing the parsed SQL rewrites it, so a query with nothing to clear is left as typed.
+          const hasLimit = (limit: any): boolean =>
+            Array.isArray(limit?.value) ? limit.value.length > 0 : !!limit;
+          const hasClearable = (node: any): boolean =>
+            !!node?.where || hasLimit(node?.limit) || (!!node?._next && hasClearable(node._next));
+          if (hasClearable(parsedSQL)) {
+            if (Object.hasOwn(parsedSQL, "where") && parsedSQL.where != "") {
+              parsedSQL.where = null;
+            }
 
-          if (Object.hasOwn(parsedSQL, "limit") && parsedSQL.limit != "") {
-            parsedSQL.limit = null;
-          }
+            if (Object.hasOwn(parsedSQL, "limit") && parsedSQL.limit != "") {
+              parsedSQL.limit = null;
+            }
 
-          if (Object.hasOwn(parsedSQL, "_next") && parsedSQL._next != "") {
-            parsedSQL._next.where = null;
-            parsedSQL._next.limit = null;
-          }
+            if (Object.hasOwn(parsedSQL, "_next") && parsedSQL._next != "") {
+              parsedSQL._next.where = null;
+              parsedSQL._next.limit = null;
+            }
 
-          searchObj.data.query = fnUnparsedSQL(parsedSQL);
-          searchObj.data.query = searchObj.data.query.replaceAll("`", '"');
-          searchObj.data.editorValue = searchObj.data.query;
+            searchObj.data.query = fnUnparsedSQL(parsedSQL);
+            searchObj.data.query = searchObj.data.query.replaceAll("`", '"');
+            searchObj.data.editorValue = searchObj.data.query;
+          }
         } else {
           // Handle both single and multiple stream scenarios
           const queries = searchObj.data.stream.selectedStream
@@ -4788,13 +4807,12 @@ export default defineComponent({
       t,
     );
 
-    const onEditorUserEdit = (isBlank = false, wasBlank = false) => {
+    const onEditorUserEdit = (isBlank = false, _wasBlank = false) => {
       recentFocusDismissed = false;
       autoRun.engine.markEditorDirty();
       updateFreeTextPreview();
       recentFocusOpen.value = recentsOpenAfterEdit(
         recentFocusOpen.value,
-        wasBlank,
         recentSearchesEnabled.value && isBlank,
       );
     };
@@ -5540,6 +5558,7 @@ export default defineComponent({
       activateFilterBuilder,
       loadFilterBuilderValues,
       onFilterBuilderQuery,
+      onFilterBuilderEnterCommit,
       onRefreshIntervalUpdate,
       updateTimezone,
       dateTimeRef,

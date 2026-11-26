@@ -144,7 +144,7 @@ export const formatLargeNumber = (number: number) => {
  */
 export const formatEventCount = (num: number): string => {
   if (!Number.isFinite(num)) return "";
-  if (num < 100000) return num.toString();
+  if (num < 100000) return Number.isInteger(num) ? addCommasToNumber(num) : num.toString();
 
   const units = ["", "K", "M", "B", "T"];
   let tier = Math.floor(Math.log10(num) / 3);

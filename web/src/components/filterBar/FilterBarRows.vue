@@ -79,7 +79,9 @@ const describe = (node: FilterCondition | FilterRawNode) => {
   if (node.kind === "raw") return node.label;
   const field = node.field ? (bar?.fieldLabel(node.field) ?? node.field) : t("filterBar.textField");
   const operator = bar?.operatorName(node.operator) ?? node.operator;
-  return [field, operator, conditionValueLabel(node)].filter(Boolean).join(" ");
+  return [field, operator, conditionValueLabel(node, t("filterBar.emptyValue"))]
+    .filter(Boolean)
+    .join(" ");
 };
 const summaryOf = (group: FilterGroup) =>
   raw(

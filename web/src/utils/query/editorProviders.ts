@@ -292,20 +292,22 @@ export interface ValueContext {
 }
 
 const BARE_OR_QUOTED = String.raw`(?:'([^']*)|([\w.\-]*))`;
+// A field is a bare word or a double-quoted identifier, which may hold spaces or reserved words.
+const FIELD = String.raw`(\w+|"[^"\n]+")`;
 // A finished IN element: a quoted literal ('' is an escaped quote) or a bare number, boolean or word.
 const IN_ELEMENT = String.raw`(?:'(?:[^']|'')*'|[\w.\-+]+)`;
 const IN_ELEMENT_EACH = /'((?:[^']|'')*)'|([\w.\-+]+)/g;
 
 const VALUE_PATTERNS: [ValueOperator, RegExp][] = [
-  ["compare", new RegExp(String.raw`(\w+)\s*(?:!=|<>|>=|<=|=|>|<)\s*${BARE_OR_QUOTED}$`)],
+  ["compare", new RegExp(String.raw`${FIELD}\s*(?:!=|<>|>=|<=|=|>|<)\s*${BARE_OR_QUOTED}$`)],
   [
     "in",
     new RegExp(
-      String.raw`(\w+)\s+(?:NOT\s+)?IN\s*\(\s*(?:${IN_ELEMENT}\s*,\s*)*${BARE_OR_QUOTED}$`,
+      String.raw`${FIELD}\s+(?:NOT\s+)?IN\s*\(\s*(?:${IN_ELEMENT}\s*,\s*)*${BARE_OR_QUOTED}$`,
       "i",
     ),
   ],
-  ["like", new RegExp(String.raw`(\w+)\s+(?:NOT\s+)?I?LIKE\s*${BARE_OR_QUOTED}$`, "i")],
+  ["like", new RegExp(String.raw`${FIELD}\s+(?:NOT\s+)?I?LIKE\s*${BARE_OR_QUOTED}$`, "i")],
   ["match", /(?:str_match|fuzzy_match)\s*\(\s*(?:\w+\.)?(\w+)\s*,\s*(?:'([^']*)|())$/i],
 ];
 
@@ -327,7 +329,7 @@ export const parseValueContext = (textUntilCursor: string): ValueContext | null 
     // The finished elements run from the IN paren to where the element being typed starts.
     const listEnd = match[0].length - typed.length - (quoted === undefined ? 0 : 1);
     return {
-      field: match[1],
+      field: match[1].replace(/^"|"$/g, ""),
       hasOpenQuote: quoted !== undefined,
       typed,
       operator,

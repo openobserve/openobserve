@@ -724,10 +724,14 @@ export default defineComponent({
 
       const query = b64EncodeUnicode(row.sql);
 
+      const hasRange = !!row.toBeStoredStartTime && !!row.toBeStoredEndTime;
       const queryObject = {
         stream_type: row.stream_type || "logs",
         stream,
-        period: "15m",
+        // Rows without a stored range (legacy) still open over the last 15 minutes.
+        ...(hasRange
+          ? { from: row.toBeStoredStartTime, to: row.toBeStoredEndTime }
+          : { period: "15m" }),
         refresh,
         sql_mode: "true",
         query,

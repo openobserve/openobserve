@@ -24,10 +24,21 @@ describe("buildPrefillFromLogs", () => {
       expect(keys(p)).not.toContain("convertedToSql");
     });
 
-    it("uses the resolved payload in filter mode and says the query changed shape", () => {
+    it("uses the resolved payload in filter mode without a conversion note for a simple filter", () => {
       const p = buildPrefillFromLogs(logs());
       expect(p.sql).toBe('select * from "k8s_logs" WHERE code = 200');
+      expect(keys(p)).not.toContain("convertedToSql");
+    });
+
+    it("keeps the conversion note for a filter the condition builder cannot draw", () => {
+      const p = buildPrefillFromLogs(logs({ rawQuery: "status=500 -404 AND is_error" }));
       expect(keys(p)).toContain("convertedToSql");
+    });
+
+    it("does not warn for a plain level = 'warn' or an AND of simple conditions", () => {
+      for (const rawQuery of ["level = 'warn'", "level = 'warn' AND code >= 500"]) {
+        expect(keys(buildPrefillFromLogs(logs({ rawQuery })))).not.toContain("convertedToSql");
+      }
     });
 
     it("never leaks the unresolved WHERE template", () => {

@@ -1716,6 +1716,9 @@ const fieldWidthClass = computed(() => {
                    48px short of the space the popover actually had). -->
                 <div
                   ref="listboxScrollEl"
+                  role="listbox"
+                  :aria-multiselectable="multiple || undefined"
+                  :aria-label="($attrs['aria-label'] as string | undefined) || label || undefined"
                   :class="[
                     'overflow-auto',
                     multiple && rowClickSingleSelect ? 'min-h-24 flex-1' : 'max-h-72',

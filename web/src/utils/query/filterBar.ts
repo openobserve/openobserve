@@ -696,9 +696,11 @@ export const nodePath = (root: FilterGroup, id: string, prefix = ""): string | n
   return null;
 };
 
-/** The value shown on a chip: `a, b` for lists, nothing for null checks. */
-export const conditionValueLabel = (condition: FilterCondition): string =>
-  OPERATORS[condition.operator].arity === "none" ? "" : condition.values.join(", ");
+/** The value shown on a chip: `a, b` for lists, nothing for null checks; `emptyLabel` stands in for an empty string. */
+export const conditionValueLabel = (condition: FilterCondition, emptyLabel = ""): string =>
+  OPERATORS[condition.operator].arity === "none"
+    ? ""
+    : condition.values.map((value) => (value === "" ? emptyLabel : value)).join(", ");
 
 const mixedTypeFields = (schemas: { name?: string; type?: string }[][]): Set<string> => {
   const types = new Map<string, FilterFieldType>();

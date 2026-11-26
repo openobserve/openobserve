@@ -351,6 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="w-full"
                             v-model="selectedTime.startTime"
                             with-seconds
+                            :aria-label="t('common.startTime')"
                             data-test="datetime-start-time"
                             @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
                           />
@@ -360,6 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="w-full"
                             v-model="selectedTime.endTime"
                             :with-seconds="true"
+                            :aria-label="t('common.endTime')"
                             data-test="datetime-end-time"
                             @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
                           />

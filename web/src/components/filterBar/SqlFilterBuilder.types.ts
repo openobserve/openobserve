@@ -41,6 +41,8 @@ export interface SqlFilterBuilderExpose {
 export interface SqlFilterBuilderEmits {
   (_e: "update:query", _value: string): void;
   (_e: "submit"): void;
+  /** Enter turned the typed text into a chip; fires after `update:query`. */
+  (_e: "enter-commit"): void;
   /** The user chose to keep editing an unparsable query as text. */
   (_e: "exit"): void;
   /** The field list is about to be shown. */

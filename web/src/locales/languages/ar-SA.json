@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "لا توجد عروض محفوظة تطابق بحثك",
     "savedViewApplied": "مطبّق حاليًا",
     "favoriteViewNamed": "إضافة {name} إلى المفضلة",
+    "unfavoriteViewNamed": "إزالة {name} من المفضلة",
     "deleteViewNamed": "حذف {name}",
     "overwriteSavedViewNamed": "استبدال {name} بالاستعلام الحالي",
     "searchSavedFunction": "البحث",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "يرجى تفعيل SQL الوضع لاستخدام مخطط الوقت",
     "drillDown": "التعمق",
     "drillDownUnavailableInSqlMode": "التعمق غير متاح في وضع SQL",
+    "drillDownSqlModeDescription": "يقارن التعمق قيم الأبعاد عبر أحداث بحثك. أوقف وضع SQL لاستخدامه؛ سيتم مسح استعلام SQL.",
+    "drillDownTurnOffSqlMode": "إيقاف وضع SQL",
     "drillDownRunTitle": "شغّل استعلامًا لبدء التعمق",
     "drillDownRunDescription": "يقارن التعمق قيم الأبعاد عبر أحداث بحثك. شغّل استعلامًا لتحميلها.",
     "patternsLogsOnly": "الأنماط متاحة لتدفقات السجلات فقط",
@@ -25119,6 +25122,8 @@
       "endpointUrlCopied": "تم نسخ عنوان URL لنقطة النهاية"
     },
     "views": {
+      "shortUrlInvalid": "هذا الرابط غير صالح أو انتهت صلاحيته",
+      "shortUrlFailed": "تعذر فتح هذا الرابط",
       "youAreNotAuthorizedToManage": "أنت غير مخول بإدارة الرخصة.",
       "copiedToClipboard": "تم نسخها إلى الحافظة",
       "errorWhilePullingDestinations": "خطأ أثناء سحب الوجهات.",

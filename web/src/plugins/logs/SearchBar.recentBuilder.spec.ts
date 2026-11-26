@@ -24,6 +24,7 @@ vi.mock("@/services/query_history", () => ({ default: api }));
 
 import { queryClient } from "@/composables/query/queryClient";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 
 const DT = "logs-search-bar-filter-builder-bar";
@@ -135,5 +136,28 @@ describe("logs recent searches with the filter builder on", () => {
     await flushPromises();
     expect(api.list).not.toHaveBeenCalled();
     expect(row("extra-recent-a")).toBeNull();
+  });
+
+  describe("Enter that makes a chip", () => {
+    const enterCommit = async (autoRun: boolean) => {
+      const vm = await mountBar();
+      (vm as any).searchObj.meta.liveMode = autoRun;
+      store.state.zoConfig.auto_query_enabled = autoRun;
+      const requestRun = vi.spyOn(useLogsAutoRun().engine, "requestRun");
+      wrapper!.findComponent(SqlFilterBuilder).vm.$emit("enter-commit");
+      await flushPromises();
+      const ran = requestRun.mock.calls.some(([reason]) => reason === "run");
+      requestRun.mockRestore();
+      delete store.state.zoConfig.auto_query_enabled;
+      return ran;
+    };
+
+    it("also runs the search when auto-run is off", async () => {
+      expect(await enterCommit(false)).toBe(true);
+    });
+
+    it("leaves the run to auto-run when it is on", async () => {
+      expect(await enterCommit(true)).toBe(false);
+    });
   });
 });

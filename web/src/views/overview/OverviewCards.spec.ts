@@ -974,7 +974,7 @@ describe("OverviewSignalCards", () => {
     expect(stats.findAll("dt")[0].element.parentElement!.classList.contains("border-t")).toBe(true);
     expect(stats.findAll("dt").map((d) => d.text())).toEqual(["Streams", "Events", "Data size"]);
     expect(w.get('[data-test="overview-signal-logs-streams"]').text()).toBe("4");
-    expect(w.get('[data-test="overview-signal-logs-events"]').text()).toBe("1000");
+    expect(w.get('[data-test="overview-signal-logs-events"]').text()).toBe("1,000");
     expect(w.get('[data-test="overview-signal-logs-stored"]').text()).toBe("1.50 GB");
     expect(w.get('[data-test="overview-signal-metrics-streams"]').text()).toBe("3");
     expect(w.get('[data-test="overview-signal-metrics-card"]').text()).toContain("Samples");

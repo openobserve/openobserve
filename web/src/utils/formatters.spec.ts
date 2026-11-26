@@ -327,8 +327,14 @@ describe("formatLargeNumber", () => {
 // ---------------------------------------------------------------------------
 
 describe("formatEventCount", () => {
-  it("prints counts below 100 000 exactly", () => {
-    expect(formatEventCount(99_999)).toBe("99999");
+  it("prints counts below 100 000 exactly, with thousands separators like the rows beside them", () => {
+    expect(formatEventCount(99_999)).toBe("99,999");
+    expect(formatEventCount(79_212)).toBe("79,212");
+    expect(formatEventCount(2_003)).toBe("2,003");
+    expect(formatEventCount(999)).toBe("999");
+    expect(formatEventCount(0)).toBe("0");
+    // A fractional measure keeps its decimals untouched rather than getting commas inside them.
+    expect(formatEventCount(1234.5678)).toBe("1234.5678");
   });
 
   it("formats larger counts with one decimal and drops a trailing .0", () => {

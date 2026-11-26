@@ -100,10 +100,13 @@ const testId = (suffix: string) => (props.dataTest ? `${props.dataTest}-${suffix
 
 // A row the user moved to stays highlighted when ticking it turns auto-highlight off.
 let navigated = false;
+// A row only hovered by the mouse is not a keyboard choice, so Enter must not re-tick it.
+let hoverOnly = false;
 watch(
   [() => props.suggestions.map((s) => s.key).join("\u0000"), () => props.open],
   () => {
     navigated = false;
+    hoverOnly = false;
     highlighted.value = props.autoHighlight && props.suggestions.length ? 0 : -1;
   },
   { immediate: true },
@@ -383,10 +386,16 @@ const capStyle = computed(() =>
 
 defineExpose<ChipInputExpose>({ focus });
 
+function onRowHover(index: number) {
+  highlighted.value = index;
+  hoverOnly = !navigated;
+}
+
 function move(step: number) {
   const count = props.suggestions.length;
   if (!count) return;
   navigated = true;
+  hoverOnly = false;
   highlighted.value = (highlighted.value + step + count) % count;
 }
 
@@ -395,6 +404,12 @@ function onEnter(event: KeyboardEvent) {
   if (event.metaKey || event.ctrlKey) {
     emit("apply");
     return;
+  }
+  if (props.multiple && hoverOnly && props.modelValue === "") {
+    if (props.suggestions.some((suggestion) => suggestion.selected)) {
+      emit("apply");
+      return;
+    }
   }
   const active = props.suggestions[highlighted.value];
   if (!active) {
@@ -650,7 +665,7 @@ function onFieldFocusOut() {
               :data-test="testId(`suggest-item-${suggestion.key}`)"
               class="rounded-default text-select-item-text data-active:bg-select-item-hover-bg flex cursor-pointer items-center gap-2 px-2 py-1 text-xs select-none"
               @mousedown.prevent
-              @pointermove="highlighted = index"
+              @pointermove="onRowHover(index)"
               @click="emit('select', suggestion.key, $event)"
             >
               <slot name="suggestion" :suggestion="suggestion" :active="index === highlighted">

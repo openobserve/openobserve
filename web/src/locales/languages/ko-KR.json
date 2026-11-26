@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "검색과 일치하는 저장된 보기가 없습니다",
     "savedViewApplied": "현재 적용됨",
     "favoriteViewNamed": "{name} 즐겨찾기에 추가",
+    "unfavoriteViewNamed": "{name} 즐겨찾기 해제",
     "deleteViewNamed": "{name} 삭제",
     "overwriteSavedViewNamed": "{name}을(를) 현재 쿼리로 덮어쓰기",
     "searchSavedFunction": "검색",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "시각화하려면 SQL 모드를 활성화하십시오.",
     "drillDown": "드릴다운",
     "drillDownUnavailableInSqlMode": "SQL 모드에서는 드릴다운을 사용할 수 없습니다",
+    "drillDownSqlModeDescription": "드릴다운은 검색의 이벤트 전반에서 차원 값을 비교합니다. 사용하려면 SQL 모드를 끄세요. SQL 쿼리가 지워집니다.",
+    "drillDownTurnOffSqlMode": "SQL 모드 끄기",
     "drillDownRunTitle": "드릴다운을 시작하려면 쿼리를 실행하세요",
     "drillDownRunDescription": "드릴다운은 검색의 이벤트 전반에 걸쳐 차원 값을 비교합니다. 값을 불러오려면 쿼리를 실행하세요.",
     "patternsLogsOnly": "패턴은 로그 스트림에서만 사용할 수 있습니다",
@@ -25119,6 +25122,8 @@
       "endpointUrlCopied": "엔드포인트 URL이 복사되었습니다"
     },
     "views": {
+      "shortUrlInvalid": "이 링크가 유효하지 않거나 만료되었습니다",
+      "shortUrlFailed": "이 링크를 열 수 없습니다",
       "youAreNotAuthorizedToManage": "라이선스를 관리할 권한이 없습니다.",
       "copiedToClipboard": "클립보드에 복사되었습니다.",
       "errorWhilePullingDestinations": "대상을 불러오는 중 오류가 발생했습니다.",

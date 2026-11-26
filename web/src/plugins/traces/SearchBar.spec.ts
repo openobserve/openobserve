@@ -2971,10 +2971,10 @@ describe("SearchBar", () => {
         .findAll('[data-test^="traces-saved-view-apply-"]')
         .map((item) => item.attributes("data-test"));
       expect(items).toEqual(["traces-saved-view-apply-t1", "traces-saved-view-apply-t2"]);
-      const pressed = (id: string) =>
-        wrapper.find(`[data-test="traces-saved-view-favorite-${id}"]`).attributes("aria-pressed");
-      expect(pressed("t1")).toBe("true");
-      expect(pressed("t2")).toBe("false");
+      const label = (id: string) =>
+        wrapper.find(`[data-test="traces-saved-view-favorite-${id}"]`).attributes("aria-label");
+      expect(label("t1")).toBe("search.unfavoriteViewNamed");
+      expect(label("t2")).toBe("search.favoriteViewNamed");
     });
 
     it("pinned dropdown shows a loading row while the list loads", async () => {
@@ -3542,7 +3542,7 @@ describe("SearchBar", () => {
   });
 
   describe("recent-searches dropdown on an edit that empties the editor", () => {
-    it("opens without a refocus when the text is cleared and closes on the next character", async () => {
+    it("does not open when the text is cleared, and closes an open list on the next character", async () => {
       store.state.zoConfig.query_history_enabled = true;
       wrapper = mountSearchBar();
       await flushPromises();
@@ -3555,20 +3555,18 @@ describe("SearchBar", () => {
 
       editor.vm.$emit("user-edit", true, false);
       await flushPromises();
-      expect(vm.recentFocusOpen).toBe(true);
-
-      editor.vm.$emit("user-edit", false, true);
-      await flushPromises();
       expect(vm.recentFocusOpen).toBe(false);
 
       searchObjInstance.data.editorValue = "";
       editor.vm.$emit("focus");
       await flushPromises();
       expect(vm.recentFocusOpen).toBe(true);
-      vm.recentFocusOpen = false;
+      editor.vm.$emit("user-edit", false, true);
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(false);
       editor.vm.$emit("user-edit", true, false);
       await flushPromises();
-      expect(vm.recentFocusOpen).toBe(true);
+      expect(vm.recentFocusOpen).toBe(false);
       delete store.state.zoConfig.query_history_enabled;
     });
 

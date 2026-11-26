@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "検索に一致する保存済みビューはありません",
     "savedViewApplied": "現在適用中",
     "favoriteViewNamed": "{name} をお気に入りに追加",
+    "unfavoriteViewNamed": "{name} をお気に入りから削除",
     "deleteViewNamed": "{name} を削除",
     "overwriteSavedViewNamed": "{name} を現在のクエリで上書き",
     "searchSavedFunction": "保存済み関数を検索",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "SQL モードを有効にして視覚化してください",
     "drillDown": "ドリルダウン",
     "drillDownUnavailableInSqlMode": "ドリルダウンは SQL モードでは使用できません",
+    "drillDownSqlModeDescription": "ドリルダウンは、検索のイベント全体にわたってディメンション値を比較します。使用するには SQL モードをオフにしてください。SQL クエリはクリアされます。",
+    "drillDownTurnOffSqlMode": "SQL モードをオフにする",
     "drillDownRunTitle": "ドリルダウンを開始するにはクエリを実行してください",
     "drillDownRunDescription": "ドリルダウンは検索のイベント全体でディメンション値を比較します。読み込むにはクエリを実行してください。",
     "patternsLogsOnly": "パターンはログストリームでのみ利用できます",
@@ -25119,6 +25122,8 @@
       "endpointUrlCopied": "エンドポイント URL をコピーしました"
     },
     "views": {
+      "shortUrlInvalid": "このリンクは無効または期限切れです",
+      "shortUrlFailed": "このリンクを開けませんでした",
       "youAreNotAuthorizedToManage": "ライセンスを管理する権限がありません。",
       "copiedToClipboard": "クリップボードにコピーしました",
       "errorWhilePullingDestinations": "宛先の取得中にエラーが発生しました。",

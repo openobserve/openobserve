@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -42,6 +43,13 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const viewId = props.view.view_id;
+
+// The label names the next press, so it carries the state and no `aria-pressed` is added on top.
+const favoriteLabel = computed(() =>
+  t(props.favorite ? "search.unfavoriteViewNamed" : "search.favoriteViewNamed", {
+    name: raw(props.view.view_name),
+  }),
+);
 
 // Arrow keys walk the row's inline actions, so star, edit and delete stay reachable without a mouse.
 const onRowKeydown = (event: KeyboardEvent) => {
@@ -85,8 +93,7 @@ const onRowKeydown = (event: KeyboardEvent) => {
         <OButton
           variant="ghost-neutral"
           size="icon-xs-sq"
-          :aria-pressed="props.favorite"
-          :aria-label="t('search.favoriteViewNamed', { name: raw(props.view.view_name) })"
+          :aria-label="favoriteLabel"
           :data-test="`${props.dataTestPrefix}-favorite-${viewId}`"
           @click.stop.prevent="emit('toggle-favorite')"
           @keydown.enter.stop.prevent="emit('toggle-favorite')"
@@ -97,7 +104,7 @@ const onRowKeydown = (event: KeyboardEvent) => {
             size="sm"
             :class="props.favorite ? 'text-favorite' : ''"
           />
-          <OTooltip :content="t('search.favoriteViewNamed', { name: raw(props.view.view_name) })" />
+          <OTooltip :content="favoriteLabel" />
         </OButton>
         <OButton
           variant="ghost-neutral"

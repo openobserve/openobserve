@@ -43,7 +43,11 @@ import {
   type FilterOperatorId,
   NUMBER_PATTERN,
 } from "@/utils/query/filterBar";
-import { parseShorthand, type ShorthandFilter } from "@/utils/query/filterBarParser";
+import {
+  flattenedFieldName,
+  parseShorthand,
+  type ShorthandFilter,
+} from "@/utils/query/filterBarParser";
 import { leafConditions } from "./codecs/types";
 import { PLACEHOLDER } from "./codecs/dashboardFilterCodec";
 import { arityFor, type FilterEditorConfig } from "./filterProfiles";
@@ -86,6 +90,8 @@ export interface FilterBarEditorOptions {
   t: TranslateFn;
   commit: (next: FilterGroup) => void;
   submit: () => void;
+  /** Enter itself turned the typed text or ticked values into a chip, after the tree was committed. */
+  enterCommit?: () => void;
 }
 
 const MAX_ROWS = 100;
@@ -205,6 +211,13 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   // An operator the field does not offer is picked again, so only an allowed one checks its value.
   const shorthandFits = ({ field, operator, value }: ShorthandFilter) =>
     !allows(field, operator) || fitsField(field, operator, value);
+  // `http.req-id` is stored as `http_req_id`; a name typed as-is wins when the stream has it.
+  const readShorthand = (input: string): ShorthandFilter | null => {
+    const parsed = parseShorthand(input);
+    if (!parsed || fieldMap.value.has(parsed.field)) return parsed;
+    const stored = flattenedFieldName(parsed.field);
+    return fieldMap.value.has(stored) ? { ...parsed, field: stored } : parsed;
+  };
   const numberHint = () =>
     t(variables.value ? "filterBar.numberOrVariable" : "filterBar.numberOnly");
   const arityOf = (id: FilterOperatorId) => arityFor(config.value, id);
@@ -300,7 +313,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const unique = config.value.limits.uniqueFields;
     // Every way to name a field honours one-condition-per-field, not just the picked list.
     const taken = (name: string) => unique && name !== editedField && usedFields.value.has(name);
-    const shorthand = parseShorthand(needle);
+    const shorthand = readShorthand(needle);
     if (shorthand && fieldMap.value.has(shorthand.field) && !taken(shorthand.field)) {
       rows.push({
         key: SHORTHAND_KEY,
@@ -527,11 +540,20 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     step.value = "operator";
   }
 
+  // Counts chips committed, so a key handler can tell whether its Enter produced one.
+  let commitSeq = 0;
+  const isEnter = (event: MouseEvent | KeyboardEvent) =>
+    "key" in event && event.key === "Enter" && !event.metaKey && !event.ctrlKey;
+  const reportEnterCommit = (seq: number, event: MouseEvent | KeyboardEvent) => {
+    if (commitSeq !== seq && isEnter(event)) options.enterCommit?.();
+  };
+
   function commitDraft() {
     const current = draft.value;
     if (!current?.operator) return;
     const filled = current.values;
     if (arityOf(current.operator) !== "none" && !filled.length) return;
+    commitSeq++;
     let next: FilterGroup;
     if (editingId.value) {
       const previous = findNode(tree.value, editingId.value);
@@ -617,7 +639,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   }
 
   function addShorthand() {
-    const shorthand = parseShorthand(text.value.trim());
+    const shorthand = readShorthand(text.value.trim());
     if (!shorthand || !shorthandFits(shorthand)) return;
     const allowed = allows(shorthand.field, shorthand.operator);
     startDraft(shorthand.field);
@@ -643,6 +665,12 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   }
 
   function select(key: string, event: MouseEvent | KeyboardEvent) {
+    const seq = commitSeq;
+    selectRow(key, event);
+    reportEnterCommit(seq, event);
+  }
+
+  function selectRow(key: string, event: MouseEvent | KeyboardEvent) {
     armedId.value = null;
     if (extraRows.value.some((row) => row.key === key)) {
       open.value = false;
@@ -654,6 +682,12 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   }
 
   function onEnter() {
+    const seq = commitSeq;
+    enterOnCaret();
+    if (commitSeq !== seq) options.enterCommit?.();
+  }
+
+  function enterOnCaret() {
     if (step.value === "value") {
       const typed = text.value.trim();
       if (typed) return acceptsTyped(typed) ? addValue(typed) : undefined;
@@ -667,7 +701,9 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   }
 
   function applyValues() {
+    const seq = commitSeq;
     if (multiValue.value && draft.value?.values.length) commitDraft();
+    if (commitSeq !== seq) options.enterCommit?.();
   }
 
   /** Applies what a half-built chip already holds, so leaving the bar never drops a filter unseen. */

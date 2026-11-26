@@ -80,7 +80,9 @@ const operatorLabel = computed<I18nText | undefined>(() =>
 const valueLabel = computed<I18nText | undefined>(() => {
   const node = condition.value;
   if (!node || OPERATORS[node.operator].arity === "none") return undefined;
-  return node.values.length ? raw(conditionValueLabel(node)) : t("filterBar.chooseValue");
+  return node.values.length
+    ? raw(conditionValueLabel(node, t("filterBar.emptyValue")))
+    : t("filterBar.chooseValue");
 });
 
 const valueHint = computed<I18nText | undefined>(() => {

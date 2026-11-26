@@ -78,6 +78,44 @@ describe("useDimensionSelector", () => {
       expect(result.length).toBeLessThanOrEqual(3);
     });
 
+    it("does not pick a numeric measure such as latency_ms as a dimension", () => {
+      const samples = Array.from({ length: 20 }, (_, i) => ({
+        latency_ms: 100 + (i % 5) * 7,
+        level: i % 2 ? "info" : "warn",
+      }));
+      const result = selectDimensionsFromData(samples, [], 8);
+      expect(result).toContain("level");
+      expect(result).not.toContain("latency_ms");
+    });
+
+    it("does not pick a many-valued numeric field whatever its name", () => {
+      const samples = Array.from({ length: 40 }, (_, i) => ({
+        score: i * 3,
+        level: i % 2 ? "info" : "warn",
+      }));
+      expect(selectDimensionsFromData(samples, [], 8)).not.toContain("score");
+    });
+
+    it("still picks a numeric code field with many values, such as status_code", () => {
+      const samples = Array.from({ length: 40 }, (_, i) => ({
+        status_code: 100 + i,
+        level: i % 2 ? "info" : "warn",
+      }));
+      expect(selectDimensionsFromData(samples, [], 8)).toContain("status_code");
+    });
+
+    it("still picks a low-cardinality numeric field such as status_code", () => {
+      const samples = Array.from({ length: 20 }, (_, i) => ({ status_code: i % 2 ? 200 : 500 }));
+      expect(selectDimensionsFromData(samples, [], 8)).toContain("status_code");
+    });
+
+    it("keeps a numeric-typed measure out of the schema-only fallback even if indexed", () => {
+      const schema = [{ name: "latency_ms", type: "Int64", isIndexed: true }, { name: "level" }];
+      const result = selectDimensionsFromData([], schema, 8);
+      expect(result).toContain("level");
+      expect(result).not.toContain("latency_ms");
+    });
+
     it("excludes high-cardinality pattern fields ending in _id", () => {
       const samples = buildSamplesWithCardinality(20, "request_id", 20);
       const result = selectDimensionsFromData(samples, [], 8);

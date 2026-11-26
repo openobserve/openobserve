@@ -117,6 +117,7 @@ import { useAiIcon } from "@/composables/useAiIcon";
 import { DateTime } from "luxon";
 import { periodToLabel } from "@/composables/useWidenRange";
 import DOMPurify from "dompurify";
+import { functionErrorText } from "@/utils/logs/functionErrorText";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 // Backend uses exclusive end boundary, so nudge end by 1s to include the record at doc_time_max.
@@ -148,19 +149,7 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const { aiIconSrc } = useAiIcon();
 
-// The server sends a list of messages, which can arrive as an array or as its JSON text.
-const functionMessages = computed<string>(() => {
-  const value = props.functionError;
-  if (Array.isArray(value)) return value.join("\n");
-  if (!value?.trimStart().startsWith("[")) return value ?? "";
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (Array.isArray(parsed)) return parsed.map(String).join("\n");
-  } catch {
-    // Not JSON after all: a message that merely starts with a bracket.
-  }
-  return value;
-});
+const functionMessages = computed<string>(() => functionErrorText(props.functionError));
 
 // --- filter detection -------------------------------------------------------
 

@@ -970,6 +970,41 @@ describe("panel records for Visualize and Build (J7)", () => {
     expect(fakeSearchObj.value.meta.executedPanel).toBeUndefined();
   });
 
+  it("a chart built from the finished Logs run enables Add to dashboard without a new run", () => {
+    let type = "bar";
+    run().setPanelConfigReader(() => ({ type }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.meta.executed = {
+      generation: 3,
+      signature: run().readSignature(),
+      req: {},
+      complete: true,
+    };
+    expect(run().persistReason("visualize", "add-to-dashboard")).toBeTruthy();
+    const events: any[] = [];
+    run().engine.onExecutedRecorded((event) => events.push(event));
+
+    run().noteReusedPanelResult();
+
+    expect(run().persistReason("visualize", "add-to-dashboard")).toBeNull();
+    expect(events).toHaveLength(0);
+    type = "line";
+    expect(run().persistReason("visualize", "add-to-dashboard")).toBeTruthy();
+  });
+
+  it("does not certify a chart when the Logs run it reuses never completed", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.meta.executed = {
+      generation: 3,
+      signature: run().readSignature(),
+      req: {},
+      complete: false,
+    };
+    run().noteReusedPanelResult();
+    expect(run().persistReason("visualize", "add-to-dashboard")).toBeTruthy();
+  });
+
   it("a Visualize toggle that loads the chart records the live query once the load ends", () => {
     const events: any[] = [];
     run().engine.onExecutedRecorded((event) => events.push(event));

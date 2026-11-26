@@ -71,9 +71,9 @@ export const useRecentSearchesEditorHost = (
       listActive.value = true;
       if (options.opensOnFocus()) open.value = true;
     },
-    onEdit: (isBlank, wasBlank) => {
+    onEdit: (isBlank, _wasBlank) => {
       const isEmpty = enabled.value && emptyWith(isBlank);
-      open.value = recentsOpenAfterEdit(open.value, emptyWith(wasBlank), isEmpty);
+      open.value = recentsOpenAfterEdit(open.value, isEmpty);
     },
     onKeydown: (event) => {
       if (!open.value) return;

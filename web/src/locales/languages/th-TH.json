@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "ไม่มีมุมมองที่บันทึกไว้ที่ตรงกับการค้นหาของคุณ",
     "savedViewApplied": "นำไปใช้อยู่",
     "favoriteViewNamed": "เพิ่ม {name} ในรายการโปรด",
+    "unfavoriteViewNamed": "ยกเลิกรายการโปรด {name}",
     "deleteViewNamed": "ลบ {name}",
     "overwriteSavedViewNamed": "เขียนทับ {name} ด้วยคิวรีปัจจุบัน",
     "searchSavedFunction": "ค้นหา",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "Please enable SQL mode to use timechart",
     "drillDown": "Drill down",
     "drillDownUnavailableInSqlMode": "Drill down is not available in SQL mode",
+    "drillDownSqlModeDescription": "การเจาะลึกจะเปรียบเทียบค่าของมิติข้ามเหตุการณ์ในผลการค้นหาของคุณ ปิดโหมด SQL เพื่อใช้งาน คุณสมบัตินี้ เนื่องจากคิวรี SQL จะถูกล้าง",
+    "drillDownTurnOffSqlMode": "ปิดโหมด SQL",
     "drillDownRunTitle": "รันคิวรีเพื่อเริ่ม Drill down",
     "drillDownRunDescription": "Drill down จะเปรียบเทียบค่าของมิติข้ามเหตุการณ์ในการค้นหาของคุณ รันคิวรีเพื่อโหลดข้อมูล",
     "patternsLogsOnly": "Patterns ใช้ได้กับสตรีมล็อกเท่านั้น",
@@ -25117,6 +25120,8 @@
       "endpointUrlCopied": "คัดลอก URL ปลายทางแล้ว"
     },
     "views": {
+      "shortUrlInvalid": "ลิงก์นี้ไม่ถูกต้องหรือหมดอายุแล้ว",
+      "shortUrlFailed": "ไม่สามารถเปิดลิงก์นี้ได้",
       "youAreNotAuthorizedToManage": "You are not authorized to manage the license.",
       "copiedToClipboard": "คัดลอกไปยังคลิปบอร์ดแล้ว",
       "errorWhilePullingDestinations": "Error while pulling destinations.",
