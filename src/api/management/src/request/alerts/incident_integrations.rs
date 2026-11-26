@@ -44,7 +44,8 @@ pub struct CreateIntegrationPayload {
     /// `IncidentIntegrationRecord::destinations`.
     #[serde(default)]
     pub destinations: Vec<String>,
-    /// The on-call team this source's new incidents page, ahead of routing; blank means none.
+    /// Id of the on-call team this source's new incidents page, ahead of routing; blank means
+    /// none.
     #[serde(default)]
     pub oncall_team: Option<String>,
 }
@@ -62,7 +63,7 @@ pub struct SetEnabledPayload {
 pub struct UpdateIntegrationPayload {
     pub name: Option<String>,
     pub destinations: Option<Vec<String>>,
-    /// Absent keeps the stored team; `null` or blank clears it back to routing.
+    /// On-call team id; absent keeps the stored team, `null` or blank clears it back to routing.
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<String>)]
     pub oncall_team: Option<Option<String>>,
@@ -82,6 +83,7 @@ pub struct IntegrationResponse {
     #[schema(value_type = Object)]
     pub config: serde_json::Value,
     pub destinations: Vec<String>,
+    /// Id of the on-call team this source pages, if set.
     pub oncall_team: Option<String>,
     pub created_by: String,
     pub created_at: i64,

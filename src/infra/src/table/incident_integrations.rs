@@ -241,12 +241,8 @@ pub async fn set_enabled(org_id: &str, id: &str, enabled: bool) -> Result<(), er
     Ok(())
 }
 
-/// Update an integration's name, incident-notification destinations and/or
-/// on-call team in a single write. `None` leaves that field untouched;
-/// `destinations: Some(&[])` clears destinations back to "use the org
-/// default" and `oncall_team: Some(None)` clears the team back to routing.
-/// `name` is just a label — it doesn't affect routing/matching, so it's safe
-/// to change at any time, including for the org's "default" source.
+/// Updates the given fields in one write; `None` keeps a field, `Some(&[])` and `Some(None)` clear
+/// destinations and team.
 pub async fn update(
     org_id: &str,
     id: &str,

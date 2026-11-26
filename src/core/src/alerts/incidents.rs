@@ -2109,6 +2109,8 @@ pub async fn open_manual_incident(
 /// The `#[cfg(feature = "cloud")]` AI-credit deduction from the internal path is
 /// intentionally NOT replicated here: it is structurally coupled to `&Alert` and
 /// P1 external events do not consume incident credits.
+///
+/// A set `oncall_team` is paged on a new incident instead of the routed team; a join pages no one.
 #[cfg(feature = "enterprise")]
 pub async fn correlate_external_event(
     org_id: &str,
