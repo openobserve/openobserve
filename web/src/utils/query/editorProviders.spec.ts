@@ -626,6 +626,26 @@ describe("parseValueContext — where a value belongs", () => {
     expect(parseValueContext("WHERE body LIKE ")?.field).toBe("body");
   });
 
+  it("reads a double-quoted field name the same as a bare one", () => {
+    expect(parseValueContext(`WHERE "group" = '`)).toMatchObject({
+      field: "group",
+      hasOpenQuote: true,
+      typed: "",
+      operator: "compare",
+    });
+    expect(parseValueContext(`WHERE "group" != 'ab`)).toMatchObject({
+      field: "group",
+      typed: "ab",
+    });
+    expect(parseValueContext(`WHERE "group" IN ('a', '`)).toMatchObject({
+      field: "group",
+      operator: "in",
+      chosen: ["a"],
+    });
+    expect(parseValueContext(`WHERE "group" NOT IN (`)?.field).toBe("group");
+    expect(parseValueContext(`WHERE "user name" LIKE '`)?.field).toBe("user name");
+  });
+
   it("recognises the match functions' value argument", () => {
     expect(parseValueContext("WHERE str_match(body, ")?.field).toBe("body");
     expect(parseValueContext("WHERE fuzzy_match(body, ")?.field).toBe("body");
