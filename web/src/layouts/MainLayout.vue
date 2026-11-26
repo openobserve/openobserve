@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
         @open-shortcuts="openShortcutsList"
+        @open-command-palette="commandPaletteOpen = true"
         @toggle-mobile-nav="mobileNavOpen = !mobileNavOpen"
         @signout="signout"
       />
@@ -272,6 +273,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite v-if="!focusMode" />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
+    <CommandPalette
+      v-model:open="commandPaletteOpen"
+      :links="navLinks"
+      :flat="store.state.solutionMode === 'security'"
+    />
     <VersionCompareDrawerHost />
     <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
     <DashboardSaveConflictDialog
@@ -292,6 +298,9 @@ import { securityNavLinks as buildSecurityNavLinks } from "@/utils/security/nav"
 import { featureState, menuState, streamTypeFeature, type FeatureState } from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
+import CommandPalette from "@/components/commandPalette/CommandPalette.vue";
+import { useRecentlyViewed } from "@/components/commandPalette/useRecentlyViewed";
+import { usePageVisitHistory } from "@/components/commandPalette/usePageVisitHistory";
 import OAccessBoundary from "@/components/access/OAccessBoundary.vue";
 import { resetAccess } from "@/composables/useAccessStore";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -400,6 +409,8 @@ import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 // Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
 const KEPT_ALIVE_VIEWS = ["AppAnalytics", "AppTraces"];
+const MODAL_OVERLAY =
+  '[data-test="o-dialog-overlay"][data-state="open"], [data-test="o-drawer-overlay"][data-state="open"]';
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -413,6 +424,7 @@ export default defineComponent({
   mixins: [mainLayoutMixin],
   components: {
     AppHeader,
+    CommandPalette,
     WebinarBanner,
     AnnouncementBanner,
     PasswordExpiryBanner,
@@ -1965,6 +1977,23 @@ export default defineComponent({
       },
     );
 
+    const commandPaletteOpen = ref(false);
+    useRecentlyViewed({
+      deployment: computed(() => store.state.API_ENDPOINT || window.location.origin),
+      subject: computed(() => store.state.userInfo?.email || ""),
+      org: computed(() => store.state.selectedOrganization?.identifier || ""),
+    });
+    usePageVisitHistory();
+    useShortcuts([
+      {
+        id: "commandPalette",
+        handler: () => {
+          // Only a modal owns the keyboard; non-modal drawers and panels render no overlay.
+          if (!commandPaletteOpen.value && document.querySelector(MODAL_OVERLAY)) return;
+          commandPaletteOpen.value = !commandPaletteOpen.value;
+        },
+      },
+    ]);
     const showShortcuts = ref(false);
     const openShortcutsList = () => {
       showShortcuts.value = true;
@@ -1978,6 +2007,7 @@ export default defineComponent({
     useShortcuts([{ id: "timeRangeOpen", handler: openPrimaryTimeRangePicker }]);
 
     return {
+      commandPaletteOpen,
       signOutDraftsOpen,
       signOutDraftCount,
       isDark,

@@ -254,11 +254,11 @@ mod tests {
         array::{
             IntoArray,
             arrays::{PrimitiveArray, StructArray, VarBinViewArray},
-            expr::{root, select},
             stream::ArrayStreamExt,
             validity::Validity,
         },
         dtype::{DType, FieldNames, Nullability},
+        expr::{root, select},
         file::{OpenOptionsSessionExt, VortexWriteOptions},
         io::session::RuntimeSessionExt,
         session::VortexSession,

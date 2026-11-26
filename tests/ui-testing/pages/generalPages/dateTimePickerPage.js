@@ -26,6 +26,9 @@ export class DateTimePickerPage {
 
         // Picker panel — an id, not a data-test, in the component source.
         this.panel = page.locator('#date-time-menu');
+        // Reka popover content around the panel; its FocusScope gives it tabindex=-1.
+        this.panelContent = page.locator('[data-o-popover-content]', { has: this.panel });
+        this.tooltipBubbles = page.locator('[data-test="o-tooltip-content"]');
 
         // Tab pair — absent when the host passes `disable-relative`.
         this.relativeTab = page.locator('[data-test="date-time-relative-tab"]');
@@ -128,6 +131,10 @@ export class DateTimePickerPage {
 
     /** Closes the panel without applying — Escape leaves any pending selection uncommitted. */
     async closePickerWithEscape() {
+        // Reka's Escape closes only the topmost layer, so an open control tooltip would swallow it.
+        await this.panelContent.hover({ position: { x: 6, y: 6 } });
+        await this.panelContent.focus();
+        await expect(this.tooltipBubbles).toHaveCount(0);
         await this.page.keyboard.press('Escape');
         await expect(this.panel).toBeHidden();
     }

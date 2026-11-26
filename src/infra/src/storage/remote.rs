@@ -135,6 +135,7 @@ impl ObjectStore for Remote {
                 Ok(PutResult {
                     e_tag: None,
                     version: None,
+                    extensions: Default::default(),
                 })
             }
             Err(err) => {

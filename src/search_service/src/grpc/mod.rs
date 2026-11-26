@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use arrow_schema::Schema;
+use arrow_schema::{Metadata, Schema};
 use config::meta::{search::ScanStats, stream::FileKey};
 use datafusion::{datasource::TableProvider, execution::cache::cache_manager::FileStatisticsCache};
 use hashbrown::HashSet;
@@ -52,7 +52,7 @@ pub async fn create_tables_from_files(
         schema_ref
             .as_ref()
             .clone()
-            .with_metadata(Default::default()),
+            .with_metadata(Metadata::default()),
     );
 
     // Helper to create table with common configuration
