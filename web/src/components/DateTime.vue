@@ -205,13 +205,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :inert="selectedType !== 'relative'"
               >
                 <div class="date-time-table relative flex h-full flex-col gap-2 py-2">
-                  <!-- One bordered table: hairline rows and a row tint keep the 36 values scannable. -->
-                  <div
-                    class="border-border-default rounded-default mx-3 flex flex-1 flex-col overflow-hidden border"
-                    data-test="date-time-relative-grid"
-                  >
+                  <!-- Hairline rows and an alternating tint keep the 36 values scannable. -->
+                  <div class="mx-3 flex flex-1 flex-col" data-test="date-time-relative-grid">
                     <div
-                      class="relative-row border-border-subtle even:bg-surface-panel hover:bg-surface-hover flex flex-1 items-center gap-1 border-b px-2 transition-colors last:border-b-0"
+                      class="relative-row border-border-subtle even:bg-surface-panel flex flex-1 items-center gap-1 border-b px-2 last:border-b-0"
                       v-for="(period, index) in relativePeriods"
                       :key="'date_' + index"
                     >
