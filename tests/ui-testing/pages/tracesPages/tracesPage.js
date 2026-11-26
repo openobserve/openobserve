@@ -250,6 +250,7 @@ export class TracesPage {
 
     this.moreMenuButton = '[data-test="traces-search-bar-more-menu-btn"]';
     this.openDropdownMenu = page.getByRole('menu');
+    this.sqlModeSwitch = '[data-test="traces-search-bar-sql-mode-toggle-btn"]';
     this.menuPinSavedViewsButton = '[data-test="traces-search-bar-menu-pin-saved-views-btn"]';
     this.menuListSavedViewsButton = '[data-test="traces-search-bar-menu-list-saved-views-btn"]';
     this.menuCreateSavedViewButton = '[data-test="traces-search-bar-menu-create-saved-view-btn"]';
@@ -3322,6 +3323,28 @@ export class TracesPage {
       .toHaveAttribute('data-state', 'on', { timeout: 10000 });
   }
 
+  // The switch runs a search; its count query follows the list and the RED charts follow on their own timer.
+  async switchToTracesModeAndSettle() {
+    let lastSent = Date.now();
+    const onRequest = (request) => {
+      if (this.isTracesSearchRequest(request)) lastSent = Date.now();
+    };
+    this.page.on('request', onRequest);
+    try {
+      await this.switchToTracesMode();
+      await expect(this.page.locator(this.tracesCountBadge))
+        .toHaveText(/[1-9][\d.,]*\s*[KMB]?\s+traces?/i, { timeout: 60000 });
+      await expect.poll(() => Date.now() - lastSent, { timeout: 15000 }).toBeGreaterThan(1000);
+    } finally {
+      this.page.off('request', onRequest);
+    }
+  }
+
+  // The Traces view lists through latest_stream; the other list, count and chart searches use _search_stream.
+  isTracesSearchRequest(request) {
+    return /_search_stream|\/traces\/latest_stream/.test(request.url());
+  }
+
   async expectGenericQueryError() {
     const errorState = this.page.locator(this.errorMessage);
     await expect(errorState).toBeVisible({ timeout: 15000 });
@@ -3375,6 +3398,15 @@ export class TracesPage {
     // A nested submenu consumes the first Escape, so repeat until no menu is left.
     await expect(async () => {
       if (await this.openDropdownMenu.count()) await this.page.keyboard.press('Escape');
+      await expect(this.openDropdownMenu).toHaveCount(0, { timeout: 1000 });
+    }).toPass({ timeout: 10000 });
+  }
+
+  // closeMoreMenu presses Escape, which closes every open toast too.
+  async closeMoreMenuKeepingToasts() {
+    const trigger = this.page.locator(this.moreMenuButton);
+    await expect(async () => {
+      if ((await trigger.getAttribute('aria-expanded')) === 'true') await trigger.click();
       await expect(this.openDropdownMenu).toHaveCount(0, { timeout: 1000 });
     }).toPass({ timeout: 10000 });
   }
@@ -4022,9 +4054,9 @@ export class TracesPage {
       await pinned.click();
       return;
     }
-    await this.page.locator('[data-test="traces-search-bar-more-menu-btn"]').click();
-    await this.page.locator('[data-test="traces-search-bar-sql-mode-toggle-btn"]').click();
-    await this.page.keyboard.press('Escape');
+    await this.page.locator(this.moreMenuButton).click();
+    await this.page.locator(this.sqlModeSwitch).click();
+    await this.closeMoreMenuKeepingToasts();
   }
 
   async expectSqlMode(on) {
@@ -4035,11 +4067,10 @@ export class TracesPage {
       });
       return;
     }
-    await this.page.locator('[data-test="traces-search-bar-more-menu-btn"]').click();
-    await expect(
-      this.page.locator('[data-test="traces-search-bar-sql-mode-toggle-btn"]'),
-    ).toHaveAttribute('aria-checked', String(on), { timeout: 10000 });
-    await this.page.keyboard.press('Escape');
+    await this.page.locator(this.moreMenuButton).click();
+    await expect(this.page.locator(this.sqlModeSwitch))
+      .toHaveAttribute('aria-checked', String(on), { timeout: 10000 });
+    await this.closeMoreMenuKeepingToasts();
   }
 
   // Monaco auto-closes quotes and brackets on typed input, so SQL is set through its API.
@@ -4116,11 +4147,11 @@ export class TracesPage {
     return dataTest.replace(`logs-search-subfield-add-${field}-`, '');
   }
 
-  // Counts _search_stream requests sent while `action` runs, until `settled` sees the page at rest and 1.5 s after.
+  // Counts search requests sent while `action` runs, until `settled` sees the page at rest and 1.5 s after.
   async countSearchStreams(action, settled) {
     let searches = 0;
     const onRequest = (request) => {
-      if (request.url().includes('_search_stream')) searches++;
+      if (this.isTracesSearchRequest(request)) searches++;
     };
     this.page.on('request', onRequest);
     try {
