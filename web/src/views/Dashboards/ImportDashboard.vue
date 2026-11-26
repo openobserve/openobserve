@@ -78,33 +78,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{ t("dashboard.communityDashboard") }}</OButton
                   >
                 </div>
+                <!-- The destination folder applies to both tabs, so it sits above the file and URL inputs -->
+                <div class="bg-card-glass-bg shrink-0 px-2 pt-1">
+                  <div
+                    data-test="dashboard-folder-dropdown"
+                    class="import-folder-dropdown-container w-full max-w-sm"
+                  >
+                    <SelectFolderDropdown
+                      @folder-selected="selectedFolder = $event"
+                      :activeFolderId="selectedFolder.value"
+                      :disabled="!!isLoading"
+                    />
+                  </div>
+                </div>
                 <div
                   v-if="activeTab == 'import_json_url'"
                   class="editor-container-url bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
                 >
                   <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
-                    <div
-                      class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2 max-md:flex-wrap"
-                    >
-                      <div data-test="dashboard-import-url-input" class="w-[69%] max-md:w-full">
-                        <OFormInput
-                          data-test="dashboard-import-url-control"
-                          name="url"
-                          :label="t('common.url')"
-                          :placeholder="t('dashboard.addURL')"
-                        />
-                      </div>
-
-                      <div
-                        data-test="dashboard-folder-dropdown"
-                        class="import-folder-dropdown-container w-[calc(30%)] max-md:w-full"
-                      >
-                        <SelectFolderDropdown
-                          @folder-selected="selectedFolder = $event"
-                          :activeFolderId="selectedFolder.value"
-                          :disabled="!!isLoading"
-                        />
-                      </div>
+                    <div data-test="dashboard-import-url-input" class="shrink-0">
+                      <OFormInput
+                        data-test="dashboard-import-url-control"
+                        name="url"
+                        :label="t('common.url')"
+                        :placeholder="t('dashboard.addURL')"
+                      />
                     </div>
                     <QueryEditor
                       data-test="dashboard-import-url-editor"
@@ -122,27 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="dashboard-import-json-container bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
                 >
                   <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
-                    <div
-                      class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2 max-md:flex-wrap"
-                    >
-                      <div data-test="dashboard-import-file-input" class="w-[69%] max-md:w-full">
-                        <OFormFile
-                          data-test="dashboard-import-file-control"
-                          name="jsonFiles"
-                          :label="t('dashboard.selectFile')"
-                          accept=".json"
-                          multiple
-                          :validate="validateJsonFile"
-                          :disabled="!!isLoading"
-                        />
-                      </div>
-                      <div class="import-folder-dropdown-container w-[calc(30%)] max-md:w-full">
-                        <SelectFolderDropdown
-                          @folder-selected="selectedFolder = $event"
-                          :activeFolderId="selectedFolder.value"
-                          :disabled="!!isLoading"
-                        />
-                      </div>
+                    <div data-test="dashboard-import-file-input" class="shrink-0">
+                      <OFormFile
+                        data-test="dashboard-import-file-control"
+                        name="jsonFiles"
+                        :label="t('dashboard.selectFile')"
+                        accept=".json"
+                        multiple
+                        :validate="validateJsonFile"
+                        :disabled="!!isLoading"
+                      />
                     </div>
                     <QueryEditor
                       data-test="dashboard-import-json-file-editor"

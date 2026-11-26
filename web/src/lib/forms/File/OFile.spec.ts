@@ -4,6 +4,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { h } from "vue";
 import OFile from "./OFile.vue";
+import { DIALOG_DEPTH_KEY } from "@/lib/overlay/Dialog/dialogStacking";
 import { createJsonFileValidator } from "./validateJsonFile";
 import { raw, gt } from "@/types/i18n";
 
@@ -38,22 +39,41 @@ describe("OFile", () => {
     await flushPromises();
   }
 
-  it("renders a drop zone with a real choose button and its constraints", () => {
+  it("renders a drop zone with one prompt line, a browse link and the file types", () => {
     wrapper = mount(OFile, { props: { accept: ".json", maxSize: 5 * 1024 * 1024 } });
     expect(wrapper.find("input[type='file']").exists()).toBe(true);
-    expect(wrapper.find('[data-test="o-file-zone"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="o-file-prompt"]').text()).toBe("Drop a file here");
-    expect(wrapper.find('[data-test="o-file-zone"]').text()).toContain("or");
+    const zone = wrapper.find('[data-test="o-file-zone"]');
+    expect(zone.exists()).toBe(true);
+    expect(wrapper.find('[data-test="o-file-prompt"]').text()).toBe(
+      "Drop a file to attach, or browse",
+    );
+    expect(wrapper.find('[data-test="o-file-types"]').text()).toBe("File supported .json");
     const btn = wrapper.find('[data-test="o-file-choose-btn"]');
     expect(btn.element.tagName).toBe("BUTTON");
-    expect(btn.text()).toBe("Choose file");
-    expect(wrapper.text()).toContain(".json · up to 5.0 MB · one file");
+    expect(btn.attributes("type")).toBe("button");
+    expect(btn.text()).toBe("browse");
+    // The zone names the file types only: no size or file count.
+    expect(zone.text()).not.toContain("MB");
+    expect(zone.text()).not.toContain("one file");
   });
 
-  it("uses the plural prompt and button label when multiple", () => {
+  it("joins several file types with commas and a final &", () => {
+    wrapper = mount(OFile, { props: { accept: ".png, .jpg, .webp" } });
+    expect(wrapper.find('[data-test="o-file-types"]').text()).toBe(
+      "File supported .png, .jpg & .webp",
+    );
+  });
+
+  it("leaves out the file types line when nothing is accepted in particular", () => {
+    wrapper = mount(OFile);
+    expect(wrapper.find('[data-test="o-file-types"]').exists()).toBe(false);
+  });
+
+  it("uses the plural prompt when multiple", () => {
     wrapper = mount(OFile, { props: { multiple: true } });
-    expect(wrapper.find('[data-test="o-file-prompt"]').text()).toBe("Drop files here");
-    expect(wrapper.find('[data-test="o-file-choose-btn"]').text()).toBe("Choose files");
+    expect(wrapper.find('[data-test="o-file-prompt"]').text()).toBe(
+      "Drop files to attach, or browse",
+    );
   });
 
   it("opens the picker when the empty zone is clicked", async () => {
@@ -80,10 +100,10 @@ describe("OFile", () => {
     expect(zone.findAll("button")).toHaveLength(1);
   });
 
-  it("hides the or and the button while dragging", async () => {
+  it("hides the prompt and the browse link while dragging", async () => {
     wrapper = mount(OFile);
     await wrapper.find('[data-test="o-file-zone"]').trigger("dragenter");
-    expect(wrapper.text()).toContain("Drop to upload");
+    expect(wrapper.text()).toContain("Drop the file to attach");
     expect(wrapper.find('[data-test="o-file-choose-btn"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="o-file-prompt"]').exists()).toBe(false);
   });
@@ -100,13 +120,13 @@ describe("OFile", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
-  it("hides the button but keeps the prompt when disabled without a reason", () => {
+  it("hides the browse link but keeps the prompt when disabled without a reason", () => {
     wrapper = mount(OFile, { props: { disabled: true } });
-    expect(wrapper.find('[data-test="o-file-prompt"]').text()).toBe("Drop a file here");
+    expect(wrapper.find('[data-test="o-file-prompt"]').text()).toBe("Drop a file to attach, or");
     expect(wrapper.find('[data-test="o-file-choose-btn"]').exists()).toBe(false);
   });
 
-  it("lets the hint slot replace the prompt, or and button", () => {
+  it("lets the hint slot replace the prompt, hint, types and button", () => {
     wrapper = mount(OFile, {
       slots: { hint: () => h("span", { "data-test": "custom-hint" }, "Custom") },
     });
@@ -123,7 +143,7 @@ describe("OFile", () => {
   it("shows the compact placeholder when no file is selected", () => {
     wrapper = mount(OFile, { props: { variant: "compact", placeholder: raw("Upload here") } });
     expect(wrapper.text()).toContain("Upload here");
-    expect(wrapper.find('[data-test="o-file-choose-btn"]').text()).toBe("Choose file");
+    expect(wrapper.find('[data-test="o-file-choose-btn"]').text()).toBe("Select file");
   });
 
   it("emits update:modelValue with a single file when not multiple", async () => {
@@ -145,11 +165,11 @@ describe("OFile", () => {
     wrapper = mount(OFile, { props: { multiple: true } });
     const zone = wrapper.find('[data-test="o-file-zone"]');
     await zone.trigger("dragenter");
-    expect(wrapper.text()).toContain("Drop to upload");
+    expect(wrapper.text()).toContain("Drop the files to attach");
     await drop([makeFile("dropped.txt", 4)]);
     const emitted = wrapper.emitted("update:modelValue");
     expect((emitted![0][0] as File[])[0].name).toBe("dropped.txt");
-    expect(wrapper.text()).not.toContain("Drop to upload");
+    expect(wrapper.text()).not.toContain("Drop the files to attach");
   });
 
   it("ignores drops while disabled", async () => {
@@ -180,6 +200,42 @@ describe("OFile", () => {
     expect(wrapper.find('[data-test="o-file-chip-0"]').text()).toContain(
       "Only .json files are accepted",
     );
+  });
+
+  describe("inside a dialog", () => {
+    const inDialog = (props: Record<string, unknown> = {}) =>
+      mount(OFile, {
+        props: { accept: ".csv", ...props },
+        global: { provide: { [DIALOG_DEPTH_KEY]: 1 } },
+      });
+
+    it("keeps an empty space in place of the file row before anything is picked", () => {
+      wrapper = inDialog();
+      const space = wrapper.find('[data-test="o-file-empty-row"]');
+      expect(space.exists()).toBe(true);
+      expect(space.text()).toBe("");
+    });
+
+    it("shows the field's own error inside the kept space, not on a new line", () => {
+      wrapper = inDialog({ errorMessage: raw("CSV File is required!") });
+      expect(wrapper.find('[data-test="o-file-empty-row"]').text()).toBe("CSV File is required!");
+      expect(wrapper.findAll('[role="alert"]')).toHaveLength(1);
+    });
+
+    it("swaps the empty row for the rejection row instead of adding one", async () => {
+      wrapper = inDialog();
+      await pick([makeFile("notes.txt", 2)]);
+      expect(wrapper.find('[data-test="o-file-empty-row"]').exists()).toBe(false);
+      expect(wrapper.findAll('[data-test^="o-file-chip-"][data-state]')).toHaveLength(1);
+    });
+
+    it("does not reserve the row for multi-file uploads or outside a dialog", () => {
+      wrapper = inDialog({ multiple: true });
+      expect(wrapper.find('[data-test="o-file-empty-row"]').exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = mount(OFile, { props: { accept: ".csv" } });
+      expect(wrapper.find('[data-test="o-file-empty-row"]').exists()).toBe(false);
+    });
   });
 
   it("rejects files past maxFiles", async () => {

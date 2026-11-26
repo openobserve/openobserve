@@ -173,111 +173,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OSettingRow>
 
-          <OSettingRow
-            control-at="end"
-            :label="t('settings.general.logoLightLabel')"
-            :description="t('settings.general.logoLightHelp')"
+          <div
+            class="border-border-default border-b px-4 py-3 last:border-b-0"
+            data-test="general-settings-branding-logos"
           >
-            <div
-              v-if="!customBrandingAccess.allowed"
-              class="flex w-full items-center gap-2"
-              @click.capture="onLockedBrandingClick"
-            >
-              <OFile
-                data-test="setting_ent_custom_logo_img_file_upload_locked"
-                accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-                variant="compact"
-                class="min-w-0 flex-1"
-              />
+            <div class="text-text-heading text-sm font-medium">
+              {{ t("settings.general.logoTitle") }}
             </div>
-            <div
-              v-else-if="
-                store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-                store.state.zoConfig.custom_logo_img != null
-              "
-              class="flex w-full items-center gap-3"
-            >
-              <img
-                data-test="setting_ent_custom_logo_img"
-                :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_img"
-                :alt="t('settings.logoLabel')"
-                class="max-h-7.75 max-w-37.5"
-              />
-              <OButton
-                :aria-label="t('common.delete')"
-                data-test="setting_ent_custom_logo_img_delete_btn"
-                variant="ghost-destructive"
-                size="icon-xs-sq"
-                type="button"
-                @click="confirmDeleteLogo('light')"
-                icon-left="delete"
-              />
+            <div class="text-text-secondary mt-0.5 text-xs">
+              {{ t("settings.general.logoHelp") }}
             </div>
-            <div v-else class="flex w-full items-center gap-2">
-              <OFile
-                data-test="setting_ent_custom_logo_img_file_upload"
-                v-model="filesLight"
-                :aria-label="t('settings.general.logoLightLabel')"
-                accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-                @rejected="onRejected"
-                variant="compact"
-                class="min-w-0 flex-1"
-              />
+            <div class="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <!-- Locked: the capture handler opens the upgrade dialog before the card can react -->
+              <div
+                v-for="logo in brandingLogos"
+                :key="logo.mode"
+                class="min-w-0"
+                @click.capture="
+                  customBrandingAccess.allowed ? undefined : onLockedBrandingClick($event)
+                "
+              >
+                <LogoUploadCard
+                  :surface="logo.mode"
+                  :icon="logo.mode === 'light' ? 'light-mode' : 'dark-mode'"
+                  :title="logo.title"
+                  :aria-label="logo.ariaLabel"
+                  :current-src="
+                    customBrandingAccess.allowed && logo.saved
+                      ? `data:image; base64, ${logo.saved}`
+                      : null
+                  "
+                  :model-value="logo.file.value"
+                  :data-test="logo.dataTest"
+                  :test-ids="
+                    customBrandingAccess.allowed
+                      ? {}
+                      : { file: `${logo.dataTest}_file_upload_locked` }
+                  "
+                  @update:model-value="logo.file.value = $event"
+                  @rejected="onRejected"
+                  @remove="confirmDeleteLogo(logo.mode)"
+                />
+              </div>
             </div>
-          </OSettingRow>
-
-          <OSettingRow
-            control-at="end"
-            :label="t('settings.general.logoDarkLabel')"
-            :description="t('settings.general.logoDarkHelp')"
-          >
-            <div
-              v-if="!customBrandingAccess.allowed"
-              class="flex w-full items-center gap-2"
-              @click.capture="onLockedBrandingClick"
-            >
-              <OFile
-                data-test="setting_ent_custom_logo_dark_img_file_upload_locked"
-                accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-                variant="compact"
-                class="min-w-0 flex-1"
-              />
-            </div>
-            <div
-              v-else-if="
-                store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
-                store.state.zoConfig.custom_logo_dark_img != null
-              "
-              class="flex w-full items-center gap-3"
-            >
-              <img
-                data-test="setting_ent_custom_logo_dark_img"
-                :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_dark_img"
-                :alt="t('settings.logoLabel')"
-                class="max-h-7.75 max-w-37.5"
-              />
-              <OButton
-                :aria-label="t('common.delete')"
-                data-test="setting_ent_custom_logo_dark_img_delete_btn"
-                variant="ghost-destructive"
-                size="icon-xs-sq"
-                type="button"
-                @click="confirmDeleteLogo('dark')"
-                icon-left="delete"
-              />
-            </div>
-            <div v-else class="flex w-full items-center gap-2">
-              <OFile
-                data-test="setting_ent_custom_logo_dark_img_file_upload"
-                v-model="filesDark"
-                :aria-label="t('settings.general.logoDarkLabel')"
-                accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-                @rejected="onRejected"
-                variant="compact"
-                class="min-w-0 flex-1"
-              />
-            </div>
-          </OSettingRow>
+          </div>
         </OFormSection>
 
         <!-- Visibility only: the backend's per-org RBAC check on DELETE is the real gate. -->
@@ -492,7 +431,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OFile from "@/lib/forms/File/OFile.vue";
+import LogoUploadCard from "@/components/common/LogoUploadCard.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -537,7 +476,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OInput,
-    OFile,
+    LogoUploadCard,
     OForm,
     OFormInput,
     OFormSection,
@@ -598,6 +537,24 @@ export default defineComponent({
     const filesLight = ref<File | null>(null);
     const filesDark = ref<File | null>(null);
     const logoFiles = { light: filesLight, dark: filesDark };
+    const brandingLogos = computed(() => [
+      {
+        mode: "light" as LogoMode,
+        title: t("settings.general.logoLightTitle"),
+        ariaLabel: t("settings.general.logoLightLabel"),
+        saved: (store.state.zoConfig?.custom_logo_img as string | null | undefined) ?? null,
+        file: filesLight,
+        dataTest: "setting_ent_custom_logo_img",
+      },
+      {
+        mode: "dark" as LogoMode,
+        title: t("settings.general.logoDarkTitle"),
+        ariaLabel: t("settings.general.logoDarkLabel"),
+        saved: (store.state.zoConfig?.custom_logo_dark_img as string | null | undefined) ?? null,
+        file: filesDark,
+        dataTest: "setting_ent_custom_logo_dark_img",
+      },
+    ]);
     const chosenLogos = computed(() => Number(!!filesLight.value) + Number(!!filesDark.value));
     const logoThemeToDelete = ref<string>("light");
 
@@ -1335,6 +1292,7 @@ export default defineComponent({
       saveGeneralSettings,
       filesLight,
       filesDark,
+      brandingLogos,
       logoThemeToDelete,
       filesImages: ref(null),
       filesMaxSize: ref(null),

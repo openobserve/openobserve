@@ -38,15 +38,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="jsonFile"
                 :label="t('correlation.importSemanticGroups.selectJsonFile')"
                 accept=".json"
-                variant="compact"
                 @update:model-value="loadFile"
                 @clear="clearFile"
                 data-test="semantic-groups-import-file"
               />
             </div>
-            <div class="col-md-4 w-full ps-2 text-right">
+            <div v-if="diffData" class="col-md-4 w-full ps-2 text-right">
               <OButton
-                v-if="diffData"
                 variant="primary"
                 size="sm"
                 @click="applyChanges"

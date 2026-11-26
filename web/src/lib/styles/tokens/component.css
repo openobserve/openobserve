@@ -723,7 +723,13 @@
   --color-file-chip-text: var(--color-primary-700);
   --color-file-chip-remove: var(--color-primary-700);
   --color-file-drag-bg: var(--color-primary-50);
+  --color-file-zone-drag-bg: var(
+    --color-primary-100
+  ); /* stronger tint for the drop zone while a file is over it */
   --color-file-drag-border: var(--color-primary-500);
+  /* Branding logo previews: fixed per logo mode, not per app theme (dark.css leaves them alone) */
+  --color-logo-preview-light-bg: var(--color-white);
+  --color-logo-preview-dark-bg: var(--color-grey-950);
 
   /* Date / Time / Color (ODate, OTime, OColor) — share input surface */
   --color-datepicker-bg: var(--color-surface-base);
@@ -1678,7 +1684,10 @@
   --color-file-chip-text: var(--color-file-chip-text);
   --color-file-chip-remove: var(--color-file-chip-remove);
   --color-file-drag-bg: var(--color-file-drag-bg);
+  --color-file-zone-drag-bg: var(--color-file-zone-drag-bg);
   --color-file-drag-border: var(--color-file-drag-border);
+  --color-logo-preview-light-bg: var(--color-logo-preview-light-bg);
+  --color-logo-preview-dark-bg: var(--color-logo-preview-dark-bg);
 
   /* Date / Time / Color (ODate, OTime, OColor) */
   --color-datepicker-bg: var(--color-datepicker-bg);

@@ -9,7 +9,7 @@ import type {
   FileSource,
   FileValue,
 } from "./OFile.types";
-import { computed, reactive, ref, useAttrs, useId, watch } from "vue";
+import { computed, inject, reactive, ref, useAttrs, useId, watch } from "vue";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -18,6 +18,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import { DIALOG_DEPTH_KEY } from "@/lib/overlay/Dialog/dialogStacking";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -85,6 +86,9 @@ const hasError = computed(() => !!effectiveError.value);
 const localSource = ref<FileSource>(props.source ?? props.sources[0] ?? "file");
 const activeSource = computed<FileSource>(() => props.source ?? localSource.value);
 const switchable = computed(() => props.variant === "zone" && props.sources.length > 1);
+// In a dialog a single-file zone keeps room for its file row and message, so the dialog never resizes.
+const inDialog = inject<number>(DIALOG_DEPTH_KEY, 0) > 0;
+const reserveSpace = computed(() => inDialog && !props.multiple && props.variant === "zone");
 const localUrl = ref(props.url ?? "");
 const localText = ref(props.text ?? "");
 watch(
@@ -123,6 +127,12 @@ const acceptTokens = computed(() =>
     .filter(Boolean),
 );
 const acceptLabel = computed(() => raw(acceptTokens.value.join(", ")));
+// The zone lists the types as ".png, .jpg & .webp".
+const acceptList = computed(() => {
+  const tokens = acceptTokens.value;
+  if (tokens.length < 2) return raw(tokens.join(""));
+  return raw(`${tokens.slice(0, -1).join(", ")} & ${tokens[tokens.length - 1]}`);
+});
 const fileLimit = computed(() => props.maxFiles ?? (props.multiple ? Infinity : 1));
 
 function formatSize(bytes: number): I18nText {
@@ -130,23 +140,6 @@ function formatSize(bytes: number): I18nText {
   if (bytes < 1024 * 1024) return raw(`${(bytes / 1024).toFixed(1)} KB`);
   return raw(`${(bytes / (1024 * 1024)).toFixed(1)} MB`);
 }
-
-const constraints = computed(() => {
-  const parts: I18nText[] = [];
-  if (acceptTokens.value.length) parts.push(acceptLabel.value);
-  if (props.maxSize !== undefined) {
-    const size = formatSize(props.maxSize);
-    parts.push(
-      props.multiple
-        ? t("components.file.upToSizeEach", { size })
-        : t("components.file.upToSize", { size }),
-    );
-  }
-  if (!props.multiple) parts.push(t("components.file.oneFile"));
-  else if (Number.isFinite(fileLimit.value))
-    parts.push(t("components.file.upToFiles", { count: fileLimit.value }));
-  return raw(parts.join(" · "));
-});
 
 function matchesAccept(file: File): boolean {
   const mime = file.type.toLowerCase();
@@ -324,16 +317,19 @@ const bottomError = computed<I18nText | null>(() => {
   return props.variant === "compact" ? compactError.value : null;
 });
 
+// The zone's dashed outline is drawn by an SVG (see the template) so the gap
+// between dashes can be wider than a CSS `border-dashed` allows. Its colour
+// comes from the zone's `--zone-dash` variable set here.
 const zoneClasses = computed(() => [
-  "flex flex-col items-center justify-center gap-2 rounded-surface border border-dashed p-4 text-center text-compact transition-colors duration-(--duration-control) ease-(--ease-control)",
+  "group relative flex min-h-16 flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-surface px-5 py-4 text-center text-compact transition-colors duration-(--duration-control) ease-(--ease-control)",
   switchable.value && "h-full",
   isDragging.value
-    ? "border-file-drag-border bg-file-drag-bg text-text-body"
+    ? "bg-file-zone-drag-bg text-text-body [--zone-dash:var(--color-file-drag-border)]"
     : isDisabled.value
-      ? "border-border-default bg-surface-subtle text-text-disabled cursor-not-allowed"
+      ? "bg-surface-subtle text-text-disabled cursor-not-allowed [--zone-dash:var(--color-border-default)]"
       : hasError.value
-        ? "border-file-error-border bg-status-error-bg text-text-secondary"
-        : "border-border-strong bg-surface-subtle text-text-secondary hover:border-file-hover-border",
+        ? "bg-status-error-bg text-text-secondary [--zone-dash:var(--color-file-error-border)]"
+        : "bg-surface-subtle text-text-secondary [--zone-dash:var(--color-border-strong)] hover:[--zone-dash:var(--color-file-hover-border)]",
   !isDisabled.value && "cursor-pointer",
 ]);
 
@@ -410,7 +406,7 @@ const compactBoxClasses = computed(() => [
             icon-only
             variant="ghost"
             size="xs"
-            icon="close"
+            icon-left="close"
             :aria-label="t('components.file.removeNamed', { name: compactSummary })"
             :disabled="isDisabled"
             data-test="o-file-chip-0-remove-btn"
@@ -419,7 +415,6 @@ const compactBoxClasses = computed(() => [
         </template>
       </div>
       <OButton
-        icon="upload"
         :disabled="isDisabled"
         :disabled-reason="disabledReason"
         :data-test="testId('choose-btn')"
@@ -465,33 +460,71 @@ const compactBoxClasses = computed(() => [
           @dragleave="onDragLeave"
           @drop="onDrop"
         >
-          <OIcon name="cloud-upload" size="md" class="text-text-muted" />
-          <span v-if="isDragging">{{ t("components.file.dropToUpload") }}</span>
+          <svg
+            aria-hidden="true"
+            class="pointer-events-none absolute inset-0 size-full overflow-visible"
+          >
+            <rect
+              class="[height:calc(100%_-_0.125rem)] [width:calc(100%_-_0.125rem)] fill-none stroke-(--zone-dash) [stroke-width:0.09375rem] transition-[stroke] duration-(--duration-control) [rx:var(--radius-surface)] [stroke-dasharray:8_8] [x:0.0625rem] [y:0.0625rem]"
+            />
+          </svg>
+          <OIcon v-if="!isDragging" name="cloud-upload" size="md" class="text-text-heading" />
+          <template v-if="isDragging">
+            <!-- An invisible copy of the resting content keeps the zone's size, so the page
+                 below doesn't jump; the drop message sits centred on top of it. -->
+            <span
+              aria-hidden="true"
+              class="invisible flex basis-full flex-wrap items-center justify-center gap-x-2 gap-y-1"
+            >
+              <OIcon name="cloud-upload" size="md" />
+              <span
+                >{{
+                  multiple
+                    ? t("components.file.attachPromptMultiple")
+                    : t("components.file.attachPrompt")
+                }}
+                {{ t("components.file.browseLink") }}</span
+              >
+              <span v-if="acceptTokens.length" class="basis-full text-xs">{{
+                t("components.file.supports", { types: acceptList })
+              }}</span>
+            </span>
+            <span
+              class="text-file-chip-text absolute inset-0 flex items-center justify-center gap-2 font-semibold"
+            >
+              <OIcon name="download" size="md" />
+              {{
+                multiple
+                  ? t("components.file.dropFilesToAttach")
+                  : t("components.file.dropFileToAttach")
+              }}
+            </span>
+          </template>
           <span v-else-if="isDisabled && disabledReason">{{ disabledReason }}</span>
           <slot v-else name="hint">
-            <span :data-test="testId('prompt')">{{
-              multiple ? t("components.file.dropHereMultiple") : t("components.file.dropHere")
-            }}</span>
-            <template v-if="!isDisabled">
-              <span class="text-text-muted text-xs">{{ t("components.file.or") }}</span>
+            <span :data-test="testId('prompt')" class="text-text-body">
+              {{
+                multiple
+                  ? t("components.file.attachPromptMultiple")
+                  : t("components.file.attachPrompt")
+              }}
               <!-- .stop: the zone's own click handler would open the picker a second time -->
               <OButton
-                size="sm"
-                icon="upload"
+                v-if="!isDisabled"
+                variant="link"
                 :data-test="testId('choose-btn')"
                 @click.stop="openPicker"
               >
-                {{
-                  multiple
-                    ? t("components.file.chooseFilesButton")
-                    : t("components.file.chooseFileButton")
-                }}
+                {{ t("components.file.browseLink") }}
               </OButton>
-            </template>
+            </span>
+            <span
+              v-if="acceptTokens.length"
+              class="text-text-secondary basis-full text-xs"
+              :data-test="testId('types')"
+              >{{ t("components.file.supports", { types: acceptList }) }}</span
+            >
           </slot>
-          <span v-if="constraints && !isDragging" class="text-text-muted text-xs tabular-nums">{{
-            constraints
-          }}</span>
         </div>
 
         <div v-else-if="activeSource === 'url'" class="flex h-full flex-col justify-center gap-1">
@@ -520,6 +553,21 @@ const compactBoxClasses = computed(() => [
         />
       </div>
 
+      <!-- The field's own error (e.g. required) shows here too, so it never adds a line below -->
+      <div
+        v-if="reserveSpace && activeSource === 'file' && !rows.length"
+        class="h-11"
+        :data-test="testId('empty-row')"
+      >
+        <span
+          v-if="bottomError"
+          :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
+          class="text-file-error-text text-xs leading-4"
+          role="alert"
+        >
+          {{ bottomError }}
+        </span>
+      </div>
       <ul v-if="activeSource === 'file' && rows.length" class="flex flex-col gap-1.5">
         <li
           v-for="(row, i) in rows"
@@ -563,7 +611,7 @@ const compactBoxClasses = computed(() => [
             icon-only
             variant="ghost"
             size="xs"
-            icon="close"
+            icon-left="close"
             :aria-label="t('components.file.removeNamed', { name: raw(row.file.name) })"
             :disabled="isDisabled"
             :data-test="`o-file-chip-${i}-remove-btn`"
@@ -573,9 +621,12 @@ const compactBoxClasses = computed(() => [
       </ul>
     </div>
 
-    <div v-if="bottomError || helpText" class="flex items-center justify-between gap-2">
+    <div
+      v-if="(bottomError && !reserveSpace) || helpText"
+      class="flex items-center justify-between gap-2"
+    >
       <span
-        v-if="bottomError"
+        v-if="bottomError && !reserveSpace"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         class="text-file-error-text text-xs leading-4"
         role="alert"

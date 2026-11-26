@@ -25,49 +25,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @cancel="router.back()"
     @import="importJson"
   >
-    <!-- Custom URL Input Section with Folder Dropdown -->
-    <template #url-input-section="{ url, updateUrl }">
-      <div class="my-[0.725rem] flex items-end gap-2 max-md:flex-wrap">
-        <div class="w-[69%] max-md:w-full">
-          <OInput
-            data-test="alert-import-url-input"
-            :model-value="url"
-            size="md"
-            @update:model-value="updateUrl"
-            :label="t('dashboard.addURL')"
-          />
-        </div>
-
-        <div class="w-[30%] max-md:w-full" data-test="alert-folder-dropdown">
-          <SelectFolderDropDown
-            :type="'alerts'"
-            @folder-selected="updateActiveFolderId"
-            :activeFolderId="activeFolderId"
-          />
-        </div>
+    <!-- The destination folder applies to both tabs, so it sits above the file and URL inputs -->
+    <template #above-input>
+      <div class="w-full max-w-sm" data-test="alert-folder-dropdown">
+        <SelectFolderDropDown
+          :type="'alerts'"
+          @folder-selected="updateActiveFolderId"
+          :activeFolderId="activeFolderId"
+        />
       </div>
     </template>
 
-    <!-- Custom File Input Section with Folder Dropdown -->
+    <template #url-input-section="{ url, updateUrl }">
+      <div class="my-[0.725rem]">
+        <OInput
+          data-test="alert-import-url-input"
+          :model-value="url"
+          size="md"
+          @update:model-value="updateUrl"
+          :label="t('dashboard.addURL')"
+        />
+      </div>
+    </template>
+
     <template #file-input-section="{ jsonFiles, updateFiles }">
-      <div class="mb-1 flex w-[calc(100%-0.625rem)] items-start gap-2 max-md:flex-wrap">
-        <div class="w-[69%] max-md:w-full">
-          <OFile
-            data-test="alert-import-json-file-input"
-            :model-value="jsonFiles"
-            @update:model-value="updateFiles"
-            accept=".json"
-            multiple
-            :validate="validateJsonFile"
-          />
-        </div>
-        <div class="w-[30%] max-md:w-full">
-          <SelectFolderDropDown
-            :type="'alerts'"
-            @folder-selected="updateActiveFolderId"
-            :activeFolderId="activeFolderId"
-          />
-        </div>
+      <div class="mb-1">
+        <OFile
+          data-test="alert-import-json-file-input"
+          :label="t('dashboard.selectFile')"
+          :model-value="jsonFiles"
+          @update:model-value="updateFiles"
+          accept=".json"
+          multiple
+          :validate="validateJsonFile"
+        />
       </div>
     </template>
 

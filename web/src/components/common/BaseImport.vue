@@ -85,6 +85,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
+              <!-- Settings that apply to both tabs, e.g. the destination folder -->
+              <div
+                v-if="$slots['above-input']"
+                class="bg-card-glass-bg shrink-0 px-2 pt-1"
+                :data-test="`${testPrefix}-import-above-input`"
+              >
+                <slot name="above-input" />
+              </div>
+
               <!-- URL Import Tab -->
               <div
                 v-if="activeTab === 'import_json_url'"
@@ -126,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="w-full">
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
+                          :label="t('dashboard.selectFile')"
                           v-model="jsonFiles"
                           accept=".json"
                           multiple
