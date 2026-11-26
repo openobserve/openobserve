@@ -144,6 +144,11 @@ impl AiErrorCode {
         if code == "agent_unreachable" {
             return Some(AiErrorCode::AgentUnavailable);
         }
+        // Older builds stored a fenced turn as `stale_epoch`; its browser was told
+        // persistence_failed.
+        if code == "stale_epoch" {
+            return Some(AiErrorCode::PersistenceFailed);
+        }
         if let Some(code) = Self::from_ledger(code) {
             return Some(code);
         }
@@ -640,8 +645,8 @@ mod tests {
             ),
             (
                 "stale_epoch",
-                AiErrorCode::StaleEpoch,
-                AiErrorAction::Reload,
+                AiErrorCode::PersistenceFailed,
+                AiErrorAction::None,
             ),
             (
                 "persistence_failed",
