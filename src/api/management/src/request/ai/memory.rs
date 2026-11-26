@@ -43,7 +43,7 @@ use utoipa::ToSchema;
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// `content` needs `base_rev`; settings never change `rev`.
-#[derive(Debug, Default, Deserialize, ToSchema)]
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct MemoryUpdateRequest {
     pub content: Option<String>,
     pub base_rev: Option<i64>,
@@ -72,7 +72,7 @@ impl MemoryUpdateRequest {
 }
 
 /// An agent-write setting, or `inherit` to store none.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, ToSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum WritesSetting {
     Review,
@@ -259,10 +259,13 @@ pub async fn update_org_memory(
     Headers(user_email): Headers<UserEmail>,
     Json(body): Json<MemoryUpdateRequest>,
 ) -> Response {
-    match caller(&org_id, &user_email.user_id, "ai").await {
+    let audited = PersonWrite::new(&org_id, &user_email.user_id, "ai/memory/org", &body);
+    let resp = match caller(&org_id, &user_email.user_id, "ai").await {
         Ok(caller) => write_memory(&MemoryKey::org(&org_id), None, body, caller).await,
         Err(resp) => resp,
-    }
+    };
+    audited.record(resp.status()).await;
+    resp
 }
 
 #[utoipa::path(
@@ -561,14 +564,17 @@ pub async fn update_toolset_memory(
     Headers(user_email): Headers<UserEmail>,
     Json(body): Json<MemoryUpdateRequest>,
 ) -> Response {
-    let key = match toolset_key(&org_id, &id).await {
-        Ok(key) => key,
-        Err(resp) => return resp,
-    };
-    match caller(&org_id, &user_email.user_id, "ai_memory").await {
-        Ok(caller) => write_memory(&key, Some(&id), body, caller).await,
+    let path = format!("ai/toolsets/{id}/memory");
+    let audited = PersonWrite::new(&org_id, &user_email.user_id, &path, &body);
+    let resp = match toolset_key(&org_id, &id).await {
+        Ok(key) => match caller(&org_id, &user_email.user_id, "ai_memory").await {
+            Ok(caller) => write_memory(&key, Some(&id), body, caller).await,
+            Err(resp) => resp,
+        },
         Err(resp) => resp,
-    }
+    };
+    audited.record(resp.status()).await;
+    resp
 }
 
 #[utoipa::path(
@@ -776,7 +782,8 @@ pub async fn update_my_memory(
     Headers(user_email): Headers<UserEmail>,
     Json(body): Json<MemoryUpdateRequest>,
 ) -> Response {
-    match my_key(&org_id, &user_email.user_id).await {
+    let audited = PersonWrite::new(&org_id, &user_email.user_id, "ai/memory/me", &body);
+    let resp = match my_key(&org_id, &user_email.user_id).await {
         Ok(key) => {
             let caller = Caller {
                 author: Author::User(key.scope_key.clone()),
@@ -786,7 +793,9 @@ pub async fn update_my_memory(
             write_memory(&key, None, body, caller).await
         }
         Err(resp) => resp,
-    }
+    };
+    audited.record(resp.status()).await;
+    resp
 }
 
 #[utoipa::path(
@@ -1419,6 +1428,71 @@ fn internal_audit_message(
         delegated: None,
         fleet_id: None,
         target: None,
+    }
+}
+
+/// Whether `path` is a memory PUT the generic audit must skip: its handler records it without the
+/// notes.
+pub fn audits_own_put(path: &str) -> bool {
+    let segments: Vec<&str> = path.trim_end_matches('/').split('/').collect();
+    matches!(
+        segments.as_slice(),
+        [.., "ai", "memory", "org" | "me"] | [.., "ai", "toolsets", _, "memory"]
+    )
+}
+
+/// A person's memory PUT, recorded as the generic audit would but with [`audited_body`].
+struct PersonWrite {
+    org_id: String,
+    user_id: String,
+    path: String,
+    body: String,
+}
+
+impl PersonWrite {
+    fn new(org_id: &str, user_id: &str, path: &str, body: &MemoryUpdateRequest) -> Self {
+        Self {
+            org_id: org_id.to_string(),
+            user_id: user_id.to_string(),
+            path: format!("{org_id}/{path}"),
+            body: audited_body(&serde_json::to_vec(body).unwrap_or_default()),
+        }
+    }
+
+    async fn record(self, status: StatusCode) {
+        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+        // As the generic audit: a refused request writes no entry.
+        if get_o2_config().common.audit_enabled && (status.is_success() || status.is_redirection())
+        {
+            audit::audit(self.message(status)).await;
+        }
+    }
+
+    fn message(
+        self,
+        status: StatusCode,
+    ) -> o2_enterprise::enterprise::common::auditor::AuditMessage {
+        use o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta};
+        AuditMessage {
+            login_ip: None,
+            user_agent: None,
+            user_email: self.user_id,
+            org_id: self.org_id,
+            _timestamp: config::utils::time::now_micros(),
+            protocol: Protocol::Http,
+            response_meta: ResponseMeta {
+                http_method: "PUT".to_string(),
+                http_path: self.path,
+                http_query_params: String::new(),
+                http_body: self.body,
+                http_response_code: status.as_u16(),
+                error_msg: None,
+                trace_id: None,
+            },
+            delegated: None,
+            fleet_id: None,
+            target: None,
+        }
     }
 }
 
@@ -2296,6 +2370,47 @@ pub(crate) mod tests {
             refused.response_meta.error_msg.as_deref(),
             Some("turn_not_running")
         );
+    }
+
+    #[test]
+    fn a_person_s_memory_put_is_audited_by_its_handler_without_the_notes() {
+        for path in [
+            "acme/ai/memory/org",
+            "acme/ai/memory/me",
+            "acme/ai/toolsets/t1/memory",
+        ] {
+            assert!(audits_own_put(path), "{path}");
+        }
+        for path in [
+            "acme/ai/memory/org/revisions",
+            "acme/ai/toolsets/t1",
+            "acme/ai/toolsets/t1/memory/revert",
+        ] {
+            assert!(!audits_own_put(path), "{path}");
+        }
+        let body = MemoryUpdateRequest {
+            content: Some("secret-note".to_string()),
+            base_rev: Some(3),
+            reason: Some("why".to_string()),
+            agent_memory_writes: Some(WritesSetting::Review),
+            ..Default::default()
+        };
+        let message =
+            PersonWrite::new("acme", "u@x.io", "ai/memory/org", &body).message(StatusCode::OK);
+        assert_eq!(
+            (message.user_email.as_str(), message.org_id.as_str()),
+            ("u@x.io", "acme")
+        );
+        let meta = message.response_meta;
+        assert_eq!(
+            (meta.http_method.as_str(), meta.http_path.as_str()),
+            ("PUT", "acme/ai/memory/org")
+        );
+        let audited: Value = serde_json::from_str(&meta.http_body).unwrap();
+        assert_eq!(audited["content"], json!("[REDACTED: 11 bytes]"));
+        assert_eq!(audited["reason"], json!("[REDACTED: 3 bytes]"));
+        assert_eq!(audited["base_rev"], json!(3));
+        assert_eq!(audited["agent_memory_writes"], json!("review"));
     }
 
     #[test]

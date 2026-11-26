@@ -769,6 +769,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     if get_o2_config().common.audit_enabled
         && !(after_org.ends_with("_stream")
             || audits_itself(&path)
+            || (http_method == Method::PUT
+                && openobserve_api_management::request::ai::memory::audits_own_put(&path))
             || common::meta::ingestion_routes::is_ingestion_write(
                 &http_method,
                 &path,
