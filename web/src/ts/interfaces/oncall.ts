@@ -645,6 +645,8 @@ export interface ChannelReadiness {
   configured_but_unverified: boolean;
   /** A finished sentence. Render verbatim. */
   blocked_because?: string | null;
+  /** On a Slack chip that is not linked, the command of the team's own Slack app. */
+  slack_command?: string;
 }
 
 export interface MemberReachability {

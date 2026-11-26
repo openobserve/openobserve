@@ -308,6 +308,14 @@ impl Scope {
             Scope::Destination => configured,
         }
     }
+
+    /// Destinations never follow: each hop is a host the audit trail does not record.
+    fn redirect_policy(self, allowlist: &'static SsrfAllowlist) -> reqwest::redirect::Policy {
+        match self {
+            Scope::Strict => revalidated_redirects(allowlist),
+            Scope::Destination => reqwest::redirect::Policy::none(),
+        }
+    }
 }
 
 /// Operator exceptions to the SSRF checks, parsed once from the two allowlist env vars.
@@ -488,11 +496,24 @@ pub fn build_safe_client(builder: reqwest::ClientBuilder) -> reqwest::Result<req
     build_scoped_client(builder, Scope::Strict, &ALLOWLIST)
 }
 
-/// [`build_safe_client`] for send-only destinations, which also admits the operator allowlist.
+/// [`build_safe_client`] for send-only destinations: admits the operator allowlist and never
+/// follows a redirect, so a 3xx reaches the caller as the answer.
 pub fn build_safe_destination_client(
     builder: reqwest::ClientBuilder,
 ) -> reqwest::Result<reqwest::Client> {
     build_scoped_client(builder, Scope::Destination, &ALLOWLIST)
+}
+
+/// [`build_safe_client`] that never follows redirects, for requests whose body carries
+/// credentials: reqwest re-sends the body on a 307/308 to whatever host the server names.
+pub fn build_safe_client_no_redirects(
+    builder: reqwest::ClientBuilder,
+) -> reqwest::Result<reqwest::Client> {
+    let resolver = SsrfDnsResolver {
+        allowlist: Scope::Strict.allowlist(&ALLOWLIST),
+        proxy_hosts: &PROXY_HOSTS,
+    };
+    build_guarded_client(builder, resolver, reqwest::redirect::Policy::none())
 }
 
 /// Parses the allowlist now so invalid entries are reported at startup, not on first request.
@@ -585,36 +606,42 @@ fn build_scoped_client(
     scope: Scope,
     configured: &'static SsrfAllowlist,
 ) -> reqwest::Result<reqwest::Client> {
+    let allowlist = scope.allowlist(configured);
     let resolver = SsrfDnsResolver {
-        allowlist: scope.allowlist(configured),
+        allowlist,
         proxy_hosts: &PROXY_HOSTS,
     };
-    build_guarded_client(builder, resolver)
+    build_guarded_client(builder, resolver, scope.redirect_policy(allowlist))
 }
 
 fn build_guarded_client(
     builder: reqwest::ClientBuilder,
     resolver: SsrfDnsResolver,
+    redirect: reqwest::redirect::Policy,
 ) -> reqwest::Result<reqwest::Client> {
-    let allowlist = resolver.allowlist;
     builder
-        .redirect(reqwest::redirect::Policy::custom(move |attempt| {
-            if attempt.previous().len() >= 5 {
-                return attempt.error("too many redirects");
-            }
-            let cfg = crate::get_config();
-            match SsrfGuard::validate_url_inner(
-                attempt.url().as_str(),
-                cfg.common.ssrf_allow_loopback,
-                cfg.common.skip_ssrf_checks,
-                allowlist,
-            ) {
-                Ok(()) => attempt.follow(),
-                Err(e) => attempt.error(SsrfRefusal(e)),
-            }
-        }))
+        .redirect(redirect)
         .dns_resolver(Arc::new(resolver))
         .build()
+}
+
+/// Follows at most 5 hops, refusing any target `allowlist`'s policy would refuse.
+fn revalidated_redirects(allowlist: &'static SsrfAllowlist) -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(move |attempt| {
+        if attempt.previous().len() >= 5 {
+            return attempt.error("too many redirects");
+        }
+        let cfg = crate::get_config();
+        match SsrfGuard::validate_url_inner(
+            attempt.url().as_str(),
+            cfg.common.ssrf_allow_loopback,
+            cfg.common.skip_ssrf_checks,
+            allowlist,
+        ) {
+            Ok(()) => attempt.follow(),
+            Err(e) => attempt.error(SsrfRefusal(e)),
+        }
+    })
 }
 
 /// Strict policy refuses `url` at `peer` while the destination policy admits it.
@@ -1164,6 +1191,68 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_no_redirect_client_does_not_resend_body_to_redirect_target() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let target = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target_port = target.local_addr().unwrap().port();
+        let origin = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin_port = origin.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (mut sock, _) = origin.accept().await.unwrap();
+            let mut buf = [0u8; 4096];
+            let _ = sock.read(&mut buf).await;
+            let reply = format!(
+                "HTTP/1.1 307 Temporary Redirect\r\nLocation: http://127.0.0.1:{target_port}/auth\r\n\
+                 Content-Length: 0\r\n\r\n"
+            );
+            let _ = sock.write_all(reply.as_bytes()).await;
+        });
+        let client = build_safe_client_no_redirects(
+            reqwest::Client::builder().timeout(std::time::Duration::from_secs(5)),
+        )
+        .unwrap();
+        let res = client
+            .post(format!("http://127.0.0.1:{origin_port}/auth"))
+            .body("access-key=secret")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), reqwest::StatusCode::TEMPORARY_REDIRECT);
+        let reached = tokio::time::timeout(std::time::Duration::from_millis(300), target.accept());
+        assert!(
+            reached.await.is_err(),
+            "the redirect target must not be contacted"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_destination_client_reports_a_redirect_without_following_it() {
+        let target = body_server().await;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let reply = format!(
+                "HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:{target}/\r\n\
+                 Content-Length: 0\r\n\r\n"
+            );
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = [0u8; 4096];
+                let _ = sock.read(&mut buf).await;
+                let _ = sock.write_all(reply.as_bytes()).await;
+            }
+        });
+        let allow: &'static SsrfAllowlist =
+            Box::leak(Box::new(SsrfAllowlist::parse("127.0.0.1/32", "")));
+        let builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(5));
+        let client = build_scoped_client(builder, Scope::Destination, allow).unwrap();
+        let url = format!("http://127.0.0.1:{port}/");
+        let resp = client.get(&url).send().await.unwrap();
+        assert_eq!(resp.status(), reqwest::StatusCode::FOUND);
+        assert_eq!(resp.url().as_str(), url);
+    }
+
+    #[tokio::test]
     async fn test_strict_validators_ignore_the_allowlist() {
         let allow = SsrfAllowlist::parse("10.1.2.0/24", "");
         let url = "http://10.1.2.3/";
@@ -1230,7 +1319,7 @@ mod tests {
                 allowlist: &NO_ALLOWLIST,
                 proxy_hosts,
             };
-            build_guarded_client(builder, resolver).unwrap()
+            build_guarded_client(builder, resolver, revalidated_redirects(&NO_ALLOWLIST)).unwrap()
         };
         let target = "http://hooks.example.com/";
         let proxied = client(Box::leak(Box::new(proxy_hosts_from(|name| {

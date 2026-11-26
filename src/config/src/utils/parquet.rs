@@ -41,7 +41,7 @@ use serde::{Deserialize, Serialize};
 use vortex::{
     VortexSessionDefault,
     array::{ArrayRef, VortexSessionExecute},
-    arrow::ArrowSessionExt,
+    arrow::{ArrowSessionExt, ExecuteArrowExt},
     buffer::Buffer,
     file::OpenOptionsSessionExt,
     io::session::RuntimeSessionExt,
@@ -172,9 +172,8 @@ pub fn vortex_array_to_record_batch(
 ) -> Result<RecordBatch, ArrowError> {
     let mut ctx = session.create_execution_ctx();
     let target = Field::new("", data_type.clone(), array.dtype().is_nullable());
-    let array = session
-        .arrow()
-        .execute_arrow(array, Some(&target), &mut ctx)
+    let array = array
+        .execute_arrow(Some(&target), &mut ctx)
         .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
     let struct_array = array
         .as_any()
@@ -346,7 +345,7 @@ mod tests {
 
     use arrow::{
         array::{Int32Array, StringArray},
-        datatypes::{DataType, Field, Schema},
+        datatypes::{DataType, Field, Metadata, Schema},
         record_batch::RecordBatch,
     };
 
@@ -435,7 +434,7 @@ mod tests {
         let read_schema = read_schema
             .as_ref()
             .clone()
-            .with_metadata(Default::default());
+            .with_metadata(Metadata::default());
         assert_eq!(Arc::new(read_schema), schema);
         assert_eq!(read_batches.len(), 1);
         assert_eq!(read_batches[0], batch);

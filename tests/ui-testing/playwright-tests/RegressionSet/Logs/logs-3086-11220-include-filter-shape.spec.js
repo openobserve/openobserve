@@ -31,7 +31,7 @@ test.describe('Logs Include Search Term query shape (ENT#3086, OSS#11220)', () =
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  test('three includes in a row keep one bracket around the original filter (ENT#3086)', {
+  test('three includes in a row stay a flat AND chain with no nested brackets (ENT#3086)', {
     tag: ['@bug-ent3086', '@P2', '@regression', '@logsRegression'],
   }, async ({ page }) => {
     await pm.logsPage.openLogsWithFilter(stream, "svc = 'alpha'");
@@ -46,12 +46,34 @@ test.describe('Logs Include Search Term query shape (ENT#3086, OSS#11220)', () =
 
     const query = (await pm.logsPage.getQueryEditorText()).replace(/\s+/g, ' ').trim();
     testLogger.info(`Query after three includes: ${query}`);
-    // Pre-fix every include re-wrapped the whole query: "( ( ( svc = 'alpha' ) AND ns ... ) AND host ... ) AND pod ...".
-    expect((query.match(/\(/g) || []).length, `one bracket level only: ${query}`).toBe(1);
-    expect(query).toMatch(/^\(\s*svc = 'alpha'\s*\) AND ns = 'ns-a' AND host = 'host-a' AND pod = 'pod-a'$/);
+    // An OR-free filter needs no brackets, so any '(' here is the old re-wrap on every include.
+    expect(query).toBe("svc = 'alpha' AND ns = 'ns-a' AND host = 'host-a' AND pod = 'pod-a'");
 
     await pm.logsPage.clickRefreshButton();
     await expect.poll(async () => (await pm.logsPage.getResultRowTexts()).length, { timeout: 30000 }).toBe(2);
+  });
+
+  test('includes on an OR filter bracket it once so the new AND binds to the whole OR (ENT#3086)', {
+    tag: ['@bug-ent3086', '@P2', '@regression', '@logsRegression'],
+  }, async ({ page }) => {
+    await pm.logsPage.openLogsWithFilter(stream, "svc = 'alpha' OR svc = 'beta'");
+    await pm.logsPage.getQueryEditorTextWhenReady("svc = 'beta'");
+    await pm.logsPage.clickRefreshButton();
+    await expect.poll(async () => (await pm.logsPage.getResultRowTexts()).length, { timeout: 30000 }).toBe(4);
+
+    for (const field of ['ns', 'host']) {
+      await pm.logsPage.includeFieldFromRowContaining('ovn-b-include beta', field);
+      await pm.logsPage.getQueryEditorTextWhenReady(`${field} = '${field}-b'`);
+    }
+
+    const query = (await pm.logsPage.getQueryEditorText()).replace(/\s+/g, ' ').trim();
+    testLogger.info(`Query after two includes on an OR filter: ${query}`);
+    expect(query).toMatch(/^\(\s*svc = 'alpha' OR svc = 'beta'\s*\) AND ns = 'ns-b' AND host = 'host-b'$/);
+
+    // Unbracketed, "alpha OR (beta AND ns-b ...)" would also return both alpha rows.
+    await pm.logsPage.clickRefreshButton();
+    await expect.poll(async () => (await pm.logsPage.getResultRowTexts()).length, { timeout: 30000 }).toBe(2);
+    for (const row of await pm.logsPage.getResultRowTexts()) expect(row).toContain('ovn-b-include beta');
   });
 
   test('include on a GROUP BY query lands inside WHERE, before GROUP BY, and the query runs (OSS#11220)', {
