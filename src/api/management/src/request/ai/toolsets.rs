@@ -749,7 +749,7 @@ async fn list_mcp_tools(mcp: &McpData) -> Result<(), ToolsetTestError> {
     }
     // Direct, never through an env proxy, so the connect-time check sees the real address.
     let builder = reqwest::Client::builder().timeout(TEST_TIMEOUT).no_proxy();
-    let client = ssrf_guard::build_destination_client_without_redirects(builder).map_err(|e| {
+    let client = ssrf_guard::build_safe_destination_client(builder).map_err(|e| {
         log::warn!("[toolset test] client not built: {e}");
         failed()
     })?;

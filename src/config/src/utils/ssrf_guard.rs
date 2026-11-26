@@ -504,20 +504,6 @@ pub fn build_safe_destination_client(
     build_scoped_client(builder, Scope::Destination, &ALLOWLIST)
 }
 
-/// [`build_safe_destination_client`] that follows no redirect at all.
-pub fn build_destination_client_without_redirects(
-    builder: reqwest::ClientBuilder,
-) -> reqwest::Result<reqwest::Client> {
-    let resolver = SsrfDnsResolver {
-        allowlist: Scope::Destination.allowlist(&ALLOWLIST),
-        proxy_hosts: &PROXY_HOSTS,
-    };
-    builder
-        .redirect(reqwest::redirect::Policy::none())
-        .dns_resolver(Arc::new(resolver))
-        .build()
-}
-
 /// [`build_safe_client`] that never follows redirects, for requests whose body carries
 /// credentials: reqwest re-sends the body on a 307/308 to whatever host the server names.
 pub fn build_safe_client_no_redirects(
