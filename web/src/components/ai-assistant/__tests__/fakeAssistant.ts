@@ -15,7 +15,7 @@
 
 import { QueryClient } from "@tanstack/vue-query";
 import { flushPromises } from "@vue/test-utils";
-import { vi } from "vitest";
+import { vi, type Mock } from "vitest";
 import { computed, defineComponent, h, ref, watch } from "vue";
 import { createMemoryHistory, createRouter, type RouteRecordRaw } from "vue-router";
 import { createStore } from "vuex";
@@ -266,9 +266,9 @@ export interface FakeVoiceEngine extends VoiceEngine {
   handlers: VoiceHandlers | null;
   options: VoiceListenOptions | null;
   meter: VoiceMeter & { db: number };
-  abort: ReturnType<typeof vi.fn>;
+  abort: Mock<() => void>;
   /** The graceful stop a real recogniser offers; only a `graceful` engine has one. */
-  stopSession: ReturnType<typeof vi.fn>;
+  stopSession: Mock<() => void>;
   graceful: boolean;
   rejectMic: Error | null;
   /** Resolves the pending microphone prompt when `holdPrompt` was set. */
