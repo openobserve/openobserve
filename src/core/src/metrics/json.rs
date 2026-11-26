@@ -539,7 +539,7 @@ pub async fn ingest(
     let mut stream_trigger_map: HashMap<String, Option<ingest::StreamTriggers>> = HashMap::new();
     for (stream_name, records) in records_by_stream {
         // redacted before finish_rows, so the series hash covers the stored values
-        #[cfg(feature = "vectorscan")]
+        #[cfg(feature = "enterprise")]
         let records = {
             let mut records = records;
             ingest::apply_redaction(org_id, &stream_name, &mut records).await;

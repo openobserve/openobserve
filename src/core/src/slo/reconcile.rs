@@ -282,6 +282,8 @@ async fn read_aggregate(slo: &Slo, from: i64, to: i64) -> Result<Vec<Rebuilt>, a
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
+
     use super::*;
 
     /// `MAX(good)` looks equivalent and is wrong: a recomputed time-slice can
@@ -346,8 +348,6 @@ mod tests {
 
     #[test]
     fn a_stream_from_before_corrections_has_no_corrected_by() {
-        use arrow_schema::{DataType, Field, Schema};
-
         let old = Schema::new(vec![
             Field::new("slice_start", DataType::Int64, false),
             Field::new("good", DataType::Float64, false),

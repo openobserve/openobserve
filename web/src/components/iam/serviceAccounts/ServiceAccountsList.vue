@@ -470,6 +470,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+} from "@/components/commandPalette/useRecentlyViewed";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { serviceAccountsQuery } from "@/services/service_accounts.queries";
@@ -733,19 +737,6 @@ export default defineComponent({
       // and the post-write reloads below pass `true`.
       await getServiceAccountsUsers();
       loadServiceAccountRoles();
-
-      // Only `action=update&email=…` auto-opens the edit dialog so a shared
-      // edit link still lands directly on the user's form. `action=add` is
-      // intentionally NOT handled here — the dialog only opens via the
-      // "Add Service Account" button click; refreshing on an `action=add`
-      // URL should leave the user on the list view.
-      const query = router.currentRoute.value.query;
-      if (query.action === "update" && query.email) {
-        const match = serviceAccountsState.service_accounts_users.find(
-          (m: any) => m.email === query.email,
-        );
-        if (match) addUser({ row: match }, true);
-      }
     });
 
     const columns: OTableColumnDef[] = [
@@ -937,11 +928,18 @@ export default defineComponent({
       return true;
     };
     const addUser = (props: any, is_updated: boolean) => {
+      if (showAddUserDialog.value) return;
       isUpdated.value = is_updated;
       selectedUser.value.organization = store.state.selectedOrganization.identifier;
 
       if (props.row != undefined) {
         selectedUser.value = props.row;
+        recordResourceVisit(captureRecentVisitScope(), {
+          type: "service_account",
+          id: props.row.email,
+          name: props.row.first_name || props.row.email,
+          route_ref: { email: props.row.email },
+        });
       } else {
         selectedUser.value = {};
       }
@@ -949,8 +947,11 @@ export default defineComponent({
         showAddUserDialog.value = true;
       }, 100);
     };
+    // Closing the editor leaves `?action=update&email=` behind, so each link opens it once.
+    let openedEditLink = "";
     const addRoutePush = (row: any) => {
       if (row?.email) {
+        openedEditLink = row.email;
         router.push({
           name: "serviceAccounts",
           query: {
@@ -975,6 +976,27 @@ export default defineComponent({
         });
       }
     };
+    watch(
+      () =>
+        [
+          serviceAccountsList.data.value,
+          router.currentRoute.value.query.action,
+          router.currentRoute.value.query.email,
+        ] as const,
+      ([rows, action, email]) => {
+        if (action !== "update" || typeof email !== "string") {
+          openedEditLink = "";
+          return;
+        }
+        if (!rows || email === openedEditLink) return;
+        const row = rows.find((user: { email: string }) => user.email === email);
+        if (!row) return;
+        openedEditLink = email;
+        addUser({ row }, true);
+      },
+      { immediate: true },
+    );
+
     const hideForm = () => {
       showAddUserDialog.value = false;
       router.replace({

@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "아직 기본 조직이 설정된 채널이 없습니다",
-      "description": "기본 조직이 없는 채널의 질문은 각 사용자의 기본 조직으로 전달됩니다(/o2 org로 변경할 수 있습니다)."
+      "description": "기본 조직이 없는 채널의 질문은 각 사용자의 기본 조직으로 전달됩니다({command} org로 변경할 수 있습니다)."
     },
     "noSlackLinkedPeople": {
       "title": "이 조직에서 아직 Slack을 연결한 사람이 없습니다"
@@ -297,10 +297,10 @@
       "importDesc": "파이프라인 정의 업로드"
     },
     "noQueues": {
-      "title": "첫 번째 큐 만들기",
-      "description": "큐는 상태를 유지하는 검토 할 일 목록입니다. Score Configs, 대상 데이터셋, 그리고 사람이 검토할 항목을 공급하는 필터를 바인딩하세요.",
-      "action": "새 큐",
-      "actionDesc": "빈 큐로 시작"
+      "title": "첫 번째 어노테이션 큐 만들기",
+      "description": "어노테이션 큐는 검토용 할 일 목록입니다 — Score Config, 대상 데이터 세트, 그리고 사람이 검토할 항목을 공급하는 필터를 연결합니다.",
+      "action": "새 어노테이션 큐",
+      "actionDesc": "빈 어노테이션 큐 시작하기"
     },
     "noPrompts": {
       "title": "첫 번째 프롬프트 만들기",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "여기에는 비정상 항목이 없습니다",
-      "description": "이 창에는 비정상 항목이 없습니다. 시간 범위를 넓히거나 큐 필터를 전환하여 이미 분류한 항목을 확인하세요."
+      "description": "이 기간에 비정상 항목이 없습니다. 시간 범위를 넓히거나 어노테이션 큐 필터를 전환하여 이미 분류한 항목을 확인하세요."
     },
     "noTraces": {
       "title": "트레이스를 찾을 수 없습니다",
@@ -9987,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "브라우저가 파일 다운로드를 거부했습니다...",
     "chartDataDownloadedCsv": "차트 데이터가 CSV 파일로 다운로드되었습니다",
+    "tableDownloadPartial": "결과의 처음 {count}개 행만 가져왔으므로 파일이 일부만 포함합니다.",
+    "tableDownloadServerPartial": "서버가 일부 데이터만 반환하여 파일이 불완전할 수 있습니다.",
+    "tableDownloadWaitForLoad": "패널을 아직 불러오는 중입니다. 완료된 후 다시 다운로드하세요.",
+    "preparingTableDownload": "다운로드를 위해 모든 행을 가져오는 중…",
     "chartDataDownloadedJson": "차트 데이터가 JSON 파일로 다운로드되었습니다",
     "dynamicFilters": "동적 필터",
     "failedToCancelRunningQuery": "실행 중인 쿼리를 취소하지 못했습니다",
@@ -16092,8 +16096,10 @@
         "searchSuffixesAria": "접미사 필터 검색",
         "searchTypesAria": "검색 유형 필터",
         "facetAria": "{label}, {count}개 메트릭",
+        "facetAriaUnchecked": "{label}, 데이터 있음 {count}개, 아직 선택하지 않음 {unchecked}개",
         "noPrefixMatch": "일치하는 접두사가 없습니다.",
         "noSuffixMatch": "일치하는 접미사가 없습니다.",
+        "uncheckedTooltip": "데이터 있음 {count}개 · 아직 선택하지 않음 {unchecked}개",
         "noTypeMatch": "일치하는 유형이 없습니다."
       },
       "views": {
@@ -17763,13 +17769,9 @@
       "noAgentsDescription": "선택한 시간 범위에서 GenAI 에이전트가 감지되지 않았습니다. 더 넓은 범위를 시도하거나 스트림 보기로 전환하세요.",
       "viewByStream": "스트림별 보기",
       "search": {
-        "placeholder": "사용자 또는 메시지로 검색",
-        "title": "사용자 ID 또는 대화 텍스트에 해당 텍스트가 포함된 세션 찾기",
         "noResultsTitle": "검색과 일치하는 세션이 없습니다",
-        "noResultsDescription": "다른 검색어, 다른 필드 또는 더 넓은 시간 범위를 시도하세요.",
-        "clear": "검색 지우기",
-        "user": "사용자: {user}",
-        "clearUser": "모든 사용자 표시"
+        "noResultsDescription": "다른 필터를 사용하거나 시간 범위를 넓혀 보세요.",
+        "clear": "필터 지우기"
       }
     },
     "sessionDetail": {
@@ -19080,7 +19082,7 @@
       "users": "사용자",
       "budgets": "예산",
       "discovery": "탐색",
-      "queues": "큐",
+      "queues": "어노테이션 큐",
       "datasets": "데이터셋",
       "experiments": "실험",
       "quality": "품질",
@@ -19365,15 +19367,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "검토 큐에 추가",
-        "title": "검토 큐에 추가",
-        "hint": "{ref}을(를) 인간 검토를 위해 큐에 넣습니다. 항목은 그 자리에 유지됩니다 — 검토 상태는 큐에 저장됩니다.",
-        "queueLabel": "큐",
-        "queuePlaceholder": "큐 선택...",
-        "noQueues": "{scope}을(를) 수락하는 큐가 없습니다 — 먼저 큐 페이지에서 큐를 만드세요.",
-        "confirm": "큐에 추가",
+        "button": "어노테이션 큐에 추가",
+        "title": "어노테이션 큐에 추가",
+        "hint": "{ref} 항목을 사람 검토용으로 추가합니다. 항목은 원래 위치에 그대로 있으며 — 어노테이션 큐가 검토 상태를 추적합니다.",
+        "queueLabel": "어노테이션 큐",
+        "queuePlaceholder": "어노테이션 큐 선택...",
+        "noQueues": "{scope}을(를) 허용하는 어노테이션 큐가 없습니다 — 먼저 어노테이션 큐 페이지에서 하나를 만드세요.",
+        "confirm": "어노테이션 큐에 추가",
         "success": "{queue}에 추가됨",
-        "error": "이 항목을 큐에 추가하지 못했습니다"
+        "error": "이 항목을 어노테이션 큐에 추가하지 못했습니다"
       },
       "dataset": {
         "button": "데이터셋에 추가",
@@ -19410,12 +19412,12 @@
         "session": "세션"
       },
       "inQueueFilter": {
-        "label": "큐에 있음",
-        "notEnqueued": "대기열: 대기 안 됨",
-        "enqueued": "대기열: 모든 대기열",
-        "pending": "대기열: 대기 중",
-        "reviewed": "대기열: 검토됨",
-        "all": "대기열: 전체"
+        "label": "어노테이션 큐 상태",
+        "notEnqueued": "큐에 추가되지 않음",
+        "enqueued": "어노테이션 큐에 있음",
+        "pending": "검토 대기 중",
+        "reviewed": "검토됨",
+        "all": "모든 항목"
       },
       "columns": {
         "timestamp": "타임스탬프",
@@ -19431,7 +19433,7 @@
         "service": "서비스",
         "input": "입력",
         "quality": "품질",
-        "inQueue": "대기열에 있나요?",
+        "inQueue": "어노테이션 큐에 있음?",
         "actions": "작업"
       },
       "spanParent": "{trace} 내",
@@ -19443,26 +19445,26 @@
       "inQueue": {
         "none": "대기 안 됨",
         "reviewed": "이미 검토됨",
-        "multiple": "{count}개 대기열에 있음"
+        "multiple": "{count}개 어노테이션 큐에 있음"
       },
-      "addToQueue": "대기열에 추가",
+      "addToQueue": "어노테이션 큐에 추가",
       "addToQueueMenu": {
-        "loading": "대기열 불러오는 중...",
-        "noQueues": "아직 대기열이 없습니다 — 먼저 대기열 페이지에서 하나 만드세요.",
+        "loading": "어노테이션 큐 불러오는 중...",
+        "noQueues": "아직 어노테이션 큐가 없습니다 — 먼저 어노테이션 큐 페이지에서 하나를 만드세요.",
         "dimensions": "{count}개 차원 | {count}개 차원",
         "accepts": "{types}만 허용",
-        "sectionTitle": "대기열에 추가",
-        "manageQueues": "대기열 관리"
+        "sectionTitle": "어노테이션 큐에 추가",
+        "manageQueues": "어노테이션 큐 관리"
       },
-      "addSuccess": "{queue}에 추가됨 — 행은 Discovery에 남아 있고, 해당 상태는 대기열에 있습니다.",
-      "addError": "대기열에 항목을 추가하지 못했습니다",
-      "openQueue": "대기열 열기",
-      "queuesError": "대기열을 불러오지 못했습니다"
+      "addSuccess": "{queue}에 추가했습니다 — 행은 Discovery에 그대로 남고, 어노테이션 큐가 검토 상태를 추적합니다.",
+      "addError": "항목을 어노테이션 큐에 추가하지 못했습니다",
+      "openQueue": "어노테이션 큐 열기",
+      "queuesError": "어노테이션 큐를 불러오지 못했습니다"
     },
     "queues": {
-      "searchPlaceholder": "대기열 검색...",
-      "newButton": "새 대기열",
-      "loadError": "대기열을 불러오지 못했습니다",
+      "searchPlaceholder": "어노테이션 큐 검색...",
+      "newButton": "새 어노테이션 큐",
+      "loadError": "어노테이션 큐를 불러오지 못했습니다",
       "optionsLoadError": "점수 구성을 불러오지 못했습니다",
       "review": "검토",
       "cleared": "해제됨",
@@ -19477,7 +19479,7 @@
         "actions": "작업"
       },
       "create": {
-        "title": "새 큐",
+        "title": "새 어노테이션 큐",
         "errors": {
           "name": "이름은 필수입니다",
           "scoreConfigs": "점수 구성을 하나 이상 바인딩하세요"
@@ -19485,9 +19487,9 @@
         "nameLabel": "이름",
         "namePlaceholder": "예: hallucination_review",
         "descriptionLabel": "설명",
-        "descriptionPlaceholder": "이 큐의 용도와 검토자를 입력하세요...",
+        "descriptionPlaceholder": "이 어노테이션 큐의 용도와 검토자를 입력하세요...",
         "scoreConfigsLabel": "점수 구성",
-        "scoreConfigsHint": "큐는 하나 이상의 차원에서 항목을 점수화합니다. 각 점수 구성은 단일 차원입니다. 바인딩할 구성을 선택하고 각각을 버전에 고정하세요.",
+        "scoreConfigsHint": "어노테이션 큐는 하나 이상의 차원에서 항목에 점수를 매깁니다. 각 Score Config는 하나의 차원입니다 — 연결할 Score Config를 선택하고 각각을 버전에 고정하세요.",
         "scoreConfigsEmpty": "바인딩할 점수 구성을 선택하세요.",
         "addScoreConfig": "점수 구성 추가",
         "allScoreConfigsAdded": "모든 점수 구성이 추가되었습니다.",
@@ -19495,10 +19497,10 @@
         "noScoreConfigs": "아직 점수 구성이 없습니다 — 먼저 점수 구성에서 만드세요.",
         "targetDatasetLabel": "대상 데이터셋",
         "targetDatasetNone": "없음 (검토 전용)",
-        "targetDatasetHint": "검토 전용 큐 — 검토된 항목은 데이터셋으로 증류되지 않습니다.",
+        "targetDatasetHint": "대상 데이터 세트가 없으면 이 어노테이션 큐의 항목은 검토만 수행됩니다.",
         "autoRoutingLabel": "자동 라우팅",
-        "autoRoutingHint": "점수가 조건과 일치하는 객체를 자동으로 큐에 넣습니다. 비워 두면 Discovery에서 수동으로 이 큐에 공급합니다.",
-        "autoRoutingEmpty": "자동 라우팅 없음 — 이 큐는 수동으로 공급됩니다.",
+        "autoRoutingHint": "점수가 조건과 일치하는 객체를 자동으로 큐에 추가합니다. 비워 두면 Discovery에서 이 어노테이션 큐에 항목을 추가합니다.",
+        "autoRoutingEmpty": "이 어노테이션 큐에는 항목이 수동으로 추가됩니다.",
         "addCondition": "조건 추가",
         "conditionAnd": "AND",
         "operatorIs": "같음",
@@ -19507,12 +19509,12 @@
         "conditionValuePlaceholder": "값",
         "pin": "버전 고정",
         "versionLatest": "v{version} (최신)",
-        "success": "큐가 생성되었습니다",
-        "error": "큐를 생성하지 못했습니다"
+        "success": "어노테이션 큐가 생성되었습니다",
+        "error": "어노테이션 큐를 생성하지 못했습니다"
       },
       "detail": {
-        "fallbackTitle": "큐",
-        "loadError": "큐 항목을 불러오지 못했습니다",
+        "fallbackTitle": "어노테이션 큐",
+        "loadError": "어노테이션 큐 항목을 불러오지 못했습니다",
         "startReviewing": "검토 시작",
         "scoreConfigs": "점수 구성 ({count})",
         "targetDataset": "대상 데이터셋",
@@ -19522,7 +19524,7 @@
         "inTrace": "트레이스 {traceId} 내",
         "reviewAgain": "다시 검토",
         "emptyTitle": "검토할 항목 없음",
-        "emptyBody": "Discovery 또는 트레이스 보기에서 이 큐에 트레이스, 스팬 또는 세션을 추가하세요.",
+        "emptyBody": "Discovery 또는 트레이스 보기에서 이 어노테이션 큐에 트레이스, 스팬, 세션을 추가하세요.",
         "columns": {
           "refType": "참조",
           "refId": "참조",
@@ -19593,7 +19595,7 @@
         "true": "참",
         "false": "거짓",
         "allReviewedTitle": "모든 항목 검토 완료",
-        "allReviewedBody": "이 대기열의 모든 항목에 완료된 리뷰가 있습니다."
+        "allReviewedBody": "이 어노테이션 큐의 모든 항목은 검토가 완료되었습니다."
       }
     },
     "experiments": {
@@ -25749,8 +25751,8 @@
     "sloDetail": "SLO 상세",
     "alertDetail": "알림 상세",
     "editAlert": "알림 편집",
-    "aiQueueDetail": "대기열",
-    "aiQueueReview": "대기열 검토",
+    "aiQueueDetail": "어노테이션 큐",
+    "aiQueueReview": "어노테이션 큐 검토",
     "aiDatasetDetail": "데이터셋",
     "aiPromptCreate": "새 프롬프트",
     "aiPromptVersionCreate": "새 프롬프트 버전",
@@ -28137,7 +28139,7 @@
     "teamChannelSilent": "이 팀의 채널은 의도적으로 비어 있습니다. 호출이 어디에도 공지되지 않습니다.",
     "slackChannelTitle": "Slack 채널",
     "slackChannelSetWith": "{command}(으)로 Slack 채널 설정",
-    "slackChannelLinkHint": "해당 Slack 채널에서 입력하세요. Slack 계정이 연결되어 있어야 합니다. Slack에서 /o2 link를 입력하세요.",
+    "slackChannelLinkHint": "해당 Slack 채널에 입력하세요. Slack 계정이 연결되어 있어야 합니다. Slack에서 {command} link를 입력하세요.",
     "slackChannelSendTest": "테스트 메시지 보내기",
     "slackChannelClear": "지우기",
     "slackChannelBackup": "{webhook}은(는) 백업으로만 사용",
@@ -28712,7 +28714,7 @@
     "mineJoinTeam": "팀에 참여",
     "mineTestTeam": "{team}에 테스트 호출 보내기",
     "mineCoverSaved": "대체 근무 저장됨",
-    "mineSlackLinkHow": "Slack에서 /o2 link 입력",
+    "mineSlackLinkHow": "Slack에서 {command} link 입력",
     "mineSlackSetUpHint": "설정 › Slack 열기",
     "myDeliveriesWhen": "시각",
     "phoneAddHint": "문자와 전화에 사용할 번호 추가",
@@ -29283,7 +29285,7 @@
     "channelUnavailable": "{channel} — 연결된 제공업체 없음",
     "channelUnverified": "{channel} — 등록됨, 아무도 확인하지 않음",
     "channelAddPhone": "{reason}. 내 온콜에서 전화번호를 추가하세요",
-    "channelLinkSlack": "{reason}. Slack에서 /o2 link를 실행하세요",
+    "channelLinkSlack": "{reason}. Slack에서 {command} link를 실행하세요",
     "loadUneven": "{name}님이 중앙값의 {factor}배를 담당했습니다 — 지난 {days}일 동안",
     "loadUnevenLabel": "부하가 불균등합니다:",
     "membersUnreachableMore": "{name}님은 이 팀에 있지만, 호출이 전달될 수 없습니다 — {why}. 다른 멤버 {count}명도 같은 상태입니다. | {name}님은 이 팀에 있지만, 호출이 전달될 수 없습니다 — {why}. 다른 멤버 {count}명도 같은 상태입니다.",
@@ -30893,6 +30895,13 @@
         "http": "HTTP",
         "httpDescription": "Slack이 사용자의 공개 URL을 호출합니다. Slack에서 Verify를 한 번 클릭해야 합니다.",
         "channelHistory": "봇이 시작한 스레드의 답글을 읽도록 허용",
+        "appName": "앱 이름",
+        "appNameHelp": "Slack에서 사람들이 보는 이름입니다. 각 OpenObserve 서버에 OpenObserve Staging처럼 고유한 이름을 지정하세요.",
+        "appNameTooLong": "앱 이름은 최대 {max}자여야 합니다",
+        "appNameMarkup": "앱 이름에는 <, > 또는 &를 포함할 수 없습니다",
+        "command": "슬래시 명령어",
+        "commandInvalid": "/로 시작하고 최대 {max}자까지 사용하세요: 소문자, 숫자, - 및 _",
+        "commandWarning": "Slack은 워크스페이스에서 하나의 앱에 대해서만 슬래시 명령어를 실행합니다. 이 워크스페이스의 다른 앱이 이미 {command}를 사용하고 있다면, 이 앱을 설치한 후 해당 앱에서는 {command}가 작동하지 않습니다.",
         "tokenLabel": "앱 구성 리프레시 토큰 (xoxe-…)",
         "tokenHelp": "Slack의 Your Apps 페이지에서 Your App Configuration Tokens › Generate Token을 선택하면 액세스 토큰과 리프레시 토큰이 표시됩니다. 리프레시 토큰을 붙여넣으세요. OpenObserve는 토큰을 순환시키고 나중에 앱을 업데이트할 수 있도록 최신 토큰을 암호화하여 보관합니다.",
         "generateToken": "토큰 생성",
@@ -31062,7 +31071,7 @@
         "settings": "설정",
         "install": "설치 시",
         "destination": "알림 대상에서",
-        "oncall": "여기에서 /o2 oncall로 설정"
+        "oncall": "여기에서 {command} oncall로 설정"
       },
       "channel": "채널",
       "channelPlaceholder": "채널 검색",
@@ -31076,7 +31085,7 @@
       "editDefault": "채널 기본값 편집",
       "removeConfirm": "기본값 제거",
       "removeTitle": "#{channel}의 기본값을 제거할까요?",
-      "removeMessage": "{name}의 질문은 이후 각 사용자의 기본 조직으로 전달됩니다(/o2 org로 변경할 수 있습니다).",
+      "removeMessage": "{name}의 질문은 이후 각 사용자의 기본 조직으로 전달됩니다({command} org로 변경할 수 있습니다).",
       "instanceAdminOnly": "인스턴스 관리자 전용",
       "ownOrgOnlyHint": "인스턴스 워크스페이스에서는 채널을 자신의 조직에 매핑합니다",
       "claimableHint": "할당되지 않은 채널 및 {org} 소유 채널",
@@ -34703,6 +34712,25 @@
       },
       "noHighConfidence": "신뢰도가 높은 이름이 없습니다"
     }
+  },
+  "commandPalette": {
+    "title": "페이지, 리소스 및 작업 검색",
+    "placeholder": "이름 및 ID 검색",
+    "moreTypes": "추가 유형",
+    "pages": "페이지",
+    "actions": "만들기",
+    "recent": "최근 방문",
+    "localHistory": "로컬 기록",
+    "clearRecent": "최근 방문 지우기",
+    "historyStorageUnavailable": "최근 방문을 저장할 수 없습니다",
+    "recentUnavailable": "현재 이 항목을 사용할 수 없습니다",
+    "loading": "검색 중…",
+    "partial": "일부 결과를 사용할 수 없습니다",
+    "failed": "검색을 완료하지 못했습니다",
+    "offline": "오프라인입니다. 최근 방문은 계속 볼 수 있습니다.",
+    "sourceUnavailable": "현재 이 리소스 유형을 사용할 수 없습니다",
+    "emptyHelp": "이름 또는 ID로 리소스 검색",
+    "globalShortcut": "전체 검색 열기"
   },
   "timeRangeInput": {
     "label": "시간 범위 입력",

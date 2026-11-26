@@ -139,7 +139,7 @@ describe("FunctionList", () => {
     ODialog: ODialogStub,
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     resetListViewState();
 
@@ -174,7 +174,8 @@ describe("FunctionList", () => {
       ],
     });
 
-    router.push("/functions");
+    await router.push("/functions");
+    await router.isReady();
   });
 
   // The list otherwise gives no clue whether a function is JS or VRL, so the
@@ -1087,6 +1088,31 @@ describe("FunctionList", () => {
   });
 
   describe("Route Query Action Handling", () => {
+    it("consumes repeated Command K create intents on the same mounted page", async () => {
+      const wrapper = mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+      await flushPromises();
+      await router.push({
+        name: "functionList",
+        query: { action: "add", palette_intent: "one", org_identifier: "test-org" },
+      });
+      await flushPromises();
+      const vm = wrapper.vm as InstanceType<typeof FunctionList>;
+      expect(vm.showAddJSTransformDialog).toBe(true);
+      expect(router.currentRoute.value.query.palette_intent).toBeUndefined();
+      vm.hideForm();
+      await flushPromises();
+      await router.push({
+        name: "functionList",
+        query: { action: "add", palette_intent: "two", org_identifier: "test-org" },
+      });
+      await flushPromises();
+      expect(vm.showAddJSTransformDialog).toBe(true);
+      expect(router.currentRoute.value.query.palette_intent).toBeUndefined();
+      wrapper.unmount();
+    });
+
     it("should trigger getJSTransforms when route has action=add query param", async () => {
       router.push({
         name: "functionList",

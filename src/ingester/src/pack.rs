@@ -993,6 +993,9 @@ pub(crate) async fn init() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::{Int64Array, StringArray};
+    use arrow_schema::{DataType, Field};
+
     use super::*;
 
     fn test_file_meta(min_ts: i64, max_ts: i64, records: i64, original_size: i64) -> FileMeta {
@@ -1147,9 +1150,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_read_from_pack_with_real_parquet_segment() {
-        use arrow::array::{Int64Array, StringArray};
-        use arrow_schema::{DataType, Field};
-
         // build a real parquet segment
         let schema = Arc::new(Schema::new(vec![
             Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),

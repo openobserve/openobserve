@@ -28,8 +28,9 @@ use axum::{
 use config::{
     ider,
     meta::{
+        destinations::{Destination, Module},
         folder::DEFAULT_FOLDER,
-        pipeline::components::{Edge, Node},
+        pipeline::components::{Edge, Node, NodeData},
         search::{Query as SearchQuery, Request as SearchRequest},
         self_reporting::{error::NodeErrors, usage::TRIGGERS_STREAM},
         stream::StreamType,
@@ -53,6 +54,7 @@ use utoipa::ToSchema;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
+    request::{OutboundOutcome, OutboundTarget, with_outbound_audit},
     service::{
         auth::check_folder_write_permissions,
         workflows::{self, InputMap, TriggerWorkflowError},
@@ -907,8 +909,9 @@ pub async fn test_workflow(
     };
 
     let is_draft: bool = is_draft.parse().unwrap_or(false);
+    let nodes = (!inputs.suppress_destinations).then(|| workflow.nodes.clone());
 
-    match workflows::test_workflow(
+    let result = workflows::test_workflow(
         &org_id,
         &workflow_id,
         workflow,
@@ -920,13 +923,20 @@ pub async fn test_workflow(
         },
         &user_email.user_id,
     )
-    .await
-    {
-        Ok(v) => MetaHttpResponse::json(WorkflowTestResult {
-            errors: v.errors,
-            inputs: v.inputs,
-            outputs: v.outputs,
-        }),
+    .await;
+    match result {
+        Ok(v) => {
+            let reached = nodes.map_or_else(Vec::new, |nodes| {
+                reached_destinations(&nodes, &v.errors, &v.outputs)
+            });
+            let targets = destination_targets(&org_id, reached).await;
+            let res = MetaHttpResponse::json(WorkflowTestResult {
+                errors: v.errors,
+                inputs: v.inputs,
+                outputs: v.outputs,
+            });
+            with_outbound_audit(res, &targets)
+        }
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
@@ -1579,8 +1589,56 @@ fn parse_workflow_history_key(key: &str) -> Option<(WorkflowTriggerType, String,
     ))
 }
 
+/// The Destination nodes a test run reached, each with its destination id and how it ended.
+fn reached_destinations(
+    nodes: &[Node],
+    errors: &HashMap<String, NodeErrors>,
+    outputs: &HashMap<String, Vec<Value>>,
+) -> Vec<(String, OutboundOutcome)> {
+    let mut reached = Vec::new();
+    // A disabled node passes its records through as output without sending them.
+    for node in nodes.iter().filter(|node| !node.is_disabled) {
+        let NodeData::Destination(destination) = &node.data else {
+            continue;
+        };
+        // The executor reports the status only inside the node's error text.
+        let outcome = if errors.contains_key(&node.id) {
+            OutboundOutcome::Failed
+        } else if outputs.contains_key(&node.id) {
+            OutboundOutcome::Succeeded
+        } else {
+            continue;
+        };
+        if !destination.destination_id.is_empty() {
+            reached.push((destination.destination_id.clone(), outcome));
+        }
+    }
+    reached
+}
+
+/// The executor never returns the URLs, so they are looked up again; a deleted one is left out.
+async fn destination_targets(
+    org_id: &str,
+    reached: Vec<(String, OutboundOutcome)>,
+) -> Vec<OutboundTarget> {
+    let mut targets = Vec::with_capacity(reached.len());
+    for (destination_id, outcome) in reached {
+        match openobserve_core::alerts::destinations::get(org_id, &destination_id).await {
+            Ok(Destination {
+                module: Module::Pipeline { endpoint },
+                ..
+            }) => targets.push(OutboundTarget::new(&endpoint.url, outcome)),
+            Ok(_) => {}
+            Err(e) => log::warn!("[{org_id}] workflow test destination {destination_id}: {e}"),
+        }
+    }
+    targets
+}
+
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field, Schema};
+
     use super::*;
 
     #[test]
@@ -1589,6 +1647,49 @@ mod tests {
         assert_eq!(missing.status(), StatusCode::NOT_FOUND);
         let failed = lookup_error(anyhow::anyhow!("db down"));
         assert_eq!(failed.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn a_workflow_test_audits_only_the_destinations_it_reached() {
+        let node = |id: &str, data: Value| -> Node {
+            serde_json::from_value(serde_json::json!({
+                "id": id, "data": data, "position": {"x": 0, "y": 0}, "io_type": "output",
+            }))
+            .unwrap()
+        };
+        let dest = |destination_id: &str| serde_json::json!({"node_type": "destination", "destination_id": destination_id});
+        let nodes = [
+            node(
+                "trigger",
+                serde_json::json!({"node_type": "workflow_trigger"}),
+            ),
+            node("ok", dest("d-ok")),
+            node("err", dest("d-err")),
+            node("unreached", dest("d-unreached")),
+            node("unset", dest("")),
+            serde_json::from_value(serde_json::json!({
+                "id": "disabled", "data": dest("d-disabled"), "position": {"x": 0, "y": 0},
+                "io_type": "output", "is_disabled": true,
+            }))
+            .unwrap(),
+        ];
+        let errors = HashMap::from([(
+            "err".to_string(),
+            NodeErrors::new("err".into(), "destination".into(), None),
+        )]);
+        let outputs = HashMap::from([
+            ("trigger".to_string(), vec![Value::Null]),
+            ("ok".to_string(), vec![Value::Null]),
+            ("unset".to_string(), vec![Value::Null]),
+            ("disabled".to_string(), vec![Value::Null]),
+        ]);
+        assert_eq!(
+            reached_destinations(&nodes, &errors, &outputs),
+            [
+                ("d-ok".to_string(), OutboundOutcome::Succeeded),
+                ("d-err".to_string(), OutboundOutcome::Failed),
+            ]
+        );
     }
 
     #[test]
@@ -1897,8 +1998,6 @@ mod tests {
 
     #[test]
     fn the_history_query_selects_only_the_optional_columns_the_stream_has() {
-        use arrow_schema::{DataType, Field, Schema};
-
         let select = |schema: &Schema| {
             let sql = history_sql("org1", "wf1", 1, 2, schema);
             sql.split(" FROM ").next().unwrap().to_string()

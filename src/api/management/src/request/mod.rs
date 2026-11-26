@@ -76,6 +76,7 @@ pub mod quality;
 pub mod query_history;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;
+pub mod resources;
 pub mod rum_analytics;
 pub mod sample_data;
 #[cfg(feature = "enterprise")]
@@ -102,6 +103,9 @@ pub mod workflows;
 #[cfg(feature = "cloud")]
 pub mod org_domains;
 
+use std::fmt;
+
+use axum::response::Response;
 use openobserve_api_common::request::{BulkDeleteRequest, BulkDeleteResponse};
 #[cfg(feature = "enterprise")]
 use {
@@ -111,6 +115,58 @@ use {
 
 #[cfg(feature = "enterprise")]
 const MAX_AUDIT_USER_AGENT_BYTES: usize = 1024;
+
+/// Where an outbound test went and how each call ended; the audit layer records it at any status.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OutboundAudit(pub String);
+
+/// One URL an outbound test called, cut to its origin.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OutboundTarget {
+    origin: String,
+    outcome: OutboundOutcome,
+}
+
+impl OutboundTarget {
+    pub fn new(url: &str, outcome: OutboundOutcome) -> Self {
+        Self {
+            origin: url_origin_or_redacted(url),
+            outcome,
+        }
+    }
+}
+
+impl fmt::Display for OutboundTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}", self.origin, self.outcome)
+    }
+}
+
+/// `Succeeded` and `Failed` are for callers that never see the status or the error kind.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum OutboundOutcome {
+    Status(u16),
+    Succeeded,
+    Failed,
+    Timeout,
+    ConnectFailed,
+    Blocked,
+    NotSent,
+}
+
+impl fmt::Display for OutboundOutcome {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Status(code) => write!(f, "HTTP {code}"),
+            Self::Succeeded => f.write_str("succeeded"),
+            Self::Failed => f.write_str("failed"),
+            Self::Timeout => f.write_str("timeout"),
+            Self::ConnectFailed => f.write_str("connect failed"),
+            Self::Blocked => f.write_str("blocked"),
+            Self::NotSent => f.write_str("not sent"),
+        }
+    }
+}
 
 #[cfg(feature = "enterprise")]
 #[derive(Clone, Copy)]
@@ -152,6 +208,26 @@ impl LoginFailure {
     }
 }
 
+/// The origin, or `[REDACTED]` when the URL does not parse or its host carries the key.
+pub fn url_origin_or_redacted(raw: &str) -> String {
+    let origin = config::utils::str::url_origin(raw);
+    if origin.is_empty() {
+        "[REDACTED]".to_string()
+    } else {
+        origin
+    }
+}
+
+/// Hands the targets to the audit layer; a test that called nothing is audited as before.
+pub fn with_outbound_audit(mut res: Response, targets: &[OutboundTarget]) -> Response {
+    if !targets.is_empty() {
+        let targets: Vec<String> = targets.iter().map(ToString::to_string).collect();
+        res.extensions_mut()
+            .insert(OutboundAudit(targets.join(", ")));
+    }
+    res
+}
+
 #[cfg(feature = "enterprise")]
 async fn audit_login_failure(message: AuditMessage, failure: LoginFailure, status: StatusCode) {
     audit::audit(failure.prepare(message, status, config::utils::time::now_micros())).await;
@@ -169,7 +245,7 @@ pub fn audit_user_agent(headers: &HeaderMap) -> Option<String> {
 
 #[cfg(all(test, feature = "enterprise"))]
 mod tests {
-    use axum::http::HeaderValue;
+    use axum::{http::HeaderValue, response::IntoResponse};
 
     use super::*;
 
@@ -194,5 +270,52 @@ mod tests {
         let oversized = "a".repeat(MAX_AUDIT_USER_AGENT_BYTES + 1);
         assert_eq!(audit_user_agent(&headers_with_agent(&oversized)), None);
         assert_eq!(audit_user_agent(&headers_with_agent("bad\tagent")), None);
+    }
+
+    #[test]
+    fn an_outbound_target_keeps_the_origin_and_names_the_outcome() {
+        for (url, outcome, shown) in [
+            (
+                "http://user:pw@svc.ns:8080/x?token=abc",
+                OutboundOutcome::Status(503),
+                "http://svc.ns:8080 HTTP 503",
+            ),
+            (
+                "https://hooks.slack.com/services/T0/B0/XYZ",
+                OutboundOutcome::Timeout,
+                "https://hooks.slack.com timeout",
+            ),
+            (
+                "http://169.254.169.254/latest",
+                OutboundOutcome::Blocked,
+                "http://169.254.169.254 blocked",
+            ),
+            (
+                "svc.ns/x?token=abc",
+                OutboundOutcome::Failed,
+                "[REDACTED] failed",
+            ),
+        ] {
+            assert_eq!(OutboundTarget::new(url, outcome).to_string(), shown);
+        }
+    }
+
+    #[test]
+    fn only_a_test_that_called_out_hands_the_audit_layer_a_target() {
+        let none = with_outbound_audit("ok".into_response(), &[]);
+        assert!(none.extensions().get::<OutboundAudit>().is_none());
+        let two = with_outbound_audit(
+            "ok".into_response(),
+            &[
+                OutboundTarget::new("http://a:1/x", OutboundOutcome::Succeeded),
+                OutboundTarget::new("http://b:2/y", OutboundOutcome::ConnectFailed),
+            ],
+        );
+        assert_eq!(
+            two.extensions().get::<OutboundAudit>(),
+            Some(&OutboundAudit(
+                "http://a:1 succeeded, http://b:2 connect failed".to_string()
+            ))
+        );
     }
 }

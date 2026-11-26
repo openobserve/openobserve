@@ -15,7 +15,11 @@
 
 import { toRaw, markRaw } from "vue";
 import { gt } from "@/types/i18n";
-import { detectChunkingDirection, shouldPrependChunk } from "@/utils/dashboard/chunkingDirection";
+import {
+  detectChunkingDirection,
+  mergeHitsChunk,
+  shouldPrependChunk,
+} from "@/utils/dashboard/chunkingDirection";
 
 /**
  * Composable that encapsulates all streaming search response event handlers
@@ -66,29 +70,11 @@ export const usePanelSearchHandlers = ({
     for (const [queryIndex, buffer] of hitsBuffer) {
       if (buffer.hits.length === 0) continue;
 
-      if (buffer.streamingAggs) {
-        // streaming_aggs mode: data is replaced, use only the last batch
-        const lastBatch = buffer.hits[buffer.hits.length - 1];
-        if (lastBatch.length > 0) {
-          state.data[queryIndex] = markRaw([...lastBatch]);
-        }
-      } else {
-        // Combine all buffered hit arrays into one flat array
-        const allNewHits: any[] = [];
-        for (const batch of buffer.hits) {
-          for (const hit of batch) {
-            allNewHits.push(hit);
-          }
-        }
-
-        const shouldPrepend = shouldPrependChunk(buffer.isLTR, buffer.orderAsc);
-
-        if (shouldPrepend) {
-          state.data[queryIndex] = markRaw([...allNewHits, ...toRaw(state.data[queryIndex] ?? [])]);
-        } else {
-          state.data[queryIndex] = markRaw([...toRaw(state.data[queryIndex] ?? []), ...allNewHits]);
-        }
-      }
+      // streaming_aggs replaces the data, so only the last batch counts.
+      const chunk = buffer.streamingAggs ? buffer.hits[buffer.hits.length - 1] : buffer.hits.flat();
+      state.data[queryIndex] = markRaw(
+        mergeHitsChunk(toRaw(state.data[queryIndex] ?? []), chunk, buffer),
+      );
 
       buffer.hits.length = 0; // clear buffer after flush
     }

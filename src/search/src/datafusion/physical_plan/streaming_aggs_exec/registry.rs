@@ -367,6 +367,7 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::{
         execution::context::TaskContext,
+        physical_expr::expressions::col,
         physical_plan::{
             ChildrenPropertiesMode, ExecutionPlan, Partitioning, ReplaceChildrenOptions,
             StatisticsArgs, StatisticsContext,
@@ -377,6 +378,12 @@ mod tests {
 
     use super::*;
     use crate::datafusion::physical_plan::streaming_aggs_exec::exec::StreamingAggsExec;
+
+    // DataFusion rejects an AggregateExec with neither grouping nor aggregates.
+    fn group_by_col1(schema: &Schema) -> PhysicalGroupBy {
+        let col1 = col("col1", schema).unwrap();
+        PhysicalGroupBy::new_single(vec![(col1, "col1".to_string())])
+    }
 
     #[test]
     fn test_streaming_aggs_cache_insert_max_entries() {
@@ -647,7 +654,7 @@ mod tests {
         let aggregate_plan = Arc::new(
             AggregateExec::try_new(
                 AggregateMode::Partial,
-                PhysicalGroupBy::new_single(vec![]),
+                group_by_col1(&schema),
                 vec![],
                 vec![],
                 input.clone(),
@@ -696,7 +703,7 @@ mod tests {
         let aggregate_plan = Arc::new(
             AggregateExec::try_new(
                 AggregateMode::Partial,
-                PhysicalGroupBy::new_single(vec![]),
+                group_by_col1(&schema),
                 vec![],
                 vec![],
                 input.clone(),
@@ -745,7 +752,7 @@ mod tests {
         let aggregate_plan = Arc::new(
             AggregateExec::try_new(
                 AggregateMode::Partial,
-                PhysicalGroupBy::new_single(vec![]),
+                group_by_col1(&schema),
                 vec![],
                 vec![],
                 input.clone(),
@@ -922,7 +929,7 @@ mod tests {
         let aggregate_plan = Arc::new(
             AggregateExec::try_new(
                 AggregateMode::Partial,
-                PhysicalGroupBy::new_single(vec![]),
+                group_by_col1(&schema),
                 vec![],
                 vec![],
                 input.clone(),
@@ -990,7 +997,7 @@ mod tests {
         let aggregate_plan = Arc::new(
             AggregateExec::try_new(
                 AggregateMode::Partial,
-                PhysicalGroupBy::new_single(vec![]),
+                group_by_col1(&schema),
                 vec![],
                 vec![],
                 input.clone(),
@@ -1031,7 +1038,7 @@ mod tests {
         let aggregate_plan = Arc::new(
             AggregateExec::try_new(
                 AggregateMode::Partial,
-                PhysicalGroupBy::new_single(vec![]),
+                group_by_col1(&schema),
                 vec![],
                 vec![],
                 input.clone(),
@@ -1184,7 +1191,7 @@ mod tests {
         let aggregate_plan = Arc::new(
             AggregateExec::try_new(
                 AggregateMode::Partial,
-                PhysicalGroupBy::new_single(vec![]),
+                group_by_col1(&schema),
                 vec![],
                 vec![],
                 input.clone(),
@@ -1228,7 +1235,7 @@ mod tests {
         let aggregate_plan = Arc::new(
             AggregateExec::try_new(
                 AggregateMode::Partial,
-                PhysicalGroupBy::new_single(vec![]),
+                group_by_col1(&schema),
                 vec![],
                 vec![],
                 input.clone(),

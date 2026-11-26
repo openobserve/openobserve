@@ -378,13 +378,15 @@ import {
   isCoveredMobile,
   type RunCoverage,
 } from "@/utils/rum/sessionReplaySeekPlan";
+import { createActivityTimer } from "@/utils/activityTimer";
 import {
   appendableIndexes,
-  createActivityTimer,
   createLoaderState,
   createQueryError,
   extendLoaderState,
   failBatch,
+  FIRST_BYTE_TIMEOUT_MS,
+  IDLE_TIMEOUT_MS,
   isFetchable,
   isSettled,
   markInFlight,
@@ -1220,12 +1222,16 @@ const runStreamQuery = (
       done();
     };
     // A cancelled stream fires no callback, so the timeout has to settle the promise itself.
-    const timer = createActivityTimer(() => {
-      cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId });
-      settle(() =>
-        reject(createQueryError("session replay query timed out", undefined, "timeout")),
-      );
-    });
+    const timer = createActivityTimer(
+      () => {
+        cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId });
+        settle(() =>
+          reject(createQueryError("session replay query timed out", undefined, "timeout")),
+        );
+      },
+      FIRST_BYTE_TIMEOUT_MS,
+      IDLE_TIMEOUT_MS,
+    );
     liveTraceIds.add(traceId);
 
     void fetchQueryDataWithHttpStream(

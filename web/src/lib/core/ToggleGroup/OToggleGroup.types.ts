@@ -48,6 +48,8 @@ export interface ToggleGroupProps {
   reorderable?: boolean;
   /** Below md, render as a dropdown showing the active item (single-select only). */
   mobileDropdown?: boolean;
+  /** Single-select only: clicking the active item clears the value (emits `null`). */
+  deselectable?: boolean;
 }
 
 /** Tells an OToggleGroupItem it is being rendered as the dropdown trigger or as a menu row. */

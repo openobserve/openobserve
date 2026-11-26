@@ -43,12 +43,14 @@ use openobserve_api_ingest::request::{clusters, datadog, logs, metrics, profiles
 use openobserve_api_management::request::org_domains;
 #[cfg(feature = "cpu-profiling")]
 use openobserve_api_management::request::profiling;
+#[cfg(any(feature = "enterprise", test))]
+use openobserve_api_management::request::{OutboundAudit, url_origin_or_redacted};
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
     ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
-    query_history, rum_analytics, sample_data, security, service_accounts, service_identity,
-    service_streams, service_versions, short_url, slack, slos, sourcemaps, status, status_pages,
-    stream, synthetics, users,
+    query_history, resources, rum_analytics, sample_data, security, service_accounts,
+    service_identity, service_streams, service_versions, short_url, slack, slos, sourcemaps,
+    status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -600,6 +602,18 @@ fn audit_org_and_next<'a>(path_columns: &[&'a str]) -> (&'a str, &'a str) {
     (org, next)
 }
 
+#[cfg(feature = "enterprise")]
+fn resource_search_audit_query(uri: &Uri) -> String {
+    if uri
+        .path()
+        .trim_end_matches('/')
+        .ends_with("/resources/_search")
+    {
+        return uri.query().map_or_else(String::new, |_| "…".to_owned());
+    }
+    uri.query().unwrap_or("").to_owned()
+}
+
 /// A delegated `/ai/chat` is audited like a Slack `chat_stream` turn: no question text.
 #[cfg(feature = "enterprise")]
 fn delegated_chat_audit_body(
@@ -658,7 +672,9 @@ fn redact_secret_fields(value: &mut serde_json::Value) {
                 if field.is_boolean() || field.is_null() {
                     continue;
                 }
-                if is_secret_field(name) {
+                if let Some(raw) = field.as_str().filter(|_| is_url_field(name)) {
+                    *field = serde_json::Value::String(url_origin_or_redacted(raw));
+                } else if is_secret_field(name) {
                     *field = serde_json::Value::String("[REDACTED]".to_string());
                 } else {
                     redact_secret_fields(field);
@@ -674,16 +690,22 @@ fn redact_secret_fields(value: &mut serde_json::Value) {
 fn redact_form_fields(body: &[u8]) -> String {
     let mut out = url::form_urlencoded::Serializer::new(String::new());
     for (name, value) in url::form_urlencoded::parse(body) {
-        out.append_pair(
-            &name,
-            if is_secret_field(&name) {
-                "[REDACTED]"
-            } else {
-                &value
-            },
-        );
+        if is_url_field(&name) {
+            out.append_pair(&name, &url_origin_or_redacted(&value));
+        } else if is_secret_field(&name) {
+            out.append_pair(&name, "[REDACTED]");
+        } else {
+            out.append_pair(&name, &value);
+        }
     }
     out.finish()
+}
+
+/// An outbound URL field: its origin says where the server went, the rest can hold the secret.
+#[cfg(any(feature = "enterprise", test))]
+fn is_url_field(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    name == "url" || name == "endpoint"
 }
 
 /// Whether a field holds a credential; `url`, `endpoint` and headers carry webhook secrets.
@@ -709,6 +731,12 @@ fn is_secret_field(name: &str) -> bool {
         || ["password", "secret", "credential"]
             .iter()
             .any(|word| name.contains(word))
+}
+
+/// A failed call is audited only when it is an outbound test, whose target must be on record.
+#[cfg(any(feature = "enterprise", test))]
+fn audits_response(status: StatusCode, outbound: Option<&OutboundAudit>) -> bool {
+    status.is_success() || status.is_redirection() || outbound.is_some()
 }
 
 /// A fleet change is published at once, so the Audit tab shows it before the periodic publish.
@@ -741,7 +769,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                 matched_route(&request).as_deref(),
             ))
     {
-        let query_params = request.uri().query().unwrap_or("").to_string();
+        let query_params = resource_search_audit_query(request.uri());
         let org_id = if audit_org == "organizations" {
             String::new()
         } else {
@@ -806,8 +834,9 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         // ERROR_HEADER is an internal detail channel for the auditor and must never reach a client.
         response.headers_mut().remove(ERROR_HEADER);
         let named = response.extensions_mut().remove::<AuditTarget>();
+        let outbound = response.extensions_mut().remove::<OutboundAudit>();
 
-        if response.status().is_success() || response.status().is_redirection() {
+        if audits_response(response.status(), outbound.as_ref()) {
             let slack_chat = delegated_chat_audit_body(
                 &http_method,
                 &path,
@@ -842,11 +871,14 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                 },
                 delegated,
                 fleet_id: named.as_ref().and_then(|n| n.fleet_id.clone()),
-                target: named.map(|n| n.target).or_else(|| {
-                    touched_security.then(|| {
-                        o2_enterprise::enterprise::security::audit::SECURITY_TARGET.to_string()
-                    })
-                }),
+                target: named
+                    .map(|n| n.target)
+                    .or(outbound.map(|o| o.0))
+                    .or_else(|| {
+                        touched_security.then(|| {
+                            o2_enterprise::enterprise::security::audit::SECURITY_TARGET.to_string()
+                        })
+                    }),
             })
             .await;
             if fleet_mutation(&http_method, &path) {
@@ -1336,6 +1368,7 @@ fn service_route_table() -> Router {
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
+    router = router.route("/{org_id}/resources/_search", get(resources::search));
     // Users
     // Reading one member returns their lockout counters, which only an enterprise build has.
 
@@ -3309,6 +3342,19 @@ mod tests {
     const DD_ORG: &str = "dd_routes_org";
     const DD_KEY: &str = "o2oi_dd_routes_key";
 
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn resource_search_audit_omits_query_text_and_offset() {
+        let uri: Uri = "/acme/resources/_search?%71=private-name&offset=40"
+            .parse()
+            .unwrap();
+        assert_eq!(resource_search_audit_query(&uri), "…");
+        let unrelated: Uri = "/acme/dashboards?title=overview".parse().unwrap();
+        assert_eq!(resource_search_audit_query(&unrelated), "title=overview");
+        let no_query: Uri = "/acme/resources/_search".parse().unwrap();
+        assert_eq!(resource_search_audit_query(&no_query), "");
+    }
+
     /// A router node merges `basic_routes()` beside its catch-all proxy
     /// `/api/{*path}`, and axum **panics at registration** — not at request
     /// time — when a parameter and a wildcard sit at the same position. So
@@ -3916,16 +3962,6 @@ mod tests {
     }
 
     #[test]
-    fn audit_body_drops_webhook_endpoints() {
-        let body = audited(
-            Method::PUT,
-            "api/default/prompts/settings",
-            r#"{"webhook":{"endpoint":"https://hooks.example.com/x?token=ep-1"}}"#,
-        );
-        assert!(!body.contains("ep-1"), "{body}");
-    }
-
-    #[test]
     fn audit_body_keeps_identifiers_that_merely_end_in_key() {
         let body = audited(
             Method::POST,
@@ -3977,16 +4013,58 @@ mod tests {
     }
 
     #[test]
-    fn audit_body_drops_destination_urls_and_headers() {
-        let body = audited(
-            Method::POST,
-            "api/default/alerts/destinations",
-            r#"{"name":"oncall","url":"https://hooks.slack.com/services/T0/B0/XYZSECRET","method":"post","headers":{"Authorization":"Bearer tok-123","X-Routing-Key":"rk-9"}}"#,
-        );
-        for secret in ["XYZSECRET", "tok-123", "rk-9"] {
-            assert!(!body.contains(secret), "{secret} leaked: {body}");
+    fn audit_body_keeps_only_the_origin_of_a_url_field() {
+        let path = "api/default/alerts/destinations/test";
+        for (body, kept) in [
+            (
+                r#"{"url":"http://user:pw@svc.ns:8080/x?token=abc"}"#,
+                r#"{"url":"http://svc.ns:8080"}"#,
+            ),
+            (
+                r#"{"url":"https://hooks.slack.com/services/T0/B0/XYZSECRET"}"#,
+                r#"{"url":"https://hooks.slack.com"}"#,
+            ),
+            (
+                r#"{"webhook":{"endpoint":"https://hooks.example.com/x?token=ep-1"}}"#,
+                r#"{"webhook":{"endpoint":"https://hooks.example.com"}}"#,
+            ),
+            (r#"{"url":"svc.ns/x?token=abc"}"#, r#"{"url":"[REDACTED]"}"#),
+            (
+                r#"{"url":"https://abc123.m.pipedream.net/x"}"#,
+                r#"{"url":"[REDACTED]"}"#,
+            ),
+            (
+                r#"{"url":{"href":"http://svc.ns/x?token=abc"}}"#,
+                r#"{"url":"[REDACTED]"}"#,
+            ),
+            (
+                r#"{"headers":{"Authorization":"Bearer tok-123"},"access_token":"t-1"}"#,
+                r#"{"headers":"[REDACTED]","access_token":"[REDACTED]"}"#,
+            ),
+        ] {
+            assert_eq!(audited(Method::POST, path, body), kept, "{body}");
         }
-        assert!(body.contains("oncall"), "{body}");
+        let form = audit_body(
+            &Method::POST,
+            path,
+            Some("application/x-www-form-urlencoded"),
+            b"url=http%3A%2F%2Fuser%3Apw%40svc.ns%3A8080%2Fx%3Ftoken%3Dabc&name=n".to_vec(),
+        );
+        assert_eq!(form, "url=http%3A%2F%2Fsvc.ns%3A8080&name=n");
+    }
+
+    #[test]
+    fn a_failed_call_is_audited_only_when_it_is_an_outbound_test() {
+        let outbound = OutboundAudit("http://svc.ns:8080 timeout".to_string());
+        for (status, outbound, audited) in [
+            (StatusCode::OK, None, true),
+            (StatusCode::FOUND, None, true),
+            (StatusCode::BAD_REQUEST, None, false),
+            (StatusCode::BAD_REQUEST, Some(&outbound), true),
+            (StatusCode::INTERNAL_SERVER_ERROR, Some(&outbound), true),
+        ] {
+            assert_eq!(audits_response(status, outbound), audited, "{status}");
+        }
     }
 
     #[test]

@@ -226,6 +226,15 @@ pub async fn set_creates_incident(
     {
         return Err(version_changed(written));
     }
+    // Turning incidents off is never refused; turning them on must pass the check a save runs.
+    if req.value {
+        config::meta::alerts::grouping::validate_multi_alert(
+            &current.query_condition,
+            &current.trigger_condition,
+            true,
+        )
+        .map_err(|e| LeaseError::BadRequest(AlertError::InvalidMultiAlert(e).to_string()))?;
+    }
     if timed {
         refuse_second_lease(org_id, alert_id, written).await?;
     }
@@ -854,7 +863,10 @@ mod tests {
     use std::sync::OnceLock;
 
     use config::meta::{
-        alerts::{FrequencyType, QueryCondition, QueryType, TriggerCondition},
+        alerts::{
+            AggFunction, Aggregation, Condition, FrequencyType, Operator, QueryCondition,
+            QueryType, TriggerCondition,
+        },
         stream::StreamType,
     };
     use infra::table::alert_leases::{CLAIM_TTL_US, PENDING_TTL_US};
@@ -1094,6 +1106,57 @@ mod tests {
                 !stored(&org, &alert).await.unwrap().creates_incident,
                 "a second pass is a no-op"
             );
+        });
+    }
+
+    #[test]
+    fn a_per_group_alert_cannot_be_toggled_to_create_incidents() {
+        RUNTIME.block_on(async {
+            if !meta_store().await {
+                return;
+            }
+            let _serial = SERIAL.lock().await;
+            let org = format!("lease_per_group_{}", now_micros());
+            let mut per_group = new_alert(&org, FrequencyType::Minutes).await;
+            per_group.query_condition.aggregation = Some(Aggregation {
+                group_by: Some(vec!["service".into()]),
+                function: AggFunction::Count,
+                having: Condition {
+                    column: "alert_agg_value".into(),
+                    operator: Operator::GreaterThan,
+                    value: serde_json::json!(5),
+                    ignore_case: false,
+                    case_insensitive: None,
+                },
+                warning_value: None,
+                multi_alert: true,
+            });
+            per_group.trigger_condition.operator = Operator::GreaterThanEquals;
+            per_group.trigger_condition.threshold = 1;
+            let conn = get_orm_client_rw().await;
+            let alert = db::alerts::alert::create(conn, &org, "default", per_group, false)
+                .await
+                .unwrap();
+            let id = alert.id.unwrap().to_string();
+            let incidents_refused = AlertError::InvalidMultiAlert(
+                config::meta::alerts::grouping::MultiAlertError::IncidentsUnsupported,
+            )
+            .to_string();
+            for until_us in [None, Some(now_micros() + HOUR_US)] {
+                let req = CreatesIncidentRequest {
+                    value: true,
+                    until_us,
+                    reason: Some("the service is failing and nothing pages".into()),
+                    ..Default::default()
+                };
+                let refused = set_creates_incident(&org, &id, &req, AO).await;
+                assert!(
+                    matches!(&refused, Err(LeaseError::BadRequest(m)) if *m == incidents_refused),
+                    "{until_us:?}: {refused:?}"
+                );
+                assert!(!stored(&org, &alert).await.unwrap().creates_incident);
+                assert!(list(&org, Some(&id), None).await.unwrap().is_empty());
+            }
         });
     }
 

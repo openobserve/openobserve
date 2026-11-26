@@ -88,6 +88,10 @@ export class MetricsExplorerPage {
         this.labelBarPrefix = 'metrics-explorer-label';
         this.labelBar = new FilterBuilderDriver(page, this.labelBarPrefix);
 
+        this.prefixFacetPrefix = 'metrics-explorer-prefix-facet-';
+        this.prefixCountPrefix = 'metrics-explorer-prefix-count-';
+        this.dataScopeWithData = '[data-test="metrics-explorer-hide-empty"]';
+
         // ===== EMPTY STATES =====
         this.noMetricsState = '[data-test="metrics-explorer-no-metrics"]';
         this.loadErrorState = '[data-test="metrics-explorer-load-error"]';
@@ -529,6 +533,32 @@ export class MetricsExplorerPage {
             timeout,
         });
         await expect(this.cardNoData(metric)).toBeHidden();
+    }
+
+    prefixCount(prefix) {
+        return this.page.locator(`[data-test="${this.prefixCountPrefix}${prefix}"]`);
+    }
+
+    async getPrefixCountText(prefix, timeout = 30000) {
+        const chip = this.prefixCount(prefix);
+        await expect(chip, `the ${prefix} prefix row should be listed`).toBeVisible({ timeout });
+        return (await chip.innerText()).trim();
+    }
+
+    async expectPrefixCount(prefix, text, timeout = 60000) {
+        await expect(this.prefixCount(prefix)).toHaveText(text, { timeout });
+    }
+
+    async tickPrefix(prefix) {
+        await this.page.locator(`[data-test="${this.prefixFacetPrefix}${prefix}"]`).click();
+    }
+
+    async expectWithDataOn() {
+        await expect(this.page.locator(this.dataScopeWithData)).toHaveAttribute('data-state', 'on');
+    }
+
+    async expectNoMatchSaysNoData(timeout = 60000) {
+        await expect(this.page.locator(this.noMatchState)).toContainText('returned no data', { timeout });
     }
 
     /* ---------------------------------------------------------------- refresh */

@@ -910,6 +910,7 @@ fn bool_field(v: &Value, key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::{DataType, Field};
     use serde_json::json;
 
     use super::*;
@@ -1212,7 +1213,6 @@ mod tests {
 
     #[test]
     fn test_columns_from_schema() {
-        use arrow_schema::{DataType, Field};
         let schema = Schema::new(vec![
             Field::new("service_name", DataType::Utf8, true),
             Field::new("span_kind", DataType::Utf8, true),
