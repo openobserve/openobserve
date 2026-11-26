@@ -13,18 +13,16 @@ describe("OShortcut", () => {
   });
 
   describe("combo rendering (string)", () => {
-    it("should render a combo string as a single symbolised keycap", () => {
+    it("should render a combo string as one symbolised keycap", () => {
       wrapper = mount(OShortcut, { props: { keys: "ctrl+shift+a" } });
       const caps = wrapper.findAll("kbd");
-      expect(caps).toHaveLength(1);
-      expect(caps[0].text()).toBe("⌘⇧A");
+      expect(caps.map((c) => c.text())).toEqual(["⌘⇧A"]);
     });
 
     it("should symbolise enter and ctrl in a two-key combo", () => {
       wrapper = mount(OShortcut, { props: { keys: "ctrl+enter" } });
       const caps = wrapper.findAll("kbd");
-      expect(caps).toHaveLength(1);
-      expect(caps[0].text()).toBe("⌘↵");
+      expect(caps.map((c) => c.text())).toEqual(["⌘↵"]);
     });
 
     it("should render a bare single key unchanged", () => {

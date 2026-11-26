@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-cy="syntax-guide-button"
           variant="ghost"
           :size="label ? 'sm-toolbar' : 'icon-toolbar'"
+          class="toolbar-btn-rest"
           :class="sqlmode ? 'sql-mode' : 'normal-mode'"
           icon-left="help"
         >

@@ -80,14 +80,17 @@ describe("SearchBar — pinned saved views", () => {
     expect(icons).toEqual(["saved-search", "expand-more"]);
   });
 
-  it("divides the list trigger from the save button with a vertical separator", async () => {
+  it("joins the list trigger and the save button into one pill with a hairline between", async () => {
     wrapper = mountSearchBar(1600);
     await flushPromises();
 
     expect(group().exists()).toBe(true);
-    const separator = group().findComponent({ name: "OSeparator" });
-    expect(separator.exists()).toBe(true);
-    expect(separator.props("vertical")).toBe(true);
+    const list = group().find('[data-test="logs-search-bar-saved-views-pinned-list-btn"]');
+    const save = group().find('[data-test="logs-search-bar-saved-views-pinned-create-btn"]');
+    expect(list.classes()).toContain("rounded-e-none!");
+    expect(save.classes()).toEqual(
+      expect.arrayContaining(["rounded-s-none!", "border-s", "size-7"]),
+    );
     expect(
       group().find('[data-test="logs-search-bar-saved-views-pinned-create-btn"]').exists(),
     ).toBe(true);

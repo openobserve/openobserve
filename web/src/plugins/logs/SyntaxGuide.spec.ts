@@ -410,7 +410,8 @@ describe("SyntaxGuide.vue", () => {
   it("should give the toolbar variant the 28px toolbar height and compact text", () => {
     wrapper = createWrapper({ toolbar: true, label: "Syntax Guide" });
     const button = wrapper.findComponent({ name: "OButton" });
-    expect(button.props("variant")).toBe("outline");
+    expect(button.props("variant")).toBe("ghost");
+    expect(button.classes()).toContain("toolbar-btn-rest");
     expect(button.classes()).toContain("h-7");
     expect(button.classes()).toContain("text-compact");
   });

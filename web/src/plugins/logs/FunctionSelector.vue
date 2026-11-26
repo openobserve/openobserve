@@ -14,8 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <OButtonGroup class="function-selector border-button-outline-border float-left me-1 border p-0">
-    <div v-if="!hideToggle" class="flex items-center px-1">
+  <OButtonGroup class="function-selector float-left me-1 p-0">
+    <div v-if="!hideToggle" class="toolbar-btn-rest rounded-s-default flex h-7 items-center px-2">
       <OSwitch
         data-test="logs-search-bar-show-query-toggle-btn"
         v-model="searchObj.meta.showTransformEditor"
@@ -28,11 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-function-dropdown"
           variant="ghost"
-          class="ms-1! size-7!"
-          size="icon-toolbar"
+          class="toolbar-btn-rest"
+          :class="hideToggle ? 'rounded-e-none!' : 'rounded-none!'"
+          size="sm-toolbar"
+          :aria-label="t('logs.functionSelector.function')"
         >
-          <img :src="functionIconUrl" :alt="t('logs.functionSelector.function')" class="size-4" />
-          <OIcon name="expand-more" size="xs" class="-ms-0.5" />
+          <OIcon name="function" size="sm" />
+          <OIcon name="expand-more" size="xs" data-menu-chevron class="-ms-0.5" />
           <OTooltip :content="raw(selectedFunctionTooltip)" :side-offset="2" />
         </OButton>
       </template>
@@ -53,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(item, i) in filteredFunctionOptions"
             :key="'saved-view-' + i"
             :data-test="`logs-search-saved-function-${item.name}`"
-            class="saved-view-item border-card-glass-border rounded-none border-b last:border-none"
+            class="saved-view-item"
             @select="applyFunction(item, true)"
           >
             {{ item.name }}
@@ -72,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="logs-search-bar-save-function-btn"
       variant="ghost"
       size="icon-toolbar"
-      class="size-7!"
+      class="toolbar-btn-rest border-border-default rounded-s-none! border-s"
       icon-left="save"
       :aria-label="t('common.save')"
       @click="fnSavedFunctionDialog"
@@ -94,8 +96,6 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
-import { getImageURL } from "@/utils/zincutils";
-import { useTheme } from "@/composables/useTheme";
 const props = withDefaults(
   defineProps<{
     functionOptions: { name: string; function: string }[];
@@ -112,20 +112,9 @@ const { t } = useI18nTyped();
 
 const { searchObj } = searchState();
 
-const { isDark } = useTheme();
-
-const iconRight = computed(() => {
-  return (
-    "img:" +
-    getImageURL(isDark.value ? "images/common/function_dark.svg" : "images/common/function.svg")
-  );
-});
-
 const functionModel = ref(false);
 
 const searchTerm = ref("");
-
-const functionIconUrl = computed(() => iconRight.value.replace("img:", ""));
 
 const fnSavedFunctionDialog = () => {
   emit("save:function");

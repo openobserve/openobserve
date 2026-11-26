@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #trigger>
                 <OButton
                   data-test="logs-search-bar-saved-views-pinned-list-btn"
-                  class="toolbar-btn-rest"
+                  class="toolbar-btn-rest rounded-e-none!"
                   variant="ghost"
                   size="sm-toolbar"
                 >
@@ -288,13 +288,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @delete="handleDeleteSavedView"
               />
             </ODropdown>
-            <OSeparator vertical />
             <OButton
               data-test="logs-search-bar-saved-views-pinned-create-btn"
-              class="toolbar-btn-rest"
+              class="toolbar-btn-rest border-border-default rounded-s-none! border-s"
               :aria-label="t('search.createSavedView')"
               variant="ghost"
-              size="icon-panel"
+              size="icon-toolbar"
               :disabled="!!saveViewReason"
               focusable-unavailable
               @click="fnSavedView"

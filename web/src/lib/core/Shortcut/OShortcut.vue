@@ -51,22 +51,19 @@ function symbolizeToken(token: string): string {
   return SYMBOLS[t.toLowerCase()] ?? (t.length === 1 ? t.toUpperCase() : t);
 }
 
-/** Symbolise a combo like "ctrl+shift+a" → "⌘⇧A" (joined into one keycap). */
+/** One keycap per combo, as each OS writes it: "⌘⇧A" on macOS, "Ctrl+Shift+A" elsewhere. */
 function symbolizeCombo(combo: string): string {
-  return combo.split("+").map(symbolizeToken).filter(Boolean).join("");
+  return combo
+    .split("+")
+    .map(symbolizeToken)
+    .filter(Boolean)
+    .join(isMac ? "" : "+");
 }
 
-/**
- * A combo string renders as ONE keycap (matching `⌘⇧A` style); an array
- * renders one keycap per element (each element is itself symbolised).
- */
+/** A combo string is one keycap; an array is a key sequence, one keycap per step. */
 const caps = computed<string[]>(() => {
   const keys = resolvedKeys.value;
-  if (Array.isArray(keys)) {
-    return keys.map(symbolizeCombo).filter(Boolean);
-  }
-  const combo = symbolizeCombo(keys);
-  return combo ? [combo] : [];
+  return (Array.isArray(keys) ? keys : [keys]).map(symbolizeCombo).filter(Boolean);
 });
 
 const sizeClasses: Record<NonNullable<ShortcutProps["size"]>, string> = {

@@ -132,27 +132,6 @@ describe("FunctionSelector", () => {
     expect(functionList.exists()).toBeTruthy();
   });
 
-  // Computed Properties Tests
-  it("should compute iconRight based on theme", async () => {
-    // Check current theme and expected icon
-    const currentTheme = store.state.theme;
-    if (currentTheme === "dark") {
-      expect(wrapper.vm.iconRight).toContain("function_dark.svg");
-    } else {
-      expect(wrapper.vm.iconRight).toContain("function.svg");
-    }
-
-    // Change to dark theme and verify reactivity
-    store.state.theme = "dark";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.iconRight).toContain("function_dark.svg");
-
-    // Reset theme for other tests
-    store.state.theme = "light";
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.iconRight).toContain("function.svg");
-  });
-
   // Reactive Data Tests
   it("should initialize functionModel as false", () => {
     expect(wrapper.vm.functionModel).toBe(false);
