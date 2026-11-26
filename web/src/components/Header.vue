@@ -364,7 +364,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-toolbar"
-                class="bg-badge-primary-soft-bg! text-badge-primary-soft-text! hover:brightness-95"
                 data-test="header-my-account-profile-icon"
                 :aria-label="
                   user.given_name ? user.given_name + ' ' + user.family_name : user.email
