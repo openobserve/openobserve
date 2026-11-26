@@ -27,6 +27,7 @@ const props = withDefaults(defineProps<FileProps>(), {
   size: "md",
   disabled: false,
   dropZone: false,
+  typeErrorToast: true,
 });
 
 const emit = defineEmits<FileEmits>();
@@ -63,7 +64,7 @@ function emitFiles(fileList: FileList | File[] | null) {
     const accepted = filterByAccept(list, props.accept);
     const rejected = list.filter((f) => !accepted.includes(f));
 
-    if (rejected.length > 0) {
+    if (rejected.length > 0 && props.typeErrorToast) {
       const names = rejected.map((f) => f.name).join(", ");
       const allowed = props.accept
         .split(",")
@@ -76,8 +77,8 @@ function emitFiles(fileList: FileList | File[] | null) {
         }),
         variant: "error",
       });
-      emit("type-error", rejected);
     }
+    if (rejected.length > 0) emit("type-error", rejected);
 
     list = accepted;
   }
@@ -134,6 +135,9 @@ function openPicker() {
   if (isDisabled.value) return;
   inputRef.value?.click();
 }
+
+/** Opens the OS file picker; for a control that hides the field behind its own button. */
+defineExpose({ open: openPicker });
 
 function onDragOver(event: DragEvent) {
   if (isDisabled.value || !props.dropZone) return;

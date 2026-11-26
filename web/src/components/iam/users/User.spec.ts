@@ -844,6 +844,22 @@ describe("User Component", () => {
         },
       });
     });
+
+    it("opens a row's editor once when its own edit link lands", async () => {
+      sharedUsersState.users = [{ email: "test@example.com", role: "admin" }];
+      // The first visit loads the lazy route; a warm one lands well inside the open timer.
+      await router.push({ name: "users", query: {} });
+      const pushSpy = vi.spyOn(router, "push").mockImplementation(() => Promise.resolve());
+      mockAnalytics.track.mockClear();
+      wrapper.vm.addRoutePush({ email: "test@example.com", role: "admin" });
+      pushSpy.mockRestore();
+      // The link addRoutePush wrote lands before the 100 ms open timer fires.
+      await router.push({ name: "users", query: { action: "update", email: "test@example.com" } });
+      await new Promise((r) => setTimeout(r, 150));
+      expect(wrapper.vm.showAddUserDialog).toBe(true);
+      expect(mockAnalytics.track).toHaveBeenCalledTimes(1);
+      await router.replace({ query: {} });
+    });
   });
 
   describe("Invite flow", () => {

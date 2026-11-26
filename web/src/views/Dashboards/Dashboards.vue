@@ -939,6 +939,7 @@ export default defineComponent({
     // Listen for AI assistant dashboard mutations to auto-refresh the list
     const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
+      if (event.type === "alerts_changed") return;
       const folderId = event.folderId || listFolderId.value;
       if (folderId) {
         // The AI agent just changed this folder, so refetch rather than serving
@@ -1268,6 +1269,30 @@ export default defineComponent({
         page: "Dashboards",
       });
     };
+    let handledDashboardIntent = "";
+    watch(
+      () => [
+        router.currentRoute.value.query.palette_intent,
+        router.currentRoute.value.query.action,
+      ],
+      ([intent, action]) => {
+        if (
+          action !== "add" ||
+          typeof intent !== "string" ||
+          intent === handledDashboardIntent ||
+          showAddDashboardDialog.value
+        )
+          return;
+        handledDashboardIntent = intent;
+        addDashboard();
+        const query = { ...router.currentRoute.value.query };
+        delete query.action;
+        delete query.palette_intent;
+        void router.replace({ query });
+      },
+      { immediate: true },
+    );
+
     const addFolder = () => {
       isFolderEditMode.value = false;
       showAddFolderDialog.value = true;

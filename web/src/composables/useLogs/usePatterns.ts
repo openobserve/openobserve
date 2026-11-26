@@ -54,6 +54,7 @@ export const patternsState = ref<{
   patterns: PatternsResult | null;
   loading: boolean;
   error: string | null;
+  errorStatus: number | null;
   lastQuery: SearchRequestPayload | null;
   // Configurable pattern-extraction scan size; may be absent until set by UI
   scanSize?: number;
@@ -61,11 +62,14 @@ export const patternsState = ref<{
   patterns: null,
   loading: false,
   error: null as string | null,
+  errorStatus: null as number | null,
   lastQuery: null as SearchRequestPayload | null,
 });
 
 // Module-level abort controller — one in-flight request at a time
 let patternAbortController: AbortController | null = null;
+// Guards the store against a superseded request that settles after a newer one.
+let patternRequestId = 0;
 
 /**
  * Composable for pattern extraction - completely separate from logs flow
@@ -85,11 +89,15 @@ export default function usePatterns(t: TranslateFn) {
       return;
     }
 
-    patternAbortController = new AbortController();
+    const controller = new AbortController();
+    patternAbortController = controller;
+    const requestId = ++patternRequestId;
+    const isLatest = () => requestId === patternRequestId;
 
     try {
       patternsState.value.loading = true;
       patternsState.value.error = null;
+      patternsState.value.errorStatus = null;
       patternsState.value.lastQuery = queryReq;
 
       // console.log("[Patterns] Extracting patterns for stream:", stream_name);
@@ -98,10 +106,10 @@ export default function usePatterns(t: TranslateFn) {
         org_identifier,
         stream_name,
         query: queryReq,
-        signal: patternAbortController.signal,
+        signal: controller.signal,
       });
 
-      // console.log("[Patterns] API Response:", response.data);
+      if (!isLatest()) return;
 
       // Transform patterns to match UI expectations
       const transformedPatterns = response.data.patterns.map((pattern: any) => ({
@@ -152,7 +160,7 @@ export default function usePatterns(t: TranslateFn) {
       // );
     } catch (error: any) {
       // Axios wraps AbortSignal cancellations as CanceledError
-      if (error?.name === "CanceledError" || error?.name === "AbortError") {
+      if (error?.name === "CanceledError" || error?.name === "AbortError" || !isLatest()) {
         return;
       }
       console.error("[Patterns] Error extracting patterns:", error);
@@ -160,12 +168,19 @@ export default function usePatterns(t: TranslateFn) {
       // stale data (e.g. from an earlier single-stream query) once this run
       // has failed.
       patternsState.value.patterns = null;
+      patternsState.value.errorStatus = error?.response?.status ?? null;
       patternsState.value.error =
-        error?.response?.data?.message || t("search.errorExtractingPatterns");
+        error?.response?.status === 403
+          ? t("search.patternsNoReadPermission")
+          : error?.response?.data?.error_detail ||
+            error?.response?.data?.message ||
+            t("search.errorExtractingPatterns");
       throw error;
     } finally {
-      patternsState.value.loading = false;
-      patternAbortController = null;
+      if (isLatest()) {
+        patternsState.value.loading = false;
+        patternAbortController = null;
+      }
     }
   };
 
@@ -173,6 +188,7 @@ export default function usePatterns(t: TranslateFn) {
    * Cancel an in-flight pattern extraction request
    */
   const cancelPatterns = () => {
+    patternRequestId++;
     if (patternAbortController) {
       patternAbortController.abort();
       patternAbortController = null;
@@ -186,6 +202,7 @@ export default function usePatterns(t: TranslateFn) {
   const clearPatterns = () => {
     patternsState.value.patterns = null;
     patternsState.value.error = null;
+    patternsState.value.errorStatus = null;
     patternsState.value.lastQuery = null;
     // console.log("[Patterns] Cleared patterns state");
   };

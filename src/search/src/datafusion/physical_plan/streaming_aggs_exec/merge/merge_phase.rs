@@ -28,7 +28,7 @@ use datafusion::{
             AggregateExec, AggregateMode, PhysicalGroupBy, aggregate_expressions,
             evaluate_group_by, evaluate_many,
             group_values::{GroupValues, new_group_values},
-            order::GroupOrdering,
+            order::GroupClustering,
         },
     },
 };
@@ -114,7 +114,7 @@ impl GroupedHashAggregateStream {
 
         let group_schema = agg_group_by.group_schema(&agg.input().schema())?;
 
-        let group_values = new_group_values(group_schema, &GroupOrdering::None)?;
+        let group_values = new_group_values(group_schema, &GroupClustering::None)?;
 
         let exec_state = ExecutionState::ReadingInput;
 

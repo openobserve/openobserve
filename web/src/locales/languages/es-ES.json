@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Ningún canal tiene aún una organización predeterminada",
-      "description": "Las preguntas en un canal sin organización predeterminada van a la organización predeterminada de cada persona (pueden cambiarla con /o2 org)."
+      "description": "Las preguntas en un canal sin una organización predeterminada se dirigen a la organización predeterminada de cada persona (pueden cambiarla con {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nadie en esta organización ha vinculado Slack todavía"
@@ -297,10 +297,10 @@
       "importDesc": "Cargar una definición de pipeline"
     },
     "noQueues": {
-      "title": "Crea tu primera cola",
-      "description": "Las colas son listas de tareas de revisión con estado: vinculan configuraciones de puntuación, un conjunto de datos de destino y un filtro que introduce elementos para la revisión humana.",
-      "action": "Nueva cola",
-      "actionDesc": "Iniciar una cola vacía"
+      "title": "Crea tu primera cola de anotación",
+      "description": "Las colas de anotación son listas de tareas de revisión: vincula configuraciones de puntuación, un conjunto de datos de destino y un filtro que introduce elementos para la revisión humana.",
+      "action": "Nueva cola de anotación",
+      "actionDesc": "Inicia una cola de anotación vacía"
     },
     "noPrompts": {
       "title": "Crea tu primer prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "No hay nada insalubre aquí",
-      "description": "No hay elementos insalubres en esta ventana. Amplía el intervalo de tiempo o cambia el filtro de la cola para ver los elementos que ya has revisado."
+      "description": "No hay elementos con problemas en esta ventana. Amplía el rango de tiempo o cambia el filtro de la cola de anotación para ver los elementos que ya has clasificado."
     },
     "noTraces": {
       "title": "No se encontraron trazas",
@@ -808,7 +808,6 @@
     "view": "Ver",
     "compare": "Comparar",
     "openInNewTab": "Abrir en una pestaña nueva",
-    "send": "Enviar",
     "copiedToClipboard": "Copiado al portapapeles",
     "customLogoAlt": "Logotipo de la organización",
     "dragToReorder": "Arrastra para reordenar",
@@ -827,7 +826,6 @@
     "copyToClipboardSuccess": "Copiado al portapapeles - éxito",
     "valueCopiedToClipboard": "Valor copiado al portapapeles",
     "replace": "Reemplazar",
-    "and": "y",
     "versionAbbreviation": "V",
     "overview": "Resumen",
     "network": "Red",
@@ -1013,7 +1011,6 @@
     "typeAndPressEnterOrComma": "Escribe y presiona Enter o coma",
     "confirmAction": "Confirmar acción",
     "crossLinks": "Enlaces cruzados",
-    "writeYourPrompt": "Escribe tu indicación",
     "expand": "Expandir",
     "collapse": "Colapsar",
     "description": "Descripción",
@@ -1121,8 +1118,6 @@
     "clockNumberMinute": "{number} minuto",
     "clockNumberSecond": "{number} segundo",
     "newChat": "Nuevo chat",
-    "collapseExpandShortcut": "{action} ({shortcut}B)",
-    "fileWithSize": "{name} ({size}KB)",
     "manageColumns": "Gestionar columnas",
     "manageColumnsHidden": "Gestionar columnas, {count} ocultas",
     "columnsHidden": "Columnas ({count} ocultas)",
@@ -1286,7 +1281,8 @@
       "leaveMessageInBrowser": "Guarda {entity}, conserva tus cambios en este navegador o descártalos.",
       "retentionInBrowser": "Los cambios se conservan en este navegador durante {days} días o hasta que cierres sesión. Solo se conservan los {max} más recientes de cada tipo.",
       "dotUndated": "Unsaved draft"
-    }
+    },
+    "justNow": "ahora mismo"
   },
   "filterBar": {
     "ariaLabel": "Filtrar por campo",
@@ -1437,7 +1433,6 @@
     "fetchingValues": "Obteniendo valores...",
     "noDataInRangeHint": "No hay datos en el rango — valores del filtro activo",
     "viewMoreValues": "Ver más valores",
-    "aiIconAlt": "IA",
     "aiModeIconAlt": "Modo IA",
     "firstPage": "Primera página",
     "lastPage": "Última página",
@@ -1611,8 +1606,8 @@
     "userDefinedSchemaLabel": "Esquema definido por el usuario",
     "allFieldsLabel": "Todos los campos",
     "nlQueryGenerationFailed": "No se pudo generar la consulta. Por favor, inténtelo de nuevo.",
-    "askAIPlaceholder": "Pídele a la IA que te ayude con tu consulta...",
-    "askAIFunctionPlaceholder": "Pídele a la IA que te ayude con tu función...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}: ayuda con tu consulta...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: ayuda con tu función...",
     "askAIPlaceholderRotation": {
       "one": "Muéstrame los errores de la última hora...",
       "two": "Encuentra consultas lentas que tardan más de 5 segundos...",
@@ -1920,6 +1915,7 @@
     "patternCount": "Conteo",
     "errorConstructingSearchQuery": "Ocurrió un error al construir la consulta de búsqueda.",
     "errorExtractingPatterns": "Error al extraer patrones. Inténtelo de nuevo.",
+    "patternsNoReadPermission": "No tienes permiso para leer este stream.",
     "errorWhileApplyingSavedView": "Error al aplicar la vista guardada.",
     "errorWhileExtractingStreamFields": "Error al extraer los campos del stream.",
     "errorWhileGeneratingHistogramData": "Error al generar los datos del histograma.",
@@ -2089,7 +2085,7 @@
     "serviceGraph": "Mapa de servicios",
     "services": "Catálogo de servicios",
     "aiObservability": "IA",
-    "aiAssistant": "Asistente de IA",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "Cerrar sesión",
     "ingestion": "Fuentes de datos",
     "metrics": "Métricas",
@@ -2112,6 +2108,7 @@
     "synthetic": "Sintéticos",
     "experience": "Experiencia",
     "slos": "SLOs",
+    "autobotInvestigate": "@:{'brand.autobotInvestigate'}",
     "reliability": "Confiabilidad",
     "onCall": "Guardia",
     "response": "Respuesta",
@@ -4140,7 +4137,7 @@
           "note": "Operaciones e información automatizadas de SRE"
         },
         "ai_assistant": {
-          "name": "Asistente de IA",
+          "name": "@:{'brand.autobot'}",
           "note": "Asistencia inteligente para consultas y análisis"
         },
         "anomaly_detection": {
@@ -4477,7 +4474,6 @@
     "mcpServerLabel": "Servidor MCP",
     "mcpServerDesc": "Conecta clientes de IA a través de {product}",
     "mcpServerHeader": "Servidor MCP",
-    "mcpServerHeaderSubtitle": "Conecta Claude, Cursor, VS Code y otros clientes de IA a esta organización.",
     "invitationsDesc": "Invitaciones de miembros pendientes y enviadas",
     "groupsDesc": "Agrupe a los usuarios para asignar funciones",
     "rolesDesc": "Definir políticas de permisos y acceso",
@@ -4995,7 +4991,26 @@
     },
     "summaryOtherRoles": "+{count} roles más",
     "indices": "Índices",
-    "roleAdmin": "Admin"
+    "roleAdmin": "Admin",
+    "modules": {
+      "descriptions": {
+        "ai": "Chat with @:{'brand.autobot'}, use AI query help and run incident analysis.",
+        "ai_chat_share": "Comparte chats dentro de la organización y abre chats que otros hayan compartido. Solo para administradores hasta que se conceda el permiso.",
+        "ai_toolsets": "Add and change the tools @:{'brand.autobot'} can use.",
+        "llmObservability": "Trazas, evaluación y prompts para tus propias aplicaciones LLM. No {product}.",
+        "mcp": "Conecta clientes de IA externos ({clients}) a esta organización mediante MCP."
+      },
+      "groups": {
+        "assistant": "@:{'brand.autobot'}",
+        "llmObservability": "Observabilidad de LLM"
+      },
+      "labels": {
+        "ai": "@:{'brand.autobot'}",
+        "ai_chat_share": "Uso compartido de chats",
+        "ai_toolsets": "Conjuntos de herramientas",
+        "mcp": "Acceso a MCP"
+      }
+    }
   },
   "announcements": {
     "dismiss": "Descartar",
@@ -6573,7 +6588,7 @@
     "vrlfunction": "Función VRL",
     "jsFunctionHint": "Utilice el objeto `row` para acceder a los campos del log y modificarlos. Ejemplo: row.new_field = row.existing_field + ' processed';",
     "vrlFunctionHint": "Usa el `.` para representar el evento actual. Ejemplo: .new_field = .existing_field + 'procesado'",
-    "askAIFunctionPlaceholder": "Pídele a la IA que te ayude con tu función...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: ayuda con tu función...",
     "enterFunctionPrompt": "Introduzca un mensaje para generar la función",
     "associatedFunctionHeader": "Funciones asociadas",
     "enrichmentTables": "Tablas de enriquecimiento",
@@ -6689,7 +6704,7 @@
       "rbac": "Crea roles personalizados con permisos granulares para tu equipo.",
       "logPatterns": "Detecta patrones de logs recurrentes automáticamente en lugar de leer línea por línea.",
       "correlation": "Salta de una línea de log directamente a sus métricas y trazas relacionadas.",
-      "aiAssistant": "Pídele a la IA que escriba consultas y explique tus datos en lenguaje claro.",
+      "aiAssistant": "@:{'brand.askAutobot'}: escribe consultas y explica tus datos en lenguaje claro.",
       "alertInsights": "Consulta con qué frecuencia se activa una alerta y detecta alertas correlacionadas de un vistazo.",
       "anomalyDetection": "Detecta automáticamente comportamientos inusuales en las métricas antes de que activen una alerta de umbral.",
       "agentGraph": "Observa cómo se comunican tus agentes de IA y herramientas, visualizado como un grafo.",
@@ -6821,7 +6836,6 @@
       "endpointLabel": "Endpoint",
       "installCheck": "Comprueba que la instalación haya finalizado en {source}.",
       "stillStuck": "¿Sigues atascado?",
-      "askAi": "Preguntar a la IA",
       "guideDocs": "Documentos de {guide}",
       "setupDocs": "Documentos de configuración",
       "askAiPrompt": "Estoy configurando {guide} en OpenObserve y todavía no ha llegado ningún dato. La comprobación del primer evento indica: {details} Id de organización: {org}. Endpoint: {endpoint}. ¿Qué debería comprobar a continuación?",
@@ -7158,7 +7172,6 @@
       },
       "installOneClick": "Agregar a {client}",
       "skillsLabel": "Añade la habilidad de {brand} (opcional)",
-      "skillsHint": "Enseña a tu Asistente de IA a consultar, alertar y crear dashboards en {brand}, para que saque más partido a las herramientas MCP. Ejecútalo en tu proyecto; las instala en todas las herramientas de IA que encuentre en tu máquina.",
       "skillsRepo": "Ver las habilidades en {host}"
     },
     "manageTokensBtnLabel": "Administrar los tokens",
@@ -9987,6 +10000,10 @@
     },
     "browserDeniedFileDownload": "El navegador denegó la descarga del archivo...",
     "chartDataDownloadedCsv": "Datos del gráfico descargados como archivo CSV",
+    "tableDownloadPartial": "Solo se obtuvieron las primeras {count} filas del resultado, por lo que el archivo es parcial.",
+    "tableDownloadServerPartial": "El servidor devolvió datos parciales, por lo que el archivo puede estar incompleto.",
+    "tableDownloadWaitForLoad": "El panel aún se está cargando. Vuelve a descargar cuando termine.",
+    "preparingTableDownload": "Obteniendo todas las filas para la descarga…",
     "chartDataDownloadedJson": "Datos del gráfico descargados como archivo JSON",
     "dynamicFilters": "Filtros dinámicos",
     "failedToCancelRunningQuery": "No se pudo cancelar la consulta en ejecución",
@@ -10615,13 +10632,33 @@
     "pipelineTitle": "Pipelines",
     "alertTitle": "Alertas",
     "dashboardTitle": "Dashboards",
-    "tabAiAssistant": "Asistente O2 AI",
     "tabOverview": "Visión general",
     "tabUsage": "Uso",
     "removeHomeDashboard": "Eliminar el Dashboard de inicio",
-    "subtitle": "Su espacio de trabajo de observabilidad de un vistazo",
     "resources": "Recursos",
-    "explore": "Explorar"
+    "explore": "Explorar",
+    "agent": {
+      "askOff": {
+        "budget": "Los créditos de IA de este mes se han agotado, por lo que {product} no puede responder",
+        "oss": "@:{'brand.autobot'} is part of OpenObserve Enterprise. This Open Source build has no @:{'brand.autobot'} and no incidents.",
+        "not_entitled": "{product} no forma parte de este plan",
+        "not_configured": "{product} aún no está configurado para esta organización",
+        "off_for_org": "{product} está desactivado para esta organización",
+        "no_permission": "Tu rol no puede usar {product}"
+      },
+      "admins": "Administradores: {names}",
+      "flapping": "Oscilando · {count}×",
+      "openIncident": "Abrir incidente",
+      "openService": "Abrir servicio",
+      "openAlert": "Abrir alerta",
+      "creditsUsedUp": "Los créditos de IA se han agotado, así que no se envió nada",
+      "firstRun": {
+        "title": "Aún no hay datos · envía tus primeros logs, métricas o trazas",
+        "note": "Inicio se completa solo en cuanto un servicio envía datos: Ahora y Problemas sin alerta. Construirlo no usa IA."
+      },
+      "tabLabel": "@:{'brand.autobot'}"
+    },
+    "answersReady": "{count} respuesta lista | {count} respuestas listas"
   },
   "overview": {
     "alertsSuffix": "alertas",
@@ -10633,9 +10670,9 @@
     "recentEvents": "Eventos recientes",
     "investigate": "Investiga →",
     "askAi": {
-      "label": "Preguntar a la IA",
-      "hint": "Preguntar a la IA sobre esto",
-      "labelFor": "Preguntar a la IA sobre {item}",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}: pregunta sobre esto",
+      "labelFor": "@:{'brand.askAutobot'}: pregunta sobre {item}",
       "chip": {
         "firing": "Alertas disparadas",
         "failing": "Reglas fallidas",
@@ -10801,36 +10838,41 @@
     "dataAsOf": "Datos a fecha de {time}",
     "timeRange": {
       "heading": "En el rango de tiempo seleccionado"
+    },
+    "now": {
+      "title": "Ahora",
+      "changedAt": "Cambiado {time}",
+      "investigate": "Investigar",
+      "investigateName": "Investigar {row}",
+      "investigateFallback": "Los créditos del asistente se han agotado. Investigar abre {target}",
+      "notSent": {
+        "runCap": "No enviado: {n} chats en ejecución",
+        "generic": "No enviado"
+      },
+      "noAlert": "sin alerta",
+      "coverageUnknown": "cobertura de alertas desconocida",
+      "vsBaseline": "{value} frente a {baseline} ({hours} h anteriores)",
+      "noBaseline": "No hay historial suficiente para una línea base",
+      "allRegions": "Todas las regiones combinadas",
+      "partialRow": "parcial",
+      "recovered": "Recuperado",
+      "firingCount": "×{count}",
+      "sentence": {
+        "service": {
+          "errors": "Errores de {service} en {value}",
+          "latency": "{service} p99 {ratio}× su línea base"
+        },
+        "incident": "{title}",
+        "anomaly": "{name}: {count} puntos anómalos",
+        "alert": "{name} disparada"
+      }
+    },
+    "goTo": {
+      "close": "Cerrar",
+      "back": "Volver a Inicio"
     }
   },
-  "chatHistory": {
-    "title": "Charlas",
-    "newChat": "Nuevo chat",
-    "search": "Buscar",
-    "noMatches": "No hay coincidencias",
-    "noHistory": "Sin historial de chat",
-    "delete": "Borrar",
-    "clearAll": "Borrar todo",
-    "clearAllTitle": "Borrar todos los chats",
-    "clearAllMessage": "Esto borrará permanentemente todo el historial de chat. Esta acción no se puede deshacer.",
-    "yesterday": "Ayer",
-    "clearSearch": "Borrar búsqueda"
-  },
   "aiChatShare": {
-    "share": "Compartir",
-    "dialogTitle": "Compartir chat",
-    "toolDataWarning": "Los chats compartidos incluyen todas las entradas y salidas de herramientas de esta conversación. Cualquier persona que pueda abrir el enlace podrá leerlas.",
-    "mode": "Modo",
-    "modeSnapshot": "Instantánea",
-    "modeLive": "En tiempo real",
-    "modeSnapshotHelp": "Congelado en el último mensaje finalizado. Puedes actualizarlo más tarde.",
-    "modeLiveHelp": "Muestra siempre los últimos mensajes finalizados.",
-    "visibility": "Quién puede verlo",
-    "visibilityOrg": "Organización",
-    "visibilityPublic": "Enlace público",
-    "visibilityOrgHelp": "Miembros con sesión iniciada de esta organización que tengan acceso a chats compartidos.",
-    "visibilityPublicHelp": "Cualquier persona con el enlace, sin necesidad de iniciar sesión.",
-    "expiry": "Vence",
     "expiryNever": "Nunca",
     "expiryHour": "En 1 hora",
     "expiryDay": "En 1 día",
@@ -10838,15 +10880,6 @@
     "expiryMonth": "En 30 días",
     "expiryQuarter": "En 90 días",
     "expiryYear": "En 1 año",
-    "createLink": "Crear enlace",
-    "newLink": "Nuevo enlace",
-    "copyLink": "Copiar enlace",
-    "existingShares": "Enlaces activos",
-    "noShares": "Este chat no tiene enlaces activos.",
-    "refreshSnapshot": "Actualizar instantánea",
-    "switchToLive": "Cambiar a tiempo real",
-    "switchToSnapshot": "Cambiar a instantánea",
-    "revoke": "Revocar",
     "linkCreated": "Enlace creado",
     "revoked": "Enlace revocado",
     "snapshotRefreshed": "Instantánea actualizada",
@@ -10854,148 +10887,47 @@
     "createFailed": "No se pudo crear el enlace",
     "updateFailed": "No se pudo actualizar el enlace",
     "revokeFailed": "No se pudo revocar el enlace",
-    "loadFailed": "No se pudieron cargar los enlaces",
-    "expiresAt": "Vence {time}",
-    "neverExpires": "Nunca vence",
-    "views": "{count} vista | {count} vistas",
-    "sharedByMe": "Compartidos por mí",
-    "sharedByMeEmpty": "No has compartido ningún chat.",
-    "sharedBy": "Compartido por {name}",
-    "sharedOn": "Compartido {time}",
     "notFoundTitle": "Este chat compartido no está disponible",
     "notFoundDescription": "Es posible que el enlace sea incorrecto, esté revocado o vencido, o que el chat se haya eliminado.",
     "loadErrorTitle": "No se pudo cargar el chat compartido",
     "unavailableTitle": "Este chat compartido no está disponible temporalmente",
     "unavailableDescription": "No se pudo cargar su historial en este momento. Inténtalo de nuevo en un momento.",
-    "historyUnavailableWarning": "El historial de este chat no se puede cargar en este momento, por lo que quienes abran sus enlaces lo verán como temporalmente no disponible.",
-    "updatedAt": "Actualizado {time}",
-    "openInMyChats": "Abrir en mis chats",
-    "forkIntoMyChats": "Copiar en mis chats",
-    "forkFailed": "No se pudo copiar el chat",
-    "forked": "Copiado a tus chats",
-    "forkedFromShareBanner": "Copiado desde el chat compartido \"{title}\". El asistente tiene sus mensajes anteriores como contexto; no se muestran aquí.",
-    "untitled": "Chat sin título",
     "emptyChat": "Este chat aún no tiene mensajes.",
     "readOnly": "Solo lectura",
-    "toolDataRedacted": "Las entradas y salidas de las herramientas están ocultas para quienes lo ven. Ellos ven las respuestas y qué herramientas se ejecutaron.",
-    "redactTools": "Ocultar las entradas y salidas de las herramientas",
-    "redactToolsHelp": "Quienes lo ven solo ven los nombres de las herramientas. Activado de forma predeterminada para los enlaces públicos.",
-    "publicExpiryHelp": "Los enlaces públicos deben caducar en un plazo de {days} días.",
-    "toolsRedactedBadge": "Herramientas ocultas",
-    "toolsVisibleBadge": "Datos de herramientas visibles",
-    "showToolsConfirm": "¿Mostrar las entradas y salidas de las herramientas a cualquiera que tenga este enlace?",
-    "showToolsAction": "Mostrar datos de herramientas",
-    "showTools": "Mostrar las entradas y salidas de las herramientas",
-    "hideTools": "Ocultar las entradas y salidas de las herramientas",
     "toolsShown": "Las entradas y salidas de las herramientas ahora son visibles",
-    "toolsHidden": "Las entradas y salidas de las herramientas ahora están ocultas",
-    "revokeConfirm": "¿Revocar este enlace?",
-    "allShares": "Todos los chats compartidos",
-    "allSharesEmpty": "No hay chats compartidos en esta organización.",
-    "allSharesForbidden": "Solo los administradores de la organización pueden ver todos los chats compartidos.",
-    "scopeMine": "Míos",
-    "scopeAll": "Todos en la organización"
+    "toolsHidden": "Las entradas y salidas de las herramientas ahora están ocultas"
   },
   "aiAssistant": {
-    "confirmDialog": {
-      "allow": "Permitir",
-      "alwaysAllow": "Permitir siempre",
-      "no": "No"
-    },
-    "searchChatHistory": "Buscar en el historial de chat",
-    "deleteChatTooltip": "Eliminar chat",
-    "noMatchingChatsFound": "No se encontraron chats que coincidan",
-    "clearAllConversations": "Borrar todas las conversaciones",
-    "editTitleTooltip": "Editar título",
-    "chatHistory": "Historial de chat",
-    "modelLabel": "Modelo:",
-    "editChatTitle": "Editar título del chat",
-    "enterChatTitle": "Ingrese el título del chat",
-    "deleteChat": "Eliminar chat",
     "deleteChatConfirmMessage": "¿Seguro que quieres eliminar el chat {name}? Esta acción no se puede deshacer.",
     "deleteChatWithLinksMessage": "¿Eliminar el chat {name}? Su {count} enlace para compartir activo dejará de funcionar. Esta acción no se puede deshacer. | ¿Eliminar el chat {name}? Sus {count} enlaces para compartir activos dejarán de funcionar. Esta acción no se puede deshacer.",
-    "clearAllConversationsTitle": "Borrar todas las conversaciones",
-    "clearAllConversationsMessage": "¿Estás seguro de que quieres borrar todas las conversaciones? Esta acción no se puede deshacer.",
-    "suggestion": "Sugerencia",
-    "results": "Resultados",
-    "recordsSuffix": "registros",
-    "ms": "ms",
-    "exitCode": "Código de salida",
-    "stdout": "Stdout",
-    "lines": "líneas",
-    "stderr": "Stderr",
-    "truncatedLabel": "truncado",
-    "copyQuery": "Copiar consulta",
-    "stream": "Stream",
-    "start": "Inicio",
-    "end": "Fin",
-    "from": "Desde",
-    "size": "Tamaño",
-    "queryType": "Tipo de consulta",
-    "copyVrl": "Copiar VRL",
-    "command": "Comando",
-    "copyCommand": "Copiar comando",
-    "copyResults": "Copiar resultados",
-    "total": "Total:",
-    "took": "Tardó:",
-    "showingFirst": "Mostrando los primeros",
-    "inputEvents": "Eventos de entrada",
-    "errorLabel": "error:",
-    "items": "Elementos",
-    "copyItems": "Copiar elementos",
-    "response": "Respuesta",
-    "copyResponse": "Copiar respuesta",
-    "copyContent": "Copiar contenido",
-    "errorMayBeTemporary": "Este error puede ser temporal. Puedes intentarlo de nuevo.",
     "creditsExhausted": "Tu organización ha usado todos sus créditos de IA.",
     "creditsExhaustedWithRemedy": "Tu organización ha usado todos sus créditos de IA. {remedy}",
-    "creditsLow": "Quedan {remaining} de {limit} créditos de IA gratuitos. No se restablecen cada mes.",
-    "creditsCosts": "Un mensaje usa {chat} crédito. El análisis de incidentes usa {incident} de los mismos créditos. | Un mensaje usa {chat} créditos. El análisis de incidentes usa {incident} de los mismos créditos.",
-    "backendConnectionError": "Error: No se puede conectar al backend",
     "responseStoppedByUser": "Respuesta detenida por el usuario",
     "turnRunning": "Aún generando. Este chat se actualiza cuando termina.",
     "turnRunningViewer": "Aún generando. Esta página se actualiza sola.",
-    "stopTurn": "Detener",
-    "turnLimitReached": "Hay demasiadas respuestas de IA en ejecución en este momento. Espera a que termine una y vuelve a intentarlo.",
-    "historyUnavailable": "El historial de este chat no se pudo cargar en este momento. Los mensajes mostrados pueden estar incompletos.",
     "turnInterrupted": "La respuesta se interrumpió antes de finalizar.",
     "turnFailed": "La respuesta falló.",
     "messageFailedToSend": "No se pudo enviar el mensaje",
     "turnErrorCode": "Código de error: {code}",
     "viewInTarget": "Ver en {target}",
     "viewTarget": "Ver {target}",
-    "navigatedTo": "Se ha navegado correctamente a {page}",
-    "helpful": "Útil",
-    "notHelpful": "No útil",
-    "streamPrefix": "Stream:",
-    "typePrefix": "Tipo:",
-    "scrollToBottom": "Desplazarse al final",
     "welcome": {
-      "wave": "👋",
-      "taglineDash": "—",
-      "taglineLead": "soy",
-      "taglineHighlight": "Asistente O2",
-      "taglineTail": ". Puedo escribir tu",
-      "taglineSql": "SQL",
-      "taglineVrl": "VRL",
-      "taglineAnd": "y te guiará a través de tus logs, trazas, métricas e incidentes.",
-      "signedInAs": "Iniciado sesión como",
-      "role": "Rol",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "O prueba uno de estos"
     },
     "capabilities": {
       "query": {
-        "title": "Escribe una consulta",
+        "title": "Escribir una consulta",
         "description": "SQL para logs, trazas, RUM o PromQL para métricas.",
         "prompt": "Ayúdame a escribir una consulta"
       },
       "incident": {
-        "title": "Investigue los incidentes",
+        "title": "Investigar problemas",
         "description": "Causa raíz en logs, trazas y alertas — p. ej., \"¿Por qué se disparó gateway-5xx?\"",
         "prompt": "Ayúdame a investigar los incidentes"
       },
       "dashboard": {
-        "title": "Cree un Dashboard",
+        "title": "Crear un dashboard",
         "description": "De un tema, por ejemplo, «Estado del nodo K8: CPU, memoria, reinicios». También crea paneles.",
         "prompt": "Ayúdame a crear un Dashboard o panel"
       },
@@ -11010,7 +10942,6 @@
       "regexRedact": "Genere un patrón de expresiones regulares para redactar correos electrónicos",
       "mapStreamSchema": "Mapear el esquema de mi stream \"default\"",
       "promqlCpu": "Escriba ProMQL para pods con más del 80% de CPU",
-      "datadogToO2": "Convierta esta consulta de Datadog en OpenObserve SQL",
       "lastAlertFired": "¿Por qué se activó mi última alerta?"
     },
     "placeholderRotation": {
@@ -11018,12 +10949,6 @@
       "two": "Escriba VRL para analizar JSON desde los logs de nginx...",
       "three": "Cree un Dashboard para el estado de los nodos de K8..."
     },
-    "autoNavigation": {
-      "label": "Navegación automática",
-      "enabledTooltip": "Navegación automática habilitada: O2 Assistant navegará automáticamente sin confirmación",
-      "disabledTooltip": "Navegación automática desactivada: O2 Assistant preguntará antes de navegar"
-    },
-    "attachImageTooltip": "Adjuntar imágenes (PNG, JPEG, máximo 2 MB)",
     "greeting": {
       "morning": "Buenos días",
       "afternoon": "Buenas tardes",
@@ -11037,54 +10962,10 @@
       "night": "Trabajando hasta tarde, {name}"
     },
     "aiChat": {
-      "analyzingMessages": {
-        "analyzing": "Analizando...",
-        "thinking": "Pensando...",
-        "processing": "Procesando...",
-        "examiningData": "Examinando datos...",
-        "reviewingContext": "Revisando contexto...",
-        "formulatingResponse": "Formulando respuesta...",
-        "checkingDetails": "Verificando detalles...",
-        "gatheringInsights": "Recopilando información...",
-        "evaluatingOptions": "Evaluando opciones...",
-        "synthesizingInformation": "Sintetizando información...",
-        "workingOnIt": "Trabajando en ello...",
-        "almostThere": "Casi terminamos...",
-        "divingDeeper": "Profundizando...",
-        "connectingTheDots": "Conectando los puntos...",
-        "crunchingNumbers": "Procesando números...",
-        "exploringPossibilities": "Explorando posibilidades...",
-        "refiningAnswer": "Refinando respuesta...",
-        "stillThinking": "Todavía pensando...",
-        "makingProgress": "Progresando...",
-        "piecingTogether": "Uniendo piezas..."
-      },
-      "toolVrlValidationFailed": "Error de validación de VRL",
-      "toolVrlValidated": "VRL validado",
-      "toolQueryFailed": "Error en la consulta",
-      "toolStreamSchema": "Se obtuvo el esquema del stream {name}",
-      "toolGetIncident": "Se recuperó el incidente {id}",
-      "toolGetAlert": "Se obtuvo la alerta {id}",
-      "toolGetDashboard": "Se obtuvo el Dashboard {id}",
-      "notSpecified": "No especificado",
       "unexpectedError": "Ocurrió un error inesperado",
       "toolExecutionFailed": "La ejecución de la herramienta falló",
       "errorOccurred": "Ocurrió un error",
-      "actionCancelledByUser": "Acción cancelada por el usuario",
-      "serverResponseError": "Error: No se pudo obtener respuesta del servidor. Inténtelo de nuevo más tarde.",
-      "requestFailed": "Error: no se pudo conectar con el servicio de IA. Comprueba tu conexión e inténtalo de nuevo.",
-      "navigateConfirmQuestion": "¿Permitir a O2 Assistant navegar?",
       "confirmToolExecution": "¿Confirmar la ejecución de {tool}?",
-      "serverErrorStatus": "Error del servidor ({status})",
-      "toolQueriedStream": "Se consultó {type} ",
-      "toolResultsCount": "({count} resultados)",
-      "toolFoundCount": "({count} encontrados)",
-      "allowAssistantTo": "¿Permitir a O2 Assistant {action}?",
-      "allowAssistantNavigateTo": "¿Permitir a O2 Assistant navegar a {name}?",
-      "confirmDeleteNamedEntity": "¿Seguro que quieres eliminar el {entity} {name}?",
-      "confirmDeleteEntity": "¿Seguro que quieres eliminar este {entity}?",
-      "toolListedFallback": "Listado",
-      "toolFallback": "Herramienta",
       "entity": {
         "alert": "alerta",
         "dashboard": "Dashboard",
@@ -11162,9 +11043,7 @@
     "aiExhaustedMessage": "Suscríbete para seguir usando la IA. El uso adicional se factura en la factura de esta organización.",
     "aiContractExhaustedMessage": "Póngase en contacto con su administrador de cuenta para agregar más créditos de IA",
     "aiPayerSubscribeMessage": "La facturación de esta organización la gestiona {payer}. Pide a un administrador de {payer} que se suscriba; el uso adicional se factura en su factura.",
-    "aiFreeUsedLabel": "créditos gratuitos usados",
-    "aiFreeOneTime": "Una asignación única.",
-    "aiUsedByFeature": "Asistente y generación de consultas: {chat} · Análisis de incidentes: {incident} · Reanálisis: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} y generación de consultas: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Reanálisis: {reanalysis}",
     "aiPaygMessage": "Créditos gratuitos agotados: el uso se factura a la suscripción",
     "billingGroup": {
       "tabLabel": "Grupo de facturación",
@@ -12731,14 +12610,14 @@
       "eventsAndCommentsAppearHere": "Los eventos y comentarios aparecerán aquí",
       "scrollToTop": "Desplazarse al principio",
       "scrollToBottom": "Desplazarse al final",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "Análisis de IA",
         "analyze": "Analizar",
-        "analyzeTooltip": "Inicia un análisis de SRE con IA de este incidente",
-        "rcaDisabled": "RCA desactivado",
-        "rcaOff": "RCA desactivado",
-        "noAiSreFor": "No hay SRE con IA para {severity}",
+        "analyzeTooltip": "Inicia un análisis de @:{'brand.autobotInvestigate'} de este incidente",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} desactivado",
+        "rcaOff": "@:{'brand.autobotInvestigate'} apagado",
+        "noAiSreFor": "No hay @:{'brand.autobotInvestigate'} para {severity}",
         "investigating": "Investigando",
         "rerunElapsed": "nueva ejecución · {elapsed}",
         "noUpdateFor": "sin actualizaciones desde hace {elapsed}",
@@ -12854,12 +12733,11 @@
       "statusUpdated": "Estado del incidente actualizado",
       "statusUpdateFailed": "No se pudo actualizar el estado del incidente",
       "rcaAnalyzeIncident": "Analizar incidente",
-      "rcaCancel": "Cancelar",
       "rcaCancelled": "Análisis cancelado",
       "rcaCancelFailed": "Error al cancelar el análisis",
       "rcaFailed": "El análisis de IA falló",
       "rcaBlocked": "El análisis de IA no se ejecutó",
-      "rcaFailedGeneric": "Error al realizar el análisis RCA",
+      "rcaFailedGeneric": "Error al realizar el análisis de @:{'brand.autobotInvestigate'}",
       "rcaRetry": "Reintentar análisis",
       "rcaCopy": "Copiar informe",
       "rcaCopied": "Informe copiado al portapapeles",
@@ -12880,19 +12758,14 @@
       },
       "rcaSteer": {
         "composerTitleLive": "Dirigir esta ejecución",
-        "composerHintLive": "Se lee después del paso actual",
         "composerTitlePaused": "Responder al agente",
-        "composerHintPaused": "La ejecución se reanuda al enviar",
         "agentAsks": "El agente pregunta",
-        "answerNote": "Tu respuesta es una pista, no una prueba. Puede mover la hipótesis a Probable. La causa raíz requiere el resultado de una herramienta.",
-        "placeholderLive": "Añade contexto o redirige al agente.",
-        "placeholderPaused": "Responde al agente o añade contexto; p. ej., PR #812 en acme/checkout, desplegado sobre las 14:02.",
+        "placeholderPaused": "Responde al agente o añade contexto",
         "suggestions": "Sugerencias",
         "chipCheck": "Comprobar …",
         "chipIgnore": "Ignorar …",
         "chipFocus": "Céntrate en el servicio…",
         "chipChanged": "Cambiamos…",
-        "sendingAs": "Enviando como {email} · visible para todos en este incidente",
         "send": "Enviar",
         "steered": "guiado {count}×",
         "fromSteering": "por indicación",
@@ -12981,7 +12854,7 @@
         "openAnalysisTab": "Abrir Análisis del incidente",
         "reportAfterRun": "El informe aparece después de la ejecución.",
         "noAnalysisTitle": "Aún no hay análisis",
-        "noAnalysisText": "El Agente SRE de IA revisa las alertas, la topología, los cambios recientes, las trazas, los logs y las métricas de este incidente, y luego redacta un informe. Puedes seguir su trabajo en el hilo de Investigación mientras se ejecuta.",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} revisa las alertas, la topología, los cambios recientes, las trazas, los logs y las métricas de este incidente, y luego redacta un informe. Puedes seguir su trabajo en el hilo de Investigación mientras se ejecuta.",
         "stageOf": "Etapa {index}/{count} · {stage}",
         "cancelRun": "Cancelar ejecución",
         "followInThread": "Seguir en el hilo",
@@ -13028,7 +12901,14 @@
           "medium": "Confianza media",
           "low": "Confianza baja",
           "none": "Sin confianza"
-        }
+        },
+        "cancelConfirmTitle": "¿Cancelar la ejecución?",
+        "cancelConfirmBody": "¿Cancelar el análisis para todos en el incidente #{number}?",
+        "showQuery": "Mostrar consulta",
+        "showResult": "Mostrar resultado",
+        "keepRunning": "Seguir ejecutando",
+        "resultFailed": "No se pudo ejecutar esta consulta.",
+        "resultEmpty": "La consulta no devolvió ninguna fila."
       },
       "rcaThread": {
         "title": "Hilo de investigación",
@@ -13066,7 +12946,6 @@
         "contextToolset": "Conjunto de herramientas de IA",
         "leadsNotEvidence": "Pistas, no pruebas",
         "working": "En curso. Los mensajes enviados ahora se leen después de este turno.",
-        "finalNote": "Este informe es definitivo y no cambiará. Para redirigir al agente, usa Volver a analizar. Se crea una nueva versión en el Historial de informes.",
         "resumableNote": "Esta ejecución se detuvo antes de terminar. Reanudar ejecución continúa desde el último paso terminado.",
         "copy": "Copiar hilo",
         "copied": "Hilo copiado al portapapeles",
@@ -13193,7 +13072,7 @@
         "severityLoweredWithReason": "Severidad reducida de {from} a {to} - {reason}",
         "splitFrom": "Se determinó que {alert} no estaba relacionada con {incident}",
         "splitFromUntitled": "el incidente al que se unió",
-        "inferredByAi": "Inferido por SRE de IA",
+        "inferredByAi": "Inferido por @:{'brand.autobot'}",
         "inferredFromAlertHistory": "Inferido del historial de alertas",
         "inferredFromServiceGraph": "Inferido del mapa de servicios",
         "inferredFromWorkload": "Inferido de la carga de trabajo",
@@ -13215,6 +13094,7 @@
         "hourAgo": "hace {count} hora | hace {count} horas",
         "dayAgo": "hace {count} día | hace {count} días"
       },
+      "byAssistant": "Análisis del incidente · por {product}",
       "rcaLight": {
         "showMore": "Mostrar más",
         "showLess": "Mostrar menos",
@@ -13361,8 +13241,6 @@
           "ruledOut": "Descartado"
         },
         "status": {
-          "rootCause": "Causa raíz",
-          "rootCauseNotConfirmed": "Causa raíz · sin confirmar",
           "contributing": "Contribuyente",
           "symptom": "Síntoma",
           "ruledOut": "Descartado",
@@ -16092,8 +15970,10 @@
         "searchSuffixesAria": "Buscar filtros de sufijo",
         "searchTypesAria": "Filtros de tipo de búsqueda",
         "facetAria": "{label}, {count} métricas",
+        "facetAriaUnchecked": "{label}, {count} con datos, {unchecked} aún sin marcar",
         "noPrefixMatch": "No coinciden prefijos.",
         "noSuffixMatch": "No coinciden sufijos.",
+        "uncheckedTooltip": "{count} con datos · {unchecked} aún sin marcar",
         "noTypeMatch": "Ningún tipo coincide."
       },
       "views": {
@@ -16267,6 +16147,10 @@
       "empty": "Aún no hay consultas",
       "noMatch": "Ninguna consulta coincide con la búsqueda o el filtro de destacadas",
       "loadMore": "Cargar más"
+    },
+    "filter": {
+      "placeholder": "Filtrar, por ejemplo: {label} =~ \"500{'|'}503\"",
+      "placeholderEmpty": "Filtrar métricas por etiqueta"
     }
   },
   "settings": {
@@ -16275,6 +16159,7 @@
     "generalLabel": "General",
     "groupGeneral": "General",
     "groupAccessSecurity": "Acceso y seguridad",
+    "groupAssistant": "@:{'brand.autobot'}",
     "groupDestinations": "Destinos",
     "groupData": "Datos",
     "groupOperations": "Operaciones",
@@ -16289,7 +16174,7 @@
     "orgSubtitle": "Nombres de campos, retención de datos y características automáticas para {org}.",
     "passwordPolicySubtitle": "Reglas para cuentas nativas de correo electrónico y contraseña.",
     "cipherKeysDesc": "Claves de cifrado para campos sensibles",
-    "aiToolsetsDesc": "Servidores MCP y habilidades que puede usar el Asistente de IA",
+    "aiToolsetsDesc": "Servidores MCP y habilidades que puede usar @:{'brand.autobot'}",
     "regexPatternsDesc": "Patrones regex reutilizables para redacción",
     "domainManagementDesc": "Análisis de claims de SSO y restricciones de inicio de sesión por dominio",
     "passwordPolicy": "Política de contraseñas",
@@ -16543,7 +16428,6 @@
       "namePlaceholder": "Ej. Contraseñas internas",
       "descriptionPlaceholder": "Describa su patrón para ayudar a los usuarios a entender",
       "regexPatternLabel": "Patrón regex",
-      "tryAiAssistant": "Pruebe el Asistente O2 para escribir expresiones",
       "writePattern": "Escribir patrón",
       "patternPlaceholder": "Ej. \\d....\\d ",
       "testRegexPattern": "Probar patrón regex",
@@ -16659,9 +16543,6 @@
       "settingsUpdated": "Configuración de la organización actualizada exitosamente",
       "settingsSaveError": "Error al guardar la configuración de la organización"
     },
-    "aiToolsetsPage": {
-      "subtitle": "Configurar integraciones de herramientas de IA"
-    },
     "cipherKeysPage": {
       "subtitle": "Claves que cifran y descifran valores de campos sensibles",
       "delete": "Eliminar",
@@ -16721,8 +16602,6 @@
       "setAiCreditsSubtitle": "Establece la cuota de créditos de IA de por vida de la organización.",
       "saveCredits": "Guardar créditos",
       "totalAiCredits": "Créditos de IA totales",
-      "aiCreditsUsed": "Créditos de IA utilizados",
-      "aiCreditsTotal": "Total de créditos de IA",
       "currentlyUsedLabel": "Actualmente en uso:",
       "credits": "créditos",
       "syntheticsBrowserStepsTab": "Pasos de navegador",
@@ -17498,7 +17377,7 @@
         "range": "{band} · {window}",
         "filter": "Filtrar por la selección",
         "drillDown": "Profundizar",
-        "askAi": "Preguntar a la IA",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "Selección del mapa de calor · {count} span | Selección del mapa de calor · {count} spans",
         "clear": "Borrar selección"
       }
@@ -17655,8 +17534,7 @@
       "otlp": "Envía trazas mediante {product}",
       "otlpDesc": "{product1}, {product2} y cualquier SDK compatible con {product3}",
       "otelCollectorDesc": "Enruta todas las señales de telemetría a través de {product}",
-      "or": "O:",
-      "askAi": "Pídele a la IA que configure el trazado"
+      "or": "O:"
     },
     "collapseFields": "Contraer campos",
     "openFields": "Expandir campos",
@@ -17678,7 +17556,6 @@
       "descOutOfRange": "Tu ventana de tiempo no contiene datos de este stream. Salta a cuando se vieron datos por última vez.",
       "jumpToData": "Saltar a los datos más recientes",
       "expandRangeDescAbsolute": "Cambie a un rango de tiempo relativo más amplio",
-      "askAi": "Pedir a la IA que corrija mi consulta",
       "selectedRange": "el rango seleccionado"
     },
     "tracesFound": "Trazas encontradas",
@@ -17709,8 +17586,8 @@
     "criticalPath": "Ruta crítica",
     "askAi": {
       "explainTrace": "Explicar traza",
-      "explainTraceHint": "Pregunta a la IA por los spans más lentos de la ruta crítica y por cada span con error",
-      "askAboutSpan": "Preguntar a la IA sobre este span",
+      "explainTraceHint": "@:{'brand.askAutobot'}: pregunta por los spans más lentos de la ruta crítica y por cada span con error",
+      "askAboutSpan": "@:{'brand.askAutobot'}: pregunta sobre este span",
       "spanChip": "Span · {operation}",
       "traceChip": "Traza · {operation}"
     },
@@ -17763,13 +17640,9 @@
       "noAgentsDescription": "No se detectaron agentes GenAI para la ventana de tiempo seleccionada. Pruebe con un rango más amplio o vuelva a la vista de stream.",
       "viewByStream": "Ver por stream",
       "search": {
-        "placeholder": "Buscar por usuario o mensaje",
-        "title": "Coincidir con las sesiones cuyo ID de usuario o texto de conversación contenga el texto",
         "noResultsTitle": "Ninguna sesión coincide con su búsqueda",
-        "noResultsDescription": "Pruebe otro término, otro campo o un rango de tiempo más amplio.",
-        "clear": "Borrar búsqueda",
-        "user": "Usuario: {user}",
-        "clearUser": "Mostrar todos los usuarios"
+        "noResultsDescription": "Prueba con otro filtro o un rango de tiempo más amplio.",
+        "clear": "Limpiar filtro"
       }
     },
     "sessionDetail": {
@@ -18318,33 +18191,25 @@
       "loadingPage": "Cargando página {page}",
       "pageFailed": "No se pudo cargar la página {page}",
       "pageEmpty": "La página {page} no tiene resultados"
+    },
+    "assistantSet": {
+      "label": "Definido por el asistente",
+      "name": "{field} was set by @:{'brand.autobot'}",
+      "field": {
+        "query": "Consulta",
+        "stream": "Stream",
+        "time": "Rango de tiempo"
+      }
     }
   },
   "aiToolset": {
     "header": "Conjuntos de herramientas de IA",
-    "add": "Nuevo conjunto de herramientas",
-    "search": "Buscar conjuntos de herramientas de IA",
-    "update": "Actualice el conjunto de herramientas de IA",
     "name": "Nombre",
     "nameRequired": "El nombre es obligatorio",
     "nameInvalid": "Solo se permiten letras, números, guiones y guiones bajos",
     "nameTooLong": "El nombre no debe superar los 256 caracteres",
     "kind": "Tipo",
     "kindRequired": "El tipo es obligatorio",
-    "kindMcp": "Servidor MCP",
-    "kindSkill": "Habilidad",
-    "description": "Descripción",
-    "actions": "Acciones",
-    "deleteTitle": "Eliminar el conjunto de herramientas de IA",
-    "deleteMessage": "¿Seguro que quieres eliminar el conjunto de herramientas de IA {name}?",
-    "loadFailed": "No se pudo cargar {product}. Inténtelo de nuevo.",
-    "createFailed": "No se pudo crear {product}. Inténtelo de nuevo.",
-    "updateFailed": "No se pudo actualizar {product}. Inténtelo de nuevo.",
-    "deleteFailed": "No se pudo eliminar {product}.",
-    "createdSuccessfully": "El conjunto de herramientas de IA se creó correctamente",
-    "updatedSuccessfully": "El conjunto de herramientas de IA se actualizó correctamente",
-    "deletedSuccessfully": "El conjunto de herramientas de IA se ha eliminado correctamente",
-    "mcpConfig": "Configuración del servidor MCP",
     "mcpUrl": "URL de punto final",
     "mcpUrlRequired": "La URL del punto final es obligatoria",
     "timeoutSeconds": "Tiempo de espera (segundos)",
@@ -18352,7 +18217,6 @@
     "headerKey": "Nombre del encabezado",
     "headerValue": "Valor de encabezado",
     "addHeader": "Agregar encabezado",
-    "skillConfig": "Configuración de habilidades",
     "skillContent": "Definición de habilidad (Markdown)",
     "skillContentRequired": "El contenido de las habilidades es obligatorio"
   },
@@ -19080,7 +18944,7 @@
       "users": "Usuarios",
       "budgets": "Presupuestos",
       "discovery": "Descubrimiento",
-      "queues": "Colas",
+      "queues": "Colas de anotación",
       "datasets": "Conjuntos de datos",
       "experiments": "Experimentos",
       "quality": "Calidad",
@@ -19365,15 +19229,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Añadir a la cola de revisión",
-        "title": "Añadir a la cola de revisión",
-        "hint": "Poner {ref} en cola para revisión humana. Permanece donde está — el estado de revisión vive en la cola.",
-        "queueLabel": "Cola",
-        "queuePlaceholder": "Seleccionar una cola...",
-        "noQueues": "Ninguna cola acepta un {scope} — crea una desde la página de Colas primero.",
-        "confirm": "Añadir a la cola",
+        "button": "Añadir a la cola de anotación",
+        "title": "Añadir a la cola de anotación",
+        "hint": "Añade {ref} para revisión humana. Permanece donde está: la cola de anotación registra su estado de revisión.",
+        "queueLabel": "Cola de anotación",
+        "queuePlaceholder": "Selecciona una cola de anotación...",
+        "noQueues": "Ninguna cola de anotación acepta un {scope}: crea una primero desde la página Colas de anotación.",
+        "confirm": "Añadir a la cola de anotación",
         "success": "Añadido a {queue}",
-        "error": "No se pudo añadir este elemento a la cola"
+        "error": "No se pudo añadir este elemento a la cola de anotación"
       },
       "dataset": {
         "button": "Añadir al conjunto de datos",
@@ -19410,12 +19274,12 @@
         "session": "Sesiones"
       },
       "inQueueFilter": {
-        "label": "En cola",
-        "notEnqueued": "En cola: No encolado",
-        "enqueued": "En cola: Cualquier cola",
-        "pending": "En cola: Pendiente",
-        "reviewed": "En cola: Revisado",
-        "all": "En cola: Todos"
+        "label": "Estado de la cola de anotación",
+        "notEnqueued": "No encolado",
+        "enqueued": "En una cola de anotación",
+        "pending": "Revisión pendiente",
+        "reviewed": "Revisado",
+        "all": "Todos los elementos"
       },
       "columns": {
         "timestamp": "Marca de tiempo",
@@ -19431,7 +19295,7 @@
         "service": "Servicio",
         "input": "Entrada",
         "quality": "Calidad",
-        "inQueue": "¿En cola?",
+        "inQueue": "¿En cola de anotación?",
         "actions": "Acciones"
       },
       "spanParent": "En {trace}",
@@ -19443,26 +19307,26 @@
       "inQueue": {
         "none": "No encolado",
         "reviewed": "Ya revisado",
-        "multiple": "En {count} colas"
+        "multiple": "En {count} colas de anotación"
       },
-      "addToQueue": "Agregar a la cola",
+      "addToQueue": "Añadir a la cola de anotación",
       "addToQueueMenu": {
-        "loading": "Cargando colas...",
-        "noQueues": "Aún no hay colas — crea una desde la página de Colas primero.",
+        "loading": "Cargando colas de anotación...",
+        "noQueues": "Aún no hay colas de anotación: crea una primero desde la página Colas de anotación.",
         "dimensions": "{count} dimensión | {count} dimensiones",
         "accepts": "Solo acepta {types}",
-        "sectionTitle": "Agregar a la cola",
-        "manageQueues": "Gestionar colas"
+        "sectionTitle": "Añadir a la cola de anotación",
+        "manageQueues": "Gestionar colas de anotación"
       },
-      "addSuccess": "Agregado a {queue} — la fila permanece en Discovery, su estado reside en la cola.",
-      "addError": "No se pudieron agregar elementos a la cola",
-      "openQueue": "Abrir cola",
-      "queuesError": "No se pudieron cargar las colas"
+      "addSuccess": "Añadido a {queue}: la fila permanece en Discovery y la cola de anotación registra su estado de revisión.",
+      "addError": "No se pudieron añadir los elementos a la cola de anotación",
+      "openQueue": "Abrir la cola de anotación",
+      "queuesError": "No se pudieron cargar las colas de anotación"
     },
     "queues": {
-      "searchPlaceholder": "Buscar colas...",
-      "newButton": "Nueva cola",
-      "loadError": "No se pudieron cargar las colas",
+      "searchPlaceholder": "Buscar colas de anotación...",
+      "newButton": "Nueva cola de anotación",
+      "loadError": "No se pudieron cargar las colas de anotación",
       "optionsLoadError": "No se pudieron cargar las configuraciones de puntuación",
       "review": "Revisar",
       "cleared": "Borrado",
@@ -19477,7 +19341,7 @@
         "actions": "Acciones"
       },
       "create": {
-        "title": "Nueva cola",
+        "title": "Nueva cola de anotación",
         "errors": {
           "name": "El nombre es obligatorio",
           "scoreConfigs": "Debes vincular al menos una configuración de puntuación"
@@ -19485,9 +19349,9 @@
         "nameLabel": "Nombre",
         "namePlaceholder": "p. ej. hallucination_review",
         "descriptionLabel": "Descripción",
-        "descriptionPlaceholder": "Para qué sirve esta cola y quién la revisa...",
+        "descriptionPlaceholder": "Para qué sirve esta cola de anotación y quién la revisa...",
         "scoreConfigsLabel": "Configuraciones de puntuación",
-        "scoreConfigsHint": "Una cola puntúa elementos en una o más dimensiones. Cada configuración de puntuación es una dimensión única — elige las configuraciones a vincular y fija cada una a una versión.",
+        "scoreConfigsHint": "Una cola de anotación puntúa los elementos en una o más dimensiones. Cada configuración de puntuación es una sola dimensión: elige las configuraciones que quieras vincular y fija cada una a una versión.",
         "scoreConfigsEmpty": "Elige las configuraciones de puntuación a vincular.",
         "addScoreConfig": "Añadir configuración de puntuación",
         "allScoreConfigsAdded": "Todas las configuraciones de puntuación se han añadido.",
@@ -19495,10 +19359,10 @@
         "noScoreConfigs": "Aún no hay configuraciones de puntuación — crea una primero en Configuraciones de puntuación.",
         "targetDatasetLabel": "Dataset de destino",
         "targetDatasetNone": "Ninguno (solo revisión)",
-        "targetDatasetHint": "Cola de solo revisión — los elementos revisados no se destilarán en un dataset.",
+        "targetDatasetHint": "Sin un conjunto de datos de destino, los elementos de esta cola de anotación solo se revisan.",
         "autoRoutingLabel": "Enrutamiento automático",
-        "autoRoutingHint": "Encolar automáticamente los objetos cuyas puntuaciones coincidan con una condición. Déjalo vacío para alimentar esta cola manualmente desde Discovery.",
-        "autoRoutingEmpty": "Sin enrutamiento automático — esta cola se alimenta manualmente.",
+        "autoRoutingHint": "Encola automáticamente los objetos cuyas puntuaciones coincidan con una condición. Déjalo vacío para añadir elementos a esta cola de anotación desde Discovery.",
+        "autoRoutingEmpty": "Los elementos se añaden a esta cola de anotación manualmente.",
         "addCondition": "Añadir condición",
         "conditionAnd": "Y",
         "operatorIs": "es",
@@ -19507,12 +19371,12 @@
         "conditionValuePlaceholder": "Valor",
         "pin": "Fijar versión",
         "versionLatest": "v{version} (última)",
-        "success": "Cola creada",
-        "error": "Error al crear la cola"
+        "success": "Cola de anotación creada",
+        "error": "No se pudo crear la cola de anotación"
       },
       "detail": {
-        "fallbackTitle": "Cola",
-        "loadError": "Error al cargar los elementos de la cola",
+        "fallbackTitle": "Cola de anotación",
+        "loadError": "No se pudieron cargar los elementos de la cola de anotación",
         "startReviewing": "Comenzar a revisar",
         "scoreConfigs": "Configuraciones de puntuación ({count})",
         "targetDataset": "Dataset de destino",
@@ -19522,7 +19386,7 @@
         "inTrace": "En la traza {traceId}",
         "reviewAgain": "Revisar de nuevo",
         "emptyTitle": "Nada que revisar",
-        "emptyBody": "Añade trazas, spans o sesiones a esta cola desde Discovery o una vista de trazas.",
+        "emptyBody": "Añade trazas, spans o sesiones a esta cola de anotación desde Discovery o desde una vista de traza.",
         "columns": {
           "refType": "Ref",
           "refId": "Referencia",
@@ -19593,7 +19457,7 @@
         "true": "Verdadero",
         "false": "Falso",
         "allReviewedTitle": "Todos los elementos revisados",
-        "allReviewedBody": "Cada elemento en esta cola tiene una revisión completada."
+        "allReviewedBody": "Todos los elementos de esta cola de anotación tienen una revisión completada."
       }
     },
     "experiments": {
@@ -20209,8 +20073,8 @@
         "loopExplain": "Una tasa de repetición alta suele significar que el agente no está guardando resultados en caché o que está reintentando. Abre las peores trazas a continuación para ver las llamadas repetidas.",
         "failExplain": "Estos son todos los mensajes de error de este agente, de todas las clases de fallo, no solo de esta. Léelos para encontrar la solución o abre una traza para ver dónde ocurrió.",
         "costExplain": "Estas trazas impulsaron el gasto de este agente. Abre las más costosas para ver qué se ejecutó.",
-        "explain": "Explicar con O2 AI",
-        "explainHelp": "O2 AI investiga esta señal a partir de sus mensajes de error y sus peores trazas, va más allá de los spans de IA hasta los logs, las métricas, Kubernetes y los despliegues, y cita sus pruebas."
+        "explain": "Explicar con @:{'brand.autobot'}",
+        "explainHelp": "@:{'brand.autobot'} investiga esta señal a partir de sus mensajes de error y sus peores trazas, va más allá de los spans de IA hasta los logs, las métricas, Kubernetes y los despliegues, y cita sus pruebas."
       }
     },
     "versionCompare": {
@@ -21768,8 +21632,7 @@
       "shippersDesc": "{product1}, {product2}, {product3}, {product4}, {product5} y más",
       "otelDesc": "Ingesta OTLP independiente del proveedor para logs, trazas y métricas",
       "or": "O:",
-      "aws": "AWS/CloudWatch",
-      "askAi": "Pídele a la IA que configure la ingesta"
+      "aws": "AWS/CloudWatch"
     },
     "noStream": {
       "title": "Elige un stream para empezar a explorar",
@@ -21789,7 +21652,6 @@
       "descOutOfRange": "Tu ventana de tiempo no contiene datos de este stream. Salta a cuando se vieron datos por última vez.",
       "jumpToData": "Saltar a los datos más recientes",
       "openHistory": "Abrir historial de búsqueda",
-      "askAi": "Pedir a la IA que corrija mi consulta",
       "selectedRange": "el rango seleccionado"
     },
     "chunkedContent": {
@@ -21798,11 +21660,8 @@
     },
     "jsonPreview": {
       "addIcon": "Agregar icono",
-      "sendToAiChat": "Enviar al chat de IA",
       "copy": "Copiar",
       "createRegexPattern": "Crear patrón regex",
-      "regexPatternTypeTitle": "¿Qué tipo de patrón regex deseas crear?",
-      "regexPatternTypeLabel": "Tipo de patrón regex (p. ej. correo electrónico, número de teléfono, etc.)",
       "failedToGetOriginalData": "Error al obtener los datos originales",
       "textCopiedToClipboard": "Texto copiado al portapapeles",
       "failedToCopyText": "Error al copiar el texto"
@@ -21810,9 +21669,7 @@
     "cellActions": {
       "copy": "Copiar",
       "includeTerm": "Incluir término",
-      "excludeTerm": "Excluir término",
-      "sendValueToAi": "Enviar valor a la IA",
-      "sendRowToAi": "Enviar fila a la IA"
+      "excludeTerm": "Excluir término"
     },
     "indexList": {
       "noMatchingFields": "No se encontraron campos coincidentes",
@@ -21825,8 +21682,7 @@
     },
     "detailTable": {
       "noDataAvailable": "No hay datos disponibles.",
-      "addIcon": "Agregar icono",
-      "sendToAiChat": "Enviar al chat de IA"
+      "addIcon": "Agregar icono"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "La consulta SELECT * no es compatible con la visualización.",
@@ -22117,7 +21973,6 @@
     "copyError": "Copiar detalles del error",
     "copied": "¡Copiado!",
     "traceId": "ID de traza:",
-    "askAi": "Pedir a la IA que corrija mi consulta",
     "showDetail": "Mostrar detalles",
     "hideDetail": "Ocultar detalles",
     "runAs": "Ejecutar como",
@@ -24020,10 +23875,12 @@
       "oncall": "Guardia",
       "synthetics": "Sintéticos",
       "fleet": "Flota",
-      "kubernetes": "Kubernetes"
+      "kubernetes": "Kubernetes",
+      "assistant": "@:{'brand.autobot'}"
     },
     "pages": {
       "global": "Global",
+      "home": "Inicio",
       "kubernetes": "Kubernetes",
       "logs": "Logs",
       "dashboardsList": "Dashboards",
@@ -24080,7 +23937,10 @@
       "downtimes": "Periodos de mantenimiento",
       "fleetConfigEditor": "Editor de configuración",
       "fleetOverview": "Pipelines de la flota",
-      "securityRecord": "Seguridad — abrir registro"
+      "securityRecord": "Seguridad — abrir registro",
+      "assistant": "@:{'brand.autobot'}",
+      "assistantComposer": "Compositor de {product}",
+      "queryEditor": "Editor de consultas"
     },
     "actions": {
       "openCheatsheet": "Abrir hoja de referencia de atajos de teclado",
@@ -24162,10 +24022,8 @@
       "ingestionTokensRefresh": "Actualizar la lista de tokens",
       "syntheticsTokensAdd": "Crear nuevo token",
       "syntheticsTokensRefresh": "Actualizar lista de tokens",
-      "aiChatToggle": "Alternar el chat de IA",
       "timeRangeOpen": "Abrir rango de tiempo",
       "k8sPalette": "Buscar recursos de Kubernetes",
-      "aiChatClose": "Cerrar chat de IA",
       "logsSaveView": "Guardar como vista guardada",
       "logsExport": "Exportar los resultados como CSV",
       "tracesCopyUrl": "Copiar URL para compartir la traza",
@@ -24218,7 +24076,18 @@
       "fleetEditorDeleteNode": "Eliminar el componente seleccionado",
       "fleetFlowCloseDetails": "Cerrar los detalles de la ruta o contraer el mapa",
       "securityRecordNext": "Registro siguiente",
-      "securityRecordPrev": "Registro anterior"
+      "securityRecordPrev": "Registro anterior",
+      "assistantClose": "Cerrar {product}",
+      "assistantComposerDictate": "Dictar mientras se mantiene pulsado",
+      "assistantComposerNewline": "Nueva línea",
+      "assistantComposerRecall": "Recuperar el prompt anterior",
+      "assistantComposerSend": "Enviar mensaje",
+      "assistantGoToAnswer": "Ir a la última respuesta",
+      "assistantHistory": "Abrir chats",
+      "assistantOpen": "Abrir {product}",
+      "editorTabFocusMode": "Permitir que Tab salga del editor",
+      "threadsBarOpen": "Abrir chats",
+      "homeFocusAsk": "Enfocar el cuadro de Preguntar"
     }
   },
   "components": {
@@ -24328,7 +24197,10 @@
     "pagination": {
       "pagination": "Paginación",
       "previousPage": "Página anterior",
-      "nextPage": "Página siguiente"
+      "nextPage": "Página siguiente",
+      "firstPage": "Primera página",
+      "lastPage": "Última página",
+      "recordsPerPage": "Registros por página"
     },
     "select": {
       "more": "más",
@@ -24763,8 +24635,6 @@
     "replacementCsvFileUrl": "URL del archivo CSV de reemplazo",
     "newCsvFileUrlHelp": "Introduzca una nueva URL para agregar a esta tabla de enriquecimiento",
     "replacementCsvFileUrlHelp": "Introduzca una URL para reemplazar todas las URLs existentes",
-    "jsFunctionPlaceholder": "Escribe una función JS. p. ej. {example}",
-    "vrlFunctionPlaceholder": "Escribe una función VRL. p. ej. {example}",
     "functionSaved": "Función guardada correctamente",
     "functionCreationFailed": "Error al crear la función",
     "functionFetchingFailed": "Error al obtener la función",
@@ -24776,9 +24646,6 @@
     "invalidEvents": "Eventos no válidos: {error}"
   },
   "toastMessages": {
-    "aitoolsets": {
-      "failedToLoadToolset": "Error al cargar el conjunto de herramientas"
-    },
     "alerts": {
       "failedToNavigateToAlert": "Error al navegar a la alerta",
       "alertNotFound": "Alerta no encontrada",
@@ -24974,11 +24841,6 @@
       "errorFetchingRegexPatterns": "Error al obtener los patrones de regex"
     },
     "components": {
-      "thanksForYourFeedback": "¡Gracias por tus comentarios!",
-      "failedToReadImage": "Error al leer la imagen: {error}",
-      "onlyPngAndJpegImagesAre": "Solo se admiten imágenes PNG y JPEG",
-      "imageExceeds2mbLimitMb": "La imagen excede el límite de 2MB ({size}MB)",
-      "responseGenerationStopped": "Generación de respuesta detenida",
       "customColorAppliedToModeSuccessfully": "Color personalizado aplicado al modo {mode} correctamente!",
       "appliedToModeSuccessfully": "{theme} aplicado al modo {mode} correctamente!",
       "failedToExportScoreConfigs": "Error al exportar las configuraciones de score",
@@ -25749,8 +25611,8 @@
     "sloDetail": "Detalle del SLO",
     "alertDetail": "Detalle de la alerta",
     "editAlert": "Editar alerta",
-    "aiQueueDetail": "Cola",
-    "aiQueueReview": "Revisión de cola",
+    "aiQueueDetail": "Cola de anotaciones",
+    "aiQueueReview": "Revisión de la cola de anotaciones",
     "aiDatasetDetail": "Conjunto de datos",
     "aiPromptCreate": "Nuevo Prompt",
     "aiPromptVersionCreate": "Nueva versión de Prompt",
@@ -26778,13 +26640,13 @@
       "subtitle": "Rendimiento y salud de las consultas en tus bases de datos"
     },
     "ai": {
-      "suggestFix": "Preguntar a la IA cómo solucionar esto",
-      "suggestFixHint": "Abre el asistente de IA con esta consulta, su motor y sus números de latencia, y pregunta qué cambiar. No cambia nada por sí mismo.",
-      "rowSuggestFix": "Preguntar a la IA cómo solucionar esto",
+      "suggestFix": "@:{'brand.askAutobot'}: cómo solucionar esto",
+      "suggestFixHint": "Abre @:{'brand.autobot'} con esta consulta, su motor y sus números de latencia, y pregunta qué cambiar. No cambia nada por sí mismo.",
+      "rowSuggestFix": "@:{'brand.askAutobot'}: cómo solucionar esto",
       "deadlockFix": "¿Cómo detengo este bloqueo?",
-      "deadlockFixHint": "Envía tanto las sentencias en conflicto como la evidencia del orden de las filas al asistente de IA.",
+      "deadlockFixHint": "Envía tanto las sentencias en conflicto como la evidencia del orden de las filas a @:{'brand.autobot'}.",
       "blockingFix": "¿Por qué está bloqueando?",
-      "blockingFixHint": "Envía la sentencia de la sesión raíz, su tiempo de inactividad y cuántas sesiones están atascadas detrás de ella al asistente de IA."
+      "blockingFixHint": "Envía la sentencia de la sesión raíz, su tiempo de inactividad y cuántas sesiones están atascadas detrás de ella a @:{'brand.autobot'}."
     },
     "filters": {
       "allEngines": "Todos los motores",
@@ -28137,7 +27999,7 @@
     "teamChannelSilent": "El canal de este equipo está vacío a propósito: los avisos no se anunciarán en ningún sitio.",
     "slackChannelTitle": "Canal de Slack",
     "slackChannelSetWith": "Configura un canal de Slack con {command}",
-    "slackChannelLinkHint": "Escríbelo en ese canal de Slack. Tu cuenta de Slack debe estar vinculada: escribe /o2 link en Slack.",
+    "slackChannelLinkHint": "Escríbelo en ese canal de Slack. Es necesario tener tu cuenta de Slack vinculada: escribe {command} link en Slack.",
     "slackChannelSendTest": "Enviar mensaje de prueba",
     "slackChannelClear": "Borrar",
     "slackChannelBackup": "Usa {webhook} solo como respaldo",
@@ -28490,8 +28352,8 @@
     "removeStep": "Eliminar paso",
     "channels": "Canales",
     "policySaved": "Política guardada",
-    "verdictTitle": "Veredicto del SRE de IA",
-    "reportTitle": "Lo que encontró el SRE de IA",
+    "verdictTitle": "Veredicto de @:{'brand.autobot'}",
+    "reportTitle": "Lo que encontró @:{'brand.autobot'}",
     "l0P1Lead": "Alerta inmediata.",
     "l0P1Desc": "El análisis de IA se ejecuta en paralelo — los avisos críticos nunca se retrasan.",
     "l0P4Lead": "Solo análisis de IA.",
@@ -28511,7 +28373,7 @@
     "l0MaxLevelsOption": "hasta {count} nivel | hasta {count} niveles",
     "l0ParallelSentence": "se avisa de inmediato; el agente investiga en paralelo",
     "l0OnlySentence": "el agente investiga; esta prioridad solo avisa si tus niveles lo indican",
-    "l0OffSentence": "no se ejecuta ningún SRE de IA; el aviso se comporta exactamente como lo hacía sin triaje de IA",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'} no se ejecuta; el aviso se comporta exactamente como lo hacía sin triaje de IA",
     "l0BudgetRange": "Entre 30 y 600 segundos — el servidor rechaza los valores fuera de este rango en lugar de limitarlos",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Suprimir el aviso",
@@ -28538,7 +28400,7 @@
     "eventKind_page": "Aviso",
     "eventKind_ack": "Reconocimiento",
     "eventKind_note": "Nota",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "Traspaso",
     "eventKind_recovery": "Recuperación",
     "eventKind_state": "Estado",
@@ -28712,7 +28574,7 @@
     "mineJoinTeam": "Unirse a un equipo",
     "mineTestTeam": "Enviar un aviso de prueba a {team}",
     "mineCoverSaved": "Cobertura guardada",
-    "mineSlackLinkHow": "Escribe /o2 link en Slack",
+    "mineSlackLinkHow": "Escribe {command} link en Slack",
     "mineSlackSetUpHint": "Abre Ajustes › Slack",
     "myDeliveriesWhen": "Cuándo",
     "phoneAddHint": "Añade un número para mensajes de texto y llamadas",
@@ -29200,7 +29062,7 @@
     "ladderAddStep": "Añadir un paso",
     "ladderRightNow": "Ahora mismo es",
     "ladderSameLadder": "la misma escalera",
-    "ladderL0Off": "Sin SRE de IA",
+    "ladderL0Off": "Sin @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "La escalera nunca aprendió las rotaciones",
     "ladderStaleDefaultHint": "Cada nivel avisa a todo el equipo, pero este equipo tiene rotaciones: la escalera se creó antes de que existieran. Agregar o quitar un miembro vuelve a aplicar la configuración predeterminada, o edita la escalera a mano una vez.",
     "reachShortNoSmtp": "solo correo electrónico · sin transporte SMTP",
@@ -29283,7 +29145,7 @@
     "channelUnavailable": "{channel} — no hay proveedor que lo respalde",
     "channelUnverified": "{channel} — registrado, pero nadie lo ha verificado",
     "channelAddPhone": "{reason}. Añade tu teléfono en Mi guardia",
-    "channelLinkSlack": "{reason}. Ejecuta /o2 link en Slack",
+    "channelLinkSlack": "{reason}. Ejecuta {command} link en Slack",
     "loadUneven": "{name} tuvo {factor}× la mediana en los últimos {days} días",
     "loadUnevenLabel": "La carga es desigual:",
     "membersUnreachableMore": "{name} está en este equipo, pero ningún aviso puede llegarle — {why}. {count} miembro más está en el mismo estado. | {name} está en este equipo, pero ningún aviso puede llegarle — {why}. {count} miembros más están en el mismo estado.",
@@ -29527,6 +29389,7 @@
     "consentBillingPayer": "Cuando se agoten los créditos gratuitos, el uso de IA se factura a la tarifa de tu plan en la factura de {payer}.",
     "organizationBillingCycle": "El uso de IA de pago se factura en la factura de esta organización.",
     "payerBillingCycle": "El uso de IA de pago se factura en la factura de la organización pagadora.",
+    "readOnlyAdmin": "Solo un administrador de la organización puede cambiar este ajuste.",
     "viewBilling": "Ver facturación",
     "memberAndPayerRequired": "{payer} también debe activar el uso de IA de pago antes de que {organization} pueda usarlo.",
     "contactPayerAdmin": "Pide a un administrador de {payer} que active el uso de IA de pago.",
@@ -29536,13 +29399,8 @@
     "consentStillRequired": "El uso de pago no está habilitado en todas las organizaciones requeridas.",
     "updateFailed": "No se pudo actualizar el uso de IA de pago. Inténtalo de nuevo.",
     "declinedNotice": "El uso de IA de pago está desactivado, por lo que esta solicitud no se envió.",
-    "consentRequiredMessage": "Se agotaron los créditos gratuitos. Actívalo para seguir usando la IA.",
-    "consentScope": "Se aplica a toda la organización: Asistente, generación de consultas y análisis de incidentes. Puedes desactivarlo en cualquier momento en la página de Planes.",
+    "consentScope": "Se aplica a toda la organización: @:{'brand.autobot'}, generación de consultas y análisis de incidentes. Puedes desactivarlo en cualquier momento en la página de Planes.",
     "managePaidUsage": "Activar el uso de pago",
-    "switchLabel": "Uso de IA de pago",
-    "adminsOnly": "Solo los administradores pueden cambiar esto",
-    "waitingForPayer": "Esperando a que {payer} lo active",
-    "offHint": "Sigue usando la IA cuando se agoten los créditos gratuitos, facturado a la tarifa de tu plan.",
     "modePayAsYouGo": "Pago por uso",
     "modeConsentRequired": "Consentimiento requerido",
     "modeExhausted": "Agotado",
@@ -30893,6 +30751,13 @@
         "http": "HTTP",
         "httpDescription": "Slack llama a tu URL pública. Requiere un clic en Verificar en Slack",
         "channelHistory": "Permite que el bot lea las respuestas en los hilos que ha iniciado",
+        "appName": "Nombre de la aplicación",
+        "appNameHelp": "El nombre que se ve en Slack. Asigna a cada servidor de OpenObserve su propio nombre, como OpenObserve Staging.",
+        "appNameTooLong": "El nombre de la aplicación debe tener como máximo {max} caracteres",
+        "appNameMarkup": "El nombre de la aplicación no debe contener <, > ni &",
+        "command": "Comando de barra",
+        "commandInvalid": "Empieza por / y usa como máximo {max} caracteres: letras minúsculas, dígitos, - y _",
+        "commandWarning": "Slack ejecuta un comando de barra para una sola aplicación en un espacio de trabajo. Si otra aplicación de este espacio de trabajo ya usa {command}, {command} dejará de funcionar en esa aplicación después de que instales esta.",
         "tokenLabel": "Token de actualización de la configuración de la app (xoxe-…)",
         "tokenHelp": "En la página Your Apps de Slack, Your App Configuration Tokens › Generate Token muestra un token de acceso y un token de actualización: pega el token de actualización. OpenObserve lo rota y guarda el más reciente cifrado para actualizar la app más adelante.",
         "generateToken": "Generar un token",
@@ -31012,7 +30877,7 @@
         "auth_test": "Token del bot",
         "last_event": "Eventos",
         "sockets": "Sockets",
-        "agent": "Asistente de IA",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "Publicación de prueba"
       },
       "connectedOrgs": "Organizaciones conectadas",
@@ -31062,7 +30927,7 @@
         "settings": "Ajustes",
         "install": "Al instalar",
         "destination": "Desde un destino de alertas",
-        "oncall": "Desde /o2 oncall aquí"
+        "oncall": "Desde {command} oncall aquí"
       },
       "channel": "Canal",
       "channelPlaceholder": "Buscar canales",
@@ -31076,7 +30941,7 @@
       "editDefault": "Editar el canal predeterminado",
       "removeConfirm": "Quitar predeterminado",
       "removeTitle": "¿Quitar el predeterminado de #{channel}?",
-      "removeMessage": "Las preguntas en {name} pasan entonces a la organización predeterminada de cada persona (pueden cambiarla con /o2 org).",
+      "removeMessage": "Las preguntas en {name} se dirigen entonces a la organización predeterminada de cada persona (pueden cambiarla con {command} org).",
       "instanceAdminOnly": "Solo administrador de la instancia",
       "ownOrgOnlyHint": "En un espacio de trabajo de instancia, asignas los canales a tu propia organización",
       "claimableHint": "Canales sin reclamar y canales que posee {org}",
@@ -33666,7 +33531,7 @@
       "openService": "Abrir servicio",
       "reviewServices": "Revisar servicios",
       "openInCalibration": "Abrir en Calibración de alertas",
-      "askAi": "Preguntar a la IA",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "Preguntar a los administradores",
       "dismiss": "Descartar…",
       "markIntendedReport": "Marcar como informe intencionado",
@@ -34704,6 +34569,25 @@
       "noHighConfidence": "No hay nombres con alta confianza"
     }
   },
+  "commandPalette": {
+    "title": "Buscar páginas, recursos y acciones",
+    "placeholder": "Buscar nombres e ID",
+    "moreTypes": "Más tipos",
+    "pages": "Páginas",
+    "actions": "Crear",
+    "recent": "Visitas recientes",
+    "localHistory": "Historial local",
+    "clearRecent": "Borrar visitas recientes",
+    "historyStorageUnavailable": "No se pueden guardar las visitas",
+    "recentUnavailable": "Este elemento no está disponible",
+    "loading": "Buscando…",
+    "partial": "Algunos resultados no están disponibles",
+    "failed": "No se pudo completar la búsqueda",
+    "offline": "Sin conexión. Las visitas recientes siguen disponibles.",
+    "sourceUnavailable": "Este tipo de recurso no está disponible",
+    "emptyHelp": "Introduce un nombre o ID para buscar",
+    "globalShortcut": "Abrir búsqueda global"
+  },
   "timeRangeInput": {
     "label": "Escribe un rango de tiempo",
     "readings": "Lecturas",
@@ -34745,5 +34629,2530 @@
     "fixedToNow": "Termina ahora, no se moverá",
     "gateOrder": "El inicio debe ser anterior al fin.",
     "gateInvalid": "No es un rango válido."
+  },
+  "autobotInvestigate": {
+    "greeting": "¿Qué deberíamos investigar?",
+    "greetingNamed": "¿Qué deberíamos investigar, {name}?",
+    "placeholder": "Describe qué falló o pega un enlace de alerta o incidente",
+    "cards": {
+      "whyAlertFired": {
+        "title": "¿Por qué se disparó mi alerta?",
+        "description": "Pick an alert. @:{'brand.autobot'} checks the data behind it and explains the cause.",
+        "prompt": "¿Por qué se disparó mi última alerta?"
+      },
+      "investigateIncident": {
+        "title": "Investigar un incidente",
+        "description": "Descubre qué cambió, qué servicios se vieron afectados y dónde empezó.",
+        "prompt": "Ayúdame a investigar mi incidente más reciente"
+      },
+      "errorSpike": {
+        "title": "Encuentra la causa de un pico de errores",
+        "description": "Compara los errores antes y después del pico, por servicio y mensaje.",
+        "prompt": "Encuentra la causa del último pico de errores"
+      },
+      "slowService": {
+        "title": "Comprueba un servicio lento",
+        "description": "Revisa las trazas y la latencia para encontrar el paso lento.",
+        "prompt": "Descubre qué servicio está lento y por qué"
+      }
+    }
+  },
+  "assistant": {
+    "actions": {
+      "count": "{count} acción en este chat | {count} acciones en este chat",
+      "entry": "{operation} {name} · aprobado por {user} · {time}",
+      "failedEntry": "No se pudo completar: {name} · {reason} · {time}",
+      "heading": "Acciones en este chat",
+      "noReview": "Sin paso de revisión",
+      "op": {
+        "create": "Se creó {entity}",
+        "delete": "Se eliminó {entity}",
+        "pause": "Se pausó {entity}",
+        "resume": "Se reanudó {entity}",
+        "run_command": "Se ejecutó {entity}",
+        "update": "Se actualizó {entity}"
+      },
+      "restored": "Restaurado",
+      "undo": "Deshacer",
+      "undoFailed": "No se pudo deshacer.",
+      "undoLimits": "Las notificaciones enviadas y los datos eliminados no se pueden deshacer.",
+      "undoNotYet": "Deshacer aún no está disponible",
+      "undoUnconfirmed": "Se envió la acción de deshacer, pero no se pudo confirmar su resultado.",
+      "undoing": "Deshaciendo…",
+      "undone": "Deshecho · {name} restaurado",
+      "you": "tú"
+    },
+    "activity": {
+      "actor": "Filtrar por persona",
+      "approved": "Aprobado",
+      "approvedBy": "Aprobado por {user}",
+      "columns": {
+        "action": "Acción",
+        "actions": "Acciones",
+        "actor": "En nombre de",
+        "approval": "Aprobado",
+        "result": "Resultado",
+        "target": "Objetivo",
+        "when": "Cuándo"
+      },
+      "done": "Completado",
+      "empty": "No @:{'brand.autobot'} actions in this period.",
+      "failed": "Falló: {cause}",
+      "failedPlain": "Fallido",
+      "loadFailed": "No se pudo cargar la actividad.",
+      "next": "Siguiente",
+      "noApproval": "No requiere aprobación",
+      "openAudit": "Abrir el stream de auditoría en Logs",
+      "openChat": "Abrir chat",
+      "previous": "Anterior",
+      "rangeLabel": "Intervalo de tiempo",
+      "ranges": {
+        "day": "Últimas 24 horas",
+        "month": "Últimos 30 días",
+        "week": "Últimos 7 días"
+      },
+      "search": "Buscar actividad",
+      "standing": "Aprobación permanente",
+      "undo": "Deshacer",
+      "undoDone": "Se deshizo: {action}",
+      "undoMessage": "Deshacer \"{action}\" en {target} desde la copia guardada. Las notificaciones ya enviadas no se pueden deshacer.",
+      "undoNamed": "Deshacer {action}",
+      "undoTitle": "¿Deshacer esta acción?",
+      "undoneState": "Deshecho",
+      "unsupported": "El historial de actividad requiere una versión más reciente del servidor."
+    },
+    "announce": {
+      "approval": "Esperando tu aprobación: {title}.",
+      "approvalExpires": "Esperando tu aprobación: {title}. Caduca en {duration}.",
+      "approvalExpiring": "La aprobación caduca en {duration}: {title}. En la tarjeta hay más tiempo disponible.",
+      "approvalExpiringFinal": "La aprobación caduca en {duration}: {title}. No se puede añadir más tiempo.",
+      "approvalExpiringNotice": "La aprobación caduca en {duration}: {title}. Revísala desde el aviso de {product}.",
+      "approvalExpiringNoticeFinal": "La aprobación caduca en {duration}: {title}. No se puede añadir más tiempo. Revísala desde el aviso de {product}.",
+      "approvalExtended": "Se añadió más tiempo. Caduca en {duration}.",
+      "approvalJump": "{line} Pulsa {keys} para revisarla.",
+      "approvalJumpTouch": "{line} La solicitud de revisión está encima del cuadro de mensaje.",
+      "closed": "{product} cerrado.",
+      "closedRunning": "{product} cerrado. Aún respondiendo en segundo plano.",
+      "floated": "{title} ahora es una ventana flotante.",
+      "madeRoom": "{title} se movió a la bandeja para hacer sitio.",
+      "minimised": "{title} minimizado en la bandeja.",
+      "moveCancelled": "Movimiento cancelado.",
+      "moveStarted": "Moviendo {title}. Las teclas de flecha lo mueven. Intro lo coloca, Escape lo devuelve.",
+      "narrower": "Más estrecho.",
+      "openedInTab": "{title} abierto en una pestaña nueva.",
+      "pinned": "{title} ahora está en la barra lateral.",
+      "pinnedSwapped": "{title} ahora está en la barra lateral. {other} se movió a la bandeja.",
+      "resizeStarted": "Cambiando el tamaño de {title}. Las teclas de flecha cambian el tamaño. Intro lo mantiene, Escape lo devuelve.",
+      "restored": "{title} restaurado.",
+      "shorter": "Más corto.",
+      "taller": "Más alto.",
+      "wider": "Más ancho.",
+      "windowClosed": "{title} cerrado.",
+      "windowClosedRunning": "{title} cerrado. Aún respondiendo en segundo plano.",
+      "windowPlaced": "Ventana colocada.",
+      "failed": "Error. {title}",
+      "failedRetryIn": "Error. {title} Reintento en {s} s.",
+      "failedWithAction": "Error. {title} {action} disponible.",
+      "keysOpen": "Control I",
+      "keysOpenMac": "Comando I",
+      "notSent": "No enviado. {title}",
+      "notSentRetryIn": "No enviado. {title} Reintento en {s} s.",
+      "notSentWithAction": "No enviado. {title} {action} disponible.",
+      "opened": "{product} abierto.",
+      "sheetCollapsed": "Contraído.",
+      "sheetExpanded": "Expandido."
+    },
+    "approval": {
+      "approve": "Aprobar",
+      "approveDelete": "Eliminar {count} {entity}",
+      "arguments": "Argumentos",
+      "askAgainPrompt": "Pregúntame de nuevo: {heading}",
+      "askedElsewhere": "Solicitado en otra pestaña",
+      "cannotUndo": "No se puede deshacer",
+      "currentUnknown": "Valor actual desconocido",
+      "deny": "Denegar",
+      "details": "Detalles",
+      "edit": "Editar y aprobar",
+      "editor": {
+        "alert": "Alertas"
+      },
+      "expiresIn": "Caduca en {time}",
+      "expiringSoon": "Caduca pronto · {time}",
+      "gateTiming": "Las aprobaciones no están disponibles en este servidor. Termina esto en {editor}.",
+      "heading": {
+        "delete": "Eliminar {count} {entity}",
+        "permission": "Permitir {tool}",
+        "runCommand": "Ejecutar comando en {toolset}"
+      },
+      "inOrg": "en {org}",
+      "minutes": "{count} minuto | {count} minutos",
+      "moreTargets": "y {count} más",
+      "moreTime": "Más tiempo",
+      "named": "{verb} {name}",
+      "nameUnknown": "No se pudo cargar el nombre de {entity} {shortId}",
+      "needsOk": "Te necesita",
+      "noDecision": "No se registró ninguna respuesta para esta solicitud",
+      "nothingSelected": "No hay nada seleccionado",
+      "open": "Abierta",
+      "reason": {
+        "conflict": "Ya existe o ya está en ese estado",
+        "forbidden": "sin permiso",
+        "notFound": "no encontrado",
+        "rateLimited": "Demasiadas solicitudes, inténtalo de nuevo en breve",
+        "server": "El servidor no pudo completarlo",
+        "status": "error {code}",
+        "unknown": "error"
+      },
+      "reply": "Responder",
+      "showLess": "Mostrar menos",
+      "showMore": "Mostrar más",
+      "result": {
+        "approved": "Aprobado · {time}",
+        "approvedNoTime": "Aprobado",
+        "approvedElsewhere": "Aprobado en otra pestaña · {time}",
+        "askAgain": "Preguntar de nuevo",
+        "checkList": "Consultar la lista",
+        "checkListName": "Consultar la lista (se abre en una pestaña nueva)",
+        "declined": "Rechazado · no se cambió nada",
+        "declinedElsewhere": "Denegado en otra pestaña · {time}",
+        "declinedNewChat": "Rechazado porque iniciaste un chat nuevo",
+        "deciding": "Se está decidiendo en otra pestaña…",
+        "done": {
+          "create": "Se creó {entity}",
+          "delete": "Se eliminaron {count} {entity}",
+          "permission": "Se permitió {tool}",
+          "runCommand": "Se ejecutó el comando en {toolset}",
+          "update": "Se actualizó {entity} {name}"
+        },
+        "failed": "No se cambió nada. {reason}",
+        "failedConsent": "El uso de pago no está habilitado para esta organización.",
+        "failedCredits": "Se han agotado los créditos de IA para esta organización.",
+        "failedForbidden": "No tienes permiso para realizar este cambio.",
+        "failedItem": "{name} falló: {reason}",
+        "itemsName": "Resultado de cada elemento",
+        "narrowed": "@:{'brand.autobot'} will propose these {count} again for your approval",
+        "open": "Abrir {name} (se abre en una pestaña nueva)",
+        "sending": "Enviando tu decisión…",
+        "stop": "Detener",
+        "stopped": "Rechazado · detuviste la respuesta",
+        "unconfirmed": "Tu decisión se envió, pero no se pudo confirmar su resultado.",
+        "unknown": "No hay ninguna respuesta registrada en este navegador.",
+        "waitingElsewhere": "Esperando tu aprobación en otra pestaña",
+        "withdrawn": "Esta solicitud ya no es válida.",
+        "partialBy": {
+          "change": "Se cambiaron {done} de {total} {entity} · {failed} con error",
+          "create": "Se crearon {done} de {total} {entity} · {failed} con error",
+          "delete": "Se eliminaron {done} de {total} {entity} · {failed} con error",
+          "pause": "Se pausaron {done} de {total} {entity} · {failed} con error",
+          "resume": "Se reanudaron {done} de {total} {entity} · {failed} con error",
+          "update": "Se actualizaron {done} de {total} {entity} · {failed} con error"
+        },
+        "partialUnnamed": "Solo se completó una parte · {reason}",
+        "partialUnnamedPlain": "Solo se completó una parte",
+        "standing": "Permitido por tu aprobación permanente"
+      },
+      "scope": {
+        "chat": "Para este chat",
+        "label": "Permitir",
+        "once": "Solo esta vez",
+        "tool": "Siempre para {tool}"
+      },
+      "seconds": "{count} segundo | {count} segundos",
+      "verb": {
+        "create": "Crear {entity}",
+        "pause": "Pausar {entity}",
+        "resume": "Reanudar {entity}",
+        "update": "Actualizar {entity}"
+      },
+      "backTo": "Volver a {title}",
+      "backToOrg": "Cambia de nuevo a {org}",
+      "deliveryFailed": "No se pudo enviar tu decisión. {entity} no ha cambiado.",
+      "finishIn": "Finalizar en {editor}",
+      "gateNoEditor": "Las aprobaciones no están disponibles en este servidor.",
+      "meta": "Hasta {time} · {scope}",
+      "metaUntil": "Hasta {time}",
+      "needsOkName": "Requiere tu acción: {name}",
+      "notifies": "notifica",
+      "retry": "Reintentar",
+      "record": {
+        "denied": "Denegado: {name}",
+        "deniedUnnamed": "Denied a change @:{'brand.autobot'} proposed",
+        "deniedUnnamedReason": "Denied a change @:{'brand.autobot'} proposed · {reason}",
+        "expired": "La solicitud ha caducado. No se cambió nada.",
+        "moved": "Se movió a {editor}",
+        "paused": "Pausa de {entity} {name}",
+        "pausedCount": "Pausa de {count} {entity}",
+        "pausedCountUntil": "Pausa de {count} {entity} hasta {time}",
+        "pausedUntil": "Pausa de {entity} {name} hasta {time}",
+        "replied": "Rechazado con una respuesta",
+        "resumed": "Reanudación de {entity} {name}",
+        "resumedCount": "Reanudación de {count} {entity}",
+        "youAt": "tú · {time}"
+      },
+      "onDashboard": "En el dashboard {name}",
+      "alwaysFor": "Siempre para {action}",
+      "alwaysAllowed": "Siempre permitido: {action}",
+      "revoke": "Revocar",
+      "changedSince": "Ha cambiado desde que se preguntó",
+      "recheckFailed": "No se pudo comprobar si había cambios, así que no se escribió nada",
+      "more": "Más acciones",
+      "revokeFailed": "No se pudo revocar. Inténtalo de nuevo desde Ajustes.",
+      "grantNotStored": "Approved once. @:{'brand.autobot'} will ask next time.",
+      "actionPhrase": {
+        "create": "creando {entity}",
+        "pause": "pausando {entity}",
+        "resume": "reanudando {entity}",
+        "update": "actualizando {entity}",
+        "delete": "eliminando {entity}"
+      },
+      "allowedForChat": "Permitido para este chat: {action}"
+    },
+    "askAdmin": {
+      "adminsOf": "Administradores de {org}",
+      "anAdminOf": "Un administrador de {org}",
+      "copied": "Mensaje copiado. Pégalo y envíalo a tu administrador.",
+      "copy": "Copiar mensaje",
+      "email": "Enviar correo a administradores",
+      "includePrompt": "Incluir la primera línea de mi pregunta",
+      "message": {
+        "access": "Hola, ¿podrías darme acceso a {product} en OpenObserve ({whereToGrant}, Chat) para la organización {org}?",
+        "consent": "¿Podrías habilitar el uso de IA de pago para {org}? Facturación › Uso de pago: {link}",
+        "credits": "¿Podrías habilitar el uso de IA de pago para {org}? Facturación › Uso de pago: {link}",
+        "enable": "Could you turn {product} on for {org}? Settings › @:{'brand.autobot'} › Access: {link}",
+        "settings": "Could you change the {product} settings for {org} in Settings › @:{'brand.autobot'}?",
+        "share_read": "¿Podrías darme acceso al uso compartido de chats ({whereToGrant}, Uso compartido de chats) en {org}?",
+        "tool_policy": "@:{'brand.autobot'} wasn't allowed to run {tool} in {org}. Could you review the permissions of @:{'brand.autobot'} in Settings › @:{'brand.autobot'} › Permissions?",
+        "agent_access": "Could you let me use {agent} in {product} for {org}? Settings › @:{'brand.autobot'} › Agents: {link}"
+      },
+      "messageLabel": "Mensaje",
+      "subject": {
+        "access": "Acceso a {product} para {org}",
+        "consent": "Uso de IA de pago para {org}",
+        "credits": "Uso de IA de pago para {org}",
+        "enable": "Activar {product} para {org}",
+        "settings": "Configuración de {product} para {org}",
+        "share_read": "Acceso al uso compartido de chats para {org}",
+        "tool_policy": "Permisos de {product} para {org}",
+        "agent_access": "Acceso a {agent} para {org}"
+      },
+      "title": "Preguntar a un administrador",
+      "withPrompt": "{message} Mi pregunta empieza por: \"{prompt}\""
+    },
+    "attachment": {
+      "cell": "Celda",
+      "field": "Campo",
+      "logEntry": "Entrada de log",
+      "queryError": "Error de consulta",
+      "span": "Span"
+    },
+    "billing": {
+      "allowance": {
+        "confirm": "Establecer límite",
+        "confirmMessage": "¿Establecer el límite de créditos de IA de {org} en {limit}, por debajo de los {used} usados? La organización se bloquea de inmediato.",
+        "confirmTitle": "¿Establecer un límite por debajo del uso actual?",
+        "floorWarning": "Por debajo del uso actual ({used}). La organización se bloquea de inmediato a menos que el uso de pago esté activado.",
+        "limit": "Límite",
+        "mode": "Modo",
+        "modeUnavailable": "Modo no disponible",
+        "setAnyway": "Establecer límite de todos modos",
+        "used": "Usado"
+      },
+      "managePaidUsage": "Gestionar el uso de pago",
+      "mode": {
+        "consentRequired": "Included credits are used up. Allow paid usage to keep using @:{'brand.autobot'}.",
+        "exhaustedContract": "Se han agotado los créditos de IA. Contacta con tu gestor de cuentas.",
+        "exhaustedContractMember": "Se han agotado los créditos de IA. Pide a un administrador de la organización que contacte con tu gestor de cuentas.",
+        "exhaustedSubscribe": "Se han agotado los créditos de IA. Suscríbete para continuar.",
+        "freeNoRenew": "Los créditos incluidos no se renuevan.",
+        "freeResets": "Se restablece el {date}"
+      },
+      "paidUsage": {
+        "allow": "Permitir el uso de pago",
+        "allowFor": "Permitir el uso de pago para {org}",
+        "allowed": "Permitido",
+        "creditsFirst": "Se necesitan créditos adicionales",
+        "effectiveOff": "En vigor: uso de pago desactivado",
+        "effectiveOn": "En vigor: uso de pago activado",
+        "effectiveWaiting": "En vigor: uso de pago desactivado. A la espera de {org}",
+        "enabledBy": "Activado por {email} el {date}",
+        "managedBy": "Gestionado por los administradores de {org}",
+        "notAllowed": "No permitido",
+        "offConfirm": "Desactivar",
+        "offMessage": "Todos los miembros de la organización se detienen al llegar a los créditos incluidos. Las solicitudes en curso finalizan.",
+        "offTitle": "¿Desactivar el uso de pago de IA para {org}?",
+        "payerOrg": "Organización pagadora ({org})",
+        "subscribeFirst": "Suscríbete para permitir el uso de pago",
+        "thisOrg": "Esta organización ({org})",
+        "title": "Uso de pago",
+        "unavailable": "Estado del uso de pago no disponible.",
+        "updateFailed": "No se pudo actualizar el uso de pago."
+      },
+      "subscribe": "Suscribirse",
+      "title": "Créditos de IA",
+      "usedBilled": "{limit} créditos incluidos usados · {billed} facturados",
+      "usedOf": "{used} de {limit} créditos incluidos usados"
+    },
+    "claim": {
+      "name": "Evidencia {n}, {step}",
+      "notAvailable": "Evidencia no disponible en esta vista",
+      "citation": "Cita {n}, consulta {n}, {rows}",
+      "range": "Citas de {from} a {to}"
+    },
+    "client": {
+      "copyManually": "No se pudo copiar. Selecciona el texto y cópialo.",
+      "popupBlocked": "Tu navegador bloqueó la nueva pestaña. ¿Abrirla aquí en su lugar?",
+      "storageBlocked": "Los borradores no se conservarán si recargas esta página."
+    },
+    "closeTab": {
+      "body": "Puedes cerrar esta pestaña.",
+      "title": "Has iniciado sesión"
+    },
+    "composer": {
+      "cleared": "Borrador borrado",
+      "clearedOrg": "Borrador de {org} borrado",
+      "draftStayed": "Chat nuevo. Tu borrador se quedó en {chat}",
+      "draftStayedUnnamed": "Chat nuevo. Tu borrador se quedó en el chat anterior",
+      "bringDraft": "Tráelo aquí",
+      "draftRestored": "Borrador restaurado",
+      "imageReadFailed": "No se pudo leer {name}",
+      "imagesDropped": "{count} imagen no se conservó al recargar | {count} imágenes no se conservaron al recargar",
+      "imageTooBig": "{name} ocupa {size}. Hasta {count} imágenes, {max} cada una",
+      "mention": {
+        "count": "{count} sugerencia. Usa Arriba y Abajo para elegir, Intro para añadir. | {count} sugerencias. Usa Arriba y Abajo para elegir, Intro para añadir.",
+        "empty": "Nada coincide con \"{q}\"",
+        "group": {
+          "alerts": "Alertas",
+          "dashboards": "Dashboards",
+          "pipelines": "Pipelines",
+          "streams": "Streams",
+          "agents": "Agentes"
+        },
+        "kind": {
+          "alerts": "alertas",
+          "dashboards": "dashboards",
+          "pipelines": "pipelines",
+          "streams": "streams"
+        },
+        "noAccess": "Sin acceso a {kind}",
+        "optionName": "{group}, {label}",
+        "pageTime": "Hora de la página",
+        "retry": "No se pudo cargar {kind} · Reintentar",
+        "showAll": "Mostrar todo",
+        "title": "Añadir al contexto"
+      },
+      "name": "Mensaje para {product}",
+      "placeholder": "Pregunta sobre tus datos",
+      "followUp": "Haz una pregunta de seguimiento",
+      "scoped": "Pregunta sobre {stream}",
+      "askAgent": "Pregunta a {agent}…",
+      "sendTo": "Enviar a {agent}",
+      "attachImage": "Foto",
+      "plus": "Añadir al mensaje",
+      "connectors": {
+        "label": "Conectores",
+        "on": "{count} activos",
+        "heading": "Conectores",
+        "empty": "No hay ningún conjunto de herramientas activo en esta organización.",
+        "failed": "No se pudieron cargar los conjuntos de herramientas.",
+        "add": "Añadir un conjunto de herramientas",
+        "noPermission": "Solo un administrador puede cambiar los conjuntos de herramientas.",
+        "toggleFailed": "No se pudo cambiar {name}. Inténtalo de nuevo."
+      },
+      "inert": "Toma una decisión arriba para continuar",
+      "busy": "{product} está ocupado. Vuelve a enviar en {s} s.",
+      "imageCap": "{name} no se añadió. Hasta {count} imágenes, {size} cada una.",
+      "sendReply": "Enviar respuesta",
+      "offline": "Estás sin conexión. Borrador conservado.",
+      "rateLimited": "Espera a que termine la cuenta atrás de Reintentar.",
+      "recalled": "Solicitud recuperada {n} de {count}",
+      "removeImage": "Quitar {name}",
+      "noAccess": "Puedes leer tus chats. Iniciar o continuar uno requiere acceso a IA.",
+      "replyHelper": "Responder rechaza la solicitud",
+      "replyPlaceholder": "Reply to @:{'brand.autobot'}",
+      "running": "Espera a que termine esta respuesta o deténla.",
+      "sendEmpty": "Escribe un mensaje o añade contexto para enviar",
+      "undo": "Deshacer",
+      "replyCancel": "Cancelar",
+      "replyRefused": "Tu respuesta no se envió. Esta solicitud no se puede responder desde esta página.",
+      "inertAnswer": "Responde arriba para continuar",
+      "goToRequest": "Ir a la solicitud",
+      "placeholderAt": "Pregunta lo que quieras · {'@'} para añadir contexto",
+      "followUpAt": "Haz una pregunta de seguimiento · {'@'} para añadir contexto",
+      "queued": "{count} en cola",
+      "queuedEdit": "Editar",
+      "steerPlaceholder": "Guía esta ejecución",
+      "strip": {
+        "runLimit": "Límite de ejecuciones alcanzado",
+        "showRunning": "Mostrar chats en curso",
+        "creditsOut": "Créditos de IA agotados",
+        "managePaid": "Gestionar el uso de pago",
+        "orgBusy": "@:{'brand.autobot'} is busy for your organization",
+        "retry": "Reintentar",
+        "micBlocked": "Micrófono bloqueado",
+        "howToAllow": "Cómo permitirlo",
+        "decideAbove": "Decide arriba para continuar",
+        "pastedLines": "Se ha pegado {count} línea | Se han pegado {count} líneas",
+        "attachAsFile": "Adjuntar como archivo",
+        "replaceDraft": "¿Reemplazar el borrador?",
+        "needsAccess": "Requiere acceso a IA",
+        "offline": "Sin conexión · borrador conservado",
+        "busyFor": "Ocupado · vuelve a enviar en {s} s",
+        "pasteInline": "Pegar en el mensaje",
+        "enterQueues": "Respuesta en curso · Intro encola esto"
+      },
+      "queuedSentence": "Tu próximo mensaje se enviará cuando termine esta respuesta.",
+      "queuedAlreadySentence": "Ya hay un mensaje en cola."
+    },
+    "consent": {
+      "aMember": "un miembro",
+      "enabledBy": "Uso de pago de IA habilitado para {org} por {user} · {time}",
+      "manage": "Gestionar",
+      "manageName": "Gestionar el uso de pago (se abre en una pestaña nueva)",
+      "you": "tú"
+    },
+    "context": {
+      "addBack": "{label} · Volver a añadir",
+      "added": "{label} añadido al contexto",
+      "atSend": "Al enviar",
+      "attachmentsValue": "{count} adjunto · {size} | {count} adjuntos · {size}",
+      "capImages": "Hasta {count} imágenes, {size} cada una",
+      "capRows": "Hasta {rows} filas o {size} de datos adjuntos por mensaje",
+      "characters": "{count} carácter | {count} caracteres",
+      "chip": {
+        "alert": "Alerta · {name}",
+        "cell": "{field} = {value}",
+        "dashboard": "Dashboard · {name}",
+        "field": "Campo · {name}",
+        "incident": "Incidente · {name}",
+        "logRow": "Fila de log · {name} · {time}",
+        "logRowAt": "Fila de log · {time}",
+        "logRowPlain": "Fila de log",
+        "logRows": "Fila de log · {count} · {name} | Filas de log · {count} · {name}",
+        "logRowsPlain": "Fila de log · {count} | Filas de log · {count}",
+        "panel": "Panel · {name}",
+        "pipeline": "Pipeline · {name}",
+        "queryError": "Error de consulta · {name}",
+        "queryNode": "Nodo de consulta · {name}",
+        "span": "Span · {name}",
+        "sql": "SQL · {name}",
+        "sqlLines": "SQL · {count} línea | SQL · {count} líneas",
+        "stream": "Stream · {name}",
+        "streams": "Stream · {count} | Streams · {count}",
+        "traceQuery": "Consulta de trazas",
+        "vrl": "VRL · {count} línea | VRL · {count} líneas"
+      },
+      "chipName": "{label}, {secondary}",
+      "dataSharing": "Uso compartido de datos · {level}",
+      "disclosure": "Attached data is sent to @:{'brand.autobot'} and saved with this chat.",
+      "disclosureShared": "Attached data is sent to @:{'brand.autobot'}, saved with this chat and included in any share.",
+      "field": {
+        "alert": "Alerta",
+        "attachments": "Archivos adjuntos",
+        "dashboard": "Dashboard",
+        "incident": "Incidente",
+        "interestingFields": "Campos de interés",
+        "org": "Organización",
+        "page": "Página",
+        "pipeline": "Pipeline",
+        "quickMode": "Modo rápido",
+        "requestTime": "Hora actual",
+        "sql": "SQL",
+        "sqlMode": "Modo SQL",
+        "streams": "Streams",
+        "timeRange": "Intervalo de tiempo",
+        "timezone": "Zona horaria",
+        "traceQuery": "Consulta de trazas",
+        "vrl": "VRL",
+        "overviewIncidents": "Incidentes en Inicio ({count})",
+        "overviewServices": "Servicios en Inicio ({count})",
+        "overviewAnomalies": "Anomalías en Inicio ({count})",
+        "overviewAlerts": "Alertas en Inicio ({count})"
+      },
+      "fromChat": "Añadido a este chat",
+      "fromPage": "De esta página",
+      "imageType": "Solo se pueden adjuntar imágenes PNG y JPEG",
+      "inChat": "En: {title}",
+      "internal": "interno",
+      "lines": "{count} línea | {count} líneas",
+      "mixedStreams": "Un tipo de stream por mensaje. Elimina el stream {type} para añadir este.",
+      "more": "+{count}",
+      "moreName": "Mostrar {count} chip de contexto más | Mostrar {count} chips de contexto más",
+      "notReadYet": "sin leer todavía",
+      "openSource": "Abrir en {page}",
+      "remove": "Quitar {label} del contexto",
+      "removeAll": "Quitar todo",
+      "removed": "{label} se ha quitado del contexto",
+      "removeRow": "Quitar fila {n}",
+      "rowsCount": "{count} fila | {count} filas",
+      "sentLine": "Enviado:",
+      "startNew": "Iniciar un chat nuevo en su lugar",
+      "streamsValue": "{names} ({type})",
+      "summary": "{scope} · {range}",
+      "time": {
+        "past": "Últimos {period}",
+        "pastRange": "últimos {period}",
+        "custom": "personalizado",
+        "default": "Tiempo · últimos 15 min · predeterminado",
+        "fromPage": "página",
+        "page": "Tiempo · {range}"
+      },
+      "trayLabel": "Contexto para tu próximo mensaje",
+      "trimInternal": "Ocultar campos internos",
+      "truncated": "truncado a {size}",
+      "truncatedFields": "Recortado para ajustarse, primero los valores más largos: {fields}",
+      "used": "Usado:",
+      "usedName": "Contexto usado",
+      "usedNone": "No se usó contexto de la página",
+      "valueOff": "Desactivado",
+      "valueOn": "Activado",
+      "pastedText": "Texto pegado · {count} línea | Texto pegado · {count} líneas",
+      "pastedAsChip": "Pegado largo adjuntado como texto.",
+      "pasteInline": "Pegar en el mensaje en su lugar",
+      "pasteInlineShort": "Pegar en el mensaje",
+      "withheld": "no enviado en este nivel de datos",
+      "withheldLine": "No enviado en este nivel de datos ({level})."
+    },
+    "credits": {
+      "copyRequest": "Añade créditos de IA para {org}: {used} de {limit} créditos incluidos usados a fecha de {date}.",
+      "copyRequestNoUsage": "Añade créditos de IA para {org}: créditos incluidos agotados a fecha de {date}.",
+      "manage": "Gestionar uso de pago",
+      "manageName": "Gestionar uso de pago (se abre en una pestaña nueva)",
+      "meter": {
+        "barName": "Créditos de IA incluidos",
+        "compact": "{used} de {limit}",
+        "consent": "Créditos incluidos usados · el uso de pago requiere consentimiento",
+        "exhausted": "Se han agotado los créditos de IA para {org}",
+        "exhaustedCompact": "Agotados",
+        "free": "{used} de {limit} créditos incluidos · {renewal}",
+        "noIncluded": "Sin créditos incluidos",
+        "noRenew": "no se renuevan",
+        "payg": "{limit} créditos incluidos usados · {billed} facturados · uso de pago activado",
+        "resets": "se restablece el {date}",
+        "retry": "Reintentar",
+        "unavailable": "Uso de créditos no disponible",
+        "unavailableCompact": "Créditos no disponibles",
+        "value": "{used} de {limit} créditos"
+      },
+      "modeTag": {
+        "consent": "Consentimiento requerido",
+        "exhausted": "Agotados",
+        "payg": "Uso de pago activado"
+      },
+      "notice": "{percent}% de los créditos de IA incluidos utilizados · no se renuevan",
+      "noticeDismiss": "Descartar aviso de créditos",
+      "costs": "Un mensaje usa {chat} crédito. El análisis de incidentes usa {incident} de los mismos créditos. | Un mensaje usa {chat} créditos. El análisis de incidentes usa {incident} de los mismos créditos.",
+      "more": "Más acciones de créditos",
+      "noticeResets": "{percent}% de los créditos de IA incluidos utilizados · se restablecen el {date}",
+      "predictedExhausted": "Se han agotado los créditos de IA de {org}."
+    },
+    "diff": {
+      "accept": "Aceptar",
+      "acceptRun": "Aceptar y ejecutar",
+      "added": "añadidas:",
+      "announce": "Se propone {language}, {added} líneas añadidas, {removed} eliminadas",
+      "applied": "Editor actualizado. Reversión disponible.",
+      "current": "{language} actual",
+      "from": "de {product}",
+      "notChecked": "sin comprobar",
+      "parseFailed": "no se puede analizar",
+      "region": {
+        "alert": "Cambio propuesto en la consulta de la alerta",
+        "alert_query": "Cambio propuesto en la consulta de la alerta",
+        "anomaly": "Cambio propuesto en la consulta de detección",
+        "dashboard": "Cambio propuesto en la consulta del panel",
+        "function": "Cambio propuesto en la función",
+        "json_editor": "Cambio propuesto en el JSON",
+        "logs": "Cambio propuesto en la consulta",
+        "regex": "Cambio propuesto en el patrón",
+        "scheduled_query": "Cambio propuesto en la consulta del nodo"
+      },
+      "reject": "Rechazar",
+      "removed": "eliminadas:",
+      "reviewInEditor": "Revisa el cambio en el editor",
+      "title": "Propuesta de {language}",
+      "unknownCount": "{count} campo desconocido | {count} campos desconocidos",
+      "validated": "validado",
+      "unknownMark": "Campo desconocido"
+    },
+    "docs": {
+      "opensInNewTab": "(se abre en una pestaña nueva)",
+      "setupGuide": "Leer la guía de configuración"
+    },
+    "editor": {
+      "protectedFields": "Se conservaron el nombre, la organización y el id guardados",
+      "title": {
+        "alert": "Alerta · {name}",
+        "alertNew": "Alerta · nueva alerta",
+        "function": "Función · {name}",
+        "functionNew": "Función · nueva función",
+        "pipeline": "Pipeline · {name}",
+        "pipelineNew": "Pipeline · nuevo pipeline",
+        "queryNode": "Pipeline · {pipeline} · nodo de consulta",
+        "queryNodeNew": "Nuevo pipeline · nodo de consulta",
+        "regex": "Patrón de regex · {name}",
+        "regexNew": "Patrón de regex · nuevo"
+      }
+    },
+    "entity": {
+      "alert": "alerta | alertas",
+      "dashboard": "dashboard | dashboards",
+      "destination": "destino | destinos",
+      "folder": "carpeta | carpetas",
+      "function": "función | funciones",
+      "object": "objeto | objetos",
+      "panel": "panel | paneles",
+      "pipeline": "pipeline | pipelines",
+      "report": "informe | informes",
+      "setting": "ajuste | ajustes",
+      "stream": "stream | streams",
+      "template": "plantilla | plantillas",
+      "user": "usuario | usuarios"
+    },
+    "entry": {
+      "addField": "Añadir campo al chat",
+      "addFiring": "Añadir alerta disparada al chat",
+      "addLogRow": "Añadir fila de log al chat",
+      "addPanel": "Añadir panel al chat",
+      "addPreviewRow": "Añadir fila de vista previa al chat",
+      "addRecord": "Añadir fila de log al chat",
+      "addSeries": "Añadir serie al chat",
+      "addSpan": "Añadir span al chat",
+      "addTestEvent": "Añadir evento de prueba al chat",
+      "addToChat": "Añadir al chat",
+      "addedAnnounce": "Añadido al chat, {count} elemento | Añadido al chat, {count} elementos",
+      "addedBehindCard": "Añadido al chat. Responde a la pregunta pendiente para enviar.",
+      "addedToDraft": "Añadido a tu mensaje. Pulsa Enviar cuando quieras.",
+      "addedToast": "Añadido al chat",
+      "ask": "Preguntar a {product}",
+      "assistant": "@:{'brand.askAutobot'}",
+      "buildFailed": "No se pudo preparar esta solicitud",
+      "capReached": "No añadido: el mensaje está completo. Quita un chip e inténtalo de nuevo.",
+      "chip": {
+        "alertFired": "Alerta · {name} · disparada {time}",
+        "alertNew": "Alerta · nueva alerta",
+        "database": "Base de datos · {name}",
+        "logRow": "Fila de log · {name}",
+        "query": "Consulta · {count} línea | Consulta · {count} líneas",
+        "reproduce": "Consulta · reproduce las filas",
+        "series": "Serie · {name}",
+        "service": "Servicio · {name}",
+        "trace": "Traza · {name}"
+      },
+      "cost": "Usa {count} crédito | Usa {count} créditos",
+      "createRegex": "Crear patrón regex",
+      "deepLinkMissing": "No se encontró ese elemento sobre el que preguntar",
+      "dependencies": "Dependencias",
+      "englishPromptNote": "La solicitud se envía en inglés.",
+      "explain": "Explicar",
+      "explainAlert": "Explicar esta alerta",
+      "explainDependencyNamed": "Explicar {name}",
+      "explainEdge": "Explicar esta dependencia",
+      "explainField": "Explicar este campo",
+      "explainPanel": "Explicar este panel",
+      "explainRows": "Explicar esta fila | Explicar estas {count} filas",
+      "explainSeries": "Explicar esta serie",
+      "explainService": "Explicar este servicio",
+      "explainSpan": "Explicar este span",
+      "fix": "@:{'brand.askAutobot'} how to fix this",
+      "inChat": "En el chat",
+      "inChatRemove": "En el chat. Quítalo con su × en la bandeja de contexto.",
+      "lockedName": "{label}, bloqueado: pide a un administrador acceso a IA",
+      "open": "Abrir",
+      "orgChanged": "Esta página pertenece a otra organización. Recárgala para preguntar sobre ella.",
+      "panelActions": "Acciones del panel",
+      "queuedWhileRunning": "Añadido al chat. Envíalo cuando termine la respuesta actual.",
+      "rowActions": "Acciones de fila",
+      "setUpIngestion": "Ayúdame a configurar la ingesta",
+      "setUpTracing": "Ayúdame a configurar el trazado",
+      "title": {
+        "dependency": "Dependencia · {name}",
+        "emptyResult": "Resultados vacíos · {name}",
+        "setUpIngestion": "Configurar la ingesta",
+        "setUpTracing": "Configurar el trazado"
+      },
+      "tooltip": {
+        "add": "Añadir al chat",
+        "createRegex": "Write a regex pattern with @:{'brand.autobot'}",
+        "dockedAsk": "Open @:{'brand.autobot'} for this editor",
+        "emptyResult": "Pregunta por qué no coincidió nada",
+        "explain": "Explicar esto",
+        "explainAlert": "Explicar esta alerta",
+        "explainEdge": "Comprobar esta dependencia",
+        "explainField": "Explicar este campo",
+        "explainPanel": "Explicar este panel",
+        "explainSeries": "Explicar esta serie",
+        "explainService": "Comprobar este servicio",
+        "explainSpan": "Explicar este span",
+        "fix": "Solucionar este hallazgo",
+        "ingestion": "Consigue los primeros datos",
+        "noStream": "Envía los primeros datos",
+        "sidebarAsk": "Open @:{'brand.autobot'} with this function",
+        "troubleshootAlert": "Pregunta por qué se disparó esta alerta",
+        "troubleshootQuery": "Solucionar esta consulta",
+        "troubleshootSpan": "Pregunta por qué falló este span"
+      },
+      "troubleshoot": "Diagnosticar",
+      "troubleshootAlert": "Diagnosticar esta alerta",
+      "troubleshootNoResults": "Diagnosticar resultados vacíos",
+      "troubleshootQuery": "Diagnosticar esta consulta",
+      "troubleshootSpan": "Diagnosticar este span"
+    },
+    "error": {
+      "account_changed": {
+        "title": "Se ha iniciado sesión con otra cuenta. Tu mensaje no se envió; recarga para continuar con esa cuenta."
+      },
+      "admission_busy": {
+        "action": "Reintentar",
+        "title": "@:{'brand.autobot'} is busy starting another answer. Your message wasn't sent."
+      },
+      "agent_unavailable": {
+        "action": "Reintentar",
+        "body": "Los hallazgos hasta ahora se conservan arriba.",
+        "title": "@:{'brand.autobot'} didn't respond. Nothing was changed.",
+        "titleAfterChange": "@:{'brand.autobot'} didn't respond."
+      },
+      "already_submitted": {
+        "action": "Recargar chat",
+        "title": "Este mensaje ya se envió. Recarga el chat para ver su respuesta."
+      },
+      "analysis_in_progress": {
+        "title": "Ya se está ejecutando un análisis de este incidente."
+      },
+      "approval_delivery_failed": {
+        "action": "Enviar de nuevo",
+        "title": "Your decision didn't reach @:{'brand.autobot'}. Nothing was changed."
+      },
+      "approval_elsewhere": {
+        "title": "Otra pestaña está esperando tu aprobación en este chat. Tu mensaje no se envió."
+      },
+      "approval_expired": {
+        "action": "Preguntar de nuevo",
+        "title": "No answer in time, so @:{'brand.autobot'} didn't run this action."
+      },
+      "authorization_unavailable": {
+        "action": "Reintentar",
+        "hint": "No se cobró nada.",
+        "title": "No se pudieron comprobar los créditos de IA. Tu mensaje no se envió."
+      },
+      "cancelled_elsewhere": {
+        "title": "Esta respuesta se detuvo desde otra pestaña."
+      },
+      "consent_declined": {
+        "title": "El uso de pago no estaba habilitado. Tu mensaje no se envió."
+      },
+      "consent_still_required": {
+        "action": "Gestionar uso de pago",
+        "actionAdmin": "Gestionar uso de pago",
+        "actionMember": "Solicitar a un administrador",
+        "body": "Habilítalo en Facturación › Uso de pago.",
+        "title": "El uso de pago no está habilitado para todas las organizaciones que lo necesitan."
+      },
+      "credits_exhausted": {
+        "action": "Gestionar uso de pago",
+        "actionAdmin": "Gestionar uso de pago",
+        "actionCopy": "Copiar solicitud",
+        "actionMember": "Solicitar a un administrador",
+        "body": "Los créditos incluidos no se renuevan.",
+        "bodyContract": "Contacta con tu gestor de cuentas para añadir créditos.",
+        "bodyMember": "Un administrador de {org} puede permitir el uso de pago en Facturación › Uso de pago.",
+        "bodyPayerMember": "Un administrador de {payer} puede permitir el uso de pago.",
+        "bodyResets": "Se restablecen el {date}.",
+        "title": "Se han agotado los créditos de IA de {org}. Tu mensaje no se envió.",
+        "titlePayer": "Se han agotado los créditos de IA de {org}, facturados a {payer}. Tu mensaje no se envió."
+      },
+      "data_level_blocked": {
+        "action": "Cambiar nivel",
+        "actionAdmin": "Cambiar nivel",
+        "actionMember": "Solicitar a un administrador",
+        "title": "Las filas sin procesar no se comparten con el modelo en {org}."
+      },
+      "empty_response": {
+        "action": "Reintentar",
+        "title": "@:{'brand.autobot'} didn't answer."
+      },
+      "history_unavailable": {
+        "action": "Reintentar",
+        "title": "No se pudo cargar el historial de este chat. Tu mensaje no se envió."
+      },
+      "not_enabled": {
+        "action": "Abrir ajustes de acceso",
+        "actionAdmin": "Abrir ajustes de acceso",
+        "actionMember": "Solicitar a un administrador",
+        "body": "Los chats anteriores seguirán siendo legibles.",
+        "title": "{product} está desactivado para {org}. Tu mensaje no se envió."
+      },
+      "off_for_org": {
+        "action": "Abrir ajustes de acceso",
+        "actionAdmin": "Abrir ajustes de acceso",
+        "actionMember": "Solicitar a un administrador",
+        "body": "Los chats anteriores seguirán siendo legibles.",
+        "title": "{product} está desactivado para {org}. Tu mensaje no se envió."
+      },
+      "offline": {
+        "action": "Reintentar",
+        "hint": "Reintentar se activa cuando vuelvas a estar en línea.",
+        "title": "No tienes conexión. Tu mensaje no se envió."
+      },
+      "permission_denied": {
+        "action": "Abrir roles de IAM",
+        "actionAdmin": "Abrir roles de IAM",
+        "actionMember": "Pide a un administrador",
+        "body": "This chat stays readable. An admin can grant access in IAM › Roles › @:{'brand.autobot'}.",
+        "title": "Tu rol ya no puede usar {product}. Tu mensaje no se ha enviado."
+      },
+      "permission_denied_tool": {
+        "action": "Abrir permisos del asistente",
+        "actionAdmin": "Abrir permisos del asistente",
+        "actionMember": "Pide a un administrador",
+        "body": "La política del asistente de tu organización lo bloquea.",
+        "title": "@:{'brand.autobot'} wasn't allowed to run {tool}."
+      },
+      "persistence_failed": {
+        "action": "Reintentar guardado",
+        "title": "Respondido, pero no guardado en el historial."
+      },
+      "provider_error": {
+        "action": "Reintentar",
+        "body": "No se ha cambiado nada.",
+        "bodyPartial": "Los hallazgos hasta ahora se conservan arriba.",
+        "reason": {
+          "modelUnavailable": "no puede conectar con el modelo",
+          "overloaded": "está sobrecargado",
+          "requestTooLarge": "no admite una pregunta tan larga",
+          "timedOut": "tardó demasiado"
+        },
+        "title": "El proveedor de IA {reason}, por lo que la respuesta se detuvo.",
+        "titleNoReason": "El proveedor de IA falló, por lo que la respuesta se detuvo."
+      },
+      "rca_disabled": {
+        "action": "Pide a un administrador",
+        "body": "Un administrador puede activarlo.",
+        "title": "El análisis de incidentes está desactivado."
+      },
+      "rate_limited": {
+        "action": "Reintentar",
+        "title": "El proveedor de IA está limitando las solicitudes. Tu mensaje no se ha enviado.",
+        "titleTimed": "El proveedor de IA está limitando las solicitudes. Tu mensaje no se ha enviado."
+      },
+      "run_limit_member": {
+        "action": "Mostrar chats en curso",
+        "title": "{n} chats están en curso o esperándote. Tu mensaje no se ha enviado."
+      },
+      "run_limit_org": {
+        "action": "Reintentar",
+        "title": "{product} está ocupado para tu organización. Tu mensaje no se ha enviado."
+      },
+      "restore_required": {
+        "action": "Recargar chat",
+        "title": "Este chat se ha restablecido en el servidor. Recarga para continuar."
+      },
+      "session_expired": {
+        "action": "Iniciar sesión",
+        "body": "Iniciar sesión abre una pestaña nueva; vuelve aquí para enviar.",
+        "title": "Tu sesión ha caducado. Tu borrador se conserva."
+      },
+      "session_owner_unavailable": {
+        "action": "Reintentar",
+        "title": "El chat se trasladó a otro servidor y no se pudo reanudar."
+      },
+      "signed_out": {
+        "action": "Iniciar sesión",
+        "title": "Has cerrado sesión en otra pestaña. Esta respuesta se detuvo."
+      },
+      "stale_epoch": {
+        "action": "Recargar chat",
+        "title": "Este chat se ha restablecido en el servidor. Recarga para continuar."
+      },
+      "stopped_before_send": {
+        "action": "Reintentar",
+        "title": "Se detuvo antes de enviar. Tu mensaje no se ha enviado."
+      },
+      "stream_dropped": {
+        "action": "Reintentar",
+        "body": "Los hallazgos hasta ahora se conservan arriba.",
+        "bodyPartial": "El texto anterior está incompleto.",
+        "title": "Conexión perdida tras {elapsed}. No se ha cambiado nada.",
+        "titleAfterChange": "Conexión perdida tras {elapsed}.",
+        "titleAfterChangeNow": "Conexión perdida.",
+        "titleNow": "Conexión perdida. No se ha cambiado nada."
+      },
+      "stream_oversized": {
+        "action": "Reintentar",
+        "body": "No se ha cambiado nada.",
+        "title": "Esta respuesta era demasiado grande para mostrarse."
+      },
+      "subscription_required": {
+        "action": "Ver planes",
+        "actionAdmin": "Ver planes",
+        "actionMember": "Pide a un administrador",
+        "body": "Subscribe to keep using @:{'brand.autobot'}.",
+        "title": "Los créditos de IA incluidos se han agotado para {org}."
+      },
+      "turn_busy": {
+        "action": "Detenerlo",
+        "title": "Este chat aún está respondiendo. Tu mensaje no se envió."
+      },
+      "turn_limit": {
+        "action": "Reintentar",
+        "body": "Vuelve a enviarlo cuando termine uno.",
+        "title": "Hay demasiadas respuestas en curso. Tu mensaje no se envió."
+      },
+      "unknown": {
+        "action": "Reintentar",
+        "status": "El servidor devolvió HTTP {status}.",
+        "title": "Se ha producido un error."
+      },
+      "unreachable": {
+        "action": "Reintentar",
+        "title": "No se pudo conectar con OpenObserve. Tu mensaje no se envió."
+      },
+      "agent_disabled": {
+        "title": "{agent} está desactivado para {org}. Tu mensaje no se envió.",
+        "action": "Abrir ajustes del agente",
+        "actionAdmin": "Abrir ajustes del agente",
+        "actionMember": "Pide a un administrador"
+      },
+      "agent_not_permitted": {
+        "title": "Tu rol no puede usar {agent}. Tu mensaje no se envió.",
+        "body": "An admin can grant it in Settings › @:{'brand.autobot'} › Agents.",
+        "action": "Pide a un administrador"
+      },
+      "agent_unreachable": {
+        "title": "No se puede contactar con {agent} ahora mismo. Tu mensaje no se envió.",
+        "action": "Inténtalo de nuevo"
+      },
+      "handoff_failed": {
+        "title": "No se pudo transferir este chat a {agent}. {fromAgent} lo ha conservado.",
+        "body": "Tu mensaje sigue en este chat.",
+        "action": "Inténtalo de nuevo"
+      }
+    },
+    "errorDetails": {
+      "chat": "Chat",
+      "code": "Código",
+      "copied": "Detalles copiados",
+      "copy": "Copiar detalles",
+      "httpStatus": "Estado HTTP",
+      "serverMessage": "Mensaje del servidor",
+      "title": "Detalles",
+      "trace": "Traza",
+      "turn": "Turno",
+      "when": "Cuándo"
+    },
+    "evidence": {
+      "copied": "Consulta copiada",
+      "fromStep": "del paso {n}",
+      "groupName": "consulta de {language} en {stream}, {range}",
+      "groupNameNoStream": "consulta de {language}, {range}",
+      "lastMinutes": "últimos {count} min",
+      "noRows": "No hay filas en este rango",
+      "noStreamAccess": "No tienes acceso al stream {stream}",
+      "openHint": "Se abre con la consulta cargada",
+      "opensNewTab": "{label} (se abre en una pestaña nueva)",
+      "otherOrg": "Esta consulta pertenece a {org}. Cambia de organización para ejecutarla.",
+      "queryFailed": "Error en la consulta: {reason}",
+      "queryFailedPlain": "Error en la consulta",
+      "rangeFallback": "rango: desconocido · se ejecuta en los últimos 15 min",
+      "rangeUnknown": "rango: desconocido",
+      "resultsOf": "Resultados de {name}",
+      "rowsCount": "{count} fila | {count} filas",
+      "rowsScannedWindow": "{count} fila · {took} · {size} escaneado · {window} | {count} filas · {took} · {size} escaneado · {window}",
+      "rowsWindow": "{count} fila · {took} · {window} | {count} filas · {took} · {window}",
+      "runNow": "Ejecutar ahora",
+      "runNowHint": "Abre {explorer} con esta consulta cargada; ejecútala allí.",
+      "sawRows": "@:{'brand.autobot'} got {count} row | @:{'brand.autobot'} got {count} rows",
+      "sawRowsIn": "@:{'brand.autobot'} got {count} row in {range} | @:{'brand.autobot'} got {count} rows in {range}",
+      "stopped": "Detenido",
+      "windowCapped": "{window} (limitado a los últimos 7 días)",
+      "askAdmin": "Pregunta a un administrador",
+      "line": "{count} consulta, {range} | {count} consultas, {range}",
+      "stepsLine": "{count} paso, {range} | {count} pasos, {range}",
+      "noAccess": "{n} cita no disponible: sin acceso a {stream} | {n} citas no disponibles: sin acceso a {stream}",
+      "noAccessPlain": "{n} cita no disponible | {n} citas no disponibles"
+    },
+    "export": {
+      "approved": "Aprobado por ti a las {time}",
+      "attachment": "[adjunto: {name}]",
+      "denied": "Denegado por ti a las {time}",
+      "doneOf": {
+        "create": "Creados {done} de {total}",
+        "delete": "Eliminados {done} de {total}",
+        "update": "Actualizados {done} de {total}"
+      },
+      "ended": "Esta respuesta no terminó",
+      "exportedLine": "Exportado {time} {zone} · {org}",
+      "image": "[imagen: {name}]",
+      "steps": "Se completó {n} paso ({names}) | Se completaron {n} pasos ({names})",
+      "stopped": "Se detuvo a las {time} · hallazgos conservados",
+      "you": "Tú"
+    },
+    "findings": {
+      "confidence": "Confianza: {level}",
+      "inferred": "Inferido",
+      "level": {
+        "high": "alta",
+        "inconclusive": "no concluyente",
+        "low": "baja",
+        "medium": "media"
+      },
+      "ruledOut": "Descartado",
+      "inferredLine": "Inferido: {text}",
+      "next": "Siguiente: {text}",
+      "notEstablished": "No establecido: {text}",
+      "ruledOutLine": "Descartado: {text}",
+      "showRaw": "Mostrar hallazgos sin procesar",
+      "unreadable": "No se pudieron mostrar los hallazgos."
+    },
+    "footer": {
+      "credits": "{count} crédito | {count} créditos",
+      "creditsCountedHint": "Los créditos se cuentan cuando se acepta una solicitud.",
+      "evaluated": "Evaluado {range}",
+      "evaluatedMore": "Evaluado {range} y {count} ventana más | Evaluado {range} y {count} ventanas más",
+      "includedCredits": "{count} crédito incluido | {count} créditos incluidos",
+      "notSaved": "no guardado",
+      "notSavedHint": "Esta respuesta se dio, pero no se pudo guardar en el historial",
+      "queries": "{count} consulta | {count} consultas",
+      "refunded": "0 créditos · reembolsados",
+      "rerun": "Volver a ejecutar para ahora",
+      "rerunFor": "Volver a ejecutar para {range}",
+      "theLastDays": "el último {n} día | los últimos {n} días",
+      "theLastHours": "las últimas {n} h",
+      "theLastMinutes": "los últimos {n} min",
+      "tokens": "{tokens} tokens · {count} llamada al modelo | {tokens} tokens · {count} llamadas al modelo",
+      "tryWider": "Prueba con los últimos {duration}"
+    },
+    "fork": {
+      "contextNote": "Tu primer mensaje usa el chat compartido como contexto.",
+      "divider": "Tu chat empieza aquí",
+      "failed": "No se pudo continuar este chat",
+      "regionName": "Continuado desde {title}",
+      "seedLost": "The shared chat is no longer available, so @:{'brand.autobot'} won't have its earlier messages.",
+      "seedMissing": "La transcripción compartida no está disponible en este dispositivo",
+      "sendAnyway": "Enviar de todos modos",
+      "showTurns": "Mostrar {count} turno compartido | Mostrar {count} turnos compartidos",
+      "sourceGone": "· origen ya no disponible",
+      "sourceHeading": "Continuado desde «{title}» · compartido por {owner} · instantánea a fecha de {time}",
+      "title": "{title} (continuación)",
+      "titleN": "{title} (continuación {n})",
+      "toast": "Continuando en tus chats",
+      "unavailable": "Este enlace ya no está disponible, así que no se puede continuar."
+    },
+    "gate": {
+      "announce": {
+        "locked": "{product} no está disponible para tu rol."
+      },
+      "checkAgain": "Comprobar de nuevo",
+      "checkAgainHint": "¿Acabas de obtener acceso?",
+      "close": "Cerrar",
+      "learnMore": "Descubre qué hace",
+      "learnTitle": "Qué hace {product}",
+      "noPermission": {
+        "askAdmin": "Pide a un administrador",
+        "body": "Un administrador puede conceder acceso en {whereToGrant}.",
+        "title": "{product} no está disponible para tu rol",
+        "tooltip": "Pide acceso a IA a un administrador",
+        "unknownNotice": "Es posible que tu rol no incluya {product}. Si el envío falla, pide a un administrador."
+      },
+      "noShare": {
+        "tooltip": "Solo los administradores pueden compartir chats"
+      },
+      "noShareRead": {
+        "body": "Pide acceso para compartir chats a un administrador.",
+        "title": "No tienes acceso a los chats compartidos en esta organización"
+      },
+      "notConfigured": {
+        "body": "No agent target is configured for this deployment, so @:{'brand.autobot'} is off for everyone.",
+        "setup": "Set up @:{'brand.autobot'}",
+        "title": "{product} aún no está configurado"
+      },
+      "notEntitled": {
+        "capability1": "Explica cualquier fila de log, span o panel",
+        "capability2": "Escribe SQL, PromQL y VRL a partir de lenguaje natural",
+        "capability3": "Propone correcciones que tú apruebas",
+        "pitch": "{product} investiga logs, trazas y métricas contigo, escribe consultas y propone cambios que tú apruebas. Forma parte de OpenObserve Enterprise y Cloud.",
+        "seePlans": "Ver planes",
+        "title": "Descubre {product}",
+        "tooltip": "{product} forma parte de OpenObserve Enterprise y Cloud"
+      },
+      "offForOrg": {
+        "body": "Past chats stay readable. An admin can turn it on in Settings › @:{'brand.autobot'}.",
+        "title": "{product} está desactivado para esta organización"
+      },
+      "openAccessSettings": "Abrir ajustes de acceso",
+      "tryAgain": "Reintentar",
+      "unhealthy": {
+        "body": "The @:{'brand.autobot'} service isn't responding. Try again in a few minutes.",
+        "notice": "{product} no responde. Tu último mensaje no obtuvo respuesta.",
+        "title": "{product} no está disponible en este momento",
+        "tooltip": "{product} no está disponible en este momento"
+      },
+      "whereToGrant": "{iam} › {roles} › {group}"
+    },
+    "grants": {
+      "always": "Siempre",
+      "alwaysAsk": "Las eliminaciones y los cambios en Facturación, IAM y retención siempre piden confirmación.",
+      "browserEmpty": "Este navegador no guarda aprobaciones permanentes.",
+      "columns": {
+        "actions": "Acciones",
+        "grantedAt": "Concedido",
+        "grantedBy": "Concedido por",
+        "scope": "Ámbito",
+        "tool": "Herramienta u operación"
+      },
+      "empty": "No hay aprobaciones permanentes",
+      "loadFailed": "No se pudieron cargar las aprobaciones permanentes.",
+      "openChat": "Abrir chat",
+      "revoke": "Revocar",
+      "revokeNamed": "Revocar el permiso permanente para {tool}",
+      "revoked": "Approval revoked. @:{'brand.autobot'} will ask next time.",
+      "thisChat": "Este chat",
+      "title": "Aprobaciones permanentes",
+      "unsupported": "Las aprobaciones para toda la organización necesitan una versión más reciente del servidor.",
+      "yours": "Tus aprobaciones",
+      "yoursInBrowser": "Tus aprobaciones en este navegador"
+    },
+    "header": {
+      "announceFailed": "La respuesta falló: {title}.",
+      "announceNeedsYou": "{product} te necesita: {title}.",
+      "announceReady": "Respuesta lista: {title}.",
+      "announceWorkingElsewhere": "Respondiendo en otra pestaña: {title}.",
+      "answeringName": "{product}, respondiendo",
+      "answeringNameOpen": "{product}, respondiendo, abierto",
+      "enterpriseName": "{product}, función de Enterprise y Cloud",
+      "failedName": "{product}, la última respuesta falló",
+      "lockedName": "{product}, bloqueado",
+      "nameOpen": "{product}, abierto",
+      "needsYouCountName": "{product}, te necesita, {count} en espera",
+      "needsYouCountNameOpen": "{product}, te necesita, {count} en espera, abierto",
+      "needsYouName": "{product}, te necesita",
+      "needsYouNameOpen": "{product}, te necesita, abierto",
+      "offName": "{product}, no configurado",
+      "open": "Abrir",
+      "readyName": "{product}, respuesta lista",
+      "stateDone": "Respuesta lista: {title}",
+      "stateFailed": "La respuesta falló: {title}",
+      "stateOpen": "{product} · Abierto",
+      "stateRunningCount": "{count} respuesta en curso | {count} respuestas en curso",
+      "stateWorking": "Respondiendo: {title}",
+      "toastReady": "Respuesta lista · {title}",
+      "tooltip": "@:{'brand.askAutobot'}",
+      "unavailableName": "{product}, no disponible",
+      "toastFailed": "{title} ha fallado",
+      "goTo": "Ir a {product}"
+    },
+    "helper": {
+      "checking": "Comprobando…",
+      "discarded": "Propuesta descartada. Vuelve a preguntar para obtener una nueva.",
+      "editorPlaceholder": {
+        "js": "Escribe una función de JavaScript, por ejemplo: return event",
+        "promql": "Escribe una consulta PromQL, por ejemplo: rate(http_requests_total[5m])",
+        "vrl": "Escribe una función VRL, por ejemplo: .status = \"active\""
+      },
+      "inserted": "Insertado",
+      "noChange": "El editor ya tiene esto.",
+      "syntax": {
+        "missing": "Falta {char}",
+        "unclosed": "{char} sin cerrar",
+        "unexpected": "{char} inesperado en la línea {line}, columna {column}"
+      },
+      "generating": "Generando… {seconds} s",
+      "overBudget": "Mayor que el presupuesto habitual"
+    },
+    "history": {
+      "allPinned": "Los 100 chats están fijados. Desfija o elimina uno para guardar chats nuevos.",
+      "clearAll": {
+        "action": "Eliminar todos los chats",
+        "bodyLocal": "Esto elimina el chat guardado en este navegador para {org}. Los chats fijados también se eliminan. | Esto elimina los {count} chats guardados en este navegador para {org}. Los chats fijados también se eliminan.",
+        "bodyServer": "Los elimina de todos los dispositivos y revoca {links} enlaces compartidos. Los chats que aún están respondiendo se detienen.",
+        "confirm": "Eliminar {count} chat | Eliminar {count} chats",
+        "confirmAll": "Eliminar todos los chats",
+        "confirmWord": "eliminar",
+        "deleting": "Eliminando…",
+        "done": "{count} chat eliminado | {count} chats eliminados",
+        "doneAll": "Se han eliminado todos tus chats",
+        "failed": "No se pudieron eliminar tus chats",
+        "linksUnknown": "No se pudieron contar los enlaces compartidos. Los que existan se revocan.",
+        "title": "¿Eliminar {count} chat? | ¿Eliminar los {count} chats?",
+        "titleAll": "¿Eliminar todos tus chats en {org}?",
+        "typeToConfirm": "Escribe eliminar para confirmar"
+      },
+      "clearOnSignOut": "Eliminar los chats de mi navegador al cerrar sesión",
+      "delete": {
+        "bodyLocal": "Esto elimina el chat de este navegador.",
+        "bodyServer": "Esto elimina el chat de todos los dispositivos y detiene cualquier respuesta en curso.",
+        "links": {
+          "checking": "Comprobando enlaces compartidos…",
+          "count": "Su {count} enlace activo dejará de funcionar | Sus {count} enlaces activos dejarán de funcionar",
+          "unknown": "No se pudieron comprobar sus enlaces compartidos. Al eliminar, se revocan."
+        },
+        "running": "Este chat aún está respondiendo. Si lo eliminas, se detiene la respuesta.",
+        "title": "¿Eliminar “{title}”?"
+      },
+      "deleteAction": "Eliminar",
+      "deleteFailed": "No se pudo eliminar el chat",
+      "deleted": "Chat eliminado",
+      "details": "Detalles",
+      "download": "Descargar",
+      "exportMarkdown": "Exportar Markdown",
+      "downloadAll": "Descargar todo",
+      "downloadFailed": "No se pudo generar la descarga",
+      "downloaded": "Descargado",
+      "empty": {
+        "title": "Aún no hay chats"
+      },
+      "filter": {
+        "active": "Filtro · {n}",
+        "agent": "Agente",
+        "alertOrIncident": "Alerta o incidente",
+        "button": "Filtrar",
+        "clear": "Borrar filtros",
+        "pinned": "Fijados",
+        "queryEditor": "Editor de consultas o funciones",
+        "remove": "Quitar filtro {filter}",
+        "shared": "Compartidos",
+        "show": "Mostrar",
+        "started": "Iniciado desde",
+        "investigations": "Investigaciones",
+        "autoRuns": "Ejecuciones automáticas",
+        "all": "Todos"
+      },
+      "filterEmpty": "Ningún chat coincide con estos filtros",
+      "group": {
+        "browser": "En este navegador",
+        "needsYou": "Requiere tu atención",
+        "older": "Anteriores",
+        "pinned": "Fijados",
+        "running": "En curso",
+        "today": "Hoy",
+        "week": "Últimos 7 días",
+        "yesterday": "Ayer"
+      },
+      "import": {
+        "dismiss": "Descartar",
+        "download": "Descargar",
+        "error": "Algo salió mal al mover tus chats. Los que no se hayan movido se quedan en este navegador.",
+        "failed": "No se pudo mover {count} chat | No se pudieron mover {count} chats",
+        "forbidden": "Tu rol no puede crear chats. Pide a un administrador acceso a IA.",
+        "move": "Mover chats",
+        "moved": "Movidos {done} de {count}",
+        "never": "No volver a preguntar",
+        "notNow": "Ahora no",
+        "offer": "Tienes {count} chats guardados en este navegador. ¿Quieres moverlos a tu cuenta para que aparezcan en todos tus dispositivos?",
+        "offline": "No tienes conexión. Los chats permanecen en este navegador hasta que lo vuelvas a intentar.",
+        "progress": "Moviendo {done} de {count}…",
+        "retry": "Reintentar",
+        "unavailable": "{count} chats están guardados en este navegador y aún no se pueden mover."
+      },
+      "loadOlder": "Cargar anteriores",
+      "loadedOlder": "Se ha cargado {count} chat anterior | Se han cargado {count} chats anteriores",
+      "localOnly": {
+        "adminHelp": "Define O2_AI_CHAT_PERSISTENCE_ENABLED para conservar los chats en el servidor.",
+        "adminLink": "Leer la documentación",
+        "description": "Chats guardados solo en este navegador, {count} de {cap}",
+        "help": "Los chats permanecen en este navegador.",
+        "info": "Acerca del historial del navegador",
+        "keptOnSignOut": "Tus chats del navegador se conservaron al cerrar sesión.",
+        "title": "Guardados solo en este navegador"
+      },
+      "matchCount": "{count} chat coincide | {count} chats coinciden",
+      "noMatch": "Ningún chat coincide con «{q}»",
+      "offline": "Sin conexión · mostrando los chats guardados en este navegador",
+      "open": "Abrir",
+      "openFailed": "No se pudo abrir este chat",
+      "origin": {
+        "alert": "Alerta",
+        "browser": "Navegador",
+        "editor": "Editor",
+        "incident": "Incidente"
+      },
+      "pending": {
+        "delete": "Eliminando…",
+        "pin": "Fijando…",
+        "rename": "Cambiando el nombre…"
+      },
+      "pin": "Fijar",
+      "pinFailed": "No se pudo fijar el chat",
+      "pinLocal": "Fijar (en este navegador)",
+      "pinned": "Fijado",
+      "prune": "{count} de {cap} chats",
+      "pruned": "Se eliminó el chat más antiguo para hacer sitio: «{title}»",
+      "readOnly": "Puedes leer tus chats. Para iniciar o continuar uno se necesita acceso a IA.",
+      "rename": "Cambiar nombre",
+      "rowMenu": "Acciones para {title}",
+      "search": "Buscar chats",
+      "searchInvestigations": "Buscar investigaciones",
+      "investigationsEmpty": "Aún no hay investigaciones",
+      "draftTag": "Borrador",
+      "serverError": "No se pudieron cargar tus chats",
+      "serverErrorCached": "Mostrando los chats guardados en este navegador · No se pudo conectar con el servidor",
+      "sharedLinks": "Enlaces compartidos",
+      "sharedByMe": "Compartidos por mí",
+      "sharedPublic": "Compartidos mediante enlace público",
+      "state": {
+        "answering": "Respondiendo",
+        "draft": "Borrador",
+        "expired": "Caducado",
+        "failed": "Fallido",
+        "needsYou": "Requiere tu atención"
+      },
+      "storageBlocked": "No se pudo guardar en este navegador. Las ventanas privadas y el almacenamiento lleno bloquean el historial.",
+      "title": "Chats",
+      "traceId": "ID de traza {id}",
+      "unpin": "Dejar de fijar",
+      "unpinLocal": "Dejar de fijar (en este navegador)",
+      "unpinned": "Sin fijar",
+      "view": {
+        "back": "Volver al chat: {title}",
+        "title": "Todos los chats"
+      },
+      "deleteChat": "Eliminar chat",
+      "deleteDraft": "Eliminar borrador local",
+      "kept": "Se conserva {days} días",
+      "lastTried": "Último intento {time}",
+      "listMenu": "Acciones de la lista de chats",
+      "serverErrorAgain": "Todavía no se pudieron cargar tus chats",
+      "stop": "Detener",
+      "titlesOnly": "Buscando en los títulos de los chats cargados hasta ahora",
+      "autoRuns": {
+        "empty": "Aún no hay ejecuciones automáticas en esta organización",
+        "openName": "Abrir {title}, {state}"
+      }
+    },
+    "label": {
+      "acceptedAt": "Aceptado {time}",
+      "askAgain": "Volver a preguntar",
+      "edited": "Editado después de {product}",
+      "provenance": "Acerca de este cambio",
+      "restoredAssistant": "Restored the version from @:{'brand.autobot'}.",
+      "restoredOriginal": "Se restauró tu versión original.",
+      "revert": "Revertir",
+      "revertAi": "Revert to the version from @:{'brand.autobot'}",
+      "revertMine": "Revertir a mi versión original",
+      "revertName": "Revertir el cambio del asistente",
+      "short": "IA",
+      "shortName": "IA, {label}",
+      "written": "Escrito por {product}"
+    },
+    "link": {
+      "cantOpen": "No se puede abrir aquí",
+      "fromAnswer": "Enlace en la respuesta",
+      "groupName": "{title}, {details}",
+      "id": "ID {id}",
+      "more": "Más acciones del enlace",
+      "newTab": "Abrir en una pestaña nueva",
+      "open": {
+        "alert": "Abrir alerta «{name}»",
+        "alerts": "Abrir alertas",
+        "chat": "Abrir chat",
+        "dashboard": "Abrir dashboard «{name}»",
+        "dashboards": "Abrir dashboards",
+        "functions": "Abrir funciones",
+        "incident": "Abrir incidente «{name}»",
+        "incidents": "Abrir incidentes",
+        "pipeline": "Abrir pipeline «{name}»",
+        "pipelines": "Abrir pipelines",
+        "trace": "Abrir traza {id}",
+        "services": "Abrir servicios",
+        "service": "Abrir servicio «{name}»",
+        "ingestion": "Abrir fuentes de datos",
+        "home": "Volver a Inicio"
+      },
+      "openAction": "Abrir",
+      "opened": "Abierto · {time}",
+      "openIn": "Abrir en {explorer}",
+      "redacted": "Una vista vinculada (detalles ocultos)",
+      "unsupported": "Este destino no es compatible con esta versión"
+    },
+    "mcp": {
+      "copyConfiguration": "Copiar configuración",
+      "deepLinkTokenNote": "Este enlace incluye tu token de acceso.",
+      "headerSubtitle": "Usa OpenObserve desde tu propio agente, como {claude}, {cursor} o {vscode}.",
+      "parityLine": "Tu agente obtiene las mismas herramientas y permisos que {product}. Las herramientas que {product} puede usar se configuran en {link}.",
+      "replaceToken": "Sustituye {token} por el token que generaste arriba, o por el Base64 de la dirección email:token de una cuenta de servicio.",
+      "skillsHint": "Enseña a tu agente a consultar, alertar y crear dashboards en {brand}.",
+      "toolsetsPath": "Settings › @:{'brand.autobot'} › Toolsets"
+    },
+    "message": {
+      "actionsName": "Acciones del mensaje",
+      "chipsName": "Contexto enviado con este mensaje",
+      "codeName": "Código, {lang}",
+      "copyAnswer": "Copiar respuesta",
+      "copyMarkdown": "Copiar como Markdown",
+      "copyPrompt": "Copiar",
+      "creditsUsedUp": "Se han agotado los créditos de IA de esta organización",
+      "edit": "Editar y reenviar",
+      "editedFrom": "Editado desde el mensaje {n}",
+      "editLabel": "Edita tu mensaje",
+      "editSend": "Enviar",
+      "evaluatedStamp": "Evaluado {range} · {n} consulta | Evaluado {range} · {n} consultas",
+      "fenceSource": "stream {stream} · {range}",
+      "firstVersion": "Esta es la primera versión",
+      "imageRemoved": "Se ha eliminado una imagen de un sitio externo",
+      "latestVersion": "Esta es la versión más reciente",
+      "meta": "{who} · {time}",
+      "more": "Más acciones",
+      "nextVersion": "Versión siguiente",
+      "olderHidden": "Continuación anterior oculta",
+      "openImage": "Abrir imagen {name}",
+      "previousVersion": "Versión anterior",
+      "regenerate": "Regenerar",
+      "tableName": "Tabla",
+      "versionName": "Versión {n} de {count}",
+      "versionOf": "{n} de {count}",
+      "you": "Tú",
+      "metaHandoff": "{meta} · para {agent}",
+      "toAgent": "Para {agent}",
+      "copyChatId": "Copiar ID del chat",
+      "shareAnswer": "Copiar enlace a esta respuesta",
+      "linkCopied": "Enlace copiado",
+      "linkCopiedPrivate": "Enlace copiado · solo tú puedes abrirlo",
+      "linkCopiedOrg": "Enlace copiado · las personas de {org} con acceso a chats compartidos pueden abrirlo",
+      "linkCopiedPublic": "Enlace copiado · cualquiera con el enlace puede abrirlo",
+      "branch": "Ramificar en un chat nuevo",
+      "branchTitle": "Ramificación de {title}",
+      "branchedFrom": "Ramificado desde",
+      "branchFailed": "No se pudo ramificar este chat",
+      "newTag": "Nuevo"
+    },
+    "name": "@:{'brand.autobot'}",
+    "limit": {
+      "slotFree": "Un chat ha finalizado. Ya puedes enviar."
+    },
+    "notice": {
+      "decision": "Requiere tu atención",
+      "delete": "Eliminar {entity}"
+    },
+    "outcome": {
+      "actions": {
+        "askAdmin": "Preguntar a un administrador",
+        "changeLevel": "Cambiar de nivel",
+        "managePaidUsage": "Gestionar el uso de pago",
+        "openIamRoles": "Abrir roles de IAM",
+        "openSettings": "Abrir los ajustes del asistente",
+        "reloadChat": "Recargar chat",
+        "sendAgain": "Enviar de nuevo",
+        "signIn": "Iniciar sesión",
+        "stopIt": "Detenerlo",
+        "viewPlans": "Ver planes"
+      },
+      "askAgain": "Preguntar de nuevo",
+      "backOnline": "Vuelves a estar en línea.",
+      "canRetryNow": "Ya puedes reintentarlo.",
+      "editResend": "Editar y reenviar",
+      "manualRoute": "Abrir en {explorer} en su lugar",
+      "noSnapshot": "El mensaje original ya no está aquí para reintentarlo. Vuelve a enviarlo desde el cuadro de mensaje.",
+      "openHere": "Abrir aquí",
+      "readonlyFailed": "Error: {title}",
+      "retry": "Reintentar",
+      "retryIn": "Reintentar en {s} s",
+      "retryOffline": "Reintentar cuando vuelvas a estar en línea",
+      "signedIn": "Sesión iniciada. Ya puedes reintentarlo.",
+      "stopItFailed": "No se pudo detener la otra respuesta. Inténtalo de nuevo.",
+      "stopItSent": "Se pidió a la otra respuesta que se detuviera.",
+      "tryLater": "Inténtalo más tarde",
+      "useAgentInstead": "Usar {agent} en su lugar",
+      "keepGoingWith": "Continuar con {agent}"
+    },
+    "plan": {
+      "deselectHint": "Desmarca lo que quieras conservar.",
+      "heading": "Voy a eliminar {count} {entity}:",
+      "itemsName": "Elementos para eliminar",
+      "largeBatch": "Lote grande: {count} {entity}",
+      "onlyThese": "Eliminar solo estos: {names}",
+      "showAll": "Mostrar los {count}",
+      "unlisted": "{count} elemento más no tiene nombre y se incluye | {count} elementos más no tienen nombre y se incluyen"
+    },
+    "policy": {
+      "autoDeclined": "Declined by @:{'brand.autobot'} safety settings",
+      "denied": "Bloqueado por la política: {tool}. {detail}",
+      "deniedAdmin": "An admin can allow it in Settings › @:{'brand.autobot'} › Permissions.",
+      "deniedPlain": "Bloqueado por la política: {tool}.",
+      "unreviewed": "@:{'brand.autobot'} changed {count} {entity} without a review step.",
+      "unreviewedAction": "Ver qué cambió",
+      "unreviewedActionName": "Ver qué cambió (se abre en una pestaña nueva)"
+    },
+    "query": {
+      "alert": "Crear borrador de alerta",
+      "copy": "Copiar consulta",
+      "dashboard": "Añadir al dashboard",
+      "insert": "Insertar como diff",
+      "more": "Más acciones de consulta",
+      "showAllLines": "Mostrar las {count} líneas",
+      "showFewerLines": "Mostrar menos líneas",
+      "newTab": "Abrir en una pestaña nueva",
+      "open": "Abrir en {explorer}",
+      "openShort": "Logs",
+      "run": "Ejecutar",
+      "running": "Ejecutando… · {n} s",
+      "stop": "Detener",
+      "openAll": "Abrir en {explorer} para los {count}"
+    },
+    "record": {
+      "compacted": "Earlier context was summarised by @:{'brand.autobot'} at {time}",
+      "theModel": "el modelo"
+    },
+    "scroll": {
+      "jumpToLatest": "Ir a lo más reciente",
+      "jumpToLatestCount": "Ir a lo más reciente · {count} nuevos",
+      "jumpToLatestName": "Ir a lo más reciente, {count} nuevos"
+    },
+    "settings": {
+      "access": {
+        "builtInAdmin": "Chat, compartir, conjuntos de herramientas",
+        "builtInEditor": "Chat, conjuntos de herramientas",
+        "builtInViewer": "Sin acceso",
+        "cancel": "Cancelar",
+        "enabled": "@:{'brand.autobot'} enabled for this organization",
+        "enabledLine": "Los miembros conservan sus chats anteriores.",
+        "grantedPerRole": "El acceso se concede por rol en {whereToGrant}",
+        "noRole": "Los usuarios que han iniciado sesión sin rol (valor predeterminado de SSO) no tienen acceso.",
+        "notice": "Los controles por organización requieren una versión más reciente del servidor.",
+        "orgSharing": "Los miembros con acceso para compartir pueden compartir chats en esta organización",
+        "publicOff": {
+          "confirm": "Desactivar los enlaces públicos",
+          "message": "{count} enlace existente dejará de funcionar. | {count} enlaces existentes dejarán de funcionar.",
+          "title": "¿Desactivar los enlaces públicos?"
+        },
+        "publicSharing": "Permitir enlaces públicos",
+        "publicSharingDeploymentOff": "Los enlaces públicos están desactivados para este despliegue (ZO_PUBLIC_AI_CHAT_ENABLED).",
+        "publicSharingLine": "Las opciones de enlaces públicos desaparecen del cuadro de diálogo para compartir.",
+        "rbacOff": "Role-based access is off, so every user can use @:{'brand.autobot'}.",
+        "roles": {
+          "allRoles": "IAM › Roles",
+          "capped": "Mostrando {shown} de {total} roles. Ver todos los roles en {link}.",
+          "chat": "Puede chatear",
+          "grant": "Conceder chat",
+          "grantNamed": "Conceder chat a {role}",
+          "loadFailed": "No se pudieron cargar los roles.",
+          "noChat": "Sin chat",
+          "title": "Roles en esta organización",
+          "unknown": "Desconocido"
+        },
+        "save": "Guardar",
+        "saved": "@:{'brand.autobot'} settings saved",
+        "sharing": "Uso compartido",
+        "tier": "Nivel de permiso predeterminado",
+        "tierAct": "Actuar con aprobación",
+        "tierActLine": "Los miembros aprueban las herramientas por chat o siempre. Las eliminaciones siempre requieren aprobación.",
+        "tierNeedsAgent": "Requiere una versión más reciente del agente para aplicarse",
+        "tierPropose": "Proponer cambios",
+        "tierProposeLine": "Cada cambio necesita la aprobación de un miembro.",
+        "tierRead": "Leer y consultar",
+        "tierReadLine": "Solo ejecuta consultas. Nunca cambia nada.",
+        "tierStored": "Nivel guardado: {tier}. Se aplicará cuando el agente pueda aplicarlo.",
+        "offInOrg": "Desactivado en esta organización",
+        "onInOrg": "Activado en esta organización",
+        "turnOff": {
+          "confirm": "Desactivar",
+          "done": "{product} desactivado para {org}",
+          "message": "¿Desactivar {product} para {org}? Las respuestas en curso se detendrán. Los miembros conservan su historial de chats.",
+          "pending": "Se desactivará cuando confirmes",
+          "title": "¿Desactivar {product}?"
+        },
+        "valueOff": "Desactivado",
+        "valueOn": "Activado",
+        "whoCanUse": "Quién puede usarlo",
+        "you": "Tú: {access}",
+        "youChat": "chat",
+        "youChatShare": "chat, compartir",
+        "youNone": "sin acceso",
+        "youUnknown": "aún no se conoce"
+      },
+      "adminOnly": "Solo los administradores de la organización pueden cambiar estos ajustes.",
+      "data": {
+        "about": "Acerca del uso compartido de datos",
+        "aboutProvider": "Las respuestas las genera {provider}.",
+        "aboutRedaction": "Las reglas de redacción de datos confidenciales se aplican primero.",
+        "level": "Datos compartidos con el modelo",
+        "levelAggregates": "Esquema y agregados",
+        "levelAggregatesLine": "Recuentos, percentiles e histogramas; no se incluyen filas individuales.",
+        "levelRaw": "Esquema, agregados y filas sin procesar",
+        "levelRawLine": "Se pueden enviar filas de logs, atributos de span y valores de muestra.",
+        "levelSchema": "Solo esquema",
+        "levelSchemaLine": "Solo nombres de stream y de campos; sin valores.",
+        "notice": "Los niveles de uso compartido de datos requieren una versión más reciente del servidor y del agente."
+      },
+      "env": {
+        "help": "Definido por el despliegue",
+        "notReported": "No informado por esta versión del servidor",
+        "setBy": "Definido por {env}"
+      },
+      "forbidden": "No tienes acceso a este ajuste.",
+      "history": {
+        "browserBody": "No se comparte entre dispositivos. Hasta 100 chats por miembro, se eliminan con los datos del navegador.",
+        "browserTitle": "Se guarda solo en el navegador de cada miembro",
+        "deleteLine": "Eliminar un chat lo borra en todas partes y revoca sus enlaces.",
+        "off": "Desactivado",
+        "on": "Activado",
+        "persistence": "Historial del servidor",
+        "persistenceHelp": "Actívalo en el despliegue para conservar los chats en el servidor.",
+        "publicLinks": "Enlaces públicos",
+        "publicLinksOff": "desactivados",
+        "publicLinksOn": "activados, hasta {days} día | activados, hasta {days} días",
+        "retention": "Retención",
+        "retentionDays": "{days} día | {days} días",
+        "retentionForever": "hasta que se elimine",
+        "serverTitle": "Se guarda en el servidor"
+      },
+      "leaveName": "the @:{'brand.autobot'} settings of {org}",
+      "offInDeployment": "@:{'brand.autobot'} is off in this deployment.",
+      "pageTitle": "@:{'brand.autobot'}",
+      "railDesc": "Estado, acceso, datos, historial, uso, conjuntos de herramientas, permisos y actividad",
+      "status": {
+        "agentEnabled": "@:{'brand.autobot'} enabled",
+        "agentHa": "Alta disponibilidad",
+        "agentUrl": "Dirección del agente",
+        "agentVersion": "Versión del agente",
+        "approvals": "Changes by @:{'brand.autobot'}",
+        "approvalsNotEnforced": "Rechazado: O2_AI_INTERNAL_SECRET no está definido, por lo que no se puede aplicar ningún cambio aprobado.",
+        "checked": "Comprobado",
+        "clientError": "El agente no respondió · última vez visto en este navegador",
+        "configured": "Configurado",
+        "dataShared": "Datos compartidos",
+        "healthUnsupported": "La comprobación de estado requiere una versión más reciente del servidor.",
+        "lastError": "Último error",
+        "lastErrorNone": "ninguno",
+        "model": "Modelo",
+        "modelHidden": "Oculto para los miembros",
+        "notSetUp": "No configurado",
+        "notSetUpMember": "@:{'brand.autobot'} isn't set up for this deployment. Ask an administrator.",
+        "offBody": "Desactivado por {actor} el {date}. Los miembros aún pueden abrir sus chats anteriores.",
+        "offBodyUnknown": "Desactivado para esta organización. Los miembros aún pueden abrir sus chats anteriores.",
+        "offForOrg": "Desactivado para esta organización",
+        "openAccess": "Abrir ajustes de acceso",
+        "reachable": "Accesible",
+        "unreachable": "Inaccesible",
+        "unreachableBody": "Members see @:{'brand.autobot'} as unavailable.",
+        "notEntitled": "No incluido en tu licencia",
+        "notEntitledBody": "Your license doesn't include @:{'brand.autobot'}. Contact your account team."
+      },
+      "tabs": {
+        "access": "Acceso",
+        "activity": "Actividad",
+        "data": "Datos",
+        "history": "Historial",
+        "permissions": "Permisos",
+        "status": "Estado",
+        "toolsets": "Conjuntos de herramientas",
+        "usage": "Uso"
+      },
+      "test": {
+        "button": "Probar",
+        "failed": "La prueba ha fallado: {cause}",
+        "failedRow": "fallida · {cause} · {when}",
+        "lastTest": "Última prueba",
+        "passed": "Prueba superada en {duration}",
+        "passedRow": "superada {duration} · {when}",
+        "running": "Probando…",
+        "unknownCause": "no se indicó ningún motivo"
+      },
+      "title": "@:{'brand.autobot'}",
+      "usage": {
+        "allowance": "Asignación de créditos",
+        "answered": "Respondidas",
+        "caps": "Límites",
+        "capsLine": "Las respuestas adicionales se bloquean y no se cobran.",
+        "consentLine": "No se ha habilitado el uso de pago. Se solicita consentimiento a los miembros en su siguiente respuesta.",
+        "exhaustedLine": "Los miembros ven «Los créditos de IA se han agotado para {org}».",
+        "failed": "Fallidas",
+        "longest": "Respuesta más larga",
+        "managePaid": "Gestionar el uso de pago",
+        "notMetered": "Esta implementación no tiene medición de consumo.",
+        "perMember": "Respuestas activas por miembro",
+        "perNode": "Respuestas activas por nodo",
+        "perOrg": "Respuestas activas por organización",
+        "period": "Este período de facturación",
+        "stopped": "Detenidas",
+        "turns": "Turnos"
+      },
+      "voice": {
+        "browser": "En el navegador",
+        "browserHelp": "La mayoría de los navegadores envían el audio al servicio de voz de su proveedor.",
+        "help": "Los miembros pueden dictar y editar el texto antes de enviarlo.",
+        "localOnly": "Guardado en este navegador, solo para ti.",
+        "off": "Desactivado",
+        "offHelp": "Nadie puede dictar en este navegador.",
+        "readOnly": "El reconocimiento de voz del servidor requiere una versión más reciente del servidor.",
+        "title": "Dictado por voz"
+      }
+    },
+    "runs": {
+      "agent": {
+        "general": "{product}",
+        "investigator": "@:{'brand.autobotInvestigate'}",
+        "queryBuilder": "Generador de consultas"
+      },
+      "chatInOrg": "Un chat en {org}",
+      "review": "Revisar",
+      "stop": "Detener",
+      "summary": {
+        "answering": "{count} respondiendo",
+        "needs": "{count} te necesita | {count} te necesitan"
+      },
+      "state": {
+        "reconnecting": "Reconectando"
+      }
+    },
+    "share": {
+      "allOrgAdminOnly": "Solo los administradores de la organización pueden ver todos los chats compartidos.",
+      "allLinks": "Todos los enlaces compartidos",
+      "anotherLink": "Crear otro enlace",
+      "attachmentHidden": "Adjunto oculto",
+      "attachmentsHiddenTag": "Adjuntos ocultos",
+      "attachmentsIncluded": "Las filas y las imágenes adjuntas se incluyen en este enlace.",
+      "changeExpiry": "Cambiar caducidad",
+      "changeExpiryFor": "Cambiar la caducidad de {title}",
+      "changeSettings": "Cambiar ajustes",
+      "content": "Contenido",
+      "copied": "Enlace copiado",
+      "copyLink": "Copiar enlace",
+      "copyLinkFor": "Copiar enlace de {title}",
+      "createAndCopy": "Crear y copiar enlace",
+      "createLiveAndCopy": "Crear enlace en tiempo real y copiar",
+      "createdNotCopied": "Enlace creado. Se bloqueó la copia, así que el enlace se muestra para que lo copies.",
+      "createdNotCopiedMenu": "Enlace creado, pero se bloqueó la copia. Abre Gestionar enlaces para copiarlo.",
+      "createFailed": "No se pudo crear el enlace",
+      "created": "Enlace creado",
+      "createdCopied": "Enlace creado y copiado",
+      "createdToast": "Enlace copiado. Las personas de {org} con acceso a chats compartidos pueden abrirlo.",
+      "empty": {
+        "all": "No hay chats compartidos en esta organización.",
+        "mine": "No has compartido ningún chat."
+      },
+      "expires": "Caduca",
+      "expiresOn": "Caduca {time}",
+      "forbidden": "No tienes permiso para compartir chats.",
+      "hideAttachments": "Ocultar adjuntos",
+      "hideTools": "Ocultar datos de herramientas",
+      "hideToolsFor": "Ocultar datos de herramientas de {title}",
+      "historyUnavailable": "El historial de este chat no se puede cargar ahora mismo, así que no se puede compartir.",
+      "link": "Enlace",
+      "liveFollows": "En tiempo real, sigue los mensajes nuevos",
+      "liveMode": "En tiempo real",
+      "loadFailed": "No se pudieron cargar tus enlaces",
+      "manage": "Gestionar enlace",
+      "managerTitle": "Enlaces compartidos",
+      "never": "Nunca",
+      "noStoredMessages": "Este chat aún no tiene mensajes guardados, así que no se puede compartir.",
+      "notSavedBlocked": "La última respuesta de este chat no está guardada, así que aún no se puede compartir.",
+      "nothingToShare": "Envía un mensaje primero",
+      "offline": "No tienes conexión",
+      "openFailed": "No se pudo abrir el chat",
+      "org": "Organización",
+      "outOfDateTag": "Desactualizado",
+      "public": "Cualquier persona con el enlace",
+      "publicMax": "Los enlaces públicos caducan en {days} días",
+      "publicNeedsAttachmentRedaction": "Los enlaces públicos aún no pueden ocultar los adjuntos en este servidor.",
+      "publicOff": "Los enlaces públicos están desactivados en esta implementación.",
+      "redactTools": "Ocultar las entradas y salidas de las herramientas",
+      "reviewTooltip": "Revisa qué incluye este enlace antes de compartirlo.",
+      "revoke": "Revocar",
+      "revokeConfirm": "¿Revocar este enlace? Quienes lo tengan perderán el acceso ahora.",
+      "revokeFailed": "No se pudo revocar el enlace",
+      "revokeFor": "Revocar el enlace de {title}",
+      "revoked": "Enlace revocado",
+      "rowMenu": "Acciones del enlace para {title}",
+      "scope": {
+        "all": "Todos en la organización",
+        "mine": "Míos"
+      },
+      "scopeLabel": "Mostrar enlaces",
+      "share": "Compartir",
+      "shared": "Compartido",
+      "sharedBy": "Compartido por {name}",
+      "sharedOrg": "Compartido con tu organización",
+      "sharedPublic": "Compartido con cualquier persona que tenga el enlace",
+      "show": "Mostrar",
+      "showTools": "Mostrar los datos de las herramientas",
+      "showToolsConfirm": "¿Mostrar las entradas y salidas de las herramientas a cualquier persona con este enlace?",
+      "showToolsFor": "Mostrar los datos de las herramientas para {title}",
+      "snapshot": "Instantánea",
+      "snapshotAsOf": "Instantánea · a fecha de {time}",
+      "snapshotNow": "Instantánea del chat tal como está ahora",
+      "snapshotWaits": "Disponible cuando termine la respuesta",
+      "snapshotUpdated": "Instantánea actualizada",
+      "switchLive": "Cambiar a en tiempo real",
+      "switchLiveFor": "Cambiar {title} a en tiempo real",
+      "switchSnapshot": "Cambiar a instantánea",
+      "switchSnapshotFor": "Cambiar {title} a instantánea",
+      "title": "Compartir chat",
+      "toolsHidden": "Herramientas ocultas",
+      "tooltip": "Comparte una instantánea con tu organización. Los datos de las herramientas permanecen ocultos.",
+      "updateBlocked": "Finaliza o detén la respuesta primero",
+      "updateBlockedRow": "Espera a que termine la respuesta",
+      "updateFailed": "No se pudo actualizar el enlace",
+      "updateSnapshot": "Actualizar instantánea",
+      "updateSnapshotFor": "Actualizar la instantánea de {title}",
+      "views": "{count} vista | {count} vistas",
+      "visibilityFixed": "Para cambiar quién puede abrirlo, crea un enlace nuevo.",
+      "waitForAnswer": "Espera a que termine la respuesta para compartir una instantánea. Los enlaces en tiempo real están en los ajustes de Compartir.",
+      "who": "Quién puede abrirlo",
+      "whoContinue": "Continuarlo en sus propios chats también requiere acceso a IA.",
+      "whoOrg": "Las personas de {org} con acceso a chats compartidos pueden leerlo.",
+      "whoPublic": "Cualquier persona con el enlace puede leerlo.",
+      "changedSince": "Cambiado desde la instantánea",
+      "readersNeedAccess": "Los lectores necesitan acceso a IA para continuarlo.",
+      "yourOrg": "Tu organización"
+    },
+    "shared": {
+      "attachmentsHidden": "El propietario ocultó los archivos adjuntos.",
+      "backoff": "Comprobando cada minuto",
+      "brand": "Compartido desde OpenObserve",
+      "brandHome": "Inicio de OpenObserve",
+      "by": "Compartido por {name}",
+      "continue": "Continuar en mis chats",
+      "continueAgain": "Continuar de nuevo",
+      "continueLocked": "Puedes leer este chat. Para continuarlo se necesita acceso a IA; pregunta a un administrador.",
+      "copied": "Copiado",
+      "copyMarkdown": "Copiar como Markdown",
+      "goToApp": "Ir a OpenObserve",
+      "goToChats": "Ir a mis chats",
+      "live": "En tiempo real · último cambio {time}",
+      "loadFailed": "No se pudo cargar este chat compartido",
+      "markdownYou": "Tú",
+      "more": "Más acciones",
+      "notFound": {
+        "body": "Puede que el enlace sea incorrecto, esté revocado o caducado, o que el chat se haya eliminado.",
+        "title": "Este chat compartido no está disponible"
+      },
+      "offline": "Sin conexión · mostrando lo cargado a las {time}",
+      "offlineTitle": "Sin conexión",
+      "openApp": "Abrir OpenObserve",
+      "openCopy": "Abrir mi copia",
+      "openCopyTooltip": "Abre la copia que continuaste en este navegador",
+      "openMine": "Abrir en mis chats",
+      "ossTitle": "Los chats compartidos forman parte de OpenObserve Enterprise y Cloud",
+      "owner": "Propietario",
+      "rateLimited": "Demasiados lectores ahora mismo · volviendo a comprobar en {seconds} s",
+      "redacted": "El propietario ocultó las entradas y salidas de las herramientas. Puedes ver las respuestas y qué herramientas se ejecutaron.",
+      "running": "Aún respondiendo · iniciado {ago} · se actualiza solo",
+      "signIn": "Inicia sesión para continuar en OpenObserve",
+      "snapshot": "Instantánea de {time}",
+      "streamHidden": "Parte de la evidencia está oculta porque proviene de streams a los que no tienes acceso.",
+      "streamHiddenBlock": "Oculto · no tienes acceso al stream {stream}",
+      "truncated": "Los primeros turnos no se incluyen porque el chat es demasiado grande para compartirlo completo.",
+      "truncatedDivider": "Turnos anteriores no incluidos",
+      "updated": "Actualizado con nuevos mensajes"
+    },
+    "shell": {
+      "answeringElsewhere": "Respondiendo en otra pestaña",
+      "answeringElsewherePolling": "Sigue respondiendo en otra pestaña",
+      "answeringHerePolling": "Sigue respondiendo",
+      "approvalElsewhere": "Esperando tu aprobación en otra pestaña",
+      "approvalNotAnswerableHere": "Esperando tu aprobación en otra pestaña",
+      "close": "Cerrar {product}",
+      "deletedElsewhere": "Este chat se eliminó en otro lugar",
+      "deletedInAnotherTab": "Este chat se eliminó en otra pestaña",
+      "discardChanges": "Descartar cambios",
+      "dockTooNarrow": "Abierto en la barra lateral: este editor es demasiado estrecho para un chat acoplado",
+      "keep": "Mantener",
+      "keepEditing": "Seguir editando",
+      "leaveGuardBody": "Si sales, se descartarán tus cambios en {name}.",
+      "leaveGuardThisAlert": "esta alerta",
+      "leaveGuardThisPattern": "este patrón",
+      "leaveGuardTitle": "Cambios sin guardar",
+      "loadFailed": "No se pudo cargar este chat",
+      "loadingChat": "Cargando tu chat…",
+      "newChat": "Nuevo chat",
+      "notFound": "Este chat no está disponible",
+      "orgSwitchRunningBody": "{count} respuesta sigue en curso en {org}. ¿Detenerla o dejarla en curso ahí? | {count} respuestas siguen en curso en {org}. ¿Detenerlas o dejarlas en curso ahí?",
+      "orgSwitchRunningTitle": "Hay respuestas aún en curso en {org}",
+      "orgSwitchWithdrawn": "Si mantienes, se retira {count} aprobación pendiente. | Si mantienes, se retiran {count} aprobaciones pendientes.",
+      "otherAccount": "Se ha iniciado sesión con otra cuenta. Recarga para continuar.",
+      "placeDock": "Junto al editor",
+      "placeWindow": "Flotante",
+      "prefersWindowHint": "Esta página conserva su ancho con una ventana flotante",
+      "refresh": "Actualizar",
+      "reload": "Recargar",
+      "resetWidth": "Restablecer ancho",
+      "resizeHandle": "Cambiar tamaño del asistente",
+      "resizeHandleValue": "{width} rem",
+      "sheetExpand": "Mostrar más",
+      "sheetPeek": "Mostrar menos",
+      "sheetSnap": {
+        "full": "Altura completa",
+        "half": "Media altura",
+        "peek": "Contraído"
+      },
+      "signOutRunningBody": "{count} respuesta sigue en curso. Al cerrar sesión, se detendrá. | {count} respuestas siguen en curso. Al cerrar sesión, se detendrán.",
+      "signOutRunningTitle": "Hay respuestas aún en curso",
+      "signedOutElsewhere": "Has cerrado sesión en otra pestaña.",
+      "skipLink": "Saltar a {product}",
+      "startNewChat": "Iniciar un chat nuevo",
+      "stillRunningRefresh": "Sigue en curso. Actualiza para comprobar de nuevo.",
+      "stop": "Detener",
+      "stopAndSignOut": "Detener y cerrar sesión",
+      "width": "Ancho",
+      "widthDefault": "Predeterminado",
+      "widthExpanded": "Ampliado",
+      "widthExpandedHint": "Mitad de la ventana",
+      "widthLimit": "En el límite de ancho",
+      "widthNarrower": "Más estrecho",
+      "widthNoRoom": "No hay espacio suficiente con este tamaño de ventana",
+      "widthWider": "Más ancho",
+      "loadFailedAgain": "Sigue sin poder cargarse este chat · último intento: {time}",
+      "openAs": "Abrir como",
+      "sidePanel": "Panel lateral",
+      "fullPage": "Página completa",
+      "newChatFullPage": "Nuevo chat en página completa",
+      "popOut": "Ventana flotante"
+    },
+    "tray": {
+      "close": "Cerrar {title}"
+    },
+    "window": {
+      "dropSidebar": "Fijar como barra lateral",
+      "dropTray": "Minimizar",
+      "gripMove": "Mover o cambiar el tamaño de {title}",
+      "gripResize": "Cambiar el tamaño de {title}",
+      "minimise": "Minimizar a la bandeja",
+      "moveKeyboard": "Mover con el teclado",
+      "moveModeHint": "Las flechas mueven · Mayús+flechas cambian el tamaño · Intro coloca · Esc cancela",
+      "name": "{product}, {title}",
+      "narrower": "Más estrecha",
+      "resetSize": "Restablecer tamaño",
+      "resizeKeyboard": "Cambiar el tamaño con el teclado",
+      "resizeModeHint": "Las flechas cambian el tamaño · Intro mantiene · Esc cancela",
+      "shorter": "Más baja",
+      "sizeLimit": "En el límite de tamaño",
+      "taller": "Más alta",
+      "wider": "Más ancha",
+      "stillAnswering": "{title} todavía está respondiendo",
+      "close": "Cerrar ventana"
+    },
+    "signout": {
+      "deleteLocal": "Eliminar también mis chats del navegador en este dispositivo"
+    },
+    "step": {
+      "create": "Creando {resource}",
+      "delete": "Eliminando {resource}",
+      "done": "Hecho",
+      "failed": "Error",
+      "fallback": "Ejecutando {tool}",
+      "GetAlert": "Leyendo alerta",
+      "GetAlertHistory": "Leyendo historial de alertas",
+      "GetCurrentServiceGraphTopology": "Leyendo el mapa de servicios",
+      "GetDashboard": "Leyendo dashboard",
+      "GetLatestTraces": "Leyendo las trazas más recientes",
+      "interrupted": "Interrumpido",
+      "ListAlerts": "Listando alertas",
+      "ListDashboards": "Listando dashboards",
+      "ListDestinations": "Listando destinos",
+      "ListIncidents": "Listando incidentes",
+      "running": "En ejecución",
+      "SearchAlerts": "Buscando alertas",
+      "SearchPromQL": "Consultando métricas",
+      "SearchSQL": "Consultando {stream}",
+      "StreamList": "Listando streams",
+      "StreamSchema": "Leyendo el esquema de {stream}",
+      "TraceSearch": "Buscando trazas",
+      "update": "Actualizando {resource}"
+    },
+    "steps": {
+      "exit": "salida {code}",
+      "failedCount": "{count} con error",
+      "fields": "{count} campo | {count} campos",
+      "hiddenByOwner": "{count} paso oculto por el propietario | {count} pasos ocultos por el propietario",
+      "inputEvents": "{count} evento de entrada | {count} eventos de entrada",
+      "lines": "{count} línea | {count} líneas",
+      "outputTruncated": "Salida truncada",
+      "rowName": "{step}, {state}",
+      "rows": "{count} fila | {count} filas",
+      "stderrLines": "stderr {count} línea | stderr {count} líneas",
+      "step": {
+        "created": "Se creó {resource}",
+        "deleted": "Se eliminó {resource}",
+        "listed": "Se listaron los streams",
+        "queried": "Se consultó {stream}",
+        "queriedMetrics": "Se consultaron las métricas",
+        "queryFailed": "La consulta falló",
+        "ran": "Se ejecutó {command}",
+        "ranTool": "Se ejecutó {tool}",
+        "schema": "Se leyó el esquema de {stream}",
+        "searchedTraces": "Se buscaron trazas",
+        "toolFailed": "{tool} falló",
+        "tools": {
+          "ListIncidents": "Se listaron los incidentes",
+          "ListAlerts": "Se listaron las alertas",
+          "SearchAlerts": "Se buscaron alertas",
+          "GetAlert": "Se leyó la alerta",
+          "GetAlertHistory": "Se leyó el historial de alertas",
+          "ListDestinations": "Se listaron los destinos",
+          "ListDashboards": "Se listaron los dashboards",
+          "GetDashboard": "Se leyó el dashboard",
+          "GetLatestTraces": "Se leyeron las trazas más recientes",
+          "GetCurrentServiceGraphTopology": "Se leyó el mapa de servicios"
+        },
+        "updated": "Se actualizó {resource}"
+      },
+      "stoppedBeforeFinish": "se detuvo antes de terminar",
+      "streams": "{count} stream | {count} streams",
+      "summary": "{count} paso | {count} pasos",
+      "window": "{from} → {to}",
+      "windowShowing": "{from} → {to} · Mostrando {shown} de {total} filas"
+    },
+    "strip": {
+      "review": "Solicitud de revisión",
+      "reviewExpires": "Solicitud de revisión · caduca en {time}",
+      "reviewLabel": "Revisar"
+    },
+    "thread": {
+      "delete": "Eliminar chat",
+      "download": "Descargar",
+      "downloadJson": "JSON",
+      "downloadMarkdown": "Markdown",
+      "draftKept": "Tu borrador se guarda en “{title}”",
+      "historyUnavailable": "Historial no disponible",
+      "keepsAnswering": "“{title}” sigue respondiendo",
+      "loadToContinue": "Carga el chat para continuar",
+      "newAnnounce": "Nuevo chat",
+      "newChat": "Nuevo chat",
+      "alreadyNew": "Este chat ya es nuevo",
+      "windowsFull": "Cierra un chat para iniciar uno nuevo",
+      "newChatTitle": "Nuevo chat",
+      "notSaved": "No guardado",
+      "pin": "Fijar",
+      "rename": "Renombrar",
+      "renameFailed": "No se pudo cambiar el nombre del chat",
+      "renameLabel": "Título del chat",
+      "renameChat": "Cambiar nombre del chat",
+      "renamed": "Nombre cambiado",
+      "thisChat": "Este chat",
+      "renaming": "Cambiando el nombre…",
+      "titleCounter": "{count}/200",
+      "unpin": "Desanclar",
+      "allChats": "Todos los chats",
+      "moreChats": "{count} más",
+      "noOtherChats": "Aún no hay otros chats",
+      "newChatAbout": "Nuevo chat sobre {object}",
+      "titleName": "{title}, chats y acciones de chat",
+      "titleNameNeeds": "{title}, chats y acciones de chat, {count} otro chat te necesita | {title}, chats y acciones de chat, {count} otros chats te necesitan",
+      "titleNameAnswering": "{title}, chats y acciones de chat, {count} otro chat respondiendo | {title}, chats y acciones de chat, {count} otros chats respondiendo",
+      "titleTooltip": "{title} · {summary}",
+      "toolbar": {
+        "more": "Más acciones",
+        "newChat": "Nuevo chat",
+        "openAs": "Abrir como"
+      }
+    },
+    "toolsets": {
+      "add": "Nuevo conjunto de herramientas",
+      "clash": "Conflicto de nombres",
+      "clashTip": "Both reach @:{'brand.autobot'} as {agent}; one hides the other.",
+      "columns": {
+        "actions": "Acciones",
+        "enabled": "Habilitado",
+        "kind": "Tipo",
+        "lastUsed": "Último uso",
+        "name": "Nombre",
+        "status": "Estado"
+      },
+      "deleteFailed": "No se pudo eliminar {name}.",
+      "deleteMessage": "{product} y el análisis de incidentes pierden esta herramienta a partir de la próxima respuesta.",
+      "deleteNamed": "Eliminar {name}",
+      "deleteTitle": "¿Eliminar {name}?",
+      "deleted": "{name} eliminado",
+      "editNamed": "Editar {name}",
+      "empty": "Add an MCP server or a skill @:{'brand.autobot'} can use.",
+      "emptyTitle": "Aún no hay conjuntos de herramientas",
+      "enableFailed": "No se pudo actualizar {name}.",
+      "enabledFor": "Habilitado, {name}",
+      "form": {
+        "added": "Conjunto de herramientas añadido",
+        "agentName": "@:{'brand.autobot'} calls this {agent}",
+        "back": "Volver a los conjuntos de herramientas",
+        "descriptionHelp": "Indica qué hace y cuándo usarlo.",
+        "descriptionLabel": "What @:{'brand.autobot'} should use this tool for",
+        "editTitle": "Editar conjunto de herramientas",
+        "enterAgain": "Introduce el valor de nuevo",
+        "wholeNumber": "Introduce un número entero mayor que 0",
+        "insertTemplate": "Insertar plantilla",
+        "kindLocked": "El tipo no se puede cambiar después de la creación.",
+        "leaveName": "cambia a {name} en {org}",
+        "loadFailed": "No se pudo cargar este conjunto de herramientas.",
+        "maskValue": "Un secreto guardado se envía como ***. Introduce el valor real.",
+        "mcpSection": "Servidor MCP",
+        "nameClash": "Another toolset already reaches @:{'brand.autobot'} as {agent}",
+        "newTitle": "Nuevo conjunto de herramientas",
+        "reenterDestination": "Vuelve a introducir todos los secretos antes de guardar una URL modificada.",
+        "reenterRefused": "El servidor ha descartado los secretos guardados para este cambio. Vuelve a introducir todos los secretos y después guarda.",
+        "reenterSecret": "Los secretos guardados no se pueden mantener junto a uno nuevo o reemplazado. Vuelve a introducir todos los secretos antes de guardar.",
+        "retypeNotice": "Esta versión del servidor requiere volver a introducir todos los secretos al guardar.",
+        "saveFailed": "No se ha podido guardar el conjunto de herramientas.",
+        "skillTemplate": "## Cuándo usarla\n\n## Pasos\n\n## Ejemplos\n",
+        "updated": "Conjunto de herramientas actualizado"
+      },
+      "healthUnsupported": "El estado, el último uso y la habilitación por conjunto de herramientas necesitan una versión más reciente del servidor.",
+      "kinds": {
+        "generic": "Genérico",
+        "mcp": "Servidor MCP",
+        "skill": "Habilidad"
+      },
+      "loadFailed": "No se han podido cargar los conjuntos de herramientas.",
+      "mcpLine": "Para usar OpenObserve desde tu propio agente, consulta {link}.",
+      "mcpLink": "Servidor MCP",
+      "moreFor": "Más acciones para {name}",
+      "notSetUp": "Toolsets take effect once @:{'brand.autobot'} is set up.",
+      "runtimeRule": "Se usa en {product} y en el análisis de incidentes.",
+      "search": "Buscar conjuntos de herramientas",
+      "secret": {
+        "hide": "Ocultar valor",
+        "keep": "Mantener el actual",
+        "keyLocked": "Reemplaza el valor para cambiar el nombre",
+        "remove": "Eliminar",
+        "removeHeader": "Eliminar encabezado {key}",
+        "replace": "Reemplazar",
+        "show": "Mostrar valor",
+        "unchanged": "Sin cambios",
+        "willReplace": "Se reemplazará al guardar"
+      },
+      "status": {
+        "disabled": "Deshabilitado",
+        "failing": "Con errores",
+        "failingNow": "Con errores desde hace un momento · {cause}",
+        "failingNowPlain": "Con errores desde hace un momento",
+        "failingSince": "Con errores desde {when}",
+        "never": "Nunca usado",
+        "ok": "OK",
+        "okIn": "OK · {ms} ms"
+      },
+      "test": "Probar",
+      "testFailed": "Prueba fallida para {name}: {cause}",
+      "testFailedPlain": "Prueba fallida para {name}",
+      "testFailedRequest": "no se ha podido ejecutar la prueba",
+      "testNamed": "Probar {name}",
+      "testPassed": "Prueba superada para {name} en {ms} ms",
+      "testUnsupported": "probar requiere una versión más reciente del servidor",
+      "testing": "Probando",
+      "viewOnly": "Solo lectura. La edición requiere el permiso de conjuntos de herramientas."
+    },
+    "transcript": {
+      "answerName": "{agent}, respuesta a {prompt}",
+      "earlierCount": "{count} mensaje anterior | {count} mensajes anteriores",
+      "followUps": "Seguimientos",
+      "name": "Conversación con {product}",
+      "showEarlier": "Mostrar mensajes anteriores",
+      "turnLabel": "Turno {n}: {prompt}"
+    },
+    "turn": {
+      "cancelUnconfirmed": "Es posible que el servidor aún esté terminando esta respuesta.",
+      "caughtUp": "Al día",
+      "compacting": "Condensando mensajes anteriores",
+      "connecting": "Conectando…",
+      "continue": "Continuar",
+      "continuePrefill": "Continuar",
+      "done": "Listo",
+      "elapsedMinutes": "{m} min {s} s",
+      "elapsedSeconds": "{n} s",
+      "elsewhere": "Respondiendo en otra pestaña",
+      "messageRestored": "Tu mensaje se ha restaurado",
+      "moreRunning": "{label} y {count} más",
+      "noResponse": "Sin respuesta durante {n} s",
+      "notSaved": "Respondido, pero no guardado en el historial.",
+      "reconnecting": "Reconectando…",
+      "restored": "Este chat se trasladó a otro servidor y continuó.",
+      "retrying": "Reintentando el proveedor de IA · intento {n}",
+      "retryingIn": "Reintentando el proveedor de IA en {s} s · intento {n}",
+      "retryNote": "Reintentar no deshará nada de lo que ya se ha cambiado.",
+      "retrySave": "Reintentar guardar",
+      "returnedToPrevious": "Tu mensaje se devolvió al chat anterior",
+      "sending": "Enviando…",
+      "sendLabel": "Enviar mensaje",
+      "stopLabel": "Detener respuesta",
+      "stopped": "Detenido",
+      "stoppedWithSteps": "Detenido tras {n} paso · hallazgos conservados | Detenido tras {n} pasos · hallazgos conservados",
+      "stepN": "paso {n}",
+      "stopping": "Deteniendo…",
+      "thinking": "Pensando",
+      "thinkingAbout": "Pensando en {count} resultado | Pensando en {count} resultados",
+      "waitingApproval": "Esperando tu aprobación",
+      "waitingConsent": "Esperando tu decisión sobre el uso de pago",
+      "withElapsed": "{status} · {elapsed}",
+      "writing": "Escribiendo la respuesta",
+      "ageDays": "{n} d",
+      "ageHours": "{n} h",
+      "connectionLost": "Conexión perdida. La respuesta anterior está incompleta.",
+      "confidence": {
+        "high": "Confianza alta",
+        "inconclusive": "No concluyente",
+        "low": "Confianza baja",
+        "medium": "Confianza media"
+      },
+      "continueDraft": "Continuar la respuesta anterior",
+      "dataAge": "Datos de hace {age}",
+      "rerun": "Volver a ejecutar",
+      "stoppedAfter": "Detenido tras {n} paso, incompleto | Detenido tras {n} pasos, incompleto",
+      "stoppedIncomplete": "Detenido, incompleto"
+    },
+    "voice": {
+      "allowTitle": "Permitir el micrófono",
+      "allowBody": "Haz clic en el candado de la barra de direcciones, permite el micrófono y recarga esta página.",
+      "cancelled": "Dictado cancelado.",
+      "continue": "Continuar",
+      "dictate": "Dictar",
+      "engine": {
+        "apple": "Safari convierte el habla en texto con el servicio de voz de Apple.",
+        "device": "Tu navegador convierte el habla en texto en este dispositivo.",
+        "google": "Chrome convierte el habla en texto con el servicio de voz de Google.",
+        "microsoft": "Edge convierte el habla en texto con el servicio de voz de Microsoft.",
+        "vendor": "El servicio de voz de tu navegador convierte el habla en texto."
+      },
+      "enterToSend": "Pulsa Intro de nuevo para enviar.",
+      "error": {
+        "how": "Cómo permitirlo",
+        "mic_denied": "El acceso al micrófono está bloqueado para este sitio.",
+        "no_mic": "No se ha encontrado ningún micrófono. Conecta uno e inténtalo de nuevo.",
+        "no_speech": "No se ha oído nada. Inténtalo de nuevo.",
+        "service_unreachable": "No se ha podido conectar con el servicio de voz de {vendor}.",
+        "service_unreachable_generic": "No se ha podido conectar con el servicio de voz de tu navegador.",
+        "stt_unavailable": "La conversión de voz a texto se ha detenido. Se conserva lo que se ha oído.",
+        "time_limit": "El dictado se detiene después de 2 minutos. Pulsa el micrófono para continuar."
+      },
+      "listening": "Escuchando",
+      "notNow": "Ahora no",
+      "primerBody": "No se envía nada hasta que pulses Enviar.",
+      "primerEngine": "{engineSentence} OpenObserve no almacena el audio.",
+      "primerTitle": "Dicta en el mensaje",
+      "holdLine": "Suelta {keys} para detener",
+      "started": "Escuchando. Intro envía; Escape o el micrófono detienen el dictado.",
+      "stopTooltip": "Detener dictado",
+      "stopped": "Dictado detenido. Se ha añadido {count} palabra. | Dictado detenido. Se han añadido {count} palabras.",
+      "stoppedEnter": "Dictado detenido. Se ha añadido {count} palabra. Pulsa Intro para enviar. | Dictado detenido. Se han añadido {count} palabras. Pulsa Intro para enviar.",
+      "tooltip": "Dictar · Mantén {keys}",
+      "tryAgain": "Reintentar",
+      "waitingPermission": "Esperando permiso",
+      "waitingShort": "Esperando",
+      "allowPrompt": "Permite el micrófono en el aviso del navegador.",
+      "privacy": "Tu navegador puede enviar audio a su proveedor.",
+      "processing": "Finalizando",
+      "offAdmin": "El dictado está desactivado en este navegador.",
+      "silent": "Tu navegador no ha convertido el habla en texto. Recarga para volver a intentarlo.",
+      "language": "El dictado no está disponible en {language}, el idioma de tu navegador."
+    },
+    "welcome": {
+      "lastRange": "últimos {period}",
+      "launcher": {
+        "ask": "Preguntar",
+        "inputName": "Pregunta a {product}",
+        "recentThreads": "Chats recientes",
+        "askEmpty": "Escribe una pregunta o adjunta una imagen para preguntar"
+      },
+      "prefill": {
+        "append": "Añadir",
+        "cancel": "Cancelar",
+        "question": "¿Sustituir tu borrador por la sugerencia?",
+        "replace": "Sustituir"
+      },
+      "starter": {
+        "otherToolToO2": "Convierte una consulta de otra herramienta a SQL de OpenObserve",
+        "mapStreamSchema": "Mapea el esquema de `{stream}`",
+        "alerts": {
+          "1": "¿Qué alertas se dispararon con más frecuencia en las últimas 24 horas?",
+          "2": "Redacta una alerta para errores en `{stream}`",
+          "2Generic": "Redacta una alerta para errores"
+        },
+        "dashboard": {
+          "1": "¿Qué ha cambiado en \"{dashboard}\" en los últimos {range}?",
+          "2": "Explica el panel con el mayor cambio",
+          "1Generic": "¿Qué ha cambiado en este dashboard recientemente?"
+        },
+        "function": {
+          "1": "Escribe VRL para parsear JSON del campo `message`",
+          "2": "Explica qué hace esta función"
+        },
+        "home": {
+          "attention": "¿Qué requiere atención ahora mismo?",
+          "errorsSummary": "Resume los errores en `{stream}`",
+          "slowSpans": "¿Qué servicios tuvieron los spans más lentos en la última hora?",
+          "service": "¿Por qué {service} está {signal}?",
+          "incident": "¿Qué causó {title}?",
+          "noAlert": "¿Qué alerta debería cubrir los errores de {service}?",
+          "ingest": {
+            "logs": "¿Cómo envío mis primeros logs?",
+            "traces": "¿Cómo envío trazas?",
+            "metrics": "¿Cómo envío métricas?"
+          },
+          "signal": {
+            "errors": "fallando",
+            "latency": "lento"
+          }
+        },
+        "ingest": {
+          "1": "Muéstrame cómo enviar logs desde mi aplicación",
+          "2": "Configura la ingesta para Kubernetes",
+          "3": "¿Qué puedes hacer una vez que lleguen los datos?"
+        },
+        "jsonEditor": {
+          "2": "Comprueba si este JSON tiene errores",
+          "alert": "Explica las condiciones de esta alerta",
+          "pipeline": "Explica qué hace este pipeline"
+        },
+        "learn": "¿Qué puedes hacer?",
+        "logs": {
+          "1": "¿Por qué aumentaron repentinamente los errores en `{stream}` en los últimos {range}?",
+          "2": "Resume qué hay en `{stream}` ahora mismo",
+          "1Generic": "¿Por qué aumentaron repentinamente los errores en mis logs recientemente?",
+          "2Generic": "Resume qué hay en mis logs ahora mismo"
+        },
+        "metrics": {
+          "1": "Escribe PromQL para la latencia p95 de `{metric}`",
+          "2": "¿Qué métricas dejaron de enviar datos?",
+          "1Generic": "Escribe PromQL para la latencia p95"
+        },
+        "recent": "Continuar \"{title}\"",
+        "regex": {
+          "1": "Escribe un patrón que oculte las direcciones de correo electrónico",
+          "2": "Prueba este patrón con las filas recientes de `{stream}`",
+          "2Generic": "Prueba este patrón con las filas recientes"
+        },
+        "sqlEditor": {
+          "1": "Escribe SQL para errores por servicio por encima del 5 % en la última hora",
+          "2": "Comprueba esta consulta con `{stream}`",
+          "2Generic": "Comprueba esta consulta"
+        },
+        "traces": {
+          "1": "¿Qué servicios tuvieron los spans más lentos en los últimos {range}?",
+          "1Generic": "¿Qué servicios tuvieron los spans más lentos recientemente?"
+        }
+      },
+      "viewAll": "Ver todo",
+      "whatCanYouDo": "¿Qué puedes hacer?"
+    },
+    "rca": {
+      "tag": "Análisis de incidentes",
+      "prompt": "Explica este informe de análisis de incidentes",
+      "incidentPrompt": "Explica este incidente",
+      "reportChip": "{run} · {size}",
+      "runAnalysis": "Ejecutar análisis",
+      "status": {
+        "starting": "Iniciando análisis… {elapsed}",
+        "analysing": "Analizando · {elapsed}"
+      }
+    },
+    "oncall": {
+      "continue": "Continue in @:{'brand.autobot'}"
+    },
+    "autoobserve": {
+      "askChip": "Pregunta de AutoObserve · {name}",
+      "continueTooltip": "Abre {product} con esta pregunta adjunta"
+    },
+    "agent": {
+      "o2": {
+        "name": "{product}",
+        "purpose": "Responde preguntas y ayuda con las tareas"
+      },
+      "investigator": {
+        "name": "@:{'brand.autobotInvestigate'}",
+        "purpose": "Encuentra causas"
+      },
+      "queryBuilder": {
+        "name": "Generador de consultas",
+        "purpose": "Escribe consultas"
+      },
+      "policy": {
+        "readOnly": "Solo lectura"
+      },
+      "picker": {
+        "choose": "Elegir agente",
+        "heading": "Agente"
+      },
+      "unavailable": {
+        "role": "No disponible · Consulta a un administrador",
+        "short": "No disponible",
+        "disabled": "Desactivado para esta organización",
+        "unreachable": "No accesible ahora mismo · comprobado {time}",
+        "unreachableNow": "No accesible ahora mismo"
+      },
+      "announceChosen": "{agent} responderá.",
+      "pendingSwitch": "{agent} responderá a partir de ahora. Las respuestas anteriores se mantienen.",
+      "clause": "{purpose} · {policy}"
+    },
+    "handoff": {
+      "marker": "Transferido a {agent} por ti · {time}",
+      "markerUntimed": "Transferido a {agent} por ti",
+      "given": "Lo que recibió",
+      "givenTurns": "Este chat hasta ahora: {questions} preguntas, {answers} respuestas",
+      "givenContext": "Contexto: {chips}",
+      "notCarried": "No transferido: {items}",
+      "notCarriedApproval": "la aprobación pendiente",
+      "announce": "Transferido a {agent}.",
+      "suggest": {
+        "title": {
+          "o2": "{agent} puede seguir con esto desde aquí",
+          "investigator": "{agent} puede buscar la causa",
+          "queryBuilder": "{agent} puede escribir esta consulta"
+        },
+        "body": "Puede tardar unos minutos.",
+        "bodyMetered": "Puede tardar unos minutos · Usa créditos de IA",
+        "accept": "Transferir a {agent}",
+        "dismiss": "Ahora no",
+        "collapsed": "Se ha sugerido a {agent}",
+        "handoff": "Transferir",
+        "prompt": "Continuar esta investigación",
+        "promptReason": "Continuar esta investigación: {reason}"
+      }
+    },
+    "question": {
+      "answerHint": "Respondiendo a la pregunta de arriba",
+      "needsAnswer": "Necesita tu respuesta: {question}",
+      "otherAnswer": "Otra respuesta",
+      "record": {
+        "answered": "Respuesta: {choice}",
+        "expired": "La pregunta ha caducado. No se ha cambiado nada."
+      },
+      "sendAnswer": "Enviar respuesta",
+      "needsAnswerLabel": "Necesita tu respuesta"
+    },
+    "threadsBar": {
+      "label": "Chats",
+      "title": "Chats",
+      "incidents": "Investigaciones en tiempo real · {count}",
+      "moreIncidents": "{count} más",
+      "pageFull": "{count}+ abiertos",
+      "openIncidents": "Incidentes abiertos",
+      "yourThreads": "Tus chats · {count}",
+      "noThreads": "No hay chats en ejecución"
+    },
+    "chart": {
+      "showChart": "Mostrar gráfico",
+      "openInMetrics": "Abrir en Métricas",
+      "addToDashboard": "Añadir al dashboard",
+      "createAlert": "Crear alerta",
+      "copyQuery": "Copiar consulta",
+      "seriesCount": "{count} series",
+      "meta": "{range} · {series}",
+      "name": "{title}, {series}",
+      "legend": "Series"
+    }
+  },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "almostThere": "Casi terminamos...",
+        "analyzing": "Analizando...",
+        "checkingDetails": "Verificando detalles...",
+        "connectingTheDots": "Conectando los puntos...",
+        "crunchingNumbers": "Procesando números...",
+        "divingDeeper": "Profundizando...",
+        "evaluatingOptions": "Evaluando opciones...",
+        "examiningData": "Examinando datos...",
+        "exploringPossibilities": "Explorando posibilidades...",
+        "formulatingResponse": "Formulando respuesta...",
+        "gatheringInsights": "Recopilando información...",
+        "makingProgress": "Progresando...",
+        "piecingTogether": "Uniendo piezas...",
+        "processing": "Procesando...",
+        "refiningAnswer": "Refinando respuesta...",
+        "reviewingContext": "Revisando contexto...",
+        "stillThinking": "Todavía pensando...",
+        "synthesizingInformation": "Sintetizando información...",
+        "thinking": "Pensando...",
+        "workingOnIt": "Trabajando en ello..."
+      }
+    },
+    "threadView": {
+      "assistant": "Asistente",
+      "userNamed": "Usuario {user}"
+    }
   }
 }

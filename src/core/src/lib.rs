@@ -19,6 +19,8 @@
 
 #[cfg(feature = "enterprise")]
 pub mod ai_chat;
+#[cfg(feature = "enterprise")]
+pub mod ai_policy;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
@@ -69,6 +71,7 @@ pub mod providers;
 pub mod public_dashboards;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
+pub mod resources;
 pub mod rum_pa;
 pub mod sample_data;
 #[cfg(feature = "enterprise")]

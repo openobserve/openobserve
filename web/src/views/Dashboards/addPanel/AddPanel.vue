@@ -2188,7 +2188,7 @@ export default defineComponent({
     });
     // [START] ai chat
 
-    // [START] O2 AI Context Handler
+    // [START] AI Context Handler
 
     const registerAiContextHandler = () => {
       registerAiChatHandler(getContext);
@@ -2236,7 +2236,7 @@ export default defineComponent({
       removeAiChatHandler();
     };
 
-    // [END] O2 AI Context Handler
+    // [END] AI Context Handler
 
     // Computed properties for current tab and panel IDs
     const currentTabId = computed(() => {

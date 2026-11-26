@@ -158,8 +158,17 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
 // 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
 //      service_streams rows named by the metric-name label that list no trace stream.
+// 158: create alert_leases.
 // 159: delete org_ai_toolsets rows of the removed cli kind.
-pub const DB_SCHEMA_VERSION: u64 = 159;
+// 160: add first_event_at to ai_chat_turns.
+// 161: org_ai_toolsets health; create ai_grants, ai_actions, ai_access_requests, ai_turn_marks.
+// 162: chat pins, seeds, turn versions, decisions, hide_attachments, ai_chat_feedback/imports.
+// 163: create paid_overage_attribution.
+// 164: create ai_approvals.
+// 165: add agent to ai_chat_turns.
+// 166: add branched_from to ai_chat_sessions.
+// 167: add approval_scope to ai_actions.
+pub const DB_SCHEMA_VERSION: u64 = 167;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2213,7 +2222,7 @@ pub struct Common {
     /// server legitimately needs to send notifications to itself.
     #[env_config(name = "ZO_SSRF_ALLOW_LOOPBACK", default = false)]
     pub ssrf_allow_loopback: bool,
-    /// Skips SSRF checks and lets any org's VRL call `http_request`, `dns_lookup`, `reverse_dns`.
+    /// Skips SSRF checks on outbound requests; VRL network functions stay disabled regardless.
     #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
     pub skip_ssrf_checks: bool,
     /// Comma-separated CIDRs that only send-only destinations may reach; changes need a restart.
@@ -2767,6 +2776,13 @@ impl Common {
 
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Limit {
+    // MB, converted to bytes in check_common_config
+    #[env_config(
+        name = "ZO_RESOURCE_CATALOG_MAX_SIZE",
+        default = 100,
+        help = "Maximum size in MB of the Command K resource catalogs one process keeps in memory; 0 means 100"
+    )]
+    pub resource_catalog_max_size: usize,
     // no need set by environment
     pub cpu_num: usize,
     pub real_cpu_num: usize,
@@ -3064,6 +3080,12 @@ pub struct Limit {
         help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less removes the age limit; each user still keeps at most 500 unstarred entries per source (logs, traces, metrics, dbm, profiles), the oldest of that source pruned first. It does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
     )]
     pub query_history_retention_days: i64,
+    #[env_config(
+        name = "ZO_AI_ACTIONS_RETENTION_DAYS",
+        default = 90,
+        help = "How long rows of the assistant's action ledger (Activity) are kept, in days. Their before/after snapshots are always cleared once the 24 h undo window passes. 0 or less keeps every row."
+    )]
+    pub ai_actions_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(
@@ -4520,6 +4542,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.req_cols_per_record_limit = 1000;
     }
 
+    cfg.limit.resource_catalog_max_size = match cfg.limit.resource_catalog_max_size {
+        0 => 100,
+        v => v,
+    }
+    .saturating_mul(SIZE_IN_MB as usize);
     cfg.limit.sourcemap_file_max_size = match cfg.limit.sourcemap_file_max_size {
         0 => 50,
         v => v,
@@ -6359,6 +6386,19 @@ mod tests {
             FileFormat::from_extension("/some/path/file.parquet"),
             Some(FileFormat::Parquet)
         );
+    }
+
+    #[test]
+    fn test_resource_catalog_max_size_is_mb_with_zero_as_default() {
+        let mut cfg = Config::init().unwrap();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.resource_catalog_max_size, 100 * 1024 * 1024);
+        for (mb, bytes) in [(0, 100 * 1024 * 1024), (7, 7 * 1024 * 1024)] {
+            let mut cfg = Config::init().unwrap();
+            cfg.limit.resource_catalog_max_size = mb;
+            check_common_config(&mut cfg).unwrap();
+            assert_eq!(cfg.limit.resource_catalog_max_size, bytes);
+        }
     }
 
     #[test]

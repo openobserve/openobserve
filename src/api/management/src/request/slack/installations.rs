@@ -213,7 +213,7 @@ pub async fn connectivity(
     params(("org_id" = String, Path, description = "Organization name"), ManifestQuery),
     responses(
         (status = 200, description = "Slack app manifest", content_type = "application/json", body = Object),
-        (status = 400, description = "Unknown mode or bad name", content_type = "application/json", body = ()),
+        (status = 400, description = "Unknown mode, bad name or bad slash command", content_type = "application/json", body = ()),
         (status = 403, description = "Not an admin, or the OSS build", content_type = "application/json", body = ()),
         (status = 404, description = "Slack is not enabled for this organization, or Cloud", content_type = "application/json", body = ()),
     ),
@@ -258,10 +258,10 @@ pub async fn manifest(
     description = "With a configuration refresh token O2 creates the app from its manifest; with Set up manually it stores the app's own credentials. Returns the pending installation and O2's bot-only authorize URL.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    request_body(content = Object, description = "`{\"mode\", \"config_refresh_token\", \"app_name\"?, \"channel_history\"?}` or `{\"mode\", \"client_id\", \"client_secret\", \"signing_secret\"?, \"app_token\"?}`", content_type = "application/json"),
+    request_body(content = Object, description = "`{\"mode\", \"config_refresh_token\", \"app_name\"?, \"channel_history\"?, \"command\"?}` or `{\"mode\", \"client_id\", \"client_secret\", \"signing_secret\"?, \"app_token\"?, \"app_name\"?, \"channel_history\"?, \"command\"?}`", content_type = "application/json"),
     responses(
         (status = 201, description = "`{\"installation\", \"authorize_url\", \"app_settings_url\", \"manifest_page_url\"?}`", content_type = "application/json", body = Object),
-        (status = 400, description = "Bad body or unknown mode", content_type = "application/json", body = ()),
+        (status = 400, description = "Bad body, unknown mode or bad slash command", content_type = "application/json", body = ()),
         (status = 403, description = "Not an admin, or the OSS build", content_type = "application/json", body = ()),
         (status = 404, description = "Slack is not enabled for this organization, or Cloud", content_type = "application/json", body = ()),
         (status = 422, description = "Slack refused the configuration refresh token", content_type = "application/json", body = ()),

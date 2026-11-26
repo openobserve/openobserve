@@ -1,6 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { h, nextTick, ref } from "vue";
+import { computed, h, nextTick, ref } from "vue";
+
+const breakpoint = vi.hoisted(() => ({ forceMobile: false }));
+vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/useBreakpoint")>();
+  return {
+    ...actual,
+    default: () =>
+      breakpoint.forceMobile
+        ? { ...actual.default(), isMobile: computed(() => true) }
+        : actual.default(),
+  };
+});
+
 import OToggleGroup from "./OToggleGroup.vue";
 import OToggleGroupItem from "./OToggleGroupItem.vue";
 
@@ -63,6 +76,16 @@ describe("OToggleGroup", () => {
     const wrapper = mountGroup({ modelValue: "" }, [{ value: "left", label: "Left" }]);
     await wrapper.find("button").trigger("click");
     expect(wrapper.emitted("update:modelValue")).toBeDefined();
+  });
+
+  it("keeps a single selection unless the group is deselectable", async () => {
+    const items = [{ value: "left", label: "Left" }];
+    const locked = mountGroup({ modelValue: "left" }, items);
+    await locked.find("button").trigger("click");
+    expect(locked.emitted("update:modelValue")).toBeUndefined();
+    const clearable = mountGroup({ modelValue: "left", deselectable: true }, items);
+    await clearable.find("button").trigger("click");
+    expect(clearable.emitted("update:modelValue")).toEqual([[null]]);
   });
 
   // --- v-model: active item has data-state=on ---
@@ -308,6 +331,35 @@ describe("OToggleGroup", () => {
       wrapper.unmount();
     });
 
+    it("stays on the active item when the track is scrolled", async () => {
+      const selected = ref("a");
+      const wrapper = mount(
+        {
+          components: { OToggleGroup, OToggleGroupItem },
+          setup: () => ({ selected }),
+          template: `
+            <OToggleGroup :model-value="selected">
+              <OToggleGroupItem v-for="value in ['a', 'b', 'c']" :key="value" :value="value">
+                {{ value }}
+              </OToggleGroupItem>
+            </OToggleGroup>`,
+        },
+        { attachTo: document.body },
+      );
+      const track = wrapper.get("[data-variant]").element as HTMLElement;
+      stubGeometry(track);
+      const onScreen = track.querySelector<HTMLElement>('[data-otoggle-value="c"]')!;
+      onScreen.getBoundingClientRect = () =>
+        ({ left: ITEM_WIDTH, top: 0, width: ITEM_WIDTH, height: 20 }) as DOMRect;
+      Object.defineProperty(track, "scrollLeft", { value: ITEM_WIDTH, configurable: true });
+      selected.value = "c";
+      await settle();
+      expect((track.firstElementChild as HTMLElement).style.transform).toBe(
+        `translate(${ITEM_WIDTH * 2}px, 0px)`,
+      );
+      wrapper.unmount();
+    });
+
     it("hides the indicator when the value matches no item", async () => {
       const selected = ref("b");
       const wrapper = mount(
@@ -341,5 +393,73 @@ describe("OToggleGroup", () => {
 
       wrapper.unmount();
     });
+  });
+});
+
+describe("OToggleGroup labelled group", () => {
+  it("names the group by its label", () => {
+    const wrapper = mountGroup({ label: "Tier" }, [{ value: "a", label: "A" }]);
+    const group = wrapper.find('[role="group"]');
+    const labelId = group.attributes("aria-labelledby");
+    expect(labelId).toBeTruthy();
+    expect(wrapper.find(`[id="${labelId}"]`).text()).toBe("Tier");
+  });
+
+  it("marks a disabled labelled group aria-disabled, so its dimmed label counts as inactive", () => {
+    const group = (disabled: boolean) =>
+      mountGroup({ label: "Tier", disabled }, [{ value: "a", label: "A" }]).find('[role="group"]');
+    expect(group(true).attributes("aria-disabled")).toBe("true");
+    expect(group(false).attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("puts aria-describedby on the group a screen reader enters", () => {
+    const wrapper = mount(OToggleGroup, {
+      props: { label: "Tier" },
+      attrs: { "aria-describedby": "line-1" },
+      slots: { default: () => h(OToggleGroupItem, { value: "a" }, () => "A") },
+    });
+    expect(wrapper.find('[role="group"]').attributes("aria-describedby")).toBe("line-1");
+  });
+
+  it("leaves aria-describedby off the layout wrapper, which still takes the other attributes", () => {
+    const labelled = mount(OToggleGroup, {
+      props: { label: "Tier" },
+      attrs: { "aria-describedby": "line-1", "data-test": "tier", class: "mt-2" },
+      slots: { default: () => h(OToggleGroupItem, { value: "a" }, () => "A") },
+    });
+    expect(labelled.findAll("[aria-describedby]")).toHaveLength(1);
+    const wrapperEl = labelled.get('[data-test="tier"]');
+    expect(wrapperEl.attributes("role")).toBeUndefined();
+    expect(wrapperEl.attributes("aria-describedby")).toBeUndefined();
+    expect(wrapperEl.classes()).toContain("mt-2");
+    const bare = mount(OToggleGroup, {
+      attrs: { "aria-describedby": "line-1", "data-test": "tier" },
+      slots: { default: () => h(OToggleGroupItem, { value: "a" }, () => "A") },
+    });
+    expect(bare.get('[role="group"]').attributes("aria-describedby")).toBe("line-1");
+    expect(bare.get('[role="group"]').attributes("data-test")).toBe("tier");
+  });
+});
+
+describe("OToggleGroup as a mobile dropdown", () => {
+  afterEach(() => {
+    breakpoint.forceMobile = false;
+  });
+
+  it("puts aria-describedby on the dropdown trigger a screen reader enters, once", () => {
+    breakpoint.forceMobile = true;
+    const wrapper = mount(OToggleGroup, {
+      props: { mobileDropdown: true, type: "single", modelValue: "a" },
+      attrs: { "aria-describedby": "line-1", "data-test": "tier" },
+      slots: {
+        default: () => [
+          h(OToggleGroupItem, { value: "a" }, () => "A"),
+          h(OToggleGroupItem, { value: "b" }, () => "B"),
+        ],
+      },
+    });
+    const trigger = wrapper.get('[data-test="tier-dropdown-btn"]');
+    expect(trigger.attributes("aria-describedby")).toBe("line-1");
+    expect(wrapper.findAll("[aria-describedby]")).toHaveLength(1);
   });
 });

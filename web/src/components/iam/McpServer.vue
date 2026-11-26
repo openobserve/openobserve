@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import McpServerCard from "@/components/ingestion/ai/McpServerCard.vue";
@@ -48,7 +48,13 @@ const subs = computed<CardSubstitutions>(() => ({
     data-test="iam-mcp-server"
     :title="t('iam.mcpServerHeader')"
     icon="mcp"
-    :subtitle="t('iam.mcpServerHeaderSubtitle')"
+    :subtitle="
+      t('assistant.mcp.headerSubtitle', {
+        claude: raw('Claude'),
+        cursor: raw('Cursor'),
+        vscode: raw('VS Code'),
+      })
+    "
     scroll
     pad-y
   >

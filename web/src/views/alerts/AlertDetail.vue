@@ -327,6 +327,7 @@
           <OTabPanel v-if="isMultiAlert" name="groups" stretch>
             <AlertGroupsTable
               :groups="groupData?.list || []"
+              :alert="alert ?? undefined"
               :loading="loadingGroups"
               :load-error="groupsLoadError"
               :alert-id="alertId"
@@ -449,6 +450,12 @@
 </template>
 
 <script setup lang="ts">
+import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+  removeFailedRecentVisit,
+  resourceFailureStatus,
+} from "@/components/commandPalette/useRecentlyViewed";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
@@ -511,6 +518,11 @@ import {
   sloIdOf,
 } from "@/utils/alerts/sloAlertRouting";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { contextRegistry } from "@/composables/contextProviders/registry";
+import {
+  ALERT_DETAIL_CONTEXT_KEY,
+  createAlertDetailContextProvider,
+} from "@/composables/contextProviders/alertDetailContextProvider";
 import type {
   AckView,
   AlertGroup,
@@ -973,17 +985,32 @@ onBeforeUnmount(() => {
 const fetchAlert = async () => {
   if (!orgId.value || !alertId.value) return;
   const request = captureDetailRequest();
+  const recentScope = captureRecentVisitScope();
+  const recentId = request.id;
+  const recentFolder = String(route.query.folder ?? "default");
   try {
     const res = await alertsService.get_by_alert_id(request.org, request.id);
     if (!isCurrentDetailRequest(request)) return;
     alert.value = res.data;
     loadFailure.value = res.data ? null : "not-found";
+    if (res.data)
+      recordResourceVisit(recentScope, {
+        type: "alert",
+        id: recentId,
+        name: res.data.name,
+        route_ref: {
+          alert_id: recentId,
+          folder_id: recentFolder,
+          alert_type: res.data.alert_type ?? (res.data.is_real_time ? "realtime" : "scheduled"),
+        },
+      });
     // Same tick as the assignment, not down in onMounted: setting alert.value
     // queues the render, so any await before this one lets the default History
     // tab mount and fire a fetch for a page that is about to switch away.
     if (isAnomalyAlert.value) activeTab.value = "charts";
   } catch (e: unknown) {
     if (!isCurrentDetailRequest(request)) return;
+    removeFailedRecentVisit(recentScope, "alert", recentId, resourceFailureStatus(e));
     alert.value = null;
     const status = (e as { response?: { status?: number } })?.response?.status;
     loadFailure.value = status === 403 ? "forbidden" : status === 404 ? "not-found" : "failed";
@@ -1097,6 +1124,30 @@ const editAlert = () => {
     },
   });
 };
+
+const assistantAlertState = computed(() => {
+  if (!listRow.value) return "";
+  if (listRow.value.enabled === false) return "disabled";
+  return isFiringNow.value ? "firing" : "ok";
+});
+
+contextRegistry.register(
+  ALERT_DETAIL_CONTEXT_KEY,
+  createAlertDetailContextProvider(
+    () => ({
+      alertId: alertId.value,
+      alert: unavailable.value ? null : alert.value,
+      state: assistantAlertState.value,
+    }),
+    store,
+  ),
+);
+contextRegistry.setActive(ALERT_DETAIL_CONTEXT_KEY);
+
+onBeforeUnmount(() => {
+  contextRegistry.unregister(ALERT_DETAIL_CONTEXT_KEY);
+  contextRegistry.setActive("");
+});
 
 // Mount, route changes and Retry share it, so a recovered page loads what the first load skipped.
 const loadPage = async () => {

@@ -259,7 +259,6 @@ const mountEditor = async () => {
       userInfo: { email: "me@x.io" },
       zoConfig: {},
       theme: "light",
-      isAiChatEnabled: false,
     },
   });
   const wrapper = mount(AddPanel, {

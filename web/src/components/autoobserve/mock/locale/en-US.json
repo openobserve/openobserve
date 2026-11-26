@@ -269,7 +269,9 @@
         "fromNowOn": "Let me handle this",
         "retune": "Quieter alert"
       },
-      "needsOk": "Needs your OK"
+      "needsOk": "Needs your OK",
+      "sampleApplied": "Sample fix applied · {headline}",
+      "sampleComplete": "Sample fix complete"
     },
     "coverageDrawer": {
       "legend": {

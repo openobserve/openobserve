@@ -7,7 +7,17 @@ import type {
 } from "./OToggleGroup.types";
 import { ToggleGroupAnimatedKey, TOGGLE_GROUP_CONTEXT_KEY } from "./OToggleGroup.types";
 import { ToggleGroupRoot, type AcceptableValue } from "reka-ui";
-import { computed, provide, ref, watch, nextTick, onMounted, onBeforeUnmount, useAttrs } from "vue";
+import {
+  computed,
+  provide,
+  ref,
+  watch,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+  useAttrs,
+  useId,
+} from "vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroupMenuScope from "./OToggleGroupMenuScope.vue";
@@ -21,7 +31,10 @@ const props = withDefaults(defineProps<ToggleGroupProps>(), {
   labelPosition: "left",
   reorderable: false,
   mobileDropdown: false,
+  deselectable: false,
 });
+
+defineOptions({ inheritAttrs: false });
 
 const emit = defineEmits<ToggleGroupEmits>();
 
@@ -35,6 +48,13 @@ const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefine
 
 const { isMobile } = useBreakpoint();
 const attrs = useAttrs();
+const labelId = useId();
+// A description belongs to the group a screen reader enters, not to the layout wrapper around it.
+const describedBy = computed(() => attrs["aria-describedby"] as string | undefined);
+const rootAttrs = computed(() => {
+  const { "aria-describedby": _describedBy, ...rest } = attrs;
+  return rest;
+});
 const asDropdown = computed(
   () =>
     props.mobileDropdown &&
@@ -105,8 +125,9 @@ const measure = (animated: boolean) => {
   const trackStyle = getComputedStyle(track);
   const borderLeft = parseFloat(trackStyle.borderLeftWidth) || 0;
   const borderTop = parseFloat(trackStyle.borderTopWidth) || 0;
-  const x = activeRect.left - trackRect.left - borderLeft;
-  const y = activeRect.top - trackRect.top - borderTop;
+  // A scrolling track places absolute children in scrolled content, not on screen.
+  const x = activeRect.left - trackRect.left - borderLeft + track.scrollLeft;
+  const y = activeRect.top - trackRect.top - borderTop + track.scrollTop;
 
   // Transition only when asked AND we already had a valid position (i.e. the group
   // was already visible). The very first placement always snaps. Setting the flag
@@ -302,7 +323,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
   <!-- With label: wrap in a flex container so the label and toggle bar sit
        together. Without label: render the ToggleGroupRoot directly to keep
        the existing inline-flex/sizing contract. -->
-  <ODropdown v-if="asDropdown" side="bottom" align="start">
+  <ODropdown v-if="asDropdown" v-bind="rootAttrs" side="bottom" align="start">
     <template #trigger>
       <OButton
         variant="outline"
@@ -310,6 +331,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
         icon-right="arrow-drop-down"
         class="shrink-0"
         :disabled="disabled"
+        :aria-describedby="describedBy"
         :data-test="dropdownTestId"
       >
         <OToggleGroupMenuScope mode="trigger" :is-active="isActiveValue" :select="selectValue">
@@ -322,8 +344,9 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
     </OToggleGroupMenuScope>
   </ODropdown>
 
-  <div v-else-if="hasLabel" :class="wrapperClasses">
+  <div v-else-if="hasLabel" v-bind="rootAttrs" :class="wrapperClasses">
     <span
+      :id="labelId"
       :class="[
         'o-input-label text-compact leading-tight select-none',
         disabled
@@ -340,6 +363,9 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       :disabled="disabled"
       :orientation="orientation"
       :data-variant="variant"
+      :aria-labelledby="labelId"
+      :aria-disabled="disabled ? 'true' : undefined"
+      :aria-describedby="describedBy"
       :class="[
         'relative inline-flex items-stretch',
         orientation === 'vertical' ? 'flex-col' : 'flex-row',
@@ -348,7 +374,10 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       v-bind="dragListeners"
       @update:model-value="
         (v) => {
-          if (type === 'single' && (v === null || v === undefined || v === '')) return;
+          if (type === 'single' && (v === null || v === undefined || v === '')) {
+            if (deselectable) emit('update:modelValue', null);
+            return;
+          }
           emit('update:modelValue', v);
         }
       "
@@ -381,10 +410,14 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       orientation !== 'vertical' &&
         'max-md:max-w-full max-md:overflow-x-auto @max-4xl/page:max-w-full @max-4xl/page:overflow-x-auto',
     ]"
-    v-bind="dragListeners"
+    :aria-describedby="describedBy"
+    v-bind="{ ...rootAttrs, ...dragListeners }"
     @update:model-value="
       (v) => {
-        if (type === 'single' && (v === null || v === undefined || v === '')) return;
+        if (type === 'single' && (v === null || v === undefined || v === '')) {
+          if (deselectable) emit('update:modelValue', null);
+          return;
+        }
         emit('update:modelValue', v);
       }
     "

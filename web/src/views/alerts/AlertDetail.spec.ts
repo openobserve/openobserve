@@ -33,6 +33,12 @@ vi.mock("@/services/alerts", async (importOriginal) => {
 
 vi.mock("@/services/downtimes");
 
+vi.mock("@/components/commandPalette/useRecentlyViewed", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/components/commandPalette/useRecentlyViewed")>();
+  return { ...actual, recordResourceVisit: vi.fn() };
+});
+
 vi.mock("@/services/anomaly_detection", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), { default: { get: vi.fn() } });
@@ -67,11 +73,13 @@ import AlertDetail from "@/views/alerts/AlertDetail.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import alertsService from "@/services/alerts";
+import { recordResourceVisit } from "@/components/commandPalette/useRecentlyViewed";
 import anomalyService from "@/services/anomaly_detection";
 import downtimes from "@/services/downtimes";
 import appConfig from "@/aws-exports";
 import { axiosReply } from "@/test/unit/helpers/mockService";
 import { queryClient } from "@/composables/query/queryClient";
+import { contextRegistry } from "@/composables/contextProviders/registry";
 import type { AlertGroupTransition } from "@/ts/interfaces/alert";
 
 // ---------------------------------------------------------------------------
@@ -296,6 +304,14 @@ describe("AlertDetail — route reuse", () => {
     await flushPromises();
     expect(wrapper.text()).toContain("New alert");
     expect(wrapper.text()).not.toContain("Stale alert");
+    expect(recordResourceVisit).toHaveBeenLastCalledWith(
+      null,
+      expect.objectContaining({ type: "alert", id: "new-alert", name: "New alert" }),
+    );
+    expect(recordResourceVisit).not.toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({ id: "slow-alert" }),
+    );
   });
 
   it.each(["open", "pending"] as const)(
@@ -1176,5 +1192,23 @@ describe("AlertDetail — first paint", () => {
     expect(
       tabs().element.compareDocumentPosition(banner().element) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+});
+
+describe("AlertDetail — assistant context", () => {
+  afterEach(() => contextRegistry.cleanup());
+
+  it("tells the assistant which alert is open, and stops when the page closes", async () => {
+    const wrapper = await mountView();
+    const context = await contextRegistry.getActiveContext();
+    expect(context).toMatchObject({
+      currentPage: "Alerts",
+      alertId: "alert-1",
+      alertName: makeSimpleAlert().name,
+      selectedStreams: [makeSimpleAlert().stream_name],
+    });
+
+    wrapper.unmount();
+    expect((await contextRegistry.getActiveContext())?.alertId).toBeUndefined();
   });
 });

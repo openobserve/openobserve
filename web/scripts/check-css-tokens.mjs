@@ -38,6 +38,9 @@ const ALLOW_EXACT = new Set([
   // components/fleet/FleetFlowEdge.vue and FleetFlowOverview.vue position labels and the popover at runtime.
   "--fleet-edge-at",
   "--fleet-popover-at",
+  // ai-assistant/shell/AssistantHeaderButton.vue and core/Table/sub-components/OTablePagination.vue.
+  "--o-ai-icon",
+  "--o-pager-clearance",
 ]);
 
 // Guard against accidental re-introduction of an --o2-* exemption above.

@@ -13,6 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import {
+  captureRecentResourceRequest,
+  removeFailedResourceRequest,
+  type RecentResourceRequest,
+} from "@/components/commandPalette/useRecentlyViewed";
 import store from "../stores";
 import type { AxiosInstance } from "axios";
 import axios from "axios";
@@ -33,9 +38,14 @@ declare module "axios" {
     skipAccessToast?: boolean;
     /** The caller handles the refusal itself, so the access boundary does not record the 403. */
     silentForbidden?: boolean;
+    /** An assistant request that handles 401 itself, so it never takes the logout-and-reload branch. */
+    assistantManaged?: boolean;
+    /** Set on the one retry of an assistant request after an SSO refresh. */
+    assistantRetried?: boolean;
     /** Route the request started on, so a late 403 is not pinned on the page the user moved to. */
     accessRouteKey?: string;
     startedAt?: number;
+    recentResourceRequest?: RecentResourceRequest;
     /** Set on the retry after a token refresh, so a second 401 is not refreshed again. */
     _afterRefresh?: boolean;
   }
@@ -45,6 +55,38 @@ declare module "axios" {
 // at a time across all axios instances and streaming fetch requests. All
 // concurrent 401s wait on the same Promise and retry once it resolves.
 let refreshPromise: Promise<void> | null = null;
+
+// The one dex_refresh request in flight; assistant 401s share it without the logout-on-failure wrapper.
+let dexRefreshPromise: Promise<void> | null = null;
+
+const sharedDexRefresh = (): Promise<void> => {
+  dexRefreshPromise ??= axios
+    .create({ withCredentials: true, baseURL: store.state.API_ENDPOINT })
+    .get("/config/dex_refresh")
+    .then((res) => {
+      if (res.status !== 200) return Promise.reject(new Error("Refresh returned non-200"));
+      return undefined;
+    })
+    .finally(() => {
+      dexRefreshPromise = null;
+    });
+  return dexRefreshPromise;
+};
+
+/** Whether this deployment refreshes an expired session through dex: self-hosted enterprise with SSO on. */
+export const ssoRefreshable = (): boolean =>
+  config.isCloud != "true" &&
+  config.isEnterprise == "true" &&
+  !!(store.state as any).zoConfig?.sso_enabled;
+
+/** Refreshes the session for an assistant call; never logs out, clears storage or reloads (`00` §5.1). */
+export const refreshSession = (): Promise<"refreshed" | "expired"> => {
+  if (!ssoRefreshable()) return Promise.resolve("expired");
+  return (refreshPromise ?? sharedDexRefresh()).then(
+    () => "refreshed" as const,
+    () => "expired" as const,
+  );
+};
 
 // Exported so streaming (fetch-based) requests that bypass the axios interceptor
 // can participate in the same token-refresh flow.
@@ -63,20 +105,13 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
     return Promise.reject(new Error("Cloud environment: direct logout"));
   }
 
-  if (config.isEnterprise == "true" && (store.state as any).zoConfig.sso_enabled) {
+  if (ssoRefreshable()) {
     if (!refreshPromise) {
       const refreshInstance = axios.create({
         withCredentials: true,
         baseURL: store.state.API_ENDPOINT,
       });
-      refreshPromise = refreshInstance
-        .get("/config/dex_refresh")
-        .then((res) => {
-          if (res.status !== 200) {
-            return Promise.reject(new Error("Refresh returned non-200"));
-          }
-          return undefined;
-        })
+      refreshPromise = sharedDexRefresh()
         .catch(() => {
           return refreshInstance
             .get("/config/logout")
@@ -129,6 +164,16 @@ const recordRefusal = (error: any) =>
     routeKey: error.config?.accessRouteKey,
   });
 
+// An assistant 401 keeps the SSO refresh and its one retry, but never the logout-and-reload branches (`00` §12.3).
+const retryAssistantAfterRefresh = (instance: AxiosInstance, error: any): Promise<unknown> => {
+  if (!ssoRefreshable() || error.config.assistantRetried) return Promise.reject(error);
+  // A failed refresh rejects with the original 401; the retry settles with its own result.
+  return sharedDexRefresh().then(
+    () => instance.request({ ...error.config, assistantRetried: true }),
+    () => Promise.reject(error),
+  );
+};
+
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
 
@@ -147,6 +192,10 @@ const http = ({ headers } = {} as any) => {
     // A retry after a token refresh reuses its config, so it keeps the page that first asked.
     requestConfig.accessRouteKey ??= currentAccessRouteKey();
     requestConfig.startedAt = Date.now();
+    requestConfig.recentResourceRequest ??= captureRecentResourceRequest(
+      requestConfig.url ?? "",
+      requestConfig.method ?? "get",
+    );
     return requestConfig;
   });
 
@@ -168,11 +217,13 @@ const http = ({ headers } = {} as any) => {
       }
       // Ahead of the status switch: a license denial must not read as a missing RBAC permission.
       if (receiveLicenseDenial(error, error?.config?.startedAt)) return Promise.reject(error);
+      removeFailedResourceRequest(error.config?.recentResourceRequest, error.response?.status);
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:
             break;
           case 401: {
+            if (error.config?.assistantManaged) return retryAssistantAfterRefresh(instance, error);
             const responseUrl: string = error.request?.responseURL || error.config?.url || "";
             // A fresh token that still gets 401 is a refusal, not an expiry: refreshing again would loop.
             if (error.config?._afterRefresh) {

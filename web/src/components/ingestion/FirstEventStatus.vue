@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, ref, toRef, watch } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref, shallowRef, toRef, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -26,7 +26,6 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { streamTypeFeature } from "@/utils/featureGate";
-import config from "@/aws-exports";
 import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { FIRST_EVENT_BUDGET, cadenceAt } from "@/composables/firstEvent/firstEventBudget";
@@ -38,6 +37,7 @@ import {
 } from "@/composables/firstEvent/firstEventReporter";
 import {
   useFirstEventWatch,
+  type FirstEventDiagnosis,
   type FirstEventResult,
   type FirstEventState,
   type StreamSignal,
@@ -45,7 +45,7 @@ import {
 import FirstEventStillStuck from "./FirstEventStillStuck.vue";
 import HeardFromPrompt from "@/components/login/HeardFromPrompt.vue";
 import { HEARD_FROM_ASKED_BY_HOST } from "@/components/login/heardFrom";
-import { FIRST_EVENT_ASK_AI, REJECTION_REASON_KEYS, askAiQuery } from "./firstEventAskAi";
+import { REJECTION_REASON_KEYS, type AskAiContext } from "@/utils/assistant/prompts/ingestion";
 
 const props = withDefaults(
   defineProps<{
@@ -100,7 +100,6 @@ const emit = defineEmits<{
 const { t, locale } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
-const askAiFn = inject(FIRST_EVENT_ASK_AI, null);
 const hostAsksHeardFrom = inject(HEARD_FROM_ASKED_BY_HOST, false);
 const hostShowsSuccess = inject(FIRST_EVENT_SUCCESS_BY_HOST, false);
 // Attached in setup, not on mount: a keyed swap then never leaves the host counting zero statuses.
@@ -398,21 +397,37 @@ const copyLabel = computed(() => {
     : t("ingestion.firstEvent.copyCommand");
 });
 
-const aiEnabled = computed(
-  () => config.isEnterprise === "true" && !!store.state.zoConfig?.ai_enabled,
+// The pill never diagnoses, so once its watch stops the door asks with no known cause.
+const pillDiagnosis = computed((): FirstEventDiagnosis | null =>
+  props.display === "pill" && state.value === "stopped"
+    ? { form: "unavailable", trigger: "auto", rejections: [] }
+    : null,
 );
-const stillStuckQuery = computed(() => {
-  if (!askAiFn || !aiEnabled.value || !diagnosis.value) return undefined;
-  return askAiQuery(
-    {
-      guideName: props.guideName,
-      diagnosis: { ...diagnosis.value, form: diagnosisForm.value },
-      org: props.org,
-      endpoint: endpoint.value,
-    },
-    t,
-  );
+const stillStuckContext = computed((): AskAiContext | undefined => {
+  const found = diagnosis.value ?? pillDiagnosis.value;
+  if (!found) return undefined;
+  return {
+    guideName: props.guideName,
+    diagnosis: { ...found, form: diagnosisForm.value },
+    org: props.org,
+    endpoint: endpoint.value,
+  };
 });
+// The door hides itself on some gates, and a step with nothing after "Still stuck?" is a dead end.
+const DOOR_GATES: ReadonlySet<string> = new Set([
+  "available",
+  "unhealthy",
+  "no_permission",
+  "off_for_org",
+]);
+const doorGate = shallowRef<{ readonly value: string } | null>(null);
+void import("@/composables/assistant").then(
+  (assistant) => (doorGate.value = assistant.useAssistantCapability().gate),
+);
+const doorShown = computed(
+  () => !!stillStuckContext.value && !!doorGate.value && DOOR_GATES.has(doorGate.value.value),
+);
+const stillStuckShown = computed(() => !!props.docUrl || doorShown.value);
 
 const hint = computed((): I18nText | undefined => {
   if (state.value === "idle") return undefined;
@@ -554,6 +569,12 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
       >
         {{ t("ingestion.firstEvent.checkAgain") }}
       </OButton>
+      <FirstEventStillStuck
+        v-if="doorShown"
+        :guide-name="guideName"
+        :ask-ai-context="stillStuckContext"
+        door-shown
+      />
     </template>
     <template v-else-if="state === 'idle'">
       <OText variant="meta" data-test="first-event-status-meta">{{
@@ -852,7 +873,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
       </div>
 
       <div
-        v-if="docUrl || (askAiFn && stillStuckQuery)"
+        v-if="stillStuckShown"
         class="border-border-default rounded-default flex items-start gap-3 border px-3 py-2"
       >
         <span
@@ -862,7 +883,8 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
         <FirstEventStillStuck
           :guide-name="guideName"
           :doc-url="docUrl"
-          :ask-ai-query="stillStuckQuery"
+          :ask-ai-context="stillStuckContext"
+          :door-shown="doorShown"
         />
       </div>
     </div>

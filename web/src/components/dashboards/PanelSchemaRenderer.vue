@@ -352,6 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Cell explorer drawer -->
     <ODrawer
       v-model:open="cellDrawer.open"
+      inset-beside
       side="right"
       :width="85"
       bleed
@@ -368,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :start-time="cellDrawer.startTime"
         :end-time="cellDrawer.endTime"
         :base-where="cellDrawer.baseWhere"
-        @send-to-ai-chat="onCellSendToAiChat"
+        :panel-title="panelSchema?.title"
       />
     </ODrawer>
   </div>
@@ -425,6 +426,9 @@ import {
   forecastPointOf,
   usePanelAlertCreation,
   usePanelDownload,
+  TABLE_EXPORT_ROW_LIMIT,
+  shownQueriesCapped,
+  type TableExport,
 } from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
 import { alertableQueryIndexes } from "@/utils/alerts/prefill/fromPanel";
@@ -729,7 +733,6 @@ export default defineComponent({
     "contextmenu",
     "show-legends",
     "format-column",
-    "sendToAiChat",
     "painted",
     "chart-click",
   ],
@@ -955,6 +958,7 @@ export default defineComponent({
       panelDiagnostics,
       isFirstLoadSettled,
       reloadAnnotations,
+      fetchExportRows,
     } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
@@ -2449,7 +2453,12 @@ export default defineComponent({
       emit("error", errorDetail.value);
     });
 
-    const { showErrorNotification, showPositiveNotification } = useNotifications();
+    const {
+      showErrorNotification,
+      showPositiveNotification,
+      showWarningNotification,
+      showInfoNotification,
+    } = useNotifications();
 
     const onFormatColumn = (field: string) => emit("format-column", field);
 
@@ -2525,6 +2534,42 @@ export default defineComponent({
       });
     };
 
+    // Builds the table again from a bounded re-fetch, through the same converter the panel renders with.
+    const fetchFullTable = async (): Promise<TableExport> => {
+      const kept = keptDataIndexes.value;
+      const {
+        data: rows,
+        capped,
+        partial,
+        heldIndexes,
+        rowLimit,
+      } = await fetchExportRows(
+        metadata.value?.queries ?? [],
+        data.value ?? [],
+        TABLE_EXPORT_ROW_LIMIT,
+        kept,
+      );
+      const table = await convertPanelData(
+        filteredPanelSchema.value,
+        kept === null ? rows : kept.map((index: number) => rows[index]),
+        store,
+        chartPanelRef,
+        hoveredSeriesState,
+        filteredResultMetaData,
+        filteredMetadata.value,
+        chartPanelStyle.value,
+        panelAnnotations,
+      );
+      // A capped query with no stored request kept its on-screen rows, so the file is short.
+      return {
+        columns: table?.columns ?? [],
+        rows: table?.rows ?? [],
+        capped,
+        partial: partial || shownQueriesCapped(panelDiagnostics?.value, heldIndexes),
+        rowLimit,
+      };
+    };
+
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
       data,
@@ -2532,6 +2577,24 @@ export default defineComponent({
       tableRendererRef,
       showErrorNotification,
       showPositiveNotification,
+      showWarningNotification,
+      showInfoNotification,
+      isPanelLoading: () => !!loading.value,
+      isTableCapped: () =>
+        panelSchema.value?.queryType !== "promql" &&
+        shownQueriesCapped(panelDiagnostics?.value, keptDataIndexes.value),
+      exportKey: () =>
+        JSON.stringify({
+          queries: (metadata.value?.queries ?? []).map(
+            (q: { query?: string; startTime?: number; endTime?: number } | undefined) => [
+              q?.query,
+              q?.startTime,
+              q?.endTime,
+            ],
+          ),
+          kept: keptDataIndexes.value,
+        }),
+      fetchFullTable,
       t,
     });
 
@@ -2599,6 +2662,7 @@ export default defineComponent({
       return { options: { backgroundColor: "transparent" } };
     });
 
+    // Only the assistant's doors need the panel usable beside this drawer; without them it stays the base modal.
     const cellDrawer = ref<{
       open: boolean;
       field: string;
@@ -2745,12 +2809,6 @@ export default defineComponent({
       }
     }
 
-    // Opening the AI chat: close the cell explorer so the two panels don't overlap.
-    function onCellSendToAiChat(value: unknown, append?: boolean) {
-      onCellDrawerOpenChange(false);
-      emit("sendToAiChat", value, append);
-    }
-
     // Called directly by the search icon so it works even with a panel drilldown config.
     // Off with drilldowns, so the anonymous public page never opens the logs drawer.
     async function exploreCellInLogs(alias: string, value: unknown, row: any) {
@@ -2885,7 +2943,6 @@ export default defineComponent({
       hideContextMenu,
       handleCreateAlert,
       cellDrawer,
-      onCellSendToAiChat,
       exploreCellInLogs,
       ensureDrilldownSchema,
       panelBaseWhere,

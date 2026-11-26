@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    inset-beside
     bleed
     lazy
     data-test="logs-permalink-detail-dialog"
@@ -38,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @close="clearPermalink"
       @closeTable="clearPermalink"
       @view-trace="onViewTrace"
-      @sendToAiChat="onSendToAiChat"
+      :door-context="permalinkDoorBase"
     />
   </ODrawer>
 </template>
@@ -51,7 +52,9 @@ import { useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { traceDetailsLocation } from "@/composables/useLogs/useViewTraceAction";
+import { logsDoorBase, type LogsDoorBase } from "@/plugins/logs/logsDoors";
 import {
+  activePermalink,
   clearPermalink,
   searchResultMounts,
   sharedLineRecord,
@@ -63,7 +66,6 @@ const DetailTable = defineAsyncComponent(() => import("@/plugins/logs/DetailTabl
 const emit = defineEmits<{
   "search-around": [params: { key: unknown; size: number; body: Record<string, unknown> }];
   "add-search-term": [field: string | number, value: string | number | boolean, action: string];
-  "send-to-ai-chat": [value: unknown, append?: boolean];
 }>();
 
 const { t } = useI18nTyped();
@@ -94,5 +96,9 @@ const onViewTrace = () => {
   router.push(traceDetailsLocation(record.value, store.state, searchObj.meta.selectedTraceStream));
 };
 
-const onSendToAiChat = (value: unknown, append?: boolean) => emit("send-to-ai-chat", value, append);
+// The shared line's record doors describe the linked row in the link's org, not whatever the grid shows.
+const permalinkDoorBase = (): LogsDoorBase => {
+  const base = logsDoorBase(searchObj, store.state, record.value ?? undefined);
+  return activePermalink.value ? { ...base, org: activePermalink.value.org } : base;
+};
 </script>

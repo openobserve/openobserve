@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 const { ingestBase } = require('./ingest-url.js');
+const { waitForSearch } = require('./traces-api.js');
 
 /**
  * Generate a random hex string of specified byte length
@@ -318,6 +319,27 @@ async function ingestTraces(page, traceCount = 10, options = {}) {
   };
 }
 
+/** Ingest traces from a beforeAll and wait until the last one is searchable; throws when any is rejected. */
+async function seedSearchableTraces(browser, traceCount, options = {}) {
+  const context = await browser.newContext({
+    storageState: 'playwright-tests/utils/auth/user.json',
+  });
+  try {
+    const page = await context.newPage();
+    const seeded = await ingestTraces(page, traceCount, options);
+    if (seeded.failed > 0) {
+      throw new Error(`${seeded.failed} of ${traceCount} seed traces were rejected: ${JSON.stringify(seeded.results.find((r) => r.status !== 200))}`);
+    }
+    await waitForSearch(page.request, `SELECT trace_id FROM "default" WHERE trace_id = '${seeded.traceIds.at(-1)}'`, {
+      expected: true,
+      pick: (result) => (result.status === 200 ? result.hits.length > 0 : result.status),
+      message: 'seeded traces must be searchable',
+    });
+  } finally {
+    await context.close();
+  }
+}
+
 /**
  * Ingest `count` single-span ERROR traces named err-op-000.. (newest first) into `streamName`,
  * each followed by an OK span, so a span_status filter and page boundaries are both checkable.
@@ -360,6 +382,7 @@ async function ingestSequencedErrorSpans(page, streamName, count) {
 module.exports = {
   generateTrace,
   ingestTraces,
+  seedSearchableTraces,
   ingestSequencedErrorSpans,
   generateHexId,
   getTimestampNs

@@ -25,6 +25,7 @@ use crate::{
         ListProvidersResponseBody, ProviderRequestBody, ProviderResponseBody,
         ProviderTestRequestBody,
     },
+    request::{OutboundOutcome, OutboundTarget, with_outbound_audit},
     service::providers::{self, ProviderError},
 };
 
@@ -274,10 +275,12 @@ pub async fn test_provider_config(
         }
         provider.auth_config = stored.auth_config;
     }
-    match test_provider_connection_config(provider).await {
+    let (tested, target) = test_provider_connection_config(provider).await;
+    let res = match tested {
         Ok(msg) => MetaHttpResponse::ok(msg),
         Err(error) => provider_test_error_response(error),
-    }
+    };
+    with_outbound_audit(res, target.as_slice())
 }
 
 #[cfg(feature = "enterprise")]
@@ -310,25 +313,44 @@ fn provider_test_error_response(error: ProviderError) -> Response {
     MetaHttpResponse::bad_request(PROVIDER_TEST_FAILURE_MESSAGE)
 }
 
+/// The test's result and the URL it called; a config that does not parse is never sent.
 async fn test_provider_connection_config(
     provider: infra::table::providers::Provider,
-) -> Result<String, ProviderError> {
+) -> (Result<String, ProviderError>, Option<OutboundTarget>) {
     #[cfg(feature = "enterprise")]
     {
-        let provider =
-            o2_enterprise::enterprise::llm_evaluations::providers::PreparedProvider::parse(
+        let prepared =
+            match o2_enterprise::enterprise::llm_evaluations::providers::PreparedProvider::parse(
                 (&provider).into(),
-            )
-            .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
-        provider
+            ) {
+                Ok(prepared) => prepared,
+                Err(e) => {
+                    let target = provider
+                        .endpoint
+                        .as_deref()
+                        .map(|url| OutboundTarget::new(url, OutboundOutcome::NotSent));
+                    return (Err(ProviderError::InvalidConfig(e.to_string())), target);
+                }
+            };
+        let tested = prepared
             .test_connection()
             .await
-            .map_err(|e| ProviderError::InvalidConfig(e.to_string()))
+            .map_err(|e| ProviderError::InvalidConfig(e.to_string()));
+        // test_connection reports the status only inside its message text.
+        let outcome = if tested.is_ok() {
+            OutboundOutcome::Succeeded
+        } else {
+            OutboundOutcome::Failed
+        };
+        (
+            tested,
+            Some(OutboundTarget::new(&prepared.endpoint, outcome)),
+        )
     }
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = provider;
-        Err(ProviderError::NotFound)
+        (Err(ProviderError::NotFound), None)
     }
 }
 
@@ -347,7 +369,9 @@ mod tests {
         .unwrap();
 
         let provider: infra::table::providers::Provider = body.into();
-        let error = test_provider_connection_config(provider).await.unwrap_err();
+        let (tested, target) = test_provider_connection_config(provider).await;
+        let error = tested.unwrap_err();
+        assert_eq!(target, None, "a config that does not parse calls nothing");
         let response = provider_test_error_response(error);
 
         assert_eq!(response.status().as_u16(), 400);
