@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Noch hat kein Kanal eine Standardorganisation",
-      "description": "Fragen in einem Kanal ohne Standard gehen an die Standardorganisation der jeweiligen Person (sie kann sie mit {command} org ändern)."
+      "description": "Fragen in einem Kanal ohne Standard gehen an die Standard-Organisation jeder Person (sie können sie mit {command} org ändern)."
     },
     "noSlackLinkedPeople": {
       "title": "Noch niemand in dieser Organisation hat Slack verknüpft"
@@ -1281,7 +1281,8 @@
       "leaveMessageInBrowser": "Speichern Sie {entity}, behalten Sie Ihre Änderungen in diesem Browser oder verwerfen Sie sie.",
       "retentionInBrowser": "Änderungen werden in diesem Browser {days} Tage lang aufbewahrt oder bis Sie sich abmelden. Nur die {max} neuesten jeder Art werden behalten.",
       "dotUndated": "Unsaved draft"
-    }
+    },
+    "justNow": "gerade eben"
   },
   "filterBar": {
     "ariaLabel": "Nach Feld filtern",
@@ -1432,7 +1433,6 @@
     "fetchingValues": "Werte werden geladen...",
     "noDataInRangeHint": "Keine Daten im Bereich — Werte aus aktivem Filter",
     "viewMoreValues": "Weitere Werte anzeigen",
-    "aiIconAlt": "KI",
     "aiModeIconAlt": "KI-Modus",
     "firstPage": "Erste Seite",
     "lastPage": "Letzte Seite",
@@ -2107,6 +2107,7 @@
     "synthetic": "Synthetics",
     "experience": "Erfahrung",
     "slos": "SLOs",
+    "autobotInvestigate": "@:{'brand.autobotInvestigate'}",
     "reliability": "Zuverlässigkeit",
     "onCall": "On-Call",
     "response": "Reaktion",
@@ -3449,6 +3450,7 @@
         "inThisView": "In dieser Ansicht",
         "pagesFunnelNote": "Ein Trichter-Schritt, der eine ausgeblendete Seite nennt, trifft weiterhin zu.",
         "fieldMissing": "Feld nicht in diesem Stream",
+        "fieldMissingOn": "{field}: Feld nicht in diesem Stream",
         "field": "Feld",
         "match": "Übereinstimmung",
         "values": "Werte",
@@ -3500,8 +3502,7 @@
         "edit": "Bearbeiten",
         "identityRowForm": "Auf dieser Karte gelten Identitätsregeln ab dem ersten identifizierten Ereignis",
         "newUsersOnly": "Nur neue Benutzer",
-        "newUsersSessionsTip": "„Nur neue Benutzer“ funktioniert nur im Benutzermodus",
-        "fieldMissingOn": "{field}: Feld nicht in diesem Stream"
+        "newUsersSessionsTip": "„Nur neue Benutzer“ funktioniert nur im Benutzermodus"
       },
       "appFilters": {
         "hiddenLabel": "Ausgeblendet durch App-Filter:",
@@ -4989,7 +4990,26 @@
     },
     "summaryOtherRoles": "+{count} weitere Rollen",
     "indices": "Indizes",
-    "roleAdmin": "Admin"
+    "roleAdmin": "Admin",
+    "modules": {
+      "descriptions": {
+        "ai": "Chat with @:{'brand.autobot'}, use AI query help and run incident analysis.",
+        "ai_chat_share": "Chats innerhalb der Organisation teilen und von anderen geteilte Chats öffnen. Nur für Admins, bis die Berechtigung erteilt wurde.",
+        "ai_toolsets": "Add and change the tools @:{'brand.autobot'} can use.",
+        "llmObservability": "Tracing, Evaluierung und Prompts für Ihre eigenen LLM-Anwendungen. Nicht {product}.",
+        "mcp": "Externe KI-Clients ({clients}) über MCP mit dieser Organisation verbinden."
+      },
+      "groups": {
+        "assistant": "@:{'brand.autobot'}",
+        "llmObservability": "LLM-Beobachtbarkeit"
+      },
+      "labels": {
+        "ai": "@:{'brand.autobot'}",
+        "ai_chat_share": "Chat-Freigabe",
+        "ai_toolsets": "Toolsets",
+        "mcp": "MCP-Zugriff"
+      }
+    }
   },
   "announcements": {
     "dismiss": "Ausblenden",
@@ -10615,7 +10635,29 @@
     "tabUsage": "Verwendungszweck",
     "removeHomeDashboard": "Home-Dashboard entfernen",
     "resources": "Ressourcen",
-    "explore": "Erkunden"
+    "explore": "Erkunden",
+    "agent": {
+      "askOff": {
+        "budget": "Die KI-Credits für diesen Monat sind aufgebraucht, daher kann {product} nicht antworten",
+        "oss": "@:{'brand.autobot'} is part of OpenObserve Enterprise. This Open Source build has no @:{'brand.autobot'} and no incidents.",
+        "not_entitled": "{product} ist nicht Teil dieses Plans",
+        "not_configured": "{product} ist für diese Organisation noch nicht eingerichtet",
+        "off_for_org": "{product} ist für diese Organisation deaktiviert",
+        "no_permission": "Ihre Rolle kann {product} nicht verwenden"
+      },
+      "admins": "Admins: {names}",
+      "flapping": "Flapping · {count}×",
+      "openIncident": "Vorfall öffnen",
+      "openService": "Service öffnen",
+      "openAlert": "Alarm öffnen",
+      "creditsUsedUp": "KI-Credits sind aufgebraucht, daher wurde nichts gesendet",
+      "firstRun": {
+        "title": "Noch keine Daten · senden Sie Ihre ersten Logs, Metriken oder Traces",
+        "note": "Die Startseite füllt sich von selbst, sobald ein Service Daten sendet: Jetzt und Probleme ohne Alarm. Der Aufbau verbraucht keine KI."
+      },
+      "tabLabel": "@:{'brand.autobot'}"
+    },
+    "answersReady": "{count} Antwort bereit | {count} Antworten bereit"
   },
   "overview": {
     "alertsSuffix": "Alarme",
@@ -10795,6 +10837,38 @@
     "dataAsOf": "Datenstand: {time}",
     "timeRange": {
       "heading": "Im ausgewählten Zeitraum"
+    },
+    "now": {
+      "title": "Jetzt",
+      "changedAt": "Geändert {time}",
+      "investigate": "Untersuchen",
+      "investigateName": "{row} untersuchen",
+      "investigateFallback": "Assistenten-Credits sind aufgebraucht. Untersuchen öffnet {target}",
+      "notSent": {
+        "runCap": "Nicht gesendet: {n} laufende Chats",
+        "generic": "Nicht gesendet"
+      },
+      "noAlert": "kein Alarm",
+      "coverageUnknown": "Alarmabdeckung unbekannt",
+      "vsBaseline": "{value} vs. {baseline} (vorherige {hours} h)",
+      "noBaseline": "Nicht genug Verlauf für eine Baseline",
+      "allRegions": "Alle Regionen zusammen",
+      "partialRow": "teilweise",
+      "recovered": "Wiederhergestellt",
+      "firingCount": "×{count}",
+      "sentence": {
+        "service": {
+          "errors": "Fehler in {service} bei {value}",
+          "latency": "{service} p99 {ratio}× über dem Basiswert"
+        },
+        "incident": "{title}",
+        "anomaly": "{name}: {count} anomale Punkte",
+        "alert": "{name} ausgelöst"
+      }
+    },
+    "goTo": {
+      "close": "Schließen",
+      "back": "Zurück zur Startseite"
     }
   },
   "aiChatShare": {
@@ -10842,17 +10916,17 @@
     },
     "capabilities": {
       "query": {
-        "title": "Schreiben Sie eine Anfrage",
+        "title": "Abfrage erstellen",
         "description": "SQL für Logs, Traces, RUM oder PromQL für Metriken.",
         "prompt": "Hilf mir, eine Anfrage zu schreiben"
       },
       "incident": {
-        "title": "Vorfälle untersuchen",
+        "title": "Probleme untersuchen",
         "description": "Ursachenanalyse über Logs, Traces und Alarme – z. B. \"Warum wurde gateway-5xx ausgelöst?\"",
         "prompt": "Hilf mir, einen Vorfall zu untersuchen"
       },
       "dashboard": {
-        "title": "Erstellen Sie ein Dashboard",
+        "title": "Dashboard erstellen",
         "description": "Aus einem Thema — z. B. „Zustand des K8s-Knotens: CPU, Speicher, Neustarts“. Erstellt auch Panels.",
         "prompt": "Hilf mir, ein Dashboard zu erstellen"
       },
@@ -10878,13 +10952,13 @@
       "morning": "Guten Morgen",
       "afternoon": "Guten Tag",
       "evening": "Guten Abend",
-      "night": "Spät arbeiten"
+      "night": "Sie arbeiten spät"
     },
     "greetingNamed": {
       "morning": "Guten Morgen, {name}",
       "afternoon": "Guten Tag, {name}",
       "evening": "Guten Abend, {name}",
-      "night": "Spätschicht, {name}"
+      "night": "Sie arbeiten spät, {name}"
     },
     "aiChat": {
       "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten",
@@ -12683,18 +12757,14 @@
       },
       "rcaSteer": {
         "composerTitleLive": "Diesen Lauf steuern",
-        "composerHintLive": "Wird nach dem aktuellen Schritt gelesen",
         "composerTitlePaused": "Dem Agenten antworten",
-        "composerHintPaused": "Der Lauf wird beim Senden fortgesetzt",
         "agentAsks": "Agent fragt",
-        "answerNote": "Ihre Antwort ist ein Hinweis, kein Beweis. Sie kann die Hypothese auf Wahrscheinlich verschieben. Für eine Ursache ist ein Tool-Ergebnis erforderlich.",
-        "placeholderPaused": "Dem Agenten antworten oder Kontext hinzufügen, z. B. PR #812 in acme/checkout, bereitgestellt gegen 14:02.",
+        "placeholderPaused": "Antworten Sie dem Agenten oder fügen Sie Kontext hinzu",
         "suggestions": "Vorschläge",
         "chipCheck": "Prüfen …",
         "chipIgnore": "Ignorieren …",
         "chipFocus": "Fokus auf Service …",
         "chipChanged": "Wir haben geändert …",
-        "sendingAs": "Senden als {email} · für alle in diesem Vorfall sichtbar",
         "send": "Senden",
         "steered": "{count}× gesteuert",
         "fromSteering": "aus der Steuerung",
@@ -12830,7 +12900,14 @@
           "medium": "Mittlere Konfidenz",
           "low": "Geringe Konfidenz",
           "none": "Keine Konfidenz"
-        }
+        },
+        "cancelConfirmTitle": "Ausführung abbrechen?",
+        "cancelConfirmBody": "Die Analyse für alle Beteiligten an Vorfall #{number} abbrechen?",
+        "showQuery": "Abfrage anzeigen",
+        "showResult": "Ergebnis anzeigen",
+        "keepRunning": "Weiter ausführen",
+        "resultFailed": "Diese Abfrage konnte nicht ausgeführt werden.",
+        "resultEmpty": "Die Abfrage hat keine Zeilen zurückgegeben."
       },
       "rcaThread": {
         "title": "Untersuchungs-Thread",
@@ -13016,6 +13093,7 @@
         "hourAgo": "{count} Stunde her | {count} Stunden her",
         "dayAgo": "{count} Tag her | {count} Tage her"
       },
+      "byAssistant": "Vorfallanalyse · von {product}",
       "rcaLight": {
         "showMore": "Mehr anzeigen",
         "showLess": "Weniger anzeigen",
@@ -16068,6 +16146,10 @@
       "empty": "Noch keine Abfragen",
       "noMatch": "Keine Abfragen passen zur Suche oder zum Sternfilter",
       "loadMore": "Mehr laden"
+    },
+    "filter": {
+      "placeholder": "Filter, zum Beispiel: {label} =~ \"500{'|'}503\"",
+      "placeholderEmpty": "Metriken nach Label filtern"
     }
   },
   "settings": {
@@ -16076,6 +16158,7 @@
     "generalLabel": "Allgemeines",
     "groupGeneral": "Allgemein",
     "groupAccessSecurity": "Zugriff & Sicherheit",
+    "groupAssistant": "@:{'brand.autobot'}",
     "groupDestinations": "Ziele",
     "groupData": "Daten",
     "groupOperations": "Betrieb",
@@ -18107,6 +18190,15 @@
       "loadingPage": "Seite {page} wird geladen",
       "pageFailed": "Seite {page} konnte nicht geladen werden",
       "pageEmpty": "Seite {page} hat keine Ergebnisse"
+    },
+    "assistantSet": {
+      "label": "Vom Assistenten festgelegt",
+      "name": "{field} was set by @:{'brand.autobot'}",
+      "field": {
+        "query": "Abfrage",
+        "stream": "Stream",
+        "time": "Zeitbereich"
+      }
     }
   },
   "aiToolset": {
@@ -23782,10 +23874,12 @@
       "oncall": "On-Call",
       "synthetics": "Synthetics",
       "fleet": "Fleet",
-      "kubernetes": "Kubernetes"
+      "kubernetes": "Kubernetes",
+      "assistant": "@:{'brand.autobot'}"
     },
     "pages": {
       "global": "Weltweit",
+      "home": "Startseite",
       "kubernetes": "Kubernetes",
       "logs": "Logs",
       "dashboardsList": "Dashboards",
@@ -23842,7 +23936,10 @@
       "downtimes": "Wartungsfenster",
       "fleetConfigEditor": "Konfigurationseditor",
       "fleetOverview": "Fleet-Pipelines",
-      "securityRecord": "Sicherheit — Datensatz öffnen"
+      "securityRecord": "Sicherheit — Datensatz öffnen",
+      "assistant": "@:{'brand.autobot'}",
+      "assistantComposer": "{product}-Eingabe",
+      "queryEditor": "Abfrage-Editor"
     },
     "actions": {
       "openCheatsheet": "Cheatsheet mit Tastenkombinationen öffnen",
@@ -23978,7 +24075,18 @@
       "fleetEditorDeleteNode": "Ausgewählte Komponente entfernen",
       "fleetFlowCloseDetails": "Pfaddetails schließen oder die Karte einklappen",
       "securityRecordNext": "Nächster Datensatz",
-      "securityRecordPrev": "Vorheriger Datensatz"
+      "securityRecordPrev": "Vorheriger Datensatz",
+      "assistantClose": "{product} schließen",
+      "assistantComposerDictate": "Gedrückt halten zum Diktieren",
+      "assistantComposerNewline": "Neue Zeile",
+      "assistantComposerRecall": "Vorherigen Prompt abrufen",
+      "assistantComposerSend": "Nachricht senden",
+      "assistantGoToAnswer": "Zur neuesten Antwort springen",
+      "assistantHistory": "Chats öffnen",
+      "assistantOpen": "{product} öffnen",
+      "editorTabFocusMode": "Tab verlässt den Editor",
+      "threadsBarOpen": "Chats öffnen",
+      "homeFocusAsk": "Fokus auf das Fragefeld setzen"
     }
   },
   "components": {
@@ -29280,6 +29388,7 @@
     "consentBillingPayer": "Nach Verbrauch der kostenlosen Guthaben wird die KI-Nutzung zum Tarif Ihres Plans über die Rechnung von {payer} abgerechnet.",
     "organizationBillingCycle": "Kostenpflichtige KI-Nutzung wird über die Rechnung dieser Organisation abgerechnet.",
     "payerBillingCycle": "Kostenpflichtige KI-Nutzung wird über die Rechnung der zahlenden Organisation abgerechnet.",
+    "readOnlyAdmin": "Nur ein Organisationsadministrator kann diese Einstellung ändern.",
     "viewBilling": "Abrechnung anzeigen",
     "memberAndPayerRequired": "{payer} muss die kostenpflichtige KI-Nutzung ebenfalls aktivieren, bevor {organization} sie verwenden kann.",
     "contactPayerAdmin": "Bitten Sie einen Administrator von {payer}, die kostenpflichtige KI-Nutzung zu aktivieren.",
@@ -30241,20 +30350,6 @@
       "loading": "Verlauf wird geladen",
       "loaded": "Verlauf geladen"
     },
-    "paging": {
-      "title": "Paging",
-      "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
-      "routing": "On-call routing",
-      "unavailable": "Paging is turned off for this deployment.",
-      "denied": "{denied} {askAdmin}",
-      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
-      "deniedTitle": "Sie haben keine Berechtigung, die Alarmierungseinstellung anzuzeigen",
-      "deniedDesc": "Die Alarmierung wird einmal für die gesamte Organisation festgelegt. Bitten Sie einen Organisationsadministrator um Zugriff.",
-      "failedTitle": "Die Alarmierungseinstellung konnte nicht geladen werden",
-      "failedDesc": "Beim Laden ist ein Fehler aufgetreten. Versuchen Sie es gleich noch einmal.",
-      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
-    },
     "incidents": {
       "title": "Alarmierte Befunde",
       "subtitle": "Befunde, die einen Vorfall für Ihr On-Call-Team eröffnet haben, mit der zugehörigen Analyse.",
@@ -30355,6 +30450,20 @@
         "desc": "Ein Administrator aktiviert AutoObserve und dessen Alarmierung für diese Bereitstellung. Wen es benachrichtigt und wie weit es selbstständig handelt, wird hier eingestellt, sobald es diese Steuerungsmöglichkeiten gibt.",
         "action": "So funktioniert es"
       }
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "Sie haben keine Berechtigung, die Alarmierungseinstellung anzuzeigen",
+      "deniedDesc": "Die Alarmierung wird einmal für die gesamte Organisation festgelegt. Bitten Sie einen Organisationsadministrator um Zugriff.",
+      "failedTitle": "Die Alarmierungseinstellung konnte nicht geladen werden",
+      "failedDesc": "Beim Laden ist ein Fehler aufgetreten. Versuchen Sie es gleich noch einmal.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
     },
     "learning": {
       "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
@@ -30492,7 +30601,10 @@
     "suggestions": {
       "title": "Vorschläge",
       "subtitle": "Wenn Sie einen Moment Zeit haben – diese reduzieren Rauschen oder sparen Ihnen Zeit."
-    }
+    },
+    "previewLabel": "Vorschau",
+    "previewStrip": "Vorschau mit Beispieldaten. Hier wird nichts in Ihrer Organisation geändert.",
+    "previewHeader": "AutoObserve · Vorschau"
   },
   "telephony": {
     "title": "Telefonie",
@@ -30831,7 +30943,7 @@
       "editDefault": "Kanalstandard bearbeiten",
       "removeConfirm": "Standard entfernen",
       "removeTitle": "Standard für #{channel} entfernen?",
-      "removeMessage": "Fragen in {name} gehen dann an die Standardorganisation jeder Person (sie kann sie mit {command} org ändern).",
+      "removeMessage": "Fragen in {name} gehen dann an die Standard-Organisation jeder Person (sie kann sie mit {command} org ändern).",
       "instanceAdminOnly": "Nur für Instanz-Administratoren",
       "ownOrgOnlyHint": "In einem Instanz-Workspace ordnen Sie Kanäle Ihrer eigenen Organisation zu",
       "claimableHint": "Nicht übernommene Kanäle und Kanäle im Besitz von {org}",
@@ -33141,175 +33253,6 @@
       "addSynthetic": "Öffnet das Formular für den synthetischen Check ausgefüllt. Es wird nichts gespeichert, bis Sie speichern.",
       "setUpKubernetes": "Öffnet die Kubernetes-Einrichtung für seinen Cluster."
     },
-    "kind": {
-      "chip": {
-        "notWatched": "Abdeckungslücke",
-        "missingAlert": "Fehlender Alarm",
-        "notifiesNoOne": "Benachrichtigt niemanden",
-        "stoppedSending": "Sendet nicht mehr",
-        "dataQuality": "Datenqualität"
-      },
-      "traffic": {
-        "handles": "Es verarbeitet etwa {count} Ereignisse pro Stunde.",
-        "usually": "Es sendet üblicherweise etwa {count} Ereignisse pro Stunde."
-      },
-      "classes": {
-        "why": {
-          "errors": "seine Fehler",
-          "latency": "seine Latenz",
-          "absence": "ob es nicht mehr sendet"
-        },
-        "ai": {
-          "errors": "Fehler",
-          "latency": "Latenz",
-          "absence": "Aussetzen"
-        },
-        "name": {
-          "errors": "Fehler",
-          "latency": "Latenz",
-          "absence": "Sendet nicht mehr"
-        }
-      },
-      "detail": {
-        "noAlert": "{check}: kein Alarm.",
-        "cantMeasure": "{check}: noch nicht messbar, {service} sendet keine Traces."
-      },
-      "coverage_gap": {
-        "headline": "Nichts überwacht {service}",
-        "why": "Kein Alarm überwacht {classes}.",
-        "next": "Fügen Sie den Alarm hinzu, den AutoObserve entworfen hat. | Fügen Sie die {count} Alarme hinzu, die AutoObserve entworfen hat.",
-        "needsTraces": "Latenz benötigt zuerst Traces.",
-        "groupAdded": "Alarme für {count} Service hinzugefügt | Alarme für {count} Services hinzugefügt",
-        "groupHeadline": "Nichts überwacht {count} Services",
-        "groupTraffic": "Zusammen verarbeiten sie etwa {count} Ereignisse pro Stunde.",
-        "groupNext": "Fügen Sie den Alarm hinzu, den AutoObserve entworfen hat. | Fügen Sie die {count} Alarme hinzu, die AutoObserve entworfen hat, und zwar in einer einzigen, nach Team gruppierten Liste."
-      },
-      "no_absence_check": {
-        "why": "Kein Alarm wird ausgelöst, wenn {service} aufhört zu senden.",
-        "why_weak": "Nur {monitor} würde es bemerken und deckt dabei den gesamten Stream ab.",
-        "why_blind": "{monitor} würde es bemerken, kann aber die Daten von {service} nicht sehen.",
-        "whySilent": "{monitor} würde bemerken, wenn {service} aufhört, benachrichtigt aber niemanden.",
-        "next": "Fügen Sie einen Alarm für fehlende Daten hinzu: Er wird ausgelöst, wenn {service} {minutes} Minuten lang nichts sendet.",
-        "nextSilent": "Legen Sie fest, wen er benachrichtigen soll."
-      },
-      "coverage_lost": {
-        "why": "Etwas hat sich an den Alarmen geändert, die es überwacht haben.",
-        "next": "Fügen Sie es wieder hinzu oder prüfen Sie, was sich an dem Alarm geändert hat, der es überwacht hat."
-      },
-      "blind_guardrail": {
-        "nextStream": "Richten Sie es auf den Stream aus, der {detail} ersetzt hat, oder löschen Sie es.",
-        "nextScope": "Prüfen Sie seinen Filter: So wie er geschrieben ist, trifft er nichts, was er treffen sollte.",
-        "nextField": "Korrigieren Sie das Feld, nach dem seine Abfrage filtert."
-      },
-      "discovery_unusable": {
-        "headline": "Nur {good} der {active} Services, die AutoObserve gefunden hat, sind nutzbar",
-        "why": "Bei den meisten ihrer Daten fehlt der Service-Name, daher ist die Liste der Lücken unvollständig.",
-        "next": "Senden Sie service.name in Ihren Traces und Logs."
-      },
-      "source_silence": {
-        "headline": "{source} sendet nicht mehr an {stream}",
-        "since": "Seit {time}.",
-        "usual": "Normalerweise sendet es etwa {count} Zeilen pro Tag; der Rest von {stream} lief weiter.",
-        "more": "Und {count} weitere Quelle in diesem Stream. | Und {count} weitere Quellen in {streams} Streams.",
-        "nextSender": "Prüfen Sie den Agenten oder Collector auf {source}.",
-        "nextGap": "Es sendet wieder. Prüfen Sie, welche Daten in der Lücke fehlen."
-      },
-      "heartbeat_on_success": {
-        "headline": "Kein Alarm wird ausgelöst, wenn Job {job} nicht mehr erfolgreich ist",
-        "why": "Seine Erfolgszeile ist am letzten Tag erschienen. | Seine Erfolgszeile ist an jedem der letzten {days} Tage erschienen.",
-        "next": "Fügen Sie einen Alarm hinzu, der ausgelöst wird, wenn seine Erfolgszeile nicht erscheint."
-      },
-      "cell": {
-        "falls": {
-          "weak": "Nur {monitor}, ein breit gefasster Alarm, überwacht {what}, und er ist nicht auf diesen Service beschränkt. | Nur {monitor}, breit gefasste Alarme, überwachen {what}, und sie sind nicht auf diesen Service beschränkt.",
-          "silent": "{monitor} überwacht {what}, benachrichtigt aber niemanden. | {monitor} überwachen {what}, benachrichtigen aber niemanden.",
-          "blind": "{monitor} überwacht {what}, kann aber die Daten dieses Service nicht sehen. | {monitor} überwachen {what}, können aber die Daten dieses Service nicht sehen.",
-          "unmapped": "{monitor} überwacht möglicherweise {what}, aber sein Geltungsbereich konnte nicht diesem Service zugeordnet werden. | {monitor} überwachen möglicherweise {what}, aber ihr Geltungsbereich konnte nicht diesem Service zugeordnet werden."
-        },
-        "watchWhat": {
-          "errors": "Fehler von {service}",
-          "latency": "Latenz von {service}",
-          "absence": "ob {service} aufhört zu senden"
-        },
-        "justAdded": "Hinzugefügt. AutoObserve berücksichtigt ihn bei der nächsten Prüfung, innerhalb von etwa 5 Minuten. | Hinzugefügt. AutoObserve berücksichtigt sie bei der nächsten Prüfung, innerhalb von etwa 5 Minuten.",
-        "errorsWhy": "Kein Alarm überwacht die Fehler von {service}.",
-        "errorsNext": "Fügen Sie einen Fehleralarm mit dem 3-Fachen der üblichen Rate hinzu.",
-        "latencyWhy": "Kein Alarm überwacht die Latenz von {service}.",
-        "latencyNext": "Fügen Sie einen Latenz-Alarm mit dem 2-Fachen des üblichen p95 hinzu.",
-        "latencyNoTraces": "Die Latenz wird aus Traces dargestellt. {service} sendet keine.",
-        "noMetrics": "Für {service} kommen keine CPU- oder Speicherdaten an, daher kann dies noch nicht überwacht werden.",
-        "noRestartEvents": "Für {service} kommen keine Neustart-Ereignisse an, daher können seine Neustarts noch nicht überwacht werden.",
-        "saturationWhy": "Kein Alarm überwacht Arbeitsspeicher oder CPU von {service}. Container-Arbeitsspeicher kommt in {stream} an.",
-        "saturationNext": "Fügen Sie einen Arbeitsspeicher-Alarm bei 90 % des Limits hinzu.",
-        "nodeWhy": "Kein Alarm überwacht die Knoten, auf denen {service} läuft. Knotendaten kommen in {stream} an.",
-        "nodeNext": "Fügen Sie einen Knoten-Alarm bei 90 % der Kapazität hinzu.",
-        "restartsWhy": "Kein Alarm überwacht Neustarts von {service}.",
-        "restartsNext": "Fügen Sie einen Alarm hinzu, der ausgelöst wird, wenn seine Pods innerhalb von 10 Minuten dreimal neu starten.",
-        "syntheticWhy": "Nichts prüft {service} von außen. Eine synthetische Prüfung sendet alle paar Minuten eine Anfrage und erkennt einen Ausfall, selbst wenn der Dienst nichts sendet.",
-        "syntheticNext": "Fügen Sie eine synthetische Prüfung für seinen Health-Endpunkt hinzu."
-      },
-      "paged": {
-        "page": {
-          "paged": "Paged {team}",
-          "pagedTeam": "Paged the on-call team",
-          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
-          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand.",
-          "pending": "On-Call wird alarmiert: Der On-Call-Dienst hat die Alarmierung noch nicht bestätigt."
-        },
-        "nextRouting": "Set up on-call routing so the next stop pages someone.",
-        "recoveredAt": "Wieder da um {time}.",
-        "stream_silence": {
-          "headline": "{count} streams stopped sending data",
-          "why": "No data has arrived on {stream} ({type}) since {time}.",
-          "whyMany": "{streams} have sent no data since {time}.",
-          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
-          "nextMany": "One cause is likely, such as a shared collector.",
-          "whyOne": "{stream} hat seit {time} keine Daten gesendet.",
-          "recovered": "{stream} ({type}) sendet wieder Daten. Der Versand stoppte um {time}.",
-          "recoveredMany": "{streams} senden wieder Daten. Der Versand stoppte um {time}.",
-          "recoveredSome": "Senden wieder: {streams}."
-        },
-        "stream_drop": {
-          "headline": "{count} streams dropped sharply",
-          "why": "{stream} ({type}) has received much less data than usual since {time}.",
-          "whyMany": "{streams} have received much less data than usual since {time}.",
-          "next": "Check whether a sender stopped or a filter changed.",
-          "nextMany": "One cause is likely, such as a shared collector or filter.",
-          "whyOne": "{stream} erhält seit {time} viel weniger Daten als üblich.",
-          "recovered": "{stream} ({type}) hat wieder sein übliches Volumen. Der Rückgang begann um {time}.",
-          "recoveredMany": "{streams} haben wieder ihr übliches Volumen. Der Rückgang begann um {time}.",
-          "recoveredSome": "Wieder normal: {streams}."
-        },
-        "stream_rise": {
-          "headline": "{count} streams rose sharply",
-          "why": "{stream} ({type}) has received much more data than usual since {time}.",
-          "whyMany": "{streams} have received much more data than usual since {time}.",
-          "next": "Check for a retry loop or a new sender writing to it.",
-          "nextMany": "One cause is likely, such as a shared sender retrying.",
-          "whyOne": "{stream} erhält seit {time} viel mehr Daten als üblich.",
-          "recovered": "{stream} ({type}) hat wieder sein übliches Volumen. Der Anstieg begann um {time}.",
-          "recoveredMany": "{streams} haben wieder ihr übliches Volumen. Der Anstieg begann um {time}.",
-          "recoveredSome": "Wieder normal: {streams}."
-        }
-      }
-    },
-    "threshold": {
-      "label": "Auslösen ab",
-      "errorsSuffix": "Fehler pro Stunde",
-      "latencySuffix": "ms (p95)",
-      "errorsReason": "AutoObserve hat in den letzten 7 Tagen keine übliche Fehleranzahl für {service} gefunden. Legen Sie einen Schwellenwert fest, um diesen Alarm hinzuzufügen.",
-      "latencyReason": "AutoObserve hat in den letzten 7 Tagen keine übliche Latenz für {service} gefunden. Legen Sie einen Schwellenwert fest, um diesen Alarm hinzuzufügen.",
-      "measuring": "Übliches Niveau wird über 7 Tage gemessen…",
-      "noUsual": "Keine in 7 Tagen",
-      "notMeasured": "Nicht gemessen",
-      "timedOut": "Die Messung hat zu lange gedauert. Legen Sie einen Schwellenwert fest.",
-      "placeholder": "Schwellenwert festlegen",
-      "placeholderShort": "Wert festlegen",
-      "required": "Schwellenwert festlegen",
-      "invalid": "Geben Sie eine Zahl größer als 0 ein.",
-      "invalidErrors": "Geben Sie 0 oder mehr ein.",
-      "anyErrorNote": "AutoObserve hat in den letzten 7 Tagen keine Fehler für {service} gefunden, daher wird dieser Alarm bei jedem Fehler ausgelöst. Erhöhen Sie den Schwellenwert, wenn einige Fehler normal sind."
-    },
     "bulk": {
       "alertsPage": "Alarme",
       "title": {
@@ -33485,32 +33428,6 @@
         "appliedEditor": "Saved and recorded for {title}.",
         "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
       },
-      "apply": {
-        "edit": "Edit in alert editor",
-        "button": "Apply",
-        "where": "Folder {folder} · notifies {destinations}",
-        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
-        "whereNoOne": "Ordner {folder} · benachrichtigt niemanden",
-        "whereTeamNoOne": "Ordner {folder} · Team {team} · benachrichtigt niemanden",
-        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
-        "acknowledgedFirst": "{count} der {of} bestätigten Auslösungen würden keinen Alarm mehr auslösen, die erste am {first}. Prüfen Sie dies vor dem Anwenden.",
-        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
-        "changed": "This alert changed. Open it to review.",
-        "offerChanged": "Die vorgeschlagene Änderung wurde aktualisiert. Prüfen Sie sie erneut.",
-        "reviewAgain": "Erneut prüfen",
-        "loading": "Checking what this changes…",
-        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
-        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
-        "cardNote": "Shows what changes before anything is saved.",
-        "gone": "This suggestion is no longer available. Open the alert to review it."
-      },
-      "applied": {
-        "title": "Applied changes",
-        "by": "by {actor} at {when}",
-        "undoneBy": "rückgängig gemacht von {actor} am {when}",
-        "undone": "Undone",
-        "you": "you"
-      },
       "undone": {
         "one": "Rückgängig gemacht: {title} wird wieder angezeigt.",
         "many": "Rückgängig gemacht: {count} Element wird wieder angezeigt. | Rückgängig gemacht: {count} Elemente werden wieder angezeigt.",
@@ -33573,6 +33490,32 @@
         "range": "{from}–{to} von {total}",
         "previous": "Vorherige Seite",
         "next": "Nächste Seite"
+      },
+      "apply": {
+        "edit": "Edit in alert editor",
+        "button": "Apply",
+        "where": "Folder {folder} · notifies {destinations}",
+        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "whereNoOne": "Ordner {folder} · benachrichtigt niemanden",
+        "whereTeamNoOne": "Ordner {folder} · Team {team} · benachrichtigt niemanden",
+        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "acknowledgedFirst": "{count} der {of} bestätigten Auslösungen würden keinen Alarm mehr auslösen, die erste am {first}. Prüfen Sie dies vor dem Anwenden.",
+        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
+        "changed": "This alert changed. Open it to review.",
+        "offerChanged": "Die vorgeschlagene Änderung wurde aktualisiert. Prüfen Sie sie erneut.",
+        "reviewAgain": "Erneut prüfen",
+        "loading": "Checking what this changes…",
+        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
+        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
+        "cardNote": "Shows what changes before anything is saved.",
+        "gone": "This suggestion is no longer available. Open the alert to review it."
+      },
+      "applied": {
+        "title": "Applied changes",
+        "by": "by {actor} at {when}",
+        "undoneBy": "rückgängig gemacht von {actor} am {when}",
+        "undone": "Undone",
+        "you": "you"
       }
     },
     "cta": {
@@ -33658,6 +33601,175 @@
       "calibration": {
         "failure": "Alarm {alert} {what}. Schlagen Sie eine korrigierte Abfrage vor, zeigen Sie sie mir und speichern Sie erst, wenn ich es sage."
       }
+    },
+    "kind": {
+      "chip": {
+        "notWatched": "Abdeckungslücke",
+        "missingAlert": "Fehlender Alarm",
+        "notifiesNoOne": "Benachrichtigt niemanden",
+        "stoppedSending": "Sendet nicht mehr",
+        "dataQuality": "Datenqualität"
+      },
+      "traffic": {
+        "handles": "Es verarbeitet etwa {count} Ereignisse pro Stunde.",
+        "usually": "Es sendet üblicherweise etwa {count} Ereignisse pro Stunde."
+      },
+      "classes": {
+        "why": {
+          "errors": "seine Fehler",
+          "latency": "seine Latenz",
+          "absence": "ob es nicht mehr sendet"
+        },
+        "ai": {
+          "errors": "Fehler",
+          "latency": "Latenz",
+          "absence": "Aussetzen"
+        },
+        "name": {
+          "errors": "Fehler",
+          "latency": "Latenz",
+          "absence": "Sendet nicht mehr"
+        }
+      },
+      "detail": {
+        "noAlert": "{check}: kein Alarm.",
+        "cantMeasure": "{check}: noch nicht messbar, {service} sendet keine Traces."
+      },
+      "coverage_gap": {
+        "headline": "Nichts überwacht {service}",
+        "why": "Kein Alarm überwacht {classes}.",
+        "next": "Fügen Sie den Alarm hinzu, den AutoObserve entworfen hat. | Fügen Sie die {count} Alarme hinzu, die AutoObserve entworfen hat.",
+        "needsTraces": "Latenz benötigt zuerst Traces.",
+        "groupAdded": "Alarme für {count} Service hinzugefügt | Alarme für {count} Services hinzugefügt",
+        "groupHeadline": "Nichts überwacht {count} Services",
+        "groupTraffic": "Zusammen verarbeiten sie etwa {count} Ereignisse pro Stunde.",
+        "groupNext": "Fügen Sie den Alarm hinzu, den AutoObserve entworfen hat. | Fügen Sie die {count} Alarme hinzu, die AutoObserve entworfen hat, und zwar in einer einzigen, nach Team gruppierten Liste."
+      },
+      "no_absence_check": {
+        "why": "Kein Alarm wird ausgelöst, wenn {service} aufhört zu senden.",
+        "why_weak": "Nur {monitor} würde es bemerken und deckt dabei den gesamten Stream ab.",
+        "why_blind": "{monitor} würde es bemerken, kann aber die Daten von {service} nicht sehen.",
+        "whySilent": "{monitor} würde bemerken, wenn {service} aufhört, benachrichtigt aber niemanden.",
+        "next": "Fügen Sie einen Alarm für fehlende Daten hinzu: Er wird ausgelöst, wenn {service} {minutes} Minuten lang nichts sendet.",
+        "nextSilent": "Legen Sie fest, wen er benachrichtigen soll."
+      },
+      "coverage_lost": {
+        "why": "Etwas hat sich an den Alarmen geändert, die es überwacht haben.",
+        "next": "Fügen Sie es wieder hinzu oder prüfen Sie, was sich an dem Alarm geändert hat, der es überwacht hat."
+      },
+      "blind_guardrail": {
+        "nextStream": "Richten Sie es auf den Stream aus, der {detail} ersetzt hat, oder löschen Sie es.",
+        "nextScope": "Prüfen Sie seinen Filter: So wie er geschrieben ist, trifft er nichts, was er treffen sollte.",
+        "nextField": "Korrigieren Sie das Feld, nach dem seine Abfrage filtert."
+      },
+      "discovery_unusable": {
+        "headline": "Nur {good} der {active} Services, die AutoObserve gefunden hat, sind nutzbar",
+        "why": "Bei den meisten ihrer Daten fehlt der Service-Name, daher ist die Liste der Lücken unvollständig.",
+        "next": "Senden Sie service.name in Ihren Traces und Logs."
+      },
+      "source_silence": {
+        "headline": "{source} sendet nicht mehr an {stream}",
+        "since": "Seit {time}.",
+        "usual": "Normalerweise sendet es etwa {count} Zeilen pro Tag; der Rest von {stream} lief weiter.",
+        "more": "Und {count} weitere Quelle in diesem Stream. | Und {count} weitere Quellen in {streams} Streams.",
+        "nextSender": "Prüfen Sie den Agenten oder Collector auf {source}.",
+        "nextGap": "Es sendet wieder. Prüfen Sie, welche Daten in der Lücke fehlen."
+      },
+      "heartbeat_on_success": {
+        "headline": "Kein Alarm wird ausgelöst, wenn Job {job} nicht mehr erfolgreich ist",
+        "why": "Seine Erfolgszeile ist am letzten Tag erschienen. | Seine Erfolgszeile ist an jedem der letzten {days} Tage erschienen.",
+        "next": "Fügen Sie einen Alarm hinzu, der ausgelöst wird, wenn seine Erfolgszeile nicht erscheint."
+      },
+      "cell": {
+        "falls": {
+          "weak": "Nur {monitor}, ein breit gefasster Alarm, überwacht {what}, und er ist nicht auf diesen Service beschränkt. | Nur {monitor}, breit gefasste Alarme, überwachen {what}, und sie sind nicht auf diesen Service beschränkt.",
+          "silent": "{monitor} überwacht {what}, benachrichtigt aber niemanden. | {monitor} überwachen {what}, benachrichtigen aber niemanden.",
+          "blind": "{monitor} überwacht {what}, kann aber die Daten dieses Service nicht sehen. | {monitor} überwachen {what}, können aber die Daten dieses Service nicht sehen.",
+          "unmapped": "{monitor} überwacht möglicherweise {what}, aber sein Geltungsbereich konnte nicht diesem Service zugeordnet werden. | {monitor} überwachen möglicherweise {what}, aber ihr Geltungsbereich konnte nicht diesem Service zugeordnet werden."
+        },
+        "watchWhat": {
+          "errors": "Fehler von {service}",
+          "latency": "Latenz von {service}",
+          "absence": "ob {service} aufhört zu senden"
+        },
+        "justAdded": "Hinzugefügt. AutoObserve berücksichtigt ihn bei der nächsten Prüfung, innerhalb von etwa 5 Minuten. | Hinzugefügt. AutoObserve berücksichtigt sie bei der nächsten Prüfung, innerhalb von etwa 5 Minuten.",
+        "errorsWhy": "Kein Alarm überwacht die Fehler von {service}.",
+        "errorsNext": "Fügen Sie einen Fehleralarm mit dem 3-Fachen der üblichen Rate hinzu.",
+        "latencyWhy": "Kein Alarm überwacht die Latenz von {service}.",
+        "latencyNext": "Fügen Sie einen Latenz-Alarm mit dem 2-Fachen des üblichen p95 hinzu.",
+        "latencyNoTraces": "Die Latenz wird aus Traces dargestellt. {service} sendet keine.",
+        "noMetrics": "Für {service} kommen keine CPU- oder Speicherdaten an, daher kann dies noch nicht überwacht werden.",
+        "noRestartEvents": "Für {service} kommen keine Neustart-Ereignisse an, daher können seine Neustarts noch nicht überwacht werden.",
+        "saturationWhy": "Kein Alarm überwacht Arbeitsspeicher oder CPU von {service}. Container-Arbeitsspeicher kommt in {stream} an.",
+        "saturationNext": "Fügen Sie einen Arbeitsspeicher-Alarm bei 90 % des Limits hinzu.",
+        "nodeWhy": "Kein Alarm überwacht die Knoten, auf denen {service} läuft. Knotendaten kommen in {stream} an.",
+        "nodeNext": "Fügen Sie einen Knoten-Alarm bei 90 % der Kapazität hinzu.",
+        "restartsWhy": "Kein Alarm überwacht Neustarts von {service}.",
+        "restartsNext": "Fügen Sie einen Alarm hinzu, der ausgelöst wird, wenn seine Pods innerhalb von 10 Minuten dreimal neu starten.",
+        "syntheticWhy": "Nichts prüft {service} von außen. Eine synthetische Prüfung sendet alle paar Minuten eine Anfrage und erkennt einen Ausfall, selbst wenn der Dienst nichts sendet.",
+        "syntheticNext": "Fügen Sie eine synthetische Prüfung für seinen Health-Endpunkt hinzu."
+      },
+      "paged": {
+        "page": {
+          "paged": "Paged {team}",
+          "pagedTeam": "Paged the on-call team",
+          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
+          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand.",
+          "pending": "On-Call wird alarmiert: Der On-Call-Dienst hat die Alarmierung noch nicht bestätigt."
+        },
+        "nextRouting": "Set up on-call routing so the next stop pages someone.",
+        "recoveredAt": "Wieder da um {time}.",
+        "stream_silence": {
+          "headline": "{count} streams stopped sending data",
+          "why": "No data has arrived on {stream} ({type}) since {time}.",
+          "whyMany": "{streams} have sent no data since {time}.",
+          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
+          "nextMany": "One cause is likely, such as a shared collector.",
+          "whyOne": "{stream} hat seit {time} keine Daten gesendet.",
+          "recovered": "{stream} ({type}) sendet wieder Daten. Der Versand stoppte um {time}.",
+          "recoveredMany": "{streams} senden wieder Daten. Der Versand stoppte um {time}.",
+          "recoveredSome": "Senden wieder: {streams}."
+        },
+        "stream_drop": {
+          "headline": "{count} streams dropped sharply",
+          "why": "{stream} ({type}) has received much less data than usual since {time}.",
+          "whyMany": "{streams} have received much less data than usual since {time}.",
+          "next": "Check whether a sender stopped or a filter changed.",
+          "nextMany": "One cause is likely, such as a shared collector or filter.",
+          "whyOne": "{stream} erhält seit {time} viel weniger Daten als üblich.",
+          "recovered": "{stream} ({type}) hat wieder sein übliches Volumen. Der Rückgang begann um {time}.",
+          "recoveredMany": "{streams} haben wieder ihr übliches Volumen. Der Rückgang begann um {time}.",
+          "recoveredSome": "Wieder normal: {streams}."
+        },
+        "stream_rise": {
+          "headline": "{count} streams rose sharply",
+          "why": "{stream} ({type}) has received much more data than usual since {time}.",
+          "whyMany": "{streams} have received much more data than usual since {time}.",
+          "next": "Check for a retry loop or a new sender writing to it.",
+          "nextMany": "One cause is likely, such as a shared sender retrying.",
+          "whyOne": "{stream} erhält seit {time} viel mehr Daten als üblich.",
+          "recovered": "{stream} ({type}) hat wieder sein übliches Volumen. Der Anstieg begann um {time}.",
+          "recoveredMany": "{streams} haben wieder ihr übliches Volumen. Der Anstieg begann um {time}.",
+          "recoveredSome": "Wieder normal: {streams}."
+        }
+      }
+    },
+    "threshold": {
+      "label": "Auslösen ab",
+      "errorsSuffix": "Fehler pro Stunde",
+      "latencySuffix": "ms (p95)",
+      "errorsReason": "AutoObserve hat in den letzten 7 Tagen keine übliche Fehleranzahl für {service} gefunden. Legen Sie einen Schwellenwert fest, um diesen Alarm hinzuzufügen.",
+      "latencyReason": "AutoObserve hat in den letzten 7 Tagen keine übliche Latenz für {service} gefunden. Legen Sie einen Schwellenwert fest, um diesen Alarm hinzuzufügen.",
+      "measuring": "Übliches Niveau wird über 7 Tage gemessen…",
+      "noUsual": "Keine in 7 Tagen",
+      "notMeasured": "Nicht gemessen",
+      "timedOut": "Die Messung hat zu lange gedauert. Legen Sie einen Schwellenwert fest.",
+      "placeholder": "Schwellenwert festlegen",
+      "placeholderShort": "Wert festlegen",
+      "required": "Schwellenwert festlegen",
+      "invalid": "Geben Sie eine Zahl größer als 0 ein.",
+      "invalidErrors": "Geben Sie 0 oder mehr ein.",
+      "anyErrorNote": "AutoObserve hat in den letzten 7 Tagen keine Fehler für {service} gefunden, daher wird dieser Alarm bei jedem Fehler ausgelöst. Erhöhen Sie den Schwellenwert, wenn einige Fehler normal sind."
     }
   },
   "serviceVersions": {
@@ -34520,33 +34632,2534 @@
     "gateOrder": "Der Start muss vor dem Ende liegen.",
     "gateInvalid": "Kein gültiger Bereich."
   },
-  "llmObservability": {
-    "playground": {
-      "progress": {
-        "analyzing": "Analysiere...",
-        "thinking": "Denke...",
-        "processing": "Verarbeite...",
-        "examiningData": "Prüfe Daten...",
-        "reviewingContext": "Überprüfe Kontext...",
-        "formulatingResponse": "Formuliere Antwort...",
-        "checkingDetails": "Prüfe Details...",
-        "gatheringInsights": "Sammle Erkenntnisse...",
-        "evaluatingOptions": "Bewerte Optionen...",
-        "synthesizingInformation": "Synthetisiere Informationen...",
-        "workingOnIt": "Arbeite daran...",
-        "almostThere": "Fast geschafft...",
-        "divingDeeper": "Tiefer eintauchen...",
-        "connectingTheDots": "Verbinde die Punkte...",
-        "crunchingNumbers": "Rechne Zahlen...",
-        "exploringPossibilities": "Erkunde Möglichkeiten...",
-        "refiningAnswer": "Verfeinere Antwort...",
-        "stillThinking": "Denke noch...",
-        "makingProgress": "Mache Fortschritte...",
-        "piecingTogether": "Setze zusammen..."
+  "autobotInvestigate": {
+    "greeting": "Was sollen wir untersuchen?",
+    "greetingNamed": "Was sollen wir untersuchen, {name}?",
+    "placeholder": "Beschreiben Sie, was schiefgelaufen ist, oder fügen Sie einen Alarm- oder Vorfall-Link ein",
+    "cards": {
+      "whyAlertFired": {
+        "title": "Warum wurde mein Alarm ausgelöst?",
+        "description": "Pick an alert. @:{'brand.autobot'} checks the data behind it and explains the cause.",
+        "prompt": "Warum wurde mein letzter Alarm ausgelöst?"
+      },
+      "investigateIncident": {
+        "title": "Einen Vorfall untersuchen",
+        "description": "Finden Sie heraus, was sich geändert hat, welche Dienste betroffen sind und wo es begann.",
+        "prompt": "Hilf mir, meinen letzten Vorfall zu untersuchen"
+      },
+      "errorSpike": {
+        "title": "Ursache eines Fehleranstiegs finden",
+        "description": "Fehler vor und nach dem Anstieg vergleichen – nach Dienst und Meldung.",
+        "prompt": "Ursache des letzten Fehleranstiegs finden"
+      },
+      "slowService": {
+        "title": "Einen langsamen Dienst prüfen",
+        "description": "Traces und Latenz ansehen, um den langsamen Schritt zu finden.",
+        "prompt": "Ermitteln, welcher Dienst langsam ist und warum"
       }
     }
   },
   "assistant": {
-    "composer": {}
+    "actions": {
+      "count": "{count} Aktion in diesem Chat | {count} Aktionen in diesem Chat",
+      "entry": "{operation} {name} · genehmigt von {user} · {time}",
+      "failedEntry": "Dies konnte nicht abgeschlossen werden: {name} · {reason} · {time}",
+      "heading": "Aktionen in diesem Chat",
+      "noReview": "Kein Prüfschritt",
+      "op": {
+        "create": "{entity} erstellt",
+        "delete": "{entity} gelöscht",
+        "pause": "{entity} pausiert",
+        "resume": "{entity} fortgesetzt",
+        "run_command": "{entity} ausgeführt",
+        "update": "{entity} aktualisiert"
+      },
+      "restored": "Wiederhergestellt",
+      "undo": "Rückgängig",
+      "undoFailed": "Rückgängig machen hat nicht funktioniert.",
+      "undoLimits": "Gesendete Benachrichtigungen und gelöschte Daten können nicht rückgängig gemacht werden.",
+      "undoNotYet": "Rückgängig ist noch nicht verfügbar",
+      "undoUnconfirmed": "Rückgängig wurde gesendet, aber das Ergebnis konnte nicht bestätigt werden.",
+      "undoing": "Wird rückgängig gemacht…",
+      "undone": "Rückgängig gemacht · {name} wiederhergestellt",
+      "you": "Sie"
+    },
+    "activity": {
+      "actor": "Nach Person filtern",
+      "approved": "Genehmigt",
+      "approvedBy": "Genehmigt von {user}",
+      "columns": {
+        "action": "Aktion",
+        "actions": "Aktionen",
+        "actor": "Im Auftrag von",
+        "approval": "Genehmigt",
+        "result": "Ergebnis",
+        "target": "Ziel",
+        "when": "Wann"
+      },
+      "done": "Erledigt",
+      "empty": "No @:{'brand.autobot'} actions in this period.",
+      "failed": "Fehlgeschlagen: {cause}",
+      "failedPlain": "Fehlgeschlagen",
+      "loadFailed": "Aktivität konnte nicht geladen werden.",
+      "next": "Weiter",
+      "noApproval": "Keine Genehmigung erforderlich",
+      "openAudit": "Audit-Stream in Logs öffnen",
+      "openChat": "Chat öffnen",
+      "previous": "Zurück",
+      "rangeLabel": "Zeitbereich",
+      "ranges": {
+        "day": "Letzte 24 Stunden",
+        "month": "Letzte 30 Tage",
+        "week": "Letzte 7 Tage"
+      },
+      "search": "Aktivität durchsuchen",
+      "standing": "Dauerhafte Genehmigung",
+      "undo": "Rückgängig",
+      "undoDone": "Rückgängig gemacht: {action}",
+      "undoMessage": "\"{action}\" für {target} aus der gespeicherten Kopie rückgängig machen. Bereits gesendete Benachrichtigungen können nicht rückgängig gemacht werden.",
+      "undoNamed": "{action} rückgängig machen",
+      "undoTitle": "Diese Aktion rückgängig machen?",
+      "undoneState": "Rückgängig gemacht",
+      "unsupported": "Der Aktivitätsverlauf erfordert eine neuere Serverversion."
+    },
+    "announce": {
+      "approval": "Wartet auf Ihre Genehmigung: {title}.",
+      "approvalExpires": "Wartet auf Ihre Genehmigung: {title}. Läuft ab in {duration}.",
+      "approvalExpiring": "Genehmigung läuft ab in {duration}: {title}. Mehr Zeit finden Sie auf der Karte.",
+      "approvalExpiringFinal": "Genehmigung läuft ab in {duration}: {title}. Es kann keine weitere Zeit hinzugefügt werden.",
+      "approvalExpiringNotice": "Genehmigung läuft ab in {duration}: {title}. Prüfen Sie sie über den {product}-Hinweis.",
+      "approvalExpiringNoticeFinal": "Genehmigung läuft ab in {duration}: {title}. Es kann keine weitere Zeit hinzugefügt werden. Prüfen Sie sie über den {product}-Hinweis.",
+      "approvalExtended": "Mehr Zeit hinzugefügt. Läuft ab in {duration}.",
+      "approvalJump": "{line} Drücken Sie {keys}, um sie zu prüfen.",
+      "approvalJumpTouch": "{line} Die Prüfanfrage befindet sich über dem Nachrichtenfeld.",
+      "closed": "{product} geschlossen.",
+      "closedRunning": "{product} geschlossen. Antwortet weiterhin im Hintergrund.",
+      "floated": "{title} ist jetzt ein schwebendes Fenster.",
+      "madeRoom": "{title} in den Tray verschoben, um Platz zu schaffen.",
+      "minimised": "{title} in den Tray minimiert.",
+      "moveCancelled": "Verschieben abgebrochen.",
+      "moveStarted": "{title} wird verschoben. Pfeiltasten bewegen es. Eingabetaste platziert es, Escape setzt es zurück.",
+      "narrower": "Schmaler.",
+      "openedInTab": "{title} in einem neuen Tab geöffnet.",
+      "pinned": "{title} ist jetzt in der Seitenleiste.",
+      "pinnedSwapped": "{title} ist jetzt in der Seitenleiste. {other} in den Tray verschoben.",
+      "resizeStarted": "{title} wird in der Größe geändert. Pfeiltasten ändern die Größe. Eingabetaste behält sie bei, Escape setzt sie zurück.",
+      "restored": "{title} wiederhergestellt.",
+      "shorter": "Kürzer.",
+      "taller": "Höher.",
+      "wider": "Breiter.",
+      "windowClosed": "{title} geschlossen.",
+      "windowClosedRunning": "{title} geschlossen. Antwortet weiterhin im Hintergrund.",
+      "windowPlaced": "Fenster platziert.",
+      "failed": "Fehlgeschlagen. {title}",
+      "failedRetryIn": "Fehlgeschlagen. {title} Erneuter Versuch in {s} s.",
+      "failedWithAction": "Fehlgeschlagen. {title} {action} verfügbar.",
+      "keysOpen": "Strg I",
+      "keysOpenMac": "Befehl I",
+      "notSent": "Nicht gesendet. {title}",
+      "notSentRetryIn": "Nicht gesendet. {title} Erneuter Versuch in {s} s.",
+      "notSentWithAction": "Nicht gesendet. {title} {action} verfügbar.",
+      "opened": "{product} geöffnet.",
+      "sheetCollapsed": "Eingeklappt.",
+      "sheetExpanded": "Ausgeklappt."
+    },
+    "approval": {
+      "approve": "Genehmigen",
+      "approveDelete": "{count} {entity} löschen",
+      "arguments": "Argumente",
+      "askAgainPrompt": "Frag mich erneut: {heading}",
+      "askedElsewhere": "In einem anderen Tab angefragt",
+      "cannotUndo": "Kann nicht rückgängig gemacht werden",
+      "currentUnknown": "Aktueller Wert unbekannt",
+      "deny": "Ablehnen",
+      "details": "Details",
+      "edit": "Bearbeiten und dann genehmigen",
+      "editor": {
+        "alert": "Alarme"
+      },
+      "expiresIn": "Läuft ab in {time}",
+      "expiringSoon": "Läuft bald ab · {time}",
+      "gateTiming": "Genehmigungen sind auf diesem Server nicht verfügbar. Schließe dies in {editor} ab.",
+      "heading": {
+        "delete": "{count} {entity} löschen",
+        "permission": "{tool} erlauben",
+        "runCommand": "Befehl auf {toolset} ausführen"
+      },
+      "inOrg": "in {org}",
+      "minutes": "{count} Minute | {count} Minuten",
+      "moreTargets": "und {count} weitere",
+      "moreTime": "Mehr Zeit",
+      "named": "{verb} {name}",
+      "nameUnknown": "Name von {entity} {shortId} konnte nicht geladen werden",
+      "needsOk": "Braucht dich",
+      "noDecision": "Für diese Anfrage wurde keine Antwort erfasst",
+      "nothingSelected": "Nichts ausgewählt",
+      "open": "Offen",
+      "reason": {
+        "conflict": "Es existiert bereits oder befindet sich bereits in diesem Zustand",
+        "forbidden": "keine Berechtigung",
+        "notFound": "nicht gefunden",
+        "rateLimited": "Zu viele Anfragen, versuche es gleich noch einmal",
+        "server": "Der Server konnte es nicht abschließen",
+        "status": "Fehler {code}",
+        "unknown": "Fehler"
+      },
+      "reply": "Antworten",
+      "showLess": "Weniger anzeigen",
+      "showMore": "Mehr anzeigen",
+      "result": {
+        "approved": "Genehmigt · {time}",
+        "approvedNoTime": "Genehmigt",
+        "approvedElsewhere": "In einem anderen Tab genehmigt · {time}",
+        "askAgain": "Erneut fragen",
+        "checkList": "Liste prüfen",
+        "checkListName": "Liste prüfen (öffnet in einem neuen Tab)",
+        "declined": "Abgelehnt · nichts wurde geändert",
+        "declinedElsewhere": "In einem anderen Tab abgelehnt · {time}",
+        "declinedNewChat": "Abgelehnt, weil du einen neuen Chat gestartet hast",
+        "deciding": "Wird in einem anderen Tab entschieden…",
+        "done": {
+          "create": "{entity} erstellt",
+          "delete": "{count} {entity} gelöscht",
+          "permission": "{tool} erlaubt",
+          "runCommand": "Befehl auf {toolset} ausgeführt",
+          "update": "{entity} {name} aktualisiert"
+        },
+        "failed": "Es wurde nichts geändert. {reason}",
+        "failedConsent": "Kostenpflichtige Nutzung ist für diese Organisation nicht aktiviert.",
+        "failedCredits": "Die KI-Guthaben dieser Organisation sind aufgebraucht.",
+        "failedForbidden": "Sie haben keine Berechtigung, diese Änderung vorzunehmen.",
+        "failedItem": "{name} fehlgeschlagen: {reason}",
+        "itemsName": "Ergebnis der einzelnen Elemente",
+        "narrowed": "@:{'brand.autobot'} will propose these {count} again for your approval",
+        "open": "{name} öffnen (öffnet in einem neuen Tab)",
+        "sending": "Ihre Entscheidung wird gesendet…",
+        "stop": "Stoppen",
+        "stopped": "Abgelehnt · Sie haben die Antwort gestoppt",
+        "unconfirmed": "Ihre Entscheidung wurde gesendet, aber das Ergebnis konnte nicht bestätigt werden.",
+        "unknown": "In diesem Browser wurde keine Antwort erfasst.",
+        "waitingElsewhere": "Warten auf Ihre Genehmigung in einem anderen Tab",
+        "withdrawn": "Diese Anfrage ist nicht mehr gültig.",
+        "partialBy": {
+          "change": "{done} von {total} {entity} geändert · {failed} fehlgeschlagen",
+          "create": "{done} von {total} {entity} erstellt · {failed} fehlgeschlagen",
+          "delete": "{done} von {total} {entity} gelöscht · {failed} fehlgeschlagen",
+          "pause": "{done} von {total} {entity} pausiert · {failed} fehlgeschlagen",
+          "resume": "{done} von {total} {entity} fortgesetzt · {failed} fehlgeschlagen",
+          "update": "{done} von {total} {entity} aktualisiert · {failed} fehlgeschlagen"
+        },
+        "partialUnnamed": "Nur ein Teil davon wurde durchgeführt · {reason}",
+        "partialUnnamedPlain": "Nur ein Teil davon wurde durchgeführt",
+        "standing": "Durch Ihre dauerhafte Genehmigung erlaubt"
+      },
+      "scope": {
+        "chat": "Für diesen Chat",
+        "label": "Erlauben",
+        "once": "Nur dieses eine Mal",
+        "tool": "Immer für {tool}"
+      },
+      "seconds": "{count} Sekunde | {count} Sekunden",
+      "verb": {
+        "create": "{entity} erstellen",
+        "pause": "{entity} pausieren",
+        "resume": "{entity} fortsetzen",
+        "update": "{entity} aktualisieren"
+      },
+      "backTo": "Zurück zu {title}",
+      "backToOrg": "Wechselt zurück zu {org}",
+      "deliveryFailed": "Ihre Entscheidung konnte nicht gesendet werden. {entity} wurde nicht geändert.",
+      "finishIn": "In {editor} abschließen",
+      "gateNoEditor": "Genehmigungen sind auf diesem Server nicht verfügbar.",
+      "meta": "Bis {time} · {scope}",
+      "metaUntil": "Bis {time}",
+      "needsOkName": "Wartet auf Sie: {name}",
+      "notifies": "benachrichtigt",
+      "retry": "Wiederholen",
+      "record": {
+        "denied": "Abgelehnt: {name}",
+        "deniedUnnamed": "Denied a change @:{'brand.autobot'} proposed",
+        "deniedUnnamedReason": "Denied a change @:{'brand.autobot'} proposed · {reason}",
+        "expired": "Anfrage abgelaufen. Es wurde nichts geändert.",
+        "moved": "Verschoben nach {editor}",
+        "paused": "{entity} {name} pausiert",
+        "pausedCount": "{count} {entity} pausiert",
+        "pausedCountUntil": "{count} {entity} pausiert bis {time}",
+        "pausedUntil": "{entity} {name} pausiert bis {time}",
+        "replied": "Mit Antwort abgelehnt",
+        "resumed": "{entity} {name} fortgesetzt",
+        "resumedCount": "{count} {entity} fortgesetzt",
+        "youAt": "Sie · {time}"
+      },
+      "onDashboard": "Auf Dashboard {name}",
+      "alwaysFor": "Immer für {action}",
+      "alwaysAllowed": "Immer erlaubt: {action}",
+      "revoke": "Widerrufen",
+      "changedSince": "Seit der Anfrage geändert",
+      "recheckFailed": "Änderungen konnten nicht geprüft werden, daher wurde nichts geschrieben",
+      "more": "Weitere Aktionen",
+      "revokeFailed": "Widerrufen nicht möglich. Versuchen Sie es erneut in den Einstellungen.",
+      "grantNotStored": "Approved once. @:{'brand.autobot'} will ask next time.",
+      "actionPhrase": {
+        "create": "das Erstellen von {entity}",
+        "pause": "das Pausieren von {entity}",
+        "resume": "das Fortsetzen von {entity}",
+        "update": "das Aktualisieren von {entity}",
+        "delete": "das Löschen von {entity}"
+      },
+      "allowedForChat": "Für diesen Chat erlaubt: {action}"
+    },
+    "askAdmin": {
+      "adminsOf": "Administratoren von {org}",
+      "anAdminOf": "Ein Administrator von {org}",
+      "copied": "Nachricht kopiert. Fügen Sie sie bei Ihrem Administrator ein.",
+      "copy": "Nachricht kopieren",
+      "email": "E-Mail an Administratoren",
+      "includePrompt": "Erste Zeile meiner Frage einschließen",
+      "message": {
+        "access": "Hallo, könnten Sie mir {product}-Zugriff in OpenObserve ({whereToGrant}, Chat) für die Organisation {org} gewähren?",
+        "consent": "Könnten Sie die kostenpflichtige KI-Nutzung für {org} aktivieren? Abrechnungen › Kostenpflichtige Nutzung: {link}",
+        "credits": "Könnten Sie die kostenpflichtige KI-Nutzung für {org} aktivieren? Abrechnungen › Kostenpflichtige Nutzung: {link}",
+        "enable": "Could you turn {product} on for {org}? Settings › @:{'brand.autobot'} › Access: {link}",
+        "settings": "Could you change the {product} settings for {org} in Settings › @:{'brand.autobot'}?",
+        "share_read": "Könnten Sie mir Zugriff auf die Chat-Freigabe ({whereToGrant}, Chat-Freigabe) in {org} gewähren?",
+        "tool_policy": "@:{'brand.autobot'} wasn't allowed to run {tool} in {org}. Could you review the permissions of @:{'brand.autobot'} in Settings › @:{'brand.autobot'} › Permissions?",
+        "agent_access": "Could you let me use {agent} in {product} for {org}? Settings › @:{'brand.autobot'} › Agents: {link}"
+      },
+      "messageLabel": "Nachricht",
+      "subject": {
+        "access": "{product}-Zugriff für {org}",
+        "consent": "Kostenpflichtige KI-Nutzung für {org}",
+        "credits": "Kostenpflichtige KI-Nutzung für {org}",
+        "enable": "{product} für {org} aktivieren",
+        "settings": "{product}-Einstellungen für {org}",
+        "share_read": "Zugriff auf Chat-Freigabe für {org}",
+        "tool_policy": "{product}-Berechtigungen für {org}",
+        "agent_access": "{agent}-Zugriff für {org}"
+      },
+      "title": "Administrator fragen",
+      "withPrompt": "{message} Meine Frage beginnt mit: \"{prompt}\""
+    },
+    "attachment": {
+      "cell": "Zelle",
+      "field": "Feld",
+      "logEntry": "Log-Eintrag",
+      "queryError": "Abfragefehler",
+      "span": "Span"
+    },
+    "billing": {
+      "allowance": {
+        "confirm": "Limit festlegen",
+        "confirmMessage": "KI-Guthabenlimit für {org} auf {limit} festlegen, unter den verbrauchten {used}? Die Organisation wird sofort blockiert.",
+        "confirmTitle": "Limit unterhalb der aktuellen Nutzung festlegen?",
+        "floorWarning": "Unter der aktuellen Nutzung ({used}). Die Organisation wird sofort blockiert, es sei denn, die kostenpflichtige Nutzung ist aktiviert.",
+        "limit": "Limit",
+        "mode": "Modus",
+        "modeUnavailable": "Modus nicht verfügbar",
+        "setAnyway": "Limit trotzdem festlegen",
+        "used": "Verbraucht"
+      },
+      "managePaidUsage": "Kostenpflichtige Nutzung verwalten",
+      "mode": {
+        "consentRequired": "Included credits are used up. Allow paid usage to keep using @:{'brand.autobot'}.",
+        "exhaustedContract": "KI-Guthaben sind aufgebraucht. Wenden Sie sich an Ihren Account-Manager.",
+        "exhaustedContractMember": "KI-Guthaben sind aufgebraucht. Bitten Sie einen Organisationsadministrator, sich an Ihren Account-Manager zu wenden.",
+        "exhaustedSubscribe": "KI-Guthaben sind aufgebraucht. Abonnieren Sie, um fortzufahren.",
+        "freeNoRenew": "Inklusivguthaben werden nicht erneuert.",
+        "freeResets": "Wird am {date} zurückgesetzt"
+      },
+      "paidUsage": {
+        "allow": "Kostenpflichtige Nutzung erlauben",
+        "allowFor": "Kostenpflichtige Nutzung für {org} erlauben",
+        "allowed": "Erlaubt",
+        "creditsFirst": "Zusätzliche Guthaben erforderlich",
+        "effectiveOff": "Wirksam: kostenpflichtige Nutzung aus",
+        "effectiveOn": "Wirksam: kostenpflichtige Nutzung an",
+        "effectiveWaiting": "Wirksam: kostenpflichtige Nutzung aus. Warten auf {org}",
+        "enabledBy": "Aktiviert von {email} am {date}",
+        "managedBy": "Verwaltet von den Administratoren von {org}",
+        "notAllowed": "Nicht erlaubt",
+        "offConfirm": "Ausschalten",
+        "offMessage": "Für alle in der Organisation gilt dann das Limit der Inklusivguthaben. Laufende Anfragen werden abgeschlossen.",
+        "offTitle": "Kostenpflichtige KI-Nutzung für {org} ausschalten?",
+        "payerOrg": "Zahlende Organisation ({org})",
+        "subscribeFirst": "Abonnieren, um kostenpflichtige Nutzung zu erlauben",
+        "thisOrg": "Diese Organisation ({org})",
+        "title": "Kostenpflichtige Nutzung",
+        "unavailable": "Status der kostenpflichtigen Nutzung nicht verfügbar.",
+        "updateFailed": "Kostenpflichtige Nutzung konnte nicht aktualisiert werden."
+      },
+      "subscribe": "Abonnieren",
+      "title": "KI-Guthaben",
+      "usedBilled": "{limit} Inklusivguthaben verbraucht · {billed} abgerechnet",
+      "usedOf": "{used} von {limit} Inklusivguthaben verbraucht"
+    },
+    "claim": {
+      "name": "Beleg {n}, {step}",
+      "notAvailable": "Beleg in dieser Ansicht nicht verfügbar",
+      "citation": "Zitat {n}, Abfrage {n}, {rows}",
+      "range": "Zitate {from} bis {to}"
+    },
+    "client": {
+      "copyManually": "Kopieren fehlgeschlagen. Wählen Sie den Text aus und kopieren Sie ihn.",
+      "popupBlocked": "Ihr Browser hat den neuen Tab blockiert. Stattdessen hier öffnen?",
+      "storageBlocked": "Entwürfe gehen verloren, wenn Sie diese Seite neu laden."
+    },
+    "closeTab": {
+      "body": "Sie können diesen Tab schließen.",
+      "title": "Sie sind angemeldet"
+    },
+    "composer": {
+      "cleared": "Entwurf gelöscht",
+      "clearedOrg": "Entwurf von {org} gelöscht",
+      "draftStayed": "Neuer Chat. Ihr Entwurf ist in {chat} geblieben",
+      "draftStayedUnnamed": "Neuer Chat. Ihr Entwurf ist im vorherigen Chat geblieben",
+      "bringDraft": "Hierher holen",
+      "draftRestored": "Entwurf wiederhergestellt",
+      "imageReadFailed": "{name} konnte nicht gelesen werden",
+      "imagesDropped": "{count} Bild wurde beim Neuladen nicht beibehalten | {count} Bilder wurden beim Neuladen nicht beibehalten",
+      "imageTooBig": "{name} ist {size}. Bis zu {count} Bilder, je {max}",
+      "mention": {
+        "count": "{count} Vorschlag. Mit Hoch und Runter wählen, mit Eingabetaste hinzufügen. | {count} Vorschläge. Mit Hoch und Runter wählen, mit Eingabetaste hinzufügen.",
+        "empty": "Nichts entspricht \"{q}\"",
+        "group": {
+          "alerts": "Alarme",
+          "dashboards": "Dashboards",
+          "pipelines": "Pipelines",
+          "streams": "Streams",
+          "agents": "Agenten"
+        },
+        "kind": {
+          "alerts": "Alarme",
+          "dashboards": "Dashboards",
+          "pipelines": "Pipelines",
+          "streams": "Streams"
+        },
+        "noAccess": "Kein Zugriff auf {kind}",
+        "optionName": "{group}, {label}",
+        "pageTime": "Seitenzeit",
+        "retry": "{kind} konnte nicht geladen werden · Erneut versuchen",
+        "showAll": "Alle anzeigen",
+        "title": "Zum Kontext hinzufügen"
+      },
+      "name": "Nachricht an {product}",
+      "placeholder": "Zu Ihren Daten fragen",
+      "followUp": "Nachfragen",
+      "scoped": "Zu {stream} fragen",
+      "askAgent": "{agent} fragen…",
+      "sendTo": "An {agent} senden",
+      "attachImage": "Foto",
+      "plus": "Zur Nachricht hinzufügen",
+      "connectors": {
+        "label": "Konnektoren",
+        "on": "{count} aktiv",
+        "heading": "Konnektoren",
+        "empty": "Für diese Organisation sind keine Toolsets aktiviert.",
+        "failed": "Toolsets konnten nicht geladen werden.",
+        "add": "Toolset hinzufügen",
+        "noPermission": "Nur ein Administrator kann Toolsets ändern.",
+        "toggleFailed": "{name} konnte nicht umgeschaltet werden. Versuchen Sie es erneut."
+      },
+      "inert": "Treffen Sie oben eine Auswahl, um fortzufahren",
+      "busy": "{product} ist beschäftigt. Senden Sie erneut in {s} s.",
+      "imageCap": "{name} wurde nicht hinzugefügt. Bis zu {count} Bilder, je {size}.",
+      "sendReply": "Antwort senden",
+      "offline": "Sie sind offline. Entwurf gespeichert.",
+      "rateLimited": "Warten Sie, bis der Countdown für den erneuten Versuch abgelaufen ist.",
+      "recalled": "Prompt {n} von {count} zurückgeholt",
+      "removeImage": "{name} entfernen",
+      "noAccess": "Sie können Ihre Chats lesen. Zum Starten oder Fortsetzen eines Chats ist KI-Zugriff erforderlich.",
+      "replyHelper": "Antwort lehnt die Anfrage ab",
+      "replyPlaceholder": "Reply to @:{'brand.autobot'}",
+      "running": "Warten Sie, bis diese Antwort abgeschlossen ist, oder stoppen Sie sie.",
+      "sendEmpty": "Nachricht eingeben oder Kontext hinzufügen, um zu senden",
+      "undo": "Rückgängig",
+      "replyCancel": "Abbrechen",
+      "replyRefused": "Ihre Antwort wurde nicht gesendet. Diese Anfrage kann von dieser Seite aus nicht beantwortet werden.",
+      "inertAnswer": "Antworten Sie oben, um fortzufahren",
+      "goToRequest": "Zur Anfrage",
+      "placeholderAt": "Fragen Sie alles · {'@'} zum Hinzufügen von Kontext",
+      "followUpAt": "Nachfrage stellen · {'@'} zum Hinzufügen von Kontext",
+      "queued": "{count} in Warteschlange",
+      "queuedEdit": "Bearbeiten",
+      "steerPlaceholder": "Diesen Lauf steuern",
+      "strip": {
+        "runLimit": "Lauf-Limit erreicht",
+        "showRunning": "Laufende Chats anzeigen",
+        "creditsOut": "KI-Guthaben aufgebraucht",
+        "managePaid": "Kostenpflichtige Nutzung verwalten",
+        "orgBusy": "@:{'brand.autobot'} is busy for your organization",
+        "retry": "Erneut versuchen",
+        "micBlocked": "Mikrofon blockiert",
+        "howToAllow": "So erlauben Sie es",
+        "decideAbove": "Entscheiden Sie oben, um fortzufahren",
+        "pastedLines": "{count} Zeile eingefügt | {count} Zeilen eingefügt",
+        "attachAsFile": "Als Datei anhängen",
+        "replaceDraft": "Entwurf ersetzen?",
+        "needsAccess": "KI-Zugriff erforderlich",
+        "offline": "Offline · Entwurf beibehalten",
+        "busyFor": "Ausgelastet · erneut senden in {s} s",
+        "pasteInline": "In die Nachricht einfügen",
+        "enterQueues": "Antwort läuft · Eingabetaste stellt in Warteschlange"
+      },
+      "queuedSentence": "Ihre nächste Nachricht wird gesendet, wenn diese Antwort abgeschlossen ist.",
+      "queuedAlreadySentence": "Eine Nachricht ist bereits in der Warteschlange."
+    },
+    "consent": {
+      "aMember": "ein Mitglied",
+      "enabledBy": "Kostenpflichtige KI-Nutzung für {org} aktiviert von {user} · {time}",
+      "manage": "Verwalten",
+      "manageName": "Kostenpflichtige Nutzung verwalten (öffnet in neuem Tab)",
+      "you": "Sie"
+    },
+    "context": {
+      "addBack": "{label} · Wieder hinzufügen",
+      "added": "{label} zum Kontext hinzugefügt",
+      "atSend": "Beim Senden",
+      "attachmentsValue": "{count} Anhang · {size} | {count} Anhänge · {size}",
+      "capImages": "Bis zu {count} Bilder, je {size}",
+      "capRows": "Bis zu {rows} Zeilen oder {size} angehängte Daten pro Nachricht",
+      "characters": "{count} Zeichen | {count} Zeichen",
+      "chip": {
+        "alert": "Alarm · {name}",
+        "cell": "{field} = {value}",
+        "dashboard": "Dashboard · {name}",
+        "field": "Feld · {name}",
+        "incident": "Vorfall · {name}",
+        "logRow": "Log-Zeile · {name} · {time}",
+        "logRowAt": "Log-Zeile · {time}",
+        "logRowPlain": "Log-Zeile",
+        "logRows": "Log-Zeile · {count} · {name} | Log-Zeilen · {count} · {name}",
+        "logRowsPlain": "Log-Zeile · {count} | Log-Zeilen · {count}",
+        "panel": "Panel · {name}",
+        "pipeline": "Pipeline · {name}",
+        "queryError": "Abfragefehler · {name}",
+        "queryNode": "Abfrageknoten · {name}",
+        "span": "Span · {name}",
+        "sql": "SQL · {name}",
+        "sqlLines": "SQL · {count} Zeile | SQL · {count} Zeilen",
+        "stream": "Stream · {name}",
+        "streams": "Stream · {count} | Streams · {count}",
+        "traceQuery": "Trace-Abfrage",
+        "vrl": "VRL · {count} Zeile | VRL · {count} Zeilen"
+      },
+      "chipName": "{label}, {secondary}",
+      "dataSharing": "Datenfreigabe · {level}",
+      "disclosure": "Attached data is sent to @:{'brand.autobot'} and saved with this chat.",
+      "disclosureShared": "Attached data is sent to @:{'brand.autobot'}, saved with this chat and included in any share.",
+      "field": {
+        "alert": "Alarm",
+        "attachments": "Anhänge",
+        "dashboard": "Dashboard",
+        "incident": "Vorfall",
+        "interestingFields": "Interessante Felder",
+        "org": "Organisation",
+        "page": "Seite",
+        "pipeline": "Pipeline",
+        "quickMode": "Schnellmodus",
+        "requestTime": "Aktuelle Zeit",
+        "sql": "SQL",
+        "sqlMode": "SQL-Modus",
+        "streams": "Streams",
+        "timeRange": "Zeitbereich",
+        "timezone": "Zeitzone",
+        "traceQuery": "Trace-Abfrage",
+        "vrl": "VRL",
+        "overviewIncidents": "Vorfälle auf der Startseite ({count})",
+        "overviewServices": "Dienste auf der Startseite ({count})",
+        "overviewAnomalies": "Anomalien auf der Startseite ({count})",
+        "overviewAlerts": "Alarme auf der Startseite ({count})"
+      },
+      "fromChat": "Zu diesem Chat hinzugefügt",
+      "fromPage": "Von dieser Seite",
+      "imageType": "Nur PNG- und JPEG-Bilder können angehängt werden",
+      "inChat": "In: {title}",
+      "internal": "intern",
+      "lines": "{count} Zeile | {count} Zeilen",
+      "mixedStreams": "Ein Stream-Typ pro Nachricht. Entfernen Sie den {type}-Stream, um diesen hinzuzufügen.",
+      "more": "+{count}",
+      "moreName": "Noch {count} weiteren Kontext-Chip anzeigen | Noch {count} weitere Kontext-Chips anzeigen",
+      "notReadYet": "noch nicht gelesen",
+      "openSource": "In {page} öffnen",
+      "remove": "{label} aus dem Kontext entfernen",
+      "removeAll": "Alle entfernen",
+      "removed": "{label} aus dem Kontext entfernt",
+      "removeRow": "Zeile {n} entfernen",
+      "rowsCount": "{count} Zeile | {count} Zeilen",
+      "sentLine": "Gesendet:",
+      "startNew": "Stattdessen neuen Chat starten",
+      "streamsValue": "{names} ({type})",
+      "summary": "{scope} · {range}",
+      "time": {
+        "past": "Letzte {period}",
+        "pastRange": "letzte {period}",
+        "custom": "benutzerdefiniert",
+        "default": "Zeit · letzte 15 Min. · Standard",
+        "fromPage": "Seite",
+        "page": "Zeit · {range}"
+      },
+      "trayLabel": "Kontext für Ihre nächste Nachricht",
+      "trimInternal": "Interne Felder ausblenden",
+      "truncated": "auf {size} gekürzt",
+      "truncatedFields": "Gekürzt, damit es passt, längste Werte zuerst: {fields}",
+      "used": "Verwendet:",
+      "usedName": "Kontext verwendet",
+      "usedNone": "Es wurde kein Seitenkontext verwendet",
+      "valueOff": "Aus",
+      "valueOn": "Ein",
+      "pastedText": "Eingefügter Text · {count} Zeile | Eingefügter Text · {count} Zeilen",
+      "pastedAsChip": "Langer Einfügetext als Text angehängt.",
+      "pasteInline": "Stattdessen in die Nachricht einfügen",
+      "pasteInlineShort": "In die Nachricht einfügen",
+      "withheld": "auf dieser Datenebene nicht gesendet",
+      "withheldLine": "Auf dieser Datenebene nicht gesendet ({level})."
+    },
+    "credits": {
+      "copyRequest": "Bitte fügen Sie KI-Credits für {org} hinzu: {used} von {limit} enthaltenen Credits sind Stand {date} verbraucht.",
+      "copyRequestNoUsage": "Bitte fügen Sie KI-Credits für {org} hinzu: enthaltene Credits sind Stand {date} aufgebraucht.",
+      "manage": "Kostenpflichtige Nutzung verwalten",
+      "manageName": "Kostenpflichtige Nutzung verwalten (öffnet in einem neuen Tab)",
+      "meter": {
+        "barName": "Enthaltene KI-Credits",
+        "compact": "{used} von {limit}",
+        "consent": "Enthaltene Credits verbraucht · kostenpflichtige Nutzung erfordert Zustimmung",
+        "exhausted": "KI-Credits für {org} sind aufgebraucht",
+        "exhaustedCompact": "Aufgebraucht",
+        "free": "{used} von {limit} enthaltenen Credits · {renewal}",
+        "noIncluded": "Keine enthaltenen Credits",
+        "noRenew": "sie werden nicht erneuert",
+        "payg": "{limit} enthaltene Credits verbraucht · {billed} abgerechnet · kostenpflichtige Nutzung aktiv",
+        "resets": "wird am {date} zurückgesetzt",
+        "retry": "Wiederholen",
+        "unavailable": "Credit-Nutzung nicht verfügbar",
+        "unavailableCompact": "Guthaben nicht verfügbar",
+        "value": "{used} von {limit} Guthaben"
+      },
+      "modeTag": {
+        "consent": "Zustimmung erforderlich",
+        "exhausted": "Aufgebraucht",
+        "payg": "Kostenpflichtige Nutzung aktiv"
+      },
+      "notice": "{percent} % der enthaltenen KI-Guthaben verbraucht · sie werden nicht erneuert",
+      "noticeDismiss": "Guthabenhinweis ausblenden",
+      "costs": "Eine Nachricht verbraucht {chat} Guthaben. Die Vorfallanalyse verwendet {incident} aus denselben Guthaben. | Eine Nachricht verbraucht {chat} Guthaben. Die Vorfallanalyse verwendet {incident} aus denselben Guthaben.",
+      "more": "Weitere Guthaben-Aktionen",
+      "noticeResets": "{percent} % der enthaltenen KI-Guthaben verbraucht · sie werden {date} zurückgesetzt",
+      "predictedExhausted": "Die KI-Guthaben für {org} sind aufgebraucht."
+    },
+    "diff": {
+      "accept": "Übernehmen",
+      "acceptRun": "Übernehmen und ausführen",
+      "added": "hinzugefügt:",
+      "announce": "Vorgeschlagen: {language}, {added} Zeilen hinzugefügt, {removed} entfernt",
+      "applied": "Editor aktualisiert. Zurücksetzen möglich.",
+      "current": "Aktuell: {language}",
+      "from": "von {product}",
+      "notChecked": "nicht geprüft",
+      "parseFailed": "lässt sich nicht parsen",
+      "region": {
+        "alert": "Vorgeschlagene Änderung der Alarmabfrage",
+        "alert_query": "Vorgeschlagene Änderung der Alarmabfrage",
+        "anomaly": "Vorgeschlagene Änderung der Erkennungsabfrage",
+        "dashboard": "Vorgeschlagene Änderung der Panel-Abfrage",
+        "function": "Vorgeschlagene Änderung der Funktion",
+        "json_editor": "Vorgeschlagene Änderung des JSON",
+        "logs": "Vorgeschlagene Änderung der Abfrage",
+        "regex": "Vorgeschlagene Änderung des Musters",
+        "scheduled_query": "Vorgeschlagene Änderung der Abfrage des Knotens"
+      },
+      "reject": "Verwerfen",
+      "removed": "entfernt:",
+      "reviewInEditor": "Änderung im Editor prüfen",
+      "title": "Vorgeschlagen: {language}",
+      "unknownCount": "{count} Feld unbekannt | {count} Felder unbekannt",
+      "validated": "validiert",
+      "unknownMark": "Unbekanntes Feld"
+    },
+    "docs": {
+      "opensInNewTab": "(öffnet in einem neuen Tab)",
+      "setupGuide": "Einrichtungsanleitung lesen"
+    },
+    "editor": {
+      "protectedFields": "Gespeicherter Name, Organisation und ID wurden beibehalten",
+      "title": {
+        "alert": "Alarm · {name}",
+        "alertNew": "Alarm · neuer Alarm",
+        "function": "Funktion · {name}",
+        "functionNew": "Funktion · neue Funktion",
+        "pipeline": "Pipeline · {name}",
+        "pipelineNew": "Pipeline · neue Pipeline",
+        "queryNode": "Pipeline · {pipeline} · Abfrageknoten",
+        "queryNodeNew": "Neue Pipeline · Abfrageknoten",
+        "regex": "Regex-Muster · {name}",
+        "regexNew": "Regex-Muster · neu"
+      }
+    },
+    "entity": {
+      "alert": "Alarm | Alarme",
+      "dashboard": "Dashboard | Dashboards",
+      "destination": "Ziel | Ziele",
+      "folder": "Ordner | Ordner",
+      "function": "Funktion | Funktionen",
+      "object": "Objekt | Objekte",
+      "panel": "Panel | Panels",
+      "pipeline": "Pipeline | Pipelines",
+      "report": "Bericht | Berichte",
+      "setting": "Einstellung | Einstellungen",
+      "stream": "Stream | Streams",
+      "template": "Vorlage | Vorlagen",
+      "user": "Benutzer | Benutzer"
+    },
+    "entry": {
+      "addField": "Feld zum Chat hinzufügen",
+      "addFiring": "Ausgelösten Alarm zum Chat hinzufügen",
+      "addLogRow": "Log-Zeile zum Chat hinzufügen",
+      "addPanel": "Panel zum Chat hinzufügen",
+      "addPreviewRow": "Vorschauzeile zum Chat hinzufügen",
+      "addRecord": "Log-Zeile zum Chat hinzufügen",
+      "addSeries": "Zeitreihe zum Chat hinzufügen",
+      "addSpan": "Span zum Chat hinzufügen",
+      "addTestEvent": "Testereignis zum Chat hinzufügen",
+      "addToChat": "Zum Chat hinzufügen",
+      "addedAnnounce": "Zum Chat hinzugefügt, {count} Element | Zum Chat hinzugefügt, {count} Elemente",
+      "addedBehindCard": "Zum Chat hinzugefügt. Beantworten Sie die ausstehende Frage, um zu senden.",
+      "addedToDraft": "Zu Ihrer Nachricht hinzugefügt. Klicken Sie auf Senden, wenn Sie bereit sind.",
+      "addedToast": "Zum Chat hinzugefügt",
+      "ask": "{product} fragen",
+      "assistant": "@:{'brand.askAutobot'}",
+      "buildFailed": "Diese Anfrage konnte nicht vorbereitet werden",
+      "capReached": "Nicht hinzugefügt: Die Nachricht ist voll. Entfernen Sie einen Chip und versuchen Sie es erneut.",
+      "chip": {
+        "alertFired": "Alarm · {name} · ausgelöst {time}",
+        "alertNew": "Alarm · neuer Alarm",
+        "database": "Datenbank · {name}",
+        "logRow": "Log-Zeile · {name}",
+        "query": "Abfrage · {count} Zeile | Abfrage · {count} Zeilen",
+        "reproduce": "Abfrage · reproduziert die Zeilen",
+        "series": "Zeitreihe · {name}",
+        "service": "Service · {name}",
+        "trace": "Trace · {name}"
+      },
+      "cost": "Verbraucht {count} Credit | Verbraucht {count} Credits",
+      "createRegex": "Regex-Muster erstellen",
+      "deepLinkMissing": "Das Element für die Frage wurde nicht gefunden",
+      "dependencies": "Abhängigkeiten",
+      "englishPromptNote": "Die Anfrage wird auf Englisch gesendet.",
+      "explain": "Erklären",
+      "explainAlert": "Diesen Alarm erklären",
+      "explainDependencyNamed": "{name} erklären",
+      "explainEdge": "Diese Abhängigkeit erklären",
+      "explainField": "Dieses Feld erklären",
+      "explainPanel": "Dieses Panel erklären",
+      "explainRows": "Diese Zeile erklären | Diese {count} Zeilen erklären",
+      "explainSeries": "Diese Serie erklären",
+      "explainService": "Diesen Service erklären",
+      "explainSpan": "Diesen Span erklären",
+      "fix": "@:{'brand.askAutobot'} how to fix this",
+      "inChat": "Im Chat",
+      "inChatRemove": "Im Chat. Entfernen Sie es über sein × in der Kontextleiste.",
+      "lockedName": "{label}, gesperrt: Bitten Sie einen Administrator um KI-Zugriff",
+      "open": "Öffnen",
+      "orgChanged": "Diese Seite gehört zu einer anderen Organisation. Laden Sie sie neu, um Fragen dazu zu stellen.",
+      "panelActions": "Panel-Aktionen",
+      "queuedWhileRunning": "Zum Chat hinzugefügt. Senden Sie es, wenn die aktuelle Antwort abgeschlossen ist.",
+      "rowActions": "Zeilenaktionen",
+      "setUpIngestion": "Hilf mir, die Datenerfassung einzurichten",
+      "setUpTracing": "Hilf mir, das Tracing einzurichten",
+      "title": {
+        "dependency": "Abhängigkeit · {name}",
+        "emptyResult": "Leere Ergebnisse · {name}",
+        "setUpIngestion": "Datenerfassung einrichten",
+        "setUpTracing": "Tracing einrichten"
+      },
+      "tooltip": {
+        "add": "Zum Chat hinzufügen",
+        "createRegex": "Write a regex pattern with @:{'brand.autobot'}",
+        "dockedAsk": "Open @:{'brand.autobot'} for this editor",
+        "emptyResult": "Fragen, warum nichts übereinstimmte",
+        "explain": "Dies erklären",
+        "explainAlert": "Diesen Alarm erklären",
+        "explainEdge": "Diese Abhängigkeit prüfen",
+        "explainField": "Dieses Feld erklären",
+        "explainPanel": "Dieses Panel erklären",
+        "explainSeries": "Diese Serie erklären",
+        "explainService": "Diesen Service prüfen",
+        "explainSpan": "Diesen Span erklären",
+        "fix": "Diesen Befund beheben",
+        "ingestion": "Erste Daten einspielen",
+        "noStream": "Die ersten Daten senden",
+        "sidebarAsk": "Open @:{'brand.autobot'} with this function",
+        "troubleshootAlert": "Fragen, warum dieser Alarm ausgelöst wurde",
+        "troubleshootQuery": "Diese Abfrage beheben",
+        "troubleshootSpan": "Fragen, warum dieser Span fehlgeschlagen ist"
+      },
+      "troubleshoot": "Analysieren",
+      "troubleshootAlert": "Diesen Alarm analysieren",
+      "troubleshootNoResults": "Leere Ergebnisse analysieren",
+      "troubleshootQuery": "Diese Abfrage analysieren",
+      "troubleshootSpan": "Diesen Span analysieren"
+    },
+    "error": {
+      "account_changed": {
+        "title": "Ein anderes Konto wurde angemeldet. Ihre Nachricht wurde nicht gesendet; laden Sie neu, um mit diesem Konto fortzufahren."
+      },
+      "admission_busy": {
+        "action": "Erneut versuchen",
+        "title": "@:{'brand.autobot'} is busy starting another answer. Your message wasn't sent."
+      },
+      "agent_unavailable": {
+        "action": "Erneut versuchen",
+        "body": "Bisherige Befunde bleiben oben erhalten.",
+        "title": "@:{'brand.autobot'} didn't respond. Nothing was changed.",
+        "titleAfterChange": "@:{'brand.autobot'} didn't respond."
+      },
+      "already_submitted": {
+        "action": "Chat neu laden",
+        "title": "Diese Nachricht wurde bereits gesendet. Laden Sie den Chat neu, um die Antwort zu sehen."
+      },
+      "analysis_in_progress": {
+        "title": "Für diesen Vorfall läuft bereits eine Analyse."
+      },
+      "approval_delivery_failed": {
+        "action": "Erneut senden",
+        "title": "Your decision didn't reach @:{'brand.autobot'}. Nothing was changed."
+      },
+      "approval_elsewhere": {
+        "title": "Ein anderer Tab wartet in diesem Chat auf Ihre Genehmigung. Ihre Nachricht wurde nicht gesendet."
+      },
+      "approval_expired": {
+        "action": "Erneut fragen",
+        "title": "No answer in time, so @:{'brand.autobot'} didn't run this action."
+      },
+      "authorization_unavailable": {
+        "action": "Erneut versuchen",
+        "hint": "Es wurde nichts berechnet.",
+        "title": "KI-Guthaben konnte nicht geprüft werden. Ihre Nachricht wurde nicht gesendet."
+      },
+      "cancelled_elsewhere": {
+        "title": "Diese Antwort wurde von einem anderen Tab gestoppt."
+      },
+      "consent_declined": {
+        "title": "Kostenpflichtige Nutzung war nicht aktiviert. Ihre Nachricht wurde nicht gesendet."
+      },
+      "consent_still_required": {
+        "action": "Kostenpflichtige Nutzung verwalten",
+        "actionAdmin": "Kostenpflichtige Nutzung verwalten",
+        "actionMember": "Admin fragen",
+        "body": "Aktivieren Sie sie unter Abrechnungen › Kostenpflichtige Nutzung.",
+        "title": "Kostenpflichtige Nutzung ist nicht für jede erforderliche Organisation aktiviert."
+      },
+      "credits_exhausted": {
+        "action": "Kostenpflichtige Nutzung verwalten",
+        "actionAdmin": "Kostenpflichtige Nutzung verwalten",
+        "actionCopy": "Anfrage kopieren",
+        "actionMember": "Admin fragen",
+        "body": "Inklusivguthaben werden nicht erneuert.",
+        "bodyContract": "Wenden Sie sich an Ihren Account-Manager, um Guthaben hinzuzufügen.",
+        "bodyMember": "Ein Admin von {org} kann kostenpflichtige Nutzung unter Abrechnungen › Kostenpflichtige Nutzung erlauben.",
+        "bodyPayerMember": "Ein Admin von {payer} kann kostenpflichtige Nutzung erlauben.",
+        "bodyResets": "Sie werden {date} zurückgesetzt.",
+        "title": "Die KI-Guthaben für {org} sind aufgebraucht. Ihre Nachricht wurde nicht gesendet.",
+        "titlePayer": "Die KI-Guthaben für {org} sind aufgebraucht, abgerechnet über {payer}. Ihre Nachricht wurde nicht gesendet."
+      },
+      "data_level_blocked": {
+        "action": "Stufe ändern",
+        "actionAdmin": "Stufe ändern",
+        "actionMember": "Admin fragen",
+        "title": "In {org} werden keine Rohdatenzeilen an das Modell weitergegeben."
+      },
+      "empty_response": {
+        "action": "Erneut versuchen",
+        "title": "@:{'brand.autobot'} didn't answer."
+      },
+      "history_unavailable": {
+        "action": "Erneut versuchen",
+        "title": "Der Verlauf dieses Chats konnte nicht geladen werden. Ihre Nachricht wurde nicht gesendet."
+      },
+      "not_enabled": {
+        "action": "Zugriffseinstellungen öffnen",
+        "actionAdmin": "Zugriffseinstellungen öffnen",
+        "actionMember": "Admin fragen",
+        "body": "Frühere Chats bleiben lesbar.",
+        "title": "{product} ist für {org} deaktiviert. Ihre Nachricht wurde nicht gesendet."
+      },
+      "off_for_org": {
+        "action": "Zugriffseinstellungen öffnen",
+        "actionAdmin": "Zugriffseinstellungen öffnen",
+        "actionMember": "Admin fragen",
+        "body": "Frühere Chats bleiben lesbar.",
+        "title": "{product} ist für {org} deaktiviert. Ihre Nachricht wurde nicht gesendet."
+      },
+      "offline": {
+        "action": "Erneut versuchen",
+        "hint": "Erneut versuchen ist verfügbar, sobald Sie wieder online sind.",
+        "title": "Sie sind offline. Ihre Nachricht wurde nicht gesendet."
+      },
+      "permission_denied": {
+        "action": "IAM-Rollen öffnen",
+        "actionAdmin": "IAM-Rollen öffnen",
+        "actionMember": "Administrator fragen",
+        "body": "This chat stays readable. An admin can grant access in IAM › Roles › @:{'brand.autobot'}.",
+        "title": "Ihre Rolle kann {product} nicht mehr verwenden. Ihre Nachricht wurde nicht gesendet."
+      },
+      "permission_denied_tool": {
+        "action": "Assistentenberechtigungen öffnen",
+        "actionAdmin": "Assistentenberechtigungen öffnen",
+        "actionMember": "Administrator fragen",
+        "body": "Die Assistenten-Richtlinie Ihrer Organisation blockiert dies.",
+        "title": "@:{'brand.autobot'} wasn't allowed to run {tool}."
+      },
+      "persistence_failed": {
+        "action": "Speichern erneut versuchen",
+        "title": "Beantwortet, aber nicht im Verlauf gespeichert."
+      },
+      "provider_error": {
+        "action": "Erneut versuchen",
+        "body": "Es wurde nichts geändert.",
+        "bodyPartial": "Die bisherigen Ergebnisse bleiben oben erhalten.",
+        "reason": {
+          "modelUnavailable": "kann das Modell nicht erreichen",
+          "overloaded": "ist überlastet",
+          "requestTooLarge": "kann keine so lange Frage annehmen",
+          "timedOut": "hat zu lange gedauert"
+        },
+        "title": "Der KI-Anbieter {reason}, daher wurde die Antwort abgebrochen.",
+        "titleNoReason": "Der KI-Anbieter ist fehlgeschlagen, daher wurde die Antwort abgebrochen."
+      },
+      "rca_disabled": {
+        "action": "Administrator fragen",
+        "body": "Ein Administrator kann sie aktivieren.",
+        "title": "Die Vorfallanalyse ist deaktiviert."
+      },
+      "rate_limited": {
+        "action": "Erneut versuchen",
+        "title": "Der KI-Anbieter begrenzt Anfragen. Ihre Nachricht wurde nicht gesendet.",
+        "titleTimed": "Der KI-Anbieter begrenzt Anfragen. Ihre Nachricht wurde nicht gesendet."
+      },
+      "run_limit_member": {
+        "action": "Laufende Chats anzeigen",
+        "title": "{n} Chats laufen oder warten auf Sie. Ihre Nachricht wurde nicht gesendet."
+      },
+      "run_limit_org": {
+        "action": "Erneut versuchen",
+        "title": "{product} ist für Ihre Organisation ausgelastet. Ihre Nachricht wurde nicht gesendet."
+      },
+      "restore_required": {
+        "action": "Chat neu laden",
+        "title": "Dieser Chat wurde auf dem Server zurückgesetzt. Zum Fortfahren neu laden."
+      },
+      "session_expired": {
+        "action": "Anmelden",
+        "body": "Anmelden öffnet einen neuen Tab; kehren Sie zum Senden hierher zurück.",
+        "title": "Ihre Sitzung ist abgelaufen. Ihr Entwurf bleibt erhalten."
+      },
+      "session_owner_unavailable": {
+        "action": "Erneut versuchen",
+        "title": "Der Chat wurde auf einen anderen Server verschoben und konnte nicht fortgesetzt werden."
+      },
+      "signed_out": {
+        "action": "Anmelden",
+        "title": "Sie haben sich in einem anderen Tab abgemeldet. Diese Antwort wurde abgebrochen."
+      },
+      "stale_epoch": {
+        "action": "Chat neu laden",
+        "title": "Dieser Chat wurde auf dem Server zurückgesetzt. Zum Fortfahren neu laden."
+      },
+      "stopped_before_send": {
+        "action": "Erneut versuchen",
+        "title": "Vor dem Senden abgebrochen. Ihre Nachricht wurde nicht gesendet."
+      },
+      "stream_dropped": {
+        "action": "Erneut versuchen",
+        "body": "Die bisherigen Ergebnisse bleiben oben erhalten.",
+        "bodyPartial": "Der Text oben ist unvollständig.",
+        "title": "Verbindung nach {elapsed} verloren. Es wurde nichts geändert.",
+        "titleAfterChange": "Verbindung nach {elapsed} verloren.",
+        "titleAfterChangeNow": "Verbindung verloren.",
+        "titleNow": "Verbindung verloren. Es wurde nichts geändert."
+      },
+      "stream_oversized": {
+        "action": "Erneut versuchen",
+        "body": "Es wurde nichts geändert.",
+        "title": "Diese Antwort war zu groß für die Anzeige."
+      },
+      "subscription_required": {
+        "action": "Pläne ansehen",
+        "actionAdmin": "Pläne ansehen",
+        "actionMember": "Admin fragen",
+        "body": "Subscribe to keep using @:{'brand.autobot'}.",
+        "title": "Die enthaltenen KI-Credits sind für {org} aufgebraucht."
+      },
+      "turn_busy": {
+        "action": "Anhalten",
+        "title": "Dieser Chat antwortet noch. Ihre Nachricht wurde nicht gesendet."
+      },
+      "turn_limit": {
+        "action": "Erneut versuchen",
+        "body": "Senden Sie erneut, sobald eine beendet ist.",
+        "title": "Zu viele Antworten laufen. Ihre Nachricht wurde nicht gesendet."
+      },
+      "unknown": {
+        "action": "Erneut versuchen",
+        "status": "Der Server hat HTTP {status} zurückgegeben.",
+        "title": "Etwas ist schiefgelaufen."
+      },
+      "unreachable": {
+        "action": "Erneut versuchen",
+        "title": "OpenObserve war nicht erreichbar. Ihre Nachricht wurde nicht gesendet."
+      },
+      "agent_disabled": {
+        "title": "{agent} ist für {org} deaktiviert. Ihre Nachricht wurde nicht gesendet.",
+        "action": "Agent-Einstellungen öffnen",
+        "actionAdmin": "Agent-Einstellungen öffnen",
+        "actionMember": "Admin fragen"
+      },
+      "agent_not_permitted": {
+        "title": "Ihre Rolle kann {agent} nicht verwenden. Ihre Nachricht wurde nicht gesendet.",
+        "body": "An admin can grant it in Settings › @:{'brand.autobot'} › Agents.",
+        "action": "Admin fragen"
+      },
+      "agent_unreachable": {
+        "title": "{agent} ist derzeit nicht erreichbar. Ihre Nachricht wurde nicht gesendet.",
+        "action": "Erneut versuchen"
+      },
+      "handoff_failed": {
+        "title": "Dieser Chat konnte nicht an {agent} übergeben werden. {fromAgent} hat ihn behalten.",
+        "body": "Ihre Nachricht ist weiterhin in diesem Chat.",
+        "action": "Erneut versuchen"
+      }
+    },
+    "errorDetails": {
+      "chat": "Chat",
+      "code": "Code",
+      "copied": "Details kopiert",
+      "copy": "Details kopieren",
+      "httpStatus": "HTTP-Status",
+      "serverMessage": "Servermeldung",
+      "title": "Details",
+      "trace": "Trace",
+      "turn": "Turn",
+      "when": "Wann"
+    },
+    "evidence": {
+      "copied": "Abfrage kopiert",
+      "fromStep": "aus Schritt {n}",
+      "groupName": "{language}-Abfrage auf {stream}, {range}",
+      "groupNameNoStream": "{language}-Abfrage, {range}",
+      "lastMinutes": "letzte {count} Min.",
+      "noRows": "Keine Zeilen in diesem Bereich",
+      "noStreamAccess": "Sie haben keinen Zugriff auf Stream {stream}",
+      "openHint": "Öffnet mit geladener Abfrage",
+      "opensNewTab": "{label} (öffnet in einem neuen Tab)",
+      "otherOrg": "Diese Abfrage gehört zu {org}. Wechseln Sie die Organisation, um sie auszuführen.",
+      "queryFailed": "Abfrage fehlgeschlagen: {reason}",
+      "queryFailedPlain": "Abfrage fehlgeschlagen",
+      "rangeFallback": "Zeitraum: unbekannt · gilt für die letzten 15 Min.",
+      "rangeUnknown": "Zeitraum: unbekannt",
+      "resultsOf": "Ergebnisse von {name}",
+      "rowsCount": "{count} Zeile | {count} Zeilen",
+      "rowsScannedWindow": "{count} Zeile · {took} · {size} gescannt · {window} | {count} Zeilen · {took} · {size} gescannt · {window}",
+      "rowsWindow": "{count} Zeile · {took} · {window} | {count} Zeilen · {took} · {window}",
+      "runNow": "Jetzt ausführen",
+      "runNowHint": "Öffnet {explorer} mit dieser geladenen Abfrage; Sie führen sie dort aus.",
+      "sawRows": "@:{'brand.autobot'} got {count} row | @:{'brand.autobot'} got {count} rows",
+      "sawRowsIn": "@:{'brand.autobot'} got {count} row in {range} | @:{'brand.autobot'} got {count} rows in {range}",
+      "stopped": "Gestoppt",
+      "windowCapped": "{window} (auf die letzten 7 Tage begrenzt)",
+      "askAdmin": "Administrator fragen",
+      "line": "{count} Abfrage, {range} | {count} Abfragen, {range}",
+      "stepsLine": "{count} Schritt, {range} | {count} Schritte, {range}",
+      "noAccess": "{n} Quellenangabe nicht verfügbar: kein Zugriff auf {stream} | {n} Quellenangaben nicht verfügbar: kein Zugriff auf {stream}",
+      "noAccessPlain": "{n} Quellenangabe nicht verfügbar | {n} Quellenangaben nicht verfügbar"
+    },
+    "export": {
+      "approved": "Von Ihnen genehmigt um {time}",
+      "attachment": "[Anhang: {name}]",
+      "denied": "Von Ihnen abgelehnt um {time}",
+      "doneOf": {
+        "create": "{done} von {total} erstellt",
+        "delete": "{done} von {total} gelöscht",
+        "update": "{done} von {total} aktualisiert"
+      },
+      "ended": "Diese Antwort wurde nicht abgeschlossen",
+      "exportedLine": "Exportiert {time} {zone} · {org}",
+      "image": "[Bild: {name}]",
+      "steps": "{n} Schritt durchgearbeitet ({names}) | {n} Schritte durchgearbeitet ({names})",
+      "stopped": "Gestoppt um {time} · Erkenntnisse beibehalten",
+      "you": "Sie"
+    },
+    "findings": {
+      "confidence": "Konfidenz: {level}",
+      "inferred": "Abgeleitet",
+      "level": {
+        "high": "hoch",
+        "inconclusive": "nicht eindeutig",
+        "low": "niedrig",
+        "medium": "mittel"
+      },
+      "ruledOut": "Ausgeschlossen",
+      "inferredLine": "Abgeleitet: {text}",
+      "next": "Als Nächstes: {text}",
+      "notEstablished": "Nicht belegt: {text}",
+      "ruledOutLine": "Ausgeschlossen: {text}",
+      "showRaw": "Rohe Erkenntnisse anzeigen",
+      "unreadable": "Erkenntnisse konnten nicht angezeigt werden."
+    },
+    "footer": {
+      "credits": "{count} Credit | {count} Credits",
+      "creditsCountedHint": "Credits werden gezählt, sobald eine Anfrage angenommen wird.",
+      "evaluated": "Ausgewertet {range}",
+      "evaluatedMore": "Ausgewertet {range} und {count} weiteres Zeitfenster | Ausgewertet {range} und {count} weitere Zeitfenster",
+      "includedCredits": "{count} enthaltener Credit | {count} enthaltene Credits",
+      "notSaved": "nicht gespeichert",
+      "notSavedHint": "Diese Antwort wurde gegeben, konnte aber nicht im Verlauf gespeichert werden",
+      "queries": "{count} Abfrage | {count} Abfragen",
+      "refunded": "0 Credits · erstattet",
+      "rerun": "Jetzt erneut ausführen",
+      "rerunFor": "Für {range} erneut ausführen",
+      "theLastDays": "der letzte {n} Tag | die letzten {n} Tage",
+      "theLastHours": "die letzten {n} h",
+      "theLastMinutes": "die letzten {n} min",
+      "tokens": "{tokens} Tokens · {count} Modellaufruf | {tokens} Tokens · {count} Modellaufrufe",
+      "tryWider": "Die letzten {duration} versuchen"
+    },
+    "fork": {
+      "contextNote": "Ihre erste Nachricht verwendet den geteilten Chat als Kontext.",
+      "divider": "Hier beginnt Ihr Chat",
+      "failed": "Dieser Chat konnte nicht fortgesetzt werden",
+      "regionName": "Fortgesetzt von {title}",
+      "seedLost": "The shared chat is no longer available, so @:{'brand.autobot'} won't have its earlier messages.",
+      "seedMissing": "Geteiltes Transkript auf diesem Gerät nicht verfügbar",
+      "sendAnyway": "Trotzdem senden",
+      "showTurns": "{count} geteilte Runde anzeigen | {count} geteilte Runden anzeigen",
+      "sourceGone": "· Quelle nicht mehr verfügbar",
+      "sourceHeading": "Fortgesetzt von „{title}“ · geteilt von {owner} · Snapshot vom {time}",
+      "title": "{title} (fortgesetzt)",
+      "titleN": "{title} (fortgesetzt {n})",
+      "toast": "Wird in Ihren Chats fortgesetzt",
+      "unavailable": "Dieser Link ist nicht mehr verfügbar und kann daher nicht fortgesetzt werden."
+    },
+    "gate": {
+      "announce": {
+        "locked": "{product} ist für Ihre Rolle nicht verfügbar."
+      },
+      "checkAgain": "Erneut prüfen",
+      "checkAgainHint": "Gerade Zugriff erhalten?",
+      "close": "Schließen",
+      "learnMore": "Erfahren, was es kann",
+      "learnTitle": "Was {product} kann",
+      "noPermission": {
+        "askAdmin": "Admin fragen",
+        "body": "Ein Admin kann den Zugriff in {whereToGrant} gewähren.",
+        "title": "{product} ist für Ihre Rolle nicht verfügbar",
+        "tooltip": "Admin um KI-Zugriff bitten",
+        "unknownNotice": "Ihre Rolle umfasst möglicherweise {product} nicht. Wenn das Senden fehlschlägt, fragen Sie einen Admin."
+      },
+      "noShare": {
+        "tooltip": "Nur Admins können Chats teilen"
+      },
+      "noShareRead": {
+        "body": "Bitten Sie einen Admin um Zugriff zum Teilen von Chats.",
+        "title": "Sie haben keinen Zugriff auf geteilte Chats in dieser Organisation"
+      },
+      "notConfigured": {
+        "body": "No agent target is configured for this deployment, so @:{'brand.autobot'} is off for everyone.",
+        "setup": "Set up @:{'brand.autobot'}",
+        "title": "{product} ist noch nicht eingerichtet"
+      },
+      "notEntitled": {
+        "capability1": "Jede Log-Zeile, jeden Span oder jedes Panel erklären",
+        "capability2": "SQL, PromQL und VRL aus einfacher Sprache schreiben",
+        "capability3": "Korrekturen vorschlagen, die Sie freigeben",
+        "pitch": "{product} untersucht Logs, Traces und Metriken gemeinsam mit Ihnen, schreibt Abfragen und schlägt Änderungen vor, die Sie freigeben. Es ist Teil von OpenObserve Enterprise und Cloud.",
+        "seePlans": "Pläne ansehen",
+        "title": "{product} kennenlernen",
+        "tooltip": "{product} ist Teil von OpenObserve Enterprise und Cloud"
+      },
+      "offForOrg": {
+        "body": "Past chats stay readable. An admin can turn it on in Settings › @:{'brand.autobot'}.",
+        "title": "{product} ist für diese Organisation deaktiviert"
+      },
+      "openAccessSettings": "Zugriffseinstellungen öffnen",
+      "tryAgain": "Erneut versuchen",
+      "unhealthy": {
+        "body": "The @:{'brand.autobot'} service isn't responding. Try again in a few minutes.",
+        "notice": "{product} antwortet nicht. Ihre letzte Nachricht wurde nicht beantwortet.",
+        "title": "{product} ist derzeit nicht verfügbar",
+        "tooltip": "{product} ist derzeit nicht verfügbar"
+      },
+      "whereToGrant": "{iam} › {roles} › {group}"
+    },
+    "grants": {
+      "always": "Immer",
+      "alwaysAsk": "Löschungen sowie Änderungen an Abrechnung, IAM und Aufbewahrung fragen immer nach.",
+      "browserEmpty": "Dieser Browser speichert keine dauerhaften Genehmigungen.",
+      "columns": {
+        "actions": "Aktionen",
+        "grantedAt": "Erteilt",
+        "grantedBy": "Erteilt von",
+        "scope": "Geltungsbereich",
+        "tool": "Tool oder Vorgang"
+      },
+      "empty": "Keine dauerhaften Genehmigungen",
+      "loadFailed": "Dauerhafte Genehmigungen konnten nicht geladen werden.",
+      "openChat": "Chat öffnen",
+      "revoke": "Widerrufen",
+      "revokeNamed": "Immer erlauben für {tool} widerrufen",
+      "revoked": "Approval revoked. @:{'brand.autobot'} will ask next time.",
+      "thisChat": "Dieser Chat",
+      "title": "Dauerhafte Genehmigungen",
+      "unsupported": "Organisationsweite Genehmigungen erfordern eine neuere Serverversion.",
+      "yours": "Ihre Genehmigungen",
+      "yoursInBrowser": "Ihre Genehmigungen in diesem Browser"
+    },
+    "header": {
+      "announceFailed": "Antwort fehlgeschlagen: {title}.",
+      "announceNeedsYou": "{product} benötigt Sie: {title}.",
+      "announceReady": "Antwort bereit: {title}.",
+      "announceWorkingElsewhere": "Antwort in einem anderen Tab: {title}.",
+      "answeringName": "{product}, antwortet",
+      "answeringNameOpen": "{product}, antwortet, geöffnet",
+      "enterpriseName": "{product}, Enterprise- und Cloud-Funktion",
+      "failedName": "{product}, letzte Antwort fehlgeschlagen",
+      "lockedName": "{product}, gesperrt",
+      "nameOpen": "{product}, geöffnet",
+      "needsYouCountName": "{product}, benötigt Sie, {count} wartend",
+      "needsYouCountNameOpen": "{product}, benötigt Sie, {count} wartend, geöffnet",
+      "needsYouName": "{product}, benötigt Sie",
+      "needsYouNameOpen": "{product}, benötigt Sie, geöffnet",
+      "offName": "{product}, nicht eingerichtet",
+      "open": "Offen",
+      "readyName": "{product}, Antwort bereit",
+      "stateDone": "Antwort bereit: {title}",
+      "stateFailed": "Antwort fehlgeschlagen: {title}",
+      "stateOpen": "{product} · Offen",
+      "stateRunningCount": "{count} Antwort läuft | {count} Antworten laufen",
+      "stateWorking": "Antwortet: {title}",
+      "toastReady": "Antwort bereit · {title}",
+      "tooltip": "@:{'brand.askAutobot'}",
+      "unavailableName": "{product}, nicht verfügbar",
+      "toastFailed": "{title} fehlgeschlagen",
+      "goTo": "Zu {product} wechseln"
+    },
+    "helper": {
+      "checking": "Wird geprüft…",
+      "discarded": "Vorschlag verworfen. Fragen Sie erneut, um einen neuen zu erhalten.",
+      "editorPlaceholder": {
+        "js": "Schreiben Sie eine JavaScript-Funktion, zum Beispiel: return event",
+        "promql": "Schreiben Sie eine PromQL-Abfrage, zum Beispiel: rate(http_requests_total[5m])",
+        "vrl": "Schreiben Sie eine VRL-Funktion, zum Beispiel: .status = \"active\""
+      },
+      "inserted": "Eingefügt",
+      "noChange": "Der Editor enthält dies bereits.",
+      "syntax": {
+        "missing": "{char} fehlt",
+        "unclosed": "{char} nicht geschlossen",
+        "unexpected": "Unerwartetes {char} in Zeile {line}, Spalte {column}"
+      },
+      "generating": "Wird generiert… {seconds} s",
+      "overBudget": "Größer als das übliche Budget"
+    },
+    "history": {
+      "allPinned": "Alle 100 Chats sind angeheftet. Heben Sie die Anheftung eines Chats auf oder löschen Sie einen, um neue Chats zu speichern.",
+      "clearAll": {
+        "action": "Alle Chats löschen",
+        "bodyLocal": "Dadurch wird der in diesem Browser für {org} gespeicherte Chat entfernt. Angeheftete Chats werden ebenfalls gelöscht. | Dadurch werden die {count} in diesem Browser für {org} gespeicherten Chats entfernt. Angeheftete Chats werden ebenfalls gelöscht.",
+        "bodyServer": "Dadurch werden sie von jedem Gerät gelöscht und {links} Freigabelinks widerrufen. Chats, die noch antworten, werden gestoppt.",
+        "confirm": "{count} Chat löschen | {count} Chats löschen",
+        "confirmAll": "Alle Chats löschen",
+        "confirmWord": "delete",
+        "deleting": "Wird gelöscht…",
+        "done": "{count} Chat gelöscht | {count} Chats gelöscht",
+        "doneAll": "Alle Ihre Chats gelöscht",
+        "failed": "Ihre Chats konnten nicht gelöscht werden",
+        "linksUnknown": "Freigabelinks konnten nicht gezählt werden. Vorhandene werden widerrufen.",
+        "title": "{count} Chat löschen? | Alle {count} Chats löschen?",
+        "titleAll": "Alle Ihre Chats in {org} löschen?",
+        "typeToConfirm": "Geben Sie delete ein, um zu bestätigen"
+      },
+      "clearOnSignOut": "Meine Browser-Chats beim Abmelden löschen",
+      "delete": {
+        "bodyLocal": "Dadurch wird der Chat aus diesem Browser entfernt.",
+        "bodyServer": "Dadurch wird der Chat von jedem Gerät gelöscht und eine noch laufende Antwort gestoppt.",
+        "links": {
+          "checking": "Freigabelinks werden geprüft…",
+          "count": "Der {count} aktive Link funktioniert nicht mehr | Die {count} aktiven Links funktionieren nicht mehr",
+          "unknown": "Die Freigabelinks konnten nicht geprüft werden. Beim Löschen werden sie widerrufen."
+        },
+        "running": "Dieser Chat antwortet noch. Beim Löschen wird die Antwort gestoppt.",
+        "title": "„{title}“ löschen?"
+      },
+      "deleteAction": "Löschen",
+      "deleteFailed": "Der Chat konnte nicht gelöscht werden",
+      "deleted": "Chat gelöscht",
+      "details": "Details",
+      "download": "Herunterladen",
+      "exportMarkdown": "Markdown exportieren",
+      "downloadAll": "Alle herunterladen",
+      "downloadFailed": "Der Download konnte nicht erstellt werden",
+      "downloaded": "Heruntergeladen",
+      "empty": {
+        "title": "Noch keine Chats"
+      },
+      "filter": {
+        "active": "Filter · {n}",
+        "agent": "Agent",
+        "alertOrIncident": "Alarm oder Vorfall",
+        "button": "Filter",
+        "clear": "Filter zurücksetzen",
+        "pinned": "Angepinnt",
+        "queryEditor": "Abfrage- oder Funktionseditor",
+        "remove": "Filter {filter} entfernen",
+        "shared": "Geteilt",
+        "show": "Anzeigen",
+        "started": "Gestartet von",
+        "investigations": "Untersuchungen",
+        "autoRuns": "Auto-Läufe",
+        "all": "Alle"
+      },
+      "filterEmpty": "Keine Chats entsprechen diesen Filtern",
+      "group": {
+        "browser": "In diesem Browser",
+        "needsYou": "Wartet auf dich",
+        "older": "Älter",
+        "pinned": "Angepinnt",
+        "running": "Läuft",
+        "today": "Heute",
+        "week": "Letzte 7 Tage",
+        "yesterday": "Gestern"
+      },
+      "import": {
+        "dismiss": "Ausblenden",
+        "download": "Herunterladen",
+        "error": "Beim Verschieben Ihrer Chats ist ein Fehler aufgetreten. Nicht verschobene Chats bleiben in diesem Browser.",
+        "failed": "{count} Chat konnte nicht verschoben werden | {count} Chats konnten nicht verschoben werden",
+        "forbidden": "Ihre Rolle kann keine Chats erstellen. Bitten Sie einen Administrator um KI-Zugriff.",
+        "move": "Chats verschieben",
+        "moved": "{done} von {count} verschoben",
+        "never": "Nicht mehr fragen",
+        "notNow": "Jetzt nicht",
+        "offer": "Sie haben {count} Chats in diesem Browser gespeichert. Möchten Sie sie in Ihr Konto verschieben, damit sie auf allen Geräten angezeigt werden?",
+        "offline": "Sie sind offline. Die Chats bleiben in diesem Browser, bis Sie es erneut versuchen.",
+        "progress": "Verschiebe {done} von {count}…",
+        "retry": "Erneut versuchen",
+        "unavailable": "{count} Chats sind in diesem Browser gespeichert und können noch nicht verschoben werden."
+      },
+      "loadOlder": "Ältere laden",
+      "loadedOlder": "{count} älterer Chat geladen | {count} ältere Chats geladen",
+      "localOnly": {
+        "adminHelp": "Legen Sie O2_AI_CHAT_PERSISTENCE_ENABLED fest, um Chats auf dem Server zu speichern.",
+        "adminLink": "Dokumentation lesen",
+        "description": "Nur in diesem Browser gespeicherte Chats: {count} von {cap}",
+        "help": "Chats bleiben in diesem Browser.",
+        "info": "Über den Browserverlauf",
+        "keptOnSignOut": "Ihre Browser-Chats wurden beim Abmelden beibehalten.",
+        "title": "Nur in diesem Browser gespeichert"
+      },
+      "matchCount": "{count} Chat stimmt überein | {count} Chats stimmen überein",
+      "noMatch": "Keine Chats entsprechen „{q}“",
+      "offline": "Sie sind offline · Chats aus diesem Browser werden angezeigt",
+      "open": "Öffnen",
+      "openFailed": "Dieser Chat konnte nicht geöffnet werden",
+      "origin": {
+        "alert": "Alarm",
+        "browser": "Browser",
+        "editor": "Editor",
+        "incident": "Vorfall"
+      },
+      "pending": {
+        "delete": "Wird gelöscht…",
+        "pin": "Wird angeheftet…",
+        "rename": "Wird umbenannt…"
+      },
+      "pin": "Anheften",
+      "pinFailed": "Chat konnte nicht angeheftet werden",
+      "pinLocal": "Anheften (in diesem Browser)",
+      "pinned": "Angeheftet",
+      "prune": "{count} von {cap} Chats",
+      "pruned": "Ältester Chat entfernt, um Platz zu schaffen: „{title}“",
+      "readOnly": "Sie können Ihre Chats lesen. Zum Starten oder Fortsetzen eines Chats ist KI-Zugriff erforderlich.",
+      "rename": "Umbenennen",
+      "rowMenu": "Aktionen für {title}",
+      "search": "Chats durchsuchen",
+      "searchInvestigations": "Untersuchungen durchsuchen",
+      "investigationsEmpty": "Noch keine Untersuchungen",
+      "draftTag": "Entwurf",
+      "serverError": "Ihre Chats konnten nicht geladen werden",
+      "serverErrorCached": "Chats aus diesem Browser werden angezeigt · Server nicht erreichbar",
+      "sharedLinks": "Geteilte Links",
+      "sharedByMe": "Von mir geteilt",
+      "sharedPublic": "Über öffentlichen Link geteilt",
+      "state": {
+        "answering": "Antwortet",
+        "draft": "Entwurf",
+        "expired": "Abgelaufen",
+        "failed": "Fehlgeschlagen",
+        "needsYou": "Erfordert Ihre Eingabe"
+      },
+      "storageBlocked": "Speichern in diesem Browser nicht möglich. Private Fenster und voller Speicher blockieren den Verlauf.",
+      "title": "Chats",
+      "traceId": "Trace-ID {id}",
+      "unpin": "Anheftung aufheben",
+      "unpinLocal": "Anheftung aufheben (in diesem Browser)",
+      "unpinned": "Anheftung aufgehoben",
+      "view": {
+        "back": "Zurück zum Chat: {title}",
+        "title": "Alle Chats"
+      },
+      "deleteChat": "Chat löschen",
+      "deleteDraft": "Lokalen Entwurf löschen",
+      "kept": "Aufbewahrt für {days} Tage",
+      "lastTried": "Zuletzt versucht {time}",
+      "listMenu": "Aktionen für die Chat-Liste",
+      "serverErrorAgain": "Ihre Chats konnten weiterhin nicht geladen werden",
+      "stop": "Stopp",
+      "titlesOnly": "Durchsucht die Titel der bisher geladenen Chats",
+      "autoRuns": {
+        "empty": "Noch keine Auto-Läufe in dieser Organisation",
+        "openName": "{title} öffnen, {state}"
+      }
+    },
+    "label": {
+      "acceptedAt": "Angenommen {time}",
+      "askAgain": "Erneut fragen",
+      "edited": "Bearbeitet nach {product}",
+      "provenance": "Über diese Änderung",
+      "restoredAssistant": "Restored the version from @:{'brand.autobot'}.",
+      "restoredOriginal": "Ihr Original wurde wiederhergestellt.",
+      "revert": "Zurücksetzen",
+      "revertAi": "Revert to the version from @:{'brand.autobot'}",
+      "revertMine": "Auf mein Original zurücksetzen",
+      "revertName": "Änderung des Assistenten zurücksetzen",
+      "short": "KI",
+      "shortName": "KI, {label}",
+      "written": "Geschrieben von {product}"
+    },
+    "link": {
+      "cantOpen": "Kann hier nicht geöffnet werden",
+      "fromAnswer": "Link in der Antwort",
+      "groupName": "{title}, {details}",
+      "id": "ID {id}",
+      "more": "Weitere Link-Aktionen",
+      "newTab": "In neuem Tab öffnen",
+      "open": {
+        "alert": "Alarm „{name}“ öffnen",
+        "alerts": "Alarme öffnen",
+        "chat": "Chat öffnen",
+        "dashboard": "Dashboard „{name}“ öffnen",
+        "dashboards": "Dashboards öffnen",
+        "functions": "Funktionen öffnen",
+        "incident": "Vorfall „{name}“ öffnen",
+        "incidents": "Vorfälle öffnen",
+        "pipeline": "Pipeline „{name}“ öffnen",
+        "pipelines": "Pipelines öffnen",
+        "trace": "Trace {id} öffnen",
+        "services": "Services öffnen",
+        "service": "Service „{name}“ öffnen",
+        "ingestion": "Datenquellen öffnen",
+        "home": "Zurück zur Startseite"
+      },
+      "openAction": "Öffnen",
+      "opened": "Geöffnet · {time}",
+      "openIn": "In {explorer} öffnen",
+      "redacted": "Eine verlinkte Ansicht (Details ausgeblendet)",
+      "unsupported": "Dieses Ziel wird in dieser Version nicht unterstützt"
+    },
+    "mcp": {
+      "copyConfiguration": "Konfiguration kopieren",
+      "deepLinkTokenNote": "Dieser Link enthält Ihr Zugriffstoken.",
+      "headerSubtitle": "Verwenden Sie OpenObserve aus Ihrem eigenen Agenten, z. B. {claude}, {cursor} oder {vscode}.",
+      "parityLine": "Ihr Agent erhält dieselben Tools und Berechtigungen wie {product}. Tools, die {product} selbst nutzen kann, werden in {link} eingerichtet.",
+      "replaceToken": "Ersetzen Sie {token} durch das oben generierte Token oder durch die Base64-Darstellung von E-Mail:Token eines Dienstkontos.",
+      "skillsHint": "Bringt Ihrem Agenten bei, wie man in {brand} abfragt, alarmiert und Dashboards erstellt.",
+      "toolsetsPath": "Settings › @:{'brand.autobot'} › Toolsets"
+    },
+    "message": {
+      "actionsName": "Nachrichtenaktionen",
+      "chipsName": "Mit dieser Nachricht gesendeter Kontext",
+      "codeName": "Code, {lang}",
+      "copyAnswer": "Antwort kopieren",
+      "copyMarkdown": "Als Markdown kopieren",
+      "copyPrompt": "Kopieren",
+      "creditsUsedUp": "Die KI-Guthaben für diese Organisation sind aufgebraucht",
+      "edit": "Bearbeiten und erneut senden",
+      "editedFrom": "Bearbeitet ab Nachricht {n}",
+      "editLabel": "Nachricht bearbeiten",
+      "editSend": "Senden",
+      "evaluatedStamp": "Ausgewertet {range} · {n} Abfrage | Ausgewertet {range} · {n} Abfragen",
+      "fenceSource": "Stream {stream} · {range}",
+      "firstVersion": "Dies ist die erste Version",
+      "imageRemoved": "Bild von einer externen Seite entfernt",
+      "latestVersion": "Dies ist die neueste Version",
+      "meta": "{who} · {time}",
+      "more": "Weitere Aktionen",
+      "nextVersion": "Nächste Version",
+      "olderHidden": "Ältere Fortsetzung ausgeblendet",
+      "openImage": "Bild {name} öffnen",
+      "previousVersion": "Vorherige Version",
+      "regenerate": "Neu generieren",
+      "tableName": "Tabelle",
+      "versionName": "Version {n} von {count}",
+      "versionOf": "{n} von {count}",
+      "you": "Sie",
+      "metaHandoff": "{meta} · an {agent}",
+      "toAgent": "An {agent}",
+      "copyChatId": "Chat-ID kopieren",
+      "shareAnswer": "Link zu dieser Antwort kopieren",
+      "linkCopied": "Link kopiert",
+      "linkCopiedPrivate": "Link kopiert · nur Sie können ihn öffnen",
+      "linkCopiedOrg": "Link kopiert · Personen in {org} mit Zugriff auf geteilte Chats können ihn öffnen",
+      "linkCopiedPublic": "Link kopiert · jeder mit dem Link kann ihn öffnen",
+      "branch": "In neuem Chat abzweigen",
+      "branchTitle": "Abzweigung von {title}",
+      "branchedFrom": "Abgezweigt von",
+      "branchFailed": "Dieser Chat konnte nicht abgezweigt werden",
+      "newTag": "Neu"
+    },
+    "name": "@:{'brand.autobot'}",
+    "limit": {
+      "slotFree": "Ein Chat wurde beendet. Sie können jetzt senden."
+    },
+    "notice": {
+      "decision": "Sie sind gefragt",
+      "delete": "{entity} löschen"
+    },
+    "outcome": {
+      "actions": {
+        "askAdmin": "Administrator fragen",
+        "changeLevel": "Stufe ändern",
+        "managePaidUsage": "Kostenpflichtige Nutzung verwalten",
+        "openIamRoles": "IAM-Rollen öffnen",
+        "openSettings": "Assistenten-Einstellungen öffnen",
+        "reloadChat": "Chat neu laden",
+        "sendAgain": "Erneut senden",
+        "signIn": "Anmelden",
+        "stopIt": "Stoppen",
+        "viewPlans": "Pläne ansehen"
+      },
+      "askAgain": "Erneut fragen",
+      "backOnline": "Sie sind wieder online.",
+      "canRetryNow": "Sie können es jetzt erneut versuchen.",
+      "editResend": "Bearbeiten und erneut senden",
+      "manualRoute": "Stattdessen in {explorer} öffnen",
+      "noSnapshot": "Die ursprüngliche Nachricht ist für einen erneuten Versuch nicht mehr vorhanden. Senden Sie sie erneut über das Nachrichtenfeld.",
+      "openHere": "Hier öffnen",
+      "readonlyFailed": "Fehlgeschlagen: {title}",
+      "retry": "Erneut versuchen",
+      "retryIn": "Erneut versuchen in {s} s",
+      "retryOffline": "Erneut versuchen, sobald Sie wieder online sind",
+      "signedIn": "Angemeldet. Sie können es jetzt erneut versuchen.",
+      "stopItFailed": "Die andere Antwort konnte nicht beendet werden. Versuchen Sie es erneut.",
+      "stopItSent": "Die andere Antwort wurde zum Beenden aufgefordert.",
+      "tryLater": "Später erneut versuchen",
+      "useAgentInstead": "{agent} stattdessen verwenden",
+      "keepGoingWith": "Mit {agent} fortfahren"
+    },
+    "plan": {
+      "deselectHint": "Entfernen Sie das Häkchen bei allem, was Sie behalten möchten.",
+      "heading": "Ich lösche {count} {entity}:",
+      "itemsName": "Zu löschende Elemente",
+      "largeBatch": "Großer Stapel: {count} {entity}",
+      "onlyThese": "Nur diese löschen: {names}",
+      "showAll": "Alle {count} anzeigen",
+      "unlisted": "{count} weiteres Element hat keinen Namen und ist enthalten | {count} weitere Elemente haben keinen Namen und sind enthalten"
+    },
+    "policy": {
+      "autoDeclined": "Declined by @:{'brand.autobot'} safety settings",
+      "denied": "Durch Richtlinie blockiert: {tool}. {detail}",
+      "deniedAdmin": "An admin can allow it in Settings › @:{'brand.autobot'} › Permissions.",
+      "deniedPlain": "Durch Richtlinie blockiert: {tool}.",
+      "unreviewed": "@:{'brand.autobot'} changed {count} {entity} without a review step.",
+      "unreviewedAction": "Änderungen ansehen",
+      "unreviewedActionName": "Änderungen ansehen (öffnet in einem neuen Tab)"
+    },
+    "query": {
+      "alert": "Alarm-Entwurf erstellen",
+      "copy": "Abfrage kopieren",
+      "dashboard": "Zum Dashboard hinzufügen",
+      "insert": "Als Diff einfügen",
+      "more": "Weitere Abfrageaktionen",
+      "showAllLines": "Alle {count} Zeilen anzeigen",
+      "showFewerLines": "Weniger Zeilen anzeigen",
+      "newTab": "In neuem Tab öffnen",
+      "open": "In {explorer} öffnen",
+      "openShort": "Logs",
+      "run": "Ausführen",
+      "running": "Läuft… · {n} s",
+      "stop": "Stoppen",
+      "openAll": "Für alle {count} in {explorer} öffnen"
+    },
+    "record": {
+      "compacted": "Earlier context was summarised by @:{'brand.autobot'} at {time}",
+      "theModel": "das Modell"
+    },
+    "scroll": {
+      "jumpToLatest": "Zum Neuesten springen",
+      "jumpToLatestCount": "Zum Neuesten springen · {count} neu",
+      "jumpToLatestName": "Zum Neuesten springen, {count} neu"
+    },
+    "settings": {
+      "access": {
+        "builtInAdmin": "Chat, Teilen, Toolsets",
+        "builtInEditor": "Chat, Toolsets",
+        "builtInViewer": "Kein Zugriff",
+        "cancel": "Abbrechen",
+        "enabled": "@:{'brand.autobot'} enabled for this organization",
+        "enabledLine": "Mitglieder behalten ihre bisherigen Chats.",
+        "grantedPerRole": "Der Zugriff wird pro Rolle in {whereToGrant} gewährt",
+        "noRole": "Angemeldete Benutzer ohne Rolle (SSO-Standard) haben keinen Zugriff.",
+        "notice": "Steuerungen pro Organisation erfordern eine neuere Serverversion.",
+        "orgSharing": "Mitglieder mit Freigabezugriff können Chats in dieser Organisation freigeben",
+        "publicOff": {
+          "confirm": "Öffentliche Links deaktivieren",
+          "message": "{count} vorhandener Link funktioniert nicht mehr. | {count} vorhandene Links funktionieren nicht mehr.",
+          "title": "Öffentliche Links deaktivieren?"
+        },
+        "publicSharing": "Öffentliche Links zulassen",
+        "publicSharingDeploymentOff": "Öffentliche Links sind für diese Bereitstellung deaktiviert (ZO_PUBLIC_AI_CHAT_ENABLED).",
+        "publicSharingLine": "Optionen für öffentliche Links werden im Freigabedialog ausgeblendet.",
+        "rbacOff": "Role-based access is off, so every user can use @:{'brand.autobot'}.",
+        "roles": {
+          "allRoles": "IAM › Rollen",
+          "capped": "{shown} von {total} Rollen werden angezeigt. Alle Rollen in {link} ansehen.",
+          "chat": "Kann chatten",
+          "grant": "Chat gewähren",
+          "grantNamed": "Chat an {role} gewähren",
+          "loadFailed": "Rollen konnten nicht geladen werden.",
+          "noChat": "Kein Chat",
+          "title": "Rollen in dieser Organisation",
+          "unknown": "Unbekannt"
+        },
+        "save": "Speichern",
+        "saved": "@:{'brand.autobot'} settings saved",
+        "sharing": "Freigabe",
+        "tier": "Standard-Berechtigungsstufe",
+        "tierAct": "Mit Genehmigung handeln",
+        "tierActLine": "Mitglieder genehmigen Tools pro Chat oder immer. Löschvorgänge erfordern immer eine Bestätigung.",
+        "tierNeedsAgent": "Erfordert eine neuere Agent-Version zur Durchsetzung",
+        "tierPropose": "Änderungen vorschlagen",
+        "tierProposeLine": "Jede Änderung erfordert die Genehmigung eines Mitglieds.",
+        "tierRead": "Lesen und Abfragen",
+        "tierReadLine": "Führt nur Abfragen aus. Ändert nie etwas.",
+        "tierStored": "Gespeicherte Stufe: {tier}. Sie gilt, sobald der Agent sie durchsetzen kann.",
+        "offInOrg": "In dieser Organisation deaktiviert",
+        "onInOrg": "In dieser Organisation aktiviert",
+        "turnOff": {
+          "confirm": "Deaktivieren",
+          "done": "{product} für {org} deaktiviert",
+          "message": "{product} für {org} deaktivieren? Laufende Antworten werden gestoppt. Mitglieder behalten ihren Chatverlauf.",
+          "pending": "Wird nach Bestätigung deaktiviert",
+          "title": "{product} deaktivieren?"
+        },
+        "valueOff": "Aus",
+        "valueOn": "Ein",
+        "whoCanUse": "Wer kann es verwenden",
+        "you": "Sie: {access}",
+        "youChat": "Chat",
+        "youChatShare": "Chat, Freigabe",
+        "youNone": "kein Zugriff",
+        "youUnknown": "Noch nicht bekannt"
+      },
+      "adminOnly": "Nur Organisationsadministratoren können diese Einstellungen ändern.",
+      "data": {
+        "about": "Über die Datenfreigabe",
+        "aboutProvider": "Antworten werden von {provider} generiert.",
+        "aboutRedaction": "Regeln zur Schwärzung sensibler Daten werden zuerst angewendet.",
+        "level": "An das Modell übermittelte Daten",
+        "levelAggregates": "Schema und Aggregate",
+        "levelAggregatesLine": "Zählungen, Perzentile und Histogramme; keine einzelnen Zeilen.",
+        "levelRaw": "Schema, Aggregate und Rohzeilen",
+        "levelRawLine": "Logzeilen, Span-Attribute und Beispielwerte können gesendet werden.",
+        "levelSchema": "Nur Schema",
+        "levelSchemaLine": "Nur Stream- und Feldnamen; keine Werte.",
+        "notice": "Datenfreigabestufen erfordern eine neuere Server- und Agent-Version."
+      },
+      "env": {
+        "help": "Von der Bereitstellung festgelegt",
+        "notReported": "Von dieser Serverversion nicht gemeldet",
+        "setBy": "Festgelegt durch {env}"
+      },
+      "forbidden": "Sie haben keinen Zugriff auf diese Einstellung.",
+      "history": {
+        "browserBody": "Nicht geräteübergreifend geteilt. Bis zu 100 Chats pro Mitglied; werden mit den Browserdaten gelöscht.",
+        "browserTitle": "Nur im Browser jedes Mitglieds gespeichert",
+        "deleteLine": "Beim Löschen eines Chats wird er überall entfernt und seine Links werden widerrufen.",
+        "off": "Aus",
+        "on": "Ein",
+        "persistence": "Serververlauf",
+        "persistenceHelp": "In der Bereitstellung aktivieren, um Chats auf dem Server zu speichern.",
+        "publicLinks": "Öffentliche Links",
+        "publicLinksOff": "aus",
+        "publicLinksOn": "an, bis zu {days} Tag | an, bis zu {days} Tagen",
+        "retention": "Aufbewahrung",
+        "retentionDays": "{days} Tag | {days} Tage",
+        "retentionForever": "bis zur Löschung",
+        "serverTitle": "Auf dem Server gespeichert"
+      },
+      "leaveName": "the @:{'brand.autobot'} settings of {org}",
+      "offInDeployment": "@:{'brand.autobot'} is off in this deployment.",
+      "pageTitle": "@:{'brand.autobot'}",
+      "railDesc": "Status, Zugriff, Daten, Verlauf, Nutzung, Toolsets, Berechtigungen und Aktivität",
+      "status": {
+        "agentEnabled": "@:{'brand.autobot'} enabled",
+        "agentHa": "Hochverfügbarkeit",
+        "agentUrl": "Agent-Adresse",
+        "agentVersion": "Agent-Version",
+        "approvals": "Changes by @:{'brand.autobot'}",
+        "approvalsNotEnforced": "Abgelehnt: O2_AI_INTERNAL_SECRET ist nicht gesetzt, daher kann keine genehmigte Änderung angewendet werden.",
+        "checked": "Geprüft",
+        "clientError": "Der Agent hat nicht geantwortet · zuletzt in diesem Browser gesehen",
+        "configured": "Konfiguriert",
+        "dataShared": "Datenfreigabe",
+        "healthUnsupported": "Der Health Check erfordert eine neuere Serverversion.",
+        "lastError": "Letzter Fehler",
+        "lastErrorNone": "keiner",
+        "model": "Modell",
+        "modelHidden": "Für Mitglieder ausgeblendet",
+        "notSetUp": "Nicht eingerichtet",
+        "notSetUpMember": "@:{'brand.autobot'} isn't set up for this deployment. Ask an administrator.",
+        "offBody": "Von {actor} am {date} deaktiviert. Mitglieder können ihre früheren Chats weiterhin öffnen.",
+        "offBodyUnknown": "Für diese Organisation deaktiviert. Mitglieder können ihre früheren Chats weiterhin öffnen.",
+        "offForOrg": "Für diese Organisation deaktiviert",
+        "openAccess": "Zugriffseinstellungen öffnen",
+        "reachable": "Erreichbar",
+        "unreachable": "Nicht erreichbar",
+        "unreachableBody": "Members see @:{'brand.autobot'} as unavailable.",
+        "notEntitled": "Nicht in Ihrer Lizenz enthalten",
+        "notEntitledBody": "Your license doesn't include @:{'brand.autobot'}. Contact your account team."
+      },
+      "tabs": {
+        "access": "Zugriff",
+        "activity": "Aktivität",
+        "data": "Daten",
+        "history": "Verlauf",
+        "permissions": "Berechtigungen",
+        "status": "Status",
+        "toolsets": "Toolsets",
+        "usage": "Nutzung"
+      },
+      "test": {
+        "button": "Testen",
+        "failed": "Test fehlgeschlagen: {cause}",
+        "failedRow": "fehlgeschlagen · {cause} · {when}",
+        "lastTest": "Letzter Test",
+        "passed": "Test in {duration} bestanden",
+        "passedRow": "bestanden in {duration} · {when}",
+        "running": "Test läuft…",
+        "unknownCause": "kein Grund angegeben"
+      },
+      "title": "@:{'brand.autobot'}",
+      "usage": {
+        "allowance": "Credit-Kontingent",
+        "answered": "Beantwortet",
+        "caps": "Obergrenzen",
+        "capsLine": "Zusätzliche Antworten werden blockiert und nicht berechnet.",
+        "consentLine": "Kostenpflichtige Nutzung wurde nicht aktiviert. Mitglieder werden bei ihrer nächsten Antwort um Zustimmung gebeten.",
+        "exhaustedLine": "Mitglieder sehen „KI-Credits für {org} sind aufgebraucht.“",
+        "failed": "Fehlgeschlagen",
+        "longest": "Längste Antwort",
+        "managePaid": "Kostenpflichtige Nutzung verwalten",
+        "notMetered": "Diese Bereitstellung wird nicht nach Verbrauch abgerechnet.",
+        "perMember": "Aktive Antworten pro Mitglied",
+        "perNode": "Aktive Antworten pro Knoten",
+        "perOrg": "Aktive Antworten pro Organisation",
+        "period": "Dieser Abrechnungszeitraum",
+        "stopped": "Gestoppt",
+        "turns": "Runden"
+      },
+      "voice": {
+        "browser": "Im Browser",
+        "browserHelp": "Die meisten Browser senden Audio an den Sprachdienst ihres Anbieters.",
+        "help": "Mitglieder können diktieren und den Text vor dem Senden bearbeiten.",
+        "localOnly": "In diesem Browser gespeichert, nur für Sie.",
+        "off": "Aus",
+        "offHelp": "Niemand kann in diesem Browser diktieren.",
+        "readOnly": "Server-Spracherkennung erfordert eine neuere Serverversion.",
+        "title": "Sprachdiktat"
+      }
+    },
+    "runs": {
+      "agent": {
+        "general": "{product}",
+        "investigator": "@:{'brand.autobotInvestigate'}",
+        "queryBuilder": "Abfrage-Generator"
+      },
+      "chatInOrg": "Ein Chat in {org}",
+      "review": "Überprüfen",
+      "stop": "Stoppen",
+      "summary": {
+        "answering": "{count} antworten",
+        "needs": "{count} braucht dich | {count} brauchen dich"
+      },
+      "state": {
+        "reconnecting": "Verbindung wird wiederhergestellt"
+      }
+    },
+    "share": {
+      "allOrgAdminOnly": "Nur Organisationsadministratoren können alle geteilten Chats sehen.",
+      "allLinks": "Alle geteilten Links",
+      "anotherLink": "Weiteren Link erstellen",
+      "attachmentHidden": "Anhang ausgeblendet",
+      "attachmentsHiddenTag": "Anhänge ausgeblendet",
+      "attachmentsIncluded": "Angehängte Zeilen und Bilder sind in diesem Link enthalten.",
+      "changeExpiry": "Ablauf ändern",
+      "changeExpiryFor": "Ablauf für {title} ändern",
+      "changeSettings": "Einstellungen ändern",
+      "content": "Inhalt",
+      "copied": "Link kopiert",
+      "copyLink": "Link kopieren",
+      "copyLinkFor": "Link für {title} kopieren",
+      "createAndCopy": "Link erstellen und kopieren",
+      "createLiveAndCopy": "Live-Link erstellen und kopieren",
+      "createdNotCopied": "Link erstellt. Das Kopieren wurde blockiert, daher wird der Link zum Kopieren angezeigt.",
+      "createdNotCopiedMenu": "Link erstellt, aber das Kopieren wurde blockiert. Öffnen Sie „Links verwalten“, um ihn zu kopieren.",
+      "createFailed": "Link konnte nicht erstellt werden",
+      "created": "Link erstellt",
+      "createdCopied": "Link erstellt und kopiert",
+      "createdToast": "Link kopiert. Personen in {org} mit Zugriff auf geteilte Chats können ihn öffnen.",
+      "empty": {
+        "all": "In dieser Organisation werden keine Chats geteilt.",
+        "mine": "Sie haben noch keine Chats geteilt."
+      },
+      "expires": "Läuft ab",
+      "expiresOn": "Läuft ab {time}",
+      "forbidden": "Sie haben keine Berechtigung, Chats zu teilen.",
+      "hideAttachments": "Anhänge ausblenden",
+      "hideTools": "Tool-Daten ausblenden",
+      "hideToolsFor": "Tool-Daten für {title} ausblenden",
+      "historyUnavailable": "Der Verlauf dieses Chats kann derzeit nicht geladen werden, daher kann er nicht geteilt werden.",
+      "link": "Link",
+      "liveFollows": "Live, folgt neuen Nachrichten",
+      "liveMode": "Live",
+      "loadFailed": "Ihre Links konnten nicht geladen werden",
+      "manage": "Link verwalten",
+      "managerTitle": "Geteilte Links",
+      "never": "Nie",
+      "noStoredMessages": "Dieser Chat hat noch keine gespeicherten Nachrichten, daher kann er nicht geteilt werden.",
+      "notSavedBlocked": "Die letzte Antwort dieses Chats ist nicht gespeichert, daher kann er noch nicht geteilt werden.",
+      "nothingToShare": "Senden Sie zuerst eine Nachricht",
+      "offline": "Sie sind offline",
+      "openFailed": "Chat konnte nicht geöffnet werden",
+      "org": "Organisation",
+      "outOfDateTag": "Veraltet",
+      "public": "Alle mit dem Link",
+      "publicMax": "Öffentliche Links verfallen innerhalb von {days} Tagen",
+      "publicNeedsAttachmentRedaction": "Öffentliche Links können auf diesem Server noch keine Anhänge ausblenden.",
+      "publicOff": "Öffentliche Links sind für diese Bereitstellung deaktiviert.",
+      "redactTools": "Tool-Eingaben und -Ausgaben ausblenden",
+      "reviewTooltip": "Prüfen Sie, was dieser Link enthält, bevor Sie ihn teilen.",
+      "revoke": "Widerrufen",
+      "revokeConfirm": "Diesen Link widerrufen? Personen, die ihn haben, verlieren sofort den Zugriff.",
+      "revokeFailed": "Link konnte nicht widerrufen werden",
+      "revokeFor": "Link für {title} widerrufen",
+      "revoked": "Link widerrufen",
+      "rowMenu": "Link-Aktionen für {title}",
+      "scope": {
+        "all": "Alle in der Organisation",
+        "mine": "Meine"
+      },
+      "scopeLabel": "Links anzeigen",
+      "share": "Teilen",
+      "shared": "Geteilt",
+      "sharedBy": "Geteilt von {name}",
+      "sharedOrg": "Mit Ihrer Organisation geteilt",
+      "sharedPublic": "Mit allen geteilt, die den Link haben",
+      "show": "Anzeigen",
+      "showTools": "Tool-Daten anzeigen",
+      "showToolsConfirm": "Tool-Eingaben und -Ausgaben für alle mit diesem Link anzeigen?",
+      "showToolsFor": "Tool-Daten für {title} anzeigen",
+      "snapshot": "Snapshot",
+      "snapshotAsOf": "Snapshot · Stand {time}",
+      "snapshotNow": "Snapshot des Chats im aktuellen Zustand",
+      "snapshotWaits": "Verfügbar, wenn die Antwort abgeschlossen ist",
+      "snapshotUpdated": "Snapshot aktualisiert",
+      "switchLive": "Zu Live wechseln",
+      "switchLiveFor": "{title} auf Live umstellen",
+      "switchSnapshot": "Zu Snapshot wechseln",
+      "switchSnapshotFor": "{title} auf Snapshot umstellen",
+      "title": "Chat teilen",
+      "toolsHidden": "Tools ausgeblendet",
+      "tooltip": "Teilen Sie einen Snapshot mit Ihrer Organisation. Tool-Daten bleiben ausgeblendet.",
+      "updateBlocked": "Beenden oder stoppen Sie zuerst die Antwort",
+      "updateBlockedRow": "Warten Sie, bis die Antwort abgeschlossen ist",
+      "updateFailed": "Link konnte nicht aktualisiert werden",
+      "updateSnapshot": "Snapshot aktualisieren",
+      "updateSnapshotFor": "Snapshot für {title} aktualisieren",
+      "views": "{count} Aufruf | {count} Aufrufe",
+      "visibilityFixed": "Um zu ändern, wer ihn öffnen kann, erstellen Sie einen neuen Link.",
+      "waitForAnswer": "Warten Sie, bis die Antwort abgeschlossen ist, um einen Snapshot zu teilen. Live-Links finden Sie in den Freigabeeinstellungen.",
+      "who": "Wer kann öffnen",
+      "whoContinue": "Auch das Fortsetzen in eigenen Chats erfordert KI-Zugriff.",
+      "whoOrg": "Personen in {org} mit Zugriff auf geteilte Chats können ihn lesen.",
+      "whoPublic": "Alle mit dem Link können ihn lesen.",
+      "changedSince": "Seit dem Snapshot geändert",
+      "readersNeedAccess": "Zum Fortsetzen ist für Leser KI-Zugriff erforderlich.",
+      "yourOrg": "Ihre Organisation"
+    },
+    "shared": {
+      "attachmentsHidden": "Anhänge wurden vom Besitzer ausgeblendet.",
+      "backoff": "Prüfung jede Minute",
+      "brand": "Aus OpenObserve geteilt",
+      "brandHome": "OpenObserve-Startseite",
+      "by": "Geteilt von {name}",
+      "continue": "In meinen Chats fortsetzen",
+      "continueAgain": "Erneut fortsetzen",
+      "continueLocked": "Sie können diesen Chat lesen. Zum Fortsetzen ist KI-Zugriff erforderlich — wenden Sie sich an einen Administrator.",
+      "copied": "Kopiert",
+      "copyMarkdown": "Als Markdown kopieren",
+      "goToApp": "Zu OpenObserve wechseln",
+      "goToChats": "Zu meinen Chats",
+      "live": "Live · letzte Änderung {time}",
+      "loadFailed": "Dieser geteilte Chat konnte nicht geladen werden",
+      "markdownYou": "Sie",
+      "more": "Weitere Aktionen",
+      "notFound": {
+        "body": "Der Link ist möglicherweise falsch, widerrufen oder abgelaufen, oder der Chat wurde gelöscht.",
+        "title": "Dieser geteilte Chat ist nicht verfügbar"
+      },
+      "offline": "Sie sind offline · Anzeige des Stands von {time}",
+      "offlineTitle": "Sie sind offline",
+      "openApp": "OpenObserve öffnen",
+      "openCopy": "Meine Kopie öffnen",
+      "openCopyTooltip": "Öffnet die Kopie, die Sie in diesem Browser fortgesetzt haben",
+      "openMine": "In meinen Chats öffnen",
+      "ossTitle": "Geteilte Chats sind Teil von OpenObserve Enterprise und Cloud",
+      "owner": "Besitzer",
+      "rateLimited": "Zu viele Leser gerade · erneute Prüfung in {seconds} s",
+      "redacted": "Tool-Eingaben und -Ausgaben wurden vom Besitzer ausgeblendet. Sie sehen die Antworten und welche Tools ausgeführt wurden.",
+      "running": "Antwortet noch · gestartet {ago} · aktualisiert sich selbst",
+      "signIn": "Anmelden, um in OpenObserve fortzufahren",
+      "snapshot": "Snapshot vom {time}",
+      "streamHidden": "Einige Belege sind ausgeblendet, da sie aus Streams stammen, auf die Sie keinen Zugriff haben.",
+      "streamHiddenBlock": "Ausgeblendet · Sie haben keinen Zugriff auf Stream {stream}",
+      "truncated": "Die frühesten Nachrichten sind nicht enthalten, weil der Chat zu groß ist, um vollständig geteilt zu werden.",
+      "truncatedDivider": "Frühere Nachrichten nicht enthalten",
+      "updated": "Mit neuen Nachrichten aktualisiert"
+    },
+    "shell": {
+      "answeringElsewhere": "Antwortet in einem anderen Tab",
+      "answeringElsewherePolling": "Antwortet weiterhin in einem anderen Tab",
+      "answeringHerePolling": "Antwortet weiterhin",
+      "approvalElsewhere": "Wartet in einem anderen Tab auf Ihre Genehmigung",
+      "approvalNotAnswerableHere": "Wartet in einem anderen Tab auf Ihre Genehmigung",
+      "close": "{product} schließen",
+      "deletedElsewhere": "Dieser Chat wurde an anderer Stelle gelöscht",
+      "deletedInAnotherTab": "Dieser Chat wurde in einem anderen Tab gelöscht",
+      "discardChanges": "Änderungen verwerfen",
+      "dockTooNarrow": "In der Seitenleiste geöffnet: Dieser Editor ist zu schmal für einen angedockten Chat",
+      "keep": "Behalten",
+      "keepEditing": "Weiter bearbeiten",
+      "leaveGuardBody": "Beim Verlassen werden Ihre Änderungen an {name} verworfen.",
+      "leaveGuardThisAlert": "dieser Alarm",
+      "leaveGuardThisPattern": "dieses Muster",
+      "leaveGuardTitle": "Nicht gespeicherte Änderungen",
+      "loadFailed": "Dieser Chat konnte nicht geladen werden",
+      "loadingChat": "Ihr Chat wird geladen…",
+      "newChat": "Neuer Chat",
+      "notFound": "Dieser Chat ist nicht verfügbar",
+      "orgSwitchRunningBody": "{count} Antwort wird in {org} noch ausgeführt. Anhalten oder dort weiterlaufen lassen? | {count} Antworten werden in {org} noch ausgeführt. Anhalten oder dort weiterlaufen lassen?",
+      "orgSwitchRunningTitle": "In {org} werden noch Antworten ausgeführt",
+      "orgSwitchWithdrawn": "Behalten zieht {count} ausstehende Genehmigung zurück. | Behalten zieht {count} ausstehende Genehmigungen zurück.",
+      "otherAccount": "Ein anderes Konto ist angemeldet. Zum Fortfahren neu laden.",
+      "placeDock": "Neben dem Editor",
+      "placeWindow": "Schwebend",
+      "prefersWindowHint": "Diese Seite behält ihre Breite mit einem schwebenden Fenster",
+      "refresh": "Aktualisieren",
+      "reload": "Neu laden",
+      "resetWidth": "Breite zurücksetzen",
+      "resizeHandle": "Assistentengröße ändern",
+      "resizeHandleValue": "{width} rem",
+      "sheetExpand": "Mehr anzeigen",
+      "sheetPeek": "Weniger anzeigen",
+      "sheetSnap": {
+        "full": "Volle Höhe",
+        "half": "Halbe Höhe",
+        "peek": "Eingeklappt"
+      },
+      "signOutRunningBody": "{count} Antwort wird noch ausgeführt. Beim Abmelden wird sie angehalten. | {count} Antworten werden noch ausgeführt. Beim Abmelden werden sie angehalten.",
+      "signOutRunningTitle": "Antworten werden noch ausgeführt",
+      "signedOutElsewhere": "Sie haben sich in einem anderen Tab abgemeldet.",
+      "skipLink": "Zu {product} springen",
+      "startNewChat": "Neuen Chat starten",
+      "stillRunningRefresh": "Wird noch ausgeführt. Zum erneuten Prüfen aktualisieren.",
+      "stop": "Anhalten",
+      "stopAndSignOut": "Anhalten und abmelden",
+      "width": "Breite",
+      "widthDefault": "Standard",
+      "widthExpanded": "Erweitert",
+      "widthExpandedHint": "Die Hälfte des Fensters",
+      "widthLimit": "Breitengrenze erreicht",
+      "widthNarrower": "Schmaler",
+      "widthNoRoom": "Bei dieser Fenstergröße ist nicht genug Platz",
+      "widthWider": "Breiter",
+      "loadFailedAgain": "Dieser Chat konnte weiterhin nicht geladen werden · Versuch um {time}",
+      "openAs": "Öffnen als",
+      "sidePanel": "Seitenbereich",
+      "fullPage": "Ganze Seite",
+      "newChatFullPage": "Neuer Chat auf ganzer Seite",
+      "popOut": "Schwebendes Fenster"
+    },
+    "tray": {
+      "close": "{title} schließen"
+    },
+    "window": {
+      "dropSidebar": "Als Seitenleiste anheften",
+      "dropTray": "Minimieren",
+      "gripMove": "{title} verschieben oder Größe ändern",
+      "gripResize": "Größe von {title} ändern",
+      "minimise": "In den Infobereich minimieren",
+      "moveKeyboard": "Mit Tastatur verschieben",
+      "moveModeHint": "Pfeiltasten verschieben · Umschalt+Pfeiltasten Größe ändern · Eingabetaste platzieren · Esc abbrechen",
+      "name": "{product}, {title}",
+      "narrower": "Schmaler",
+      "resetSize": "Größe zurücksetzen",
+      "resizeKeyboard": "Mit Tastatur Größe ändern",
+      "resizeModeHint": "Pfeiltasten ändern die Größe · Eingabetaste übernehmen · Esc abbrechen",
+      "shorter": "Kürzer",
+      "sizeLimit": "Größenlimit erreicht",
+      "taller": "Höher",
+      "wider": "Breiter",
+      "stillAnswering": "{title} antwortet noch",
+      "close": "Fenster schließen"
+    },
+    "signout": {
+      "deleteLocal": "Auch meine Browser-Chats auf diesem Gerät löschen"
+    },
+    "step": {
+      "create": "{resource} wird erstellt",
+      "delete": "{resource} wird gelöscht",
+      "done": "Fertig",
+      "failed": "Fehlgeschlagen",
+      "fallback": "{tool} wird ausgeführt",
+      "GetAlert": "Alarm wird gelesen",
+      "GetAlertHistory": "Alarmverlauf wird gelesen",
+      "GetCurrentServiceGraphTopology": "Service-Graph wird gelesen",
+      "GetDashboard": "Dashboard wird gelesen",
+      "GetLatestTraces": "Neueste Traces werden gelesen",
+      "interrupted": "Unterbrochen",
+      "ListAlerts": "Alarme werden aufgelistet",
+      "ListDashboards": "Dashboards werden aufgelistet",
+      "ListDestinations": "Ziele werden aufgelistet",
+      "ListIncidents": "Vorfälle werden aufgelistet",
+      "running": "Wird ausgeführt",
+      "SearchAlerts": "Alarme werden durchsucht",
+      "SearchPromQL": "Metriken werden abgefragt",
+      "SearchSQL": "{stream} wird abgefragt",
+      "StreamList": "Streams werden aufgelistet",
+      "StreamSchema": "Schema für {stream} wird gelesen",
+      "TraceSearch": "Traces werden durchsucht",
+      "update": "{resource} wird aktualisiert"
+    },
+    "steps": {
+      "exit": "Beendet: {code}",
+      "failedCount": "{count} fehlgeschlagen",
+      "fields": "{count} Feld | {count} Felder",
+      "hiddenByOwner": "{count} Schritt vom Eigentümer ausgeblendet | {count} Schritte vom Eigentümer ausgeblendet",
+      "inputEvents": "{count} Eingabeereignis | {count} Eingabeereignisse",
+      "lines": "{count} Zeile | {count} Zeilen",
+      "outputTruncated": "Ausgabe gekürzt",
+      "rowName": "{step}, {state}",
+      "rows": "{count} Zeile | {count} Zeilen",
+      "stderrLines": "stderr {count} Zeile | stderr {count} Zeilen",
+      "step": {
+        "created": "Erstellt: {resource}",
+        "deleted": "Gelöscht: {resource}",
+        "listed": "Streams aufgelistet",
+        "queried": "{stream} abgefragt",
+        "queriedMetrics": "Metriken abgefragt",
+        "queryFailed": "Abfrage fehlgeschlagen",
+        "ran": "{command} ausgeführt",
+        "ranTool": "{tool} ausgeführt",
+        "schema": "Schema für {stream} gelesen",
+        "searchedTraces": "Traces durchsucht",
+        "toolFailed": "{tool} fehlgeschlagen",
+        "tools": {
+          "ListIncidents": "Vorfälle aufgelistet",
+          "ListAlerts": "Alarme aufgelistet",
+          "SearchAlerts": "Alarme durchsucht",
+          "GetAlert": "Alarm gelesen",
+          "GetAlertHistory": "Alarmverlauf gelesen",
+          "ListDestinations": "Ziele aufgelistet",
+          "ListDashboards": "Dashboards aufgelistet",
+          "GetDashboard": "Dashboard gelesen",
+          "GetLatestTraces": "Neueste Traces gelesen",
+          "GetCurrentServiceGraphTopology": "Service-Graph gelesen"
+        },
+        "updated": "Aktualisiert: {resource}"
+      },
+      "stoppedBeforeFinish": "vor Abschluss beendet",
+      "streams": "{count} Stream | {count} Streams",
+      "summary": "{count} Schritt | {count} Schritte",
+      "window": "{from} → {to}",
+      "windowShowing": "{from} → {to} · {shown} von {total} Zeilen angezeigt"
+    },
+    "strip": {
+      "review": "Überprüfungsanfrage",
+      "reviewExpires": "Überprüfungsanfrage · läuft in {time} ab",
+      "reviewLabel": "Überprüfen"
+    },
+    "thread": {
+      "delete": "Chat löschen",
+      "download": "Herunterladen",
+      "downloadJson": "JSON",
+      "downloadMarkdown": "Markdown",
+      "draftKept": "Ihr Entwurf wird in „{title}“ aufbewahrt",
+      "historyUnavailable": "Verlauf nicht verfügbar",
+      "keepsAnswering": "„{title}“ antwortet weiter",
+      "loadToContinue": "Chat laden, um fortzufahren",
+      "newAnnounce": "Neuer Chat",
+      "newChat": "Neuer Chat",
+      "alreadyNew": "Dieser Chat ist bereits neu",
+      "windowsFull": "Einen Chat schließen, um einen neuen zu starten",
+      "newChatTitle": "Neuer Chat",
+      "notSaved": "Nicht gespeichert",
+      "pin": "Anheften",
+      "rename": "Umbenennen",
+      "renameFailed": "Chat konnte nicht umbenannt werden",
+      "renameLabel": "Chat-Titel",
+      "renameChat": "Chat umbenennen",
+      "renamed": "Umbenannt",
+      "thisChat": "Dieser Chat",
+      "renaming": "Wird umbenannt…",
+      "titleCounter": "{count}/200",
+      "unpin": "Nicht mehr anheften",
+      "allChats": "Alle Chats",
+      "moreChats": "{count} weitere",
+      "noOtherChats": "Noch keine weiteren Chats",
+      "newChatAbout": "Neuer Chat zu {object}",
+      "titleName": "{title}, Chats und Chat-Aktionen",
+      "titleNameNeeds": "{title}, Chats und Chat-Aktionen, {count} weiterer Chat wartet auf Sie | {title}, Chats und Chat-Aktionen, {count} weitere Chats warten auf Sie",
+      "titleNameAnswering": "{title}, Chats und Chat-Aktionen, {count} weiterer Chat antwortet gerade | {title}, Chats und Chat-Aktionen, {count} weitere Chats antworten gerade",
+      "titleTooltip": "{title} · {summary}",
+      "toolbar": {
+        "more": "Weitere Aktionen",
+        "newChat": "Neuer Chat",
+        "openAs": "Öffnen als"
+      }
+    },
+    "toolsets": {
+      "add": "Neues Toolset",
+      "clash": "Namenskonflikt",
+      "clashTip": "Both reach @:{'brand.autobot'} as {agent}; one hides the other.",
+      "columns": {
+        "actions": "Aktionen",
+        "enabled": "Aktiviert",
+        "kind": "Art",
+        "lastUsed": "Zuletzt verwendet",
+        "name": "Name",
+        "status": "Status"
+      },
+      "deleteFailed": "{name} konnte nicht gelöscht werden.",
+      "deleteMessage": "Für {product} und die Vorfallanalyse ist dieses Tool ab der nächsten Antwort nicht mehr verfügbar.",
+      "deleteNamed": "{name} löschen",
+      "deleteTitle": "{name} löschen?",
+      "deleted": "{name} gelöscht",
+      "editNamed": "{name} bearbeiten",
+      "empty": "Add an MCP server or a skill @:{'brand.autobot'} can use.",
+      "emptyTitle": "Noch keine Toolsets",
+      "enableFailed": "{name} konnte nicht aktualisiert werden.",
+      "enabledFor": "Aktiviert, {name}",
+      "form": {
+        "added": "Toolset hinzugefügt",
+        "agentName": "@:{'brand.autobot'} calls this {agent}",
+        "back": "Zurück zu den Toolsets",
+        "descriptionHelp": "Beschreiben Sie, was es tut und wann es verwendet werden soll.",
+        "descriptionLabel": "What @:{'brand.autobot'} should use this tool for",
+        "editTitle": "Toolset bearbeiten",
+        "enterAgain": "Wert erneut eingeben",
+        "wholeNumber": "Geben Sie eine ganze Zahl größer als 0 ein",
+        "insertTemplate": "Vorlage einfügen",
+        "kindLocked": "Die Art kann nach dem Erstellen nicht geändert werden.",
+        "leaveName": "wird in {org} zu {name}",
+        "loadFailed": "Dieses Toolset konnte nicht geladen werden.",
+        "maskValue": "Ein beibehaltenes Geheimnis wird als *** gesendet. Geben Sie den echten Wert ein.",
+        "mcpSection": "MCP-Server",
+        "nameClash": "Another toolset already reaches @:{'brand.autobot'} as {agent}",
+        "newTitle": "Neues Toolset",
+        "reenterDestination": "Geben Sie jedes Geheimnis erneut ein, bevor Sie eine geänderte URL speichern.",
+        "reenterRefused": "Der Server hat die gespeicherten Geheimnisse für diese Änderung verworfen. Geben Sie jedes Geheimnis erneut ein, und speichern Sie dann.",
+        "reenterSecret": "Die gespeicherten Geheimnisse können nicht neben einem neuen oder ersetzten beibehalten werden. Geben Sie jedes Geheimnis vor dem Speichern erneut ein.",
+        "retypeNotice": "Diese Serverversion erfordert, dass Sie beim Speichern jedes Geheimnis erneut eingeben.",
+        "saveFailed": "Das Toolset konnte nicht gespeichert werden.",
+        "skillTemplate": "## Verwendung\n\n## Schritte\n\n## Beispiele\n",
+        "updated": "Toolset aktualisiert"
+      },
+      "healthUnsupported": "Status, letzte Verwendung und Aktivierung pro Toolset erfordern eine neuere Serverversion.",
+      "kinds": {
+        "generic": "Allgemein",
+        "mcp": "MCP-Server",
+        "skill": "Skill"
+      },
+      "loadFailed": "Toolsets konnten nicht geladen werden.",
+      "mcpLine": "Um OpenObserve aus Ihrem eigenen Agenten zu verwenden, siehe {link}.",
+      "mcpLink": "MCP-Server",
+      "moreFor": "Weitere Aktionen für {name}",
+      "notSetUp": "Toolsets take effect once @:{'brand.autobot'} is set up.",
+      "runtimeRule": "Wird von {product} und der Vorfallanalyse verwendet.",
+      "search": "Toolsets durchsuchen",
+      "secret": {
+        "hide": "Wert ausblenden",
+        "keep": "Aktuelles beibehalten",
+        "keyLocked": "Ersetzen Sie den Wert, um umzubenennen",
+        "remove": "Entfernen",
+        "removeHeader": "Header {key} entfernen",
+        "replace": "Ersetzen",
+        "show": "Wert anzeigen",
+        "unchanged": "Unverändert",
+        "willReplace": "Wird beim Speichern ersetzt"
+      },
+      "status": {
+        "disabled": "Deaktiviert",
+        "failing": "Fehlerhaft",
+        "failingNow": "Fehlerhaft seit gerade eben · {cause}",
+        "failingNowPlain": "Fehlerhaft seit gerade eben",
+        "failingSince": "Fehlerhaft seit {when}",
+        "never": "Nie verwendet",
+        "ok": "OK",
+        "okIn": "OK · {ms} ms"
+      },
+      "test": "Testen",
+      "testFailed": "Test für {name} fehlgeschlagen: {cause}",
+      "testFailedPlain": "Test für {name} fehlgeschlagen",
+      "testFailedRequest": "der Test konnte nicht ausgeführt werden",
+      "testNamed": "{name} testen",
+      "testPassed": "Test für {name} in {ms} ms bestanden",
+      "testUnsupported": "Testen erfordert eine neuere Serverversion",
+      "testing": "Wird getestet",
+      "viewOnly": "Nur Ansicht. Bearbeiten erfordert die Berechtigung für Toolsets."
+    },
+    "transcript": {
+      "answerName": "{agent}, Antwort auf {prompt}",
+      "earlierCount": "{count} frühere Nachricht | {count} frühere Nachrichten",
+      "followUps": "Nachfragen",
+      "name": "Unterhaltung mit {product}",
+      "showEarlier": "Frühere Nachrichten anzeigen",
+      "turnLabel": "Runde {n}: {prompt}"
+    },
+    "turn": {
+      "cancelUnconfirmed": "Der Server schließt diese Antwort möglicherweise noch ab.",
+      "caughtUp": "Auf dem neuesten Stand",
+      "compacting": "Frühere Nachrichten werden zusammengefasst",
+      "connecting": "Verbinden…",
+      "continue": "Fortfahren",
+      "continuePrefill": "Fortfahren",
+      "done": "Fertig",
+      "elapsedMinutes": "{m} Min. {s} Sek.",
+      "elapsedSeconds": "{n} Sek.",
+      "elsewhere": "Antwort erfolgt in einem anderen Tab",
+      "messageRestored": "Ihre Nachricht wurde wiederhergestellt",
+      "moreRunning": "{label} und {count} weitere",
+      "noResponse": "Keine Antwort seit {n} Sek.",
+      "notSaved": "Beantwortet, aber nicht im Verlauf gespeichert.",
+      "reconnecting": "Erneut verbinden…",
+      "restored": "Dieser Chat wurde auf einen anderen Server verschoben und fortgesetzt.",
+      "retrying": "KI-Anbieter wird erneut versucht · Versuch {n}",
+      "retryingIn": "KI-Anbieter wird in {s} Sek. erneut versucht · Versuch {n}",
+      "retryNote": "Ein erneuter Versuch macht bereits vorgenommene Änderungen nicht rückgängig.",
+      "retrySave": "Speichern erneut versuchen",
+      "returnedToPrevious": "Ihre Nachricht wurde in den vorherigen Chat zurückgegeben",
+      "sending": "Senden…",
+      "sendLabel": "Nachricht senden",
+      "stopLabel": "Antwort stoppen",
+      "stopped": "Gestoppt",
+      "stoppedWithSteps": "Nach {n} Schritt gestoppt · Ergebnisse beibehalten | Nach {n} Schritten gestoppt · Ergebnisse beibehalten",
+      "stepN": "Schritt {n}",
+      "stopping": "Wird gestoppt…",
+      "thinking": "Denkt nach",
+      "thinkingAbout": "Denkt über {count} Ergebnis nach | Denkt über {count} Ergebnisse nach",
+      "waitingApproval": "Warten auf Ihre Genehmigung",
+      "waitingConsent": "Warten auf Ihre Entscheidung zur kostenpflichtigen Nutzung",
+      "withElapsed": "{status} · {elapsed}",
+      "writing": "Antwort wird geschrieben",
+      "ageDays": "{n} T",
+      "ageHours": "{n} Std.",
+      "connectionLost": "Verbindung verloren. Die obige Antwort ist unvollständig.",
+      "confidence": {
+        "high": "Hohe Konfidenz",
+        "inconclusive": "Nicht eindeutig",
+        "low": "Niedrige Konfidenz",
+        "medium": "Mittlere Konfidenz"
+      },
+      "continueDraft": "Die obige Antwort fortsetzen",
+      "dataAge": "Daten von vor {age}",
+      "rerun": "Erneut ausführen",
+      "stoppedAfter": "Nach {n} Schritt gestoppt, unvollständig | Nach {n} Schritten gestoppt, unvollständig",
+      "stoppedIncomplete": "Gestoppt, unvollständig"
+    },
+    "voice": {
+      "allowTitle": "Mikrofon zulassen",
+      "allowBody": "Klicken Sie auf das Schloss in der Adressleiste, erlauben Sie das Mikrofon und laden Sie diese Seite dann neu.",
+      "cancelled": "Diktat abgebrochen.",
+      "continue": "Weiter",
+      "dictate": "Diktieren",
+      "engine": {
+        "apple": "Safari wandelt Sprache mit dem Sprachdienst von Apple in Text um.",
+        "device": "Ihr Browser wandelt Sprache auf diesem Gerät in Text um.",
+        "google": "Chrome wandelt Sprache mit dem Sprachdienst von Google in Text um.",
+        "microsoft": "Edge wandelt Sprache mit dem Sprachdienst von Microsoft in Text um.",
+        "vendor": "Der Sprachdienst Ihres Browsers wandelt Sprache in Text um."
+      },
+      "enterToSend": "Zum Senden erneut die Eingabetaste drücken.",
+      "error": {
+        "how": "So lassen Sie es zu",
+        "mic_denied": "Der Mikrofonzugriff ist für diese Website blockiert.",
+        "no_mic": "Kein Mikrofon gefunden. Schließen Sie eines an und versuchen Sie es erneut.",
+        "no_speech": "Es wurde nichts gehört. Versuchen Sie es erneut.",
+        "service_unreachable": "Der Sprachdienst von {vendor} ist nicht erreichbar.",
+        "service_unreachable_generic": "Der Sprachdienst Ihres Browsers ist nicht erreichbar.",
+        "stt_unavailable": "Sprache-zu-Text wurde beendet. Das bereits Gehörte bleibt erhalten.",
+        "time_limit": "Das Diktat endet nach 2 Minuten. Drücken Sie auf das Mikrofon, um fortzufahren."
+      },
+      "listening": "Hört zu",
+      "notNow": "Nicht jetzt",
+      "primerBody": "Es wird nichts gesendet, bis Sie auf Senden drücken.",
+      "primerEngine": "{engineSentence} OpenObserve speichert die Audiodaten nicht.",
+      "primerTitle": "In die Nachricht diktieren",
+      "holdLine": "Zum Beenden {keys} loslassen.",
+      "started": "Hört zu. Eingabetaste sendet; Escape oder das Mikrofon beendet das Diktat.",
+      "stopTooltip": "Diktat beenden",
+      "stopped": "Diktat beendet. {count} Wort hinzugefügt. | Diktat beendet. {count} Wörter hinzugefügt.",
+      "stoppedEnter": "Diktat beendet. {count} Wort hinzugefügt. Zum Senden die Eingabetaste drücken. | Diktat beendet. {count} Wörter hinzugefügt. Zum Senden die Eingabetaste drücken.",
+      "tooltip": "Diktieren · {keys} gedrückt halten",
+      "tryAgain": "Erneut versuchen",
+      "waitingPermission": "Warten auf Berechtigung",
+      "waitingShort": "Warten",
+      "allowPrompt": "Erlauben Sie das Mikrofon im Browser-Dialog.",
+      "privacy": "Ihr Browser kann Audiodaten an seinen Anbieter senden.",
+      "processing": "Wird abgeschlossen",
+      "offAdmin": "Diktat ist in diesem Browser deaktiviert.",
+      "silent": "Ihr Browser hat Sprache nicht in Text umgewandelt. Laden Sie die Seite neu, um es erneut zu versuchen.",
+      "language": "Diktat ist in {language}, der Sprache Ihres Browsers, nicht verfügbar."
+    },
+    "welcome": {
+      "lastRange": "letzte {period}",
+      "launcher": {
+        "ask": "Fragen",
+        "inputName": "{product} fragen",
+        "recentThreads": "Letzte Chats",
+        "askEmpty": "Geben Sie eine Frage ein oder hängen Sie ein Bild an, um zu fragen"
+      },
+      "prefill": {
+        "append": "Anhängen",
+        "cancel": "Abbrechen",
+        "question": "Entwurf durch den Vorschlag ersetzen?",
+        "replace": "Ersetzen"
+      },
+      "starter": {
+        "otherToolToO2": "Abfrage aus einem anderen Tool in OpenObserve SQL umwandeln",
+        "mapStreamSchema": "Schema von `{stream}` zuordnen",
+        "alerts": {
+          "1": "Welche Alarme wurden in den letzten 24 Stunden am häufigsten ausgelöst?",
+          "2": "Entwirf einen Alarm für Fehler in `{stream}`",
+          "2Generic": "Entwirf einen Alarm für Fehler"
+        },
+        "dashboard": {
+          "1": "Was hat sich an \"{dashboard}\" in den letzten {range} geändert?",
+          "2": "Erkläre das Panel mit der größten Änderung",
+          "1Generic": "Was hat sich an diesem Dashboard kürzlich geändert?"
+        },
+        "function": {
+          "1": "Schreibe VRL, um JSON aus dem Feld `message` zu parsen",
+          "2": "Erkläre, was diese Funktion macht"
+        },
+        "home": {
+          "attention": "Was erfordert gerade Aufmerksamkeit?",
+          "errorsSummary": "Fasse Fehler in `{stream}` zusammen",
+          "slowSpans": "Welche Services hatten in der letzten Stunde die langsamsten Spans?",
+          "service": "Warum ist {service} {signal}?",
+          "incident": "Was hat {title} verursacht?",
+          "noAlert": "Welcher Alarm sollte {service}-Fehler abdecken?",
+          "ingest": {
+            "logs": "Wie sende ich meine ersten Logs?",
+            "traces": "Wie sende ich Traces?",
+            "metrics": "Wie sende ich Metriken?"
+          },
+          "signal": {
+            "errors": "fehlerhaft",
+            "latency": "langsam"
+          }
+        },
+        "ingest": {
+          "1": "Zeig mir, wie ich Logs aus meiner App sende",
+          "2": "Datenerfassung für Kubernetes einrichten",
+          "3": "Was kannst du tun, sobald Daten ankommen?"
+        },
+        "jsonEditor": {
+          "2": "Prüfe dieses JSON auf Fehler",
+          "alert": "Erkläre die Bedingungen dieses Alarms",
+          "pipeline": "Erkläre, was diese Pipeline macht"
+        },
+        "learn": "Was kannst du tun?",
+        "logs": {
+          "1": "Warum sind die Fehler in `{stream}` in den letzten {range} stark angestiegen?",
+          "2": "Fasse zusammen, was gerade in `{stream}` ist",
+          "1Generic": "Warum sind die Fehler in meinen Logs kürzlich stark angestiegen?",
+          "2Generic": "Fasse zusammen, was gerade in meinen Logs ist"
+        },
+        "metrics": {
+          "1": "Schreibe PromQL für die p95-Latenz von `{metric}`",
+          "2": "Welche Metriken melden keine Werte mehr?",
+          "1Generic": "Schreibe PromQL für die p95-Latenz"
+        },
+        "recent": "\"{title}\" fortsetzen",
+        "regex": {
+          "1": "Schreibe ein Muster, das E-Mail-Adressen maskiert",
+          "2": "Teste dieses Muster an aktuellen Zeilen aus `{stream}`",
+          "2Generic": "Teste dieses Muster an aktuellen Zeilen"
+        },
+        "sqlEditor": {
+          "1": "Schreibe SQL für Fehler pro Service über 5 % in der letzten Stunde",
+          "2": "Prüfe diese Abfrage gegen `{stream}`",
+          "2Generic": "Prüfe diese Abfrage"
+        },
+        "traces": {
+          "1": "Welche Services hatten in den letzten {range} die langsamsten Spans?",
+          "1Generic": "Welche Services hatten kürzlich die langsamsten Spans?"
+        }
+      },
+      "viewAll": "Alle anzeigen",
+      "whatCanYouDo": "Was kannst du tun?"
+    },
+    "rca": {
+      "tag": "Vorfallanalyse",
+      "prompt": "Erkläre diesen Bericht zur Vorfallanalyse",
+      "incidentPrompt": "Erkläre diesen Vorfall",
+      "reportChip": "{run} · {size}",
+      "runAnalysis": "Analyse ausführen",
+      "status": {
+        "starting": "Analyse wird gestartet… {elapsed}",
+        "analysing": "Analyse läuft · {elapsed}"
+      }
+    },
+    "oncall": {
+      "continue": "Continue in @:{'brand.autobot'}"
+    },
+    "autoobserve": {
+      "askChip": "AutoObserve-Anfrage · {name}",
+      "continueTooltip": "Öffnet {product} mit dieser Anfrage"
+    },
+    "agent": {
+      "o2": {
+        "name": "{product}",
+        "purpose": "Beantwortet Fragen und hilft bei Aufgaben"
+      },
+      "investigator": {
+        "name": "@:{'brand.autobotInvestigate'}",
+        "purpose": "Findet Ursachen"
+      },
+      "queryBuilder": {
+        "name": "Abfrage-Generator",
+        "purpose": "Schreibt Abfragen"
+      },
+      "policy": {
+        "readOnly": "Schreibgeschützt"
+      },
+      "picker": {
+        "choose": "Agent auswählen",
+        "heading": "Agent"
+      },
+      "unavailable": {
+        "role": "Nicht verfügbar · Administrator fragen",
+        "short": "Nicht verfügbar",
+        "disabled": "Für diese Organisation deaktiviert",
+        "unreachable": "Derzeit nicht erreichbar · geprüft {time}",
+        "unreachableNow": "Derzeit nicht erreichbar"
+      },
+      "announceChosen": "{agent} antwortet.",
+      "pendingSwitch": "{agent} antwortet ab jetzt. Frühere Antworten bleiben erhalten.",
+      "clause": "{purpose} · {policy}"
+    },
+    "handoff": {
+      "marker": "Von Ihnen an {agent} übergeben · {time}",
+      "markerUntimed": "Von Ihnen an {agent} übergeben",
+      "given": "Was übergeben wurde",
+      "givenTurns": "Dieser Chat bisher: {questions} Fragen, {answers} Antworten",
+      "givenContext": "Kontext: {chips}",
+      "notCarried": "Nicht übernommen: {items}",
+      "notCarriedApproval": "die ausstehende Genehmigung",
+      "announce": "An {agent} übergeben.",
+      "suggest": {
+        "title": {
+          "o2": "{agent} kann ab hier übernehmen",
+          "investigator": "{agent} kann nach der Ursache suchen",
+          "queryBuilder": "{agent} kann diese Abfrage schreiben"
+        },
+        "body": "Es kann einige Minuten dauern.",
+        "bodyMetered": "Es kann einige Minuten dauern · Verbraucht KI-Credits",
+        "accept": "An {agent} übergeben",
+        "dismiss": "Jetzt nicht",
+        "collapsed": "{agent} wurde vorgeschlagen",
+        "handoff": "Übergeben",
+        "prompt": "Diese Untersuchung fortsetzen",
+        "promptReason": "Diese Untersuchung fortsetzen: {reason}"
+      }
+    },
+    "question": {
+      "answerHint": "Antwortet auf die obige Frage",
+      "needsAnswer": "Ihre Antwort erforderlich: {question}",
+      "otherAnswer": "Andere Antwort",
+      "record": {
+        "answered": "Beantwortet: {choice}",
+        "expired": "Frage abgelaufen. Es wurde nichts geändert."
+      },
+      "sendAnswer": "Antwort senden",
+      "needsAnswerLabel": "Ihre Antwort erforderlich"
+    },
+    "threadsBar": {
+      "label": "Chats",
+      "title": "Chats",
+      "incidents": "Live-Untersuchungen · {count}",
+      "moreIncidents": "{count} weitere",
+      "pageFull": "{count}+ offen",
+      "openIncidents": "Offene Vorfälle",
+      "yourThreads": "Ihre Chats · {count}",
+      "noThreads": "Keine laufenden Chats"
+    },
+    "chart": {
+      "showChart": "Diagramm anzeigen",
+      "openInMetrics": "In Metriken öffnen",
+      "addToDashboard": "Zum Dashboard hinzufügen",
+      "createAlert": "Alarm erstellen",
+      "copyQuery": "Abfrage kopieren",
+      "seriesCount": "{count} Serien",
+      "meta": "{range} · {series}",
+      "name": "{title}, {series}",
+      "legend": "Serien"
+    }
+  },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "almostThere": "Fast geschafft...",
+        "analyzing": "Analysiere...",
+        "checkingDetails": "Prüfe Details...",
+        "connectingTheDots": "Verbinde die Punkte...",
+        "crunchingNumbers": "Rechne Zahlen...",
+        "divingDeeper": "Tiefer eintauchen...",
+        "evaluatingOptions": "Bewerte Optionen...",
+        "examiningData": "Prüfe Daten...",
+        "exploringPossibilities": "Erkunde Möglichkeiten...",
+        "formulatingResponse": "Formuliere Antwort...",
+        "gatheringInsights": "Sammle Erkenntnisse...",
+        "makingProgress": "Mache Fortschritte...",
+        "piecingTogether": "Setze zusammen...",
+        "processing": "Verarbeite...",
+        "refiningAnswer": "Verfeinere Antwort...",
+        "reviewingContext": "Überprüfe Kontext...",
+        "stillThinking": "Denke noch...",
+        "synthesizingInformation": "Synthetisiere Informationen...",
+        "thinking": "Denke...",
+        "workingOnIt": "Arbeite daran..."
+      }
+    },
+    "threadView": {
+      "assistant": "Assistent",
+      "userNamed": "Benutzer {user}"
+    }
+  },
+  "brand": {
+    "askAutobot": "Autobot fragen",
+    "autobot": "Autobot",
+    "autobotInvestigate": "Autobot untersuchen"
   }
 }

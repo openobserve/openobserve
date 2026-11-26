@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Пока ни у одного канала нет организации по умолчанию",
-      "description": "Вопросы в канале без организации по умолчанию направляются в организацию по умолчанию каждого пользователя (её можно изменить с помощью {command} org)."
+      "description": "Вопросы в канале, где организация по умолчанию не задана, попадают в организацию по умолчанию каждого пользователя (её можно изменить с помощью {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "В этой организации пока никто не привязал Slack"
@@ -1281,7 +1281,8 @@
       "leaveMessageInBrowser": "Сохранить {entity}, сохранить изменения в этом браузере или отбросить их.",
       "retentionInBrowser": "Изменения хранятся в этом браузере в течение {days} дн. или до выхода из системы. Хранится не более {max} новейших изменений каждого типа.",
       "dotUndated": "Unsaved draft"
-    }
+    },
+    "justNow": "только что"
   },
   "filterBar": {
     "ariaLabel": "Фильтр по полю",
@@ -1432,7 +1433,6 @@
     "fetchingValues": "Получение значений...",
     "noDataInRangeHint": "Нет данных в диапазоне — значения из активного фильтра",
     "viewMoreValues": "Показать больше значений",
-    "aiIconAlt": "ИИ",
     "aiModeIconAlt": "Режим ИИ",
     "firstPage": "Первая страница",
     "lastPage": "Последняя страница",
@@ -2107,6 +2107,7 @@
     "synthetic": "Синтетика",
     "experience": "Опыт",
     "slos": "SLO",
+    "autobotInvestigate": "@:{'brand.autobotInvestigate'}",
     "reliability": "Надёжность",
     "onCall": "Дежурства",
     "response": "Реагирование",
@@ -4989,7 +4990,26 @@
     },
     "summaryOtherRoles": "ещё ролей: {count}",
     "indices": "Индексы",
-    "roleAdmin": "Администратор"
+    "roleAdmin": "Администратор",
+    "modules": {
+      "descriptions": {
+        "ai": "Chat with @:{'brand.autobot'}, use AI query help and run incident analysis.",
+        "ai_chat_share": "Делитесь чатами внутри организации и открывайте чаты, которыми поделились другие. Пока право не предоставлено, доступно только администраторам.",
+        "ai_toolsets": "Add and change the tools @:{'brand.autobot'} can use.",
+        "llmObservability": "Трассировка, оценка и промпты для ваших собственных LLM-приложений. Это не {product}.",
+        "mcp": "Подключайте внешние ИИ-клиенты ({clients}) к этой организации через MCP."
+      },
+      "groups": {
+        "assistant": "@:{'brand.autobot'}",
+        "llmObservability": "Наблюдаемость LLM"
+      },
+      "labels": {
+        "ai": "@:{'brand.autobot'}",
+        "ai_chat_share": "Общий доступ к чатам",
+        "ai_toolsets": "Наборы инструментов",
+        "mcp": "Доступ к MCP"
+      }
+    }
   },
   "announcements": {
     "dismiss": "Скрыть",
@@ -10615,7 +10635,29 @@
     "tabUsage": "Использование",
     "removeHomeDashboard": "Удалить домашний дашборд",
     "resources": "Ресурсы",
-    "explore": "Исследовать"
+    "explore": "Исследовать",
+    "agent": {
+      "askOff": {
+        "budget": "Кредиты ИИ на этот месяц израсходованы, поэтому {product} не может ответить",
+        "oss": "@:{'brand.autobot'} is part of OpenObserve Enterprise. This Open Source build has no @:{'brand.autobot'} and no incidents.",
+        "not_entitled": "{product} не входит в этот план",
+        "not_configured": "{product} ещё не настроен для этой организации",
+        "off_for_org": "{product} отключён для этой организации",
+        "no_permission": "Ваша роль не может использовать {product}"
+      },
+      "admins": "Администраторы: {names}",
+      "flapping": "Нестабильно · {count}×",
+      "openIncident": "Открыть инцидент",
+      "openService": "Открыть сервис",
+      "openAlert": "Открыть оповещение",
+      "creditsUsedUp": "Кредиты ИИ израсходованы, поэтому ничего не отправлено",
+      "firstRun": {
+        "title": "Данных пока нет · отправьте первые логи, метрики или трейсы",
+        "note": "Главная заполняется сама, как только сервис начнёт отправлять данные: «Сейчас» и «Проблемы» — без оповещений. Для её построения ИИ не используется."
+      },
+      "tabLabel": "@:{'brand.autobot'}"
+    },
+    "answersReady": "{count} ответ готов | {count} ответов готово"
   },
   "overview": {
     "alertsSuffix": "оповещения",
@@ -10795,6 +10837,38 @@
     "dataAsOf": "Данные на {time}",
     "timeRange": {
       "heading": "В выбранном временном диапазоне"
+    },
+    "now": {
+      "title": "Сейчас",
+      "changedAt": "Изменено {time}",
+      "investigate": "Исследовать",
+      "investigateName": "Исследовать {row}",
+      "investigateFallback": "Кредиты ассистента израсходованы. «Исследовать» откроет {target}",
+      "notSent": {
+        "runCap": "Не отправлено: активных чатов — {n}",
+        "generic": "Не отправлено"
+      },
+      "noAlert": "нет оповещения",
+      "coverageUnknown": "покрытие оповещениями неизвестно",
+      "vsBaseline": "{value} против {baseline} (за предыдущие {hours} ч)",
+      "noBaseline": "Недостаточно истории для базового уровня",
+      "allRegions": "Все регионы вместе",
+      "partialRow": "частично",
+      "recovered": "Восстановлено",
+      "firingCount": "×{count}",
+      "sentence": {
+        "service": {
+          "errors": "{service}: ошибки {value}",
+          "latency": "{service}: p99 в {ratio}× от базового уровня"
+        },
+        "incident": "{title}",
+        "anomaly": "{name}: аномальных точек — {count}",
+        "alert": "{name} срабатывает"
+      }
+    },
+    "goTo": {
+      "close": "Закрыть",
+      "back": "На главную"
     }
   },
   "aiChatShare": {
@@ -10847,7 +10921,7 @@
         "prompt": "Помогите написать запрос"
       },
       "incident": {
-        "title": "Расследовать инциденты",
+        "title": "Исследовать проблемы",
         "description": "Анализ первопричин по логам, трейсам и оповещениям — например, «Почему сработал gateway-5xx?»",
         "prompt": "Помогите расследовать инцидент"
       },
@@ -12683,18 +12757,14 @@
       },
       "rcaSteer": {
         "composerTitleLive": "Скорректировать этот запуск",
-        "composerHintLive": "Будет прочитано после текущего этапа",
         "composerTitlePaused": "Ответить агенту",
-        "composerHintPaused": "Запуск продолжится после отправки",
         "agentAsks": "Агент спрашивает",
-        "answerNote": "Ваш ответ — это зацепка, а не доказательство. Он может перевести гипотезу в статус «Вероятно». Для корневой причины нужен результат инструмента.",
-        "placeholderPaused": "Ответьте агенту или добавьте контекст, например PR #812 в acme/checkout, развёрнутый около 14:02.",
+        "placeholderPaused": "Ответьте агенту или добавьте контекст",
         "suggestions": "Подсказки",
         "chipCheck": "Проверить …",
         "chipIgnore": "Игнорировать …",
         "chipFocus": "Сфокусироваться на сервисе …",
         "chipChanged": "Мы изменили …",
-        "sendingAs": "Отправка от имени {email} · видно всем участникам этого инцидента",
         "send": "Отправить",
         "steered": "скорректировано {count}×",
         "fromSteering": "из указаний",
@@ -12830,7 +12900,14 @@
           "medium": "Средняя уверенность",
           "low": "Низкая уверенность",
           "none": "Нет уверенности"
-        }
+        },
+        "cancelConfirmTitle": "Отменить запуск?",
+        "cancelConfirmBody": "Отменить анализ для всех по инциденту #{number}?",
+        "showQuery": "Показать запрос",
+        "showResult": "Показать результат",
+        "keepRunning": "Продолжить выполнение",
+        "resultFailed": "Не удалось выполнить этот запрос.",
+        "resultEmpty": "Запрос не вернул ни одной строки."
       },
       "rcaThread": {
         "title": "Цепочка расследования",
@@ -13016,6 +13093,7 @@
         "hourAgo": "{count} час назад | {count} ч назад",
         "dayAgo": "{count} день назад | {count} дн. назад"
       },
+      "byAssistant": "Анализ инцидента · от {product}",
       "rcaLight": {
         "showMore": "Показать больше",
         "showLess": "Показать меньше",
@@ -16068,6 +16146,10 @@
       "empty": "Запросов пока нет",
       "noMatch": "Нет запросов, соответствующих поиску или фильтру избранного",
       "loadMore": "Загрузить ещё"
+    },
+    "filter": {
+      "placeholder": "Фильтр, например: {label} =~ \"500{'|'}503\"",
+      "placeholderEmpty": "Фильтровать метрики по метке"
     }
   },
   "settings": {
@@ -16076,6 +16158,7 @@
     "generalLabel": "Общие настройки",
     "groupGeneral": "Общие",
     "groupAccessSecurity": "Доступ и безопасность",
+    "groupAssistant": "@:{'brand.autobot'}",
     "groupDestinations": "Получатели",
     "groupData": "Данные",
     "groupOperations": "Операции",
@@ -18107,6 +18190,15 @@
       "loadingPage": "Загрузка страницы {page}",
       "pageFailed": "Не удалось загрузить страницу {page}",
       "pageEmpty": "На странице {page} нет результатов"
+    },
+    "assistantSet": {
+      "label": "Задано ассистентом",
+      "name": "{field} was set by @:{'brand.autobot'}",
+      "field": {
+        "query": "Запрос",
+        "stream": "Поток",
+        "time": "Диапазон времени"
+      }
     }
   },
   "aiToolset": {
@@ -23782,10 +23874,12 @@
       "oncall": "Дежурства",
       "synthetics": "Синтетика",
       "fleet": "Парк",
-      "kubernetes": "Kubernetes"
+      "kubernetes": "Kubernetes",
+      "assistant": "@:{'brand.autobot'}"
     },
     "pages": {
       "global": "Общие",
+      "home": "Главная",
       "kubernetes": "Kubernetes",
       "logs": "Логи",
       "dashboardsList": "Дашборды",
@@ -23842,7 +23936,10 @@
       "downtimes": "Окна обслуживания",
       "fleetConfigEditor": "Редактор конфигурации",
       "fleetOverview": "Конвейеры парка",
-      "securityRecord": "Безопасность — открыть запись"
+      "securityRecord": "Безопасность — открыть запись",
+      "assistant": "@:{'brand.autobot'}",
+      "assistantComposer": "Поле ввода {product}",
+      "queryEditor": "Редактор запросов"
     },
     "actions": {
       "openCheatsheet": "Открыть шпаргалку по клавиатурным сокращениям",
@@ -23978,7 +24075,18 @@
       "fleetEditorDeleteNode": "Удалить выбранный компонент",
       "fleetFlowCloseDetails": "Закрыть сведения о пути или свернуть карту",
       "securityRecordNext": "Следующая запись",
-      "securityRecordPrev": "Предыдущая запись"
+      "securityRecordPrev": "Предыдущая запись",
+      "assistantClose": "Закрыть {product}",
+      "assistantComposerDictate": "Диктовать при удержании",
+      "assistantComposerNewline": "Новая строка",
+      "assistantComposerRecall": "Вернуть предыдущий запрос",
+      "assistantComposerSend": "Отправить сообщение",
+      "assistantGoToAnswer": "Перейти к последнему ответу",
+      "assistantHistory": "Открыть чаты",
+      "assistantOpen": "Открыть {product}",
+      "editorTabFocusMode": "Разрешить Tab выходить из редактора",
+      "threadsBarOpen": "Открыть чаты",
+      "homeFocusAsk": "Сфокусироваться на поле Ask"
     }
   },
   "components": {
@@ -29280,6 +29388,7 @@
     "consentBillingPayer": "После исчерпания бесплатных кредитов использование ИИ тарифицируется по тарифу вашего плана в счёте {payer}.",
     "organizationBillingCycle": "Платное использование ИИ тарифицируется в счёте этой организации.",
     "payerBillingCycle": "Платное использование ИИ тарифицируется в счёте организации-плательщика.",
+    "readOnlyAdmin": "Только администратор организации может изменить эту настройку.",
     "viewBilling": "Просмотр счетов",
     "memberAndPayerRequired": "{payer} также должен включить платное использование ИИ, прежде чем {organization} сможет им пользоваться.",
     "contactPayerAdmin": "Попросите администратора {payer} включить платное использование ИИ.",
@@ -30492,7 +30601,10 @@
     "suggestions": {
       "title": "Рекомендации",
       "subtitle": "Когда будет минутка — они уменьшают шум или экономят ваше время."
-    }
+    },
+    "previewLabel": "Предпросмотр",
+    "previewStrip": "Предпросмотр с тестовыми данными. Ничто здесь не изменяет вашу организацию.",
+    "previewHeader": "AutoObserve · Предпросмотр"
   },
   "telephony": {
     "title": "Телефония",
@@ -30817,7 +30929,7 @@
         "settings": "Настройки",
         "install": "При установке",
         "destination": "Из получателя оповещений",
-        "oncall": "Из {command} oncall в этом канале"
+        "oncall": "Из {command} oncall здесь"
       },
       "channel": "Канал",
       "channelPlaceholder": "Поиск каналов",
@@ -30831,7 +30943,7 @@
       "editDefault": "Изменить канал по умолчанию",
       "removeConfirm": "Удалить канал по умолчанию",
       "removeTitle": "Удалить значение по умолчанию для #{channel}?",
-      "removeMessage": "Вопросы в {name} затем направляются в организацию по умолчанию каждого пользователя (её можно изменить командой {command} org).",
+      "removeMessage": "Вопросы в {name} затем попадают в организацию по умолчанию каждого пользователя (её можно изменить с помощью {command} org).",
       "instanceAdminOnly": "Только для администратора экземпляра",
       "ownOrgOnlyHint": "В рабочей области экземпляра каналы привязываются к вашей собственной организации",
       "claimableHint": "Непривязанные каналы и каналы, принадлежащие {org}",
@@ -34520,33 +34632,2534 @@
     "gateOrder": "Начало должно быть раньше конца.",
     "gateInvalid": "Недопустимый диапазон."
   },
-  "llmObservability": {
-    "playground": {
-      "progress": {
-        "analyzing": "Анализирую...",
-        "thinking": "Думаю...",
-        "processing": "Обрабатываю...",
-        "examiningData": "Изучаю данные...",
-        "reviewingContext": "Просматриваю контекст...",
-        "formulatingResponse": "Формулирую ответ...",
-        "checkingDetails": "Проверяю детали...",
-        "gatheringInsights": "Собираю информацию...",
-        "evaluatingOptions": "Оцениваю варианты...",
-        "synthesizingInformation": "Синтезирую информацию...",
-        "workingOnIt": "Работаю над этим...",
-        "almostThere": "Почти готово...",
-        "divingDeeper": "Углубляюсь...",
-        "connectingTheDots": "Соединяю точки...",
-        "crunchingNumbers": "Вычисляю...",
-        "exploringPossibilities": "Изучаю возможности...",
-        "refiningAnswer": "Уточняю ответ...",
-        "stillThinking": "Всё ещё думаю...",
-        "makingProgress": "Продвигаюсь...",
-        "piecingTogether": "Собираю фрагменты..."
+  "autobotInvestigate": {
+    "greeting": "Что нужно расследовать?",
+    "greetingNamed": "Что нужно расследовать, {name}?",
+    "placeholder": "Опишите, что пошло не так, или вставьте ссылку на оповещение или инцидент",
+    "cards": {
+      "whyAlertFired": {
+        "title": "Почему сработало моё оповещение?",
+        "description": "Pick an alert. @:{'brand.autobot'} checks the data behind it and explains the cause.",
+        "prompt": "Почему сработало моё последнее оповещение?"
+      },
+      "investigateIncident": {
+        "title": "Расследовать инцидент",
+        "description": "Определите, что изменилось, какие сервисы затронуты и где это началось.",
+        "prompt": "Помоги мне расследовать последний инцидент"
+      },
+      "errorSpike": {
+        "title": "Найдите причину всплеска ошибок",
+        "description": "Сравните ошибки до и после всплеска по сервисам и сообщениям.",
+        "prompt": "Найдите причину последнего всплеска ошибок"
+      },
+      "slowService": {
+        "title": "Проверьте медленный сервис",
+        "description": "Изучите трейсы и задержки, чтобы найти медленный шаг.",
+        "prompt": "Выясните, какой сервис работает медленно и почему"
       }
     }
   },
   "assistant": {
-    "composer": {}
+    "actions": {
+      "count": "{count} действие в этом чате | {count} действий в этом чате",
+      "entry": "{operation} {name} · одобрено {user} · {time}",
+      "failedEntry": "Не удалось выполнить: {name} · {reason} · {time}",
+      "heading": "Действия в этом чате",
+      "noReview": "Без этапа проверки",
+      "op": {
+        "create": "Создано: {entity}",
+        "delete": "Удалено: {entity}",
+        "pause": "Приостановлено: {entity}",
+        "resume": "Возобновлено: {entity}",
+        "run_command": "Запущено: {entity}",
+        "update": "Обновлено: {entity}"
+      },
+      "restored": "Восстановлено",
+      "undo": "Отменить",
+      "undoFailed": "Не удалось отменить.",
+      "undoLimits": "Отправленные уведомления и удалённые данные нельзя отменить.",
+      "undoNotYet": "Отмена пока недоступна",
+      "undoUnconfirmed": "Отмена отправлена, но подтвердить результат не удалось.",
+      "undoing": "Отмена…",
+      "undone": "Отменено · {name} восстановлено",
+      "you": "вы"
+    },
+    "activity": {
+      "actor": "Фильтр по человеку",
+      "approved": "Одобрено",
+      "approvedBy": "Одобрено: {user}",
+      "columns": {
+        "action": "Действие",
+        "actions": "Действия",
+        "actor": "От имени",
+        "approval": "Одобрено",
+        "result": "Результат",
+        "target": "Объект",
+        "when": "Когда"
+      },
+      "done": "Выполнено",
+      "empty": "No @:{'brand.autobot'} actions in this period.",
+      "failed": "Ошибка: {cause}",
+      "failedPlain": "Ошибка",
+      "loadFailed": "Не удалось загрузить активность.",
+      "next": "Далее",
+      "noApproval": "Одобрение не требуется",
+      "openAudit": "Открыть поток аудита в логах",
+      "openChat": "Открыть чат",
+      "previous": "Назад",
+      "rangeLabel": "Диапазон времени",
+      "ranges": {
+        "day": "Последние 24 часа",
+        "month": "Последние 30 дней",
+        "week": "Последние 7 дней"
+      },
+      "search": "Поиск по активности",
+      "standing": "Постоянное одобрение",
+      "undo": "Отменить",
+      "undoDone": "Отменено: {action}",
+      "undoMessage": "Отменить \"{action}\" для {target} из сохранённой копии. Уже отправленные уведомления отменить нельзя.",
+      "undoNamed": "Отменить {action}",
+      "undoTitle": "Отменить это действие?",
+      "undoneState": "Отменено",
+      "unsupported": "Для истории активности нужна более новая версия сервера."
+    },
+    "announce": {
+      "approval": "Ожидает вашего одобрения: {title}.",
+      "approvalExpires": "Ожидает вашего одобрения: {title}. Истекает через {duration}.",
+      "approvalExpiring": "Одобрение истекает через {duration}: {title}. Дополнительное время указано на карточке.",
+      "approvalExpiringFinal": "Одобрение истекает через {duration}: {title}. Добавить время больше нельзя.",
+      "approvalExpiringNotice": "Одобрение истекает через {duration}: {title}. Проверьте его в уведомлении {product}.",
+      "approvalExpiringNoticeFinal": "Одобрение истекает через {duration}: {title}. Добавить время больше нельзя. Проверьте его в уведомлении {product}.",
+      "approvalExtended": "Время добавлено. Истекает через {duration}.",
+      "approvalJump": "{line} Нажмите {keys}, чтобы проверить.",
+      "approvalJumpTouch": "{line} Запрос на проверку находится над полем сообщения.",
+      "closed": "{product} закрыт.",
+      "closedRunning": "{product} закрыт. Ответ по-прежнему формируется в фоне.",
+      "floated": "{title} теперь плавающее окно.",
+      "madeRoom": "{title} перемещено в трей, чтобы освободить место.",
+      "minimised": "{title} свёрнуто в трей.",
+      "moveCancelled": "Перемещение отменено.",
+      "moveStarted": "Перемещение {title}. Стрелки перемещают. Enter — разместить, Escape — вернуть на место.",
+      "narrower": "Уже.",
+      "openedInTab": "{title} открыто в новой вкладке.",
+      "pinned": "{title} теперь на боковой панели.",
+      "pinnedSwapped": "{title} теперь на боковой панели. {other} перемещено в трей.",
+      "resizeStarted": "Изменение размера {title}. Стрелки меняют размер. Enter — сохранить, Escape — вернуть на место.",
+      "restored": "{title} восстановлено.",
+      "shorter": "Ниже.",
+      "taller": "Выше.",
+      "wider": "Шире.",
+      "windowClosed": "{title} закрыто.",
+      "windowClosedRunning": "{title} закрыто. Ответ по-прежнему формируется в фоне.",
+      "windowPlaced": "Окно размещено.",
+      "failed": "Не удалось. {title}",
+      "failedRetryIn": "Не удалось. {title} Повтор через {s} с.",
+      "failedWithAction": "Не удалось. {title} Доступно: {action}.",
+      "keysOpen": "Control I",
+      "keysOpenMac": "Command I",
+      "notSent": "Не отправлено. {title}",
+      "notSentRetryIn": "Не отправлено. {title} Повтор через {s} с.",
+      "notSentWithAction": "Не отправлено. {title} Доступно: {action}.",
+      "opened": "{product} открыт.",
+      "sheetCollapsed": "Свёрнуто.",
+      "sheetExpanded": "Развёрнуто."
+    },
+    "approval": {
+      "approve": "Одобрить",
+      "approveDelete": "Удалить {count} {entity}",
+      "arguments": "Аргументы",
+      "askAgainPrompt": "Спросите меня снова: {heading}",
+      "askedElsewhere": "Запрошено в другой вкладке",
+      "cannotUndo": "Нельзя отменить",
+      "currentUnknown": "Текущее значение неизвестно",
+      "deny": "Отклонить",
+      "details": "Подробности",
+      "edit": "Изменить, затем одобрить",
+      "editor": {
+        "alert": "Оповещения"
+      },
+      "expiresIn": "Истекает через {time}",
+      "expiringSoon": "Скоро истекает · {time}",
+      "gateTiming": "Одобрения недоступны на этом сервере. Завершите это в {editor}.",
+      "heading": {
+        "delete": "Удалить {count} {entity}",
+        "permission": "Разрешить {tool}",
+        "runCommand": "Выполнить команду в {toolset}"
+      },
+      "inOrg": "в {org}",
+      "minutes": "{count} минута | {count} минут",
+      "moreTargets": "и ещё {count}",
+      "moreTime": "Больше времени",
+      "named": "{verb} {name}",
+      "nameUnknown": "Не удалось загрузить имя {entity} {shortId}",
+      "needsOk": "Требуется ваше решение",
+      "noDecision": "Для этого запроса ответ не был записан",
+      "nothingSelected": "Ничего не выбрано",
+      "open": "Открыть",
+      "reason": {
+        "conflict": "Оно уже существует или уже находится в этом состоянии",
+        "forbidden": "нет разрешения",
+        "notFound": "не найдено",
+        "rateLimited": "Слишком много запросов, попробуйте позже",
+        "server": "Сервер не смог это выполнить",
+        "status": "ошибка {code}",
+        "unknown": "ошибка"
+      },
+      "reply": "Ответить",
+      "showLess": "Показать меньше",
+      "showMore": "Показать больше",
+      "result": {
+        "approved": "Одобрено · {time}",
+        "approvedNoTime": "Одобрено",
+        "approvedElsewhere": "Одобрено в другой вкладке · {time}",
+        "askAgain": "Спросить снова",
+        "checkList": "Проверьте список",
+        "checkListName": "Проверьте список (откроется в новой вкладке)",
+        "declined": "Отклонено · ничего не изменилось",
+        "declinedElsewhere": "Отклонено в другой вкладке · {time}",
+        "declinedNewChat": "Отклонено, так как вы начали новый чат",
+        "deciding": "Решение принимается в другой вкладке…",
+        "done": {
+          "create": "Создано: {entity}",
+          "delete": "Удалено {count} {entity}",
+          "permission": "Разрешено: {tool}",
+          "runCommand": "Выполнена команда в {toolset}",
+          "update": "Обновлено: {entity} {name}"
+        },
+        "failed": "Ничего не изменено. {reason}",
+        "failedConsent": "Платные услуги не включены для этой организации.",
+        "failedCredits": "Кредиты ИИ для этой организации исчерпаны.",
+        "failedForbidden": "У вас нет прав на это изменение.",
+        "failedItem": "Не удалось выполнить {name}: {reason}",
+        "itemsName": "Результат по каждому элементу",
+        "narrowed": "@:{'brand.autobot'} will propose these {count} again for your approval",
+        "open": "Открыть {name} (откроется в новой вкладке)",
+        "sending": "Отправляем ваше решение…",
+        "stop": "Остановить",
+        "stopped": "Отклонено · вы остановили ответ",
+        "unconfirmed": "Ваше решение отправлено, но результат подтвердить не удалось.",
+        "unknown": "В этом браузере ответ не зафиксирован.",
+        "waitingElsewhere": "Ожидает вашего утверждения в другой вкладке",
+        "withdrawn": "Этот запрос больше не действителен.",
+        "partialBy": {
+          "change": "Изменено {done} из {total} {entity} · {failed} с ошибкой",
+          "create": "Создано {done} из {total} {entity} · {failed} с ошибкой",
+          "delete": "Удалено {done} из {total} {entity} · {failed} с ошибкой",
+          "pause": "Приостановлено {done} из {total} {entity} · {failed} с ошибкой",
+          "resume": "Возобновлено {done} из {total} {entity} · {failed} с ошибкой",
+          "update": "Обновлено {done} из {total} {entity} · {failed} с ошибкой"
+        },
+        "partialUnnamed": "Выполнено только частично · {reason}",
+        "partialUnnamedPlain": "Выполнено только частично",
+        "standing": "Разрешено вашим постоянным одобрением"
+      },
+      "scope": {
+        "chat": "Для этого чата",
+        "label": "Разрешить",
+        "once": "Только один раз",
+        "tool": "Всегда для {tool}"
+      },
+      "seconds": "{count} секунда | {count} секунд",
+      "verb": {
+        "create": "Создать {entity}",
+        "pause": "Приостановить {entity}",
+        "resume": "Возобновить {entity}",
+        "update": "Обновить {entity}"
+      },
+      "backTo": "Назад к {title}",
+      "backToOrg": "Переключается обратно на {org}",
+      "deliveryFailed": "Не удалось отправить ваше решение. {entity} не изменён.",
+      "finishIn": "Завершить в {editor}",
+      "gateNoEditor": "Утверждения недоступны на этом сервере.",
+      "meta": "До {time} · {scope}",
+      "metaUntil": "До {time}",
+      "needsOkName": "Требует вашего внимания: {name}",
+      "notifies": "уведомляет",
+      "retry": "Повторить",
+      "record": {
+        "denied": "Отклонено: {name}",
+        "deniedUnnamed": "Denied a change @:{'brand.autobot'} proposed",
+        "deniedUnnamedReason": "Denied a change @:{'brand.autobot'} proposed · {reason}",
+        "expired": "Срок запроса истёк. Ничего не изменено.",
+        "moved": "Перемещено в {editor}",
+        "paused": "Приостановлено: {entity} {name}",
+        "pausedCount": "Приостановлено: {count} {entity}",
+        "pausedCountUntil": "Приостановлено: {count} {entity} до {time}",
+        "pausedUntil": "Приостановлено: {entity} {name} до {time}",
+        "replied": "Отклонено с ответом",
+        "resumed": "Возобновлено: {entity} {name}",
+        "resumedCount": "Возобновлено: {count} {entity}",
+        "youAt": "вы · {time}"
+      },
+      "onDashboard": "На дашборде {name}",
+      "alwaysFor": "Всегда для {action}",
+      "alwaysAllowed": "Всегда разрешено: {action}",
+      "revoke": "Отозвать",
+      "changedSince": "Изменено с момента запроса",
+      "recheckFailed": "Не удалось проверить изменения, поэтому ничего не записано",
+      "more": "Другие действия",
+      "revokeFailed": "Не удалось отозвать. Повторите попытку в Настройках.",
+      "grantNotStored": "Approved once. @:{'brand.autobot'} will ask next time.",
+      "actionPhrase": {
+        "create": "создание {entity}",
+        "pause": "приостановка {entity}",
+        "resume": "возобновление {entity}",
+        "update": "обновление {entity}",
+        "delete": "удаление {entity}"
+      },
+      "allowedForChat": "Разрешено для этого чата: {action}"
+    },
+    "askAdmin": {
+      "adminsOf": "Администраторы {org}",
+      "anAdminOf": "Администратор {org}",
+      "copied": "Сообщение скопировано. Вставьте его своему администратору.",
+      "copy": "Копировать сообщение",
+      "email": "Отправить письмо администраторам",
+      "includePrompt": "Включить первую строку моего вопроса",
+      "message": {
+        "access": "Здравствуйте! Не могли бы вы предоставить мне доступ к {product} в OpenObserve ({whereToGrant}, Чат) для организации {org}?",
+        "consent": "Не могли бы вы включить платное использование ИИ для {org}? Биллинг › Платное использование: {link}",
+        "credits": "Не могли бы вы включить платное использование ИИ для {org}? Биллинг › Платное использование: {link}",
+        "enable": "Could you turn {product} on for {org}? Settings › @:{'brand.autobot'} › Access: {link}",
+        "settings": "Could you change the {product} settings for {org} in Settings › @:{'brand.autobot'}?",
+        "share_read": "Не могли бы вы предоставить мне доступ к общему использованию чатов ({whereToGrant}, Общий доступ к чатам) в {org}?",
+        "tool_policy": "@:{'brand.autobot'} wasn't allowed to run {tool} in {org}. Could you review the permissions of @:{'brand.autobot'} in Settings › @:{'brand.autobot'} › Permissions?",
+        "agent_access": "Could you let me use {agent} in {product} for {org}? Settings › @:{'brand.autobot'} › Agents: {link}"
+      },
+      "messageLabel": "Сообщение",
+      "subject": {
+        "access": "Доступ к {product} для {org}",
+        "consent": "Платное использование ИИ для {org}",
+        "credits": "Платное использование ИИ для {org}",
+        "enable": "Включить {product} для {org}",
+        "settings": "Настройки {product} для {org}",
+        "share_read": "Доступ к общему использованию чатов для {org}",
+        "tool_policy": "Разрешения {product} для {org}",
+        "agent_access": "Доступ к {agent} для {org}"
+      },
+      "title": "Обратиться к администратору",
+      "withPrompt": "{message} Мой вопрос начинается с: \"{prompt}\""
+    },
+    "attachment": {
+      "cell": "Ячейка",
+      "field": "Поле",
+      "logEntry": "Запись лога",
+      "queryError": "Ошибка запроса",
+      "span": "Спан"
+    },
+    "billing": {
+      "allowance": {
+        "confirm": "Задать лимит",
+        "confirmMessage": "Установить лимит ИИ-кредитов для {org} на уровне {limit}, ниже уже использованных {used}? Организация будет заблокирована немедленно.",
+        "confirmTitle": "Установить лимит ниже текущего использования?",
+        "floorWarning": "Ниже текущего использования ({used}). Организация блокируется немедленно, если платное использование не включено.",
+        "limit": "Лимит",
+        "mode": "Режим",
+        "modeUnavailable": "Режим недоступен",
+        "setAnyway": "Всё равно установить лимит",
+        "used": "Использовано"
+      },
+      "managePaidUsage": "Управление платным использованием",
+      "mode": {
+        "consentRequired": "Included credits are used up. Allow paid usage to keep using @:{'brand.autobot'}.",
+        "exhaustedContract": "ИИ-кредиты израсходованы. Свяжитесь с вашим менеджером аккаунта.",
+        "exhaustedContractMember": "ИИ-кредиты израсходованы. Попросите администратора организации связаться с вашим менеджером аккаунта.",
+        "exhaustedSubscribe": "ИИ-кредиты израсходованы. Подпишитесь, чтобы продолжить.",
+        "freeNoRenew": "Включённые кредиты не возобновляются.",
+        "freeResets": "Сброс {date}"
+      },
+      "paidUsage": {
+        "allow": "Разрешить платное использование",
+        "allowFor": "Разрешить платное использование для {org}",
+        "allowed": "Разрешено",
+        "creditsFirst": "Требуются дополнительные кредиты",
+        "effectiveOff": "Действует: платное использование выключено",
+        "effectiveOn": "Действует: платное использование включено",
+        "effectiveWaiting": "Действует: платное использование выключено. Ожидание {org}",
+        "enabledBy": "Включено пользователем {email} {date}",
+        "managedBy": "Управляется администраторами {org}",
+        "notAllowed": "Не разрешено",
+        "offConfirm": "Выключить",
+        "offMessage": "Все в организации будут ограничены включёнными кредитами. Текущие запросы завершатся.",
+        "offTitle": "Выключить платное использование ИИ для {org}?",
+        "payerOrg": "Организация-плательщик ({org})",
+        "subscribeFirst": "Подпишитесь, чтобы разрешить платное использование",
+        "thisOrg": "Эта организация ({org})",
+        "title": "Платное использование",
+        "unavailable": "Статус платного использования недоступен.",
+        "updateFailed": "Не удалось обновить платное использование."
+      },
+      "subscribe": "Подписаться",
+      "title": "ИИ-кредиты",
+      "usedBilled": "Использовано {limit} включённых кредитов · выставлено {billed}",
+      "usedOf": "Использовано {used} из {limit} включённых кредитов"
+    },
+    "claim": {
+      "name": "Доказательство {n}, {step}",
+      "notAvailable": "Доказательства недоступны в этом представлении",
+      "citation": "Цитата {n}, запрос {n}, {rows}",
+      "range": "Цитаты с {from} по {to}"
+    },
+    "client": {
+      "copyManually": "Не удалось скопировать. Выделите текст и скопируйте его.",
+      "popupBlocked": "Браузер заблокировал новую вкладку. Открыть её здесь?",
+      "storageBlocked": "Черновики не сохранятся при перезагрузке этой страницы."
+    },
+    "closeTab": {
+      "body": "Можете закрыть эту вкладку.",
+      "title": "Вы вошли в систему"
+    },
+    "composer": {
+      "cleared": "Черновик очищен",
+      "clearedOrg": "Черновик из {org} очищен",
+      "draftStayed": "Новый чат. Ваш черновик остался в {chat}",
+      "draftStayedUnnamed": "Новый чат. Ваш черновик остался в предыдущем чате",
+      "bringDraft": "Перенести сюда",
+      "draftRestored": "Черновик восстановлен",
+      "imageReadFailed": "Не удалось прочитать {name}",
+      "imagesDropped": "{count} изображение не сохранилось при перезагрузке | {count} изображений не сохранилось при перезагрузке",
+      "imageTooBig": "{name} — {size}. Не более {count} изображений, по {max} каждое.",
+      "mention": {
+        "count": "{count} подсказка. Стрелки вверх и вниз для выбора, Enter — добавить. | {count} подсказок. Стрелки вверх и вниз для выбора, Enter — добавить.",
+        "empty": "Нет совпадений с \"{q}\"",
+        "group": {
+          "alerts": "Оповещения",
+          "dashboards": "Дашборды",
+          "pipelines": "Конвейеры",
+          "streams": "Потоки",
+          "agents": "Агенты"
+        },
+        "kind": {
+          "alerts": "оповещения",
+          "dashboards": "дашборды",
+          "pipelines": "конвейеры",
+          "streams": "потоки"
+        },
+        "noAccess": "Нет доступа: {kind}",
+        "optionName": "{group}, {label}",
+        "pageTime": "Время страницы",
+        "retry": "Не удалось загрузить {kind} · Повторить",
+        "showAll": "Показать все",
+        "title": "Добавить в контекст"
+      },
+      "name": "Сообщение {product}",
+      "placeholder": "Спросите о своих данных",
+      "followUp": "Задать уточняющий вопрос",
+      "scoped": "Спросить о {stream}",
+      "askAgent": "Спросить у {agent}…",
+      "sendTo": "Отправить агенту {agent}",
+      "attachImage": "Фото",
+      "plus": "Добавить к сообщению",
+      "connectors": {
+        "label": "Коннекторы",
+        "on": "{count} вкл.",
+        "heading": "Коннекторы",
+        "empty": "В этой организации нет включённых наборов инструментов.",
+        "failed": "Не удалось загрузить наборы инструментов.",
+        "add": "Добавить набор инструментов",
+        "noPermission": "Только администратор может изменять наборы инструментов.",
+        "toggleFailed": "Не удалось переключить {name}. Повторите попытку."
+      },
+      "inert": "Сделайте выбор выше, чтобы продолжить",
+      "busy": "{product} занят. Отправьте снова через {s} с.",
+      "imageCap": "Не удалось добавить {name}. Не более {count} изображений, по {size} каждое.",
+      "sendReply": "Отправить ответ",
+      "offline": "Вы не в сети. Черновик сохранён.",
+      "rateLimited": "Дождитесь окончания обратного отсчёта «Повторить».",
+      "recalled": "Восстановлен запрос {n} из {count}",
+      "removeImage": "Удалить {name}",
+      "noAccess": "Вы можете читать свои чаты. Чтобы начать или продолжить чат, нужен доступ к ИИ.",
+      "replyHelper": "Ответить — значит отклонить запрос",
+      "replyPlaceholder": "Reply to @:{'brand.autobot'}",
+      "running": "Дождитесь завершения этого ответа или остановите его.",
+      "sendEmpty": "Введите сообщение или добавьте контекст, чтобы отправить",
+      "undo": "Отменить",
+      "replyCancel": "Отмена",
+      "replyRefused": "Ваш ответ не отправлен. На этот запрос нельзя ответить с этой страницы.",
+      "inertAnswer": "Ответьте выше, чтобы продолжить",
+      "goToRequest": "Перейти к запросу",
+      "placeholderAt": "Спросите что угодно · {'@'} для добавления контекста",
+      "followUpAt": "Задайте уточняющий вопрос · {'@'} для добавления контекста",
+      "queued": "{count} в очереди",
+      "queuedEdit": "Изменить",
+      "steerPlaceholder": "Направьте этот запуск",
+      "strip": {
+        "runLimit": "Достигнут лимит запусков",
+        "showRunning": "Показать активные чаты",
+        "creditsOut": "Кредиты ИИ израсходованы",
+        "managePaid": "Управлять платным использованием",
+        "orgBusy": "@:{'brand.autobot'} is busy for your organization",
+        "retry": "Повторить",
+        "micBlocked": "Микрофон заблокирован",
+        "howToAllow": "Как разрешить",
+        "decideAbove": "Примите решение выше, чтобы продолжить",
+        "pastedLines": "Вставлена {count} строка | Вставлено {count} строк",
+        "attachAsFile": "Прикрепить как файл",
+        "replaceDraft": "Заменить черновик?",
+        "needsAccess": "Требуется доступ к ИИ",
+        "offline": "Не в сети · черновик сохранён",
+        "busyFor": "Занято · повторите отправку через {s} с",
+        "pasteInline": "Вставить в сообщение",
+        "enterQueues": "Ответ выполняется · Enter поставит это в очередь"
+      },
+      "queuedSentence": "Ваше следующее сообщение будет отправлено после завершения этого ответа.",
+      "queuedAlreadySentence": "Одно сообщение уже в очереди."
+    },
+    "consent": {
+      "aMember": "участник",
+      "enabledBy": "Платное использование ИИ включено для {org} пользователем {user} · {time}",
+      "manage": "Управлять",
+      "manageName": "Управлять платным использованием (откроется в новой вкладке)",
+      "you": "вы"
+    },
+    "context": {
+      "addBack": "{label} · Добавить обратно",
+      "added": "В контекст добавлено: {label}",
+      "atSend": "При отправке",
+      "attachmentsValue": "{count} вложение · {size} | {count} вложений · {size}",
+      "capImages": "До {count} изображений, {size} каждое",
+      "capRows": "До {rows} строк или {size} прикреплённых данных на сообщение",
+      "characters": "{count} символ | {count} символов",
+      "chip": {
+        "alert": "Оповещение · {name}",
+        "cell": "{field} = {value}",
+        "dashboard": "Дашборд · {name}",
+        "field": "Поле · {name}",
+        "incident": "Инцидент · {name}",
+        "logRow": "Строка лога · {name} · {time}",
+        "logRowAt": "Строка лога · {time}",
+        "logRowPlain": "Строка лога",
+        "logRows": "Строка лога · {count} · {name} | Строки логов · {count} · {name}",
+        "logRowsPlain": "Строка лога · {count} | Строки логов · {count}",
+        "panel": "Панель · {name}",
+        "pipeline": "Конвейер · {name}",
+        "queryError": "Ошибка запроса · {name}",
+        "queryNode": "Узел запроса · {name}",
+        "span": "Спан · {name}",
+        "sql": "SQL · {name}",
+        "sqlLines": "SQL · {count} строка | SQL · {count} строк",
+        "stream": "Поток · {name}",
+        "streams": "Поток · {count} | Потоки · {count}",
+        "traceQuery": "Запрос трейсов",
+        "vrl": "VRL · {count} строка | VRL · {count} строк"
+      },
+      "chipName": "{label}, {secondary}",
+      "dataSharing": "Общий доступ к данным · {level}",
+      "disclosure": "Attached data is sent to @:{'brand.autobot'} and saved with this chat.",
+      "disclosureShared": "Attached data is sent to @:{'brand.autobot'}, saved with this chat and included in any share.",
+      "field": {
+        "alert": "Оповещение",
+        "attachments": "Вложения",
+        "dashboard": "Дашборд",
+        "incident": "Инцидент",
+        "interestingFields": "Интересные поля",
+        "org": "Организация",
+        "page": "Страница",
+        "pipeline": "Конвейер",
+        "quickMode": "Быстрый режим",
+        "requestTime": "Текущее время",
+        "sql": "SQL",
+        "sqlMode": "Режим SQL",
+        "streams": "Потоки",
+        "timeRange": "Диапазон времени",
+        "timezone": "Часовой пояс",
+        "traceQuery": "Запрос трейсов",
+        "vrl": "VRL",
+        "overviewIncidents": "Инциденты на главной ({count})",
+        "overviewServices": "Сервисы на главной ({count})",
+        "overviewAnomalies": "Аномалии на главной ({count})",
+        "overviewAlerts": "Оповещения на главной ({count})"
+      },
+      "fromChat": "Добавлено в этот чат",
+      "fromPage": "С этой страницы",
+      "imageType": "Можно прикреплять только изображения PNG и JPEG",
+      "inChat": "В: {title}",
+      "internal": "внутренний",
+      "lines": "{count} строка | {count} строк",
+      "mixedStreams": "Один тип потока на сообщение. Удалите поток типа {type}, чтобы добавить этот.",
+      "more": "+{count}",
+      "moreName": "Показать ещё {count} чип контекста | Показать ещё {count} чипов контекста",
+      "notReadYet": "ещё не прочитано",
+      "openSource": "Открыть в {page}",
+      "remove": "Удалить {label} из контекста",
+      "removeAll": "Удалить все",
+      "removed": "{label} удалён из контекста",
+      "removeRow": "Удалить строку {n}",
+      "rowsCount": "{count} строка | {count} строк",
+      "sentLine": "Отправлено:",
+      "startNew": "Вместо этого начать новый чат",
+      "streamsValue": "{names} ({type})",
+      "summary": "{scope} · {range}",
+      "time": {
+        "past": "Последние {period}",
+        "pastRange": "последние {period}",
+        "custom": "пользовательский",
+        "default": "Время · последние 15 мин · по умолчанию",
+        "fromPage": "страница",
+        "page": "Время · {range}"
+      },
+      "trayLabel": "Контекст для следующего сообщения",
+      "trimInternal": "Скрыть внутренние поля",
+      "truncated": "сокращено до {size}",
+      "truncatedFields": "Обрезано, чтобы уместиться; сначала самые длинные значения: {fields}",
+      "used": "Использовано:",
+      "usedName": "Использовано контекста",
+      "usedNone": "Контекст страницы не использовался",
+      "valueOff": "Выкл.",
+      "valueOn": "Вкл.",
+      "pastedText": "Вставленный текст · {count} строка | Вставленный текст · {count} строк",
+      "pastedAsChip": "Длинная вставка прикреплена как текст.",
+      "pasteInline": "Вместо этого вставить в сообщение",
+      "pasteInlineShort": "Вставить в сообщение",
+      "withheld": "не отправлено на этом уровне данных",
+      "withheldLine": "Не отправлено на этом уровне данных ({level})."
+    },
+    "credits": {
+      "copyRequest": "Добавьте AI-кредиты для {org}: по состоянию на {date} использовано {used} из {limit} включённых кредитов.",
+      "copyRequestNoUsage": "Добавьте AI-кредиты для {org}: по состоянию на {date} включённые кредиты исчерпаны.",
+      "manage": "Управление платным использованием",
+      "manageName": "Управление платным использованием (откроется в новой вкладке)",
+      "meter": {
+        "barName": "Включённые AI-кредиты",
+        "compact": "{used} из {limit}",
+        "consent": "Включённые кредиты использованы · для платного использования требуется согласие",
+        "exhausted": "AI-кредиты для {org} исчерпаны",
+        "exhaustedCompact": "Исчерпано",
+        "free": "{used} из {limit} включённых кредитов · {renewal}",
+        "noIncluded": "Нет включённых кредитов",
+        "noRenew": "они не возобновляются",
+        "payg": "{limit} включённых кредитов использовано · {billed} списано · платное использование включено",
+        "resets": "сброс {date}",
+        "retry": "Повторить",
+        "unavailable": "Использование кредитов недоступно",
+        "unavailableCompact": "Кредиты недоступны",
+        "value": "{used} из {limit} кредитов"
+      },
+      "modeTag": {
+        "consent": "Требуется согласие",
+        "exhausted": "Исчерпаны",
+        "payg": "Платное использование включено"
+      },
+      "notice": "Использовано {percent}% включённых ИИ-кредитов · они не возобновляются",
+      "noticeDismiss": "Закрыть уведомление о кредитах",
+      "costs": "Сообщение расходует {chat} кредит. На анализ инцидента расходуется {incident} из тех же кредитов. | Сообщение расходует {chat} кредитов. На анализ инцидента расходуется {incident} из тех же кредитов.",
+      "more": "Другие действия с кредитами",
+      "noticeResets": "Использовано {percent}% включённых ИИ-кредитов · они сбрасываются {date}",
+      "predictedExhausted": "ИИ-кредиты для {org} израсходованы."
+    },
+    "diff": {
+      "accept": "Принять",
+      "acceptRun": "Принять и запустить",
+      "added": "добавлено:",
+      "announce": "Предложен {language}: добавлено строк — {added}, удалено — {removed}",
+      "applied": "Редактор обновлён. Доступен откат.",
+      "current": "Текущий {language}",
+      "from": "из {product}",
+      "notChecked": "не проверено",
+      "parseFailed": "не разбирается",
+      "region": {
+        "alert": "Предлагаемое изменение запроса оповещения",
+        "alert_query": "Предлагаемое изменение запроса оповещения",
+        "anomaly": "Предлагаемое изменение запроса обнаружения",
+        "dashboard": "Предлагаемое изменение запроса панели",
+        "function": "Предлагаемое изменение функции",
+        "json_editor": "Предлагаемое изменение JSON",
+        "logs": "Предлагаемое изменение запроса",
+        "regex": "Предлагаемое изменение шаблона регулярного выражения",
+        "scheduled_query": "Предлагаемое изменение запроса узла"
+      },
+      "reject": "Отклонить",
+      "removed": "удалено:",
+      "reviewInEditor": "Проверить изменение в редакторе",
+      "title": "Предлагаемый {language}",
+      "unknownCount": "{count} неизвестное поле | {count} неизвестных полей",
+      "validated": "проверено",
+      "unknownMark": "Неизвестное поле"
+    },
+    "docs": {
+      "opensInNewTab": "(открывается в новой вкладке)",
+      "setupGuide": "Прочитать руководство по настройке"
+    },
+    "editor": {
+      "protectedFields": "Сохранены имя, организация и id",
+      "title": {
+        "alert": "Оповещение · {name}",
+        "alertNew": "Оповещение · новое оповещение",
+        "function": "Функция · {name}",
+        "functionNew": "Функция · новая функция",
+        "pipeline": "Конвейер · {name}",
+        "pipelineNew": "Конвейер · новый конвейер",
+        "queryNode": "Конвейер · {pipeline} · узел запроса",
+        "queryNodeNew": "Новый конвейер · узел запроса",
+        "regex": "Шаблон регулярного выражения · {name}",
+        "regexNew": "Шаблон регулярного выражения · новый"
+      }
+    },
+    "entity": {
+      "alert": "оповещение | оповещений",
+      "dashboard": "дашборд | дашборды",
+      "destination": "получатель | получатели",
+      "folder": "папка | папки",
+      "function": "функция | функции",
+      "object": "объект | объекты",
+      "panel": "панель | панели",
+      "pipeline": "конвейер | конвейеры",
+      "report": "отчёт | отчёты",
+      "setting": "настройка | настройки",
+      "stream": "поток | потоки",
+      "template": "шаблон | шаблоны",
+      "user": "пользователь | пользователи"
+    },
+    "entry": {
+      "addField": "Добавить поле в чат",
+      "addFiring": "Добавить срабатывание в чат",
+      "addLogRow": "Добавить строку лога в чат",
+      "addPanel": "Добавить панель в чат",
+      "addPreviewRow": "Добавить строку предпросмотра в чат",
+      "addRecord": "Добавить строку лога в чат",
+      "addSeries": "Добавить серию в чат",
+      "addSpan": "Добавить спан в чат",
+      "addTestEvent": "Добавить тестовое событие в чат",
+      "addToChat": "Добавить в чат",
+      "addedAnnounce": "Добавлено в чат, {count} элемент | Добавлено в чат, {count} элементов",
+      "addedBehindCard": "Добавлено в чат. Ответьте на ожидающий вопрос, чтобы отправить.",
+      "addedToDraft": "Добавлено в ваше сообщение. Нажмите «Отправить», когда будете готовы.",
+      "addedToast": "Добавлено в чат",
+      "ask": "Спросить {product}",
+      "assistant": "@:{'brand.askAutobot'}",
+      "buildFailed": "Не удалось подготовить этот запрос",
+      "capReached": "Не добавлено: сообщение заполнено. Удалите элемент и попробуйте снова.",
+      "chip": {
+        "alertFired": "Оповещение · {name} · сработало {time}",
+        "alertNew": "Оповещение · новое оповещение",
+        "database": "База данных · {name}",
+        "logRow": "Строка лога · {name}",
+        "query": "Запрос · {count} строка | Запрос · {count} строк",
+        "reproduce": "Запрос · воспроизводит строки",
+        "series": "Серия · {name}",
+        "service": "Сервис · {name}",
+        "trace": "Трейс · {name}"
+      },
+      "cost": "Использует {count} кредит | Использует {count} кредитов",
+      "createRegex": "Создать шаблон регулярного выражения",
+      "deepLinkMissing": "Не удалось найти элемент для вопроса",
+      "dependencies": "Зависимости",
+      "englishPromptNote": "Запрос отправляется на английском языке.",
+      "explain": "Объяснить",
+      "explainAlert": "Объяснить это оповещение",
+      "explainDependencyNamed": "Объяснить {name}",
+      "explainEdge": "Объяснить эту зависимость",
+      "explainField": "Объяснить это поле",
+      "explainPanel": "Объяснить эту панель",
+      "explainRows": "Объяснить эту строку | Объяснить эти строки ({count})",
+      "explainSeries": "Объяснить эту серию",
+      "explainService": "Объяснить этот сервис",
+      "explainSpan": "Объяснить этот спан",
+      "fix": "@:{'brand.askAutobot'} how to fix this",
+      "inChat": "В чате",
+      "inChatRemove": "В чате. Удалите его с помощью × в панели контекста.",
+      "lockedName": "{label}, заблокировано: запросите у администратора доступ к ИИ",
+      "open": "Открыть",
+      "orgChanged": "Эта страница относится к другой организации. Перезагрузите её, чтобы задать вопрос о ней.",
+      "panelActions": "Действия с панелью",
+      "queuedWhileRunning": "Добавлено в чат. Отправьте, когда текущий ответ завершится.",
+      "rowActions": "Действия со строкой",
+      "setUpIngestion": "Помогите настроить прием данных",
+      "setUpTracing": "Помогите настроить трассировку",
+      "title": {
+        "dependency": "Зависимость · {name}",
+        "emptyResult": "Пустые результаты · {name}",
+        "setUpIngestion": "Настроить прием данных",
+        "setUpTracing": "Настроить трассировку"
+      },
+      "tooltip": {
+        "add": "Добавить в чат",
+        "createRegex": "Write a regex pattern with @:{'brand.autobot'}",
+        "dockedAsk": "Open @:{'brand.autobot'} for this editor",
+        "emptyResult": "Спросить, почему нет совпадений",
+        "explain": "Объяснить это",
+        "explainAlert": "Объяснить это оповещение",
+        "explainEdge": "Проверить эту зависимость",
+        "explainField": "Объяснить это поле",
+        "explainPanel": "Объяснить эту панель",
+        "explainSeries": "Объяснить эту серию",
+        "explainService": "Проверить этот сервис",
+        "explainSpan": "Объяснить этот спан",
+        "fix": "Исправить это замечание",
+        "ingestion": "Загрузить первые данные",
+        "noStream": "Отправить первые данные",
+        "sidebarAsk": "Open @:{'brand.autobot'} with this function",
+        "troubleshootAlert": "Спросить, почему сработало это оповещение",
+        "troubleshootQuery": "Исправить этот запрос",
+        "troubleshootSpan": "Спросить, почему этот спан завершился с ошибкой"
+      },
+      "troubleshoot": "Диагностировать",
+      "troubleshootAlert": "Диагностировать это оповещение",
+      "troubleshootNoResults": "Диагностировать пустые результаты",
+      "troubleshootQuery": "Диагностировать этот запрос",
+      "troubleshootSpan": "Диагностировать этот спан"
+    },
+    "error": {
+      "account_changed": {
+        "title": "Вошёл другой аккаунт. Ваше сообщение не отправлено; перезагрузите страницу, чтобы продолжить с этим аккаунтом."
+      },
+      "admission_busy": {
+        "action": "Повторить",
+        "title": "@:{'brand.autobot'} is busy starting another answer. Your message wasn't sent."
+      },
+      "agent_unavailable": {
+        "action": "Повторить",
+        "body": "Найденное на данный момент сохранено выше.",
+        "title": "@:{'brand.autobot'} didn't respond. Nothing was changed.",
+        "titleAfterChange": "@:{'brand.autobot'} didn't respond."
+      },
+      "already_submitted": {
+        "action": "Перезагрузить чат",
+        "title": "Это сообщение уже отправлено. Перезагрузите чат, чтобы увидеть ответ."
+      },
+      "analysis_in_progress": {
+        "title": "Анализ этого инцидента уже выполняется."
+      },
+      "approval_delivery_failed": {
+        "action": "Отправить ещё раз",
+        "title": "Your decision didn't reach @:{'brand.autobot'}. Nothing was changed."
+      },
+      "approval_elsewhere": {
+        "title": "В другой вкладке этот чат ожидает вашего подтверждения. Ваше сообщение не отправлено."
+      },
+      "approval_expired": {
+        "action": "Запросить снова",
+        "title": "No answer in time, so @:{'brand.autobot'} didn't run this action."
+      },
+      "authorization_unavailable": {
+        "action": "Повторить",
+        "hint": "Списание не производилось.",
+        "title": "Не удалось проверить кредиты ИИ. Ваше сообщение не отправлено."
+      },
+      "cancelled_elsewhere": {
+        "title": "Этот ответ был остановлен из другой вкладки."
+      },
+      "consent_declined": {
+        "title": "Платное использование не включено. Ваше сообщение не отправлено."
+      },
+      "consent_still_required": {
+        "action": "Управлять платным использованием",
+        "actionAdmin": "Управлять платным использованием",
+        "actionMember": "Обратиться к администратору",
+        "body": "Включите его в разделе Биллинг › Платное использование.",
+        "title": "Платное использование не включено для всех организаций, где оно требуется."
+      },
+      "credits_exhausted": {
+        "action": "Управлять платным использованием",
+        "actionAdmin": "Управлять платным использованием",
+        "actionCopy": "Копировать запрос",
+        "actionMember": "Обратиться к администратору",
+        "body": "Кредиты из плана не возобновляются.",
+        "bodyContract": "Свяжитесь с вашим менеджером аккаунта, чтобы добавить кредиты.",
+        "bodyMember": "Администратор {org} может разрешить платное использование в разделе Биллинг › Платное использование.",
+        "bodyPayerMember": "Администратор {payer} может разрешить платное использование.",
+        "bodyResets": "Они возобновятся {date}.",
+        "title": "Кредиты ИИ для {org} израсходованы. Ваше сообщение не отправлено.",
+        "titlePayer": "Кредиты ИИ для {org}, оплачиваемые {payer}, израсходованы. Ваше сообщение не отправлено."
+      },
+      "data_level_blocked": {
+        "action": "Изменить уровень",
+        "actionAdmin": "Изменить уровень",
+        "actionMember": "Обратиться к администратору",
+        "title": "Необработанные строки не передаются модели в {org}."
+      },
+      "empty_response": {
+        "action": "Повторить",
+        "title": "@:{'brand.autobot'} didn't answer."
+      },
+      "history_unavailable": {
+        "action": "Повторить",
+        "title": "Не удалось загрузить историю этого чата. Ваше сообщение не отправлено."
+      },
+      "not_enabled": {
+        "action": "Открыть настройки доступа",
+        "actionAdmin": "Открыть настройки доступа",
+        "actionMember": "Обратиться к администратору",
+        "body": "Прошлые чаты останутся доступными для чтения.",
+        "title": "Доступ к {product} для {org} отключён. Ваше сообщение не отправлено."
+      },
+      "off_for_org": {
+        "action": "Открыть настройки доступа",
+        "actionAdmin": "Открыть настройки доступа",
+        "actionMember": "Обратиться к администратору",
+        "body": "Прошлые чаты останутся доступными для чтения.",
+        "title": "Доступ к {product} для {org} отключён. Ваше сообщение не отправлено."
+      },
+      "offline": {
+        "action": "Повторить",
+        "hint": "Кнопка «Повторить» станет доступна, когда вы снова будете онлайн.",
+        "title": "Вы не в сети. Ваше сообщение не отправлено."
+      },
+      "permission_denied": {
+        "action": "Открыть роли в IAM",
+        "actionAdmin": "Открыть роли в IAM",
+        "actionMember": "Обратиться к администратору",
+        "body": "This chat stays readable. An admin can grant access in IAM › Roles › @:{'brand.autobot'}.",
+        "title": "Ваша роль больше не может использовать {product}. Ваше сообщение не отправлено."
+      },
+      "permission_denied_tool": {
+        "action": "Открыть разрешения ассистента",
+        "actionAdmin": "Открыть разрешения ассистента",
+        "actionMember": "Обратиться к администратору",
+        "body": "Политика ассистента вашей организации блокирует это.",
+        "title": "@:{'brand.autobot'} wasn't allowed to run {tool}."
+      },
+      "persistence_failed": {
+        "action": "Повторить сохранение",
+        "title": "Ответ получен, но не сохранён в истории."
+      },
+      "provider_error": {
+        "action": "Повторить",
+        "body": "Ничего не изменено.",
+        "bodyPartial": "Промежуточные результаты сохранены выше.",
+        "reason": {
+          "modelUnavailable": "не может связаться с моделью",
+          "overloaded": "перегружен",
+          "requestTooLarge": "не может принять такой длинный вопрос",
+          "timedOut": "отвечал слишком долго"
+        },
+        "title": "Провайдер ИИ {reason}, поэтому ответ остановлен.",
+        "titleNoReason": "Провайдер ИИ дал сбой, поэтому ответ остановлен."
+      },
+      "rca_disabled": {
+        "action": "Обратиться к администратору",
+        "body": "Администратор может включить его.",
+        "title": "Анализ инцидентов отключён."
+      },
+      "rate_limited": {
+        "action": "Повторить",
+        "title": "Провайдер ИИ ограничивает запросы. Ваше сообщение не отправлено.",
+        "titleTimed": "Провайдер ИИ ограничивает запросы. Ваше сообщение не отправлено."
+      },
+      "run_limit_member": {
+        "action": "Показать активные чаты",
+        "title": "У вас есть {n} выполняющихся или ожидающих чатов. Ваше сообщение не отправлено."
+      },
+      "run_limit_org": {
+        "action": "Повторить",
+        "title": "{product} перегружен для вашей организации. Ваше сообщение не отправлено."
+      },
+      "restore_required": {
+        "action": "Перезагрузить чат",
+        "title": "Этот чат был сброшен на сервере. Перезагрузите, чтобы продолжить."
+      },
+      "session_expired": {
+        "action": "Войти",
+        "body": "При входе откроется новая вкладка; вернитесь сюда, чтобы отправить.",
+        "title": "Срок действия сеанса истёк. Ваш черновик сохранён."
+      },
+      "session_owner_unavailable": {
+        "action": "Повторить",
+        "title": "Чат был перемещён на другой сервер, и возобновить его не удалось."
+      },
+      "signed_out": {
+        "action": "Войти",
+        "title": "Вы вышли из системы в другой вкладке. Этот ответ был остановлен."
+      },
+      "stale_epoch": {
+        "action": "Перезагрузить чат",
+        "title": "Этот чат был сброшен на сервере. Перезагрузите, чтобы продолжить."
+      },
+      "stopped_before_send": {
+        "action": "Повторить",
+        "title": "Остановлено до отправки. Ваше сообщение не отправлено."
+      },
+      "stream_dropped": {
+        "action": "Повторить",
+        "body": "Промежуточные результаты сохранены выше.",
+        "bodyPartial": "Текст выше неполный.",
+        "title": "Соединение потеряно спустя {elapsed}. Ничего не изменено.",
+        "titleAfterChange": "Соединение потеряно спустя {elapsed}.",
+        "titleAfterChangeNow": "Соединение потеряно.",
+        "titleNow": "Соединение потеряно. Ничего не изменено."
+      },
+      "stream_oversized": {
+        "action": "Повторить",
+        "body": "Ничего не изменено.",
+        "title": "Этот ответ слишком большой для отображения."
+      },
+      "subscription_required": {
+        "action": "Посмотреть планы",
+        "actionAdmin": "Посмотреть планы",
+        "actionMember": "Спросить администратора",
+        "body": "Subscribe to keep using @:{'brand.autobot'}.",
+        "title": "Включённые кредиты ИИ для {org} закончились."
+      },
+      "turn_busy": {
+        "action": "Остановить",
+        "title": "Этот чат всё ещё отвечает. Ваше сообщение не отправлено."
+      },
+      "turn_limit": {
+        "action": "Повторить",
+        "body": "Отправьте снова, когда один из ответов завершится.",
+        "title": "Слишком много ответов выполняется. Ваше сообщение не отправлено."
+      },
+      "unknown": {
+        "action": "Повторить",
+        "status": "Сервер вернул HTTP {status}.",
+        "title": "Что-то пошло не так."
+      },
+      "unreachable": {
+        "action": "Повторить",
+        "title": "Не удалось связаться с OpenObserve. Ваше сообщение не отправлено."
+      },
+      "agent_disabled": {
+        "title": "{agent} отключён для {org}. Ваше сообщение не отправлено.",
+        "action": "Открыть настройки агента",
+        "actionAdmin": "Открыть настройки агента",
+        "actionMember": "Спросить администратора"
+      },
+      "agent_not_permitted": {
+        "title": "Ваша роль не позволяет использовать {agent}. Ваше сообщение не отправлено.",
+        "body": "An admin can grant it in Settings › @:{'brand.autobot'} › Agents.",
+        "action": "Спросить администратора"
+      },
+      "agent_unreachable": {
+        "title": "{agent} сейчас недоступен. Ваше сообщение не отправлено.",
+        "action": "Попробовать снова"
+      },
+      "handoff_failed": {
+        "title": "Не удалось передать этот чат агенту {agent}. {fromAgent} оставил его у себя.",
+        "body": "Ваше сообщение всё ещё в этом чате.",
+        "action": "Попробовать снова"
+      }
+    },
+    "errorDetails": {
+      "chat": "Чат",
+      "code": "Код",
+      "copied": "Детали скопированы",
+      "copy": "Копировать детали",
+      "httpStatus": "HTTP-статус",
+      "serverMessage": "Сообщение сервера",
+      "title": "Детали",
+      "trace": "Трейс",
+      "turn": "Ход",
+      "when": "Когда"
+    },
+    "evidence": {
+      "copied": "Запрос скопирован",
+      "fromStep": "из шага {n}",
+      "groupName": "Запрос {language} к потоку {stream}, {range}",
+      "groupNameNoStream": "Запрос {language}, {range}",
+      "lastMinutes": "последние {count} мин",
+      "noRows": "В этом диапазоне нет строк",
+      "noStreamAccess": "У вас нет доступа к потоку {stream}",
+      "openHint": "Открывается с загруженным запросом",
+      "opensNewTab": "{label} (открывается в новой вкладке)",
+      "otherOrg": "Этот запрос принадлежит организации {org}. Переключите организацию, чтобы выполнить его.",
+      "queryFailed": "Запрос не выполнен: {reason}",
+      "queryFailedPlain": "Запрос не выполнен",
+      "rangeFallback": "диапазон: неизвестен · выполняется за последние 15 мин",
+      "rangeUnknown": "диапазон: неизвестен",
+      "resultsOf": "Результаты {name}",
+      "rowsCount": "{count} строка | {count} строк",
+      "rowsScannedWindow": "{count} строка · {took} · просканировано {size} · {window} | {count} строк · {took} · просканировано {size} · {window}",
+      "rowsWindow": "{count} строка · {took} · {window} | {count} строк · {took} · {window}",
+      "runNow": "Выполнить сейчас",
+      "runNowHint": "Открывает {explorer} с загруженным запросом; запуск выполняется там.",
+      "sawRows": "@:{'brand.autobot'} got {count} row | @:{'brand.autobot'} got {count} rows",
+      "sawRowsIn": "@:{'brand.autobot'} got {count} row in {range} | @:{'brand.autobot'} got {count} rows in {range}",
+      "stopped": "Остановлено",
+      "windowCapped": "{window} (обрезано до последних 7 дней)",
+      "askAdmin": "Спросите администратора",
+      "line": "{count} запрос, {range} | {count} запросов, {range}",
+      "stepsLine": "{count} шаг, {range} | {count} шагов, {range}",
+      "noAccess": "{n} ссылка недоступна: нет доступа к {stream} | {n} ссылок недоступно: нет доступа к {stream}",
+      "noAccessPlain": "{n} ссылка недоступна | {n} ссылок недоступно"
+    },
+    "export": {
+      "approved": "Одобрено вами в {time}",
+      "attachment": "[вложение: {name}]",
+      "denied": "Отклонено вами в {time}",
+      "doneOf": {
+        "create": "Создано {done} из {total}",
+        "delete": "Удалено {done} из {total}",
+        "update": "Обновлено {done} из {total}"
+      },
+      "ended": "Этот ответ не был завершён",
+      "exportedLine": "Экспортировано {time} {zone} · {org}",
+      "image": "[изображение: {name}]",
+      "steps": "Выполнено {n} шаг ({names}) | Выполнено {n} шагов ({names})",
+      "stopped": "Остановлено в {time} · результаты сохранены",
+      "you": "Вы"
+    },
+    "findings": {
+      "confidence": "Уверенность: {level}",
+      "inferred": "Предположительно",
+      "level": {
+        "high": "высокая",
+        "inconclusive": "неопределённая",
+        "low": "низкая",
+        "medium": "средняя"
+      },
+      "ruledOut": "Исключено",
+      "inferredLine": "Предположительно: {text}",
+      "next": "Далее: {text}",
+      "notEstablished": "Не установлено: {text}",
+      "ruledOutLine": "Исключено: {text}",
+      "showRaw": "Показать исходные результаты",
+      "unreadable": "Не удалось показать результаты."
+    },
+    "footer": {
+      "credits": "{count} кредит | {count} кредитов",
+      "creditsCountedHint": "Кредиты учитываются при принятии запроса.",
+      "evaluated": "Проанализировано {range}",
+      "evaluatedMore": "Проанализировано {range} и ещё {count} окно | Проанализировано {range} и ещё {count} окон",
+      "includedCredits": "{count} включённый кредит | {count} включённых кредитов",
+      "notSaved": "не сохранено",
+      "notSavedHint": "Этот ответ был получен, но его не удалось сохранить в историю",
+      "queries": "{count} запрос | {count} запросов",
+      "refunded": "0 кредитов · возвращено",
+      "rerun": "Перезапустить для «сейчас»",
+      "rerunFor": "Перезапустить для {range}",
+      "theLastDays": "последний {n} день | последние {n} дней",
+      "theLastHours": "последние {n} ч",
+      "theLastMinutes": "последние {n} мин",
+      "tokens": "{tokens} токенов · {count} вызов модели | {tokens} токенов · {count} вызовов модели",
+      "tryWider": "Попробуйте последние {duration}"
+    },
+    "fork": {
+      "contextNote": "Ваше первое сообщение использует общий чат как контекст.",
+      "divider": "Ваш чат начинается здесь",
+      "failed": "Не удалось продолжить этот чат",
+      "regionName": "Продолжение {title}",
+      "seedLost": "The shared chat is no longer available, so @:{'brand.autobot'} won't have its earlier messages.",
+      "seedMissing": "Общая история чата недоступна на этом устройстве",
+      "sendAnyway": "Всё равно отправить",
+      "showTurns": "Показать {count} общую реплику | Показать {count} общих реплик",
+      "sourceGone": "· источник больше недоступен",
+      "sourceHeading": "Продолжение «{title}» · поделился {owner} · снимок на {time}",
+      "title": "{title} (продолжение)",
+      "titleN": "{title} (продолжение {n})",
+      "toast": "Продолжение в ваших чатах",
+      "unavailable": "Эта ссылка больше недоступна, поэтому продолжить нельзя."
+    },
+    "gate": {
+      "announce": {
+        "locked": "{product} недоступен для вашей роли."
+      },
+      "checkAgain": "Проверить снова",
+      "checkAgainHint": "Только что получили доступ?",
+      "close": "Закрыть",
+      "learnMore": "Узнать, что он умеет",
+      "learnTitle": "Что делает {product}",
+      "noPermission": {
+        "askAdmin": "Обратитесь к администратору",
+        "body": "Администратор может предоставить доступ в {whereToGrant}.",
+        "title": "{product} недоступен для вашей роли",
+        "tooltip": "Попросите администратора предоставить доступ к ИИ",
+        "unknownNotice": "Возможно, ваша роль не включает {product}. Если отправка не удалась, обратитесь к администратору."
+      },
+      "noShare": {
+        "tooltip": "Только администраторы могут делиться чатами"
+      },
+      "noShareRead": {
+        "body": "Попросите администратора предоставить доступ к обмену чатами.",
+        "title": "У вас нет доступа к общим чатам в этой организации"
+      },
+      "notConfigured": {
+        "body": "No agent target is configured for this deployment, so @:{'brand.autobot'} is off for everyone.",
+        "setup": "Set up @:{'brand.autobot'}",
+        "title": "{product} ещё не настроен"
+      },
+      "notEntitled": {
+        "capability1": "Объясняет любую строку логов, спан или панель",
+        "capability2": "Пишет SQL, PromQL и VRL на основе обычного текста",
+        "capability3": "Предлагает исправления, которые вы утверждаете",
+        "pitch": "{product} вместе с вами исследует логи, трейсы и метрики, пишет запросы и предлагает изменения, которые вы утверждаете. Это часть OpenObserve Enterprise и Cloud.",
+        "seePlans": "Посмотреть планы",
+        "title": "Знакомьтесь: {product}",
+        "tooltip": "{product} входит в OpenObserve Enterprise и Cloud"
+      },
+      "offForOrg": {
+        "body": "Past chats stay readable. An admin can turn it on in Settings › @:{'brand.autobot'}.",
+        "title": "{product} отключён для этой организации"
+      },
+      "openAccessSettings": "Открыть настройки доступа",
+      "tryAgain": "Повторить",
+      "unhealthy": {
+        "body": "The @:{'brand.autobot'} service isn't responding. Try again in a few minutes.",
+        "notice": "{product} не отвечает. На ваше последнее сообщение не ответили.",
+        "title": "{product} сейчас недоступен",
+        "tooltip": "{product} сейчас недоступен"
+      },
+      "whereToGrant": "{iam} › {roles} › {group}"
+    },
+    "grants": {
+      "always": "Всегда",
+      "alwaysAsk": "Удаления, изменения биллинга, IAM и сроков хранения всегда требуют подтверждения.",
+      "browserEmpty": "В этом браузере нет постоянных разрешений.",
+      "columns": {
+        "actions": "Действия",
+        "grantedAt": "Выдано",
+        "grantedBy": "Кем выдано",
+        "scope": "Область",
+        "tool": "Инструмент или операция"
+      },
+      "empty": "Нет постоянных разрешений",
+      "loadFailed": "Не удалось загрузить постоянные разрешения.",
+      "openChat": "Открыть чат",
+      "revoke": "Отозвать",
+      "revokeNamed": "Отозвать разрешение «всегда разрешать» для {tool}",
+      "revoked": "Approval revoked. @:{'brand.autobot'} will ask next time.",
+      "thisChat": "Этот чат",
+      "title": "Постоянные разрешения",
+      "unsupported": "Для разрешений на уровне организации нужна более новая версия сервера.",
+      "yours": "Ваши разрешения",
+      "yoursInBrowser": "Ваши разрешения в этом браузере"
+    },
+    "header": {
+      "announceFailed": "Не удалось получить ответ: {title}.",
+      "announceNeedsYou": "{product} требует вашего внимания: {title}.",
+      "announceReady": "Ответ готов: {title}.",
+      "announceWorkingElsewhere": "Ответ формируется в другой вкладке: {title}.",
+      "answeringName": "{product}, отвечает",
+      "answeringNameOpen": "{product}, отвечает, открыто",
+      "enterpriseName": "{product}, функция Enterprise и Cloud",
+      "failedName": "{product}, последний ответ завершился ошибкой",
+      "lockedName": "{product}, заблокировано",
+      "nameOpen": "{product}, открыто",
+      "needsYouCountName": "{product}, требует вашего внимания, {count} в ожидании",
+      "needsYouCountNameOpen": "{product}, требует вашего внимания, {count} в ожидании, открыто",
+      "needsYouName": "{product}, требует вашего внимания",
+      "needsYouNameOpen": "{product}, требует вашего внимания, открыто",
+      "offName": "{product}, не настроено",
+      "open": "Открыть",
+      "readyName": "{product}, ответ готов",
+      "stateDone": "Ответ готов: {title}",
+      "stateFailed": "Не удалось получить ответ: {title}",
+      "stateOpen": "{product} · Открыто",
+      "stateRunningCount": "{count} ответ выполняется | {count} ответов выполняется",
+      "stateWorking": "Формируется ответ: {title}",
+      "toastReady": "Ответ готов · {title}",
+      "tooltip": "@:{'brand.askAutobot'}",
+      "unavailableName": "{product}: недоступен",
+      "toastFailed": "Не удалось: {title}",
+      "goTo": "Перейти в {product}"
+    },
+    "helper": {
+      "checking": "Проверка…",
+      "discarded": "Предложение отклонено. Запросите новое.",
+      "editorPlaceholder": {
+        "js": "Напишите функцию JavaScript, например: return event",
+        "promql": "Напишите запрос PromQL, например: rate(http_requests_total[5m])",
+        "vrl": "Напишите функцию VRL, например: .status = \"active\""
+      },
+      "inserted": "Вставлено",
+      "noChange": "В редакторе это уже есть.",
+      "syntax": {
+        "missing": "Отсутствует {char}",
+        "unclosed": "Незакрытый {char}",
+        "unexpected": "Неожиданный {char} в строке {line}, столбец {column}"
+      },
+      "generating": "Генерация… {seconds} с",
+      "overBudget": "Больше обычного лимита"
+    },
+    "history": {
+      "allPinned": "Все 100 чатов закреплены. Открепите или удалите один, чтобы сохранять новые чаты.",
+      "clearAll": {
+        "action": "Удалить все чаты",
+        "bodyLocal": "Удаляет чат, сохранённый в этом браузере для {org}. Закреплённые чаты также удаляются. | Удаляет сохранённые в этом браузере чаты ({count}) для {org}. Закреплённые чаты также удаляются.",
+        "bodyServer": "Удаляет их со всех устройств и отзывает ссылки общего доступа: {links}. Чаты, которые ещё формируют ответ, останавливаются.",
+        "confirm": "Удалить {count} чат | Удалить {count} чатов",
+        "confirmAll": "Удалить все чаты",
+        "confirmWord": "удалить",
+        "deleting": "Удаление…",
+        "done": "Удалён {count} чат | Удалено {count} чатов",
+        "doneAll": "Все ваши чаты удалены",
+        "failed": "Не удалось удалить ваши чаты",
+        "linksUnknown": "Не удалось подсчитать ссылки общего доступа. Все существующие будут отозваны.",
+        "title": "Удалить {count} чат? | Удалить все {count} чатов?",
+        "titleAll": "Удалить все ваши чаты в {org}?",
+        "typeToConfirm": "Введите «удалить» для подтверждения"
+      },
+      "clearOnSignOut": "Удалять мои чаты в браузере при выходе",
+      "delete": {
+        "bodyLocal": "Удаляет чат из этого браузера.",
+        "bodyServer": "Удаляет чат со всех устройств и останавливает текущий ответ.",
+        "links": {
+          "checking": "Проверка ссылок общего доступа…",
+          "count": "Его {count} активная ссылка перестанет работать | Его {count} активных ссылок перестанут работать",
+          "unknown": "Не удалось проверить ссылки общего доступа. При удалении они отзываются."
+        },
+        "running": "Этот чат всё ещё формирует ответ. Удаление остановит его.",
+        "title": "Удалить «{title}»?"
+      },
+      "deleteAction": "Удалить",
+      "deleteFailed": "Не удалось удалить чат",
+      "deleted": "Чат удалён",
+      "details": "Подробности",
+      "download": "Скачать",
+      "exportMarkdown": "Экспорт в Markdown",
+      "downloadAll": "Скачать все",
+      "downloadFailed": "Не удалось сформировать файл для скачивания",
+      "downloaded": "Скачано",
+      "empty": {
+        "title": "Чатов пока нет"
+      },
+      "filter": {
+        "active": "Фильтр · {n}",
+        "agent": "Агент",
+        "alertOrIncident": "Оповещение или инцидент",
+        "button": "Фильтр",
+        "clear": "Очистить фильтры",
+        "pinned": "Закреплённые",
+        "queryEditor": "Редактор запросов или функций",
+        "remove": "Удалить фильтр {filter}",
+        "shared": "Общие",
+        "show": "Показать",
+        "started": "Начато с",
+        "investigations": "Расследования",
+        "autoRuns": "Автозапуски",
+        "all": "Все"
+      },
+      "filterEmpty": "Нет чатов, соответствующих этим фильтрам",
+      "group": {
+        "browser": "В этом браузере",
+        "needsYou": "Требуют внимания",
+        "older": "Старые",
+        "pinned": "Закреплённые",
+        "running": "Выполняются",
+        "today": "Сегодня",
+        "week": "Предыдущие 7 дней",
+        "yesterday": "Вчера"
+      },
+      "import": {
+        "dismiss": "Закрыть",
+        "download": "Скачать",
+        "error": "Что-то пошло не так при перемещении чатов. Неперемещённые останутся в этом браузере.",
+        "failed": "Не удалось переместить {count} чат | Не удалось переместить {count} чатов",
+        "forbidden": "Ваша роль не позволяет создавать чаты. Попросите администратора предоставить доступ к ИИ.",
+        "move": "Переместить чаты",
+        "moved": "Перемещено {done} из {count}",
+        "never": "Больше не спрашивать",
+        "notNow": "Не сейчас",
+        "offer": "В этом браузере сохранено {count} чатов. Переместить их в аккаунт, чтобы они отображались на всех устройствах?",
+        "offline": "Вы не в сети. Чаты останутся в этом браузере, пока вы не попробуете снова.",
+        "progress": "Перемещение {done} из {count}…",
+        "retry": "Повторить",
+        "unavailable": "В этом браузере сохранено {count} чатов, и их пока нельзя переместить."
+      },
+      "loadOlder": "Загрузить более старые",
+      "loadedOlder": "Загружен {count} старый чат | Загружено {count} старых чатов",
+      "localOnly": {
+        "adminHelp": "Установите O2_AI_CHAT_PERSISTENCE_ENABLED, чтобы хранить чаты на сервере.",
+        "adminLink": "Читать документацию",
+        "description": "Чаты, сохранённые только в этом браузере, {count} из {cap}",
+        "help": "Чаты остаются в этом браузере.",
+        "info": "Об истории браузера",
+        "keptOnSignOut": "Ваши чаты в браузере были сохранены при выходе из аккаунта.",
+        "title": "Сохранено только в этом браузере"
+      },
+      "matchCount": "Найден {count} чат | Найдено {count} чатов",
+      "noMatch": "Нет чатов, соответствующих “{q}”",
+      "offline": "Вы не в сети · показаны чаты, сохранённые в этом браузере",
+      "open": "Открыть",
+      "openFailed": "Не удалось открыть этот чат",
+      "origin": {
+        "alert": "Оповещение",
+        "browser": "Браузер",
+        "editor": "Редактор",
+        "incident": "Инцидент"
+      },
+      "pending": {
+        "delete": "Удаление…",
+        "pin": "Закрепление…",
+        "rename": "Переименование…"
+      },
+      "pin": "Закрепить",
+      "pinFailed": "Не удалось закрепить чат",
+      "pinLocal": "Закрепить (в этом браузере)",
+      "pinned": "Закреплено",
+      "prune": "{count} из {cap} чатов",
+      "pruned": "Удалён самый старый чат, чтобы освободить место: «{title}»",
+      "readOnly": "Вы можете читать свои чаты. Для начала или продолжения чата нужен доступ к ИИ.",
+      "rename": "Переименовать",
+      "rowMenu": "Действия для {title}",
+      "search": "Поиск чатов",
+      "searchInvestigations": "Поиск расследований",
+      "investigationsEmpty": "Расследований пока нет",
+      "draftTag": "Черновик",
+      "serverError": "Не удалось загрузить ваши чаты",
+      "serverErrorCached": "Показаны чаты, сохранённые в этом браузере · Не удалось связаться с сервером",
+      "sharedLinks": "Общие ссылки",
+      "sharedByMe": "Мои общие ссылки",
+      "sharedPublic": "По публичной ссылке",
+      "state": {
+        "answering": "Отвечает",
+        "draft": "Черновик",
+        "expired": "Истёк",
+        "failed": "Ошибка",
+        "needsYou": "Ждёт вас"
+      },
+      "storageBlocked": "Не удалось сохранить в этом браузере. Приватные окна и заполненное хранилище блокируют историю.",
+      "title": "Чаты",
+      "traceId": "ID трейса {id}",
+      "unpin": "Открепить",
+      "unpinLocal": "Открепить (в этом браузере)",
+      "unpinned": "Откреплено",
+      "view": {
+        "back": "Назад к чату: {title}",
+        "title": "Все чаты"
+      },
+      "deleteChat": "Удалить чат",
+      "deleteDraft": "Удалить локальный черновик",
+      "kept": "Хранится {days} дн.",
+      "lastTried": "Последняя попытка {time}",
+      "listMenu": "Действия со списком чатов",
+      "serverErrorAgain": "По-прежнему не удалось загрузить ваши чаты",
+      "stop": "Остановить",
+      "titlesOnly": "Поиск по названиям уже загруженных чатов",
+      "autoRuns": {
+        "empty": "В этой организации пока нет автозапусков",
+        "openName": "Открыть {title}, {state}"
+      }
+    },
+    "label": {
+      "acceptedAt": "Принято {time}",
+      "askAgain": "Спросить снова",
+      "edited": "Отредактировано после {product}",
+      "provenance": "Об этом изменении",
+      "restoredAssistant": "Restored the version from @:{'brand.autobot'}.",
+      "restoredOriginal": "Восстановлена ваша исходная версия.",
+      "revert": "Откатить",
+      "revertAi": "Revert to the version from @:{'brand.autobot'}",
+      "revertMine": "Вернуться к моей исходной версии",
+      "revertName": "Откатить изменение ассистента",
+      "short": "ИИ",
+      "shortName": "ИИ, {label}",
+      "written": "Написано {product}"
+    },
+    "link": {
+      "cantOpen": "Здесь это открыть нельзя",
+      "fromAnswer": "Ссылка в ответе",
+      "groupName": "{title}, {details}",
+      "id": "ID {id}",
+      "more": "Другие действия со ссылкой",
+      "newTab": "Открыть в новой вкладке",
+      "open": {
+        "alert": "Открыть оповещение «{name}»",
+        "alerts": "Открыть оповещения",
+        "chat": "Открыть чат",
+        "dashboard": "Открыть дашборд «{name}»",
+        "dashboards": "Открыть дашборды",
+        "functions": "Открыть функции",
+        "incident": "Открыть инцидент «{name}»",
+        "incidents": "Открыть инциденты",
+        "pipeline": "Открыть конвейер «{name}»",
+        "pipelines": "Открыть конвейеры",
+        "trace": "Открыть трейс {id}",
+        "services": "Открыть сервисы",
+        "service": "Открыть сервис «{name}»",
+        "ingestion": "Открыть источники данных",
+        "home": "Вернуться на главную"
+      },
+      "openAction": "Открыть",
+      "opened": "Открыто · {time}",
+      "openIn": "Открыть в {explorer}",
+      "redacted": "Связанное представление (детали скрыты)",
+      "unsupported": "Этот получатель не поддерживается в этой версии"
+    },
+    "mcp": {
+      "copyConfiguration": "Копировать конфигурацию",
+      "deepLinkTokenNote": "Эта ссылка содержит ваш токен доступа.",
+      "headerSubtitle": "Используйте OpenObserve из своего агента, например {claude}, {cursor} или {vscode}.",
+      "parityLine": "Ваш агент получает те же инструменты и разрешения, что и {product}. Инструменты, которые может использовать сам {product}, настраиваются в {link}.",
+      "replaceToken": "Замените {token} на токен, созданный выше, или на Base64 от email:token сервисного аккаунта.",
+      "skillsHint": "Учит вашего агента выполнять запросы, настраивать оповещения и создавать дашборды в {brand}.",
+      "toolsetsPath": "Settings › @:{'brand.autobot'} › Toolsets"
+    },
+    "message": {
+      "actionsName": "Действия с сообщением",
+      "chipsName": "Контекст, отправленный с этим сообщением",
+      "codeName": "Код, {lang}",
+      "copyAnswer": "Копировать ответ",
+      "copyMarkdown": "Копировать как Markdown",
+      "copyPrompt": "Копировать",
+      "creditsUsedUp": "Кредиты ИИ для этой организации исчерпаны",
+      "edit": "Изменить и отправить снова",
+      "editedFrom": "Изменено из сообщения {n}",
+      "editLabel": "Изменить ваше сообщение",
+      "editSend": "Отправить",
+      "evaluatedStamp": "Оценено {range} · {n} запрос | Оценено {range} · {n} запросов",
+      "fenceSource": "поток {stream} · {range}",
+      "firstVersion": "Это первая версия",
+      "imageRemoved": "Изображение с внешнего сайта удалено",
+      "latestVersion": "Это последняя версия",
+      "meta": "{who} · {time}",
+      "more": "Другие действия",
+      "nextVersion": "Следующая версия",
+      "olderHidden": "Более раннее продолжение скрыто",
+      "openImage": "Открыть изображение {name}",
+      "previousVersion": "Предыдущая версия",
+      "regenerate": "Сгенерировать заново",
+      "tableName": "Таблица",
+      "versionName": "Версия {n} из {count}",
+      "versionOf": "{n} из {count}",
+      "you": "Вы",
+      "metaHandoff": "{meta} · агенту {agent}",
+      "toAgent": "Агенту {agent}",
+      "copyChatId": "Скопировать ID чата",
+      "shareAnswer": "Скопировать ссылку на этот ответ",
+      "linkCopied": "Ссылка скопирована",
+      "linkCopiedPrivate": "Ссылка скопирована · открыть можете только вы",
+      "linkCopiedOrg": "Ссылка скопирована · пользователи из {org} с доступом к общим чатам могут её открыть",
+      "linkCopiedPublic": "Ссылка скопирована · открыть может любой, у кого есть ссылка",
+      "branch": "Создать ветку в новом чате",
+      "branchTitle": "Ветка от {title}",
+      "branchedFrom": "Ответвлено от",
+      "branchFailed": "Не удалось создать ветку этого чата",
+      "newTag": "Новое"
+    },
+    "name": "@:{'brand.autobot'}",
+    "limit": {
+      "slotFree": "Чат завершён. Теперь можно отправлять сообщения."
+    },
+    "notice": {
+      "decision": "Требуется ваше участие",
+      "delete": "Удалить {entity}"
+    },
+    "outcome": {
+      "actions": {
+        "askAdmin": "Обратиться к администратору",
+        "changeLevel": "Изменить уровень",
+        "managePaidUsage": "Управлять платным использованием",
+        "openIamRoles": "Открыть роли IAM",
+        "openSettings": "Открыть настройки ассистента",
+        "reloadChat": "Перезагрузить чат",
+        "sendAgain": "Отправить снова",
+        "signIn": "Войти",
+        "stopIt": "Остановить",
+        "viewPlans": "Посмотреть планы"
+      },
+      "askAgain": "Спросить снова",
+      "backOnline": "Вы снова в сети.",
+      "canRetryNow": "Теперь можно повторить попытку.",
+      "editResend": "Изменить и отправить снова",
+      "manualRoute": "Открыть вместо этого в {explorer}",
+      "noSnapshot": "Исходное сообщение больше недоступно для повтора. Отправьте его заново из поля ввода.",
+      "openHere": "Открыть здесь",
+      "readonlyFailed": "Ошибка: {title}",
+      "retry": "Повторить",
+      "retryIn": "Повтор через {s} с",
+      "retryOffline": "Повторить, когда снова будете онлайн",
+      "signedIn": "Вход выполнен. Можно повторить.",
+      "stopItFailed": "Не удалось остановить другой ответ. Попробуйте ещё раз.",
+      "stopItSent": "Другому ответу отправлен запрос на остановку.",
+      "tryLater": "Повторите позже",
+      "useAgentInstead": "Использовать {agent} вместо этого",
+      "keepGoingWith": "Продолжить с {agent}"
+    },
+    "plan": {
+      "deselectHint": "Снимите отметки с того, что хотите оставить.",
+      "heading": "Я удалю {count} {entity}:",
+      "itemsName": "Элементы для удаления",
+      "largeBatch": "Большая партия: {count} {entity}",
+      "onlyThese": "Удалить только эти: {names}",
+      "showAll": "Показать все {count}",
+      "unlisted": "{count} элемент без названия также включён | {count} элементов без названия также включены"
+    },
+    "policy": {
+      "autoDeclined": "Declined by @:{'brand.autobot'} safety settings",
+      "denied": "Заблокировано политикой: {tool}. {detail}",
+      "deniedAdmin": "An admin can allow it in Settings › @:{'brand.autobot'} › Permissions.",
+      "deniedPlain": "Заблокировано политикой: {tool}.",
+      "unreviewed": "@:{'brand.autobot'} changed {count} {entity} without a review step.",
+      "unreviewedAction": "Посмотреть, что изменилось",
+      "unreviewedActionName": "Посмотреть, что изменилось (откроется в новой вкладке)"
+    },
+    "query": {
+      "alert": "Создать черновик оповещения",
+      "copy": "Копировать запрос",
+      "dashboard": "Добавить на дашборд",
+      "insert": "Вставить как diff",
+      "more": "Другие действия с запросом",
+      "showAllLines": "Показать все {count} строк",
+      "showFewerLines": "Показать меньше строк",
+      "newTab": "Открыть в новой вкладке",
+      "open": "Открыть в {explorer}",
+      "openShort": "Логи",
+      "run": "Запустить",
+      "running": "Выполняется… · {n} с",
+      "stop": "Остановить",
+      "openAll": "Открыть в {explorer} для всех: {count}"
+    },
+    "record": {
+      "compacted": "Earlier context was summarised by @:{'brand.autobot'} at {time}",
+      "theModel": "модель"
+    },
+    "scroll": {
+      "jumpToLatest": "Перейти к последнему",
+      "jumpToLatestCount": "Перейти к последнему · новых: {count}",
+      "jumpToLatestName": "Перейти к последнему, новых: {count}"
+    },
+    "settings": {
+      "access": {
+        "builtInAdmin": "Чат, общий доступ, наборы инструментов",
+        "builtInEditor": "Чат, наборы инструментов",
+        "builtInViewer": "Нет доступа",
+        "cancel": "Отмена",
+        "enabled": "@:{'brand.autobot'} enabled for this organization",
+        "enabledLine": "Участники сохраняют свои прошлые чаты.",
+        "grantedPerRole": "Доступ предоставляется по ролям в {whereToGrant}",
+        "noRole": "Вошедшие пользователи без роли (по умолчанию для SSO) не имеют доступа.",
+        "notice": "Элементы управления для организации требуют более новой версии сервера.",
+        "orgSharing": "Участники с правом на общий доступ могут делиться чатами в этой организации",
+        "publicOff": {
+          "confirm": "Отключить публичные ссылки",
+          "message": "{count} существующая ссылка перестанет работать. | {count} существующих ссылок перестанут работать.",
+          "title": "Отключить публичные ссылки?"
+        },
+        "publicSharing": "Разрешить публичные ссылки",
+        "publicSharingDeploymentOff": "Публичные ссылки отключены для этого развёртывания (ZO_PUBLIC_AI_CHAT_ENABLED).",
+        "publicSharingLine": "Параметры публичных ссылок исчезнут из диалога общего доступа.",
+        "rbacOff": "Role-based access is off, so every user can use @:{'brand.autobot'}.",
+        "roles": {
+          "allRoles": "IAM › Роли",
+          "capped": "Показано {shown} из {total} ролей. Все роли смотрите в {link}.",
+          "chat": "Может общаться в чате",
+          "grant": "Предоставить доступ к чату",
+          "grantNamed": "Предоставить доступ к чату для {role}",
+          "loadFailed": "Не удалось загрузить роли.",
+          "noChat": "Нет доступа к чату",
+          "title": "Роли в этой организации",
+          "unknown": "Неизвестно"
+        },
+        "save": "Сохранить",
+        "saved": "@:{'brand.autobot'} settings saved",
+        "sharing": "Общий доступ",
+        "tier": "Уровень разрешений по умолчанию",
+        "tierAct": "Действовать с одобрения",
+        "tierActLine": "Участники одобряют инструменты для каждого чата или всегда. Удаления всегда требуют подтверждения.",
+        "tierNeedsAgent": "Требуется более новая версия агента для применения",
+        "tierPropose": "Предлагать изменения",
+        "tierProposeLine": "Каждое изменение требует одобрения участника.",
+        "tierRead": "Чтение и запросы",
+        "tierReadLine": "Выполняет только запросы. Ничего не меняет.",
+        "tierStored": "Сохранённый уровень: {tier}. Применяется, когда агент сможет его применять.",
+        "offInOrg": "Отключено в этой организации",
+        "onInOrg": "Включено в этой организации",
+        "turnOff": {
+          "confirm": "Отключить",
+          "done": "{product} отключён для {org}",
+          "message": "Отключить {product} для {org}? Выполняющиеся ответы будут остановлены. Участники сохранят историю чатов.",
+          "pending": "Отключится после подтверждения",
+          "title": "Отключить {product}?"
+        },
+        "valueOff": "Выкл.",
+        "valueOn": "Вкл.",
+        "whoCanUse": "Кто может использовать",
+        "you": "Вы: {access}",
+        "youChat": "чат",
+        "youChatShare": "чат, общий доступ",
+        "youNone": "нет доступа",
+        "youUnknown": "пока неизвестно"
+      },
+      "adminOnly": "Только администраторы организации могут изменять эти настройки.",
+      "data": {
+        "about": "О передаче данных",
+        "aboutProvider": "Ответы создаются с помощью {provider}.",
+        "aboutRedaction": "Сначала применяются правила скрытия конфиденциальных данных.",
+        "level": "Данные, передаваемые модели",
+        "levelAggregates": "Схема и агрегаты",
+        "levelAggregatesLine": "Количество, процентили и гистограммы; без отдельных строк.",
+        "levelRaw": "Схема, агрегаты и сырые строки",
+        "levelRawLine": "Могут передаваться строки логов, атрибуты спанов и примеры значений.",
+        "levelSchema": "Только схема",
+        "levelSchemaLine": "Только имена потоков и полей; без значений.",
+        "notice": "Для уровней передачи данных нужны более новые версии сервера и агента."
+      },
+      "env": {
+        "help": "Задаётся при развёртывании",
+        "notReported": "Не сообщается этой версией сервера",
+        "setBy": "Задано в {env}"
+      },
+      "forbidden": "У вас нет доступа к этой настройке.",
+      "history": {
+        "browserBody": "Не синхронизируется между устройствами. До 100 чатов на участника; очищается вместе с данными браузера.",
+        "browserTitle": "Сохраняется только в браузере каждого участника",
+        "deleteLine": "Удаление чата удаляет его везде и отзывает его ссылки.",
+        "off": "Выкл.",
+        "on": "Вкл.",
+        "persistence": "История на сервере",
+        "persistenceHelp": "Включите в развёртывании, чтобы хранить чаты на сервере.",
+        "publicLinks": "Публичные ссылки",
+        "publicLinksOff": "выкл.",
+        "publicLinksOn": "вкл., до {days} дня | вкл., до {days} дней",
+        "retention": "Срок хранения",
+        "retentionDays": "{days} день | {days} дней",
+        "retentionForever": "до удаления",
+        "serverTitle": "Сохраняется на сервере"
+      },
+      "leaveName": "the @:{'brand.autobot'} settings of {org}",
+      "offInDeployment": "@:{'brand.autobot'} is off in this deployment.",
+      "pageTitle": "@:{'brand.autobot'}",
+      "railDesc": "Статус, доступ, данные, история, использование, наборы инструментов, разрешения и активность",
+      "status": {
+        "agentEnabled": "@:{'brand.autobot'} enabled",
+        "agentHa": "Высокая доступность",
+        "agentUrl": "Адрес агента",
+        "agentVersion": "Версия агента",
+        "approvals": "Changes by @:{'brand.autobot'}",
+        "approvalsNotEnforced": "Отказано: O2_AI_INTERNAL_SECRET не задан, поэтому ни одно одобренное изменение не может быть применено.",
+        "checked": "Проверено",
+        "clientError": "Агент не ответил · последний раз замечен в этом браузере",
+        "configured": "Настроено",
+        "dataShared": "Данные передаются",
+        "healthUnsupported": "Для проверки работоспособности нужна более новая версия сервера.",
+        "lastError": "Последняя ошибка",
+        "lastErrorNone": "нет",
+        "model": "Модель",
+        "modelHidden": "Скрыто от участников",
+        "notSetUp": "Не настроено",
+        "notSetUpMember": "@:{'brand.autobot'} isn't set up for this deployment. Ask an administrator.",
+        "offBody": "Отключено пользователем {actor} {date}. Участники по-прежнему могут открывать свои прошлые чаты.",
+        "offBodyUnknown": "Отключено для этой организации. Участники по-прежнему могут открывать свои прошлые чаты.",
+        "offForOrg": "Отключено для этой организации",
+        "openAccess": "Открыть настройки доступа",
+        "reachable": "Доступен",
+        "unreachable": "Недоступен",
+        "unreachableBody": "Members see @:{'brand.autobot'} as unavailable.",
+        "notEntitled": "Не входит в вашу лицензию",
+        "notEntitledBody": "Your license doesn't include @:{'brand.autobot'}. Contact your account team."
+      },
+      "tabs": {
+        "access": "Доступ",
+        "activity": "Активность",
+        "data": "Данные",
+        "history": "История",
+        "permissions": "Разрешения",
+        "status": "Статус",
+        "toolsets": "Наборы инструментов",
+        "usage": "Использование"
+      },
+      "test": {
+        "button": "Проверить",
+        "failed": "Проверка не пройдена: {cause}",
+        "failedRow": "не пройдено · {cause} · {when}",
+        "lastTest": "Последняя проверка",
+        "passed": "Проверка пройдена за {duration}",
+        "passedRow": "пройдено за {duration} · {when}",
+        "running": "Проверка…",
+        "unknownCause": "причина не указана"
+      },
+      "title": "@:{'brand.autobot'}",
+      "usage": {
+        "allowance": "Лимит кредитов",
+        "answered": "Отвечено",
+        "caps": "Ограничения",
+        "capsLine": "Дополнительные ответы блокируются и не тарифицируются.",
+        "consentLine": "Платное использование не включено. При следующем ответе у участников запросят согласие.",
+        "exhaustedLine": "Участники видят: «ИИ-кредиты для {org} израсходованы».",
+        "failed": "С ошибкой",
+        "longest": "Самый длинный ответ",
+        "managePaid": "Управлять платным использованием",
+        "notMetered": "Это развёртывание не тарифицируется.",
+        "perMember": "Активные ответы на участника",
+        "perNode": "Активные ответы на узел",
+        "perOrg": "Активные ответы на организацию",
+        "period": "Текущий расчётный период",
+        "stopped": "Остановлено",
+        "turns": "Ходы"
+      },
+      "voice": {
+        "browser": "В браузере",
+        "browserHelp": "Большинство браузеров отправляют аудио в речевой сервис своего поставщика.",
+        "help": "Участники могут диктовать и редактировать текст перед отправкой.",
+        "localOnly": "Сохраняется в этом браузере, только для вас.",
+        "off": "Выключено",
+        "offHelp": "В этом браузере никто не может диктовать.",
+        "readOnly": "Для серверного распознавания речи требуется более новая версия сервера.",
+        "title": "Голосовая диктовка"
+      }
+    },
+    "runs": {
+      "agent": {
+        "general": "{product}",
+        "investigator": "@:{'brand.autobotInvestigate'}",
+        "queryBuilder": "Конструктор запросов"
+      },
+      "chatInOrg": "Чат в {org}",
+      "review": "Проверка",
+      "stop": "Остановить",
+      "summary": {
+        "answering": "{count} в процессе ответа",
+        "needs": "{count} ждёт вас | {count} ждут вас"
+      },
+      "state": {
+        "reconnecting": "Переподключение"
+      }
+    },
+    "share": {
+      "allOrgAdminOnly": "Только администраторы организации видят все общие чаты.",
+      "allLinks": "Все общие ссылки",
+      "anotherLink": "Создать ещё одну ссылку",
+      "attachmentHidden": "Вложение скрыто",
+      "attachmentsHiddenTag": "Вложения скрыты",
+      "attachmentsIncluded": "Прикреплённые строки и изображения включены в эту ссылку.",
+      "changeExpiry": "Изменить срок действия",
+      "changeExpiryFor": "Изменить срок действия для {title}",
+      "changeSettings": "Изменить настройки",
+      "content": "Содержимое",
+      "copied": "Ссылка скопирована",
+      "copyLink": "Копировать ссылку",
+      "copyLinkFor": "Копировать ссылку для {title}",
+      "createAndCopy": "Создать и скопировать ссылку",
+      "createLiveAndCopy": "Создать ссылку в реальном времени и скопировать",
+      "createdNotCopied": "Ссылка создана. Копирование было заблокировано, поэтому ссылка показана, чтобы вы могли её скопировать.",
+      "createdNotCopiedMenu": "Ссылка создана, но копирование было заблокировано. Откройте «Управление ссылками», чтобы скопировать её.",
+      "createFailed": "Не удалось создать ссылку",
+      "created": "Ссылка создана",
+      "createdCopied": "Ссылка создана и скопирована",
+      "createdToast": "Ссылка скопирована. Пользователи в {org} с доступом к общим чатам могут её открыть.",
+      "empty": {
+        "all": "В этой организации нет общих чатов.",
+        "mine": "Вы ещё не делились ни одним чатом."
+      },
+      "expires": "Истекает",
+      "expiresOn": "Истекает {time}",
+      "forbidden": "У вас нет разрешения делиться чатами.",
+      "hideAttachments": "Скрыть вложения",
+      "hideTools": "Скрыть данные инструментов",
+      "hideToolsFor": "Скрыть данные инструментов для {title}",
+      "historyUnavailable": "Историю этого чата сейчас не удаётся загрузить, поэтому поделиться им нельзя.",
+      "link": "Ссылка",
+      "liveFollows": "В реальном времени, следит за новыми сообщениями",
+      "liveMode": "В реальном времени",
+      "loadFailed": "Не удалось загрузить ваши ссылки",
+      "manage": "Управлять ссылкой",
+      "managerTitle": "Общие ссылки",
+      "never": "Никогда",
+      "noStoredMessages": "В этом чате пока нет сохранённых сообщений, поэтому поделиться им нельзя.",
+      "notSavedBlocked": "Последний ответ в этом чате не сохранён, поэтому пока нельзя поделиться этим чатом.",
+      "nothingToShare": "Сначала отправьте сообщение",
+      "offline": "Вы не в сети",
+      "openFailed": "Не удалось открыть чат",
+      "org": "Организация",
+      "outOfDateTag": "Устарело",
+      "public": "Все, у кого есть ссылка",
+      "publicMax": "Публичные ссылки истекают через {days} дн.",
+      "publicNeedsAttachmentRedaction": "Публичные ссылки пока не могут скрывать вложения на этом сервере.",
+      "publicOff": "Публичные ссылки отключены для этого развёртывания.",
+      "redactTools": "Скрыть входные и выходные данные инструментов",
+      "reviewTooltip": "Проверьте, что содержит эта ссылка, прежде чем делиться ею.",
+      "revoke": "Отозвать",
+      "revokeConfirm": "Отозвать эту ссылку? У тех, у кого она есть, доступ пропадёт сразу.",
+      "revokeFailed": "Не удалось отозвать ссылку",
+      "revokeFor": "Отозвать ссылку для {title}",
+      "revoked": "Ссылка отозвана",
+      "rowMenu": "Действия со ссылкой для {title}",
+      "scope": {
+        "all": "Все в организации",
+        "mine": "Мои"
+      },
+      "scopeLabel": "Показать ссылки",
+      "share": "Поделиться",
+      "shared": "Общий доступ",
+      "sharedBy": "Поделился {name}",
+      "sharedOrg": "Доступно вашей организации",
+      "sharedPublic": "Доступно всем, у кого есть ссылка",
+      "show": "Показать",
+      "showTools": "Показать данные инструментов",
+      "showToolsConfirm": "Показать входные и выходные данные инструментов всем, у кого есть эта ссылка?",
+      "showToolsFor": "Показать данные инструментов для {title}",
+      "snapshot": "Снимок",
+      "snapshotAsOf": "Снимок · на {time}",
+      "snapshotNow": "Снимок чата в текущем виде",
+      "snapshotWaits": "Доступно после завершения ответа",
+      "snapshotUpdated": "Снимок обновлён",
+      "switchLive": "Переключить на реальное время",
+      "switchLiveFor": "Переключить {title} на реальное время",
+      "switchSnapshot": "Переключить на снимок",
+      "switchSnapshotFor": "Переключить {title} на снимок",
+      "title": "Поделиться чатом",
+      "toolsHidden": "Инструменты скрыты",
+      "tooltip": "Поделиться снимком с вашей организацией. Данные инструментов остаются скрытыми.",
+      "updateBlocked": "Сначала завершите или остановите ответ",
+      "updateBlockedRow": "Дождитесь завершения ответа",
+      "updateFailed": "Не удалось обновить ссылку",
+      "updateSnapshot": "Обновить снимок",
+      "updateSnapshotFor": "Обновить снимок для {title}",
+      "views": "{count} просмотр | {count} просмотров",
+      "visibilityFixed": "Чтобы изменить, кто может её открыть, создайте новую ссылку.",
+      "waitForAnswer": "Дождитесь завершения ответа, чтобы поделиться снимком. Ссылки в реальном времени — в настройках общего доступа.",
+      "who": "Кто может открыть",
+      "whoContinue": "Чтобы продолжить его в своих чатах, также нужен доступ к ИИ.",
+      "whoOrg": "Пользователи в {org}, имеющие доступ к общим чатам, могут его прочитать.",
+      "whoPublic": "Любой, у кого есть ссылка, может его прочитать.",
+      "changedSince": "Изменено после снимка",
+      "readersNeedAccess": "Читателям нужен доступ к ИИ, чтобы продолжить его.",
+      "yourOrg": "Ваша организация"
+    },
+    "shared": {
+      "attachmentsHidden": "Вложения скрыты владельцем.",
+      "backoff": "Проверка каждую минуту",
+      "brand": "Общий доступ из OpenObserve",
+      "brandHome": "Главная OpenObserve",
+      "by": "Общий доступ от {name}",
+      "continue": "Продолжить в моих чатах",
+      "continueAgain": "Продолжить снова",
+      "continueLocked": "Вы можете прочитать этот чат. Чтобы продолжить его, нужен доступ к ИИ — обратитесь к администратору.",
+      "copied": "Скопировано",
+      "copyMarkdown": "Копировать как Markdown",
+      "goToApp": "Перейти в OpenObserve",
+      "goToChats": "Перейти к моим чатам",
+      "live": "В реальном времени · последнее изменение {time}",
+      "loadFailed": "Не удалось загрузить этот общий чат",
+      "markdownYou": "Вы",
+      "more": "Другие действия",
+      "notFound": {
+        "body": "Возможно, ссылка неверна, отозвана или её срок действия истёк, либо чат был удалён.",
+        "title": "Этот общий чат недоступен"
+      },
+      "offline": "Вы не в сети · показано то, что загрузилось на момент {time}",
+      "offlineTitle": "Вы не в сети",
+      "openApp": "Открыть OpenObserve",
+      "openCopy": "Открыть мою копию",
+      "openCopyTooltip": "Открывает копию, которую вы продолжили в этом браузере",
+      "openMine": "Открыть в моих чатах",
+      "ossTitle": "Общие чаты входят в OpenObserve Enterprise и Cloud",
+      "owner": "Владелец",
+      "rateLimited": "Слишком много читателей сейчас · повторная проверка через {seconds} с",
+      "redacted": "Владелец скрыл входные и выходные данные инструментов. Вам видны ответы и то, какие инструменты выполнялись.",
+      "running": "Всё ещё отвечает · запущено {ago} · обновляется автоматически",
+      "signIn": "Войдите, чтобы продолжить в OpenObserve",
+      "snapshot": "Снимок по состоянию на {time}",
+      "streamHidden": "Некоторые доказательства скрыты: они получены из потоков, к которым у вас нет доступа.",
+      "streamHiddenBlock": "Скрыто · у вас нет доступа к потоку {stream}",
+      "truncated": "Самые ранние реплики не включены, поскольку чат слишком большой, чтобы поделиться им полностью.",
+      "truncatedDivider": "Ранние реплики не включены",
+      "updated": "Обновлено новыми сообщениями"
+    },
+    "shell": {
+      "answeringElsewhere": "Отвечает в другой вкладке",
+      "answeringElsewherePolling": "Всё ещё отвечает в другой вкладке",
+      "answeringHerePolling": "Всё ещё отвечает",
+      "approvalElsewhere": "Ожидает вашего подтверждения в другой вкладке",
+      "approvalNotAnswerableHere": "Ожидает вашего подтверждения в другой вкладке",
+      "close": "Закрыть {product}",
+      "deletedElsewhere": "Этот чат был удалён в другом месте",
+      "deletedInAnotherTab": "Этот чат был удалён в другой вкладке",
+      "discardChanges": "Отменить изменения",
+      "dockTooNarrow": "Открыто в боковой панели: этот редактор слишком узок для закреплённого чата",
+      "keep": "Оставить",
+      "keepEditing": "Продолжить редактирование",
+      "leaveGuardBody": "При выходе изменения в {name} будут потеряны.",
+      "leaveGuardThisAlert": "это оповещение",
+      "leaveGuardThisPattern": "этот паттерн",
+      "leaveGuardTitle": "Несохранённые изменения",
+      "loadFailed": "Не удалось загрузить этот чат",
+      "loadingChat": "Загрузка чата…",
+      "newChat": "Новый чат",
+      "notFound": "Этот чат недоступен",
+      "orgSwitchRunningBody": "{count} ответ всё ещё выполняется в {org}. Остановить его или оставить выполняться там? | {count} ответов всё ещё выполняются в {org}. Остановить их или оставить выполняться там?",
+      "orgSwitchRunningTitle": "Ответы всё ещё выполняются в {org}",
+      "orgSwitchWithdrawn": "Оставить — значит отозвать {count} ожидающее одобрение. | Оставить — значит отозвать {count} ожидающих одобрений.",
+      "otherAccount": "Выполнен вход в другой аккаунт. Перезагрузите страницу, чтобы продолжить.",
+      "placeDock": "Рядом с редактором",
+      "placeWindow": "Плавающее окно",
+      "prefersWindowHint": "Эта страница сохраняет ширину при плавающем окне",
+      "refresh": "Обновить",
+      "reload": "Перезагрузить",
+      "resetWidth": "Сбросить ширину",
+      "resizeHandle": "Изменить размер ассистента",
+      "resizeHandleValue": "{width} rem",
+      "sheetExpand": "Показать больше",
+      "sheetPeek": "Показать меньше",
+      "sheetSnap": {
+        "full": "Полная высота",
+        "half": "Половина высоты",
+        "peek": "Свёрнуто"
+      },
+      "signOutRunningBody": "{count} ответ всё ещё выполняется. Выход остановит его. | {count} ответов всё ещё выполняются. Выход остановит их.",
+      "signOutRunningTitle": "Ответы всё ещё выполняются",
+      "signedOutElsewhere": "Вы вышли из системы в другой вкладке.",
+      "skipLink": "Перейти к {product}",
+      "startNewChat": "Начать новый чат",
+      "stillRunningRefresh": "Всё ещё выполняется. Обновите, чтобы проверить снова.",
+      "stop": "Остановить",
+      "stopAndSignOut": "Остановить и выйти",
+      "width": "Ширина",
+      "widthDefault": "По умолчанию",
+      "widthExpanded": "Развёрнуто",
+      "widthExpandedHint": "Половина окна",
+      "widthLimit": "Достигнут предел ширины",
+      "widthNarrower": "Уже",
+      "widthNoRoom": "Недостаточно места при таком размере окна",
+      "widthWider": "Шире",
+      "loadFailedAgain": "Всё ещё не удалось загрузить этот чат · последняя попытка: {time}",
+      "openAs": "Открыть как",
+      "sidePanel": "Боковая панель",
+      "fullPage": "Полная страница",
+      "newChatFullPage": "Новый чат на всю страницу",
+      "popOut": "Плавающее окно"
+    },
+    "tray": {
+      "close": "Закрыть {title}"
+    },
+    "window": {
+      "dropSidebar": "Закрепить как боковую панель",
+      "dropTray": "Свернуть",
+      "gripMove": "Переместить или изменить размер {title}",
+      "gripResize": "Изменить размер {title}",
+      "minimise": "Свернуть в трей",
+      "moveKeyboard": "Перемещать с клавиатуры",
+      "moveModeHint": "Стрелки — перемещение · Shift+стрелки — изменение размера · Enter — разместить · Esc — отмена",
+      "name": "{product}, {title}",
+      "narrower": "Уже",
+      "resetSize": "Сбросить размер",
+      "resizeKeyboard": "Изменить размер с клавиатуры",
+      "resizeModeHint": "Стрелки — изменение размера · Enter — сохранить · Esc — отмена",
+      "shorter": "Ниже",
+      "sizeLimit": "Достигнут предел размера",
+      "taller": "Выше",
+      "wider": "Шире",
+      "stillAnswering": "{title} всё ещё отвечает",
+      "close": "Закрыть окно"
+    },
+    "signout": {
+      "deleteLocal": "Также удалить мои чаты в браузере на этом устройстве"
+    },
+    "step": {
+      "create": "Создание {resource}",
+      "delete": "Удаление {resource}",
+      "done": "Готово",
+      "failed": "Ошибка",
+      "fallback": "Выполняется {tool}",
+      "GetAlert": "Чтение оповещения",
+      "GetAlertHistory": "Чтение истории оповещений",
+      "GetCurrentServiceGraphTopology": "Чтение графа сервисов",
+      "GetDashboard": "Чтение дашборда",
+      "GetLatestTraces": "Чтение последних трейсов",
+      "interrupted": "Прервано",
+      "ListAlerts": "Получение списка оповещений",
+      "ListDashboards": "Получение списка дашбордов",
+      "ListDestinations": "Получение списка получателей",
+      "ListIncidents": "Получение списка инцидентов",
+      "running": "Выполняется",
+      "SearchAlerts": "Поиск оповещений",
+      "SearchPromQL": "Запрос метрик",
+      "SearchSQL": "Запрос {stream}",
+      "StreamList": "Получение списка потоков",
+      "StreamSchema": "Чтение схемы {stream}",
+      "TraceSearch": "Поиск трейсов",
+      "update": "Обновление {resource}"
+    },
+    "steps": {
+      "exit": "exit {code}",
+      "failedCount": "С ошибкой: {count}",
+      "fields": "{count} поле | {count} полей",
+      "hiddenByOwner": "{count} шаг скрыт владельцем | {count} шагов скрыто владельцем",
+      "inputEvents": "{count} входное событие | {count} входных событий",
+      "lines": "{count} строка | {count} строк",
+      "outputTruncated": "Вывод обрезан",
+      "rowName": "{step}, {state}",
+      "rows": "{count} строка | {count} строк",
+      "stderrLines": "stderr {count} строка | stderr {count} строк",
+      "step": {
+        "created": "Создано: {resource}",
+        "deleted": "Удалено: {resource}",
+        "listed": "Получен список потоков",
+        "queried": "Выполнен запрос к {stream}",
+        "queriedMetrics": "Запрошены метрики",
+        "queryFailed": "Запрос не выполнен",
+        "ran": "Выполнена команда {command}",
+        "ranTool": "Запущен инструмент {tool}",
+        "schema": "Прочитана схема для {stream}",
+        "searchedTraces": "Выполнен поиск трейсов",
+        "toolFailed": "{tool}: ошибка",
+        "tools": {
+          "ListIncidents": "Получен список инцидентов",
+          "ListAlerts": "Получен список оповещений",
+          "SearchAlerts": "Выполнен поиск оповещений",
+          "GetAlert": "Прочитано оповещение",
+          "GetAlertHistory": "Прочитана история оповещений",
+          "ListDestinations": "Получен список получателей",
+          "ListDashboards": "Получен список дашбордов",
+          "GetDashboard": "Прочитан дашборд",
+          "GetLatestTraces": "Прочитаны последние трейсы",
+          "GetCurrentServiceGraphTopology": "Прочитан граф сервисов"
+        },
+        "updated": "Обновлено: {resource}"
+      },
+      "stoppedBeforeFinish": "остановлено до завершения",
+      "streams": "{count} поток | {count} потоков",
+      "summary": "{count} шаг | {count} шагов",
+      "window": "{from} → {to}",
+      "windowShowing": "{from} → {to} · Показано {shown} из {total} строк"
+    },
+    "strip": {
+      "review": "Запрос на проверку",
+      "reviewExpires": "Запрос на проверку · истекает через {time}",
+      "reviewLabel": "Проверить"
+    },
+    "thread": {
+      "delete": "Удалить чат",
+      "download": "Скачать",
+      "downloadJson": "JSON",
+      "downloadMarkdown": "Markdown",
+      "draftKept": "Ваш черновик сохранён в «{title}»",
+      "historyUnavailable": "История недоступна",
+      "keepsAnswering": "«{title}» продолжает отвечать",
+      "loadToContinue": "Загрузите чат, чтобы продолжить",
+      "newAnnounce": "Новый чат",
+      "newChat": "Новый чат",
+      "alreadyNew": "Этот чат уже новый",
+      "windowsFull": "Закройте чат, чтобы начать новый",
+      "newChatTitle": "Новый чат",
+      "notSaved": "Не сохранено",
+      "pin": "Закрепить",
+      "rename": "Переименовать",
+      "renameFailed": "Не удалось переименовать чат",
+      "renameLabel": "Название чата",
+      "renameChat": "Переименовать чат",
+      "renamed": "Переименовано",
+      "thisChat": "Этот чат",
+      "renaming": "Переименование…",
+      "titleCounter": "{count}/200",
+      "unpin": "Открепить",
+      "allChats": "Все чаты",
+      "moreChats": "Ещё {count}",
+      "noOtherChats": "Других чатов пока нет",
+      "newChatAbout": "Новый чат о {object}",
+      "titleName": "{title}, чаты и действия с чатами",
+      "titleNameNeeds": "{title}, чаты и действия с чатами, ещё {count} чат требует вашего внимания | {title}, чаты и действия с чатами, ещё {count} чатов требуют вашего внимания",
+      "titleNameAnswering": "{title}, чаты и действия с чатами, ещё {count} чат отвечает | {title}, чаты и действия с чатами, ещё {count} чатов отвечают",
+      "titleTooltip": "{title} · {summary}",
+      "toolbar": {
+        "more": "Другие действия",
+        "newChat": "Новый чат",
+        "openAs": "Открыть как"
+      }
+    },
+    "toolsets": {
+      "add": "Новый набор инструментов",
+      "clash": "Конфликт имён",
+      "clashTip": "Both reach @:{'brand.autobot'} as {agent}; one hides the other.",
+      "columns": {
+        "actions": "Действия",
+        "enabled": "Включено",
+        "kind": "Тип",
+        "lastUsed": "Последнее использование",
+        "name": "Название",
+        "status": "Статус"
+      },
+      "deleteFailed": "Не удалось удалить {name}.",
+      "deleteMessage": "{product} и анализ инцидентов потеряют этот инструмент в следующем ответе.",
+      "deleteNamed": "Удалить {name}",
+      "deleteTitle": "Удалить {name}?",
+      "deleted": "{name} удалён",
+      "editNamed": "Изменить {name}",
+      "empty": "Add an MCP server or a skill @:{'brand.autobot'} can use.",
+      "emptyTitle": "Наборов инструментов пока нет",
+      "enableFailed": "Не удалось обновить {name}.",
+      "enabledFor": "Включено, {name}",
+      "form": {
+        "added": "Набор инструментов добавлен",
+        "agentName": "@:{'brand.autobot'} calls this {agent}",
+        "back": "Назад к наборам инструментов",
+        "descriptionHelp": "Опишите, что он делает и когда его использовать.",
+        "descriptionLabel": "What @:{'brand.autobot'} should use this tool for",
+        "editTitle": "Изменить набор инструментов",
+        "enterAgain": "Введите значение ещё раз",
+        "wholeNumber": "Введите целое число больше 0",
+        "insertTemplate": "Вставить шаблон",
+        "kindLocked": "Тип нельзя изменить после создания.",
+        "leaveName": "изменится на {name} в {org}",
+        "loadFailed": "Не удалось загрузить этот набор инструментов.",
+        "maskValue": "*** — так отправляется сохранённый секрет. Введите реальное значение.",
+        "mcpSection": "MCP-сервер",
+        "nameClash": "Another toolset already reaches @:{'brand.autobot'} as {agent}",
+        "newTitle": "Новый набор инструментов",
+        "reenterDestination": "Введите все секреты заново перед сохранением изменённого URL.",
+        "reenterRefused": "Сервер сбросил сохранённые секреты из-за этого изменения. Введите все секреты заново, затем сохраните.",
+        "reenterSecret": "Сохранённые секреты нельзя оставить рядом с новым или заменённым. Введите все секреты заново перед сохранением.",
+        "retypeNotice": "Эта версия сервера требует заново ввести все секреты при сохранении.",
+        "saveFailed": "Не удалось сохранить набор инструментов.",
+        "skillTemplate": "## Когда использовать\n\n## Шаги\n\n## Примеры\n",
+        "updated": "Набор инструментов обновлён"
+      },
+      "healthUnsupported": "Статус, последнее использование и включение отдельных наборов инструментов требуют более новой версии сервера.",
+      "kinds": {
+        "generic": "Универсальный",
+        "mcp": "MCP-сервер",
+        "skill": "Навык"
+      },
+      "loadFailed": "Не удалось загрузить наборы инструментов.",
+      "mcpLine": "Чтобы использовать OpenObserve из собственного агента, см. {link}.",
+      "mcpLink": "MCP-сервер",
+      "moreFor": "Другие действия для {name}",
+      "notSetUp": "Toolsets take effect once @:{'brand.autobot'} is set up.",
+      "runtimeRule": "Используется в {product} и при анализе инцидентов.",
+      "search": "Поиск наборов инструментов",
+      "secret": {
+        "hide": "Скрыть значение",
+        "keep": "Оставить текущее",
+        "keyLocked": "Замените значение, чтобы переименовать",
+        "remove": "Удалить",
+        "removeHeader": "Удалить заголовок {key}",
+        "replace": "Заменить",
+        "show": "Показать значение",
+        "unchanged": "Без изменений",
+        "willReplace": "Будет заменено при сохранении"
+      },
+      "status": {
+        "disabled": "Отключено",
+        "failing": "Сбой",
+        "failingNow": "Сбой начался только что · {cause}",
+        "failingNowPlain": "Сбой начался только что",
+        "failingSince": "Сбой с {when}",
+        "never": "Не использовался",
+        "ok": "OK",
+        "okIn": "OK · {ms} мс"
+      },
+      "test": "Проверить",
+      "testFailed": "Проверка не удалась для {name}: {cause}",
+      "testFailedPlain": "Проверка не удалась для {name}",
+      "testFailedRequest": "не удалось выполнить проверку",
+      "testNamed": "Проверить {name}",
+      "testPassed": "Проверка {name} пройдена за {ms} мс",
+      "testUnsupported": "для проверки нужна более новая версия сервера",
+      "testing": "Проверка",
+      "viewOnly": "Только просмотр. Для редактирования нужно разрешение Toolsets."
+    },
+    "transcript": {
+      "answerName": "{agent}, ответ на {prompt}",
+      "earlierCount": "{count} более раннее сообщение | {count} более ранних сообщений",
+      "followUps": "Дополнительные вопросы",
+      "name": "Беседа с {product}",
+      "showEarlier": "Показать предыдущие сообщения",
+      "turnLabel": "Ход {n}: {prompt}"
+    },
+    "turn": {
+      "cancelUnconfirmed": "Сервер может всё ещё завершать этот ответ.",
+      "caughtUp": "Синхронизировано",
+      "compacting": "Сжатие предыдущих сообщений",
+      "connecting": "Подключение…",
+      "continue": "Продолжить",
+      "continuePrefill": "Продолжить",
+      "done": "Готово",
+      "elapsedMinutes": "{m} мин {s} с",
+      "elapsedSeconds": "{n} с",
+      "elsewhere": "Ответ формируется в другой вкладке",
+      "messageRestored": "Ваше сообщение восстановлено",
+      "moreRunning": "{label} и ещё {count}",
+      "noResponse": "Нет ответа уже {n} с",
+      "notSaved": "Ответ получен, но не сохранён в истории.",
+      "reconnecting": "Переподключение…",
+      "restored": "Этот чат был перенесён на другой сервер и продолжен.",
+      "retrying": "Повторная попытка обращения к провайдеру ИИ · попытка {n}",
+      "retryingIn": "Повторная попытка обращения к провайдеру ИИ через {s} с · попытка {n}",
+      "retryNote": "Повтор не отменит уже внесённые изменения.",
+      "retrySave": "Повторить сохранение",
+      "returnedToPrevious": "Ваше сообщение возвращено в предыдущий чат",
+      "sending": "Отправка…",
+      "sendLabel": "Отправить сообщение",
+      "stopLabel": "Остановить ответ",
+      "stopped": "Остановлено",
+      "stoppedWithSteps": "Остановлено после {n} шага · результаты сохранены | Остановлено после {n} шагов · результаты сохранены",
+      "stepN": "шаг {n}",
+      "stopping": "Остановка…",
+      "thinking": "Размышление",
+      "thinkingAbout": "Анализ {count} результата | Анализ {count} результатов",
+      "waitingApproval": "Ожидание вашего подтверждения",
+      "waitingConsent": "Ожидание вашего решения о платном использовании",
+      "withElapsed": "{status} · {elapsed}",
+      "writing": "Формирование ответа",
+      "ageDays": "{n} дн.",
+      "ageHours": "{n} ч",
+      "connectionLost": "Соединение потеряно. Ответ выше не завершён.",
+      "confidence": {
+        "high": "Высокая уверенность",
+        "inconclusive": "Неоднозначно",
+        "low": "Низкая уверенность",
+        "medium": "Средняя уверенность"
+      },
+      "continueDraft": "Продолжить ответ выше",
+      "dataAge": "Данные {age} назад",
+      "rerun": "Запустить снова",
+      "stoppedAfter": "Остановлено после {n} шага, не завершено | Остановлено после {n} шагов, не завершено",
+      "stoppedIncomplete": "Остановлено, не завершено"
+    },
+    "voice": {
+      "allowTitle": "Разрешить доступ к микрофону",
+      "allowBody": "Нажмите на замок в адресной строке, разрешите доступ к микрофону и перезагрузите эту страницу.",
+      "cancelled": "Диктовка отменена.",
+      "continue": "Продолжить",
+      "dictate": "Диктовать",
+      "engine": {
+        "apple": "Safari распознаёт речь в текст с помощью службы распознавания речи Apple.",
+        "device": "Ваш браузер распознаёт речь в текст на этом устройстве.",
+        "google": "Chrome распознаёт речь в текст с помощью службы распознавания речи Google.",
+        "microsoft": "Edge распознаёт речь в текст с помощью службы распознавания речи Microsoft.",
+        "vendor": "Служба распознавания речи вашего браузера преобразует речь в текст."
+      },
+      "enterToSend": "Нажмите Enter ещё раз, чтобы отправить.",
+      "error": {
+        "how": "Как разрешить доступ",
+        "mic_denied": "Доступ к микрофону заблокирован для этого сайта.",
+        "no_mic": "Микрофон не найден. Подключите его и повторите попытку.",
+        "no_speech": "Ничего не слышно. Попробуйте ещё раз.",
+        "service_unreachable": "Не удалось подключиться к службе распознавания речи {vendor}.",
+        "service_unreachable_generic": "Не удалось подключиться к службе распознавания речи вашего браузера.",
+        "stt_unavailable": "Распознавание речи остановлено. Распознанный текст сохранён.",
+        "time_limit": "Диктовка останавливается через 2 минуты. Нажмите на микрофон, чтобы продолжить."
+      },
+      "listening": "Слушаю",
+      "notNow": "Не сейчас",
+      "primerBody": "Ничего не отправляется, пока вы не нажмёте «Отправить».",
+      "primerEngine": "{engineSentence} OpenObserve не сохраняет аудио.",
+      "primerTitle": "Надиктовать сообщение",
+      "holdLine": "Отпустите {keys}, чтобы остановить",
+      "started": "Слушаю. Enter — отправить, Escape или микрофон — остановить.",
+      "stopTooltip": "Остановить диктовку",
+      "stopped": "Диктовка остановлена. Добавлено {count} слово. | Диктовка остановлена. Добавлено {count} слов.",
+      "stoppedEnter": "Диктовка остановлена. Добавлено {count} слово. Нажмите Enter, чтобы отправить. | Диктовка остановлена. Добавлено {count} слов. Нажмите Enter, чтобы отправить.",
+      "tooltip": "Диктовать · Удерживайте {keys}",
+      "tryAgain": "Попробовать снова",
+      "waitingPermission": "Ожидание разрешения",
+      "waitingShort": "Ожидание",
+      "allowPrompt": "Разрешите доступ к микрофону в запросе браузера.",
+      "privacy": "Ваш браузер может передавать аудио своему поставщику.",
+      "processing": "Завершение",
+      "offAdmin": "Диктовка отключена в этом браузере.",
+      "silent": "Браузер не распознал речь в текст. Перезагрузите страницу и повторите попытку.",
+      "language": "Диктовка недоступна для языка {language} — языка вашего браузера."
+    },
+    "welcome": {
+      "lastRange": "за последние {period}",
+      "launcher": {
+        "ask": "Спросить",
+        "inputName": "Спросить {product}",
+        "recentThreads": "Недавние чаты",
+        "askEmpty": "Введите вопрос или прикрепите изображение"
+      },
+      "prefill": {
+        "append": "Добавить",
+        "cancel": "Отмена",
+        "question": "Заменить ваш черновик предложением?",
+        "replace": "Заменить"
+      },
+      "starter": {
+        "otherToolToO2": "Преобразовать запрос из другого инструмента в OpenObserve SQL",
+        "mapStreamSchema": "Сопоставить схему `{stream}`",
+        "alerts": {
+          "1": "Какие оповещения чаще всего срабатывали за последние 24 часа?",
+          "2": "Составьте оповещение об ошибках в `{stream}`",
+          "2Generic": "Составьте оповещение об ошибках"
+        },
+        "dashboard": {
+          "1": "Что изменилось на «{dashboard}» за последние {range}?",
+          "2": "Объясните панель с самым большим изменением",
+          "1Generic": "Что недавно изменилось на этом дашборде?"
+        },
+        "function": {
+          "1": "Напишите VRL для разбора JSON из поля `message`",
+          "2": "Объясните, что делает эта функция"
+        },
+        "home": {
+          "attention": "Что требует внимания прямо сейчас?",
+          "errorsSummary": "Сделайте сводку ошибок в `{stream}`",
+          "slowSpans": "У каких сервисов были самые медленные спаны за последний час?",
+          "service": "Почему {service} {signal}?",
+          "incident": "Что стало причиной {title}?",
+          "noAlert": "Какое оповещение должно отслеживать ошибки {service}?",
+          "ingest": {
+            "logs": "Как отправить первые логи?",
+            "traces": "Как отправить трейсы?",
+            "metrics": "Как отправить метрики?"
+          },
+          "signal": {
+            "errors": "сбоит",
+            "latency": "медленный"
+          }
+        },
+        "ingest": {
+          "1": "Покажите, как отправлять логи из моего приложения",
+          "2": "Настройте прием данных для Kubernetes",
+          "3": "Что можно сделать после поступления данных?"
+        },
+        "jsonEditor": {
+          "2": "Проверьте этот JSON на ошибки",
+          "alert": "Объясните условия этого оповещения",
+          "pipeline": "Объясните, что делает этот конвейер"
+        },
+        "learn": "Что вы умеете?",
+        "logs": {
+          "1": "Почему ошибки в `{stream}` резко выросли за последние {range}?",
+          "2": "Кратко опишите, что сейчас в `{stream}`",
+          "1Generic": "Почему ошибки в моих логах недавно резко выросли?",
+          "2Generic": "Кратко опишите, что сейчас в моих логах"
+        },
+        "metrics": {
+          "1": "Напишите PromQL для p95-задержки `{metric}`",
+          "2": "Какие метрики перестали поступать?",
+          "1Generic": "Напишите PromQL для p95-задержки"
+        },
+        "recent": "Продолжить «{title}»",
+        "regex": {
+          "1": "Напишите шаблон для маскировки адресов электронной почты",
+          "2": "Проверьте этот шаблон на последних строках `{stream}`",
+          "2Generic": "Проверьте этот шаблон на последних строках"
+        },
+        "sqlEditor": {
+          "1": "Напишите SQL для ошибок по сервисам с долей более 5 % за последний час",
+          "2": "Проверьте этот запрос на `{stream}`",
+          "2Generic": "Проверьте этот запрос"
+        },
+        "traces": {
+          "1": "У каких сервисов были самые медленные спаны за последние {range}?",
+          "1Generic": "У каких сервисов недавно были самые медленные спаны?"
+        }
+      },
+      "viewAll": "Показать все",
+      "whatCanYouDo": "Что вы умеете?"
+    },
+    "rca": {
+      "tag": "Анализ инцидента",
+      "prompt": "Объясните этот отчёт об анализе инцидента",
+      "incidentPrompt": "Объясните этот инцидент",
+      "reportChip": "{run} · {size}",
+      "runAnalysis": "Запустить анализ",
+      "status": {
+        "starting": "Запуск анализа… {elapsed}",
+        "analysing": "Анализ · {elapsed}"
+      }
+    },
+    "oncall": {
+      "continue": "Continue in @:{'brand.autobot'}"
+    },
+    "autoobserve": {
+      "askChip": "Запрос AutoObserve · {name}",
+      "continueTooltip": "Открывает {product} с прикреплённым запросом"
+    },
+    "agent": {
+      "o2": {
+        "name": "{product}",
+        "purpose": "Отвечает на вопросы и помогает с задачами"
+      },
+      "investigator": {
+        "name": "@:{'brand.autobotInvestigate'}",
+        "purpose": "Находит причины"
+      },
+      "queryBuilder": {
+        "name": "Конструктор запросов",
+        "purpose": "Составляет запросы"
+      },
+      "policy": {
+        "readOnly": "Только чтение"
+      },
+      "picker": {
+        "choose": "Выберите агента",
+        "heading": "Агент"
+      },
+      "unavailable": {
+        "role": "Недоступно · Обратитесь к администратору",
+        "short": "Недоступно",
+        "disabled": "Отключено для этой организации",
+        "unreachable": "Сейчас недоступен · проверено {time}",
+        "unreachableNow": "Сейчас недоступен"
+      },
+      "announceChosen": "{agent} ответит.",
+      "pendingSwitch": "{agent} отвечает с этого момента. Предыдущие ответы сохранятся.",
+      "clause": "{purpose} · {policy}"
+    },
+    "handoff": {
+      "marker": "Передано агенту {agent} вами · {time}",
+      "markerUntimed": "Передано агенту {agent} вами",
+      "given": "Что было передано",
+      "givenTurns": "В этом чате: {questions} вопросов, {answers} ответов",
+      "givenContext": "Контекст: {chips}",
+      "notCarried": "Не передано: {items}",
+      "notCarriedApproval": "ожидающее подтверждение",
+      "announce": "Передано агенту {agent}.",
+      "suggest": {
+        "title": {
+          "o2": "{agent} может продолжить с этого места",
+          "investigator": "{agent} может поискать причину",
+          "queryBuilder": "{agent} может составить этот запрос"
+        },
+        "body": "Это может занять несколько минут.",
+        "bodyMetered": "Это может занять несколько минут · Расходует кредиты ИИ",
+        "accept": "Передать агенту {agent}",
+        "dismiss": "Не сейчас",
+        "collapsed": "Предложен {agent}",
+        "handoff": "Передать",
+        "prompt": "Продолжить это расследование",
+        "promptReason": "Продолжить это расследование: {reason}"
+      }
+    },
+    "question": {
+      "answerHint": "Ответ на вопрос выше",
+      "needsAnswer": "Нужен ваш ответ: {question}",
+      "otherAnswer": "Другой ответ",
+      "record": {
+        "answered": "Ответ: {choice}",
+        "expired": "Срок действия вопроса истёк. Ничего не изменено."
+      },
+      "sendAnswer": "Отправить ответ",
+      "needsAnswerLabel": "Нужен ваш ответ"
+    },
+    "threadsBar": {
+      "label": "Чаты",
+      "title": "Чаты",
+      "incidents": "Расследования в реальном времени · {count}",
+      "moreIncidents": "Ещё {count}",
+      "pageFull": "{count}+ открыто",
+      "openIncidents": "Открытые инциденты",
+      "yourThreads": "Ваши чаты · {count}",
+      "noThreads": "Нет активных чатов"
+    },
+    "chart": {
+      "showChart": "Показать график",
+      "openInMetrics": "Открыть в Метриках",
+      "addToDashboard": "Добавить на дашборд",
+      "createAlert": "Создать оповещение",
+      "copyQuery": "Скопировать запрос",
+      "seriesCount": "{count} серий",
+      "meta": "{range} · {series}",
+      "name": "{title}, {series}",
+      "legend": "Серии"
+    }
+  },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "almostThere": "Почти готово...",
+        "analyzing": "Анализирую...",
+        "checkingDetails": "Проверяю детали...",
+        "connectingTheDots": "Соединяю точки...",
+        "crunchingNumbers": "Вычисляю...",
+        "divingDeeper": "Углубляюсь...",
+        "evaluatingOptions": "Оцениваю варианты...",
+        "examiningData": "Изучаю данные...",
+        "exploringPossibilities": "Изучаю возможности...",
+        "formulatingResponse": "Формулирую ответ...",
+        "gatheringInsights": "Собираю информацию...",
+        "makingProgress": "Продвигаюсь...",
+        "piecingTogether": "Собираю фрагменты...",
+        "processing": "Обрабатываю...",
+        "refiningAnswer": "Уточняю ответ...",
+        "reviewingContext": "Просматриваю контекст...",
+        "stillThinking": "Всё ещё думаю...",
+        "synthesizingInformation": "Синтезирую информацию...",
+        "thinking": "Думаю...",
+        "workingOnIt": "Работаю над этим..."
+      }
+    },
+    "threadView": {
+      "assistant": "Ассистент",
+      "userNamed": "Пользователь {user}"
+    }
+  },
+  "brand": {
+    "askAutobot": "Спросить Autobot",
+    "autobot": "Autobot",
+    "autobotInvestigate": "Autobot Investigate"
   }
 }

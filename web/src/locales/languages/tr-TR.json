@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Henüz hiçbir kanalın varsayılan kuruluşu yok",
-      "description": "Varsayılanı olmayan bir kanaldaki sorular, her kişinin varsayılan kuruluşuna gider ({command} org ile değiştirebilirler)."
+      "description": "Varsayılanı olmayan bir kanaldaki sorular her kişinin varsayılan kuruluşuna gider ({command} org ile değiştirebilirler)."
     },
     "noSlackLinkedPeople": {
       "title": "Bu kuruluşta henüz kimse Slack'i bağlamadı"
@@ -1281,7 +1281,8 @@
       "leaveMessageInBrowser": "{entity} kaydedin, değişikliklerinizi bu tarayıcıda tutun veya atın.",
       "retentionInBrowser": "Değişiklikler bu tarayıcıda {days} gün boyunca veya oturumu kapatana kadar saklanır. Her türden yalnızca en yeni {max} tanesi saklanır.",
       "dotUndated": "Unsaved draft"
-    }
+    },
+    "justNow": "az önce"
   },
   "filterBar": {
     "ariaLabel": "Alana göre filtrele",
@@ -1432,7 +1433,6 @@
     "fetchingValues": "Değerler getiriliyor...",
     "noDataInRangeHint": "Aralıkta veri yok — aktif filtreden değerler",
     "viewMoreValues": "Daha fazla değer gör",
-    "aiIconAlt": "AI",
     "aiModeIconAlt": "AI Modu",
     "firstPage": "İlk sayfa",
     "lastPage": "Son sayfa",
@@ -2107,6 +2107,7 @@
     "synthetic": "Sentetikler",
     "experience": "Deneyim",
     "slos": "SLO'lar",
+    "autobotInvestigate": "@:{'brand.autobotInvestigate'}",
     "reliability": "Güvenilirlik",
     "onCall": "Nöbet",
     "response": "Yanıt",
@@ -3449,6 +3450,7 @@
         "inThisView": "Bu görünümde",
         "pagesFunnelNote": "Gizli bir sayfayı adlandıran bir huni adımı yine de eşleşir.",
         "fieldMissing": "bu akışta olmayan alan",
+        "fieldMissingOn": "{field}: bu akışta olmayan alan",
         "field": "Alan",
         "match": "Eşleşme",
         "values": "Değerler",
@@ -3500,8 +3502,7 @@
         "edit": "Düzenle",
         "identityRowForm": "Bu kartta, kimlik kuralları ilk tanımlanan olaydan itibaren geçerlidir.",
         "newUsersOnly": "Yalnızca yeni kullanıcılar",
-        "newUsersSessionsTip": "Yalnızca yeni kullanıcılar, Kullanıcılar modunda çalışır",
-        "fieldMissingOn": "{field}: bu akışta olmayan alan"
+        "newUsersSessionsTip": "Yalnızca yeni kullanıcılar, Kullanıcılar modunda çalışır"
       },
       "appFilters": {
         "hiddenLabel": "Uygulama filtreleri tarafından gizlendi:",
@@ -4989,7 +4990,26 @@
     },
     "summaryOtherRoles": "+{count} rol daha",
     "indices": "İndeksler",
-    "roleAdmin": "Yönetici"
+    "roleAdmin": "Yönetici",
+    "modules": {
+      "descriptions": {
+        "ai": "Chat with @:{'brand.autobot'}, use AI query help and run incident analysis.",
+        "ai_chat_share": "Sohbetleri kuruluş içinde paylaşın ve başkalarının paylaştığı sohbetleri açın. Yetki verilene kadar yalnızca yöneticiler.",
+        "ai_toolsets": "Add and change the tools @:{'brand.autobot'} can use.",
+        "llmObservability": "Kendi LLM uygulamalarınız için izleme, değerlendirme ve istemler. {product} için değil.",
+        "mcp": "Harici yapay zeka istemcilerini ({clients}) MCP aracılığıyla bu kuruluşa bağlayın."
+      },
+      "groups": {
+        "assistant": "@:{'brand.autobot'}",
+        "llmObservability": "LLM gözlemlenebilirliği"
+      },
+      "labels": {
+        "ai": "@:{'brand.autobot'}",
+        "ai_chat_share": "Sohbet paylaşımı",
+        "ai_toolsets": "Araç setleri",
+        "mcp": "MCP erişimi"
+      }
+    }
   },
   "announcements": {
     "dismiss": "Kapat",
@@ -10615,7 +10635,29 @@
     "tabUsage": "Kullanımı",
     "removeHomeDashboard": "Ana sayfa gösterge panosunu kaldır",
     "resources": "Kaynaklar",
-    "explore": "Keşfet"
+    "explore": "Keşfet",
+    "agent": {
+      "askOff": {
+        "budget": "Bu ayın yapay zeka kredileri tükendi, bu nedenle {product} yanıt veremiyor",
+        "oss": "@:{'brand.autobot'} is part of OpenObserve Enterprise. This Open Source build has no @:{'brand.autobot'} and no incidents.",
+        "not_entitled": "{product} bu planın parçası değil",
+        "not_configured": "{product} henüz bu kuruluş için ayarlanmadı",
+        "off_for_org": "{product} bu kuruluş için kapalı",
+        "no_permission": "Rolünüz {product} kullanamıyor"
+      },
+      "admins": "Yöneticiler: {names}",
+      "flapping": "Dalgalanıyor · {count}×",
+      "openIncident": "Vakayı aç",
+      "openService": "Hizmeti aç",
+      "openAlert": "Uyarıyı aç",
+      "creditsUsedUp": "Yapay zeka kredileri tükendi, bu nedenle hiçbir şey gönderilmedi",
+      "firstRun": {
+        "title": "Henüz veri yok · ilk günlüklerinizi, metriklerinizi veya izlerinizi gönderin",
+        "note": "Ana Sayfa, bir hizmet veri gönderdiğinde kendiliğinden dolar: Şimdi ve uyarı olmayan Sorunlar. Bunu oluşturmak yapay zeka gerektirmez."
+      },
+      "tabLabel": "@:{'brand.autobot'}"
+    },
+    "answersReady": "{count} yanıt hazır | {count} yanıt hazır"
   },
   "overview": {
     "alertsSuffix": "uyarılar",
@@ -10795,6 +10837,38 @@
     "dataAsOf": "Veriler {time} itibarıyla",
     "timeRange": {
       "heading": "Seçilen zaman aralığında"
+    },
+    "now": {
+      "title": "Şimdi",
+      "changedAt": "Değişti: {time}",
+      "investigate": "İncele",
+      "investigateName": "{row} öğesini incele",
+      "investigateFallback": "Asistan kredileri tükendi. İncele, {target} açar.",
+      "notSent": {
+        "runCap": "Gönderilmedi: {n} sohbet çalışıyor",
+        "generic": "Gönderilmedi"
+      },
+      "noAlert": "uyarı yok",
+      "coverageUnknown": "uyarı kapsamı bilinmiyor",
+      "vsBaseline": "{value}, {baseline} değerine göre (önceki {hours} sa)",
+      "noBaseline": "Temel değer için yeterli geçmiş yok",
+      "allRegions": "Tüm bölgeler birleşik",
+      "partialRow": "kısmi",
+      "recovered": "Kurtarıldı",
+      "firingCount": "×{count}",
+      "sentence": {
+        "service": {
+          "errors": "{service} hataları {value} seviyesinde",
+          "latency": "{service} p99 değeri temel çizgisinin {ratio}× katı"
+        },
+        "incident": "{title}",
+        "anomaly": "{name}: {count} anormal nokta",
+        "alert": "{name} tetiklenmiş"
+      }
+    },
+    "goTo": {
+      "close": "Kapat",
+      "back": "Ana Sayfaya Dön"
     }
   },
   "aiChatShare": {
@@ -10842,22 +10916,22 @@
     },
     "capabilities": {
       "query": {
-        "title": "Bir Sorgu Yazın",
+        "title": "Sorgu yaz",
         "description": "Günlükler, izler, RUM için SQL veya metrikler için PromQL.",
         "prompt": "Bir sorgu yazmama yardım et"
       },
       "incident": {
-        "title": "Vakaları Araştırın",
+        "title": "Sorunları incele",
         "description": "Günlükler, izler ve uyarılar arasında kök neden analizi — ör. \"gateway-5xx neden tetiklendi?\"",
         "prompt": "Bir vakayı araştırmama yardım et"
       },
       "dashboard": {
-        "title": "Bir Gösterge Panosu Oluşturun",
+        "title": "Gösterge panosu oluştur",
         "description": "Bir konudan — örn. “K8s düğüm durumu: CPU, bellek, yeniden başlatmalar”. Ayrıca paneller oluşturur.",
         "prompt": "Bir gösterge panosu veya panel oluşturmama yardım et"
       },
       "alert": {
-        "title": "Uyarı Oluştur",
+        "title": "Uyarı oluştur",
         "description": "Eşik veya zamanlanmış uyarılar ve alım zamanı VRL işlem hatları.",
         "prompt": "Uyarı veya işlem hattı oluşturmama yardım et"
       }
@@ -10876,15 +10950,15 @@
     },
     "greeting": {
       "morning": "Günaydın",
-      "afternoon": "Tünaydın",
+      "afternoon": "İyi günler",
       "evening": "İyi akşamlar",
-      "night": "Geç Çalışmak"
+      "night": "Geç saatlere kadar çalışıyorsunuz"
     },
     "greetingNamed": {
       "morning": "Günaydın, {name}",
-      "afternoon": "Tünaydın, {name}",
+      "afternoon": "İyi günler, {name}",
       "evening": "İyi akşamlar, {name}",
-      "night": "Geç saate kadar çalışıyorsunuz, {name}"
+      "night": "Geç saatlere kadar çalışıyorsunuz, {name}"
     },
     "aiChat": {
       "unexpectedError": "Beklenmeyen bir hata oluştu",
@@ -12683,18 +12757,14 @@
       },
       "rcaSteer": {
         "composerTitleLive": "Bu çalıştırmayı yönlendir",
-        "composerHintLive": "Geçerli adımdan sonra okunur",
         "composerTitlePaused": "Aracıya yanıt ver",
-        "composerHintPaused": "Gönderdiğinizde çalıştırma devam eder",
         "agentAsks": "Aracı soruyor",
-        "answerNote": "Yanıtınız bir ipucu, kanıt değil. Hipotezi Olası seviyesine taşıyabilir. Kök neden için bir araç sonucu gerekir.",
-        "placeholderPaused": "Aracıya yanıt verin veya bağlam ekleyin, ör. acme/checkout içinde PR #812, 14:02 civarında dağıtıldı.",
+        "placeholderPaused": "Ajana yanıt verin veya bağlam ekleyin",
         "suggestions": "Öneriler",
         "chipCheck": "Kontrol et …",
         "chipIgnore": "Yoksay …",
         "chipFocus": "Hizmete odaklan …",
         "chipChanged": "Değiştirdik …",
-        "sendingAs": "Gönderen: {email} · bu vakadaki herkes tarafından görülebilir",
         "send": "Gönder",
         "steered": "yönlendirildi {count}×",
         "fromSteering": "yönlendirmeden",
@@ -12830,7 +12900,14 @@
           "medium": "Orta güven",
           "low": "Düşük güven",
           "none": "Güven yok"
-        }
+        },
+        "cancelConfirmTitle": "Çalıştırma iptal edilsin mi?",
+        "cancelConfirmBody": "#{number} numaralı vakanın analizi herkes için iptal edilsin mi?",
+        "showQuery": "Sorguyu göster",
+        "showResult": "Sonucu göster",
+        "keepRunning": "Çalışmaya devam et",
+        "resultFailed": "Bu sorgu çalıştırılamadı.",
+        "resultEmpty": "Sorgu hiçbir satır döndürmedi."
       },
       "rcaThread": {
         "title": "İnceleme dizisi",
@@ -13016,6 +13093,7 @@
         "hourAgo": "{count} saat önce | {count} saat önce",
         "dayAgo": "{count} gün önce | {count} gün önce"
       },
+      "byAssistant": "Vaka analizi · {product} tarafından",
       "rcaLight": {
         "showMore": "Daha fazla göster",
         "showLess": "Daha az göster",
@@ -16068,6 +16146,10 @@
       "empty": "Henüz sorgu yok",
       "noMatch": "Arama veya yıldızlı filtresiyle eşleşen sorgu yok",
       "loadMore": "Daha fazla yükle"
+    },
+    "filter": {
+      "placeholder": "Filtre, örneğin: {label} =~ \"500{'|'}503\"",
+      "placeholderEmpty": "Metrikleri etikete göre filtrele"
     }
   },
   "settings": {
@@ -16076,6 +16158,7 @@
     "generalLabel": "General",
     "groupGeneral": "Genel",
     "groupAccessSecurity": "Erişim ve Güvenlik",
+    "groupAssistant": "@:{'brand.autobot'}",
     "groupDestinations": "Hedefler",
     "groupData": "Veri",
     "groupOperations": "Operasyonlar",
@@ -18107,6 +18190,15 @@
       "loadingPage": "Sayfa {page} yükleniyor",
       "pageFailed": "Sayfa {page} yüklenemedi",
       "pageEmpty": "Sayfa {page} sonuç içermiyor"
+    },
+    "assistantSet": {
+      "label": "Asistan tarafından ayarlandı",
+      "name": "{field} was set by @:{'brand.autobot'}",
+      "field": {
+        "query": "Sorgu",
+        "stream": "Akış",
+        "time": "Zaman aralığı"
+      }
     }
   },
   "aiToolset": {
@@ -23782,10 +23874,12 @@
       "oncall": "Nöbet",
       "synthetics": "Sentetikler",
       "fleet": "Filo",
-      "kubernetes": "Kubernetes"
+      "kubernetes": "Kubernetes",
+      "assistant": "@:{'brand.autobot'}"
     },
     "pages": {
       "global": "Küresel",
+      "home": "Ana Sayfa",
       "kubernetes": "Kubernetes",
       "logs": "Günlükler",
       "dashboardsList": "Gösterge panoları",
@@ -23842,7 +23936,10 @@
       "downtimes": "Bakım pencereleri",
       "fleetConfigEditor": "Yapılandırma düzenleyicisi",
       "fleetOverview": "Filo işlem hatları",
-      "securityRecord": "Güvenlik — kaydı aç"
+      "securityRecord": "Güvenlik — kaydı aç",
+      "assistant": "@:{'brand.autobot'}",
+      "assistantComposer": "{product} yazma alanı",
+      "queryEditor": "Sorgu düzenleyicisi"
     },
     "actions": {
       "openCheatsheet": "Klavye kısayolları özet sayfasını aç",
@@ -23978,7 +24075,18 @@
       "fleetEditorDeleteNode": "Seçili bileşeni kaldır",
       "fleetFlowCloseDetails": "Yol ayrıntılarını kapat veya haritayı daralt",
       "securityRecordNext": "Sonraki kayıt",
-      "securityRecordPrev": "Önceki kayıt"
+      "securityRecordPrev": "Önceki kayıt",
+      "assistantClose": "{product} kapat",
+      "assistantComposerDictate": "Basılı tutarken dikte et",
+      "assistantComposerNewline": "Yeni satır",
+      "assistantComposerRecall": "Önceki istemi geri çağır",
+      "assistantComposerSend": "Mesaj gönder",
+      "assistantGoToAnswer": "En son yanıta git",
+      "assistantHistory": "Sohbetleri aç",
+      "assistantOpen": "{product} aç",
+      "editorTabFocusMode": "Tab'ın düzenleyiciden çıkmasına izin ver",
+      "threadsBarOpen": "Sohbetleri aç",
+      "homeFocusAsk": "Sor kutusuna odaklan"
     }
   },
   "components": {
@@ -28465,7 +28573,7 @@
     "mineJoinTeam": "Bir ekibe katıl",
     "mineTestTeam": "{team} ekibine test çağrısı gönder",
     "mineCoverSaved": "Vekalet kaydedildi",
-    "mineSlackLinkHow": "Slack'te {command} link komutunu yazın",
+    "mineSlackLinkHow": "Slack'te {command} link yazın",
     "mineSlackSetUpHint": "Ayarlar › Slack bölümünü açar",
     "myDeliveriesWhen": "Ne zaman",
     "phoneAddHint": "SMS ve aramalar için bir numara ekleyin",
@@ -29280,6 +29388,7 @@
     "consentBillingPayer": "Ücretsiz krediler tükendikten sonra, Yapay Zeka kullanımı planınızın ücreti üzerinden {payer} faturasına yansıtılır.",
     "organizationBillingCycle": "Ücretli Yapay Zeka kullanımı bu kuruluşun faturasına yansıtılır.",
     "payerBillingCycle": "Ücretli Yapay Zeka kullanımı ödeyici kuruluşun faturasına yansıtılır.",
+    "readOnlyAdmin": "Bu ayarı yalnızca bir kuruluş yöneticisi değiştirebilir.",
     "viewBilling": "Faturalandırmayı görüntüle",
     "memberAndPayerRequired": "{organization} kullanabilmesi için {payer} da ücretli Yapay Zeka kullanımını açmalıdır.",
     "contactPayerAdmin": "{payer} yöneticisinden ücretli Yapay Zeka kullanımını açmasını isteyin.",
@@ -30241,20 +30350,6 @@
       "loading": "Geçmiş yükleniyor",
       "loaded": "Geçmiş yüklendi"
     },
-    "paging": {
-      "title": "Paging",
-      "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
-      "routing": "On-call routing",
-      "unavailable": "Paging is turned off for this deployment.",
-      "denied": "{denied} {askAdmin}",
-      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
-      "deniedTitle": "Çağrı gönderme ayarını görme izniniz yok",
-      "deniedDesc": "Çağrı gönderme tüm kuruluş için bir kez ayarlanır. Erişim için bir kuruluş yöneticisinden isteyin.",
-      "failedTitle": "Çağrı gönderme ayarı yüklenemedi",
-      "failedDesc": "Yüklenirken bir sorun oluştu. Biraz sonra tekrar deneyin.",
-      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
-    },
     "incidents": {
       "title": "Çağrı gönderen bulgular",
       "subtitle": "Nöbet ekibiniz için vaka açan ve analizini içeren bulgular.",
@@ -30355,6 +30450,20 @@
         "desc": "Bir yönetici bu dağıtım için AutoObserve'u ve çağrı göndermeyi etkinleştirir. Kime bildirim göndereceği ve ne ölçüde kendi başına hareket edeceği, bu kontroller mevcut olduğunda burada ayarlanacak.",
         "action": "Nasıl çalışır"
       }
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "Çağrı gönderme ayarını görme izniniz yok",
+      "deniedDesc": "Çağrı gönderme tüm kuruluş için bir kez ayarlanır. Erişim için bir kuruluş yöneticisinden isteyin.",
+      "failedTitle": "Çağrı gönderme ayarı yüklenemedi",
+      "failedDesc": "Yüklenirken bir sorun oluştu. Biraz sonra tekrar deneyin.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
     },
     "learning": {
       "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
@@ -30492,7 +30601,10 @@
     "suggestions": {
       "title": "Öneriler",
       "subtitle": "Bir dakikanız olduğunda — bunlar gürültüyü azaltır veya size zaman kazandırır."
-    }
+    },
+    "previewLabel": "Önizleme",
+    "previewStrip": "Örnek verilerle önizleme. Buradaki hiçbir şey kuruluşunuzu değiştirmez.",
+    "previewHeader": "AutoObserve · Önizleme"
   },
   "telephony": {
     "title": "Telefon",
@@ -30817,7 +30929,7 @@
         "settings": "Ayarlar",
         "install": "Kurulum sırasında",
         "destination": "Bir uyarı hedefinden",
-        "oncall": "Buradan {command} oncall ile"
+        "oncall": "{command} oncall ile buradan"
       },
       "channel": "Kanal",
       "channelPlaceholder": "Kanal ara",
@@ -30831,7 +30943,7 @@
       "editDefault": "Kanal varsayılanını düzenle",
       "removeConfirm": "Varsayılanı kaldır",
       "removeTitle": "#{channel} için varsayılan kaldırılsın mı?",
-      "removeMessage": "{name} kanalındaki sorular bu durumda her kişinin varsayılan kuruluşuna gider (bunu {command} org ile değiştirebilirler).",
+      "removeMessage": "{name} kanalındaki sorular ardından her kişinin varsayılan kuruluşuna gider ({command} org ile değiştirebilirler).",
       "instanceAdminOnly": "Yalnızca örnek yöneticisi",
       "ownOrgOnlyHint": "Bir örnek çalışma alanında kanalları kendi kuruluşunuza eşlersiniz",
       "claimableHint": "Sahiplenilmemiş kanallar ve {org} kuruluşunun sahip olduğu kanallar",
@@ -33141,175 +33253,6 @@
       "addSynthetic": "Sentetik kontrol formunu doldurulmuş olarak açar. Kaydedene kadar hiçbir şey kaydedilmez.",
       "setUpKubernetes": "Kubernetes kurulumunu kendi kümesi için açar."
     },
-    "kind": {
-      "chip": {
-        "notWatched": "Kapsam boşluğu",
-        "missingAlert": "Eksik uyarı",
-        "notifiesNoOne": "Kimseye bildirim göndermiyor",
-        "stoppedSending": "Göndermeyi durdurdu",
-        "dataQuality": "Veri kalitesi"
-      },
-      "traffic": {
-        "handles": "Saatte yaklaşık {count} olay işliyor.",
-        "usually": "Genellikle saatte yaklaşık {count} olay gönderir."
-      },
-      "classes": {
-        "why": {
-          "errors": "hataları",
-          "latency": "gecikmesi",
-          "absence": "göndermeyi durdurup durdurmadığı"
-        },
-        "ai": {
-          "errors": "hatalar",
-          "latency": "gecikme",
-          "absence": "göndermeyi durdurma"
-        },
-        "name": {
-          "errors": "Hatalar",
-          "latency": "Gecikme",
-          "absence": "Göndermeyi durdurur"
-        }
-      },
-      "detail": {
-        "noAlert": "{check}: uyarı yok.",
-        "cantMeasure": "{check}: henüz ölçülemiyor, {service} hiç iz göndermiyor."
-      },
-      "coverage_gap": {
-        "headline": "{service} için hiçbir izleme yok",
-        "why": "{classes} için hiçbir uyarı yok.",
-        "next": "AutoObserve'un hazırladığı uyarıyı ekleyin. | AutoObserve'un hazırladığı {count} uyarıyı ekleyin.",
-        "needsTraces": "Gecikme için önce izler gerekir.",
-        "groupAdded": "{count} hizmet için uyarı eklendi | {count} hizmet için uyarı eklendi",
-        "groupHeadline": "{count} hizmet için hiçbir izleme yok",
-        "groupTraffic": "Birlikte saatte yaklaşık {count} olay işliyorlar.",
-        "groupNext": "AutoObserve'un hazırladığı uyarıyı ekleyin. | AutoObserve'un hazırladığı {count} uyarıyı tek bir listede, takıma göre gruplanmış olarak ekleyin."
-      },
-      "no_absence_check": {
-        "why": "{service} göndermeyi durdurursa hiçbir uyarı tetiklenmez.",
-        "why_weak": "Bunu yalnızca {monitor} fark eder, o da tüm akışı izliyor.",
-        "why_blind": "{monitor} fark eder, ancak {service} verilerini göremiyor.",
-        "whySilent": "{monitor} {service} durduğunda fark eder, ancak kimseye bildirim göndermiyor.",
-        "next": "Veri yok uyarısı ekleyin: {service} {minutes} dakika boyunca hiçbir şey göndermezse tetiklenir.",
-        "nextSilent": "Ona bildirim gönderecek birini tanımlayın."
-      },
-      "coverage_lost": {
-        "why": "Onu izleyen uyarılarda bir şey değişti.",
-        "next": "Tekrar ekleyin veya onu izleyen uyarıda neyin değiştiğini kontrol edin."
-      },
-      "blind_guardrail": {
-        "nextStream": "Onu {detail} yerine geçen akışa yönlendirin veya silin.",
-        "nextScope": "Filtresini kontrol edin: bu haliyle olması gereken hiçbir şeyle eşleşmiyor.",
-        "nextField": "Sorgusunun filtrelediği alanı düzeltin."
-      },
-      "discovery_unusable": {
-        "headline": "AutoObserve'un bulduğu {active} hizmetten yalnızca {good} tanesi kullanılabilir",
-        "why": "Verilerinin çoğunda hizmet adı yok, bu yüzden boşluklar listesi eksik kalıyor.",
-        "next": "İzlerinizde ve günlüklerinizde service.name gönderin."
-      },
-      "source_silence": {
-        "headline": "{source}, {stream} akışına göndermeyi durdurdu",
-        "since": "{time} itibarıyla.",
-        "usual": "Genellikle günde yaklaşık {count} satır gönderiyor; {stream} akışının geri kalanı akmaya devam etti.",
-        "more": "Bu akışta {count} kaynak daha var. | {streams} akışta {count} kaynak daha var.",
-        "nextSender": "{source} üzerindeki aracıyı veya toplayıcıyı kontrol edin.",
-        "nextGap": "Geri geldi. Boşlukta nelerin atlandığını kontrol edin."
-      },
-      "heartbeat_on_success": {
-        "headline": "{job} işi başarılı olmayı bırakırsa hiçbir uyarı tetiklenmez",
-        "why": "Başarı satırı son gün içinde göründü. | Başarı satırı son {days} günün her birinde göründü.",
-        "next": "Başarı satırı görünmediğinde tetiklenecek bir uyarı ekleyin."
-      },
-      "cell": {
-        "falls": {
-          "weak": "Yalnızca geniş kapsamlı bir uyarı olan {monitor} {what} izliyor ve bu hizmete özel kapsamlanmamış. | Yalnızca geniş kapsamlı uyarılar olan {monitor} {what} izliyor ve bu hizmete özel kapsamlanmamış.",
-          "silent": "{monitor} {what} izliyor, ancak kimseye bildirim göndermiyor. | {monitor} {what} izliyor, ancak kimseye bildirim göndermiyor.",
-          "blind": "{monitor} {what} izliyor, ancak bu hizmetin verilerini göremiyor. | {monitor} {what} izliyor, ancak bu hizmetin verilerini göremiyor.",
-          "unmapped": "{monitor} {what} izliyor olabilir, ancak kapsamı bu hizmete bağlanamadı. | {monitor} {what} izliyor olabilir, ancak kapsamları bu hizmete bağlanamadı."
-        },
-        "watchWhat": {
-          "errors": "{service} hataları",
-          "latency": "{service} gecikmesi",
-          "absence": "{service} göndermeyi durdurup durdurmadığı"
-        },
-        "justAdded": "Eklendi. AutoObserve bir sonraki kontrolünde, yaklaşık 5 dakika içinde bunu sayar. | Eklendi. AutoObserve bir sonraki kontrolünde, yaklaşık 5 dakika içinde bunları sayar.",
-        "errorsWhy": "{service} hataları için hiçbir uyarı yok.",
-        "errorsNext": "Olağan hızının 3 katında bir hata uyarısı ekleyin.",
-        "latencyWhy": "{service} gecikmesi için hiçbir uyarı yok.",
-        "latencyNext": "Olağan p95 değerinin 2 katında bir gecikme uyarısı ekleyin.",
-        "latencyNoTraces": "Gecikme izlerden grafiklenir. {service} hiç iz göndermiyor.",
-        "noMetrics": "{service} için CPU veya bellek verisi gelmiyor, bu yüzden bu henüz izlenemiyor.",
-        "noRestartEvents": "{service} için yeniden başlatma olayı gelmiyor, bu yüzden yeniden başlatmaları henüz izlenemiyor.",
-        "saturationWhy": "{service} için belleği veya CPU'yu izleyen hiçbir uyarı yok. Konteyner belleği {stream} akışına geliyor.",
-        "saturationNext": "Limitinin %90'ında bir bellek uyarısı ekleyin.",
-        "nodeWhy": "{service} hizmetinin çalıştığı düğümleri izleyen bir uyarı yok. Düğüm verileri {stream} akışına gelir.",
-        "nodeNext": "Kapasitenin %90'ında bir düğüm uyarısı ekleyin.",
-        "restartsWhy": "{service} hizmetinin yeniden başlatmalarını izleyen bir uyarı yok.",
-        "restartsNext": "Pod'ları 10 dakikada 3 kez yeniden başladığında tetiklenen bir uyarı ekleyin.",
-        "syntheticWhy": "{service} hizmetini dışarıdan kontrol eden hiçbir şey yok. Sentetik kontrol birkaç dakikada bir istek gönderir ve hizmet hiçbir şey göndermese bile bir kesintiyi fark eder.",
-        "syntheticNext": "Sağlık uç noktasına bir sentetik kontrol ekleyin."
-      },
-      "paged": {
-        "page": {
-          "paged": "Paged {team}",
-          "pagedTeam": "Paged the on-call team",
-          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
-          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand.",
-          "pending": "Nöbete çağrı gönderiliyor: nöbet hizmeti çağrıyı henüz onaylamadı."
-        },
-        "nextRouting": "Set up on-call routing so the next stop pages someone.",
-        "recoveredAt": "{time} itibarıyla geri döndü.",
-        "stream_silence": {
-          "headline": "{count} streams stopped sending data",
-          "why": "No data has arrived on {stream} ({type}) since {time}.",
-          "whyMany": "{streams} have sent no data since {time}.",
-          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
-          "nextMany": "One cause is likely, such as a shared collector.",
-          "whyOne": "{stream}, {time} tarihinden beri veri göndermedi.",
-          "recovered": "{stream} ({type}) yeniden veri gönderiyor. {time} tarihinde durmuştu.",
-          "recoveredMany": "{streams} yeniden veri gönderiyor. {time} tarihinde durmuşlardı.",
-          "recoveredSome": "Yeniden gönderiyor: {streams}."
-        },
-        "stream_drop": {
-          "headline": "{count} streams dropped sharply",
-          "why": "{stream} ({type}) has received much less data than usual since {time}.",
-          "whyMany": "{streams} have received much less data than usual since {time}.",
-          "next": "Check whether a sender stopped or a filter changed.",
-          "nextMany": "One cause is likely, such as a shared collector or filter.",
-          "whyOne": "{stream}, {time} tarihinden beri normalden çok daha az veri aldı.",
-          "recovered": "{stream} ({type}) olağan hacmine döndü. Düşüş {time} tarihinde yaşandı.",
-          "recoveredMany": "{streams} olağan hacimlerine döndü. Düşüş {time} tarihinde yaşandı.",
-          "recoveredSome": "Olağan hacme dönenler: {streams}."
-        },
-        "stream_rise": {
-          "headline": "{count} streams rose sharply",
-          "why": "{stream} ({type}) has received much more data than usual since {time}.",
-          "whyMany": "{streams} have received much more data than usual since {time}.",
-          "next": "Check for a retry loop or a new sender writing to it.",
-          "nextMany": "One cause is likely, such as a shared sender retrying.",
-          "whyOne": "{stream}, {time} tarihinden beri normalden çok daha fazla veri aldı.",
-          "recovered": "{stream} ({type}) olağan hacmine döndü. Artış {time} tarihinde yaşandı.",
-          "recoveredMany": "{streams} olağan hacimlerine döndü. Artış {time} tarihinde yaşandı.",
-          "recoveredSome": "Olağan hacme dönenler: {streams}."
-        }
-      }
-    },
-    "threshold": {
-      "label": "Şu değeri aşınca tetikle",
-      "errorsSuffix": "saat başına hata",
-      "latencySuffix": "ms (p95)",
-      "errorsReason": "AutoObserve, son 7 günde {service} için olağan hata sayısı bulamadı. Bu uyarıyı eklemek için bir eşik belirleyin.",
-      "latencyReason": "AutoObserve, son 7 günde {service} için olağan gecikme bulamadı. Bu uyarıyı eklemek için bir eşik belirleyin.",
-      "measuring": "7 günlük olağan seviye ölçülüyor…",
-      "noUsual": "7 günde yok",
-      "notMeasured": "Ölçülmedi",
-      "timedOut": "Ölçüm çok uzun sürdü. Bir eşik belirleyin.",
-      "placeholder": "Eşik belirleyin",
-      "placeholderShort": "Değer belirleyin",
-      "required": "Eşik belirleyin",
-      "invalid": "0'dan büyük bir sayı girin.",
-      "invalidErrors": "0 veya daha fazla girin.",
-      "anyErrorNote": "AutoObserve, son 7 günde {service} için hata bulamadı; bu nedenle bu uyarı her hatada tetiklenir. Bazı hatalar normal ise eşiği yükseltin."
-    },
     "bulk": {
       "alertsPage": "Uyarılar",
       "title": {
@@ -33485,32 +33428,6 @@
         "appliedEditor": "Saved and recorded for {title}.",
         "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
       },
-      "apply": {
-        "edit": "Edit in alert editor",
-        "button": "Apply",
-        "where": "Folder {folder} · notifies {destinations}",
-        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
-        "whereNoOne": "Klasör {folder} · kimseye bildirim göndermez",
-        "whereTeamNoOne": "Klasör {folder} · ekip {team} · kimseye bildirim göndermez",
-        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
-        "acknowledgedFirst": "{of} onaylanmış tetiklenmeden {count} tanesi artık uyarı vermeyecek, ilki {first}. Uygulamadan önce kontrol edin.",
-        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
-        "changed": "This alert changed. Open it to review.",
-        "offerChanged": "Önerilen değişiklik güncellendi. Tekrar inceleyin.",
-        "reviewAgain": "Tekrar incele",
-        "loading": "Checking what this changes…",
-        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
-        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
-        "cardNote": "Shows what changes before anything is saved.",
-        "gone": "This suggestion is no longer available. Open the alert to review it."
-      },
-      "applied": {
-        "title": "Applied changes",
-        "by": "by {actor} at {when}",
-        "undoneBy": "{actor} tarafından {when} geri alındı",
-        "undone": "Undone",
-        "you": "you"
-      },
       "undone": {
         "one": "Geri alındı: {title} tekrar gösteriliyor.",
         "many": "Geri alındı: {count} öğe tekrar gösteriliyor. | Geri alındı: {count} öğe tekrar gösteriliyor.",
@@ -33573,6 +33490,32 @@
         "range": "{total} içinden {from}–{to}",
         "previous": "Önceki sayfa",
         "next": "Sonraki sayfa"
+      },
+      "apply": {
+        "edit": "Edit in alert editor",
+        "button": "Apply",
+        "where": "Folder {folder} · notifies {destinations}",
+        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "whereNoOne": "Klasör {folder} · kimseye bildirim göndermez",
+        "whereTeamNoOne": "Klasör {folder} · ekip {team} · kimseye bildirim göndermez",
+        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "acknowledgedFirst": "{of} onaylanmış tetiklenmeden {count} tanesi artık uyarı vermeyecek, ilki {first}. Uygulamadan önce kontrol edin.",
+        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
+        "changed": "This alert changed. Open it to review.",
+        "offerChanged": "Önerilen değişiklik güncellendi. Tekrar inceleyin.",
+        "reviewAgain": "Tekrar incele",
+        "loading": "Checking what this changes…",
+        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
+        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
+        "cardNote": "Shows what changes before anything is saved.",
+        "gone": "This suggestion is no longer available. Open the alert to review it."
+      },
+      "applied": {
+        "title": "Applied changes",
+        "by": "by {actor} at {when}",
+        "undoneBy": "{actor} tarafından {when} geri alındı",
+        "undone": "Undone",
+        "you": "you"
       }
     },
     "cta": {
@@ -33658,6 +33601,175 @@
       "calibration": {
         "failure": "{alert} uyarısı {what}. Düzeltilmiş bir sorgu önerin, bana gösterin ve ben söyleyene kadar kaydetmeyin."
       }
+    },
+    "kind": {
+      "chip": {
+        "notWatched": "Kapsam boşluğu",
+        "missingAlert": "Eksik uyarı",
+        "notifiesNoOne": "Kimseye bildirim göndermiyor",
+        "stoppedSending": "Göndermeyi durdurdu",
+        "dataQuality": "Veri kalitesi"
+      },
+      "traffic": {
+        "handles": "Saatte yaklaşık {count} olay işliyor.",
+        "usually": "Genellikle saatte yaklaşık {count} olay gönderir."
+      },
+      "classes": {
+        "why": {
+          "errors": "hataları",
+          "latency": "gecikmesi",
+          "absence": "göndermeyi durdurup durdurmadığı"
+        },
+        "ai": {
+          "errors": "hatalar",
+          "latency": "gecikme",
+          "absence": "göndermeyi durdurma"
+        },
+        "name": {
+          "errors": "Hatalar",
+          "latency": "Gecikme",
+          "absence": "Göndermeyi durdurur"
+        }
+      },
+      "detail": {
+        "noAlert": "{check}: uyarı yok.",
+        "cantMeasure": "{check}: henüz ölçülemiyor, {service} hiç iz göndermiyor."
+      },
+      "coverage_gap": {
+        "headline": "{service} için hiçbir izleme yok",
+        "why": "{classes} için hiçbir uyarı yok.",
+        "next": "AutoObserve'un hazırladığı uyarıyı ekleyin. | AutoObserve'un hazırladığı {count} uyarıyı ekleyin.",
+        "needsTraces": "Gecikme için önce izler gerekir.",
+        "groupAdded": "{count} hizmet için uyarı eklendi | {count} hizmet için uyarı eklendi",
+        "groupHeadline": "{count} hizmet için hiçbir izleme yok",
+        "groupTraffic": "Birlikte saatte yaklaşık {count} olay işliyorlar.",
+        "groupNext": "AutoObserve'un hazırladığı uyarıyı ekleyin. | AutoObserve'un hazırladığı {count} uyarıyı tek bir listede, takıma göre gruplanmış olarak ekleyin."
+      },
+      "no_absence_check": {
+        "why": "{service} göndermeyi durdurursa hiçbir uyarı tetiklenmez.",
+        "why_weak": "Bunu yalnızca {monitor} fark eder, o da tüm akışı izliyor.",
+        "why_blind": "{monitor} fark eder, ancak {service} verilerini göremiyor.",
+        "whySilent": "{monitor} {service} durduğunda fark eder, ancak kimseye bildirim göndermiyor.",
+        "next": "Veri yok uyarısı ekleyin: {service} {minutes} dakika boyunca hiçbir şey göndermezse tetiklenir.",
+        "nextSilent": "Ona bildirim gönderecek birini tanımlayın."
+      },
+      "coverage_lost": {
+        "why": "Onu izleyen uyarılarda bir şey değişti.",
+        "next": "Tekrar ekleyin veya onu izleyen uyarıda neyin değiştiğini kontrol edin."
+      },
+      "blind_guardrail": {
+        "nextStream": "Onu {detail} yerine geçen akışa yönlendirin veya silin.",
+        "nextScope": "Filtresini kontrol edin: bu haliyle olması gereken hiçbir şeyle eşleşmiyor.",
+        "nextField": "Sorgusunun filtrelediği alanı düzeltin."
+      },
+      "discovery_unusable": {
+        "headline": "AutoObserve'un bulduğu {active} hizmetten yalnızca {good} tanesi kullanılabilir",
+        "why": "Verilerinin çoğunda hizmet adı yok, bu yüzden boşluklar listesi eksik kalıyor.",
+        "next": "İzlerinizde ve günlüklerinizde service.name gönderin."
+      },
+      "source_silence": {
+        "headline": "{source}, {stream} akışına göndermeyi durdurdu",
+        "since": "{time} itibarıyla.",
+        "usual": "Genellikle günde yaklaşık {count} satır gönderiyor; {stream} akışının geri kalanı akmaya devam etti.",
+        "more": "Bu akışta {count} kaynak daha var. | {streams} akışta {count} kaynak daha var.",
+        "nextSender": "{source} üzerindeki aracıyı veya toplayıcıyı kontrol edin.",
+        "nextGap": "Geri geldi. Boşlukta nelerin atlandığını kontrol edin."
+      },
+      "heartbeat_on_success": {
+        "headline": "{job} işi başarılı olmayı bırakırsa hiçbir uyarı tetiklenmez",
+        "why": "Başarı satırı son gün içinde göründü. | Başarı satırı son {days} günün her birinde göründü.",
+        "next": "Başarı satırı görünmediğinde tetiklenecek bir uyarı ekleyin."
+      },
+      "cell": {
+        "falls": {
+          "weak": "Yalnızca geniş kapsamlı bir uyarı olan {monitor} {what} izliyor ve bu hizmete özel kapsamlanmamış. | Yalnızca geniş kapsamlı uyarılar olan {monitor} {what} izliyor ve bu hizmete özel kapsamlanmamış.",
+          "silent": "{monitor} {what} izliyor, ancak kimseye bildirim göndermiyor. | {monitor} {what} izliyor, ancak kimseye bildirim göndermiyor.",
+          "blind": "{monitor} {what} izliyor, ancak bu hizmetin verilerini göremiyor. | {monitor} {what} izliyor, ancak bu hizmetin verilerini göremiyor.",
+          "unmapped": "{monitor} {what} izliyor olabilir, ancak kapsamı bu hizmete bağlanamadı. | {monitor} {what} izliyor olabilir, ancak kapsamları bu hizmete bağlanamadı."
+        },
+        "watchWhat": {
+          "errors": "{service} hataları",
+          "latency": "{service} gecikmesi",
+          "absence": "{service} göndermeyi durdurup durdurmadığı"
+        },
+        "justAdded": "Eklendi. AutoObserve bir sonraki kontrolünde, yaklaşık 5 dakika içinde bunu sayar. | Eklendi. AutoObserve bir sonraki kontrolünde, yaklaşık 5 dakika içinde bunları sayar.",
+        "errorsWhy": "{service} hataları için hiçbir uyarı yok.",
+        "errorsNext": "Olağan hızının 3 katında bir hata uyarısı ekleyin.",
+        "latencyWhy": "{service} gecikmesi için hiçbir uyarı yok.",
+        "latencyNext": "Olağan p95 değerinin 2 katında bir gecikme uyarısı ekleyin.",
+        "latencyNoTraces": "Gecikme izlerden grafiklenir. {service} hiç iz göndermiyor.",
+        "noMetrics": "{service} için CPU veya bellek verisi gelmiyor, bu yüzden bu henüz izlenemiyor.",
+        "noRestartEvents": "{service} için yeniden başlatma olayı gelmiyor, bu yüzden yeniden başlatmaları henüz izlenemiyor.",
+        "saturationWhy": "{service} için belleği veya CPU'yu izleyen hiçbir uyarı yok. Konteyner belleği {stream} akışına geliyor.",
+        "saturationNext": "Limitinin %90'ında bir bellek uyarısı ekleyin.",
+        "nodeWhy": "{service} hizmetinin çalıştığı düğümleri izleyen bir uyarı yok. Düğüm verileri {stream} akışına gelir.",
+        "nodeNext": "Kapasitenin %90'ında bir düğüm uyarısı ekleyin.",
+        "restartsWhy": "{service} hizmetinin yeniden başlatmalarını izleyen bir uyarı yok.",
+        "restartsNext": "Pod'ları 10 dakikada 3 kez yeniden başladığında tetiklenen bir uyarı ekleyin.",
+        "syntheticWhy": "{service} hizmetini dışarıdan kontrol eden hiçbir şey yok. Sentetik kontrol birkaç dakikada bir istek gönderir ve hizmet hiçbir şey göndermese bile bir kesintiyi fark eder.",
+        "syntheticNext": "Sağlık uç noktasına bir sentetik kontrol ekleyin."
+      },
+      "paged": {
+        "page": {
+          "paged": "Paged {team}",
+          "pagedTeam": "Paged the on-call team",
+          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
+          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand.",
+          "pending": "Nöbete çağrı gönderiliyor: nöbet hizmeti çağrıyı henüz onaylamadı."
+        },
+        "nextRouting": "Set up on-call routing so the next stop pages someone.",
+        "recoveredAt": "{time} itibarıyla geri döndü.",
+        "stream_silence": {
+          "headline": "{count} streams stopped sending data",
+          "why": "No data has arrived on {stream} ({type}) since {time}.",
+          "whyMany": "{streams} have sent no data since {time}.",
+          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
+          "nextMany": "One cause is likely, such as a shared collector.",
+          "whyOne": "{stream}, {time} tarihinden beri veri göndermedi.",
+          "recovered": "{stream} ({type}) yeniden veri gönderiyor. {time} tarihinde durmuştu.",
+          "recoveredMany": "{streams} yeniden veri gönderiyor. {time} tarihinde durmuşlardı.",
+          "recoveredSome": "Yeniden gönderiyor: {streams}."
+        },
+        "stream_drop": {
+          "headline": "{count} streams dropped sharply",
+          "why": "{stream} ({type}) has received much less data than usual since {time}.",
+          "whyMany": "{streams} have received much less data than usual since {time}.",
+          "next": "Check whether a sender stopped or a filter changed.",
+          "nextMany": "One cause is likely, such as a shared collector or filter.",
+          "whyOne": "{stream}, {time} tarihinden beri normalden çok daha az veri aldı.",
+          "recovered": "{stream} ({type}) olağan hacmine döndü. Düşüş {time} tarihinde yaşandı.",
+          "recoveredMany": "{streams} olağan hacimlerine döndü. Düşüş {time} tarihinde yaşandı.",
+          "recoveredSome": "Olağan hacme dönenler: {streams}."
+        },
+        "stream_rise": {
+          "headline": "{count} streams rose sharply",
+          "why": "{stream} ({type}) has received much more data than usual since {time}.",
+          "whyMany": "{streams} have received much more data than usual since {time}.",
+          "next": "Check for a retry loop or a new sender writing to it.",
+          "nextMany": "One cause is likely, such as a shared sender retrying.",
+          "whyOne": "{stream}, {time} tarihinden beri normalden çok daha fazla veri aldı.",
+          "recovered": "{stream} ({type}) olağan hacmine döndü. Artış {time} tarihinde yaşandı.",
+          "recoveredMany": "{streams} olağan hacimlerine döndü. Artış {time} tarihinde yaşandı.",
+          "recoveredSome": "Olağan hacme dönenler: {streams}."
+        }
+      }
+    },
+    "threshold": {
+      "label": "Şu değeri aşınca tetikle",
+      "errorsSuffix": "saat başına hata",
+      "latencySuffix": "ms (p95)",
+      "errorsReason": "AutoObserve, son 7 günde {service} için olağan hata sayısı bulamadı. Bu uyarıyı eklemek için bir eşik belirleyin.",
+      "latencyReason": "AutoObserve, son 7 günde {service} için olağan gecikme bulamadı. Bu uyarıyı eklemek için bir eşik belirleyin.",
+      "measuring": "7 günlük olağan seviye ölçülüyor…",
+      "noUsual": "7 günde yok",
+      "notMeasured": "Ölçülmedi",
+      "timedOut": "Ölçüm çok uzun sürdü. Bir eşik belirleyin.",
+      "placeholder": "Eşik belirleyin",
+      "placeholderShort": "Değer belirleyin",
+      "required": "Eşik belirleyin",
+      "invalid": "0'dan büyük bir sayı girin.",
+      "invalidErrors": "0 veya daha fazla girin.",
+      "anyErrorNote": "AutoObserve, son 7 günde {service} için hata bulamadı; bu nedenle bu uyarı her hatada tetiklenir. Bazı hatalar normal ise eşiği yükseltin."
     }
   },
   "serviceVersions": {
@@ -34520,33 +34632,2534 @@
     "gateOrder": "Başlangıç bitişten önce olmalı.",
     "gateInvalid": "Geçerli bir aralık değil."
   },
-  "llmObservability": {
-    "playground": {
-      "progress": {
-        "analyzing": "Analiz ediliyor...",
-        "thinking": "Düşünülüyor...",
-        "processing": "İşleniyor...",
-        "examiningData": "Veriler inceleniyor...",
-        "reviewingContext": "Bağlam gözden geçiriliyor...",
-        "formulatingResponse": "Yanıt oluşturuluyor...",
-        "checkingDetails": "Ayrıntılar kontrol ediliyor...",
-        "gatheringInsights": "İçgörüler toplanıyor...",
-        "evaluatingOptions": "Seçenekler değerlendiriliyor...",
-        "synthesizingInformation": "Bilgiler derleniyor...",
-        "workingOnIt": "Üzerinde çalışılıyor...",
-        "almostThere": "Neredeyse tamam...",
-        "divingDeeper": "Daha derine iniliyor...",
-        "connectingTheDots": "Bağlantılar kuruluyor...",
-        "crunchingNumbers": "Sayılar hesaplanıyor...",
-        "exploringPossibilities": "Olasılıklar araştırılıyor...",
-        "refiningAnswer": "Yanıt iyileştiriliyor...",
-        "stillThinking": "Hâlâ düşünülüyor...",
-        "makingProgress": "İlerleme kaydediliyor...",
-        "piecingTogether": "Parçalar birleştiriliyor..."
+  "autobotInvestigate": {
+    "greeting": "Neyi incelemeliyiz?",
+    "greetingNamed": "Neyi incelemeliyiz, {name}?",
+    "placeholder": "Neyin ters gittiğini açıklayın veya bir uyarı ya da vaka bağlantısı yapıştırın",
+    "cards": {
+      "whyAlertFired": {
+        "title": "Uyarım neden tetiklendi?",
+        "description": "Pick an alert. @:{'brand.autobot'} checks the data behind it and explains the cause.",
+        "prompt": "Son uyarım neden tetiklendi?"
+      },
+      "investigateIncident": {
+        "title": "Bir vakayı incele",
+        "description": "Neyin değiştiğini, hangi hizmetlerin etkilendiğini ve sorunun nerede başladığını bulun.",
+        "prompt": "En son vakamı incelememe yardım et"
+      },
+      "errorSpike": {
+        "title": "Hata artışının nedenini bulun",
+        "description": "Hata artışından önceki ve sonraki hataları hizmete ve mesaja göre karşılaştırın.",
+        "prompt": "En son hata artışının nedenini bul"
+      },
+      "slowService": {
+        "title": "Yavaş bir hizmeti kontrol edin",
+        "description": "Yavaş adımı bulmak için izlere ve gecikmeye bakın.",
+        "prompt": "Hangi hizmetin yavaş olduğunu ve nedenini bulun"
       }
     }
   },
   "assistant": {
-    "composer": {}
+    "actions": {
+      "count": "Bu sohbette {count} eylem | Bu sohbette {count} eylem",
+      "entry": "{operation} {name} · {user} tarafından onaylandı · {time}",
+      "failedEntry": "Bu tamamlanamadı: {name} · {reason} · {time}",
+      "heading": "Bu sohbetteki eylemler",
+      "noReview": "İnceleme adımı yok",
+      "op": {
+        "create": "{entity} oluşturuldu",
+        "delete": "{entity} silindi",
+        "pause": "{entity} duraklatıldı",
+        "resume": "{entity} sürdürüldü",
+        "run_command": "{entity} çalıştırıldı",
+        "update": "{entity} güncellendi"
+      },
+      "restored": "Geri yüklendi",
+      "undo": "Geri al",
+      "undoFailed": "Geri alma işe yaramadı.",
+      "undoLimits": "Gönderilen bildirimler ve silinen veriler geri alınamaz.",
+      "undoNotYet": "Geri alma henüz kullanılamıyor",
+      "undoUnconfirmed": "Geri alma gönderildi ancak sonucu doğrulanamadı.",
+      "undoing": "Geri alınıyor…",
+      "undone": "Geri alındı · {name} geri yüklendi",
+      "you": "siz"
+    },
+    "activity": {
+      "actor": "Kişiye göre filtrele",
+      "approved": "Onaylandı",
+      "approvedBy": "{user} tarafından onaylandı",
+      "columns": {
+        "action": "Eylem",
+        "actions": "Eylemler",
+        "actor": "Adına",
+        "approval": "Onaylandı",
+        "result": "Sonuç",
+        "target": "Hedef",
+        "when": "Ne zaman"
+      },
+      "done": "Tamamlandı",
+      "empty": "No @:{'brand.autobot'} actions in this period.",
+      "failed": "Başarısız: {cause}",
+      "failedPlain": "Başarısız",
+      "loadFailed": "Etkinlik yüklenemedi.",
+      "next": "Sonraki",
+      "noApproval": "Onay gerekmiyor",
+      "openAudit": "Denetim akışını Günlükler'de aç",
+      "openChat": "Sohbeti aç",
+      "previous": "Önceki",
+      "rangeLabel": "Zaman aralığı",
+      "ranges": {
+        "day": "Son 24 saat",
+        "month": "Son 30 gün",
+        "week": "Son 7 gün"
+      },
+      "search": "Etkinlik ara",
+      "standing": "Daimi onay",
+      "undo": "Geri al",
+      "undoDone": "Geri alındı: {action}",
+      "undoMessage": "Kayıtlı kopyadan {target} üzerindeki \"{action}\" işlemini geri alın. Zaten gönderilen bildirimler geri alınamaz.",
+      "undoNamed": "{action} işlemini geri al",
+      "undoTitle": "Bu işlem geri alınsın mı?",
+      "undoneState": "Geri alındı",
+      "unsupported": "Etkinlik geçmişi daha yeni bir sunucu sürümü gerektiriyor."
+    },
+    "announce": {
+      "approval": "Onayınız bekleniyor: {title}.",
+      "approvalExpires": "Onayınız bekleniyor: {title}. Süresi {duration} içinde doluyor.",
+      "approvalExpiring": "Onayın süresi {duration} içinde doluyor: {title}. Kartta daha fazla süre seçeneği var.",
+      "approvalExpiringFinal": "Onayın süresi {duration} içinde doluyor: {title}. Daha fazla süre eklenemez.",
+      "approvalExpiringNotice": "Onayın süresi {duration} içinde doluyor: {title}. Bunu {product} bildiriminden inceleyin.",
+      "approvalExpiringNoticeFinal": "Onayın süresi {duration} içinde doluyor: {title}. Daha fazla süre eklenemez. Bunu {product} bildiriminden inceleyin.",
+      "approvalExtended": "Daha fazla süre eklendi. Süresi {duration} içinde doluyor.",
+      "approvalJump": "{line} İncelemek için {keys} tuşlarına basın.",
+      "approvalJumpTouch": "{line} İnceleme isteği mesaj kutusunun üzerinde.",
+      "closed": "{product} kapatıldı.",
+      "closedRunning": "{product} kapatıldı. Arka planda yanıtlamaya devam ediyor.",
+      "floated": "{title} artık yüzen bir pencere.",
+      "madeRoom": "{title} yer açmak için tepsiye taşındı.",
+      "minimised": "{title} tepsiye küçültüldü.",
+      "moveCancelled": "Taşıma iptal edildi.",
+      "moveStarted": "{title} taşınıyor. Ok tuşları taşır. Enter yerleştirir, Escape eski yerine koyar.",
+      "narrower": "Daha dar.",
+      "openedInTab": "{title} yeni sekmede açıldı.",
+      "pinned": "{title} artık kenar çubuğunda.",
+      "pinnedSwapped": "{title} artık kenar çubuğunda. {other} tepsiye taşındı.",
+      "resizeStarted": "{title} yeniden boyutlandırılıyor. Ok tuşları boyutu değiştirir. Enter bu boyutu korur, Escape eski haline döndürür.",
+      "restored": "{title} geri yüklendi.",
+      "shorter": "Daha kısa.",
+      "taller": "Daha uzun.",
+      "wider": "Daha geniş.",
+      "windowClosed": "{title} kapatıldı.",
+      "windowClosedRunning": "{title} kapatıldı. Arka planda yanıtlamaya devam ediyor.",
+      "windowPlaced": "Pencere yerleştirildi.",
+      "failed": "Başarısız. {title}",
+      "failedRetryIn": "Başarısız. {title} {s} sn içinde yeniden deneyin.",
+      "failedWithAction": "Başarısız. {title} {action} kullanılabilir.",
+      "keysOpen": "Control I",
+      "keysOpenMac": "Command I",
+      "notSent": "Gönderilmedi. {title}",
+      "notSentRetryIn": "Gönderilmedi. {title} {s} sn içinde yeniden deneyin.",
+      "notSentWithAction": "Gönderilmedi. {title} {action} kullanılabilir.",
+      "opened": "{product} açıldı.",
+      "sheetCollapsed": "Daraltıldı.",
+      "sheetExpanded": "Genişletildi."
+    },
+    "approval": {
+      "approve": "Onayla",
+      "approveDelete": "Sil {count} {entity}",
+      "arguments": "Argümanlar",
+      "askAgainPrompt": "Bana tekrar sor: {heading}",
+      "askedElsewhere": "Başka bir sekmede soruldu",
+      "cannotUndo": "Geri alınamaz",
+      "currentUnknown": "Mevcut değer bilinmiyor",
+      "deny": "Reddet",
+      "details": "Ayrıntılar",
+      "edit": "Düzenle ve onayla",
+      "editor": {
+        "alert": "Uyarılar"
+      },
+      "expiresIn": "{time} içinde sona erer",
+      "expiringSoon": "Yakında sona eriyor · {time}",
+      "gateTiming": "Onaylar bu sunucuda kullanılamıyor. Bunu {editor} içinde tamamlayın.",
+      "heading": {
+        "delete": "Sil {count} {entity}",
+        "permission": "{tool} için izin ver",
+        "runCommand": "{toolset} üzerinde komut çalıştır"
+      },
+      "inOrg": "{org} içinde",
+      "minutes": "{count} dakika | {count} dakika",
+      "moreTargets": "ve {count} tane daha",
+      "moreTime": "Daha fazla zaman",
+      "named": "{verb} {name}",
+      "nameUnknown": "{entity} {shortId} adı yüklenemedi",
+      "needsOk": "Sizi bekliyor",
+      "noDecision": "Bu istek için yanıt kaydedilmedi",
+      "nothingSelected": "Hiçbir şey seçilmedi",
+      "open": "Aç",
+      "reason": {
+        "conflict": "Zaten var veya zaten o durumda",
+        "forbidden": "izin yok",
+        "notFound": "bulunamadı",
+        "rateLimited": "Çok fazla istek, kısa süre sonra tekrar deneyin",
+        "server": "Sunucu bunu tamamlayamadı",
+        "status": "hata {code}",
+        "unknown": "hata"
+      },
+      "reply": "Yanıtla",
+      "showLess": "Daha az göster",
+      "showMore": "Daha fazla göster",
+      "result": {
+        "approved": "Onaylandı · {time}",
+        "approvedNoTime": "Onaylandı",
+        "approvedElsewhere": "Başka bir sekmede onaylandı · {time}",
+        "askAgain": "Tekrar sor",
+        "checkList": "Listeyi kontrol et",
+        "checkListName": "Listeyi kontrol et (yeni sekmede açılır)",
+        "declined": "Reddedildi · hiçbir şey değiştirilmedi",
+        "declinedElsewhere": "Başka bir sekmede reddedildi · {time}",
+        "declinedNewChat": "Yeni bir sohbet başlattığınız için reddedildi",
+        "deciding": "Başka bir sekmede karar veriliyor…",
+        "done": {
+          "create": "{entity} oluşturuldu",
+          "delete": "{count} {entity} silindi",
+          "permission": "{tool} için izin verildi",
+          "runCommand": "{toolset} üzerinde komut çalıştırıldı",
+          "update": "{entity} {name} güncellendi"
+        },
+        "failed": "Hiçbir şey değiştirilmedi. {reason}",
+        "failedConsent": "Bu kuruluş için ücretli kullanım etkin değil.",
+        "failedCredits": "Bu kuruluşun yapay zeka kredileri tükendi.",
+        "failedForbidden": "Bu değişikliği yapma izniniz yok.",
+        "failedItem": "{name} başarısız oldu: {reason}",
+        "itemsName": "Her öğenin sonucu",
+        "narrowed": "@:{'brand.autobot'} will propose these {count} again for your approval",
+        "open": "{name} öğesini aç (yeni sekmede açılır)",
+        "sending": "Kararınız gönderiliyor…",
+        "stop": "Durdur",
+        "stopped": "Reddedildi · yanıtı durdurdunuz",
+        "unconfirmed": "Kararınız gönderildi ancak sonucu doğrulanamadı.",
+        "unknown": "Bu tarayıcıda kayıtlı bir yanıt yok.",
+        "waitingElsewhere": "Onayınız başka bir sekmede bekleniyor",
+        "withdrawn": "Bu istek artık geçerli değil.",
+        "partialBy": {
+          "change": "{total} {entity} içinden {done} tanesi değiştirildi · {failed} başarısız",
+          "create": "{total} {entity} içinden {done} tanesi oluşturuldu · {failed} başarısız",
+          "delete": "{total} {entity} içinden {done} tanesi silindi · {failed} başarısız",
+          "pause": "{total} {entity} içinden {done} tanesi duraklatıldı · {failed} başarısız",
+          "resume": "{total} {entity} içinden {done} tanesi devam ettirildi · {failed} başarısız",
+          "update": "{total} {entity} içinden {done} tanesi güncellendi · {failed} başarısız"
+        },
+        "partialUnnamed": "Bunun yalnızca bir kısmı tamamlandı · {reason}",
+        "partialUnnamedPlain": "Bunun yalnızca bir kısmı tamamlandı",
+        "standing": "Kalıcı onayınızla izin verildi"
+      },
+      "scope": {
+        "chat": "Bu sohbet için",
+        "label": "İzin ver",
+        "once": "Yalnızca bu kez",
+        "tool": "{tool} için her zaman"
+      },
+      "seconds": "{count} saniye | {count} saniye",
+      "verb": {
+        "create": "{entity} oluştur",
+        "pause": "{entity} öğesini duraklat",
+        "resume": "{entity} öğesini devam ettir",
+        "update": "{entity} öğesini güncelle"
+      },
+      "backTo": "{title} sayfasına dön",
+      "backToOrg": "{org} kuruluşuna geri döner",
+      "deliveryFailed": "Kararınız gönderilemedi. {entity} değişmedi.",
+      "finishIn": "{editor} içinde tamamla",
+      "gateNoEditor": "Onaylar bu sunucuda kullanılamıyor.",
+      "meta": "{time} tarihine kadar · {scope}",
+      "metaUntil": "{time} tarihine kadar",
+      "needsOkName": "Sizi bekliyor: {name}",
+      "notifies": "bildirir",
+      "retry": "Yeniden dene",
+      "record": {
+        "denied": "Reddedildi: {name}",
+        "deniedUnnamed": "Denied a change @:{'brand.autobot'} proposed",
+        "deniedUnnamedReason": "Denied a change @:{'brand.autobot'} proposed · {reason}",
+        "expired": "İsteğin süresi doldu. Hiçbir şey değiştirilmedi.",
+        "moved": "{editor} içine taşındı",
+        "paused": "{entity} {name} duraklatıldı",
+        "pausedCount": "{count} {entity} duraklatıldı",
+        "pausedCountUntil": "{count} {entity}, {time} tarihine kadar duraklatıldı",
+        "pausedUntil": "{entity} {name}, {time} tarihine kadar duraklatıldı",
+        "replied": "Yanıtla reddedildi",
+        "resumed": "{entity} {name} sürdürüldü",
+        "resumedCount": "{count} {entity} sürdürüldü",
+        "youAt": "siz · {time}"
+      },
+      "onDashboard": "{name} gösterge panosunda",
+      "alwaysFor": "{action} işlemi için her zaman",
+      "alwaysAllowed": "Her zaman izinli: {action}",
+      "revoke": "Geri al",
+      "changedSince": "Sorulduğundan beri değişti",
+      "recheckFailed": "Değişiklikler denetlenemedi; bu nedenle hiçbir şey yazılmadı.",
+      "more": "Diğer işlemler",
+      "revokeFailed": "Geri alınamadı. Ayarlar'dan tekrar deneyin.",
+      "grantNotStored": "Approved once. @:{'brand.autobot'} will ask next time.",
+      "actionPhrase": {
+        "create": "{entity} oluşturma",
+        "pause": "{entity} duraklatma",
+        "resume": "{entity} sürdürme",
+        "update": "{entity} güncelleme",
+        "delete": "{entity} silme"
+      },
+      "allowedForChat": "Bu sohbet için izinli: {action}"
+    },
+    "askAdmin": {
+      "adminsOf": "{org} yöneticileri",
+      "anAdminOf": "{org} yöneticisi",
+      "copied": "Mesaj kopyalandı. Yöneticinize yapıştırın.",
+      "copy": "Mesajı kopyala",
+      "email": "Yöneticilere e-posta gönder",
+      "includePrompt": "Sorumun ilk satırını ekle",
+      "message": {
+        "access": "Merhaba, {org} kuruluşu için OpenObserve'da ({whereToGrant}, Sohbet) bana {product} erişimi verebilir misiniz?",
+        "consent": "{org} için ücretli yapay zeka kullanımını etkinleştirebilir misiniz? Faturalandırma › Ücretli kullanım: {link}",
+        "credits": "{org} için ücretli yapay zeka kullanımını etkinleştirebilir misiniz? Faturalandırma › Ücretli kullanım: {link}",
+        "enable": "Could you turn {product} on for {org}? Settings › @:{'brand.autobot'} › Access: {link}",
+        "settings": "Could you change the {product} settings for {org} in Settings › @:{'brand.autobot'}?",
+        "share_read": "Bana {org} içinde sohbet paylaşımı erişimi ({whereToGrant}, Sohbet paylaşımı) verebilir misiniz?",
+        "tool_policy": "@:{'brand.autobot'} wasn't allowed to run {tool} in {org}. Could you review the permissions of @:{'brand.autobot'} in Settings › @:{'brand.autobot'} › Permissions?",
+        "agent_access": "Could you let me use {agent} in {product} for {org}? Settings › @:{'brand.autobot'} › Agents: {link}"
+      },
+      "messageLabel": "Mesaj",
+      "subject": {
+        "access": "{org} için {product} erişimi",
+        "consent": "{org} için ücretli yapay zeka kullanımı",
+        "credits": "{org} için ücretli yapay zeka kullanımı",
+        "enable": "{org} için {product} öğesini aç",
+        "settings": "{org} için {product} ayarları",
+        "share_read": "{org} için sohbet paylaşımı erişimi",
+        "tool_policy": "{org} için {product} izinleri",
+        "agent_access": "{org} için {agent} erişimi"
+      },
+      "title": "Yöneticiye sor",
+      "withPrompt": "{message} Sorum şu şekilde başlıyor: \"{prompt}\""
+    },
+    "attachment": {
+      "cell": "Hücre",
+      "field": "Alan",
+      "logEntry": "Günlük kaydı",
+      "queryError": "Sorgu hatası",
+      "span": "Span"
+    },
+    "billing": {
+      "allowance": {
+        "confirm": "Limiti ayarla",
+        "confirmMessage": "AI kredi limitini {org} için, kullanılan {used} değerinin altında {limit} olarak ayarlansın mı? Kuruluş hemen engellenir.",
+        "confirmTitle": "Mevcut kullanımın altında bir limit ayarlansın mı?",
+        "floorWarning": "Mevcut kullanımın ({used}) altında. Ücretli kullanım açık değilse kuruluş hemen engellenir.",
+        "limit": "Limit",
+        "mode": "Mod",
+        "modeUnavailable": "Mod kullanılamıyor",
+        "setAnyway": "Yine de limiti ayarla",
+        "used": "Kullanılan"
+      },
+      "managePaidUsage": "Ücretli kullanımı yönet",
+      "mode": {
+        "consentRequired": "Included credits are used up. Allow paid usage to keep using @:{'brand.autobot'}.",
+        "exhaustedContract": "AI kredileri tükendi. Hesap yöneticinizle iletişime geçin.",
+        "exhaustedContractMember": "AI kredileri tükendi. Bir kuruluş yöneticisinden hesap yöneticinizle iletişime geçmesini isteyin.",
+        "exhaustedSubscribe": "AI kredileri tükendi. Devam etmek için abone olun.",
+        "freeNoRenew": "Dahil krediler yenilenmez.",
+        "freeResets": "{date} tarihinde sıfırlanır"
+      },
+      "paidUsage": {
+        "allow": "Ücretli kullanıma izin ver",
+        "allowFor": "{org} için ücretli kullanıma izin ver",
+        "allowed": "İzin verildi",
+        "creditsFirst": "Ek krediler gerekli",
+        "effectiveOff": "Yürürlükte: ücretli kullanım kapalı",
+        "effectiveOn": "Yürürlükte: ücretli kullanım açık",
+        "effectiveWaiting": "Yürürlükte: ücretli kullanım kapalı. {org} bekleniyor",
+        "enabledBy": "{email} tarafından {date} tarihinde etkinleştirildi",
+        "managedBy": "{org} yöneticileri tarafından yönetilir",
+        "notAllowed": "İzin verilmedi",
+        "offConfirm": "Kapat",
+        "offMessage": "Kuruluştaki herkes için kullanım dahil kredilerle sınırlı kalır. Çalışmakta olan istekler tamamlanır.",
+        "offTitle": "{org} için ücretli AI kullanımı kapatılsın mı?",
+        "payerOrg": "Ödeyen kuruluş ({org})",
+        "subscribeFirst": "Ücretli kullanıma izin vermek için abone olun",
+        "thisOrg": "Bu kuruluş ({org})",
+        "title": "Ücretli kullanım",
+        "unavailable": "Ücretli kullanım durumu kullanılamıyor.",
+        "updateFailed": "Ücretli kullanım güncellenemedi."
+      },
+      "subscribe": "Abone ol",
+      "title": "AI kredileri",
+      "usedBilled": "{limit} dahil kredi kullanıldı · {billed} faturalandırıldı",
+      "usedOf": "{limit} dahil krediden {used} kullanıldı"
+    },
+    "claim": {
+      "name": "Kanıt {n}, {step}",
+      "notAvailable": "Kanıt bu görünümde kullanılamıyor",
+      "citation": "Atıf {n}, sorgu {n}, {rows}",
+      "range": "{from} ile {to} arasındaki atıflar"
+    },
+    "client": {
+      "copyManually": "Kopyalanamadı. Metni seçip kopyalayın.",
+      "popupBlocked": "Tarayıcınız yeni sekmeyi engelledi. Bunun yerine burada açılsın mı?",
+      "storageBlocked": "Bu sayfayı yeniden yüklerseniz taslaklar saklanmaz."
+    },
+    "closeTab": {
+      "body": "Bu sekmeyi kapatabilirsiniz.",
+      "title": "Oturum açtınız"
+    },
+    "composer": {
+      "cleared": "Taslak temizlendi",
+      "clearedOrg": "{org} taslağı temizlendi",
+      "draftStayed": "Yeni sohbet. Taslağınız {chat} içinde kaldı",
+      "draftStayedUnnamed": "Yeni sohbet. Taslağınız önceki sohbette kaldı",
+      "bringDraft": "Buraya getir",
+      "draftRestored": "Taslak geri yüklendi",
+      "imageReadFailed": "{name} okunamadı",
+      "imagesDropped": "{count} görsel yeniden yükleme sırasında korunmadı | {count} görsel yeniden yükleme sırasında korunmadı",
+      "imageTooBig": "{name} {size} boyutunda. En fazla {count} görsel, her biri {max}",
+      "mention": {
+        "count": "{count} öneri. Seçmek için Yukarı ve Aşağı, eklemek için Enter. | {count} öneri. Seçmek için Yukarı ve Aşağı, eklemek için Enter.",
+        "empty": "\"{q}\" ile eşleşen bir şey yok",
+        "group": {
+          "alerts": "Uyarılar",
+          "dashboards": "Gösterge panoları",
+          "pipelines": "İşlem hatları",
+          "streams": "Akışlar",
+          "agents": "Ajanlar"
+        },
+        "kind": {
+          "alerts": "uyarılar",
+          "dashboards": "gösterge panoları",
+          "pipelines": "işlem hatları",
+          "streams": "akışlar"
+        },
+        "noAccess": "{kind} için erişim yok",
+        "optionName": "{group}, {label}",
+        "pageTime": "Sayfa zamanı",
+        "retry": "{kind} yüklenemedi · Yeniden dene",
+        "showAll": "Tümünü göster",
+        "title": "Bağlama ekle"
+      },
+      "name": "{product} mesajı",
+      "placeholder": "Verileriniz hakkında sorun",
+      "followUp": "Takip sorusu sorun",
+      "scoped": "{stream} hakkında sorun",
+      "askAgent": "{agent} ajanına sor…",
+      "sendTo": "{agent} ajanına gönder",
+      "attachImage": "Fotoğraf",
+      "plus": "Mesaja ekle",
+      "connectors": {
+        "label": "Bağlayıcılar",
+        "on": "{count} açık",
+        "heading": "Bağlayıcılar",
+        "empty": "Bu kuruluş için açık araç seti yok.",
+        "failed": "Araç setleri yüklenemedi.",
+        "add": "Araç seti ekle",
+        "noPermission": "Araç setlerini yalnızca bir yönetici değiştirebilir.",
+        "toggleFailed": "{name} değiştirilemedi. Tekrar deneyin."
+      },
+      "inert": "Devam etmek için yukarıda seçim yapın",
+      "busy": "{product} meşgul. {s} sn sonra tekrar gönderin.",
+      "imageCap": "{name} eklenmedi. En fazla {count} görsel, her biri {size}.",
+      "sendReply": "Yanıt gönder",
+      "offline": "Çevrimdışısınız. Taslak korundu.",
+      "rateLimited": "Yeniden dene geri sayımının bitmesini bekleyin.",
+      "recalled": "{count} istemden {n}. geri çağrıldı",
+      "removeImage": "{name} öğesini kaldır",
+      "noAccess": "Sohbetlerinizi okuyabilirsiniz. Bir sohbeti başlatmak veya sürdürmek için yapay zeka erişimi gerekir.",
+      "replyHelper": "Yanıtlamak isteği reddeder.",
+      "replyPlaceholder": "Reply to @:{'brand.autobot'}",
+      "running": "Bu yanıtın bitmesini bekleyin veya durdurun.",
+      "sendEmpty": "Göndermek için bir mesaj yazın veya bağlam ekleyin",
+      "undo": "Geri al",
+      "replyCancel": "İptal",
+      "replyRefused": "Yanıtınız gönderilmedi. Bu istek bu sayfadan yanıtlanamaz.",
+      "inertAnswer": "Devam etmek için yukarıdaki soruyu yanıtlayın",
+      "goToRequest": "İsteğe git",
+      "placeholderAt": "Her şeyi sorun · bağlam eklemek için {'@'}",
+      "followUpAt": "Takip sorusu sorun · bağlam eklemek için {'@'}",
+      "queued": "{count} sırada",
+      "queuedEdit": "Düzenle",
+      "steerPlaceholder": "Bu çalıştırmayı yönlendir",
+      "strip": {
+        "runLimit": "Çalıştırma sınırına ulaşıldı",
+        "showRunning": "Çalışan sohbetleri göster",
+        "creditsOut": "Yapay zeka kredileri tükendi",
+        "managePaid": "Ücretli kullanımı yönet",
+        "orgBusy": "@:{'brand.autobot'} is busy for your organization",
+        "retry": "Yeniden dene",
+        "micBlocked": "Mikrofon engellendi",
+        "howToAllow": "Nasıl izin verilir",
+        "decideAbove": "Devam etmek için yukarıda karar verin",
+        "pastedLines": "{count} satır yapıştırıldı | {count} satır yapıştırıldı",
+        "attachAsFile": "Dosya olarak ekle",
+        "replaceDraft": "Taslak değiştirilsin mi?",
+        "needsAccess": "Yapay zeka erişimi gerekiyor",
+        "offline": "Çevrimdışı · taslak korundu",
+        "busyFor": "Meşgul · {s} sn sonra tekrar gönderin",
+        "pasteInline": "İletiye yapıştır",
+        "enterQueues": "Yanıt sürüyor · Enter bunu kuyruğa alır"
+      },
+      "queuedSentence": "Sonraki mesajınız bu yanıt bitince gönderilir.",
+      "queuedAlreadySentence": "Bir mesaj zaten kuyrukta."
+    },
+    "consent": {
+      "aMember": "bir üye",
+      "enabledBy": "{org} için ücretli yapay zeka kullanımı {user} tarafından etkinleştirildi · {time}",
+      "manage": "Yönet",
+      "manageName": "Ücretli kullanımı yönet (yeni sekmede açılır)",
+      "you": "siz"
+    },
+    "context": {
+      "addBack": "{label} · Yeniden ekle",
+      "added": "{label} bağlama eklendi",
+      "atSend": "Gönderdiğinizde",
+      "attachmentsValue": "{count} ek dosya · {size} | {count} ek dosya · {size}",
+      "capImages": "En fazla {count} görsel, her biri {size}",
+      "capRows": "İleti başına en fazla {rows} satır veya {size} eklenmiş veri",
+      "characters": "{count} karakter | {count} karakter",
+      "chip": {
+        "alert": "Uyarı · {name}",
+        "cell": "{field} = {value}",
+        "dashboard": "Gösterge panosu · {name}",
+        "field": "Alan · {name}",
+        "incident": "Vaka · {name}",
+        "logRow": "Günlük satırı · {name} · {time}",
+        "logRowAt": "Günlük satırı · {time}",
+        "logRowPlain": "Günlük satırı",
+        "logRows": "Günlük satırı · {count} · {name} | Günlük satırları · {count} · {name}",
+        "logRowsPlain": "Günlük satırı · {count} | Günlük satırları · {count}",
+        "panel": "Panel · {name}",
+        "pipeline": "İşlem hattı · {name}",
+        "queryError": "Sorgu hatası · {name}",
+        "queryNode": "Sorgu düğümü · {name}",
+        "span": "Span · {name}",
+        "sql": "SQL · {name}",
+        "sqlLines": "SQL · {count} satır | SQL · {count} satır",
+        "stream": "Akış · {name}",
+        "streams": "Akış · {count} | Akışlar · {count}",
+        "traceQuery": "İz sorgusu",
+        "vrl": "VRL · {count} satır | VRL · {count} satır"
+      },
+      "chipName": "{label}, {secondary}",
+      "dataSharing": "Veri paylaşımı · {level}",
+      "disclosure": "Attached data is sent to @:{'brand.autobot'} and saved with this chat.",
+      "disclosureShared": "Attached data is sent to @:{'brand.autobot'}, saved with this chat and included in any share.",
+      "field": {
+        "alert": "Uyarı",
+        "attachments": "Ekler",
+        "dashboard": "Gösterge panosu",
+        "incident": "Vaka",
+        "interestingFields": "İlginç alanlar",
+        "org": "Kuruluş",
+        "page": "Sayfa",
+        "pipeline": "İşlem hattı",
+        "quickMode": "Hızlı mod",
+        "requestTime": "Geçerli saat",
+        "sql": "SQL",
+        "sqlMode": "SQL modu",
+        "streams": "Akışlar",
+        "timeRange": "Zaman aralığı",
+        "timezone": "Saat dilimi",
+        "traceQuery": "İz sorgusu",
+        "vrl": "VRL",
+        "overviewIncidents": "Ana Sayfa'daki vakalar ({count})",
+        "overviewServices": "Ana Sayfa'daki hizmetler ({count})",
+        "overviewAnomalies": "Ana Sayfa'daki anomaliler ({count})",
+        "overviewAlerts": "Ana Sayfa'daki uyarılar ({count})"
+      },
+      "fromChat": "Bu sohbete eklendi",
+      "fromPage": "Bu sayfadan",
+      "imageType": "Yalnızca PNG ve JPEG görselleri eklenebilir",
+      "inChat": "İçinde: {title}",
+      "internal": "dahili",
+      "lines": "{count} satır | {count} satır",
+      "mixedStreams": "Her mesajda tek bir akış türü olabilir. Bunu eklemek için {type} akışını kaldırın.",
+      "more": "+{count}",
+      "moreName": "{count} bağlam çipi daha göster | {count} bağlam çipi daha göster",
+      "notReadYet": "henüz okunmadı",
+      "openSource": "{page} içinde aç",
+      "remove": "{label} öğesini bağlamdan kaldır",
+      "removeAll": "Tümünü kaldır",
+      "removed": "{label} bağlamdan kaldırıldı",
+      "removeRow": "{n}. satırı kaldır",
+      "rowsCount": "{count} satır | {count} satır",
+      "sentLine": "Gönderilen:",
+      "startNew": "Bunun yerine yeni bir sohbet başlat",
+      "streamsValue": "{names} ({type})",
+      "summary": "{scope} · {range}",
+      "time": {
+        "past": "Son {period}",
+        "pastRange": "son {period}",
+        "custom": "özel",
+        "default": "Zaman · son 15 dk · varsayılan",
+        "fromPage": "sayfa",
+        "page": "Zaman · {range}"
+      },
+      "trayLabel": "Sonraki mesajınız için bağlam",
+      "trimInternal": "Dahili alanları gizle",
+      "truncated": "{size} boyutuna kısaltıldı",
+      "truncatedFields": "Sığdırmak için kesildi, en uzun değerler önce: {fields}",
+      "used": "Kullanılan:",
+      "usedName": "Kullanılan bağlam",
+      "usedNone": "Hiçbir sayfa bağlamı kullanılmadı",
+      "valueOff": "Kapalı",
+      "valueOn": "Açık",
+      "pastedText": "Yapıştırılan metin · {count} satır | Yapıştırılan metin · {count} satır",
+      "pastedAsChip": "Uzun yapıştırma metin olarak eklendi.",
+      "pasteInline": "Bunun yerine mesaja yapıştır",
+      "pasteInlineShort": "Mesaja yapıştır",
+      "withheld": "bu veri düzeyinde gönderilmedi",
+      "withheldLine": "Bu veri düzeyinde gönderilmedi ({level})."
+    },
+    "credits": {
+      "copyRequest": "{org} için lütfen AI kredisi ekleyin: {date} itibarıyla {limit} dahil krediden {used} tanesi kullanıldı.",
+      "copyRequestNoUsage": "{org} için lütfen AI kredisi ekleyin: dahil krediler {date} itibarıyla tükendi.",
+      "manage": "Ücretli kullanımı yönet",
+      "manageName": "Ücretli kullanımı yönet (yeni sekmede açılır)",
+      "meter": {
+        "barName": "Dahil AI kredileri",
+        "compact": "{used} / {limit}",
+        "consent": "Dahil krediler kullanıldı · ücretli kullanım için onay gerekli",
+        "exhausted": "{org} için AI kredileri tükendi",
+        "exhaustedCompact": "Tükendi",
+        "free": "{limit} dahil krediden {used} kullanıldı · {renewal}",
+        "noIncluded": "Dahil kredi yok",
+        "noRenew": "yenilenmezler",
+        "payg": "{limit} dahil kredi kullanıldı · {billed} faturalandırıldı · ücretli kullanım açık",
+        "resets": "{date} tarihinde sıfırlanır",
+        "retry": "Yeniden dene",
+        "unavailable": "Kredi kullanımı kullanılamıyor",
+        "unavailableCompact": "Krediler kullanılamıyor",
+        "value": "{limit} krediden {used} tanesi"
+      },
+      "modeTag": {
+        "consent": "Onay gerekli",
+        "exhausted": "Tükendi",
+        "payg": "Ücretli kullanım açık"
+      },
+      "notice": "Dahil edilen AI kredilerinin {percent}%'i kullanıldı · yenilenmez",
+      "noticeDismiss": "Kredi bildirimini kapat",
+      "costs": "Bir mesaj {chat} kredi kullanır. Vaka analizi aynı kredilerden {incident} kullanır. | Bir mesaj {chat} kredi kullanır. Vaka analizi aynı kredilerden {incident} kullanır.",
+      "more": "Diğer kredi işlemleri",
+      "noticeResets": "Dahil edilen AI kredilerinin {percent}%'i kullanıldı · {date} tarihinde sıfırlanır",
+      "predictedExhausted": "{org} için AI kredileri tükendi."
+    },
+    "diff": {
+      "accept": "Kabul et",
+      "acceptRun": "Kabul et ve çalıştır",
+      "added": "eklendi:",
+      "announce": "Önerilen {language}, {added} satır eklendi, {removed} satır kaldırıldı",
+      "applied": "Düzenleyici güncellendi. Geri alma kullanılabilir.",
+      "current": "Mevcut {language}",
+      "from": "{product} tarafından",
+      "notChecked": "denetlenmedi",
+      "parseFailed": "ayrıştırılamıyor",
+      "region": {
+        "alert": "Uyarı sorgusunda önerilen değişiklik",
+        "alert_query": "Uyarı sorgusunda önerilen değişiklik",
+        "anomaly": "Algılama sorgusunda önerilen değişiklik",
+        "dashboard": "Panel sorgusunda önerilen değişiklik",
+        "function": "Fonksiyonda önerilen değişiklik",
+        "json_editor": "JSON'da önerilen değişiklik",
+        "logs": "Sorguda önerilen değişiklik",
+        "regex": "Desende önerilen değişiklik",
+        "scheduled_query": "Düğümün sorgusunda önerilen değişiklik"
+      },
+      "reject": "Reddet",
+      "removed": "kaldırıldı:",
+      "reviewInEditor": "Değişikliği düzenleyicide inceleyin",
+      "title": "Önerilen {language}",
+      "unknownCount": "{count} alan bilinmiyor | {count} alan bilinmiyor",
+      "validated": "doğrulandı",
+      "unknownMark": "Bilinmeyen alan"
+    },
+    "docs": {
+      "opensInNewTab": "(yeni sekmede açılır)",
+      "setupGuide": "Kurulum kılavuzunu okuyun"
+    },
+    "editor": {
+      "protectedFields": "Kaydedilen ad, kuruluş ve kimlik korundu",
+      "title": {
+        "alert": "Uyarı · {name}",
+        "alertNew": "Uyarı · yeni uyarı",
+        "function": "Fonksiyon · {name}",
+        "functionNew": "Fonksiyon · yeni fonksiyon",
+        "pipeline": "İşlem hattı · {name}",
+        "pipelineNew": "İşlem hattı · yeni işlem hattı",
+        "queryNode": "İşlem hattı · {pipeline} · sorgu düğümü",
+        "queryNodeNew": "Yeni işlem hattı · sorgu düğümü",
+        "regex": "Regex deseni · {name}",
+        "regexNew": "Regex deseni · yeni"
+      }
+    },
+    "entity": {
+      "alert": "uyarı | uyarı",
+      "dashboard": "gösterge panosu | gösterge panosu",
+      "destination": "hedef | hedef",
+      "folder": "klasör | klasör",
+      "function": "fonksiyon | fonksiyon",
+      "object": "nesne | nesne",
+      "panel": "panel | panel",
+      "pipeline": "işlem hattı | işlem hattı",
+      "report": "rapor | rapor",
+      "setting": "ayar | ayar",
+      "stream": "akış | akış",
+      "template": "şablon | şablon",
+      "user": "kullanıcı | kullanıcı"
+    },
+    "entry": {
+      "addField": "Sohbete alan ekle",
+      "addFiring": "Tetiklenmiş uyarıyı sohbete ekle",
+      "addLogRow": "Sohbete günlük satırı ekle",
+      "addPanel": "Sohbete panel ekle",
+      "addPreviewRow": "Sohbete önizleme satırı ekle",
+      "addRecord": "Sohbete günlük satırı ekle",
+      "addSeries": "Sohbete seri ekle",
+      "addSpan": "Sohbete span ekle",
+      "addTestEvent": "Sohbete test olayı ekle",
+      "addToChat": "Sohbete ekle",
+      "addedAnnounce": "Sohbete eklendi, {count} öğe | Sohbete eklendi, {count} öğe",
+      "addedBehindCard": "Sohbete eklendi. Göndermek için bekleyen soruyu yanıtlayın.",
+      "addedToDraft": "Mesajınıza eklendi. Hazır olduğunuzda Gönder'e basın.",
+      "addedToast": "Sohbete eklendi",
+      "ask": "{product} ürününe sor",
+      "assistant": "@:{'brand.askAutobot'}",
+      "buildFailed": "Bu istek hazırlanamadı",
+      "capReached": "Eklenmedi: mesaj dolu. Bir çipi kaldırıp yeniden deneyin.",
+      "chip": {
+        "alertFired": "Uyarı · {name} · {time} tetiklendi",
+        "alertNew": "Uyarı · yeni uyarı",
+        "database": "Veritabanı · {name}",
+        "logRow": "Günlük satırı · {name}",
+        "query": "Sorgu · {count} satır | Sorgu · {count} satır",
+        "reproduce": "Sorgu · satırları yeniden oluşturur",
+        "series": "Seri · {name}",
+        "service": "Hizmet · {name}",
+        "trace": "İz · {name}"
+      },
+      "cost": "{count} kredi kullanır | {count} kredi kullanır",
+      "createRegex": "Regex deseni oluştur",
+      "deepLinkMissing": "Soru sorulacak öğe bulunamadı",
+      "dependencies": "Bağımlılıklar",
+      "englishPromptNote": "İstek İngilizce gönderilir.",
+      "explain": "Açıkla",
+      "explainAlert": "Bu uyarıyı açıkla",
+      "explainDependencyNamed": "{name} açıkla",
+      "explainEdge": "Bu bağımlılığı açıkla",
+      "explainField": "Bu alanı açıkla",
+      "explainPanel": "Bu paneli açıkla",
+      "explainRows": "Bu satırı açıkla | Bu {count} satırı açıkla",
+      "explainSeries": "Bu seriyi açıkla",
+      "explainService": "Bu hizmeti açıkla",
+      "explainSpan": "Bu span'ı açıkla",
+      "fix": "@:{'brand.askAutobot'} how to fix this",
+      "inChat": "Sohbette",
+      "inChatRemove": "Sohbette. Bağlam tepsisindeki × simgesiyle kaldırın.",
+      "lockedName": "{label}, kilitli: yapay zeka erişimi için bir yöneticiye sorun",
+      "open": "Aç",
+      "orgChanged": "Bu sayfa başka bir kuruluşa ait. Hakkında soru sormak için sayfayı yeniden yükleyin.",
+      "panelActions": "Panel işlemleri",
+      "queuedWhileRunning": "Sohbete eklendi. Geçerli yanıt tamamlandığında gönderin.",
+      "rowActions": "Satır işlemleri",
+      "setUpIngestion": "Veri alımını kurmama yardım et",
+      "setUpTracing": "İzlemeyi kurmama yardım et",
+      "title": {
+        "dependency": "Bağımlılık · {name}",
+        "emptyResult": "Boş sonuçlar · {name}",
+        "setUpIngestion": "Veri alımını kur",
+        "setUpTracing": "İzlemeyi kur"
+      },
+      "tooltip": {
+        "add": "Sohbete ekle",
+        "createRegex": "Write a regex pattern with @:{'brand.autobot'}",
+        "dockedAsk": "Open @:{'brand.autobot'} for this editor",
+        "emptyResult": "Neden hiçbir şeyin eşleşmediğini sor",
+        "explain": "Bunu açıkla",
+        "explainAlert": "Bu uyarıyı açıkla",
+        "explainEdge": "Bu bağımlılığı kontrol et",
+        "explainField": "Bu alanı açıkla",
+        "explainPanel": "Bu paneli açıkla",
+        "explainSeries": "Bu seriyi açıkla",
+        "explainService": "Bu hizmeti kontrol et",
+        "explainSpan": "Bu span'ı açıkla",
+        "fix": "Bu bulguyu düzelt",
+        "ingestion": "İlk veriyi içeri al",
+        "noStream": "İlk veriyi gönder",
+        "sidebarAsk": "Open @:{'brand.autobot'} with this function",
+        "troubleshootAlert": "Bu uyarının neden tetiklendiğini sor",
+        "troubleshootQuery": "Bu sorguyu düzelt",
+        "troubleshootSpan": "Bu span'ın neden başarısız olduğunu sor"
+      },
+      "troubleshoot": "Sorun gider",
+      "troubleshootAlert": "Bu uyarının sorununu gider",
+      "troubleshootNoResults": "Boş sonuçların sorununu gider",
+      "troubleshootQuery": "Bu sorgunun sorununu gider",
+      "troubleshootSpan": "Bu span'ın sorununu gider"
+    },
+    "error": {
+      "account_changed": {
+        "title": "Başka bir hesap oturum açtı. Mesajınız gönderilmedi; o hesapla devam etmek için yeniden yükleyin."
+      },
+      "admission_busy": {
+        "action": "Yeniden dene",
+        "title": "@:{'brand.autobot'} is busy starting another answer. Your message wasn't sent."
+      },
+      "agent_unavailable": {
+        "action": "Yeniden dene",
+        "body": "Şimdiye kadarki bulgular yukarıda korunuyor.",
+        "title": "@:{'brand.autobot'} didn't respond. Nothing was changed.",
+        "titleAfterChange": "@:{'brand.autobot'} didn't respond."
+      },
+      "already_submitted": {
+        "action": "Sohbeti yeniden yükle",
+        "title": "Bu mesaj zaten gönderildi. Yanıtını görmek için sohbeti yeniden yükleyin."
+      },
+      "analysis_in_progress": {
+        "title": "Bu vaka için zaten bir analiz çalışıyor."
+      },
+      "approval_delivery_failed": {
+        "action": "Tekrar gönder",
+        "title": "Your decision didn't reach @:{'brand.autobot'}. Nothing was changed."
+      },
+      "approval_elsewhere": {
+        "title": "Başka bir sekme bu sohbette onayınızı bekliyor. Mesajınız gönderilmedi."
+      },
+      "approval_expired": {
+        "action": "Tekrar sor",
+        "title": "No answer in time, so @:{'brand.autobot'} didn't run this action."
+      },
+      "authorization_unavailable": {
+        "action": "Yeniden dene",
+        "hint": "Hiçbir ücret alınmadı.",
+        "title": "AI kredileri kontrol edilemedi. Mesajınız gönderilmedi."
+      },
+      "cancelled_elsewhere": {
+        "title": "Bu yanıt başka bir sekmeden durduruldu."
+      },
+      "consent_declined": {
+        "title": "Ücretli kullanım etkinleştirilmedi. Mesajınız gönderilmedi."
+      },
+      "consent_still_required": {
+        "action": "Ücretli kullanımı yönet",
+        "actionAdmin": "Ücretli kullanımı yönet",
+        "actionMember": "Yöneticiye sor",
+        "body": "Faturalandırma › Ücretli kullanım bölümünden etkinleştirin.",
+        "title": "Bu işlem için gereken tüm kuruluşlarda ücretli kullanım etkin değil."
+      },
+      "credits_exhausted": {
+        "action": "Ücretli kullanımı yönet",
+        "actionAdmin": "Ücretli kullanımı yönet",
+        "actionCopy": "İsteği kopyala",
+        "actionMember": "Yöneticiye sor",
+        "body": "Dahil edilen krediler yenilenmez.",
+        "bodyContract": "Kredi eklemek için hesap yöneticinizle iletişime geçin.",
+        "bodyMember": "{org} yöneticisi Faturalandırma › Ücretli kullanım bölümünden ücretli kullanıma izin verebilir.",
+        "bodyPayerMember": "{payer} yöneticisi ücretli kullanıma izin verebilir.",
+        "bodyResets": "Yenilenme tarihi: {date}.",
+        "title": "{org} için AI kredileri tükendi. Mesajınız gönderilmedi.",
+        "titlePayer": "{org} için AI kredileri tükendi; ücret {payer} hesabına faturalandırılıyor. Mesajınız gönderilmedi."
+      },
+      "data_level_blocked": {
+        "action": "Seviyeyi değiştir",
+        "actionAdmin": "Seviyeyi değiştir",
+        "actionMember": "Yöneticiye sor",
+        "title": "{org} içinde ham satırlar modelle paylaşılmaz."
+      },
+      "empty_response": {
+        "action": "Yeniden dene",
+        "title": "@:{'brand.autobot'} didn't answer."
+      },
+      "history_unavailable": {
+        "action": "Yeniden dene",
+        "title": "Bu sohbetin geçmişi yüklenemedi. Mesajınız gönderilmedi."
+      },
+      "not_enabled": {
+        "action": "Erişim ayarlarını aç",
+        "actionAdmin": "Erişim ayarlarını aç",
+        "actionMember": "Yöneticiye sor",
+        "body": "Geçmiş sohbetler okunabilir kalır.",
+        "title": "{org} için {product} kapalı. Mesajınız gönderilmedi."
+      },
+      "off_for_org": {
+        "action": "Erişim ayarlarını aç",
+        "actionAdmin": "Erişim ayarlarını aç",
+        "actionMember": "Yöneticiye sor",
+        "body": "Geçmiş sohbetler okunabilir kalır.",
+        "title": "{org} için {product} kapalı. Mesajınız gönderilmedi."
+      },
+      "offline": {
+        "action": "Yeniden dene",
+        "hint": "Tekrar çevrimiçi olduğunuzda Yeniden dene etkinleşir.",
+        "title": "Çevrimdışısınız. Mesajınız gönderilmedi."
+      },
+      "permission_denied": {
+        "action": "IAM rollerini aç",
+        "actionAdmin": "IAM rollerini aç",
+        "actionMember": "Yöneticiye sor",
+        "body": "This chat stays readable. An admin can grant access in IAM › Roles › @:{'brand.autobot'}.",
+        "title": "Rolünüz artık {product} kullanamıyor. Mesajınız gönderilmedi."
+      },
+      "permission_denied_tool": {
+        "action": "Asistan izinlerini aç",
+        "actionAdmin": "Asistan izinlerini aç",
+        "actionMember": "Yöneticiye sor",
+        "body": "Kuruluşunuzun asistan ilkesi bunu engelliyor.",
+        "title": "@:{'brand.autobot'} wasn't allowed to run {tool}."
+      },
+      "persistence_failed": {
+        "action": "Kaydetmeyi yeniden dene",
+        "title": "Yanıtlandı, ancak geçmişe kaydedilmedi."
+      },
+      "provider_error": {
+        "action": "Yeniden dene",
+        "body": "Hiçbir şey değiştirilmedi.",
+        "bodyPartial": "Şu ana kadarki bulgular yukarıda tutuluyor.",
+        "reason": {
+          "modelUnavailable": "modele ulaşamıyor",
+          "overloaded": "aşırı yüklü",
+          "requestTooLarge": "bu kadar uzun bir soruyu alamıyor",
+          "timedOut": "çok uzun sürdü"
+        },
+        "title": "Yapay zeka sağlayıcısı {reason}, bu nedenle yanıt durdu.",
+        "titleNoReason": "Yapay zeka sağlayıcısı başarısız oldu, bu nedenle yanıt durdu."
+      },
+      "rca_disabled": {
+        "action": "Yöneticiye sor",
+        "body": "Bir yönetici bunu açabilir.",
+        "title": "Vaka analizi kapalı."
+      },
+      "rate_limited": {
+        "action": "Yeniden dene",
+        "title": "Yapay zeka sağlayıcısı istekleri sınırlıyor. Mesajınız gönderilmedi.",
+        "titleTimed": "Yapay zeka sağlayıcısı istekleri sınırlıyor. Mesajınız gönderilmedi."
+      },
+      "run_limit_member": {
+        "action": "Çalışan sohbetleri göster",
+        "title": "{n} sohbet çalışıyor veya sizi bekliyor. Mesajınız gönderilmedi."
+      },
+      "run_limit_org": {
+        "action": "Yeniden dene",
+        "title": "{product}, kuruluşunuz için meşgul. Mesajınız gönderilmedi."
+      },
+      "restore_required": {
+        "action": "Sohbeti yeniden yükle",
+        "title": "Bu sohbet sunucuda sıfırlandı. Devam etmek için yeniden yükleyin."
+      },
+      "session_expired": {
+        "action": "Oturum aç",
+        "body": "Oturum açma yeni bir sekmede açılır; göndermek için buraya geri dönün.",
+        "title": "Oturumunuz sona erdi. Taslağınız korunuyor."
+      },
+      "session_owner_unavailable": {
+        "action": "Yeniden dene",
+        "title": "Sohbet başka bir sunucuya taşındı ve sürdürülemedi."
+      },
+      "signed_out": {
+        "action": "Oturum aç",
+        "title": "Başka bir sekmede oturumu kapattınız. Bu yanıt durduruldu."
+      },
+      "stale_epoch": {
+        "action": "Sohbeti yeniden yükle",
+        "title": "Bu sohbet sunucuda sıfırlandı. Devam etmek için yeniden yükleyin."
+      },
+      "stopped_before_send": {
+        "action": "Yeniden dene",
+        "title": "Göndermeden önce durduruldu. Mesajınız gönderilmedi."
+      },
+      "stream_dropped": {
+        "action": "Yeniden dene",
+        "body": "Şu ana kadarki bulgular yukarıda tutuluyor.",
+        "bodyPartial": "Yukarıdaki metin eksik.",
+        "title": "{elapsed} sonra bağlantı kesildi. Hiçbir şey değiştirilmedi.",
+        "titleAfterChange": "{elapsed} sonra bağlantı kesildi.",
+        "titleAfterChangeNow": "Bağlantı kesildi.",
+        "titleNow": "Bağlantı kesildi. Hiçbir şey değiştirilmedi."
+      },
+      "stream_oversized": {
+        "action": "Yeniden dene",
+        "body": "Hiçbir şey değiştirilmedi.",
+        "title": "Bu yanıt görüntülenemeyecek kadar büyüktü."
+      },
+      "subscription_required": {
+        "action": "Planları görüntüle",
+        "actionAdmin": "Planları görüntüle",
+        "actionMember": "Yöneticiye sor",
+        "body": "Subscribe to keep using @:{'brand.autobot'}.",
+        "title": "{org} için dahil edilen yapay zeka kredileri tükendi."
+      },
+      "turn_busy": {
+        "action": "Durdur",
+        "title": "Bu sohbet hâlâ yanıt veriyor. Mesajınız gönderilmedi."
+      },
+      "turn_limit": {
+        "action": "Yeniden dene",
+        "body": "Biri sona erdiğinde tekrar gönderin.",
+        "title": "Çok fazla yanıt çalışıyor. Mesajınız gönderilmedi."
+      },
+      "unknown": {
+        "action": "Yeniden dene",
+        "status": "Sunucu HTTP {status} döndürdü.",
+        "title": "Bir şeyler ters gitti."
+      },
+      "unreachable": {
+        "action": "Yeniden dene",
+        "title": "OpenObserve'a ulaşılamadı. Mesajınız gönderilmedi."
+      },
+      "agent_disabled": {
+        "title": "{agent}, {org} için kapalı. Mesajınız gönderilmedi.",
+        "action": "Aracı ayarlarını aç",
+        "actionAdmin": "Aracı ayarlarını aç",
+        "actionMember": "Yöneticiye sor"
+      },
+      "agent_not_permitted": {
+        "title": "Rolünüz {agent} kullanamıyor. Mesajınız gönderilmedi.",
+        "body": "An admin can grant it in Settings › @:{'brand.autobot'} › Agents.",
+        "action": "Yöneticiye sor"
+      },
+      "agent_unreachable": {
+        "title": "{agent} şu anda erişilebilir değil. Mesajınız gönderilmedi.",
+        "action": "Tekrar dene"
+      },
+      "handoff_failed": {
+        "title": "Bu sohbet {agent} aracısına devredilemedi. {fromAgent} sohbeti elinde tuttu.",
+        "body": "Mesajınız hâlâ bu sohbette.",
+        "action": "Tekrar dene"
+      }
+    },
+    "errorDetails": {
+      "chat": "Sohbet",
+      "code": "Kod",
+      "copied": "Ayrıntılar kopyalandı",
+      "copy": "Ayrıntıları kopyala",
+      "httpStatus": "HTTP durumu",
+      "serverMessage": "Sunucu mesajı",
+      "title": "Ayrıntılar",
+      "trace": "İz",
+      "turn": "Tur",
+      "when": "Ne zaman"
+    },
+    "evidence": {
+      "copied": "Sorgu kopyalandı",
+      "fromStep": "{n}. adımdan",
+      "groupName": "{stream} üzerinde {language} sorgusu, {range}",
+      "groupNameNoStream": "{language} sorgusu, {range}",
+      "lastMinutes": "son {count} dk",
+      "noRows": "Bu aralıkta satır yok",
+      "noStreamAccess": "{stream} akışına erişiminiz yok",
+      "openHint": "Sorgu yüklenmiş olarak açılır",
+      "opensNewTab": "{label} (yeni sekmede açılır)",
+      "otherOrg": "Bu sorgu {org} kuruluşuna aittir. Çalıştırmak için kuruluşu değiştirin.",
+      "queryFailed": "Sorgu başarısız oldu: {reason}",
+      "queryFailedPlain": "Sorgu başarısız oldu",
+      "rangeFallback": "aralık: bilinmiyor · son 15 dakika için çalışır",
+      "rangeUnknown": "aralık: bilinmiyor",
+      "resultsOf": "{name} sonuçları",
+      "rowsCount": "{count} satır | {count} satır",
+      "rowsScannedWindow": "{count} satır · {took} · {size} tarandı · {window} | {count} satır · {took} · {size} tarandı · {window}",
+      "rowsWindow": "{count} satır · {took} · {window} | {count} satır · {took} · {window}",
+      "runNow": "Şimdi çalıştır",
+      "runNowHint": "Bu sorgu yüklü olarak {explorer} açılır; sorguyu orada çalıştırırsınız.",
+      "sawRows": "@:{'brand.autobot'} got {count} row | @:{'brand.autobot'} got {count} rows",
+      "sawRowsIn": "@:{'brand.autobot'} got {count} row in {range} | @:{'brand.autobot'} got {count} rows in {range}",
+      "stopped": "Durduruldu",
+      "windowCapped": "{window} (son 7 güne kısaltıldı)",
+      "askAdmin": "Yöneticiye sor",
+      "line": "{count} sorgu, {range} | {count} sorgu, {range}",
+      "stepsLine": "{count} adım, {range} | {count} adım, {range}",
+      "noAccess": "{n} alıntı kullanılamıyor: {stream} akışına erişim yok | {n} alıntı kullanılamıyor: {stream} akışına erişim yok",
+      "noAccessPlain": "{n} alıntı kullanılamıyor | {n} alıntı kullanılamıyor"
+    },
+    "export": {
+      "approved": "{time} tarihinde tarafınızdan onaylandı",
+      "attachment": "[ek: {name}]",
+      "denied": "{time} tarihinde tarafınızdan reddedildi",
+      "doneOf": {
+        "create": "{done}/{total} oluşturuldu",
+        "delete": "{done}/{total} silindi",
+        "update": "{done}/{total} güncellendi"
+      },
+      "ended": "Bu yanıt tamamlanmadı",
+      "exportedLine": "Dışa aktarıldı: {time} {zone} · {org}",
+      "image": "[görsel: {name}]",
+      "steps": "{n} adım tamamlandı ({names}) | {n} adım tamamlandı ({names})",
+      "stopped": "{time} tarihinde durduruldu · bulgular korundu",
+      "you": "Siz"
+    },
+    "findings": {
+      "confidence": "Güven: {level}",
+      "inferred": "Çıkarıldı",
+      "level": {
+        "high": "yüksek",
+        "inconclusive": "sonuçsuz",
+        "low": "düşük",
+        "medium": "orta"
+      },
+      "ruledOut": "Elendi",
+      "inferredLine": "Çıkarıldı: {text}",
+      "next": "Sonraki: {text}",
+      "notEstablished": "Belirlenmedi: {text}",
+      "ruledOutLine": "Elendi: {text}",
+      "showRaw": "Ham bulguları göster",
+      "unreadable": "Bulgular gösterilemedi."
+    },
+    "footer": {
+      "credits": "{count} kredi | {count} kredi",
+      "creditsCountedHint": "Krediler, bir istek kabul edildiğinde sayılır.",
+      "evaluated": "{range} değerlendirildi",
+      "evaluatedMore": "{range} ve {count} diğer pencere değerlendirildi | {range} ve {count} diğer pencere değerlendirildi",
+      "includedCredits": "{count} kredi dahil | {count} kredi dahil",
+      "notSaved": "kaydedilmedi",
+      "notSavedHint": "Bu yanıt verildi ancak geçmişe kaydedilemedi",
+      "queries": "{count} sorgu | {count} sorgu",
+      "refunded": "0 kredi · iade edildi",
+      "rerun": "Şu an için yeniden çalıştır",
+      "rerunFor": "{range} için yeniden çalıştır",
+      "theLastDays": "son {n} gün | son {n} gün",
+      "theLastHours": "son {n} sa",
+      "theLastMinutes": "son {n} dk",
+      "tokens": "{tokens} token · {count} model çağrısı | {tokens} token · {count} model çağrısı",
+      "tryWider": "Son {duration} aralığını deneyin"
+    },
+    "fork": {
+      "contextNote": "İlk mesajınız bağlam olarak paylaşılan sohbeti kullanır.",
+      "divider": "Sohbetiniz burada başlıyor",
+      "failed": "Bu sohbet sürdürülemedi",
+      "regionName": "{title} sohbetinden sürdürüldü",
+      "seedLost": "The shared chat is no longer available, so @:{'brand.autobot'} won't have its earlier messages.",
+      "seedMissing": "Paylaşılan döküm bu cihazda kullanılamıyor",
+      "sendAnyway": "Yine de gönder",
+      "showTurns": "{count} paylaşılan turu göster | {count} paylaşılan turu göster",
+      "sourceGone": "· kaynak artık kullanılamıyor",
+      "sourceHeading": "“{title}” sohbetinden sürdürüldü · paylaşan: {owner} · {time} itibarıyla anlık görüntü",
+      "title": "{title} (devam)",
+      "titleN": "{title} (devam {n})",
+      "toast": "Sohbetlerinizde sürdürülüyor",
+      "unavailable": "Bu bağlantı artık kullanılamıyor, bu nedenle sürdürülemez."
+    },
+    "gate": {
+      "announce": {
+        "locked": "{product} rolünüz için kullanılamıyor."
+      },
+      "checkAgain": "Tekrar kontrol et",
+      "checkAgainHint": "Yeni mi erişim aldınız?",
+      "close": "Kapat",
+      "learnMore": "Ne yaptığını öğrenin",
+      "learnTitle": "{product} ne yapar",
+      "noPermission": {
+        "askAdmin": "Bir yöneticiye sorun",
+        "body": "Bir yönetici {whereToGrant} bölümünde erişim verebilir.",
+        "title": "{product} rolünüz için kullanılamıyor",
+        "tooltip": "Yapay zeka erişimi için bir yöneticiye sorun",
+        "unknownNotice": "Rolünüz {product} içermiyor olabilir. Gönderme başarısız olursa bir yöneticiye sorun."
+      },
+      "noShare": {
+        "tooltip": "Sohbetleri yalnızca yöneticiler paylaşabilir"
+      },
+      "noShareRead": {
+        "body": "Sohbet paylaşımı erişimi için bir yöneticiye sorun.",
+        "title": "Bu kuruluştaki paylaşılan sohbetlere erişiminiz yok"
+      },
+      "notConfigured": {
+        "body": "No agent target is configured for this deployment, so @:{'brand.autobot'} is off for everyone.",
+        "setup": "Set up @:{'brand.autobot'}",
+        "title": "{product} henüz kurulmadı"
+      },
+      "notEntitled": {
+        "capability1": "Herhangi bir günlük satırını, span'ı veya paneli açıklayın",
+        "capability2": "Düz dille SQL, PromQL ve VRL yazın",
+        "capability3": "Onaylayacağınız düzeltmeler önerin",
+        "pitch": "{product} günlükleri, izleri ve metrikleri sizinle birlikte inceler, sorgular yazar ve onaylayacağınız değişiklikler önerir. OpenObserve Enterprise ve Cloud'un bir parçasıdır.",
+        "seePlans": "Planları görün",
+        "title": "{product} ile tanışın",
+        "tooltip": "{product}, OpenObserve Enterprise ve Cloud'un bir parçasıdır"
+      },
+      "offForOrg": {
+        "body": "Past chats stay readable. An admin can turn it on in Settings › @:{'brand.autobot'}.",
+        "title": "{product} bu kuruluş için kapalı"
+      },
+      "openAccessSettings": "Erişim ayarlarını aç",
+      "tryAgain": "Yeniden dene",
+      "unhealthy": {
+        "body": "The @:{'brand.autobot'} service isn't responding. Try again in a few minutes.",
+        "notice": "{product} yanıt vermiyor. Son mesajınız yanıtlanmadı.",
+        "title": "{product} şu anda kullanılamıyor",
+        "tooltip": "{product} şu anda kullanılamıyor"
+      },
+      "whereToGrant": "{iam} › {roles} › {group}"
+    },
+    "grants": {
+      "always": "Her zaman",
+      "alwaysAsk": "Silme işlemleri ve faturalandırma, IAM ve saklama değişiklikleri her zaman sorar.",
+      "browserEmpty": "Bu tarayıcı kalıcı onay saklamaz.",
+      "columns": {
+        "actions": "İşlemler",
+        "grantedAt": "Verildi",
+        "grantedBy": "Veren",
+        "scope": "Kapsam",
+        "tool": "Araç veya işlem"
+      },
+      "empty": "Kalıcı onay yok",
+      "loadFailed": "Kalıcı onaylar yüklenemedi.",
+      "openChat": "Sohbeti aç",
+      "revoke": "İptal et",
+      "revokeNamed": "{tool} için her zaman izin ver onayını iptal et",
+      "revoked": "Approval revoked. @:{'brand.autobot'} will ask next time.",
+      "thisChat": "Bu sohbet",
+      "title": "Kalıcı onaylar",
+      "unsupported": "Kuruluş genelinde onaylar daha yeni bir sunucu sürümü gerektirir.",
+      "yours": "Onaylarınız",
+      "yoursInBrowser": "Bu tarayıcıdaki onaylarınız"
+    },
+    "header": {
+      "announceFailed": "Yanıt başarısız: {title}.",
+      "announceNeedsYou": "{product} size ihtiyaç duyuyor: {title}.",
+      "announceReady": "Yanıt hazır: {title}.",
+      "announceWorkingElsewhere": "Başka bir sekmede yanıtlanıyor: {title}.",
+      "answeringName": "{product}, yanıtlıyor",
+      "answeringNameOpen": "{product}, yanıtlıyor, açık",
+      "enterpriseName": "{product}, Enterprise ve Cloud özelliği",
+      "failedName": "{product}, son yanıt başarısız",
+      "lockedName": "{product}, kilitli",
+      "nameOpen": "{product}, açık",
+      "needsYouCountName": "{product}, size ihtiyaç duyuyor, {count} bekliyor",
+      "needsYouCountNameOpen": "{product}, size ihtiyaç duyuyor, {count} bekliyor, açık",
+      "needsYouName": "{product}, size ihtiyaç duyuyor",
+      "needsYouNameOpen": "{product}, size ihtiyaç duyuyor, açık",
+      "offName": "{product}, ayarlanmadı",
+      "open": "Aç",
+      "readyName": "{product}, yanıt hazır",
+      "stateDone": "Yanıt hazır: {title}",
+      "stateFailed": "Yanıt başarısız: {title}",
+      "stateOpen": "{product} · Açık",
+      "stateRunningCount": "{count} yanıt çalışıyor | {count} yanıt çalışıyor",
+      "stateWorking": "Yanıtlanıyor: {title}",
+      "toastReady": "Yanıt hazır · {title}",
+      "tooltip": "@:{'brand.askAutobot'}",
+      "unavailableName": "{product}, kullanılamıyor",
+      "toastFailed": "{title} başarısız oldu",
+      "goTo": "{product} sayfasına git"
+    },
+    "helper": {
+      "checking": "Kontrol ediliyor…",
+      "discarded": "Öneri kaldırıldı. Yenisini almak için tekrar sorun.",
+      "editorPlaceholder": {
+        "js": "Bir JavaScript fonksiyonu yazın, örneğin: return event",
+        "promql": "Bir PromQL sorgusu yazın, örneğin: rate(http_requests_total[5m])",
+        "vrl": "Bir VRL fonksiyonu yazın, örneğin: .status = \"active\""
+      },
+      "inserted": "Eklendi",
+      "noChange": "Düzenleyicide bu zaten var.",
+      "syntax": {
+        "missing": "Eksik {char}",
+        "unclosed": "Kapatılmamış {char}",
+        "unexpected": "Satır {line}, sütun {column}: beklenmeyen {char}"
+      },
+      "generating": "Oluşturuluyor… {seconds} sn",
+      "overBudget": "Olağan bütçeden daha büyük"
+    },
+    "history": {
+      "allPinned": "100 sohbetin tamamı sabitlenmiş. Yeni sohbetleri kaydetmek için birini sabitlemeyi kaldırın veya silin.",
+      "clearAll": {
+        "action": "Tüm sohbetleri sil",
+        "bodyLocal": "Bu, {org} için bu tarayıcıda kaydedilen sohbeti kaldırır. Sabitlenmiş sohbetler de silinir. | Bu, {org} için bu tarayıcıda kaydedilen {count} sohbeti kaldırır. Sabitlenmiş sohbetler de silinir.",
+        "bodyServer": "Bunları her cihazdan siler ve {links} paylaşım bağlantısını iptal eder. Hâlâ yanıtlayan sohbetler durdurulur.",
+        "confirm": "{count} sohbeti sil | {count} sohbeti sil",
+        "confirmAll": "Tüm sohbetleri sil",
+        "confirmWord": "sil",
+        "deleting": "Siliniyor…",
+        "done": "{count} sohbet silindi | {count} sohbet silindi",
+        "doneAll": "Tüm sohbetleriniz silindi",
+        "failed": "Sohbetleriniz silinemedi",
+        "linksUnknown": "Paylaşım bağlantıları sayılamadı. Mevcut olanlar iptal edilir.",
+        "title": "{count} sohbet silinsin mi? | {count} sohbetin tamamı silinsin mi?",
+        "titleAll": "{org} içindeki tüm sohbetleriniz silinsin mi?",
+        "typeToConfirm": "Onaylamak için delete yazın"
+      },
+      "clearOnSignOut": "Oturumu kapattığımda tarayıcı sohbetlerimi sil",
+      "delete": {
+        "bodyLocal": "Bu, sohbeti bu tarayıcıdan kaldırır.",
+        "bodyServer": "Bu, sohbeti her cihazdan siler ve hâlâ çalışan yanıtı durdurur.",
+        "links": {
+          "checking": "Paylaşım bağlantıları kontrol ediliyor…",
+          "count": "Bunun {count} etkin bağlantısı artık çalışmayacak | Bunun {count} etkin bağlantısı artık çalışmayacak",
+          "unknown": "Paylaşım bağlantıları kontrol edilemedi. Silmek bunları iptal eder."
+        },
+        "running": "Bu sohbet hâlâ yanıt veriyor. Silmek yanıtı durdurur.",
+        "title": "“{title}” silinsin mi?"
+      },
+      "deleteAction": "Sil",
+      "deleteFailed": "Sohbet silinemedi",
+      "deleted": "Sohbet silindi",
+      "details": "Ayrıntılar",
+      "download": "İndir",
+      "exportMarkdown": "Markdown olarak dışa aktar",
+      "downloadAll": "Tümünü indir",
+      "downloadFailed": "İndirme oluşturulamadı",
+      "downloaded": "İndirildi",
+      "empty": {
+        "title": "Henüz sohbet yok"
+      },
+      "filter": {
+        "active": "Filtre · {n}",
+        "agent": "Ajan",
+        "alertOrIncident": "Uyarı veya vaka",
+        "button": "Filtre",
+        "clear": "Filtreleri temizle",
+        "pinned": "Sabitlenmiş",
+        "queryEditor": "Sorgu veya fonksiyon düzenleyici",
+        "remove": "{filter} filtresini kaldır",
+        "shared": "Paylaşılan",
+        "show": "Göster",
+        "started": "Başlangıç noktası",
+        "investigations": "İncelemeler",
+        "autoRuns": "Otomatik çalışmalar",
+        "all": "Tümü"
+      },
+      "filterEmpty": "Bu filtrelerle eşleşen sohbet yok",
+      "group": {
+        "browser": "Bu tarayıcıda",
+        "needsYou": "Sizi bekliyor",
+        "older": "Daha eski",
+        "pinned": "Sabitlenmiş",
+        "running": "Devam ediyor",
+        "today": "Bugün",
+        "week": "Önceki 7 gün",
+        "yesterday": "Dün"
+      },
+      "import": {
+        "dismiss": "Kapat",
+        "download": "İndir",
+        "error": "Sohbetleriniz taşınırken bir sorun oluştu. Taşınamayanlar bu tarayıcıda kalır.",
+        "failed": "{count} sohbet taşınamadı | {count} sohbet taşınamadı",
+        "forbidden": "Rolünüz sohbet oluşturamaz. Yapay zeka erişimi için bir yöneticiye başvurun.",
+        "move": "Sohbetleri taşı",
+        "moved": "{count} sohbetten {done} tanesi taşındı",
+        "never": "Bir daha sorma",
+        "notNow": "Şimdi değil",
+        "offer": "Bu tarayıcıda kayıtlı {count} sohbetiniz var. Her cihazda görünmeleri için hesabınıza taşınsın mı?",
+        "offline": "Çevrimdışısınız. Tekrar deneyene kadar sohbetler bu tarayıcıda kalır.",
+        "progress": "{count} sohbetten {done} tanesi taşınıyor…",
+        "retry": "Yeniden dene",
+        "unavailable": "Bu tarayıcıda {count} sohbet kayıtlı ve henüz taşınamıyor."
+      },
+      "loadOlder": "Daha eskileri yükle",
+      "loadedOlder": "{count} eski sohbet yüklendi | {count} eski sohbet yüklendi",
+      "localOnly": {
+        "adminHelp": "Sohbetleri sunucuda tutmak için O2_AI_CHAT_PERSISTENCE_ENABLED değişkenini ayarlayın.",
+        "adminLink": "Dokümanları okuyun",
+        "description": "Yalnızca bu tarayıcıda kayıtlı sohbetler, {count}/{cap}",
+        "help": "Sohbetler bu tarayıcıda kalır.",
+        "info": "Tarayıcı geçmişi hakkında",
+        "keptOnSignOut": "Oturumu kapattığınızda tarayıcı sohbetleriniz korundu.",
+        "title": "Yalnızca bu tarayıcıda kayıtlı"
+      },
+      "matchCount": "{count} sohbet eşleşiyor | {count} sohbet eşleşiyor",
+      "noMatch": "“{q}” ile eşleşen sohbet yok",
+      "offline": "Çevrimdışısınız · bu tarayıcıda kayıtlı sohbetler gösteriliyor",
+      "open": "Aç",
+      "openFailed": "Bu sohbet açılamadı",
+      "origin": {
+        "alert": "Uyarı",
+        "browser": "Tarayıcı",
+        "editor": "Düzenleyici",
+        "incident": "Vaka"
+      },
+      "pending": {
+        "delete": "Siliniyor…",
+        "pin": "Sabitleniyor…",
+        "rename": "Yeniden adlandırılıyor…"
+      },
+      "pin": "Sabitle",
+      "pinFailed": "Sohbet sabitlenemedi",
+      "pinLocal": "Sabitle (bu tarayıcıda)",
+      "pinned": "Sabitlendi",
+      "prune": "{count} / {cap} sohbet",
+      "pruned": "Yer açmak için en eski sohbet kaldırıldı: “{title}”",
+      "readOnly": "Sohbetlerinizi okuyabilirsiniz. Bir sohbeti başlatmak veya sürdürmek için yapay zeka erişimi gerekir.",
+      "rename": "Yeniden adlandır",
+      "rowMenu": "{title} için işlemler",
+      "search": "Sohbetlerde ara",
+      "searchInvestigations": "İncelemelerde ara",
+      "investigationsEmpty": "Henüz inceleme yok",
+      "draftTag": "Taslak",
+      "serverError": "Sohbetleriniz yüklenemedi",
+      "serverErrorCached": "Bu tarayıcıda kayıtlı sohbetler gösteriliyor · Sunucuya ulaşılamadı",
+      "sharedLinks": "Paylaşılan bağlantılar",
+      "sharedByMe": "Benim paylaştıklarım",
+      "sharedPublic": "Herkese açık bağlantıyla paylaşıldı",
+      "state": {
+        "answering": "Yanıtlanıyor",
+        "draft": "Taslak",
+        "expired": "Süresi doldu",
+        "failed": "Başarısız",
+        "needsYou": "Sizi bekliyor"
+      },
+      "storageBlocked": "Bu tarayıcıya kaydedilemedi. Gizli pencereler ve dolu depolama alanı geçmişi engeller.",
+      "title": "Sohbetler",
+      "traceId": "İz Kimliği {id}",
+      "unpin": "Sabitlemeyi kaldır",
+      "unpinLocal": "Sabitlemeyi kaldır (bu tarayıcıda)",
+      "unpinned": "Sabitleme kaldırıldı",
+      "view": {
+        "back": "Sohbete dön: {title}",
+        "title": "Tüm sohbetler"
+      },
+      "deleteChat": "Sohbeti sil",
+      "deleteDraft": "Yerel taslağı sil",
+      "kept": "{days} gün saklanır",
+      "lastTried": "Son deneme {time}",
+      "listMenu": "Sohbet listesi işlemleri",
+      "serverErrorAgain": "Sohbetleriniz hâlâ yüklenemedi",
+      "stop": "Durdur",
+      "titlesOnly": "Şu ana kadar yüklenen sohbetlerin başlıklarında aranıyor",
+      "autoRuns": {
+        "empty": "Bu kuruluşta henüz otomatik çalıştırma yok",
+        "openName": "{title} öğesini aç, {state}"
+      }
+    },
+    "label": {
+      "acceptedAt": "{time} tarihinde kabul edildi",
+      "askAgain": "Yeniden sor",
+      "edited": "{product} sonrasında düzenlendi",
+      "provenance": "Bu değişiklik hakkında",
+      "restoredAssistant": "Restored the version from @:{'brand.autobot'}.",
+      "restoredOriginal": "Orijinal sürümünüz geri yüklendi.",
+      "revert": "Geri al",
+      "revertAi": "Revert to the version from @:{'brand.autobot'}",
+      "revertMine": "Orijinalime geri dön",
+      "revertName": "Asistanın değişikliğini geri al",
+      "short": "AI",
+      "shortName": "AI, {label}",
+      "written": "{product} tarafından yazıldı"
+    },
+    "link": {
+      "cantOpen": "Bu burada açılamıyor",
+      "fromAnswer": "Yanıttaki bağlantı",
+      "groupName": "{title}, {details}",
+      "id": "ID {id}",
+      "more": "Diğer bağlantı işlemleri",
+      "newTab": "Yeni sekmede aç",
+      "open": {
+        "alert": "“{name}” uyarısını aç",
+        "alerts": "Uyarıları aç",
+        "chat": "Sohbeti aç",
+        "dashboard": "“{name}” gösterge panosunu aç",
+        "dashboards": "Gösterge panolarını aç",
+        "functions": "Fonksiyonları aç",
+        "incident": "“{name}” vakasını aç",
+        "incidents": "Vakaları aç",
+        "pipeline": "“{name}” işlem hattını aç",
+        "pipelines": "İşlem hatlarını aç",
+        "trace": "{id} izini aç",
+        "services": "Hizmetleri aç",
+        "service": "“{name}” hizmetini aç",
+        "ingestion": "Veri kaynaklarını aç",
+        "home": "Ana Sayfa'ya dön"
+      },
+      "openAction": "Aç",
+      "opened": "Açıldı · {time}",
+      "openIn": "{explorer} içinde aç",
+      "redacted": "Bağlantılı bir görünüm (ayrıntılar gizli)",
+      "unsupported": "Bu hedef bu sürümde desteklenmiyor"
+    },
+    "mcp": {
+      "copyConfiguration": "Yapılandırmayı kopyala",
+      "deepLinkTokenNote": "Bu bağlantı erişim tokenınızı içeriyor.",
+      "headerSubtitle": "OpenObserve'u {claude}, {cursor} veya {vscode} gibi kendi ajanınızdan kullanın.",
+      "parityLine": "Ajanınız {product} ile aynı araçlara ve izinlere sahip olur. {product} ürününün kendisinin kullanabildiği araçlar {link} bölümünde ayarlanır.",
+      "replaceToken": "{token} yerine yukarıda oluşturduğunuz tokenı veya bir hizmet hesabının email:token değerinin Base64'ünü koyun.",
+      "skillsHint": "Ajanınıza {brand} içinde nasıl sorgulayacağını, uyarı vereceğini ve gösterge panosu oluşturacağını öğretir.",
+      "toolsetsPath": "Settings › @:{'brand.autobot'} › Toolsets"
+    },
+    "message": {
+      "actionsName": "Mesaj işlemleri",
+      "chipsName": "Bu mesajla gönderilen bağlam",
+      "codeName": "Kod, {lang}",
+      "copyAnswer": "Yanıtı kopyala",
+      "copyMarkdown": "Markdown olarak kopyala",
+      "copyPrompt": "Kopyala",
+      "creditsUsedUp": "Bu kuruluş için yapay zeka kredileri tükendi",
+      "edit": "Düzenle ve yeniden gönder",
+      "editedFrom": "Mesaj {n} üzerinden düzenlendi",
+      "editLabel": "Mesajınızı düzenleyin",
+      "editSend": "Gönder",
+      "evaluatedStamp": "{range} değerlendirildi · {n} sorgu | {range} değerlendirildi · {n} sorgu",
+      "fenceSource": "akış {stream} · {range}",
+      "firstVersion": "Bu ilk sürüm",
+      "imageRemoved": "Harici bir sitedeki görsel kaldırıldı",
+      "latestVersion": "Bu en son sürüm",
+      "meta": "{who} · {time}",
+      "more": "Diğer işlemler",
+      "nextVersion": "Sonraki sürüm",
+      "olderHidden": "Daha eski devam gizlendi",
+      "openImage": "{name} görselini aç",
+      "previousVersion": "Önceki sürüm",
+      "regenerate": "Yeniden oluştur",
+      "tableName": "Tablo",
+      "versionName": "Sürüm {n} / {count}",
+      "versionOf": "{n} / {count}",
+      "you": "Siz",
+      "metaHandoff": "{meta} · {agent} kişisine",
+      "toAgent": "{agent} kişisine",
+      "copyChatId": "Sohbet kimliğini kopyala",
+      "shareAnswer": "Bu yanıtın bağlantısını kopyala",
+      "linkCopied": "Bağlantı kopyalandı",
+      "linkCopiedPrivate": "Bağlantı kopyalandı · yalnızca siz açabilirsiniz",
+      "linkCopiedOrg": "Bağlantı kopyalandı · {org} içinde paylaşılan sohbet erişimi olan kişiler açabilir",
+      "linkCopiedPublic": "Bağlantı kopyalandı · bağlantıya sahip herkes açabilir",
+      "branch": "Yeni sohbette dallandır",
+      "branchTitle": "{title} sohbetinin dalı",
+      "branchedFrom": "Dallandırıldığı sohbet",
+      "branchFailed": "Bu sohbet dallandırılamadı",
+      "newTag": "Yeni"
+    },
+    "name": "@:{'brand.autobot'}",
+    "limit": {
+      "slotFree": "Bir sohbet tamamlandı. Artık gönderebilirsiniz."
+    },
+    "notice": {
+      "decision": "Sizi bekliyor",
+      "delete": "{entity} öğesini sil"
+    },
+    "outcome": {
+      "actions": {
+        "askAdmin": "Yöneticiye sor",
+        "changeLevel": "Seviyeyi değiştir",
+        "managePaidUsage": "Ücretli kullanımı yönet",
+        "openIamRoles": "IAM rollerini aç",
+        "openSettings": "Asistan ayarlarını aç",
+        "reloadChat": "Sohbeti yeniden yükle",
+        "sendAgain": "Yeniden gönder",
+        "signIn": "Oturum aç",
+        "stopIt": "Durdur",
+        "viewPlans": "Planları görüntüle"
+      },
+      "askAgain": "Yeniden sor",
+      "backOnline": "Tekrar çevrimiçisiniz.",
+      "canRetryNow": "Artık yeniden deneyebilirsiniz.",
+      "editResend": "Düzenle ve yeniden gönder",
+      "manualRoute": "Bunun yerine {explorer} içinde aç",
+      "noSnapshot": "Özgün mesaj artık yeniden denemek için burada değil. Mesaj kutusundan tekrar gönderin.",
+      "openHere": "Burada aç",
+      "readonlyFailed": "Başarısız: {title}",
+      "retry": "Yeniden dene",
+      "retryIn": "{s} sn sonra yeniden dene",
+      "retryOffline": "Tekrar çevrimiçi olduğunuzda yeniden deneyin",
+      "signedIn": "Oturum açıldı. Yeniden deneyebilirsiniz.",
+      "stopItFailed": "Diğer yanıt durdurulamadı. Tekrar deneyin.",
+      "stopItSent": "Diğer yanıttan durması istendi.",
+      "tryLater": "Daha sonra tekrar deneyin",
+      "useAgentInstead": "Bunun yerine {agent} kullan",
+      "keepGoingWith": "{agent} ile devam et"
+    },
+    "plan": {
+      "deselectHint": "Saklamak istediklerinizin işaretini kaldırın.",
+      "heading": "{count} {entity} sileceğim:",
+      "itemsName": "Silinecek öğeler",
+      "largeBatch": "Büyük toplu işlem: {count} {entity}",
+      "onlyThese": "Yalnızca bunları sil: {names}",
+      "showAll": "Tümünü göster ({count})",
+      "unlisted": "Adı olmayan {count} öğe daha var ve dahil edildi | Adı olmayan {count} öğe daha var ve dahil edildi"
+    },
+    "policy": {
+      "autoDeclined": "Declined by @:{'brand.autobot'} safety settings",
+      "denied": "İlke tarafından engellendi: {tool}. {detail}",
+      "deniedAdmin": "An admin can allow it in Settings › @:{'brand.autobot'} › Permissions.",
+      "deniedPlain": "İlke tarafından engellendi: {tool}.",
+      "unreviewed": "@:{'brand.autobot'} changed {count} {entity} without a review step.",
+      "unreviewedAction": "Neyin değiştiğini gör",
+      "unreviewedActionName": "Neyin değiştiğini gör (yeni sekmede açılır)"
+    },
+    "query": {
+      "alert": "Uyarı taslağı oluştur",
+      "copy": "Sorguyu kopyala",
+      "dashboard": "Gösterge panosuna ekle",
+      "insert": "Fark olarak ekle",
+      "more": "Daha fazla sorgu işlemi",
+      "showAllLines": "Tüm {count} satırı göster",
+      "showFewerLines": "Daha az satır göster",
+      "newTab": "Yeni sekmede aç",
+      "open": "{explorer} içinde aç",
+      "openShort": "Günlükler",
+      "run": "Çalıştır",
+      "running": "Çalışıyor… · {n} sn",
+      "stop": "Durdur",
+      "openAll": "Tümü için {explorer} içinde aç: {count}"
+    },
+    "record": {
+      "compacted": "Earlier context was summarised by @:{'brand.autobot'} at {time}",
+      "theModel": "model"
+    },
+    "scroll": {
+      "jumpToLatest": "En sona atla",
+      "jumpToLatestCount": "En sona atla · {count} yeni",
+      "jumpToLatestName": "En sona atla, {count} yeni"
+    },
+    "settings": {
+      "access": {
+        "builtInAdmin": "Sohbet, paylaşım, araç setleri",
+        "builtInEditor": "Sohbet, araç setleri",
+        "builtInViewer": "Erişim yok",
+        "cancel": "İptal",
+        "enabled": "@:{'brand.autobot'} enabled for this organization",
+        "enabledLine": "Üyeler geçmiş sohbetlerini korur.",
+        "grantedPerRole": "Erişim, {whereToGrant} bölümünde rol bazında verilir.",
+        "noRole": "Rolü olmayan oturum açmış kullanıcıların (SSO varsayılanı) erişimi yoktur.",
+        "notice": "Kuruluş bazlı kontroller daha yeni bir sunucu sürümü gerektirir.",
+        "orgSharing": "Paylaşım erişimi olan üyeler bu kuruluştaki sohbetleri paylaşabilir.",
+        "publicOff": {
+          "confirm": "Genel bağlantıları kapat",
+          "message": "{count} mevcut bağlantı artık çalışmayacak. | {count} mevcut bağlantı artık çalışmayacak.",
+          "title": "Genel bağlantılar kapatılsın mı?"
+        },
+        "publicSharing": "Genel bağlantılara izin ver",
+        "publicSharingDeploymentOff": "Genel bağlantılar bu dağıtım için kapalı (ZO_PUBLIC_AI_CHAT_ENABLED).",
+        "publicSharingLine": "Paylaşım iletişim kutusundan genel bağlantı seçenekleri kaybolur.",
+        "rbacOff": "Role-based access is off, so every user can use @:{'brand.autobot'}.",
+        "roles": {
+          "allRoles": "IAM › Roller",
+          "capped": "{total} rol içinden {shown} tanesi gösteriliyor. Tüm rolleri {link} bölümünde görün.",
+          "chat": "Sohbet edebilir",
+          "grant": "Sohbet izni ver",
+          "grantNamed": "{role} rolüne sohbet izni ver",
+          "loadFailed": "Roller yüklenemedi.",
+          "noChat": "Sohbet yok",
+          "title": "Bu kuruluştaki roller",
+          "unknown": "Bilinmiyor"
+        },
+        "save": "Kaydet",
+        "saved": "@:{'brand.autobot'} settings saved",
+        "sharing": "Paylaşım",
+        "tier": "Varsayılan izin düzeyi",
+        "tierAct": "Onayla işlem yap",
+        "tierActLine": "Üyeler araçları sohbet başına veya her zaman onaylar. Silme işlemleri her zaman sorar.",
+        "tierNeedsAgent": "Uygulamak için daha yeni bir aracı sürümü gerekir",
+        "tierPropose": "Değişiklik öner",
+        "tierProposeLine": "Her değişiklik bir üyenin onayını gerektirir.",
+        "tierRead": "Oku ve sorgula",
+        "tierReadLine": "Yalnızca sorguları çalıştırır. Hiçbir şeyi asla değiştirmez.",
+        "tierStored": "Kaydedilen düzey: {tier}. Aracı bunu uygulayabildiğinde geçerli olur.",
+        "offInOrg": "Bu kuruluşta kapalı",
+        "onInOrg": "Bu kuruluşta açık",
+        "turnOff": {
+          "confirm": "Kapat",
+          "done": "{product}, {org} için kapatıldı",
+          "message": "{product}, {org} için kapatılsın mı? Çalışan yanıtlar durdurulacak. Üyeler sohbet geçmişlerini korur.",
+          "pending": "Onayladığınızda kapanır",
+          "title": "{product} kapatılsın mı?"
+        },
+        "valueOff": "Kapalı",
+        "valueOn": "Açık",
+        "whoCanUse": "Kimler kullanabilir",
+        "you": "Siz: {access}",
+        "youChat": "sohbet",
+        "youChatShare": "sohbet, paylaşım",
+        "youNone": "erişim yok",
+        "youUnknown": "henüz bilinmiyor"
+      },
+      "adminOnly": "Bu ayarları yalnızca kuruluş yöneticileri değiştirebilir.",
+      "data": {
+        "about": "Veri paylaşımı hakkında",
+        "aboutProvider": "Yanıtlar {provider} tarafından oluşturulur.",
+        "aboutRedaction": "Önce hassas veri maskeleme kuralları uygulanır.",
+        "level": "Modelle paylaşılan veri",
+        "levelAggregates": "Şema ve toplamlar",
+        "levelAggregatesLine": "Sayımlar, yüzdelikler ve histogramlar; tek tek satır yok.",
+        "levelRaw": "Şema, toplamlar ve ham satırlar",
+        "levelRawLine": "Günlük satırları, span öznitelikleri ve örnek değerler gönderilebilir.",
+        "levelSchema": "Yalnızca şema",
+        "levelSchemaLine": "Yalnızca akış ve alan adları; değer yok.",
+        "notice": "Veri paylaşımı düzeyleri daha yeni bir sunucu ve aracı sürümü gerektirir."
+      },
+      "env": {
+        "help": "Dağıtım tarafından ayarlanır",
+        "notReported": "Bu sunucu sürümü tarafından bildirilmedi",
+        "setBy": "{env} tarafından ayarlanır"
+      },
+      "forbidden": "Bu ayara erişiminiz yok.",
+      "history": {
+        "browserBody": "Cihazlar arasında paylaşılmaz. Üye başına en fazla 100 sohbet; tarayıcı verileriyle birlikte temizlenir.",
+        "browserTitle": "Yalnızca her üyenin tarayıcısında kaydedilir",
+        "deleteLine": "Bir sohbeti silmek onu her yerden kaldırır ve bağlantılarını iptal eder.",
+        "off": "Kapalı",
+        "on": "Açık",
+        "persistence": "Sunucu geçmişi",
+        "persistenceHelp": "Sohbetleri sunucuda tutmak için dağıtımda açın.",
+        "publicLinks": "Genel bağlantılar",
+        "publicLinksOff": "kapalı",
+        "publicLinksOn": "açık, en fazla {days} gün | açık, en fazla {days} gün",
+        "retention": "Saklama",
+        "retentionDays": "{days} gün | {days} gün",
+        "retentionForever": "silinene kadar",
+        "serverTitle": "Sunucuya kaydedilir"
+      },
+      "leaveName": "the @:{'brand.autobot'} settings of {org}",
+      "offInDeployment": "@:{'brand.autobot'} is off in this deployment.",
+      "pageTitle": "@:{'brand.autobot'}",
+      "railDesc": "Durum, erişim, veri, geçmiş, kullanım, araç takımları, izinler ve etkinlik",
+      "status": {
+        "agentEnabled": "@:{'brand.autobot'} enabled",
+        "agentHa": "Yüksek kullanılabilirlik",
+        "agentUrl": "Aracı adresi",
+        "agentVersion": "Aracı sürümü",
+        "approvals": "Changes by @:{'brand.autobot'}",
+        "approvalsNotEnforced": "Reddedildi: O2_AI_INTERNAL_SECRET ayarlanmamış, bu nedenle onaylanmış hiçbir değişiklik uygulanamaz.",
+        "checked": "Kontrol edildi",
+        "clientError": "Aracı yanıt vermedi · bu tarayıcıda son görülme",
+        "configured": "Yapılandırıldı",
+        "dataShared": "Paylaşılan veri",
+        "healthUnsupported": "Sağlık kontrolü daha yeni bir sunucu sürümü gerektirir.",
+        "lastError": "Son hata",
+        "lastErrorNone": "yok",
+        "model": "Model",
+        "modelHidden": "Üyelerden gizli",
+        "notSetUp": "Ayarlanmadı",
+        "notSetUpMember": "@:{'brand.autobot'} isn't set up for this deployment. Ask an administrator.",
+        "offBody": "{actor} tarafından {date} tarihinde kapatıldı. Üyeler yine de geçmiş sohbetlerini açabilir.",
+        "offBodyUnknown": "Bu kuruluş için kapatıldı. Üyeler yine de geçmiş sohbetlerini açabilir.",
+        "offForOrg": "Bu kuruluş için kapalı",
+        "openAccess": "Erişim ayarlarını aç",
+        "reachable": "Erişilebilir",
+        "unreachable": "Erişilemez",
+        "unreachableBody": "Members see @:{'brand.autobot'} as unavailable.",
+        "notEntitled": "Lisansınızda yok",
+        "notEntitledBody": "Your license doesn't include @:{'brand.autobot'}. Contact your account team."
+      },
+      "tabs": {
+        "access": "Erişim",
+        "activity": "Etkinlik",
+        "data": "Veri",
+        "history": "Geçmiş",
+        "permissions": "İzinler",
+        "status": "Durum",
+        "toolsets": "Araç kümeleri",
+        "usage": "Kullanım"
+      },
+      "test": {
+        "button": "Test",
+        "failed": "Test başarısız oldu: {cause}",
+        "failedRow": "başarısız · {cause} · {when}",
+        "lastTest": "Son test",
+        "passed": "Test {duration} sürede geçti",
+        "passedRow": "geçti {duration} · {when}",
+        "running": "Test ediliyor…",
+        "unknownCause": "neden belirtilmedi"
+      },
+      "title": "@:{'brand.autobot'}",
+      "usage": {
+        "allowance": "Kredi hakkı",
+        "answered": "Yanıtlandı",
+        "caps": "Üst sınırlar",
+        "capsLine": "Ek yanıtlar engellenir ve ücretlendirilmez.",
+        "consentLine": "Ücretli kullanım etkinleştirilmedi. Üyelerden bir sonraki yanıtlarında onay istenir.",
+        "exhaustedLine": "Üyeler 'AI kredileri {org} için tükendi.' ifadesini görür.",
+        "failed": "Başarısız",
+        "longest": "En uzun yanıt",
+        "managePaid": "Ücretli kullanımı yönet",
+        "notMetered": "Bu kurulum ölçümlenmiyor.",
+        "perMember": "Üye başına etkin yanıtlar",
+        "perNode": "Düğüm başına etkin yanıtlar",
+        "perOrg": "Kuruluş başına etkin yanıtlar",
+        "period": "Bu faturalandırma dönemi",
+        "stopped": "Durduruldu",
+        "turns": "Turlar"
+      },
+      "voice": {
+        "browser": "Tarayıcıda",
+        "browserHelp": "Çoğu tarayıcı sesi satıcısının konuşma hizmetine gönderir.",
+        "help": "Üyeler göndermeden önce metni dikte edebilir ve düzenleyebilir.",
+        "localOnly": "Bu tarayıcıda yalnızca sizin için kaydedilir.",
+        "off": "Kapalı",
+        "offHelp": "Bu tarayıcıda kimse dikte edemez.",
+        "readOnly": "Sunucu tarafı konuşma-metin dönüşümü daha yeni bir sunucu sürümü gerektiriyor.",
+        "title": "Sesli dikte"
+      }
+    },
+    "runs": {
+      "agent": {
+        "general": "{product}",
+        "investigator": "@:{'brand.autobotInvestigate'}",
+        "queryBuilder": "Sorgu oluşturucu"
+      },
+      "chatInOrg": "{org} içinde bir sohbet",
+      "review": "İncele",
+      "stop": "Durdur",
+      "summary": {
+        "answering": "{count} yanıt veriyor",
+        "needs": "{count} sizi bekliyor | {count} sizi bekliyor"
+      },
+      "state": {
+        "reconnecting": "Yeniden bağlanıyor"
+      }
+    },
+    "share": {
+      "allOrgAdminOnly": "Tüm paylaşılan sohbetleri yalnızca kuruluş yöneticileri görebilir.",
+      "allLinks": "Tüm paylaşılan bağlantılar",
+      "anotherLink": "Başka bir bağlantı oluştur",
+      "attachmentHidden": "Ek gizlendi",
+      "attachmentsHiddenTag": "Ekler gizlendi",
+      "attachmentsIncluded": "Bu bağlantıya ekli satırlar ve görseller dahildir.",
+      "changeExpiry": "Sona erme tarihini değiştir",
+      "changeExpiryFor": "{title} için sona erme tarihini değiştir",
+      "changeSettings": "Ayarları değiştir",
+      "content": "İçerik",
+      "copied": "Bağlantı kopyalandı",
+      "copyLink": "Bağlantıyı kopyala",
+      "copyLinkFor": "{title} için bağlantıyı kopyala",
+      "createAndCopy": "Bağlantı oluştur ve kopyala",
+      "createLiveAndCopy": "Canlı bağlantı oluştur ve kopyala",
+      "createdNotCopied": "Bağlantı oluşturuldu. Kopyalama engellendiğinden bağlantı, kopyalamanız için gösteriliyor.",
+      "createdNotCopiedMenu": "Bağlantı oluşturuldu ancak kopyalama engellendi. Kopyalamak için Bağlantıları yönet seçeneğini açın.",
+      "createFailed": "Bağlantı oluşturulamadı",
+      "created": "Bağlantı oluşturuldu",
+      "createdCopied": "Bağlantı oluşturuldu ve kopyalandı",
+      "createdToast": "Bağlantı kopyalandı. {org} kuruluşunda paylaşılan sohbet erişimi olan kişiler açabilir.",
+      "empty": {
+        "all": "Bu kuruluşta paylaşılan sohbet yok.",
+        "mine": "Henüz hiçbir sohbet paylaşmadınız."
+      },
+      "expires": "Sona erme",
+      "expiresOn": "{time} tarihinde sona erer",
+      "forbidden": "Sohbetleri paylaşma izniniz yok.",
+      "hideAttachments": "Ekleri gizle",
+      "hideTools": "Araç verilerini gizle",
+      "hideToolsFor": "{title} için araç verilerini gizle",
+      "historyUnavailable": "Bu sohbetin geçmişi şu anda yüklenemiyor, bu nedenle paylaşılamaz.",
+      "link": "Bağlantı",
+      "liveFollows": "Canlı, yeni iletileri takip eder",
+      "liveMode": "Canlı",
+      "loadFailed": "Bağlantılarınız yüklenemedi",
+      "manage": "Bağlantıyı yönet",
+      "managerTitle": "Paylaşılan bağlantılar",
+      "never": "Hiçbir zaman",
+      "noStoredMessages": "Bu sohbetin henüz kaydedilmiş iletisi yok, bu nedenle paylaşılamaz.",
+      "notSavedBlocked": "Bu sohbetin son yanıtı kaydedilmediği için henüz paylaşılamaz.",
+      "nothingToShare": "Önce bir mesaj gönderin",
+      "offline": "Çevrimdışısınız",
+      "openFailed": "Sohbet açılamadı",
+      "org": "Kuruluş",
+      "outOfDateTag": "Güncel değil",
+      "public": "Bağlantıya sahip olan herkes",
+      "publicMax": "Herkese açık bağlantılar {days} gün içinde sona erer",
+      "publicNeedsAttachmentRedaction": "Herkese açık bağlantılar bu sunucuda henüz ekleri gizleyemiyor.",
+      "publicOff": "Herkese açık bağlantılar bu dağıtım için kapatıldı.",
+      "redactTools": "Araç girdilerini ve çıktılarını gizle",
+      "reviewTooltip": "Paylaşmadan önce bu bağlantının neler içerdiğini gözden geçirin.",
+      "revoke": "İptal et",
+      "revokeConfirm": "Bu bağlantı iptal edilsin mi? Bağlantıya sahip olanlar artık erişemeyecek.",
+      "revokeFailed": "Bağlantı iptal edilemedi",
+      "revokeFor": "{title} için bağlantıyı iptal et",
+      "revoked": "Bağlantı iptal edildi",
+      "rowMenu": "{title} için bağlantı işlemleri",
+      "scope": {
+        "all": "Kuruluştaki tümü",
+        "mine": "Benim"
+      },
+      "scopeLabel": "Bağlantıları göster",
+      "share": "Paylaş",
+      "shared": "Paylaşıldı",
+      "sharedBy": "{name} tarafından paylaşıldı",
+      "sharedOrg": "Kuruluşunuzla paylaşıldı",
+      "sharedPublic": "Bağlantıya sahip olan herkesle paylaşıldı",
+      "show": "Göster",
+      "showTools": "Araç verilerini göster",
+      "showToolsConfirm": "Bu bağlantıya sahip olan herkese araç girdileri ve çıktıları gösterilsin mi?",
+      "showToolsFor": "{title} için araç verilerini göster",
+      "snapshot": "Anlık görüntü",
+      "snapshotAsOf": "Anlık görüntü · {time} itibarıyla",
+      "snapshotNow": "Sohbetin şu anki anlık görüntüsü",
+      "snapshotWaits": "Yanıt tamamlandığında kullanılabilir",
+      "snapshotUpdated": "Anlık görüntü güncellendi",
+      "switchLive": "Canlıya geç",
+      "switchLiveFor": "{title} öğesini canlıya geçir",
+      "switchSnapshot": "Anlık görüntüye geç",
+      "switchSnapshotFor": "{title} öğesini anlık görüntüye geçir",
+      "title": "Sohbeti paylaş",
+      "toolsHidden": "Araçlar gizli",
+      "tooltip": "Kuruluşunuzla bir anlık görüntü paylaşın. Araç verileri gizli kalır.",
+      "updateBlocked": "Önce yanıtı tamamlayın veya durdurun",
+      "updateBlockedRow": "Yanıtın tamamlanmasını bekleyin",
+      "updateFailed": "Bağlantı güncellenemedi",
+      "updateSnapshot": "Anlık görüntüyü güncelle",
+      "updateSnapshotFor": "{title} için anlık görüntüyü güncelle",
+      "views": "{count} görüntüleme | {count} görüntüleme",
+      "visibilityFixed": "Kimlerin açabileceğini değiştirmek için yeni bir bağlantı oluşturun.",
+      "waitForAnswer": "Anlık görüntü paylaşmak için yanıtın tamamlanmasını bekleyin. Canlı bağlantılar Paylaşım ayarlarındadır.",
+      "who": "Kimler açabilir",
+      "whoContinue": "Kendi sohbetlerinde devam etmek için de yapay zeka erişimi gerekir.",
+      "whoOrg": "{org} içinde paylaşılan sohbet erişimi olan kişiler bunu okuyabilir.",
+      "whoPublic": "Bağlantıya sahip herkes bunu okuyabilir.",
+      "changedSince": "Anlık görüntüden bu yana değişti",
+      "readersNeedAccess": "Okuyucuların devam edebilmesi için yapay zeka erişimi gerekir.",
+      "yourOrg": "Kuruluşunuz"
+    },
+    "shared": {
+      "attachmentsHidden": "Ekler sahip tarafından gizlendi.",
+      "backoff": "Her dakika kontrol ediliyor",
+      "brand": "OpenObserve'dan paylaşıldı",
+      "brandHome": "OpenObserve ana sayfası",
+      "by": "{name} tarafından paylaşıldı",
+      "continue": "Sohbetlerimde devam et",
+      "continueAgain": "Yeniden devam et",
+      "continueLocked": "Bu sohbeti okuyabilirsiniz. Devam etmek için yapay zeka erişimi gerekir — bir yöneticiye sorun.",
+      "copied": "Kopyalandı",
+      "copyMarkdown": "Markdown olarak kopyala",
+      "goToApp": "OpenObserve'a git",
+      "goToChats": "Sohbetlerime git",
+      "live": "Canlı · son değişiklik {time}",
+      "loadFailed": "Bu paylaşılan sohbet yüklenemedi",
+      "markdownYou": "Siz",
+      "more": "Diğer işlemler",
+      "notFound": {
+        "body": "Bağlantı yanlış, iptal edilmiş veya süresi dolmuş olabilir ya da sohbet silinmiş olabilir.",
+        "title": "Bu paylaşılan sohbet kullanılamıyor"
+      },
+      "offline": "Çevrimdışısınız · {time} itibarıyla yüklenenler gösteriliyor",
+      "offlineTitle": "Çevrimdışısınız",
+      "openApp": "OpenObserve'u aç",
+      "openCopy": "Kopyamı aç",
+      "openCopyTooltip": "Bu tarayıcıda devam ettiğiniz kopyayı açar",
+      "openMine": "Sohbetlerimde aç",
+      "ossTitle": "Paylaşılan sohbetler OpenObserve Enterprise ve Cloud'un bir parçasıdır",
+      "owner": "Sahip",
+      "rateLimited": "Şu anda çok fazla okuyucu var · {seconds} sn sonra tekrar kontrol edilecek",
+      "redacted": "Araç girdileri ve çıktıları sahip tarafından gizlendi. Yanıtları ve hangi araçların çalıştığını görürsünüz.",
+      "running": "Hâlâ yanıtlıyor · başlangıç: {ago} · kendi kendine güncelleniyor",
+      "signIn": "OpenObserve'da devam etmek için oturum açın",
+      "snapshot": "{time} itibarıyla anlık görüntü",
+      "streamHidden": "Bazı kanıtlar, erişemediğiniz akışlardan geldiği için gizlendi.",
+      "streamHiddenBlock": "Gizli · {stream} akışına erişiminiz yok",
+      "truncated": "Sohbet tam olarak paylaşılamayacak kadar büyük olduğu için en eski mesajlar dahil edilmedi.",
+      "truncatedDivider": "Daha önceki mesajlar dahil edilmedi",
+      "updated": "Yeni mesajlarla güncellendi"
+    },
+    "shell": {
+      "answeringElsewhere": "Başka bir sekmede yanıtlıyor",
+      "answeringElsewherePolling": "Hâlâ başka bir sekmede yanıtlıyor",
+      "answeringHerePolling": "Hâlâ yanıtlıyor",
+      "approvalElsewhere": "Başka bir sekmede onayınız bekleniyor",
+      "approvalNotAnswerableHere": "Başka bir sekmede onayınız bekleniyor",
+      "close": "{product} uygulamasını kapat",
+      "deletedElsewhere": "Bu sohbet başka bir yerde silindi",
+      "deletedInAnotherTab": "Bu sohbet başka bir sekmede silindi",
+      "discardChanges": "Değişiklikleri at",
+      "dockTooNarrow": "Kenar çubuğunda açıldı: bu düzenleyici, yerleşik sohbet için çok dar",
+      "keep": "Koru",
+      "keepEditing": "Düzenlemeye devam et",
+      "leaveGuardBody": "Ayrılmak, {name} üzerindeki değişikliklerinizi atar.",
+      "leaveGuardThisAlert": "bu uyarı",
+      "leaveGuardThisPattern": "bu desen",
+      "leaveGuardTitle": "Kaydedilmemiş değişiklikler",
+      "loadFailed": "Bu sohbet yüklenemedi",
+      "loadingChat": "Sohbetiniz yükleniyor…",
+      "newChat": "Yeni sohbet",
+      "notFound": "Bu sohbet kullanılamıyor",
+      "orgSwitchRunningBody": "{count} yanıt {org} içinde hâlâ çalışıyor. Durdurulsun mu, yoksa orada çalışmaya devam mı etsin? | {count} yanıt {org} içinde hâlâ çalışıyor. Durdurulsunlar mı, yoksa orada çalışmaya devam mı etsinler?",
+      "orgSwitchRunningTitle": "Yanıtlar {org} içinde hâlâ çalışıyor",
+      "orgSwitchWithdrawn": "Korumak, onay bekleyen {count} talebi geri çeker. | Korumak, onay bekleyen {count} talebi geri çeker.",
+      "otherAccount": "Başka bir hesap oturum açtı. Devam etmek için yeniden yükleyin.",
+      "placeDock": "Düzenleyicinin yanında",
+      "placeWindow": "Yüzer",
+      "prefersWindowHint": "Bu sayfa genişliğini yüzer pencereyle korur",
+      "refresh": "Yenile",
+      "reload": "Yeniden yükle",
+      "resetWidth": "Genişliği sıfırla",
+      "resizeHandle": "Asistanı yeniden boyutlandır",
+      "resizeHandleValue": "{width} rem",
+      "sheetExpand": "Daha fazla göster",
+      "sheetPeek": "Daha az göster",
+      "sheetSnap": {
+        "full": "Tam yükseklik",
+        "half": "Yarım yükseklik",
+        "peek": "Daraltılmış"
+      },
+      "signOutRunningBody": "{count} yanıt hâlâ çalışıyor. Oturumu kapatmak onu durdurur. | {count} yanıt hâlâ çalışıyor. Oturumu kapatmak onları durdurur.",
+      "signOutRunningTitle": "Yanıtlar hâlâ çalışıyor",
+      "signedOutElsewhere": "Başka bir sekmede oturumu kapattınız.",
+      "skipLink": "{product} bölümüne geç",
+      "startNewChat": "Yeni bir sohbet başlat",
+      "stillRunningRefresh": "Hâlâ çalışıyor. Tekrar kontrol etmek için yenileyin.",
+      "stop": "Durdur",
+      "stopAndSignOut": "Durdur ve oturumu kapat",
+      "width": "Genişlik",
+      "widthDefault": "Varsayılan",
+      "widthExpanded": "Genişletilmiş",
+      "widthExpandedHint": "Pencerenin yarısı",
+      "widthLimit": "Genişlik sınırında",
+      "widthNarrower": "Daha dar",
+      "widthNoRoom": "Bu pencere boyutunda yeterli alan yok",
+      "widthWider": "Daha geniş",
+      "loadFailedAgain": "Bu sohbet hâlâ yüklenemedi · denendi: {time}",
+      "openAs": "Şu şekilde aç",
+      "sidePanel": "Yan panel",
+      "fullPage": "Tam sayfa",
+      "newChatFullPage": "Tam sayfada yeni sohbet",
+      "popOut": "Yüzen pencere"
+    },
+    "tray": {
+      "close": "{title} penceresini kapat"
+    },
+    "window": {
+      "dropSidebar": "Kenar çubuğu olarak sabitle",
+      "dropTray": "Küçült",
+      "gripMove": "{title} penceresini taşı veya yeniden boyutlandır",
+      "gripResize": "{title} penceresini yeniden boyutlandır",
+      "minimise": "Sistem tepsisine küçült",
+      "moveKeyboard": "Klavyeyle taşı",
+      "moveModeHint": "Oklar taşır · Shift+oklar yeniden boyutlandırır · Enter yerleştir · Esc iptal",
+      "name": "{product}, {title}",
+      "narrower": "Daha dar",
+      "resetSize": "Boyutu sıfırla",
+      "resizeKeyboard": "Klavyeyle yeniden boyutlandır",
+      "resizeModeHint": "Oklar yeniden boyutlandırır · Enter koru · Esc iptal",
+      "shorter": "Daha kısa",
+      "sizeLimit": "Boyut sınırında",
+      "taller": "Daha uzun",
+      "wider": "Daha geniş",
+      "stillAnswering": "{title} hâlâ yanıtlıyor",
+      "close": "Pencereyi kapat"
+    },
+    "signout": {
+      "deleteLocal": "Bu cihazdaki tarayıcı sohbetlerimi de sil"
+    },
+    "step": {
+      "create": "{resource} oluşturuluyor",
+      "delete": "{resource} siliniyor",
+      "done": "Tamamlandı",
+      "failed": "Başarısız",
+      "fallback": "{tool} çalıştırılıyor",
+      "GetAlert": "Uyarı okunuyor",
+      "GetAlertHistory": "Uyarı geçmişi okunuyor",
+      "GetCurrentServiceGraphTopology": "Hizmet grafiği okunuyor",
+      "GetDashboard": "Gösterge panosu okunuyor",
+      "GetLatestTraces": "En son izler okunuyor",
+      "interrupted": "Kesildi",
+      "ListAlerts": "Uyarılar listeleniyor",
+      "ListDashboards": "Gösterge panoları listeleniyor",
+      "ListDestinations": "Hedefler listeleniyor",
+      "ListIncidents": "Vakalar listeleniyor",
+      "running": "Çalışıyor",
+      "SearchAlerts": "Uyarılar aranıyor",
+      "SearchPromQL": "Metrikler sorgulanıyor",
+      "SearchSQL": "{stream} sorgulanıyor",
+      "StreamList": "Akışlar listeleniyor",
+      "StreamSchema": "{stream} için şema okunuyor",
+      "TraceSearch": "İzler aranıyor",
+      "update": "{resource} güncelleniyor"
+    },
+    "steps": {
+      "exit": "çıkış {code}",
+      "failedCount": "{count} başarısız",
+      "fields": "{count} alan | {count} alan",
+      "hiddenByOwner": "{count} adım sahibi tarafından gizlendi | {count} adım sahibi tarafından gizlendi",
+      "inputEvents": "{count} giriş olayı | {count} giriş olayı",
+      "lines": "{count} satır | {count} satır",
+      "outputTruncated": "Çıktı kesildi",
+      "rowName": "{step}, {state}",
+      "rows": "{count} satır | {count} satır",
+      "stderrLines": "stderr {count} satır | stderr {count} satır",
+      "step": {
+        "created": "{resource} oluşturuldu",
+        "deleted": "{resource} silindi",
+        "listed": "Akışlar listelendi",
+        "queried": "{stream} sorgulandı",
+        "queriedMetrics": "Metrikler sorgulandı",
+        "queryFailed": "Sorgu başarısız",
+        "ran": "{command} çalıştırıldı",
+        "ranTool": "{tool} çalıştırıldı",
+        "schema": "{stream} için şema okundu",
+        "searchedTraces": "İzlerde arama yapıldı",
+        "toolFailed": "{tool} başarısız oldu",
+        "tools": {
+          "ListIncidents": "Vakalar listelendi",
+          "ListAlerts": "Uyarılar listelendi",
+          "SearchAlerts": "Uyarılarda arama yapıldı",
+          "GetAlert": "Uyarı okundu",
+          "GetAlertHistory": "Uyarı geçmişi okundu",
+          "ListDestinations": "Hedefler listelendi",
+          "ListDashboards": "Gösterge panoları listelendi",
+          "GetDashboard": "Gösterge panosu okundu",
+          "GetLatestTraces": "En son izler okundu",
+          "GetCurrentServiceGraphTopology": "Hizmet grafiği okundu"
+        },
+        "updated": "{resource} güncellendi"
+      },
+      "stoppedBeforeFinish": "bitmeden durdu",
+      "streams": "{count} akış | {count} akış",
+      "summary": "{count} adım | {count} adım",
+      "window": "{from} → {to}",
+      "windowShowing": "{from} → {to} · {total} satırdan {shown} tanesi gösteriliyor"
+    },
+    "strip": {
+      "review": "İnceleme isteği",
+      "reviewExpires": "İnceleme isteği · {time} içinde sona erer",
+      "reviewLabel": "İncele"
+    },
+    "thread": {
+      "delete": "Sohbeti sil",
+      "download": "İndir",
+      "downloadJson": "JSON",
+      "downloadMarkdown": "Markdown",
+      "draftKept": "Taslağınız “{title}” içinde saklanıyor",
+      "historyUnavailable": "Geçmiş kullanılamıyor",
+      "keepsAnswering": "“{title}” yanıt vermeye devam ediyor",
+      "loadToContinue": "Devam etmek için sohbeti yükleyin",
+      "newAnnounce": "Yeni sohbet",
+      "newChat": "Yeni sohbet",
+      "alreadyNew": "Bu sohbet zaten yeni",
+      "windowsFull": "Yeni bir sohbet başlatmak için bir sohbeti kapatın",
+      "newChatTitle": "Yeni sohbet",
+      "notSaved": "Kaydedilmedi",
+      "pin": "Sabitle",
+      "rename": "Yeniden adlandır",
+      "renameFailed": "Sohbet yeniden adlandırılamadı",
+      "renameLabel": "Sohbet başlığı",
+      "renameChat": "Sohbeti yeniden adlandır",
+      "renamed": "Yeniden adlandırıldı",
+      "thisChat": "Bu sohbet",
+      "renaming": "Yeniden adlandırılıyor…",
+      "titleCounter": "{count}/200",
+      "unpin": "Sabitlemeyi kaldır",
+      "allChats": "Tüm sohbetler",
+      "moreChats": "{count} tane daha",
+      "noOtherChats": "Henüz başka sohbet yok",
+      "newChatAbout": "{object} hakkında yeni sohbet",
+      "titleName": "{title}, sohbetler ve sohbet eylemleri",
+      "titleNameNeeds": "{title}, sohbetler ve sohbet eylemleri, {count} başka sohbet sizi bekliyor | {title}, sohbetler ve sohbet eylemleri, {count} başka sohbet sizi bekliyor",
+      "titleNameAnswering": "{title}, sohbetler ve sohbet eylemleri, {count} başka sohbet yanıtlıyor | {title}, sohbetler ve sohbet eylemleri, {count} başka sohbet yanıtlıyor",
+      "titleTooltip": "{title} · {summary}",
+      "toolbar": {
+        "more": "Diğer eylemler",
+        "newChat": "Yeni sohbet",
+        "openAs": "Şu şekilde aç"
+      }
+    },
+    "toolsets": {
+      "add": "Yeni araç seti",
+      "clash": "Ad çakışması",
+      "clashTip": "Both reach @:{'brand.autobot'} as {agent}; one hides the other.",
+      "columns": {
+        "actions": "Eylemler",
+        "enabled": "Etkin",
+        "kind": "Tür",
+        "lastUsed": "Son kullanım",
+        "name": "Ad",
+        "status": "Durum"
+      },
+      "deleteFailed": "{name} silinemedi.",
+      "deleteMessage": "{product} ve vaka analizi bu aracı bir sonraki yanıttan itibaren kaybeder.",
+      "deleteNamed": "{name} öğesini sil",
+      "deleteTitle": "{name} silinsin mi?",
+      "deleted": "{name} silindi",
+      "editNamed": "{name} öğesini düzenle",
+      "empty": "Add an MCP server or a skill @:{'brand.autobot'} can use.",
+      "emptyTitle": "Henüz araç seti yok",
+      "enableFailed": "{name} güncellenemedi.",
+      "enabledFor": "Etkin, {name}",
+      "form": {
+        "added": "Araç seti eklendi",
+        "agentName": "@:{'brand.autobot'} calls this {agent}",
+        "back": "Araç setlerine dön",
+        "descriptionHelp": "Ne yaptığını ve ne zaman kullanılacağını yazın.",
+        "descriptionLabel": "What @:{'brand.autobot'} should use this tool for",
+        "editTitle": "Araç setini düzenle",
+        "enterAgain": "Değeri yeniden girin",
+        "wholeNumber": "0'dan büyük bir tam sayı girin",
+        "insertTemplate": "Şablon ekle",
+        "kindLocked": "Tür, oluşturulduktan sonra değiştirilemez.",
+        "leaveName": "{org} içinde {name} olarak değişir",
+        "loadFailed": "Bu araç seti yüklenemedi.",
+        "maskValue": "***, saklanan bir gizli değerin nasıl gönderildiğini gösterir. Gerçek değeri girin.",
+        "mcpSection": "MCP sunucusu",
+        "nameClash": "Another toolset already reaches @:{'brand.autobot'} as {agent}",
+        "newTitle": "Yeni araç seti",
+        "reenterDestination": "Değiştirilmiş bir URL kaydetmeden önce her gizli değeri yeniden girin.",
+        "reenterRefused": "Sunucu bu değişiklik için saklanan gizli değerleri kaldırdı. Her gizli değeri yeniden girin, ardından kaydedin.",
+        "reenterSecret": "Saklanan gizli değerler yeni veya değiştirilmiş bir değerle birlikte tutulamaz. Kaydetmeden önce her gizli değeri yeniden girin.",
+        "retypeNotice": "Bu sunucu sürümü, kaydettiğinizde her gizli değerin yeniden girilmesini gerektirir.",
+        "saveFailed": "Araç seti kaydedilemedi.",
+        "skillTemplate": "## Ne zaman kullanılır\n\n## Adımlar\n\n## Örnekler\n",
+        "updated": "Araç seti güncellendi"
+      },
+      "healthUnsupported": "Durum, son kullanım ve araç seti başına etkinleştirme daha yeni bir sunucu sürümü gerektirir.",
+      "kinds": {
+        "generic": "Genel",
+        "mcp": "MCP sunucusu",
+        "skill": "Beceri"
+      },
+      "loadFailed": "Araç setleri yüklenemedi.",
+      "mcpLine": "OpenObserve'u kendi ajanınızdan kullanmak için {link} bölümüne bakın.",
+      "mcpLink": "MCP sunucusu",
+      "moreFor": "{name} için daha fazla işlem",
+      "notSetUp": "Toolsets take effect once @:{'brand.autobot'} is set up.",
+      "runtimeRule": "{product} ve vaka analizi tarafından kullanılır.",
+      "search": "Araç setlerinde ara",
+      "secret": {
+        "hide": "Değeri gizle",
+        "keep": "Mevcut olanı koru",
+        "keyLocked": "Yeniden adlandırmak için değeri değiştirin",
+        "remove": "Kaldır",
+        "removeHeader": "{key} başlığını kaldır",
+        "replace": "Değiştir",
+        "show": "Değeri göster",
+        "unchanged": "Değişmedi",
+        "willReplace": "Kaydedildiğinde değiştirilecek"
+      },
+      "status": {
+        "disabled": "Devre dışı",
+        "failing": "Başarısız",
+        "failingNow": "Az önce başarısız olmaya başladı · {cause}",
+        "failingNowPlain": "Az önce başarısız olmaya başladı",
+        "failingSince": "{when} tarihinden beri başarısız",
+        "never": "Hiç kullanılmadı",
+        "ok": "Tamam",
+        "okIn": "Tamam · {ms} ms"
+      },
+      "test": "Test et",
+      "testFailed": "{name} için test başarısız oldu: {cause}",
+      "testFailedPlain": "{name} için test başarısız oldu",
+      "testFailedRequest": "test çalıştırılamadı",
+      "testNamed": "{name} öğesini test et",
+      "testPassed": "{name} için test {ms} ms içinde geçti",
+      "testUnsupported": "test etmek için daha yeni bir sunucu sürümü gerekir",
+      "testing": "Test ediliyor",
+      "viewOnly": "Yalnızca görüntüleme. Düzenleme için Araç Setleri izni gerekir."
+    },
+    "transcript": {
+      "answerName": "{agent}, {prompt} için yanıt",
+      "earlierCount": "{count} önceki mesaj | {count} önceki mesaj",
+      "followUps": "Takip soruları",
+      "name": "{product} ile sohbet",
+      "showEarlier": "Önceki mesajları göster",
+      "turnLabel": "Tur {n}: {prompt}"
+    },
+    "turn": {
+      "cancelUnconfirmed": "Sunucu bu yanıtı hâlâ tamamlıyor olabilir.",
+      "caughtUp": "Güncel",
+      "compacting": "Önceki mesajlar sıkıştırılıyor",
+      "connecting": "Bağlanıyor…",
+      "continue": "Devam et",
+      "continuePrefill": "Devam et",
+      "done": "Tamamlandı",
+      "elapsedMinutes": "{m} dk {s} sn",
+      "elapsedSeconds": "{n} sn",
+      "elsewhere": "Başka bir sekmede yanıtlanıyor",
+      "messageRestored": "Mesajınız geri yüklendi",
+      "moreRunning": "{label} ve {count} tane daha",
+      "noResponse": "{n} sn boyunca yanıt yok",
+      "notSaved": "Yanıtlandı ancak geçmişe kaydedilmedi.",
+      "reconnecting": "Yeniden bağlanıyor…",
+      "restored": "Bu sohbet başka bir sunucuya taşındı ve devam etti.",
+      "retrying": "Yapay zeka sağlayıcısı yeniden deneniyor · deneme {n}",
+      "retryingIn": "Yapay zeka sağlayıcısı {s} sn içinde yeniden denenecek · deneme {n}",
+      "retryNote": "Yeniden denemek, zaten değiştirilmiş hiçbir şeyi geri almaz.",
+      "retrySave": "Kaydetmeyi yeniden dene",
+      "returnedToPrevious": "Mesajınız önceki sohbete geri gönderildi",
+      "sending": "Gönderiliyor…",
+      "sendLabel": "Mesaj gönder",
+      "stopLabel": "Yanıtlamayı durdur",
+      "stopped": "Durduruldu",
+      "stoppedWithSteps": "{n} adımdan sonra durduruldu · bulgular korundu | {n} adımdan sonra durduruldu · bulgular korundu",
+      "stepN": "adım {n}",
+      "stopping": "Durduruluyor…",
+      "thinking": "Düşünüyor",
+      "thinkingAbout": "{count} sonuç hakkında düşünüyor | {count} sonuç hakkında düşünüyor",
+      "waitingApproval": "Onayınız bekleniyor",
+      "waitingConsent": "Ücretli kullanım konusunda kararınız bekleniyor",
+      "withElapsed": "{status} · {elapsed}",
+      "writing": "Yanıt yazılıyor",
+      "ageDays": "{n} g",
+      "ageHours": "{n} sa",
+      "connectionLost": "Bağlantı kesildi. Yukarıdaki yanıt tamamlanmadı.",
+      "confidence": {
+        "high": "Yüksek güven",
+        "inconclusive": "Sonuçsuz",
+        "low": "Düşük güven",
+        "medium": "Orta güven"
+      },
+      "continueDraft": "Yukarıdaki yanıta devam et",
+      "dataAge": "{age} önceki veri",
+      "rerun": "Yeniden çalıştır",
+      "stoppedAfter": "{n} adımdan sonra durduruldu, tamamlanmadı | {n} adımdan sonra durduruldu, tamamlanmadı",
+      "stoppedIncomplete": "Durduruldu, tamamlanmadı"
+    },
+    "voice": {
+      "allowTitle": "Mikrofona izin ver",
+      "allowBody": "Adres çubuğundaki kilide tıklayın, mikrofona izin verin ve ardından bu sayfayı yeniden yükleyin.",
+      "cancelled": "Dikte iptal edildi.",
+      "continue": "Devam et",
+      "dictate": "Dikte et",
+      "engine": {
+        "apple": "Safari, konuşmayı Apple'ın konuşma hizmetiyle metne dönüştürür.",
+        "device": "Tarayıcınız konuşmayı bu cihazda metne dönüştürür.",
+        "google": "Chrome, konuşmayı Google'ın konuşma hizmetiyle metne dönüştürür.",
+        "microsoft": "Edge, konuşmayı Microsoft'un konuşma hizmetiyle metne dönüştürür.",
+        "vendor": "Tarayıcınızın konuşma hizmeti konuşmayı metne dönüştürür."
+      },
+      "enterToSend": "Göndermek için tekrar Enter'a basın.",
+      "error": {
+        "how": "Nasıl izin verilir",
+        "mic_denied": "Bu site için mikrofon erişimi engellendi.",
+        "no_mic": "Mikrofon bulunamadı. Bir mikrofon bağlayıp tekrar deneyin.",
+        "no_speech": "Hiçbir şey duyulmadı. Tekrar deneyin.",
+        "service_unreachable": "{vendor} konuşma hizmetine ulaşılamadı.",
+        "service_unreachable_generic": "Tarayıcınızın konuşma hizmetine ulaşılamadı.",
+        "stt_unavailable": "Konuşmadan metne dönüştürme durdu. Duyulanlar korunur.",
+        "time_limit": "Dikte 2 dakika sonra durur. Devam etmek için mikrofona basın."
+      },
+      "listening": "Dinliyor",
+      "notNow": "Şimdi değil",
+      "primerBody": "Gönder'e basana kadar hiçbir şey gönderilmez.",
+      "primerEngine": "{engineSentence} OpenObserve sesi saklamaz.",
+      "primerTitle": "Mesaj alanına dikte et",
+      "holdLine": "Durdurmak için {keys} tuşunu bırakın",
+      "started": "Dinliyor. Enter gönderir; Escape veya mikrofon durdurur.",
+      "stopTooltip": "Dikteyi durdur",
+      "stopped": "Dikte durdu. {count} kelime eklendi. | Dikte durdu. {count} kelime eklendi.",
+      "stoppedEnter": "Dikte durdu. {count} kelime eklendi. Göndermek için Enter'a basın. | Dikte durdu. {count} kelime eklendi. Göndermek için Enter'a basın.",
+      "tooltip": "Dikte et · {keys} tuşunu basılı tut",
+      "tryAgain": "Tekrar dene",
+      "waitingPermission": "İzin bekleniyor",
+      "waitingShort": "Bekliyor",
+      "allowPrompt": "Tarayıcı isteminde mikrofona izin verin.",
+      "privacy": "Tarayıcınız sesi sağlayıcısına gönderebilir.",
+      "processing": "Tamamlanıyor",
+      "offAdmin": "Dikte bu tarayıcıda devre dışı.",
+      "silent": "Tarayıcınız konuşmayı metne dönüştürmedi. Tekrar denemek için sayfayı yeniden yükleyin.",
+      "language": "Dikte, tarayıcı diliniz {language} için kullanılamıyor."
+    },
+    "welcome": {
+      "lastRange": "son {period}",
+      "launcher": {
+        "ask": "Sor",
+        "inputName": "{product} ürününe sor",
+        "recentThreads": "Son sohbetler",
+        "askEmpty": "Soru yazın veya sormak için bir görsel ekleyin."
+      },
+      "prefill": {
+        "append": "Sona ekle",
+        "cancel": "İptal",
+        "question": "Taslağınız öneriyle değiştirilsin mi?",
+        "replace": "Değiştir"
+      },
+      "starter": {
+        "otherToolToO2": "Başka bir araçtaki sorguyu OpenObserve SQL'e dönüştürün",
+        "mapStreamSchema": "`{stream}` akışının şemasını eşle",
+        "alerts": {
+          "1": "Son 24 saatte en çok hangi uyarılar tetiklendi?",
+          "2": "`{stream}` içindeki hatalar için bir uyarı taslağı oluştur",
+          "2Generic": "Hatalar için bir uyarı taslağı oluştur"
+        },
+        "dashboard": {
+          "1": "\"{dashboard}\" üzerinde son {range} içinde ne değişti?",
+          "2": "En büyük değişimi gösteren paneli açıkla",
+          "1Generic": "Bu gösterge panosunda son zamanlarda ne değişti?"
+        },
+        "function": {
+          "1": "`message` alanındaki JSON'u ayrıştırmak için VRL yaz",
+          "2": "Bu fonksiyonun ne yaptığını açıkla"
+        },
+        "home": {
+          "attention": "Şu anda neye dikkat edilmesi gerekiyor?",
+          "errorsSummary": "`{stream}` içindeki hataları özetle",
+          "slowSpans": "Son bir saatte hangi hizmetler en yavaş span'lere sahipti?",
+          "service": "{service} neden {signal}?",
+          "incident": "{title} olayına ne yol açtı?",
+          "noAlert": "{service} hatalarını hangi uyarı kapsamalı?",
+          "ingest": {
+            "logs": "İlk günlüklerimi nasıl gönderirim?",
+            "traces": "İzleri nasıl gönderirim?",
+            "metrics": "Metrikleri nasıl gönderirim?"
+          },
+          "signal": {
+            "errors": "başarısız",
+            "latency": "yavaş"
+          }
+        },
+        "ingest": {
+          "1": "Uygulamımdan günlükleri nasıl göndereceğimi göster",
+          "2": "Kubernetes için veri alımını ayarla",
+          "3": "Veri geldikten sonra neler yapabilirsin?"
+        },
+        "jsonEditor": {
+          "2": "Bu JSON'u hatalar için kontrol et",
+          "alert": "Bu uyarının koşullarını açıkla",
+          "pipeline": "Bu işlem hattının ne yaptığını açıkla"
+        },
+        "learn": "Neler yapabilirsin?",
+        "logs": {
+          "1": "Son {range} içinde `{stream}` içindeki hatalar neden arttı?",
+          "2": "Şu anda `{stream}` içinde ne olduğunu özetle",
+          "1Generic": "Günlüklerimde son zamanlarda hatalar neden arttı?",
+          "2Generic": "Şu anda günlüklerimde ne olduğunu özetle"
+        },
+        "metrics": {
+          "1": "`{metric}` p95 gecikmesi için PromQL yaz",
+          "2": "Hangi metrikler raporlamayı durdurdu?",
+          "1Generic": "p95 gecikmesi için PromQL yaz"
+        },
+        "recent": "\"{title}\" konuşmasını sürdür",
+        "regex": {
+          "1": "E-posta adreslerini gizleyen bir desen yaz",
+          "2": "Bu deseni son `{stream}` satırları üzerinde test et",
+          "2Generic": "Bu deseni son satırlar üzerinde test et"
+        },
+        "sqlEditor": {
+          "1": "Son bir saatte hizmet başına %5'i aşan hatalar için SQL yaz",
+          "2": "Bu sorguyu `{stream}` üzerinde kontrol et",
+          "2Generic": "Bu sorguyu kontrol et"
+        },
+        "traces": {
+          "1": "Son {range} içinde hangi hizmetler en yavaş span'lere sahipti?",
+          "1Generic": "Son zamanlarda hangi hizmetler en yavaş span'lere sahipti?"
+        }
+      },
+      "viewAll": "Tümünü görüntüle",
+      "whatCanYouDo": "Neler yapabilirsin?"
+    },
+    "rca": {
+      "tag": "Vaka analizi",
+      "prompt": "Bu vaka analizi raporunu açıkla",
+      "incidentPrompt": "Bu vakayı açıkla",
+      "reportChip": "{run} · {size}",
+      "runAnalysis": "Analizi çalıştır",
+      "status": {
+        "starting": "Analiz başlatılıyor… {elapsed}",
+        "analysing": "Analiz ediliyor · {elapsed}"
+      }
+    },
+    "oncall": {
+      "continue": "Continue in @:{'brand.autobot'}"
+    },
+    "autoobserve": {
+      "askChip": "AutoObserve sorusu · {name}",
+      "continueTooltip": "Bu soru ekli olarak {product} uygulamasını açar"
+    },
+    "agent": {
+      "o2": {
+        "name": "{product}",
+        "purpose": "Soruları yanıtlar ve görevlerde yardımcı olur"
+      },
+      "investigator": {
+        "name": "@:{'brand.autobotInvestigate'}",
+        "purpose": "Nedenleri bulur"
+      },
+      "queryBuilder": {
+        "name": "Sorgu Oluşturucu",
+        "purpose": "Sorgular yazar"
+      },
+      "policy": {
+        "readOnly": "Salt okunur"
+      },
+      "picker": {
+        "choose": "Aracı seç",
+        "heading": "Aracı"
+      },
+      "unavailable": {
+        "role": "Kullanılamıyor · Bir yöneticiye sorun",
+        "short": "Kullanılamıyor",
+        "disabled": "Bu kuruluş için kapatıldı",
+        "unreachable": "Şu anda ulaşılamıyor · kontrol edildi: {time}",
+        "unreachableNow": "Şu anda ulaşılamıyor"
+      },
+      "announceChosen": "{agent} yanıtlayacak.",
+      "pendingSwitch": "{agent} bundan sonra yanıtlayacak. Önceki yanıtlar kalır.",
+      "clause": "{purpose} · {policy}"
+    },
+    "handoff": {
+      "marker": "{agent} aracısına siz devrettiniz · {time}",
+      "markerUntimed": "{agent} aracısına siz devrettiniz",
+      "given": "Ona verilenler",
+      "givenTurns": "Bu sohbette şu ana kadar: {questions} soru, {answers} yanıt",
+      "givenContext": "Bağlam: {chips}",
+      "notCarried": "Aktarılmayanlar: {items}",
+      "notCarriedApproval": "bekleyen onay",
+      "announce": "{agent} aracısına devredildi.",
+      "suggest": {
+        "title": {
+          "o2": "{agent} bundan sonrasını devralabilir",
+          "investigator": "{agent} nedeni araştırabilir",
+          "queryBuilder": "{agent} bu sorguyu yazabilir"
+        },
+        "body": "Birkaç dakika sürebilir.",
+        "bodyMetered": "Birkaç dakika sürebilir · Yapay zeka kredileri kullanır",
+        "accept": "{agent} aracısına devret",
+        "dismiss": "Şimdi değil",
+        "collapsed": "{agent} önerildi",
+        "handoff": "Devret",
+        "prompt": "Bu incelemeye devam et",
+        "promptReason": "Bu incelemeye devam et: {reason}"
+      }
+    },
+    "question": {
+      "answerHint": "Yukarıdaki soruyu yanıtlıyor",
+      "needsAnswer": "Yanıtınız gerekiyor: {question}",
+      "otherAnswer": "Diğer yanıt",
+      "record": {
+        "answered": "Yanıtlandı: {choice}",
+        "expired": "Sorunun süresi doldu. Hiçbir şey değiştirilmedi."
+      },
+      "sendAnswer": "Yanıtı gönder",
+      "needsAnswerLabel": "Yanıtınız gerekiyor"
+    },
+    "threadsBar": {
+      "label": "Sohbetler",
+      "title": "Sohbetler",
+      "incidents": "Canlı incelemeler · {count}",
+      "moreIncidents": "{count} tane daha",
+      "pageFull": "{count}+ açık",
+      "openIncidents": "Açık vakalar",
+      "yourThreads": "Sohbetleriniz · {count}",
+      "noThreads": "Çalışan sohbet yok"
+    },
+    "chart": {
+      "showChart": "Grafiği göster",
+      "openInMetrics": "Metriklerde aç",
+      "addToDashboard": "Gösterge panosuna ekle",
+      "createAlert": "Uyarı oluştur",
+      "copyQuery": "Sorguyu kopyala",
+      "seriesCount": "{count} seri",
+      "meta": "{range} · {series}",
+      "name": "{title}, {series}",
+      "legend": "Seriler"
+    }
+  },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "almostThere": "Neredeyse tamam...",
+        "analyzing": "Analiz ediliyor...",
+        "checkingDetails": "Ayrıntılar kontrol ediliyor...",
+        "connectingTheDots": "Bağlantılar kuruluyor...",
+        "crunchingNumbers": "Sayılar hesaplanıyor...",
+        "divingDeeper": "Daha derine iniliyor...",
+        "evaluatingOptions": "Seçenekler değerlendiriliyor...",
+        "examiningData": "Veriler inceleniyor...",
+        "exploringPossibilities": "Olasılıklar araştırılıyor...",
+        "formulatingResponse": "Yanıt oluşturuluyor...",
+        "gatheringInsights": "İçgörüler toplanıyor...",
+        "makingProgress": "İlerleme kaydediliyor...",
+        "piecingTogether": "Parçalar birleştiriliyor...",
+        "processing": "İşleniyor...",
+        "refiningAnswer": "Yanıt iyileştiriliyor...",
+        "reviewingContext": "Bağlam gözden geçiriliyor...",
+        "stillThinking": "Hâlâ düşünülüyor...",
+        "synthesizingInformation": "Bilgiler derleniyor...",
+        "thinking": "Düşünülüyor...",
+        "workingOnIt": "Üzerinde çalışılıyor..."
+      }
+    },
+    "threadView": {
+      "assistant": "Asistan",
+      "userNamed": "Kullanıcı {user}"
+    }
+  },
+  "brand": {
+    "askAutobot": "Autobot'a sor",
+    "autobot": "Autobot",
+    "autobotInvestigate": "Autobot ile araştır"
   }
 }
