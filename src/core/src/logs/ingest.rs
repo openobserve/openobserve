@@ -321,7 +321,7 @@ async fn ingest_inner(
     if stream_name.is_empty() {
         return Err(Error::IngestionError("Stream name is empty".to_string()));
     }
-    // Internal writers pass the same test as the rollup write guard below.
+    // Change events carry customer text, so internal write access cannot exempt them from SDR.
     #[cfg(feature = "enterprise")]
     let platform_write = {
         let internal_writer = is_internal_writer(&user, is_derived);

@@ -187,6 +187,7 @@ pub enum ResponseEventKind {
     /// record must not hide. A timeline showing only the page it did send is a
     /// timeline that lies about what happened.
     Flapped,
+    PromotionOwed,
 }
 
 impl ResponseState {
@@ -255,6 +256,7 @@ impl ResponseEventKind {
             Self::AiVerdict => 11,
             Self::SeverityPromoted => 12,
             Self::Flapped => 13,
+            Self::PromotionOwed => 14,
         }
     }
 
@@ -273,6 +275,7 @@ impl ResponseEventKind {
             11 => Some(Self::AiVerdict),
             12 => Some(Self::SeverityPromoted),
             13 => Some(Self::Flapped),
+            14 => Some(Self::PromotionOwed),
             _ => None,
         }
     }
@@ -292,6 +295,7 @@ impl ResponseEventKind {
             Self::AiVerdict => "ai_verdict",
             Self::SeverityPromoted => "severity_promoted",
             Self::Flapped => "flapped",
+            Self::PromotionOwed => "promotion_owed",
         }
     }
 
@@ -306,7 +310,7 @@ impl ResponseEventKind {
     /// timeline: a rung that paged eight people on two channels is one line to
     /// a human and sixteen rows to the engine.
     pub fn is_ledger_only(&self) -> bool {
-        matches!(self, Self::Delivery)
+        matches!(self, Self::Delivery | Self::PromotionOwed)
     }
 }
 
@@ -406,6 +410,10 @@ impl ResponseEvent {
     pub fn with_templates(mut self, templates: Vec<SentTemplate>) -> Self {
         self.templates = templates;
         self
+    }
+
+    pub fn is_pending_delivery(&self) -> bool {
+        self.kind == ResponseEventKind::Delivery && self.delivered.is_none()
     }
 
     /// Marks a rung's own entry as one the transport lost outright.
@@ -1075,7 +1083,7 @@ mod tests {
         ResponseState::Resolved,
     ];
 
-    const KINDS: [ResponseEventKind; 13] = [
+    const KINDS: [ResponseEventKind; 14] = [
         ResponseEventKind::Sys,
         ResponseEventKind::Page,
         ResponseEventKind::Ack,
@@ -1089,6 +1097,7 @@ mod tests {
         ResponseEventKind::AiVerdict,
         ResponseEventKind::SeverityPromoted,
         ResponseEventKind::Flapped,
+        ResponseEventKind::PromotionOwed,
     ];
 
     /// The note sits in the run it belongs to: the new run when it re-paged, else the current.
@@ -1216,7 +1225,7 @@ mod tests {
 
     #[test]
     fn test_event_kind_storage_ids_are_pinned() {
-        let expected = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        let expected = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
         for (k, want) in KINDS.iter().zip(expected) {
             assert_eq!(k.to_i32(), want, "{k} moved");
         }
@@ -1252,7 +1261,7 @@ mod tests {
         assert_eq!(ResponseState::from_i32(0), None);
         assert_eq!(ResponseState::from_i32(5), None);
         assert_eq!(ResponseEventKind::from_i32(0), None);
-        assert_eq!(ResponseEventKind::from_i32(14), None);
+        assert_eq!(ResponseEventKind::from_i32(15), None);
     }
 
     /// A late event must never reopen a record a human already closed. Which
@@ -1301,14 +1310,14 @@ mod tests {
         }
     }
 
-    /// A rung that pages eight people on two channels is one line to a
-    /// responder and sixteen rows to the engine. Only the engine's rows are
-    /// kept off the timeline.
     #[test]
-    fn test_only_delivery_rows_are_kept_off_the_timeline() {
-        assert!(ResponseEventKind::Delivery.is_ledger_only());
-        for k in KINDS.iter().filter(|k| **k != ResponseEventKind::Delivery) {
-            assert!(!k.is_ledger_only(), "{k} belongs on the timeline");
+    fn test_promotion_intents_and_deliveries_are_kept_off_the_timeline() {
+        for k in KINDS {
+            let hidden = matches!(
+                k,
+                ResponseEventKind::Delivery | ResponseEventKind::PromotionOwed
+            );
+            assert_eq!(k.is_ledger_only(), hidden, "{k}");
         }
     }
 

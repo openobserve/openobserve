@@ -22,7 +22,7 @@ use config::{
 };
 use sqlx::{Pool, Postgres, Row};
 
-use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus};
+use super::{EscalationFinish, TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus};
 use crate::{
     db::{
         self, IndexStatement,
@@ -112,7 +112,7 @@ SET status = $1, retries = $2, next_run_at = $3,
 WHERE id = $8 AND claim_epoch = $9 AND status = $10;"#;
 
 /// The scheduler table; `armed_for` is only written by the `OncallSlackSync` statements (SY-2).
-const CREATE_TABLE_QUERY: &str = r#"
+pub(super) const CREATE_TABLE_QUERY: &str = r#"
 CREATE TABLE IF NOT EXISTS scheduled_jobs
 (
     id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -159,6 +159,47 @@ const FINISH_SLACK_SYNC_QUERY: &str = r#"UPDATE scheduled_jobs SET
     data = $5,
     armed_for = NULL
 WHERE id = $6 AND claim_epoch = $7 AND status = $8;"#;
+
+/// M138 (a) arm while `data` is still the read `$8`: insert at `$5` with `$7`; a Waiting row
+/// moves no later, a finished one waits again, and a row a tick holds (`$6`) notes `armed_for`.
+const ARM_ESCALATION_QUERY: &str = r#"INSERT INTO scheduled_jobs
+    (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, data)
+VALUES ($1, $2, $3, false, false, $4, 0, $5, $7)
+ON CONFLICT (org, module, module_key) DO UPDATE SET
+    status = CASE WHEN scheduled_jobs.status = $6 THEN scheduled_jobs.status ELSE $4 END,
+    next_run_at = CASE
+        WHEN scheduled_jobs.status = $6 THEN scheduled_jobs.next_run_at
+        WHEN scheduled_jobs.status = $4 THEN LEAST(scheduled_jobs.next_run_at, $5)
+        ELSE $5 END,
+    retries = CASE WHEN scheduled_jobs.status = $6 THEN scheduled_jobs.retries ELSE 0 END,
+    data = excluded.data,
+    armed_for = CASE
+        WHEN scheduled_jobs.status = $6 THEN LEAST(COALESCE(scheduled_jobs.armed_for, $5), $5)
+        ELSE scheduled_jobs.armed_for END
+WHERE scheduled_jobs.data = $8;"#;
+
+/// The escalation row's `data`, read before an arm merges over it.
+const ESCALATION_DATA_QUERY: &str =
+    "SELECT data FROM scheduled_jobs WHERE org = $1 AND module = $2 AND module_key = $3;";
+
+/// OF-10 finish with a next tick: Waiting (`$1`) at `$2`, or earlier for an arm made during the
+/// tick; `data` is left to the tick's own writes. Fenced on id, epoch and Processing (`$5`).
+const FINISH_ESCALATION_QUERY: &str = r#"UPDATE scheduled_jobs SET
+    status = $1, retries = 0,
+    next_run_at = CASE WHEN armed_for IS NULL THEN $2 ELSE LEAST(armed_for, $2) END,
+    armed_for = NULL
+WHERE id = $3 AND claim_epoch = $4 AND status = $5
+RETURNING *;"#;
+
+/// OF-10 finish of an ended ladder that an arm re-opened: Waiting (`$1`) at `armed_for`.
+const REQUEUE_ARMED_ESCALATION_QUERY: &str = r#"UPDATE scheduled_jobs SET
+    status = $1, retries = 0, next_run_at = armed_for, armed_for = NULL
+WHERE id = $2 AND claim_epoch = $3 AND status = $4 AND armed_for IS NOT NULL
+RETURNING *;"#;
+
+/// OF-10 finish of an ended ladder nothing armed; `$3` Processing.
+const DELETE_UNARMED_ESCALATION_QUERY: &str = r#"DELETE FROM scheduled_jobs
+WHERE id = $1 AND claim_epoch = $2 AND status = $3 AND armed_for IS NULL;"#;
 
 /// [`super::Scheduler::rename_key`] on `pool`.
 async fn rename_key_in(
@@ -215,6 +256,95 @@ async fn finish_slack_sync_in(
         .execute(pool)
         .await?;
     Ok(result.rows_affected() == 1)
+}
+
+/// [`super::Scheduler::arm_escalation`] on `pool`.
+async fn arm_escalation_in(
+    pool: &Pool<Postgres>,
+    org: &str,
+    response_id: &str,
+    at: i64,
+    data: &str,
+) -> Result<()> {
+    for _ in 0..super::ESCALATION_ARM_ATTEMPTS {
+        let stored: Option<String> = sqlx::query_scalar(ESCALATION_DATA_QUERY)
+            .bind(org)
+            .bind(TriggerModule::OncallEscalation)
+            .bind(response_id)
+            .fetch_optional(pool)
+            .await?;
+        crate::race_point!("arm_escalation.read");
+        let merged = super::escalation_arm_data(stored.as_deref(), data);
+        crate::race_point!("arm_escalation.before_write");
+        let armed = sqlx::query(ARM_ESCALATION_QUERY)
+            .bind(org)
+            .bind(TriggerModule::OncallEscalation)
+            .bind(response_id)
+            .bind(TriggerStatus::Waiting)
+            .bind(at)
+            .bind(TriggerStatus::Processing)
+            .bind(merged)
+            .bind(stored)
+            .execute(pool)
+            .await?;
+        if armed.rows_affected() > 0 {
+            return Ok(());
+        }
+    }
+    Err(Error::Message(format!(
+        "the escalation arm of {response_id} lost every race for its row's data"
+    )))
+}
+
+/// [`super::Scheduler::finish_escalation`] on `pool`.
+async fn finish_escalation_in(
+    pool: &Pool<Postgres>,
+    claim: &Trigger,
+    next_run_at: Option<i64>,
+) -> Result<EscalationFinish> {
+    if let Some(at) = next_run_at {
+        let row = sqlx::query_as::<_, Trigger>(FINISH_ESCALATION_QUERY)
+            .bind(TriggerStatus::Waiting)
+            .bind(at)
+            .bind(claim.id)
+            .bind(claim.claim_epoch)
+            .bind(TriggerStatus::Processing)
+            .fetch_optional(pool)
+            .await?;
+        return Ok(row.map_or(EscalationFinish::Lost, EscalationFinish::Requeued));
+    }
+    if let Some(row) = requeue_armed_escalation(pool, claim).await? {
+        return Ok(EscalationFinish::Requeued(row));
+    }
+    crate::race_point!("escalation_finish.unarmed");
+    crate::race_point!("escalation_finish.before_delete");
+    let deleted = sqlx::query(DELETE_UNARMED_ESCALATION_QUERY)
+        .bind(claim.id)
+        .bind(claim.claim_epoch)
+        .bind(TriggerStatus::Processing)
+        .execute(pool)
+        .await?;
+    if deleted.rows_affected() == 1 {
+        return Ok(EscalationFinish::Deleted);
+    }
+    // Only a finish clears `armed_for`, so an arm that landed between the two statements is
+    // still there; a second miss means the claim is gone.
+    Ok(requeue_armed_escalation(pool, claim)
+        .await?
+        .map_or(EscalationFinish::Lost, EscalationFinish::Requeued))
+}
+
+async fn requeue_armed_escalation(
+    pool: &Pool<Postgres>,
+    claim: &Trigger,
+) -> Result<Option<Trigger>> {
+    Ok(sqlx::query_as::<_, Trigger>(REQUEUE_ARMED_ESCALATION_QUERY)
+        .bind(TriggerStatus::Waiting)
+        .bind(claim.id)
+        .bind(claim.claim_epoch)
+        .bind(TriggerStatus::Processing)
+        .fetch_optional(pool)
+        .await?)
 }
 
 pub struct PostgresScheduler {}
@@ -345,7 +475,7 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs WHERE module = $1;"#,
     /// Pushes a Trigger job into the queue
     async fn push(&self, trigger: Trigger) -> Result<()> {
         // let db = db::get_db().await;
-        let pool = CLIENT_RW.clone();
+        let pool = scheduler_write_pool();
         let mut tx = pool.begin().await?;
         DB_QUERY_NUMS
             .with_label_values(&["insert", "scheduled_jobs"])
@@ -388,7 +518,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
     /// Deletes the Trigger job matching the given parameters
     async fn delete(&self, org: &str, module: TriggerModule, key: &str) -> Result<()> {
-        let pool = CLIENT_RW.clone();
+        let pool = scheduler_write_pool();
         log::debug!("Deleting scheduled job for org: {org}, module: {module}, key: {key}",);
         DB_QUERY_NUMS
             .with_label_values(&["delete", "scheduled_jobs"])
@@ -460,7 +590,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     }
 
     async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()> {
-        let pool = CLIENT_RW.clone();
+        let pool = scheduler_write_pool();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
@@ -802,6 +932,42 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         finish_slack_sync_in(&CLIENT_RW.clone(), claim, finish).await
     }
 
+    async fn arm_escalation(
+        &self,
+        org: &str,
+        response_id: &str,
+        at: i64,
+        data: &str,
+    ) -> Result<()> {
+        arm_escalation_in(&CLIENT_RW.clone(), org, response_id, at, data).await
+    }
+
+    async fn write_escalation_tick_data(
+        &self,
+        current: &Trigger,
+        data: &str,
+        renew_until: Option<i64>,
+    ) -> Result<bool> {
+        let result = sqlx::query(super::WRITE_ESCALATION_TICK_DATA_QUERY)
+            .bind(data)
+            .bind(renew_until)
+            .bind(current.id)
+            .bind(current.claim_epoch)
+            .bind(&current.status)
+            .bind(&current.data)
+            .execute(&scheduler_write_pool())
+            .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    async fn finish_escalation(
+        &self,
+        claim: &Trigger,
+        next_run_at: Option<i64>,
+    ) -> Result<EscalationFinish> {
+        finish_escalation_in(&CLIENT_RW.clone(), claim, next_run_at).await
+    }
+
     async fn complete_claim(&self, trigger: Trigger) -> Result<bool> {
         let result = sqlx::query(COMPLETE_CLAIM_QUERY)
             .bind(&trigger.status)
@@ -814,7 +980,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             .bind(trigger.id)
             .bind(trigger.claim_epoch)
             .bind(TriggerStatus::Processing)
-            .execute(&CLIENT_RW.clone())
+            .execute(&scheduler_write_pool())
             .await?;
         Ok(result.rows_affected() == 1)
     }
@@ -846,7 +1012,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         report_timeout: i64,
         module: Option<TriggerModule>,
     ) -> Result<Vec<Trigger>> {
-        let pool = CLIENT_RW.clone();
+        let pool = scheduler_write_pool();
 
         let now = now_micros();
         let report_max_time = now
@@ -927,7 +1093,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     }
 
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
-        let pool = CLIENT_RO.clone();
+        let pool = scheduler_read_pool();
         DB_QUERY_NUMS
             .with_label_values(&["select", "scheduled_jobs"])
             .inc();
@@ -1138,17 +1304,42 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
     }
 }
 
+fn scheduler_write_pool() -> sqlx::PgPool {
+    #[cfg(any(test, feature = "test-utils"))]
+    if let Some(Some(pool)) = super::with_test_db(|pool| match pool {
+        super::TestPool::Postgres(pool) => Some(pool.clone()),
+        _ => None,
+    }) {
+        return pool;
+    }
+    CLIENT_RW.clone()
+}
+
+fn scheduler_read_pool() -> sqlx::PgPool {
+    #[cfg(any(test, feature = "test-utils"))]
+    if let Some(Some(pool)) = super::with_test_db(|pool| match pool {
+        super::TestPool::Postgres(pool) => Some(pool.clone()),
+        _ => None,
+    }) {
+        return pool;
+    }
+    CLIENT_RO.clone()
+}
+
 #[cfg(test)]
 mod tests {
 
     use sqlx::{Pool, Postgres};
 
     use super::{
-        ARM_SLACK_SYNC_QUERY, CREATE_TABLE_QUERY, FINISH_SLACK_SYNC_QUERY, SlackSyncFinish,
-        Trigger, TriggerModule, TriggerStatus, arm_slack_sync_in, finish_slack_sync_in,
-        rename_key_in,
+        ARM_SLACK_SYNC_QUERY, CREATE_TABLE_QUERY, EscalationFinish, FINISH_SLACK_SYNC_QUERY,
+        SlackSyncFinish, Trigger, TriggerModule, TriggerStatus, arm_escalation_in,
+        arm_slack_sync_in, finish_escalation_in, finish_slack_sync_in, rename_key_in,
     };
-    use crate::scheduler::slack_sync_tests::{self as cases, KEY, ORG, SyncDb};
+    use crate::scheduler::{
+        escalation_tests::{self as escalation, EscalationDb},
+        slack_sync_tests::{self as cases, KEY, ORG, SyncDb},
+    };
 
     struct PostgresDb(Pool<Postgres>);
 
@@ -1166,6 +1357,78 @@ mod tests {
         .await
         .unwrap();
         pool
+    }
+
+    impl EscalationDb for PostgresDb {
+        async fn write_data(&self, data: &str) {
+            <Self as SyncDb>::set_data(self, data).await;
+        }
+
+        async fn fresh_table() -> Option<Self> {
+            <Self as SyncDb>::fresh().await
+        }
+
+        async fn arm_at(&self, at: i64, data: &str) {
+            arm_escalation_in(&self.0, ORG, KEY, at, data)
+                .await
+                .unwrap();
+        }
+
+        async fn finish_at(&self, claim: &Trigger, next_run_at: Option<i64>) -> EscalationFinish {
+            finish_escalation_in(&self.0, claim, next_run_at)
+                .await
+                .unwrap()
+        }
+
+        async fn claim_due(&self, now: i64) -> Vec<Trigger> {
+            sqlx::query_as::<_, Trigger>(PULL_QUERY_BY_MODULE)
+                .bind(TriggerStatus::Processing)
+                .bind(now)
+                .bind(TriggerModule::Report)
+                .bind(now + 90_000_000)
+                .bind(now + 90_000_000)
+                .bind(TriggerStatus::Waiting)
+                .bind(now)
+                .bind(true)
+                .bind(false)
+                .bind(TriggerModule::OncallEscalation)
+                .bind(10_i64)
+                .fetch_all(&self.0)
+                .await
+                .unwrap()
+        }
+
+        async fn force(&self, status: TriggerStatus, next_run_at: i64) {
+            sqlx::query(
+                "UPDATE scheduled_jobs SET status = $1, next_run_at = $2 WHERE module = $3",
+            )
+            .bind(status)
+            .bind(next_run_at)
+            .bind(TriggerModule::OncallEscalation)
+            .execute(&self.0)
+            .await
+            .unwrap();
+        }
+
+        async fn escalation_row(&self) -> Option<(Trigger, Option<i64>)> {
+            let row = sqlx::query_as::<_, Trigger>(
+                "SELECT * FROM scheduled_jobs WHERE module_key = $1 AND module = $2",
+            )
+            .bind(KEY)
+            .bind(TriggerModule::OncallEscalation)
+            .fetch_optional(&self.0)
+            .await
+            .unwrap()?;
+            let armed: (Option<i64>,) = sqlx::query_as(
+                "SELECT armed_for FROM scheduled_jobs WHERE module_key = $1 AND module = $2",
+            )
+            .bind(KEY)
+            .bind(TriggerModule::OncallEscalation)
+            .fetch_one(&self.0)
+            .await
+            .unwrap();
+            Some((row, armed.0))
+        }
     }
 
     impl SyncDb for PostgresDb {
@@ -1291,6 +1554,36 @@ mod tests {
             .await
             .unwrap();
         }
+    }
+
+    #[tokio::test]
+    async fn an_escalation_arm_keeps_a_running_ticks_claim() {
+        escalation::an_escalation_arm_keeps_a_running_ticks_claim::<PostgresDb>().await;
+    }
+
+    #[tokio::test]
+    async fn a_finish_requeues_at_the_tick_or_an_earlier_arm() {
+        escalation::a_finish_requeues_at_the_tick_or_an_earlier_arm::<PostgresDb>().await;
+    }
+
+    #[tokio::test]
+    async fn fenced_finish_keeps_armed_for() {
+        escalation::fenced_finish_keeps_armed_for::<PostgresDb>().await;
+    }
+
+    #[tokio::test]
+    async fn a_finish_of_a_lost_claim_writes_nothing() {
+        escalation::a_finish_of_a_lost_claim_writes_nothing::<PostgresDb>().await;
+    }
+
+    #[tokio::test]
+    async fn an_arm_between_the_finish_statements_still_requeues() {
+        escalation::an_arm_between_the_finish_statements_still_requeues::<PostgresDb>().await;
+    }
+
+    #[tokio::test]
+    async fn an_arm_keeps_a_budget_the_tick_wrote_after_its_read() {
+        escalation::an_arm_keeps_a_budget_the_tick_wrote_after_its_read::<PostgresDb>().await;
     }
 
     #[tokio::test]

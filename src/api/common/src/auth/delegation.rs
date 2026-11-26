@@ -97,6 +97,19 @@ const ALERT_ID_LITERALS: &[&str] = &[
     "tags",
 ];
 const ALERT_ID: Seg = Id(ALERT_ID_LITERALS);
+/// Router literals that axum hands to their own routes instead of the `{incident_id}` slot.
+const INCIDENT_ID_LITERALS: &[&str] = &[
+    "action_items",
+    "changes",
+    "declare",
+    "external-alerts",
+    "insights",
+    "page_team",
+    "recovery_checks",
+    "reviews",
+    "stats",
+];
+const INCIDENT_ID: Seg = Id(INCIDENT_ID_LITERALS);
 const GET: &[&str] = &["GET"];
 const POST: &[&str] = &["POST"];
 const GET_POST: &[&str] = &["GET", "POST"];
@@ -126,12 +139,16 @@ const ASSISTANT_SCOPE: &[ScopeRoute] = &[
     v2(&[Param, Lit("alerts"), Param], GET),
     v2(&[Param, Lit("alerts"), Param, Lit("groups")], GET),
     v2(&[Param, Lit("alerts"), Param, Lit("groups"), Lit("transitions")], GET),
-    v2(&[Param, Lit("alerts"), Lit("incidents"), Param, Lit("events")], GET),
-    v2(&[Param, Lit("alerts"), Lit("incidents"), Param, Lit("rca"), Lit("runs")], GET),
-    v2(&[Param, Lit("alerts"), Lit("incidents"), Param, Lit("rca"), Lit("runs"), Param], GET),
-    v2(&[Param, Lit("alerts"), Lit("incidents"), Param, Lit("update")], PATCH),
-    v2(&[Param, Lit("alerts"), Lit("incidents"), Param, Lit("events"), Lit("comment")], POST),
-    v2(&[Param, Lit("alerts"), Lit("incidents"), Param], GET),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), INCIDENT_ID, Lit("brief")], GET),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), INCIDENT_ID, Lit("contexts")], GET),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), INCIDENT_ID, Lit("contexts"), Param], GET),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), INCIDENT_ID, Lit("events")], GET),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), INCIDENT_ID, Lit("rca"), Lit("runs")], GET),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), INCIDENT_ID, Lit("rca"), Lit("runs"), Param], GET),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), INCIDENT_ID, Lit("rca"), Lit("runs"), Param, Lit("feedback")], GET),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), INCIDENT_ID, Lit("update")], PATCH),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), INCIDENT_ID, Lit("events"), Lit("comment")], POST),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), INCIDENT_ID], GET),
     v1(&[Param, Stream, Lit("traces"), Lit("latest")], GET),
     v1(&[Param, Stream, Lit("traces"), Lit("latest_stream")], GET),
     v1(&[Param, Stream, Lit("traces"), Lit("session")], GET),
@@ -183,7 +200,7 @@ const SLACK_ACTION_SCOPE: &[ScopeRoute] = &[
     v2(&[Param, Lit("alerts"), ALERT_ID, Lit("mute")], POST),
     v2(&[Param, Lit("alerts"), ALERT_ID, Lit("mute"), Param, Lit("extend")], POST),
     v2(&[Param, Lit("alerts"), ALERT_ID, Lit("mute"), Param, Lit("cancel")], POST),
-    v2(&[Param, Lit("alerts"), Lit("incidents"), Param, Lit("update")], PATCH),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), INCIDENT_ID, Lit("update")], PATCH),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("resolve")], POST),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("snooze")], POST),
     v1(&[Param, Lit("oncall"), Lit("responses"), Param, Lit("acknowledge")], POST),
@@ -1109,6 +1126,30 @@ mod tests {
     }
 
     #[test]
+    fn incident_brief_allows_a_signed_assistant_token_only_in_its_org() {
+        let path = "/v2/acme/alerts/incidents/i1/brief";
+        for (signed_claims, expected) in [
+            (claims("acme"), 200),
+            (claims("other"), 403),
+            (slack_action("acme"), 403),
+        ] {
+            let verified = verified_claims(
+                &token(&signed_claims),
+                true,
+                || false,
+                || Ok(keys()),
+                NOW_SECS,
+                |_| None,
+            )
+            .unwrap();
+            assert_eq!(
+                status(check_route(path, "/api/", &Method::GET, &verified)),
+                expected
+            );
+        }
+    }
+
+    #[test]
     fn path_org_must_match() {
         assert_eq!(route("/acme/_search", "/api/", Method::POST), 200);
         assert_eq!(route("/other/_search", "/api/", Method::POST), 403);
@@ -1243,6 +1284,108 @@ mod tests {
         ] {
             assert!(!in_assistant_scope(&method, path), "{method} {path}");
         }
+    }
+
+    #[test]
+    fn page_team_is_outside_delegated_scope() {
+        assert!(!in_assistant_scope(
+            &Method::POST,
+            "v2/acme/alerts/incidents/inc-1/page_team"
+        ));
+        assert!(!in_assistant_scope(
+            &Method::GET,
+            "v2/acme/alerts/incidents/page_team"
+        ));
+    }
+
+    #[test]
+    fn recovery_check_routes_are_outside_delegated_scope() {
+        let collection = "v2/acme/alerts/incidents/inc-1/recovery_checks";
+        let item = format!("{collection}/check-1");
+        assert!(!in_assistant_scope(&Method::GET, collection));
+        assert!(!in_assistant_scope(&Method::PATCH, &item));
+        assert!(!in_assistant_scope(&Method::DELETE, &item));
+    }
+
+    #[test]
+    fn assistant_can_read_contexts_and_cannot_declare_or_attach() {
+        for path in [
+            "v2/acme/alerts/incidents/inc-1/contexts",
+            "v2/acme/alerts/incidents/inc-1/contexts/ctx-1",
+        ] {
+            assert!(in_assistant_scope(&Method::GET, path), "{path}");
+            assert!(!in_assistant_scope(&Method::POST, path), "{path}");
+        }
+        for path in [
+            "v2/acme/alerts/incidents/declare",
+            "v2/acme/alerts/incidents/declare/preview",
+        ] {
+            assert!(!in_assistant_scope(&Method::POST, path), "{path}");
+        }
+        assert!(!in_assistant_scope(
+            &Method::GET,
+            "v2/acme/alerts/incidents/declare/contexts"
+        ));
+    }
+
+    #[test]
+    fn assistant_scope_allows_feedback_reads_only() {
+        let feedback = "v2/acme/alerts/incidents/inc-1/rca/runs/run-1/feedback";
+        let confirm = "v2/acme/alerts/incidents/inc-1/cause/confirm";
+        assert!(in_assistant_scope(&Method::GET, feedback));
+        assert!(!in_assistant_scope(&Method::POST, feedback));
+        assert!(!in_assistant_scope(&Method::POST, confirm));
+        assert!(!in_slack_action_scope(&Method::GET, feedback));
+    }
+
+    #[test]
+    fn no_incident_scope_route_takes_a_literal_as_the_incident_id() {
+        assert!(!in_assistant_scope(
+            &Method::POST,
+            "v2/acme/alerts/incidents/changes"
+        ));
+        for literal in [
+            "action_items",
+            "changes",
+            "declare",
+            "external-alerts",
+            "insights",
+            "recovery_checks",
+            "reviews",
+            "stats",
+        ] {
+            for (method, path) in [
+                (Method::GET, format!("v2/acme/alerts/incidents/{literal}")),
+                (
+                    Method::GET,
+                    format!("v2/acme/alerts/incidents/{literal}/brief"),
+                ),
+                (
+                    Method::GET,
+                    format!("v2/acme/alerts/incidents/{literal}/events"),
+                ),
+                (
+                    Method::GET,
+                    format!("v2/acme/alerts/incidents/{literal}/rca/runs"),
+                ),
+                (
+                    Method::PATCH,
+                    format!("v2/acme/alerts/incidents/{literal}/update"),
+                ),
+                (
+                    Method::POST,
+                    format!("v2/acme/alerts/incidents/{literal}/events/comment"),
+                ),
+            ] {
+                assert!(!in_assistant_scope(&method, &path), "{method} {path}");
+            }
+            let update = format!("/v2/acme/alerts/incidents/{literal}/update");
+            assert_eq!(action_route(Method::PATCH, &update), 403, "{update}");
+        }
+        assert!(in_assistant_scope(
+            &Method::GET,
+            "v2/acme/alerts/incidents/stats-1"
+        ));
     }
 
     #[test]

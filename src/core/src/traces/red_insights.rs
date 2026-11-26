@@ -374,6 +374,32 @@ pub fn volume_sql(stream: &str, cols: &StreamColumns) -> String {
     )
 }
 
+pub fn impact_sql(
+    stream: &str,
+    service: &str,
+    cols: &StreamColumns,
+    bucket_secs: i64,
+    scope_filter: &str,
+) -> Option<String> {
+    if !supports_impact(stream, cols) {
+        return None;
+    }
+    let stream = quote_identifier(stream);
+    let service = quote_sql_string(service);
+    let requests = request_predicate(cols.has_parent);
+    let ratio = RedSignal::ErrorRatio.value_expr();
+    Some(format!(
+        "SELECT histogram(_timestamp, '{bucket_secs} seconds') AS bucket, \
+         MIN(_timestamp) AS zo_onset_at, 100.0 * ({ratio}) AS zo_onset_value \
+         FROM {stream} WHERE service_name = {service} AND ({requests}){scope_filter} \
+         GROUP BY bucket ORDER BY bucket"
+    ))
+}
+
+pub fn supports_impact(stream: &str, cols: &StreamColumns) -> bool {
+    cols.has_status && !stream_name_is_error_restricted(stream)
+}
+
 /// Shared with the catalog's requestPredicate; unlike the service graph, roots of any kind count.
 fn request_predicate(has_parent: bool) -> String {
     if has_parent {

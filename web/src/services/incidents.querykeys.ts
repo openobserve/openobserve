@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { orgKey } from "@/composables/query/keys";
+import type { IncidentListParams } from "./incidents";
 
 /**
  * Keys only, dependency-free apart from `orgKey`, so a write in another domain
@@ -26,6 +27,7 @@ export const incidentKeys = {
   all: (org: string) => orgKey(org, "incidents"),
   list: (org: string, status: string, limit: number, offset: number) =>
     orgKey(org, "incidents", "list", { status, limit, offset }),
+  page: (org: string, params: IncidentListParams) => orgKey(org, "incidents", "page", params),
   detail: (org: string, id: string) => orgKey(org, "incidents", "detail", id),
   events: (org: string, id: string) => orgKey(org, "incidents", "events", id),
 };

@@ -261,11 +261,10 @@ describe("useEnterpriseRoutes.ts", () => {
     });
 
     // Test 20: iam + synthetics + its 6 sub-routes (all OSS) + on-call's 7
-    // routes + incidents' 2 routes + the workflows parent — always registered
-    // now, locked in OSS rather than absent.
-    it("should have 19 routes in basic configuration", () => {
+    // routes + incidents' 3 routes + the workflows parent + investigate are always registered.
+    it("should have 20 routes in basic configuration", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(19);
+      expect(routes.length).toBe(20);
     });
 
     // Fleet APIs 403 on OSS, so the routes must be absent, which also drops the nav entry via router.hasRoute.
@@ -401,10 +400,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(12);
     });
 
-    // Test 34: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + workflows + onboarding = 19
-    it("should have 20 routes in cloud configuration", () => {
+    // Test 34: the basic routes plus onboarding.
+    it("should have 21 routes in cloud configuration", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(20);
+      expect(routes.length).toBe(21);
     });
   });
 
@@ -431,10 +430,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(typeof route?.beforeEnter).toBe("function");
     });
 
-    // Test 37: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + 2 fleet + workflows = 22
+    // Test 37: the basic routes plus two AutoObserve and two Fleet routes.
     it("should have enterprise routes structure", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(27);
+      expect(routes.length).toBe(28);
     });
 
     // On-call and Fleet are set up before any data flows, so the empty-data gate must not block them.
@@ -482,10 +481,10 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "true";
     });
 
-    // Test 38: Should add all routes when both flags are true (iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + 2 fleet + workflows + onboarding = 23)
+    // Test 38: the enterprise routes plus onboarding.
     it("should add all routes when both flags are true", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(28);
+      expect(routes.length).toBe(29);
     });
 
     // Test 39: Should have all IAM children when both flags are true
@@ -817,7 +816,7 @@ describe("useEnterpriseRoutes.ts", () => {
   describe("Route Structure Validation", () => {
     // Test 50: Should have valid route structure for all basic routes
     it("should have valid route structure for all basic routes", () => {
-      const routes = useEnterpriseRoutes();
+      const routes = useEnterpriseRoutes().filter((route: any) => !route.redirect);
       routes.forEach((route: any) => {
         expect(route).toHaveProperty("path");
         expect(route).toHaveProperty("name");
@@ -938,7 +937,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = undefined;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(19); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
+      expect(routes.length).toBe(20); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
     });
 
     // Test 63: Should handle config with null values
@@ -948,7 +947,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = null;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(19); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
+      expect(routes.length).toBe(20); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
     });
 
     // Test 64: Should handle config with non-string values
@@ -958,7 +957,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = false;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(19); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
+      expect(routes.length).toBe(20); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
     });
 
     // Test 65: Should handle config with empty string values
@@ -968,7 +967,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "";
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(19); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
+      expect(routes.length).toBe(20); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
     });
 
     // Test 66: Should handle mixed string cases
@@ -978,7 +977,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "TRUE";
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(19); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
+      expect(routes.length).toBe(20); // Always registered now (oncall/incidents/workflows locked, not absent, in OSS)
     });
 
     // Test 67: Should maintain iam route as first element

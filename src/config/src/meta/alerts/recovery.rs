@@ -18,15 +18,64 @@
 //! DELIVERED notification, cleared by the write that emits the recovery, so exactly-once is
 //! structural and a suppressed firing needs no check in any consumer.
 
+pub mod transitions;
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use super::state::{AlertState, apply_outcome};
 use crate::meta::{alerts::level::AlertLevel, self_reporting::usage::RunOutcome};
 
 /// Microseconds in a second, for `keep_firing_for`.
 const MICROS_PER_SECOND: i64 = 1_000_000;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Observation {
+    pub incident_id: String,
+    pub check_id: String,
+    pub attempt_id: String,
+    pub generation: i64,
+    pub sample_ts: i64,
+    pub verdict: Verdict,
+    pub value: Option<f64>,
+    pub volume_pct: Option<f64>,
+    pub evaluator_region: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Verdict {
+    Pass,
+    NotYet,
+    Breach,
+    NoData,
+    LowTraffic,
+    Error,
+    Denied { reason: String },
+    RollbackObserved(Rollback),
+}
+
+impl Verdict {
+    pub fn has_signal(&self) -> bool {
+        matches!(self, Self::Pass | Self::NotYet | Self::Breach)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct RecoveryCondition {
+    pub recover_threshold: f64,
+    pub alert_threshold: f64,
+    pub expect_effect_secs: i32,
+    pub volume_floor_pct: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Rollback {
+    pub change_ref: String,
+    pub at: i64,
+}
 
 /// Carries what consumers need after the state row has forgotten it: the correlation key, and who
 /// owned firing delivery.

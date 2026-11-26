@@ -17,12 +17,13 @@
 
 use config::meta::alerts::ack::AlertAck;
 use sea_orm::{
-    ColumnTrait, Condition, ConnectionTrait, EntityTrait, Iterable, QueryFilter, QueryOrder, Set,
-    TransactionTrait,
-    sea_query::{Alias, Expr, OnConflict, Query},
+    ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, EntityTrait, Iterable,
+    QueryFilter, QueryOrder, Set, TransactionTrait,
+    sea_query::{Alias, Expr, OnConflict, Query, SimpleExpr},
 };
 
 use super::{
+    alert_incidents::{Episode, hold_episode, relapse_repage},
     entity::{
         alert_acks::{ActiveModel, Column, Entity, Model},
         alert_states,
@@ -153,7 +154,7 @@ pub async fn put_with_outbox_with<C: ConnectionTrait + TransactionTrait>(
 ) -> Result<u64, Error> {
     let txn = conn.begin().await?;
     Entity::insert(to_active(ack)?)
-        .on_conflict(upsert())
+        .on_conflict(local_upsert(ack.updated_at))
         .exec_without_returning(&txn)
         .await?;
     let bumped = slack_alert_messages::bump_wanted_with(
@@ -173,7 +174,7 @@ pub async fn claim_with_outbox_with<C: ConnectionTrait + TransactionTrait>(
 ) -> Result<Option<u64>, Error> {
     let txn = conn.begin().await?;
     // The upsert's own WHERE keeps the first of two racing acks of one firing.
-    let mut on_conflict = upsert();
+    let mut on_conflict = local_upsert(ack.updated_at);
     on_conflict.action_and_where(
         Expr::col((Entity, Column::FiringStartedAt))
             .ne(Expr::col((Alias::new("excluded"), Column::FiringStartedAt)))
@@ -212,7 +213,7 @@ pub async fn take_over_with_outbox_with<C: ConnectionTrait + TransactionTrait>(
             Column::TakenOverFrom,
             Expr::value(ack.taken_over_from.clone()),
         )
-        .col_expr(Column::UpdatedAt, Expr::value(ack.updated_at))
+        .col_expr(Column::UpdatedAt, next_revision(ack.updated_at))
         .filter(Column::OrgId.eq(&ack.org_id))
         .filter(Column::AlertId.eq(&ack.alert_id))
         .filter(Column::GroupKey.eq(&ack.group_key))
@@ -276,9 +277,7 @@ pub async fn unack_with_outbox_with<C: ConnectionTrait + TransactionTrait>(
     unack_matching(
         conn,
         row,
-        alert_id,
-        group_key,
-        firing_started_at,
+        (org_id, alert_id, group_key, firing_started_at),
         unacked_by,
         unacked_at,
     )
@@ -300,13 +299,50 @@ pub async fn unack_held_with_outbox_with<C: ConnectionTrait + TransactionTrait>(
     unack_matching(
         conn,
         row,
-        &held.alert_id,
-        &held.group_key,
-        held.firing_started_at,
+        (
+            &held.org_id,
+            &held.alert_id,
+            &held.group_key,
+            held.firing_started_at,
+        ),
         unacked_by,
         unacked_at,
     )
     .await
+}
+
+pub async fn unack_for_resolved_incident(
+    conn: &DatabaseConnection,
+    incident_id: &str,
+    episode: &Episode,
+    held: &AlertAck,
+    unacked_by: &str,
+    unacked_at: i64,
+) -> Result<bool, Error> {
+    let Some(txn) = hold_episode(conn, &held.org_id, incident_id, episode).await? else {
+        return Ok(false);
+    };
+    let row = Condition::all()
+        .add(Column::OrgId.eq(&held.org_id))
+        .add(Column::AlertId.eq(&held.alert_id))
+        .add(Column::GroupKey.eq(&held.group_key))
+        .add(Column::FiringStartedAt.eq(held.firing_started_at))
+        .add(Column::UpdatedAt.eq(held.updated_at));
+    let changed = unack_matching(
+        &txn,
+        row,
+        (
+            &held.org_id,
+            &held.alert_id,
+            &held.group_key,
+            held.firing_started_at,
+        ),
+        unacked_by,
+        unacked_at,
+    )
+    .await?;
+    txn.commit().await?;
+    Ok(changed)
 }
 
 pub async fn apply_replicated_with<C: ConnectionTrait>(
@@ -314,10 +350,12 @@ pub async fn apply_replicated_with<C: ConnectionTrait>(
     ack: &AlertAck,
 ) -> Result<bool, Error> {
     let mut on_conflict = upsert();
-    on_conflict.action_and_where(
-        Expr::col((Entity, Column::UpdatedAt))
-            .lt(Expr::col((Alias::new("excluded"), Column::UpdatedAt))),
-    );
+    on_conflict
+        .update_column(Column::UpdatedAt)
+        .action_and_where(
+            Expr::col((Entity, Column::UpdatedAt))
+                .lt(Expr::col((Alias::new("excluded"), Column::UpdatedAt))),
+        );
     let written = Entity::insert(to_active(ack)?)
         .on_conflict(on_conflict)
         .exec_without_returning(conn)
@@ -380,18 +418,31 @@ pub async fn create_table_for_test<C: ConnectionTrait>(conn: &C) -> Result<(), s
 /// Unacks the acked rows `row` matches and bumps the firing's Slack messages, in one transaction.
 async fn unack_matching<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
-    row: Condition,
-    alert_id: &str,
-    group_key: &str,
-    firing_started_at: i64,
+    mut row: Condition,
+    (org_id, alert_id, group_key, firing_started_at): (&str, &str, &str, i64),
     unacked_by: &str,
     unacked_at: i64,
 ) -> Result<bool, Error> {
     let txn = conn.begin().await?;
+    if let Some(fence) = relapse_repage::current(org_id) {
+        let Some(revision) =
+            fence
+                .acknowledgements
+                .firing_revision(alert_id, group_key, firing_started_at)
+        else {
+            txn.rollback().await?;
+            return Ok(false);
+        };
+        if !fence.lock_current(&txn).await? {
+            txn.rollback().await?;
+            return Ok(false);
+        }
+        row = row.add(Column::UpdatedAt.eq(revision));
+    }
     let result = Entity::update_many()
         .col_expr(Column::UnackedAt, Expr::value(unacked_at))
         .col_expr(Column::UnackedBy, Expr::value(unacked_by))
-        .col_expr(Column::UpdatedAt, Expr::value(unacked_at))
+        .col_expr(Column::UpdatedAt, next_revision(unacked_at))
         .filter(row)
         .filter(Column::UnackedAt.is_null())
         .exec(&txn)
@@ -407,11 +458,29 @@ async fn unack_matching<C: ConnectionTrait + TransactionTrait>(
 
 fn upsert() -> OnConflict {
     OnConflict::columns([Column::OrgId, Column::AlertId, Column::GroupKey])
-        .update_columns(
-            Column::iter()
-                .filter(|c| !matches!(c, Column::OrgId | Column::AlertId | Column::GroupKey)),
-        )
+        .update_columns(Column::iter().filter(|c| {
+            !matches!(
+                c,
+                Column::OrgId | Column::AlertId | Column::GroupKey | Column::UpdatedAt
+            )
+        }))
         .to_owned()
+}
+
+fn local_upsert(now: i64) -> OnConflict {
+    upsert()
+        .value(Column::UpdatedAt, next_revision(now))
+        .to_owned()
+}
+
+fn next_revision(now: i64) -> SimpleExpr {
+    // A writer that waited on the row must still advance its revision.
+    Expr::case(
+        Expr::col((Entity, Column::UpdatedAt)).gte(now),
+        Expr::col((Entity, Column::UpdatedAt)).add(1),
+    )
+    .finally(now)
+    .into()
 }
 
 fn to_active(ack: &AlertAck) -> Result<ActiveModel, Error> {
@@ -689,6 +758,91 @@ mod tests {
             (stored.unacked_at, stored.unacked_by.as_deref()),
             (Some(31), Some("o2-engine"))
         );
+    }
+
+    #[tokio::test]
+    async fn resolution_ack_cleanup_keeps_the_ack_of_a_reopened_incident() {
+        use sea_orm::Schema;
+
+        use crate::table::{alert_incidents, entity::alert_incidents as incident, migration};
+
+        for db in migration::sqlite_and_postgres_for_test("resolution_ack_cleanup").await {
+            let backend = db.get_database_backend();
+            db.execute(
+                backend.build(&Schema::new(backend).create_table_from_entity(incident::Entity)),
+            )
+            .await
+            .unwrap();
+            migration::create_incident_recovery_checks_for_test(&db)
+                .await
+                .unwrap();
+            create_table_for_test(&db).await.unwrap();
+            crate::table::slack::create_tables_for_test(&db)
+                .await
+                .unwrap();
+            let original = ack("g", 10, 20);
+            let txn = db.begin().await.unwrap();
+            let incident = alert_incidents::insert_declared_in(
+                &txn,
+                alert_incidents::DeclaredIncident {
+                    org: &original.org_id,
+                    severity: "P1",
+                    title: "Episode-fenced ack cleanup",
+                    groups: serde_json::json!({}),
+                    now: 10,
+                    impact_start_at: None,
+                    source_fingerprint: None,
+                    owner_team_id: None,
+                    muted_by: None,
+                },
+            )
+            .await
+            .unwrap();
+            txn.commit().await.unwrap();
+
+            put_with_outbox_with(&db, &original).await.unwrap();
+            let resolved = alert_incidents::update_status_with(
+                &db,
+                &incident.org_id,
+                &incident.id,
+                "resolved",
+            )
+            .await
+            .unwrap();
+            let episode = Episode::of(&resolved);
+            assert!(
+                unack_for_resolved_incident(&db, &incident.id, &episode, &original, "ana", 30)
+                    .await
+                    .unwrap()
+            );
+
+            alert_incidents::update_status_with(&db, &incident.org_id, &incident.id, "open")
+                .await
+                .unwrap();
+            alert_incidents::acknowledge_with(&db, &incident.org_id, &incident.id, "new-responder")
+                .await
+                .unwrap()
+                .unwrap();
+            let new_ack = AlertAck {
+                acked_by: "new-responder".into(),
+                ..ack("g", 10, 40)
+            };
+            claim_with_outbox_with(&db, &new_ack)
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(
+                !unack_for_resolved_incident(&db, &incident.id, &episode, &new_ack, "ana", 50)
+                    .await
+                    .unwrap()
+            );
+            assert_eq!(
+                get_with(&db, &new_ack.org_id, &new_ack.alert_id, &new_ack.group_key)
+                    .await
+                    .unwrap(),
+                Some(new_ack)
+            );
+        }
     }
 
     #[tokio::test]

@@ -217,10 +217,19 @@ class AlertsClient:
         return self._v2("POST", f"alerts/{alert_id}/leases/{lease_id}/{action}", json=body)
 
     def incidents_for(self, alert_id: str) -> list[dict]:
-        """Incidents whose alert groups include `alert_id` ([] when the incidents API does not answer)."""
-        r = self._v2("GET", "alerts/incidents?limit=1000")
-        found = (r.json().get("incidents") or []) if r.status_code == 200 else []
-        return [i for i in found if any(g.get("alert_id") == alert_id for g in i.get("alert_groups") or [])]
+        found: list[dict] = []
+        params: dict[str, int | str] = {"limit": 200}
+        while True:
+            page = self._v2("GET", "alerts/incidents", params=params, raise_for_status=True).json()
+            found.extend(
+                incident
+                for incident in page.get("incidents") or []
+                if any(group.get("alert_id") == alert_id for group in incident.get("alert_groups") or [])
+            )
+            cursor = page.get("next_cursor")
+            if not cursor:
+                return found
+            params["cursor"] = cursor
 
     def delete_alerts(self, ids: list[str]) -> None:
         """Best-effort delete of the given alert_ids (used in teardown)."""

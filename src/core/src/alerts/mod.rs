@@ -22,9 +22,11 @@ use config::{
     meta::{
         alerts::{
             AggFunction, AlertConditionParams, Condition, ConditionList, Operator, QueryCondition,
-            QueryType, TriggerCondition, TriggerEvalResults, grouping::GroupObservation,
+            QueryType, TriggerCondition, TriggerEvalResults, alert::Alert,
+            grouping::GroupObservation,
         },
         cluster::RoleGroup,
+        promql::value::{Labels, Sample, Value as PromValue},
         search::{SearchEventContext, SearchEventType, SqlQuery},
         sql::{TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
@@ -47,6 +49,7 @@ pub mod alert;
 pub mod alert_calibration;
 pub mod auto_investigate_decisions;
 pub mod backfill;
+pub mod change_events;
 pub mod composite;
 pub mod composite_graph_lock;
 pub mod derived_streams;
@@ -66,6 +69,9 @@ pub mod membership_provider;
 pub mod mute;
 pub mod notifications;
 mod prom_rule;
+pub mod rca_capabilities;
+#[cfg(feature = "enterprise")]
+pub mod rca_context;
 #[cfg(feature = "enterprise")]
 pub mod rca_live;
 #[cfg(feature = "enterprise")]
@@ -85,6 +91,27 @@ pub mod slack_investigate;
 pub mod slack_publish;
 pub mod slack_view;
 pub mod templates;
+#[cfg(feature = "enterprise")]
+pub mod what_changed;
+
+pub enum AlertSeries<'a> {
+    Onset,
+    Impact(&'a [Condition]),
+}
+
+pub struct ScheduledEvaluation<'a> {
+    pub org_id: &'a str,
+    pub stream_name: Option<&'a str>,
+    pub stream_type: StreamType,
+    pub trigger_condition: &'a TriggerCondition,
+    pub range: (Option<i64>, i64),
+    pub search_type: Option<SearchEventType>,
+    pub search_event_context: Option<SearchEventContext>,
+    pub trace_id: Option<String>,
+    pub user_id: Option<&'a str>,
+    pub timeout_secs: i64,
+    pub raw_promql_step: Option<i64>,
+}
 
 #[async_trait]
 pub trait QueryConditionExt: Sync + Send + 'static {
@@ -93,17 +120,9 @@ pub trait QueryConditionExt: Sync + Send + 'static {
         row: Option<&Map<String, Value>>,
     ) -> Result<TriggerEvalResults, anyhow::Error>;
 
-    #[allow(clippy::too_many_arguments)]
     async fn evaluate_scheduled(
         &self,
-        org_id: &str,
-        stream_name: Option<&str>,
-        stream_type: StreamType,
-        trigger_condition: &TriggerCondition,
-        (start_time, end_time): (Option<i64>, i64),
-        search_type: Option<SearchEventType>,
-        search_event_context: Option<SearchEventContext>,
-        trace_id: Option<String>,
+        evaluation: ScheduledEvaluation<'_>,
     ) -> Result<TriggerEvalResults, anyhow::Error>;
 }
 
@@ -137,15 +156,21 @@ impl QueryConditionExt for QueryCondition {
 
     async fn evaluate_scheduled(
         &self,
-        org_id: &str,
-        stream_name: Option<&str>,
-        stream_type: StreamType,
-        trigger_condition: &TriggerCondition,
-        (start_time, end_time): (Option<i64>, i64),
-        search_type: Option<SearchEventType>,
-        search_event_context: Option<SearchEventContext>,
-        trace_id: Option<String>,
+        evaluation: ScheduledEvaluation<'_>,
     ) -> Result<TriggerEvalResults, anyhow::Error> {
+        let ScheduledEvaluation {
+            org_id,
+            stream_name,
+            stream_type,
+            trigger_condition,
+            range: (start_time, end_time),
+            search_type,
+            search_event_context,
+            trace_id,
+            user_id,
+            timeout_secs,
+            raw_promql_step,
+        } = evaluation;
         let trace_id = trace_id.unwrap_or_else(ider::generate_trace_id);
         // create context with trace_id
         let eval_span = setup_tracing_with_trace_id(
@@ -190,6 +215,10 @@ impl QueryConditionExt for QueryCondition {
             }
             QueryType::PromQL => {
                 if self.promql_rule_mode {
+                    anyhow::ensure!(
+                        user_id.is_none() && raw_promql_step.is_none(),
+                        "Rule evaluation does not accept a user or raw sample step"
+                    );
                     return prom_rule::evaluate(
                         self,
                         org_id,
@@ -215,26 +244,23 @@ impl QueryConditionExt for QueryCondition {
                             .unwrap()
                 };
                 let end = end_time;
-                let condition = self.promql_condition.as_ref().unwrap();
-                // Same strategy as the SQL HAVING clause: query at the LESS
-                // severe threshold so the warning band comes back too, then
-                // classify each series below. With no warning threshold this
-                // widens to critical, leaving the expression unchanged.
-                let promql_critical = to_float(&condition.value);
-                let promql_filter = config::meta::alerts::aggregation_level::widened_threshold(
-                    condition.operator,
-                    promql_critical,
-                    self.promql_warning_value,
-                );
-                // Per-series alerts run the raw expression and classify in
-                // Rust, mirroring the SQL multi path dropping its HAVING: with
-                // the threshold baked into the expression, a recovered series
-                // simply stops being returned and could only resolve later via
-                // the reaper timeout, with a NULL value. Single alerts keep the
-                // filtered query.
-                let query = if self.promql_multi_alert {
+                let condition = raw_promql_step.is_none().then(|| {
+                    let condition = self.promql_condition.as_ref().unwrap();
+                    (condition, to_float(&condition.value))
+                });
+                // Per-series alerts need unfiltered readings to observe recovery when a series
+                // would otherwise disappear behind the firing threshold.
+                let query = if self.promql_multi_alert || raw_promql_step.is_some() {
                     format!("({v})")
                 } else {
+                    let (condition, promql_critical) = condition.unwrap();
+                    // Like SQL HAVING, widening keeps the warning band observable for
+                    // classification below.
+                    let promql_filter = config::meta::alerts::aggregation_level::widened_threshold(
+                        condition.operator,
+                        promql_critical,
+                        self.promql_warning_value,
+                    );
                     format!(
                         "({}) {} {}",
                         v,
@@ -249,10 +275,12 @@ impl QueryConditionExt for QueryCondition {
                     query,
                     start,
                     end,
-                    step: std::cmp::max(
-                        ::promql::micros(::promql::MINIMAL_INTERVAL),
-                        (end - start) / ::promql::MAX_DATA_POINTS,
-                    ),
+                    step: raw_promql_step.unwrap_or_else(|| {
+                        std::cmp::max(
+                            ::promql::micros(::promql::MINIMAL_INTERVAL),
+                            (end - start) / ::promql::MAX_DATA_POINTS,
+                        )
+                    }),
                     query_exemplars: false,
                     use_cache: None,
                     search_type: Some(SearchEventType::Alerts),
@@ -271,8 +299,8 @@ impl QueryConditionExt for QueryCondition {
                     &trace_id,
                     org_id,
                     &req,
-                    "",
-                    0,
+                    user_id.unwrap_or_default(),
+                    timeout_secs,
                     is_super_cluster,
                 )
                 .await
@@ -292,26 +320,20 @@ impl QueryConditionExt for QueryCondition {
                         return Err(anyhow::anyhow!("PromQL search error for alert query: {e}"));
                     }
                 };
-                let config::meta::promql::value::Value::Matrix(value) = resp else {
+                if raw_promql_step.is_some() {
+                    eval_results.data = Some(raw_promql_rows(resp)?);
+                    return Ok(eval_results);
+                }
+                let PromValue::Matrix(value) = resp else {
                     return Err(anyhow::anyhow!(
                         "PromQL query returned unexpected (non-matrix) response: {resp:?}"
                     ));
                 };
-                let values: Vec<_> =
-                    value
-                        .iter()
-                        .map(|v| {
-                            let mut val = Map::with_capacity(v.labels.len() + 2);
-                            val.extend(v.labels.iter().map(|label| {
-                                (label.name.to_string(), label.value.to_string().into())
-                            }));
-
-                            let last_sample = v.samples.last().unwrap();
-                            val.insert("_timestamp".to_string(), last_sample.timestamp.into());
-                            val.insert("value".to_string(), last_sample.value.into());
-                            val
-                        })
-                        .collect();
+                let (condition, promql_critical) = condition.unwrap();
+                let values: Vec<_> = value
+                    .iter()
+                    .map(|series| promql_sample_row(&series.labels, series.samples.last().unwrap()))
+                    .collect();
 
                 // Two axes, exactly like aggregation: each SERIES is classified
                 // against the promql condition value, then the SERIES COUNT is
@@ -428,6 +450,8 @@ impl QueryConditionExt for QueryCondition {
                 (start_time.unwrap_or(end_time - time_diff), end_time),
                 search_type,
                 search_event_context.clone(),
+                user_id,
+                timeout_secs,
             )
             .await?;
             let exact = count_resp.0;
@@ -541,7 +565,7 @@ impl QueryConditionExt for QueryCondition {
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
                 clusters: vec![],
-                timeout: 0,
+                timeout: timeout_secs,
                 search_type,
                 search_event_context,
                 from: 0,
@@ -565,7 +589,7 @@ impl QueryConditionExt for QueryCondition {
                 &trace_id,
                 org_id,
                 stream_type,
-                None,
+                user_id.map(str::to_owned),
                 &req,
                 Some(RoleGroup::Background),
             )
@@ -598,7 +622,7 @@ impl QueryConditionExt for QueryCondition {
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
                 clusters: vec![],
-                timeout: 0,
+                timeout: timeout_secs,
                 search_type,
                 search_event_context,
                 use_cache: false,
@@ -616,7 +640,7 @@ impl QueryConditionExt for QueryCondition {
                 &trace_id,
                 org_id,
                 stream_type,
-                None,
+                user_id.map(str::to_owned),
                 &req,
                 Some(RoleGroup::Background),
             )
@@ -854,6 +878,36 @@ impl QueryConditionExt for QueryCondition {
     }
 }
 
+fn raw_promql_rows(value: PromValue) -> anyhow::Result<Vec<Map<String, Value>>> {
+    let series = match value {
+        PromValue::Matrix(series) => series,
+        PromValue::Range(series) => vec![series],
+        PromValue::None => Vec::new(),
+        other => anyhow::bail!("PromQL query returned unexpected range response: {other:?}"),
+    };
+    Ok(series
+        .iter()
+        .flat_map(|series| {
+            series
+                .samples
+                .iter()
+                .map(move |sample| promql_sample_row(&series.labels, sample))
+        })
+        .collect())
+}
+
+fn promql_sample_row(labels: &Labels, sample: &Sample) -> Map<String, Value> {
+    let mut row = Map::with_capacity(labels.len() + 2);
+    row.extend(
+        labels
+            .iter()
+            .map(|label| (label.name.to_string(), label.value.to_string().into())),
+    );
+    row.insert("_timestamp".to_string(), sample.timestamp.into());
+    row.insert("value".to_string(), sample.value.into());
+    row
+}
+
 /// Checks that every stream in the alert SQL exists and allows the alert period.
 async fn check_query_streams(
     org_id: &str,
@@ -903,6 +957,8 @@ async fn run_alert_count_query(
     (start_time, end_time): (i64, i64),
     search_type: Option<SearchEventType>,
     search_event_context: Option<SearchEventContext>,
+    user_id: Option<&str>,
+    timeout_secs: i64,
 ) -> Result<(f64, i64), anyhow::Error> {
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -917,7 +973,7 @@ async fn run_alert_count_query(
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
         clusters: vec![],
-        timeout: 0,
+        timeout: timeout_secs,
         search_type,
         search_event_context,
         use_cache: false,
@@ -931,7 +987,7 @@ async fn run_alert_count_query(
         trace_id,
         org_id,
         stream_type,
-        None,
+        user_id.map(str::to_owned),
         &req,
         Some(RoleGroup::Background),
     )
@@ -1598,6 +1654,75 @@ pub async fn build_sql(
     build_aggregation_sql(stream_name, &schema, agg, &where_sql)
 }
 
+pub async fn alert_series_sql(
+    alert: &Alert,
+    schema: &Schema,
+    bucket_secs: i64,
+    purpose: AlertSeries<'_>,
+) -> Result<String, anyhow::Error> {
+    let query = &alert.query_condition;
+    let row_filter = match &query.conditions {
+        Some(conditions) if conditions.len().await > 0 => Some(conditions.to_sql(schema).await?),
+        _ => None,
+    };
+    let mut value = query
+        .aggregation
+        .as_ref()
+        .map_or_else(|| "COUNT(*)".to_owned(), agg_func_expr);
+    let scope = match purpose {
+        AlertSeries::Onset => &[],
+        AlertSeries::Impact(scope) => scope,
+    };
+    let mut predicates = scope
+        .iter()
+        .map(|condition| {
+            let field = schema.field_with_name(&condition.column)?;
+            build_expr(condition, "", field.data_type())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if let Some(row_filter) = row_filter {
+        if matches!(purpose, AlertSeries::Impact(_)) && alert_counts_rows(alert) {
+            // Keep observed buckets so a completed minute with zero matches can report zero.
+            value = format!("{value} FILTER (WHERE {row_filter})");
+        } else {
+            predicates.push(format!("({row_filter})"));
+        }
+    }
+    let where_sql = if predicates.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {}", predicates.join(" AND "))
+    };
+    Ok(alert_bucket_sql(
+        &alert.stream_name,
+        &where_sql,
+        &value,
+        bucket_secs,
+    ))
+}
+
+pub fn alert_counts_rows(alert: &Alert) -> bool {
+    alert
+        .query_condition
+        .aggregation
+        .as_ref()
+        .is_none_or(|aggregation| aggregation.function == AggFunction::Count)
+}
+
+fn alert_bucket_sql(stream: &str, where_sql: &str, value: &str, bucket_secs: i64) -> String {
+    let stream = quote_identifier(stream);
+    let interval = if bucket_secs == 60 {
+        "1 minute".to_string()
+    } else {
+        format!("{bucket_secs} seconds")
+    };
+    format!(
+        "SELECT histogram(_timestamp, '{interval}') AS zo_onset_bucket, MIN(_timestamp) AS \
+         zo_onset_at, {value} AS zo_onset_value FROM {stream}{where_sql} GROUP BY \
+         zo_onset_bucket ORDER BY zo_onset_bucket"
+    )
+}
+
 /// Only columns of `schema` reach the SQL; any other `group_by`/`having` entry is refused.
 fn build_aggregation_sql(
     stream_name: &str,
@@ -1618,20 +1743,7 @@ fn build_aggregation_sql(
         build_having_expr(agg, data_type)?
     };
 
-    let col = quote_identifier(&agg.having.column);
-    let func_expr = match agg.function {
-        AggFunction::Avg => format!("AVG({col})"),
-        AggFunction::Max => format!("MAX({col})"),
-        AggFunction::Min => format!("MIN({col})"),
-        AggFunction::Sum => format!("SUM({col})"),
-        AggFunction::Count => format!("COUNT({col})"),
-        AggFunction::Median => format!("MEDIAN({col})"),
-        AggFunction::P50 => format!("approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY {col})"),
-        AggFunction::P75 => format!("approx_percentile_cont(0.75) WITHIN GROUP (ORDER BY {col})"),
-        AggFunction::P90 => format!("approx_percentile_cont(0.9) WITHIN GROUP (ORDER BY {col})"),
-        AggFunction::P95 => format!("approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY {col})"),
-        AggFunction::P99 => format!("approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY {col})"),
-    };
+    let func_expr = agg_func_expr(agg);
 
     let group = agg.group_by.as_deref().unwrap_or(&[]);
     if group.is_empty() {
@@ -1657,6 +1769,24 @@ fn build_aggregation_sql(
     Ok(format!(
         "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} HAVING {having_expr}"
     ))
+}
+
+/// The SQL aggregate the alert's `having` compares, over its quoted column.
+pub(crate) fn agg_func_expr(agg: &config::meta::alerts::Aggregation) -> String {
+    let col = quote_identifier(&agg.having.column);
+    match agg.function {
+        AggFunction::Avg => format!("AVG({col})"),
+        AggFunction::Max => format!("MAX({col})"),
+        AggFunction::Min => format!("MIN({col})"),
+        AggFunction::Sum => format!("SUM({col})"),
+        AggFunction::Count => format!("COUNT({col})"),
+        AggFunction::Median => format!("MEDIAN({col})"),
+        AggFunction::P50 => format!("approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P75 => format!("approx_percentile_cont(0.75) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P90 => format!("approx_percentile_cont(0.9) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P95 => format!("approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P99 => format!("approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY {col})"),
+    }
 }
 
 /// Quoted, escaped identifiers; `Err` carries the first entry that is not a column of `schema`.
@@ -2124,6 +2254,33 @@ mod tests {
     use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
     use super::*;
+
+    #[test]
+    fn recovery_raw_promql_preserves_healthy_samples_and_probe_labels() {
+        use config::meta::promql::value::{LabelsExt, RangeValue};
+
+        let mut labels = Labels::new();
+        labels.set("zo_recovery_probe", "volume");
+        let rows = raw_promql_rows(PromValue::Range(RangeValue {
+            labels,
+            samples: vec![
+                Sample {
+                    timestamp: 60_000_000,
+                    value: 0.0,
+                },
+                Sample {
+                    timestamp: 120_000_000,
+                    value: 2.0,
+                },
+            ],
+            ..Default::default()
+        }))
+        .unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0]["value"].as_f64(), Some(0.0));
+        assert_eq!(rows[1]["_timestamp"].as_i64(), Some(120_000_000));
+        assert_eq!(rows[1]["zo_recovery_probe"].as_str(), Some("volume"));
+    }
 
     #[test]
     fn a_count_from_a_partial_response_is_refused_unless_its_errors_are_permissible() {

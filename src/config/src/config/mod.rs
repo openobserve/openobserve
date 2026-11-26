@@ -179,7 +179,17 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 //      added_connections to autoresolve_runs.
 // 172: add autoresolve_runs.plan_history.
 // 173: add incident_id to autoresolve_runs, with one live run per incident.
-pub const DB_SCHEMA_VERSION: u64 = 173;
+// 174: create rca_delivery_obligations, the delivery each run owes its on-call records.
+// 175: add incident_events.seq, raised by every write of an incident's timeline.
+// 176: add the Phase 1 Incidents v2 columns and indexes of alert_incidents.
+// 177: create rca_skipped_pages, add rca_runs.run_number and fenced, and add
+//      service_streams.streams_cut, recomputed once for existing rows.
+// 178: create incident_contexts and incident_declare_keys.
+// 179: reserved for incident_links (held slice).
+// 180: create incident_recovery_checks.
+// 181: create rca_feedback.
+// 182: add the on-call delivery claim token.
+pub const DB_SCHEMA_VERSION: u64 = 182;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

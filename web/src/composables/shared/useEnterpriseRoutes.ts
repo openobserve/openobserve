@@ -412,6 +412,12 @@ const useEnterpriseRoutes = () => {
       },
       beforeEnter: withFeatureGate("incidents", routeGuard),
     }),
+    // Notifications sent before #16780 link here; the target route runs the gates.
+    withLicenseFeature("incidents", {
+      path: "alerts/incidents/:id",
+      name: "legacyIncidentDetail",
+      redirect: (to: any) => ({ name: "incidentDetail", params: to.params, query: to.query }),
+    }),
     withLicenseFeature("ai_assistant", {
       path: "investigate",
       name: "autobotInvestigate",

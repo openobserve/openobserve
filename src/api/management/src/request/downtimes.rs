@@ -15,19 +15,19 @@
 
 //! Downtime handlers: enterprise-only (D1), 403 in the OSS build and while the flag is off.
 
+use axum::{Extension, extract::Path, http::HeaderMap, response::Response};
 #[cfg(feature = "enterprise")]
 use axum::{
     Json,
     extract::{Query, rejection::JsonRejection},
 };
-use axum::{extract::Path, response::Response};
 use config::meta::downtimes::{
     CancelDowntimeQuery, CreateDowntimeResponse, Downtime, DowntimeDetail, DowntimeRequest,
     DowntimeTestRequest, DowntimeTestResult, ExtendDowntimeRequest, ExtendDowntimeResponse,
     ListDowntimesQuery, ListDowntimesResponse, MoveDowntimesRequest, PreviewRequest,
     PreviewResponse, ResourcesRequest, ResourcesResponse, ValuesRequest, ValuesResponse,
 };
-use openobserve_api_common::extractors::Headers;
+use openobserve_api_common::{auth::delegation::DelegatedCaller, extractors::Headers};
 use serde::Deserialize;
 use utoipa::IntoParams;
 
@@ -103,15 +103,22 @@ pub async fn create_downtime(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Query(folder): Query<FolderQuery>,
     Headers(user_email): Headers<UserEmail>,
+    delegated: Option<Extension<DelegatedCaller>>,
+    headers: HeaderMap,
     #[cfg(feature = "enterprise")] body: Result<Json<DowntimeRequest>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let req = match body_of(body) {
+        let mut req = match body_of(body) {
             Ok(req) => req,
             Err(response) => return response,
         };
-        let mut req = req;
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
         if let Some(folder) = folder.folder.filter(|f| !f.is_empty()) {
             req.folder_id = folder;
         }
@@ -128,14 +135,14 @@ pub async fn create_downtime(
         {
             return MetaHttpResponse::forbidden("You cannot create downtimes in this folder.");
         }
-        match openobserve_core::downtimes::create(&org_id, &user_email.user_id, req).await {
+        match openobserve_core::downtimes::create(&org_id, &caller, req).await {
             Ok(downtime) => created(downtime.id),
             Err(e) => error_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, user_email);
+        let _ = (org_id, user_email, delegated, headers);
         not_supported()
     }
 }
@@ -321,6 +328,8 @@ pub async fn get_downtime(
 pub async fn update_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
+    delegated: Option<Extension<DelegatedCaller>>,
+    headers: HeaderMap,
     #[cfg(feature = "enterprise")] body: Result<Json<DowntimeRequest>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -329,14 +338,17 @@ pub async fn update_downtime(
             Ok(req) => req,
             Err(response) => return response,
         };
-        respond(
-            openobserve_core::downtimes::update(&org_id, &user_email.user_id, &downtime_id, req)
-                .await,
-        )
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
+        respond(openobserve_core::downtimes::update(&org_id, &caller, &downtime_id, req).await)
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, downtime_id, user_email);
+        let _ = (org_id, downtime_id, user_email, delegated, headers);
         not_supported()
     }
 }
@@ -421,18 +433,23 @@ pub async fn cancel_downtime(
 pub async fn extend_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
+    delegated: Option<Extension<DelegatedCaller>>,
+    headers: HeaderMap,
     #[cfg(feature = "enterprise")] Json(req): Json<ExtendDowntimeRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        respond(
-            openobserve_core::downtimes::extend(&org_id, &user_email.user_id, &downtime_id, &req)
-                .await,
-        )
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
+        respond(openobserve_core::downtimes::extend(&org_id, &caller, &downtime_id, &req).await)
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, downtime_id, user_email);
+        let _ = (org_id, downtime_id, user_email, delegated, headers);
         not_supported()
     }
 }
@@ -664,14 +681,14 @@ mod tests {
         let one = || Path(("default".to_string(), "d1".to_string()));
         let responses = vec![
             list_downtimes(org(), user()).await,
-            create_downtime(org(), user()).await,
+            create_downtime(org(), user(), None, HeaderMap::new()).await,
             preview_downtime(org(), user()).await,
             downtime_resources(org(), user()).await,
             downtime_values(org(), user()).await,
             get_downtime(one(), user()).await,
-            update_downtime(one(), user()).await,
+            update_downtime(one(), user(), None, HeaderMap::new()).await,
             cancel_downtime(one(), user()).await,
-            extend_downtime(one(), user()).await,
+            extend_downtime(one(), user(), None, HeaderMap::new()).await,
             test_downtime(one(), user()).await,
             move_downtimes(org(), user()).await,
             delete_downtime(one(), user()).await,
@@ -818,6 +835,265 @@ mod tests {
         let absent = cancel("absent", None).await;
         assert_eq!(absent.status(), StatusCode::OK);
         assert!(cancelled("absent").await);
+    }
+
+    /// The three AI principal kinds of §6.7, each as the request carries it.
+    #[cfg(feature = "enterprise")]
+    fn ai_requests(org: &str, person: &str) -> Vec<(String, Option<DelegatedCaller>, HeaderMap)> {
+        use config::{
+            meta::user::{SRE_AGENT_EMAIL_PREFIX, SRE_AGENT_EMAIL_SUFFIX},
+            utils::delegation::SCOPE_ASSISTANT,
+        };
+        let mut mcp = HeaderMap::new();
+        mcp.insert("x-o2-mcp", axum::http::HeaderValue::from_static("loopback"));
+        vec![
+            (
+                person.to_string(),
+                Some(delegated(SCOPE_ASSISTANT)),
+                HeaderMap::new(),
+            ),
+            (person.to_string(), None, mcp),
+            (
+                format!("{SRE_AGENT_EMAIL_PREFIX}{org}{SRE_AGENT_EMAIL_SUFFIX}"),
+                None,
+                HeaderMap::new(),
+            ),
+        ]
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn delegated(scope: &str) -> DelegatedCaller {
+        DelegatedCaller {
+            link_id: "lnk_01".to_string(),
+            installation_id: "inst_01".to_string(),
+            org: "acme".to_string(),
+            jti: "jti-0001".to_string(),
+            scope: scope.to_string(),
+        }
+    }
+
+    /// F24 (D34, D39) through the real routes: a P1/P2-matching write by an AI principal is a 403.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_ai_principal_cannot_write_a_downtime_that_can_mute_a_p1_or_p2_alert() {
+        use config::{
+            meta::{
+                alerts::{alert::Alert, priority::AlertPriority},
+                folder::{DEFAULT_FOLDER, Folder, FolderType},
+                user::UserRole,
+            },
+            utils::delegation::SCOPE_SLACK_ACTION,
+        };
+        use svix_ksuid::KsuidLike as _;
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let now = config::utils::time::now_micros();
+        let org = format!("ai_downtimes_{now}");
+        let root = format!("root-{org}@example.com");
+        let ai = ai_requests(&org, &root);
+        for email in std::iter::once(&root).chain(ai.iter().map(|(user, ..)| user)) {
+            common::infra::config::ORG_USERS.insert(
+                format!("{}/{email}", config::DEFAULT_ORG),
+                infra::table::org_users::OrgUserRecord {
+                    role: UserRole::Root,
+                    token: String::new(),
+                    rum_token: None,
+                    org_id: config::DEFAULT_ORG.to_string(),
+                    email: email.clone(),
+                    created_at: 0,
+                    allow_static_token: false,
+                },
+            );
+        }
+        let folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: String::new(),
+            icon: None,
+        };
+        infra::table::folders::get_or_create(&org, folder.clone(), FolderType::Downtimes)
+            .await
+            .unwrap();
+        let alert_of = |priority: Option<AlertPriority>| {
+            let id = svix_ksuid::Ksuid::new(None, None);
+            let mut alert = Alert::default();
+            alert.id = Some(id);
+            alert.org_id = org.clone();
+            alert.name = format!("{priority:?}");
+            alert.priority = priority;
+            (id.to_string(), alert)
+        };
+        let (p1, p1_alert) = alert_of(Some(AlertPriority::P1));
+        let (unset, unset_alert) = alert_of(None);
+        let (p3, p3_alert) = alert_of(Some(AlertPriority::P3));
+        for (id, alert) in [(&p1, p1_alert), (&unset, unset_alert), (&p3, p3_alert)] {
+            common::infra::config::ALERTS.write().await.insert(
+                db::alerts::alert::cache_alert_key(&org, id),
+                (folder.clone(), alert),
+            );
+        }
+        let hour = 3_600_000_000;
+        let request = |ids: &[&String]| -> DowntimeRequest {
+            serde_json::from_value(serde_json::json!({
+                "targets": [{ "module": "alerts", "folders": { "kind": "all" }, "ids": ids }],
+                "schedule": { "repeat": "none", "starts_at": now + hour, "ends_at": now + 2 * hour,
+                              "timezone": "UTC", "duration_secs": 3600 }
+            }))
+            .unwrap()
+        };
+        let create =
+            |user: &str, d: Option<DelegatedCaller>, h: HeaderMap, req: DowntimeRequest| {
+                create_downtime(
+                    Path(org.clone()),
+                    Query(FolderQuery { folder: None }),
+                    Headers(UserEmail {
+                        user_id: user.to_string(),
+                    }),
+                    d.map(Extension),
+                    h,
+                    Ok(Json(req)),
+                )
+            };
+        let count = || async {
+            let conn = infra::db::get_orm_client_rw().await;
+            infra::table::downtimes::list_with(conn, &org, None)
+                .await
+                .unwrap()
+                .len()
+        };
+        let live = Downtime {
+            id: format!("live-{now}"),
+            org: org.clone(),
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: "folder wide".to_string(),
+            reason: None,
+            condition: None,
+            targets: request(&[]).targets,
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
+            schedule: config::meta::downtimes::DowntimeSchedule {
+                repeat: config::meta::downtimes::Repeat::None,
+                starts_at: now - hour,
+                ends_at: Some(now + hour),
+                timezone: "UTC".to_string(),
+                start_time_local: None,
+                duration_secs: 7200,
+                weekdays: vec![],
+            },
+            cancelled_at: None,
+            cancelled_by: None,
+            show_banner: false,
+            notifications: None,
+            origin_region: None,
+            version: 1,
+            created_by: root.clone(),
+            created_at: now,
+            updated_by: root.clone(),
+            updated_at: now,
+        };
+        infra::table::downtimes::put_with(infra::db::get_orm_client_rw().await, &live)
+            .await
+            .unwrap();
+        let stored = || async {
+            infra::table::downtimes::get_rw(&org, &live.id)
+                .await
+                .unwrap()
+                .unwrap()
+        };
+        let version = stored().await.version;
+
+        for (user, d, h) in &ai {
+            for (what, req) in [
+                ("a named P1", request(&[&p1])),
+                ("an unset priority", request(&[&unset])),
+                ("a P3 beside a P1", request(&[&p3, &p1])),
+                ("every alert", request(&[])),
+            ] {
+                let before = count().await;
+                let refused = create(user, d.clone(), h.clone(), req).await;
+                assert_eq!(refused.status(), StatusCode::FORBIDDEN, "{user}: {what}");
+                assert_eq!(count().await, before, "{user}: {what} wrote a row");
+            }
+            let mut edit = request(&[&p3]);
+            edit.version = Some(version);
+            let updated = update_downtime(
+                Path((org.clone(), live.id.clone())),
+                Headers(UserEmail {
+                    user_id: user.clone(),
+                }),
+                d.clone().map(Extension),
+                h.clone(),
+                Ok(Json(edit)),
+            )
+            .await;
+            assert_eq!(updated.status(), StatusCode::FORBIDDEN, "{user}: update");
+            let extended = extend_downtime(
+                Path((org.clone(), live.id.clone())),
+                Headers(UserEmail {
+                    user_id: user.clone(),
+                }),
+                d.clone().map(Extension),
+                h.clone(),
+                Json(ExtendDowntimeRequest {
+                    by_secs: Some(3600),
+                    until: None,
+                    version: Some(version),
+                }),
+            )
+            .await;
+            assert_eq!(extended.status(), StatusCode::FORBIDDEN, "{user}: extend");
+            let row = stored().await;
+            assert_eq!(
+                row.version, version,
+                "{user}: a refused write leaves the row"
+            );
+            assert_eq!(row.schedule.ends_at, Some(now + hour));
+
+            let low = create(user, d.clone(), h.clone(), request(&[&p3])).await;
+            assert_eq!(
+                low.status(),
+                StatusCode::CREATED,
+                "{user}: a named P3 stays allowed"
+            );
+        }
+
+        let pressed = create(
+            &root,
+            Some(delegated(SCOPE_SLACK_ACTION)),
+            HeaderMap::new(),
+            request(&[&p1]),
+        )
+        .await;
+        assert_eq!(
+            pressed.status(),
+            StatusCode::CREATED,
+            "a Slack press is a person's"
+        );
+        let by_person = create(&root, None, HeaderMap::new(), request(&[])).await;
+        assert_eq!(by_person.status(), StatusCode::CREATED);
+        let extended = extend_downtime(
+            Path((org.clone(), live.id.clone())),
+            Headers(UserEmail {
+                user_id: root.clone(),
+            }),
+            None,
+            HeaderMap::new(),
+            Json(ExtendDowntimeRequest {
+                by_secs: Some(3600),
+                until: None,
+                version: Some(version),
+            }),
+        )
+        .await;
+        assert_eq!(extended.status(), StatusCode::OK);
+        assert_eq!(stored().await.schedule.ends_at, Some(now + 2 * hour));
     }
 
     #[cfg(feature = "enterprise")]

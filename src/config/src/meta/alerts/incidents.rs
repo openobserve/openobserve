@@ -18,11 +18,20 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::rca_steering::SteerKind;
+use super::{
+    incident_fields::ResolutionDetails, rca_runs::SkipReason, rca_steering::SteerKind,
+    recovery::RecoveryCondition,
+};
+use crate::meta::{
+    oncall::{confidence::SignalClass, response::ResolutionCause},
+    stream::StreamType,
+};
 
 /// The `Reopened` reason of a manual status change; an unacknowledge writes another one.
 pub const MANUAL_REOPEN_REASON: &str = "Manually reopened";
 
+/// `AssignmentChanged.role` of the comms owner; an event without a role is the lead's.
+pub const COMMS_ROLE: &str = "comms";
 pub const FIRING_LABELS_MAX_KEYS: usize = 64;
 pub const FIRING_LABELS_MAX_BYTES: usize = 4096;
 const FIRING_LABEL_VALUE_MAX_BYTES: usize = 256;
@@ -388,6 +397,25 @@ pub struct Incident {
     /// When a different detection last joined the security case while someone was working it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_detection_at: Option<i64>,
+
+    /// The on-call team that owns the incident; a person's edit wins over routing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_team_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comms_owner: Option<String>,
+    /// Start and end of customer impact, in microseconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub impact_start_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub impact_end_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub customer_impact: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolution_cause: Option<ResolutionCause>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cause_reviewed_by: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cause_reviewed_at: Option<i64>,
 }
 
 /// One alert's firings within an incident, for the list row.
@@ -522,6 +550,145 @@ pub struct ManualIncidentRequest {
     pub summary: String,
     #[serde(default)]
     pub link: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DeclareRequest {
+    pub title: String,
+    pub severity: IncidentSeverity,
+    pub service: Option<String>,
+    pub env: Option<String>,
+    pub region: Option<String>,
+    pub note: Option<String>,
+    pub source: Option<ContextSource>,
+    pub impact_start_at: Option<i64>,
+    pub page_team_id: Option<String>,
+    #[serde(default)]
+    pub page_through_downtime: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct AddContextRequest {
+    #[serde(flatten)]
+    pub source: ContextSource,
+    pub note: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct ContextSource {
+    pub kind: ContextKind,
+    pub title: String,
+    pub target: ContextTarget,
+    pub origin: ContextOrigin,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ContextKind {
+    Logs,
+    Panel,
+    Traces,
+    Metrics,
+    Page,
+}
+
+impl ContextKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Logs => "logs",
+            Self::Panel => "panel",
+            Self::Traces => "traces",
+            Self::Metrics => "metrics",
+            Self::Page => "page",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ContextTarget {
+    pub signal: SignalClass,
+    #[serde(default)]
+    pub streams: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_type: Option<StreamType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sql: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub promql: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<String>,
+    #[serde(alias = "query_fn", skip_serializing_if = "Option::is_none")]
+    pub function: Option<String>,
+    pub start_us: i64,
+    pub end_us: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
+}
+
+impl ContextTarget {
+    pub fn has_query(&self) -> bool {
+        self.sql.is_some() || self.promql.is_some() || self.filter.is_some()
+    }
+
+    pub fn stream_type(&self) -> StreamType {
+        self.stream_type.unwrap_or(match self.signal {
+            SignalClass::Metrics => StreamType::Metrics,
+            SignalClass::Traces => StreamType::Traces,
+            _ => StreamType::Logs,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ContextOrigin {
+    pub route: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dashboard_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub folder_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tab_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panel_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dashboard_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub variables: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selection_start_us: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selection_end_us: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub span_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chat_link: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct ResultSummary {
+    pub rows: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub columns: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub sample: Vec<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub series: Option<SummarySeries>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub buckets: Vec<(u32, u64)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct SummarySeries {
+    pub min: f64,
+    pub max: f64,
+    pub last: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -664,19 +831,6 @@ pub struct ExternalAlertEvent {
     pub raw: serde_json::Value,
 }
 
-/// Built-in default severity mapping (spec §4.9: "no JSON for humans").
-/// critical→P1, error/major→P2, warning/minor→P3, info→P4, P1..P4 passthrough,
-/// anything else → P3.
-pub fn map_external_severity(s: &str) -> IncidentSeverity {
-    match s.to_ascii_lowercase().as_str() {
-        "critical" | "crit" | "fatal" | "p1" => IncidentSeverity::P1,
-        "error" | "major" | "high" | "p2" => IncidentSeverity::P2,
-        "warning" | "warn" | "minor" | "p3" => IncidentSeverity::P3,
-        "info" | "low" | "ok" | "p4" => IncidentSeverity::P4,
-        _ => IncidentSeverity::P3,
-    }
-}
-
 /// Statistics for incidents dashboard
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct IncidentStats {
@@ -744,11 +898,91 @@ impl CaseVerdict {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeclareIntent {
+    pub transition: String,
+    pub at: i64,
+    pub title: String,
+    pub severity: IncidentSeverity,
+    pub dimensions: HashMap<String, String>,
+    pub request_dimensions: HashMap<String, String>,
+    pub team: Option<String>,
+    pub source_less_guidance: Option<String>,
+    pub page_through_downtime: bool,
+    pub reopen_count: i32,
+    pub effects: Vec<DeclareEffectEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeclareEffectEntry {
+    pub kind: DeclareEffectKind,
+    pub state: DeclareEffectState,
+    pub possible_duplicate: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeclareEffectKind {
+    Page,
+    Rca,
+    Notify { destination: String },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeclareEffectState {
+    Pending,
+    Claimed { at: i64 },
+    Complete,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoveryRelapsePhase {
+    Soak,
+    HeldWatch,
+    AfterResolve,
+}
+
+impl RecoveryRelapsePhase {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Soak => "soak",
+            Self::HeldWatch => "held_watch",
+            Self::AfterResolve => "after_resolve",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoveryFailureReason {
+    NotRecovering,
+    Expired,
+    Unverified,
+    Denied,
+}
+
+impl RecoveryFailureReason {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::NotRecovering => "not_recovering",
+            Self::Expired => "expired",
+            Self::Unverified => "unverified",
+            Self::Denied => "denied",
+        }
+    }
+}
+
 /// A single event in an incident's lifecycle timeline
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct IncidentEvent {
     /// Microseconds since epoch
     pub timestamp: i64,
+    /// The timeline's `seq` after the last write that added or changed this event; 0 for events
+    /// written before it.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub seq: i64,
     /// What happened
     #[serde(flatten)]
     pub event_type: IncidentEventType,
@@ -801,6 +1035,8 @@ pub enum IncidentEventType {
 
     /// Resolved incident reopened
     Reopened {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transition_id: Option<String>,
         user_id: String,
         reason: String,
     },
@@ -827,6 +1063,29 @@ pub enum IncidentEventType {
         from: Option<String>,
         to: Option<String>,
         /// Who changed it; absent on events written before it was recorded.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        user_id: Option<String>,
+        /// `comms` for the comms owner; absent means the lead.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        role: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        via: Option<String>,
+    },
+
+    /// A person moved the incident to another owner team, or cleared it.
+    OwnerTeamChanged {
+        from: Option<String>,
+        to: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        user_id: Option<String>,
+    },
+
+    /// A person edited the impact window; the onset detector never writes this.
+    ImpactWindowChanged {
+        from_start: Option<i64>,
+        from_end: Option<i64>,
+        to_start: Option<i64>,
+        to_end: Option<i64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         user_id: Option<String>,
     },
@@ -890,6 +1149,8 @@ pub enum IncidentEventType {
         trigger_type: AnalysisTriggerType,
         /// Optional error details for debugging
         error_details: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_code: Option<String>,
     },
 
     /// AI/RCA analysis cancelled by a user.
@@ -925,6 +1186,19 @@ pub enum IncidentEventType {
         deadline_at: i64,
     },
 
+    /// An automatic page started no run because another run covered it.
+    AnalysisSkipped {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        response_id: Option<String>,
+        reason: SkipReason,
+        covering_run_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        covering_run_number: Option<u32>,
+        /// `cooling_down` only: the covering run's end plus the cooldown, µs.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        retry_after_us: Option<i64>,
+    },
+
     /// Opens an incident an alert was moved into, found unrelated to the one it had joined.
     /// A recovery naming `from_incident_id` follows the firings here.
     SplitFrom {
@@ -935,6 +1209,111 @@ pub enum IncidentEventType {
         alert_name: String,
         inferred_by: InferredBy,
         reason: String,
+    },
+
+    Declared {
+        declared_by: String,
+    },
+
+    ContextAttached {
+        context_id: String,
+        kind: ContextKind,
+    },
+
+    FixApplied {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transition_id: Option<String>,
+        attempt_id: String,
+        summary: String,
+        kind: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        option_key: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        command: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        source_ref: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        observed_ref: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        watch_refused: Option<String>,
+        actor: String,
+    },
+    FixSuperseded {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transition_id: Option<String>,
+        attempt_id: String,
+        superseded_attempt_id: String,
+    },
+    FixRetracted {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transition_id: Option<String>,
+        attempt_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        revived_attempt_id: Option<String>,
+    },
+    FixClaimed {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transition_id: Option<String>,
+        option_key: String,
+        summary: String,
+        actor: String,
+        expires_at: i64,
+    },
+
+    RollbackObserved {
+        transition_id: String,
+        attempt_id: String,
+        change_ref: String,
+        at: i64,
+    },
+    RecoveryVerified {
+        transition_id: String,
+    },
+    RecoveryHeld {
+        transition_id: String,
+    },
+    RecoveryRelapsed {
+        transition_id: String,
+        check_id: String,
+        phase: RecoveryRelapsePhase,
+    },
+    RecoveryFailed {
+        transition_id: String,
+        check_id: String,
+        reason: RecoveryFailureReason,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        attempt_id: Option<String>,
+    },
+    TeamPaged {
+        team_id: String,
+        actor: String,
+        transition_id: String,
+    },
+    CauseReviewed {
+        cause_class: ResolutionCause,
+        cause_text: String,
+        actor: String,
+        transition_id: String,
+    },
+    FeedbackGiven {
+        run_id: String,
+        target_kind: String,
+        target_id: String,
+        verdict: String,
+        actor: String,
+    },
+    ResolutionRecorded {
+        transition_id: String,
+        actor: String,
+        #[serde(flatten)]
+        details: ResolutionDetails,
+    },
+    RecoveryConditionChanged {
+        check_id: String,
+        old: RecoveryCondition,
+        new: RecoveryCondition,
+        actor: String,
+        transition_id: String,
     },
 
     /// Forward-compatibility catch-all for event types this binary does not know.
@@ -974,6 +1353,8 @@ impl IncidentEventType {
         "DimensionsUpgraded",
         "TitleChanged",
         "AssignmentChanged",
+        "OwnerTeamChanged",
+        "ImpactWindowChanged",
         "Verdict",
         "AlertsAttached",
         "EventAttached",
@@ -985,7 +1366,24 @@ impl IncidentEventType {
         "ai_analysis_cancelled",
         "ai_analysis_steered",
         "ai_analysis_needs_input",
+        "AnalysisSkipped",
         "SplitFrom",
+        "Declared",
+        "ContextAttached",
+        "FixApplied",
+        "FixSuperseded",
+        "FixRetracted",
+        "FixClaimed",
+        "RollbackObserved",
+        "RecoveryVerified",
+        "RecoveryHeld",
+        "RecoveryRelapsed",
+        "RecoveryFailed",
+        "TeamPaged",
+        "CauseReviewed",
+        "FeedbackGiven",
+        "ResolutionRecorded",
+        "RecoveryConditionChanged",
     ];
 
     /// True when `raw` carries a `type` tag this binary recognizes.
@@ -1004,6 +1402,7 @@ impl IncidentEvent {
     fn now(event_type: IncidentEventType) -> Self {
         Self {
             timestamp: chrono::Utc::now().timestamp_micros(),
+            seq: 0,
             event_type,
         }
     }
@@ -1103,6 +1502,7 @@ impl IncidentEvent {
 
     pub fn reopened(user_id: impl Into<String>, reason: impl Into<String>) -> Self {
         Self::now(IncidentEventType::Reopened {
+            transition_id: None,
             user_id: user_id.into(),
             reason: reason.into(),
         })
@@ -1135,6 +1535,62 @@ impl IncidentEvent {
         Self::now(IncidentEventType::AssignmentChanged {
             from,
             to,
+            user_id: Some(user_id.into()),
+            role: None,
+            via: Some("assign".to_string()),
+        })
+    }
+
+    pub fn assignment_changed_via_ack(
+        from: Option<String>,
+        to: Option<String>,
+        user_id: impl Into<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::AssignmentChanged {
+            from,
+            to,
+            user_id: Some(user_id.into()),
+            role: None,
+            via: Some("ack".to_string()),
+        })
+    }
+
+    pub fn comms_owner_changed(
+        from: Option<String>,
+        to: Option<String>,
+        user_id: impl Into<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::AssignmentChanged {
+            from,
+            to,
+            user_id: Some(user_id.into()),
+            role: Some(COMMS_ROLE.to_string()),
+            via: Some("assign".to_string()),
+        })
+    }
+
+    pub fn owner_team_changed(
+        from: Option<String>,
+        to: Option<String>,
+        user_id: impl Into<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::OwnerTeamChanged {
+            from,
+            to,
+            user_id: Some(user_id.into()),
+        })
+    }
+
+    pub fn impact_window_changed(
+        from: (Option<i64>, Option<i64>),
+        to: (Option<i64>, Option<i64>),
+        user_id: impl Into<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::ImpactWindowChanged {
+            from_start: from.0,
+            from_end: from.1,
+            to_start: to.0,
+            to_end: to.1,
             user_id: Some(user_id.into()),
         })
     }
@@ -1216,6 +1672,7 @@ impl IncidentEvent {
             reason: reason.into(),
             trigger_type,
             error_details,
+            error_code: None,
         })
     }
 
@@ -1294,23 +1751,60 @@ impl IncidentEvent {
     }
 }
 
-/// Counts a firing into the trailing block of Alert events, or appends a new Alert event.
+/// The built-in mapping lets external sources omit custom severity rules (§4.9).
+pub fn map_external_severity(s: &str) -> IncidentSeverity {
+    match s.to_ascii_lowercase().as_str() {
+        "critical" | "crit" | "fatal" | "p1" => IncidentSeverity::P1,
+        "error" | "major" | "high" | "p2" => IncidentSeverity::P2,
+        "warning" | "warn" | "minor" | "p3" => IncidentSeverity::P3,
+        "info" | "low" | "ok" | "p4" => IncidentSeverity::P4,
+        _ => IncidentSeverity::P3,
+    }
+}
+
+pub fn affected_services(
+    group_values: &serde_json::Value,
+    topology: Option<&IncidentTopology>,
+) -> Vec<String> {
+    let grouped = group_values
+        .get("service")
+        .and_then(serde_json::Value::as_str);
+    let nodes = topology.into_iter().flat_map(|topology| &topology.nodes);
+    let mut services = Vec::new();
+    for service in grouped
+        .into_iter()
+        .chain(nodes.map(|node| node.service_name.as_str()))
+    {
+        if service.is_empty() || service == "unknown" || services.iter().any(|s| s == service) {
+            continue;
+        }
+        services.push(service.to_string());
+        if services.len() == 20 {
+            break;
+        }
+    }
+    services
+}
+
+/// Counts a firing into the trailing block of Alert events, or appends a new Alert event; returns
+/// the index of the event it counted into or added.
 pub fn push_alert_event(
     events: &mut Vec<IncidentEvent>,
     alert_id: &str,
     alert_name: &str,
     triggered_at: i64,
-) {
-    for event in events.iter_mut().rev() {
+) -> usize {
+    for (index, event) in events.iter_mut().enumerate().rev() {
         if !event.is_alert() {
             break;
         }
         if event.is_alert_for(alert_id) {
             event.increment_alert(alert_id, triggered_at);
-            return;
+            return index;
         }
     }
     events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));
+    events.len() - 1
 }
 
 /// A firing's labels as stored on its membership row; `None` when it has none.
@@ -1332,6 +1826,11 @@ pub fn firing_labels_json(labels: &HashMap<String, String>) -> Option<String> {
         }
         kept.pop_last();
     }
+}
+
+/// UTF-8 truncation can stop up to three bytes before the stored limit.
+pub fn firing_label_may_be_truncated(value: &str) -> bool {
+    value.len() > FIRING_LABEL_VALUE_MAX_BYTES - char::MAX.len_utf8()
 }
 
 /// A firing's group-by dimensions, SQL GROUP BY columns included: never its measured values or the
@@ -1376,6 +1875,10 @@ pub fn manual_reopen_awaits_firing(events: &[IncidentEvent]) -> bool {
     false
 }
 
+fn is_zero(n: &i64) -> bool {
+    *n == 0
+}
+
 fn truncate_utf8(s: &str, max: usize) -> &str {
     if s.len() <= max {
         return s;
@@ -1399,6 +1902,35 @@ mod tests {
             IncidentCorrelationOutcome::repeated("inc_1".into(), "checkout".into(), after_reopen),
             IncidentCorrelationOutcome::FiredAfterReopen { .. }
         )
+    }
+
+    #[test]
+    fn affected_services_prefers_group_then_topology_and_caps_unique_services() {
+        let topology = IncidentTopology {
+            nodes: ["checkout".to_string(), "unknown".to_string(), String::new()]
+                .into_iter()
+                .chain((0..25).map(|n| format!("service-{n}")))
+                .map(|service_name| AlertNode {
+                    alert_id: String::new(),
+                    alert_name: String::new(),
+                    service_name,
+                    alert_count: 1,
+                    first_fired_at: 1,
+                    last_fired_at: 1,
+                    display_name: None,
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let services =
+            affected_services(&serde_json::json!({"service": "checkout"}), Some(&topology));
+        assert_eq!(services.len(), 20);
+        assert_eq!(services[0], "checkout");
+        assert_eq!(services[1], "service-0");
+        assert_eq!(services[19], "service-18");
+        assert_eq!(services.iter().filter(|s| *s == "checkout").count(), 1);
+        assert!(!services.iter().any(|s| s == "unknown" || s.is_empty()));
+        assert!(affected_services(&serde_json::json!({"service": "unknown"}), None).is_empty());
     }
 
     #[test]
@@ -1732,6 +2264,14 @@ mod tests {
         }
     }
 
+    #[test]
+    fn declare_rejects_unknown_fields() {
+        let mut request = serde_json::json!({"title": "Elevated errors", "severity": "P2"});
+        assert!(serde_json::from_value::<DeclareRequest>(request.clone()).is_ok());
+        request["result_summary"] = serde_json::json!({"rows": 100});
+        assert!(serde_json::from_value::<DeclareRequest>(request).is_err());
+    }
+
     /// `KNOWN_TAGS` must list exactly the tags the enum actually serializes.
     ///
     /// Guards the hand-maintained list: a new variant whose tag is not added here would
@@ -1764,6 +2304,7 @@ mod tests {
             },
             IncidentEventType::Resolved { user_id: None },
             IncidentEventType::Reopened {
+                transition_id: None,
                 user_id: "u".into(),
                 reason: "r".into(),
             },
@@ -1782,6 +2323,20 @@ mod tests {
             IncidentEventType::AssignmentChanged {
                 from: None,
                 to: None,
+                user_id: None,
+                role: None,
+                via: None,
+            },
+            IncidentEventType::OwnerTeamChanged {
+                from: None,
+                to: Some("t".into()),
+                user_id: None,
+            },
+            IncidentEventType::ImpactWindowChanged {
+                from_start: None,
+                from_end: None,
+                to_start: Some(1),
+                to_end: None,
                 user_id: None,
             },
             IncidentEventType::Verdict {
@@ -1817,6 +2372,7 @@ mod tests {
                 reason: "r".into(),
                 trigger_type: AnalysisTriggerType::Manual,
                 error_details: None,
+                error_code: None,
             },
             IncidentEventType::AIAnalysisCancelled { user_id: None },
             IncidentEventType::AiAnalysisSteered {
@@ -1831,6 +2387,112 @@ mod tests {
                 need: "n".into(),
                 question: "?".into(),
                 deadline_at: 1,
+            },
+            IncidentEventType::AnalysisSkipped {
+                response_id: None,
+                reason: SkipReason::InFlight,
+                covering_run_id: "r".into(),
+                covering_run_number: None,
+                retry_after_us: None,
+            },
+            IncidentEventType::Declared {
+                declared_by: "u".into(),
+            },
+            IncidentEventType::FixApplied {
+                transition_id: None,
+                attempt_id: "attempt".to_owned(),
+                summary: "summary".to_owned(),
+                kind: "manual".to_owned(),
+                option_key: None,
+                command: None,
+                source_ref: None,
+                observed_ref: None,
+                watch_refused: None,
+                actor: "actor".to_owned(),
+            },
+            IncidentEventType::FixSuperseded {
+                transition_id: None,
+                attempt_id: "attempt".to_owned(),
+                superseded_attempt_id: "previous".to_owned(),
+            },
+            IncidentEventType::FixRetracted {
+                transition_id: None,
+                attempt_id: "attempt".to_owned(),
+                revived_attempt_id: None,
+            },
+            IncidentEventType::FixClaimed {
+                transition_id: None,
+                option_key: "option".to_owned(),
+                summary: "summary".to_owned(),
+                actor: "actor".to_owned(),
+                expires_at: 1,
+            },
+            IncidentEventType::RollbackObserved {
+                transition_id: "transition".into(),
+                attempt_id: "attempt".into(),
+                change_ref: "change".into(),
+                at: 1,
+            },
+            IncidentEventType::RecoveryVerified {
+                transition_id: "transition".into(),
+            },
+            IncidentEventType::RecoveryHeld {
+                transition_id: "transition".into(),
+            },
+            IncidentEventType::RecoveryRelapsed {
+                transition_id: "transition".into(),
+                check_id: "check".into(),
+                phase: RecoveryRelapsePhase::Soak,
+            },
+            IncidentEventType::RecoveryFailed {
+                transition_id: "transition".into(),
+                check_id: "check".into(),
+                reason: RecoveryFailureReason::NotRecovering,
+                attempt_id: Some("attempt".into()),
+            },
+            IncidentEventType::TeamPaged {
+                team_id: "team".into(),
+                actor: "actor".into(),
+                transition_id: "transition".into(),
+            },
+            IncidentEventType::CauseReviewed {
+                cause_class: ResolutionCause::GenuineDefect,
+                cause_text: "cause".into(),
+                actor: "actor".into(),
+                transition_id: "transition".into(),
+            },
+            IncidentEventType::FeedbackGiven {
+                run_id: "run".into(),
+                target_kind: "run".into(),
+                target_id: String::new(),
+                verdict: "correct".into(),
+                actor: "actor".into(),
+            },
+            IncidentEventType::ResolutionRecorded {
+                transition_id: "transition".into(),
+                actor: "actor".into(),
+                details: ResolutionDetails::default(),
+            },
+            IncidentEventType::RecoveryConditionChanged {
+                check_id: "check".into(),
+                old: RecoveryCondition {
+                    recover_threshold: 1.0,
+                    alert_threshold: 2.0,
+                    expect_effect_secs: 60,
+                    volume_floor_pct: 50,
+                },
+                new: RecoveryCondition {
+                    recover_threshold: 1.1,
+                    alert_threshold: 2.0,
+                    expect_effect_secs: 60,
+                    volume_floor_pct: 50,
+                },
+                actor: "actor".into(),
+                transition_id: "transition".into(),
+            },
+            IncidentEventType::ContextAttached {
+                context_id: "c".into(),
+                kind: ContextKind::Panel,
             },
             IncidentEventType::SplitFrom {
                 from_incident_id: "i".into(),
@@ -1906,6 +2568,7 @@ mod tests {
     fn test_known_event_types_not_captured_as_unknown() {
         let event = IncidentEvent {
             timestamp: 5,
+            seq: 0,
             event_type: IncidentEventType::AIAnalysisCancelled {
                 user_id: Some("bob".into()),
             },
@@ -1922,6 +2585,7 @@ mod tests {
     fn test_incident_event_serde_created() {
         let event = IncidentEvent {
             timestamp: 1000000,
+            seq: 0,
             event_type: IncidentEventType::Created,
         };
         let json = serde_json::to_string(&event).unwrap();
@@ -1934,6 +2598,7 @@ mod tests {
     fn test_incident_event_serde_alert() {
         let event = IncidentEvent {
             timestamp: 2000000,
+            seq: 0,
             event_type: IncidentEventType::Alert {
                 alert_id: "abc".into(),
                 alert_name: "CPU High".into(),
@@ -1965,6 +2630,7 @@ mod tests {
     fn test_incident_event_serde_comment() {
         let event = IncidentEvent {
             timestamp: 3000000,
+            seq: 0,
             event_type: IncidentEventType::Comment {
                 user_id: "user@test.com".into(),
                 comment: "investigating".into(),
@@ -1980,6 +2646,7 @@ mod tests {
     fn test_incident_event_serde_title_changed() {
         let event = IncidentEvent {
             timestamp: 4000000,
+            seq: 0,
             event_type: IncidentEventType::TitleChanged {
                 from: "Old Title".into(),
                 to: "New Title".into(),
@@ -2584,6 +3251,14 @@ mod tests {
             historical: false,
             group_values_display: None,
             last_detection_at: None,
+            owner_team_id: None,
+            comms_owner: None,
+            impact_start_at: None,
+            impact_end_at: None,
+            customer_impact: None,
+            resolution_cause: None,
+            cause_reviewed_by: None,
+            cause_reviewed_at: None,
         }
     }
 
@@ -2729,7 +3404,10 @@ mod tests {
     fn test_incident_event_factory_reopened() {
         let event = IncidentEvent::reopened("user@example.com", "false positive");
         assert!(event.timestamp > 0);
-        if let IncidentEventType::Reopened { user_id, reason } = &event.event_type {
+        if let IncidentEventType::Reopened {
+            user_id, reason, ..
+        } = &event.event_type
+        {
             assert_eq!(user_id, "user@example.com");
             assert_eq!(reason, "false positive");
         } else {
@@ -3012,6 +3690,24 @@ mod tests {
     }
 
     #[test]
+    fn test_a_comms_assignment_carries_its_role_and_an_old_one_reads_as_the_lead() {
+        let comms = IncidentEvent::comms_owner_changed(None, Some("c@acme.io".into()), "u");
+        let v = serde_json::to_value(&comms).unwrap();
+        assert_eq!(v["data"]["role"], "comms");
+        let lead = IncidentEvent::assignment_changed(None, Some("a@acme.io".into()), "u");
+        let v = serde_json::to_value(&lead).unwrap();
+        assert!(v["data"].get("role").is_none());
+        let old = serde_json::json!({
+            "timestamp": 1, "type": "AssignmentChanged", "data": {"from": null, "to": "a"}
+        });
+        let event: IncidentEvent = serde_json::from_value(old).unwrap();
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::AssignmentChanged { role: None, .. }
+        ));
+    }
+
+    #[test]
     fn test_assignment_event_without_actor_still_parses() {
         let old = serde_json::json!({
             "timestamp": 1,
@@ -3068,5 +3764,34 @@ mod tests {
             serde_json::to_string(&node).unwrap(),
             r#"{"alert_id":"a","alert_name":"n","service_name":"checkoutservice","alert_count":1,"first_fired_at":1,"last_fired_at":2}"#
         );
+    }
+
+    #[test]
+    fn assignment_via_decodes_legacy_events_and_distinguishes_ack_from_assign() {
+        let legacy: IncidentEvent = serde_json::from_value(serde_json::json!({
+            "timestamp": 1,
+            "type": "AssignmentChanged",
+            "data": {"from": null, "to": "ana", "user_id": "ana"}
+        }))
+        .unwrap();
+        assert!(matches!(
+            legacy.event_type,
+            IncidentEventType::AssignmentChanged { via: None, .. }
+        ));
+        for (event, expected) in [
+            (
+                IncidentEvent::assignment_changed(None, Some("ana".into()), "ana"),
+                "assign",
+            ),
+            (
+                IncidentEvent::assignment_changed_via_ack(None, Some("ana".into()), "ana"),
+                "ack",
+            ),
+        ] {
+            let decoded: IncidentEvent =
+                serde_json::from_value(serde_json::to_value(event).unwrap()).unwrap();
+            assert!(matches!(decoded.event_type,
+                IncidentEventType::AssignmentChanged { via: Some(via), .. } if via == expected));
+        }
     }
 }

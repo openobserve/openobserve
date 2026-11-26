@@ -20,7 +20,7 @@ use serde::Serialize;
 
 use super::{
     ledger::Origin,
-    protocol::route_request,
+    protocol::{McpCaller, route_request, route_request_as},
     types::{MCPRequest, MCPResponse, ToolAccess},
 };
 
@@ -120,6 +120,14 @@ pub async fn handle_mcp_request(
     route_request(org_id, request, auth_token, origin, access).await
 }
 
+pub async fn handle_mcp_request_as(
+    org_id: &str,
+    request: MCPRequest,
+    caller: McpCaller<'_>,
+) -> Result<MCPResponse> {
+    route_request_as(org_id, request, &caller).await
+}
+
 /// Handle an MCP request with streaming response
 /// This returns a stream of SSE-formatted JSON-RPC responses
 pub async fn handle_mcp_request_stream(
@@ -129,8 +137,21 @@ pub async fn handle_mcp_request_stream(
     origin: Option<&Origin>,
     access: ToolAccess,
 ) -> Result<impl Stream<Item = Result<Bytes>> + use<>> {
+    let caller = McpCaller {
+        auth_token,
+        origin,
+        access,
+    };
+    handle_mcp_request_stream_as(org_id, request, caller).await
+}
+
+pub async fn handle_mcp_request_stream_as(
+    org_id: &str,
+    request: MCPRequest,
+    caller: McpCaller<'_>,
+) -> Result<impl Stream<Item = Result<Bytes>> + use<>> {
     // Process the request
-    let response = route_request(org_id, request, auth_token, origin, access).await?;
+    let response = route_request_as(org_id, request, &caller).await?;
 
     // Serialize to JSON
     let json_str = serde_json::to_string(&response)?;

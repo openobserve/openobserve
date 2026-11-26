@@ -539,8 +539,11 @@ pub fn is_platform_write(
     stream_name: &str,
 ) -> bool {
     // Only the Usage target itself: a pipeline on it may route into a customer stream.
+    // Change events carry text a customer sent, so fail-closed refuses them unscanned.
     (usage_request && stream_name == source_stream)
-        || (internal_writer && super::usage::is_internal_rollup_stream(stream_name))
+        || (internal_writer
+            && super::usage::is_internal_rollup_stream(stream_name)
+            && stream_name != crate::meta::alerts::change_events::CHANGE_EVENTS_STREAM)
 }
 
 /// `ZO_SDR_FAIL_CLOSED`: why an unscanned batch is refused; `exempt` marks platform writes.
@@ -681,6 +684,8 @@ mod tests {
         assert!(!is_platform_write(false, true, "app_logs", "app_logs"));
         // A pipeline from a Usage target into a customer stream is still scanned or refused.
         assert!(!is_platform_write(true, false, USAGE_STREAM, "app_logs"));
+        let change = crate::meta::alerts::change_events::CHANGE_EVENTS_STREAM;
+        assert!(!is_platform_write(false, true, change, change));
     }
 
     #[test]

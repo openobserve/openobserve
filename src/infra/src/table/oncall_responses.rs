@@ -15,28 +15,143 @@
 
 //! Response records and their timelines.
 
+use std::{collections::HashSet, future::Future};
+
 use config::{
     ider,
     meta::oncall::{
         Channel, ResolutionCause, ResponderRole, Response, ResponseEvent, ResponseEventKind,
-        ResponseState, SubjectRef, SubjectType, response::FIRST_LADDER_RUN,
+        ResponseState, SubjectRef, SubjectType, policy::DELIVERY_CLAIM_EXPIRY_MICROS,
+        response::FIRST_LADDER_RUN,
     },
     utils::time::now_micros,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, Select, Set,
-    sea_query::{Expr, ExprTrait, SimpleExpr},
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DatabaseBackend, EntityTrait,
+    FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Select, Set, Statement,
+    TransactionTrait,
+    sea_query::{Expr, ExprTrait, LockType, Query, SimpleExpr},
 };
 
-use super::entity::{oncall_response_events, oncall_responses};
+use super::{
+    alert_incidents::relapse_repage,
+    entity::{oncall_response_events, oncall_responses},
+};
 use crate::{
-    db::get_orm_client_rw,
+    db::{clock_micros, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
+tokio::task_local! {
+    static DECLARED_INCIDENT_EPISODE: DeclaredIncidentEpisode;
+    static SCHEDULED_ONCALL_RESPONSE: String;
+    static REVIEWED_CAUSE_RECORD: ReviewedCauseRecord;
+}
+
 /// Subject ids per [team_pages_of] query, far below SQLite's and Postgres's bind limits.
 const PAGE_SUBJECTS_PER_QUERY: usize = 500;
+
+/// An overwrite requires the prior row in this statement's snapshot so release can restore it.
+const CLAIM_DELIVERY_QUERY: &str = r#"WITH prior AS MATERIALIZED (
+    SELECT delivered, at, actor, body FROM oncall_response_events
+    WHERE response_id = $2 AND ladder_run = $3 AND rung_micros = $4 AND recipient = $5
+      AND channel = $6{lock}
+)
+INSERT INTO oncall_response_events
+    (id, response_id, kind, at, actor, body, rung_micros, ladder_run, recipient, channel,
+     delivered, templates, claim_token)
+SELECT $1, $2, $7, {now}, $8, $9, $4, $3, $5, $6, NULL, NULL, $1
+FROM (SELECT 1 AS one) AS claim LEFT JOIN prior ON true WHERE true
+ON CONFLICT (response_id, ladder_run, rung_micros, recipient, channel) DO UPDATE SET
+    delivered = NULL, at = excluded.at, actor = excluded.actor, body = excluded.body,
+    claim_token = excluded.claim_token
+WHERE EXISTS (SELECT 1 FROM prior) AND ((oncall_response_events.delivered = false
+        AND oncall_response_events.at <= excluded.at - $10)
+   OR (oncall_response_events.delivered IS NULL
+        AND oncall_response_events.at < excluded.at - $11))
+RETURNING at,
+    (SELECT CASE WHEN delivered IS NULL THEN 0 ELSE 1 END FROM prior) AS prior,
+    (SELECT at FROM prior) AS prior_at,
+    (SELECT actor FROM prior) AS prior_actor,
+    (SELECT body FROM prior) AS prior_body"#;
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("The on-call page changed. Refresh it before trying again.")]
+pub struct ResponseConflict {
+    pub response_id: String,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Incident episode changed before the on-call record opened")]
+pub struct DeclaredIncidentEpisodeChanged;
+
+#[derive(Clone)]
+struct ReviewedCauseRecord {
+    page: Response,
+    transition_id: String,
+}
+
+#[derive(Clone)]
+struct DeclaredIncidentEpisode {
+    org_id: String,
+    incident_id: String,
+    reopen_count: i32,
+}
+
+impl DeclaredIncidentEpisode {
+    fn covers(
+        &self,
+        org_id: &str,
+        subject: &SubjectRef,
+        team_id: Option<&str>,
+        role: ResponderRole,
+    ) -> bool {
+        if self.org_id != org_id || subject.subject_type != SubjectType::Incident {
+            return false;
+        }
+        match role {
+            ResponderRole::Owner => {
+                subject.source_id == self.incident_id
+                    || team_id.is_some_and(|team_id| {
+                        subject.source_id == format!("{}:group:{team_id}", self.incident_id)
+                    })
+            }
+            ResponderRole::Impacted => {
+                subject
+                    .source_id
+                    .rsplit_once(":impacted:")
+                    .is_some_and(|(origin, team)| {
+                        team_id == Some(team)
+                            && (origin == self.incident_id
+                                || SubjectRef::new(subject.subject_type, origin, subject.firing)
+                                    .help_page_incident()
+                                    == Some(self.incident_id.as_str()))
+                    })
+            }
+        }
+    }
+}
+
+enum DeclaredPage<'a> {
+    Owner,
+    Impacted {
+        subject: &'a SubjectRef,
+        origin_response_id: Option<&'a str>,
+    },
+}
+
+struct HandoffEdit<'a> {
+    to_team_id: Option<&'a str>,
+    expected_holder: Option<&'a str>,
+    actor: Option<&'a str>,
+    now: i64,
+}
+
+struct PageResolution<'a> {
+    actor: Option<&'a str>,
+    cause: Option<ResolutionCause>,
+    note: Option<&'a str>,
+}
 
 /// A record read only by the columns that make it a page, so a state this build cannot decode
 /// still counts and can still be named.
@@ -60,6 +175,54 @@ impl TeamPage {
 /// A [TeamPage]'s columns, in the order `into_tuple` reads them.
 type TeamPageRow = (String, Option<String>, i64, String);
 
+/// One (person, channel) page of one rung: the five columns of the delivery key.
+#[derive(Clone, Copy, Debug)]
+pub struct DeliveryPair<'a> {
+    pub response_id: &'a str,
+    pub ladder_run: i32,
+    pub rung_micros: i64,
+    pub recipient: &'a str,
+    pub channel: Channel,
+}
+
+/// A restorable outcome timestamp cannot identify a claim owner.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Claim {
+    pub arm: ClaimArm,
+    pub claim_at: i64,
+    token: String,
+    prior: Option<PriorDelivery>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct PriorDelivery {
+    at: i64,
+    actor: String,
+    body: String,
+}
+
+/// Which arm of the claim statement took the pair (OF-8).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClaimArm {
+    /// No row held the pair.
+    Inserted,
+    /// The last attempt failed and its retry is due.
+    Failed,
+    /// A pending claim outlived the expiry with no outcome; its send may have landed.
+    Expired,
+}
+
+/// The claim statement's returned row.
+#[derive(Debug, FromQueryResult)]
+struct ClaimRow {
+    at: i64,
+    /// The row before the claim: null for none, 0 pending, 1 with an outcome.
+    prior: Option<i32>,
+    prior_at: Option<i64>,
+    prior_actor: Option<String>,
+    prior_body: Option<String>,
+}
+
 fn team_page_columns() -> Select<oncall_responses::Entity> {
     oncall_responses::Entity::find()
         .select_only()
@@ -76,37 +239,6 @@ fn team_page_of_row((id, team_id, opened_at, subject_id): TeamPageRow) -> TeamPa
         opened_at,
         subject_id,
     }
-}
-
-/// Rows whose stored discriminants this build cannot interpret are dropped. A
-/// record whose state we cannot read must not be shown as `triggered` and
-/// re-escalated.
-fn to_response(m: oncall_responses::Model) -> Option<Response> {
-    let subject_type = SubjectType::from_i32(m.subject_type)?;
-    Some(Response {
-        subject: SubjectRef::parse(subject_type, &m.subject_id).ok()?,
-        state: ResponseState::from_i32(m.state)?,
-        id: m.id,
-        org_id: m.org_id,
-        team_id: m.team_id,
-        title: m.title,
-        // An unreadable cause degrades to "no cause recorded" rather than losing the record.
-        cause: m.cause.as_deref().and_then(ResolutionCause::from_str_opt),
-        cause_note: m.cause_note,
-        snoozed_until: m.snoozed_until,
-        ladder_anchor: m.ladder_anchor,
-        ladder_run: m.ladder_run,
-        responder_role: ResponderRole::from_i32(m.responder_role).unwrap_or(ResponderRole::Owner),
-        origin_response_id: m.origin_response_id,
-        priority: m.priority,
-        opened_at: m.opened_at,
-        acked_by: m.acked_by,
-        acked_at: m.acked_at,
-        closed_at: m.closed_at,
-        incident_id: m.incident_id,
-        exhausted_at: m.exhausted_at,
-        updated_at: m.updated_at,
-    })
 }
 
 /// The next revision for a record, computed by the database rather than here.
@@ -232,6 +364,54 @@ pub(super) fn templates_json(event: &ResponseEvent) -> Option<String> {
         .flatten()
 }
 
+/// Defaulting an unreadable state to `triggered` could re-escalate the page.
+pub(super) fn to_response(m: oncall_responses::Model) -> Option<Response> {
+    let subject_type = SubjectType::from_i32(m.subject_type)?;
+    Some(Response {
+        subject: SubjectRef::parse(subject_type, &m.subject_id).ok()?,
+        state: ResponseState::from_i32(m.state)?,
+        id: m.id,
+        org_id: m.org_id,
+        team_id: m.team_id,
+        title: m.title,
+        // An unreadable cause degrades to "no cause recorded" rather than losing the record.
+        cause: m.cause.as_deref().and_then(ResolutionCause::from_str_opt),
+        cause_note: m.cause_note,
+        snoozed_until: m.snoozed_until,
+        ladder_anchor: m.ladder_anchor,
+        ladder_run: m.ladder_run,
+        responder_role: ResponderRole::from_i32(m.responder_role).unwrap_or(ResponderRole::Owner),
+        origin_response_id: m.origin_response_id,
+        priority: m.priority,
+        opened_at: m.opened_at,
+        acked_by: m.acked_by,
+        acked_at: m.acked_at,
+        closed_at: m.closed_at,
+        incident_id: m.incident_id,
+        exhausted_at: m.exhausted_at,
+        updated_at: m.updated_at,
+    })
+}
+
+/// Scope the existing paging call to one episode without holding a lock across delivery.
+pub async fn with_declared_incident_episode<T>(
+    org: &str,
+    incident_id: &str,
+    reopen_count: i32,
+    future: impl Future<Output = T>,
+) -> T {
+    DECLARED_INCIDENT_EPISODE
+        .scope(
+            DeclaredIncidentEpisode {
+                org_id: org.to_string(),
+                incident_id: incident_id.to_string(),
+                reopen_count,
+            },
+            future,
+        )
+        .await
+}
+
 /// Opens a record for one firing.
 ///
 /// The unique index on `(org_id, subject_type, subject_id)` makes this safe to
@@ -246,39 +426,17 @@ pub async fn open(
     role: ResponderRole,
     origin_response_id: Option<&str>,
 ) -> Result<Response, errors::Error> {
-    let client = get_orm_client_rw().await;
-    let model = oncall_responses::ActiveModel {
-        id: Set(ider::uuid()),
-        org_id: Set(org_id.to_string()),
-        subject_type: Set(subject.subject_type.to_i32()),
-        subject_id: Set(subject.subject_id()),
-        team_id: Set(team_id.map(str::to_string)),
-        title: Set(title.map(|t| t.to_string())),
-        cause: Set(None),
-        cause_note: Set(None),
-        snoozed_until: Set(None),
-        ladder_anchor: Set(None),
-        ladder_run: Set(Some(FIRST_LADDER_RUN)),
-        responder_role: Set(role.to_i32()),
-        origin_response_id: Set(origin_response_id.map(|s| s.to_string())),
-        priority: Set(priority),
-        state: Set(ResponseState::Triggered.to_i32()),
-        opened_at: Set(now_micros()),
-        acked_by: Set(None),
-        acked_at: Set(None),
-        closed_at: Set(None),
-        incident_id: Set(None),
-        // Copied at open, so the page keeps pointing where the alert pointed when it fired.
-        runbook_url: Set(runbook_for(org_id, subject).await),
-        exhausted_at: Set(None),
-        updated_at: Set(now_micros()),
-    };
-    let inserted = model.insert(client).await?;
-    to_response(inserted).ok_or_else(|| {
-        Error::DbError(DbError::KeyNotExists(
-            "just-inserted response failed to decode".to_string(),
-        ))
-    })
+    open_record(
+        org_id,
+        subject,
+        team_id,
+        priority,
+        title,
+        role,
+        origin_response_id,
+    )
+    .await
+    .map(|(response, _)| response)
 }
 
 /// Reads the record for a firing, or creates it. Returns `(record, created)`.
@@ -294,7 +452,7 @@ pub async fn open_or_get(
     if let Some(found) = get_by_subject(org_id, subject).await? {
         return Ok((found, false));
     }
-    match open(
+    match open_record(
         org_id,
         subject,
         team_id,
@@ -305,7 +463,7 @@ pub async fn open_or_get(
     )
     .await
     {
-        Ok(created) => Ok((created, true)),
+        Ok(result) => Ok(result),
         Err(e) => match get_by_subject(org_id, subject).await? {
             Some(found) => Ok((found, false)),
             None => Err(e),
@@ -559,6 +717,219 @@ pub async fn runbook_urls(
         .collect())
 }
 
+fn open_incident_team_query(
+    org: &str,
+    incident: &str,
+    team: &str,
+) -> Select<oncall_responses::Entity> {
+    use oncall_responses::Column as Col;
+    open_pages(pages_held_by_incident(org, incident))
+        .filter(Col::TeamId.eq(team))
+        .order_by_desc(Col::OpenedAt)
+        .order_by_desc(Col::Id)
+}
+
+async fn open_record(
+    org_id: &str,
+    subject: &SubjectRef,
+    team_id: Option<&str>,
+    priority: i32,
+    title: Option<&str>,
+    role: ResponderRole,
+    origin_response_id: Option<&str>,
+) -> Result<(Response, bool), errors::Error> {
+    let client = get_orm_client_rw().await;
+    let model = oncall_responses::ActiveModel {
+        id: Set(ider::uuid()),
+        org_id: Set(org_id.to_string()),
+        subject_type: Set(subject.subject_type.to_i32()),
+        subject_id: Set(subject.subject_id()),
+        team_id: Set(team_id.map(str::to_string)),
+        title: Set(title.map(|t| t.to_string())),
+        cause: Set(None),
+        cause_note: Set(None),
+        snoozed_until: Set(None),
+        ladder_anchor: Set(None),
+        ladder_run: Set(Some(FIRST_LADDER_RUN)),
+        responder_role: Set(role.to_i32()),
+        origin_response_id: Set(origin_response_id.map(|s| s.to_string())),
+        priority: Set(priority),
+        state: Set(ResponseState::Triggered.to_i32()),
+        opened_at: Set(now_micros()),
+        acked_by: Set(None),
+        acked_at: Set(None),
+        closed_at: Set(None),
+        incident_id: Set(None),
+        // Copied at open, so the page keeps pointing where the alert pointed when it fired.
+        runbook_url: Set(runbook_for(org_id, subject).await),
+        exhausted_at: Set(None),
+        updated_at: Set(now_micros()),
+    };
+    let episode = DECLARED_INCIDENT_EPISODE
+        .try_with(|episode| {
+            episode
+                .covers(org_id, subject, team_id, role)
+                .then(|| episode.clone())
+        })
+        .unwrap_or_default();
+    let episode = match episode {
+        Some(episode) => Some(episode),
+        None => {
+            incident_episode_for_page(client, org_id, subject, role, origin_response_id).await?
+        }
+    };
+    let (record, created) = match episode {
+        Some(episode) => {
+            let page = match role {
+                ResponderRole::Owner => DeclaredPage::Owner,
+                ResponderRole::Impacted => DeclaredPage::Impacted {
+                    subject,
+                    origin_response_id,
+                },
+            };
+            open_declared_incident(client, model, episode, page, team_id).await?
+        }
+        None => (model.insert(client).await?, true),
+    };
+    to_response(record)
+        .map(|page| (page, created))
+        .ok_or_else(|| {
+            Error::DbError(DbError::KeyNotExists(
+                "opened response failed to decode".to_string(),
+            ))
+        })
+}
+
+async fn incident_episode_for_page(
+    client: &sea_orm::DatabaseConnection,
+    org: &str,
+    subject: &SubjectRef,
+    role: ResponderRole,
+    origin_response_id: Option<&str>,
+) -> Result<Option<DeclaredIncidentEpisode>, errors::Error> {
+    let incident_id = match (subject.subject_type, role, origin_response_id) {
+        (SubjectType::Incident, ResponderRole::Owner, _) => Some(
+            subject
+                .help_page_incident()
+                .unwrap_or(&subject.source_id)
+                .to_owned(),
+        ),
+        (_, ResponderRole::Impacted, Some(origin)) => {
+            use oncall_responses::Column as Col;
+            oncall_responses::Entity::find_by_id(origin)
+                .filter(Col::OrgId.eq(org))
+                .select_only()
+                .column(Col::IncidentId)
+                .into_tuple::<Option<String>>()
+                .one(client)
+                .await?
+                .flatten()
+        }
+        _ => None,
+    };
+    let Some(id) = incident_id else {
+        return Ok(None);
+    };
+    let incident = super::alert_incidents::get_with(client, org, &id).await?;
+    if incident.is_none() && subject.help_page_incident().is_some() {
+        return Err(Error::OtherError(DeclaredIncidentEpisodeChanged.into()));
+    }
+    Ok(incident.map(|incident| DeclaredIncidentEpisode {
+        org_id: org.to_owned(),
+        incident_id: id,
+        reopen_count: incident.reopen_count,
+    }))
+}
+
+async fn open_declared_incident(
+    client: &sea_orm::DatabaseConnection,
+    mut model: oncall_responses::ActiveModel,
+    episode: DeclaredIncidentEpisode,
+    page: DeclaredPage<'_>,
+    team: Option<&str>,
+) -> Result<(oncall_responses::Model, bool), errors::Error> {
+    crate::race_point!("declare.page_before_incident_lock");
+    let txn = client.begin().await?;
+    let incident =
+        super::alert_incidents::get_locked(&txn, &episode.org_id, &episode.incident_id).await?;
+    let active_episode = incident.as_ref().is_some_and(|incident| {
+        matches!(incident.status.as_str(), "open" | "acknowledged")
+            && incident.reopen_count == episode.reopen_count
+            && incident.merged_into_id.is_none()
+    });
+    if !active_episode {
+        txn.rollback().await?;
+        return Err(Error::OtherError(DeclaredIncidentEpisodeChanged.into()));
+    }
+    if let Some(fence) = relapse_repage::current(&episode.org_id)
+        && let Some(incident) = incident.as_ref()
+        && fence.incident_id == incident.id
+        && !fence.allows(&txn, incident).await?
+    {
+        txn.rollback().await?;
+        return Err(Error::OtherError(DeclaredIncidentEpisodeChanged.into()));
+    }
+    if let DeclaredPage::Impacted {
+        subject,
+        origin_response_id,
+    } = page
+        && !has_declared_owner(&txn, &episode, origin_response_id, subject).await?
+    {
+        txn.rollback().await?;
+        return Err(Error::OtherError(DeclaredIncidentEpisodeChanged.into()));
+    }
+    if let Some(team) = team
+        && let Some(existing) =
+            open_incident_team_query(&episode.org_id, &episode.incident_id, team)
+                .one(&txn)
+                .await?
+    {
+        txn.commit().await?;
+        return Ok((existing, false));
+    }
+    if matches!(page, DeclaredPage::Owner) {
+        // Resolution must find the owner page even if it wins before paging returns.
+        model.incident_id = Set(Some(episode.incident_id));
+    }
+    let now = clock_micros(&txn).await?;
+    model.opened_at = Set(now);
+    model.updated_at = Set(now);
+    let inserted = model.insert(&txn).await?;
+    txn.commit().await?;
+    Ok((inserted, true))
+}
+
+async fn has_declared_owner(
+    txn: &sea_orm::DatabaseTransaction,
+    episode: &DeclaredIncidentEpisode,
+    origin_response_id: Option<&str>,
+    impacted: &SubjectRef,
+) -> Result<bool, sea_orm::DbErr> {
+    let Some(origin_response_id) = origin_response_id else {
+        return Ok(false);
+    };
+    let Some((source, _)) = impacted.source_id.rsplit_once(":impacted:") else {
+        return Ok(false);
+    };
+    let subject = SubjectRef::new(impacted.subject_type, source, impacted.firing);
+    Ok(oncall_responses::Entity::find_by_id(origin_response_id)
+        .filter(oncall_responses::Column::OrgId.eq(&episode.org_id))
+        .filter(oncall_responses::Column::IncidentId.eq(&episode.incident_id))
+        .filter(oncall_responses::Column::ResponderRole.eq(ResponderRole::Owner.to_i32()))
+        .filter(oncall_responses::Column::SubjectType.eq(subject.subject_type.to_i32()))
+        .filter(oncall_responses::Column::SubjectId.eq(subject.subject_id()))
+        .filter(oncall_responses::Column::ClosedAt.is_null())
+        .filter(oncall_responses::Column::State.is_in([
+            ResponseState::Triggered.to_i32(),
+            ResponseState::Triaged.to_i32(),
+            ResponseState::Acknowledged.to_i32(),
+        ]))
+        .lock(LockType::Update)
+        .one(txn)
+        .await?
+        .is_some())
+}
+
 /// The runbook the alert names, if the subject is an alert that names one.
 ///
 /// Looked up when the record opens, so the link is copied onto the page rather
@@ -749,24 +1120,43 @@ pub async fn unsnooze(org_id: &str, id: &str, now: i64) -> Result<Option<Respons
     .await
 }
 
-/// Writes a new severity onto an open record.
-///
-/// The severity is what SLO reporting, digests and the post-incident review
-/// read as truth, so the only caller is the escalation engine applying a
-/// ratcheted promotion — `SeverityDecision::applied`, never a raw suggestion.
+/// Replay must see the owed pairs whenever it sees their promoted priority.
 pub async fn set_priority(
-    org_id: &str,
-    id: &str,
+    response: &Response,
     priority: i32,
+    owed: &[ResponseEvent],
 ) -> Result<Option<Response>, errors::Error> {
-    // No existence read: `save` filters on the same key, and reads the row back,
-    // so a record that is not there comes back as `None` from one round trip.
-    save(
-        org_id,
-        id,
-        vec![(oncall_responses::Column::Priority, Expr::value(priority))],
-    )
-    .await
+    use oncall_responses::{Column as Col, Entity};
+
+    let txn = get_orm_client_rw().await.begin().await?;
+    let written = Entity::update_many()
+        .col_expr(Col::Priority, Expr::value(priority))
+        .col_expr(Col::UpdatedAt, next_revision(now_micros()))
+        .filter(Col::Id.eq(&response.id))
+        .filter(Col::OrgId.eq(&response.org_id))
+        .filter(Col::UpdatedAt.eq(response.updated_at))
+        .exec(&txn)
+        .await?;
+    if written.rows_affected == 0 {
+        txn.rollback().await?;
+        return Ok(None);
+    }
+    if !owed.is_empty() {
+        let at = clock_micros(&txn).await?;
+        for event in owed {
+            let event = ResponseEvent {
+                at,
+                ..event.clone()
+            };
+            add_event_in(&txn, &response.id, &event).await?;
+        }
+    }
+    let promoted = Entity::find_by_id(&response.id)
+        .one(&txn)
+        .await?
+        .and_then(to_response);
+    txn.commit().await?;
+    Ok(promoted)
 }
 
 /// Moves a record to another team and starts its ladder again.
@@ -807,13 +1197,85 @@ pub async fn restart_ladder_if_acked_by(
     hand_over(org_id, id, None, Some(acked_by), now).await
 }
 
+pub async fn reassign_team_as(
+    org_id: &str,
+    id: &str,
+    to_team_id: &str,
+    actor: &str,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
+    hand_over_as_in(
+        get_orm_client_rw().await,
+        org_id,
+        id,
+        HandoffEdit {
+            to_team_id: Some(to_team_id),
+            expected_holder: None,
+            actor: Some(actor),
+            now,
+        },
+    )
+    .await
+}
+
+pub async fn restart_ladder_as(
+    org_id: &str,
+    id: &str,
+    actor: &str,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
+    hand_over_as_in(
+        get_orm_client_rw().await,
+        org_id,
+        id,
+        HandoffEdit {
+            to_team_id: None,
+            expected_holder: None,
+            actor: Some(actor),
+            now,
+        },
+    )
+    .await
+}
+
+pub async fn restart_held_ladder_as(
+    org_id: &str,
+    id: &str,
+    holder: &str,
+    actor: &str,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
+    hand_over_as_in(
+        get_orm_client_rw().await,
+        org_id,
+        id,
+        HandoffEdit {
+            to_team_id: None,
+            expected_holder: Some(holder),
+            actor: Some(actor),
+            now,
+        },
+    )
+    .await
+}
+
 /// Re-runs an exhausted, unowned page only if its row is still as `seen`, else `None`. [strong]
 pub async fn restart_exhausted(
     org_id: &str,
     seen: &Response,
     now: i64,
 ) -> Result<Option<Response>, errors::Error> {
-    if !restart_exhausted_in(get_orm_client_rw().await, org_id, seen, now).await? {
+    let db = get_orm_client_rw().await;
+    let restarted = if let Some(fence) = relapse_repage::current(org_id) {
+        let txn = db.begin().await?;
+        let restarted = fence.lock_current(&txn).await?
+            && restart_exhausted_in(&txn, org_id, seen, now).await?;
+        txn.commit().await?;
+        restarted
+    } else {
+        restart_exhausted_in(db, org_id, seen, now).await?
+    };
+    if !restarted {
         return Ok(None);
     }
     get(org_id, &seen.id).await
@@ -988,13 +1450,39 @@ async fn hand_over(
 }
 
 async fn hand_over_in(
-    client: &impl ConnectionTrait,
+    client: &(impl ConnectionTrait + TransactionTrait),
     org_id: &str,
     id: &str,
     to_team_id: Option<&str>,
     acked_by: Option<&str>,
     now: i64,
 ) -> Result<Option<Response>, errors::Error> {
+    hand_over_as_in(
+        client,
+        org_id,
+        id,
+        HandoffEdit {
+            to_team_id,
+            expected_holder: acked_by,
+            actor: None,
+            now,
+        },
+    )
+    .await
+}
+
+async fn hand_over_as_in(
+    client: &(impl ConnectionTrait + TransactionTrait),
+    org_id: &str,
+    id: &str,
+    edit: HandoffEdit<'_>,
+) -> Result<Option<Response>, errors::Error> {
+    let HandoffEdit {
+        to_team_id,
+        expected_holder: acked_by,
+        actor,
+        now,
+    } = edit;
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .one(client)
@@ -1002,11 +1490,31 @@ async fn hand_over_in(
     else {
         return Ok(None);
     };
-    let Some(current) = to_response(existing.clone()) else {
+    let Some(mut current) = to_response(existing) else {
         return Ok(None);
     };
+    crate::race_point!("oncall_responses.handoff_after_read");
+    crate::race_point!("oncall_responses.handoff_before_write");
+    let txn = client.begin().await?;
+    if let Some(fence) = relapse_repage::current(org_id) {
+        let Some(locked) = fence
+            .lock_current_page_ack(&txn, id)
+            .await?
+            .filter(|page| !page.is_snoozed(now))
+        else {
+            txn.rollback().await?;
+            return Ok(None);
+        };
+        current = locked;
+    }
     // A handoff's effect on a record is decided in `Response::handed_over`; this writes it down.
     let next = current.handed_over(to_team_id, now);
+    if current.closed_at.is_none()
+        && current.acked_by.is_some()
+        && let (Some(actor), Some(incident_id)) = (actor, current.incident_id.as_deref())
+    {
+        super::alert_incidents::clear_ack_lead_in(&txn, org_id, incident_id, actor).await?;
+    }
     // Conditional: a `resolve` landing between the read and this write would tear the row.
     let mut query = oncall_responses::Entity::update_many()
         .col_expr(
@@ -1045,6 +1553,7 @@ async fn hand_over_in(
         .col_expr(oncall_responses::Column::UpdatedAt, next_revision(now))
         .filter(oncall_responses::Column::Id.eq(id))
         .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::UpdatedAt.eq(current.updated_at))
         .filter(oncall_responses::Column::ClosedAt.is_null())
         .filter(oncall_responses::Column::State.ne(ResponseState::Resolved.to_i32()));
     if let Some(holder) = acked_by {
@@ -1052,16 +1561,28 @@ async fn hand_over_in(
             .filter(oncall_responses::Column::State.eq(ResponseState::Acknowledged.to_i32()))
             .filter(oncall_responses::Column::AckedBy.eq(holder));
     }
-    let result = query.exec(client).await?;
-    if acked_by.is_some() && result.rows_affected == 0 {
-        return Ok(None);
+    let result = query.exec(&txn).await?;
+    if result.rows_affected == 0 {
+        txn.rollback().await?;
+        if relapse_repage::current(org_id).is_some()
+            || acked_by.is_some()
+                && (current.state != ResponseState::Acknowledged
+                    || current.acked_by.as_deref() != acked_by)
+        {
+            return Ok(None);
+        }
+        return Err(Error::OtherError(anyhow::Error::new(ResponseConflict {
+            response_id: id.to_string(),
+        })));
     }
     // Read back, not from the snapshot: after a lost race the answer is the closed record.
-    Ok(oncall_responses::Entity::find_by_id(id)
+    let after = oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
-        .one(client)
+        .one(&txn)
         .await?
-        .and_then(to_response))
+        .and_then(to_response);
+    txn.commit().await?;
+    Ok(after)
 }
 
 /// Records opened because `origin_id` fired — the impacted teams.
@@ -1283,7 +1804,81 @@ pub async fn resolve(
     cause: Option<ResolutionCause>,
     cause_note: Option<&str>,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = get_orm_client_rw().await;
+    resolve_in(
+        get_orm_client_rw().await,
+        org_id,
+        id,
+        PageResolution {
+            actor: None,
+            cause,
+            note: cause_note,
+        },
+    )
+    .await
+}
+
+pub async fn resolve_as(
+    org_id: &str,
+    id: &str,
+    actor: &str,
+    cause: Option<ResolutionCause>,
+    cause_note: Option<&str>,
+) -> Result<Option<Response>, errors::Error> {
+    resolve_as_with(
+        get_orm_client_rw().await,
+        org_id,
+        id,
+        actor,
+        cause,
+        cause_note,
+    )
+    .await
+}
+
+pub async fn resolve_as_with(
+    db: &(impl ConnectionTrait + TransactionTrait),
+    org_id: &str,
+    id: &str,
+    actor: &str,
+    cause: Option<ResolutionCause>,
+    cause_note: Option<&str>,
+) -> Result<Option<Response>, errors::Error> {
+    resolve_in(
+        db,
+        org_id,
+        id,
+        PageResolution {
+            actor: Some(actor),
+            cause,
+            note: cause_note,
+        },
+    )
+    .await
+}
+
+/// The revision protects a responder's cause written after the cascade reads the record.
+pub async fn with_closed_causeless_record<T>(
+    record: &Response,
+    transition_id: &str,
+    future: impl Future<Output = T>,
+) -> T {
+    REVIEWED_CAUSE_RECORD
+        .scope(
+            ReviewedCauseRecord {
+                page: record.clone(),
+                transition_id: transition_id.to_owned(),
+            },
+            future,
+        )
+        .await
+}
+
+async fn resolve_in(
+    client: &(impl ConnectionTrait + TransactionTrait),
+    org_id: &str,
+    id: &str,
+    edit: PageResolution<'_>,
+) -> Result<Option<Response>, errors::Error> {
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .one(client)
@@ -1291,26 +1886,95 @@ pub async fn resolve(
     else {
         return Ok(None);
     };
-    let note = cause_note.map(str::trim).filter(|n| !n.is_empty());
-    // Resolving again must not move `closed_at`, nor swallow a cause recorded after the fact.
-    if existing.closed_at.is_some() {
-        if cause.is_none() && note.is_none() {
-            return Ok(to_response(existing));
-        }
-        return save(org_id, id, cause_columns(cause, note)).await;
+    let review = REVIEWED_CAUSE_RECORD.try_with(Clone::clone).ok();
+    if review.as_ref().is_some_and(|review| {
+        let seen = &review.page;
+        seen.org_id != org_id
+            || seen.id != id
+            || seen.updated_at != existing.updated_at
+            || existing.closed_at.is_none()
+            || existing.cause.is_some()
+            || existing.cause_note.is_some()
+    }) {
+        return Err(Error::OtherError(
+            ResponseConflict {
+                response_id: id.to_owned(),
+            }
+            .into(),
+        ));
     }
-    let mut columns = vec![
-        (
-            oncall_responses::Column::State,
-            Expr::value(ResponseState::Resolved.to_i32()),
-        ),
-        (
-            oncall_responses::Column::ClosedAt,
-            Expr::value(now_micros()),
-        ),
-    ];
-    columns.extend(cause_columns(cause, note));
-    save(org_id, id, columns).await
+    let note = edit.note.map(str::trim).filter(|n| !n.is_empty());
+    crate::race_point!("oncall_responses.resolve_after_read");
+    crate::race_point!("oncall_responses.resolve_before_write");
+    let txn = client.begin().await?;
+    if let Some(review) = &review {
+        let current = match existing.incident_id.as_deref() {
+            Some(incident) => {
+                super::incident_events::cause_review_is_current_in(
+                    &txn,
+                    org_id,
+                    incident,
+                    &review.transition_id,
+                )
+                .await?
+            }
+            None => false,
+        };
+        if !current {
+            return Err(Error::OtherError(
+                ResponseConflict {
+                    response_id: id.to_owned(),
+                }
+                .into(),
+            ));
+        }
+    }
+    if existing.closed_at.is_none()
+        && existing.acked_by.is_some()
+        && !(existing.subject_type == SubjectType::Incident.to_i32()
+            && SubjectRef::parse(SubjectType::Incident, &existing.subject_id)
+                .is_ok_and(|subject| subject.help_page_incident().is_some()))
+        && let (Some(actor), Some(incident_id)) = (edit.actor, existing.incident_id.as_deref())
+    {
+        super::alert_incidents::clear_ack_lead_in(&txn, org_id, incident_id, actor).await?;
+    }
+    let mut query = oncall_responses::Entity::update_many()
+        .col_expr(
+            oncall_responses::Column::UpdatedAt,
+            next_revision(now_micros()),
+        )
+        .filter(oncall_responses::Column::Id.eq(id))
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::UpdatedAt.eq(existing.updated_at));
+    // Resolving again must not move `closed_at`, nor swallow a cause recorded after the fact.
+    if existing.closed_at.is_none() {
+        query = query
+            .col_expr(
+                oncall_responses::Column::State,
+                Expr::value(ResponseState::Resolved.to_i32()),
+            )
+            .col_expr(
+                oncall_responses::Column::ClosedAt,
+                Expr::value(now_micros()),
+            )
+            .filter(oncall_responses::Column::ClosedAt.is_null());
+    }
+    for (column, value) in cause_columns(edit.cause, note) {
+        query = query.col_expr(column, value);
+    }
+    if query.exec(&txn).await?.rows_affected == 0 {
+        txn.rollback().await?;
+        return Err(Error::OtherError(anyhow::Error::new(ResponseConflict {
+            response_id: id.to_string(),
+        })));
+    }
+    let after = oncall_responses::Entity::find_by_id(id)
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .one(&txn)
+        .await?
+        .and_then(to_response);
+    txn.commit().await?;
+    Ok(after)
 }
 
 /// The cause and its note, each written only when the caller supplied one — a
@@ -1390,16 +2054,85 @@ pub async fn list_for_incident(
     org_id: &str,
     incident_id: &str,
 ) -> Result<Vec<Response>, errors::Error> {
-    let client = get_orm_client_rw().await;
+    list_for_incident_with(get_orm_client_rw().await, org_id, incident_id).await
+}
+
+pub async fn list_for_incident_with(
+    conn: &impl ConnectionTrait,
+    org_id: &str,
+    incident_id: &str,
+) -> Result<Vec<Response>, errors::Error> {
     Ok(oncall_responses::Entity::find()
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::IncidentId.eq(incident_id))
         .order_by_desc(oncall_responses::Column::OpenedAt)
-        .all(client)
+        .all(conn)
         .await?
         .into_iter()
         .filter_map(to_response)
         .collect())
+}
+
+pub async fn open_for_incident_team(
+    org: &str,
+    incident: &str,
+    team: &str,
+) -> Result<Option<Response>, errors::Error> {
+    Ok(open_incident_team_query(org, incident, team)
+        .one(get_orm_client_rw().await)
+        .await?
+        .and_then(to_response))
+}
+
+pub async fn open_pages_held_by_incident(
+    org: &str,
+    incident: &str,
+) -> Result<Vec<Response>, errors::Error> {
+    Ok(open_pages(pages_held_by_incident(org, incident))
+        .all(get_orm_client_rw().await)
+        .await?
+        .into_iter()
+        .filter_map(to_response)
+        .collect())
+}
+
+pub(crate) fn pages_held_by_incident(
+    org: &str,
+    incident: &str,
+) -> Select<oncall_responses::Entity> {
+    use oncall_responses::{Column as Col, Entity};
+    let direct = Condition::any().add(Col::IncidentId.eq(incident)).add(
+        Condition::all()
+            .add(Col::IncidentId.is_null())
+            .add(Col::SubjectType.eq(SubjectType::Incident.to_i32()))
+            .add(Col::SubjectId.starts_with(format!("{incident}#"))),
+    );
+    let origins = Query::select()
+        .column(Col::Id)
+        .from(Entity)
+        .and_where(Col::OrgId.eq(org))
+        .cond_where(direct.clone())
+        .to_owned();
+    Entity::find().filter(Col::OrgId.eq(org)).filter(
+        direct.add(
+            Condition::all()
+                .add(Col::IncidentId.is_null())
+                .add(Col::OriginResponseId.in_subquery(origins)),
+        ),
+    )
+}
+
+pub(super) fn open_pages(
+    query: Select<oncall_responses::Entity>,
+) -> Select<oncall_responses::Entity> {
+    use oncall_responses::Column as Col;
+    query
+        .filter(Col::ClosedAt.is_null())
+        .filter(Col::State.is_in([
+            ResponseState::Triggered.to_i32(),
+            ResponseState::Triaged.to_i32(),
+            ResponseState::Acknowledged.to_i32(),
+        ]))
 }
 
 /// Writes one timeline entry, and rewrites the ledger row when one already
@@ -1440,6 +2173,7 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
         channel: Set(event.channel.map(|c| c.to_i32())),
         delivered: Set(event.delivered),
         templates: Set(templates_json(event)),
+        claim_token: Set(None),
     };
     let Err(e) = model.insert(conn).await else {
         return Ok(());
@@ -1500,6 +2234,176 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
     Ok(())
 }
 
+/// Claims one pair before its send (M145): a new row, a failed row whose retry is due, or an
+/// expired claim. `None` when the pair landed, failed with no retry due, or is in flight.
+pub async fn claim_delivery(
+    org_id: &str,
+    pair: &DeliveryPair<'_>,
+    actor: &str,
+    body: &str,
+    retry_after_micros: i64,
+) -> Result<Option<Claim>, errors::Error> {
+    let claim = claim_delivery_in(
+        get_orm_client_rw().await,
+        pair,
+        actor,
+        body,
+        retry_after_micros,
+    )
+    .await?;
+    if claim.as_ref().is_some_and(|c| c.arm == ClaimArm::Expired) {
+        config::metrics::oncall::possible_duplicate(org_id, pair.channel.as_str());
+        log::warn!(
+            "[ONCALL] possible duplicate page: record {} run {} rung {} channel {}: an expired \
+             claim recorded no outcome",
+            pair.response_id,
+            pair.ladder_run,
+            pair.rung_micros,
+            pair.channel
+        );
+    }
+    Ok(claim)
+}
+
+/// [`claim_delivery`] in one statement on `conn`; a statement error is returned, never `None`.
+pub(super) async fn claim_delivery_in<C: ConnectionTrait>(
+    conn: &C,
+    pair: &DeliveryPair<'_>,
+    actor: &str,
+    body: &str,
+    retry_after_micros: i64,
+) -> Result<Option<Claim>, errors::Error> {
+    let backend = conn.get_database_backend();
+    let now = delivery_claim_clock(backend)?;
+    let lock = if backend == DatabaseBackend::Postgres {
+        " FOR UPDATE"
+    } else {
+        ""
+    };
+    let sql = CLAIM_DELIVERY_QUERY
+        .replace("{now}", now)
+        .replace("{lock}", lock);
+    let id = ider::uuid();
+    let values = [
+        id.clone().into(),
+        pair.response_id.into(),
+        pair.ladder_run.into(),
+        pair.rung_micros.into(),
+        pair.recipient.into(),
+        pair.channel.to_i32().into(),
+        ResponseEventKind::Delivery.to_i32().into(),
+        actor.into(),
+        body.into(),
+        retry_after_micros.into(),
+        DELIVERY_CLAIM_EXPIRY_MICROS.into(),
+    ];
+    crate::race_point!("claim_delivery.before_claim");
+    let row = ClaimRow::find_by_statement(Statement::from_sql_and_values(backend, sql, values))
+        .one(conn)
+        .await?;
+    Ok(row.map(|row| Claim {
+        arm: match row.prior {
+            None => ClaimArm::Inserted,
+            Some(0) => ClaimArm::Expired,
+            Some(_) => ClaimArm::Failed,
+        },
+        claim_at: row.at,
+        token: id,
+        prior: row
+            .prior_at
+            .zip(row.prior_actor)
+            .zip(row.prior_body)
+            .map(|((at, actor), body)| PriorDelivery { at, actor, body }),
+    }))
+}
+
+/// Restores the prior outcome only while this claim owns the pending row.
+/// Ownership is cleared even if the previous lease timestamp is restored.
+pub async fn release_delivery_claim(
+    org_id: &str,
+    pair: &DeliveryPair<'_>,
+    claim: &Claim,
+) -> Result<bool, errors::Error> {
+    let released = release_delivery_claim_in(get_orm_client_rw().await, pair, claim).await?;
+    log::debug!(
+        "[ONCALL] org {org_id} record {} run {} rung {} channel {}: claim released: {released}",
+        pair.response_id,
+        pair.ladder_run,
+        pair.rung_micros,
+        pair.channel
+    );
+    Ok(released)
+}
+
+/// Restamps a queued send only while its original claim still owns the pair.
+pub async fn renew_delivery_claim(
+    pair: &DeliveryPair<'_>,
+    claim: &Claim,
+) -> Result<Option<i64>, errors::Error> {
+    let conn = get_orm_client_rw().await;
+    let backend = conn.get_database_backend();
+    let now = delivery_claim_clock(backend)?;
+    let sql = format!(
+        "UPDATE oncall_response_events SET at = {now} WHERE response_id = $1 AND ladder_run = $2 \
+         AND rung_micros = $3 AND recipient = $4 AND channel = $5 AND kind = $6 AND claim_token = $7 \
+         AND delivered IS NULL RETURNING at"
+    );
+    let row = conn
+        .query_one(Statement::from_sql_and_values(
+            backend,
+            sql,
+            [
+                pair.response_id.into(),
+                pair.ladder_run.into(),
+                pair.rung_micros.into(),
+                pair.recipient.into(),
+                pair.channel.to_i32().into(),
+                ResponseEventKind::Delivery.to_i32().into(),
+                claim.token.as_str().into(),
+            ],
+        ))
+        .await?;
+    Ok(row.map(|row| row.try_get("", "at")).transpose()?)
+}
+
+/// [`release_delivery_claim`] in one statement on `conn`.
+pub(super) async fn release_delivery_claim_in<C: ConnectionTrait>(
+    conn: &C,
+    pair: &DeliveryPair<'_>,
+    claim: &Claim,
+) -> Result<bool, errors::Error> {
+    let rows_affected = match claim.arm {
+        ClaimArm::Inserted => {
+            held_claim(oncall_response_events::Entity::delete_many(), pair, claim)
+                .exec(conn)
+                .await?
+                .rows_affected
+        }
+        // An expired claim stays pending at its old stamp, so the next claim still counts the
+        // possible duplicate its unknown send left.
+        ClaimArm::Failed | ClaimArm::Expired => {
+            let Some(prior) = &claim.prior else {
+                return Err(Error::Message("missing prior on-call delivery".into()));
+            };
+            use oncall_response_events::Column;
+            let restore = oncall_response_events::Entity::update_many()
+                .col_expr(Column::At, Expr::value(prior.at))
+                .col_expr(Column::Actor, Expr::value(prior.actor.as_str()))
+                .col_expr(Column::Body, Expr::value(prior.body.as_str()))
+                .col_expr(Column::ClaimToken, Expr::value(None::<String>))
+                .col_expr(
+                    Column::Delivered,
+                    Expr::value((claim.arm == ClaimArm::Failed).then_some(false)),
+                );
+            held_claim(restore, pair, claim)
+                .exec(conn)
+                .await?
+                .rows_affected
+        }
+    };
+    Ok(rows_affected > 0)
+}
+
 /// The timeline, as a person reads it.
 ///
 /// Sorted on `at`, with the id as the tiebreak — ksuids alone cannot order
@@ -1510,11 +2414,34 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
 /// responder and sixteen rows to the ledger, and the `Page` entry beside them
 /// already says who was reached.
 pub async fn list_events(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Error> {
-    Ok(all_events(response_id)
-        .await?
+    let events = all_events(response_id).await?;
+    let is_tick = SCHEDULED_ONCALL_RESPONSE
+        .try_with(|id| id == response_id)
+        .unwrap_or(false);
+    let pending: HashSet<_> = if is_tick {
+        events
+            .iter()
+            .filter(|event| event.is_pending_delivery())
+            .map(|event| (event.run(), event.rung_micros))
+            .collect()
+    } else {
+        HashSet::new()
+    };
+    Ok(events
         .into_iter()
-        .filter(|e| !e.kind.is_ledger_only())
+        .filter(|event| {
+            !event.kind.is_ledger_only()
+                && (event.kind != ResponseEventKind::Page
+                    || !pending.contains(&(event.run(), event.rung_micros)))
+        })
         .collect())
+}
+
+/// A rung summary can land before its delivery claims settle.
+pub async fn with_delivery_retries<T>(response_id: &str, tick: impl Future<Output = T>) -> T {
+    SCHEDULED_ONCALL_RESPONSE
+        .scope(response_id.to_owned(), tick)
+        .await
 }
 
 /// The story and the ledger, in one list and one read.
@@ -1527,6 +2454,19 @@ pub async fn list_events_and_deliveries(
     response_id: &str,
 ) -> Result<Vec<ResponseEvent>, errors::Error> {
     all_events(response_id).await
+}
+
+pub async fn list_promotion_intents(
+    response_id: &str,
+) -> Result<Vec<ResponseEvent>, errors::Error> {
+    Ok(oncall_response_events::Entity::find()
+        .filter(oncall_response_events::Column::ResponseId.eq(response_id))
+        .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::PromotionOwed.to_i32()))
+        .all(get_orm_client_rw().await)
+        .await?
+        .into_iter()
+        .filter_map(to_event)
+        .collect())
 }
 
 /// Every page this record actually attempted, per person and per channel.
@@ -1556,6 +2496,7 @@ pub async fn list_deliveries_page(
 ) -> Result<Vec<ResponseEvent>, errors::Error> {
     let client = get_orm_client_rw().await;
     Ok(deliveries_query(response_id)
+        .filter(oncall_response_events::Column::Delivered.is_not_null())
         .limit(limit)
         .offset(offset)
         .all(client)
@@ -1569,7 +2510,10 @@ pub async fn list_deliveries_page(
 /// of. "Showing 100" is not an answer to "was everybody reached".
 pub async fn count_deliveries(response_id: &str) -> Result<u64, errors::Error> {
     let client = get_orm_client_rw().await;
-    Ok(deliveries_query(response_id).count(client).await?)
+    Ok(deliveries_query(response_id)
+        .filter(oncall_response_events::Column::Delivered.is_not_null())
+        .count(client)
+        .await?)
 }
 
 /// Ordered exactly as [`all_events`] is, so a page of the ledger reads in the
@@ -1639,6 +2583,31 @@ pub async fn prune_events(cutoff: i64, max_records: u64) -> Result<(u64, u64), e
         .await?
         .rows_affected;
     Ok((records, deleted))
+}
+
+/// The pair's delivery row while it is still pending under `claim`.
+fn held_claim<Q: QueryFilter>(query: Q, pair: &DeliveryPair<'_>, claim: &Claim) -> Q {
+    query
+        .filter(oncall_response_events::Column::ResponseId.eq(pair.response_id))
+        .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Delivery.to_i32()))
+        .filter(oncall_response_events::Column::LadderRun.eq(pair.ladder_run))
+        .filter(oncall_response_events::Column::RungMicros.eq(pair.rung_micros))
+        .filter(oncall_response_events::Column::Recipient.eq(pair.recipient))
+        .filter(oncall_response_events::Column::Channel.eq(pair.channel.to_i32()))
+        .filter(oncall_response_events::Column::Delivered.is_null())
+        .filter(oncall_response_events::Column::ClaimToken.eq(claim.token.as_str()))
+}
+
+fn delivery_claim_clock(backend: DatabaseBackend) -> Result<&'static str, errors::Error> {
+    match backend {
+        DatabaseBackend::Postgres => {
+            Ok("CAST(EXTRACT(EPOCH FROM clock_timestamp()) * 1000000 AS BIGINT)")
+        }
+        DatabaseBackend::Sqlite => Ok("CAST(unixepoch('subsec') * 1000000 AS INTEGER)"),
+        _ => Err(Error::Message(
+            "unsupported metadata store for the delivery claim".to_string(),
+        )),
+    }
 }
 
 async fn all_events(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Error> {
@@ -1871,6 +2840,7 @@ async fn delivery_health_in<C: ConnectionTrait>(
     let rows: Vec<DeliveryTally> = oncall_response_events::Entity::find()
         .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Delivery.to_i32()))
         .filter(oncall_response_events::Column::Recipient.is_not_null())
+        .filter(oncall_response_events::Column::Delivered.is_not_null())
         .filter(oncall_response_events::Column::At.gte(since))
         .filter(
             oncall_response_events::Column::ResponseId.in_subquery(
@@ -1948,6 +2918,8 @@ async fn deliveries_by_person_in<C: ConnectionTrait>(
         oncall_response_events::Entity::find()
             .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Delivery.to_i32()))
             .filter(oncall_response_events::Column::Recipient.is_not_null())
+            // A pending claim is no page yet (M150); it counts once its outcome lands.
+            .filter(oncall_response_events::Column::Delivered.is_not_null())
             .filter(oncall_response_events::Column::At.gte(from))
             .filter(oncall_response_events::Column::At.lt(to))
             // The ledger has no org column, so the team restriction comes through its records.
@@ -2119,6 +3091,126 @@ async fn deepest_rungs_in<C: ConnectionTrait>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn declare_page_open_links_the_owner_and_fences_late_impacted_pages() {
+        use crate::{race::Barriers, table::alert_incidents};
+
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("declare_page");
+        let incident = alert_incidents::create(
+            &org,
+            "P2",
+            serde_json::json!({}),
+            "primary",
+            now_micros(),
+            None,
+        )
+        .await
+        .unwrap();
+        let id = incident.id.as_str();
+        alert_incidents::update_status(&org, id, "acknowledged")
+            .await
+            .unwrap();
+        let owner_subject = SubjectRef::new(SubjectType::Incident, id, 1);
+        let (owner, created) = with_declared_incident_episode(
+            &org,
+            id,
+            incident.reopen_count,
+            open_or_get(
+                &org,
+                &owner_subject,
+                None,
+                2,
+                None,
+                ResponderRole::Owner,
+                None,
+            ),
+        )
+        .await
+        .unwrap();
+        assert!(created);
+        assert_eq!(owner.incident_id.as_deref(), Some(id));
+        assert_eq!(list_for_incident(&org, id).await.unwrap()[0].id, owner.id);
+
+        let unrelated_subject =
+            SubjectRef::new(SubjectType::Incident, format!("{id}-unrelated"), 1);
+        let unrelated = with_declared_incident_episode(
+            &org,
+            id,
+            incident.reopen_count,
+            open(
+                &org,
+                &unrelated_subject,
+                None,
+                2,
+                None,
+                ResponderRole::Owner,
+                None,
+            ),
+        )
+        .await
+        .unwrap();
+        assert!(unrelated.incident_id.is_none());
+
+        let impacted_subject =
+            |team: &str| SubjectRef::new(SubjectType::Incident, format!("{id}:impacted:{team}"), 1);
+        let open_impacted = async |team: &str, origin_id: &str| {
+            with_declared_incident_episode(
+                &org,
+                id,
+                incident.reopen_count,
+                open_or_get(
+                    &org,
+                    &impacted_subject(team),
+                    Some(team),
+                    2,
+                    None,
+                    ResponderRole::Impacted,
+                    Some(origin_id),
+                ),
+            )
+            .await
+        };
+        let foreign = open_impacted("team", &unrelated.id).await;
+        assert!(
+            matches!(foreign, Err(Error::OtherError(error)) if error.is::<DeclaredIncidentEpisodeChanged>())
+        );
+        let (impacted, created) = open_impacted("team", &owner.id).await.unwrap();
+        assert!(created);
+        assert_eq!(
+            impacted.origin_response_id.as_deref(),
+            Some(owner.id.as_str())
+        );
+        assert!(impacted.incident_id.is_none());
+
+        let race = Barriers::new();
+        race.arm("declare.page_before_incident_lock", 2);
+        let late_open = race.run(open_impacted("late-team", &owner.id));
+        let change_episode = async {
+            alert_incidents::update_status(&org, id, "resolved")
+                .await
+                .unwrap();
+            let reopened = alert_incidents::update_status(&org, id, "open")
+                .await
+                .unwrap();
+            assert_eq!(reopened.reopen_count, incident.reopen_count + 1);
+            race.wait("declare.page_before_incident_lock").await;
+        };
+        let (late_open, ()) = tokio::join!(late_open, change_episode);
+        assert!(
+            matches!(late_open, Err(Error::OtherError(error)) if error.is::<DeclaredIncidentEpisodeChanged>())
+        );
+        assert!(
+            get_by_subject(&org, &impacted_subject("late-team"))
+                .await
+                .unwrap()
+                .is_none()
+        );
+        race.assert_all_met();
+    }
 
     #[tokio::test]
     async fn takeover_moves_only_the_previous_holders_acknowledged_page() {
@@ -2318,6 +3410,7 @@ mod tests {
             channel: None,
             delivered: None,
             templates: None,
+            claim_token: None,
         }
     }
 
@@ -2854,5 +3947,834 @@ mod tests {
             Some(&600),
             "no stored run is the first run"
         );
+    }
+
+    const CLAIM_SEC: i64 = 1_000_000;
+
+    fn claim_pair<'a>(response_id: &'a str, recipient: &'a str) -> DeliveryPair<'a> {
+        DeliveryPair {
+            response_id,
+            ladder_run: FIRST_LADDER_RUN,
+            rung_micros: 0,
+            recipient,
+            channel: Channel::Email,
+        }
+    }
+
+    async fn claim(
+        org_id: &str,
+        pair: &DeliveryPair<'_>,
+        retry_after_micros: i64,
+    ) -> Option<Claim> {
+        claim_delivery(org_id, pair, "o2-engine", "claimed", retry_after_micros)
+            .await
+            .unwrap()
+    }
+
+    /// Moves every ledger row of the record `micros` into the past, on the database's own values.
+    async fn age(response_id: &str, micros: i64) {
+        oncall_response_events::Entity::update_many()
+            .col_expr(
+                oncall_response_events::Column::At,
+                Expr::col(oncall_response_events::Column::At).sub(micros),
+            )
+            .filter(oncall_response_events::Column::ResponseId.eq(response_id))
+            .exec(get_orm_client_rw().await)
+            .await
+            .unwrap();
+    }
+
+    async fn pair_row(pair: &DeliveryPair<'_>) -> oncall_response_events::Model {
+        oncall_response_events::Entity::find()
+            .filter(oncall_response_events::Column::ResponseId.eq(pair.response_id))
+            .filter(oncall_response_events::Column::Recipient.eq(pair.recipient))
+            .one(get_orm_client_rw().await)
+            .await
+            .unwrap()
+            .expect("the pair has a row")
+    }
+
+    /// The sender's outcome write, stamped with the claim it holds.
+    async fn outcome(pair: &DeliveryPair<'_>, claim_at: i64, delivered: bool) {
+        let event = ResponseEvent::new(ResponseEventKind::Delivery, claim_at, "o2-engine", "sent")
+            .at_rung(pair.rung_micros)
+            .in_run(pair.ladder_run)
+            .delivered_to(pair.recipient, pair.channel, delivered);
+        add_event(pair.response_id, &event).await.unwrap();
+    }
+
+    fn duplicates(org_id: &str) -> u64 {
+        config::metrics::oncall::ONCALL_POSSIBLE_DUPLICATES
+            .with_label_values(&[org_id, "email"])
+            .get()
+    }
+
+    /// OF-8: the statement names its arm, and each claim hands back the `at` the row now holds.
+    #[tokio::test]
+    async fn test_a_claim_names_the_arm_that_took_the_pair() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("claim_org");
+        let record = crate::table::testing::unique("claim_rec");
+        let pair = claim_pair(&record, "ana@example.com");
+        let retry = 30 * CLAIM_SEC;
+
+        let first = claim(&org, &pair, retry).await.expect("a new pair");
+        assert_eq!(first.arm, ClaimArm::Inserted);
+        let row = pair_row(&pair).await;
+        assert_eq!((row.at, row.delivered), (first.claim_at, None));
+        assert!(
+            claim(&org, &pair, retry).await.is_none(),
+            "a live claim is in flight"
+        );
+
+        outcome(&pair, first.claim_at, false).await;
+        assert_eq!(pair_row(&pair).await.delivered, Some(false));
+        assert!(
+            claim(&org, &pair, retry).await.is_none(),
+            "a just-failed attempt's retry is not due"
+        );
+        age(&record, 31 * CLAIM_SEC).await;
+        let retried = claim(&org, &pair, retry).await.expect("the retry is due");
+        assert_eq!(retried.arm, ClaimArm::Failed);
+        let row = pair_row(&pair).await;
+        assert_eq!((row.at, row.delivered), (retried.claim_at, None));
+
+        let before = duplicates(&org);
+        age(&record, 31 * CLAIM_SEC).await;
+        let expired = claim(&org, &pair, retry).await.expect("the claim expired");
+        assert_eq!(expired.arm, ClaimArm::Expired);
+        assert_eq!(pair_row(&pair).await.at, expired.claim_at);
+        assert_eq!(duplicates(&org), before + 1);
+
+        outcome(&pair, expired.claim_at, true).await;
+        age(&record, 3_600 * CLAIM_SEC).await;
+        assert!(
+            claim(&org, &pair, retry).await.is_none(),
+            "a landed page is never claimed again"
+        );
+        assert_eq!(pair_row(&pair).await.delivered, Some(true));
+        assert_eq!(duplicates(&org), before + 1);
+    }
+
+    /// OF-9 `claim_uses_db_clock`: T1 on node 1 holds a claim stamped on node 1's clock (here
+    /// the database's); T2 on a node 20 s ahead cannot take it at 5 s or 15 s old.
+    #[tokio::test]
+    async fn test_claim_uses_db_clock() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("clock_org");
+        let record = crate::table::testing::unique("clock_rec");
+        let pair = claim_pair(&record, "ana@example.com");
+        let t1 = claim(&org, &pair, 30 * CLAIM_SEC).await.expect("T1 claims");
+        assert!(
+            (t1.claim_at - now_micros()).abs() < 60 * CLAIM_SEC,
+            "claim_at is a clock reading"
+        );
+        for (age_secs, taken) in [(5, false), (15, false), (31, true)] {
+            oncall_response_events::Entity::update_many()
+                .col_expr(
+                    oncall_response_events::Column::At,
+                    Expr::value(now_micros() - age_secs * CLAIM_SEC),
+                )
+                .filter(oncall_response_events::Column::ResponseId.eq(record.as_str()))
+                .exec(get_orm_client_rw().await)
+                .await
+                .unwrap();
+            let t2 = claim(&org, &pair, 30 * CLAIM_SEC).await;
+            assert_eq!(t2.is_some(), taken, "T1's claim {age_secs} s old: {t2:?}");
+            if let Some(t2) = t2 {
+                assert_eq!(t2.arm, ClaimArm::Expired);
+            }
+        }
+    }
+
+    /// Resolved 2: a claim statement that fails is an error, never "no claim".
+    #[tokio::test]
+    async fn test_a_failed_claim_statement_is_an_error_not_none() {
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let pair = claim_pair("resp_1", "ana@example.com");
+        assert!(
+            claim_delivery_in(&db, &pair, "o2-engine", "claimed", 0)
+                .await
+                .is_err()
+        );
+    }
+
+    /// The outcome write is stamped with its claim, so a claimant whose claim was taken over
+    /// cannot mark the new claimant's attempt failed.
+    #[tokio::test]
+    async fn test_an_outcome_applies_only_under_its_own_claim() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("outcome_org");
+        let record = crate::table::testing::unique("outcome_rec");
+        let pair = claim_pair(&record, "ana@example.com");
+        let t1 = claim(&org, &pair, 30 * CLAIM_SEC).await.unwrap();
+        age(&record, 31 * CLAIM_SEC).await;
+        // SQLite's clock has millisecond precision; two claims in one millisecond share a stamp.
+        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+        let t2 = claim(&org, &pair, 30 * CLAIM_SEC).await.unwrap();
+        assert_eq!(t2.arm, ClaimArm::Expired);
+        assert_ne!(t1.claim_at, t2.claim_at);
+
+        outcome(&pair, t1.claim_at, false).await;
+        let row = pair_row(&pair).await;
+        assert_eq!((row.at, row.delivered), (t2.claim_at, None));
+        outcome(&pair, t2.claim_at, false).await;
+        assert_eq!(pair_row(&pair).await.delivered, Some(false));
+    }
+
+    /// Restoring an expired lease timestamp must never restore the displaced ownership.
+    #[tokio::test]
+    async fn test_a_release_gives_back_only_its_own_pending_claim() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("release_org");
+        let record = crate::table::testing::unique("release_rec");
+        let retry = 30 * CLAIM_SEC;
+        let pair = claim_pair(&record, "ana@example.com");
+        let first = claim(&org, &pair, retry).await.unwrap();
+        let stranger = Claim {
+            token: ider::uuid(),
+            ..first.clone()
+        };
+        assert!(
+            !release_delivery_claim(&org, &pair, &stranger)
+                .await
+                .unwrap(),
+            "another claim's token"
+        );
+        assert!(release_delivery_claim(&org, &pair, &first).await.unwrap());
+        let before = duplicates(&org);
+        let again = claim(&org, &pair, retry).await.expect("claimed fresh");
+        assert_eq!(again.arm, ClaimArm::Inserted);
+        assert_eq!(duplicates(&org), before);
+
+        // T1's claim, aged past the expiry, was taken by T2: T1's release must not drop T2's.
+        age(&record, 31 * CLAIM_SEC).await;
+        let expired = pair_row(&pair).await;
+        assert_eq!(expired.claim_token.as_deref(), Some(again.token.as_str()));
+        let displaced = Claim {
+            claim_at: expired.at,
+            ..again
+        };
+        let taken = claim(&org, &pair, retry).await.unwrap();
+        assert_eq!(taken.arm, ClaimArm::Expired);
+        assert!(
+            !release_delivery_claim(&org, &pair, &displaced)
+                .await
+                .unwrap()
+        );
+        let row = pair_row(&pair).await;
+        assert_eq!((row.at, row.delivered), (taken.claim_at, None));
+        assert_eq!(row.id, expired.id);
+        assert_ne!(row.claim_token, expired.claim_token);
+
+        // T2 releases its expired-arm claim: the old pending stamp is back, so it stays expired.
+        assert!(release_delivery_claim(&org, &pair, &taken).await.unwrap());
+        let row = pair_row(&pair).await;
+        assert_eq!((row.at, row.delivered), (expired.at, None));
+        assert!(
+            renew_delivery_claim(&pair, &displaced)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(renew_delivery_claim(&pair, &taken).await.unwrap().is_none());
+        let retaken = claim(&org, &pair, retry).await.expect("still expired");
+        assert_eq!(retaken.arm, ClaimArm::Expired);
+
+        let landed = claim_pair(&record, "bo@example.com");
+        let sent = claim(&org, &landed, retry).await.unwrap();
+        outcome(&landed, sent.claim_at, true).await;
+        assert!(!release_delivery_claim(&org, &landed, &sent).await.unwrap());
+        assert_eq!(pair_row(&landed).await.delivered, Some(true));
+
+        // A failed attempt retried through the `Failed` arm and released keeps its failed row.
+        let failed = claim_pair(&record, "cy@example.com");
+        let tried = claim(&org, &failed, retry).await.unwrap();
+        outcome(&failed, tried.claim_at, false).await;
+        age(&record, 31 * CLAIM_SEC).await;
+        let failed_at = pair_row(&failed).await.at;
+        let retried = claim(&org, &failed, retry).await.unwrap();
+        assert_eq!(retried.arm, ClaimArm::Failed);
+        assert!(
+            release_delivery_claim(&org, &failed, &retried)
+                .await
+                .unwrap()
+        );
+        let row = pair_row(&failed).await;
+        assert_eq!((row.at, row.delivered), (failed_at, Some(false)));
+    }
+
+    #[tokio::test]
+    async fn a_released_retry_preserves_the_previous_delivery_details() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("retry_details_org");
+        let record = crate::table::testing::unique("retry_details_resp");
+        let pair = claim_pair(&record, "ana@example.com");
+        let retry_after = 30 * CLAIM_SEC;
+        let first = claim(&org, &pair, retry_after).await.unwrap();
+        outcome(&pair, first.claim_at, false).await;
+        age(&record, 31 * CLAIM_SEC).await;
+        let prior = pair_row(&pair).await;
+
+        let retry = claim_delivery(&org, &pair, "retry-sender", "retry body", retry_after)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(retry.arm, ClaimArm::Failed);
+        assert!(release_delivery_claim(&org, &pair, &retry).await.unwrap());
+
+        let restored = pair_row(&pair).await;
+        assert_eq!(
+            (
+                restored.at,
+                restored.delivered,
+                restored.actor,
+                restored.body
+            ),
+            (prior.at, prior.delivered, prior.actor, prior.body)
+        );
+    }
+
+    /// Two senders claim one pair at once; exactly one wins, on either store.
+    #[tokio::test]
+    async fn test_two_claims_of_one_pair_take_it_once() {
+        use sea_orm::TransactionTrait;
+
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("race_org");
+        let side = |record: String, race: Option<crate::race::Barriers>| async move {
+            let pair = claim_pair(&record, "ana@example.com");
+            let tx = get_orm_client_rw().await.begin().await.unwrap();
+            let claim = match race {
+                Some(race) => {
+                    race.run(claim_delivery_in(&tx, &pair, "o2-engine", "claimed", 0))
+                        .await
+                }
+                None => claim_delivery_in(&tx, &pair, "o2-engine", "claimed", 0).await,
+            }
+            .unwrap();
+            tx.commit().await.unwrap();
+            claim
+        };
+        let store: config::meta::meta_store::MetaStore =
+            config::get_config().common.meta_store.as_str().into();
+        if store == config::meta::meta_store::MetaStore::PostgreSQL {
+            let record = crate::table::testing::unique(&org);
+            let race = crate::race::Barriers::new();
+            race.arm("claim_delivery.before_claim", 2);
+            let a = tokio::spawn(side(record.clone(), Some(race.clone())));
+            let b = tokio::spawn(side(record.clone(), Some(race.clone())));
+            let (a, b) = (a.await.unwrap(), b.await.unwrap());
+            race.assert_all_met();
+            assert_eq!(
+                [a, b].iter().flatten().count(),
+                1,
+                "exactly one claim: {a:?} {b:?}"
+            );
+            return;
+        }
+        let runs = crate::race::in_both_orders(|_| {
+            let record = crate::table::testing::unique(&org);
+            async move { (side(record.clone(), None), side(record, None)) }
+        })
+        .await;
+        for run in runs {
+            let first = match run.order {
+                crate::race::Order::AThenB => (&run.a, &run.b),
+                crate::race::Order::BThenA => (&run.b, &run.a),
+            };
+            assert_eq!(first.0.map(|c| c.arm), Some(ClaimArm::Inserted), "{run:?}");
+            assert!(first.1.is_none(), "{run:?}");
+        }
+    }
+
+    /// M150 (3): the ledger page and count, delivery health, per-person load and the inbox
+    /// leave out a pending claim.
+    #[tokio::test]
+    async fn test_readers_leave_out_a_pending_claim() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("readers_org");
+        let record = crate::table::testing::unique("readers_rec");
+        let mut row = model();
+        row.id = record.clone();
+        row.org_id = org.clone();
+        row.team_id = Some("team_r".into());
+        oncall_responses::ActiveModel::from(row)
+            .insert(get_orm_client_rw().await)
+            .await
+            .unwrap();
+        let landed = claim_pair(&record, "ana@example.com");
+        let failed = claim_pair(&record, "bob@example.com");
+        let pending = claim_pair(&record, "carol@example.com");
+        for (pair, delivered) in [
+            (&landed, Some(true)),
+            (&failed, Some(false)),
+            (&pending, None),
+        ] {
+            let c = claim(&org, pair, 30 * CLAIM_SEC).await.unwrap();
+            if let Some(delivered) = delivered {
+                outcome(pair, c.claim_at, delivered).await;
+            }
+        }
+
+        let page = list_deliveries_page(&record, 100, 0).await.unwrap();
+        let who: Vec<_> = page.iter().filter_map(|e| e.recipient.as_deref()).collect();
+        assert_eq!(who.len(), 2, "{who:?}");
+        assert!(!who.contains(&"carol@example.com"));
+        assert_eq!(count_deliveries(&record).await.unwrap(), 2);
+
+        let health = delivery_health(&org, "team_r", 0).await.unwrap();
+        assert_eq!(health.len(), 2, "{health:?}");
+        assert!(!health.contains_key(&("carol@example.com".to_string(), Channel::Email)));
+
+        let load = deliveries_by_person(&org, "team_r", 0, i64::MAX, &[(0, i64::MAX)])
+            .await
+            .unwrap();
+        assert_eq!(load.len(), 2, "{load:?}");
+        assert!(load.iter().all(|(who, ..)| who != "carol@example.com"));
+
+        let q = super::super::oncall_deliveries::InboxQuery::default();
+        let inbox = |who: &'static str| {
+            let (org, q) = (org.clone(), q.clone());
+            async move {
+                let list = super::super::oncall_deliveries::list_for_user(&org, who, &q, 10, 0)
+                    .await
+                    .unwrap();
+                let count = super::super::oncall_deliveries::count_for_user(&org, who, &q)
+                    .await
+                    .unwrap();
+                (list.len(), count)
+            }
+        };
+        assert_eq!(inbox("ana@example.com").await, (1, 1));
+        assert_eq!(inbox("carol@example.com").await, (0, 0));
+    }
+    async fn ownership_backends() -> Vec<sea_orm::DatabaseConnection> {
+        let dbs = crate::table::migration::sqlite_and_postgres_for_test("page_ownership").await;
+        for db in &dbs {
+            let backend = db.get_database_backend();
+            let schema = sea_orm::Schema::new(backend);
+            for stmt in [
+                schema.create_table_from_entity(oncall_responses::Entity),
+                schema.create_table_from_entity(super::super::entity::alert_incidents::Entity),
+                schema.create_table_from_entity(super::super::entity::incident_events::Entity),
+            ] {
+                db.execute(backend.build(&stmt)).await.unwrap();
+            }
+        }
+        dbs
+    }
+
+    async fn owned_orphan_page(db: &sea_orm::DatabaseConnection, id: &str, explicit: bool) {
+        use config::meta::alerts::incidents::IncidentEvent;
+
+        use super::super::{entity::alert_incidents as incidents, incident_events};
+
+        incidents::ActiveModel {
+            id: Set(id.to_string()),
+            org_id: Set("default".to_string()),
+            status: Set("open".to_string()),
+            severity: Set("P2".to_string()),
+            group_values: Set(serde_json::json!({})),
+            key_type: Set("service".to_string()),
+            first_alert_at: Set(100),
+            last_alert_at: Set(100),
+            alert_count: Set(1),
+            assigned_to: Set(Some("ana".to_string())),
+            created_at: Set(100),
+            updated_at: Set(100),
+            ..Default::default()
+        }
+        .insert(db)
+        .await
+        .unwrap();
+        let assignment = if explicit {
+            IncidentEvent::assignment_changed(None, Some("ana".into()), "ana")
+        } else {
+            IncidentEvent::assignment_changed_via_ack(None, Some("ana".into()), "ana")
+        };
+        incident_events::append_with(db, "default", id, assignment)
+            .await
+            .unwrap();
+        let mut page = model();
+        page.id = id.to_string();
+        page.incident_id = Some(id.to_string());
+        page.state = ResponseState::Acknowledged.to_i32();
+        page.acked_by = Some("ana".to_string());
+        page.acked_at = Some(500);
+        oncall_responses::ActiveModel::from(page)
+            .insert(db)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn orphan_unack_handoff_and_resolve_clear_only_the_actors_ack_set_lead() {
+        use super::super::{entity::alert_incidents as incidents, incident_events};
+
+        for db in ownership_backends().await {
+            for action in ["unack", "handoff", "resolve"] {
+                for (explicit, actor, clears) in [
+                    (false, "ana", true),
+                    (true, "ana", false),
+                    (false, "bo", false),
+                ] {
+                    let id = format!("{action}_{explicit}_{actor}");
+                    owned_orphan_page(&db, &id, explicit).await;
+                    let after = if action == "resolve" {
+                        resolve_in(
+                            &db,
+                            "default",
+                            &id,
+                            PageResolution {
+                                actor: Some(actor),
+                                cause: None,
+                                note: None,
+                            },
+                        )
+                        .await
+                        .unwrap()
+                        .unwrap()
+                    } else {
+                        hand_over_as_in(
+                            &db,
+                            "default",
+                            &id,
+                            HandoffEdit {
+                                to_team_id: (action == "handoff").then_some("team_2"),
+                                expected_holder: (action == "unack").then_some("ana"),
+                                actor: Some(actor),
+                                now: 10_000,
+                            },
+                        )
+                        .await
+                        .unwrap()
+                        .unwrap()
+                    };
+                    assert_eq!(
+                        after.state,
+                        if action == "resolve" {
+                            ResponseState::Resolved
+                        } else {
+                            ResponseState::Triggered
+                        }
+                    );
+                    let lead = incidents::Entity::find_by_id(&id)
+                        .one(&db)
+                        .await
+                        .unwrap()
+                        .unwrap();
+                    assert_eq!(lead.assigned_to.is_none(), clears, "{id}");
+                    assert_eq!(
+                        incident_events::get_with(&db, "default", &id)
+                            .await
+                            .unwrap()
+                            .len(),
+                        if clears { 2 } else { 1 }
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_page_clear_that_loses_its_holder_guard_rolls_back_lead_and_event() {
+        use super::super::{entity::alert_incidents as incidents, incident_events};
+
+        for db in ownership_backends().await {
+            owned_orphan_page(&db, "lost", false).await;
+            let before = incident_events::seq_with(&db, "default", "lost")
+                .await
+                .unwrap();
+            let result = hand_over_as_in(
+                &db,
+                "default",
+                "lost",
+                HandoffEdit {
+                    to_team_id: None,
+                    expected_holder: Some("bo"),
+                    actor: Some("ana"),
+                    now: 10_000,
+                },
+            )
+            .await
+            .unwrap();
+            assert!(result.is_none());
+            let lead = incidents::Entity::find_by_id("lost")
+                .one(&db)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(lead.assigned_to.as_deref(), Some("ana"));
+            assert_eq!(
+                incident_events::seq_with(&db, "default", "lost")
+                    .await
+                    .unwrap(),
+                before
+            );
+            let page = oncall_responses::Entity::find_by_id("lost")
+                .one(&db)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(page.acked_by.as_deref(), Some("ana"));
+            assert_eq!(page.state, ResponseState::Acknowledged.to_i32());
+        }
+    }
+
+    #[tokio::test]
+    async fn a_failed_orphan_assignment_event_preserves_the_page_and_lead() {
+        use super::super::entity::alert_incidents as incidents;
+
+        for db in ownership_backends().await {
+            owned_orphan_page(&db, "failed", false).await;
+            let before = oncall_responses::Entity::find_by_id("failed")
+                .one(&db)
+                .await
+                .unwrap()
+                .unwrap();
+            db.execute_unprepared("DROP TABLE incident_events")
+                .await
+                .unwrap();
+            assert!(
+                hand_over_as_in(
+                    &db,
+                    "default",
+                    "failed",
+                    HandoffEdit {
+                        to_team_id: None,
+                        expected_holder: Some("ana"),
+                        actor: Some("ana"),
+                        now: 10_000,
+                    }
+                )
+                .await
+                .is_err()
+            );
+            assert_eq!(
+                oncall_responses::Entity::find_by_id("failed")
+                    .one(&db)
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                before
+            );
+            assert_eq!(
+                incidents::Entity::find_by_id("failed")
+                    .one(&db)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .assigned_to
+                    .as_deref(),
+                Some("ana")
+            );
+        }
+    }
+    #[tokio::test]
+    async fn stale_resolve_and_handoff_snapshots_return_conflict_and_preserve_the_newer_page() {
+        use std::sync::Arc;
+
+        use super::super::{entity::alert_incidents as incidents, incident_events};
+        use crate::race::Barriers;
+
+        for db in ownership_backends().await {
+            let db = Arc::new(db);
+            for (action, mutation) in [
+                ("resolve", "ack"),
+                ("resolve", "snooze"),
+                ("handoff", "ack"),
+                ("handoff", "snooze"),
+                ("unack", "snooze"),
+                ("closed_resolve", "reopen"),
+            ] {
+                let id = format!("stale_{action}_{mutation}");
+                owned_orphan_page(&db, &id, false).await;
+                if action == "closed_resolve" {
+                    oncall_responses::Entity::update_many()
+                        .col_expr(
+                            oncall_responses::Column::State,
+                            Expr::value(ResponseState::Resolved.to_i32()),
+                        )
+                        .col_expr(oncall_responses::Column::ClosedAt, Expr::value(2_000))
+                        .filter(oncall_responses::Column::Id.eq(&id))
+                        .exec(db.as_ref())
+                        .await
+                        .unwrap();
+                }
+                let (read, proceed) = if action == "resolve" || action == "closed_resolve" {
+                    (
+                        "oncall_responses.resolve_after_read",
+                        "oncall_responses.resolve_before_write",
+                    )
+                } else {
+                    (
+                        "oncall_responses.handoff_after_read",
+                        "oncall_responses.handoff_before_write",
+                    )
+                };
+                let race = Barriers::new();
+                race.arm(read, 2);
+                race.arm(proceed, 2);
+                let pending = {
+                    let (db, race, id) = (db.clone(), race.clone(), id.clone());
+                    tokio::spawn(async move {
+                        race.run(async {
+                            if action == "resolve" || action == "closed_resolve" {
+                                resolve_in(
+                                    db.as_ref(),
+                                    "default",
+                                    &id,
+                                    PageResolution {
+                                        actor: Some("ana"),
+                                        cause: None,
+                                        note: None,
+                                    },
+                                )
+                                .await
+                            } else {
+                                hand_over_as_in(
+                                    db.as_ref(),
+                                    "default",
+                                    &id,
+                                    HandoffEdit {
+                                        to_team_id: (action == "handoff").then_some("team_2"),
+                                        expected_holder: (action == "unack").then_some("ana"),
+                                        actor: Some("ana"),
+                                        now: 10_000,
+                                    },
+                                )
+                                .await
+                            }
+                        })
+                        .await
+                    })
+                };
+                race.wait(read).await;
+                let mut update = oncall_responses::Entity::update_many()
+                    .col_expr(oncall_responses::Column::UpdatedAt, next_revision(3_000));
+                update = match mutation {
+                    "ack" => update
+                        .col_expr(oncall_responses::Column::AckedBy, Expr::value("bo"))
+                        .col_expr(oncall_responses::Column::AckedAt, Expr::value(3_000)),
+                    "snooze" => {
+                        update.col_expr(oncall_responses::Column::SnoozedUntil, Expr::value(30_000))
+                    }
+                    "reopen" => update
+                        .col_expr(
+                            oncall_responses::Column::State,
+                            Expr::value(ResponseState::Triggered.to_i32()),
+                        )
+                        .col_expr(
+                            oncall_responses::Column::ClosedAt,
+                            Expr::value(Option::<i64>::None),
+                        ),
+                    _ => panic!("unexpected mutation"),
+                };
+                update
+                    .filter(oncall_responses::Column::Id.eq(&id))
+                    .exec(db.as_ref())
+                    .await
+                    .unwrap();
+                let page = oncall_responses::Entity::find_by_id(&id)
+                    .one(db.as_ref())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let lead = incidents::Entity::find_by_id(&id)
+                    .one(db.as_ref())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let seq = incident_events::seq_with(db.as_ref(), "default", &id)
+                    .await
+                    .unwrap();
+                race.wait(proceed).await;
+                let error = pending.await.unwrap().unwrap_err();
+                race.assert_all_met();
+                let Error::OtherError(error) = error else {
+                    panic!("a revision loss must return a typed conflict");
+                };
+                assert_eq!(
+                    error
+                        .downcast_ref::<ResponseConflict>()
+                        .unwrap()
+                        .response_id,
+                    id
+                );
+                assert_eq!(
+                    oncall_responses::Entity::find_by_id(&id)
+                        .one(db.as_ref())
+                        .await
+                        .unwrap()
+                        .unwrap(),
+                    page
+                );
+                assert_eq!(
+                    incidents::Entity::find_by_id(&id)
+                        .one(db.as_ref())
+                        .await
+                        .unwrap()
+                        .unwrap(),
+                    lead
+                );
+                assert_eq!(
+                    incident_events::seq_with(db.as_ref(), "default", &id)
+                        .await
+                        .unwrap(),
+                    seq
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_repeated_resolve_keeps_the_original_close_and_cause() {
+        for db in ownership_backends().await {
+            owned_orphan_page(&db, "repeated_resolve", false).await;
+            let first = resolve_in(
+                &db,
+                "default",
+                "repeated_resolve",
+                PageResolution {
+                    actor: Some("ana"),
+                    cause: None,
+                    note: Some("fixed"),
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+            let second = resolve_in(
+                &db,
+                "default",
+                "repeated_resolve",
+                PageResolution {
+                    actor: Some("ana"),
+                    cause: None,
+                    note: None,
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+            assert_eq!(second.closed_at, first.closed_at);
+            assert_eq!(second.cause_note, first.cause_note);
+            assert_eq!(second.state, ResponseState::Resolved);
+        }
     }
 }

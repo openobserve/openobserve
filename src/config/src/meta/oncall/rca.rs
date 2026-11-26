@@ -19,15 +19,15 @@
 use serde::{Deserialize, Serialize};
 
 use super::subject::SubjectType;
-use crate::meta::alerts::priority::AlertPriority;
+use crate::meta::alerts::{priority::AlertPriority, what_changed::WhatChanged};
 
 pub const MAX_BUNDLE_ITEMS: usize = 12;
 pub const MAX_OFFERED_ACTIONS: usize = 6;
+pub const MAX_DECLARED_QUERY_BYTES: usize = 8 * 1024;
+pub const LOCAL_SERVING_REGION: &str = "local";
+const CONTEXT_LEAD_US: i64 = 2 * 60 * 60 * 1_000_000;
 
-/// What the RCA agent is told about the thing it is investigating.
-///
-/// A field it has nothing to say about is omitted from the wire, never sent as `null` — `o2-ai`
-/// routes on key presence, which a null satisfies.
+/// Unset fields must be omitted because the agent routes on key presence.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RcaContext {
     pub subject_type: SubjectType,
@@ -50,6 +50,143 @@ pub struct RcaContext {
     pub dimensions: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence: Option<EvidenceBundle>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub impact_start_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window_start_us: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_alert_at_us: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fired_at_us: Option<i64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub affected_services: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub history_reads_allowed: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<RcaCapabilities>,
+    #[serde(default, skip_serializing_if = "recent_changes_are_empty")]
+    pub recent_changes: Option<WhatChanged>,
+    #[serde(
+        default,
+        skip_serializing_if = "texts_are_empty",
+        serialize_with = "serialize_texts"
+    )]
+    pub similar_causes: Vec<String>,
+    #[serde(default, skip_serializing_if = "declared_context_is_empty")]
+    pub declared_context: Option<DeclaredContext>,
+}
+
+impl RcaContext {
+    pub fn new(
+        subject_type: SubjectType,
+        subject_id: impl Into<String>,
+        org_id: impl Into<String>,
+    ) -> Self {
+        let subject_id = subject_id.into();
+        Self {
+            subject_type,
+            incident_id: (subject_type == SubjectType::Incident).then(|| subject_id.clone()),
+            subject_id,
+            org_id: org_id.into(),
+            previous_analysis: None,
+            severity: None,
+            past_causes: Vec::new(),
+            alert_name: None,
+            stream: None,
+            dimensions: None,
+            evidence: None,
+            impact_start_at: None,
+            window_start_us: None,
+            first_alert_at_us: None,
+            fired_at_us: None,
+            affected_services: Vec::new(),
+            history_reads_allowed: None,
+            capabilities: None,
+            recent_changes: None,
+            similar_causes: Vec::new(),
+            declared_context: None,
+        }
+    }
+
+    pub fn with_window(mut self, impact_start_at: i64) -> Self {
+        self.impact_start_at = Some(impact_start_at);
+        self.window_start_us = Some(impact_start_at.saturating_sub(CONTEXT_LEAD_US));
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RcaCapabilities {
+    pub edition: RcaEdition,
+    #[serde(default)]
+    pub service_versions: bool,
+    #[serde(default)]
+    pub service_streams: bool,
+    #[serde(default)]
+    pub incident_events: bool,
+    #[serde(default)]
+    pub service_graph_edge_trend: bool,
+    #[serde(default)]
+    pub super_cluster: bool,
+    #[serde(default, skip_serializing_if = "optional_text_is_empty")]
+    pub serving_region: Option<String>,
+}
+
+impl RcaCapabilities {
+    pub fn oss() -> Self {
+        Self {
+            edition: RcaEdition::Oss,
+            service_versions: false,
+            service_streams: false,
+            incident_events: false,
+            service_graph_edge_trend: false,
+            super_cluster: false,
+            serving_region: Some(LOCAL_SERVING_REGION.to_string()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RcaEdition {
+    Oss,
+    Enterprise,
+    Cloud,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DeclaredContext {
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub kind: String,
+    #[serde(
+        skip_serializing_if = "String::is_empty",
+        serialize_with = "serialize_declared_query",
+        deserialize_with = "deserialize_declared_query"
+    )]
+    pub query: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub streams: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub window: Option<DeclaredContextWindow>,
+    #[serde(skip_serializing_if = "optional_text_is_empty")]
+    pub result_summary: Option<String>,
+}
+
+impl DeclaredContext {
+    pub fn is_empty(&self) -> bool {
+        self.kind.is_empty()
+            && self.query.is_empty()
+            && self.streams.is_empty()
+            && self.window.is_none()
+            && optional_text_is_empty(&self.result_summary)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeclaredContextWindow {
+    pub start_us: i64,
+    pub end_us: i64,
 }
 
 /// The engine's findings for the issue behind an incident; the model starts from them.
@@ -94,24 +231,184 @@ pub struct OfferedAction {
     pub from: Vec<String>,
 }
 
+fn recent_changes_are_empty(changes: &Option<WhatChanged>) -> bool {
+    changes.as_ref().is_none_or(WhatChanged::is_empty)
+}
+
+fn declared_context_is_empty(context: &Option<DeclaredContext>) -> bool {
+    context.as_ref().is_none_or(DeclaredContext::is_empty)
+}
+
+fn optional_text_is_empty(text: &Option<String>) -> bool {
+    text.as_ref().is_none_or(String::is_empty)
+}
+
+fn texts_are_empty(texts: &[String]) -> bool {
+    texts.iter().all(|text| text.trim().is_empty())
+}
+
+fn serialize_texts<S: serde::Serializer>(
+    texts: &[String],
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let texts: Vec<_> = texts
+        .iter()
+        .filter(|text| !text.trim().is_empty())
+        .collect();
+    texts.serialize(serializer)
+}
+
+fn serialize_declared_query<S: serde::Serializer>(
+    query: &str,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    if query.len() > MAX_DECLARED_QUERY_BYTES {
+        return Err(serde::ser::Error::custom("declared query exceeds 8 KiB"));
+    }
+    serializer.serialize_str(query)
+}
+
+fn deserialize_declared_query<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<String, D::Error> {
+    let query = String::deserialize(deserializer)?;
+    if query.len() > MAX_DECLARED_QUERY_BYTES {
+        return Err(serde::de::Error::custom("declared query exceeds 8 KiB"));
+    }
+    Ok(query)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn base(subject_type: SubjectType, incident_id: Option<String>) -> RcaContext {
-        RcaContext {
-            subject_type,
-            subject_id: "al_ckt#1".to_string(),
-            incident_id,
-            org_id: "default".to_string(),
-            previous_analysis: None,
-            severity: None,
-            past_causes: Vec::new(),
-            alert_name: None,
-            stream: None,
-            dimensions: None,
-            evidence: None,
+    #[test]
+    fn rca_context_json_keeps_the_legacy_bytes_when_new_fields_are_empty() {
+        let context = RcaContext::new(SubjectType::Alert, "al_ckt#1", "default");
+        assert_eq!(
+            serde_json::to_string(&context).unwrap(),
+            r#"{"subject_type":"alert","subject_id":"al_ckt#1","org_id":"default"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&RcaContext::new(SubjectType::Incident, "inc_1", "default"))
+                .unwrap(),
+            r#"{"subject_type":"incident","subject_id":"inc_1","incident_id":"inc_1","org_id":"default"}"#
+        );
+        let mut empty = context;
+        empty.recent_changes = Some(WhatChanged::default());
+        empty.declared_context = Some(DeclaredContext::default());
+        empty.similar_causes = vec![String::new(), "  ".into()];
+        assert_eq!(
+            serde_json::to_string(&empty).unwrap(),
+            serde_json::to_string(&base(SubjectType::Alert, None)).unwrap()
+        );
+        let json = serde_json::to_value(empty).unwrap();
+        for key in [
+            "impact_start_at",
+            "window_start_us",
+            "first_alert_at_us",
+            "fired_at_us",
+            "affected_services",
+            "history_reads_allowed",
+            "capabilities",
+            "recent_changes",
+            "similar_causes",
+            "declared_context",
+        ] {
+            assert!(json.get(key).is_none(), "{key}: {json}");
         }
+    }
+
+    #[test]
+    fn rca_context_json_sends_each_new_field_when_set_and_never_null() {
+        let mut context = RcaContext::new(SubjectType::Incident, "inc_1", "default")
+            .with_window(14 * 3_600_000_000);
+        context.first_alert_at_us = Some(14 * 3_600_000_000);
+        context.fired_at_us = Some(14 * 3_600_000_000);
+        context.affected_services = vec!["checkout".into()];
+        context.history_reads_allowed = Some(false);
+        context.capabilities = Some(RcaCapabilities::oss());
+        context.recent_changes = Some(WhatChanged {
+            coverage: crate::meta::alerts::what_changed::ChangeCoverage {
+                change_events: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        context.similar_causes = vec!["reviewed cause".into()];
+        context.declared_context = Some(DeclaredContext {
+            kind: "logs".into(),
+            query: "select * from app".into(),
+            streams: vec!["app".into()],
+            window: Some(DeclaredContextWindow {
+                start_us: 1,
+                end_us: 2,
+            }),
+            result_summary: Some("3 errors".into()),
+        });
+        let json = serde_json::to_value(&context).unwrap();
+        for key in [
+            "impact_start_at",
+            "window_start_us",
+            "first_alert_at_us",
+            "fired_at_us",
+            "affected_services",
+            "history_reads_allowed",
+            "capabilities",
+            "recent_changes",
+            "similar_causes",
+            "declared_context",
+        ] {
+            assert!(!json[key].is_null(), "{key}: {json}");
+        }
+        assert_eq!(json["history_reads_allowed"], false);
+        assert_eq!(
+            json["declared_context"]["window"],
+            serde_json::json!({"start_us": 1, "end_us": 2})
+        );
+        assert!(json.get("serving_region").is_none());
+    }
+
+    #[test]
+    fn impact_and_alert_windows_start_two_hours_before_their_subject() {
+        let onset = 14 * 3_600_000_000;
+        let incident =
+            RcaContext::new(SubjectType::Incident, "inc_1", "default").with_window(onset);
+        assert_eq!(incident.impact_start_at, Some(onset));
+        assert_eq!(incident.window_start_us, Some(12 * 3_600_000_000));
+        let alert = RcaContext::new(SubjectType::Alert, "al_1#1", "default").with_window(onset);
+        assert_eq!(alert.window_start_us, incident.window_start_us);
+    }
+
+    #[test]
+    fn declared_query_is_limited_to_eight_kibibytes() {
+        let mut declared = DeclaredContext {
+            query: "x".repeat(MAX_DECLARED_QUERY_BYTES),
+            ..Default::default()
+        };
+        assert!(serde_json::to_value(&declared).is_ok());
+        declared.query.push('x');
+        assert!(serde_json::to_value(&declared).is_err());
+        let json = serde_json::json!({"query": "x".repeat(MAX_DECLARED_QUERY_BYTES + 1)});
+        assert!(serde_json::from_value::<DeclaredContext>(json).is_err());
+    }
+
+    #[test]
+    fn oss_capabilities_name_the_available_reads() {
+        let json = serde_json::to_value(RcaCapabilities::oss()).unwrap();
+        assert_eq!(json["edition"], "oss");
+        assert_eq!(json["service_versions"], false);
+        assert_eq!(json["service_streams"], false);
+        assert_eq!(json["incident_events"], false);
+        assert_eq!(json["service_graph_edge_trend"], false);
+        assert_eq!(json["super_cluster"], false);
+        assert_eq!(json["serving_region"], "local");
+    }
+
+    fn base(subject_type: SubjectType, incident_id: Option<String>) -> RcaContext {
+        let mut context = RcaContext::new(subject_type, "al_ckt#1", "default");
+        context.incident_id = incident_id;
+        context
     }
 
     /// Pins the exact wire shape: an alert subject omits the key entirely,

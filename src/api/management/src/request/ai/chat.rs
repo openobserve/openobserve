@@ -151,7 +151,7 @@ const MAX_TURN_CLIENT_ID_BYTES: usize = 128;
 
 /// The RCA agent's context contract (`RcaContext`, `is_reanalysis`); o2-ai routes on key presence.
 #[cfg(feature = "enterprise")]
-const RCA_CONTEXT_KEYS: [&str; 10] = [
+const RCA_CONTEXT_KEYS: [&str; 21] = [
     "subject_type",
     "subject_id",
     "incident_id",
@@ -162,6 +162,17 @@ const RCA_CONTEXT_KEYS: [&str; 10] = [
     "stream",
     "dimensions",
     "is_reanalysis",
+    "evidence",
+    "impact_start_at",
+    "first_alert_at_us",
+    "window_start_us",
+    "fired_at_us",
+    "affected_services",
+    "history_reads_allowed",
+    "capabilities",
+    "recent_changes",
+    "similar_causes",
+    "declared_context",
 ];
 
 /// Client keys an RCA chat keeps: display fields, timezone, locale and the door; never RCA inputs.
@@ -928,11 +939,12 @@ async fn incident_rca_context(
         return None;
     }
     Some(
-        o2_enterprise::enterprise::alerts::rca_service::build_incident_context(
+        openobserve_core::alerts::rca_context::incident_context(
             org_id,
             incident_id,
             None,
             None,
+            Some(user_id),
         )
         .await,
     )
@@ -980,8 +992,8 @@ pub(crate) async fn can_run_incident_rca(org_id: &str, user_id: &str, incident_i
         return false;
     }
     match infra::table::alert_incidents::get(org_id, incident_id).await {
-        Ok(Some(_)) => {}
-        Ok(None) => return false,
+        Ok(Some(incident)) if !incident.security_case => {}
+        Ok(Some(_)) | Ok(None) => return false,
         Err(e) => {
             log::error!("[org_id:{org_id}] failed to load incident for AI chat: {e}");
             return false;
@@ -5622,19 +5634,15 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     fn incident_rca_context() -> RcaContext {
-        RcaContext {
-            subject_type: config::meta::oncall::subject::SubjectType::Incident,
-            subject_id: "inc-1".to_string(),
-            incident_id: Some("inc-1".to_string()),
-            org_id: "org-a".to_string(),
-            previous_analysis: None,
-            severity: Some(config::meta::alerts::priority::AlertPriority::P2),
-            past_causes: vec!["disk full".to_string()],
-            alert_name: None,
-            stream: None,
-            dimensions: None,
-            evidence: None,
-        }
+        let mut context = RcaContext::new(
+            config::meta::oncall::subject::SubjectType::Incident,
+            "inc-1",
+            "org-a",
+        );
+        context.incident_id = Some("inc-1".to_string());
+        context.severity = Some(config::meta::alerts::priority::AlertPriority::P2);
+        context.past_causes = vec!["disk full".to_string()];
+        context
     }
 
     #[cfg(feature = "enterprise")]
@@ -5657,6 +5665,15 @@ mod tests {
         full.alert_name = Some("a".to_string());
         full.stream = Some("s".to_string());
         full.dimensions = Some(serde_json::json!({"k": "v"}));
+        full = full.with_window(14 * 3_600_000_000);
+        full.first_alert_at_us = Some(14 * 3_600_000_000);
+        full.fired_at_us = Some(14 * 3_600_000_000);
+        full.affected_services = vec!["checkout".into()];
+        full.history_reads_allowed = Some(false);
+        full.capabilities =
+            Some(openobserve_core::alerts::rca_capabilities::rca_capabilities("org-a"));
+        full.recent_changes = Some(Default::default());
+        full.similar_causes = vec!["reviewed cause".into()];
         let json = serde_json::to_value(full).unwrap();
         for key in json.as_object().unwrap().keys() {
             assert!(
@@ -5688,22 +5705,26 @@ mod tests {
         context["alert_name"] = serde_json::json!("forged");
         context["stream"] = serde_json::json!("forged");
         context["dimensions"] = serde_json::json!({"forged": true});
+        for key in [
+            "impact_start_at",
+            "window_start_us",
+            "first_alert_at_us",
+            "fired_at_us",
+            "affected_services",
+            "history_reads_allowed",
+            "capabilities",
+            "recent_changes",
+            "similar_causes",
+            "declared_context",
+            "evidence",
+        ] {
+            context[key] = serde_json::json!("forged");
+        }
 
         let (agent, context) = select_chat_agent(context, None);
         assert_eq!(agent, DEFAULT_AGENT_TYPE);
         let obj = context.as_object().unwrap();
-        for key in [
-            "subject_type",
-            "subject_id",
-            "incident_id",
-            "previous_analysis",
-            "severity",
-            "past_causes",
-            "alert_name",
-            "stream",
-            "dimensions",
-            "is_reanalysis",
-        ] {
+        for key in RCA_CONTEXT_KEYS {
             assert!(!obj.contains_key(key), "{key} must be stripped: {context}");
         }
         assert_eq!(context["stream_name"], "default");
@@ -6070,6 +6091,7 @@ mod tests {
             security_case: false,
             historical: false,
             last_detection_at: None,
+            ..Default::default()
         };
         alert_incidents::Entity::insert(alert_incidents::ActiveModel::from(row).reset_all())
             .exec(conn)

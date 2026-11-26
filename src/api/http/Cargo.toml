@@ -90,6 +90,7 @@ infra.workspace = true
 futures-util.workspace = true
 
 [dev-dependencies]
+openobserve-mcp = { workspace = true, features = ["test-utils"] }
 base64.workspace = true
 jsonschema = { version = "0.38", default-features = false }
 opentelemetry-proto.workspace = true

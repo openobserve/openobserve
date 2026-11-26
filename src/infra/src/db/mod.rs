@@ -25,7 +25,10 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_config, meta::meta_store::MetaStore};
 use hashbrown::HashMap;
-use sea_orm::{DatabaseConnection, SqlxPostgresConnector, SqlxSqliteConnector};
+use sea_orm::{
+    ConnectionTrait, DatabaseBackend, DatabaseConnection, DbErr, SqlxPostgresConnector,
+    SqlxSqliteConnector, Statement,
+};
 use tokio::sync::{OnceCell, mpsc};
 
 use crate::errors::{DbError, Error, Result};
@@ -63,6 +66,23 @@ pub async fn get_orm_client_rw() -> &'static DatabaseConnection {
 /// ORM client for schema migrations.
 pub async fn get_orm_client_ddl() -> &'static DatabaseConnection {
     ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await
+}
+
+pub async fn clock_micros(conn: &impl ConnectionTrait) -> std::result::Result<i64, DbErr> {
+    let backend = conn.get_database_backend();
+    let sql = match backend {
+        DatabaseBackend::Postgres => {
+            "SELECT CAST(EXTRACT(EPOCH FROM clock_timestamp()) * 1000000 AS BIGINT) AS now_us"
+        }
+        DatabaseBackend::Sqlite => {
+            "SELECT CAST(unixepoch('subsec') * 1000000 AS INTEGER) AS now_us"
+        }
+        _ => return Err(DbErr::Custom("Unsupported meta store clock".to_owned())),
+    };
+    conn.query_one(Statement::from_string(backend, sql))
+        .await?
+        .ok_or_else(|| DbErr::Custom("Meta store clock returned no row".to_owned()))?
+        .try_get("", "now_us")
 }
 
 async fn connect_to_orm_ro() -> DatabaseConnection {

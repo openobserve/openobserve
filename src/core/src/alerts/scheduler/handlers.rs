@@ -1044,6 +1044,9 @@ pub async fn handle_triggers(
             handle_oncall_slack_sync_triggers(trigger).await
         }
         db::scheduler::TriggerModule::AutoObserve => handle_autoobserve_triggers(trigger).await,
+        db::scheduler::TriggerModule::IncidentRecovery => {
+            handle_incident_recovery_trigger(&trigger).await
+        }
     }
 }
 
@@ -1099,6 +1102,22 @@ async fn handle_fleet_rollout_triggers(
     infra::scheduler::delete(
         &trigger.org,
         db::scheduler::TriggerModule::FleetRollout,
+        &trigger.module_key,
+    )
+    .await?;
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn handle_incident_recovery_trigger(trigger: &db::scheduler::Trigger) -> anyhow::Result<()> {
+    crate::alerts::incidents::recovery::handle(trigger).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_incident_recovery_trigger(trigger: &db::scheduler::Trigger) -> anyhow::Result<()> {
+    infra::scheduler::delete(
+        &trigger.org,
+        db::scheduler::TriggerModule::IncidentRecovery,
         &trigger.module_key,
     )
     .await?;
@@ -1201,7 +1220,8 @@ where
     Ok(true)
 }
 
-/// Dropped rather than re-armed once the ladder ends: a timer outliving it fires at nobody.
+/// Dropped once the ladder ends unless an arm came in during the tick: a timer outliving the
+/// ladder fires at nobody.
 #[cfg(feature = "enterprise")]
 async fn handle_oncall_escalation_triggers(
     trigger: db::scheduler::Trigger,
@@ -1229,29 +1249,15 @@ async fn handle_oncall_escalation_triggers(
     }
 
     // `None` so the engine builds a notifier per team, whose destinations can change per tick.
-    match oncall::escalation::tick(&trigger.org, &response_id, None, now_micros()).await? {
-        Some(next_run_at) => {
-            // Re-read first: `tick` writes the retry budget to this row's `data`.
-            let mut row = db::scheduler::get(
-                &trigger.org,
-                db::scheduler::TriggerModule::OncallEscalation,
-                &response_id,
-            )
-            .await
-            .unwrap_or(trigger);
-            row.next_run_at = next_run_at;
-            row.status = db::scheduler::TriggerStatus::Waiting;
-            row.retries = 0;
-            db::scheduler::update_trigger(row, true, "").await?;
-        }
-        None => {
-            db::scheduler::delete(
-                &trigger.org,
-                db::scheduler::TriggerModule::OncallEscalation,
-                &response_id,
-            )
-            .await?;
-        }
+    // The claimed row lets the tick renew its claim and stop claiming pairs once it loses it.
+    let next_run_at = infra::table::oncall_responses::with_delivery_retries(
+        &response_id,
+        oncall::escalation::tick_claimed(&trigger, None, now_micros()),
+    )
+    .await?;
+    // Fenced and data-preserving: an arm during the tick keeps its time and its analysis (OF-10).
+    if !db::scheduler::finish_escalation(&trigger, next_run_at).await? {
+        log::warn!("[ONCALL] the tick of {response_id} lost its claim; its finish wrote nothing");
     }
     Ok(())
 }
@@ -2741,6 +2747,15 @@ async fn trigger_rca_for_alert_firing(
         let subject_id = alert_id.unwrap_or_else(|| representative.response.subject.subject_id());
         let subjects: Vec<config::meta::oncall::SubjectRef> =
             pending.iter().map(|p| p.response.subject.clone()).collect();
+        // The ladder generation each record is on now; delivery compares against it.
+        let recipients = pending
+            .iter()
+            .map(|p| infra::table::rca_delivery_obligations::Recipient {
+                response_id: p.response.id.clone(),
+                subject: p.response.subject.clone(),
+                ladder_run: p.response.current_run(),
+            })
+            .collect();
 
         // One `alert` run per firing; every exit below ends it.
         let run_id = match rca_runs::start_run(rca_runs::StartRun {
@@ -2756,6 +2771,8 @@ async fn trigger_rca_for_alert_firing(
             skip_cooldown: true,
             oncall_subjects: serde_json::to_value(&subjects).ok(),
             context_used: None,
+            recipients,
+            page_key: None,
         })
         .await
         {
@@ -2783,23 +2800,22 @@ async fn trigger_rca_for_alert_firing(
             .all(|p| p.dimensions == representative.dimensions)
             .then(|| serde_json::to_value(&representative.dimensions).ok())
             .flatten();
+        let fired_at_us = pending
+            .iter()
+            .fold(representative.response.opened_at, |first, paged| {
+                first.min(paged.response.opened_at)
+            });
 
         // §2.2: one context for the whole firing — every record it opened reads the same answer.
-        let context = config::meta::oncall::RcaContext {
-            subject_type: config::meta::oncall::SubjectType::Alert,
-            subject_id: subject_id.clone(),
-            // Omitted, never null — the agent routes on `"incident_id" in context`.
-            incident_id: None,
-            org_id: org_id.clone(),
-            previous_analysis: None,
-            severity: Some(severity),
-            past_causes: rca_service::past_causes_for_record(&org_id, &representative.response.id)
-                .await,
-            alert_name: Some(alert_name.clone()),
-            stream: Some(stream_name.clone()),
-            dimensions,
-            evidence: None,
-        };
+        // Omitted, never null — the agent routes on `"incident_id" in context`.
+        let mut context =
+            crate::alerts::rca_capabilities::alert_context(&org_id, &subject_id, fired_at_us);
+        context.severity = Some(severity);
+        context.past_causes =
+            rca_service::past_causes_for_record(&org_id, &representative.response.id).await;
+        context.alert_name = Some(alert_name.clone());
+        context.stream = Some(stream_name.clone());
+        context.dimensions = dimensions;
 
         // The turn's finalizer delivers the report to `oncall_subjects` or releases them.
         let run = RcaTurnRun {

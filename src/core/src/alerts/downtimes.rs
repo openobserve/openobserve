@@ -93,6 +93,33 @@ pub fn active_for_alert(
     )
 }
 
+#[cfg(feature = "enterprise")]
+pub fn active_for_declare(
+    org: &str,
+    dims: &HashMap<String, String>,
+    now: i64,
+) -> Option<ActiveDowntime> {
+    use config::meta::downtimes::{TargetFolders, TargetModule};
+
+    if !enabled() {
+        return None;
+    }
+    let rows = db::downtimes::list_cached(org);
+    let matching_alerts: Vec<_> = rows
+        .iter()
+        .filter(|row| {
+            row.targets.iter().any(|target| {
+                target.module == TargetModule::Alerts
+                    && target.folders == TargetFolders::All
+                    && target.ids.is_empty()
+            })
+        })
+        .cloned()
+        .collect();
+    let item = enterprise::item("", "", dims, &[]);
+    enterprise::active_in(&matching_alerts, TargetModule::Alerts, &item, now)
+}
+
 #[cfg(not(feature = "enterprise"))]
 pub fn active_for_alert(
     _org: &str,

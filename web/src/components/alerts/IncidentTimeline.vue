@@ -84,11 +84,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, watch, nextTick } from "vue";
+import { computed, ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
+import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import incidentsService from "@/services/incidents";
+import { incidentEventsQuery } from "@/services/incidents.queries";
 import DOMPurify from "dompurify";
 import ActivityTimeline from "@/components/shared/ActivityTimeline.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -113,8 +115,14 @@ const store = useStore();
 const { t } = useI18nTyped();
 const { isDark } = useTheme();
 
-const events = ref<any[]>([]);
-const loading = ref(false);
+// The drawer's observer of this key polls; this one reads the shared cache and refetches on demand.
+const eventsQuery = useQuery(() =>
+  Object.assign(incidentEventsQuery(props.orgId, props.incidentId), {
+    enabled: props.visible && !!props.incidentId,
+  }),
+);
+const events = computed<any[]>(() => eventsQuery.data.value ?? []);
+const loading = computed(() => eventsQuery.isLoading.value);
 const commentText = ref("");
 const submitting = ref(false);
 const activityRef = ref<InstanceType<typeof ActivityTimeline> | null>(null);
@@ -126,15 +134,15 @@ const scrollToBottom = async () => {
 
 const fetchEvents = async () => {
   if (!props.incidentId) return;
-  loading.value = true;
+  await eventsQuery.refetch();
+};
+
+// Fetches only when the shared cache is stale, so opening the tab does not double the drawer's read.
+const loadEvents = async () => {
   try {
-    const response = await incidentsService.getEvents(props.orgId, props.incidentId);
-    events.value = response.data?.events || [];
+    await eventsQuery.suspense();
   } catch (e: any) {
     console.error("[IncidentTimeline] Failed to fetch events:", e);
-    events.value = [];
-  } finally {
-    loading.value = false;
   }
 };
 
@@ -470,6 +478,11 @@ const getInlineEventText = (event: any): string => {
       });
 
     case "AssignmentChanged":
+      if (data.role === "comms") {
+        return data.to
+          ? t("alerts.incidents.timeline.commsOwnerSet", { user: bold(data.to) })
+          : t("alerts.incidents.timeline.commsOwnerCleared");
+      }
       return data.to
         ? t("alerts.incidents.timeline.assignedTo", { user: bold(data.to) })
         : t("alerts.incidents.timeline.assignmentRemoved");
@@ -544,7 +557,7 @@ watch(
   () => props.visible,
   async (visible) => {
     if (visible && props.incidentId) {
-      await fetchEvents();
+      await loadEvents();
       await scrollToBottom();
     }
   },
@@ -563,7 +576,7 @@ watch(
 
 onMounted(async () => {
   if (props.visible && props.incidentId) {
-    await fetchEvents();
+    await loadEvents();
     await scrollToBottom();
   }
 });

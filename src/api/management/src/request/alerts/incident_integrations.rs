@@ -30,7 +30,13 @@ use serde::{Deserialize, Deserializer, Serialize};
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Allowed values for `source_type` on create.
-const ALLOWED_SOURCE_TYPES: &[&str] = &["auto", "grafana", "alertmanager", "generic"];
+const ALLOWED_SOURCE_TYPES: &[&str] = &[
+    "auto",
+    "grafana",
+    "alertmanager",
+    "generic",
+    config::meta::alerts::change_events::CHANGE_EVENTS_SOURCE_TYPE,
+];
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
@@ -99,7 +105,12 @@ impl IntegrationResponse {
         org_id: &str,
         record: infra::table::incident_integrations::IncidentIntegrationRecord,
     ) -> Self {
-        let url = format!("/api/v2/{org_id}/incidents/events/{}", record.token);
+        let intake = if super::change_events::is_change_events_source(&record.source_type) {
+            "changes"
+        } else {
+            "events"
+        };
+        let url = format!("/api/v2/{org_id}/incidents/{intake}/{}", record.token);
         Self {
             id: record.id,
             org_id: record.org_id,
@@ -146,7 +157,10 @@ pub struct SenderResponse {
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 impl From<infra::table::incident_integrations::SenderRecord> for SenderResponse {
     fn from(r: infra::table::incident_integrations::SenderRecord) -> Self {
-        let resolve_wiring_hint = r.accepted_count > 0 && !r.resolved_seen;
+        // change events have no resolved state to wire
+        let resolve_wiring_hint = r.accepted_count > 0
+            && !r.resolved_seen
+            && !super::change_events::is_change_events_source(&r.detected_source);
         let display_name = openobserve_core::alerts::external_alerts::resolve_display_name(
             &r.detected_source,
             r.sender_label.as_deref(),
@@ -811,6 +825,35 @@ mod tests {
         for st in ALLOWED_SOURCE_TYPES {
             assert!(validate_create(&payload("n", Some(st))).is_ok());
         }
+        assert!(validate_create(&payload("n", Some("change_events"))).is_ok());
+    }
+
+    #[test]
+    fn a_change_events_integration_points_at_the_change_intake() {
+        let record =
+            |source_type: &str| infra::table::incident_integrations::IncidentIntegrationRecord {
+                id: "i1".to_string(),
+                org_id: "demo-org".to_string(),
+                name: "n".to_string(),
+                source_type: source_type.to_string(),
+                token: "o2iat_t".to_string(),
+                enabled: true,
+                config: serde_json::json!({}),
+                destinations: vec![],
+                oncall_team: None,
+                created_by: "a@example.com".to_string(),
+                created_at: 0,
+                updated_at: 0,
+            };
+        let url = |st: &str| IntegrationResponse::from_record("demo-org", record(st)).url;
+        assert_eq!(
+            url("change_events").as_deref(),
+            Some("/api/v2/demo-org/incidents/changes/o2iat_t")
+        );
+        assert_eq!(
+            url("auto").as_deref(),
+            Some("/api/v2/demo-org/incidents/events/o2iat_t")
+        );
     }
 
     #[test]
@@ -941,6 +984,22 @@ mod tests {
             accepted_count: 5,
             rejected_count: 0,
             resolved_seen: true,
+            sender_label: None,
+        };
+        let resp: SenderResponse = r.into();
+        assert!(!resp.resolve_wiring_hint);
+    }
+
+    #[test]
+    fn a_change_events_sender_gets_no_resolve_wiring_hint() {
+        let r = infra::table::incident_integrations::SenderRecord {
+            integration_id: "i1".into(),
+            detected_source: config::meta::alerts::change_events::CHANGE_EVENTS_SOURCE_TYPE.into(),
+            first_received_at: 1,
+            last_received_at: 2,
+            accepted_count: 5,
+            rejected_count: 0,
+            resolved_seen: false,
             sender_label: None,
         };
         let resp: SenderResponse = r.into();

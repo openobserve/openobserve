@@ -63,10 +63,16 @@ pub struct IncidentsQuery {
 pub async fn list_incidents(
     Path(org_id): Path<String>,
     Headers(user): Headers<UserEmail>,
+    headers: axum::http::HeaderMap,
     query: Result<Query<IncidentsQuery>, QueryRejection>,
 ) -> Response {
     if let Some(disabled) = deployment_disabled() {
         return disabled;
+    }
+    let rca =
+        crate::request::security::rca_scope::rca_caller(&org_id, &user.user_id, &headers).await;
+    if !rca.history_allowed() {
+        return MetaHttpResponse::forbidden("History is not available to this analysis");
     }
     let query = match parse_query(query) {
         Ok(query) => query,
@@ -79,6 +85,9 @@ pub async fn list_incidents(
     }
     match incidents::list(&org_id, page, query.incident_id.as_deref()).await {
         Ok(mut body) => {
+            if rca.is_rca() {
+                hide_case_analyses(&org_id, &mut body.items).await;
+            }
             let viewer = WebViewer {
                 user_id: user.user_id,
             };
@@ -86,11 +95,34 @@ pub async fn list_incidents(
             if let Err(e) = incidents::attach_context(&org_id, &mut body.items, &viewer).await {
                 log::warn!("[autoobserve] reading the incident context of {org_id} failed: {e}");
             }
+            if !crate::request::security::rca_scope::record_history_response(
+                &org_id,
+                &rca,
+                !body.items.is_empty(),
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("History is not available to this analysis");
+            }
             MetaHttpResponse::json(body)
         }
         Err(e) => {
             log::error!("[autoobserve] listing the incidents of {org_id} failed: {e}");
             MetaHttpResponse::internal_error("listing AutoObserve incidents failed")
+        }
+    }
+}
+
+async fn hide_case_analyses(org_id: &str, items: &mut [incidents::AutoObserveIncident]) {
+    for item in items {
+        if !infra::table::rca_fence::incident_history_allowed(org_id, &item.incident.id).await {
+            item.investigation = incidents::InvestigationView {
+                run_id: None,
+                state: None,
+                outcome: None,
+                summary: None,
+                not_run_reason: None,
+            };
         }
     }
 }

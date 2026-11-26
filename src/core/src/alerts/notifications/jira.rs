@@ -24,6 +24,8 @@ use std::{
 };
 
 use anyhow::{Result, anyhow, bail};
+use async_trait::async_trait;
+use bytes::Bytes;
 pub use config::meta::destinations::JIRA_DESTINATION_TYPE as DESTINATION_TYPE;
 use config::{
     meta::{
@@ -43,6 +45,7 @@ use dashmap::DashMap;
 use db::alerts::destinations::DestinationError;
 use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use super::{NotificationContext, STATUS_RESOLVED};
 
@@ -79,18 +82,13 @@ const CREATEMETA_MAX_PAGES: usize = 20;
 /// Jira's search usually catches a new issue within minutes, so 30 bridges even a slow reindex.
 const CREATED_TTL: Duration = Duration::from_secs(30 * 60);
 
-/// The key and creation time of the issue this node last made for one (site, project, label).
-type CreatedSlot = Arc<tokio::sync::Mutex<Option<(String, Instant)>>>;
-
-/// Find-or-create runs one send per slot at a time, so a lagging search adds no twin.
-// ponytail: per node, so two cluster nodes can still both create; a shared lock if that bites.
-static CREATED: LazyLock<DashMap<(String, String, String), CreatedSlot>> =
-    LazyLock::new(DashMap::new);
-
-/// Unix second after which the next send sweeps idle slots out of `CREATED`.
-static NEXT_SWEEP: AtomicI64 = AtomicI64::new(0);
+/// This node's slots; the cluster lock and the remembered key in `Cluster` stop twins across nodes.
+static NODE: LazyLock<Node> = LazyLock::new(Node::default);
 
 const SWEEP_EVERY_SECS: i64 = 60;
+
+const CREATE_LOCK_PREFIX: &str = "/jira/create/";
+const CREATED_KEY_PREFIX: &str = "/jira/created/";
 
 /// Filled by OpenObserve or by its own form controls, so setup never asks for them.
 const SETUP_SKIPPED_FIELDS: [&str; 7] = [
@@ -222,6 +220,154 @@ pub struct JiraRejected {
     pub message: String,
 }
 
+/// The key and creation time of the issue this node last saw made for one (site, project, label).
+type CreatedSlot = Arc<tokio::sync::Mutex<Option<(String, Instant)>>>;
+
+/// One node's find-or-create slots: one send per slot at a time, so a lagging search adds no twin.
+#[derive(Default)]
+struct Node {
+    slots: DashMap<(String, String, String), CreatedSlot>,
+    /// Unix second after which the next send sweeps idle slots out of `slots`.
+    next_sweep: AtomicI64,
+}
+
+impl Node {
+    fn slot(&self, base: &str, project_key: &str, label: &str) -> CreatedSlot {
+        let key = (base.to_string(), project_key.to_string(), label.to_string());
+        Arc::clone(&self.slots.entry(key).or_default())
+    }
+
+    fn sweep(&self) {
+        self.slots.retain(|_, slot| {
+            Arc::strong_count(slot) > 1
+                || slot.try_lock().is_ok_and(|held| {
+                    held.as_ref()
+                        .is_some_and(|(_, at)| at.elapsed() < CREATED_TTL)
+                })
+        });
+    }
+}
+
+/// Seen by every node; a trait so tests can run two nodes against one in-memory stand-in.
+#[async_trait]
+trait Shared: Sync {
+    type Lock: Send + Sync;
+
+    /// `wait_secs` 0 is the backend's default wait.
+    async fn lock(&self, key: &str, wait_secs: u64) -> Result<Self::Lock>;
+    /// True once another holder may have the lock, so a create would race it.
+    fn lost(&self, lock: &Self::Lock) -> bool;
+    async fn unlock(&self, lock: Self::Lock);
+    async fn get(&self, key: &str) -> Result<Option<Bytes>>;
+    async fn put(&self, key: &str, value: Bytes) -> Result<()>;
+    async fn delete(&self, key: &str) -> Result<()>;
+    async fn list(&self, prefix: &str) -> Result<Vec<(String, Bytes)>>;
+}
+
+/// The NATS lock and the meta key-value store; no meta-store transaction spans a Jira call.
+struct Cluster;
+
+#[async_trait]
+impl Shared for Cluster {
+    /// `None` in local mode, where the node's own slot already serializes every send.
+    type Lock = Option<infra::dist_lock::Locker>;
+
+    async fn lock(&self, key: &str, wait_secs: u64) -> Result<Self::Lock> {
+        infra::dist_lock::lock(key, wait_secs)
+            .await
+            .map_err(|e| anyhow!("Jira create lock {key} could not be taken: {e}"))
+    }
+
+    fn lost(&self, lock: &Self::Lock) -> bool {
+        lock.as_ref().is_some_and(|held| *held.lost().borrow())
+    }
+
+    async fn unlock(&self, lock: Self::Lock) {
+        if let Err(e) = infra::dist_lock::unlock(&lock).await {
+            log::warn!("[JIRA] releasing the create lock failed: {e}");
+        }
+    }
+
+    /// Reads on the write connection: a read replica can lag the record another node just wrote.
+    async fn get(&self, key: &str) -> Result<Option<Bytes>> {
+        let read = Arc::new(std::sync::Mutex::new(None));
+        let seen = Arc::clone(&read);
+        let db = infra::db::get_db().await;
+        db.get_for_update(
+            key,
+            infra::db::NO_NEED_WATCH,
+            None,
+            Box::new(move |current| {
+                *seen.lock().unwrap_or_else(|e| e.into_inner()) = current;
+                Ok(None)
+            }),
+        )
+        .await?;
+        Ok(read.lock().unwrap_or_else(|e| e.into_inner()).take())
+    }
+
+    async fn put(&self, key: &str, value: Bytes) -> Result<()> {
+        let db = infra::db::get_db().await;
+        Ok(db.put(key, value, infra::db::NO_NEED_WATCH, None).await?)
+    }
+
+    async fn delete(&self, key: &str) -> Result<()> {
+        let db = infra::db::get_db().await;
+        Ok(db
+            .delete_if_exists(key, false, infra::db::NO_NEED_WATCH)
+            .await?)
+    }
+
+    async fn list(&self, prefix: &str) -> Result<Vec<(String, Bytes)>> {
+        let records = infra::db::get_db().await.list(prefix).await?;
+        Ok(records.into_iter().collect())
+    }
+}
+
+/// `created_at` is in microseconds, the unit `_timestamp` uses.
+#[derive(Serialize, Deserialize)]
+struct RememberedIssue {
+    key: String,
+    created_at: i64,
+}
+
+impl RememberedIssue {
+    /// Another node's clock may run ahead, so a record from the near future counts as brand new.
+    fn age(&self) -> Duration {
+        let micros = config::utils::time::now_micros() - self.created_at;
+        Duration::from_micros(u64::try_from(micros).unwrap_or(0))
+    }
+
+    fn expired(&self) -> bool {
+        self.age() >= CREATED_TTL
+    }
+}
+
+struct SharedKeys {
+    lock: String,
+    created: String,
+}
+
+impl SharedKeys {
+    fn new(base: &str, project_key: &str, label: &str) -> Self {
+        let id = format!(
+            "{:x}",
+            Sha256::digest(json!([base, project_key, label]).to_string())
+        );
+        Self {
+            lock: format!("{CREATE_LOCK_PREFIX}{id}"),
+            created: format!("{CREATED_KEY_PREFIX}{id}"),
+        }
+    }
+}
+
+enum Found {
+    /// An open issue to comment on, with its creation time when another node's record named it.
+    Open(String, Option<Instant>),
+    Created(String),
+    Nothing(String),
+}
+
 /// A destination setting Jira can never accept; a 400 so the caller does not retry it.
 fn misconfigured(message: String) -> anyhow::Error {
     JiraRejected {
@@ -237,8 +383,17 @@ pub fn is_jira(endpoint: &Endpoint) -> bool {
 
 /// Comment on the open issue for this alert, incident or anomaly, or create one; never on recovery.
 pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<String> {
-    let meta = |key: &str| endpoint.metadata.get(key).map_or("", String::as_str);
-    let project_key = meta("jira_project_key");
+    send_on(&NODE, &Cluster, endpoint, ctx).await
+}
+
+/// The cluster lock spans the remembered-key read, the search, the create and the key write.
+async fn send_on<S: Shared>(
+    node: &Node,
+    shared: &S,
+    endpoint: &Endpoint,
+    ctx: &NotificationContext,
+) -> Result<String> {
+    let project_key = metadata(endpoint, "jira_project_key");
     if project_key.is_empty() {
         return Err(misconfigured("Jira destination has no project key".into()));
     }
@@ -253,34 +408,115 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
         .collect();
     let jira = Jira::new(&endpoint.url, headers, endpoint.skip_tls_verify, false)?;
 
-    let slot = created_slot(&jira.base, project_key, &label);
+    if sweep_due(&node.next_sweep, chrono::Utc::now().timestamp()) {
+        node.sweep();
+        sweep_records(shared).await;
+    }
+    let slot = node.slot(&jira.base, project_key, &label);
     let mut created = slot.lock().await;
     let remembered = created
         .as_ref()
         .filter(|(_, at)| at.elapsed() < CREATED_TTL)
         .map(|(key, _)| key.clone());
-    if let Some(key) = remembered
-        && still_open(&jira, &key).await
-    {
-        drop(created);
-        return comment_on(&jira, &key, ctx).await;
+    let mut done = None;
+    if let Some(key) = remembered {
+        if issue_open(&jira, &key).await? {
+            drop(created);
+            return comment_on(&jira, &key, ctx).await;
+        }
+        done = Some(key);
     }
     *created = None;
 
+    let keys = SharedKeys::new(&jira.base, project_key, &label);
+    let lock = shared.lock(&keys.lock, 0).await?;
+    let found = match remembered_by_cluster(shared, &jira, &keys.created, done.as_deref()).await {
+        Ok(Some((key, at))) => Ok(Found::Open(key, Some(at))),
+        Ok(None) => find_or_create(shared, &lock, &keys, &jira, endpoint, &label, ctx).await,
+        Err(e) => Err(e),
+    };
+    shared.unlock(lock).await;
+    match found? {
+        Found::Open(key, at) => {
+            if let Some(at) = at {
+                *created = Some((key.clone(), at));
+            }
+            drop(created);
+            comment_on(&jira, &key, ctx).await
+        }
+        Found::Created(key) => {
+            if !key.is_empty() {
+                *created = Some((key.clone(), Instant::now()));
+            }
+            Ok(format!("created {key}"))
+        }
+        Found::Nothing(message) => Ok(message),
+    }
+}
+
+fn metadata<'a>(endpoint: &'a Endpoint, key: &str) -> &'a str {
+    endpoint.metadata.get(key).map_or("", String::as_str)
+}
+
+/// A record younger than `CREATED_TTL` naming an open issue; a record Jira calls done is deleted.
+async fn remembered_by_cluster<S: Shared>(
+    shared: &S,
+    jira: &Jira,
+    key: &str,
+    done: Option<&str>,
+) -> Result<Option<(String, Instant)>> {
+    let Some(raw) = shared
+        .get(key)
+        .await
+        .map_err(|e| anyhow!("Jira created-issue record {key} could not be read: {e}"))?
+    else {
+        return Ok(None);
+    };
+    let issue = serde_json::from_slice::<RememberedIssue>(&raw)
+        .ok()
+        .filter(|issue| !issue.expired() && done != Some(issue.key.as_str()));
+    if let Some(issue) = issue {
+        let open = issue_open(jira, &issue.key).await?;
+        if open {
+            let at = Instant::now()
+                .checked_sub(issue.age())
+                .unwrap_or_else(Instant::now);
+            return Ok(Some((issue.key, at)));
+        }
+    }
+    if let Err(e) = shared.delete(key).await {
+        log::warn!("[JIRA] deleting the stale record {key} failed: {e}");
+    }
+    Ok(None)
+}
+
+/// Search, then create; a lost lock creates nothing, as another node may be creating.
+async fn find_or_create<S: Shared>(
+    shared: &S,
+    lock: &S::Lock,
+    keys: &SharedKeys,
+    jira: &Jira,
+    endpoint: &Endpoint,
+    label: &str,
+    ctx: &NotificationContext,
+) -> Result<Found> {
+    let meta = |key: &str| metadata(endpoint, key);
+    let project_key = meta("jira_project_key");
     let search = if meta("jira_deployment") == "data_center" {
         "/rest/api/2/search"
     } else {
         "/rest/api/2/search/jql"
     };
-    let query = json!({"jql": jql(project_key, &label), "fields": ["key"], "maxResults": 1});
+    let query = json!({"jql": jql(project_key, label), "fields": ["key"], "maxResults": 1});
     let found = jira.call(Method::POST, search, Some(query)).await?;
     let open = &found["issues"][0];
     if let Some(key) = open["key"].as_str().or_else(|| open["id"].as_str()) {
-        drop(created);
-        return comment_on(&jira, key, ctx).await;
+        return Ok(Found::Open(key.to_string(), None));
     }
     if ctx.alert_status == STATUS_RESOLVED {
-        return Ok(format!("no open Jira issue with label {label}"));
+        return Ok(Found::Nothing(format!(
+            "no open Jira issue with label {label}"
+        )));
     }
 
     let extra = match meta("jira_fields") {
@@ -297,6 +533,12 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
     fields.insert("summary".into(), json!(summary(ctx)));
     fields.insert("description".into(), json!(description(ctx)));
     fields.insert("labels".into(), json!([LABEL, label]));
+    if shared.lost(lock) {
+        bail!(
+            "Jira create lock {} was lost before the issue was created; nothing was created",
+            keys.lock
+        );
+    }
     let issue = jira
         .call(
             Method::POST,
@@ -306,28 +548,59 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
         .await;
     let issue = match issue {
         Ok(issue) => issue,
-        Err(refused) => return Err(name_rejected_token(&jira, refused).await),
+        Err(refused) => return Err(name_rejected_token(jira, refused).await),
     };
-    let key = issue["key"].as_str().unwrap_or_default();
+    let key = issue["key"].as_str().unwrap_or_default().to_string();
     if !key.is_empty() {
-        *created = Some((key.to_string(), Instant::now()));
+        let record = RememberedIssue {
+            key: key.clone(),
+            created_at: config::utils::time::now_micros(),
+        };
+        let stored = match serde_json::to_vec(&record) {
+            Ok(value) => shared.put(&keys.created, value.into()).await,
+            Err(e) => Err(e.into()),
+        };
+        if let Err(e) = stored {
+            log::error!(
+                "[JIRA] created {key} but could not record it under {}, so another node may create a twin: {e}",
+                keys.created
+            );
+        }
     }
-    Ok(format!("created {key}"))
+    Ok(Found::Created(key))
 }
 
-/// The slot for one issue identity; idle slots are swept once a minute so the map stays small.
-fn created_slot(base: &str, project_key: &str, label: &str) -> CreatedSlot {
-    if sweep_due(&NEXT_SWEEP, chrono::Utc::now().timestamp()) {
-        CREATED.retain(|_, slot| {
-            Arc::strong_count(slot) > 1
-                || slot.try_lock().is_ok_and(|held| {
-                    held.as_ref()
-                        .is_some_and(|(_, at)| at.elapsed() < CREATED_TTL)
-                })
-        });
+/// Drops records past `CREATED_TTL` that no later send for their issue would ever delete.
+async fn sweep_records<S: Shared>(shared: &S) {
+    let records = match shared.list(CREATED_KEY_PREFIX).await {
+        Ok(records) => records,
+        Err(e) => {
+            log::warn!("[JIRA] listing {CREATED_KEY_PREFIX} records failed: {e}");
+            return;
+        }
+    };
+    let expired = |raw: &[u8]| {
+        serde_json::from_slice::<RememberedIssue>(raw).map_or(true, |issue| issue.expired())
+    };
+    for (key, raw) in records {
+        let Some(id) = key.strip_prefix(CREATED_KEY_PREFIX) else {
+            continue;
+        };
+        if !expired(&raw) {
+            continue;
+        }
+        // A send holding the lock may be writing a fresh record under this key; skip it.
+        let Ok(lock) = shared.lock(&format!("{CREATE_LOCK_PREFIX}{id}"), 1).await else {
+            continue;
+        };
+        if let Ok(Some(raw)) = shared.get(&key).await
+            && expired(&raw)
+            && let Err(e) = shared.delete(&key).await
+        {
+            log::warn!("[JIRA] deleting the expired record {key} failed: {e}");
+        }
+        shared.unlock(lock).await;
     }
-    let key = (base.to_string(), project_key.to_string(), label.to_string());
-    Arc::clone(&CREATED.entry(key).or_default())
 }
 
 /// True for the one caller that moves `next` past `now`, so concurrent sends sweep once.
@@ -344,15 +617,24 @@ fn sweep_due(next: &AtomicI64, now: i64) -> bool {
             .is_ok()
 }
 
-/// An issue that cannot be read counts as gone, so the search decides instead.
-async fn still_open(jira: &Jira, key: &str) -> bool {
-    jira.call(
-        Method::GET,
-        &format!("/rest/api/2/issue/{key}?fields=status"),
-        None,
-    )
-    .await
-    .is_ok_and(|issue| issue["fields"]["status"]["statusCategory"]["key"] != "done")
+/// `Ok(false)` only when Jira answers that the issue is done or gone; a failed call is an error.
+async fn issue_open(jira: &Jira, key: &str) -> Result<bool> {
+    let path = format!("/rest/api/2/issue/{key}?fields=status");
+    match jira.call(Method::GET, &path, None).await {
+        Ok(issue) => Ok(issue["fields"]["status"]["statusCategory"]["key"] != "done"),
+        Err(error) => match error.downcast::<JiraRejected>() {
+            Ok(rejected) if rejected.status == 404 => Ok(false),
+            Ok(rejected) => Err(JiraRejected {
+                status: rejected.status,
+                message: format!("Issue {key} could not be checked: {}", rejected.message),
+            }
+            .into()),
+            Err(error) => {
+                let checked = format!("Issue {key} could not be checked: {error:#}");
+                Err(error.context(checked))
+            }
+        },
+    }
 }
 
 async fn comment_on(jira: &Jira, key: &str, ctx: &NotificationContext) -> Result<String> {
@@ -1110,14 +1392,107 @@ fn sentence_case(event: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::{
+        collections::HashMap,
+        sync::{Arc, Mutex},
+    };
 
     use config::meta::{alerts::QueryType, destinations::HTTPType};
 
     use super::*;
     use crate::{alerts::notifications::STATUS_FIRING, ssrf_test_support::isolated};
 
+    static MEMORY: LazyLock<Memory> = LazyLock::new(Memory::default);
+
     type Seen = Arc<Mutex<Vec<(String, Value)>>>;
+
+    /// Stands in for the NATS lock and the meta store, shared by the simulated nodes of one test.
+    #[derive(Default)]
+    struct Memory {
+        lock: Arc<tokio::sync::Mutex<()>>,
+        records: Mutex<HashMap<String, Bytes>>,
+        /// Every locker waits here, so both sends want the lock before either holds it.
+        both_locking: Option<tokio::sync::Barrier>,
+        refuse_lock: bool,
+        lose_lock: bool,
+        fail_reads: bool,
+        fail_writes: bool,
+    }
+
+    impl Memory {
+        fn record(&self, key: &str) -> Option<RememberedIssue> {
+            let records = self.records.lock().unwrap();
+            records
+                .get(key)
+                .map(|raw| serde_json::from_slice(raw).unwrap())
+        }
+
+        fn remember(&self, key: &str, issue: &str, created_at: i64) {
+            let record = RememberedIssue {
+                key: issue.into(),
+                created_at,
+            };
+            let raw = serde_json::to_vec(&record).unwrap();
+            self.records.lock().unwrap().insert(key.into(), raw.into());
+        }
+    }
+
+    #[async_trait]
+    impl Shared for Memory {
+        type Lock = tokio::sync::OwnedMutexGuard<()>;
+
+        async fn lock(&self, key: &str, _: u64) -> Result<Self::Lock> {
+            if let Some(both_locking) = &self.both_locking {
+                both_locking.wait().await;
+            }
+            if self.refuse_lock {
+                bail!("Jira create lock {key} could not be taken: acquire timeout");
+            }
+            Ok(Arc::clone(&self.lock).lock_owned().await)
+        }
+
+        fn lost(&self, _: &Self::Lock) -> bool {
+            self.lose_lock
+        }
+
+        async fn unlock(&self, lock: Self::Lock) {
+            drop(lock);
+        }
+
+        async fn get(&self, key: &str) -> Result<Option<Bytes>> {
+            if self.fail_reads {
+                bail!("meta store unavailable");
+            }
+            Ok(self.records.lock().unwrap().get(key).cloned())
+        }
+
+        async fn put(&self, key: &str, value: Bytes) -> Result<()> {
+            if self.fail_writes {
+                bail!("meta store unavailable");
+            }
+            self.records.lock().unwrap().insert(key.into(), value);
+            Ok(())
+        }
+
+        async fn delete(&self, key: &str) -> Result<()> {
+            self.records.lock().unwrap().remove(key);
+            Ok(())
+        }
+
+        async fn list(&self, prefix: &str) -> Result<Vec<(String, Bytes)>> {
+            let records = self.records.lock().unwrap();
+            Ok(records
+                .iter()
+                .filter(|(key, _)| key.starts_with(prefix))
+                .map(|(key, raw)| (key.clone(), raw.clone()))
+                .collect())
+        }
+    }
+
+    /// `send` on this process's node, with `MEMORY` in place of NATS and the meta store.
+    async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<String> {
+        send_on(&NODE, &*MEMORY, endpoint, ctx).await
+    }
 
     fn alert_ctx() -> NotificationContext {
         NotificationContext {
@@ -2241,6 +2616,458 @@ mod tests {
                 );
             },
         );
+    }
+
+    fn creates(seen: &Seen) -> usize {
+        paths(seen)
+            .iter()
+            .filter(|path| *path == "POST /rest/api/2/issue")
+            .count()
+    }
+
+    fn created_key(base: &str) -> String {
+        SharedKeys::new(base, "OPS", "openobserve-incident-inc-7").created
+    }
+
+    #[test]
+    fn two_nodes_sending_at_once_create_one_issue() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::two_nodes_sending_at_once_create_one_issue"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, seen) = jira_site(None, "indeterminate").await;
+                let endpoint = endpoint(base);
+                let cluster = Memory {
+                    both_locking: Some(tokio::sync::Barrier::new(2)),
+                    ..Default::default()
+                };
+                let (one, two) = (Node::default(), Node::default());
+                let (opened, joined) = (
+                    incident_ctx("new_incident_created"),
+                    incident_ctx("new_alert_correlated"),
+                );
+                let (first, second) = tokio::join!(
+                    send_on(&one, &cluster, &endpoint, &opened),
+                    send_on(&two, &cluster, &endpoint, &joined),
+                );
+                let mut sent = [first.unwrap(), second.unwrap()];
+                sent.sort();
+                assert_eq!(sent, ["commented on OPS-142", "created OPS-142"]);
+                assert_eq!(
+                    paths(&seen),
+                    [
+                        "POST /rest/api/2/search/jql",
+                        "POST /rest/api/2/issue",
+                        "GET /rest/api/2/issue/OPS-142",
+                        "POST /rest/api/2/issue/OPS-142/comment",
+                    ]
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn a_node_that_sends_inside_the_search_lag_comments_on_the_issue_another_node_made() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_node_that_sends_inside_the_search_lag_comments_on_the_issue_another_node_made"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, seen) = jira_site(None, "indeterminate").await;
+                let endpoint = endpoint(base.clone());
+                let cluster = Memory::default();
+                let ctx = incident_ctx("new_incident_created");
+                let first = send_on(&Node::default(), &cluster, &endpoint, &ctx).await;
+                assert_eq!(first.unwrap(), "created OPS-142");
+                let record = cluster.record(&created_key(&base)).unwrap();
+                assert_eq!(record.key, "OPS-142");
+                let age = config::utils::time::now_micros() - record.created_at;
+                assert!((0..60_000_000).contains(&age), "{age}");
+
+                let ctx = incident_ctx("new_alert_correlated");
+                let second = send_on(&Node::default(), &cluster, &endpoint, &ctx).await;
+                assert_eq!(second.unwrap(), "commented on OPS-142");
+                assert_eq!(
+                    paths(&seen),
+                    [
+                        "POST /rest/api/2/search/jql",
+                        "POST /rest/api/2/issue",
+                        "GET /rest/api/2/issue/OPS-142",
+                        "POST /rest/api/2/issue/OPS-142/comment",
+                    ]
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn a_record_older_than_the_search_lag_is_deleted_and_the_search_decides() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_record_older_than_the_search_lag_is_deleted_and_the_search_decides"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, seen) = jira_site(None, "indeterminate").await;
+                let cluster = Memory::default();
+                let key = created_key(&base);
+                let stale = config::utils::time::now_micros() - 31 * 60 * 1_000_000;
+                cluster.remember(&key, "OPS-7", stale);
+                let ctx = incident_ctx("new_incident_created");
+                let sent = send_on(&Node::default(), &cluster, &endpoint(base), &ctx).await;
+                assert_eq!(sent.unwrap(), "created OPS-142");
+                assert_eq!(
+                    paths(&seen),
+                    ["POST /rest/api/2/search/jql", "POST /rest/api/2/issue"]
+                );
+                let record = cluster.record(&key).unwrap();
+                assert_eq!(record.key, "OPS-142");
+                assert!(record.created_at > stale);
+            },
+        );
+    }
+
+    #[test]
+    fn a_record_naming_a_done_issue_is_deleted_and_the_search_decides() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_record_naming_a_done_issue_is_deleted_and_the_search_decides"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, seen) = jira_site(Some("OPS-150"), "done").await;
+                let cluster = Memory::default();
+                let key = created_key(&base);
+                cluster.remember(&key, "OPS-142", config::utils::time::now_micros());
+                let ctx = incident_ctx("new_alert_correlated");
+                let sent = send_on(&Node::default(), &cluster, &endpoint(base), &ctx).await;
+                assert_eq!(sent.unwrap(), "commented on OPS-150");
+                assert!(cluster.record(&key).is_none());
+                assert_eq!(
+                    paths(&seen),
+                    [
+                        "GET /rest/api/2/issue/OPS-142",
+                        "POST /rest/api/2/search/jql",
+                        "POST /rest/api/2/issue/OPS-150/comment",
+                    ]
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn a_create_lock_that_cannot_be_taken_fails_the_send_before_any_jira_call() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_create_lock_that_cannot_be_taken_fails_the_send_before_any_jira_call"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, seen) = jira_site(None, "indeterminate").await;
+                let cluster = Memory {
+                    refuse_lock: true,
+                    ..Default::default()
+                };
+                let ctx = incident_ctx("new_incident_created");
+                let err = send_on(&Node::default(), &cluster, &endpoint(base), &ctx)
+                    .await
+                    .unwrap_err();
+                assert!(err.to_string().contains("create lock"), "{err}");
+                assert!(paths(&seen).is_empty());
+            },
+        );
+    }
+
+    #[test]
+    fn a_create_lock_lost_before_the_create_creates_nothing() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_create_lock_lost_before_the_create_creates_nothing"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, seen) = jira_site(None, "indeterminate").await;
+                let cluster = Memory {
+                    lose_lock: true,
+                    ..Default::default()
+                };
+                let key = created_key(&base);
+                let ctx = incident_ctx("new_incident_created");
+                let err = send_on(&Node::default(), &cluster, &endpoint(base), &ctx)
+                    .await
+                    .unwrap_err();
+                assert_eq!(
+                    err.to_string(),
+                    format!(
+                        "Jira create lock {} was lost before the issue was created; nothing was created",
+                        key.replace(CREATED_KEY_PREFIX, CREATE_LOCK_PREFIX)
+                    )
+                );
+                assert_eq!(creates(&seen), 0);
+                assert!(cluster.record(&key).is_none());
+            },
+        );
+    }
+
+    #[test]
+    fn an_unreadable_record_fails_the_send_before_any_jira_call() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::an_unreadable_record_fails_the_send_before_any_jira_call"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, seen) = jira_site(None, "indeterminate").await;
+                let cluster = Memory {
+                    fail_reads: true,
+                    ..Default::default()
+                };
+                let ctx = incident_ctx("new_incident_created");
+                let err = send_on(&Node::default(), &cluster, &endpoint(base), &ctx)
+                    .await
+                    .unwrap_err();
+                assert!(err.to_string().contains("created-issue record"), "{err}");
+                assert!(paths(&seen).is_empty());
+            },
+        );
+    }
+
+    #[test]
+    fn a_record_stamped_by_a_clock_running_ahead_is_still_honoured() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_record_stamped_by_a_clock_running_ahead_is_still_honoured"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, seen) = jira_site(None, "indeterminate").await;
+                let cluster = Memory::default();
+                let key = created_key(&base);
+                let ahead = config::utils::time::now_micros() + 5_000_000;
+                cluster.remember(&key, "OPS-142", ahead);
+                let ctx = incident_ctx("new_alert_correlated");
+                let sent = send_on(&Node::default(), &cluster, &endpoint(base), &ctx).await;
+                assert_eq!(sent.unwrap(), "commented on OPS-142");
+                assert_eq!(creates(&seen), 0);
+                assert_eq!(cluster.record(&key).unwrap().created_at, ahead);
+            },
+        );
+    }
+
+    #[test]
+    fn a_failed_status_check_keeps_the_record_and_creates_nothing() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_failed_status_check_keeps_the_record_and_creates_nothing"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let seen: Seen = Arc::default();
+                let log = seen.clone();
+                let app = axum::Router::new().fallback(
+                    move |method: axum::http::Method, uri: axum::http::Uri| {
+                        let log = log.clone();
+                        async move {
+                            let call = format!("{method} {}", uri.path());
+                            let mut seen = log.lock().unwrap();
+                            seen.push((call, Value::Null));
+                            if seen.len() == 1 {
+                                (axum::http::StatusCode::SERVICE_UNAVAILABLE, "")
+                            } else {
+                                (axum::http::StatusCode::OK, "invalid JSON")
+                            }
+                        }
+                    },
+                );
+                let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let base = format!("http://{}", listener.local_addr().unwrap());
+                tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+                let cluster = Memory::default();
+                let key = created_key(&base);
+                cluster.remember(&key, "OPS-142", config::utils::time::now_micros());
+                let ctx = incident_ctx("new_alert_correlated");
+                let endpoint = endpoint(base);
+                let node = Node::default();
+                let err = send_on(&node, &cluster, &endpoint, &ctx).await.unwrap_err();
+                let rejected = crate::alerts::notifications::notify::NotifyError::from_send(err);
+                assert_eq!(rejected.status_code(), Some(503));
+                let message = rejected.to_string();
+                assert!(
+                    message.contains("Issue OPS-142 could not be checked"),
+                    "{message}"
+                );
+                assert_eq!(paths(&seen), ["GET /rest/api/2/issue/OPS-142"]);
+
+                let slot = node.slot(&endpoint.url, "OPS", &issue_label(&ctx).unwrap());
+                let issue = ("OPS-142".to_string(), Instant::now());
+                for (index, remembered) in [None, Some(issue)].into_iter().enumerate() {
+                    *slot.lock().await = remembered.clone();
+                    let err = send_on(&node, &cluster, &endpoint, &ctx).await.unwrap_err();
+                    let message = err.to_string();
+                    assert!(
+                        message.contains("Issue OPS-142 could not be checked"),
+                        "{err}"
+                    );
+                    assert!(message.contains("did not answer like"), "{err}");
+                    assert!(!message.contains(&key), "{err}");
+                    assert_eq!(
+                        paths(&seen),
+                        vec!["GET /rest/api/2/issue/OPS-142"; index + 2]
+                    );
+                    assert_eq!(cluster.record(&key).unwrap().key, "OPS-142");
+                    assert_eq!(*slot.lock().await, remembered);
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn a_record_that_cannot_be_written_still_reports_the_created_issue() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_record_that_cannot_be_written_still_reports_the_created_issue"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, seen) = jira_site(None, "indeterminate").await;
+                let endpoint = endpoint(base);
+                let cluster = Memory {
+                    fail_writes: true,
+                    ..Default::default()
+                };
+                let node = Node::default();
+                let ctx = incident_ctx("new_incident_created");
+                let first = send_on(&node, &cluster, &endpoint, &ctx).await;
+                assert_eq!(first.unwrap(), "created OPS-142");
+                let ctx = incident_ctx("new_alert_correlated");
+                let second = send_on(&node, &cluster, &endpoint, &ctx).await;
+                assert_eq!(second.unwrap(), "commented on OPS-142");
+                assert_eq!(
+                    paths(&seen),
+                    [
+                        "POST /rest/api/2/search/jql",
+                        "POST /rest/api/2/issue",
+                        "GET /rest/api/2/issue/OPS-142",
+                        "POST /rest/api/2/issue/OPS-142/comment",
+                    ]
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn the_minute_sweep_drops_expired_records_of_every_issue() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::the_minute_sweep_drops_expired_records_of_every_issue"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let (base, _) = jira_site(Some("OPS-142"), "indeterminate").await;
+                let cluster = Memory::default();
+                let now = config::utils::time::now_micros();
+                let other =
+                    |label: &str| SharedKeys::new("https://jira.other", "OPS", label).created;
+                cluster.remember(&other("expired"), "OPS-1", now - 31 * 60 * 1_000_000);
+                cluster.remember(&other("fresh"), "OPS-2", now - 60 * 1_000_000);
+                cluster.remember(&other("ahead"), "OPS-3", now + 5_000_000);
+                cluster
+                    .records
+                    .lock()
+                    .unwrap()
+                    .insert(other("garbage"), Bytes::from_static(b"not json"));
+                let ctx = alert_ctx();
+                let sent = send_on(&Node::default(), &cluster, &endpoint(base), &ctx).await;
+                assert_eq!(sent.unwrap(), "commented on OPS-142");
+                assert!(cluster.record(&other("expired")).is_none());
+                assert!(
+                    !cluster
+                        .records
+                        .lock()
+                        .unwrap()
+                        .contains_key(&other("garbage"))
+                );
+                assert_eq!(cluster.record(&other("fresh")).unwrap().key, "OPS-2");
+                assert_eq!(cluster.record(&other("ahead")).unwrap().key, "OPS-3");
+            },
+        );
+    }
+
+    /// The meta store the server runs on, so `Cluster`'s record is the one other nodes read.
+    #[test]
+    fn the_cluster_records_the_created_issue_in_the_meta_store_for_other_nodes() {
+        let data_dir = std::env::temp_dir().join(format!("o2-jira-{}/", config::ider::uuid()));
+        isolated(
+            concat!(
+                module_path!(),
+                "::the_cluster_records_the_created_issue_in_the_meta_store_for_other_nodes"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_DATA_DIR", data_dir.to_str().unwrap()),
+            ],
+            || async {
+                use infra::table::entity::kv_store::Entity;
+                use sea_orm::{ConnectionTrait, Schema};
+
+                infra::db::create_table().await.unwrap();
+                let conn = infra::db::get_orm_client_rw().await;
+                let backend = conn.get_database_backend();
+                let mut table = Schema::new(backend).create_table_from_entity(Entity);
+                conn.execute(backend.build(table.if_not_exists()))
+                    .await
+                    .unwrap();
+
+                let (base, seen) = jira_site(None, "indeterminate").await;
+                let endpoint = endpoint(base.clone());
+                let ctx = incident_ctx("new_incident_created");
+                assert_eq!(
+                    super::send(&endpoint, &ctx).await.unwrap(),
+                    "created OPS-142"
+                );
+                let raw = infra::db::get_db()
+                    .await
+                    .get_if_exists(&created_key(&base))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let record: RememberedIssue = serde_json::from_slice(&raw).unwrap();
+                assert_eq!(record.key, "OPS-142");
+
+                let expired = SharedKeys::new("https://jira.other", "OPS", "gone").created;
+                let record = RememberedIssue {
+                    key: "OPS-1".into(),
+                    created_at: config::utils::time::now_micros() - 31 * 60 * 1_000_000,
+                };
+                let db = infra::db::get_db().await;
+                let raw = serde_json::to_vec(&record).unwrap();
+                db.put(&expired, raw.into(), false, None).await.unwrap();
+
+                let ctx = incident_ctx("new_alert_correlated");
+                let other = send_on(&Node::default(), &Cluster, &endpoint, &ctx).await;
+                assert_eq!(other.unwrap(), "commented on OPS-142");
+                assert_eq!(creates(&seen), 1);
+                assert!(db.get_if_exists(&expired).await.unwrap().is_none());
+                db.delete_if_exists(&created_key(&base), false, false)
+                    .await
+                    .unwrap();
+            },
+        );
+        _ = std::fs::remove_dir_all(data_dir);
     }
 
     async fn setup_on_site(action: &str, issue_type_id: &str) -> Value {

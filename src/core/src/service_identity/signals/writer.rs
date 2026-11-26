@@ -20,7 +20,11 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use config::meta::stream::{StreamSettings, StreamType};
+use config::meta::{
+    promql::{NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+    service_identity::SERVICE_DEPLOY_DETECTOR_COMPLETED,
+    stream::StreamType,
+};
 use dashmap::DashMap;
 use o2_enterprise::enterprise::service_identity::signals::{
     mappers::{PodRow, SignalRow},
@@ -30,12 +34,15 @@ use tokio::sync::Mutex;
 
 use super::processor::Ownership;
 use crate::{
-    ingestion::feature_writer::{self, FeatureWriter, GrpcTransport, WriteError, WriterTransport},
+    ingestion::feature_writer::{
+        self, FeatureWriter, GrpcTransport, WriteError, WriterTransport, seed_retention_settings,
+    },
     traces::service_graph::v4::writer::{chunk, max_request_bytes},
 };
 
 pub const KIND_TOP_N: &str = "top_n";
 pub const KIND_HISTORY: &str = "history";
+const DETECTOR_COMPLETION_RETENTION_DAYS: i64 = 90;
 
 static SERIES: LazyLock<DashMap<String, Arc<Mutex<OrgSeries>>>> = LazyLock::new(DashMap::new);
 static DROPPED: LazyLock<prometheus::IntCounterVec> = LazyLock::new(|| {
@@ -126,6 +133,31 @@ pub(super) async fn write_window(
     seed_retention(org, &written, ownership).await
 }
 
+pub(super) async fn write_detector_completion(
+    org: &str,
+    start: i64,
+    end: i64,
+    ownership: &Ownership<'_>,
+) -> anyhow::Result<()> {
+    let written = before_backlog_edge(end, config::utils::time::now_micros(), async {
+        ownership.check().await?;
+        let record = detector_completion_record(start, end, &config::get_cluster_name());
+        deliver(&GrpcTransport, org, &[record]).await
+    })
+    .await?;
+    seed_retention(org, &written, ownership).await
+}
+
+pub(crate) fn detector_completion_record(start: i64, end: i64, cluster: &str) -> serde_json::Value {
+    serde_json::json!({
+        (NAME_LABEL): SERVICE_DEPLOY_DETECTOR_COMPLETED,
+        (TYPE_LABEL): "gauge",
+        "_timestamp": end,
+        (VALUE_LABEL): end.saturating_sub(start) as f64,
+        (series::L_CLUSTER): cluster,
+    })
+}
+
 /// Sends `records` with the org's own writer token, one request per metric stream it names.
 async fn deliver(
     transport: &dyn WriterTransport,
@@ -151,16 +183,6 @@ async fn deliver(
         }
     }
     Ok(by_stream.into_keys().collect())
-}
-
-/// D239: a new stream gets its retention while the operator has not set one.
-pub fn seed_retention_settings(settings: &mut StreamSettings, days: i64, default: i64) -> bool {
-    if settings.data_retention == 0 || settings.data_retention == default {
-        let changed = settings.data_retention != days;
-        settings.data_retention = days;
-        return changed;
-    }
-    false
 }
 
 // Settled arm reads are kept as final (metrics::settled_read), so no window may land behind them.
@@ -220,7 +242,10 @@ where
     F: Fn(&'static str, i64) -> Fut,
     Fut: Future<Output = anyhow::Result<()>>,
 {
-    for (stream, days) in series::STREAM_RETENTION_DAYS {
+    for (stream, days) in series::STREAM_RETENTION_DAYS.into_iter().chain([(
+        SERVICE_DEPLOY_DETECTOR_COMPLETED,
+        DETECTOR_COMPLETION_RETENTION_DAYS,
+    )]) {
         seed(stream, days).await?;
     }
     Ok(())
@@ -228,6 +253,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use config::meta::stream::StreamSettings;
+
     use super::*;
 
     const W: i64 = 60_000_000;
@@ -333,19 +360,6 @@ mod tests {
         assert_eq!(first, again);
     }
 
-    #[test]
-    fn retention_is_seeded_only_while_the_operator_kept_the_default() {
-        let mut settings = StreamSettings::default();
-        assert!(seed_retention_settings(&mut settings, 90, 3650));
-        assert_eq!(settings.data_retention, 90);
-        settings.data_retention = 3650;
-        assert!(seed_retention_settings(&mut settings, 30, 3650));
-        assert_eq!(settings.data_retention, 30);
-        settings.data_retention = 12;
-        assert!(!seed_retention_settings(&mut settings, 30, 3650));
-        assert_eq!(settings.data_retention, 12);
-    }
-
     #[tokio::test]
     async fn a_stream_created_after_the_first_window_still_gets_its_retention() {
         let settings = std::sync::Mutex::new(BTreeMap::from([(
@@ -366,8 +380,16 @@ mod tests {
             .lock()
             .unwrap()
             .insert(series::M_RUM_VIEWS, StreamSettings::default());
+        settings
+            .lock()
+            .unwrap()
+            .insert(SERVICE_DEPLOY_DETECTOR_COMPLETED, StreamSettings::default());
         seed_streams(&seed).await.unwrap();
         assert!(settings.lock().unwrap()[series::M_RUM_VIEWS].data_retention > 0);
+        assert_eq!(
+            settings.lock().unwrap()[SERVICE_DEPLOY_DETECTOR_COMPLETED].data_retention,
+            DETECTOR_COMPLETION_RETENTION_DAYS
+        );
         settings.lock().unwrap().remove(series::M_REQUESTS);
         seed_streams(&seed).await.unwrap();
         settings
@@ -390,7 +412,10 @@ mod tests {
             format!("svc-signals-a-{now}"),
             format!("svc-signals-b-{now}"),
         );
-        let records = [serde_json::json!({"__name__": series::M_REQUESTS, "value": 1.0})];
+        let records = [
+            serde_json::json!({"__name__": series::M_REQUESTS, "value": 1.0}),
+            detector_completion_record(now - W, now, "east"),
+        ];
         let transport = RecordingTransport::answering(200);
         for org in [&a, &b] {
             deliver(&transport, org, &records).await.unwrap();
@@ -409,18 +434,20 @@ mod tests {
         assert_eq!(
             scope,
             [
+                (a.as_str(), "metrics", SERVICE_DEPLOY_DETECTOR_COMPLETED),
                 (a.as_str(), "metrics", series::M_REQUESTS),
-                (b.as_str(), "metrics", series::M_REQUESTS)
+                (b.as_str(), "metrics", SERVICE_DEPLOY_DETECTOR_COMPLETED),
+                (b.as_str(), "metrics", series::M_REQUESTS),
             ]
         );
-        assert_ne!(sent[0].0, sent[1].0, "two orgs wrote with one token");
+        assert_ne!(sent[0].0, sent[2].0, "two orgs wrote with one token");
         crate::ingestion_tokens::set_enabled_token(&a, "_o2_service_signals", false)
             .await
             .unwrap();
         assert!(deliver(&transport, &a, &records).await.is_err());
         assert_eq!(
             transport.credentials().len(),
-            2,
+            4,
             "a disabled token still wrote"
         );
     }

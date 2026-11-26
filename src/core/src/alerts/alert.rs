@@ -76,7 +76,7 @@ use crate::alerts::notifications::{apply_custom_template, render, resolve_conten
 use crate::auth::{check_folder_write_permissions, check_permissions};
 use crate::{
     alerts::{
-        QueryConditionExt, build_sql,
+        QueryConditionExt, ScheduledEvaluation, build_sql,
         destinations::{self, note_skipped},
         notifications::{
             NotificationContext, RenderedMessage, build_row_columns, chart,
@@ -3028,16 +3028,19 @@ impl AlertExt for Alert {
             search_event_ctx.alert_name = Some(self.name.clone());
 
             self.query_condition
-                .evaluate_scheduled(
-                    &self.org_id,
-                    Some(&self.stream_name),
-                    self.stream_type,
-                    &self.trigger_condition,
-                    (start_time, end_time),
-                    Some(SearchEventType::Alerts),
-                    Some(search_event_ctx),
+                .evaluate_scheduled(ScheduledEvaluation {
+                    org_id: &self.org_id,
+                    stream_name: Some(&self.stream_name),
+                    stream_type: self.stream_type,
+                    trigger_condition: &self.trigger_condition,
+                    range: (start_time, end_time),
+                    search_type: Some(SearchEventType::Alerts),
+                    search_event_context: Some(search_event_ctx),
                     trace_id,
-                )
+                    user_id: None,
+                    timeout_secs: 0,
+                    raw_promql_step: None,
+                })
                 .await
         }
     }

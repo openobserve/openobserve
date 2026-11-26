@@ -12737,6 +12737,7 @@
       "statusOpen": "미해결",
       "statusAcknowledged": "확인됨",
       "statusResolved": "해결됨",
+      "pagerTotal": "인시던트 {count}건",
       "correlationServiceDiscovery": "서비스 디스커버리",
       "correlationPrimaryMatch": "기본 일치",
       "correlationSecondaryMatch": "보조 일치",

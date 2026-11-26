@@ -66,6 +66,20 @@ pub fn uuid() -> String {
     Ksuid::new(None, None).to_string()
 }
 
+pub fn generate_ulid(at_micros: i64) -> String {
+    const ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+    let mut bytes = rand::random::<[u8; 16]>();
+    bytes[..6].copy_from_slice(&at_micros.div_euclid(1_000).to_be_bytes()[2..]);
+    let mut value = u128::from_be_bytes(bytes);
+    let mut encoded = ['0'; 26];
+    for digit in encoded.iter_mut().rev() {
+        *digit = char::from(ALPHABET[(value & 31) as usize]);
+        value >>= 5;
+    }
+    encoded.into_iter().collect()
+}
+
 /// Generate a random hyphenated GUID, for credentials that must be unguessable.
 ///
 /// `uuid()` above returns a KSUID and `Uuid::now_v7()` leaks its creation time,

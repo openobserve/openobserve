@@ -29,6 +29,7 @@ all CloneAlert
 ent CloneExperiment
 ent CompareExperiments
 all CompareServiceVersions
+all CorrelateServiceStreams
 ent CountAlertCalibrationFindingsByRule
 all CreateAlert
 all CreateAnnotations
@@ -151,6 +152,8 @@ all GetGenAiAgentMapping
 all GetGenAiDataHealth
 all GetGroup
 all GetIncident
+all GetIncidentBrief
+ent GetIncidentEvents
 all GetIncidentStats
 all GetKVValue
 all GetLatestSessions
@@ -183,6 +186,7 @@ all GetSavedView
 all GetSearchJobResult
 all GetSearchJobStatus
 all GetSemanticGroups
+ent GetServiceGraphEdgeTrend
 all GetServiceIdentityConfig
 all GetServiceStreamAnalytics
 all GetSessionDetails
@@ -225,6 +229,7 @@ all ListFleets
 all ListFolders
 all ListGenAiAgents
 all ListGroups
+ent ListIncidentRcaFeedback
 all ListIncidentRcaRuns
 all ListIncidents
 all ListKVKeys

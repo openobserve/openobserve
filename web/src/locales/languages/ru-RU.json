@@ -12737,6 +12737,7 @@
       "statusOpen": "Открыт",
       "statusAcknowledged": "Подтверждено",
       "statusResolved": "Решено",
+      "pagerTotal": "{count} инцидент | {count} инцидентов",
       "correlationServiceDiscovery": "Обнаружение сервисов",
       "correlationPrimaryMatch": "Первичное совпадение",
       "correlationSecondaryMatch": "Вторичное совпадение",

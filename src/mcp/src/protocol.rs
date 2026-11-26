@@ -26,10 +26,15 @@ use super::{
     streaming::StreamedCall,
     tools::{
         get_pinned_tools, get_shared_http_client, get_tool_metadata, is_read_only,
-        requires_confirmation, tool_search,
+        loopback_headers, requires_confirmation, tool_search,
     },
     types::*,
 };
+
+#[cfg(any(test, feature = "test-utils"))]
+tokio::task_local! {
+    pub static TEST_LOOPBACK_BASE_URL: url::Url;
+}
 
 /// Answer given to tool calls when the MCP tool registry was never built.
 const MCP_DISABLED_MESSAGE: &str = "MCP is disabled on this node (ZO_MCP_ENABLED=false)";
@@ -37,6 +42,22 @@ const READ_ONLY_REFUSAL: &str = "OpenObserve changes are not available to AutoRe
 
 /// Largest upstream text a tool result carries; more would swamp most models' context windows.
 const MAX_TOOL_RESULT_BYTES: usize = 1024 * 1024;
+
+pub const ASSISTANT_SESSION_HEADER: &str = ledger::SESSION_HEADER;
+
+// Server identity and capabilities only change across deployments.
+const DISCOVER_TTL_MS: u64 = 3_600_000;
+// A shorter tool list lifetime bounds staleness across rolling upgrades.
+const TOOLS_LIST_TTL_MS: u64 = 300_000;
+const DEFAULT_SEARCH_LIMIT: usize = 3;
+const MAX_SEARCH_LIMIT: usize = 20;
+
+#[derive(Debug, Clone, Default)]
+pub struct McpCaller<'a> {
+    pub auth_token: Option<String>,
+    pub origin: Option<&'a Origin>,
+    pub access: ToolAccess,
+}
 
 /// A failed request, carrying the JSON-RPC code the client should see.
 struct RpcError {
@@ -81,6 +102,19 @@ pub async fn route_request(
     auth_token: Option<String>,
     origin: Option<&Origin>,
     access: ToolAccess,
+) -> Result<MCPResponse> {
+    let caller = McpCaller {
+        auth_token,
+        origin,
+        access,
+    };
+    route_request_as(org_id, request, &caller).await
+}
+
+pub async fn route_request_as(
+    org_id: &str,
+    request: MCPRequest,
+    caller: &McpCaller<'_>,
 ) -> Result<MCPResponse> {
     // Validate JSON-RPC version
     if request.jsonrpc != JSONRPC_VERSION {
@@ -135,9 +169,7 @@ pub async fn route_request(
         MCPMethod::ToolsList if !mcp_enabled => Ok(json!({ "tools": [] })),
         MCPMethod::ToolsCall if !mcp_enabled => Err(anyhow!(MCP_DISABLED_MESSAGE).into()),
         MCPMethod::ToolsList => handle_tools_list().map_err(RpcError::from),
-        MCPMethod::ToolsCall => {
-            handle_tools_call(org_id, request.params, auth_token, origin, access).await
-        }
+        MCPMethod::ToolsCall => handle_tools_call(org_id, request.params, caller).await,
         MCPMethod::ServerDiscover => handle_server_discover().map_err(RpcError::from),
         // Notifications are one-way; no response body required (HTTP layer returns 202)
         MCPMethod::NotificationsInitialized => Ok(Value::Null),
@@ -153,14 +185,6 @@ pub async fn route_request(
         Err(e) => Ok(MCPResponse::error(request.id, e.code, e.message, e.data)),
     }
 }
-
-/// Cache lifetime advertised on `server/discover` results (1 hour); the
-/// version/capability surface only changes across deployments.
-const DISCOVER_TTL_MS: u64 = 3_600_000;
-/// Cache lifetime advertised on modern `tools/list` results (5 minutes);
-/// the tool set is fixed per process but kept shorter to bound staleness
-/// across rolling upgrades.
-const TOOLS_LIST_TTL_MS: u64 = 300_000;
 
 /// Server identity for `_meta` (`io.modelcontextprotocol/serverInfo`).
 fn server_info_meta() -> Value {
@@ -313,10 +337,6 @@ fn handle_tools_list() -> Result<Value> {
     Ok(serde_json::to_value(&result)?)
 }
 
-/// Default and maximum limits for tool_search results
-const DEFAULT_SEARCH_LIMIT: usize = 3;
-const MAX_SEARCH_LIMIT: usize = 20;
-
 /// Handle tool_search - search for tools by query
 fn handle_tool_search(query: &str, limit: Option<usize>) -> Result<Value> {
     let limit = limit.unwrap_or(DEFAULT_SEARCH_LIMIT).min(MAX_SEARCH_LIMIT);
@@ -364,32 +384,30 @@ async fn handle_direct_call(
     tool_name: &str,
     args: Value,
     detail: &DetailLevel,
-    auth_token: Option<String>,
-    origin: Option<&Origin>,
-    access: ToolAccess,
+    caller: &McpCaller<'_>,
 ) -> Result<Value, RpcError> {
     // Find the tool metadata for execution
     let tool_metadata = get_tool_metadata(tool_name)
         .ok_or_else(|| RpcError::invalid_params(format!("Unknown tool: {tool_name}")))?;
-    refuse_change(access, &tool_metadata)?;
+    refuse_change(caller.access, &tool_metadata)?;
     approval::check(
         org_id,
         &tool_metadata.name,
         requires_confirmation(&tool_metadata),
-        origin,
+        caller.origin,
         &args,
     )
     .await?;
 
-    let client = authorized_client(auth_token.clone());
+    let client = authorized_client(caller, &tool_metadata.method)?;
     let result = execute_tool(
         &client,
         org_id,
         &tool_metadata,
         args,
         detail,
-        auth_token.as_deref(),
-        origin,
+        caller.auth_token.as_deref(),
+        caller.origin,
     )
     .await;
     Ok(serde_json::to_value(result)?)
@@ -400,9 +418,7 @@ async fn handle_direct_call(
 async fn handle_tools_call(
     org_id: &str,
     params: Value,
-    auth_token: Option<String>,
-    origin: Option<&Origin>,
-    access: ToolAccess,
+    caller: &McpCaller<'_>,
 ) -> Result<Value, RpcError> {
     // Parse parameters
     let call_params: ToolsCallParams = serde_json::from_value(params)
@@ -424,16 +440,7 @@ async fn handle_tools_call(
                 serde_json::from_value(call_params.arguments).map_err(|e| {
                     RpcError::invalid_params(format!("Invalid arguments for tools_call: {e}"))
                 })?;
-            handle_direct_call(
-                org_id,
-                &args.tool,
-                args.args,
-                &args.detail,
-                auth_token,
-                origin,
-                access,
-            )
-            .await
+            handle_direct_call(org_id, &args.tool, args.args, &args.detail, caller).await
         }
         // Pinned tools are exposed directly in tools/list and called by name.
         // Route them straight to execution with their arguments.
@@ -443,9 +450,7 @@ async fn handle_tools_call(
                 name,
                 call_params.arguments,
                 &DetailLevel::default(),
-                auth_token,
-                origin,
-                access,
+                caller,
             )
             .await
         }
@@ -581,12 +586,36 @@ fn structured_content(content_text: &str) -> Option<Value> {
 }
 
 /// The shared HTTP client, carrying the caller's own credentials when it sent any.
-fn authorized_client(auth_token: Option<String>) -> rmcp_openapi::HttpClient {
-    let shared_client = get_shared_http_client();
-    match auth_token {
-        Some(token) => shared_client.with_authorization(&token),
-        None => shared_client.clone(),
-    }
+fn authorized_client(
+    caller: &McpCaller<'_>,
+    http_method: &str,
+) -> Result<rmcp_openapi::HttpClient> {
+    let client = get_shared_http_client().clone();
+    #[cfg(any(test, feature = "test-utils"))]
+    let client = match TEST_LOOPBACK_BASE_URL.try_with(Clone::clone) {
+        // The test constructs an absolute HTTP URL from its bound listener.
+        Ok(url) => client.with_base_url(url)?,
+        Err(_) => client,
+    };
+
+    // RCA reads need the session binding. MCP writes already pass tool approval before loopback.
+    let client = if (http_method.eq_ignore_ascii_case("GET")
+        || http_method.eq_ignore_ascii_case("HEAD"))
+        && let Some(origin) = caller.origin
+    {
+        let mut headers = loopback_headers()?;
+        headers.insert(
+            ASSISTANT_SESSION_HEADER,
+            reqwest::header::HeaderValue::from_str(&origin.session_id)?,
+        );
+        client.with_default_headers(headers)
+    } else {
+        client
+    };
+    Ok(match caller.auth_token.as_deref() {
+        Some(token) => client.with_authorization(token),
+        None => client,
+    })
 }
 
 /// What a client may be told of a failed API request; the cause stays in the server log.

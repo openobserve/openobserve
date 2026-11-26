@@ -529,6 +529,8 @@
         "titleChanged": "Renamed to {to}",
         "assigned": "Assigned to {to}",
         "unassigned": "Unassigned",
+        "commsOwnerSet": "Comms owner set to {to}",
+        "commsOwnerCleared": "Comms owner cleared",
         "comment": "Note",
         "analysisBegin": "Root-cause analysis started",
         "analysisComplete": "Root-cause analysis completed",

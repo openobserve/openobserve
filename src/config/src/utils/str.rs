@@ -23,6 +23,9 @@ pub static EMPTY_STR: &str = "";
 /// Webhook hosts whose subdomain is the key, so even the origin carries it.
 const SUBDOMAIN_KEYED_HOSTS: &[&str] = &[".m.pipedream.net"];
 
+/// The longest stream object id the org-wide shortcut accepts; OpenFGA refuses objects past 256.
+pub const MAX_SHORTCUT_ID_LEN: usize = 200;
+
 /// Canonical email-validation regex (RFC 5321/5322 dot-atom form).
 ///
 /// Local part = one or more non-empty atoms separated by single dots (accepts single-char dotted
@@ -96,6 +99,16 @@ pub fn into_ofga_supported_format(name: &str) -> String {
 /// True if `name` contains any character an OpenFGA object id cannot represent.
 pub fn is_ofga_unsupported(name: &str) -> bool {
     RE_OFGA_UNSUPPORTED_NAME.is_match(name)
+}
+
+/// True when OpenFGA accepts the stream's own Check, so an org-wide grant is known to cover it.
+/// A name outside this strict form keeps its own Check, whose answer may be a refusal.
+pub fn org_wide_grant_covers(stream_name: &str) -> bool {
+    let id = into_ofga_supported_format(stream_name);
+    (1..=MAX_SHORTCUT_ID_LEN).contains(&id.len())
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'=' | b'-'))
 }
 
 #[inline(always)]

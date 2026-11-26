@@ -11,6 +11,7 @@ import pytest
 
 from helpers.webhook_sink import WebhookSink
 from support.client import OpenObserveClient
+from support.incidents import list_all_incidents
 from support.wait import wait_until
 
 from .multialert_helpers import AlertsClient, uniq
@@ -95,9 +96,7 @@ def _resolve_incidents(alerts: AlertsClient, services: set[str]) -> None:
     if not services:
         return
     for status in ("open", "acknowledged"):
-        resp = alerts._v2("GET", f"alerts/incidents?status={status}&limit=1000")
-        assert resp.status_code == 200, resp.text
-        for incident in resp.json()["incidents"]:
+        for incident in list_all_incidents(alerts._v2, status):
             if any(s in str(incident) for s in services):
                 patched = alerts._v2("PATCH", f"alerts/incidents/{incident['id']}/update", json={"status": "resolved"})
                 assert patched.status_code == 200, patched.text
@@ -122,9 +121,7 @@ def _incident_opened(incident_alerts: dict[str, Any], case: str) -> None:
     alert_id = incident_alerts["ids"][case]
 
     def ours() -> list[dict]:
-        resp = incident_alerts["alerts"]._v2("GET", "alerts/incidents?limit=1000")
-        assert resp.status_code == 200, resp.text
-        return [i for i in resp.json()["incidents"]
+        return [i for i in list_all_incidents(incident_alerts["alerts"]._v2)
                 if any(g.get("alert_id") == alert_id for g in i.get("alert_groups") or [])]
 
     incidents = wait_until(ours, timeout=120, interval=5, msg=f"{case}: no incident was opened for alert {alert_id}")

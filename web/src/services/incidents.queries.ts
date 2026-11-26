@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-import incidents, { type Incident } from "./incidents";
+import incidents, { type Incident, type IncidentListParams } from "./incidents";
 import type { AckAlertResponse, UnackAlertResponse } from "@/ts/interfaces/alert";
 import { incidentKeys } from "./incidents.querykeys";
 import { oneAckScopes } from "./alerts.querykeys";
@@ -24,6 +24,13 @@ export const incidentsQuery = (org: string, status: string, limit: number, offse
   queryOptions({
     queryKey: incidentKeys.list(org, status, limit, offset),
     queryFn: async () => (await incidents.list(org, status, limit, offset)).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
+export const incidentListQuery = (org: string, params: IncidentListParams) =>
+  queryOptions({
+    queryKey: incidentKeys.page(org, params),
+    queryFn: async () => (await incidents.listPage(org, params)).data,
     staleTime: LIVE_STALE_TIME,
   });
 
@@ -37,15 +44,32 @@ export const incidentQuery = (org: string, id: string) =>
 /** One incident's events, oldest first: alerts, acknowledges, resolves, comments, analyses. */
 export interface IncidentEvent {
   timestamp: number;
+  /** The timeline's `seq` after the write that added this event; absent on older events. */
+  seq?: number;
   type: string;
   data?: { user_id?: string | null; reason?: string | null } & Record<string, unknown>;
 }
 
+/** The cached page: the events and the `seq` they were read at, sent back as `If-None-Match`. */
+interface IncidentEventsPage {
+  events: IncidentEvent[];
+  seq?: number;
+}
+
+/** How often an open drawer re-reads the timeline; TanStack skips the tick while the tab is hidden. */
+export const INCIDENT_EVENTS_POLL_MS = 30_000;
+
 export const incidentEventsQuery = (org: string, id: string) =>
   queryOptions({
     queryKey: incidentKeys.events(org, id),
-    queryFn: async (): Promise<IncidentEvent[]> =>
-      (await incidents.getEvents(org, id)).data?.events ?? [],
+    queryFn: async ({ client, queryKey }): Promise<IncidentEventsPage> => {
+      const cached = client.getQueryData<IncidentEventsPage>(queryKey);
+      const res = await incidents.getEvents(org, id, cached?.seq);
+      if (res.status === 304 && cached) return cached;
+      return { events: res.data?.events ?? [], seq: res.data?.seq };
+    },
+    // A removal (an alert moved out) has no cursor, so the list is replaced on every 200.
+    select: (page): IncidentEvent[] => page.events,
     staleTime: LIVE_STALE_TIME,
   });
 

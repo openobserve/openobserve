@@ -31,6 +31,7 @@ use std::{
 
 use config::{
     meta::{
+        alerts::priority::AlertPriority,
         downtimes::{
             AffectedItems, AlertGroupRef, DimensionCondition, Downtime, DowntimeDetail,
             DowntimeListItem, DowntimeNotifications, DowntimeRequest, DowntimeSchedule,
@@ -40,6 +41,7 @@ use config::{
             ResourcesResponse, TargetModule, ValuesRequest, ValuesResponse, same_alert_groups,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
+        oncall::DEFAULT_PAGING_PRIORITY,
     },
     utils::time::now_micros,
 };
@@ -61,7 +63,7 @@ use self::{
     matching::{Inventory, Matches, Visibility},
     notify::DueEvent,
 };
-use crate::slo::corrections::RemeasurePlan;
+use crate::{alerts::ack::Caller, slo::corrections::RemeasurePlan};
 
 /// Match counts are recomputed at most this often per downtime.
 const MATCH_COUNTS_TTL: Duration = Duration::from_secs(60);
@@ -70,6 +72,8 @@ const AFFECTED_CAP: usize = 500;
 /// A move takes at most this many ids, each a write and an authorization check.
 const MAX_MOVE_IDS: usize = 100;
 const MICROS_PER_SEC: i64 = 1_000_000;
+const AI_URGENT_REFUSAL: &str = "An AI assistant cannot create, change or extend a downtime that \
+                                 can mute a P1 or P2 alert; a person must.";
 /// Appended to the name of the one-time row that extends a recurring one.
 const EXTENDED_SUFFIX: &str = " (extended)";
 /// Who cancels an Until-it-clears row when its alert clears, the incidents' system actor (V-36).
@@ -220,22 +224,22 @@ pub async fn get(org: &str, user_id: &str, id: &str) -> Result<DowntimeDetail, D
 
 pub async fn create(
     org: &str,
-    user_id: &str,
+    caller: &Caller,
     req: DowntimeRequest,
 ) -> Result<Downtime, DowntimeError> {
     ensure_enabled()?;
-    insert_new(org, user_id, req, None).await
+    insert_new(org, caller, req, None).await
 }
 
 /// A quick mute from an alert route, whose rule stands in for the folder-write check.
 pub async fn create_for_alert(
     org: &str,
-    user_id: &str,
+    caller: &Caller,
     req: DowntimeRequest,
     source: MuteSource,
 ) -> Result<Downtime, DowntimeError> {
     ensure_enabled()?;
-    insert_new(org, user_id, req, Some(source)).await
+    insert_new(org, caller, req, Some(source)).await
 }
 
 /// The org cap's message when one more active or upcoming row would pass it (V-40).
@@ -256,17 +260,22 @@ pub async fn get_row(org: &str, id: &str) -> Result<Downtime, DowntimeError> {
 /// Edits everything but the folder, which only `move` changes.
 pub async fn update(
     org: &str,
-    user_id: &str,
+    caller: &Caller,
     id: &str,
     req: DowntimeRequest,
 ) -> Result<Downtime, DowntimeError> {
     ensure_enabled()?;
+    let user_id = caller.email.as_str();
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
     require_version(req.version)?;
     check_version(req.version, &before)?;
     check_editable(&before, now_micros())?;
     let req = checked_request(org, user_id, req, Some(&before), true).await?;
+    refuse_urgent_for_ai(org, caller, &before.targets).await?;
+    if req.targets != before.targets {
+        refuse_urgent_for_ai(org, caller, &req.targets).await?;
+    }
     check_started_edit(&before, &req, now_micros())?;
     let continues = before
         .notifications
@@ -385,12 +394,13 @@ fn cancel_on_clear_audit(
 /// Moves the end of a quick mute; `end_on_clear` is what the row ends on from now.
 pub async fn extend_quick_mute(
     org: &str,
-    user_id: &str,
+    caller: &Caller,
     before: &Downtime,
     new_end: i64,
     end_on_clear: Option<EndOnClear>,
 ) -> Result<Downtime, DowntimeError> {
     ensure_enabled()?;
+    let user_id = caller.email.as_str();
     let now = now_micros();
     let window = extendable_window(before, now)?;
     if new_end <= now {
@@ -401,6 +411,7 @@ pub async fn extend_quick_mute(
     let mut after = extended_once(before, new_end, user_id, now);
     after.end_on_clear = end_on_clear;
     checked_request(org, user_id, request_of(&after), Some(before), false).await?;
+    refuse_urgent_for_ai(org, caller, &before.targets).await?;
     let plan = remeasure_plan(Some(before), &after).await?;
     set_if_unchanged(&after, before.updated_at, &plan).await?;
     plan.trigger(&after.id).await;
@@ -444,13 +455,15 @@ pub async fn send_test(
 /// Lengthens the active window; a recurring row gets a one-time follow-up instead.
 pub async fn extend(
     org: &str,
-    user_id: &str,
+    caller: &Caller,
     id: &str,
     req: &ExtendDowntimeRequest,
 ) -> Result<ExtendDowntimeResponse, DowntimeError> {
     ensure_enabled()?;
+    let user_id = caller.email.as_str();
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
+    refuse_urgent_for_ai(org, caller, &before.targets).await?;
     check_version(req.version, &before)?;
     let now = now_micros();
     let window = extendable_window(&before, now)?;
@@ -727,6 +740,27 @@ pub fn corrections_may_change(before: Option<&Downtime>, after: &Downtime) -> bo
             || before.condition != after.condition
             || before.cancelled_at != after.cancelled_at
     })
+}
+
+/// D39: the alerts the targets can mute, or `None` when they are not a fixed list. [pure]
+pub fn named_alerts(targets: &[DowntimeTarget]) -> Option<BTreeSet<&str>> {
+    let mut ids = BTreeSet::new();
+    for target in targets.iter().filter(|t| t.module == TargetModule::Alerts) {
+        // No ids: a folder, tag or condition scope, which also covers alerts made later.
+        if target.ids.is_empty() {
+            return None;
+        }
+        ids.extend(target.ids.iter().map(String::as_str));
+    }
+    Some(ids)
+}
+
+/// Whether an alert of this priority pages at P1 or P2; unset pages at the default. [pure]
+pub fn pages_urgently(priority: Option<AlertPriority>) -> bool {
+    matches!(
+        priority.unwrap_or(DEFAULT_PAGING_PRIORITY),
+        AlertPriority::P1 | AlertPriority::P2
+    )
 }
 
 async fn cancel_row(
@@ -1026,12 +1060,14 @@ fn takes_room_on_edit(before: &Downtime, after: &Downtime, now: i64) -> bool {
 /// A new row; `source` is set only for a quick mute from an alert route.
 async fn insert_new(
     org: &str,
-    user_id: &str,
+    caller: &Caller,
     req: DowntimeRequest,
     source: Option<MuteSource>,
 ) -> Result<Downtime, DowntimeError> {
+    let user_id = caller.email.as_str();
     let folder_id = resolve_folder(org, &req.folder_id).await?;
     let req = checked_request(org, user_id, req, None, true).await?;
+    refuse_urgent_for_ai(org, caller, &req.targets).await?;
     let now = now_micros();
     check_room(org, now)?;
     let mut downtime = created(org, folder_id, &req, user_id, now);
@@ -1046,6 +1082,53 @@ async fn insert_new(
     }
     plan.trigger(&downtime.id).await;
     Ok(downtime)
+}
+
+/// F24 (D34, D39): an AI principal may not write a downtime that can mute a P1 or P2 page.
+async fn refuse_urgent_for_ai(
+    org: &str,
+    caller: &Caller,
+    targets: &[DowntimeTarget],
+) -> Result<(), DowntimeError> {
+    if caller.ai && may_mute_urgent(org, targets).await {
+        return Err(DowntimeError::Forbidden(AI_URGENT_REFUSAL.to_string()));
+    }
+    Ok(())
+}
+
+/// Whether any alert the targets can mute pages at P1 or P2 now. [strong] (reads)
+async fn may_mute_urgent(org: &str, targets: &[DowntimeTarget]) -> bool {
+    let Some(ids) = named_alerts(targets) else {
+        return true;
+    };
+    for id in ids {
+        if named_alert_pages_urgently(org, id).await {
+            return true;
+        }
+    }
+    false
+}
+
+/// A failed read counts as urgent, so the guard fails closed.
+async fn named_alert_pages_urgently(org: &str, id: &str) -> bool {
+    if let Ok(ksuid) = id.parse::<svix_ksuid::Ksuid>() {
+        match db::alerts::alert::get_by_id(infra::db::get_orm_client_ro().await, org, ksuid).await {
+            Ok(Some((_, alert))) => return pages_urgently(alert.priority),
+            Ok(None) => {}
+            Err(_) => return true,
+        }
+    }
+    match crate::alerts::composite::get_composite(org, id).await {
+        Ok(Some(composite)) => pages_urgently(
+            composite
+                .definition
+                .priority
+                .and_then(AlertPriority::from_i32),
+        ),
+        // A deleted alert pages nobody; a create naming one fails validation first.
+        Ok(None) => false,
+        Err(_) => true,
+    }
 }
 
 /// Validates, normalizes as stored, then checks what the user may silence if it changed.
@@ -4197,5 +4280,38 @@ mod tests {
         }
         // A detail opened right after its create must not 404 on replica lag.
         assert!(body_of("pub async fn get(").contains("load(org, id)"));
+    }
+
+    #[test]
+    fn only_a_list_of_named_alerts_is_a_fixed_set_and_unset_priority_pages_at_p2() {
+        let alerts = |folders: TargetFolders, ids: &[&str]| DowntimeTarget {
+            module: TargetModule::Alerts,
+            folders,
+            tags: vec![],
+            ids: ids.iter().map(|id| id.to_string()).collect(),
+            slo_mode: None,
+            incident_mode: Default::default(),
+        };
+        let named = [alerts(TargetFolders::All, &["a1", "a2"])];
+        assert_eq!(named_alerts(&named), Some(BTreeSet::from(["a1", "a2"])));
+        assert_eq!(named_alerts(&[alerts(TargetFolders::All, &[])]), None);
+        let folder = TargetFolders::Some {
+            folder_ids: vec!["prod".to_string()],
+        };
+        assert_eq!(named_alerts(&[alerts(folder, &[])]), None, "a folder");
+        let synthetics = DowntimeTarget {
+            module: TargetModule::Synthetics,
+            ..alerts(TargetFolders::All, &[])
+        };
+        assert_eq!(
+            named_alerts(&[synthetics]),
+            Some(BTreeSet::new()),
+            "no alert can be muted"
+        );
+        assert!(pages_urgently(Some(AlertPriority::P1)));
+        assert!(pages_urgently(Some(AlertPriority::P2)));
+        assert!(pages_urgently(None));
+        assert!(!pages_urgently(Some(AlertPriority::P3)));
+        assert!(!pages_urgently(Some(AlertPriority::P5)));
     }
 }

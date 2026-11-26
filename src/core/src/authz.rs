@@ -17,7 +17,7 @@
 use std::collections::HashMap;
 #[cfg(any(feature = "enterprise", test))]
 use std::collections::HashSet;
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(all(feature = "enterprise", any(test, feature = "test-utils")))]
 use std::sync::RwLock;
 #[cfg(feature = "enterprise")]
 use std::sync::{Arc, LazyLock};
@@ -29,7 +29,7 @@ use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::meta::user::UserRole;
 #[cfg(any(feature = "enterprise", test))]
 use config::meta::{
-    service_streams::{RelatedStreams, StreamInfo},
+    service_streams::{RelatedStreams, ServiceStreams, StreamInfo},
     stream::StreamType,
 };
 use datafusion::common::TableReference;
@@ -40,10 +40,6 @@ use infra::table::service_streams::ServiceRecord;
 
 use crate::auth::AuthExtractor;
 
-/// The longest stream object id the org-wide shortcut accepts; OpenFGA refuses objects past 256.
-#[cfg(any(feature = "enterprise", test))]
-const MAX_SHORTCUT_ID_LEN: usize = 200;
-
 #[cfg(any(feature = "enterprise", test))]
 pub const STREAM_ACCESS_HINT: &str = "Ask an org admin for read access to the listed streams, or change the query to streams you can read.";
 
@@ -51,7 +47,7 @@ pub const STREAM_ACCESS_HINT: &str = "Ask an org admin for read access to the li
 static PRODUCTION_CHECKER: LazyLock<Arc<dyn StreamAccessChecker>> =
     LazyLock::new(|| Arc::new(OpenFgaStreamChecker));
 
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(all(feature = "enterprise", any(test, feature = "test-utils")))]
 static TEST_CHECKER: RwLock<Option<Arc<dyn StreamAccessChecker>>> = RwLock::new(None);
 
 #[cfg(feature = "enterprise")]
@@ -64,7 +60,7 @@ pub enum StreamPermissionResourceType {
 
 /// Every variant carries the org it reads in, which may differ from the request org.
 #[cfg(any(feature = "enterprise", test))]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum QuerySource {
     Sql {
         org_id: String,
@@ -231,7 +227,7 @@ pub trait WriteCheck<T: Sync>: Send + Sync {
     async fn check(&self, object: &T) -> Result<(), axum::response::Response>;
 }
 
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(all(feature = "enterprise", any(test, feature = "test-utils")))]
 #[derive(Default)]
 pub struct FakeStreamChecker {
     roots: RwLock<HashSet<String>>,
@@ -242,7 +238,7 @@ pub struct FakeStreamChecker {
     calls: RwLock<HashMap<String, CheckCalls>>,
 }
 
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(all(feature = "enterprise", any(test, feature = "test-utils")))]
 impl FakeStreamChecker {
     pub fn grant_root(&self, user_id: &str) {
         write_set(&self.roots).insert(user_id.to_string());
@@ -255,6 +251,11 @@ impl FakeStreamChecker {
     pub fn grant_read(&self, user_id: &str, stream: &TypedStream) {
         let key = format!("{}/{}/{}", stream.org_id, stream.stream_type, stream.name);
         write_set(&self.grants).insert((user_id.to_string(), key));
+    }
+
+    pub fn revoke_read(&self, user_id: &str, stream: &TypedStream) {
+        let key = format!("{}/{}/{}", stream.org_id, stream.stream_type, stream.name);
+        write_set(&self.grants).remove(&(user_id.to_string(), key));
     }
 
     pub fn grant_cipher_key(&self, org_id: &str, user_id: &str, key: &str) {
@@ -303,7 +304,7 @@ impl FakeStreamChecker {
     }
 }
 
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(all(feature = "enterprise", any(test, feature = "test-utils")))]
 #[async_trait::async_trait]
 impl StreamAccessChecker for FakeStreamChecker {
     async fn enforces_rbac(&self) -> bool {
@@ -368,7 +369,7 @@ impl StreamAccessChecker for FakeStreamChecker {
 }
 
 /// What one user asked a [`FakeStreamChecker`], so a test can count the Checks a path costs.
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(all(feature = "enterprise", any(test, feature = "test-utils")))]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CheckCalls {
     pub streams: usize,
@@ -1022,6 +1023,83 @@ pub async fn readable_service_records(
         .collect()
 }
 
+/// The ids of the Correlate `rows` (id, lists, stored cut) that count for the caller; `None` when
+/// RBAC limits no stream of theirs, so every row counts as Live. [no-fail]
+#[cfg(any(feature = "enterprise", test))]
+pub async fn admitted_rows(
+    checker: &dyn StreamAccessChecker,
+    user_id: &str,
+    org_id: &str,
+    rows: &[(&str, &ServiceStreams, i16)],
+) -> Option<HashSet<String>> {
+    use config::meta::service_streams::{
+        CorrelateAccess, STREAMS_CUT_OUTSIDE_FORM, STREAMS_CUT_TYPES, row_counts,
+    };
+
+    let mut wanted = HashSet::new();
+    for (_, lists, _) in rows {
+        for (stream_type, names) in [
+            (StreamType::Logs, &lists.logs),
+            (StreamType::Traces, &lists.traces),
+            (StreamType::Metrics, &lists.metrics),
+            (StreamType::Profiles, &lists.profiles),
+        ] {
+            wanted.extend(names.iter().map(|name| (stream_type, name.clone())));
+        }
+    }
+    let readable = readable_streams(checker, user_id, org_id, wanted).await?;
+    let mut cut_types: Vec<StreamType> = Vec::new();
+    for (_, _, cut) in rows.iter().filter(|r| r.2 & STREAMS_CUT_OUTSIDE_FORM == 0) {
+        for (stream_type, bit) in STREAMS_CUT_TYPES {
+            if cut & bit != 0 && !cut_types.contains(&stream_type) {
+                cut_types.push(stream_type);
+            }
+        }
+    }
+    let org_wide_types = if cut_types.is_empty() {
+        HashSet::new()
+    } else {
+        checker.org_wide_readable(user_id, org_id, &cut_types).await
+    };
+    let access = CorrelateAccess::Restricted {
+        readable,
+        org_wide_types,
+    };
+    Some(
+        rows.iter()
+            .filter(|(_, lists, cut)| row_counts(lists, *cut, &access))
+            .map(|(id, ..)| (*id).to_string())
+            .collect(),
+    )
+}
+
+/// Whether the caller may correlate from the source it names. Correlate never reads that stream,
+/// and UI callers send placeholders, so only a real stream of the org is checked. [no-fail]
+#[cfg(any(feature = "enterprise", test))]
+pub async fn may_correlate_from<F>(
+    checker: &dyn StreamAccessChecker,
+    user_id: &str,
+    org_id: &str,
+    source_stream: &str,
+    source_type: &str,
+    exists: impl FnOnce(TypedStream) -> F,
+) -> bool
+where
+    F: std::future::Future<Output = bool>,
+{
+    let Some(source) = correlate_source(org_id, source_stream, source_type) else {
+        return true;
+    };
+    if !checker.enforces_rbac().await
+        || checker.is_root(user_id).await
+        || checker.is_root_or_admin(org_id, user_id).await
+        || !exists(source.clone()).await
+    {
+        return true;
+    }
+    checker.can_read_stream(user_id, &source).await
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn authorize_query_sources(
     user_id: &str,
@@ -1033,7 +1111,7 @@ pub async fn authorize_query_sources(
 
 #[cfg(feature = "enterprise")]
 pub fn active_checker() -> Arc<dyn StreamAccessChecker> {
-    #[cfg(feature = "test-utils")]
+    #[cfg(any(test, feature = "test-utils"))]
     if let Some(checker) = TEST_CHECKER
         .read()
         .unwrap_or_else(|e| e.into_inner())
@@ -1044,13 +1122,13 @@ pub fn active_checker() -> Arc<dyn StreamAccessChecker> {
     PRODUCTION_CHECKER.clone()
 }
 
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(all(feature = "enterprise", any(test, feature = "test-utils")))]
 pub fn install_test_checker(checker: Arc<dyn StreamAccessChecker>) {
     *TEST_CHECKER.write().unwrap_or_else(|e| e.into_inner()) = Some(checker);
 }
 
 /// One process-wide checker, so tests isolate by granting to unique users.
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(all(feature = "enterprise", any(test, feature = "test-utils")))]
 pub fn fake_checker() -> Arc<FakeStreamChecker> {
     static FAKE: std::sync::OnceLock<Arc<FakeStreamChecker>> = std::sync::OnceLock::new();
     FAKE.get_or_init(|| {
@@ -1262,15 +1340,21 @@ async fn cipher_key_allowed(
     .await
 }
 
-/// True when OpenFGA accepts the stream's own Check, so an org-wide grant is known to cover it.
-/// A name outside this strict form keeps its own Check, whose answer may be a refusal.
+/// `None` for an empty name or a type no service row lists, such as the drawer's `incident`.
 #[cfg(any(feature = "enterprise", test))]
-fn org_wide_grant_covers(stream_name: &str) -> bool {
-    let id = config::utils::str::into_ofga_supported_format(stream_name);
-    (1..=MAX_SHORTCUT_ID_LEN).contains(&id.len())
-        && id
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'=' | b'-'))
+fn correlate_source(org_id: &str, name: &str, source_type: &str) -> Option<TypedStream> {
+    let stream_type = match source_type.to_lowercase().as_str() {
+        "logs" => StreamType::Logs,
+        "traces" => StreamType::Traces,
+        "metrics" => StreamType::Metrics,
+        "profiles" => StreamType::Profiles,
+        _ => return None,
+    };
+    (!name.trim().is_empty()).then(|| TypedStream {
+        org_id: org_id.to_string(),
+        stream_type,
+        name: name.to_string(),
+    })
 }
 
 /// True when an org-wide grant decides the stream; `stream:_all_` never reaches enrichment tables.
@@ -1284,7 +1368,7 @@ fn org_wide_shortcut_covers(stream_type: StreamType, name: &str) -> bool {
             | StreamType::Profiles
             | StreamType::Index
             | StreamType::Metadata
-    ) && org_wide_grant_covers(name)
+    ) && config::utils::str::org_wide_grant_covers(name)
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -1382,7 +1466,7 @@ fn search_rewritten_sql(sql: &str) -> String {
         .unwrap_or_else(|_| sql.to_string())
 }
 
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(all(feature = "enterprise", any(test, feature = "test-utils")))]
 fn write_set<T>(set: &RwLock<HashSet<T>>) -> std::sync::RwLockWriteGuard<'_, HashSet<T>> {
     set.write().unwrap_or_else(|e| e.into_inner())
 }
@@ -2311,8 +2395,8 @@ mod tests {
     async fn a_name_openfga_may_refuse_keeps_its_own_check() {
         use StreamType::Logs;
 
-        let longest = "a".repeat(MAX_SHORTCUT_ID_LEN);
-        let too_long = "a".repeat(MAX_SHORTCUT_ID_LEN + 1);
+        let longest = "a".repeat(config::utils::str::MAX_SHORTCUT_ID_LEN);
+        let too_long = "a".repeat(config::utils::str::MAX_SHORTCUT_ID_LEN + 1);
         let refused = [too_long.as_str(), "", "*", "a\u{1}b", "caf\u{e9}"];
         let shortcut = wanted(&[(Logs, longest.as_str()), (Logs, "app")]);
         let mut all = shortcut.clone();
@@ -2436,5 +2520,222 @@ mod tests {
                 "rbac_on={rbac_on}"
             );
         }
+    }
+
+    /// C1 reads `app_a`, `app_b` and `app_c` by per-stream grants; C2 is an org admin; C3 holds
+    /// only an org-wide logs grant (§7.7).
+    fn correlate_callers() -> FakeChecker {
+        FakeChecker::default()
+            .reads("c1", "o1/logs/app_a")
+            .reads("c1", "o1/logs/app_b")
+            .reads("c1", "o1/logs/app_c")
+            .admin("c2", "o1")
+            .reads_all("c3", "o1", StreamType::Logs)
+    }
+
+    fn correlate_row(name: &str, logs: &[&str]) -> ServiceRecord {
+        let mut record = ServiceRecord::new("o1", name, "k8s", serde_json::json!({}));
+        record.logs_streams = serde_json::json!(logs);
+        record
+    }
+
+    fn stream_lists(row: &infra::table::service_streams::Model) -> ServiceStreams {
+        let names = |v: &serde_json::Value| -> Vec<String> {
+            v.as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|n| n.as_str().map(str::to_string))
+                .collect()
+        };
+        ServiceStreams {
+            logs: names(&row.logs_streams),
+            traces: names(&row.traces_streams),
+            metrics: names(&row.metrics_streams),
+            profiles: names(&row.profiles_streams),
+        }
+    }
+
+    /// Each caller's admitted service names over the stored rows, and C1's union of what they hold.
+    async fn admitted_by_caller(
+        db: &sea_orm::DatabaseConnection,
+    ) -> (Vec<Option<Vec<String>>>, String) {
+        use sea_orm::EntityTrait;
+        let rows = infra::table::service_streams::Entity::find()
+            .all(db)
+            .await
+            .unwrap();
+        let lists: Vec<ServiceStreams> = rows.iter().map(stream_lists).collect();
+        let view: Vec<(&str, &ServiceStreams, i16)> = rows
+            .iter()
+            .zip(&lists)
+            .map(|(row, lists)| (row.id.as_str(), lists, row.streams_cut))
+            .collect();
+        let checker = correlate_callers();
+        let mut out = Vec::new();
+        let mut c1_union = String::new();
+        for caller in ["c1", "c2", "c3"] {
+            let admitted = admitted_rows(&checker, caller, "o1", &view).await;
+            let names = admitted.as_ref().map(|ids| {
+                let mut names: Vec<String> = rows
+                    .iter()
+                    .filter(|row| ids.contains(&row.id))
+                    .map(|row| row.service_name.clone())
+                    .collect();
+                names.sort();
+                names
+            });
+            if caller == "c1" {
+                for row in rows
+                    .iter()
+                    .filter(|r| admitted.as_ref().unwrap().contains(&r.id))
+                {
+                    c1_union.push_str(&format!(
+                        "{} {} ",
+                        row.all_dimensions,
+                        serde_json::json!(stream_lists(row))
+                    ));
+                }
+            }
+            out.push(names);
+        }
+        (out, c1_union)
+    }
+
+    #[tokio::test]
+    async fn correlate_mixed_access_row_never_merges() {
+        use infra::table::service_streams::{Entity, backends_for_tests, put_with};
+        use sea_orm::EntityTrait;
+        let names = |v: &[&str]| v.iter().map(|n| n.to_string()).collect::<Vec<_>>();
+        for db in backends_for_tests("correlate_mixed").await {
+            let mut r1 = correlate_row("r1", &["app_a", "app_private"]);
+            r1.all_dimensions = serde_json::json!({"namespace": "payments"});
+            let _ = put_with(&db, "o1", r1, 50).await.unwrap();
+            let _ = put_with(&db, "o1", correlate_row("r2", &["app_a"]), 50)
+                .await
+                .unwrap();
+            for (name, extra) in [("r3", None), ("r5", Some("app_c"))] {
+                let mut first = correlate_row(name, &["app_a", "app_b", "app_cut"]);
+                first.all_dimensions = serde_json::json!({"team": "ledger"});
+                let _ = put_with(&db, "o1", first, 50).await.unwrap();
+                let _ = put_with(&db, "o1", correlate_row(name, &[]), 2)
+                    .await
+                    .unwrap();
+                if let Some(extra) = extra {
+                    let _ = put_with(&db, "o1", correlate_row(name, &[extra]), 3)
+                        .await
+                        .unwrap();
+                }
+            }
+            let mut r4 = correlate_row("r4", &["app_a"]);
+            r4.profiles_streams = serde_json::json!(["prof_a"]);
+            let _ = put_with(&db, "o1", r4, 50).await.unwrap();
+            // D31: s16 recomputes a legacy row listing only `app_a` to 0.
+            let _ = put_with(&db, "o1", correlate_row("r6", &["app_a"]), 50)
+                .await
+                .unwrap();
+
+            let (admitted, c1_union) = admitted_by_caller(&db).await;
+            assert_eq!(admitted[0], Some(names(&["r2", "r6"])), "C1");
+            assert_eq!(admitted[1], None, "C2 counts every row, as Live");
+            assert_eq!(
+                admitted[2],
+                Some(names(&["r1", "r2", "r3", "r5", "r6"])),
+                "C3"
+            );
+            for hidden in [
+                "payments",
+                "ledger",
+                "app_private",
+                "app_b",
+                "app_c",
+                "prof_a",
+            ] {
+                assert!(!c1_union.contains(hidden), "C1 sees {hidden}: {c1_union}");
+            }
+
+            Entity::delete_many().exec(&db).await.unwrap();
+            let mut fresh = correlate_row("r3", &["app_a", "app_b"]);
+            fresh.all_dimensions = serde_json::json!({"team": "ledger"});
+            let _ = put_with(&db, "o1", fresh, 50).await.unwrap();
+            let (admitted, _) = admitted_by_caller(&db).await;
+            assert_eq!(
+                admitted[0],
+                Some(names(&["r3"])),
+                "after _reset R3 counts for C1"
+            );
+        }
+    }
+
+    /// The caller half of s16's L1-L3 fixture (SLICES §9 I-29), with the bits s16 recomputes.
+    #[tokio::test]
+    async fn correlate_upgrade_recomputes_legacy_cut() {
+        use config::meta::service_streams::{STREAMS_CUT_LOGS, STREAMS_CUT_OUTSIDE_FORM};
+        use infra::table::service_streams::{backends_for_tests, put_with};
+        let names = |v: &[&str]| v.iter().map(|n| n.to_string()).collect::<Vec<_>>();
+        let outside = "a".repeat(config::utils::str::MAX_SHORTCUT_ID_LEN + 1);
+        for db in backends_for_tests("correlate_legacy").await {
+            for (name, logs, cut) in [
+                ("l1", vec!["app_a"], 0),
+                ("l2", vec!["app_a", "app_b"], STREAMS_CUT_LOGS),
+                ("l3", vec![outside.as_str()], STREAMS_CUT_OUTSIDE_FORM),
+            ] {
+                let mut row = correlate_row(name, &logs);
+                row.streams_cut = cut;
+                let _ = put_with(&db, "o1", row, 50).await.unwrap();
+            }
+            let (admitted, _) = admitted_by_caller(&db).await;
+            assert_eq!(admitted[0], Some(names(&["l1"])), "C1");
+            assert_eq!(admitted[1], None, "C2 sees all three");
+            assert_eq!(admitted[2], Some(names(&["l1", "l2"])), "C3");
+        }
+    }
+
+    #[tokio::test]
+    async fn correlate_source_is_checked_only_when_it_names_a_real_stream() {
+        let checker = correlate_callers();
+        let real = ["o1/logs/app_a", "o1/logs/app_private", "o1/traces/default"];
+        let asked = std::sync::Mutex::new(Vec::new());
+        let may = |user: &'static str, name: &'static str, source_type: &'static str| {
+            let (checker, asked) = (&checker, &asked);
+            async move {
+                may_correlate_from(checker, user, "o1", name, source_type, |s| async move {
+                    let key = format!("{}/{}/{}", s.org_id, s.stream_type, s.name);
+                    asked.lock().unwrap().push(key.clone());
+                    real.contains(&key.as_str())
+                })
+                .await
+            }
+        };
+        assert!(may("c1", "app_a", "logs").await, "a readable source");
+        assert!(!may("c1", "app_private", "logs").await, "403: unreadable");
+        assert!(!may("c1", "default", "traces").await, "403: a real default");
+        assert!(may("c2", "app_private", "logs").await, "an org admin");
+        let checks = checker.stream_checks();
+        let before = asked.lock().unwrap().len();
+        for (name, source_type) in [
+            ("", "incident"),
+            ("", "logs"),
+            ("app_private", "incident"),
+            ("all", "traces"),
+            ("default", "logs"),
+        ] {
+            assert!(
+                may("c1", name, source_type).await,
+                "placeholder {name:?}/{source_type}"
+            );
+        }
+        assert_eq!(checker.stream_checks(), checks, "no placeholder is checked");
+        assert_eq!(
+            asked.lock().unwrap()[before..],
+            ["o1/traces/all", "o1/logs/default"],
+            "only a stream-typed name is looked up"
+        );
+        let off = FakeChecker {
+            rbac_off: true,
+            ..Default::default()
+        };
+        let allowed =
+            may_correlate_from(&off, "c1", "o1", "app_private", "logs", |_| async { true }).await;
+        assert!(allowed, "RBAC off");
     }
 }

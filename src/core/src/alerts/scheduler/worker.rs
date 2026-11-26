@@ -15,6 +15,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
+use common::meta::incidents_v2;
 use tokio::{
     sync::{Mutex, mpsc},
     time,
@@ -627,7 +628,26 @@ fn keep_alive_lifetime_secs(
         TriggerModule::AlertCalibration => super::calibration::claim_lifetime_secs(),
         TriggerModule::Alert => ALERT_CLAIM_LIFETIME_SECS,
         TriggerModule::AutoObserve => autoobserve_claim_lifetime_secs(alert_timeout),
-        _ => std::cmp::max(alert_timeout, report_timeout) * 3,
+        TriggerModule::IncidentRecovery => {
+            #[cfg(feature = "enterprise")]
+            let timeout = incidents_v2::recovery_settings()
+                .query_timeout_secs
+                .max(alert_timeout);
+            #[cfg(not(feature = "enterprise"))]
+            let timeout = alert_timeout;
+            timeout.saturating_mul(3)
+        }
+        TriggerModule::Report
+        | TriggerModule::DerivedStream
+        | TriggerModule::QueryRecommendations
+        | TriggerModule::Backfill
+        | TriggerModule::AnomalyDetection
+        | TriggerModule::Slo
+        | TriggerModule::SloBackfill
+        | TriggerModule::CompositeAlert
+        | TriggerModule::OncallEscalation
+        | TriggerModule::FleetRollout
+        | TriggerModule::OncallSlackSync => std::cmp::max(alert_timeout, report_timeout) * 3,
     }
 }
 
@@ -728,18 +748,14 @@ fn resolve_module_configs(
     if autoobserve_lane_wanted() {
         configs.push(autoobserve_module_config(base));
     }
+    if incidents_v2::incidents_v2_enabled() {
+        configs.push(incident_recovery_module_config(base));
+    }
     configs
 }
 
-/// The lanes that exist even when `ZO_SCHEDULER_PER_MODULE_PULLERS` is off.
-///
-/// Every other module degrades to "late" when it shares a lane, which is a nuisance a flag is the
-/// right way out of. On-call escalation degrades to "nobody was woken up": a rung that says five
-/// minutes has to fire in five minutes, and a paging timer behind a thousand queued alert
-/// evaluations does not. So this one is not behind the flag — a deployment nobody has tuned is
-/// precisely where the promise still has to hold.
-///
-/// Only AutoObserve joins, because the shared lane never pulls its row; others chose that lane.
+/// Paging timers must avoid alert queues, and the shared lane skips AutoObserve and
+/// IncidentRecovery rows so older schedulers cannot claim them.
 fn always_on_module_configs(
     cfg: &config::Config,
     base: &SchedulerConfig,
@@ -752,6 +768,9 @@ fn always_on_module_configs(
     }
     if autoobserve_lane_wanted() {
         lanes.push(autoobserve_module_config(base));
+    }
+    if incidents_v2::incidents_v2_enabled() {
+        lanes.push(incident_recovery_module_config(base));
     }
     lanes
 }
@@ -774,6 +793,23 @@ fn autoobserve_module_config(base: &SchedulerConfig) -> ModuleSchedulerConfig {
             autoobserve_lane_interval_secs(),
             base.poll_interval_secs as i64,
         ]) as u64,
+        lease_timeout_secs: None,
+    }
+}
+
+fn incident_recovery_module_config(base: &SchedulerConfig) -> ModuleSchedulerConfig {
+    #[cfg(feature = "enterprise")]
+    let poll_interval_secs = {
+        let settings = incidents_v2::recovery_settings();
+        let shortest_secs = settings.grid_secs.min(settings.held_interval_secs) as u64;
+        base.poll_interval_secs.clamp(1, shortest_secs)
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let poll_interval_secs = base.poll_interval_secs;
+    ModuleSchedulerConfig {
+        module: TriggerModule::IncidentRecovery,
+        concurrency: base.alert_schedule_concurrency,
+        poll_interval_secs,
         lease_timeout_secs: None,
     }
 }
@@ -1080,8 +1116,12 @@ mod tests {
             TriggerModule::FleetRollout,
             TriggerModule::OncallSlackSync,
             TriggerModule::AutoObserve,
+            TriggerModule::IncidentRecovery,
         ];
         all.retain(|m| *m != TriggerModule::AutoObserve || autoobserve_lane_wanted());
+        all.retain(|m| {
+            *m != TriggerModule::IncidentRecovery || incidents_v2::incidents_v2_enabled()
+        });
         assert_eq!(configs.len(), all.len());
         let modules: std::collections::HashSet<_> =
             configs.iter().map(|c| c.module.clone()).collect();
@@ -1401,6 +1441,9 @@ mod tests {
             if autoobserve_lane_wanted() {
                 expected.push(TriggerModule::AutoObserve);
             }
+            if incidents_v2::incidents_v2_enabled() {
+                expected.push(TriggerModule::IncidentRecovery);
+            }
             assert_eq!(
                 modules, expected,
                 "on-call gets its lanes, AutoObserve its own"
@@ -1473,6 +1516,57 @@ mod tests {
         assert_eq!(has_lane(resolve_module_configs(&cfg, &base)), wanted);
         assert_eq!(has_lane(always_on_module_configs(&cfg, &base)), wanted);
         assert!(TriggerModule::AutoObserve.hidden_from_older_pullers());
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn incident_recovery_lane_is_absent_while_v2_is_off() {
+        assert_incident_recovery_lanes(false);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn incident_recovery_lane_follows_v2_switch() {
+        use o2_enterprise::enterprise::common::config::{get_config, with_incidents_v2};
+
+        with_incidents_v2(false, async { assert_incident_recovery_lanes(false) }).await;
+        with_incidents_v2(true, async {
+            assert_incident_recovery_lanes(!get_config().super_cluster.enabled);
+        })
+        .await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn incident_recovery_poll_does_not_exceed_the_shortest_recovery_interval() {
+        let settings = incidents_v2::recovery_settings();
+        let shortest_secs = settings.grid_secs.min(settings.held_interval_secs) as u64;
+        let mut base = make_config();
+        for (requested, expected) in [(shortest_secs + 1, shortest_secs), (1, 1)] {
+            base.poll_interval_secs = requested;
+            let lane = incident_recovery_module_config(&base);
+            assert_eq!(lane.poll_interval_secs, expected);
+        }
+    }
+
+    fn assert_incident_recovery_lanes(enabled: bool) {
+        let cfg = config::Config::default();
+        let base = make_config();
+        let count = |lanes: Vec<ModuleSchedulerConfig>| {
+            lanes
+                .into_iter()
+                .filter(|lane| lane.module == TriggerModule::IncidentRecovery)
+                .count()
+        };
+        assert_eq!(
+            count(resolve_module_configs(&cfg, &base)),
+            usize::from(enabled)
+        );
+        assert_eq!(
+            count(always_on_module_configs(&cfg, &base)),
+            usize::from(enabled)
+        );
+        assert_eq!(count(region_local_module_configs(&base)), 0);
     }
 
     #[test]

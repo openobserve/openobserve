@@ -603,6 +603,45 @@ describe("IncidentDetailDrawer.vue", () => {
       }
     });
 
+    it("polls the events every 30 s while visible, open or resolved, and keeps them on a 304", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+      const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+      const getEvents = incidentsService.getEvents as any;
+      const comment = { timestamp: 1, seq: 3, type: "Comment", data: { user_id: "sam" } };
+      try {
+        getEvents.mockResolvedValue({ status: 200, data: { events: [comment], seq: 3 } });
+        await mountWith([createAlert({ alert_id: "a1" })]);
+        await openTab("activity");
+        const timeline = () => wrapper.findComponent(IncidentTimeline);
+        expect((timeline().vm as any).events).toEqual([comment]);
+        expect(getEvents).toHaveBeenCalledTimes(1);
+
+        getEvents.mockResolvedValue({ status: 304, data: "" });
+        await vi.advanceTimersByTimeAsync(30_000);
+        await flushPromises();
+        expect(getEvents).toHaveBeenCalledTimes(2);
+        expect(getEvents).toHaveBeenLastCalledWith("default", "test-123", 3);
+        expect((timeline().vm as any).events).toEqual([comment]);
+
+        visibility.mockReturnValue("hidden");
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(getEvents).toHaveBeenCalledTimes(2);
+
+        visibility.mockReturnValue("visible");
+        wrapper.vm.incidentDetails.status = "resolved";
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(30_000);
+        await flushPromises();
+        expect(getEvents).toHaveBeenCalledTimes(3);
+        wrapper.unmount();
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(getEvents).toHaveBeenCalledTimes(3);
+      } finally {
+        visibility.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
     it("leaves the alerts' state unknown while the alert list loads or fails", async () => {
       listAlerts.mockRejectedValue(new Error("down"));
       await mountWith([createAlert({ alert_id: "a1" })]);
@@ -2377,6 +2416,168 @@ describe("IncidentDetailDrawer.vue", () => {
       );
       expect(wrapper.text()).toContain(i18n.global.t("alerts.incidents.noServiceDimensions"));
       router.currentRoute.value = { ...router.currentRoute.value, query: {} } as any;
+    });
+
+    describe("URL state", () => {
+      const withHistory = () =>
+        rcaSummary({
+          state: "completed",
+          current_run: rcaRun({ state: "completed" }),
+          report_run: rcaRunItem({ run_id: "run-2" }),
+          history: [rcaRunItem({ run_id: "run-2" }), rcaRunItem({ run_id: "run-1" })],
+        });
+      const openWith = async (query: Record<string, string>) => {
+        router.currentRoute.value = { ...router.currentRoute.value, query } as any;
+        // Like the real router, the route changes only once the navigation resolves.
+        const replace = vi.spyOn(router, "replace").mockImplementation(async (to: any) => {
+          await Promise.resolve();
+          router.currentRoute.value = { ...router.currentRoute.value, query: to.query } as any;
+        });
+        (incidentsService.get as any).mockResolvedValue({
+          data: createIncidentWithAlerts({ id: "1", rca: withHistory() }),
+        });
+        wrapper = await createWrapper({}, {}, "1");
+        await flushPromises();
+        return replace;
+      };
+      afterEach(() => {
+        vi.mocked(router.replace).mockRestore?.();
+        router.currentRoute.value = { ...router.currentRoute.value, query: {} } as any;
+      });
+
+      it("a tab switch replaces ?tab and keeps the rest of the query", async () => {
+        const replace = await openWith({ org_identifier: "default" });
+        const push = vi.spyOn(router, "push");
+        wrapper.vm.activeTab = "activity";
+        await flushPromises();
+
+        expect(replace).toHaveBeenLastCalledWith({
+          query: { org_identifier: "default", tab: "activity" },
+        });
+        expect(push).not.toHaveBeenCalled();
+      });
+
+      it("?tab=activity&run=<older run> opens Activity on that run; the latest run drops `run`", async () => {
+        const replace = await openWith({ tab: "activity", run: "run-1" });
+
+        expect(wrapper.vm.activeTab).toBe("activity");
+        expect(wrapper.vm.rcaViewedRun?.run_id).toBe("run-1");
+        expect(replace).not.toHaveBeenCalled();
+
+        wrapper.vm.viewRcaRun("run-2");
+        await flushPromises();
+        expect(router.currentRoute.value.query).toEqual({ tab: "activity" });
+        wrapper.vm.viewRcaRun("run-1");
+        await flushPromises();
+        expect(router.currentRoute.value.query).toEqual({ tab: "activity", run: "run-1" });
+      });
+
+      it("drops a `tab` or `run` that names nothing", async () => {
+        await openWith({ tab: "bogus", run: "run-9", page: "2" });
+
+        expect(wrapper.vm.activeTab).toBe(wrapper.vm.tabOrder[0]);
+        expect(wrapper.vm.rcaViewedRun).toBeNull();
+        expect(router.currentRoute.value.query).toEqual({ page: "2" });
+      });
+
+      it("keeps both of two writes made in one tick", async () => {
+        await openWith({ org_identifier: "default" });
+        wrapper.vm.activeTab = "report";
+        wrapper.vm.viewRcaRun("run-1");
+        await flushPromises();
+
+        expect(router.currentRoute.value.query).toEqual({
+          org_identifier: "default",
+          tab: "report",
+          run: "run-1",
+        });
+      });
+
+      it("names the open tab after a move to another incident whose link has no tab", async () => {
+        await openWith({ org_identifier: "default" });
+        wrapper.vm.activeTab = "activity";
+        await flushPromises();
+
+        const route = router.currentRoute.value;
+        router.currentRoute.value = {
+          ...route,
+          params: { id: "2" },
+          query: { org_identifier: "default" },
+        } as any;
+        await flushPromises();
+
+        expect(wrapper.vm.activeTab).toBe("activity");
+        expect(router.currentRoute.value.query).toEqual({
+          org_identifier: "default",
+          tab: "activity",
+        });
+      });
+
+      it("applies a linked run to its own incident, not to a load that lands late", async () => {
+        await openWith({});
+        let resolveFirst!: (value: unknown) => void;
+        let resolveSecond!: (value: unknown) => void;
+        (incidentsService.get as any)
+          .mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)))
+          .mockReturnValueOnce(new Promise((resolve) => (resolveSecond = resolve)));
+        const route = router.currentRoute.value;
+        router.currentRoute.value = { ...route, params: { id: "3" }, query: {} } as any;
+        await flushPromises();
+        router.currentRoute.value = {
+          ...router.currentRoute.value,
+          params: { id: "4" },
+          query: { run: "run-1" },
+        } as any;
+        await flushPromises();
+
+        resolveFirst({ data: createIncidentWithAlerts({ id: "3", rca: withHistory() }) });
+        await flushPromises();
+        expect(router.currentRoute.value.query).toEqual({ run: "run-1" });
+        resolveSecond({ data: createIncidentWithAlerts({ id: "4", rca: withHistory() }) });
+        await flushPromises();
+
+        expect(wrapper.vm.rcaViewedRun?.run_id).toBe("run-1");
+        expect(router.currentRoute.value.query).toEqual({ run: "run-1" });
+      });
+
+      it("keeps the current run link when the previous incident completes last", async () => {
+        await openWith({});
+        type DetailResponse = Awaited<ReturnType<typeof incidentsService.get>>;
+        const response = (id: string) =>
+          ({ data: createIncidentWithAlerts({ id, rca: withHistory() }) }) as DetailResponse;
+        let resolvePrevious!: (value: DetailResponse) => void;
+        vi.mocked(incidentsService.get)
+          .mockImplementationOnce(() => new Promise((resolve) => (resolvePrevious = resolve)))
+          .mockResolvedValueOnce(response("4"));
+        const route = router.currentRoute.value;
+        router.currentRoute.value = { ...route, params: { id: "3" }, query: {} };
+        await flushPromises();
+        router.currentRoute.value = {
+          ...route,
+          params: { id: "4" },
+          query: { tab: "activity", run: "run-1" },
+        };
+        await flushPromises();
+        expect(wrapper.vm.rcaViewedRun?.run_id).toBe("run-1");
+
+        resolvePrevious(response("3"));
+        await flushPromises();
+
+        expect(router.currentRoute.value.query).toEqual({ tab: "activity", run: "run-1" });
+      });
+
+      it("opens a history link navigated to while the same incident is open", async () => {
+        await openWith({ tab: "overview" });
+        const route = router.currentRoute.value;
+        router.currentRoute.value = {
+          ...route,
+          query: { tab: "activity", run: "run-1" },
+        };
+        await flushPromises();
+
+        expect(wrapper.vm.activeTab).toBe("activity");
+        expect(wrapper.vm.rcaViewedRun?.run_id).toBe("run-1");
+      });
     });
   });
 

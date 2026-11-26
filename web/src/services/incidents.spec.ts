@@ -170,6 +170,19 @@ describe("incidents service", () => {
     });
   });
 
+  describe("updateIncident", () => {
+    it("sends assigned_to as the assignee update", async () => {
+      mockHttp.patch.mockResolvedValue({ data: { id: "incident-123" } });
+
+      await incidents.updateIncident("test-org", "incident-123", { assigned_to: "a@b.c" });
+
+      expect(mockHttp.patch).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/update",
+        { assigned_to: "a@b.c" },
+      );
+    });
+  });
+
   describe("getStats", () => {
     it("should call http.get with correct URL", () => {
       mockHttp.get.mockResolvedValue({

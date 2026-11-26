@@ -2815,6 +2815,21 @@ pub static RCA_RUN_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static RCA_FIRST_HYPOTHESIS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_first_hypothesis_seconds",
+            "Time from an RCA run's start to its first recorded hypothesis",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![
+            10.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1200.0, 1800.0, 3600.0,
+        ]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
 pub static RCA_RUN_STEPS: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new(
@@ -3934,6 +3949,7 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(AI_CHAT_REPLICA_PURGES_TOTAL.clone()),
         Box::new(RCA_RUNS_TOTAL.clone()),
         Box::new(RCA_RUN_DURATION_SECONDS.clone()),
+        Box::new(RCA_FIRST_HYPOTHESIS_SECONDS.clone()),
         Box::new(RCA_RUN_STEPS.clone()),
         Box::new(RCA_RUN_TOOL_CALLS.clone()),
         Box::new(RCA_RUN_CONTINUATIONS_TOTAL.clone()),
@@ -4015,6 +4031,24 @@ mod tests {
             names.contains(&format!(
                 "{NAMESPACE}_workflow_hook_snapshot_apply_failures_total"
             )),
+            "{names:?}"
+        );
+    }
+
+    #[test]
+    fn rca_first_hypothesis_seconds_is_registered_under_its_name() {
+        let registry = Registry::new();
+        register(&registry);
+        RCA_FIRST_HYPOTHESIS_SECONDS
+            .with_label_values(&["o"])
+            .observe(42.0);
+        let names: Vec<String> = registry
+            .gather()
+            .iter()
+            .map(|family| family.name().to_string())
+            .collect();
+        assert!(
+            names.contains(&format!("{NAMESPACE}_rca_first_hypothesis_seconds")),
             "{names:?}"
         );
     }

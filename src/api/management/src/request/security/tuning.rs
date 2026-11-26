@@ -593,8 +593,16 @@ pub async fn list_suppressions(
 pub async fn create_suppression(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
+    delegated: Option<axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>>,
+    headers: axum::http::HeaderMap,
     Json(req): Json<NewSuppression>,
 ) -> Response {
+    let caller = crate::request::alerts::ack::caller_of(
+        &org_id,
+        &user_email.user_id,
+        delegated.as_deref(),
+        &headers,
+    );
     let user_id = user_email.user_id;
     let author = security_allowed(&org_id, &user_id, "POST").await;
     let triage = author || security_allowed(&org_id, &user_id, "PUT").await;
@@ -618,7 +626,7 @@ pub async fn create_suppression(
             case_id,
             CaseVerdict::Benign,
             &format!("Suppressed similar: {}", req.reason.trim()),
-            &user_id,
+            &caller,
         )
         .await
     {
@@ -1087,6 +1095,8 @@ mod tests {
                 Headers(UserEmail {
                     user_id: user.to_string(),
                 }),
+                None,
+                axum::http::HeaderMap::new(),
                 Json(req),
             )
         };

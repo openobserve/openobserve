@@ -150,6 +150,34 @@ pub async fn rename_key(
     Ok(moved)
 }
 
+/// OF-10: ends a claimed escalation tick, fenced on its claim; false when the claim was lost.
+/// The outcome replicates as the unfenced update and delete it replaces did.
+pub async fn finish_escalation(claim: &Trigger, next_run_at: Option<i64>) -> Result<bool> {
+    let finish = infra_scheduler::finish_escalation(claim, next_run_at).await?;
+
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        match &finish {
+            infra_scheduler::EscalationFinish::Requeued(row) => {
+                super_cluster::queue::scheduler_update(row.clone())
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?
+            }
+            infra_scheduler::EscalationFinish::Deleted => super_cluster::queue::scheduler_delete(
+                &claim.org,
+                claim.module.clone(),
+                &claim.module_key,
+            )
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?,
+            infra_scheduler::EscalationFinish::Lost => {}
+        }
+    }
+
+    Ok(!matches!(finish, infra_scheduler::EscalationFinish::Lost))
+}
+
 /// Returns the scheduled job associated with the given id in read-only fashion
 #[inline]
 pub async fn exists(org: &str, module: TriggerModule, key: &str) -> bool {

@@ -112,6 +112,15 @@ impl SubjectRef {
         (self.subject_type.to_i32(), self.subject_id())
     }
 
+    pub fn help_page_incident(&self) -> Option<&str> {
+        let (incident, team) = self.source_id.split_once(":group:")?;
+        (self.subject_type == SubjectType::Incident
+            && !incident.is_empty()
+            && !team.is_empty()
+            && !team.contains(':'))
+        .then_some(incident)
+    }
+
     /// Parse a stored `subject_id` back into its parts. Splits on the LAST `#`
     /// so a source id containing one is not corrupted.
     pub fn parse(subject_type: SubjectType, subject_id: &str) -> Result<Self, SubjectError> {

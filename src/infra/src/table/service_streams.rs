@@ -19,9 +19,10 @@
 //! `disambiguation` is a JSONB object of distinguish_by field values.
 //! Streams are split into four typed columns.
 
+use config::meta::service_streams::{STREAMS_CUT_ALL, STREAMS_CUT_OUTSIDE_FORM, STREAMS_CUT_TYPES};
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter, Set,
-    entity::prelude::*, sea_query::Expr,
+    ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, FromQueryResult, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait, entity::prelude::*,
 };
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
@@ -88,6 +89,9 @@ pub struct Model {
     pub field_name_mapping: Option<Json>,
 
     pub last_seen: i64,
+
+    /// Bits of the lists a cap may have cut (`config::meta::service_streams::STREAMS_CUT_*`).
+    pub streams_cut: i16,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]
@@ -125,6 +129,9 @@ pub struct ServiceRecord {
     /// None for records written before this column was added.
     pub field_name_mapping: Option<serde_json::Value>,
     pub last_seen: i64,
+    /// A record without the field cannot prove its lists whole, so it reads as all cut.
+    #[serde(default = "all_cut")]
+    pub streams_cut: i16,
 }
 
 /// Outcome of a [`put`]; a named struct so call sites cannot positionally confuse the two facts.
@@ -161,6 +168,7 @@ impl ServiceRecord {
             profiles_streams: serde_json::json!([]),
             field_name_mapping: None,
             last_seen: 0,
+            streams_cut: 0,
         }
     }
 }
@@ -191,26 +199,48 @@ pub async fn put(
 }
 
 /// [`put`] against a caller-supplied connection, so tests exercise the exact production code path.
-pub async fn put_with<C: sea_orm::ConnectionTrait>(
+pub async fn put_with<C: TransactionTrait>(
     client: &C,
+    org_id: &str,
+    record: ServiceRecord,
+    max_streams_per_type: usize,
+) -> Result<PutOutcome, errors::Error> {
+    let txn = client.begin().await.map_err(db_error)?;
+    let outcome = put_in(&txn, org_id, record, max_streams_per_type).await?;
+    txn.commit().await.map_err(db_error)?;
+    Ok(outcome)
+}
+
+/// One transaction reads, merges and writes the row, so a concurrent writer cannot drop the
+/// lists or dimensions this one merged (OF-1).
+async fn put_in(
+    client: &DatabaseTransaction,
     org_id: &str,
     mut record: ServiceRecord,
     max_streams_per_type: usize,
 ) -> Result<PutOutcome, errors::Error> {
+    crate::race_point!("service_streams.before_row_read");
     // Normalize disambiguation to sorted-key JSON so that text comparisons in SQLite
     // are stable regardless of insertion order of the original object.
     record.disambiguation = normalize_json_object(record.disambiguation);
 
-    // Look up the exact row via (org_id, service_name, set_id, disambiguation).
     // Scoping by set_id ensures records from different identity sets never merge.
-    let existing = Entity::find()
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::ServiceName.eq(&record.service_name))
-        .filter(Column::SetId.eq(&record.set_id))
-        .filter(Expr::col(Column::Disambiguation).eq(record.disambiguation.clone()))
-        .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    lock_service(client, org_id, &record.service_name, &record.set_id).await?;
+    let mut candidates = locked(
+        client,
+        Entity::find()
+            .filter(Column::OrgId.eq(org_id))
+            .filter(Column::ServiceName.eq(&record.service_name))
+            .filter(Column::SetId.eq(&record.set_id))
+            .order_by_asc(Column::Id),
+    )
+    .all(client)
+    .await
+    .map_err(db_error)?;
+    let existing = candidates
+        .iter()
+        .position(|row| row.disambiguation == record.disambiguation)
+        .map(|i| candidates.remove(i));
 
     // Build incoming disambiguation map once — used in both branches for orphan cleanup.
     let incoming_map: std::collections::HashMap<String, String> = record
@@ -231,26 +261,9 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
         // newly configured alias group) never become visible on the row.
         let merged_dims =
             union_dimension_objects(&existing_model.all_dimensions, &record.all_dimensions);
-        let logs = union_stream_array(
-            &existing_model.logs_streams,
-            &record.logs_streams,
-            max_streams_per_type,
-        );
-        let traces = union_stream_array(
-            &existing_model.traces_streams,
-            &record.traces_streams,
-            max_streams_per_type,
-        );
-        let metrics = union_stream_array(
-            &existing_model.metrics_streams,
-            &record.metrics_streams,
-            max_streams_per_type,
-        );
-        let profiles = union_stream_array(
-            &existing_model.profiles_streams,
-            &record.profiles_streams,
-            max_streams_per_type,
-        );
+        let ([logs, traces, metrics, profiles], cut) =
+            union_stream_lists(&existing_model, &record, max_streams_per_type);
+        let streams_cut = existing_model.streams_cut | record.streams_cut | cut;
 
         let merged_fnm = record.field_name_mapping.map(|incoming| {
             merge_field_name_mapping(existing_model.field_name_mapping.as_ref(), incoming)
@@ -265,6 +278,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
         if let Some(fnm) = merged_fnm {
             set_if_dirty(&mut active.field_name_mapping, Some(fnm), &mut dirty);
         }
+        set_if_dirty(&mut active.streams_cut, streams_cut, &mut dirty);
         active.last_seen = Set(record.last_seen);
 
         let updated = active
@@ -297,14 +311,6 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
         // (all existing key-value pairs match in the incoming map, incoming may have more).
         // This merges e.g. {} → {"k8s-cluster": "prod"} or
         // {"k8s-cluster": "prod"} → {"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}.
-        let candidates = Entity::find()
-            .filter(Column::OrgId.eq(org_id))
-            .filter(Column::ServiceName.eq(&record.service_name))
-            .filter(Column::SetId.eq(&record.set_id))
-            .all(client)
-            .await
-            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
         // Find a compatible row in either direction:
         //   Case A: existing ⊆ incoming → upgrade (adopt incoming's richer disambiguation)
         //   Case B: incoming ⊆ existing → match (keep existing's richer disambiguation)
@@ -333,26 +339,9 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
         if let Some(existing_model) = upgradeable {
             let kept_id = existing_model.id.clone();
             let previous_disambiguation = existing_model.disambiguation.clone();
-            let logs = union_stream_array(
-                &existing_model.logs_streams,
-                &record.logs_streams,
-                max_streams_per_type,
-            );
-            let traces = union_stream_array(
-                &existing_model.traces_streams,
-                &record.traces_streams,
-                max_streams_per_type,
-            );
-            let metrics = union_stream_array(
-                &existing_model.metrics_streams,
-                &record.metrics_streams,
-                max_streams_per_type,
-            );
-            let profiles = union_stream_array(
-                &existing_model.profiles_streams,
-                &record.profiles_streams,
-                max_streams_per_type,
-            );
+            let ([logs, traces, metrics, profiles], cut) =
+                union_stream_lists(&existing_model, &record, max_streams_per_type);
+            let streams_cut = existing_model.streams_cut | record.streams_cut | cut;
 
             // Keep whichever disambiguation is richer (more keys wins)
             let existing_map: std::collections::HashMap<String, String> = existing_model
@@ -395,6 +384,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
             if let Some(fnm) = merged_fnm {
                 set_if_dirty(&mut active.field_name_mapping, Some(fnm), &mut dirty);
             }
+            set_if_dirty(&mut active.streams_cut, streams_cut, &mut dirty);
             active.last_seen = Set(record.last_seen);
 
             let updated = active
@@ -436,6 +426,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
                 profiles_streams: Set(record.profiles_streams.clone()),
                 field_name_mapping: Set(record.field_name_mapping.clone()),
                 last_seen: Set(record.last_seen),
+                streams_cut: Set(record.streams_cut),
             };
 
             Entity::insert(active_model)
@@ -569,7 +560,8 @@ fn union_stream_array(
     existing: &serde_json::Value,
     new: &serde_json::Value,
     max_streams_per_type: usize,
-) -> serde_json::Value {
+    type_bit: i16,
+) -> (serde_json::Value, i16) {
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     // Compact existing, dropping any duplicates already in the stored array
     let mut result: Vec<serde_json::Value> = existing
@@ -591,8 +583,78 @@ fn union_stream_array(
             }
         }
     }
-    result.truncate(max_streams_per_type);
-    serde_json::Value::Array(result)
+    let dropped = result.split_off(max_streams_per_type.min(result.len()));
+    let mut cut = if dropped.is_empty() { 0 } else { type_bit };
+    if dropped.iter().any(|name| {
+        name.as_str()
+            .is_none_or(|name| !config::utils::str::org_wide_grant_covers(name))
+    }) {
+        cut |= STREAMS_CUT_OUTSIDE_FORM;
+    }
+    (serde_json::Value::Array(result), cut)
+}
+
+/// The four merged lists in `STREAMS_CUT_TYPES` order, with the bits this merge cut.
+fn union_stream_lists(
+    stored: &Model,
+    record: &ServiceRecord,
+    max_streams_per_type: usize,
+) -> ([serde_json::Value; 4], i16) {
+    let pairs = [
+        (&stored.logs_streams, &record.logs_streams),
+        (&stored.traces_streams, &record.traces_streams),
+        (&stored.metrics_streams, &record.metrics_streams),
+        (&stored.profiles_streams, &record.profiles_streams),
+    ];
+    let mut cut = 0;
+    let lists = std::array::from_fn(|i| {
+        let (existing, new) = pairs[i];
+        let (list, list_cut) =
+            union_stream_array(existing, new, max_streams_per_type, STREAMS_CUT_TYPES[i].1);
+        cut |= list_cut;
+        list
+    });
+    (lists, cut)
+}
+
+/// Serializes one (org, service, set)'s writers on PostgreSQL, covering a first insert no row lock
+/// can; SQLite's one writer already does.
+async fn lock_service(
+    txn: &DatabaseTransaction,
+    org_id: &str,
+    service_name: &str,
+    set_id: &str,
+) -> Result<(), Error> {
+    let backend = txn.get_database_backend();
+    if backend != sea_orm::DatabaseBackend::Postgres {
+        return Ok(());
+    }
+    let key = format!("service_streams/{org_id}/{service_name}/{set_id}");
+    txn.execute(sea_orm::Statement::from_sql_and_values(
+        backend,
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [key.into()],
+    ))
+    .await
+    .map_err(db_error)?;
+    Ok(())
+}
+
+/// Row lock for the merge's reads; SQLite has no `FOR UPDATE`, and its one writer serializes.
+fn locked(txn: &DatabaseTransaction, query: Select<Entity>) -> Select<Entity> {
+    if txn.get_database_backend() == sea_orm::DatabaseBackend::Sqlite {
+        query
+    } else {
+        query.lock_exclusive()
+    }
+}
+
+fn db_error(e: sea_orm::DbErr) -> Error {
+    Error::DbError(DbError::SeaORMError(e.to_string()))
+}
+
+fn all_cut() -> i16 {
+    STREAMS_CUT_ALL
 }
 
 /// List all services for an organization
@@ -629,6 +691,35 @@ pub async fn create_table_for_tests<C: ConnectionTrait>(conn: &C) -> Result<(), 
     Ok(())
 }
 
+/// A fresh SQLite database and, with `ZO_META_POSTGRES_DSN` set, a fresh PostgreSQL schema, each
+/// holding this table.
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn backends_for_tests(label: &str) -> Vec<sea_orm::DatabaseConnection> {
+    let dbs = super::migration::sqlite_and_postgres_for_test(label).await;
+    for db in &dbs {
+        create_table_for_tests(db).await.unwrap();
+        if db.get_database_backend() != sea_orm::DatabaseBackend::Postgres {
+            continue;
+        }
+        // The migrations store these as jsonb, which the disambiguation lookup compares against.
+        for column in [
+            "disambiguation",
+            "all_dimensions",
+            "logs_streams",
+            "traces_streams",
+            "metrics_streams",
+            "profiles_streams",
+            "field_name_mapping",
+        ] {
+            let sql = format!(
+                "ALTER TABLE service_streams ALTER COLUMN {column} TYPE jsonb USING {column}::jsonb"
+            );
+            db.execute_unprepared(&sql).await.unwrap();
+        }
+    }
+    dbs
+}
+
 #[cfg(any(test, feature = "test-utils"))]
 pub async fn insert_for_tests<C: ConnectionTrait>(
     conn: &C,
@@ -648,6 +739,7 @@ pub async fn insert_for_tests<C: ConnectionTrait>(
             profiles_streams: Set(record.profiles_streams.clone()),
             field_name_mapping: Set(record.field_name_mapping.clone()),
             last_seen: Set(record.last_seen),
+            streams_cut: Set(record.streams_cut),
         }
         .insert(conn)
         .await?;
@@ -783,6 +875,7 @@ fn model_to_record(r: Model) -> ServiceRecord {
         profiles_streams: r.profiles_streams,
         field_name_mapping: r.field_name_mapping,
         last_seen: r.last_seen,
+        streams_cut: r.streams_cut,
     }
 }
 
@@ -821,7 +914,7 @@ mod tests {
     fn test_union_stream_array_combines_without_duplicates() {
         let existing = serde_json::json!(["a", "b"]);
         let new = serde_json::json!(["b", "c"]);
-        let result = union_stream_array(&existing, &new, DEFAULT_MAX_STREAMS_PER_TYPE);
+        let (result, ..) = union_stream_array(&existing, &new, DEFAULT_MAX_STREAMS_PER_TYPE, 1);
         let arr = result.as_array().unwrap();
         assert_eq!(arr.len(), 3);
         let strs: Vec<&str> = arr.iter().filter_map(|v| v.as_str()).collect();
@@ -834,7 +927,7 @@ mod tests {
     fn test_union_stream_array_empty_existing() {
         let existing = serde_json::json!([]);
         let new = serde_json::json!(["x", "y"]);
-        let result = union_stream_array(&existing, &new, DEFAULT_MAX_STREAMS_PER_TYPE);
+        let (result, ..) = union_stream_array(&existing, &new, DEFAULT_MAX_STREAMS_PER_TYPE, 1);
         let arr = result.as_array().unwrap();
         assert_eq!(arr.len(), 2);
     }
@@ -843,7 +936,7 @@ mod tests {
     fn test_union_stream_array_deduplicates_existing() {
         let existing = serde_json::json!(["a", "a", "b"]);
         let new = serde_json::json!([]);
-        let result = union_stream_array(&existing, &new, DEFAULT_MAX_STREAMS_PER_TYPE);
+        let (result, ..) = union_stream_array(&existing, &new, DEFAULT_MAX_STREAMS_PER_TYPE, 1);
         let arr = result.as_array().unwrap();
         assert_eq!(arr.len(), 2);
     }
@@ -852,7 +945,7 @@ mod tests {
     fn test_union_stream_array_caps_at_max_streams_per_type() {
         let existing = serde_json::json!(["a", "b", "c"]);
         let new = serde_json::json!(["d", "e"]);
-        let result = union_stream_array(&existing, &new, 4);
+        let (result, ..) = union_stream_array(&existing, &new, 4, 1);
         let strs: Vec<&str> = result
             .as_array()
             .unwrap()
@@ -874,7 +967,7 @@ mod tests {
     }
 
     // Nothing enforces this list — keep it in sync manually when adding a mutable column.
-    const MUTABLE_COLUMNS: [&str; 8] = [
+    const MUTABLE_COLUMNS: [&str; 9] = [
         "disambiguation",
         "all_dimensions",
         "logs_streams",
@@ -883,6 +976,7 @@ mod tests {
         "profiles_streams",
         "field_name_mapping",
         "last_seen",
+        "streams_cut",
     ];
 
     /// AFTER UPDATE OF a col fires iff it is in the SET clause, which holds only Set(_) fields.
@@ -1937,6 +2031,7 @@ mod tests {
             profiles_streams: Set(serde_json::json!([])),
             field_name_mapping: Set(None),
             last_seen: Set(500),
+            streams_cut: Set(0),
         };
         Entity::insert(orphan).exec(&db).await.unwrap();
 
@@ -1995,6 +2090,7 @@ mod tests {
             profiles_streams: Set(serde_json::json!([])),
             field_name_mapping: Set(None),
             last_seen: Set(500),
+            streams_cut: Set(0),
         };
         Entity::insert(orphan).exec(&db).await.unwrap();
 
@@ -2142,5 +2238,207 @@ mod tests {
             fresh_read(&db, &id).await
         );
         assert_eq!(outcome.replaced_disambiguation, None);
+    }
+
+    fn checkout(logs: &[&str]) -> ServiceRecord {
+        let mut record = ServiceRecord::new(
+            "org1",
+            "checkout",
+            "k8s",
+            serde_json::json!({"k8s-cluster": "prod"}),
+        );
+        record.logs_streams = serde_json::json!(logs);
+        record
+    }
+
+    async fn stored(db: &sea_orm::DatabaseConnection) -> Model {
+        let mut rows = Entity::find().all(db).await.unwrap();
+        assert_eq!(rows.len(), 1);
+        rows.remove(0)
+    }
+
+    fn logs_of(row: &Model) -> Vec<String> {
+        let mut names: Vec<String> = row
+            .logs_streams
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| v.as_str().map(str::to_string))
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// R3 then R5 of `correlate_mixed_access_row_never_merges`: a raised cap never clears the cut.
+    #[tokio::test]
+    async fn writers_or_their_cut_and_a_raised_cap_never_clears_it() {
+        use config::meta::service_streams::STREAMS_CUT_LOGS;
+        for db in backends_for_tests("cut_or").await {
+            let mut first = checkout(&["app_a", "app_b", "app_cut"]);
+            first.streams_cut = 0;
+            let out = put_with(&db, "org1", first, 3).await.unwrap();
+            assert_eq!(
+                out.stored.streams_cut, 0,
+                "a fresh insert stores the record's bits"
+            );
+            let out = put_with(&db, "org1", checkout(&["app_x"]), 2)
+                .await
+                .unwrap();
+            assert_eq!(out.stored.streams_cut, STREAMS_CUT_LOGS);
+            assert_eq!(logs_of(&stored(&db).await), ["app_a", "app_b"]);
+
+            let out = put_with(&db, "org1", checkout(&["app_c"]), 3)
+                .await
+                .unwrap();
+            let row = stored(&db).await;
+            assert_eq!(logs_of(&row), ["app_a", "app_b", "app_c"]);
+            assert_eq!(row.streams_cut, STREAMS_CUT_LOGS, "R5 keeps bit 1");
+            assert_eq!(out.stored.streams_cut, STREAMS_CUT_LOGS);
+
+            let mut odd = checkout(&[]);
+            let too_long = "m".repeat(config::utils::str::MAX_SHORTCUT_ID_LEN + 1);
+            odd.metrics_streams = serde_json::json!(["m1", "m2", too_long]);
+            let _ = put_with(&db, "org1", odd, 2).await.unwrap();
+            let row = stored(&db).await;
+            assert_eq!(
+                row.streams_cut,
+                STREAMS_CUT_LOGS | STREAMS_CUT_TYPES[2].1 | STREAMS_CUT_OUTSIDE_FORM,
+                "a dropped name outside the grant's form sets 16"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_replicated_record_without_the_field_stores_31() {
+        let mut wire = serde_json::to_value(checkout(&["app_a"])).unwrap();
+        wire.as_object_mut().unwrap().remove("streams_cut");
+        let record: ServiceRecord = serde_json::from_value(wire).unwrap();
+        assert_eq!(record.streams_cut, STREAMS_CUT_ALL);
+        for db in backends_for_tests("cut_wire").await {
+            let _ = put_with(&db, "org1", record.clone(), 50).await.unwrap();
+            assert_eq!(stored(&db).await.streams_cut, STREAMS_CUT_ALL);
+            let _ = put_with(&db, "org1", checkout(&["app_a"]), 50)
+                .await
+                .unwrap();
+            assert_eq!(
+                stored(&db).await.streams_cut,
+                STREAMS_CUT_ALL,
+                "never cleared"
+            );
+        }
+    }
+
+    fn writer(adds: &str, team: Option<&str>) -> ServiceRecord {
+        let mut record = checkout(&[adds]);
+        if let Some(team) = team {
+            record.all_dimensions = serde_json::json!({ "team": team });
+        }
+        record
+    }
+
+    /// OF-1: R lists `[app_a]`, cap 3; W1 adds `app_secret` and `team=ledger`, W2 adds `app_b`.
+    fn assert_both_writers_kept(row: &Model, case: &str) {
+        use config::meta::service_streams::{CorrelateAccess, ServiceStreams, row_counts};
+        assert_eq!(logs_of(row), ["app_a", "app_b", "app_secret"], "{case}");
+        assert_eq!(row.all_dimensions["team"], "ledger", "{case}");
+        let c1 = CorrelateAccess::Restricted {
+            readable: [
+                (config::meta::stream::StreamType::Logs, "app_a"),
+                (config::meta::stream::StreamType::Logs, "app_b"),
+            ]
+            .into_iter()
+            .map(|(t, n)| (t, n.to_string()))
+            .collect(),
+            org_wide_types: Default::default(),
+        };
+        let lists = ServiceStreams {
+            logs: logs_of(row),
+            ..Default::default()
+        };
+        assert!(
+            !row_counts(&lists, row.streams_cut, &c1),
+            "{case}: C1 drops R"
+        );
+    }
+
+    #[tokio::test]
+    async fn correlate_concurrent_put_keeps_provenance() {
+        let w1 = || writer("app_secret", Some("ledger"));
+        let w2 = || writer("app_b", None);
+        for db in backends_for_tests("of1").await {
+            let db = std::sync::Arc::new(db);
+            let postgres = db.get_database_backend() == sea_orm::DatabaseBackend::Postgres;
+            for (order, (first, second)) in
+                [("w1 then w2", (w1(), w2())), ("w2 then w1", (w2(), w1()))]
+            {
+                Entity::delete_many().exec(db.as_ref()).await.unwrap();
+                let _ = put_with(db.as_ref(), "org1", checkout(&["app_a"]), 3)
+                    .await
+                    .unwrap();
+                if !postgres {
+                    // SQLite has one writer, so the two serial orders stand in for the race.
+                    let _ = put_with(db.as_ref(), "org1", first, 3).await.unwrap();
+                    let _ = put_with(db.as_ref(), "org1", second, 3).await.unwrap();
+                    assert_both_writers_kept(&stored(&db).await, order);
+                    continue;
+                }
+                let held = db.begin().await.unwrap();
+                let _ = put_in(&held, "org1", first, 3).await.unwrap();
+                let race = crate::race::Barriers::new();
+                race.arm("service_streams.before_row_read", 2);
+                let (conn, gate) = (db.clone(), race.clone());
+                let blocked = tokio::spawn(async move {
+                    gate.run(put_with(conn.as_ref(), "org1", second, 3)).await
+                });
+                race.wait("service_streams.before_row_read").await;
+                tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                assert!(
+                    !blocked.is_finished(),
+                    "{order}: the second writer waits on the row lock"
+                );
+                held.commit().await.unwrap();
+                let _ = blocked.await.unwrap().unwrap();
+                race.assert_all_met();
+                assert_both_writers_kept(&stored(&db).await, order);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_first_insert_race_keeps_one_row() {
+        for db in backends_for_tests("first_insert").await {
+            let db = std::sync::Arc::new(db);
+            if db.get_database_backend() != sea_orm::DatabaseBackend::Postgres {
+                let _ = put_with(db.as_ref(), "org1", writer("app_secret", None), 3)
+                    .await
+                    .unwrap();
+                let _ = put_with(db.as_ref(), "org1", writer("app_b", None), 3)
+                    .await
+                    .unwrap();
+                assert_eq!(logs_of(&stored(&db).await), ["app_b", "app_secret"]);
+                continue;
+            }
+            let held = db.begin().await.unwrap();
+            let _ = put_in(&held, "org1", writer("app_secret", None), 3)
+                .await
+                .unwrap();
+            let race = crate::race::Barriers::new();
+            race.arm("service_streams.before_row_read", 2);
+            let (conn, gate) = (db.clone(), race.clone());
+            let blocked = tokio::spawn(async move {
+                gate.run(put_with(conn.as_ref(), "org1", writer("app_b", None), 3))
+                    .await
+            });
+            race.wait("service_streams.before_row_read").await;
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            assert!(
+                !blocked.is_finished(),
+                "the second writer waits though no row exists yet"
+            );
+            held.commit().await.unwrap();
+            let _ = blocked.await.unwrap().unwrap();
+            race.assert_all_met();
+            assert_eq!(logs_of(&stored(&db).await), ["app_b", "app_secret"]);
+        }
     }
 }

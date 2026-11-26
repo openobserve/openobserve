@@ -334,7 +334,7 @@ pub async fn correlate_from_source(
     identity: &ServiceIdentityConfig,
     groups: &[FieldAlias],
 ) -> anyhow::Result<Option<config::meta::service_streams::CorrelationResponse>> {
-    use o2_enterprise::enterprise::service_streams::{SourceIdentity, storage::correlate};
+    use o2_enterprise::enterprise::service_streams::SourceIdentity;
     let span_window = match spans {
         Spans::Skip => None,
         Spans::Recent => Some((window(None, None, config::utils::time::now_micros()), true)),
@@ -366,7 +366,15 @@ pub async fn correlate_from_source(
             .map(String::from),
         dims: record.clone(),
     };
-    correlate(org_id, location, identity, groups, Some(&source)).await
+    crate::service_identity::correlate_scope::correlate_for(
+        org_id,
+        reader,
+        location,
+        identity,
+        groups,
+        Some(&source),
+    )
+    .await
 }
 
 /// The location's service that the spans `reader` may read vote for; a failure gives none.

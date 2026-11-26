@@ -34,6 +34,7 @@ use config::{
     },
     utils::time::now_micros,
 };
+use infra::table::alert_incidents::Episode;
 
 use crate::alerts::lifecycle;
 
@@ -48,8 +49,14 @@ pub enum Act {
     TakeOver,
     Resolve,
     Mute,
-    Escalate,
+    Unmute,
+    Snooze,
+    Unsnooze,
+    Note,
     HandOff,
+    ConfirmRecovery,
+    Escalate,
+    Promote,
 }
 
 impl From<Verb> for Act {
@@ -270,6 +277,12 @@ struct Gathered {
     incident_status: Option<IncidentStatus>,
 }
 
+struct ResolvedFiringAck<'a> {
+    incident_id: &'a str,
+    episode: &'a Episode,
+    held: &'a AlertAck,
+}
+
 /// One open on-call response for the alert or its incident, and the people behind it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ResponderTeam {
@@ -288,6 +301,23 @@ pub struct AuthorizeFacts {
     pub fga_allows: bool,
     pub role: Option<UserRole>,
     pub responders: Vec<ResponderTeam>,
+}
+
+/// Who asks, built once per request; only the API layer sees what makes it an AI principal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Caller {
+    pub email: String,
+    pub ai: bool,
+}
+
+impl Caller {
+    /// A person: a browser, an API key, a Slack button, a phone press or an email link.
+    pub fn person(email: &str) -> Self {
+        Self {
+            email: email.to_string(),
+            ai: false,
+        }
+    }
 }
 
 /// Δ2: root; alert PUT (OpenFGA on) or Admin/Editor/service account; or a member of a paged team.
@@ -355,15 +385,7 @@ pub fn refusal(
             name: name.clone(),
         })
         .collect();
-    let (code, verb) = match act {
-        Act::Ack => (RefusalCode::AckRefused, "acknowledge"),
-        Act::Unack => (RefusalCode::AckRefused, "unacknowledge"),
-        Act::TakeOver => (RefusalCode::AckRefused, "take over"),
-        Act::Resolve => (RefusalCode::AckRefused, "resolve"),
-        Act::Mute => (RefusalCode::MuteRefused, "mute"),
-        Act::Escalate => (RefusalCode::AckRefused, "escalate"),
-        Act::HandOff => (RefusalCode::AckRefused, "hand off"),
-    };
+    let (code, verb) = code_and_verb(act);
     let message = if facts.fga_enabled {
         format!("You need edit access to this alert, or to be on call for it, to {verb} it")
     } else {
@@ -380,6 +402,29 @@ pub fn refusal(
         on_call,
         can_act,
     }
+}
+
+/// Human incident actions control paging and review state once v2 is enabled.
+pub fn refuses_ai(caller: &Caller, p: &Problem) -> bool {
+    refuses_ai_with(
+        caller,
+        p,
+        common::meta::incidents_v2::incidents_v2_enabled(),
+    )
+}
+
+/// [`refusal`] for an AI principal: the same people to turn to, and why the AI cannot act.
+pub fn ai_refusal(
+    act: Act,
+    facts: &AuthorizeFacts,
+    org_editors: &[(String, UserRole, Option<String>)],
+) -> ActRefusal {
+    let mut refused = refusal(act, facts, org_editors);
+    refused.message = format!(
+        "An AI assistant cannot {}; a person on call or who can act must",
+        ai_action(act)
+    );
+    refused
 }
 
 /// The alert or composite behind `alert_id`, or `NotFound`.
@@ -502,30 +547,36 @@ pub async fn problem_of_page(org_id: &str, response_id: &str) -> Result<Problem,
     }
 }
 
-/// Lets the actor act on the problem; `Refused` says who can act instead. [strong] (reads)
-pub async fn authorize_problem(p: &Problem, actor: &str, act: Act) -> Result<Via, AckError> {
+/// Lets the caller act on the problem; `Refused` says who can act instead. [strong] (reads)
+pub async fn authorize_problem(p: &Problem, caller: &Caller, act: Act) -> Result<Via, AckError> {
     let pages = problem_pages(p).await?;
-    let facts = gather_facts(p, actor, &pages).await;
-    if let Some(via) = decide(actor, &facts) {
+    let facts = gather_facts(p, &caller.email, &pages).await;
+    let ai_refused = refuses_ai(caller, p);
+    if !ai_refused && let Some(via) = decide(&caller.email, &facts) {
         return Ok(via);
     }
     let editors = org_editors(p.org_id()).await;
-    Err(AckError::Refused(refusal(act, &facts, &editors)))
+    Err(AckError::Refused(if ai_refused {
+        ai_refusal(act, &facts, &editors)
+    } else {
+        refusal(act, &facts, &editors)
+    }))
 }
 
-/// Lets the actor act on the alert's problem; `Refused` says who can. [strong] (reads)
-pub async fn authorize(target: &AckTarget, actor: &str, act: Act) -> Result<Via, AckError> {
+/// Lets the caller act on the alert's problem; `Refused` says who can. [strong] (reads)
+pub async fn authorize(target: &AckTarget, caller: &Caller, act: Act) -> Result<Via, AckError> {
     let problem = problem_of_target(target.clone(), Groups::All).await?;
-    authorize_problem(&problem, actor, act).await
+    authorize_problem(&problem, caller, act).await
 }
 
 /// A page whose alert is gone: root, the role rule or its team may act. [strong] (reads)
 #[cfg(feature = "enterprise")]
 pub async fn authorize_orphan_page(
     page: &config::meta::oncall::response::Response,
-    actor: &str,
+    caller: &Caller,
     act: Act,
 ) -> Result<Via, ActRefusal> {
+    let actor = caller.email.as_str();
     let facts = AuthorizeFacts {
         root: db::user::is_root_user(actor),
         fga_enabled: o2_openfga::config::get_config().enabled,
@@ -536,11 +587,17 @@ pub async fn authorize_orphan_page(
             .map(|u| u.role),
         responders: responders_of(&page.org_id, std::slice::from_ref(page)).await,
     };
-    if let Some(via) = decide(actor, &facts) {
+    let ai_refused = caller.ai
+        && (page.incident_id.is_none() || common::meta::incidents_v2::incidents_v2_enabled());
+    if !ai_refused && let Some(via) = decide(actor, &facts) {
         return Ok(via);
     }
     let editors = org_editors(&page.org_id).await;
-    Err(refusal(act, &facts, &editors))
+    Err(if ai_refused {
+        ai_refusal(act, &facts, &editors)
+    } else {
+        refusal(act, &facts, &editors)
+    })
 }
 
 /// Whether `may_edit` admits the alert, or any alert of the incident (D24). [strong] (reads)
@@ -588,7 +645,7 @@ pub async fn acknowledge(
     actor: &str,
     source: AckSource,
 ) -> Result<AckResponse, AckError> {
-    hold(p, Verb::Acknowledge, actor, source).await
+    acknowledge_as(p, &Caller::person(actor), source).await
 }
 
 /// Moves the problem's ack to `actor` on every record and page. [weak: same as acknowledge]
@@ -597,14 +654,67 @@ pub async fn take_over(
     actor: &str,
     source: AckSource,
 ) -> Result<AckResponse, AckError> {
-    hold(p, Verb::TakeOver, actor, source).await
+    take_over_as(p, &Caller::person(actor), source).await
+}
+
+pub async fn acknowledge_as(
+    p: &Problem,
+    caller: &Caller,
+    source: AckSource,
+) -> Result<AckResponse, AckError> {
+    hold(p, Verb::Acknowledge, caller, source).await
+}
+
+pub async fn take_over_as(
+    p: &Problem,
+    caller: &Caller,
+    source: AckSource,
+) -> Result<AckResponse, AckError> {
+    hold(p, Verb::TakeOver, caller, source).await
+}
+
+/// The CAS owns the incident write; delayed effects must never acquire that ownership again.
+#[cfg(feature = "enterprise")]
+pub async fn incident_ack_effects(
+    snapshot: &infra::table::entity::alert_incidents::Model,
+    caller: &Caller,
+    verb: Verb,
+    source: AckSource,
+) -> Result<AckResponse, AckError> {
+    let problem = Problem::Incident {
+        org_id: snapshot.org_id.clone(),
+        incident_id: snapshot.id.clone(),
+    };
+    let gathered = gather(&problem, verb, &caller.email).await?;
+    let current = infra::table::alert_incidents::get_rw(&snapshot.org_id, &snapshot.id)
+        .await?
+        .ok_or(AckError::NotFound)?;
+    let mut effect_plan = plan(&gathered.facts);
+    effect_plan
+        .writes
+        .retain(|(record, _)| matches!(record, AckRecord::Firing { .. }));
+    if current.status != "acknowledged"
+        || current.acknowledged_by != snapshot.acknowledged_by
+        || current.acknowledged_at != snapshot.acknowledged_at
+    {
+        effect_plan.writes.clear();
+        effect_plan.pages.clear();
+    }
+    let outcome = carry_out(&problem, &gathered, &effect_plan, caller, source, None).await?;
+    Ok(AckResponse {
+        changed: outcome.changed,
+        acks: outcome.acks,
+        incident: outcome.incident,
+        oncall: outcome.oncall,
+        other_groups_unacked: outcome.other_groups_unacked,
+    })
 }
 
 /// Clears the problem's ack and restarts the pages it stopped at step 1.
 /// [weak: the ack is cleared first; a page that fails to restart stays acknowledged until the next
 /// unack; one restarted with no ladder armed is logged and left to `reconcile_abandoned`]
 pub async fn unack(p: &Problem, actor: &str, source: AckSource) -> Result<UnackResponse, AckError> {
-    release(p, Verb::Unack, actor, source, None).await
+    release(p, Verb::Unack, actor, source, None, None).await
 }
 
 /// Clears the problem's ack for a hand-off, which restarts the page it moves.
@@ -615,7 +725,7 @@ pub async fn release_for_hand_off(
     actor: &str,
     source: AckSource,
 ) -> Result<UnackResponse, AckError> {
-    release(p, Verb::HandOff, actor, source, None).await
+    release(p, Verb::HandOff, actor, source, None, None).await
 }
 
 /// Ends the covered ack after a person's Resolve. [weak: a retried Resolve clears the rest]
@@ -625,7 +735,29 @@ pub async fn resolve(
     source: AckSource,
     cover: Option<PageCover>,
 ) -> Result<UnackResponse, AckError> {
-    release(p, Verb::Resolve, actor, source, cover).await
+    release(p, Verb::Resolve, actor, source, cover, None).await
+}
+
+pub async fn resolve_incident_episode(
+    org_id: &str,
+    incident_id: &str,
+    actor: &str,
+    episode: &Episode,
+) -> Result<(), AckError> {
+    let problem = Problem::Incident {
+        org_id: org_id.to_owned(),
+        incident_id: incident_id.to_owned(),
+    };
+    release(
+        &problem,
+        Verb::Resolve,
+        actor,
+        AckSource::Incident,
+        None,
+        Some(episode),
+    )
+    .await
+    .map(|_| ())
 }
 
 /// An alert page covers its alert's firings up to its first close; an incident page all. [pure]
@@ -647,9 +779,19 @@ pub async fn release_leaver(p: &Problem, leaver: &str) -> Result<(), AckError> {
     // A release verb, so a named group is read even when it no longer fires.
     let g = gather(p, Verb::HandOff, leaver).await?;
     let plan = plan_leaver_release(&g.facts);
-    carry_out(p, &g, &plan, ENGINE_ACTOR, AckSource::Oncall)
-        .await
-        .map(|_| ())
+    carry_out(
+        p,
+        &g,
+        &plan,
+        &Caller {
+            email: ENGINE_ACTOR.to_string(),
+            ai: true,
+        },
+        AckSource::Oncall,
+        None,
+    )
+    .await
+    .map(|_| ())
 }
 
 /// [`release_leaver`] on each released page's problem; a failure is logged. [no-fail]
@@ -718,6 +860,7 @@ pub async fn join_acked_incident(org_id: &str, incident_id: &str, alert_id: &str
             &RecordWrite::Claim,
             &holder,
             AckSource::Incident,
+            None,
         )
         .await
         {
@@ -934,6 +1077,17 @@ pub async fn pick_firing_incident<E>(
 #[cfg(feature = "enterprise")]
 pub fn episode_stands(marked: Option<bool>, detection: bool) -> bool {
     marked != Some(!detection)
+}
+
+/// The open pages of the problem: its subjects' pages and the impacted teams' pages they opened.
+pub(super) async fn problem_pages(
+    p: &Problem,
+) -> Result<Vec<config::meta::oncall::response::Response>, AckError> {
+    Ok(marked_problem_pages(p)
+        .await?
+        .into_iter()
+        .map(|(page, _)| page)
+        .collect())
 }
 
 #[cfg(feature = "enterprise")]
@@ -1219,6 +1373,43 @@ async fn responders_of(
     teams
 }
 
+/// The refusal code and the verb a refusal of `act` names.
+fn code_and_verb(act: Act) -> (RefusalCode, &'static str) {
+    match act {
+        Act::Ack
+        | Act::Snooze
+        | Act::Unsnooze
+        | Act::Note
+        | Act::ConfirmRecovery
+        | Act::Promote => (RefusalCode::AckRefused, "acknowledge"),
+        Act::Unack => (RefusalCode::AckRefused, "unacknowledge"),
+        Act::TakeOver => (RefusalCode::AckRefused, "take over"),
+        Act::Resolve => (RefusalCode::AckRefused, "resolve"),
+        Act::Mute | Act::Unmute => (RefusalCode::MuteRefused, "mute"),
+        Act::HandOff => (RefusalCode::AckRefused, "hand off"),
+        Act::Escalate => (RefusalCode::AckRefused, "escalate"),
+    }
+}
+
+/// What an AI refusal says the caller tried, with its object.
+fn ai_action(act: Act) -> &'static str {
+    match act {
+        Act::Ack => "acknowledge an alert",
+        Act::Unack => "unacknowledge an alert",
+        Act::TakeOver => "take over an alert",
+        Act::Resolve => "resolve an alert",
+        Act::Mute => "mute an alert",
+        Act::Unmute => "unmute an alert",
+        Act::Snooze => "snooze an alert's page",
+        Act::Unsnooze => "unsnooze an alert's page",
+        Act::Note => "add a note to an alert's page",
+        Act::HandOff => "hand off an alert's page",
+        Act::ConfirmRecovery => "confirm the recovery of an alert's page",
+        Act::Escalate => "escalate an alert's page",
+        Act::Promote => "promote an alert's page to an incident",
+    }
+}
+
 async fn org_editors(org_id: &str) -> Vec<(String, UserRole, Option<String>)> {
     let Ok(users) = infra::table::org_users::list_users_by_org(org_id).await else {
         return vec![];
@@ -1262,6 +1453,10 @@ fn covered(f: &PlanFacts) -> Vec<&HeldRecord> {
         return vec![];
     }
     f.records.iter().filter(|r| !newer(r)).collect()
+}
+
+fn refuses_ai_with(caller: &Caller, p: &Problem, v2_enabled: bool) -> bool {
+    caller.ai && (matches!(p, Problem::Firing { .. }) || v2_enabled)
 }
 
 fn same(a: &str, b: &str) -> bool {
@@ -1399,16 +1594,16 @@ fn plan_release(f: &PlanFacts) -> AckPlan {
 async fn hold(
     p: &Problem,
     verb: Verb,
-    actor: &str,
+    caller: &Caller,
     source: AckSource,
 ) -> Result<AckResponse, AckError> {
-    let g = gather(p, verb, actor).await?;
+    let g = gather(p, verb, &caller.email).await?;
     let plan = plan(&g.facts);
     // Nothing fires and no page is open: there is nothing to acknowledge at all.
     if plan.answer == Answer::NothingFiring && g.facts.pages.is_empty() {
         return Err(AckError::Conflict(AckConflict::NotFiring));
     }
-    let out = carry_out(p, &g, &plan, actor, source).await?;
+    let out = carry_out(p, &g, &plan, caller, source, None).await?;
     Ok(AckResponse {
         changed: out.changed,
         acks: out.acks,
@@ -1424,11 +1619,26 @@ async fn release(
     actor: &str,
     source: AckSource,
     cover: Option<PageCover>,
+    resolved_episode: Option<&Episode>,
 ) -> Result<UnackResponse, AckError> {
     let mut g = gather(p, verb, actor).await?;
+    if resolved_episode.is_some() && g.incident_status != Some(IncidentStatus::Resolved) {
+        return Ok(UnackResponse {
+            changed: false,
+            ack: None,
+        });
+    }
     g.facts.cover = cover;
     let plan = plan(&g.facts);
-    let out = carry_out(p, &g, &plan, actor, source).await?;
+    let out = carry_out(
+        p,
+        &g,
+        &plan,
+        &Caller::person(actor),
+        source,
+        resolved_episode,
+    )
+    .await?;
     Ok(UnackResponse {
         changed: out.changed,
         ack: out.acks.into_iter().next(),
@@ -1572,7 +1782,7 @@ async fn gather_incident(
     org_id: &str,
     incident_id: &str,
 ) -> Result<(), AckError> {
-    let Some(model) = infra::table::alert_incidents::get(org_id, incident_id).await? else {
+    let Some(model) = infra::table::alert_incidents::get_rw(org_id, incident_id).await? else {
         return Err(AckError::NotFound);
     };
     let status: IncidentStatus = model.status.parse().unwrap_or_default();
@@ -1635,9 +1845,11 @@ async fn carry_out(
     p: &Problem,
     g: &Gathered,
     plan: &AckPlan,
-    actor: &str,
+    caller: &Caller,
     source: AckSource,
+    resolved_episode: Option<&Episode>,
 ) -> Result<Outcome, AckError> {
+    let actor = caller.email.as_str();
     let mut views: HashMap<(String, String), AckView> =
         g.held.iter().map(|(k, a)| (k.clone(), a.view())).collect();
     let mut won_named = false;
@@ -1652,7 +1864,7 @@ async fn carry_out(
         let won = match record {
             AckRecord::Incident { incident_id } => {
                 let won =
-                    write_incident(p.org_id(), incident_id, write, actor, g.facts.verb).await?;
+                    write_incident(p.org_id(), incident_id, write, caller, g.facts.verb).await?;
                 if won {
                     incident_status = Some(status_after(write));
                 } else if *write == RecordWrite::Claim {
@@ -1675,9 +1887,30 @@ async fn carry_out(
                 } else {
                     source
                 };
-                let (view, won) =
-                    write_firing(target, group_key, *firing_started_at, write, actor, src).await?;
                 let key = (alert_id.clone(), group_key.clone());
+                let cleanup = match (p, resolved_episode) {
+                    (Problem::Incident { incident_id, .. }, Some(episode)) => {
+                        let held = g.held.get(&key).ok_or_else(|| {
+                            AckError::Internal(format!("no ack read for {alert_id}/{group_key}"))
+                        })?;
+                        Some(ResolvedFiringAck {
+                            incident_id,
+                            episode,
+                            held,
+                        })
+                    }
+                    _ => None,
+                };
+                let (view, won) = write_firing(
+                    target,
+                    group_key,
+                    *firing_started_at,
+                    write,
+                    actor,
+                    src,
+                    cleanup,
+                )
+                .await?;
                 match view {
                     Some(v) => views.insert(key, v),
                     None => views.remove(&key),
@@ -1746,6 +1979,7 @@ async fn write_firing(
     write: &RecordWrite,
     actor: &str,
     source: AckSource,
+    cleanup: Option<ResolvedFiringAck<'_>>,
 ) -> Result<(Option<AckView>, bool), AckError> {
     let now = now_micros();
     let ack = |taken_over_from: Option<String>| AlertAck {
@@ -1785,16 +2019,27 @@ async fn write_firing(
             (row, AckAction::TakeOver, Some(from.clone()))
         }
         RecordWrite::Clear { .. } => {
-            let Some(row) = db::alerts::alert_acks::unack(
-                &target.org_id,
-                &target.alert_id,
-                group_key,
-                started,
-                actor,
-                now,
-            )
-            .await?
-            else {
+            let row = if let Some(cleanup) = cleanup {
+                db::alerts::alert_acks::unack_for_resolved_incident(
+                    cleanup.incident_id,
+                    cleanup.episode,
+                    cleanup.held,
+                    actor,
+                    now,
+                )
+                .await?
+            } else {
+                db::alerts::alert_acks::unack(
+                    &target.org_id,
+                    &target.alert_id,
+                    group_key,
+                    started,
+                    actor,
+                    now,
+                )
+                .await?
+            };
+            let Some(row) = row else {
                 return Ok((None, false));
             };
             reopen_silence(target, group_key, started, now).await;
@@ -1824,38 +2069,65 @@ async fn write_incident(
     org_id: &str,
     incident_id: &str,
     write: &RecordWrite,
-    actor: &str,
+    caller: &Caller,
     verb: Verb,
 ) -> Result<bool, AckError> {
     use config::meta::alerts::incidents::IncidentEvent;
     use infra::table::alert_incidents;
 
-    let (won, event) = match write {
+    let actor = caller.email.as_str();
+    let (won, event, acknowledged_at) = match write {
         RecordWrite::Claim => {
             let Some(m) = alert_incidents::acknowledge(org_id, incident_id, actor).await? else {
                 return Err(AckError::NotFound);
             };
             let won = m.status == "acknowledged"
                 && m.acknowledged_by.as_deref().is_some_and(|h| same(h, actor));
-            (won, IncidentEvent::acknowledged(actor))
+            (won, IncidentEvent::acknowledged(actor), m.acknowledged_at)
         }
-        RecordWrite::Move { from } => (
-            alert_incidents::take_over_acknowledgement(org_id, incident_id, from, actor).await?,
-            IncidentEvent::acknowledged(actor),
-        ),
-        RecordWrite::Clear { holder } | RecordWrite::Release { holder } => (
-            alert_incidents::unacknowledge(org_id, incident_id, holder).await?,
-            match verb {
+        RecordWrite::Move { from } => {
+            let moved =
+                alert_incidents::take_over_acknowledgement_row(org_id, incident_id, from, actor)
+                    .await?;
+            let acknowledged_at = moved.as_ref().and_then(|row| row.acknowledged_at);
+            (
+                moved.is_some(),
+                IncidentEvent::acknowledged(actor),
+                acknowledged_at,
+            )
+        }
+        RecordWrite::Clear { holder } | RecordWrite::Release { holder } => {
+            let cleared =
+                alert_incidents::unacknowledge_by(org_id, incident_id, holder, actor).await?;
+            let won = cleared.is_some();
+            if let Some(event) = cleared.and_then(|change| change.event)
+                && let Err(error) =
+                    crate::incidents::send_incident_event_trigger(org_id, incident_id, event).await
+            {
+                log::error!(
+                    "[INCIDENTS] could not dispatch lead release of {incident_id}: {error}"
+                );
+            }
+            let event = match verb {
                 Verb::Resolve => IncidentEvent::ack_ended_by_page_resolve(actor),
                 Verb::Acknowledge | Verb::TakeOver | Verb::Unack | Verb::HandOff => {
                     IncidentEvent::reopened(actor, "Unacknowledged")
                 }
-            },
-        ),
+            };
+            (won, event, None)
+        }
     };
     if won {
         let status = status_after(write);
-        crate::alerts::incidents::record_ack_change(org_id, incident_id, status, event).await;
+        crate::alerts::incidents::record_ack_change(
+            org_id,
+            incident_id,
+            status,
+            event,
+            caller,
+            acknowledged_at,
+        )
+        .await;
     }
     Ok(won)
 }
@@ -1865,7 +2137,7 @@ async fn write_incident(
     _org_id: &str,
     _incident_id: &str,
     _write: &RecordWrite,
-    _actor: &str,
+    _caller: &Caller,
     _verb: Verb,
 ) -> Result<bool, AckError> {
     Err(AckError::NotFound)
@@ -1979,17 +2251,6 @@ async fn step_page(
             }
         }
     }
-}
-
-/// The open pages of the problem: its subjects' pages and the impacted teams' pages they opened.
-async fn problem_pages(
-    p: &Problem,
-) -> Result<Vec<config::meta::oncall::response::Response>, AckError> {
-    Ok(marked_problem_pages(p)
-        .await?
-        .into_iter()
-        .map(|(page, _)| page)
-        .collect())
 }
 
 /// [`problem_pages`], each marked current or left over from an earlier firing (D34).
@@ -2842,6 +3103,96 @@ mod tests {
         assert_eq!(
             siem_evaluates_through_silence(&alert),
             cfg!(feature = "enterprise")
+        );
+    }
+
+    #[test]
+    fn an_ai_principal_is_refused_a_plain_firing_and_the_refusal_names_the_act() {
+        let target = AckTarget {
+            org_id: "acme".into(),
+            alert_id: "a1".into(),
+            name: "checkout".into(),
+            folder_id: "default".into(),
+            multi_alert: false,
+            composite: false,
+            silence_micros: 0,
+            evaluates_through_silence: false,
+        };
+        let firing = Problem::Firing {
+            target,
+            groups: Groups::All,
+        };
+        let incident = Problem::Incident {
+            org_id: "acme".into(),
+            incident_id: "i1".into(),
+        };
+        let ai = Caller {
+            email: "dana@acme.com".into(),
+            ai: true,
+        };
+        let person = Caller::person("dana@acme.com");
+        assert!(refuses_ai(&ai, &firing));
+        assert!(!refuses_ai(&person, &firing));
+        assert!(!refuses_ai_with(&ai, &incident, false));
+        assert!(refuses_ai_with(&ai, &incident, true));
+        assert!(!refuses_ai_with(&person, &incident, true));
+        let editors = vec![(
+            "lee@acme.com".to_string(),
+            UserRole::Admin,
+            Some("Lee".to_string()),
+        )];
+        let on_call = AuthorizeFacts {
+            responders: vec![team(&["sam@acme.com"])],
+            ..Default::default()
+        };
+        for (act, code, verb) in [
+            (Act::Ack, RefusalCode::AckRefused, "acknowledge an alert"),
+            (
+                Act::Unack,
+                RefusalCode::AckRefused,
+                "unacknowledge an alert",
+            ),
+            (Act::TakeOver, RefusalCode::AckRefused, "take over an alert"),
+            (Act::Resolve, RefusalCode::AckRefused, "resolve an alert"),
+            (Act::Mute, RefusalCode::MuteRefused, "mute an alert"),
+            (Act::Unmute, RefusalCode::MuteRefused, "unmute an alert"),
+            (
+                Act::Snooze,
+                RefusalCode::AckRefused,
+                "snooze an alert's page",
+            ),
+            (Act::Unsnooze, RefusalCode::AckRefused, "unsnooze"),
+            (Act::Note, RefusalCode::AckRefused, "add a note"),
+            (Act::HandOff, RefusalCode::AckRefused, "hand off"),
+            (
+                Act::ConfirmRecovery,
+                RefusalCode::AckRefused,
+                "confirm the recovery",
+            ),
+            (Act::Escalate, RefusalCode::AckRefused, "escalate"),
+            (Act::Promote, RefusalCode::AckRefused, "promote"),
+        ] {
+            let refused = ai_refusal(act, &on_call, &editors);
+            assert_eq!(refused.code, code);
+            assert!(
+                refused.message.contains("AI assistant"),
+                "{}",
+                refused.message
+            );
+            assert!(refused.message.contains(verb), "{}", refused.message);
+            assert_eq!(refused.on_call[0].email, "sam@acme.com");
+            assert_eq!(refused.can_act[0].email, "lee@acme.com");
+        }
+        for act in [Act::Snooze, Act::Note, Act::Promote] {
+            assert_eq!(
+                refusal(act, &on_call, &editors).message,
+                refusal(Act::Ack, &on_call, &editors).message,
+                "a person's refusal of a page action reads as before"
+            );
+        }
+        assert_eq!(
+            refusal(Act::Unmute, &on_call, &editors),
+            refusal(Act::Mute, &on_call, &editors)
         );
     }
 }

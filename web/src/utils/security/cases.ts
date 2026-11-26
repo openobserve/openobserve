@@ -153,7 +153,14 @@ export function toTimelineEntry(event: IncidentEventRaw): TimelineEntry {
         ...base,
         kind: "assignment",
         icon: "person",
-        key: d.to ? "assigned" : "unassigned",
+        key:
+          d.role === "comms"
+            ? d.to
+              ? "commsOwnerSet"
+              : "commsOwnerCleared"
+            : d.to
+              ? "assigned"
+              : "unassigned",
         params: { to: String(d.to ?? "") },
         actor: d.user_id ?? undefined,
       };

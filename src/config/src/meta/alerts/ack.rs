@@ -143,6 +143,12 @@ pub struct UnackRequest {
 #[serde(default)]
 pub struct ProblemAckRequest {
     pub take_over: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assign_self: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_holder: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_lead: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

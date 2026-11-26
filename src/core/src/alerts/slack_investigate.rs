@@ -367,6 +367,8 @@ mod enterprise {
             skip_cooldown: true,
             oncall_subjects: None,
             context_used: None,
+            recipients: Vec::new(),
+            page_key: None,
         })
         .await
         {
@@ -676,19 +678,16 @@ mod enterprise {
             .collect();
         let name = alert.map(|a| a.name.clone());
         let stream = alert.map(|a| a.stream_name.clone());
-        let context = config::meta::oncall::RcaContext {
-            subject_type: config::meta::oncall::SubjectType::Alert,
-            subject_id: req.alert_id.clone(),
-            incident_id: None,
-            org_id: req.org_id.clone(),
-            previous_analysis: None,
-            severity: alert.and_then(|a| a.priority),
-            past_causes: Vec::new(),
-            alert_name: name.clone(),
-            stream: stream.clone(),
-            dimensions: (!dimensions.is_empty()).then_some(serde_json::Value::Object(dimensions)),
-            evidence: None,
-        };
+        let mut context = crate::alerts::rca_capabilities::alert_context(
+            &req.org_id,
+            &req.alert_id,
+            req.firing_started_at,
+        );
+        context.severity = alert.and_then(|a| a.priority);
+        context.alert_name = name.clone();
+        context.stream = stream.clone();
+        context.dimensions =
+            (!dimensions.is_empty()).then_some(serde_json::Value::Object(dimensions));
         (
             context,
             name.unwrap_or_else(|| req.alert_id.clone()),
@@ -1043,6 +1042,8 @@ mod tests {
                 skip_cooldown: true,
                 oncall_subjects: None,
                 context_used: None,
+                recipients: Vec::new(),
+                page_key: None,
             })
             .await
             .unwrap();
@@ -1366,6 +1367,13 @@ mod tests {
                 group_labels: vec![("cluster".into(), "prod".into())],
             };
             let (context, name, stream) = context_of(&req, None);
+            assert_eq!(context.fired_at_us, Some(req.firing_started_at));
+            assert_eq!(context.first_alert_at_us, Some(req.firing_started_at));
+            assert_eq!(
+                context.window_start_us,
+                Some(req.firing_started_at - 7_200_000_000)
+            );
+            assert!(context.capabilities.is_some());
             assert_eq!((context.alert_name, context.stream), (None, None));
             assert_eq!((name.as_str(), stream.as_str()), ("3L5gone", ""));
             assert_eq!(context.dimensions.unwrap()["cluster"], "prod");

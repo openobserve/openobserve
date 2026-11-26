@@ -15,22 +15,27 @@
 
 //! RCA report parsing, evidence grading and final run-record policy.
 
-use std::collections::BTreeMap;
-
+pub mod coverage;
 mod evidence;
+mod evidence_time;
+pub(crate) mod grading;
 mod ledger;
 mod outcome;
 mod summary;
 
+use std::collections::BTreeMap;
+
+pub use coverage::{CallCoverage, ComparisonCitation, call_coverage};
 pub use evidence::{
     Citation, EvidenceEntry, EvidenceTarget, build_evidence, change_rows, evidence_kind,
     evidence_target, exit_code, observed_window, summarize_result,
 };
 pub use ledger::{
-    BlindSpot, BlindSpotAxis, BlindSpotFix, EvidenceItem, EvidenceLedger, Hypothesis,
-    HypothesisStatus, LeadingEntry, LedgerCall, LedgerCounts, LedgerTool, MAX_BLIND_SPOTS,
-    MAX_EVIDENCE_ITEMS, MAX_HYPOTHESES, MAX_QUERY_BYTES, MAX_TEXT_CHARS, MAX_TITLE_CHARS, Polarity,
-    StatusChange, Strength, build_ledger, leading, leading_history, status_rank, subject,
+    BlindSpot, BlindSpotAxis, BlindSpotFix, ClaimScope, DisproofCheck, DisproofCheckKind,
+    DisproofCheckResult, EvidenceItem, EvidenceLedger, Hypothesis, HypothesisStatus, LeadingEntry,
+    LedgerCall, LedgerCounts, LedgerTool, MAX_BLIND_SPOTS, MAX_EVIDENCE_ITEMS, MAX_HYPOTHESES,
+    MAX_QUERY_BYTES, MAX_TEXT_CHARS, MAX_TITLE_CHARS, Polarity, StatusChange, Strength,
+    build_ledger, leading, leading_history, status_rank, subject,
 };
 pub use outcome::{EndedBy, OutcomeReason, derive_outcome};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -48,7 +53,8 @@ use super::{
         ProposedAction, SubmittedNextStep, SuspectChange,
     },
     confidence::{
-        ConfidenceGrade, ToolCallRecord, UnverifiedCitation, apply_outcome, grade_confidence,
+        ConfidenceGrade, GradeTrust, ToolCallRecord, UnverifiedCitation, apply_outcome,
+        grade_confidence_with,
     },
 };
 
@@ -606,6 +612,10 @@ fn blocked_detail(blind_spots: &[BlindSpot]) -> String {
 
 /// Build the ledger, grade verified evidence and derive the final outcome in precedence order.
 pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
+    record_run_end_with(input, &GradeTrust::default())
+}
+
+pub fn record_run_end_with(input: &RunEndInput, trust: &GradeTrust) -> RunEndResult {
     let (ledger, mut blind_spots, counts) = build_ledger(input.calls, Some(input.ended_at_us));
     if !input.completed
         && let Some(spot) = run_end_blind_spot(input.stages_run)
@@ -618,12 +628,13 @@ pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
 
     let (grade, outcome) = match submitted {
         Some(v) => {
-            let mut grade = grade_confidence(
+            let mut grade = grade_confidence_with(
                 v,
                 ledger.as_ref(),
                 &blind_spots,
                 input.tool_log,
                 input.steer_authors,
+                trust,
             );
             let (outcome, reason) = derive_outcome(ledger.as_ref(), &grade, v, input.ended_by);
             apply_outcome(&mut grade, outcome, reason);
@@ -792,6 +803,7 @@ pub(crate) mod fixtures {
             observed: None,
             change_rows: None,
             result_summary: format!("{call_id} summary"),
+            coverage: None,
         }
     }
 
@@ -902,7 +914,10 @@ mod tests {
     use super::*;
     use crate::meta::{
         alerts::priority::AlertPriority,
-        oncall::agent::{ActionKind, PageAction},
+        oncall::{
+            agent::{ActionKind, PageAction},
+            confidence::grade_confidence,
+        },
     };
 
     /// Every field, as `submit_report` sends it.

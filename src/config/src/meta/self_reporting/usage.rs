@@ -91,6 +91,7 @@ pub fn is_feature_writer_stream(stream_name: &str) -> bool {
         || stream_name.starts_with(crate::meta::autoobserve::AUTOOBSERVE_STREAM_PREFIX)
         || stream_name.starts_with(crate::meta::service_identity::SERVICE_SIGNALS_STREAM_PREFIX)
         || stream_name == SESSION_REPLAY_RESOURCES_STREAM
+        || stream_name == crate::meta::alerts::change_events::CHANGE_EVENTS_STREAM
 }
 
 /// Outcome of a single scheduled evaluation — "did it fire?".

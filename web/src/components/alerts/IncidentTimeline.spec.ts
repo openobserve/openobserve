@@ -93,7 +93,7 @@ describe("IncidentTimeline - fetchEvents", () => {
     (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
     await mountComp({ visible: true });
     await flushPromises();
-    expect(incidentsService.getEvents).toHaveBeenCalledWith("default", "incident-1");
+    expect(incidentsService.getEvents).toHaveBeenCalledWith("default", "incident-1", undefined);
   });
 
   it("does not call getEvents when visible=false", async () => {
@@ -433,6 +433,21 @@ describe("IncidentTimeline - getInlineEventText", () => {
     expect(vm.getEventBadgeText({ type: "ai_analysis_needs_input" })).toBe("AI needs input");
   });
 
+  it("reads a comms owner change as the comms owner, never as the lead's assignment", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    const vm = w.vm as any;
+    const comms = (to: string | null) => ({
+      type: "AssignmentChanged",
+      data: { from: null, to, role: "comms" },
+    });
+    expect(vm.getInlineEventText(comms("c@acme.io"))).toContain("Comms owner set to");
+    expect(vm.getInlineEventText(comms("c@acme.io"))).not.toContain("Assigned to");
+    expect(vm.getInlineEventText(comms(null))).toBe("Comms owner cleared");
+    const lead = { type: "AssignmentChanged", data: { from: null, to: "l@acme.io" } };
+    expect(vm.getInlineEventText(lead)).toContain("Assigned to");
+  });
+
   it("returns empty string for unknown type", async () => {
     const w = await mountComp();
     await flushPromises();
@@ -637,7 +652,7 @@ describe("IncidentTimeline - watcher: visible", () => {
     (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
     await w.setProps({ visible: true });
     await flushPromises();
-    expect(incidentsService.getEvents).toHaveBeenCalledWith("default", "incident-1");
+    expect(incidentsService.getEvents).toHaveBeenCalledWith("default", "incident-1", undefined);
   });
 });
 

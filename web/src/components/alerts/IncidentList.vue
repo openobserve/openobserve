@@ -30,19 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="loading"
         :forbidden="forbidden"
         row-key="id"
-        pagination="client"
-        :page-size="pageSize"
-        :page-size-options="[20, 50, 100, 250, 500]"
-        :current-page="currentPage"
-        keep-page-on-data-change
-        @update:current-page="onPageChange"
-        @update:page-size="pageSize = $event"
-        sorting="client"
+        pagination="none"
+        sorting="server"
         :sort-by="sortBy"
         :sort-order="sortOrder"
         @update:sort-by="sortBy = $event"
         @update:sort-order="sortOrder = $event"
-        filter-mode="client"
+        filter-mode="server"
         :default-columns="false"
         show-index
         virtual-scroll
@@ -348,14 +342,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
+        <template #pagination-bar>
+          <div
+            class="border-border-default flex flex-wrap items-center justify-end gap-x-3 gap-y-1 border-t px-3 py-1"
+            data-test="incident-list-pager"
+          >
+            <span
+              class="text-text-secondary text-xs whitespace-nowrap tabular-nums"
+              data-test="incident-list-pager-total"
+            >
+              {{ t("alerts.incidents.pagerTotal", { count: total.toLocaleString() }, total) }}
+            </span>
+            <div class="flex items-center gap-1.5 text-xs">
+              <span class="whitespace-nowrap max-md:hidden">{{ t("search.recordsPerPage") }}</span>
+              <OSelect
+                v-model="pageSize"
+                :options="pageSizeOptions"
+                :searchable="false"
+                size="xs"
+                :aria-label="t('search.recordsPerPage')"
+                data-test="incident-list-page-size"
+              />
+            </div>
+            <nav
+              class="flex items-center gap-1"
+              :aria-label="t('components.pagination.pagination')"
+            >
+              <OButton
+                variant="outline"
+                size="icon-xs-sq"
+                :disabled="!hasPreviousPage || fetching"
+                :aria-label="t('components.pagination.previousPage')"
+                data-test="incident-list-prev-page"
+                @click="previousPage"
+              >
+                <OIcon name="chevron-left" size="sm" />
+              </OButton>
+              <OButton
+                variant="outline"
+                size="icon-xs-sq"
+                :disabled="!nextCursor || fetching"
+                :aria-label="t('components.pagination.nextPage')"
+                data-test="incident-list-next-page"
+                @click="nextPage"
+              >
+                <OIcon name="chevron-right" size="sm" />
+              </OButton>
+            </nav>
+          </div>
+        </template>
+
         <!-- Empty state -->
         <template #empty>
           <div v-if="!loading" class="flex h-full w-full items-center justify-center">
             <OEmptyState
               size="hero"
               preset="no-incidents"
-              :filtered="!!searchQuery || statusFilter !== 'all'"
-              :hide-action="!searchQuery && statusFilter === 'all'"
+              :filtered="hasFilters"
+              :hide-action="!hasFilters"
               @action="(id) => (id === 'clear-filters' ? clearFilters() : null)"
             />
           </div>
@@ -368,8 +412,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { useMutation, useQuery } from "@tanstack/vue-query";
-import { incidentsQuery, updateIncidentStatusMutation } from "@/services/incidents.queries";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/vue-query";
+import { watchDebounced } from "@vueuse/core";
+import { incidentListQuery, updateIncidentStatusMutation } from "@/services/incidents.queries";
 import { incidentRefusalToast, incidentStatusToast } from "@/utils/alerts/ackState";
 import type { AckAlertResponse, UnackAlertResponse } from "@/ts/interfaces/alert";
 import {
@@ -386,7 +431,12 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
-import { type Incident } from "@/services/incidents";
+import {
+  cursorSort,
+  type Incident,
+  type IncidentListParams,
+  type ListIncidentsResponse,
+} from "@/services/incidents";
 import IncidentAiAnalysisCell from "@/components/alerts/IncidentAiAnalysisCell.vue";
 import { isLiveRca } from "@/utils/incidents/rcaCell";
 import { useListViewState } from "@/composables/useListViewState";
@@ -396,6 +446,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -409,7 +460,7 @@ import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDi
 import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import { matchesAnyKey, readFilterKeys } from "@/utils/filterKeys";
+import { readFilterKeys } from "@/utils/filterKeys";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -426,6 +477,11 @@ const SEVERITY_KEYS = ["P1", "P2", "P3", "P4"] as const;
 type SeverityKey = (typeof SEVERITY_KEYS)[number];
 const isSeverityKey = (key: string): key is SeverityKey =>
   (SEVERITY_KEYS as readonly string[]).includes(key);
+const PAGE_SIZES = [20, 50, 100, 200];
+/** The server's order when the request names no sort. */
+const DEFAULT_SORT = "last_alert_at:desc";
+/** URL keys the list owns (design spec 2.6); any other key on the route is left alone. */
+const URL_KEYS = ["sev", "q", "sort", "cursor", "assignee", "service", "from", "to"] as const;
 
 export default defineComponent({
   name: "IncidentList",
@@ -436,6 +492,7 @@ export default defineComponent({
     OButton,
     ORefreshButton,
     OSearchInput,
+    OSelect,
     OTooltip,
     OTruncatedText,
     OIcon,
@@ -460,17 +517,154 @@ export default defineComponent({
 
     const qTableRef: any = ref(null);
     const orgIdForList = useOrgId();
+    const queryText = (key: string): string | undefined => {
+      const value = route.query[key];
+      return typeof value === "string" && value !== "" ? value : undefined;
+    };
+    const queryMicros = (key: string): number | undefined => {
+      const value = Number(queryText(key));
+      return Number.isFinite(value) && queryText(key) ? value : undefined;
+    };
+    const linkedFilters = shallowRef<
+      Pick<IncidentListParams, "assignedTo" | "service" | "startTime" | "endTime">
+    >({
+      assignedTo: queryText("assignee") === "me" ? "me" : undefined,
+      service: queryText("service"),
+      startTime: queryMicros("from"),
+      endTime: queryMicros("to"),
+    });
+    const urlSort = queryText("sort")?.split(":");
+    const urlSeverities = (queryText("sev") ?? "").split(",").filter(isSeverityKey);
+
+    const searchQuery = ref(queryText("q") ?? "");
+    // Typing waits for a pause before it becomes a request.
+    const debouncedSearch = ref(searchQuery.value);
+    watchDebounced(
+      searchQuery,
+      (value) => {
+        debouncedSearch.value = value;
+      },
+      { debounce: 300 },
+    );
+    // Active covers open and acknowledged; Open is open only, matching the Overview count.
+    const validStatuses = ["all", "active", "open", "resolved"];
+    // Default to "active"; a valid ?status= query wins over the saved state.
+    const urlStatus = validStatuses.includes(route.query.status as string)
+      ? (route.query.status as string)
+      : null;
+    const statusFilter = ref(urlStatus ?? "active");
+    const isRestoringState = ref(false);
+    const viewState = useListViewState("incidents", {
+      severityFilter: [] as SeverityKey[],
+      pageSize: 20,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+      cursor: "",
+      cursorContext: "",
+    });
+    // A size saved before the cursor pager may be 250 or 500, past the server's 200.
+    const pageSize = ref(PAGE_SIZES.find((size) => size >= viewState.pageSize) ?? 200);
+    const pageSizeOptions = PAGE_SIZES.map((size) => ({ label: raw(String(size)), value: size }));
+    const sortBy = ref(urlSort?.[0] ?? viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(
+      urlSort ? (urlSort[1] === "asc" ? "asc" : "desc") : viewState.sortOrder,
+    );
+    // A status link ignores the saved facet so it cannot silently narrow the linked view.
+    const severityFilters = ref<SeverityKey[]>(
+      urlSeverities.length
+        ? urlSeverities
+        : urlStatus
+          ? []
+          : readFilterKeys(viewState.severityFilter, isSeverityKey),
+    );
+    const hasFilters = computed(
+      () =>
+        !!searchQuery.value ||
+        statusFilter.value !== "all" ||
+        severityFilters.value.length > 0 ||
+        Object.values(linkedFilters.value).some((value) => value !== undefined),
+    );
+    watch([severityFilters, pageSize, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        severityFilter: severityFilters.value,
+        pageSize: pageSize.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
+
+    // A cursor has no page number: Previous pops the cursors this visit walked, and a
+    // cursor that came in on a link has none behind it, so Previous goes to the first page.
+    // A cursor is a position under one status, filter set and sort; a URL cursor is kept
+    // only while the view state says it was written under the ones restored now.
+    const urlCursor = queryText("cursor");
+    const currentCursor = ref<string | undefined>(
+      urlCursor && urlCursor === viewState.cursor ? urlCursor : undefined,
+    );
+    if (route.query.status !== undefined || (urlCursor && !currentCursor.value)) {
+      const { status: _status, cursor, ...rest } = route.query;
+      router.replace({ query: currentCursor.value ? { ...rest, cursor } : rest });
+    }
+    const cursorStack = ref<(string | undefined)[]>([]);
+    const hasPreviousPage = computed(() => !!currentCursor.value);
+    const resetPage = () => {
+      currentCursor.value = undefined;
+      cursorStack.value = [];
+    };
+    watch([debouncedSearch, statusFilter, severityFilters, pageSize, sortBy, sortOrder], () => {
+      if (!isRestoringState.value) resetPage();
+    });
+
+    const listParams = computed<IncidentListParams>(() => ({
+      ...linkedFilters.value,
+      status: statusFilter.value === "all" ? undefined : statusFilter.value,
+      severity: severityFilters.value.length ? [...severityFilters.value] : undefined,
+      q: debouncedSearch.value.trim() || undefined,
+      sort: sortBy.value ? `${sortBy.value}:${sortOrder.value}` : undefined,
+      cursor: currentCursor.value,
+      limit: pageSize.value,
+    }));
+    const listContext = (params: IncidentListParams) =>
+      JSON.stringify({ ...params, cursor: undefined, limit: undefined });
+    const cursorFits = (cursor: string) =>
+      cursor === viewState.cursor &&
+      viewState.cursorContext === listContext(listParams.value) &&
+      cursorSort(cursor) === (listParams.value.sort ?? DEFAULT_SORT);
+    watch(listParams, (params) => {
+      if (params.cursor) {
+        Object.assign(viewState, { cursor: params.cursor, cursorContext: listContext(params) });
+      }
+      const kept = Object.fromEntries(
+        Object.entries(route.query).filter(
+          ([key]) => key !== "status" && !(URL_KEYS as readonly string[]).includes(key),
+        ),
+      );
+      const owned: Record<(typeof URL_KEYS)[number], string | undefined> = {
+        sev: params.severity?.join(","),
+        q: params.q,
+        sort: params.sort,
+        cursor: params.cursor,
+        assignee: params.assignedTo,
+        service: params.service,
+        from: params.startTime?.toString(),
+        to: params.endTime?.toString(),
+      };
+      const set = Object.fromEntries(Object.entries(owned).filter(([, value]) => !!value));
+      router.replace({ query: { ...kept, ...set } });
+    });
+
     // Set from `liveRowOnPage` below; the query getter reads it, so a change
     // re-applies the options and TanStack restarts or stops its interval timer.
     const pollLiveRows = ref(false);
     const incidentsList = useQuery(() =>
-      Object.assign(incidentsQuery(orgIdForList.value, undefined as unknown as string, 1000, 0), {
+      Object.assign(incidentListQuery(orgIdForList.value, listParams.value), {
         enabled: !!orgIdForList.value,
+        placeholderData: keepPreviousData,
         refetchInterval: pollLiveRows.value ? RCA_LIVE_POLL_MS : (false as const),
       }),
     );
 
-    // `isPending` also starts true on a cold read, so the page-restore watch below still sees a real true→false transition.
+    // `isPending` is the cold read only; `keepPreviousData` keeps the last page on screen while the next one loads.
     const loading = incidentsList.isPending;
     // Request in flight with rows still on screen — the refresh button's
     // spinner. `loading` is the skeleton, for a cold read only.
@@ -482,17 +676,21 @@ export default defineComponent({
       const e: any = incidentsList.error.value;
       return forbiddenState(e) || e?.status === 403;
     });
-    // The first real load lands after mount: land on the saved page, or page 1 when it no longer exists. setTimeout(0) runs after the table has taken the new rows.
-    watch(
-      loading,
-      (isLoading) => {
-        if (isLoading) return;
-        setTimeout(() => {
-          qTableRef.value?.restorePage?.(currentPage.value);
-        }, 0);
-      },
-      { once: true },
-    );
+    // A 400 under a cursor is a position the server no longer accepts, so start over.
+    watch(incidentsList.error, (e: any) => {
+      if (currentCursor.value && (e?.response?.status ?? e?.status) === 400) resetPage();
+    });
+    const listData = computed(() => incidentsList.data.value as ListIncidentsResponse | undefined);
+    const total = computed(() => listData.value?.total ?? 0);
+    const nextCursor = computed(() => listData.value?.next_cursor ?? undefined);
+    const nextPage = () => {
+      if (!nextCursor.value) return;
+      cursorStack.value.push(currentCursor.value);
+      currentCursor.value = nextCursor.value;
+    };
+    const previousPage = () => {
+      currentCursor.value = cursorStack.value.pop();
+    };
     // The incident dataset is read-only display data replaced wholesale on every
     // reload, so hold it in a shallowRef (and freeze each row on load — see
     // loadIncidents). Vue then never deep-proxies the hundreds of objects, which
@@ -516,57 +714,6 @@ export default defineComponent({
       notLoaded(id)
         ? t("alerts.downtimes.incident.notLoadedTooltip", { id })
         : t("alerts.downtimes.incident.mutedBy", { name: nameOf(id) });
-    const searchQuery = ref("");
-    // Active covers open and acknowledged; Open is open only, matching the Overview count.
-    const validStatuses = ["all", "active", "open", "resolved"];
-    // Default to "active"; a valid ?status= query wins over the saved state.
-    const urlStatus = validStatuses.includes(route.query.status as string)
-      ? (route.query.status as string)
-      : null;
-    if (route.query.status !== undefined) {
-      const { status: _status, ...rest } = route.query;
-      router.replace({ query: rest });
-    }
-    const statusFilter = ref(urlStatus ?? "active");
-    const isRestoringState = ref(false);
-    const viewState = useListViewState("incidents", {
-      severityFilter: [] as SeverityKey[],
-      pageSize: 20,
-      sortBy: "",
-      sortOrder: "asc" as "asc" | "desc",
-    });
-    const pageSize = ref(viewState.pageSize);
-    const sortBy = ref(viewState.sortBy);
-    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
-    // Restored from the Vuex incidents store (same mechanism as searchQuery/statusFilter) so returning from a detail view lands back on the same page.
-    const currentPage = ref(1);
-    const onPageChange = (page: number) => {
-      currentPage.value = page;
-      savePageState();
-    };
-    // Severity facet, independent of status; an empty list is every severity.
-    // A status link lands on every severity of that status, so the saved facet is dropped.
-    const severityFilters = ref<SeverityKey[]>(
-      urlStatus ? [] : readFilterKeys(viewState.severityFilter, isSeverityKey),
-    );
-    watch([severityFilters, pageSize, sortBy, sortOrder], () => {
-      Object.assign(viewState, {
-        severityFilter: severityFilters.value,
-        pageSize: pageSize.value,
-        sortBy: sortBy.value,
-        sortOrder: sortOrder.value,
-      });
-    });
-    // The table keeps its page when the rows change (a poll refetch), so
-    // a new filter, sort or page size starts over on page 1 here.
-    const resetPage = () => {
-      currentPage.value = 1;
-      qTableRef.value?.restorePage?.(1);
-      savePageState();
-    };
-    watch([searchQuery, statusFilter, severityFilters, pageSize, sortBy, sortOrder], () => {
-      if (!isRestoringState.value) resetPage();
-    });
 
     const columns: OTableColumnDef[] = [
       {
@@ -644,75 +791,10 @@ export default defineComponent({
       },
     ];
 
-    // Frontend search filter function
-    const applyFrontendSearch = (incidentsList: Incident[], query: string) => {
-      if (!query || query.trim() === "") {
-        return incidentsList;
-      }
-      const searchLower = query.toLowerCase().trim();
-      return incidentsList.filter((incident) => {
-        const title = incident.title || formatDimensions(incident.group_values);
-        if (title.toLowerCase().includes(searchLower)) return true;
-        const statusLabel = getStatusLabel(incident.status).toLowerCase();
-        if (
-          statusLabel.includes(searchLower) ||
-          incident.status.toLowerCase().includes(searchLower)
-        )
-          return true;
-        if (incident.severity.toLowerCase().includes(searchLower)) return true;
-        if (incident.group_values) {
-          const dimensionsStr = Object.entries(incident.group_values)
-            .map(([k, v]) => `${k}=${v}`)
-            .join(" ")
-            .toLowerCase();
-          if (dimensionsStr.includes(searchLower)) return true;
-        }
-        return false;
-      });
-    };
-
-    // Search first (so the summary counts track the current search); the status
-    // filter is layered on top for the table rows.
-    const searchedIncidents = computed(() =>
-      applyFrontendSearch(allIncidents.value, searchQuery.value),
+    const visibleIncidents = computed(() => allIncidents.value);
+    const liveRowOnPage = computed(() =>
+      allIncidents.value.some((incident) => isLiveRca(incident.rca)),
     );
-    // Search + status toggle (but NOT severity) — the scope the severity cards
-    // count over, so selecting a status updates the severity breakdown to match.
-    const statusScopedIncidents = computed(() => {
-      const rows = searchedIncidents.value;
-      if (statusFilter.value === "active") {
-        return rows.filter((i) => i.status === "open" || i.status === "acknowledged");
-      }
-      if (statusFilter.value === "open") {
-        return rows.filter((i) => i.status === "open");
-      }
-      if (statusFilter.value === "resolved") {
-        return rows.filter((i) => i.status === "resolved");
-      }
-      return rows;
-    });
-    const visibleIncidents = computed(() => {
-      const rows = statusScopedIncidents.value;
-      return rows.filter((incident) =>
-        matchesAnyKey(
-          severityFilters.value,
-          incident,
-          (row, key) => String(row.severity).toUpperCase() === key,
-        ),
-      );
-    });
-
-    // OTable pages and sorts on the client, so mirror its only sortable
-    // column to know which rows the current page shows.
-    const liveRowOnPage = computed(() => {
-      let rows = visibleIncidents.value;
-      if (sortBy.value === "last_alert_at") {
-        const dir = sortOrder.value === "desc" ? -1 : 1;
-        rows = [...rows].sort((a, b) => dir * (a.last_alert_at - b.last_alert_at));
-      }
-      const start = (currentPage.value - 1) * pageSize.value;
-      return rows.slice(start, start + pageSize.value).some((incident) => isLiveRca(incident.rca));
-    });
     watch(
       liveRowOnPage,
       (live) => {
@@ -730,22 +812,14 @@ export default defineComponent({
     }, RCA_LIVE_POLL_MS);
     onUnmounted(() => clearInterval(nowTimer));
 
-    // Severity breakdown for the summary strip (over the status-scoped set, so it
-    // tracks the toggle). The four hues (red/orange/amber/blue) match the rail.
+    // The server counts every filter but severity, so picking a severity card keeps the others' counts.
     const severityCounts = computed(() => {
-      const rows = statusScopedIncidents.value;
-      let p1 = 0;
-      let p2 = 0;
-      let p3 = 0;
-      let p4 = 0;
-      for (const i of rows) {
-        const s = String(i.severity).toUpperCase();
-        if (s === "P1") p1 += 1;
-        else if (s === "P2") p2 += 1;
-        else if (s === "P3") p3 += 1;
-        else if (s === "P4") p4 += 1;
-      }
-      return { p1, p2, p3, p4, total: rows.length };
+      const counts = listData.value?.counts_by_severity;
+      const p1 = counts?.P1 ?? 0;
+      const p2 = counts?.P2 ?? 0;
+      const p3 = counts?.P3 ?? 0;
+      const p4 = counts?.P4 ?? 0;
+      return { p1, p2, p3, p4, total: p1 + p2 + p3 + p4 };
     });
     // Severity summary strip — mirrors the Alerts state strip: Total + the four
     // severities as filter tiles, keyed by severity ("P1" .. "P4").
@@ -862,7 +936,6 @@ export default defineComponent({
       store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
-        pagination: { page: currentPage.value, rowsPerPage: pageSize.value },
         organizationIdentifier: store.state.selectedOrganization.identifier,
       });
 
@@ -883,7 +956,6 @@ export default defineComponent({
       store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
-        pagination: { page: currentPage.value, rowsPerPage: pageSize.value },
         organizationIdentifier: store.state.selectedOrganization.identifier,
       });
     };
@@ -897,8 +969,9 @@ export default defineComponent({
     };
 
     const clearFilters = () => {
+      linkedFilters.value = {};
       searchQuery.value = "";
-      severityFilters.value = [];
+      debouncedSearch.value = "";
       filterByStatus("active");
     };
 
@@ -1093,14 +1166,13 @@ export default defineComponent({
         if (cachedData && cachedData.length > 0) {
           allIncidents.value = cachedData;
         }
-        if (savedState.searchQuery !== undefined && !urlStatus) {
+        // The URL's search wins; the debounced copy is set too, or its late update would reset the page.
+        if (savedState.searchQuery !== undefined && !urlStatus && !queryText("q")) {
           searchQuery.value = savedState.searchQuery;
+          debouncedSearch.value = savedState.searchQuery;
         }
         if (savedState.statusFilter !== undefined && !urlStatus) {
           statusFilter.value = savedState.statusFilter;
-        }
-        if (savedState.pagination?.page && !urlStatus) {
-          currentPage.value = savedState.pagination.page;
         }
         return true;
       }
@@ -1109,6 +1181,7 @@ export default defineComponent({
 
     onMounted(async () => {
       const hasRestoredState = restoreStateFromStore();
+      if (currentCursor.value && !cursorFits(currentCursor.value)) resetPage();
       const shouldRefresh = store.state.incidents?.shouldRefresh || false;
 
       if (allIncidents.value.length === 0 || shouldRefresh) {
@@ -1117,9 +1190,6 @@ export default defineComponent({
         if (shouldRefresh) {
           store.dispatch("incidents/setShouldRefresh", false);
         }
-      } else {
-        // Cached data means loadIncidents() never ran, so loading needs an explicit false here to fire the once-off page-restore watch.
-        loading.value = false;
       }
 
       if (!store.state.incidents.isInitialized) {
@@ -1130,7 +1200,6 @@ export default defineComponent({
         store.dispatch("incidents/setIncidents", {
           searchQuery: searchQuery.value,
           statusFilter: statusFilter.value,
-          pagination: { page: currentPage.value, rowsPerPage: pageSize.value },
           organizationIdentifier: store.state.selectedOrganization.identifier,
         });
       }
@@ -1138,14 +1207,6 @@ export default defineComponent({
       await nextTick();
       isRestoringState.value = false;
     });
-
-    // Rows can leave under the current page (a resolve, a refetch); a page past
-    // the end falls back to page 1, and the table reports it to `onPageChange`.
-    watch(
-      () => visibleIncidents.value.length,
-      () => qTableRef.value?.restorePage?.(currentPage.value),
-      { flush: "post" },
-    );
 
     const refreshIncidents = async () => {
       if ((await incidentsList.refetch()).isError) return;
@@ -1184,14 +1245,19 @@ export default defineComponent({
       incidentRowStyle,
       searchQuery,
       statusFilter,
+      hasFilters,
       filterByStatus,
       clearFilters,
       columns,
       pageSize,
+      pageSizeOptions,
       sortBy,
       sortOrder,
-      currentPage,
-      onPageChange,
+      total,
+      nextCursor,
+      hasPreviousPage,
+      nextPage,
+      previousPage,
       loadIncidents,
       refreshIncidents,
       viewIncident,

@@ -22,7 +22,7 @@ use super::*;
 
 /// Every route `search_routes_with` registers, as (method, template, handler).
 #[rustfmt::skip]
-const GATED: [(&str, &str, &str); 50] = [
+const GATED: [(&str, &str, &str); 51] = [
     ("POST", "/{org_id}/_search_multi", "search::multi_streams::search_multi"),
     ("POST", "/{org_id}/_search_multi_stream", "search::multi_streams::search_multi_stream"),
     ("POST", "/{org_id}/_search_partition_multi", "search::multi_streams::_search_partition_multi"),
@@ -33,6 +33,7 @@ const GATED: [(&str, &str, &str); 50] = [
     ("POST", "/v2/{org_id}/downtimes/values", "downtimes::downtime_values"),
     ("PATCH", "/v2/{org_id}/alerts/{alert_id}/trigger", "alerts::trigger_alert"),
     ("PATCH", "/v2/{org_id}/alerts/{alert_id}/retrain", "alerts::retrain_alert"),
+    ("GET", "/v2/{org_id}/alerts/incidents/{incident_id}/brief", "alerts::incident_brief::get"),
     ("GET", "/{org_id}/db_monitoring/databases", "db_monitoring::handler::get_dbm_databases"),
     ("GET", "/{org_id}/db_monitoring/queries", "db_monitoring::handler::get_dbm_queries"),
     ("GET", "/{org_id}/db_monitoring/query/history", "db_monitoring::handler::get_dbm_query_history"),
@@ -263,7 +264,10 @@ const BACKGROUND_SEARCH_FNS: [(&str, Option<&str>); 10] = [
     ("slo::job::", None),
     ("slo::reconcile::", None),
     ("search_slices_page(", None),
-    ("red_insights::", None),
+    (
+        "red_insights::",
+        Some("api/management/src/request/alerts/incident_brief/impact.rs"),
+    ),
     ("SearchAdapter", None),
     (
         "run_dbm_search(",
@@ -278,11 +282,13 @@ const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchServic
 
 /// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, &str, Caller); 83] = [
+const SEARCH_CALLERS: [(&str, &str, Caller); 90] = [
     ("api/management/src/request/alert_calibration/digests.rs", "search_at", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history_summary.rs", "get_alert_history_summary", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
+    ("api/management/src/request/alerts/incident_brief/impact.rs", "promql_series", Caller::Routed("alerts::incident_brief::get")),
+    ("api/management/src/request/alerts/incident_brief/impact.rs", "search_sql", Caller::Routed("alerts::incident_brief::get")),
     ("api/management/src/request/dashboards/reports_history.rs", "run_search", Caller::Exempt("the org's own report run history; its route stays open")),
     ("api/management/src/request/db_monitoring/service/common.rs", "run_events_search", Caller::Routed("db_monitoring::handler::")),
     ("api/management/src/request/db_monitoring/service/common.rs", "stats_search_once", Caller::Routed("db_monitoring::handler::")),
@@ -325,12 +331,17 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 83] = [
     ("core/src/ai_chat.rs", "search_rows", Caller::Operational),
     ("core/src/alerts/alert_calibration/mod.rs", "search", Caller::Background("calibration runs")),
     ("core/src/alerts/auto_investigate_decisions.rs", "query", Caller::Exempt("the org's own auto-investigate decision log from the meta org; its route stays open")),
+    ("core/src/alerts/incidents/declare/capture.rs", "promql_value", Caller::InHandler),
+    ("core/src/alerts/incidents/declare/capture.rs", "sql", Caller::InHandler),
+    ("core/src/alerts/incidents/v2_fields.rs", "promql_series", Caller::Background("incident onset detection after the alert incident commits")),
+    ("core/src/alerts/incidents/v2_fields.rs", "sql_series", Caller::Background("incident onset detection after the alert incident commits")),
     ("core/src/alerts/mod.rs", "evaluate_scheduled", Caller::Background("alert evaluation")),
     ("core/src/alerts/mod.rs", "run_alert_count_query", Caller::Background("alert evaluation")),
     ("core/src/alerts/notifications/chart/mod.rs", "fetch_anomaly_rows", Caller::Background("notification charts")),
     ("core/src/alerts/notifications/chart/mod.rs", "fetch_series", Caller::Background("notification charts")),
     ("core/src/alerts/prom_rule.rs", "evaluate", Caller::Background("alert evaluation of PromQL rules")),
     ("core/src/alerts/scheduler/query_optimization_recommendation.rs", "search", Caller::Background("query recommendation analysis")),
+    ("core/src/alerts/what_changed.rs", "load_events", Caller::Exempt("incident change and rollout evidence from the org's own _o2_change_events stream")),
     ("core/src/anomaly_detection.rs", "execute_anomaly_query", Caller::Background("anomaly detection runs")),
     ("core/src/anomaly_detection/explore_state.rs", "search_hits", Caller::Exempt("the detector's own scored points for its explore state; its route stays open")),
     ("core/src/anomaly_detection/partitioned_search.rs", "plan", Caller::Background("anomaly detection runs")),
@@ -348,7 +359,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 83] = [
     ("core/src/public_dashboards/mod.rs", "publish_estimate", Caller::Helper("public dashboard builds; request/public_dashboards/public.rs checks the licence before any read")),
     ("core/src/public_dashboards/mod.rs", "sql", Caller::Helper("public dashboard builds; request/public_dashboards/public.rs checks the licence before any read")),
     ("core/src/self_reporting/search.rs", "get_usage", Caller::Exempt("licence usage from the meta org")),
-    ("core/src/service_identity/signals/metrics.rs", "range", Caller::Helper("version compare arms and RUM vitals; service_versions::compare is in the gated group, deploy detection and verdict ticks call it in the background")),
+    ("core/src/service_identity/signals/metrics.rs", "fetch_range", Caller::Helper("gated version compare, internal incident coverage metrics, and background deploy detection and verdict ticks")),
     ("core/src/service_identity/signals/processor.rs", "query", Caller::Background("service version deploy detection and verdict ticks")),
     ("core/src/service_identity/signals/record_services.rs", "search", Caller::InHandler),
     ("core/src/service_identity/signals/rum_drill.rs", "hits", Caller::Routed("service_versions::compare")),

@@ -72,6 +72,29 @@ pub fn org_status_refusal(
     }
 }
 
+/// The enabled alert-source row of `org_id` holding `token`; a foreign or unknown token is a 404.
+pub async fn authorize_alert_source(
+    org_id: &str,
+    token: Option<String>,
+) -> Result<infra::table::incident_integrations::IncidentIntegrationRecord, Response> {
+    let Some(token) = token else {
+        return Err(MetaHttpResponse::not_found("not found")); // never confirm token semantics
+    };
+    let integration = match infra::table::incident_integrations::find_by_token(&token).await {
+        Ok(Some(i)) if i.org_id != org_id => return Err(MetaHttpResponse::not_found("not found")),
+        Ok(Some(i)) if super::change_events::is_change_events_source(&i.source_type) => {
+            return Err(super::change_events::unauthorized());
+        }
+        Ok(Some(i)) => i,
+        Ok(None) => return Err(MetaHttpResponse::not_found("not found")),
+        Err(e) => return Err(MetaHttpResponse::internal_error(e)),
+    };
+    if let Some(resp) = inactive_org_response(&integration.org_id).await {
+        return Err(resp);
+    }
+    Ok(integration)
+}
+
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     post,
@@ -141,17 +164,10 @@ async fn handle_events(
     if !o2_config().incidents.enabled {
         return MetaHttpResponse::forbidden("External alert sources not enabled");
     }
-    let Some(token) = token else {
-        return MetaHttpResponse::not_found("not found"); // never confirm token semantics
+    let integration = match authorize_alert_source(&org_id, token).await {
+        Ok(integration) => integration,
+        Err(resp) => return resp,
     };
-    let integration = match infra::table::incident_integrations::find_by_token(&token).await {
-        Ok(Some(i)) if i.org_id == org_id => i,
-        Ok(_) => return MetaHttpResponse::not_found("not found"),
-        Err(e) => return MetaHttpResponse::internal_error(e),
-    };
-    if let Some(resp) = inactive_org_response(&integration.org_id).await {
-        return resp;
-    }
 
     let now = chrono::Utc::now().timestamp_micros();
     let ua = headers.get("user-agent").and_then(|v| v.to_str().ok());

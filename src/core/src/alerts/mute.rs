@@ -35,7 +35,7 @@ use o2_enterprise::enterprise::downtimes::{MAX_NAME_LEN, schedule};
 
 use crate::{
     alerts::{
-        ack::{self, AckTarget, Act},
+        ack::{self, AckTarget, Act, Caller},
         lifecycle,
     },
     downtimes::{self, DowntimeError},
@@ -74,11 +74,12 @@ impl From<ack::AckError> for MuteError {
 pub async fn mute(
     target: &AckTarget,
     req: &AlertMuteRequest,
-    actor: &str,
+    caller: &Caller,
     source: MuteSource,
 ) -> Result<AlertMuteResponse, MuteError> {
     downtimes::ensure_enabled()?;
-    ack::authorize(target, actor, Act::Mute)
+    let actor = caller.email.as_str();
+    ack::authorize(target, caller, Act::Mute)
         .await
         .map_err(MuteError::from)?;
     authorize_folder(&target.org_id, actor, req).await?;
@@ -103,7 +104,7 @@ pub async fn mute(
         .until_clear
         .then(|| until_clear_of(&target.alert_id, groups.as_deref()));
     let request = quick_mute_request(target, req, now, ends_at, groups, end_on_clear);
-    let row = downtimes::create_for_alert(&target.org_id, actor, request, source).await?;
+    let row = downtimes::create_for_alert(&target.org_id, caller, request, source).await?;
     lifecycle::on_view_changed(&target.org_id, &target.alert_id, single_group(&row)).await;
     // D25: a mute quiets the problem's open pages until it ends, as a Slack mute always did.
     let pages = ack::snooze_pages_until(target, actor, ends_at, now).await;
@@ -122,10 +123,10 @@ pub async fn extend(
     target: &AckTarget,
     downtime_id: &str,
     req: &AlertMuteExtendRequest,
-    actor: &str,
+    caller: &Caller,
 ) -> Result<AlertMuteExtendResponse, MuteError> {
     downtimes::ensure_enabled()?;
-    ack::authorize(target, actor, Act::Mute)
+    ack::authorize(target, caller, Act::Mute)
         .await
         .map_err(MuteError::from)?;
     let row = quick_mute_of(target, downtime_id).await?;
@@ -133,22 +134,17 @@ pub async fn extend(
         return Err(version_changed(&row));
     }
     let (new_end, end_on_clear) = extended_end(&row, req, now_micros())?;
-    let after = match downtimes::extend_quick_mute(
-        &target.org_id,
-        actor,
-        &row,
-        new_end,
-        end_on_clear,
-    )
-    .await
-    {
-        Ok(after) => after,
-        Err(DowntimeError::Conflict(_)) => {
-            let current = quick_mute_of(target, downtime_id).await?;
-            return Err(version_changed(&current));
-        }
-        Err(e) => return Err(e.into()),
-    };
+    let after =
+        match downtimes::extend_quick_mute(&target.org_id, caller, &row, new_end, end_on_clear)
+            .await
+        {
+            Ok(after) => after,
+            Err(DowntimeError::Conflict(_)) => {
+                let current = quick_mute_of(target, downtime_id).await?;
+                return Err(version_changed(&current));
+            }
+            Err(e) => return Err(e.into()),
+        };
     lifecycle::on_view_changed(&target.org_id, &target.alert_id, single_group(&after)).await;
     Ok(AlertMuteExtendResponse {
         version: after.version,
@@ -162,14 +158,14 @@ pub async fn unmute(
     target: &AckTarget,
     downtime_id: &str,
     version: Option<i64>,
-    actor: &str,
+    caller: &Caller,
     idle: Option<IdleRun<'_>>,
 ) -> Result<Downtime, MuteError> {
     downtimes::ensure_enabled()?;
-    ack::authorize(target, actor, Act::Mute)
+    ack::authorize(target, caller, Act::Unmute)
         .await
         .map_err(MuteError::from)?;
-    let after = end_seen_quick_mute(target, downtime_id, version, actor, idle).await?;
+    let after = end_seen_quick_mute(target, downtime_id, version, &caller.email, idle).await?;
     lifecycle::on_view_changed(&target.org_id, &target.alert_id, single_group(&after)).await;
     Ok(after)
 }

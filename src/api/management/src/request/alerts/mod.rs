@@ -13,6 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod ack;
+pub mod auto_investigate;
+pub mod change_events;
+pub mod chart_render;
+pub mod deduplication;
+pub mod destinations;
+pub mod external_events;
+pub mod history;
+#[cfg(feature = "enterprise")]
+pub mod history_summary;
+pub mod incident_brief;
+pub mod incident_declare;
+pub mod incident_feedback;
+pub mod incident_integrations;
+pub mod incident_mitigations;
+pub mod incident_page_team;
+pub mod incident_recovery_checks;
+pub mod incidents;
+pub mod leases;
+pub mod mute;
+pub mod rca_runs_org;
+#[cfg(feature = "cloud")]
+pub mod slack_oauth;
+pub mod templates;
+
 use std::{collections::HashMap as StdHashMap, str::FromStr};
 
 use axum::{
@@ -77,24 +102,6 @@ use crate::{
         dashboards::{get_folder, is_overwrite},
     },
 };
-
-pub mod ack;
-pub mod auto_investigate;
-pub mod chart_render;
-pub mod deduplication;
-pub mod destinations;
-pub mod external_events;
-pub mod history;
-#[cfg(feature = "enterprise")]
-pub mod history_summary;
-pub mod incident_integrations;
-pub mod incidents;
-pub mod leases;
-pub mod mute;
-pub mod rca_runs_org;
-#[cfg(feature = "cloud")]
-pub mod slack_oauth;
-pub mod templates;
 
 /// Save warning for an alert that keeps a workflow the license does not grant.
 const WORKFLOWS_LOCKED_WARNING: &str =
@@ -346,21 +353,14 @@ async fn locked_target_names(
     known_target_names(read)
 }
 
-/// Reject a `runbook_url` that is not a link.
-///
-/// Refused at save, when somebody is looking, rather than stored and left to
-/// fail at read. A runbook is read at exactly one moment — the middle of a page
-/// — and "the link does nothing" is then indistinguishable from "there is no
-/// runbook".
-///
-/// `None` clears the link and is always allowed.
-fn validate_runbook_url(url: Option<&str>) -> Result<(), Response> {
-    let Some(url) = url else {
+/// Stores the normalized `runbook_url`, `None` when blank; a link that goes nowhere is a 400.
+fn normalize_runbook_url(url: &mut Option<String>) -> Result<(), Response> {
+    let Some(raw) = url.as_deref() else {
         return Ok(());
     };
-    config::meta::alerts::alert::normalize_runbook_url(url)
-        .map(|_| ())
-        .map_err(MetaHttpResponse::bad_request)
+    *url = config::meta::alerts::alert::normalize_runbook_url(raw)
+        .map_err(MetaHttpResponse::bad_request)?;
+    Ok(())
 }
 
 /// Removes the runtime/training keys from an anomaly config's export payload, in place.
@@ -467,7 +467,7 @@ pub async fn create_alert(
     if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
         return resp;
     }
-    if let Err(resp) = validate_runbook_url(alert.runbook_url.as_deref()) {
+    if let Err(resp) = normalize_runbook_url(&mut alert.runbook_url) {
         return resp;
     }
     if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
@@ -2513,7 +2513,7 @@ pub async fn update_alert(
     if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
         return resp;
     }
-    if let Err(resp) = validate_runbook_url(alert.runbook_url.as_deref()) {
+    if let Err(resp) = normalize_runbook_url(&mut alert.runbook_url) {
         return resp;
     }
     alert.last_edited_by = Some(user_email.user_id.clone());
@@ -4889,6 +4889,23 @@ mod tests {
         known_target_names, locked_target_ids, locked_target_warnings, resolve_generate_sql,
         save_warnings, visible_alert,
     };
+
+    #[test]
+    fn a_saved_runbook_link_is_stored_normalized_and_a_blank_one_as_none() {
+        for (sent, stored) in [
+            (None, None),
+            (Some(""), None),
+            (Some("   "), None),
+            (Some(" https://wiki/rb "), Some("https://wiki/rb")),
+        ] {
+            let mut url = sent.map(str::to_string);
+            assert!(super::normalize_runbook_url(&mut url).is_ok(), "{sent:?}");
+            assert_eq!(url.as_deref(), stored, "{sent:?}");
+        }
+        let mut bad = Some("wiki/runbooks/checkout".to_string());
+        let refused = super::normalize_runbook_url(&mut bad).unwrap_err();
+        assert_eq!(refused.status(), StatusCode::BAD_REQUEST);
+    }
 
     #[cfg(not(feature = "enterprise"))]
     #[tokio::test]

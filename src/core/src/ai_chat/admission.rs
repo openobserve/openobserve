@@ -376,7 +376,14 @@ async fn admit_under_lease(turn: &NewTurn<'_>) -> Result<Model, AdmitError> {
         Err(e) => return Err(unavailable(&format!("cannot record turn {turn_id} of"), &e)),
     }
     // Every admitted turn is a new epoch, so a writer of an earlier turn is fenced.
-    let epoch = match ai_chat_sessions::bump_epoch(org_id, session_id, row.session_epoch, now).await
+    let epoch = match ai_chat_sessions::bump_epoch_for_turn(
+        org_id,
+        session_id,
+        turn_id,
+        row.session_epoch,
+        now,
+    )
+    .await
     {
         Ok(Some(epoch)) => epoch,
         outcome => {
@@ -388,9 +395,6 @@ async fn admit_under_lease(turn: &NewTurn<'_>) -> Result<Model, AdmitError> {
             return Err(unavailable("cannot start a new epoch of", &reason));
         }
     };
-    if let Err(e) = ai_chat_sessions::begin_turn(org_id, session_id, turn_id, now).await {
-        log::warn!("[AI-CHAT] cannot record the last turn of {session_id}: {e}");
-    }
     record_turn_agent(turn, &row).await;
     let (typed, _) = crate::ai_chat::projection::split_attachment_blocks(turn.prompt);
     if !typed.is_empty()
@@ -408,6 +412,7 @@ async fn admit_under_lease(turn: &NewTurn<'_>) -> Result<Model, AdmitError> {
     }
     Ok(Model {
         session_epoch: epoch,
+        last_turn_id: Some(turn_id.to_owned()),
         ..row
     })
 }

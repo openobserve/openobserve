@@ -105,8 +105,9 @@ impl FromStr for MCPMethod {
 }
 
 /// Which tools a caller may run; an AutoResolve run's token may only read.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ToolAccess {
+    #[default]
     Any,
     ReadOnly,
 }

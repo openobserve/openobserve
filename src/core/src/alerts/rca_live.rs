@@ -182,6 +182,7 @@ struct RunMark {
     updated_at: i64,
     state: String,
     has_result: bool,
+    fenced: bool,
     /// `last_committed_seq` and `updated_at` of the session row.
     session: Option<(i64, i64)>,
 }
@@ -269,7 +270,18 @@ impl PartError {
 
 impl RunSession {
     /// `row` is the run's session row, if it has one.
-    pub fn of(run: &RunRow, row: Option<SessionRow>) -> Self {
+    pub async fn of(run: &RunRow, row: Option<SessionRow>) -> Self {
+        match infra::table::rca_fence::is_fenced(run).await {
+            Ok(false) => {}
+            Ok(true) => return Self::None,
+            Err(error) => {
+                log::warn!(
+                    "[RCA] cannot classify run {}: {error}; transcript withheld",
+                    run.run_id
+                );
+                return Self::None;
+            }
+        }
         match (run.session_id.as_deref(), row) {
             (None, _) => Self::None,
             (Some(_), Some(row)) => Self::Present(Box::new(row)),
@@ -280,11 +292,14 @@ impl RunSession {
     }
 
     pub async fn load(org_id: &str, run: &RunRow) -> anyhow::Result<Self> {
+        if infra::table::rca_fence::is_fenced(run).await? {
+            return Ok(Self::None);
+        }
         let row = match run.session_id.as_deref() {
             Some(session_id) => ai_chat_sessions::get(org_id, session_id).await?,
             None => None,
         };
-        Ok(Self::of(run, row))
+        Ok(Self::of(run, row).await)
     }
 }
 
@@ -403,6 +418,12 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
             PartError::internal(format!("run {run_id} has an unknown state {}", run.state))
         })?;
 
+        if infra::table::rca_fence::is_fenced(run)
+            .await
+            .map_err(PartError::internal)?
+        {
+            return Ok(rca_run::summary_legacy(run_id, state, run_version(run)));
+        }
         if state.is_terminal() {
             // Until the record is stored, the same record built from the transcript stands in.
             if reads_session(run, state)
@@ -726,7 +747,7 @@ impl<R: TranscriptReader> LiveStream<R> {
         self.run_mark = Some(run_mark);
         self.steer_marks = Some(steer_marks);
 
-        let session = RunSession::of(&run, session_row);
+        let session = RunSession::of(&run, session_row).await;
         let summary_sent = !self.transcript_gone && !summary_reads_session(&run);
         let failure = if summary_sent {
             let summary = RunParts::new(org_id, &run, &session, &self.reader)
@@ -780,7 +801,8 @@ impl<R: TranscriptReader> LiveStream<R> {
             rows,
             transcript,
             self.spec.can_steer,
-        );
+        )
+        .await;
         self.sink.send("steering", &steering);
         self.sink.clear_error(Part::Steering);
 
@@ -817,6 +839,7 @@ impl RunMark {
             updated_at: run.updated_at,
             state: run.state.clone(),
             has_result: run.result.is_some(),
+            fenced: run.fenced,
             session: session.map(|s| (s.last_committed_seq, s.updated_at)),
         }
     }
@@ -918,8 +941,9 @@ pub fn summary_reads_session(run: &RunRow) -> bool {
 
 /// A live summary reads the session; so does an ended one until its record is stored.
 fn reads_session(run: &RunRow, state: RunState) -> bool {
-    !state.is_terminal()
-        || (run.result.is_none() && matches!(state, RunState::Failed | RunState::Cancelled))
+    !infra::table::rca_fence::row_fenced(run)
+        && (!state.is_terminal()
+            || (run.result.is_none() && matches!(state, RunState::Failed | RunState::Cancelled)))
 }
 
 fn never_started(run: &RunRow) -> bool {
@@ -1738,5 +1762,229 @@ pub(crate) mod tests {
             "Changes, Traces, Log patterns, Metrics, Converge"
         );
         assert_eq!(run_end["fix"], "resume_run");
+    }
+    async fn s19_live(read_history: bool) -> (String, String, String) {
+        let (org, inc, run_id) = live_run().await;
+        let used = if read_history {
+            json!({"history_read": true, "past_causes": ["private history"]})
+        } else {
+            json!({"history_read": false})
+        };
+        update_run(
+            &org,
+            &run_id,
+            RunUpdate {
+                context_used: Some(used),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        (org, inc, run_id)
+    }
+
+    #[tokio::test]
+    async fn fenced_completion_vs_reclassify_c_d_g_row_only_readers() {
+        if !crate::alerts::rca_runs::tests::s19_meta().await {
+            return;
+        }
+        for state in [RunState::Failed, RunState::Cancelled] {
+            let (org, inc, run_id) = s19_live(true).await;
+            alert_incidents::mark_security_case(&org, &inc)
+                .await
+                .unwrap();
+            update_run(
+                &org,
+                &run_id,
+                RunUpdate {
+                    state: Some(state),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+            update_run(
+                &org,
+                &run_id,
+                RunUpdate {
+                    final_stats_only: true,
+                    withhold_if_case: true,
+                    result: Some(record()),
+                    stats: Some(config::meta::alerts::rca_runs::RunStats {
+                        steps: Some(9),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+            let run = runs_table::get(&org, &run_id).await.unwrap().unwrap();
+            assert!(run.result.is_none());
+            let session = RunSession::load(&org, &run).await.unwrap();
+            assert!(matches!(session, RunSession::None));
+            let reader = Reader::new(hypothesis_events());
+            let parts = RunParts::new(&org, &run, &session, &reader);
+            let thread = serde_json::to_value(parts.thread(true).await.unwrap()).unwrap();
+            let summary = serde_json::to_value(parts.summary(None).await.unwrap()).unwrap();
+            assert_eq!(
+                summary,
+                serde_json::to_value(rca_run::summary_legacy(&run_id, state, run_version(&run)))
+                    .unwrap()
+            );
+            assert!(!thread.to_string().contains("hypothesis"));
+            let now = now_micros();
+            let mut live = LiveStream::new(spec(&org, &inc, Some(&run_id)), &reader, now);
+            let frames = live.tick(now).await;
+            assert!(names(&frames).contains(&"thread"));
+            assert_eq!(
+                reader.reads(),
+                0,
+                "fenced GET and live parts never read session events"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn fenced_completion_vs_reclassify_j_no_history_keeps_session() {
+        if !crate::alerts::rca_runs::tests::s19_meta().await {
+            return;
+        }
+        let (org, inc, run_id) = s19_live(false).await;
+        alert_incidents::mark_security_case(&org, &inc)
+            .await
+            .unwrap();
+        assert!(
+            complete_run(
+                &org,
+                &run_id,
+                "safe report",
+                RunUpdate {
+                    result: Some(record()),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap()
+        );
+        let run = runs_table::get(&org, &run_id).await.unwrap().unwrap();
+        assert_eq!(run.report.as_deref(), Some("safe report"));
+        assert!(run.result.is_some());
+        let session = RunSession::load(&org, &run).await.unwrap();
+        assert!(matches!(session, RunSession::Present(_)));
+        let reader = Reader::new(hypothesis_events());
+        let parts = RunParts::new(&org, &run, &session, &reader);
+        parts.thread(false).await.unwrap();
+        parts.summary(None).await.unwrap();
+        let now = now_micros();
+        let mut live = LiveStream::new(spec(&org, &inc, Some(&run_id)), &reader, now);
+        live.tick(now).await;
+        assert!(reader.reads() >= 2);
+    }
+
+    #[tokio::test]
+    async fn fenced_run_serves_no_transcript_before_and_after_end() {
+        if !crate::alerts::rca_runs::tests::s19_meta().await {
+            return;
+        }
+        let (org, inc, run_id) = s19_live(true).await;
+        update_run(
+            &org,
+            &run_id,
+            RunUpdate {
+                state: Some(RunState::WaitingInput),
+                pending_question_id: Some(Some("private-question".into())),
+                input_deadline_at: Some(Some(now_micros() + 60 * SEC)),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let mut steer = guidance_row(
+            &org,
+            &run_id,
+            &inc,
+            "responder",
+            "Check the deploy",
+            now_micros(),
+        );
+        steer.status = SteerStatus::Read;
+        steer.agent_note = Some("private acknowledgement".into());
+        steer.acted_at = Some(now_micros());
+        steering_table::insert(&steer).await.unwrap();
+        alert_incidents::mark_security_case(&org, &inc)
+            .await
+            .unwrap();
+        for ended in [false, true] {
+            if ended {
+                update_run(
+                    &org,
+                    &run_id,
+                    RunUpdate {
+                        state: Some(RunState::Failed),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+            }
+            let run = runs_table::get(&org, &run_id).await.unwrap().unwrap();
+            let session = RunSession::load(&org, &run).await.unwrap();
+            assert!(matches!(session, RunSession::None));
+            let reader = Reader::new(hypothesis_events());
+            let parts = RunParts::new(&org, &run, &session, &reader);
+            let thread = serde_json::to_value(parts.thread(true).await.unwrap()).unwrap();
+            assert!(thread["steps"].as_array().is_none_or(Vec::is_empty));
+            parts.summary(None).await.unwrap();
+            let now = now_micros();
+            let mut live = LiveStream::new(spec(&org, &inc, Some(&run_id)), &reader, now);
+            let frames = live.tick(now).await;
+            let steering = data(&frames, "steering");
+            assert!(steering["open_question"].is_null());
+            assert!(
+                steering["items"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .all(|row| row["agent_note"].is_null() && row["acted_at"].is_null())
+            );
+            assert_eq!(reader.reads(), 0);
+            assert!(!format!("{frames:?}").contains("private"));
+        }
+    }
+    #[tokio::test]
+    async fn steering_stream_redacts_stored_acknowledgements_only_after_history() {
+        if !crate::alerts::rca_runs::tests::s19_meta().await {
+            return;
+        }
+        for read_history in [false, true] {
+            let (org, inc, run_id) = s19_live(read_history).await;
+            let mut steer = guidance_row(
+                &org,
+                &run_id,
+                &inc,
+                "responder",
+                "Check deployment",
+                now_micros(),
+            );
+            steer.status = SteerStatus::Read;
+            steer.agent_note = Some("stored acknowledgement".into());
+            steer.acted_at = Some(now_micros());
+            steering_table::insert(&steer).await.unwrap();
+            alert_incidents::mark_security_case(&org, &inc)
+                .await
+                .unwrap();
+            let reader = Reader::new(hypothesis_events());
+            let now = now_micros();
+            let mut live = LiveStream::new(spec(&org, &inc, Some(&run_id)), &reader, now);
+            let frames = live.tick(now).await;
+            let steering = data(&frames, "steering");
+            let item = &steering["items"][0];
+            assert_eq!(item["agent_note"].is_null(), read_history);
+            assert_eq!(item["acted_at"].is_null(), read_history);
+            if !read_history {
+                assert_eq!(item["agent_note"], "stored acknowledgement");
+            }
+        }
     }
 }

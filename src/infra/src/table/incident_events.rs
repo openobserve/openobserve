@@ -13,16 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::alerts::incidents::IncidentEvent;
+use std::collections::HashSet;
+
+use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter,
-    QuerySelect, Select, Set, TransactionTrait, sea_query::LockType,
+    QuerySelect, Select, Set, TransactionTrait,
+    sea_query::{Expr, LockType, Query},
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     table::entity::incident_events,
 };
+
+const CAUSE_NOTICE_DESTINATIONS: &str = "CauseNoticeDestinations";
+const REOPEN_EFFECT_COMPLETED: &str = "ReopenEffectCompleted";
+
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum ReopenEffect {
+    Workflow(String),
+    AutoReopen,
+    Repage(Option<String>),
+}
 
 /// Encode events for storage, surfacing failures instead of writing a null column.
 ///
@@ -50,8 +64,6 @@ fn encode_events(events: &[IncidentEvent]) -> Result<serde_json::Value, sea_orm:
 /// are logged at different levels — see `malformed` vs `forward_compat`. In practice
 /// `dropped` only counts entries that are not JSON objects at all.
 fn decode_events(org_id: &str, incident_id: &str, raw: &serde_json::Value) -> Vec<IncidentEvent> {
-    use config::meta::alerts::incidents::IncidentEventType;
-
     let Some(items) = raw.as_array() else {
         if !raw.is_null() {
             log::error!(
@@ -112,11 +124,44 @@ fn decode_events(org_id: &str, incident_id: &str, raw: &serde_json::Value) -> Ve
     events
 }
 
+/// An empty events row written with its incident, so its opener's `init` and a joiner's
+/// `record_alert` both find a row to lock instead of both inserting one.
+pub async fn open_empty_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    incident_id: &str,
+) -> Result<(), sea_orm::DbErr> {
+    incident_events::Entity::insert(incident_events::ActiveModel {
+        org_id: Set(org_id.to_string()),
+        incident_id: Set(incident_id.to_string()),
+        events: Set(encode_events(&[])?),
+        seq: Set(1),
+    })
+    .on_conflict(
+        sea_orm::sea_query::OnConflict::columns([
+            incident_events::Column::OrgId,
+            incident_events::Column::IncidentId,
+        ])
+        .do_nothing()
+        .to_owned(),
+    )
+    .exec_without_returning(conn)
+    .await?;
+    Ok(())
+}
+
 /// Initialize events row for a new incident with a Created event
 pub async fn init(org_id: &str, incident_id: &str) -> Result<(), sea_orm::DbErr> {
-    use config::meta::alerts::incidents::IncidentEventType;
+    init_with(get_orm_client_rw().await, org_id, incident_id).await
+}
 
-    let txn = get_orm_client_rw().await.begin().await?;
+/// [init] on a given connection, in its own transaction.
+pub async fn init_with<C: TransactionTrait>(
+    db: &C,
+    org_id: &str,
+    incident_id: &str,
+) -> Result<(), sea_orm::DbErr> {
+    let txn = db.begin().await?;
     let mut created = IncidentEvent::created();
     // A moved alert's incident is visible before its setup, so its SplitFrom may already be there.
     match locked_row(&txn, org_id, incident_id).one(&txn).await? {
@@ -134,20 +179,12 @@ pub async fn init(org_id: &str, incident_id: &str) -> Result<(), sea_orm::DbErr>
                     .iter()
                     .take_while(|e| matches!(e.event_type, IncidentEventType::SplitFrom { .. }))
                     .count();
+                created.seq = model.seq + 1;
                 events.insert(at, created);
-                let mut active: incident_events::ActiveModel = model.into();
-                active.events = Set(encode_events(&events)?);
-                active.update(&txn).await?;
+                rewrite_in(&txn, model, &events).await?;
             }
         }
-        None => {
-            let model = incident_events::ActiveModel {
-                org_id: Set(org_id.to_string()),
-                incident_id: Set(incident_id.to_string()),
-                events: Set(encode_events(&[created])?),
-            };
-            model.insert(&txn).await?;
-        }
+        None => insert_in(&txn, org_id, incident_id, vec![created]).await?,
     }
     txn.commit().await
 }
@@ -169,16 +206,207 @@ pub async fn get_with<C: ConnectionTrait>(
     org_id: &str,
     incident_id: &str,
 ) -> Result<Vec<IncidentEvent>, sea_orm::DbErr> {
-    let row = incident_events::Entity::find()
-        .filter(incident_events::Column::OrgId.eq(org_id))
-        .filter(incident_events::Column::IncidentId.eq(incident_id))
-        .one(db)
+    let row = event_row(org_id, incident_id).one(db).await?;
+    Ok(row.map_or_else(Vec::new, |model| {
+        visible_events(org_id, incident_id, &model.events)
+    }))
+}
+
+/// Holding the incident lock keeps a superseding review outside the caller's write.
+pub async fn cause_review_is_current_in(
+    txn: &DatabaseTransaction,
+    org: &str,
+    incident: &str,
+    transition_id: &str,
+) -> Result<bool, sea_orm::DbErr> {
+    if super::alert_incidents::get_locked(txn, org, incident)
+        .await?
+        .is_none()
+    {
+        return Ok(false);
+    }
+    cause_review_is_current_with(txn, org, incident, transition_id).await
+}
+
+pub async fn cause_review_is_current_with(
+    conn: &impl ConnectionTrait,
+    org: &str,
+    incident: &str,
+    transition_id: &str,
+) -> Result<bool, sea_orm::DbErr> {
+    use super::entity::alert_incidents as incidents;
+
+    let reviewed = Query::select()
+        .column(incidents::Column::Id)
+        .from(incidents::Entity)
+        .and_where(Expr::col(incidents::Column::OrgId).eq(org))
+        .and_where(Expr::col(incidents::Column::CauseReviewedAt).is_not_null())
+        .to_owned();
+    let events = event_row(org, incident)
+        .filter(incident_events::Column::IncidentId.in_subquery(reviewed))
+        .select_only()
+        .column(incident_events::Column::Events)
+        .into_tuple::<serde_json::Value>()
+        .one(conn)
         .await?;
 
-    match row {
-        Some(model) => Ok(decode_events(org_id, incident_id, &model.events)),
-        None => Ok(vec![]),
+    Ok(events
+        .as_ref()
+        .and_then(serde_json::Value::as_array)
+        .and_then(|events| {
+            events
+                .iter()
+                .rev()
+                .find(|event| event["type"].as_str() == Some("CauseReviewed"))
+        })
+        .and_then(|event| event["data"]["transition_id"].as_str())
+        == Some(transition_id))
+}
+
+pub async fn cause_notice_destinations_in(
+    txn: &DatabaseTransaction,
+    org: &str,
+    incident: &str,
+) -> Result<Option<Vec<String>>, sea_orm::DbErr> {
+    let Some(row) = event_row(org, incident).one(txn).await? else {
+        return Ok(None);
+    };
+    let destinations = decode_events(org, incident, &row.events)
+        .into_iter()
+        .find_map(|event| match event.event_type {
+            IncidentEventType::Unknown(mut raw)
+                if raw["type"].as_str() == Some(CAUSE_NOTICE_DESTINATIONS) =>
+            {
+                Some(raw["data"].take())
+            }
+            _ => None,
+        });
+    destinations
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|error| {
+            sea_orm::DbErr::Custom(format!("decode cause notice destinations: {error}"))
+        })
+}
+
+pub async fn record_cause_notice_destinations_in(
+    txn: &DatabaseTransaction,
+    org: &str,
+    incident: &str,
+    at: i64,
+    destinations: &[String],
+) -> Result<(), sea_orm::DbErr> {
+    append_in(
+        txn,
+        org,
+        incident,
+        IncidentEvent {
+            timestamp: at,
+            seq: 0,
+            event_type: IncidentEventType::Unknown(serde_json::json!({
+                "type": CAUSE_NOTICE_DESTINATIONS,
+                "data": destinations,
+            })),
+        },
+    )
+    .await
+}
+
+pub async fn completed_reopen_effects(
+    org: &str,
+    incident: &str,
+    transition_id: &str,
+) -> Result<HashSet<ReopenEffect>, sea_orm::DbErr> {
+    completed_reopen_effects_with(get_orm_client_rw().await, org, incident, transition_id).await
+}
+
+pub async fn complete_reopen_effect(
+    org: &str,
+    incident: &str,
+    transition_id: &str,
+    effect: ReopenEffect,
+) -> Result<(), sea_orm::DbErr> {
+    let txn = get_orm_client_rw().await.begin().await?;
+    claim_reopen_effect_in(&txn, org, incident, transition_id, effect).await?;
+    txn.commit().await
+}
+
+pub async fn claim_reopen_effect_in(
+    txn: &DatabaseTransaction,
+    org: &str,
+    incident: &str,
+    transition_id: &str,
+    effect: ReopenEffect,
+) -> Result<bool, sea_orm::DbErr> {
+    let model = locked_row(txn, org, incident)
+        .one(txn)
+        .await?
+        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Reopen timeline".into()))?;
+    let mut events = decode_events(org, incident, &model.events);
+    // Live unack can restart several pages, shifting which response a retry would select.
+    if events.iter().any(|event| {
+        let claimed = reopen_effect(event, transition_id);
+        claimed.as_ref() == Some(&effect)
+            || matches!(
+                (claimed, &effect),
+                (Some(ReopenEffect::Repage(_)), ReopenEffect::Repage(_))
+            )
+    }) {
+        return Ok(false);
     }
+    events.push(IncidentEvent {
+        timestamp: config::utils::time::now_micros(),
+        seq: model.seq + 1,
+        event_type: IncidentEventType::Unknown(serde_json::json!({
+            "type": REOPEN_EFFECT_COMPLETED,
+            "data": {"transition_id": transition_id, "effect": effect},
+        })),
+    });
+    rewrite_in(txn, model, &events).await?;
+    Ok(true)
+}
+
+/// An incident's events with the row's `seq`; `(vec![], 0)` when it has no row yet.
+pub async fn get_page(
+    org_id: &str,
+    incident_id: &str,
+) -> Result<(Vec<IncidentEvent>, i64), sea_orm::DbErr> {
+    get_page_with(get_orm_client_ro().await, org_id, incident_id).await
+}
+
+/// [get_page] on a given connection.
+pub async fn get_page_with<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    incident_id: &str,
+) -> Result<(Vec<IncidentEvent>, i64), sea_orm::DbErr> {
+    let row = event_row(org_id, incident_id).one(db).await?;
+    Ok(row.map_or((vec![], 0), |model| {
+        (
+            visible_events(org_id, incident_id, &model.events),
+            model.seq,
+        )
+    }))
+}
+
+/// The row's `seq` alone, without reading the events; 0 when the incident has no row yet.
+pub async fn seq(org_id: &str, incident_id: &str) -> Result<i64, sea_orm::DbErr> {
+    seq_with(get_orm_client_ro().await, org_id, incident_id).await
+}
+
+/// [seq] on a given connection.
+pub async fn seq_with<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    incident_id: &str,
+) -> Result<i64, sea_orm::DbErr> {
+    let seq = event_row(org_id, incident_id)
+        .select_only()
+        .column(incident_events::Column::Seq)
+        .into_tuple::<i64>()
+        .one(db)
+        .await?;
+    Ok(seq.unwrap_or(0))
 }
 
 /// Assemble the reconstructed timeline from authoritative incident/alert columns.
@@ -189,16 +417,15 @@ pub async fn get_with<C: ConnectionTrait>(
 /// the moment of repair.
 fn build_reconstructed_events(
     created_at: i64,
-    resolved_at: Option<i64>,
+    resolution: Option<(i64, Option<String>)>,
     alerts: impl Iterator<Item = (String, String, i64)>,
 ) -> Vec<IncidentEvent> {
-    use config::meta::alerts::incidents::IncidentEventType;
-
     let mut events = Vec::new();
 
     for (alert_id, alert_name, fired_at) in alerts {
         events.push(IncidentEvent {
             timestamp: fired_at,
+            seq: 0,
             event_type: IncidentEventType::Alert {
                 alert_id,
                 alert_name,
@@ -211,12 +438,11 @@ fn build_reconstructed_events(
         });
     }
 
-    if let Some(resolved_at) = resolved_at {
+    if let Some((resolved_at, user_id)) = resolution {
         events.push(IncidentEvent {
             timestamp: resolved_at,
-            // The acting user is not recorded on the incident row; `None` reads as
-            // system-resolved, which is the truthful choice over guessing an identity.
-            event_type: IncidentEventType::Resolved { user_id: None },
+            seq: 0,
+            event_type: IncidentEventType::Resolved { user_id },
         });
     }
 
@@ -232,6 +458,7 @@ fn build_reconstructed_events(
         0,
         IncidentEvent {
             timestamp: created_at,
+            seq: 0,
             event_type: IncidentEventType::Created,
         },
     );
@@ -264,15 +491,19 @@ pub async fn reconstruct_if_empty(
     org_id: &str,
     incident_id: &str,
 ) -> Result<Option<usize>, sea_orm::DbErr> {
-    let db = get_orm_client_rw().await;
+    reconstruct_if_empty_with(get_orm_client_rw().await, org_id, incident_id).await
+}
 
+/// [reconstruct_if_empty] on a given connection, in its own transaction.
+pub async fn reconstruct_if_empty_with<C: TransactionTrait>(
+    db: &C,
+    org_id: &str,
+    incident_id: &str,
+) -> Result<Option<usize>, sea_orm::DbErr> {
     let txn = db.begin().await?;
 
-    let row = incident_events::Entity::find()
-        .filter(incident_events::Column::OrgId.eq(org_id))
-        .filter(incident_events::Column::IncidentId.eq(incident_id))
-        .one(&txn)
-        .await?;
+    // Locked so an append landing during the rebuild waits instead of being overwritten.
+    let row = locked_row(&txn, org_id, incident_id).one(&txn).await?;
 
     // Only touch rows that are genuinely empty. Anything with surviving events is left
     // alone — a partial rebuild must never displace real history.
@@ -298,30 +529,28 @@ pub async fn reconstruct_if_empty(
         .all(&txn)
         .await?;
 
-    let events = build_reconstructed_events(
+    let resolution = incident.resolved_at.map(|at| {
+        let resolver = incident
+            .resolved_by
+            .filter(|actor| actor != super::alert_incidents::SYSTEM_RESOLVER);
+        (at, resolver)
+    });
+    let mut events = build_reconstructed_events(
         incident.created_at,
-        incident.resolved_at,
+        resolution,
         alerts
             .into_iter()
             .map(|a| (a.alert_id, a.alert_name, a.alert_fired_at)),
     );
-    let events_json = encode_events(&events)?;
     let count = events.len();
 
     match row {
         Some(model) => {
-            let mut active: incident_events::ActiveModel = model.into();
-            active.events = Set(events_json);
-            active.update(&txn).await?;
+            let seq = model.seq + 1;
+            events.iter_mut().for_each(|e| e.seq = seq);
+            rewrite_in(&txn, model, &events).await?;
         }
-        None => {
-            let model = incident_events::ActiveModel {
-                org_id: Set(org_id.to_string()),
-                incident_id: Set(incident_id.to_string()),
-                events: Set(events_json),
-            };
-            model.insert(&txn).await?;
-        }
+        None => insert_in(&txn, org_id, incident_id, events).await?,
     }
 
     txn.commit().await?;
@@ -386,8 +615,6 @@ pub async fn forget_alert_in(
     incident_id: &str,
     alert_id: &str,
 ) -> Result<(), sea_orm::DbErr> {
-    use config::meta::alerts::incidents::IncidentEventType;
-
     let Some(model) = locked_row(txn, org_id, incident_id).one(txn).await? else {
         return Ok(());
     };
@@ -407,25 +634,24 @@ pub async fn forget_alert_in(
             && !reason.is_empty()
         {
             reason.clear();
+            event.seq = model.seq + 1;
             changed = true;
         }
     }
     if !changed {
         return Ok(());
     }
-    let mut active: incident_events::ActiveModel = model.into();
-    active.events = Set(encode_events(&events)?);
-    active.update(txn).await?;
-    Ok(())
+    rewrite_in(txn, model, &events).await
 }
 
 async fn append_once_in(
     txn: &DatabaseTransaction,
     org_id: &str,
     incident_id: &str,
-    event: IncidentEvent,
+    mut event: IncidentEvent,
     resolution: bool,
 ) -> Result<(), sea_orm::DbErr> {
+    crate::race_point!("incident_events.before_row_read");
     let row = locked_row(txn, org_id, incident_id).one(txn).await?;
 
     match row {
@@ -434,24 +660,45 @@ async fn append_once_in(
             if resolution && has_resolution(&events, event.timestamp) {
                 return Ok(());
             }
+            event.seq = model.seq + 1;
             events.push(event);
-            let events_json = encode_events(&events)?;
-
-            let mut active: incident_events::ActiveModel = model.into();
-            active.events = Set(events_json);
-            active.update(txn).await?;
+            rewrite_in(txn, model, &events).await
         }
-        None => {
-            // Row doesn't exist yet (incident created before events table)
-            let events_json = encode_events(&[event])?;
-            let model = incident_events::ActiveModel {
-                org_id: Set(org_id.to_string()),
-                incident_id: Set(incident_id.to_string()),
-                events: Set(events_json),
-            };
-            model.insert(txn).await?;
-        }
+        // Row doesn't exist yet (incident created before events table)
+        None => insert_in(txn, org_id, incident_id, vec![event]).await,
     }
+}
+
+/// Writes `events` over `model`'s row and raises its `seq` by one; the caller holds the row lock.
+async fn rewrite_in<C: ConnectionTrait>(
+    conn: &C,
+    model: incident_events::Model,
+    events: &[IncidentEvent],
+) -> Result<(), sea_orm::DbErr> {
+    let seq = model.seq + 1;
+    let mut active: incident_events::ActiveModel = model.into();
+    active.events = Set(encode_events(events)?);
+    active.seq = Set(seq);
+    active.update(conn).await?;
+    Ok(())
+}
+
+/// The first write of a row: `seq` 1, stamped on every event it carries.
+async fn insert_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    incident_id: &str,
+    mut events: Vec<IncidentEvent>,
+) -> Result<(), sea_orm::DbErr> {
+    events.iter_mut().for_each(|e| e.seq = 1);
+    incident_events::ActiveModel {
+        org_id: Set(org_id.to_string()),
+        incident_id: Set(incident_id.to_string()),
+        events: Set(encode_events(&events)?),
+        seq: Set(1),
+    }
+    .insert(conn)
+    .await?;
     Ok(())
 }
 
@@ -465,15 +712,58 @@ fn has_resolution(events: &[IncidentEvent], resolved_at: i64) -> bool {
     })
 }
 
+async fn completed_reopen_effects_with(
+    db: &impl ConnectionTrait,
+    org: &str,
+    incident: &str,
+    transition_id: &str,
+) -> Result<HashSet<ReopenEffect>, sea_orm::DbErr> {
+    let row = event_row(org, incident).one(db).await?;
+    Ok(row.map_or_else(HashSet::new, |row| {
+        decode_events(org, incident, &row.events)
+            .iter()
+            .filter_map(|event| reopen_effect(event, transition_id))
+            .collect()
+    }))
+}
+
+fn reopen_effect(event: &IncidentEvent, transition_id: &str) -> Option<ReopenEffect> {
+    let IncidentEventType::Unknown(raw) = &event.event_type else {
+        return None;
+    };
+    if raw["type"].as_str() == Some(REOPEN_EFFECT_COMPLETED)
+        && raw["data"]["transition_id"].as_str() == Some(transition_id)
+    {
+        return serde_json::from_value(raw["data"]["effect"].clone()).ok();
+    }
+    None
+}
+
+fn visible_events(org: &str, incident: &str, raw: &serde_json::Value) -> Vec<IncidentEvent> {
+    let mut events = decode_events(org, incident, raw);
+    events.retain(|event| match &event.event_type {
+        IncidentEventType::Unknown(raw) => !matches!(
+            raw["type"].as_str(),
+            Some("DeclareEffects" | CAUSE_NOTICE_DESTINATIONS | REOPEN_EFFECT_COMPLETED)
+        ),
+        _ => true,
+    });
+    events
+}
+
+fn event_row(org_id: &str, incident_id: &str) -> Select<incident_events::Entity> {
+    incident_events::Entity::find()
+        .filter(incident_events::Column::OrgId.eq(org_id))
+        .filter(incident_events::Column::IncidentId.eq(incident_id))
+}
+
 /// Row lock so concurrent rewrites cannot drop each other's event; SQLite has no `FOR UPDATE`.
 fn locked_row(
     txn: &DatabaseTransaction,
     org_id: &str,
     incident_id: &str,
 ) -> Select<incident_events::Entity> {
-    let query = incident_events::Entity::find()
-        .filter(incident_events::Column::OrgId.eq(org_id))
-        .filter(incident_events::Column::IncidentId.eq(incident_id));
+    let query = event_row(org_id, incident_id);
     if txn.get_database_backend() == sea_orm::DatabaseBackend::Sqlite {
         query
     } else {
@@ -489,7 +779,18 @@ pub async fn record_alert(
     triggered_at: i64,
 ) -> Result<Option<bool>, sea_orm::DbErr> {
     let db = get_orm_client_rw().await;
+    record_alert_with(db, org_id, incident_id, alert_id, alert_name, triggered_at).await
+}
 
+/// [record_alert] on a given connection, in its own transaction.
+pub async fn record_alert_with<C: TransactionTrait>(
+    db: &C,
+    org_id: &str,
+    incident_id: &str,
+    alert_id: &str,
+    alert_name: &str,
+    triggered_at: i64,
+) -> Result<Option<bool>, sea_orm::DbErr> {
     let txn = db.begin().await?;
 
     let row = locked_row(&txn, org_id, incident_id).one(&txn).await?;
@@ -503,28 +804,20 @@ pub async fn record_alert(
         Some(model) => {
             let mut events = decode_events(org_id, incident_id, &model.events);
             let waited = config::meta::alerts::incidents::manual_reopen_awaits_firing(&events);
-            config::meta::alerts::incidents::push_alert_event(
+            let touched = config::meta::alerts::incidents::push_alert_event(
                 &mut events,
                 alert_id,
                 alert_name,
                 triggered_at,
             );
-            let events_json = encode_events(&events)?;
-
-            let mut active: incident_events::ActiveModel = model.into();
-            active.events = Set(events_json);
-            active.update(&txn).await?;
+            // A repeat firing changes its entry in place; the new seq lets a `since` reader see it.
+            events[touched].seq = model.seq + 1;
+            rewrite_in(&txn, model, &events).await?;
             waited
         }
         None => {
-            // Row doesn't exist yet
             let events = vec![IncidentEvent::alert(alert_id, alert_name, triggered_at)];
-            let model = incident_events::ActiveModel {
-                org_id: Set(org_id.to_string()),
-                incident_id: Set(incident_id.to_string()),
-                events: Set(encode_events(&events)?),
-            };
-            model.insert(&txn).await?;
+            insert_in(&txn, org_id, incident_id, events).await?;
             false
         }
     };
@@ -620,6 +913,50 @@ mod tests {
         let mut event = IncidentEvent::resolved(None);
         event.timestamp = timestamp;
         event
+    }
+
+    #[tokio::test]
+    async fn incidents_reopen_effects_are_idempotent_and_hidden() {
+        for (_, db, schema) in event_backends().await {
+            append_with(&db, "demo-org", "incident", IncidentEvent::created())
+                .await
+                .unwrap();
+            let effects = [
+                ReopenEffect::Workflow("flow".to_owned()),
+                ReopenEffect::AutoReopen,
+            ];
+            for _ in 0..2 {
+                for effect in &effects {
+                    let txn = db.begin().await.unwrap();
+                    claim_reopen_effect_in(
+                        &txn,
+                        "demo-org",
+                        "incident",
+                        "transition-1",
+                        effect.clone(),
+                    )
+                    .await
+                    .unwrap();
+                    txn.commit().await.unwrap();
+                }
+            }
+            assert_eq!(
+                completed_reopen_effects_with(&db, "demo-org", "incident", "transition-1")
+                    .await
+                    .unwrap(),
+                HashSet::from(effects),
+            );
+            assert!(
+                completed_reopen_effects_with(&db, "demo-org", "incident", "transition-2")
+                    .await
+                    .unwrap()
+                    .is_empty()
+            );
+            let (events, seq) = get_page_with(&db, "demo-org", "incident").await.unwrap();
+            assert_eq!(events.len(), 1);
+            assert_eq!(seq, 3);
+            drop_event_schema(schema).await;
+        }
     }
 
     #[tokio::test]
@@ -760,7 +1097,7 @@ mod tests {
             ("a1".to_string(), "CPU high".to_string(), 200),
         ];
 
-        let events = build_reconstructed_events(100, Some(400), alerts.into_iter());
+        let events = build_reconstructed_events(100, Some((400, None)), alerts.into_iter());
 
         let timestamps: Vec<i64> = events.iter().map(|e| e.timestamp).collect();
         assert_eq!(
@@ -809,8 +1146,11 @@ mod tests {
             ),
         ];
 
-        let events =
-            build_reconstructed_events(created_at, Some(1_785_020_636_649_257), alerts.into_iter());
+        let events = build_reconstructed_events(
+            created_at,
+            Some((1_785_020_636_649_257, None)),
+            alerts.into_iter(),
+        );
 
         assert!(
             matches!(events[0].event_type, IncidentEventType::Created),
@@ -840,7 +1180,7 @@ mod tests {
     fn test_reconstructed_events_roundtrip() {
         let events = build_reconstructed_events(
             10,
-            Some(30),
+            Some((30, None)),
             vec![("a1".to_string(), "n".to_string(), 20)].into_iter(),
         );
         let encoded = encode_events(&events).unwrap();
@@ -888,6 +1228,7 @@ mod tests {
                 org_id: Set("acme".to_string()),
                 incident_id: Set(incident_id.to_string()),
                 events: Set(seed.clone()),
+                seq: Set(1),
             }
             .insert(&db)
             .await
@@ -914,5 +1255,293 @@ mod tests {
             decode_events("acme", "new-a", &read("new-a").await).len(),
             1
         );
+    }
+
+    async fn row(db: &sea_orm::DatabaseConnection, incident_id: &str) -> incident_events::Model {
+        incident_events::Entity::find()
+            .filter(incident_events::Column::IncidentId.eq(incident_id))
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
+    fn event_seqs(model: &incident_events::Model) -> Vec<i64> {
+        decode_events(&model.org_id, &model.incident_id, &model.events)
+            .iter()
+            .map(|e| e.seq)
+            .collect()
+    }
+
+    fn comment(n: usize) -> IncidentEvent {
+        IncidentEvent::comment("someone@example.com", format!("note {n}"))
+    }
+
+    /// Every write raises `seq` once, so N appends end at N with N distinct event stamps.
+    #[tokio::test]
+    async fn seq_rises_once_per_append_and_stamps_each_event() {
+        for (backend, db, schema) in event_backends().await {
+            // SQLite has one writer, so both serial orders stand in for the race.
+            for order in [[0, 1], [1, 0]] {
+                let incident_id = format!("serial-{}", order[0]);
+                for n in order {
+                    append_with(&db, "demo-org", &incident_id, comment(n))
+                        .await
+                        .unwrap();
+                }
+                let model = row(&db, &incident_id).await;
+                assert_eq!(model.seq, 2, "{backend}");
+                assert_eq!(event_seqs(&model), vec![1, 2], "{backend}");
+                assert_eq!(seq_with(&db, "demo-org", &incident_id).await.unwrap(), 2);
+                let (events, page_seq) =
+                    get_page_with(&db, "demo-org", &incident_id).await.unwrap();
+                assert_eq!((events.len(), page_seq), (2, 2), "{backend}");
+            }
+            assert_eq!(seq_with(&db, "demo-org", "missing").await.unwrap(), 0);
+            drop_event_schema(schema).await;
+        }
+    }
+
+    /// All appenders meet before the row read, so they contend on the row lock at once.
+    #[tokio::test]
+    async fn concurrent_appends_get_distinct_seqs_on_postgres() {
+        const WRITERS: usize = 4;
+        let Some(schema) = event_schema().await else {
+            println!("postgres arm skipped: ZO_META_POSTGRES_DSN is unset");
+            return;
+        };
+        let db = schema_connection(&schema).await;
+        let backend = db.get_database_backend();
+        let table = sea_orm::Schema::new(backend).create_table_from_entity(incident_events::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        open_empty_in(&db, "demo-org", "incident").await.unwrap();
+        let race = crate::race::Barriers::new();
+        race.arm("incident_events.before_row_read", WRITERS);
+        let mut writers = Vec::new();
+        for n in 0..WRITERS {
+            let (race, conn) = (race.clone(), schema_connection(&schema).await);
+            writers.push(tokio::spawn(async move {
+                race.run(append_with(&conn, "demo-org", "incident", comment(n)))
+                    .await
+            }));
+        }
+        for writer in writers {
+            writer.await.unwrap().unwrap();
+        }
+        race.assert_all_met();
+        let model = row(&db, "incident").await;
+        assert_eq!(
+            model.seq,
+            1 + WRITERS as i64,
+            "the empty row's insert, then each append"
+        );
+        let mut seqs = event_seqs(&model);
+        seqs.sort_unstable();
+        assert_eq!(seqs, (2..=1 + WRITERS as i64).collect::<Vec<_>>());
+        drop_event_schema(Some(schema)).await;
+    }
+
+    #[tokio::test]
+    async fn init_forget_and_reconstruct_raise_seq_and_a_deduped_resolution_does_not() {
+        for (backend, db, schema) in event_backends().await {
+            let b = db.get_database_backend();
+            for stmt in [
+                sea_orm::Schema::new(b)
+                    .create_table_from_entity(crate::table::entity::alert_incidents::Entity),
+                sea_orm::Schema::new(b)
+                    .create_table_from_entity(crate::table::entity::alert_incident_alerts::Entity),
+            ] {
+                db.execute(b.build(&stmt)).await.unwrap();
+            }
+
+            init_with(&db, "demo-org", "inc").await.unwrap();
+            let model = row(&db, "inc").await;
+            assert_eq!((model.seq, event_seqs(&model)), (1, vec![1]), "{backend}");
+
+            let txn = db.begin().await.unwrap();
+            append_in(
+                &txn,
+                "demo-org",
+                "inc",
+                IncidentEvent::alert("a1", "cpu", 5),
+            )
+            .await
+            .unwrap();
+            forget_alert_in(&txn, "demo-org", "inc", "a1")
+                .await
+                .unwrap();
+            txn.commit().await.unwrap();
+            let model = row(&db, "inc").await;
+            assert_eq!((model.seq, event_seqs(&model)), (3, vec![1]), "{backend}");
+
+            let txn = db.begin().await.unwrap();
+            forget_alert_in(&txn, "demo-org", "inc", "a1")
+                .await
+                .unwrap();
+            append_once_in(&txn, "demo-org", "inc", resolution_at(100), true)
+                .await
+                .unwrap();
+            append_once_in(&txn, "demo-org", "inc", resolution_at(100), true)
+                .await
+                .unwrap();
+            txn.commit().await.unwrap();
+            assert_eq!(
+                row(&db, "inc").await.seq,
+                4,
+                "{backend}: a forget that removes nothing and the resolution's retry write nothing"
+            );
+
+            seed_incident(&db, "emptied").await;
+            open_empty_in(&db, "demo-org", "emptied").await.unwrap();
+            assert_eq!(
+                reconstruct_if_empty_with(&db, "demo-org", "emptied")
+                    .await
+                    .unwrap(),
+                Some(1),
+                "{backend}"
+            );
+            let model = row(&db, "emptied").await;
+            assert_eq!((model.seq, event_seqs(&model)), (2, vec![2]), "{backend}");
+            drop_event_schema(schema).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn a_reconstructed_resolution_keeps_its_recorded_resolver() {
+        for (backend, db, schema) in event_backends().await {
+            let b = db.get_database_backend();
+            for stmt in [
+                sea_orm::Schema::new(b)
+                    .create_table_from_entity(crate::table::entity::alert_incidents::Entity),
+                sea_orm::Schema::new(b)
+                    .create_table_from_entity(crate::table::entity::alert_incident_alerts::Entity),
+            ] {
+                db.execute(b.build(&stmt)).await.unwrap();
+            }
+            let actor = "ana@acme.io";
+            seed_incident(&db, "emptied").await;
+            crate::table::alert_incidents::update_status_by_with(
+                &db,
+                "demo-org",
+                "emptied",
+                "resolved",
+                Some(actor),
+            )
+            .await
+            .unwrap();
+            open_empty_in(&db, "demo-org", "emptied").await.unwrap();
+
+            reconstruct_if_empty_with(&db, "demo-org", "emptied")
+                .await
+                .unwrap();
+            let events = get_with(&db, "demo-org", "emptied").await.unwrap();
+            drop_event_schema(schema).await;
+            assert!(
+                events.iter().any(|event| matches!(
+                    &event.event_type,
+                    IncidentEventType::Resolved { user_id } if user_id.as_deref() == Some(actor)
+                )),
+                "{backend}: {events:?}"
+            );
+        }
+    }
+
+    /// A `since` reader holding the first firing's seq must see the repeat's count bump.
+    #[tokio::test]
+    async fn a_repeat_firing_count_bump_is_returned_by_since() {
+        for (backend, db, schema) in event_backends().await {
+            let b = db.get_database_backend();
+            for stmt in [
+                sea_orm::Schema::new(b)
+                    .create_table_from_entity(crate::table::entity::alert_incidents::Entity),
+                sea_orm::Schema::new(b)
+                    .create_table_from_entity(crate::table::entity::alert_incident_alerts::Entity),
+            ] {
+                db.execute(b.build(&stmt)).await.unwrap();
+            }
+            seed_incident(&db, "inc").await;
+            crate::table::entity::alert_incident_alerts::ActiveModel {
+                incident_id: Set("inc".to_string()),
+                alert_id: Set("a1".to_string()),
+                alert_fired_at: Set(5),
+                alert_name: Set("cpu".to_string()),
+                alert_kind: Set("scheduled".to_string()),
+                correlation_reason: Set(None),
+                created_at: Set(5),
+                resolved_at: Set(None),
+                labels: Set(None),
+                severity: Set(None),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+            init_with(&db, "demo-org", "inc").await.unwrap();
+            record_alert_with(&db, "demo-org", "inc", "a1", "cpu", 5)
+                .await
+                .unwrap();
+            let since = row(&db, "inc").await.seq;
+            record_alert_with(&db, "demo-org", "inc", "a1", "cpu", 9)
+                .await
+                .unwrap();
+            let model = row(&db, "inc").await;
+            let mut events = decode_events("demo-org", "inc", &model.events);
+            assert_eq!(
+                events.len(),
+                2,
+                "{backend}: the repeat counts into one entry"
+            );
+            events.retain(|event| event.seq > since);
+            assert_eq!(
+                events.len(),
+                1,
+                "{backend}: the bumped entry is newer than since"
+            );
+            assert!(
+                matches!(
+                    events[0].event_type,
+                    IncidentEventType::Alert { count: 2, .. }
+                ),
+                "{backend}"
+            );
+            drop_event_schema(schema).await;
+        }
+    }
+
+    async fn seed_incident(db: &sea_orm::DatabaseConnection, id: &str) {
+        crate::table::entity::alert_incidents::ActiveModel {
+            id: Set(id.to_string()),
+            org_id: Set("demo-org".to_string()),
+            status: Set("open".to_string()),
+            severity: Set("P2".to_string()),
+            group_values: Set(serde_json::json!({})),
+            key_type: Set("service".to_string()),
+            topology_context: Set(None),
+            first_alert_at: Set(10),
+            last_alert_at: Set(10),
+            resolved_at: Set(None),
+            alert_count: Set(0),
+            title: Set(None),
+            assigned_to: Set(None),
+            acknowledged_by: Set(None),
+            acknowledged_at: Set(None),
+            created_at: Set(10),
+            updated_at: Set(10),
+            muted_by_downtime_id: Set(None),
+            rca_run_id: Set(None),
+            rca_state: Set(None),
+            rca_started_at: Set(None),
+            rca_updated_at: Set(None),
+            rca_outcome: Set(None),
+            rca_confidence: Set(None),
+            rca_summary: Set(None),
+            rca_off_reason: Set(None),
+            security_case: Set(false),
+            historical: Set(false),
+            last_detection_at: Set(None),
+            ..Default::default()
+        }
+        .insert(db)
+        .await
+        .unwrap();
     }
 }

@@ -22,7 +22,7 @@ vi.mock("@/services/incidents", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
     default: {
-      list: vi.fn(),
+      listPage: vi.fn(),
       updateStatus: vi.fn(),
       acknowledge: vi.fn(),
       unacknowledge: vi.fn(),
@@ -62,7 +62,6 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
 import IncidentList from "./IncidentList.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import incidentsService from "@/services/incidents";
@@ -125,6 +124,16 @@ const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   ...overrides,
 });
 
+const DEFAULT_SORT = "last_alert_at:desc";
+/** A cursor in the server's encoding, read under `sort`. */
+const serverCursor = (sort: string) =>
+  btoa(JSON.stringify({ s: sort, v: 1, id: "x" }))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, ".");
+/** Ignore requests made before the filter or page change under test. */
+const lastParams = () => (incidentsService.listPage as any).mock.calls.at(-1)[1];
+
 // ── mount helper ───────────────────────────────────────────────────────────────
 
 function createWrapper() {
@@ -182,7 +191,7 @@ describe("IncidentList.vue", () => {
       return undefined;
     });
 
-    (incidentsService.list as any).mockResolvedValue({
+    (incidentsService.listPage as any).mockResolvedValue({
       data: {
         incidents: [
           createIncident({ id: "1", status: "open", severity: "P1" }),
@@ -260,18 +269,19 @@ describe("IncidentList.vue", () => {
   // ── Data Loading ───────────────────────────────────────────────────────────
 
   describe("Incident Data Loading", () => {
-    it("calls incidentsService.list on mount", async () => {
+    it("calls incidentsService.listPage on mount", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      expect(incidentsService.list).toHaveBeenCalled();
+      expect(incidentsService.listPage).toHaveBeenCalled();
     });
 
-    it("calls list with correct org identifier", async () => {
+    it("asks the server for one page of the active incidents", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      // Reads through incidentsQuery now, which passes the four arguments its key
-      // is built from — the fifth was always undefined.
-      expect(incidentsService.list).toHaveBeenCalledWith("default", undefined, 1000, 0);
+      expect(incidentsService.listPage).toHaveBeenCalledWith("default", {
+        status: "active",
+        limit: 20,
+      });
     });
 
     it("populates allIncidents after successful load", async () => {
@@ -287,7 +297,7 @@ describe("IncidentList.vue", () => {
     });
 
     it("handles empty incidents list", async () => {
-      (incidentsService.list as any).mockResolvedValue({
+      (incidentsService.listPage as any).mockResolvedValue({
         data: { incidents: [], total: 0 },
       });
       wrapper = createWrapper();
@@ -296,7 +306,7 @@ describe("IncidentList.vue", () => {
     });
 
     it("handles API error gracefully", async () => {
-      (incidentsService.list as any).mockRejectedValue(new Error("API Error"));
+      (incidentsService.listPage as any).mockRejectedValue(new Error("API Error"));
       wrapper = createWrapper();
       await flushPromises();
       expect(wrapper.exists()).toBe(true);
@@ -307,12 +317,12 @@ describe("IncidentList.vue", () => {
       wrapper = createWrapper();
       await flushPromises();
       vi.clearAllMocks();
-      (incidentsService.list as any).mockResolvedValue({
+      (incidentsService.listPage as any).mockResolvedValue({
         data: { incidents: [], total: 0 },
       });
       await (wrapper.vm as any).refreshIncidents();
       await flushPromises();
-      expect(incidentsService.list).toHaveBeenCalled();
+      expect(incidentsService.listPage).toHaveBeenCalled();
       expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
@@ -320,17 +330,17 @@ describe("IncidentList.vue", () => {
       wrapper = createWrapper();
       await flushPromises();
       vi.clearAllMocks();
-      (incidentsService.list as any).mockRejectedValue({ response: { status: 403 } });
+      (incidentsService.listPage as any).mockRejectedValue({ response: { status: 403 } });
       await (wrapper.vm as any).refreshIncidents();
       await flushPromises();
-      expect(incidentsService.list).toHaveBeenCalled();
+      expect(incidentsService.listPage).toHaveBeenCalled();
       expect(toast).not.toHaveBeenCalled();
     });
   });
 
   describe("Muted chip", () => {
     it("shows the chip on a list row that carries muted_by_downtime_id", async () => {
-      (incidentsService.list as any).mockResolvedValue({
+      (incidentsService.listPage as any).mockResolvedValue({
         data: {
           incidents: [
             createIncident({ id: "1", muted_by_downtime_id: "dt-1" }),
@@ -356,7 +366,7 @@ describe("IncidentList.vue", () => {
       vi.mocked(downtimesService.list).mockResolvedValue({
         data: { items: [{ id: "dt-1", name: "Deploy freeze" }], total: 600 },
       } as any);
-      (incidentsService.list as any).mockResolvedValue({
+      (incidentsService.listPage as any).mockResolvedValue({
         data: {
           incidents: [
             createIncident({ id: "1", muted_by_downtime_id: "dt-1" }),
@@ -381,83 +391,73 @@ describe("IncidentList.vue", () => {
     });
   });
 
-  // ── visibleIncidents computed ──────────────────────────────────────────────
+  // ── Server-side filters ─────────────────────────────────────────────────────
 
-  describe("visibleIncidents computed", () => {
-    it("returns all incidents when searchQuery is empty", async () => {
+  describe("Server-side filters", () => {
+    it("sends the status, severity and sort with the request", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      // Default status filter is now "active"; select "all" to see every row.
-      (wrapper.vm as any).statusFilter = "all";
-      (wrapper.vm as any).searchQuery = "";
-      expect((wrapper.vm as any).visibleIncidents).toHaveLength(3);
-    });
-
-    it("filters by title match", async () => {
-      (incidentsService.list as any).mockResolvedValue({
-        data: {
-          incidents: [
-            createIncident({ id: "1", title: "Database Crash", status: "open" }),
-            createIncident({ id: "2", title: "Network Outage", status: "open" }),
-          ],
-          total: 2,
-        },
+      wrapper.vm.statusFilter = "resolved";
+      wrapper.vm.severityFilters = ["P1", "P3"];
+      wrapper.vm.sortBy = "last_alert_at";
+      wrapper.vm.sortOrder = "asc";
+      await flushPromises();
+      expect(lastParams()).toEqual({
+        status: "resolved",
+        severity: ["P1", "P3"],
+        sort: "last_alert_at:asc",
+        limit: 20,
       });
-      wrapper = createWrapper();
-      await flushPromises();
-      (wrapper.vm as any).searchQuery = "Database";
-      const visible = (wrapper.vm as any).visibleIncidents;
-      expect(visible).toHaveLength(1);
-      expect(visible[0].title).toBe("Database Crash");
     });
 
-    it("filters by severity match", async () => {
+    it("sends no status for All", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      (wrapper.vm as any).searchQuery = "P1";
-      const visible = (wrapper.vm as any).visibleIncidents;
-      expect(visible.every((i: Incident) => i.severity === "P1")).toBe(true);
+      wrapper.vm.statusFilter = "all";
+      await flushPromises();
+      expect(lastParams().status).toBeUndefined();
     });
 
-    it("ORs two picked severity chips", async () => {
-      (incidentsService.list as any).mockResolvedValue({
+    it("sends the search as q once typing pauses", async () => {
+      vi.useFakeTimers();
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.searchQuery = "  Database ";
+      await flushPromises();
+      expect(lastParams().q).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(300);
+      await flushPromises();
+      expect(lastParams().q).toBe("Database");
+      vi.useRealTimers();
+    });
+
+    it("shows the rows the server sent without filtering them again", async () => {
+      vi.useFakeTimers();
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.searchQuery = "zzz-no-match";
+      wrapper.vm.severityFilters = ["P4"];
+      await vi.advanceTimersByTimeAsync(300);
+      await flushPromises();
+      expect(wrapper.vm.visibleIncidents.map((i: Incident) => i.id)).toEqual(["1", "2", "3"]);
+      vi.useRealTimers();
+    });
+
+    it("reads the severity cards from the server's counts", async () => {
+      (incidentsService.listPage as any).mockResolvedValue({
         data: {
-          incidents: [
-            createIncident({ id: "1", severity: "P1" }),
-            createIncident({ id: "2", severity: "P2" }),
-            createIncident({ id: "3", severity: "P3" }),
-          ],
-          total: 3,
-        },
-      });
-      wrapper = createWrapper();
-      await flushPromises();
-      (wrapper.vm as any).severityFilters = ["P1", "P3"];
-      const ids = (wrapper.vm as any).visibleIncidents.map((i: Incident) => i.id);
-      expect(ids.sort()).toEqual(["1", "3"]);
-    });
-
-    it("returns empty array when no match", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      (wrapper.vm as any).searchQuery = "zzz-no-match";
-      expect((wrapper.vm as any).visibleIncidents).toHaveLength(0);
-    });
-
-    // Row index is now OTable's built-in `show-index`; visibleIncidents no
-    // longer injects a "#" field into the data.
-
-    it("filters case-insensitively", async () => {
-      (incidentsService.list as any).mockResolvedValue({
-        data: {
-          incidents: [createIncident({ id: "1", title: "Alpha Incident", status: "open" })],
+          incidents: [createIncident({ id: "1", severity: "P1" })],
           total: 1,
+          counts_by_severity: { P1: 1, P2: 4, P3: 0, P4: 2 },
         },
       });
       wrapper = createWrapper();
       await flushPromises();
-      (wrapper.vm as any).searchQuery = "alpha";
-      expect((wrapper.vm as any).visibleIncidents).toHaveLength(1);
+      const value = (key: string) =>
+        wrapper.vm.severityStats.find((item: any) => item.key === key).value;
+      expect([value("P1"), value("P2"), value("P3"), value("P4"), value("total")]).toEqual([
+        1, 4, 0, 2, 7,
+      ]);
     });
   });
 
@@ -564,13 +564,13 @@ describe("IncidentList.vue", () => {
     it("reloads incidents after successful status update", async () => {
       const incident = (wrapper.vm as any).allIncidents[0];
       vi.clearAllMocks();
-      (incidentsService.list as any).mockResolvedValue({
+      (incidentsService.listPage as any).mockResolvedValue({
         data: { incidents: [], total: 0 },
       });
       (incidentsService.updateStatus as any).mockResolvedValue({});
       await (wrapper.vm as any).resolveIncident(incident);
       await flushPromises();
-      expect(incidentsService.list).toHaveBeenCalled();
+      expect(incidentsService.listPage).toHaveBeenCalled();
     });
 
     it("handles updateStatus error without crashing", async () => {
@@ -703,33 +703,12 @@ describe("IncidentList.vue", () => {
     });
 
     it("shows NoData in empty slot when no incidents", async () => {
-      (incidentsService.list as any).mockResolvedValue({
+      (incidentsService.listPage as any).mockResolvedValue({
         data: { incidents: [], total: 0 },
       });
       wrapper = createWrapper();
       await flushPromises();
       expect(wrapper.find('[data-test="no-data-stub"]').exists()).toBe(true);
-    });
-
-    it("search query reactively filters visibleIncidents", async () => {
-      (incidentsService.list as any).mockResolvedValue({
-        data: {
-          incidents: [
-            createIncident({ id: "1", title: "Alpha", status: "open" }),
-            createIncident({ id: "2", title: "Beta", status: "open" }),
-          ],
-          total: 2,
-        },
-      });
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect((wrapper.vm as any).visibleIncidents).toHaveLength(2);
-
-      (wrapper.vm as any).searchQuery = "Alpha";
-      await nextTick();
-
-      expect((wrapper.vm as any).visibleIncidents).toHaveLength(1);
     });
   });
 
@@ -783,10 +762,10 @@ describe("IncidentList.vue", () => {
       return wrapper.vm as any;
     };
 
-    it("shows exactly the open incidents for ?status=open, not the acknowledged ones", async () => {
+    it("asks for exactly the open incidents for ?status=open, not the acknowledged ones", async () => {
       const vm = await mountWithStatus("open");
       expect(vm.statusFilter).toBe("open");
-      expect(vm.visibleIncidents.map((i: any) => i.id)).toEqual(["1"]);
+      expect(lastParams().status).toBe("open");
     });
 
     it("strips ?status from the URL after reading it, keeping other keys", async () => {
@@ -800,7 +779,8 @@ describe("IncidentList.vue", () => {
     });
 
     it("keeps Active as open plus acknowledged and falls back to it for an unknown status", async () => {
-      expect((await mountWithStatus("active")).visibleIncidents).toHaveLength(2);
+      await mountWithStatus("active");
+      expect(lastParams().status).toBe("active");
       wrapper.unmount();
       expect((await mountWithStatus("bogus")).statusFilter).toBe("active");
     });
@@ -841,7 +821,7 @@ describe("IncidentList.vue", () => {
       store.state.incidents = { incidents: {}, isInitialized: false };
 
       expect(vm.searchQuery).toBe("");
-      expect(vm.currentPage).toBe(1);
+      expect(lastParams().cursor).toBeUndefined();
     });
 
     it("offers Open as a status toggle", async () => {
@@ -851,71 +831,262 @@ describe("IncidentList.vue", () => {
     });
   });
 
-  // ── Page persistence across navigation (Vuex-backed, like searchQuery/statusFilter) ──
+  // ── Cursor pager and URL state ──────────────────────────────────────────────
 
-  describe("currentPage persistence", () => {
-    it("defaults currentPage to 1 when no saved state exists", () => {
-      wrapper = createWrapper();
-      expect((wrapper.vm as any).currentPage).toBe(1);
-    });
+  describe("Cursor pager", () => {
+    const pages = (next: string | null) =>
+      (incidentsService.listPage as any).mockResolvedValue({
+        data: { incidents: [createIncident({ id: "1" })], total: 41, next_cursor: next },
+      });
 
-    it("restores currentPage from the Vuex incidents store on mount", () => {
-      store.state.incidents = {
-        incidents: {
-          searchQuery: "",
-          statusFilter: "active",
-          pagination: { page: 4, rowsPerPage: 20 },
-          organizationIdentifier: "default",
-        },
-        cachedData: [],
-        isInitialized: true,
-        shouldRefresh: false,
-      };
-      wrapper = createWrapper();
-      expect((wrapper.vm as any).currentPage).toBe(4);
-      store.state.incidents = { incidents: {}, isInitialized: false };
-    });
-
-    it("onPageChange updates currentPage and persists the new page to the store", async () => {
+    it("Next sends the page's cursor and Previous walks back", async () => {
+      const after: Record<string, string | null> = { first: "c1", c1: "c2", c2: null };
+      (incidentsService.listPage as any).mockImplementation(async (_org: string, params: any) => {
+        const id = params.cursor ?? "first";
+        return { data: { incidents: [createIncident({ id })], total: 3, next_cursor: after[id] } };
+      });
       wrapper = createWrapper();
       await flushPromises();
-      const dispatchSpy = store.dispatch as any;
-      dispatchSpy.mockClear();
+      const shown = () => wrapper.vm.visibleIncidents.map((i: Incident) => i.id);
+      expect(wrapper.vm.hasPreviousPage).toBe(false);
 
-      (wrapper.vm as any).onPageChange(5);
+      wrapper.vm.nextPage();
+      await flushPromises();
+      expect(lastParams().cursor).toBe("c1");
+      wrapper.vm.nextPage();
+      await flushPromises();
+      expect(shown()).toEqual(["c2"]);
+      expect(wrapper.vm.nextCursor).toBeUndefined();
 
-      expect((wrapper.vm as any).currentPage).toBe(5);
-      expect(dispatchSpy).toHaveBeenCalledWith(
-        "incidents/setIncidents",
-        expect.objectContaining({ pagination: { page: 5, rowsPerPage: 20 } }),
-      );
+      wrapper.vm.previousPage();
+      await flushPromises();
+      expect(shown()).toEqual(["c1"]);
+      wrapper.vm.previousPage();
+      await flushPromises();
+      expect(shown()).toEqual(["first"]);
+      expect(wrapper.vm.hasPreviousPage).toBe(false);
     });
 
-    it("reasserts the restored page once loading settles (TanStack auto-reset race)", async () => {
-      vi.useFakeTimers();
-      store.state.incidents = {
-        incidents: {
-          searchQuery: "",
-          statusFilter: "active",
-          pagination: { page: 3, rowsPerPage: 20 },
-          organizationIdentifier: "default",
-        },
-        cachedData: [],
-        isInitialized: true,
-        shouldRefresh: false,
-      };
+    it("has no Next on the last page and shows the total", async () => {
+      pages(null);
       wrapper = createWrapper();
-      const restorePage = vi.fn();
-      // OTable is stubbed in this suite, so plant the piece of its exposed surface the fix depends on directly onto the template ref.
-      (wrapper.vm as any).qTableRef.restorePage = restorePage;
-
       await flushPromises();
-      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
-      vi.runOnlyPendingTimers();
+      expect(wrapper.vm.nextCursor).toBeUndefined();
+      expect(wrapper.vm.total).toBe(41);
+    });
 
-      expect(restorePage).toHaveBeenCalledWith(3);
-      store.state.incidents = { incidents: {}, isInitialized: false };
-      vi.useRealTimers();
+    it("offers 20 to 200 rows and clamps a size saved above 200", async () => {
+      useListViewState("incidents", { pageSize: 500 }).pageSize = 500;
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.pageSizeOptions.map((o: any) => o.value)).toEqual([20, 50, 100, 200]);
+      expect(lastParams().limit).toBe(200);
+    });
+
+    it("reads its filters and sort from the URL", async () => {
+      router.currentRoute.value.query = {
+        sev: "P1,P2,bogus",
+        q: "checkout",
+        sort: "title:asc",
+        assignee: "me",
+        service: "checkout-api",
+        from: "100",
+        to: "200",
+      } as any;
+      wrapper = createWrapper();
+      await flushPromises();
+      router.currentRoute.value.query = {};
+      expect(lastParams()).toEqual({
+        status: "active",
+        severity: ["P1", "P2"],
+        q: "checkout",
+        sort: "title:asc",
+        assignedTo: "me",
+        service: "checkout-api",
+        startTime: 100,
+        endTime: 200,
+        limit: 20,
+      });
+    });
+
+    it("combines an explicit status link with the severity on that link", async () => {
+      const route = router.currentRoute.value;
+      const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+      try {
+        router.currentRoute.value = { ...route, query: { status: "open", sev: "P2" } };
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(lastParams()).toMatchObject({ status: "open", severity: ["P2"] });
+      } finally {
+        router.currentRoute.value = route;
+        replace.mockRestore();
+      }
+    });
+
+    it("clears a service filter set by a link when clearing filters", async () => {
+      const route = router.currentRoute.value;
+      const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+      try {
+        router.currentRoute.value = { ...route, query: { service: "absent-service" } };
+        vi.mocked(incidentsService.listPage).mockImplementation(
+          async (_org, params) =>
+            ({
+              data: {
+                incidents: params.service ? [] : [createIncident()],
+                total: params.service ? 0 : 1,
+              },
+            }) as Awaited<ReturnType<typeof incidentsService.listPage>>,
+        );
+        wrapper = createWrapper();
+        await flushPromises();
+        expect(wrapper.vm.visibleIncidents).toHaveLength(0);
+
+        wrapper.vm.clearFilters();
+        await flushPromises();
+
+        expect(lastParams().service).toBeUndefined();
+        expect(wrapper.vm.visibleIncidents).toHaveLength(1);
+      } finally {
+        router.currentRoute.value = route;
+        replace.mockRestore();
+      }
+    });
+
+    describe("a cursor restored from the URL", () => {
+      const savedStatus = (statusFilter: string) => {
+        store.state.incidents = {
+          incidents: { searchQuery: "", statusFilter, organizationIdentifier: "default" },
+          cachedData: [],
+          isInitialized: true,
+          shouldRefresh: false,
+        };
+      };
+      // Walks to page 2 under `status`, then leaves the list with its cursor in the URL.
+      const leavePageTwo = async (status: string) => {
+        const next = serverCursor(DEFAULT_SORT);
+        pages(next);
+        savedStatus(status);
+        wrapper = createWrapper();
+        await flushPromises();
+        wrapper.vm.nextPage();
+        await flushPromises();
+        expect(lastParams().cursor).toBe(next);
+        wrapper.unmount();
+        return next;
+      };
+      const remount = async (query: Record<string, string>) => {
+        const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+        router.currentRoute.value.query = query as any;
+        wrapper = createWrapper();
+        await flushPromises();
+        router.currentRoute.value.query = {};
+        store.state.incidents = { incidents: {}, isInitialized: false };
+        return replace;
+      };
+
+      it("is kept when the status, filters and sort it was read under come back", async () => {
+        const cursor = await leavePageTwo("resolved");
+        const replace = await remount({ cursor });
+        expect(wrapper.vm.statusFilter).toBe("resolved");
+        expect(lastParams().cursor).toBe(cursor);
+        expect(wrapper.vm.hasPreviousPage).toBe(true);
+        replace.mockRestore();
+      });
+
+      it("is dropped from the URL on a reload, which restores no status", async () => {
+        const cursor = await leavePageTwo("resolved");
+        resetListViewState();
+        store.state.incidents = { incidents: {}, isInitialized: false };
+        const replace = await remount({ cursor, org_identifier: "default" });
+        expect(wrapper.vm.statusFilter).toBe("active");
+        expect(wrapper.vm.hasPreviousPage).toBe(false);
+        expect(replace).toHaveBeenLastCalledWith({ query: { org_identifier: "default" } });
+        replace.mockRestore();
+      });
+
+      it("is dropped when the restored status differs", async () => {
+        const cursor = await leavePageTwo("resolved");
+        savedStatus("open");
+        const replace = await remount({ cursor });
+        expect(wrapper.vm.statusFilter).toBe("open");
+        expect(wrapper.vm.hasPreviousPage).toBe(false);
+        expect(lastParams()).toMatchObject({ status: "open", cursor: undefined });
+        replace.mockRestore();
+      });
+
+      it("is dropped when it belongs to another sort", async () => {
+        const cursor = await leavePageTwo("resolved");
+        const replace = await remount({ cursor, sort: "title:asc" });
+        expect(wrapper.vm.hasPreviousPage).toBe(false);
+        expect(lastParams()).toMatchObject({ sort: "title:asc", cursor: undefined });
+        replace.mockRestore();
+      });
+    });
+
+    it("starts over on the first page when the server refuses the cursor", async () => {
+      const next = serverCursor(DEFAULT_SORT);
+      (incidentsService.listPage as any).mockImplementation(async (_org: string, params: any) => {
+        if (params.cursor) throw { response: { status: 400 } };
+        return { data: { incidents: [createIncident({ id: "1" })], total: 2, next_cursor: next } };
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.nextPage();
+      await flushPromises();
+      expect(wrapper.vm.hasPreviousPage).toBe(false);
+      expect(wrapper.vm.visibleIncidents.map((i: Incident) => i.id)).toEqual(["1"]);
+    });
+
+    it("writes its filters, sort and cursor back to the URL, keeping other keys", async () => {
+      pages("c1");
+      const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+      router.currentRoute.value.query = { org_identifier: "default" } as any;
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.severityFilters = ["P2"];
+      wrapper.vm.sortBy = "last_alert_at";
+      wrapper.vm.sortOrder = "desc";
+      await flushPromises();
+      wrapper.vm.nextPage();
+      await flushPromises();
+      router.currentRoute.value.query = {};
+      expect(replace).toHaveBeenLastCalledWith({
+        query: {
+          org_identifier: "default",
+          sev: "P2",
+          sort: "last_alert_at:desc",
+          cursor: "c1",
+        },
+      });
+      replace.mockRestore();
+    });
+
+    it("a filter change starts over on the first page", async () => {
+      pages("c1");
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.nextPage();
+      await flushPromises();
+
+      wrapper.vm.severityFilters = ["P2"];
+      await flushPromises();
+
+      expect(lastParams().cursor).toBeUndefined();
+      expect(wrapper.vm.hasPreviousPage).toBe(false);
+    });
+
+    it("a sort change starts over on the first page", async () => {
+      pages("c1");
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.nextPage();
+      await flushPromises();
+
+      wrapper.vm.sortBy = "last_alert_at";
+      await flushPromises();
+
+      expect(lastParams().cursor).toBeUndefined();
     });
   });
 
@@ -950,7 +1121,7 @@ describe("IncidentList.vue", () => {
   describe("Service display name", () => {
     it("shows the display name in the service chip while the row keeps the key", async () => {
       const row = labelRows.differs;
-      (incidentsService.list as any).mockResolvedValue({
+      (incidentsService.listPage as any).mockResolvedValue({
         data: {
           incidents: [
             createIncident({
@@ -973,7 +1144,7 @@ describe("IncidentList.vue", () => {
     });
 
     it("leaves non-service dimensions as plain dimension chips", async () => {
-      (incidentsService.list as any).mockResolvedValue({
+      (incidentsService.listPage as any).mockResolvedValue({
         data: {
           incidents: [
             createIncident({
@@ -1016,7 +1187,7 @@ describe("IncidentList.vue", () => {
         previous: null,
       },
     });
-    const listMock = vi.mocked(incidentsService.list);
+    const listMock = vi.mocked(incidentsService.listPage);
     const triggerRcaMock = vi.mocked(incidentsService.triggerRca);
     let zoConfig: typeof store.state.zoConfig;
 
@@ -1133,16 +1304,15 @@ describe("IncidentList.vue", () => {
 
     it("RR-34: a poll refetch on page 2 keeps page 2", async () => {
       vi.useFakeTimers();
-      // 25 rows at page size 20: the live row (index 22) is on page 2.
-      const incidents = Array.from({ length: 25 }, (_, i) =>
-        createIncident({ id: `inc-${i}`, rca: i === 22 ? liveRca() : null }),
-      );
-      listMock.mockResolvedValue({ data: { incidents, total: 25 } });
+      listMock.mockResolvedValue({
+        data: { incidents: [createIncident({ id: "1" })], total: 2, next_cursor: "c1" },
+      });
       wrapper = createWrapper();
       await flushPromises();
-      const restorePage = vi.fn();
-      wrapper.vm.qTableRef.restorePage = restorePage;
-      wrapper.vm.onPageChange(2);
+      listMock.mockResolvedValue({
+        data: { incidents: [createIncident({ id: "2", rca: liveRca() })], total: 2 },
+      });
+      wrapper.vm.nextPage();
       await flushPromises();
       const listCalls = listMock.mock.calls.length;
 
@@ -1150,39 +1320,13 @@ describe("IncidentList.vue", () => {
       await flushPromises();
 
       expect(listMock.mock.calls.length).toBe(listCalls + 1);
-      expect(wrapper.vm.currentPage).toBe(2);
-      expect(restorePage).not.toHaveBeenCalledWith(1);
-      expect(wrapper.findComponent({ name: "OTable" }).props("keepPageOnDataChange")).toBe(true);
-    });
-
-    it("a filter change starts over on page 1", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.onPageChange(2);
-      await flushPromises();
-
-      wrapper.vm.severityFilters = ["P2"];
-      await flushPromises();
-
-      expect(wrapper.vm.currentPage).toBe(1);
-    });
-
-    it("a sort change starts over on page 1", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.onPageChange(2);
-      await flushPromises();
-
-      wrapper.vm.sortBy = "last_alert_at";
-      await flushPromises();
-
-      expect(wrapper.vm.currentPage).toBe(1);
+      expect(lastParams().cursor).toBe("c1");
     });
   });
 
   describe("Alerts cell", () => {
     const mountWith = async (incident: Incident) => {
-      (incidentsService.list as any).mockResolvedValue({
+      (incidentsService.listPage as any).mockResolvedValue({
         data: { incidents: [incident], total: 1 },
       });
       wrapper = createWrapper();
@@ -1254,7 +1398,7 @@ describe("IncidentList.vue", () => {
 
   describe("Dimensions cell", () => {
     const mountWith = async (group_values: Record<string, string>) => {
-      (incidentsService.list as any).mockResolvedValue({
+      (incidentsService.listPage as any).mockResolvedValue({
         data: { incidents: [createIncident({ id: "1", group_values })], total: 1 },
       });
       wrapper = createWrapper();

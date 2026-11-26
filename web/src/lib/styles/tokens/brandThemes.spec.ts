@@ -25,7 +25,7 @@
  * colour under every theme, and the sheets cannot show that.
  *
  * These cases drive the real generator through `applyThemeColors`, read the
- * palette back off the DOM, and re-resolve the four ring primitives against the
+ * palette back off the DOM, and re-resolve the ring primitives against the
  * page surface. A failure means keyboard focus is invisible under that theme;
  * the fix is a different `themeColor` in `constants/themes.ts`, or a different
  * shade behind the ring token — never a lower threshold.
@@ -56,8 +56,9 @@ const SURFACE_BASE = "--color-surface-base";
 /** SC 1.4.11: a focus indicator is a non-text contrast requirement. */
 const FOCUS_RING_MIN = 3;
 
-/** The library draws every ring with `ring-offset-surface-base`. */
+/** The page surface is the common contrast baseline across themes. */
 const FOCUS_RINGS = [
+  "--color-focus-ring",
   "--color-focus-ring-accent",
   "--color-focus-ring-danger",
   "--color-focus-ring-success",

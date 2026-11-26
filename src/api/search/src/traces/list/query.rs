@@ -15,6 +15,7 @@
 
 use std::time::Duration;
 
+pub(super) use config::meta::traces::build_trace_query;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -250,17 +251,6 @@ pub fn build_llm_trace_query(
             FROM {stream_ident}"
         )
     }
-}
-
-pub fn build_trace_query(stream_name: &str, extra_selects: &str) -> String {
-    format!(
-        "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-        min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-        (max(end_time) - min(start_time)) as zo_sql_duration, \
-        {extra_selects} \
-        FROM {}",
-        quote_identifier(stream_name)
-    )
 }
 
 pub fn build_partition_query(stream_name: &str) -> String {

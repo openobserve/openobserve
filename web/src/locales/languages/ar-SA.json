@@ -12737,6 +12737,7 @@
       "statusOpen": "مفتوح",
       "statusAcknowledged": "تم الإقرار",
       "statusResolved": "تم الحل",
+      "pagerTotal": "{count} حادث | {count} حوادث",
       "correlationServiceDiscovery": "اكتشاف الخدمة",
       "correlationPrimaryMatch": "التطابق الأساسي",
       "correlationSecondaryMatch": "التطابق الثانوي",

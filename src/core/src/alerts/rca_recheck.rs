@@ -273,6 +273,9 @@ pub(crate) async fn write(
         skip_cooldown: true,
         oncall_subjects: None,
         context_used: Some(serde_json::json!({ "same_as": ids })),
+        // No obligations: the completion below delivers the verdict directly.
+        recipients: Vec::new(),
+        page_key: None,
     })
     .await?;
     let run_id = match started {

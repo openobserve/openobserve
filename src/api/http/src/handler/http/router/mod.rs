@@ -1289,6 +1289,12 @@ pub fn basic_routes() -> Router {
                 middleware::from_fn(|req, next| require_features(&[Feature::Incidents], req, next)),
             ),
         )
+        .route(
+            "/api/v2/{org_id}/incidents/changes/{token}",
+            post(alerts::change_events::ingest_changes_url_token).route_layer(middleware::from_fn(
+                |req, next| require_features(&[Feature::Incidents], req, next),
+            )),
+        )
         .route_layer(DefaultBodyLimit::max(
             alerts::external_events::MAX_BODY_BYTES,
         ));
@@ -1837,8 +1843,19 @@ fn service_route_table() -> Router {
         // Alerts - incidents must be before alerts to avoid route conflicts
         .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents).post(alerts::incidents::create_incident))
         .route("/v2/{org_id}/alerts/incidents/stats", get(alerts::incidents::get_incident_stats))
+        .route("/v2/{org_id}/alerts/incidents/changes", post(alerts::change_events::ingest_changes).layer(DefaultBodyLimit::max(alerts::change_events::MAX_BODY_BYTES)))
         .route("/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload", get(alerts::incidents::get_external_alert_payload))
+        .route("/v2/{org_id}/alerts/incidents/declare/preview", post(alerts::incident_declare::preview))
+        .route("/v2/{org_id}/alerts/incidents/declare", post(alerts::incident_declare::declare))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/contexts", get(alerts::incident_declare::list_contexts).post(alerts::incident_declare::add_context))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/contexts/{context_id}", get(alerts::incident_declare::get_context))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/page_team", post(alerts::incident_page_team::page))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/mitigations", post(alerts::incident_mitigations::record))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/mitigations/claims", post(alerts::incident_mitigations::claim))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/mitigations/{attempt_id}", delete(alerts::incident_mitigations::retract))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/recovery_checks", get(alerts::incident_recovery_checks::get))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/recovery_checks/{check_id}", patch(alerts::incident_recovery_checks::patch).delete(alerts::incident_recovery_checks::delete))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca).delete(alerts::incidents::cancel_incident_rca))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs", get(alerts::incidents::list_incident_rca_runs))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/live_stream", get(alerts::incidents::get_incident_rca_live_stream))
@@ -1848,7 +1865,10 @@ fn service_route_table() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steering", get(alerts::incidents::get_incident_rca_steering))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume", post(alerts::incidents::resume_incident_rca_run))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary", get(alerts::incidents::get_incident_rca_summary))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback", get(alerts::incident_feedback::get_feedback).post(alerts::incident_feedback::post_feedback))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/cause/confirm", post(alerts::incident_feedback::confirm_cause))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/opened", post(alerts::incidents::mark_incident_opened))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/acknowledge", post(alerts::ack::ack_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/unacknowledge", post(alerts::ack::unack_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
@@ -2738,6 +2758,7 @@ fn search_routes_with(llm_eval: bool) -> Router {
         // A manual trigger of an anomaly alert runs detection now, and a retrain trains now.
         .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/brief", get(alerts::incident_brief::get))
 
         // Both builds register these so OSS answers 403, not 404; OFGA keys on this path segment.
         .route("/{org_id}/db_monitoring/databases", get(db_monitoring::handler::get_dbm_databases))
@@ -3799,6 +3820,7 @@ mod tests {
             ("PUT", "/api/default/alerts/deduplication/semantic-groups", 403, "Enterprise feature not available"),
             ("POST", "/api/v2/default/alerts/incidents/i1/events/comment", 403, "Not Supported"),
             ("PATCH", "/api/v2/default/alerts/incidents/i1/update", 403, "Not Supported"),
+            ("POST", "/api/v2/default/alerts/incidents/i1/opened", 403, "Not Supported"),
             ("GET", "/api/v2/default/alerts/incidents/i1/rca/runs", 403, "Not Supported"),
             ("GET", "/api/v2/default/alerts/incidents/i1/rca/runs/r1/thread", 403, "Not Supported"),
             ("GET", "/api/v2/default/alerts/incidents/i1/rca/runs/r1/summary", 403, "Not Supported"),
@@ -3819,6 +3841,11 @@ mod tests {
             ("POST", "/api/default/status_pages/notices/n1/updates", 403, "require an enterprise license"),
             ("POST", "/api/default/status_pages/notices/n1/mark_false_positive", 403, "require an enterprise license"),
             ("POST", "/api/default/status_pages/s1/domains", 403, "require an enterprise license"),
+            ("POST", "/api/v2/default/alerts/incidents/declare/preview", 403, "Not Supported"),
+            ("POST", "/api/v2/default/alerts/incidents/declare", 403, "Not Supported"),
+            ("POST", "/api/v2/default/alerts/incidents/i1/contexts", 403, "Not Supported"),
+            ("GET", "/api/v2/default/alerts/incidents/i1/contexts", 403, "Not Supported"),
+            ("GET", "/api/v2/default/alerts/incidents/i1/contexts/c1", 403, "Not Supported"),
             ("POST", "/api/v2/default/alerts/incidents", 403, "Service incidents require the enterprise build"),
             ("PUT", "/api/default/service_identity/overrides", 403, "Service versions require the enterprise build"),
             ("POST", "/api/default/service_identity/aliases", 403, "Service versions require the enterprise build"),
@@ -6604,11 +6631,14 @@ mod tests {
             "GET /v2/{org_id}/alerts",
             "GET /v2/{org_id}/alerts/history",
             "GET /v2/{org_id}/alerts/incidents",
-            "GET /v2/{org_id}/alerts/incidents/stats",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/brief",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/contexts",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/contexts/{context_id}",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/events",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback",
             "GET /v2/{org_id}/alerts/rca_runs",
             "GET /v2/{org_id}/alerts/tags",
             "GET /v2/{org_id}/alerts/{alert_id}",
