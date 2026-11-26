@@ -951,7 +951,7 @@ mod tests {
     fn credential_shaped_text_is_refused_for_every_writer() {
         assert_eq!(
             SECRET_RES.len(),
-            12,
+            18,
             "every pattern of the shared file compiles"
         );
         let token = format!("ghp_{}", "a".repeat(36));
@@ -991,6 +991,59 @@ mod tests {
                 pattern: "AWS access key"
             })
         );
+    }
+
+    #[test]
+    fn toolset_vendor_keys_are_refused_and_hashes_are_not() {
+        let (id, secret) = ("ABCDEFGHIJKLMNOPQRSTUVWX", "AB".repeat(32));
+        let (hex32, hex40) = ("0123456789abcdef".repeat(2), "0123456789".repeat(4));
+        let cases = [
+            (format!("dt0c01.{id}.{secret}"), Some("Dynatrace token")),
+            (format!("dt0s16.ABCDEFGH.{secret}"), Some("Dynatrace token")),
+            (format!("dt0s02.ABCDEFGH.{secret}"), Some("Dynatrace token")),
+            (
+                format!("ddapp_{}", "a1".repeat(17)),
+                Some("Datadog application key"),
+            ),
+            (
+                format!("ddpat_{}", "x9".repeat(16)),
+                Some("Datadog access token"),
+            ),
+            (
+                format!("ddsat_{}", "y8".repeat(16)),
+                Some("Datadog access token"),
+            ),
+            (format!("DD_API_KEY: {hex32}"), Some("Datadog key")),
+            (format!("DD_APPLICATION_KEY={hex40}"), Some("Datadog key")),
+            (format!("datadog app key = '{hex40}'"), Some("Datadog key")),
+            (
+                format!("glsa_{}_0a1b2c3d", "a".repeat(32)),
+                Some("Grafana service account token"),
+            ),
+            (
+                format!("glc_{}", "Zm9v".repeat(10)),
+                Some("Grafana Cloud token"),
+            ),
+            (
+                format!("eyJrIjoi{}", "QWxh".repeat(20)),
+                Some("Grafana API key"),
+            ),
+            (
+                format!("client_secret: {}", "q".repeat(20)),
+                Some("key, token or password value"),
+            ),
+            (format!("commit {hex40} fixed it"), None),
+            (format!("md5 {hex32}"), None),
+            ("dd if=/dev/zero of=x bs=1M".to_string(), None),
+            (
+                "datadog-prod: the metrics backend, 3 services".to_string(),
+                None,
+            ),
+            ("max_tokens = 4096".to_string(), None),
+        ];
+        for (text, expected) in cases {
+            assert_eq!(secret_pattern(&text), expected, "{text}");
+        }
     }
 
     #[test]
