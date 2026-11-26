@@ -485,6 +485,14 @@ pub struct AgentToolsetList {
     pub toolsets: Vec<AgentToolset>,
 }
 
+/// What a `PUT` stores, and the secrets it kept and replaced (names only).
+#[derive(Debug, PartialEq)]
+struct UpdatedData {
+    data: Option<String>,
+    kept: Vec<String>,
+    replaced: Vec<String>,
+}
+
 // ---------------------------------------------------------------------------
 // Create
 // ---------------------------------------------------------------------------
@@ -1265,14 +1273,6 @@ fn mark_renames(org_names: &[String], toolsets: &mut [ToolsetResponse]) {
     for toolset in toolsets {
         toolset.rename_needed = colliding.contains(&normalize_tool_name(&toolset.name));
     }
-}
-
-/// What a `PUT` stores, and the secrets it kept and replaced (names only).
-#[derive(Debug, PartialEq)]
-struct UpdatedData {
-    data: Option<String>,
-    kept: Vec<String>,
-    replaced: Vec<String>,
 }
 
 /// The `data` a `PUT` stores: the request's `data` merged over the stored one, then validated.
