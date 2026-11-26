@@ -43,7 +43,7 @@ use tantivy::{
 use super::physical::{
     conjunction, create_like_expr_with_not_null, create_str_match_expr, disjunction,
     get_physical_column_name, get_physical_value, get_scalar_value, is_alphanumeric,
-    is_physical_column, is_physical_value,
+    is_physical_column, is_physical_value, like_contains_pattern,
 };
 use crate::datafusion::udf::{
     MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
@@ -446,12 +446,11 @@ impl Condition {
                     .trim_start_matches('*') // contains
                     .trim_end_matches('*') // prefix or contains
                     .to_string();
+                let pattern = like_contains_pattern(&value);
                 let term = if cfg.common.utf8_view_enabled {
-                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(format!(
-                        "%{value}%"
-                    )))))
+                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(pattern.clone()))))
                 } else {
-                    Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))))
+                    Arc::new(Literal::new(ScalarValue::Utf8(Some(pattern.clone()))))
                 };
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
@@ -460,9 +459,7 @@ impl Condition {
                         && let Some((_idx, schema_field)) = schema.column_with_name(field)
                         && schema_field.data_type() == &DataType::LargeUtf8
                     {
-                        Arc::new(Literal::new(ScalarValue::LargeUtf8(Some(format!(
-                            "%{value}%"
-                        )))))
+                        Arc::new(Literal::new(ScalarValue::LargeUtf8(Some(pattern.clone()))))
                     } else {
                         term.clone()
                     };

@@ -1915,6 +1915,7 @@
     "patternCount": "Количество",
     "errorConstructingSearchQuery": "Произошла ошибка при построении поискового запроса.",
     "errorExtractingPatterns": "Ошибка извлечения шаблонов. Попробуйте еще раз.",
+    "patternsNoReadPermission": "У вас нет разрешения на чтение этого потока.",
     "errorWhileApplyingSavedView": "Ошибка при применении сохраненного представления.",
     "errorWhileExtractingStreamFields": "Ошибка при извлечении полей потока.",
     "errorWhileGeneratingHistogramData": "Ошибка при генерации данных гистограммы.",
@@ -30929,7 +30930,7 @@
         "settings": "Настройки",
         "install": "При установке",
         "destination": "Из получателя оповещений",
-        "oncall": "Из {command} oncall здесь"
+        "oncall": "С помощью {command} oncall here"
       },
       "channel": "Канал",
       "channelPlaceholder": "Поиск каналов",
@@ -30943,7 +30944,7 @@
       "editDefault": "Изменить канал по умолчанию",
       "removeConfirm": "Удалить канал по умолчанию",
       "removeTitle": "Удалить значение по умолчанию для #{channel}?",
-      "removeMessage": "Вопросы в {name} затем попадают в организацию по умолчанию каждого пользователя (её можно изменить с помощью {command} org).",
+      "removeMessage": "После этого вопросы в {name} направляются в организацию по умолчанию каждого пользователя (её можно изменить с помощью {command} org).",
       "instanceAdminOnly": "Только для администратора экземпляра",
       "ownOrgOnlyHint": "В рабочей области экземпляра каналы привязываются к вашей собственной организации",
       "claimableHint": "Непривязанные каналы и каналы, принадлежащие {org}",
