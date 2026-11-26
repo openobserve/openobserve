@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -50,6 +50,16 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
+import config from "@/aws-exports";
+import { settleAsyncParts } from "@/components/ai-assistant/__tests__/assistantPartStubs";
+import { AVAILABLE, fakeRuntime } from "@/composables/assistant/__tests__/fakeRuntime";
+import { createOpenAssistant } from "@/composables/assistant/openAssistant";
+import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
+import {
+  proposalFor,
+  resetEditorProposalsForTests,
+} from "@/composables/assistant/useEditorProposal";
+import { contextRegistry } from "@/composables/contextProviders/registry";
 
 const childEditorStub = {
   template: '<div class="stub-editor"></div>',
@@ -654,5 +664,207 @@ vi.mock("@/services/query_functions", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
     default: { list: vi.fn().mockResolvedValue({ data: { list: [] } }) },
+  });
+});
+vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiEntryButtonStub),
+);
+vi.mock("@/components/ai-assistant/shell/AssistantDock.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.assistantDockStub),
+);
+vi.mock("@/components/ai-assistant/entry/AiLabel.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiLabelStub),
+);
+vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.diffBlockStub),
+);
+
+describe("QueryEditorDialog with the revamped assistant", () => {
+  const replaceAssistantValue = vi.fn();
+
+  function setupWithAssistant(modelValue = true) {
+    const base = fakeRuntime();
+    const runtime = {
+      ...base,
+      openAssistant: createOpenAssistant({
+        store: base.store,
+        capability: () => AVAILABLE,
+        hosts: base.hosts,
+        routeName: () => "alerts",
+        routePrefersFloating: () => false,
+        pushRoute: vi.fn(),
+        lgUp: () => true,
+        viewportPx: () => 1280,
+        currentOrg: () => "org1",
+        now: () => Date.now(),
+        notify: vi.fn(),
+      }),
+    };
+    setRuntimeHandle(runtime as never);
+    const wrapper = mount(QueryEditorDialog, {
+      props: {
+        modelValue,
+        tab: "sql",
+        sqlQuery: 'SELECT * FROM "default"',
+        promqlQuery: "",
+        vrlFunction: "",
+        streamName: "default",
+        streamType: "logs",
+        columns: [],
+        period: 10,
+        multiTimeRange: [],
+        savedFunctions: [],
+        sqlQueryErrorMsg: "",
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          CodeQueryEditor: { template: "<div />" },
+          QueryEditor: { template: "<div />" },
+          UnifiedQueryEditor: {
+            template: '<div class="stub-unified-editor"><textarea /></div>',
+            props: ["query"],
+            methods: { replaceValue: replaceAssistantValue },
+          },
+          FullViewContainer: { template: "<div><slot /></div>" },
+        },
+      },
+      attachTo: document.body,
+    });
+    return { wrapper, runtime };
+  }
+
+  beforeEach(() => {
+    Object.assign(config, { isEnterprise: "true", isAiEnabled: "true" });
+    store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
+    sessionStorage.clear();
+    localStorage.clear();
+    contextRegistry.cleanup();
+    replaceAssistantValue.mockClear();
+  });
+
+  afterEach(() => {
+    resetEditorProposalsForTests();
+    setRuntimeHandle(null);
+    document.body.innerHTML = "";
+    Object.assign(config, { isEnterprise: "false", isAiEnabled: "false" });
+  });
+
+  it("offers the one Assistant toggle and registers the alert query host while open", async () => {
+    const { wrapper, runtime } = setupWithAssistant();
+    await settleAsyncParts();
+    expect(document.querySelector('[data-test="ai-entry-alert-query-ask"]')).not.toBeNull();
+    expect(document.querySelector('[data-test="menu-link-ai-item"]')).toBeNull();
+    expect(runtime.hosts.has("alert_query")).toBe(true);
+    const context = await contextRegistry.getActiveContext();
+    expect(context).toMatchObject({
+      selectedStreams: ["default"],
+      currentSQLQuery: 'SELECT * FROM "default"',
+    });
+    wrapper.unmount();
+    expect(runtime.hosts.has("alert_query")).toBe(false);
+  });
+
+  it("docks the shared shell in the dialog's body row and closes it through the toggle", async () => {
+    const { runtime } = setupWithAssistant();
+    await settleAsyncParts();
+    await runtime.openAssistant({
+      entryKind: "editor_toggle",
+      entryVerb: "ask",
+      objectKind: "alert",
+      intent: "open",
+      dockHost: "alert_query",
+      container: "docked",
+    });
+    await settleAsyncParts();
+    const dock = document.querySelector('[data-test="assistant-dock-stub"]');
+    expect(dock?.getAttribute("data-host")).toBe("alert_query");
+    expect(dock?.parentElement?.getAttribute("data-test")).toBe("query-editor-dialog-card");
+    const toggle = document.querySelector<HTMLElement>('[data-test="ai-entry-alert-query-ask"]')!;
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    toggle.click();
+    await settleAsyncParts();
+    expect(runtime.store.state.shell.placement.kind).toBe("hidden");
+  });
+
+  it("previews an Insert as a diff and lands it only on Accept, then labels it with Revert", async () => {
+    const { wrapper } = setupWithAssistant();
+    await settleAsyncParts();
+    const proposal = proposalFor("alert_query")!;
+    const handle = await proposal.propose('SELECT count(*) FROM "default"', {
+      mode: "replace",
+      provenance: { prompt: "count" },
+      canRun: true,
+    });
+    await settleAsyncParts();
+    expect(document.querySelector('[data-test="assistant-diff-block"]')).not.toBeNull();
+    expect(wrapper.emitted("update:sqlQuery")).toBeUndefined();
+    (document.querySelector('[data-test="assistant-diff-accept"]') as HTMLElement).click();
+    await expect(handle.decision).resolves.toBe("accepted");
+    await settleAsyncParts();
+    expect(wrapper.emitted("update:sqlQuery")?.at(-1)).toEqual([
+      '-- count\nSELECT count(*) FROM "default"',
+    ]);
+    expect(replaceAssistantValue).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[data-test="ai-label-editor"]')).not.toBeNull();
+    (document.querySelector('[data-test="ai-label-revert"]') as HTMLElement).click();
+    await settleAsyncParts();
+    expect(wrapper.emitted("update:sqlQuery")?.at(-1)).toEqual(['SELECT * FROM "default"']);
+    expect(document.querySelector('[data-test="ai-label-editor"]')).toBeNull();
+  });
+
+  it("remounts the diff for a second proposal, so Accept never applies text the user did not see", async () => {
+    setupWithAssistant();
+    await settleAsyncParts();
+    const proposal = proposalFor("alert_query")!;
+    const first = await proposal.propose("SELECT 1", {
+      mode: "replace",
+      provenance: { prompt: "one" },
+      canRun: false,
+    });
+    await settleAsyncParts();
+    const shown = document.querySelector('[data-test="assistant-diff-block"]');
+    await proposal.propose("SELECT 2", {
+      mode: "replace",
+      provenance: { prompt: "two" },
+      canRun: false,
+    });
+    await settleAsyncParts();
+    await expect(first.decision).resolves.toBe("discarded");
+    const now = document.querySelector('[data-test="assistant-diff-block"]');
+    expect(now).not.toBe(shown);
+    expect(now?.getAttribute("data-proposal-id")).toBe(String(proposal.pending.value!.id));
+  });
+
+  it("settles an open diff as discarded when the dialog closes, and shows nothing on reopen", async () => {
+    const { wrapper } = setupWithAssistant();
+    await settleAsyncParts();
+    const handle = await proposalFor("alert_query")!.propose("SELECT 1", {
+      mode: "replace",
+      provenance: { prompt: "one" },
+      canRun: false,
+    });
+    await wrapper.setProps({ modelValue: false });
+    await expect(handle.decision).resolves.toBe("discarded");
+    await wrapper.setProps({ modelValue: true });
+    await settleAsyncParts();
+    expect(document.querySelector('[data-test="assistant-diff-block"]')).toBeNull();
+  });
+
+  it("drops the label when the tab changes, so Revert never writes SQL into PromQL", async () => {
+    const { wrapper } = setupWithAssistant();
+    await settleAsyncParts();
+    const handle = await proposalFor("alert_query")!.propose('SELECT count(*) FROM "default"', {
+      mode: "replace",
+      provenance: { prompt: "count" },
+      canRun: false,
+    });
+    handle.accept();
+    await settleAsyncParts();
+    expect(document.querySelector('[data-test="ai-label-editor"]')).not.toBeNull();
+    await wrapper.setProps({ tab: "promql" });
+    (wrapper.vm as unknown as { localTab: string }).localTab = "promql";
+    await settleAsyncParts();
+    expect(document.querySelector('[data-test="ai-label-editor"]')).toBeNull();
   });
 });
