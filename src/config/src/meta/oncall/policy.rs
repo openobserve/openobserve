@@ -407,6 +407,9 @@ pub struct EscalationPolicy {
     /// Template override for this team's on-call messages; `None` uses each destination's.
     #[serde(default)]
     pub template: Option<String>,
+    /// A person saved this ladder, so code that regenerates it keeps its channels; never unset.
+    #[serde(default)]
+    pub saved_by_person: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -552,6 +555,7 @@ impl EscalationPolicy {
                 },
             ],
             template: None,
+            saved_by_person: false,
         }
     }
 
@@ -611,6 +615,7 @@ impl EscalationPolicy {
                 },
             ],
             template: None,
+            saved_by_person: false,
         }
     }
 

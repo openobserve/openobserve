@@ -28,6 +28,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
+import { applyOverrideConfigDefault } from "@/utils/dashboard/panelConfigDefaults";
 import {
   getLegendSeriesNames,
   type SeriesOverridePreviewSource,
@@ -221,11 +222,7 @@ export default defineComponent({
     if (!isChartMode.value) fetchColumns();
 
     onBeforeMount(() => {
-      if (isChartMode.value) return;
-      // Ensure that the override_config object is initialized in config
-      if (!dashboardPanelData.data.config.override_config) {
-        dashboardPanelData.data.config.override_config = [];
-      }
+      if (!isChartMode.value) applyOverrideConfigDefault(dashboardPanelData.data.config);
     });
 
     return {

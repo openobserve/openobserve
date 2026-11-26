@@ -58,6 +58,9 @@ SOURCE_LOCALE = "en-US"
 # so the web entry chunk does not ship them. Every reader and writer here sees one merged tree.
 SPLIT_NAMESPACES = {"siem": "security"}
 
+# Product names live only in en-US; other locales link to them with @:{'brand.x'}.
+SOURCE_ONLY_NAMESPACES = {"brand"}
+
 # Human-readable target names used in the translation prompt, keyed by the target
 # locale's filename stem (BCP-47 style, matching web/src/locales/languages/*.json).
 LANGUAGE_NAMES = {
@@ -804,8 +807,9 @@ def write_locale(locale, tree):
 
 
 def load_source():
-    """Load the English source (en-US.json plus its split namespaces)."""
-    return load_locale(SOURCE_LOCALE)
+    """Load the English source (en-US.json plus its split namespaces), minus source-only namespaces."""
+    source = load_locale(SOURCE_LOCALE)
+    return {k: v for k, v in source.items() if k not in SOURCE_ONLY_NAMESPACES}
 
 
 def load_state():

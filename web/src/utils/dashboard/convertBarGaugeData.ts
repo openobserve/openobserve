@@ -21,6 +21,7 @@ import { getFieldLabel } from "./fieldLabel";
 import { calculateWidthText } from "./chartDimensionUtils";
 import { GAUGE_EMPTY_GROUP_NAME } from "./gaugeDial";
 import { createSeriesOverrideLookup } from "./seriesOverrides";
+import { hasTopLevelOrderBy } from "./sqlOrderBy";
 import {
   echartsPaletteColor,
   getSeriesThresholds,
@@ -102,21 +103,6 @@ const toNumber = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
-};
-
-const hasTopLevelOrderBy = (sql: string): boolean => {
-  const code = sql.replace(/'(?:[^']|'')*'|--[^\n]*|\/\*[\s\S]*?\*\//g, " ");
-  const orderBy = /order\s+by\b/iy;
-  let depth = 0;
-  for (let i = 0; i < code.length; i++) {
-    if (code[i] === "(") depth++;
-    else if (code[i] === ")") depth--;
-    else if (depth === 0 && !/\w/.test(code[i - 1] ?? "")) {
-      orderBy.lastIndex = i;
-      if (orderBy.test(code)) return true;
-    }
-  }
-  return false;
 };
 
 // Derived builder fields never reach ORDER BY, so their sortBy orders nothing.

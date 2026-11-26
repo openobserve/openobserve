@@ -81,6 +81,10 @@ static ORG_PAID_OVERAGE: Lazy<RwLock<HashMap<String, bool>>> =
 /// snapshot so a write landing mid-read is kept, not reverted to the older row.
 static ORG_PAID_OVERAGE_EPOCH: AtomicU64 = AtomicU64::new(0);
 
+/// Stripe subscription id to its last period-end lookup, failed or not; see [`cached_period_end`].
+static SUBSCRIPTION_PERIOD_END: Lazy<RwLock<HashMap<String, PeriodEndLookup>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
 /// Bounded channel for deduction records pending DB flush.
 /// Capacity is generous to avoid backpressure on the hot path.
 static FLUSH_TX: Lazy<mpsc::Sender<FlushRecord>> = Lazy::new(|| {
@@ -97,6 +101,13 @@ static FLUSH_TX: Lazy<mpsc::Sender<FlushRecord>> = Lazy::new(|| {
 static FLUSH_RX: OnceLock<&'static tokio::sync::Mutex<mpsc::Receiver<FlushRecord>>> =
     OnceLock::new();
 
+/// Chat turn charges not yet settled or refunded, keyed by `(org_id, turn_id, charge_id)`.
+static PENDING_TURN_CHARGES: Lazy<RwLock<HashMap<TurnChargeKey, PendingTurnCharge>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Two requests may carry one turn id, so each charge is told apart by its own id.
+static NEXT_TURN_CHARGE: AtomicU64 = AtomicU64::new(1);
+
 /// Dedicated NATS queue for HA sync of quota deductions across nodes.
 pub const TRIAL_QUOTA_HA_QUEUE: &str = "trial_quota_ha_queue";
 
@@ -111,12 +122,27 @@ static INIT_WATERMARK: AtomicI64 = AtomicI64::new(0);
 /// The checkpoints at which quota notification emails are sent.
 const QUOTA_CHECKPOINTS: &[u8] = &[80, 90, 95, 100];
 
+// A plan change can re-anchor the period on a node the webhook missed, so even a good end expires.
+const PERIOD_END_TTL_SECS: i64 = 3600;
+
+// a failed or already-passed lookup is retried this soon, not on every usage poll
+const PERIOD_END_RETRY_SECS: i64 = 300;
+
+const STRIPE_READ_TIMEOUT: Duration = Duration::from_secs(3);
+
 /// A usage record buffered for periodic DB flush. `cost` is signed to match the
-/// counters it feeds; every producer today passes a non-negative value.
+/// counters it feeds; only a refund the DB refused passes a negative value.
 struct FlushRecord {
     org_id: String,
     feature_key: String,
     cost: i64,
+}
+
+/// One Stripe period-end lookup; `end` is `None` when it failed. Times are unix seconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PeriodEndLookup {
+    end: Option<i64>,
+    fetched_at: i64,
 }
 
 /// A free grant per org, and the unit of isolation between features. Every pool is lifetime except
@@ -569,11 +595,16 @@ pub async fn set_paid_overage_enabled_for_pool(
     org_id: &str,
     pool: TrialQuotaPool,
     enabled: bool,
+    actor: &str,
 ) -> Result<(), anyhow::Error> {
     infra::table::trial_quota_usage::set_paid_overage_enabled_for_features(
         org_id,
+        infra::table::trial_quota_usage::PaidOverageConsent {
+            pool: pool.key(),
+            enabled,
+            actor,
+        },
         pool.feature_keys(),
-        enabled,
     )
     .await?;
 
@@ -1175,6 +1206,44 @@ pub struct PaidOverageOrganizationStatus {
     pub org_id: String,
     pub enabled: bool,
     pub can_manage: bool,
+    /// Who turned paid usage on; only for a caller who can manage this org, and only while on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled_by: Option<PaidOverageActor>,
+    /// Who turned paid usage off; only for a caller who can manage this org, and only while off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disabled_by: Option<PaidOverageActor>,
+}
+
+impl PaidOverageOrganizationStatus {
+    /// Attaches the side of `row` that matches the flag, and nothing unless the caller can manage.
+    fn with_attribution(
+        mut self,
+        row: Option<&infra::table::entity::paid_overage_attribution::Model>,
+    ) -> Self {
+        // Only managers see the actor: it names a member by email.
+        let Some(row) = row.filter(|_| self.can_manage) else {
+            return self;
+        };
+        let actor = |email: &Option<String>, at: Option<i64>| {
+            Some(PaidOverageActor {
+                email: email.clone()?,
+                at: rfc3339_from_micros(at?)?,
+            })
+        };
+        if self.enabled {
+            self.enabled_by = actor(&row.enabled_by_email, row.enabled_at);
+        } else {
+            self.disabled_by = actor(&row.disabled_by_email, row.disabled_at);
+        }
+        self
+    }
+}
+
+/// The authenticated user who made a consent change, and when (RFC 3339).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct PaidOverageActor {
+    pub email: String,
+    pub at: String,
 }
 
 /// Billing eligibility attached to cumulative paid-overage state.
@@ -1210,6 +1279,84 @@ async fn can_manage_paid_overage(org_id: &str, user_email: &str) -> bool {
         crate::users::get_user(None, user_email).await,
         Some(user) if user.role == UserRole::Root
     )
+}
+
+/// Org and payer status, each gated on the caller's own manage right in that org.
+async fn assemble_paid_overage_status<M, MF, A, AF>(
+    org_id: &str,
+    pool: TrialQuotaPool,
+    resolution: PaidOverageResolution,
+    can_manage: M,
+    attribution: A,
+) -> PaidOverageStatus
+where
+    M: Fn(String) -> MF,
+    MF: std::future::Future<Output = bool>,
+    A: Fn(String) -> AF,
+    AF: std::future::Future<
+            Output = Result<
+                Option<infra::table::entity::paid_overage_attribution::Model>,
+                sea_orm::DbErr,
+            >,
+        >,
+{
+    let manages = can_manage(org_id.to_string()).await;
+    let organization = organization_status(
+        org_id,
+        resolution.organization_enabled,
+        manages,
+        &attribution,
+    )
+    .await;
+    let payer = match (resolution.payer_org_id, resolution.payer_enabled) {
+        (Some(payer_org_id), Some(enabled)) => {
+            let manages = can_manage(payer_org_id.clone()).await;
+            Some(organization_status(&payer_org_id, enabled, manages, &attribution).await)
+        }
+        _ => None,
+    };
+    PaidOverageStatus {
+        feature: pool.key().to_string(),
+        organization,
+        payer,
+        effective: resolution.effective,
+        billing_status: resolution.billing_status,
+    }
+}
+
+/// One org's consent state; the attribution is read only for a manager, and best effort.
+async fn organization_status<A, AF>(
+    org_id: &str,
+    enabled: bool,
+    can_manage: bool,
+    attribution: &A,
+) -> PaidOverageOrganizationStatus
+where
+    A: Fn(String) -> AF,
+    AF: std::future::Future<
+            Output = Result<
+                Option<infra::table::entity::paid_overage_attribution::Model>,
+                sea_orm::DbErr,
+            >,
+        >,
+{
+    let status = PaidOverageOrganizationStatus {
+        org_id: org_id.to_string(),
+        enabled,
+        can_manage,
+        enabled_by: None,
+        disabled_by: None,
+    };
+    if !can_manage {
+        return status;
+    }
+    match attribution(org_id.to_string()).await {
+        Ok(row) => status.with_attribution(row.as_ref()),
+        Err(e) => {
+            log::warn!("[TRIAL_QUOTA] paid-overage attribution read failed for org={org_id}: {e}");
+            status
+        }
+    }
 }
 
 fn paid_overage_is_effective(
@@ -1277,26 +1424,16 @@ pub async fn paid_overage_status_for_user(
     resolution: PaidOverageResolution,
     user_email: &str,
 ) -> PaidOverageStatus {
-    let organization = PaidOverageOrganizationStatus {
-        org_id: org_id.to_string(),
-        enabled: resolution.organization_enabled,
-        can_manage: can_manage_paid_overage(org_id, user_email).await,
-    };
-    let payer = match (resolution.payer_org_id, resolution.payer_enabled) {
-        (Some(payer_org_id), Some(enabled)) => Some(PaidOverageOrganizationStatus {
-            enabled,
-            can_manage: can_manage_paid_overage(&payer_org_id, user_email).await,
-            org_id: payer_org_id,
-        }),
-        _ => None,
-    };
-    PaidOverageStatus {
-        feature: pool.key().to_string(),
-        organization,
-        payer,
-        effective: resolution.effective,
-        billing_status: resolution.billing_status,
-    }
+    assemble_paid_overage_status(
+        org_id,
+        pool,
+        resolution,
+        |org: String| async move { can_manage_paid_overage(&org, user_email).await },
+        |org: String| async move {
+            infra::table::paid_overage_attribution::get(&org, pool.key()).await
+        },
+    )
+    .await
 }
 
 /// Resolve billing eligibility and cumulative consent into one public state.
@@ -1313,11 +1450,17 @@ pub async fn get_paid_overage_status(
 #[derive(Debug)]
 pub struct AiUsagePermit {
     feature: TrialQuotaFeature,
+    charge_id: Option<u64>,
 }
 
 impl AiUsagePermit {
     pub fn feature(&self) -> TrialQuotaFeature {
         self.feature
+    }
+
+    /// The held charge of [`authorize_ai_turn`], which settles or refunds only that charge.
+    pub fn charge_id(&self) -> Option<u64> {
+        self.charge_id
     }
 }
 
@@ -1334,7 +1477,7 @@ pub enum PaymentRemedy {
 #[derive(Debug, thiserror::Error)]
 pub enum AiUsageAuthorizationError {
     #[error("Paid usage requires organization consent.")]
-    PaidOverageConsentRequired(PaidOverageStatus),
+    PaidOverageConsentRequired(Box<PaidOverageStatus>),
     #[error("{message}")]
     PaymentRequired {
         message: String,
@@ -1344,6 +1487,16 @@ pub enum AiUsageAuthorizationError {
     },
     #[error("AI usage authorization is temporarily unavailable: {0}")]
     Unavailable(String),
+}
+
+type TurnChargeKey = (String, String, u64);
+
+/// One chat turn's charge, held until the turn shows content or fails before any.
+struct PendingTurnCharge {
+    user_email: String,
+    feature: TrialQuotaFeature,
+    billable: bool,
+    usage_context: AiUsageContext,
 }
 
 /// Reject a chat request that cannot be billed without consuming a free credit.
@@ -1379,7 +1532,7 @@ async fn authorize_paid_overage(
         PaidOverageBillingStatus::Eligible => {
             let status = paid_overage_status_for_user(org_id, pool, resolution, user_email).await;
             Err(AiUsageAuthorizationError::PaidOverageConsentRequired(
-                status,
+                Box::new(status),
             ))
         }
         PaidOverageBillingStatus::AdditionalCreditsRequired => {
@@ -1417,7 +1570,10 @@ pub async fn authorize_ai_usage(
     match deducted {
         Ok(_) => {
             record_free_ai_usage(org_id, usage_context, feature);
-            Ok(AiUsagePermit { feature })
+            Ok(AiUsagePermit {
+                feature,
+                charge_id: None,
+            })
         }
         Err(exhausted) => {
             authorize_paid_overage(
@@ -1428,9 +1584,119 @@ pub async fn authorize_ai_usage(
             )
             .await?;
             record_billable_ai_usage(org_id, usage_context, feature);
-            Ok(AiUsagePermit { feature })
+            Ok(AiUsagePermit {
+                feature,
+                charge_id: None,
+            })
         }
     }
+}
+
+/// [`authorize_ai_usage`] for a chat turn, held until [`settle_ai_turn`] or [`refund_ai_usage`].
+pub async fn authorize_ai_turn(
+    org_id: &str,
+    feature: TrialQuotaFeature,
+    usage_context: &AiUsageContext,
+    turn_id: &str,
+) -> Result<AiUsagePermit, AiUsageAuthorizationError> {
+    let deducted = try_deduct(org_id, feature)
+        .await
+        .map_err(|error| AiUsageAuthorizationError::Unavailable(error.to_string()))?;
+    let billable = match deducted {
+        Ok(_) => false,
+        Err(exhausted) => {
+            authorize_paid_overage(
+                org_id,
+                feature.pool(),
+                &usage_context.user_email,
+                &exhausted.to_string(),
+            )
+            .await?;
+            true
+        }
+    };
+    let charge_id = hold_turn_charge(
+        org_id,
+        turn_id,
+        PendingTurnCharge {
+            user_email: usage_context.user_email.clone(),
+            feature,
+            billable,
+            usage_context: usage_context.clone(),
+        },
+    );
+    Ok(AiUsagePermit {
+        feature,
+        charge_id: Some(charge_id),
+    })
+}
+
+/// Records a charged turn's usage once it showed content; `false` when nothing was held.
+pub fn settle_ai_turn(org_id: &str, turn_id: &str, charge_id: u64) -> bool {
+    let key = (org_id.to_string(), turn_id.to_string(), charge_id);
+    let Some(charge) = PENDING_TURN_CHARGES.write().remove(&key) else {
+        return false;
+    };
+    record_usage_internal(
+        org_id,
+        &charge.usage_context,
+        charge.feature,
+        charge.billable,
+    );
+    true
+}
+
+/// Returns the credit of a turn that failed before any content, once per charge of `turn_id`.
+pub async fn refund_ai_usage(
+    org_id: &str,
+    user_email: &str,
+    turn_id: &str,
+    charge_id: u64,
+) -> bool {
+    let Some(charge) = take_turn_charge(org_id, user_email, turn_id, charge_id) else {
+        return false;
+    };
+    // A paid charge only ever became a usage record at settle time, so dropping it is the refund.
+    if !charge.billable {
+        let cost = i64::try_from(charge.feature.cost()).unwrap_or(i64::MAX);
+        apply_to_pool_counter(org_id, charge.feature.pool(), -cost);
+        let record = (
+            org_id.to_string(),
+            charge.feature.feature_key().to_string(),
+            -cost,
+        );
+        if let Err(e) = infra::table::trial_quota_usage::batch_increment(vec![record]).await {
+            log::warn!("[TRIAL_QUOTA] refund of turn {turn_id} deferred to the flush: {e}");
+            buffer_flush(org_id, charge.feature, -cost);
+        }
+    }
+    log::info!(
+        "[TRIAL_QUOTA] refunded turn {turn_id}: org={org_id} feature={} billable={}",
+        charge.feature,
+        charge.billable
+    );
+    true
+}
+
+fn hold_turn_charge(org_id: &str, turn_id: &str, charge: PendingTurnCharge) -> u64 {
+    let charge_id = NEXT_TURN_CHARGE.fetch_add(1, Ordering::Relaxed);
+    let key = (org_id.to_string(), turn_id.to_string(), charge_id);
+    PENDING_TURN_CHARGES.write().insert(key, charge);
+    charge_id
+}
+
+fn take_turn_charge(
+    org_id: &str,
+    user_email: &str,
+    turn_id: &str,
+    charge_id: u64,
+) -> Option<PendingTurnCharge> {
+    let key = (org_id.to_string(), turn_id.to_string(), charge_id);
+    let mut pending = PENDING_TURN_CHARGES.write();
+    if pending.get(&key)?.user_email != user_email {
+        return None;
+    }
+    pending.remove(&key)
 }
 
 /// AI usage response for the API
@@ -1446,6 +1712,10 @@ pub struct AiUsageResponse {
     pub costs: AiCreditCosts,
     /// Free credits each feature used; `None` when the breakdown could not be read.
     pub used_by_feature: Option<AiCreditCosts>,
+    /// RFC 3339 instant the included credits renew; `None` for a lifetime pool.
+    pub resets_at: Option<String>,
+    /// RFC 3339 end of the subscription's current billing period; set only in `pay_as_you_go`.
+    pub billing_period_end: Option<String>,
 }
 
 /// Credits per AI feature: the configured cost of one operation, or the credits it used.
@@ -1470,7 +1740,14 @@ pub struct PoolUsageResponse {
     pub requires_additional_credits: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payer_org_id: Option<String>,
+    /// RFC 3339 instant the free grant renews; `None` for a lifetime pool.
+    #[serde(default)]
+    pub resets_at: Option<String>,
+    /// RFC 3339 end of the subscription's current billing period; set only in `pay_as_you_go`.
+    #[serde(default)]
+    pub billing_period_end: Option<String>,
 }
+
 fn pool_usage_mode(
     exhaustion_policy: Option<
         o2_enterprise::enterprise::cloud::ai_credits::AiCreditExhaustionPolicy,
@@ -1492,6 +1769,96 @@ fn pool_usage_mode(
         Some(AiCreditExhaustionPolicy::MeteredOverage) => "pay_as_you_go",
         Some(_) => "exhausted",
     }
+}
+
+/// When a pool's free grant renews: the next UTC month for the monthly pool, never otherwise.
+fn pool_resets_at(pool: TrialQuotaPool, now: chrono::DateTime<Utc>) -> Option<String> {
+    use chrono::TimeZone;
+
+    if !pool.is_monthly() {
+        return None;
+    }
+    let (year, month) = if now.month() == 12 {
+        (now.year() + 1, 1)
+    } else {
+        (now.year(), now.month() + 1)
+    };
+    Utc.with_ymd_and_hms(year, month, 1, 0, 0, 0)
+        .single()
+        .map(|at| at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+}
+
+/// The org whose subscription period `GET /ai/usage` shows: only in `pay_as_you_go`, the payer's.
+fn billing_period_org<'a>(
+    mode: &str,
+    payer_org_id: Option<&'a str>,
+    org_id: &'a str,
+) -> Option<&'a str> {
+    (mode == "pay_as_you_go").then_some(payer_org_id.unwrap_or(org_id))
+}
+
+/// Current period end of the Stripe subscription billing `billing_org`, if one can be read.
+async fn billing_period_end(billing_org: &str) -> Option<String> {
+    use o2_enterprise::enterprise::cloud::billings::{self, MeteringProvider};
+
+    let billing = billings::get_billing_by_org_id(billing_org)
+        .await
+        .inspect_err(|e| log::warn!("[TRIAL_QUOTA] billing read failed for org={billing_org}: {e}"))
+        .ok()??;
+    if billing.provider != MeteringProvider::Stripe {
+        return None;
+    }
+    let sub_id = billing.subscription_id.filter(|id| !id.is_empty())?;
+    let now = Utc::now().timestamp();
+    // Bound first so the read guard is released before the write below.
+    let cached = cached_period_end(SUBSCRIPTION_PERIOD_END.read().get(&sub_id).copied(), now);
+    let end = match cached {
+        Some(end) => end,
+        None => {
+            let end = fetch_period_end(&sub_id, billing_org).await;
+            let lookup = PeriodEndLookup {
+                end,
+                fetched_at: now,
+            };
+            SUBSCRIPTION_PERIOD_END.write().insert(sub_id, lookup);
+            end.filter(|end| *end > now)
+        }
+    }?;
+    chrono::DateTime::from_timestamp(end, 0)
+        .map(|at| at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+}
+
+/// The Stripe period end, or `None` on an error, a timeout or a zero end.
+async fn fetch_period_end(sub_id: &str, billing_org: &str) -> Option<i64> {
+    let read = o2_enterprise::enterprise::cloud::billings::get_stripe_subscription(sub_id);
+    match tokio::time::timeout(STRIPE_READ_TIMEOUT, read).await {
+        Ok(Ok(sub)) => Some(sub.current_period_end).filter(|end| *end > 0),
+        Ok(Err(e)) => {
+            log::warn!("[TRIAL_QUOTA] subscription read failed for org={billing_org}: {e}");
+            None
+        }
+        Err(_) => {
+            log::warn!("[TRIAL_QUOTA] subscription read timed out for org={billing_org}");
+            None
+        }
+    }
+}
+
+/// `None` when `lookup` must be refetched; otherwise the end to show, never one already past.
+fn cached_period_end(lookup: Option<PeriodEndLookup>, now: i64) -> Option<Option<i64>> {
+    let lookup = lookup?;
+    let ahead = lookup.end.filter(|end| *end > now);
+    let ttl = if ahead.is_some() {
+        PERIOD_END_TTL_SECS
+    } else {
+        PERIOD_END_RETRY_SECS
+    };
+    (now - lookup.fetched_at < ttl).then_some(ahead)
+}
+
+fn rfc3339_from_micros(micros: i64) -> Option<String> {
+    chrono::DateTime::from_timestamp_micros(micros)
+        .map(|at| at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
 }
 
 /// The exhaustion policy is a property of the org's billing, not of the pool, so the AI-named
@@ -1564,6 +1931,11 @@ pub async fn get_pool_usage(org_id: &str, pool: TrialQuotaPool) -> PoolUsageResp
         None
     };
     let mode = pool_usage_mode(exhaustion_policy, pool, consent_effective);
+    let payer_org_id = billing.and_then(|billing| billing.payer_org_id);
+    let billing_period_end = match billing_period_org(mode, payer_org_id.as_deref(), org_id) {
+        Some(billing_org) => billing_period_end(billing_org).await,
+        None => None,
+    };
 
     PoolUsageResponse {
         pool: pool.key().to_string(),
@@ -1572,7 +1944,9 @@ pub async fn get_pool_usage(org_id: &str, pool: TrialQuotaPool) -> PoolUsageResp
         limit,
         remaining,
         requires_additional_credits,
-        payer_org_id: billing.and_then(|billing| billing.payer_org_id),
+        payer_org_id,
+        resets_at: pool_resets_at(pool, Utc::now()),
+        billing_period_end,
     }
 }
 
@@ -1586,6 +1960,8 @@ impl From<PoolUsageResponse> for AiUsageResponse {
             requires_additional_credits: usage.requires_additional_credits,
             payer_org_id: usage.payer_org_id,
             used_by_feature: None,
+            resets_at: usage.resets_at,
+            billing_period_end: usage.billing_period_end,
             costs: AiCreditCosts {
                 chat: TrialQuotaFeature::AiChat.cost(),
                 incident: TrialQuotaFeature::NewIncident.cost(),
@@ -1621,6 +1997,27 @@ pub async fn get_usage(org_id: &str) -> AiUsageResponse {
                 }
             });
     usage
+}
+
+/// Drops this node's cached period ends, for when a Stripe webhook says a subscription changed.
+pub fn forget_billing_periods() {
+    SUBSCRIPTION_PERIOD_END.write().clear();
+}
+
+/// The `used` that [`get_pool_usage`] reports, but an error instead of the cache when the DB fails.
+pub async fn get_pool_used_from_db(
+    org_id: &str,
+    pool: TrialQuotaPool,
+) -> Result<u64, anyhow::Error> {
+    let total =
+        infra::table::trial_quota_usage::get_total_usage_for_org(org_id, pool.feature_keys())
+            .await?;
+    Ok((total.max(0) as u64).max(get_pool_used(org_id, pool)))
+}
+
+/// A lowered allowance below the pool's usage needs `force`; raising one is never refused.
+pub fn limit_is_below_usage(used: u64, current_limit: u64, new_limit: u64, force: bool) -> bool {
+    !force && new_limit < used && new_limit < current_limit
 }
 
 /// Get the current usage percentage for an org (0–100, clamped).
@@ -3133,5 +3530,359 @@ mod tests {
         let json = serde_json::to_string(&body).unwrap();
         assert!(json.contains("session_id"));
         assert!(json.contains("incident_id"));
+    }
+
+    fn held(user: &str, billable: bool) -> PendingTurnCharge {
+        PendingTurnCharge {
+            user_email: user.to_string(),
+            feature: TrialQuotaFeature::AiChat,
+            billable,
+            usage_context: AiUsageContext {
+                user_email: user.to_string(),
+                ..Default::default()
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn a_refund_returns_one_charge_of_a_turn_once() {
+        let charge = hold_turn_charge("refund-org", "t1", held("u@x", true));
+        assert!(refund_ai_usage("refund-org", "u@x", "t1", charge).await);
+        assert!(
+            !refund_ai_usage("refund-org", "u@x", "t1", charge).await,
+            "no double refund"
+        );
+        assert!(
+            !settle_ai_turn("refund-org", "t1", charge),
+            "a refunded turn records no usage"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_turn_that_showed_content_is_never_refunded() {
+        let charge = hold_turn_charge("settle-org", "t1", held("u@x", true));
+        assert!(settle_ai_turn("settle-org", "t1", charge));
+        assert!(!settle_ai_turn("settle-org", "t1", charge));
+        assert!(!refund_ai_usage("settle-org", "u@x", "t1", charge).await);
+    }
+
+    #[tokio::test]
+    async fn only_the_charged_user_is_refunded() {
+        let charge = hold_turn_charge("owner-org", "t1", held("a@x", true));
+        assert!(!refund_ai_usage("owner-org", "b@x", "t1", charge).await);
+        assert!(!refund_ai_usage("other-org", "a@x", "t1", charge).await);
+        assert!(refund_ai_usage("owner-org", "a@x", "t1", charge).await);
+    }
+
+    #[tokio::test]
+    async fn two_charges_of_one_turn_id_settle_and_refund_apart() {
+        let first = hold_turn_charge("shared-org", "t1", held("a@x", true));
+        let second = hold_turn_charge("shared-org", "t1", held("a@x", true));
+        assert_ne!(first, second);
+        assert!(refund_ai_usage("shared-org", "a@x", "t1", first).await);
+        assert!(
+            settle_ai_turn("shared-org", "t1", second),
+            "the other request's charge is untouched"
+        );
+        assert!(!settle_ai_turn("shared-org", "t1", first));
+    }
+
+    #[test]
+    fn chat_turns_are_charged_only_by_the_turn_meter() {
+        let chat = workspace_code_mentioning(&["authorize_ai_turn".to_string()])
+            .into_iter()
+            .filter(|(path, _)| path.ends_with("request/ai/chat.rs"))
+            .map(|(_, code)| code)
+            .next()
+            .expect("chat.rs charges chat turns");
+        let without_tests = chat.split("mod tests {").next().unwrap();
+        assert_eq!(without_tests.matches("authorize_ai_turn(").count(), 1);
+        // The non-streaming route charges once, after o2-ai answered with a 2xx.
+        assert_eq!(without_tests.matches("authorize_ai_usage(").count(), 1);
+        let charge = without_tests
+            .find("async fn charge(&mut self)")
+            .expect("TurnCharge::charge");
+        let call = without_tests.find("authorize_ai_turn(").unwrap();
+        assert!(
+            call > charge,
+            "authorize_ai_turn is called inside TurnCharge::charge"
+        );
+    }
+
+    fn at(rfc3339: &str) -> chrono::DateTime<Utc> {
+        chrono::DateTime::parse_from_rfc3339(rfc3339)
+            .unwrap()
+            .with_timezone(&Utc)
+    }
+
+    #[test]
+    fn the_monthly_pool_renews_at_the_next_utc_month() {
+        let pool = TrialQuotaPool::SyntheticsStatusProtocol;
+        assert_eq!(
+            pool_resets_at(pool, at("2026-10-21T13:05:00Z")).as_deref(),
+            Some("2026-11-01T00:00:00Z")
+        );
+        assert_eq!(
+            pool_resets_at(pool, at("2026-12-31T23:59:59Z")).as_deref(),
+            Some("2027-01-01T00:00:00Z")
+        );
+        assert_eq!(
+            pool_resets_at(pool, at("2026-11-01T00:00:00Z")).as_deref(),
+            Some("2026-12-01T00:00:00Z")
+        );
+    }
+
+    #[test]
+    fn lifetime_pools_never_renew() {
+        for pool in TrialQuotaPool::ALL_POOLS {
+            if !pool.is_monthly() {
+                assert_eq!(pool_resets_at(*pool, at("2026-10-21T13:05:00Z")), None);
+            }
+        }
+    }
+
+    #[test]
+    fn ai_usage_carries_both_dates_and_nulls_them_when_unknown() {
+        let pool_usage =
+            |resets_at: Option<&str>, billing_period_end: Option<&str>| PoolUsageResponse {
+                pool: "ai_credits".to_string(),
+                mode: "pay_as_you_go".to_string(),
+                used: 1200,
+                limit: 1000,
+                remaining: 0,
+                requires_additional_credits: false,
+                payer_org_id: None,
+                resets_at: resets_at.map(str::to_string),
+                billing_period_end: billing_period_end.map(str::to_string),
+            };
+        let payg: AiUsageResponse = pool_usage(None, Some("2026-11-03T00:00:00Z")).into();
+        let wire = json::to_value(&payg).unwrap();
+        assert_eq!(wire["resets_at"], json::Value::Null);
+        assert_eq!(wire["billing_period_end"], "2026-11-03T00:00:00Z");
+
+        let free: AiUsageResponse = pool_usage(None, None).into();
+        let wire = json::to_value(&free).unwrap();
+        assert!(wire.get("resets_at").is_some_and(json::Value::is_null));
+        assert!(
+            wire.get("billing_period_end")
+                .is_some_and(json::Value::is_null)
+        );
+
+        let monthly = json::to_value(pool_usage(Some("2026-11-01T00:00:00Z"), None)).unwrap();
+        assert_eq!(monthly["resets_at"], "2026-11-01T00:00:00Z");
+    }
+
+    #[test]
+    fn a_good_period_end_is_cached_until_it_passes_or_the_ttl_ends() {
+        let lookup = |end, fetched_at| Some(PeriodEndLookup { end, fetched_at });
+        let end = 100_000;
+        assert_eq!(cached_period_end(None, 0), None);
+        assert_eq!(cached_period_end(lookup(Some(end), 0), 10), Some(Some(end)));
+        assert_eq!(
+            cached_period_end(lookup(Some(end), 0), PERIOD_END_TTL_SECS),
+            None
+        );
+        // Passed but fetched recently: served as unknown, never as a past date.
+        assert_eq!(
+            cached_period_end(lookup(Some(end), end - 10), end + 1),
+            Some(None)
+        );
+    }
+
+    #[test]
+    fn a_failed_or_past_lookup_is_retried_only_after_a_short_wait() {
+        let failed = Some(PeriodEndLookup {
+            end: None,
+            fetched_at: 1_000,
+        });
+        assert_eq!(cached_period_end(failed, 1_001), Some(None));
+        assert_eq!(
+            cached_period_end(failed, 1_000 + PERIOD_END_RETRY_SECS - 1),
+            Some(None)
+        );
+        assert_eq!(
+            cached_period_end(failed, 1_000 + PERIOD_END_RETRY_SECS),
+            None
+        );
+        let past = Some(PeriodEndLookup {
+            end: Some(500),
+            fetched_at: 1_000,
+        });
+        assert_eq!(cached_period_end(past, 1_001), Some(None));
+        assert_eq!(cached_period_end(past, 1_000 + PERIOD_END_RETRY_SECS), None);
+    }
+
+    #[test]
+    fn only_pay_as_you_go_reads_a_billing_period_and_from_the_payer() {
+        assert_eq!(
+            billing_period_org("pay_as_you_go", None, "acme"),
+            Some("acme")
+        );
+        assert_eq!(
+            billing_period_org("pay_as_you_go", Some("payer"), "acme"),
+            Some("payer")
+        );
+        for mode in ["free", "consent_required", "exhausted"] {
+            assert_eq!(billing_period_org(mode, Some("payer"), "acme"), None);
+        }
+    }
+
+    #[test]
+    fn the_allowance_floor_needs_force_only_to_go_below_usage() {
+        assert!(limit_is_below_usage(500, 1000, 400, false));
+        assert!(!limit_is_below_usage(500, 1000, 400, true));
+        assert!(!limit_is_below_usage(500, 1000, 500, false));
+        assert!(!limit_is_below_usage(500, 1000, 800, false));
+        // Raising a limit that is still below usage is never refused.
+        assert!(!limit_is_below_usage(500, 100, 300, false));
+    }
+
+    fn attribution(enabled: bool) -> infra::table::entity::paid_overage_attribution::Model {
+        let at = 1_792_591_200_000_000;
+        let (enabled_by, disabled_by) = if enabled {
+            (Some("admin@acme.io".to_string()), None)
+        } else {
+            (None, Some("owner@acme.io".to_string()))
+        };
+        infra::table::entity::paid_overage_attribution::Model {
+            org_id: "acme".to_string(),
+            pool: "ai_credits".to_string(),
+            enabled_at: enabled_by.as_ref().map(|_| at),
+            enabled_by_email: enabled_by,
+            disabled_at: disabled_by.as_ref().map(|_| at),
+            disabled_by_email: disabled_by,
+        }
+    }
+
+    fn org_status(enabled: bool) -> PaidOverageOrganizationStatus {
+        PaidOverageOrganizationStatus {
+            org_id: "acme".to_string(),
+            enabled,
+            can_manage: true,
+            enabled_by: None,
+            disabled_by: None,
+        }
+    }
+
+    #[test]
+    fn an_enabled_org_shows_its_enabler_and_hides_the_revoker() {
+        let status = org_status(true).with_attribution(Some(&attribution(true)));
+        assert_eq!(
+            status.enabled_by,
+            Some(PaidOverageActor {
+                email: "admin@acme.io".to_string(),
+                at: "2026-10-21T14:00:00Z".to_string(),
+            })
+        );
+        assert_eq!(status.disabled_by, None);
+        let wire = json::to_value(&status).unwrap();
+        assert_eq!(wire["enabled_by"]["email"], "admin@acme.io");
+        assert!(wire.get("disabled_by").is_none());
+    }
+
+    #[test]
+    fn a_revoked_org_shows_the_revoker_and_no_enabler() {
+        let status = org_status(false).with_attribution(Some(&attribution(false)));
+        assert_eq!(status.enabled_by, None);
+        assert_eq!(
+            status.disabled_by.map(|actor| actor.email).as_deref(),
+            Some("owner@acme.io")
+        );
+    }
+
+    #[test]
+    fn a_caller_who_cannot_manage_sees_no_actor_on_or_off() {
+        for enabled in [true, false] {
+            let status = PaidOverageOrganizationStatus {
+                can_manage: false,
+                ..org_status(enabled)
+            }
+            .with_attribution(Some(&attribution(enabled)));
+            let wire = json::to_value(&status).unwrap();
+            assert!(wire.get("enabled_by").is_none(), "{wire}");
+            assert!(wire.get("disabled_by").is_none(), "{wire}");
+        }
+    }
+
+    fn resolution_with_payer() -> PaidOverageResolution {
+        PaidOverageResolution {
+            billing_status: PaidOverageBillingStatus::Eligible,
+            organization_enabled: true,
+            payer_org_id: Some("payer".to_string()),
+            payer_enabled: Some(true),
+            effective: true,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_payer_the_caller_cannot_manage_shows_no_actor_and_is_not_read() {
+        let reads = std::sync::Mutex::new(Vec::new());
+        let status = assemble_paid_overage_status(
+            "acme",
+            TrialQuotaPool::AiCredits,
+            resolution_with_payer(),
+            |org: String| async move { org == "acme" },
+            |org: String| {
+                reads.lock().unwrap().push(org);
+                async { Ok(Some(attribution(true))) }
+            },
+        )
+        .await;
+
+        assert_eq!(
+            status
+                .organization
+                .enabled_by
+                .map(|actor| actor.email)
+                .as_deref(),
+            Some("admin@acme.io")
+        );
+        let payer = status.payer.unwrap();
+        assert!(!payer.can_manage);
+        assert_eq!(payer.enabled_by, None);
+        assert_eq!(*reads.lock().unwrap(), vec!["acme".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn a_member_sees_no_actor_and_no_attribution_is_read() {
+        let status = assemble_paid_overage_status(
+            "acme",
+            TrialQuotaPool::AiCredits,
+            resolution_with_payer(),
+            |_: String| async { false },
+            |_: String| async { panic!("a member's view must not read attribution") },
+        )
+        .await;
+
+        let wire = json::to_value(&status).unwrap();
+        assert!(wire["organization"].get("enabled_by").is_none(), "{wire}");
+        assert!(wire["payer"].get("enabled_by").is_none(), "{wire}");
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_attribution_still_returns_the_status() {
+        let status = assemble_paid_overage_status(
+            "acme",
+            TrialQuotaPool::AiCredits,
+            resolution_with_payer(),
+            |_: String| async { true },
+            |_: String| async { Err(sea_orm::DbErr::Custom("down".to_string())) },
+        )
+        .await;
+
+        assert!(status.organization.enabled);
+        assert_eq!(status.organization.enabled_by, None);
+    }
+
+    #[test]
+    fn a_flag_without_a_recorded_actor_reports_none() {
+        let status = org_status(true).with_attribution(None);
+        assert_eq!(status.enabled_by, None);
+        // A flag that disagrees with the row is never attributed to the row's actor.
+        let status = org_status(true).with_attribution(Some(&attribution(false)));
+        assert_eq!(status.enabled_by, None);
+        assert_eq!(status.disabled_by, None);
+        let wire = json::to_value(&status).unwrap();
+        assert!(wire.get("enabled_by").is_none());
     }
 }

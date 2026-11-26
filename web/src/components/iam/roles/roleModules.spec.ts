@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   buildRoleModules,
   GROUP_ORDER,
+  GROUP_ORDER_V2,
   matchModule,
+  MODULE_COPY,
   moduleGroup,
   TASK_WORDS,
   type CatalogResource,
@@ -112,15 +114,15 @@ describe("buildRoleModules - grouping", () => {
   });
 
   // Synthetic Environments arrived after the group map was written; unmapped, it would sit under Other.
-  it("groups prompt protected labels with AI", () => {
+  it("groups prompt protected labels with LLM observability", () => {
     const modules = buildRoleModules([{ key: "prompt_label", parent: "", has_entities: false }]);
-    expect(modules[0].group).toBe("ai");
+    expect(modules[0].group).toBe("llmObservability");
     expect(modules[0].icon).toBe("label");
   });
 
-  it("groups prompts with AI", () => {
+  it("groups prompts with LLM observability", () => {
     const modules = buildRoleModules([{ key: "prompt", parent: "", has_entities: false }]);
-    expect(modules[0].group).toBe("ai");
+    expect(modules[0].group).toBe("llmObservability");
     expect(modules[0].icon).toBe("edit-note");
   });
 
@@ -141,9 +143,70 @@ describe("buildRoleModules - grouping", () => {
 
   it("orders modules by group", () => {
     const modules = buildRoleModules(catalogue);
-    const groupIndexes = modules.map((module) => GROUP_ORDER.indexOf(module.group));
+    const groupIndexes = modules.map((module) => GROUP_ORDER_V2.indexOf(module.group));
 
     expect(groupIndexes).toEqual([...groupIndexes].sort((a, b) => a - b));
+  });
+});
+
+describe("buildRoleModules - assistant groups", () => {
+  const ASSISTANT = ["ai", "ai_chat_share", "ai_toolsets", "mcp"];
+  const LLM = [
+    "provider",
+    "score_config",
+    "scorer",
+    "eval_job",
+    "annotation_queue",
+    "dataset",
+    "experiment",
+    "playground",
+    "pfolder",
+    "prompt",
+    "prompt_label",
+    "model_pricing",
+  ];
+  const resources: CatalogResource[] = [...ASSISTANT, ...LLM, "alert", "role"].map(
+    (key, order) => ({
+      key,
+      order,
+    }),
+  );
+
+  it("splits Assistant and LLM observability, Assistant right after Alerting", () => {
+    const modules = buildRoleModules(resources);
+    const groupOf = (key: string) => modules.find((module) => module.key === key)?.group;
+    expect(ASSISTANT.map(groupOf)).toEqual(ASSISTANT.map(() => "assistant"));
+    expect(LLM.map(groupOf)).toEqual(LLM.map(() => "llmObservability"));
+    expect(GROUP_ORDER_V2.indexOf("assistant")).toBe(GROUP_ORDER_V2.indexOf("alerting") + 1);
+    expect(GROUP_ORDER_V2.indexOf("assistant")).toBeLessThan(GROUP_ORDER_V2.indexOf("access"));
+    expect(Object.keys(MODULE_COPY).sort()).toEqual([...ASSISTANT].sort());
+  });
+
+  it("starts the order with Data and keeps Fleet before Access", () => {
+    const withFleet = [
+      { key: "fleets", has_entities: true, order: 0 },
+      ...resources,
+      { key: "stream", has_entities: true, order: 99 },
+    ];
+    const groups = buildRoleModules(withFleet).map((module) => module.group);
+    expect(groups[0]).toBe("data");
+    expect(groups.indexOf("fleet")).toBeGreaterThan(groups.lastIndexOf("llmObservability"));
+    expect(groups.indexOf("fleet")).toBeLessThan(groups.indexOf("access"));
+    expect(GROUP_ORDER_V2[0]).toBe("data");
+    expect(GROUP_ORDER_V2).toContain("fleet");
+    expect(GROUP_ORDER_V2.indexOf("fleet")).toBe(GROUP_ORDER_V2.indexOf("access") - 1);
+    expect(new Set(GROUP_ORDER_V2)).toEqual(
+      new Set([...GROUP_ORDER.filter((group) => group !== "ai"), "assistant", "llmObservability"]),
+    );
+  });
+
+  it("never reuses an Assistant icon in LLM observability", () => {
+    const modules = buildRoleModules(resources);
+    const icons = (group: string) =>
+      new Set(modules.filter((module) => module.group === group).map((module) => module.icon));
+    const shared = [...icons("assistant")].filter((icon) => icons("llmObservability").has(icon));
+    expect(shared).toEqual([]);
+    expect(modules.find((module) => module.key === "ai")?.icon).toBe("assistant-spark");
   });
 });
 

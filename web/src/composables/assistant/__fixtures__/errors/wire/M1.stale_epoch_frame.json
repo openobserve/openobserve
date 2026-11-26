@@ -1,0 +1,11 @@
+{
+  "_source": "o2-ai src/server/app.py:2135-2141",
+  "shape": "M1",
+  "body": {
+    "type": "error",
+    "message": "A newer turn of this conversation has started.",
+    "recoverable": false,
+    "category": "stale_epoch",
+    "code": "stale_epoch"
+  }
+}

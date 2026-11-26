@@ -1778,6 +1778,10 @@
         }
        }
       },
+      "query": {
+       "language": "sql",
+       "text": "SELECT 1"
+      },
       "call_id": "call_prt_t1"
      },
      {
@@ -1821,6 +1825,10 @@
         }
        }
       },
+      "query": {
+       "language": "sql",
+       "text": "SELECT 1"
+      },
       "call_id": "call_prt_t2"
      },
      {
@@ -1852,6 +1860,10 @@
         }
        }
       },
+      "query": {
+       "language": "sql",
+       "text": "SELECT 1"
+      },
       "call_id": "call_prt_t3"
      },
      {
@@ -1882,6 +1894,10 @@
          "sql": "SELECT 1"
         }
        }
+      },
+      "query": {
+       "language": "sql",
+       "text": "SELECT 1"
       },
       "call_id": "call_prt_t4"
      },
@@ -2431,10 +2447,44 @@
       "content": "hi from [internal path]"
      },
      {
+      "type": "confirmation_required",
+      "tool": "o2_delete",
+      "args": {
+       "items": [
+        {
+         "resource_type": "alert",
+         "name": "A",
+         "id": "a1",
+         "params": {}
+        }
+       ]
+      },
+      "message": "Do you really want to delete the \"A\" alert?",
+      "id": "apr_d918844213c15d67ff8d",
+      "kind": "delete",
+      "operation": "delete",
+      "destructive": true,
+      "targets": [
+       {
+        "type": "alert",
+        "id": "a1",
+        "name": "A",
+        "key": "apr_d918844213c15d67ff8d:0"
+       }
+      ],
+      "expires_at": 0,
+      "editable": false,
+      "grantable": false,
+      "user_extends_left": 10,
+      "background_extends_left": 3,
+      "call_id": "call_prt_t18"
+     },
+     {
       "type": "complete"
      }
     ],
     "error": null,
+    "error_code": null,
     "first_seq": 0,
     "last_seq": 74
    }

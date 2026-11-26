@@ -271,7 +271,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="p-2"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
-        @sendToAiChat="sendToAiChat"
       />
     </div>
     <ConfirmDialog
@@ -402,13 +401,8 @@ export default defineComponent({
     ORefreshButton,
     EditorDraftDot,
   },
-  emits: [
-    "updated:fields",
-    "update:changeRecordPerPage",
-    "update:maxRecordToReturn",
-    "sendToAiChat",
-  ],
-  setup(props, { emit }) {
+  emits: ["updated:fields", "update:changeRecordPerPage", "update:maxRecordToReturn"],
+  setup() {
     const store = useStore();
     const { t } = useI18nTyped();
     const router = useRouter();
@@ -795,10 +789,6 @@ export default defineComponent({
 
     const forceDeleteFn = () => {};
 
-    const sendToAiChat = (value: any) => {
-      emit("sendToAiChat", value);
-    };
-
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
       terms = terms.toLowerCase();
@@ -1077,7 +1067,6 @@ export default defineComponent({
       filterData,
       getImageURL,
       verifyOrganizationStatus,
-      sendToAiChat,
       visibleRows,
       hasVisibleRows,
       openBulkDeleteDialog,

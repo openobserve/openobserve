@@ -1,0 +1,9 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chat.rs:286-294 ai_upstream_error_response",
+  "shape": "C",
+  "status": 409,
+  "body": {
+    "code": "session_owner_unavailable",
+    "error": "session_owner_unavailable: session is owned by another replica"
+  }
+}

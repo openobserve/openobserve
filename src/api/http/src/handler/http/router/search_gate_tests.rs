@@ -321,7 +321,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 82] = [
     ("api/search/src/traces/session.rs", "get_session_details", Caller::InHandler),
     ("api/search/src/traces/time_index/mod.rs", "search_index_window", Caller::InHandler),
     ("api/search/src/traces/user.rs", "get_latest_users", Caller::InHandler),
-    ("core/src/ai_chat.rs", "search_window", Caller::Operational),
+    ("core/src/ai_chat.rs", "search_rows", Caller::Operational),
     ("core/src/alerts/alert_calibration/mod.rs", "search", Caller::Background("calibration runs")),
     ("core/src/alerts/auto_investigate_decisions.rs", "query", Caller::Exempt("the org's own auto-investigate decision log from the meta org; its route stays open")),
     ("core/src/alerts/mod.rs", "evaluate_scheduled", Caller::Background("alert evaluation")),

@@ -57,6 +57,8 @@ export interface RcaCellOptions {
   now: number;
   /** Zone of the "until HH:mm <zone>" answer deadline; UTC when not given. */
   timezone?: string;
+  /** The band reads "Medium confidence": the detail shares one chip with the label, so a bare "Medium" is ambiguous. */
+  namedBand?: boolean;
 }
 
 const EMPTY = raw("");
@@ -164,8 +166,15 @@ const BAND_KEY: Record<RcaBand, I18nKey> = {
   low: "alerts.incidents.aiAnalysis.band.low",
 };
 
-/** The band as list detail ("High"), or empty when the run has none. */
-const bandDetail = (band: RcaBand | null): I18nText => (band ? gt(BAND_KEY[band]) : EMPTY);
+const NAMED_BAND_KEY: Record<RcaBand, I18nKey> = {
+  high: "alerts.incidents.rcaRun.band.high",
+  medium: "alerts.incidents.rcaRun.band.medium",
+  low: "alerts.incidents.rcaRun.band.low",
+};
+
+/** The band as list detail ("High", or "High confidence" when named), or empty when the run has none. */
+const bandDetail = (band: RcaBand | null, named = false): I18nText =>
+  band ? gt((named ? NAMED_BAND_KEY : BAND_KEY)[band]) : EMPTY;
 
 /** Joins the non-empty detail parts with " · ". */
 const joinDetail = (...parts: I18nText[]): I18nText => raw(parts.filter(Boolean).join(" · "));
@@ -180,7 +189,7 @@ const steeredByDetail = (rca: RcaSummary): I18nText =>
 
 export function rcaCellModel(
   incident: Pick<Incident, "rca" | "rca_off_reason" | "severity">,
-  { rcaEnabled, lockedReason, now, timezone = "UTC" }: RcaCellOptions,
+  { rcaEnabled, lockedReason, now, timezone = "UTC", namedBand = false }: RcaCellOptions,
 ): RcaCellModel {
   const rca = incident.rca;
 
@@ -279,7 +288,7 @@ export function rcaCellModel(
       const outcome = OUTCOME[rca.outcome];
       // A blocked run names what it needs; the others show the band.
       const detail =
-        rca.outcome === "blocked" ? raw(rca.summary.detail) : bandDetail(rca.confidence);
+        rca.outcome === "blocked" ? raw(rca.summary.detail) : bandDetail(rca.confidence, namedBand);
       // "Root cause identified · Medium · unblocked by a.rao".
       const unblockedBy = rca.summary.unblocked_by
         ? gt("alerts.incidents.aiAnalysis.unblockedBy", {
@@ -303,7 +312,7 @@ export function rcaCellModel(
           return state(gt("alerts.incidents.aiAnalysis.analyzed"), "ok", EMPTY, { rerunNote });
         }
         const outcome = OUTCOME[previous.outcome];
-        return state(gt(outcome.key), outcome.tone, bandDetail(previous.confidence), {
+        return state(gt(outcome.key), outcome.tone, bandDetail(previous.confidence, namedBand), {
           rerunNote,
         });
       }
@@ -331,3 +340,31 @@ export function rcaCellModel(
 /** True for a run the list polls for. */
 export const isLiveRca = (rca: { state: RcaRunState | null } | null | undefined): boolean =>
   rca?.state === "running" || rca?.state === "waiting_input";
+
+/** Incidents carry no sequence number, so the cancel confirm names one by its id's first 8 characters. */
+export const rcaIncidentNumber = (incidentId: string): string => incidentId.slice(0, 8);
+
+/** The run "Follow in thread" opens for an incident: its latest run, or null when none ran. */
+export function rcaFollowTarget(
+  incident: Pick<Incident, "id" | "rca">,
+  org: string,
+): { org: string; incidentId: string; runId: string } | null {
+  const runId = incident.rca?.run_id;
+  return runId ? { org, incidentId: incident.id, runId } : null;
+}
+
+/** Alert id → the newest open incident that alert fired into and that has a run. */
+export function alertRcaRuns(
+  incidents: readonly Pick<Incident, "id" | "rca" | "created_at" | "alert_groups">[],
+): Map<string, { incidentId: string; runId: string }> {
+  const out = new Map<string, { incidentId: string; runId: string }>();
+  const newestFirst = [...incidents].sort((a, b) => b.created_at - a.created_at);
+  for (const incident of newestFirst) {
+    const runId = incident.rca?.run_id;
+    if (!runId) continue;
+    for (const group of incident.alert_groups ?? []) {
+      if (!out.has(group.alert_id)) out.set(group.alert_id, { incidentId: incident.id, runId });
+    }
+  }
+  return out;
+}
