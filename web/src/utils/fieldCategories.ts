@@ -21,7 +21,7 @@
  *   2. Dot-namespace prefix  ("aws.region" → "aws")
  *   3. Underscore-namespace prefix — dynamically discovered from the field set
  *      (any prefix shared by ≥ MIN_PREFIX_FIELDS fields qualifies)
- *   4. Data-type bucket  (string / number / boolean)
+ *   4. Other  (the type icon on each row already says its type)
  */
 
 import { gt } from "@/types/i18n";
@@ -36,9 +36,6 @@ export type StreamType = "logs" | "traces" | "metrics" | string;
 
 export const CATEGORY = {
   PINNED: "pinned",
-  TYPE_STRING: "type_string",
-  TYPE_NUMBER: "type_number",
-  TYPE_BOOLEAN: "type_boolean",
   OTHER: "other",
 } as const;
 
@@ -50,15 +47,6 @@ export type Category = (typeof CATEGORY)[keyof typeof CATEGORY];
 const CATEGORY_LABELS: Record<string, string> = {
   get [CATEGORY.PINNED]() {
     return gt("common.keyFields");
-  },
-  get [CATEGORY.TYPE_STRING]() {
-    return gt("common.typeString");
-  },
-  get [CATEGORY.TYPE_NUMBER]() {
-    return gt("common.typeNumber");
-  },
-  get [CATEGORY.TYPE_BOOLEAN]() {
-    return gt("common.typeBoolean");
   },
   get [CATEGORY.OTHER]() {
     return gt("common.other");
@@ -160,26 +148,6 @@ export function discoverPrefixes(
 }
 
 // ---------------------------------------------------------------------------
-// Data-type bucket (tier 4)
-// ---------------------------------------------------------------------------
-
-function dataTypeBucket(dataType: string): string {
-  const t = (dataType || "").toLowerCase();
-  if (
-    t === "int64" ||
-    t === "float64" ||
-    t === "int32" ||
-    t === "float32" ||
-    t === "double" ||
-    t === "long" ||
-    t === "integer"
-  )
-    return CATEGORY.TYPE_NUMBER;
-  if (t === "bool" || t === "boolean") return CATEGORY.TYPE_BOOLEAN;
-  return CATEGORY.TYPE_STRING;
-}
-
-// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -187,13 +155,11 @@ function dataTypeBucket(dataType: string): string {
  * Resolve the group key for a field.
  *
  * @param fieldName       - raw field name
- * @param dataType        - schema type string (e.g. "Utf8", "Int64")
  * @param index           - pre-built SemanticIndex, or null
  * @param dynamicPrefixes - set returned by discoverPrefixes(), or null
  */
 export function resolveFieldGroup(
   fieldName: string,
-  dataType: string,
   index: SemanticIndex | null,
   dynamicPrefixes: Set<string> | null = null,
 ): string {
@@ -220,8 +186,7 @@ export function resolveFieldGroup(
   if (dynamicPrefixes?.has(canonicalise(lower, index?.grouping)))
     return canonicalise(lower, index?.grouping);
 
-  // 3. Data-type bucket
-  return dataTypeBucket(dataType);
+  return CATEGORY.OTHER;
 }
 
 /**
@@ -242,18 +207,12 @@ export function getGroupLabel(groupKey: string, index: SemanticIndex | null): st
 /**
  * Sort order for a group key.
  * Semantic index groups come first (API order), dynamic groups in the middle,
- * data-type buckets trail at the end.
+ * the Other group trails at the end.
  */
 export function groupSortOrder(groupKey: string, index: SemanticIndex | null): number {
   if (groupKey === CATEGORY.PINNED) return -1;
 
-  const TAIL: Record<string, number> = {
-    [CATEGORY.TYPE_STRING]: 990,
-    [CATEGORY.TYPE_NUMBER]: 991,
-    [CATEGORY.TYPE_BOOLEAN]: 992,
-    [CATEGORY.OTHER]: 999,
-  };
-  if (groupKey in TAIL) return TAIL[groupKey];
+  if (groupKey === CATEGORY.OTHER) return 999;
 
   if (index) {
     const pos = index.groupOrder.indexOf(groupKey);
@@ -305,7 +264,7 @@ export function applyFieldGrouping(
   for (const f of fields) {
     if (f.label) continue; // skip existing label rows
 
-    const resolvedGroup = resolveFieldGroup(f.name, f.dataType || "", index, dynamicPrefixes);
+    const resolvedGroup = resolveFieldGroup(f.name, index, dynamicPrefixes);
     const lower = f.name.toLowerCase();
     const semanticGroup = index.fieldToGroup.get(lower) ?? null;
     const us = lower.indexOf("_");
@@ -326,6 +285,10 @@ export function applyFieldGrouping(
   const sortedGroups = Array.from(groupBuckets.keys()).sort(
     (a, b) => groupSortOrder(a, index) - groupSortOrder(b, index),
   );
+  // A lone Other header names nothing, so the list stays flat.
+  if (sortedGroups.length === 1 && sortedGroups[0] === CATEGORY.OTHER) {
+    return groupBuckets.get(CATEGORY.OTHER)!;
+  }
 
   const result: FieldObj[] = [];
   for (const groupKey of sortedGroups) {

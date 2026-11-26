@@ -207,17 +207,17 @@ describe("useLocalFieldSource", () => {
   });
 
   describe("grouping", () => {
-    it("falls back to key fields, prefix and type groups without semantic aliases", async () => {
+    it("falls back to key fields, prefix groups and one Other group without semantic aliases", async () => {
       harness = mountSource();
       await flush();
       const groups = harness.source.fields.value
         .filter((row) => row.isGroup)
         .map((row) => row.group);
-      expect(groups).toEqual(["pinned", "k8s", "type_string", "type_number"]);
+      expect(groups).toEqual(["pinned", "k8s", "other"]);
       const rows = harness.source.fields.value.filter((row) => !row.isGroup);
       expect(rows.find((row) => row.name === "service")?.group).toBe("pinned");
       expect(rows.find((row) => row.name === "k8s_pod")?.group).toBe("k8s");
-      expect(rows.find((row) => row.name === "count")?.group).toBe("type_number");
+      expect(rows.find((row) => row.name === "count")?.group).toBe("other");
     });
 
     it("keeps the flat list and warns when the grouping config fails", async () => {

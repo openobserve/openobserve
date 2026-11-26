@@ -44,39 +44,39 @@ describe("resolveFieldGroup", () => {
   const prefixes = discoverPrefixes(allFields);
 
   it("tier 1: returns semantic group for known alias field", () => {
-    expect(resolveFieldGroup("http_method", "Utf8", index, prefixes)).toBe("http");
+    expect(resolveFieldGroup("http_method", index, prefixes)).toBe("http");
   });
 
   it("tier 2a: dot-namespace prefix", () => {
-    expect(resolveFieldGroup("aws.region", "Utf8", index, prefixes)).toBe("aws");
+    expect(resolveFieldGroup("aws.region", index, prefixes)).toBe("aws");
   });
 
   it("tier 2b: dynamic underscore prefix with ≥2 fields", () => {
     // body_raw and body_size → "body" qualifies
-    expect(resolveFieldGroup("body_raw", "Utf8", index, prefixes)).toBe("body");
+    expect(resolveFieldGroup("body_raw", index, prefixes)).toBe("body");
   });
 
-  it("tier 3: falls back to data-type bucket when no prefix qualifies", () => {
-    expect(resolveFieldGroup("plain", "Utf8", index, prefixes)).toBe(CATEGORY.TYPE_STRING);
+  it("tier 3: falls back to Other whatever the type, when no prefix qualifies", () => {
+    expect(resolveFieldGroup("plain", index, prefixes)).toBe(CATEGORY.OTHER);
   });
 
-  it("tier 3: numeric data type bucket", () => {
-    expect(resolveFieldGroup("unknown_field", "Int64", index, null)).toBe(CATEGORY.TYPE_NUMBER);
+  it("tier 3: a number field without a group is Other too", () => {
+    expect(resolveFieldGroup("unknown_field", index, null)).toBe(CATEGORY.OTHER);
   });
 
-  it("tier 3: boolean data type bucket", () => {
-    expect(resolveFieldGroup("flag_field", "Boolean", index, null)).toBe(CATEGORY.TYPE_BOOLEAN);
+  it("tier 3: a boolean field without a group is Other too", () => {
+    expect(resolveFieldGroup("flag_field", index, null)).toBe(CATEGORY.OTHER);
   });
 
   it("handles null index gracefully", () => {
-    expect(resolveFieldGroup("http_method", "Utf8", null, null)).toBe(CATEGORY.TYPE_STRING);
+    expect(resolveFieldGroup("http_method", null, null)).toBe(CATEGORY.OTHER);
   });
 
   it("single underscore-field prefix does NOT qualify (below MIN_PREFIX_FIELDS=2)", () => {
     // only one "solo_*" field, so it falls to data-type bucket
     const solo = discoverPrefixes(["solo_only", "other"]);
     expect(solo.has("solo")).toBe(false);
-    expect(resolveFieldGroup("solo_only", "Utf8", null, solo)).toBe(CATEGORY.TYPE_STRING);
+    expect(resolveFieldGroup("solo_only", null, solo)).toBe(CATEGORY.OTHER);
   });
 });
 
@@ -146,14 +146,24 @@ describe("applyFieldGrouping", () => {
     expect(firstGroup.group).toBe(CATEGORY.PINNED);
   });
 
-  it("data-type buckets appear after semantic groups", () => {
-    const fields = [makeField("http_method"), makeField("plain_string", "Utf8")];
+  it("puts ungrouped fields of every type in one Other group after semantic groups", () => {
+    const fields = [
+      makeField("http_method"),
+      makeField("message", "Utf8"),
+      makeField("latency", "Int64"),
+    ];
     const result = applyFieldGrouping(fields, semanticIndex, keyFieldSet, keyGroupSet);
 
     const groupKeys = result.filter((r: any) => r.label).map((r: any) => r.group);
-    const httpIdx = groupKeys.indexOf("http");
-    const stringIdx = groupKeys.indexOf(CATEGORY.TYPE_STRING);
-    expect(httpIdx).toBeLessThan(stringIdx);
+    expect(groupKeys).toEqual(["http", CATEGORY.OTHER]);
+    expect(result.filter((r: any) => r.group === CATEGORY.OTHER && !r.label)).toHaveLength(2);
+  });
+
+  it("keeps the list flat when every field would land in Other", () => {
+    const fields = [makeField("message", "Utf8"), makeField("latency", "Int64")];
+    const result = applyFieldGrouping(fields, semanticIndex, keyFieldSet, keyGroupSet);
+    expect(result.some((r: any) => r.label)).toBe(false);
+    expect(result.map((r: any) => r.name)).toEqual(["message", "latency"]);
   });
 
   it("returns flat list unchanged when index is null", () => {
