@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "Geen opgeslagen weergaven komen overeen met uw zoekopdracht",
     "savedViewApplied": "Momenteel toegepast",
     "favoriteViewNamed": "{name} als favoriet markeren",
+    "unfavoriteViewNamed": "Verwijder {name} uit favorieten",
     "deleteViewNamed": "{name} verwijderen",
     "overwriteSavedViewNamed": "{name} overschrijven met de huidige query",
     "searchSavedFunction": "Zoek",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "Schakel de SQL-modus in om te visualiseren",
     "drillDown": "Inzoomen",
     "drillDownUnavailableInSqlMode": "Inzoomen is niet beschikbaar in SQL-modus",
+    "drillDownSqlModeDescription": "Drill-down vergelijkt dimensiewaarden binnen de gebeurtenissen van je zoekopdracht. Schakel de SQL-modus uit om het te gebruiken; de SQL-query wordt gewist.",
+    "drillDownTurnOffSqlMode": "SQL-modus uitschakelen",
     "drillDownRunTitle": "Voer een query uit om Drill down te starten",
     "drillDownRunDescription": "Drill down vergelijkt dimensiewaarden over de gebeurtenissen van je zoekopdracht. Voer een query uit om ze te laden.",
     "patternsLogsOnly": "Patronen zijn alleen beschikbaar voor logs-streams",
@@ -25119,6 +25122,8 @@
       "endpointUrlCopied": "Endpoint-URL gekopieerd"
     },
     "views": {
+      "shortUrlInvalid": "Deze link is ongeldig of verlopen",
+      "shortUrlFailed": "Kon deze link niet openen",
       "youAreNotAuthorizedToManage": "U bent niet gemachtigd om de licentie te beheren.",
       "copiedToClipboard": "Gekopieerd naar klembord",
       "errorWhilePullingDestinations": "Fout bij het ophalen van bestemmingen.",

@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "Keine gespeicherten Ansichten entsprechen Ihrer Suche",
     "savedViewApplied": "Aktuell angewendet",
     "favoriteViewNamed": "{name} als Favorit markieren",
+    "unfavoriteViewNamed": "Aus Favoriten entfernen: {name}",
     "deleteViewNamed": "{name} löschen",
     "overwriteSavedViewNamed": "{name} mit aktueller Abfrage überschreiben",
     "searchSavedFunction": "Suchen",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "Bitte aktivieren Sie den SQL-Modus zur Visualisierung",
     "drillDown": "Drilldown",
     "drillDownUnavailableInSqlMode": "Drilldown ist im SQL-Modus nicht verfügbar",
+    "drillDownSqlModeDescription": "Drilldown vergleicht Dimensionswerte über die Ereignisse Ihrer Suche. Deaktivieren Sie den SQL-Modus, um dies zu nutzen; die SQL-Abfrage wird gelöscht.",
+    "drillDownTurnOffSqlMode": "SQL-Modus deaktivieren",
     "drillDownRunTitle": "Abfrage ausführen, um Drill-down zu starten",
     "drillDownRunDescription": "Drill-down vergleicht Dimensionswerte über die Ereignisse Ihrer Suche hinweg. Führen Sie eine Abfrage aus, um sie zu laden.",
     "patternsLogsOnly": "Muster sind nur für Logs-Streams verfügbar",
@@ -25119,6 +25122,8 @@
       "endpointUrlCopied": "Endpunkt-URL kopiert"
     },
     "views": {
+      "shortUrlInvalid": "Dieser Link ist ungültig oder abgelaufen",
+      "shortUrlFailed": "Dieser Link konnte nicht geöffnet werden",
       "youAreNotAuthorizedToManage": "Sie sind nicht berechtigt, die Lizenz zu verwalten.",
       "copiedToClipboard": "In die Zwischenablage kopiert.",
       "errorWhilePullingDestinations": "Fehler beim Abrufen der Ziele.",

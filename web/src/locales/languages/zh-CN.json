@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "没有与搜索匹配的已保存视图",
     "savedViewApplied": "当前已应用",
     "favoriteViewNamed": "将 {name} 加入收藏",
+    "unfavoriteViewNamed": "取消收藏 {name}",
     "deleteViewNamed": "删除 {name}",
     "overwriteSavedViewNamed": "用当前查询覆盖 {name}",
     "searchSavedFunction": "搜索",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "请启用 SQL 模式进行可视化",
     "drillDown": "下钻",
     "drillDownUnavailableInSqlMode": "SQL 模式下无法使用下钻",
+    "drillDownSqlModeDescription": "下钻会跨搜索的事件比较维度值。关闭 SQL 模式即可使用；SQL 查询将被清除。",
+    "drillDownTurnOffSqlMode": "关闭 SQL 模式",
     "drillDownRunTitle": "运行查询以开始钻取",
     "drillDownRunDescription": "钻取会比较搜索事件中的维度值。运行查询以加载它们。",
     "patternsLogsOnly": "模式仅适用于日志数据流",
@@ -25119,6 +25122,8 @@
       "endpointUrlCopied": "端点 URL 已复制"
     },
     "views": {
+      "shortUrlInvalid": "此链接无效或已过期",
+      "shortUrlFailed": "无法打开此链接",
       "youAreNotAuthorizedToManage": "您无权管理许可证。",
       "copiedToClipboard": "已复制到剪贴板",
       "errorWhilePullingDestinations": "获取目标时出错。",

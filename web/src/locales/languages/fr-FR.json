@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "Aucune vue enregistrée ne correspond à votre recherche",
     "savedViewApplied": "Actuellement appliquée",
     "favoriteViewNamed": "Mettre {name} en favori",
+    "unfavoriteViewNamed": "Retirer {name} des favoris",
     "deleteViewNamed": "Supprimer {name}",
     "overwriteSavedViewNamed": "Remplacer {name} par la requête actuelle",
     "searchSavedFunction": "Rechercher",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "Veuillez activer le mode SQL pour visualiser",
     "drillDown": "Exploration détaillée",
     "drillDownUnavailableInSqlMode": "L'exploration détaillée n'est pas disponible en mode SQL",
+    "drillDownSqlModeDescription": "L'exploration compare les valeurs de dimension entre les événements de votre recherche. Désactivez le mode SQL pour l'utiliser ; la requête SQL est effacée.",
+    "drillDownTurnOffSqlMode": "Désactiver le mode SQL",
     "drillDownRunTitle": "Exécutez une requête pour démarrer l'exploration",
     "drillDownRunDescription": "L'exploration compare les valeurs de dimension entre les événements de votre recherche. Exécutez une requête pour les charger.",
     "patternsLogsOnly": "Les patterns ne sont disponibles que pour les flux de logs",
@@ -25119,6 +25122,8 @@
       "endpointUrlCopied": "URL du point de terminaison copiée"
     },
     "views": {
+      "shortUrlInvalid": "Ce lien est invalide ou a expiré",
+      "shortUrlFailed": "Impossible d'ouvrir ce lien",
       "youAreNotAuthorizedToManage": "Vous n'êtes pas autorisé à gérer la licence.",
       "copiedToClipboard": "Copié dans le presse-papiers",
       "errorWhilePullingDestinations": "Erreur lors de la récupération des destinations.",

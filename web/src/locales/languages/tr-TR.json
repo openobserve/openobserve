@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "Aramanızla eşleşen kayıtlı görünüm yok",
     "savedViewApplied": "Şu anda uygulanıyor",
     "favoriteViewNamed": "{name} görünümünü favorilere ekle",
+    "unfavoriteViewNamed": "{name} öğesini sık kullanılanlardan çıkar",
     "deleteViewNamed": "{name} görünümünü sil",
     "overwriteSavedViewNamed": "{name} görünümünü geçerli sorguyla üzerine yaz",
     "searchSavedFunction": "Ara",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "Lütfen görselleştirmek için SQL modunu etkinleştirin",
     "drillDown": "Ayrıntıya in",
     "drillDownUnavailableInSqlMode": "Ayrıntıya inme SQL modunda kullanılamaz",
+    "drillDownSqlModeDescription": "Drill down, aramanızın olayları arasında boyut değerlerini karşılaştırır. Kullanmak için SQL modunu kapatın; SQL sorgusu temizlenir.",
+    "drillDownTurnOffSqlMode": "SQL modunu kapat",
     "drillDownRunTitle": "Detaya inmeyi başlatmak için bir sorgu çalıştırın",
     "drillDownRunDescription": "Detaya inme, aramanızın olayları genelinde boyut değerlerini karşılaştırır. Yüklemek için bir sorgu çalıştırın.",
     "patternsLogsOnly": "Desenler yalnızca günlük akışları için kullanılabilir",
@@ -25119,6 +25122,8 @@
       "endpointUrlCopied": "Uç nokta URL'si kopyalandı"
     },
     "views": {
+      "shortUrlInvalid": "Bu bağlantı geçersiz veya süresi dolmuş",
+      "shortUrlFailed": "Bu bağlantı açılamadı",
       "youAreNotAuthorizedToManage": "Lisansı yönetme yetkiniz yok.",
       "copiedToClipboard": "Panoya kopyalandı",
       "errorWhilePullingDestinations": "Hedefler alınırken hata oluştu.",

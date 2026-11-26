@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "Nenhuma visualização guardada corresponde à pesquisa",
     "savedViewApplied": "Aplicada atualmente",
     "favoriteViewNamed": "Marcar {name} como favorita",
+    "unfavoriteViewNamed": "Remover {name} dos favoritos",
     "deleteViewNamed": "Eliminar {name}",
     "overwriteSavedViewNamed": "Substituir {name} pela consulta atual",
     "searchSavedFunction": "Pesquisar",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "Ative o modo SQL para visualizar",
     "drillDown": "Detalhar",
     "drillDownUnavailableInSqlMode": "Detalhar não está disponível no modo SQL",
+    "drillDownSqlModeDescription": "A exploração detalhada compara os valores das dimensões entre os eventos da sua pesquisa. Desative o modo SQL para a utilizar; a consulta SQL será apagada.",
+    "drillDownTurnOffSqlMode": "Desativar o modo SQL",
     "drillDownRunTitle": "Execute uma consulta para iniciar o detalhamento",
     "drillDownRunDescription": "O detalhamento compara os valores das dimensões entre os eventos da sua pesquisa. Execute uma consulta para os carregar.",
     "patternsLogsOnly": "Os padrões estão disponíveis apenas para streams de logs",
@@ -25119,6 +25122,8 @@
       "endpointUrlCopied": "URL do endpoint copiado"
     },
     "views": {
+      "shortUrlInvalid": "Este link é inválido ou expirou",
+      "shortUrlFailed": "Não foi possível abrir este link",
       "youAreNotAuthorizedToManage": "Não está autorizado a gerir a licença.",
       "copiedToClipboard": "Copiado para a área de transferência",
       "errorWhilePullingDestinations": "Erro ao carregar destinos.",

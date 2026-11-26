@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "Нет сохранённых представлений, соответствующих поиску",
     "savedViewApplied": "Применено сейчас",
     "favoriteViewNamed": "Добавить {name} в избранное",
+    "unfavoriteViewNamed": "Убрать {name} из избранного",
     "deleteViewNamed": "Удалить {name}",
     "overwriteSavedViewNamed": "Перезаписать {name} текущим запросом",
     "searchSavedFunction": "Поиск",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "Включите режим SQL для использования временной диаграммы",
     "drillDown": "Детализация",
     "drillDownUnavailableInSqlMode": "Детализация недоступна в режиме SQL",
+    "drillDownSqlModeDescription": "Детализация сравнивает значения измерений по событиям вашего поиска. Отключите режим SQL, чтобы её использовать; SQL-запрос будет очищен.",
+    "drillDownTurnOffSqlMode": "Отключить режим SQL",
     "drillDownRunTitle": "Запустите запрос, чтобы начать детализацию",
     "drillDownRunDescription": "Детализация сравнивает значения измерений по событиям, найденным в результате поиска. Запустите запрос, чтобы загрузить их.",
     "patternsLogsOnly": "Паттерны доступны только для потоков логов",
@@ -25119,6 +25122,8 @@
       "endpointUrlCopied": "URL конечной точки скопирован"
     },
     "views": {
+      "shortUrlInvalid": "Эта ссылка недействительна или устарела",
+      "shortUrlFailed": "Не удалось открыть эту ссылку",
       "youAreNotAuthorizedToManage": "Вы не авторизованы для управления лицензией.",
       "copiedToClipboard": "Скопировано в буфер обмена",
       "errorWhilePullingDestinations": "Ошибка при получении получателей.",

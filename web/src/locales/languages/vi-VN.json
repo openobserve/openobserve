@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "Không có chế độ xem đã lưu nào khớp với tìm kiếm",
     "savedViewApplied": "Đang được áp dụng",
     "favoriteViewNamed": "Thêm {name} vào mục yêu thích",
+    "unfavoriteViewNamed": "Bỏ yêu thích {name}",
     "deleteViewNamed": "Xóa {name}",
     "overwriteSavedViewNamed": "Ghi đè {name} bằng truy vấn hiện tại",
     "searchSavedFunction": "Tìm kiếm",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "Vui lòng bật chế độ SQL để sử dụng biểu đồ thời gian",
     "drillDown": "Đi sâu",
     "drillDownUnavailableInSqlMode": "Không thể đi sâu ở chế độ SQL",
+    "drillDownSqlModeDescription": "Drill down so sánh giá trị của các chiều trên các sự kiện trong tìm kiếm của bạn. Tắt chế độ SQL để sử dụng tính năng này; truy vấn SQL sẽ bị xóa.",
+    "drillDownTurnOffSqlMode": "Tắt chế độ SQL",
     "drillDownRunTitle": "Chạy truy vấn để bắt đầu Drill down",
     "drillDownRunDescription": "Drill down so sánh các giá trị chiều trên các sự kiện trong tìm kiếm của bạn. Hãy chạy truy vấn để tải chúng.",
     "patternsLogsOnly": "Pattern chỉ khả dụng cho các stream nhật ký",
@@ -25119,6 +25122,8 @@
       "endpointUrlCopied": "Đã sao chép URL điểm cuối"
     },
     "views": {
+      "shortUrlInvalid": "Liên kết này không hợp lệ hoặc đã hết hạn",
+      "shortUrlFailed": "Không thể mở liên kết này",
       "youAreNotAuthorizedToManage": "Bạn không có quyền quản lý giấy phép.",
       "copiedToClipboard": "Đã sao chép vào bộ nhớ tạm",
       "errorWhilePullingDestinations": "Lỗi khi tải đích.",

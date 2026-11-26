@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "沒有符合搜尋的已儲存檢視",
     "savedViewApplied": "目前已套用",
     "favoriteViewNamed": "將 {name} 加入收藏",
+    "unfavoriteViewNamed": "取消收藏 {name}",
     "deleteViewNamed": "刪除 {name}",
     "overwriteSavedViewNamed": "以目前查詢覆蓋 {name}",
     "searchSavedFunction": "搜尋",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "請啟用 SQL 模式以使用時間圖表",
     "drillDown": "向下鑽研",
     "drillDownUnavailableInSqlMode": "SQL 模式下無法使用向下鑽研",
+    "drillDownSqlModeDescription": "下鑽會比較您搜尋事件中的維度值。請關閉 SQL 模式以使用此功能；SQL 查詢將被清除。",
+    "drillDownTurnOffSqlMode": "關閉 SQL 模式",
     "drillDownRunTitle": "執行查詢以開始下鑽",
     "drillDownRunDescription": "下鑽會比較搜尋事件中的維度值。執行查詢以載入這些值。",
     "patternsLogsOnly": "模式僅適用於日誌串流",
@@ -25114,6 +25117,8 @@
       "endpointUrlCopied": "端點 URL 已複製"
     },
     "views": {
+      "shortUrlInvalid": "此連結無效或已過期",
+      "shortUrlFailed": "無法開啟此連結",
       "youAreNotAuthorizedToManage": "您無權管理授權。",
       "copiedToClipboard": "已複製到剪貼簿。",
       "errorWhilePullingDestinations": "取得目標時發生錯誤。",

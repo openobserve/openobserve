@@ -1599,6 +1599,7 @@
     "savedViewsNoMatch": "Żaden zapisany widok nie pasuje do wyszukiwania",
     "savedViewApplied": "Obecnie zastosowany",
     "favoriteViewNamed": "Dodaj {name} do ulubionych",
+    "unfavoriteViewNamed": "Usuń {name} z ulubionych",
     "deleteViewNamed": "Usuń {name}",
     "overwriteSavedViewNamed": "Zastąp {name} bieżącym zapytaniem",
     "searchSavedFunction": "Szukaj",
@@ -1648,6 +1649,8 @@
     "enableSqlModeOrSelectSingleStream": "Włącz tryb SQL, aby użyć timechart",
     "drillDown": "Drążenie danych",
     "drillDownUnavailableInSqlMode": "Drążenie danych nie jest dostępne w trybie SQL",
+    "drillDownSqlModeDescription": "Drill down porównuje wartości wymiarów w zdarzeniach wyszukiwania. Wyłącz tryb SQL, aby z niego korzystać; zapytanie SQL zostanie wyczyszczone.",
+    "drillDownTurnOffSqlMode": "Wyłącz tryb SQL",
     "drillDownRunTitle": "Uruchom zapytanie, aby rozpocząć drążenie szczegółów",
     "drillDownRunDescription": "Drążenie szczegółów porównuje wartości wymiarów w zdarzeniach z Twojego wyszukiwania. Uruchom zapytanie, aby je wczytać.",
     "patternsLogsOnly": "Wzorce są dostępne tylko dla strumieni logów",
@@ -25119,6 +25122,8 @@
       "endpointUrlCopied": "Skopiowano adres URL punktu końcowego"
     },
     "views": {
+      "shortUrlInvalid": "Ten link jest nieprawidłowy lub wygasł",
+      "shortUrlFailed": "Nie udało się otworzyć tego linku",
       "youAreNotAuthorizedToManage": "Nie masz uprawnień do zarządzania licencją.",
       "copiedToClipboard": "Skopiowano do schowka.",
       "errorWhilePullingDestinations": "Błąd podczas pobierania miejsc docelowych.",
