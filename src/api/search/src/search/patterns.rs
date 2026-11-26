@@ -31,7 +31,9 @@ use {
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 #[cfg(feature = "enterprise")]
-use crate::common::utils::http::client_search_type;
+use crate::{
+    common::utils::http::client_search_type, search::error_utils::map_error_to_http_response,
+};
 
 /// Extract patterns from search results
 ///
@@ -234,9 +236,7 @@ pub async fn extract_patterns(
                     log::error!(
                         "[PATTERNS trace_id {trace_id}] Error during pattern extraction: {e}",
                     );
-                    return MetaHttpResponse::internal_error(format!(
-                        "Pattern extraction failed: {e}"
-                    ));
+                    return map_error_to_http_response(&e, Some(trace_id.clone()));
                 }
             }
         }

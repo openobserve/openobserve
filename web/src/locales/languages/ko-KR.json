@@ -1915,6 +1915,7 @@
     "patternCount": "개수",
     "errorConstructingSearchQuery": "검색 쿼리를 구성하는 동안 오류가 발생했습니다.",
     "errorExtractingPatterns": "패턴을 추출하는 중 오류가 발생했습니다. 다시 시도해 주세요.",
+    "patternsNoReadPermission": "이 스트림을 읽을 권한이 없습니다.",
     "errorWhileApplyingSavedView": "저장된 보기를 적용하는 동안 오류가 발생했습니다.",
     "errorWhileExtractingStreamFields": "스트림 필드를 추출하는 동안 오류가 발생했습니다.",
     "errorWhileGeneratingHistogramData": "히스토그램 데이터를 생성하는 동안 오류가 발생했습니다.",
@@ -28573,7 +28574,7 @@
     "mineJoinTeam": "팀에 참여",
     "mineTestTeam": "{team}에 테스트 호출 보내기",
     "mineCoverSaved": "대체 근무 저장됨",
-    "mineSlackLinkHow": "Slack에서 {command} link 입력",
+    "mineSlackLinkHow": "Slack에서 {command} link를 입력하세요",
     "mineSlackSetUpHint": "설정 › Slack 열기",
     "myDeliveriesWhen": "시각",
     "phoneAddHint": "문자와 전화에 사용할 번호 추가",
@@ -30929,7 +30930,7 @@
         "settings": "설정",
         "install": "설치 시",
         "destination": "알림 대상에서",
-        "oncall": "{command} oncall에서 여기로"
+        "oncall": "{command} oncall here에서 설정됨"
       },
       "channel": "채널",
       "channelPlaceholder": "채널 검색",

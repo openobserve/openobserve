@@ -1526,6 +1526,7 @@ export default defineComponent({
         if (generationId !== null && generationId !== undefined && !engine.isCurrent(generationId))
           return;
         searchObj.loading = false;
+        searchObj.meta.searchApplied = true;
         if (generationId !== null && generationId !== undefined)
           engine.recordPatternsComplete(generationId);
 
@@ -1533,7 +1534,10 @@ export default defineComponent({
       } catch (error) {
         console.error("[Index] Error extracting patterns:", error);
         searchObj.loading = false;
-        showErrorNotification(t("logs.index.errorExtractingPatterns"));
+        // The Patterns list shows the stored error itself; a toast would repeat it generically.
+        if (!patternsState.value?.error) {
+          showErrorNotification(t("logs.index.errorExtractingPatterns"));
+        }
         if (generationId !== null && generationId !== undefined)
           engine.recordPatternsFailure(generationId);
         settle();

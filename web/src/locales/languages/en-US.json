@@ -1915,6 +1915,7 @@
     "patternCount": "Count",
     "errorConstructingSearchQuery": "An error occurred while constructing the search query.",
     "errorExtractingPatterns": "Error extracting patterns. Please try again.",
+    "patternsNoReadPermission": "You don't have permission to read this stream.",
     "errorWhileApplyingSavedView": "Error while applying saved view.",
     "errorWhileExtractingStreamFields": "Error while extracting stream fields.",
     "errorWhileGeneratingHistogramData": "Error while generating histogram data.",

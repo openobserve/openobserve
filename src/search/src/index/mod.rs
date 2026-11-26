@@ -25,7 +25,7 @@ pub use condition::Condition;
 use datafusion::{arrow::datatypes::SchemaRef, physical_plan::PhysicalExpr};
 use hashbrown::HashSet;
 use physical::conjunction;
-pub(crate) use physical::{like_contains_term, like_substring};
+pub(crate) use physical::{like_contains_pattern, like_contains_term, like_substring};
 use tantivy::{
     query::{BooleanQuery, Occur, Query},
     schema::{Field, Schema},

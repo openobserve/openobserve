@@ -243,18 +243,15 @@ fn rewrite_match_all_physical(
             .trim_start_matches('*') // contains
             .trim_end_matches('*') // prefix or contains
             .to_string(); // remove prefix and suffix *
+        let pattern = crate::index::like_contains_pattern(&item);
 
         for (field, data_type) in fields.iter() {
             let term = if cfg.common.utf8_view_enabled {
-                Arc::new(Literal::new(ScalarValue::Utf8View(Some(format!(
-                    "%{item}%"
-                )))))
+                Arc::new(Literal::new(ScalarValue::Utf8View(Some(pattern.clone()))))
             } else if data_type == &DataType::LargeUtf8 {
-                Arc::new(Literal::new(ScalarValue::LargeUtf8(Some(format!(
-                    "%{item}%"
-                )))))
+                Arc::new(Literal::new(ScalarValue::LargeUtf8(Some(pattern.clone()))))
             } else {
-                Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{item}%")))))
+                Arc::new(Literal::new(ScalarValue::Utf8(Some(pattern.clone()))))
             };
 
             let new_expr = create_like_expr_with_not_null_physical(schema.as_ref(), field, term);
