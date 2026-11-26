@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
+import * as echarts from "echarts";
 import { convertPanelData } from "./convertPanelData";
 import { buildSQLChartQuery } from "./dashboardAutoQueryBuilder";
 import {
@@ -161,21 +162,97 @@ describe("box plot", () => {
     ]);
   });
 
-  it("labels every category, tilting and truncating only when they crowd the axis", async () => {
-    const services = ["auth", "cart", "checkout", "inventory", "payments", "search"];
-    const many = services.flatMap((name) => [
-      { x_axis_1: name, y_axis_1: 1 },
-      { x_axis_1: name, y_axis_1: 3 },
-    ]);
-    const roomy = (await convert(panel(), [many], 1200)).options.xAxis.axisLabel;
-    expect(roomy).toMatchObject({ interval: 0, rotate: 0 });
-    expect(roomy.hideOverlap).toBeUndefined();
-    const crowded = (await convert(panel(), [many], 400)).options.xAxis.axisLabel;
-    expect(crowded).toMatchObject({ interval: 0, rotate: 45, width: 120, overflow: "truncate" });
-    const chosen = (
-      await convert(panel({ axis_label_rotate: 30, axis_label_truncate_width: 60 }), [many], 400)
-    ).options.xAxis.axisLabel;
-    expect(chosen).toMatchObject({ interval: 0, rotate: 30, width: 60 });
+  describe("x-axis labels", () => {
+    const servicesRows = (names: string[]) =>
+      names.flatMap((name) => [
+        { x_axis_1: name, y_axis_1: 1 },
+        { x_axis_1: name, y_axis_1: 3 },
+      ]);
+    const five = ["alpha", "bravo", "charlie", "delta", "echo"];
+    const fiveLong = five.map((name) => `${name}-checkout-service-production-eu-west-1`);
+    const many = Array.from(
+      { length: 600 },
+      (_, i) => `rtoss16687_1794506_trace_${String(i).padStart(4, "0")}`,
+    );
+    const renderSvg = (options: any, width: number) => {
+      const chart = echarts.init(null as any, null, {
+        renderer: "svg",
+        ssr: true,
+        width,
+        height: 400,
+      });
+      chart.setOption({ ...options, animation: false });
+      const svg = chart.renderToSVGString();
+      chart.dispose();
+      return svg;
+    };
+    // A truncated label keeps its start, so a name counts as drawn when its unique prefix is.
+    const shownLabels = (options: any, names: string[], width: number) => {
+      const svg = renderSvg(options, width);
+      return names.filter((name) => svg.includes(`>${name.slice(0, 10)}`));
+    };
+
+    it("keeps labels that fit flat and untruncated", async () => {
+      const roomy = (await convert(panel(), [servicesRows(five)], 800)).options.xAxis.axisLabel;
+      expect(roomy).toMatchObject({
+        interval: "auto",
+        hideOverlap: true,
+        rotate: 0,
+        overflow: "none",
+      });
+    });
+
+    it("tilts and truncates long labels only when every tilted label then fits", async () => {
+      const narrow = (await convert(panel(), [servicesRows(fiveLong)], 420)).options.xAxis
+        .axisLabel;
+      expect(narrow).toMatchObject({ rotate: 45, width: 120, overflow: "truncate" });
+      const crowded = (await convert(panel(), [servicesRows(many)], 1000)).options.xAxis.axisLabel;
+      expect(crowded.interval).not.toBe(0);
+      expect(crowded).toMatchObject({
+        interval: "auto",
+        hideOverlap: true,
+        rotate: 0,
+        overflow: "none",
+      });
+    });
+
+    it("uses the panel's rotation and truncate width, truncating at that width", async () => {
+      const chosen = (
+        await convert(panel({ axis_label_rotate: 30, axis_label_truncate_width: 40 }), [
+          servicesRows(five),
+        ])
+      ).options.xAxis.axisLabel;
+      expect(chosen).toMatchObject({ rotate: 30, width: 40, overflow: "truncate" });
+      const widthOnly = (
+        await convert(panel({ axis_label_truncate_width: 40 }), [servicesRows(five)], 1200)
+      ).options.xAxis.axisLabel;
+      expect(widthOnly).toMatchObject({ rotate: 0, width: 40, overflow: "truncate" });
+    });
+
+    it("keeps time-bucket labels flat at the default width", async () => {
+      const time = (
+        await convert(
+          panel({ axis_label_rotate: 30 }, [field("x_axis_1", "_timestamp", "histogram")]),
+          [[{ x_axis_1: "2026-10-01T00:00:00", y_axis_1: 1 }]],
+        )
+      ).options.xAxis.axisLabel;
+      expect(time).toMatchObject({ rotate: 0, width: 120, overflow: "none" });
+    });
+
+    it("draws all of a few long labels on a narrow panel and a readable subset of 600", async () => {
+      const short = await convert(panel(), [servicesRows(five)], 800);
+      expect(shownLabels(short.options, five, 800)).toEqual(five);
+      const narrow = await convert(panel(), [servicesRows(fiveLong)], 420);
+      expect(shownLabels(narrow.options, fiveLong, 420)).toEqual(fiveLong);
+      const crowded = await convert(panel(), [servicesRows(many)], 1000);
+      const svg = renderSvg(crowded.options, 1000);
+      // Every drawn trace label must be a whole name, never a truncated shared prefix.
+      const drawn = svg.split(">rtoss16687_").length - 1;
+      const whole = many.filter((name) => svg.includes(`>${name}</text>`));
+      expect(drawn).toBeGreaterThan(2);
+      expect(drawn).toBeLessThan(100);
+      expect(whole).toHaveLength(drawn);
+    });
   });
 
   it("keeps adjacent y-axis ticks distinct after unit rounding, and exact ticks unchanged", async () => {
@@ -283,6 +360,154 @@ describe("box plot", () => {
       __name: "web",
       __value: 100,
       __axisValue: "web",
+    });
+  });
+
+  it("skips the query for a value the stream types as text", () => {
+    const schema = panel();
+    const build = (type: string) =>
+      buildSQLChartQuery({
+        queryData: schema.queries[0],
+        chartType: "boxplot",
+        dashboardPanelData: {
+          data: schema,
+          meta: {
+            streamFields: {
+              groupedFields: [{ stream_alias: null, schema: [{ name: "latency_ms", type }] }],
+            },
+          },
+        },
+      });
+    expect(build("Utf8")).toBe("");
+    expect(build("Float64")).toContain('min(latency_ms) as "y_axis_1_min"');
+  });
+
+  describe("category order", () => {
+    const summaryRow = (name: string, low: number) => ({
+      x_axis_1: name,
+      y_axis_1_min: low,
+      y_axis_1_q1: low + 1,
+      y_axis_1_median: low + 2,
+      y_axis_1_q3: low + 3,
+      y_axis_1_max: low + 4,
+      y_axis_1_count: 10,
+    });
+    const descRows = [summaryRow("echo", 5), summaryRow("charlie", 3), summaryRow("alpha", 1)];
+    const sorted = (sortBy: string | null) =>
+      panel({}, [{ ...field("x_axis_1", "service"), sortBy } as any]);
+    const custom = (sql: string, x = [field("x_axis_1", "service")]) => {
+      const schema: any = panel({}, x);
+      schema.queries[0].customQuery = true;
+      schema.queries[0].query = sql;
+      return schema;
+    };
+
+    it("follows a builder category's sort direction", async () => {
+      const desc = await convert(sorted("DESC"), [descRows]);
+      expect(desc.options.xAxis.data).toEqual(["echo", "charlie", "alpha"]);
+      expect(desc.options.series[0].data[0]).toEqual([5, 6, 7, 8, 9]);
+      const asc = await convert(sorted("ASC"), [[...descRows].reverse()]);
+      expect(asc.options.xAxis.data).toEqual(["alpha", "charlie", "echo"]);
+    });
+
+    it("runs A to Z when the builder category has no sort direction", async () => {
+      const none = await convert(sorted(null), [descRows]);
+      expect(none.options.xAxis.data).toEqual(["alpha", "charlie", "echo"]);
+    });
+
+    it("keeps custom SQL row order only when its first top-level ORDER BY key is the category", async () => {
+      const rawRows = [
+        { x_axis_1: "web", y_axis_1: 1 },
+        { x_axis_1: "api", y_axis_1: 2 },
+        { x_axis_1: "web", y_axis_1: 3 },
+      ];
+      const order = async (sql: string) =>
+        (await convert(custom(sql), [rawRows])).options.xAxis.data;
+      const select = 'SELECT service as "x_axis_1", v as "y_axis_1" FROM t';
+      expect(await order(`${select} ORDER BY x_axis_1 DESC`)).toEqual(["web", "api"]);
+      expect(await order(`${select} ORDER BY "x_axis_1" desc LIMIT 10`)).toEqual(["web", "api"]);
+      expect(await order(`${select} ORDER BY service DESC, v`)).toEqual(["web", "api"]);
+      expect(await order(`${select} ORDER BY _timestamp DESC LIMIT 10000`)).toEqual(["api", "web"]);
+      expect(await order(`${select} ORDER BY v DESC`)).toEqual(["api", "web"]);
+      expect(await order(`${select} ORDER BY x_axis_1 || v`)).toEqual(["api", "web"]);
+      expect(
+        await order(
+          'SELECT service as "x_axis_1", v as "y_axis_1" FROM (SELECT * FROM t ORDER BY v)',
+        ),
+      ).toEqual(["api", "web"]);
+      expect(
+        await order(
+          'SELECT service as "x_axis_1", v as "y_axis_1", 1 as "sort order by x_axis_1" FROM t',
+        ),
+      ).toEqual(["api", "web"]);
+    });
+
+    it("keeps time buckets chronological whatever the row order", async () => {
+      const bucketRows = [
+        { x_axis_1: "2026-10-01T02:00:00", y_axis_1: 1 },
+        { x_axis_1: "2026-10-01T00:00:00", y_axis_1: 2 },
+        { x_axis_1: "2026-10-01T01:00:00", y_axis_1: 3 },
+      ];
+      const histogram = [field("x_axis_1", "_timestamp", "histogram")];
+      const expected = ["2026-10-01 00:00:00", "2026-10-01 01:00:00", "2026-10-01 02:00:00"];
+      const ordered = await convert(
+        custom("SELECT histogram(_timestamp) as x_axis_1 FROM t ORDER BY x_axis_1 DESC", histogram),
+        [bucketRows],
+      );
+      expect(ordered.options.xAxis.data).toEqual(expected);
+      const builder = panel({}, [{ ...histogram[0], sortBy: "DESC" } as any]);
+      expect((await convert(builder, [bucketRows])).options.xAxis.data).toEqual(expected);
+    });
+  });
+
+  describe("custom SQL that kept the builder's summary columns", () => {
+    const summaryRows = [
+      {
+        x_axis_1: "alpha",
+        y_axis_1_min: 20,
+        y_axis_1_q1: 40,
+        y_axis_1_median: 50,
+        y_axis_1_q3: 60,
+        y_axis_1_max: 80,
+        y_axis_1_count: 6000,
+      },
+      {
+        x_axis_1: "bravo",
+        y_axis_1_min: 50,
+        y_axis_1_q1: 70,
+        y_axis_1_median: 80,
+        y_axis_1_q3: 90,
+        y_axis_1_max: 110,
+        y_axis_1_count: 6000,
+      },
+    ];
+
+    it("draws the same boxes as the builder from the summary columns", async () => {
+      const builder = await convert(panel(), [summaryRows]);
+      const schema: any = panel();
+      schema.queries[0].customQuery = true;
+      schema.queries[0].query = buildSQLChartQuery({
+        queryData: panel().queries[0],
+        chartType: "boxplot",
+        dashboardPanelData: { data: panel(), meta: {} },
+      });
+      const custom = await convert(schema, [summaryRows]);
+      expect(custom.options.series[0].data).toEqual(builder.options.series[0].data);
+      expect(custom.options.series[0].data[0]).toEqual([20, 40, 50, 60, 80]);
+      expect(custom.options.tooltip.formatter({ seriesType: "boxplot", dataIndex: 0 })).toContain(
+        "Samples: 6,000",
+      );
+    });
+
+    it("falls back to raw values when a summary column is missing", async () => {
+      const schema: any = panel();
+      schema.queries[0].customQuery = true;
+      const partial = summaryRows.map(({ y_axis_1_q3: _q3, ...rest }) => ({
+        ...rest,
+        y_axis_1: 7,
+      }));
+      const out = await convert(schema, [partial]);
+      expect(out.options.series[0].data[0]).toEqual([7, 7, 7, 7, 7]);
     });
   });
 

@@ -158,6 +158,14 @@ count badge, one click each. Reference: the Pipelines and Alerts lists
   a primary count badge; error/warning chips with a count above 0 get a tinted
   badge. The tooltip says what a click does ("Show only / Also show / Stop
   showing …").
+- **Keyboard-first surfaces opt in to `roving`.** One tab stop for the whole strip;
+  arrows / Home / End move between chips and a single-select strip selects the chip
+  they land on (a `multiple` strip only moves focus; Space / Enter toggle). Pass
+  `hide-values` while the counts are not known (the command palette before anything
+  is typed) rather than showing a row of `—`. Reference:
+  [CommandPalette.vue](../../../web/src/components/commandPalette/CommandPalette.vue).
+- **Inside a dialog or popover: `dense`.** 28px chips with tighter padding; the
+  strip still scrolls on one line like every other chip row.
 - **Read-only counts are not chips.** Info-only stats above a list are an `inline`
   KPI line (icon · value · label, no border, no hover) in the toolbar row, or their
   own compact `row` above the table header when the toolbar is full (DB

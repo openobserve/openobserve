@@ -363,7 +363,6 @@ mod tests {
             },
             deleted: false,
             selection: None,
-            row_group_size: None,
         }
     }
 

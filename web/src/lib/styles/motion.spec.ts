@@ -96,6 +96,14 @@ describe("one set of motion timings (item 9)", () => {
     expect(code).not.toMatch(/data-\[state=(open|closed)\]:duration-\d/);
   });
 
+  it.each(PANELS)("keeps %s from animating its inline position changes", (file) => {
+    expect(read(file).match(/'transition-none'/g)).toHaveLength(2);
+  });
+
+  it.each(PANELS)("keeps %s from animating its inline position changes", (file) => {
+    expect(read(file).match(/'transition-none'/g)).toHaveLength(2);
+  });
+
   it("stops pulse, shimmer and bounce under reduced motion", () => {
     const reduced = reducedMotionCss(read("styles/tailwind.css"));
     for (const selector of [".animate-pulse", ".animate-bounce", ".skeleton-wave::after"]) {

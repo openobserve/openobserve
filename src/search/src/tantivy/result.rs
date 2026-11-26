@@ -68,16 +68,11 @@ impl TantivyMultiResultBuilder {
     }
 
     // simple select
-    pub fn add_select_candidates(
-        &mut self,
-        file_name: String,
-        candidates: Arc<Vec<(i64, u32)>>,
-        row_group_size: Option<u32>,
-    ) {
+    pub fn add_select_candidates(&mut self, file_name: String, candidates: Arc<Vec<(i64, u32)>>) {
         match self {
             Self::SimpleSelect { num_rows, pruner } => {
                 *num_rows += candidates.len() as u64;
-                pruner.record_candidates(file_name, candidates, row_group_size);
+                pruner.record_candidates(file_name, candidates);
             }
             _ => unreachable!("unsupported tantivy multi result"),
         }
