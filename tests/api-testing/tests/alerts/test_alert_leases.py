@@ -4,6 +4,7 @@ Nothing here waits on the 60 s expiry sweep (see the _wallclock file); leases en
 from __future__ import annotations
 
 import pytest
+from support.wait import wait_until
 
 from .multialert_helpers import (
     DAY_US,
@@ -59,6 +60,15 @@ def _alert(alerts, alert_id: str) -> dict:
     alert = alerts.get_alert(alert_id)
     assert alert is not None, f"alert {alert_id} is gone"
     return alert
+
+
+def _settles(alerts, alert_id: str, field: str, value: bool, msg: str = "") -> None:
+    # GET reads the alert cache, which a watcher refreshes just after each write
+    wait_until(
+        lambda: _alert(alerts, alert_id)[field] is value,
+        timeout=5,
+        msg=msg or f"alert {alert_id} {field} to become {value}",
+    )
 
 
 def _item(alerts, name: str) -> dict:
@@ -184,7 +194,7 @@ def test_ending_a_temporary_alert_disables_it_and_keeps_it(alerts):
     assert ended["state"] == "ended"
     assert ended["id"] == lease["id"]
     assert ended["ended_at_us"] >= before
-    assert _alert(alerts, alert_id)["enabled"] is False
+    _settles(alerts, alert_id, "enabled", False)
     item = _item(alerts, name)
     assert item["enabled"] is False
     assert "leases" not in item, "an ended lease leaves the list row"
@@ -200,11 +210,11 @@ def test_keeping_a_temporary_alert_makes_it_ordinary(alerts):
     kept = resp.json()
     assert kept["state"] == "kept"
     assert kept["state_reason"] == f"Kept by {alerts._c.email}"
-    assert _alert(alerts, alert_id)["enabled"] is True
+    _settles(alerts, alert_id, "enabled", True)
     assert "leases" not in _item(alerts, name)
     _conflict(alerts.lease_action(alert_id, lease["id"], "end"), "not_active")
     _conflict(alerts.lease_action(alert_id, lease["id"], "keep"), "not_active")
-    assert _alert(alerts, alert_id)["enabled"] is True, "a refused end must not disable a kept alert"
+    _settles(alerts, alert_id, "enabled", True, "a refused end must not disable a kept alert")
 
 
 def test_a_temporary_alert_blocks_a_timed_toggle_until_kept(alerts):
@@ -212,12 +222,12 @@ def test_a_temporary_alert_blocks_a_timed_toggle_until_kept(alerts):
     _, alert_id, lease = _temporary(alerts, "lease_a9")
     blocked = _conflict(_timed(alerts, alert_id), "lease_active")
     assert blocked["lease_id"] == lease["id"]
-    assert _alert(alerts, alert_id)["creates_incident"] is False
+    _settles(alerts, alert_id, "creates_incident", False)
     assert [x["id"] for x in _leases(alerts, alert_id)] == [lease["id"]]
 
     assert alerts.lease_action(alert_id, lease["id"], "keep").status_code == 200
     timed = _timed_lease(alerts, alert_id)
-    assert _alert(alerts, alert_id)["creates_incident"] is True
+    _settles(alerts, alert_id, "creates_incident", True)
     assert {x["id"]: x["state"] for x in _leases(alerts, alert_id)} == {lease["id"]: "kept", timed["id"]: "active"}
 
 
@@ -231,7 +241,7 @@ def test_an_untimed_toggle_changes_the_value_without_a_lease(alerts):
         assert body["creates_incident"] is value
         assert isinstance(body["version"], int)
         assert "lease" not in body
-        assert _alert(alerts, alert_id)["creates_incident"] is value
+        _settles(alerts, alert_id, "creates_incident", value)
     assert _leases(alerts, alert_id) == []
     assert "leases" not in _item(alerts, name)
 
@@ -250,13 +260,13 @@ def test_a_timed_toggle_holds_the_value_and_its_end_restores_the_prior_one(alert
     assert lease["reason"] == REASON
     assert lease["origin_ref"] == "inc-a11"
     assert lease["version"] == body["version"]
-    assert _alert(alerts, alert_id)["creates_incident"] is True
+    _settles(alerts, alert_id, "creates_incident", True)
     assert [x["id"] for x in _item(alerts, name)["leases"]] == [lease["id"]]
 
     ended = _end(alerts, alert_id, lease["id"])
     assert ended["state"] == "ended"
     assert "ended_at_us" in ended
-    assert _alert(alerts, alert_id)["creates_incident"] is False, "the prior value returns at the end"
+    _settles(alerts, alert_id, "creates_incident", False, "the prior value returns at the end")
     assert "leases" not in _item(alerts, name)
 
 
@@ -266,7 +276,7 @@ def test_a_second_timed_toggle_is_refused(alerts):
     first = _timed_lease(alerts, alert_id, True)
     second = _conflict(_timed(alerts, alert_id, False), "lease_active")
     assert second["lease_id"] == first["id"]
-    assert _alert(alerts, alert_id)["creates_incident"] is True
+    _settles(alerts, alert_id, "creates_incident", True)
     assert [x["id"] for x in _leases(alerts, alert_id)] == [first["id"]]
 
 
@@ -287,7 +297,7 @@ def test_an_invalid_timed_toggle_changes_nothing(alerts, until_s, reason, messag
     if reason is not None:
         body["reason"] = reason
     _bad_request(alerts.set_creates_incident(alert_id, body), message)
-    assert _alert(alerts, alert_id)["creates_incident"] is False
+    _settles(alerts, alert_id, "creates_incident", False)
     assert _leases(alerts, alert_id) == []
 
 
@@ -305,7 +315,7 @@ def test_expected_version_guards_the_toggle(alerts):
 
     stale = _conflict(alerts.set_creates_incident(alert_id, {"value": True, "expected_version": v1}), "version_changed")
     assert stale["version"] == v2, "the conflict carries the current version"
-    assert _alert(alerts, alert_id)["creates_incident"] is False, "a stale toggle must not land"
+    _settles(alerts, alert_id, "creates_incident", False, "a stale toggle must not land")
     timed_stale = _timed(alerts, alert_id, True, expected_version=v1)
     _conflict(timed_stale, "version_changed")
     assert _leases(alerts, alert_id) == []
