@@ -180,18 +180,8 @@ export function useLLMInsights() {
     });
   }
 
-  /**
-   * Internal — fetch the whole-window P95 latency (the one KPI card that
-   * can't be derived from the histogram, since percentiles aren't
-   * additive across buckets — you can't average per-bucket P95s to get
-   * the overall P95).
-   *
-   * Scoped to LLM calls in WHERE (`gen_ai_operation_name IS NOT NULL`) so
-   * other spans are never scanned — "P95 Latency" means "how slow
-   * are the model calls", so the fast child/tool spans must be excluded
-   * or they drag the tail down. This matches the dedicated Latency trend
-   * panel and the sparkline's per-bucket P95.
-   */
+  // Own query because percentiles don't add across buckets. LLM calls only;
+  // child/tool spans would drag the tail down.
   async function fetchLatency(
     streamName: string,
     startTime: number,

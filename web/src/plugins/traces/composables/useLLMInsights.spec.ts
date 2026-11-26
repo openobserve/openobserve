@@ -845,7 +845,7 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     expect(p95Call).toBeTruthy();
     const sql: string = (p95Call as any)[0].queryReq.query.sql;
 
-    // LLM-only in WHERE, so the scan skips child/tool spans instead of filtering after reading them.
+    // LLM-only via WHERE, so non-LLM spans never reach the aggregate.
     expect(sql).toBe(
       'SELECT COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration FROM "default" WHERE gen_ai_operation_name IS NOT NULL',
     );
@@ -868,11 +868,26 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     const sql: string = mockFetchQueryDataWithHttpStream.mock.calls
       .map(([p]: any) => p.queryReq.query.sql as string)
       .find((s) => s.includes("p95_duration") && !s.includes("GROUP BY"))!;
-    expect(sql).toContain(
-      "WHERE gen_ai_operation_name IS NOT NULL AND gen_ai_agent_name = 'support-agent' AND ",
+    expect(sql).toBe(
+      'SELECT COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration FROM "default" ' +
+        "WHERE gen_ai_operation_name IS NOT NULL AND gen_ai_agent_name = 'support-agent' " +
+        "AND (gen_ai_agent_env IS NULL OR gen_ai_agent_env = '') " +
+        'AND trace_id IN (SELECT trace_id FROM "default" WHERE (x = 1))',
     );
-    expect(sql).toContain('AND trace_id IN (SELECT trace_id FROM "default" WHERE (x = 1))');
-    expect(sql).not.toContain("FILTER");
+  });
+
+  it("P95 query with only a page filter ANDs it after the LLM-span predicate", async () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll("default", 100, 200, null, "service_name = 'checkout'");
+    await flushPromises();
+
+    const sql: string = mockFetchQueryDataWithHttpStream.mock.calls
+      .map(([p]: any) => p.queryReq.query.sql as string)
+      .find((s) => s.includes("p95_duration") && !s.includes("GROUP BY"))!;
+    expect(sql).toBe(
+      'SELECT COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration FROM "default" ' +
+        "WHERE gen_ai_operation_name IS NOT NULL AND service_name = 'checkout'",
+    );
   });
 
   // Trace and error counts include non-LLM spans, so this query must keep scanning every span.
@@ -887,6 +902,8 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     expect(summarySqls).toHaveLength(2);
     for (const sql of summarySqls) {
       expect(sql).toMatch(/= agent_parent_span GROUP BY (ts|trace_id)\b/);
+      // The LLM predicate may appear only in aggregate FILTERs; a top-level WHERE drops error spans.
+      expect(sql).not.toMatch(/[^(]WHERE gen_ai_operation_name IS NOT NULL/);
     }
   });
 

@@ -114,13 +114,8 @@ const TOTAL_TOKENS_FIELD = `gen_ai_usage_total_tokens`;
 const MODEL_FIELD = `gen_ai_response_model`;
 const OBSERVATION_TYPE_FIELD = `gen_ai_operation_name`;
 
-// Scope for every panel that groups by model. `LLM_SPAN_FILTER` alone admits ALL
-// gen_ai spans — including `execute_tool` children and evaluator spans, which
-// legitimately carry no model (the OTEL gen_ai conventions only put a model on
-// generation/embedding operations). Bucketing those under a synthetic
-// "unknown" model made them dominate the per-model panels: an agent emits one
-// generation span per turn but a tool span per tool call, so "unknown" read as
-// ~9x the real model and its token bar was always a flat zero.
+// Tool and evaluator spans carry no model; bucketing them as "unknown" swamped
+// the per-model panels, so model panels also require a model.
 const modelScopedFilter = `${LLM_SPAN_FILTER} AND ${MODEL_FIELD} IS NOT NULL`;
 
 // Operations that are LLM calls (mirrors GENERATION_GEN_AI_OPERATIONS in
