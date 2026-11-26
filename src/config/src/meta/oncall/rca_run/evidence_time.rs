@@ -17,7 +17,10 @@ use std::{collections::BTreeMap, ops::ControlFlow};
 
 use serde_json::Value;
 use sqlparser::{
-    ast::{Expr, GroupByExpr, OrderByKind, Query, SelectItem, SetExpr, Statement, Visit, Visitor},
+    ast::{
+        Expr, GroupByExpr, OrderByKind, OrderBySort, Query, SelectItem, SetExpr, Statement, Visit,
+        Visitor,
+    },
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -134,8 +137,9 @@ impl SqlTimes {
             let temporal = name.is_some_and(|name| {
                 time_column(name) || parsed.columns.iter().any(|column| column == name)
             });
-            parsed.ascending = temporal && first.options.asc != Some(false);
-            if temporal && first.options.asc == Some(false) {
+            let descending = first.options.sort == Some(OrderBySort::Desc);
+            parsed.ascending = temporal && !descending;
+            if temporal && descending {
                 return None;
             }
         }
