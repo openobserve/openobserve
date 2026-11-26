@@ -321,8 +321,8 @@ describe("UsageTab", () => {
     it("should render events count tile", () => {
       const tile = wrapper.find('[data-test="home-usage-tab-events-count"]');
       expect(tile.exists()).toBe(true);
-      // formatEventCount(10000) -> "10000" (falls back to summary.doc_count)
-      expect(tile.text()).toBe("10000");
+      // formatEventCount(10000) -> "10,000" (falls back to summary.doc_count)
+      expect(tile.text()).toBe("10,000");
     });
 
     it("should render ingested data size tile", () => {
