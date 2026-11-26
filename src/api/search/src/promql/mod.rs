@@ -739,7 +739,7 @@ async fn query_range(
     tag = "Metrics",
     operation_id = "PrometheusMetadata",
     summary = "Get metric metadata",
-    description = "Retrieves metadata information about metrics including their type, help text, and units. Provides essential information for understanding metric semantics and proper usage in queries and visualizations.",
+    description = "Retrieves metadata information about metrics including their type, help text, and units. Provides essential information for understanding metric semantics and proper usage in queries and visualizations. With RBAC, `metric` is checked against that metric; without it the result holds only the metrics the caller may read, and `limit` applies after that filter.",
     security(
         ("Authorization"= [])
     ),
@@ -773,7 +773,7 @@ async fn query_range(
               ]
             }
         })),
-        (status = 403, description = "No permission to read metrics", content_type = "application/json", body = ()),
+        (status = 403, description = "No read permission on the requested metric", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -998,7 +998,7 @@ async fn series(
     tag = "Metrics",
     operation_id = "PrometheusLabels",
     summary = "Get metric label names",
-    description = "Returns a list of label names available in the metric data within the specified time range. Optionally filter by series selector to get labels for specific metrics. Useful for building dynamic queries and understanding data structure.",
+    description = "Returns a list of label names available in the metric data within the specified time range. Optionally filter by series selector to get labels for specific metrics. Useful for building dynamic queries and understanding data structure. With RBAC, the metric in `match[]` is checked per metric; without `match[]` the caller needs read on all metrics.",
     security(
         ("Authorization"= [])
     ),
@@ -1036,7 +1036,7 @@ async fn series(
             ]
         })),
         (status = 400, description = "Invalid match[] or time range", content_type = "application/json", body = ()),
-        (status = 403, description = "No permission to read metrics", content_type = "application/json", body = ()),
+        (status = 403, description = "No read permission on the requested metric, or on all metrics when match[] is absent", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1066,6 +1066,7 @@ pub async fn labels_get(
     request_body(content = inline(config::meta::promql::RequestLabels), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::promql::ApiFuncResponse<Vec<String>>),
+        (status = 403, description = "No read permission on the requested metric, or on all metrics when match[] is absent", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
@@ -1155,7 +1156,7 @@ async fn labels(
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
     summary = "Get label values",
-    description = "Returns values for a label within the specified time range. Labels other than __name__ require match[] to identify a metric; requests without a metric return 400 because querying all metrics streams is unsupported.",
+    description = "Returns values for a label within the specified time range. Labels other than __name__ require match[] to identify a metric; requests without a metric return 400 because querying all metrics streams is unsupported. With RBAC, the metric in `match[]` is checked per metric, and __name__ values without a metric list only the metrics the caller may read.",
     security(
         ("Authorization"= [])
     ),
@@ -1175,7 +1176,7 @@ async fn labels(
             ]
         })),
         (status = 400, description = "Invalid parameters or match[] does not identify a metric", content_type = "application/json", body = ()),
-        (status = 403, description = "No permission to read metrics", content_type = "application/json", body = ()),
+        (status = 403, description = "No read permission on the requested metric", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
