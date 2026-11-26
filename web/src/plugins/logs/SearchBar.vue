@@ -4131,6 +4131,31 @@ export default defineComponent({
               if (leftViewOrg()) return;
             } else {
               // ----- Here we are explicitly handling stream change -----
+              let selectedStreams = [];
+              if (typeof extractedObj.data.stream.selectedStream == "object") {
+                if (
+                  Object.prototype.hasOwnProperty.call(
+                    extractedObj.data.stream.selectedStream,
+                    "value",
+                  )
+                ) {
+                  selectedStreams.push(extractedObj.data.stream.selectedStream.value);
+                } else {
+                  selectedStreams.push(...extractedObj.data.stream.selectedStream);
+                }
+              } else {
+                selectedStreams.push(extractedObj.data.stream.selectedStream);
+              }
+              // Validate against the target type's streams before any state is touched.
+              const targetType = extractedObj.data.stream.streamType;
+              const targetStreamData = await getStreams(targetType, true);
+              if (leftViewOrg()) return;
+              const targetStreams = new Set((targetStreamData?.list ?? []).map((s) => s.name));
+              const streamNotExist = selectedStreams.filter((n) => !targetStreams.has(n));
+              if (streamNotExist.length > 0) {
+                let errMsg = t("search.streamNotExist").replace("[STREAM_NAME]", streamNotExist);
+                throw Object.assign(new Error(errMsg), { userFacing: true });
+              }
               searchObj.meta.sqlMode = false;
               await nextTick();
               if (leftViewOrg()) return;
@@ -4148,22 +4173,6 @@ export default defineComponent({
               // const selectedStream = cloneDeep(
               //   extractedObj.data.stream.selectedStream
               // );
-              let selectedStreams = [];
-              if (typeof extractedObj.data.stream.selectedStream == "object") {
-                if (
-                  Object.prototype.hasOwnProperty.call(
-                    extractedObj.data.stream.selectedStream,
-                    "value",
-                  )
-                ) {
-                  selectedStreams.push(extractedObj.data.stream.selectedStream.value);
-                } else {
-                  selectedStreams.push(...extractedObj.data.stream.selectedStream);
-                }
-              } else {
-                selectedStreams.push(extractedObj.data.stream.selectedStream);
-              }
-
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.histogram = {
                 xData: [],
@@ -4190,20 +4199,12 @@ export default defineComponent({
               }
               await restoreBuildData(extractedObj.data.buildData ?? null);
 
+              // resetStreamData() cleared the store, so reload the list into it.
               const streamData = await getStreams(searchObj.data.stream.streamType, true);
               if (leftViewOrg()) return;
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
-              searchObj.data.stream.selectedStream = [selectedStreams];
-
-              const streamValues = searchObj.data.stream.streamLists.map((item) => item.value);
-              const streamNotExist = selectedStreams.filter(
-                (stream_str) => !streamValues.includes(stream_str),
-              );
-              if (streamNotExist.length > 0) {
-                let errMsg = t("search.streamNotExist").replace("[STREAM_NAME]", streamNotExist);
-                throw Object.assign(new Error(errMsg), { userFacing: true });
-              }
+              searchObj.data.stream.selectedStream = selectedStreams;
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
