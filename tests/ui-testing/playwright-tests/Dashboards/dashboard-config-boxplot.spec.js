@@ -47,8 +47,6 @@ const ONE_VALUE_ERROR = "Add one field for the";
 // Custom SQL returning raw values: the browser computes the box itself, so IQR mode can split off outliers.
 // Without a GROUP BY every projected column lands on the Value well, so only the value is selected.
 const RAW_VALUES_SQL = `SELECT ${VALUE_FIELD} AS "y_axis_1" FROM "e2e_automate" WHERE ${VALUE_FIELD} IS NOT NULL`;
-// First column of the builder's summary SQL, which the Value well keeps after the switch to custom mode.
-const STALE_SUMMARY_ALIAS = "y_axis_1_min";
 
 // Intercepted drilldown target, so the new tab never leaves the test network.
 const DRILLDOWN_HOST = "https://example.com";
@@ -215,12 +213,10 @@ test.describe("ConfigPanel — Box Plot Settings", () => {
 
       await setupBoxplotPanelWithConfig(page, pm, dashboardName);
       await selector.setCustomSQL(RAW_VALUES_SQL);
-      // Replacing the seeded summary SQL changes the column count, so Value is not remapped from
-      // y_axis_1_min; swap it by hand, as a user has to.
+      // The switch maps Value to the base alias, never to the summary's first column.
       await selector.waitForFieldListRow("y_axis_1");
-      await selector.removeFieldIfPresent(STALE_SUMMARY_ALIAS, "y");
-      await selector.searchAndAddField("y_axis_1", "y");
       await selector.waitForCustomQueryAxes(null, "y_axis_1");
+      await expect(page.locator('[data-test="dashboard-y-item-y_axis_1_min"]')).toHaveCount(0);
       await actions.applyDashboardBtn();
       await actions.waitForChartToRender();
       await expect(actions.dashboardErrorItems).toHaveCount(0);

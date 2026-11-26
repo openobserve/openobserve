@@ -20,6 +20,14 @@ pub struct Model {
     pub region_only: bool,
     /// The region whose write this row holds; `None` for this region's own.
     pub origin_region: Option<String>,
+    /// A disabled toolset is never pushed to the assistant.
+    pub enabled: bool,
+    /// `ok` | `failing`; none until a turn used the toolset.
+    pub status_state: Option<String>,
+    pub status_since: Option<i64>,
+    /// A fixed server sentence, never upstream text.
+    pub last_error: Option<String>,
+    pub last_used_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -45,6 +53,11 @@ mod tests {
             updated_at: 2000,
             region_only: false,
             origin_region: None,
+            enabled: true,
+            status_state: None,
+            status_since: None,
+            last_error: None,
+            last_used_at: None,
         };
         assert_eq!(m.id, "ts-1");
         assert_eq!(m.org, "myorg");

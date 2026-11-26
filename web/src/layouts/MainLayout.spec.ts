@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
@@ -30,6 +30,7 @@ import config from "@/aws-exports";
 import stream from "@/services/stream";
 import billings from "@/services/billings";
 import configService from "@/services/config";
+import organizationsService from "@/services/organizations";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 
 const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
@@ -262,39 +263,6 @@ describe("MainLayout Methods and Functions", () => {
       // Test case insensitive
       expect(filteredOrganizations("TEST")).toHaveLength(1);
     });
-
-    it("should compute getBtnLogo based on state", () => {
-      const getImageURL = vi.fn((path: string) => `mock-${path}`);
-
-      const getBtnLogo = (theme: string, isHovered: boolean, isAiChatEnabled: boolean) => {
-        if (theme === "dark") {
-          if (isAiChatEnabled) {
-            return getImageURL("images/ai_icons/ai_icon_dark_enabled.svg");
-          } else if (isHovered) {
-            return getImageURL("images/ai_icons/ai_icon_dark_hovered.svg");
-          } else {
-            return getImageURL("images/ai_icons/ai_icon_dark.svg");
-          }
-        } else {
-          if (isAiChatEnabled) {
-            return getImageURL("images/ai_icons/ai_icon_enabled.svg");
-          } else if (isHovered) {
-            return getImageURL("images/ai_icons/ai_icon_hovered.svg");
-          } else {
-            return getImageURL("images/ai_icons/ai_icon.svg");
-          }
-        }
-      };
-
-      // Test dark theme default
-      expect(getBtnLogo("dark", false, false)).toContain("ai_icon_dark.svg");
-
-      // Test dark theme hovered
-      expect(getBtnLogo("dark", true, false)).toContain("ai_icon_dark_hovered.svg");
-
-      // Test dark theme enabled
-      expect(getBtnLogo("dark", false, true)).toContain("ai_icon_dark_enabled.svg");
-    });
   });
 
   describe("Organization Management", () => {
@@ -508,44 +476,6 @@ describe("MainLayout Methods and Functions", () => {
           expect.objectContaining({ usage_stream_enabled: false }),
         );
       });
-    });
-  });
-
-  describe("AI Chat Functionality", () => {
-    it("should toggle AI chat", () => {
-      const toggleAIChat = () => {
-        const isAiChatEnabled = false;
-        mockStore.dispatch("setIsAiChatEnabled", !isAiChatEnabled);
-      };
-
-      toggleAIChat();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
-    });
-
-    it("should close AI chat", () => {
-      const closeChat = () => {
-        mockStore.dispatch("setIsAiChatEnabled", false);
-      };
-
-      closeChat();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", false);
-    });
-
-    it("should enable AI chat and pass message to context", () => {
-      const sendToAiChat = (message: string, store: any) => {
-        // Enable AI chat first
-        store.dispatch("setIsAiChatEnabled", true);
-        // Set the message context for AI
-        store.dispatch("setAiChatContext", message);
-      };
-
-      const testMessage = "Test message for AI";
-      sendToAiChat(testMessage, mockStore);
-
-      // Verify AI chat is enabled
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
-      // Verify message context is set
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setAiChatContext", testMessage);
     });
   });
 
@@ -1010,23 +940,6 @@ describe("MainLayout Methods and Functions", () => {
   });
 
   describe("Theme and UI State Management", () => {
-    it("should compute button logo for light theme", () => {
-      const getImageURL = vi.fn((path: string) => `mock-${path}`);
-
-      const getBtnLogo = (theme: string, isHovered: boolean, isEnabled: boolean) => {
-        if (isHovered || isEnabled) {
-          return getImageURL("images/common/ai_icon_dark.svg");
-        }
-
-        return theme === "dark"
-          ? getImageURL("images/common/ai_icon_dark.svg")
-          : getImageURL("images/common/ai_icon.svg");
-      };
-
-      const result = getBtnLogo("light", false, false);
-      expect(result).toContain("ai_icon.svg");
-    });
-
     it("should handle theme switching", () => {
       const switchTheme = (currentTheme: string) => {
         return currentTheme === "dark" ? "light" : "dark";
@@ -1741,42 +1654,6 @@ describe("MainLayout Methods and Functions", () => {
   });
 
   describe("Event Handling - High Priority", () => {
-    it("should dispatch window resize event after AI chat toggle", () => {
-      const toggleAIChatWithResize = () => {
-        const isEnabled = false;
-        mockStore.dispatch("setIsAiChatEnabled", !isEnabled);
-
-        // Simulate window resize dispatch
-        window.dispatchEvent(new Event("resize"));
-        return true;
-      };
-
-      toggleAIChatWithResize();
-
-      // Verify that dispatchEvent was called with resize event
-      expect(window.dispatchEvent).toHaveBeenCalled();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
-    });
-
-    it("should handle AI chat input context with nextTick", async () => {
-      const sendToAiChat = async (message: string) => {
-        const trimmedMessage = message.trim();
-
-        if (!trimmedMessage) return false;
-
-        mockStore.dispatch("setIsAiChatEnabled", true);
-
-        // Simulate nextTick wait
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        return true;
-      };
-
-      const result = await sendToAiChat("  Test message  ");
-      expect(result).toBe(true);
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
-    });
-
     it("should handle multiple rapid search query changes", () => {
       let selectedOrg: any = { identifier: "org1" };
 
@@ -1918,7 +1795,10 @@ describe("MainLayout — focus-mode route", () => {
         stubs: {
           AppHeader: StubDiv,
           ONavbar: { name: "ONavbar", setup: () => () => h("nav") },
-          O2AIChat: StubDiv,
+          AssistantSidebarHost: { name: "AssistantSidebarHost", setup: () => () => h("div") },
+          AssistantWindowLayer: StubDiv,
+          AssistantSkipLink: StubDiv,
+          HomeReturnBar: StubDiv,
           WebinarBanner: { name: "WebinarBanner", setup: () => () => h("div") },
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,
@@ -1937,7 +1817,6 @@ describe("MainLayout — focus-mode route", () => {
     writeFirstDataRecord("focus_org", { lastVisit: 1, hadData: false });
     store.state.organizationData.isDataIngested = false;
     (wrapper.vm as unknown as { isLoading: boolean }).isLoading = true;
-    store.state.isAiChatEnabled = true;
     await flushPromises();
     return wrapper;
   };
@@ -1948,7 +1827,6 @@ describe("MainLayout — focus-mode route", () => {
 
   afterEach(() => {
     queryClient.clear();
-    store.state.isAiChatEnabled = false;
     localStorage.clear();
   });
 
@@ -1962,7 +1840,7 @@ describe("MainLayout — focus-mode route", () => {
     expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(false);
     expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(false);
     expect(wrapper.find('[data-test="first-data-notice"]').exists()).toBe(false);
-    expect(wrapper.find("aside.o2-sidebar-right").exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "AssistantSidebarHost" }).exists()).toBe(false);
     // it mounts before the page renders, so only its absence keeps the Slack invite off onboarding
     expect(wrapper.findComponent({ name: "CommunitySlackInvite" }).exists()).toBe(false);
     wrapper.unmount();
@@ -1976,6 +1854,7 @@ describe("MainLayout — focus-mode route", () => {
     expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(true);
     expect(wrapper.find("header.o2-app-header").classes()).not.toContain("hidden");
     expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "AssistantSidebarHost" }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: "CommunitySlackInvite" }).exists()).toBe(true);
     wrapper.unmount();
   });
@@ -2002,7 +1881,10 @@ describe("MainLayout — first-time cloud login", () => {
         stubs: {
           AppHeader: StubDiv,
           ONavbar: StubDiv,
-          O2AIChat: StubDiv,
+          AssistantSidebarHost: StubDiv,
+          AssistantWindowLayer: StubDiv,
+          AssistantSkipLink: StubDiv,
+          HomeReturnBar: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,
@@ -2341,7 +2223,10 @@ describe("MainLayout — org switch on an org-scoped page", () => {
         stubs: {
           AppHeader: StubDiv,
           ONavbar: StubDiv,
-          O2AIChat: StubDiv,
+          AssistantSidebarHost: StubDiv,
+          AssistantWindowLayer: StubDiv,
+          AssistantSkipLink: StubDiv,
+          HomeReturnBar: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,
@@ -2410,5 +2295,253 @@ describe("MainLayout — org switch on an org-scoped page", () => {
       picked: "same_org",
     });
     expect(route.name).toBe("viewDashboard");
+  });
+});
+
+describe("MainLayout — assistant page gates", () => {
+  const getOrgSettings = vi.fn();
+  const getConfigFull = vi.mocked(configService.get_config_full) as ReturnType<typeof vi.fn>;
+
+  const StubDiv = defineComponent({ setup: () => () => h("div") });
+  const Page = defineComponent({
+    name: "AssistantGatesPage",
+    setup: () => () => h("div", { "data-test": "assistant-gates-page" }),
+  });
+
+  const mountLayout = async (meta: Record<string, unknown> = {}) => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", name: "page", component: Page, meta }],
+    });
+    await router.push("/");
+    return mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: StubDiv,
+          ONavbar: StubDiv,
+          AssistantSidebarHost: StubDiv,
+          AssistantWindowLayer: StubDiv,
+          AssistantSkipLink: StubDiv,
+          HomeReturnBar: StubDiv,
+          WebinarBanner: StubDiv,
+          AnnouncementBanner: StubDiv,
+          ShortcutCheatsheet: StubDiv,
+          GetStarted: StubDiv,
+          CommunitySlackInvite: StubDiv,
+          ThemeSwitcher: StubDiv,
+          PredefinedThemes: StubDiv,
+          SlackIcon: StubDiv,
+          ManagementIcon: StubDiv,
+          ODialog: StubDiv,
+          PaidOverageConsentDialog: StubDiv,
+        },
+      },
+    });
+  };
+
+  const pageShown = (w: VueWrapper) => w.find('[data-test="assistant-gates-page"]').exists();
+  const pendingShown = (w: VueWrapper) => w.find('[data-test="main-content-pending"]').exists();
+
+  describe("MainLayout — page gates", () => {
+    let wrapper: VueWrapper | undefined;
+    let savedConfig: Record<string, unknown>;
+    const savedOrgs = store.state.organizations;
+
+    let orgSettingsSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      global.window = realWindow;
+      orgSettingsSpy = vi
+        .spyOn(organizationsService, "get_organization_settings")
+        .mockImplementation((...args: unknown[]) => getOrgSettings(...args));
+      localStorage.clear();
+      savedConfig = store.state.zoConfig;
+      store.state.userInfo = { ...store.state.userInfo, email: "gates@example.com" };
+      store.state.organizations = [
+        {
+          id: 1,
+          name: "Default",
+          identifier: "default",
+          type: "default",
+          UserObj: { email: "gates@example.com" },
+        },
+      ];
+      getOrgSettings.mockResolvedValue({ data: { data: {} } });
+    });
+
+    afterEach(() => {
+      wrapper?.unmount();
+      wrapper = undefined;
+      queryClient.clear();
+      getOrgSettings.mockReset();
+      getConfigFull.mockReset();
+      getConfigFull.mockImplementation(() => new Promise(() => {}));
+      orgSettingsSpy.mockRestore();
+      store.state.zoConfig = savedConfig;
+      store.state.organizations = savedOrgs;
+    });
+
+    it("puts a license-locked page behind its feature lock", async () => {
+      store.state.zoConfig = { ...savedConfig, features: { alerts: "locked" } };
+      wrapper = await mountLayout({ licenseFeature: "alerts" });
+      await flushPromises();
+      const boundary = wrapper.find('[data-test="feature-lock-boundary"]');
+      expect(boundary.attributes("data-locked-feature")).toBe("alerts");
+      expect(boundary.find('[data-test="assistant-gates-page"]').exists()).toBe(true);
+    });
+
+    it("holds the page behind the skeleton until the full config lands", async () => {
+      store.state.zoConfig = { commit_hash: "abc" };
+      let land: (v: unknown) => void = () => {};
+      getConfigFull.mockReturnValue(new Promise((r) => (land = r)));
+      wrapper = await mountLayout();
+      await flushPromises();
+      expect(pendingShown(wrapper)).toBe(true);
+      expect(pageShown(wrapper)).toBe(false);
+
+      land({ data: { version: "v1", ai_enabled: true, rum: { enabled: false } } });
+      await flushPromises();
+      expect(pageShown(wrapper)).toBe(true);
+    });
+  });
+});
+
+describe("MainLayout — assistant kiosk and consent", () => {
+  const StubDiv = defineComponent({ setup: () => () => h("div") });
+  const tagged = (test: string) =>
+    defineComponent({ setup: () => () => h("div", { "data-test": test }) });
+  const SidebarHost = tagged("assistant-sidebar-host");
+
+  describe("MainLayout — the assistant shell in kiosk and focus mode", () => {
+    let wrapper: VueWrapper | undefined;
+
+    beforeEach(() => {
+      global.window = realWindow;
+    });
+
+    afterEach(() => {
+      wrapper?.unmount();
+      wrapper = undefined;
+      store.state.kioskMode = false;
+    });
+
+    const mountLayout = async (kioskMode: boolean, meta: Record<string, unknown> = {}) => {
+      store.state.kioskMode = kioskMode;
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/", component: StubDiv, meta }],
+      });
+      await router.push("/");
+      wrapper = mount(MainLayout, {
+        global: {
+          plugins: [store, i18n, router],
+          stubs: {
+            AppHeader: StubDiv,
+            ONavbar: StubDiv,
+            AssistantSidebarHost: SidebarHost,
+            AssistantWindowLayer: tagged("assistant-window-layer"),
+            AssistantSkipLink: StubDiv,
+            WebinarBanner: StubDiv,
+            AnnouncementBanner: StubDiv,
+            ShortcutCheatsheet: StubDiv,
+            GetStarted: StubDiv,
+            CommunitySlackInvite: StubDiv,
+            ThemeSwitcher: StubDiv,
+            PredefinedThemes: StubDiv,
+            SlackIcon: StubDiv,
+            ManagementIcon: StubDiv,
+            ODialog: StubDiv,
+            PaidOverageConsentDialog: tagged("paid-overage-consent"),
+          },
+        },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    it("drops the gutter, card chrome and assistant sidebar in kiosk mode", async () => {
+      const layout = await mountLayout(true);
+      const main = layout.find('[data-test="main-content"]');
+      expect(main.classes()).not.toContain("pe-2");
+      expect(main.find("div").classes()).not.toContain("shadow-md");
+      expect(layout.find('[data-test="assistant-sidebar-host"]').exists()).toBe(false);
+    });
+
+    it("keeps them outside kiosk mode", async () => {
+      const layout = await mountLayout(false);
+      const main = layout.find('[data-test="main-content"]');
+      expect(main.classes()).toContain("pe-2");
+      expect(main.find("div").classes()).toContain("shadow-md");
+      expect(layout.find('[data-test="assistant-sidebar-host"]').exists()).toBe(true);
+    });
+
+    it("mounts no assistant sidebar or window on a focus-mode route", async () => {
+      const layout = await mountLayout(false, { focusMode: true });
+      expect(layout.find('[data-test="assistant-sidebar-host"]').exists()).toBe(false);
+      expect(layout.find('[data-test="assistant-window-layer"]').exists()).toBe(false);
+    });
+  });
+
+  describe("MainLayout — the paid overage consent dialog", () => {
+    let wrapper: VueWrapper | undefined;
+    const savedCloud = config.isCloud;
+    const savedConfig = store.state.zoConfig;
+
+    beforeEach(() => {
+      global.window = realWindow;
+    });
+
+    afterEach(() => {
+      wrapper?.unmount();
+      wrapper = undefined;
+      config.isCloud = savedCloud;
+      store.state.zoConfig = savedConfig;
+    });
+
+    const mountLayout = async () => {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/", component: StubDiv }],
+      });
+      await router.push("/");
+      wrapper = mount(MainLayout, {
+        global: {
+          plugins: [store, i18n, router],
+          stubs: {
+            AppHeader: StubDiv,
+            ONavbar: StubDiv,
+            AssistantSidebarHost: StubDiv,
+            AssistantWindowLayer: StubDiv,
+            AssistantSkipLink: StubDiv,
+            WebinarBanner: StubDiv,
+            AnnouncementBanner: StubDiv,
+            ShortcutCheatsheet: StubDiv,
+            CommunitySlackInvite: StubDiv,
+            ThemeSwitcher: StubDiv,
+            PredefinedThemes: StubDiv,
+            SlackIcon: StubDiv,
+            ManagementIcon: StubDiv,
+            ODialog: StubDiv,
+            PaidOverageConsentDialog: tagged("paid-overage-consent"),
+          },
+        },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    it("stays off a self-hosted build that bills", async () => {
+      config.isCloud = "false";
+      store.state.zoConfig = { ...savedConfig, billing_enabled: true };
+      const layout = await mountLayout();
+      expect(layout.find('[data-test="paid-overage-consent"]').exists()).toBe(false);
+    });
+
+    it("mounts on cloud", async () => {
+      config.isCloud = "true";
+      const layout = await mountLayout();
+      expect(layout.find('[data-test="paid-overage-consent"]').exists()).toBe(true);
+    });
   });
 });

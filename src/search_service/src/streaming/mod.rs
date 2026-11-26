@@ -114,13 +114,17 @@ pub async fn process_search_stream_request(
             if let Ok(schema) = infra::schema::get(&org_id, stream_name, stream_type).await {
                 let stream_settings = infra::schema::unwrap_stream_settings(&schema);
                 let fts_fields = infra::schema::get_stream_setting_fts_fields(&stream_settings);
-                all_fts_fields.extend(fts_fields);
+                let configured = stream_settings
+                    .as_ref()
+                    .map(|s| s.full_text_search_keys.as_slice())
+                    .unwrap_or_default();
+                all_fts_fields.extend(order_fts_fields_for_patterns(configured, fts_fields));
             }
         }
 
-        // Deduplicate FTS fields
-        all_fts_fields.sort();
-        all_fts_fields.dedup();
+        // The miner takes the first usable field, so keep priority order.
+        let mut seen = std::collections::HashSet::new();
+        all_fts_fields.retain(|f| seen.insert(f.clone()));
 
         log::info!(
             "[HTTP2_STREAM trace_id {trace_id}] Using FTS fields for pattern extraction: {all_fts_fields:?}",
@@ -840,6 +844,13 @@ pub async fn process_search_stream_request(
             log::info!(
                 "[HTTP2_STREAM trace_id {trace_id}] No logs accumulated for pattern extraction"
             );
+            if let Some(patterns) = execution::empty_partial_patterns(&accumulated_results) {
+                let _ = sender
+                    .send(Ok(
+                        config::meta::search::StreamResponses::PatternExtractionResult { patterns },
+                    ))
+                    .await;
+            }
         }
     }
 
@@ -1461,6 +1472,30 @@ async fn apply_vrl_to_multi_results(
     }
 }
 
+/// Orders FTS fields for pattern mining: configured keys first, then `message`/`log`,
+/// then the rest. The miner takes the first field long enough, so order picks the text.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn order_fts_fields_for_patterns(configured: &[String], all: Vec<String>) -> Vec<String> {
+    let mut ordered: Vec<String> = Vec::with_capacity(all.len() + configured.len());
+    let preferred = configured
+        .iter()
+        .map(String::as_str)
+        .chain(["message", "log"]);
+    for name in preferred {
+        if (all.iter().any(|f| f == name) || configured.iter().any(|f| f == name))
+            && !ordered.iter().any(|f| f == name)
+        {
+            ordered.push(name.to_string());
+        }
+    }
+    for name in all {
+        if !ordered.contains(&name) {
+            ordered.push(name);
+        }
+    }
+    ordered
+}
+
 #[cfg(test)]
 mod tests {
     use config::{
@@ -1471,11 +1506,34 @@ mod tests {
     use tracing_subscriber::Registry;
 
     use super::{
-        apply_vrl_to_multi_results, process_search_stream_request,
+        apply_vrl_to_multi_results, order_fts_fields_for_patterns, process_search_stream_request,
         process_search_stream_request_multi,
     };
 
     type StreamItem = Result<StreamResponses, infra::errors::Error>;
+
+    fn names(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn fts_order_prefers_message_over_alphabetical_error() {
+        let all = names(&["content", "error", "log", "message"]);
+        assert_eq!(
+            order_fts_fields_for_patterns(&[], all),
+            names(&["message", "log", "content", "error"])
+        );
+    }
+
+    #[test]
+    fn fts_order_puts_configured_keys_first_in_order() {
+        let all = names(&["error", "message", "yy_text", "zz_text"]);
+        let configured = names(&["zz_text", "yy_text"]);
+        assert_eq!(
+            order_fts_fields_for_patterns(&configured, all),
+            names(&["zz_text", "yy_text", "message", "error"])
+        );
+    }
 
     fn full_channel() -> (mpsc::Sender<StreamItem>, mpsc::Receiver<StreamItem>) {
         let (tx, rx) = mpsc::channel(1);

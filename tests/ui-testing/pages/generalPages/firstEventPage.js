@@ -20,7 +20,7 @@ export class FirstEventPage {
         this.diagnosisEndpoint = page.locator('[data-test="first-event-diagnosis-endpoint"]');
         this.stillStuck = page.locator('[data-test="first-event-diagnosis-still-stuck"]');
         this.docsLink = page.locator('[data-test="first-event-diagnosis-docs-link"]');
-        this.askAiBtn = page.locator('[data-test="first-event-diagnosis-ask-ai-btn"]');
+        this.askAiBtn = page.locator('[data-test="ai-entry-ingestion-troubleshoot"]');
         this.contactSupportLink = page.locator('[data-test="first-event-diagnosis-contact-support-link"]');
         this.notice = page.locator('[data-test="first-data-notice"]');
         this.noticeText = page.locator('[data-test="first-data-notice-text"]');

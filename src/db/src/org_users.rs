@@ -164,6 +164,7 @@ pub async fn remove(org_id: &str, user_email: &str) -> Result<(), anyhow::Error>
     org_users::remove(org_id, user_email)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {e}"))?;
+    forget_grants(Some(org_id), user_email).await;
     delete_from_db_coordinator(&key, false, true, None)
         .await
         .inspect_err(|e| {
@@ -188,6 +189,7 @@ pub async fn remove_by_user(email: &str) -> Result<(), anyhow::Error> {
     org_users::remove_by_user(email)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {e}"))?;
+    forget_grants(None, email).await;
     notify_removed_by_user(email).await
 }
 
@@ -493,6 +495,13 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
     log::info!("Organizations users Cached");
     Ok(())
+}
+
+/// A member who leaves keeps no standing assistant approval for a later account with that email.
+async fn forget_grants(org_id: Option<&str>, user_email: &str) {
+    if let Err(e) = infra::table::ai_grants::delete_for_member(org_id, user_email).await {
+        log::error!("cannot remove the assistant grants of {user_email} in {org_id:?}: {e}");
+    }
 }
 
 #[cfg(feature = "enterprise")]

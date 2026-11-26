@@ -20,6 +20,7 @@ const { safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
 import PageManager from "../../pages/page-manager.js";
 import {
   PANEL_DRAFT_RESTORE_DIALOG,
+  PANEL_LEAVE_DIALOG,
   answerPanelDraftRestore,
   answerPanelLeaveIfShown,
   settlePanelLeave,
@@ -225,6 +226,23 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
 
       await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Non-mutating interaction did not arm the unsaved warning");
+    }
+  );
+
+  test(
+    "opening the Config sidebar without edits does not warn on Discard",
+    { tag: ["@dashboard-panel-unsaved-changes", "@all", "@dashboards", "@P0"] },
+    async ({ page }) => {
+      const panelName = pm.dashboardPanelActions.generateUniquePanelName("unsaved");
+      dashboardName = await createDashboardWithPanel(page, pm, panelName);
+
+      await openSavedPanelEditor(page, pm, panelName);
+      // Opening Config fills the config keys the server dropped on save (#7454); that is not an edit.
+      await pm.dashboardPanelConfigs.openConfigPanel();
+
+      await expectDiscardWithoutPrompt(page, pm);
+      await expect(page.locator(PANEL_LEAVE_DIALOG)).toHaveCount(0);
+      testLogger.info("Opening Config and discarding did not raise the leave dialog");
     }
   );
 

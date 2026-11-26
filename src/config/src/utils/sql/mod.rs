@@ -29,7 +29,7 @@ pub use eligible_for_histogram::is_eligible_for_histogram;
 pub use explain_query::is_explain_query;
 pub use group_by_query::{group_by_columns, is_group_by_query};
 pub use simple_aggregate_query::is_simple_aggregate_query;
-pub use time_splittable::is_time_splittable;
+pub use time_splittable::{has_limit_clause, is_time_splittable};
 pub use timestamp_selected::is_timestamp_selected;
 pub use visitors::TimestampVisitor;
 pub use where_fragment::{validate_optional_where_fragment, validate_where_fragment};

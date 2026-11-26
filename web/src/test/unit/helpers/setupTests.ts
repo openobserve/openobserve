@@ -44,6 +44,15 @@ config.global.plugins = [
   [VueQueryPlugin, { queryClient: appQueryClient }],
 ];
 
+// MainLayout mounts the assistant shell lazily; layout specs do not exercise it.
+config.global.stubs = {
+  ...config.global.stubs,
+  AssistantSidebarHost: true,
+  AssistantWindowLayer: true,
+  AssistantSkipLink: true,
+  HomeReturnBar: true,
+};
+
 import { restHandlers } from "./handlers";
 
 // Wire the badge registry's i18n resolver for tests WITHOUT pulling in vue-i18n

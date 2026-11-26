@@ -21,7 +21,7 @@ use config::{
     meta::oncall::confidence::{ToolsetNames, call_ref, strip_call_ref},
     utils::json::{Map, Value},
 };
-use infra::table::ai_toolset_health::{self, CallOutcome};
+use infra::table::org_ai_toolsets::{self, HealthOutcome};
 use o2_enterprise::enterprise::{
     ai::{
         chat::{OnCommit, TurnIdentity, batcher::DurableEvent},
@@ -37,6 +37,8 @@ use super::rca_thread::{ToolPart, updated_part};
 
 /// What opencode writes on a call that was running when its turn was stopped.
 const ABORTED_TEXT: &str = "Tool execution aborted";
+/// What a failed call leaves as the toolset's `last_error`, the same as the live stream's.
+const CALL_FAILED: &str = "The last call through this toolset failed";
 /// o2-ai's `toolset_policy.refusal`, whole: each names the toolset, which no vendor is told.
 const REFUSALS: [&str; 4] = [
     "{tool} in {toolset} isn't allowed",
@@ -192,6 +194,14 @@ fn is_policy_refusal(error: &str, toolset: &str, tool: &str) -> bool {
 
 async fn record(owner: &TurnOwner, calls: Vec<ToolsetCall>) {
     let now = config::utils::time::now_micros();
+    // Health is kept per toolset id; a toolset deleted meanwhile has none to update.
+    let ids = match org_ai_toolsets::list_names(&owner.org_id).await {
+        Ok(names) => names,
+        Err(e) => {
+            log::warn!("[AI] org={}: listing toolsets for health failed: {e}", owner.org_id);
+            Vec::new()
+        }
+    };
     for call in calls {
         if get_o2_config().common.audit_enabled {
             audit::audit(audit_message(owner, &call, now)).await;
@@ -200,20 +210,22 @@ async fn record(owner: &TurnOwner, calls: Vec<ToolsetCall>) {
         if matches!(call.failure, Some(Failure::Refused | Failure::Aborted)) {
             continue;
         }
-        let outcome = CallOutcome {
-            org: &owner.org_id,
-            toolset: &call.toolset,
-            at: call.at.unwrap_or(now),
-            error: call.failure.map(Failure::as_str),
+        let outcome = match call.failure {
+            None => HealthOutcome::Ok,
+            Some(_) => HealthOutcome::Failing(CALL_FAILED),
         };
-        let exists =
-            |names: &[String]| names.iter().any(|n| normalize_tool_name(n) == call.toolset);
-        if let Err(e) = ai_toolset_health::record(outcome, exists).await {
-            log::warn!(
-                "[AI] org={} toolset={}: recording health failed: {e}",
-                owner.org_id,
-                call.toolset
-            );
+        let at = call.at.unwrap_or(now);
+        let matching = ids
+            .iter()
+            .filter(|(_, name, _)| normalize_tool_name(name) == call.toolset);
+        for (id, _, _) in matching {
+            if let Err(e) = org_ai_toolsets::record_health(&owner.org_id, id, outcome, at).await {
+                log::warn!(
+                    "[AI] org={} toolset={}: recording health failed: {e}",
+                    owner.org_id,
+                    call.toolset
+                );
+            }
         }
     }
 }

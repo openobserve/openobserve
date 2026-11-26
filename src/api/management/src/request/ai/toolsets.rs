@@ -13,25 +13,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{LazyLock, Mutex},
+    time::{Duration, Instant},
+};
 
 use axum::{
     Json,
+    body::Bytes,
     extract::{Path, Query},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use config::{meta::oncall::confidence::collides_with_first_party_tools, utils::time::now_micros};
+use config::{
+    meta::oncall::confidence::collides_with_first_party_tools,
+    utils::{
+        ssrf_guard::{self, SsrfGuard},
+        time::now_micros,
+    },
+};
 use infra::table::{
-    ai_memory::ToolsetDelete, ai_toolset_health::ToolsetHealth as HealthRow,
-    org_ai_toolsets::OrgToolset,
+    ai_memory::ToolsetDelete,
+    org_ai_toolsets::{HealthOutcome, OrgToolset},
 };
 use o2_enterprise::enterprise::{
     ai::{
         client::{DiscoverError, DiscoveredTool, McpEntry, get_agent_client},
         toolsets::{
-            McpAuth, McpData, ToolsetCreateRequest, ToolsetHealth, ToolsetKind,
-            ToolsetListResponse, ToolsetResponse, ToolsetUpdateRequest, merge_update_data,
+            McpAuth, McpData, ToolsetCreateRequest, ToolsetKind, ToolsetListResponse,
+            ToolsetResponse, ToolsetState, ToolsetStatus, ToolsetUpdateRequest, merge_update_data,
             needs_credentials,
             oauth::{TokenError, tokens},
             push::{colliding_names, normalize_tool_name},
@@ -47,11 +58,155 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{UserEmail, check_permissions};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::{Ksuid, KsuidLike};
+use utoipa::ToSchema;
 
+use super::{
+    capabilities,
+    error::{self, AiErrorCode, AiErrorEnvelope},
+};
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 const UNREADABLE: &str = "its settings can't be read";
 const SAME_AGENT_NAME: &str = "another toolset has the same agent name";
+const TURNED_OFF: &str = "it is turned off";
+const TEST_TIMEOUT: Duration = Duration::from_secs(10);
+const MAX_PENDING_LINE: usize = 1 << 20;
+// A toolset used many times in a turn is written once a minute unless its state changes.
+const HEALTH_WRITE_INTERVAL: Duration = Duration::from_secs(60);
+const CALL_FAILED: &str = "The last call through this toolset failed";
+// One sentence for every network outcome, so a test never tells hosts or ports apart.
+const TEST_FAILED: &str = "The toolset's server did not list its tools";
+const TEST_INVALID: &str = "The toolset's configuration is not valid";
+const URL_REFUSED: &str = "The toolset URL must not reach a loopback, private, link-local or \
+                           metadata address unless the operator allows it";
+const URL_UNRESOLVED: &str = "The toolset URL's host can't be resolved";
+
+static LAST_TEST: LazyLock<Mutex<HashMap<String, Instant>>> = LazyLock::new(Mutex::default);
+static LAST_HEALTH: LazyLock<Mutex<HealthWrites>> = LazyLock::new(Mutex::default);
+
+/// Per `(org, toolset id)`: whether the last written call succeeded, and when.
+type HealthWrites = HashMap<(String, String), (bool, Instant)>;
+
+/// `PATCH` body: only the switch.
+#[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ToolsetPatch {
+    pub enabled: bool,
+}
+
+/// `POST /api/{org_id}/ai/toolsets/{id}/test`; `error.message` is a fixed sentence.
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct ToolsetTestResult {
+    pub ok: bool,
+    pub duration_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<ToolsetTestError>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct ToolsetTestError {
+    pub code: String,
+    pub message: String,
+}
+
+impl ToolsetTestError {
+    fn new(code: &str, message: &str) -> Self {
+        Self {
+            code: code.to_string(),
+            message: message.to_string(),
+        }
+    }
+}
+
+/// The org's enabled toolsets as tool frames name them, so a turn can report their use.
+#[derive(Debug, Default)]
+pub(crate) struct ToolsetUse {
+    org_id: String,
+    /// `(id, normalized name)`, longest name first so a prefix never shadows a longer one.
+    names: Vec<(String, String)>,
+    // The unterminated tail of the last chunk; a frame split across chunks is joined here.
+    partial: Mutex<Vec<u8>>,
+}
+
+impl ToolsetUse {
+    pub(crate) async fn load(org_id: &str) -> Self {
+        let names = match infra::table::org_ai_toolsets::list_names(org_id).await {
+            Ok(toolsets) => toolsets,
+            Err(e) => {
+                log::warn!("[org_id:{org_id}] toolset health not tracked this turn: {e}");
+                Vec::new()
+            }
+        };
+        Self::new(org_id, names)
+    }
+
+    fn new(org_id: &str, toolsets: Vec<(String, String, bool)>) -> Self {
+        let mut names: Vec<(String, String)> = toolsets
+            .into_iter()
+            .filter(|(_, _, enabled)| *enabled)
+            .map(|(id, name, _)| (id, normalize_tool_name(&name)))
+            .collect();
+        names.sort_by_key(|(_, name)| std::cmp::Reverse(name.len()));
+        Self {
+            org_id: org_id.to_string(),
+            names,
+            partial: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Records each `tool_result` frame in `chunk` against the toolset that served it.
+    pub(crate) fn note(&self, chunk: &[u8]) {
+        if self.names.is_empty() {
+            return;
+        }
+        for (id, ok) in self.results(chunk) {
+            record_use(&self.org_id, &id, ok);
+        }
+    }
+
+    fn results(&self, chunk: &[u8]) -> Vec<(String, bool)> {
+        let complete = {
+            let mut partial = self
+                .partial
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            partial.extend_from_slice(chunk);
+            let complete = match partial.iter().rposition(|b| *b == b'\n') {
+                Some(end) => partial.drain(..=end).collect::<Vec<u8>>(),
+                None => Vec::new(),
+            };
+            if partial.len() > MAX_PENDING_LINE {
+                partial.clear();
+            }
+            complete
+        };
+        if !complete.windows(11).any(|w| w == b"tool_result") {
+            return Vec::new();
+        }
+        std::str::from_utf8(&complete)
+            .into_iter()
+            .flat_map(str::lines)
+            .filter_map(|line| line.strip_prefix("data: "))
+            .filter_map(|data| serde_json::from_str::<serde_json::Value>(data).ok())
+            .filter(|frame| frame["type"] == "tool_result")
+            .filter_map(|frame| {
+                let tool = frame["tool"].as_str()?;
+                let id = self.toolset_of(tool)?;
+                Some((id, frame["success"].as_bool().unwrap_or(false)))
+            })
+            .collect()
+    }
+
+    fn toolset_of(&self, tool: &str) -> Option<String> {
+        self.names
+            .iter()
+            .find(|(_, name)| {
+                tool.strip_prefix(name.as_str())
+                    .is_some_and(|rest| rest.starts_with(['_', '-']))
+            })
+            .map(|(id, _)| id.clone())
+    }
+}
 
 /// Body of `_discover`: an unsaved config, or a saved toolset by `id` with unsaved `overrides`.
 #[derive(Default, Deserialize, utoipa::ToSchema)]
@@ -187,7 +342,7 @@ pub struct AgentToolset {
     /// A secret it names has no value in this region.
     pub needs_credentials: bool,
     pub region_only: bool,
-    /// Its last call outcomes in this region; absent before its first call.
+    /// Its last use or test in this region; absent before its first and while turned off.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub health: Option<AgentToolsetHealth>,
 }
@@ -195,11 +350,7 @@ pub struct AgentToolset {
 impl AgentToolset {
     /// The rows `query` asks for, judged against all of the org's `rows`; a row of a kind this node
     /// doesn't know is left out and, as in a turn, doesn't count against another's name.
-    fn from_rows(
-        rows: Vec<OrgToolset>,
-        query: &AgentListQuery,
-        health: &HashMap<String, HealthRow>,
-    ) -> Vec<Self> {
+    fn from_rows(rows: Vec<OrgToolset>, query: &AgentListQuery) -> Vec<Self> {
         let known: Vec<(ToolsetKind, OrgToolset)> = rows
             .into_iter()
             .filter_map(|row| Some((row.kind.parse().ok()?, row)))
@@ -208,16 +359,13 @@ impl AgentToolset {
         known
             .into_iter()
             .filter(|(_, row)| query.matches(row))
-            .map(|(kind, row)| Self::from_row(kind, row, &colliding, health))
+            .map(|(kind, row)| Self::from_row(kind, row, &colliding))
             .collect()
     }
 
-    fn from_row(
-        kind: ToolsetKind,
-        row: OrgToolset,
-        colliding: &HashSet<String>,
-        health: &HashMap<String, HealthRow>,
-    ) -> Self {
+    fn from_row(kind: ToolsetKind, row: OrgToolset, colliding: &HashSet<String>) -> Self {
+        let health = AgentToolsetHealth::of(&row);
+        let enabled = row.enabled;
         let mut toolset = Self {
             id: row.id,
             name: row.name,
@@ -236,10 +384,14 @@ impl AgentToolset {
         };
         // Another kind's `data` has no field the agent may see, and no calls of its own.
         if kind == ToolsetKind::Mcp {
-            toolset.fill_mcp(row.data.as_deref(), health);
+            toolset.health = health;
+            toolset.fill_mcp(row.data.as_deref());
         }
         if colliding.contains(&normalize_tool_name(&toolset.name)) {
             toolset.unavailable = Some(SAME_AGENT_NAME);
+        }
+        if !enabled {
+            toolset.unavailable = Some(TURNED_OFF);
         }
         if toolset.unavailable.is_some() {
             toolset.tool_prefix = None;
@@ -247,9 +399,8 @@ impl AgentToolset {
         toolset
     }
 
-    fn fill_mcp(&mut self, data: Option<&str>, health: &HashMap<String, HealthRow>) {
+    fn fill_mcp(&mut self, data: Option<&str>) {
         let agent_name = normalize_tool_name(&self.name);
-        self.health = health.get(&agent_name).map(AgentToolsetHealth::from);
         self.tool_prefix = Some(format!("{agent_name}_"));
         let data = data.and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok());
         let Some((mcp, data)) =
@@ -294,29 +445,30 @@ impl From<&McpAuth> for ToolsetCredentialType {
     }
 }
 
-/// When a toolset's calls last succeeded and failed (microseconds), never the vendor's error.
+/// A toolset's state since `since` and its last use (microseconds), never the vendor's error.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct AgentToolsetHealth {
     pub status: ToolsetHealthStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_ok_at: Option<i64>,
+    pub since: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_error_at: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub failing_since: Option<i64>,
+    pub last_used_at: Option<i64>,
 }
 
-impl From<&HealthRow> for AgentToolsetHealth {
-    fn from(row: &HealthRow) -> Self {
-        Self {
-            status: if row.failing_since.is_some() {
-                ToolsetHealthStatus::Failing
-            } else {
-                ToolsetHealthStatus::Ok
-            },
-            last_ok_at: row.last_ok_at,
-            last_error_at: row.last_error_at,
-            failing_since: row.failing_since,
+impl AgentToolsetHealth {
+    /// `None` before the first use or test, and while the toolset is turned off.
+    fn of(row: &OrgToolset) -> Option<Self> {
+        let state = row.status_state.as_deref();
+        let status = ToolsetStatus::from_stored(row.enabled, state, row.status_since, None);
+        let health = |status| Self {
+            status,
+            since: row.status_since,
+            last_used_at: row.last_used_at,
+        };
+        match status.state {
+            ToolsetState::Ok => Some(health(ToolsetHealthStatus::Ok)),
+            ToolsetState::Failing => Some(health(ToolsetHealthStatus::Failing)),
+            ToolsetState::NeverUsed | ToolsetState::Disabled => None,
         }
     }
 }
@@ -396,6 +548,9 @@ pub async fn create(
     if let Err(e) = validate_data(kind, &body.data) {
         return MetaHttpResponse::bad_request(e);
     }
+    if let Err(refusal) = admit_url(kind, body.data.as_ref()).await {
+        return refusal;
+    }
     let data_str = body
         .data
         .map(|data| without_dropped_keys(kind, data).to_string());
@@ -413,6 +568,11 @@ pub async fn create(
         updated_at: now,
         region_only: body.region_only,
         origin_region: None,
+        enabled: true,
+        status_state: None,
+        status_since: None,
+        last_error: None,
+        last_used_at: None,
     };
 
     let id = entry.id.clone();
@@ -482,7 +642,6 @@ pub async fn get(
         Ok(Some(t)) => {
             let mut toolsets = [ToolsetResponse::from_toolset(t)];
             flag_renames(&org_id, &mut toolsets).await;
-            attach_health(&org_id, &mut toolsets).await;
             hide_mcp_urls(&org_id, &user_email.user_id, &mut toolsets).await;
             let [toolset] = toolsets;
             Json(toolset).into_response()
@@ -547,7 +706,6 @@ pub async fn list(
                     .collect(),
             };
             flag_renames(&org_id, &mut res.toolsets).await;
-            attach_health(&org_id, &mut res.toolsets).await;
             hide_mcp_urls(&org_id, &user_email.user_id, &mut res.toolsets).await;
             Json(res).into_response()
         }
@@ -580,7 +738,8 @@ impl AgentListQuery {
     operation_id = "list_toolsets",
     summary = "List AI toolsets for the agent",
     description = "Lists each AI toolset's tool limits, credential type and health status, without \
-                   URLs, credentials, skill content or error texts. \
+                   URLs, credentials, skill content or error texts; a turned-off toolset is \
+                   `unavailable`. \
                    Only available in enterprise deployments.",
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -611,14 +770,7 @@ pub async fn list_for_agent(
         Ok(rows) => rows,
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
-    let health = match infra::table::ai_toolset_health::list(&org_id).await {
-        Ok(health) => health,
-        Err(e) => {
-            log::warn!("failed to read toolset health for org={org_id}: {e}");
-            HashMap::new()
-        }
-    };
-    let toolsets = AgentToolset::from_rows(rows, &params, &health);
+    let toolsets = AgentToolset::from_rows(rows, &params);
     Json(AgentToolsetList { toolsets }).into_response()
 }
 
@@ -638,7 +790,9 @@ pub async fn list_for_agent(
                    unless it carries `\"schema\": 2`, which replaces the config wholesale. \
                    A secret value of `***` keeps the stored value; when the MCP URL \
                    changes every secret must be sent again, and so must `auth`'s when \
-                   `auth.token_url` does. `auth` is replaced whole when sent. A merge update that omits the MCP \
+                   `auth.token_url` does, and when a `headers` entry is added or removed next to a \
+                   kept `***` (400 `invalid_request`, `error_code: destination_changed`, `fields`). \
+                   `auth` is replaced whole when sent. A merge update that omits the MCP \
                    limits (`allowed_tools`, `blocked_tools`, `write_tools`) keeps the stored ones; \
                    send `null` to clear one. A `\"schema\": 2` replacement drops every limit it omits, so it must \
                    resend any it wants to keep. A dropped `allowed_tools` means `[\"*\"]`, and \
@@ -656,7 +810,7 @@ pub async fn list_for_agent(
     security(("Authorization" = [])),
     responses(
         (status = 200, description = "Toolset updated", content_type = "application/json", body = ToolsetResponse),
-        (status = 400, description = "Invalid request", content_type = "application/json"),
+        (status = 400, description = "Invalid request, or a `***` secret kept while the URL or a `headers` entry changed (`invalid_request`, `error_code: destination_changed`, `fields`)", content_type = "application/json"),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
@@ -678,6 +832,135 @@ pub async fn update(
     flag_renames(&org_id, &mut toolsets).await;
     let [toolset] = toolsets;
     Json(toolset).into_response()
+}
+
+#[utoipa::path(
+    patch,
+    path = "/{org_id}/ai/toolsets/{id}",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "PatchAiToolset",
+    summary = "Turn an AI toolset on or off",
+    description = "Body `{enabled}` only. A disabled toolset is not given to the assistant or \
+                   incident analysis from their next turn on; its status reads `disabled`. \
+                   Only available in enterprise deployments.",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Toolset id (KSUID)"),
+    ),
+    request_body(content = ToolsetPatch, content_type = "application/json"),
+    security(("Authorization" = [])),
+    responses(
+        (status = 200, description = "The toolset", body = ToolsetResponse, content_type = "application/json"),
+        (status = 400, description = "A field other than `enabled`", content_type = "application/json"),
+        (status = 404, description = "Toolset not found", content_type = "application/json"),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
+)]
+pub async fn patch(Path((org_id, id)): Path<(String, String)>, body: Bytes) -> Response {
+    let body: ToolsetPatch = match error::json_body(&body) {
+        Ok(body) => body,
+        Err(response) => return response,
+    };
+    match infra::table::org_ai_toolsets::set_enabled(&org_id, &id, body.enabled, now_micros()).await
+    {
+        Ok(true) => {}
+        Ok(false) => return MetaHttpResponse::not_found(format!("toolset '{id}' not found")),
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    }
+    log::info!("[org_id:{org_id}] toolset {id} enabled={}", body.enabled);
+    let primary = infra::db::get_orm_client_rw().await;
+    match infra::table::org_ai_toolsets::get_with(primary, &org_id, &id).await {
+        Ok(Some(t)) => {
+            db::ai_toolsets::published_put(&t).await;
+            let mut toolsets = [ToolsetResponse::from_toolset(t)];
+            flag_renames(&org_id, &mut toolsets).await;
+            let [toolset] = toolsets;
+            Json(toolset).into_response()
+        }
+        Ok(None) => MetaHttpResponse::not_found(format!("toolset '{id}' not found")),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/toolsets/{id}/test",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "TestAiToolset",
+    summary = "Check that an AI toolset works",
+    description = "Org admins and root only. An MCP toolset is asked to list its tools with \
+                   its stored credentials; a skill toolset has its configuration \
+                   checked, since only O2 Assistant runs it. Creates no chat, spends no \
+                   credit and never returns a secret or the server's own text: \
+                   `error.message` is a fixed sentence and every network failure is the \
+                   same `failed` with `duration_ms: 0`. The URL must not resolve to a \
+                   loopback, private, link-local, CGNAT or metadata address unless the \
+                   operator allows it with `ZO_SSRF_ALLOWED_CIDRS` / `ZO_SSRF_ALLOWED_HOSTS`; \
+                   no redirect is followed. The result becomes the toolset's status. At most \
+                   one test per toolset and one per user every 10 s on a node.",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Toolset id (KSUID)"),
+    ),
+    security(("Authorization" = [])),
+    responses(
+        (status = 200, description = "Test result", body = ToolsetTestResult, content_type = "application/json"),
+        (status = 403, description = "Not an organization admin", content_type = "application/json"),
+        (status = 404, description = "Toolset not found", content_type = "application/json"),
+        (status = 429, description = "Tested moments ago (`rate_limited`)", content_type = "application/json"),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "create"})), ("x-o2-mcp" = json!({"enabled": false})))
+)]
+pub async fn test(
+    Path((org_id, id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    if !capabilities::is_org_admin(&org_id, &user_email.user_id).await {
+        return error::permission_denied("Only organization administrators can test a toolset");
+    }
+    let admitted = capabilities::admit_test(
+        &mut LAST_TEST.lock().unwrap(),
+        &format!("{org_id}/{id}"),
+        &user_email.user_id,
+        Instant::now(),
+    );
+    if let Err(wait) = admitted {
+        return AiErrorEnvelope::new(
+            AiErrorCode::RateLimited,
+            "This toolset was tested moments ago; please wait",
+        )
+        .retry_after(Some(wait.as_secs().max(1)))
+        .into_response();
+    }
+    let toolset = match infra::table::org_ai_toolsets::get(&org_id, &id).await {
+        Ok(Some(t)) => t,
+        Ok(None) => return MetaHttpResponse::not_found(format!("toolset '{id}' not found")),
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+    let started = Instant::now();
+    let error = check_toolset(&toolset).await;
+    // A failure's timing would still tell a closed port from a slow one.
+    let duration_ms = match error {
+        None => u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+        Some(_) => 0,
+    };
+    let outcome = match &error {
+        None => HealthOutcome::Ok,
+        Some(error) => HealthOutcome::Failing(&error.message),
+    };
+    if let Err(e) =
+        infra::table::org_ai_toolsets::record_health(&org_id, &id, outcome, now_micros()).await
+    {
+        log::warn!("[org_id:{org_id}] toolset {id} test result not stored: {e}");
+    }
+    Json(ToolsetTestResult {
+        ok: error.is_none(),
+        duration_ms,
+        error,
+    })
+    .into_response()
 }
 
 // ---------------------------------------------------------------------------
@@ -818,12 +1101,6 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
     if let Err(e) = db::ai_toolsets::published_delete(&row, now_micros()).await {
         log::error!("[SUPER_CLUSTER:sync] toolset '{name}' in org={org_id} wasn't replicated: {e}");
     }
-    // A later toolset of the same name starts with no health history.
-    if let Err(e) =
-        infra::table::ai_toolset_health::remove(&org_id, &normalize_tool_name(&name)).await
-    {
-        log::warn!("failed to remove the health of toolset '{name}' in org={org_id}: {e}");
-    }
 
     (
         StatusCode::OK,
@@ -927,8 +1204,23 @@ async fn write_update(
             }
             Err(e) => return Err(MetaHttpResponse::internal_error(e)),
         };
-        let data = updated_data(&existing.kind, existing.data.as_deref(), body.data.clone())
-            .map_err(MetaHttpResponse::bad_request)?;
+        let update = updated_data(&existing.kind, existing.data.as_deref(), body.data.clone())
+            .map_err(|e| update_refused(org_id, id, e))?;
+        if let Ok(kind) = existing.kind.parse::<ToolsetKind>() {
+            let parsed = update
+                .data
+                .as_deref()
+                .and_then(|d| serde_json::from_str(d).ok());
+            admit_url(kind, parsed.as_ref()).await?;
+        }
+        if !(update.kept.is_empty() && update.replaced.is_empty()) {
+            log::info!(
+                "[org_id:{org_id}] toolset {id} secrets kept={:?} replaced={:?}",
+                update.kept,
+                update.replaced
+            );
+        }
+        let data = update.data;
         let read_updated_at = existing.updated_at;
         let updated = OrgToolset {
             description: body.description.clone().or(existing.description),
@@ -951,34 +1243,9 @@ async fn write_update(
     )))
 }
 
-/// Each toolset's last call outcomes in this region, keyed by the name the agent uses.
-async fn attach_health(org_id: &str, toolsets: &mut [ToolsetResponse]) {
-    match infra::table::ai_toolset_health::list(org_id).await {
-        Ok(rows) => fill_health(&rows, toolsets),
-        Err(e) => log::warn!("failed to read toolset health for org={org_id}: {e}"),
-    }
-}
-
-fn fill_health(
-    rows: &std::collections::HashMap<String, infra::table::ai_toolset_health::ToolsetHealth>,
-    toolsets: &mut [ToolsetResponse],
-) {
-    // A skill that took a deleted MCP toolset's name has no calls of its own.
-    for toolset in toolsets.iter_mut().filter(|t| t.kind == ToolsetKind::Mcp) {
-        toolset.health = rows
-            .get(&normalize_tool_name(&toolset.name))
-            .map(|row| ToolsetHealth {
-                last_ok_at: row.last_ok_at,
-                last_error_at: row.last_error_at,
-                failing_since: row.failing_since,
-                last_error: row.last_error.clone(),
-            });
-    }
-}
-
 /// Flags toolsets whose normalized name another row of the org shares; the agent is sent neither.
 async fn flag_renames(org_id: &str, toolsets: &mut [ToolsetResponse]) {
-    match infra::table::org_ai_toolsets::list_names(org_id).await {
+    match infra::table::org_ai_toolsets::list_raw_names(org_id).await {
         Ok(names) => mark_renames(&names, toolsets),
         Err(e) => log::warn!("failed to list toolset names for org={org_id}: {e}"),
     }
@@ -1000,23 +1267,57 @@ fn mark_renames(org_names: &[String], toolsets: &mut [ToolsetResponse]) {
     }
 }
 
+/// What a `PUT` stores, and the secrets it kept and replaced (names only).
+#[derive(Debug, PartialEq)]
+struct UpdatedData {
+    data: Option<String>,
+    kept: Vec<String>,
+    replaced: Vec<String>,
+}
+
 /// The `data` a `PUT` stores: the request's `data` merged over the stored one, then validated.
 fn updated_data(
     kind: &str,
     stored: Option<&str>,
     incoming: Option<serde_json::Value>,
-) -> Result<Option<String>, String> {
+) -> Result<UpdatedData, String> {
     let kind = kind.parse::<ToolsetKind>()?;
     let raw = stored;
     let stored = raw.and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok());
     let Some(incoming) = incoming else {
-        return Ok(stored
+        let data = stored
             .map(|data| without_dropped_keys(kind, data).to_string())
-            .or_else(|| raw.map(str::to_string)));
+            .or_else(|| raw.map(str::to_string));
+        return Ok(UpdatedData {
+            data,
+            kept: Vec::new(),
+            replaced: Vec::new(),
+        });
     };
-    let merged = Some(merge_update_data(kind, stored.as_ref(), incoming)?);
+    let merge = merge_update_data(kind, stored.as_ref(), incoming)?;
+    let merged = Some(merge.data);
     validate_update(kind, stored.as_ref(), &merged)?;
-    Ok(merged.map(|v| v.to_string()))
+    Ok(UpdatedData {
+        data: merged.map(|v| v.to_string()),
+        kept: merge.kept,
+        replaced: merge.replaced,
+    })
+}
+
+/// A refused merge; a kept secret that would follow a changed URL or header is the typed 400.
+fn update_refused(org_id: &str, id: &str, error: String) -> Response {
+    let field = if error.contains("gains or loses an entry") {
+        "headers"
+    } else if error.starts_with("re-enter secrets when the URL changes") {
+        "url"
+    } else {
+        return MetaHttpResponse::bad_request(error);
+    };
+    log::warn!("[org_id:{org_id}] toolset {id} update refused: secrets kept while {field} changed");
+    AiErrorEnvelope::new(AiErrorCode::InvalidRequest, error)
+        .legacy_code("destination_changed")
+        .with("fields", vec![field])
+        .into_response()
 }
 
 async fn run_discovery(
@@ -1088,6 +1389,7 @@ fn discover_entry(
                 .unwrap_or_else(|| serde_json::Value::Object(Default::default()));
             merge_update_data(ToolsetKind::Mcp, saved.as_ref(), overrides)
                 .map_err(DiscoverFailure::refused)?
+                .data
         }
         (None, _) => {
             let mut data = serde_json::Map::new();
@@ -1103,7 +1405,9 @@ fn discover_entry(
             }
             let data = serde_json::Value::Object(data);
             // With no saved row a `***` would be sent to the server as the header's value.
-            merge_update_data(ToolsetKind::Mcp, None, data).map_err(DiscoverFailure::refused)?
+            merge_update_data(ToolsetKind::Mcp, None, data)
+                .map_err(DiscoverFailure::refused)?
+                .data
         }
     };
     validate_data(ToolsetKind::Mcp, &Some(data.clone())).map_err(DiscoverFailure::refused)?;
@@ -1188,6 +1492,189 @@ async fn audit_discovery(
     .await;
 }
 
+/// An MCP toolset's URL passes the SSRF policy Test uses, since o2-ai connects to it on every turn.
+async fn admit_url(kind: ToolsetKind, data: Option<&serde_json::Value>) -> Result<(), Response> {
+    let url = match (kind, data.and_then(|d| d.get("url")?.as_str())) {
+        (ToolsetKind::Mcp, Some(url)) => url,
+        _ => return Ok(()),
+    };
+    SsrfGuard::validate_destination_url_with_config_async(url)
+        .await
+        .map_err(|e| {
+            log::info!("[toolset] URL refused: {e}");
+            error::invalid_request(refusal_sentence(&e))
+        })
+}
+
+/// The fixed sentence for a guard refusal: a host that does not resolve is not a private address.
+fn refusal_sentence(guard_error: &str) -> &'static str {
+    if guard_error.starts_with("Failed to resolve host")
+        || guard_error.ends_with("resolved to no addresses")
+    {
+        URL_UNRESOLVED
+    } else {
+        URL_REFUSED
+    }
+}
+
+/// Stores one call's outcome unless the same state was written moments ago.
+fn record_use(org_id: &str, id: &str, ok: bool) {
+    let key = (org_id.to_string(), id.to_string());
+    let now = Instant::now();
+    {
+        let mut last = LAST_HEALTH.lock().unwrap();
+        if let Some((state, at)) = last.get(&key)
+            && *state == ok
+            && now.saturating_duration_since(*at) < HEALTH_WRITE_INTERVAL
+        {
+            return;
+        }
+        last.retain(|_, (_, at)| now.saturating_duration_since(*at) < HEALTH_WRITE_INTERVAL);
+        last.insert(key, (ok, now));
+    }
+    let (org_id, id) = (org_id.to_string(), id.to_string());
+    tokio::spawn(async move {
+        let outcome = if ok {
+            HealthOutcome::Ok
+        } else {
+            HealthOutcome::Failing(CALL_FAILED)
+        };
+        if let Err(e) =
+            infra::table::org_ai_toolsets::record_health(&org_id, &id, outcome, now_micros()).await
+        {
+            log::warn!("[org_id:{org_id}] toolset {id} health not stored: {e}");
+        }
+    });
+}
+
+/// `None` when the toolset answers; never carries the server's own text.
+async fn check_toolset(toolset: &OrgToolset) -> Option<ToolsetTestError> {
+    let invalid = || Some(ToolsetTestError::new("invalid_config", TEST_INVALID));
+    let Ok(kind) = toolset.kind.parse::<ToolsetKind>() else {
+        return invalid();
+    };
+    let data = toolset
+        .data
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok());
+    if validate_data(kind, &data).is_err() {
+        return invalid();
+    }
+    match kind {
+        ToolsetKind::Mcp => match data.and_then(|d| serde_json::from_value::<McpData>(d).ok()) {
+            Some(mut mcp) => match authorize_test(toolset, &mut mcp).await {
+                Ok(()) => list_mcp_tools(&mcp).await.err(),
+                Err(error) => Some(error),
+            },
+            None => invalid(),
+        },
+        ToolsetKind::Skill | ToolsetKind::Generic => None,
+    }
+}
+
+/// An OAuth toolset is tested with the token a turn would send; a refused token fails the test.
+async fn authorize_test(toolset: &OrgToolset, mcp: &mut McpData) -> Result<(), ToolsetTestError> {
+    let McpAuth::OauthClientCredentials(client) = &mcp.auth else {
+        return Ok(());
+    };
+    let token = tokens()
+        .token(&toolset.org, &toolset.id, client, TEST_TIMEOUT)
+        .await
+        .map_err(|e| {
+            log::info!("[toolset test] token request failed: {}", e.reason());
+            ToolsetTestError::new("failed", TEST_FAILED)
+        })?;
+    mcp.headers
+        .retain(|name, _| !name.trim().eq_ignore_ascii_case("authorization"));
+    mcp.headers
+        .insert("Authorization".to_string(), token.bearer());
+    Ok(())
+}
+
+/// [`list_tools_with`] after the SSRF policy admits the URL; private addresses need the allowlist.
+async fn list_mcp_tools(mcp: &McpData) -> Result<(), ToolsetTestError> {
+    let failed = || ToolsetTestError::new("failed", TEST_FAILED);
+    if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&mcp.url).await {
+        log::info!("[toolset test] URL refused: {e}");
+        return Err(failed());
+    }
+    // Direct, never through an env proxy, so the connect-time check sees the real address.
+    let builder = reqwest::Client::builder().timeout(TEST_TIMEOUT).no_proxy();
+    let client = ssrf_guard::build_safe_destination_client(builder).map_err(|e| {
+        log::warn!("[toolset test] client not built: {e}");
+        failed()
+    })?;
+    list_tools_with(&client, mcp).await
+}
+
+/// `initialize` then `tools/list` on the toolset's URL with its stored headers.
+async fn list_tools_with(client: &reqwest::Client, mcp: &McpData) -> Result<(), ToolsetTestError> {
+    let initialize = serde_json::json!({
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": {
+            "protocolVersion": openobserve_mcp::MCP_PROTOCOL_VERSION,
+            "capabilities": {},
+            "clientInfo": {"name": "openobserve-toolset-test", "version": config::VERSION}
+        }
+    });
+    let session = mcp_call(client, mcp, None, &initialize).await?;
+    let list = serde_json::json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"});
+    mcp_call(client, mcp, session.as_deref(), &list).await?;
+    Ok(())
+}
+
+/// One JSON-RPC call; `Ok` carries the session id the server issued, if any.
+async fn mcp_call(
+    client: &reqwest::Client,
+    mcp: &McpData,
+    session: Option<&str>,
+    request: &serde_json::Value,
+) -> Result<Option<String>, ToolsetTestError> {
+    let mut builder = client
+        .post(&mcp.url)
+        .header(
+            reqwest::header::ACCEPT,
+            "application/json, text/event-stream",
+        )
+        .json(request);
+    for (name, value) in &mcp.headers {
+        builder = builder.header(name.as_str(), value.as_str());
+    }
+    if let Some(session) = session {
+        builder = builder.header("mcp-session-id", session);
+    }
+    let failed = || ToolsetTestError::new("failed", TEST_FAILED);
+    let response = builder.send().await.map_err(|e| {
+        log::info!("[toolset test] MCP request failed: {e}");
+        failed()
+    })?;
+    let status = response.status();
+    let session = response
+        .headers()
+        .get("mcp-session-id")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    let body = response.text().await.unwrap_or_default();
+    if !status.is_success() || !has_jsonrpc_result(&body) {
+        log::info!("[toolset test] MCP server answered {status}");
+        return Err(failed());
+    }
+    Ok(session)
+}
+
+/// A JSON or SSE answer holding a JSON-RPC `result`.
+fn has_jsonrpc_result(body: &str) -> bool {
+    let has = |text: &str| {
+        serde_json::from_str::<serde_json::Value>(text)
+            .is_ok_and(|v| v.get("result").is_some() && v.get("error").is_none())
+    };
+    has(body.trim())
+        || body
+            .lines()
+            .filter_map(|line| line.strip_prefix("data:"))
+            .any(|data| has(data.trim()))
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::{Value, json};
@@ -1213,9 +1700,11 @@ mod tests {
             created_at: 0,
             updated_at: 0,
             rename_needed: false,
-            health: None,
             region_only: false,
             needs_credentials: false,
+            enabled: true,
+            status: Default::default(),
+            last_used_at: None,
         }
     }
 
@@ -1229,8 +1718,8 @@ mod tests {
         .to_string()
     }
 
-    fn parsed(data: Option<String>) -> Value {
-        serde_json::from_str(&data.unwrap()).unwrap()
+    fn parsed(update: UpdatedData) -> Value {
+        serde_json::from_str(&update.data.unwrap()).unwrap()
     }
 
     #[tokio::test]
@@ -1348,7 +1837,7 @@ mod tests {
     fn update_without_data_keeps_the_stored_data() {
         let stored = stored_mcp();
         assert_eq!(
-            updated_data("mcp", Some(&stored), None).unwrap(),
+            updated_data("mcp", Some(&stored), None).unwrap().data,
             Some(stored)
         );
     }
@@ -1516,41 +2005,6 @@ mod tests {
     }
 
     #[test]
-    fn health_is_attached_by_the_name_the_agent_uses() {
-        use infra::table::ai_toolset_health::ToolsetHealth as Row;
-        let rows = std::collections::HashMap::from([(
-            "datadog-prod".to_string(),
-            Row {
-                org: "org".to_string(),
-                toolset: "datadog-prod".to_string(),
-                last_ok_at: Some(1),
-                last_error_at: Some(5),
-                failing_since: Some(3),
-                last_error: Some("401 Unauthorized".to_string()),
-            },
-        )]);
-        let mut toolsets = [response("datadog-prod"), response("github")];
-        fill_health(&rows, &mut toolsets);
-        assert_eq!(
-            toolsets[0].health,
-            Some(ToolsetHealth {
-                last_ok_at: Some(1),
-                last_error_at: Some(5),
-                failing_since: Some(3),
-                last_error: Some("401 Unauthorized".to_string()),
-            })
-        );
-        assert_eq!(toolsets[1].health, None);
-
-        let mut skill = [ToolsetResponse {
-            kind: ToolsetKind::Skill,
-            ..response("datadog-prod")
-        }];
-        fill_health(&rows, &mut skill);
-        assert_eq!(skill[0].health, None);
-    }
-
-    #[test]
     fn rename_needed_is_set_on_every_row_sharing_a_normalized_name() {
         let org_names = ["Datadog Prod", "datadog-prod", "github"].map(String::from);
         let mut toolsets = [
@@ -1576,22 +2030,23 @@ mod tests {
             updated_at: 1,
             region_only: false,
             origin_region: None,
+            enabled: true,
+            status_state: None,
+            status_since: None,
+            last_error: None,
+            last_used_at: None,
         }
     }
 
-    fn agent_list(
-        rows: Vec<OrgToolset>,
-        query: &AgentListQuery,
-        health: &HashMap<String, HealthRow>,
-    ) -> Vec<Value> {
-        AgentToolset::from_rows(rows, query, health)
+    fn agent_list(rows: Vec<OrgToolset>, query: &AgentListQuery) -> Vec<Value> {
+        AgentToolset::from_rows(rows, query)
             .into_iter()
             .map(|toolset| serde_json::to_value(toolset).unwrap())
             .collect()
     }
 
     fn agent_view(row: OrgToolset) -> Value {
-        agent_list(vec![row], &AgentListQuery::default(), &HashMap::new()).remove(0)
+        agent_list(vec![row], &AgentListQuery::default()).remove(0)
     }
 
     #[test]
@@ -1613,18 +2068,11 @@ mod tests {
         stored.name = "Datadog_Prod".to_string();
         stored.description = Some("Datadog, production".to_string());
         stored.region_only = true;
-        let rows = HashMap::from([(
-            "datadog-prod".to_string(),
-            HealthRow {
-                org: "org".to_string(),
-                toolset: "datadog-prod".to_string(),
-                last_ok_at: Some(1),
-                last_error_at: Some(5),
-                failing_since: Some(3),
-                last_error: Some("401 v-secret".to_string()),
-            },
-        )]);
-        let item = agent_list(vec![stored], &AgentListQuery::default(), &rows).remove(0);
+        stored.status_state = Some("failing".to_string());
+        stored.status_since = Some(3);
+        stored.last_error = Some("401 v-secret".to_string());
+        stored.last_used_at = Some(5);
+        let item = agent_list(vec![stored], &AgentListQuery::default()).remove(0);
         assert_eq!(
             item,
             json!({
@@ -1642,9 +2090,8 @@ mod tests {
                 "region_only": true,
                 "health": {
                     "status": "failing",
-                    "last_ok_at": 1,
-                    "last_error_at": 5,
-                    "failing_since": 3
+                    "since": 3,
+                    "last_used_at": 5
                 }
             })
         );
@@ -1700,17 +2147,6 @@ mod tests {
 
     #[test]
     fn the_agent_s_list_shows_no_content_of_a_skill_or_generic_toolset() {
-        let rows = HashMap::from([(
-            "datadog-prod".to_string(),
-            HealthRow {
-                org: "org".to_string(),
-                toolset: "datadog-prod".to_string(),
-                last_ok_at: Some(1),
-                last_error_at: None,
-                failing_since: None,
-                last_error: None,
-            },
-        )]);
         for (kind, data) in [
             ("skill", json!({"content": "c-secret"})),
             (
@@ -1718,9 +2154,12 @@ mod tests {
                 json!({"url": "g-secret", "allowed_tools": ["x"]}),
             ),
         ] {
+            let mut used = row(kind, data);
+            used.status_state = Some("ok".to_string());
+            used.last_used_at = Some(1);
             let query = AgentListQuery::default();
             assert_eq!(
-                agent_list(vec![row(kind, data)], &query, &rows).remove(0),
+                agent_list(vec![used], &query).remove(0),
                 json!({
                     "id": "t1",
                     "name": "datadog-prod",
@@ -1735,7 +2174,7 @@ mod tests {
     #[test]
     fn the_agent_s_list_leaves_out_an_unknown_kind() {
         let cli = row("cli", json!({"env": {"GH_TOKEN": "s3cret"}}));
-        let listed = agent_list(vec![cli], &AgentListQuery::default(), &HashMap::new());
+        let listed = agent_list(vec![cli], &AgentListQuery::default());
         assert!(listed.is_empty());
     }
 
@@ -1786,7 +2225,7 @@ mod tests {
         ] {
             let label = format!("{} {} {query:?}", other.name, other.kind);
             let rows = vec![named("Datadog Prod", "mcp"), other];
-            let listed = agent_list(rows, &query, &HashMap::new());
+            let listed = agent_list(rows, &query);
             assert_eq!(listed.len(), 1, "{label}");
             let item = &listed[0];
             assert_eq!(item["name"], "Datadog Prod", "{label}");
@@ -1802,28 +2241,32 @@ mod tests {
             }
         }
         let both = vec![named("Datadog Prod", "mcp"), named("datadog_prod", "skill")];
-        let listed = agent_list(both, &AgentListQuery::default(), &HashMap::new());
+        let listed = agent_list(both, &AgentListQuery::default());
         assert!(listed.iter().all(|t| t["unavailable"].is_string()));
     }
 
     #[test]
-    fn a_toolset_is_failing_until_a_call_succeeds() {
-        let at = |failing_since| HealthRow {
-            org: "org".to_string(),
-            toolset: "t".to_string(),
-            last_ok_at: Some(9),
-            last_error_at: Some(5),
-            failing_since,
-            last_error: None,
-        };
+    fn the_agent_s_list_reads_health_from_the_toolset_s_status() {
+        let mut failing = row("mcp", json!({"url": "https://mcp.example.com/mcp"}));
+        failing.status_state = Some("failing".to_string());
+        failing.status_since = Some(3);
+        failing.last_error = Some("The last call through this toolset failed".to_string());
+        failing.last_used_at = Some(5);
+        let item = agent_view(failing.clone());
         assert_eq!(
-            AgentToolsetHealth::from(&at(Some(3))).status,
-            ToolsetHealthStatus::Failing
+            item["health"],
+            json!({"status": "failing", "since": 3, "last_used_at": 5})
         );
-        assert_eq!(
-            AgentToolsetHealth::from(&at(None)).status,
-            ToolsetHealthStatus::Ok
-        );
+        assert!(!item.to_string().contains("failed"), "{item}");
+
+        failing.status_state = Some("ok".to_string());
+        assert_eq!(agent_view(failing.clone())["health"]["status"], "ok");
+
+        failing.enabled = false;
+        let off = agent_view(failing);
+        assert!(off.get("health").is_none(), "{off}");
+        assert_eq!(off["unavailable"], "it is turned off");
+        assert!(off.get("tool_prefix").is_none(), "{off}");
     }
 
     #[test]
@@ -2159,5 +2602,305 @@ mod tests {
             let failure = DiscoverFailure::from(error);
             assert_eq!((failure.status, failure.code), (status, code));
         }
+    }
+
+    const STORED: &str =
+        r#"{"url":"https://mcp.example.com/","headers":{"Authorization":"Bearer real-token"}}"#;
+
+    /// What the edit form sends back after a GET: the redacted data, unchanged.
+    fn redacted_round_trip() -> serde_json::Value {
+        let stored: serde_json::Value = serde_json::from_str(STORED).unwrap();
+        o2_enterprise::enterprise::ai::toolsets::redact_response_data(
+            ToolsetKind::Mcp,
+            Some(stored),
+        )
+        .unwrap()
+    }
+
+    fn merge_secrets(
+        stored: Option<&str>,
+        incoming: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        updated_data("mcp", stored, Some(incoming)).map(parsed)
+    }
+
+    #[test]
+    fn a_save_that_sends_the_redacted_header_keeps_the_stored_one() {
+        let incoming = redacted_round_trip();
+        assert_eq!(incoming["headers"]["Authorization"], "***");
+        let merged = merge_secrets(Some(STORED), incoming).unwrap();
+        assert_eq!(merged["headers"]["Authorization"], "Bearer real-token");
+
+        // The agent push parses the stored data as `McpData`, so it carries the real header.
+        let pushed: McpData = serde_json::from_value(merged).unwrap();
+        assert_eq!(pushed.headers["Authorization"], "Bearer real-token");
+    }
+
+    #[test]
+    fn a_new_secret_replaces_the_stored_one_and_an_empty_map_removes_it() {
+        let mut incoming = redacted_round_trip();
+        incoming["headers"]["Authorization"] = json!("Bearer rotated");
+        let merged = merge_secrets(Some(STORED), incoming).unwrap();
+        assert_eq!(merged["headers"]["Authorization"], "Bearer rotated");
+
+        let cleared = json!({"url": "https://mcp.example.com/", "headers": {}});
+        let merged = merge_secrets(Some(STORED), cleared).unwrap();
+        assert_eq!(merged["headers"], json!({}));
+    }
+
+    #[test]
+    fn a_placeholder_with_nothing_stored_is_refused() {
+        assert!(merge_secrets(None, redacted_round_trip()).is_err());
+    }
+
+    #[test]
+    fn a_kept_header_is_never_sent_to_a_changed_url_or_next_to_a_new_header() {
+        let mut incoming = redacted_round_trip();
+        incoming["url"] = json!("https://attacker.example/mcp");
+        assert!(merge_secrets(Some(STORED), incoming).is_err());
+        let mut incoming = redacted_round_trip();
+        incoming["headers"]["Host"] = json!("attacker-vhost");
+        assert!(merge_secrets(Some(STORED), incoming).is_err());
+
+        // Re-entering the secret makes the new URL acceptable.
+        let incoming = json!({
+            "url": "https://attacker.example/mcp",
+            "headers": {"Authorization": "Bearer typed-again"}
+        });
+        let merged = merge_secrets(Some(STORED), incoming).unwrap();
+        assert_eq!(merged["headers"]["Authorization"], "Bearer typed-again");
+    }
+
+    #[tokio::test]
+    async fn a_refused_save_is_a_typed_400_that_names_fields_never_values() {
+        for (field, change) in [
+            ("url", json!({"url": "https://attacker.example/mcp"})),
+            (
+                "headers",
+                json!({"headers": {"Authorization": "***", "Host": "attacker"}}),
+            ),
+        ] {
+            let mut incoming = redacted_round_trip();
+            for (key, value) in change.as_object().unwrap() {
+                incoming[key] = value.clone();
+            }
+            let error = merge_secrets(Some(STORED), incoming).unwrap_err();
+            let response = update_refused("o", "t1", error);
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+            let body = body_of(response).await;
+            assert_eq!(body["code"], "invalid_request");
+            assert_eq!(body["error_code"], "destination_changed");
+            assert_eq!(body["fields"], json!([field]));
+            let text = body.to_string();
+            assert!(
+                !text.contains("real-token") && !text.contains("attacker"),
+                "{text}"
+            );
+        }
+        let other = update_refused("o", "t1", "invalid mcp data: x".to_string());
+        assert!(body_of(other).await.get("error_code").is_none());
+    }
+
+    /// Answers each request in turn with the next of `replies`, then closes.
+    async fn mcp_server(replies: Vec<&'static str>) -> String {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/mcp", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            for reply in replies {
+                let Ok((mut socket, _)) = listener.accept().await else {
+                    return;
+                };
+                let mut buf = [0u8; 8192];
+                let _ = socket.read(&mut buf).await;
+                let _ = socket.write_all(reply.as_bytes()).await;
+            }
+        });
+        url
+    }
+
+    const RESULT: &str = "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\nmcp-session-id: s1\r\nconnection: close\r\ncontent-length: 36\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}";
+    const REFUSED: &str =
+        "HTTP/1.1 401 Unauthorized\r\nconnection: close\r\ncontent-length: 13\r\n\r\nbad token xyz";
+
+    fn mcp(url: &str) -> McpData {
+        serde_json::from_value(
+            json!({"url": url, "headers": {"Authorization": "Bearer real-token"}}),
+        )
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_test_lists_the_tools_and_every_failure_is_one_fixed_sentence() {
+        let client = reqwest::Client::new();
+        let ok = mcp_server(vec![RESULT, RESULT]).await;
+        assert_eq!(list_tools_with(&client, &mcp(&ok)).await, Ok(()));
+        let refused = mcp_server(vec![REFUSED]).await;
+        let error = list_tools_with(&client, &mcp(&refused)).await.unwrap_err();
+        let gone = list_tools_with(&client, &mcp("http://127.0.0.1:9/mcp"))
+            .await
+            .unwrap_err();
+        assert_eq!(error, gone);
+        assert_eq!(
+            (error.code.as_str(), error.message.as_str()),
+            ("failed", TEST_FAILED)
+        );
+        let result = serde_json::to_string(&ToolsetTestResult {
+            ok: false,
+            duration_ms: 0,
+            error: Some(error),
+        })
+        .unwrap();
+        assert!(
+            !result.contains("real-token") && !result.contains("xyz"),
+            "{result}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_test_never_reaches_a_private_or_metadata_address() {
+        let local = mcp_server(vec![RESULT, RESULT]).await;
+        for url in [
+            local.as_str(),
+            "http://10.0.0.5:9200/",
+            "http://100.64.0.1/mcp",
+            "http://169.254.169.254/latest/",
+            "http://[fd00::1]/mcp",
+            "http://localhost:5080/mcp",
+        ] {
+            let error = list_mcp_tools(&mcp(url)).await.unwrap_err();
+            assert_eq!(error.code, "failed", "{url}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_toolset_is_never_saved_with_a_private_or_metadata_url() {
+        for url in [
+            "http://10.0.0.5:9200/",
+            "http://169.254.169.254/latest/",
+            "http://localhost/",
+        ] {
+            let data = json!({"url": url, "headers": {}});
+            let refusal = admit_url(ToolsetKind::Mcp, Some(&data)).await.unwrap_err();
+            assert_eq!(refusal.status(), StatusCode::BAD_REQUEST, "{url}");
+        }
+        let public = json!({"url": "https://8.8.8.8/mcp", "headers": {}});
+        assert!(admit_url(ToolsetKind::Mcp, Some(&public)).await.is_ok());
+        assert!(admit_url(ToolsetKind::Mcp, None).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn an_unresolvable_host_is_refused_with_its_own_sentence() {
+        let message = |response: Response| async move {
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            json["message"].as_str().unwrap_or_default().to_string()
+        };
+        let unresolvable = json!({"url": "https://no-such-host.invalid/mcp", "headers": {}});
+        let refusal = admit_url(ToolsetKind::Mcp, Some(&unresolvable))
+            .await
+            .unwrap_err();
+        assert_eq!(message(refusal).await, URL_UNRESOLVED);
+        let private = json!({"url": "http://10.0.0.5/mcp", "headers": {}});
+        let refusal = admit_url(ToolsetKind::Mcp, Some(&private))
+            .await
+            .unwrap_err();
+        assert_eq!(message(refusal).await, URL_REFUSED);
+        assert_eq!(
+            refusal_sentence("Host x resolved to no addresses"),
+            URL_UNRESOLVED
+        );
+    }
+
+    #[tokio::test]
+    async fn a_toolset_whose_config_does_not_parse_fails_its_test_without_a_call() {
+        let toolset = OrgToolset {
+            id: "t1".into(),
+            org: "o".into(),
+            name: "GitHub".into(),
+            kind: "mcp".into(),
+            description: None,
+            data: Some("{}".into()),
+            created_by: "a@x".into(),
+            created_at: 1,
+            updated_at: 1,
+            enabled: true,
+            status_state: None,
+            status_since: None,
+            last_error: None,
+            last_used_at: None,
+            region_only: false,
+            origin_region: None,
+        };
+        assert_eq!(
+            check_toolset(&toolset).await.unwrap().code,
+            "invalid_config"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_patch_with_anything_but_the_switch_is_the_400_envelope() {
+        let response = patch(
+            Path(("o".to_string(), "t1".to_string())),
+            Bytes::from_static(br#"{"enabled": false, "name": "x"}"#),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["code"], "invalid_request");
+    }
+
+    #[test]
+    fn an_sse_answer_counts_and_an_error_answer_does_not() {
+        assert!(has_jsonrpc_result(
+            "event: message\ndata: {\"result\":{\"tools\":[]}}\n\n"
+        ));
+        assert!(!has_jsonrpc_result(r#"{"error":{"code":-1}}"#));
+        assert!(!has_jsonrpc_result("<html>"));
+    }
+
+    #[test]
+    fn a_tool_frame_is_credited_to_its_enabled_toolset_only() {
+        let names = vec![
+            ("t1".to_string(), "GitHub".to_string(), true),
+            ("t2".to_string(), "GitHub Enterprise".to_string(), true),
+            ("t3".to_string(), "kubectl".to_string(), true),
+            ("t4".to_string(), "Old".to_string(), false),
+        ];
+        let usage = ToolsetUse::new("o", names);
+        let frames = concat!(
+            "data: {\"type\":\"tool_result\",\"tool\":\"github-enterprise_create_issue\",\"success\":true}\n",
+            "data: {\"type\":\"tool_result\",\"tool\":\"github_search\",\"success\":false}\n",
+            "data: {\"type\":\"tool_result\",\"tool\":\"kubectl_get\",\"success\":true}\n",
+            "data: {\"type\":\"tool_result\",\"tool\":\"old_x\",\"success\":true}\n",
+            "data: {\"type\":\"tool_result\",\"tool\":\"SearchSQL\",\"success\":true}\n",
+        );
+        assert_eq!(
+            usage.results(frames.as_bytes()),
+            vec![
+                ("t2".to_string(), true),
+                ("t1".to_string(), false),
+                ("t3".to_string(), true)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_tool_frame_split_across_chunks_is_still_credited() {
+        let usage = ToolsetUse::new("o", vec![("t1".to_string(), "GitHub".to_string(), true)]);
+        let frame =
+            "data: {\"type\":\"tool_result\",\"tool\":\"github_search\",\"success\":true}\n\n";
+        let (head, tail) = frame.split_at(20);
+        assert!(usage.results(head.as_bytes()).is_empty());
+        assert_eq!(
+            usage.results(tail.as_bytes()),
+            vec![("t1".to_string(), true)]
+        );
     }
 }

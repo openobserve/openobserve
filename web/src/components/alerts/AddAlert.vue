@@ -599,7 +599,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="min-h-0 flex-1 overflow-hidden">
               <template v-if="isAnomalyMode">
-                <AnomalyDataPreview :config="anomalyConfig" />
+                <AnomalyDataPreview ref="anomalyPreviewRef" :config="anomalyConfig" />
               </template>
               <template v-else>
                 <div
@@ -666,6 +666,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('alerts.editJson')"
     persistent
   >
+    <template #header-right>
+      <AiEntryButton
+        appearance="toggle"
+        verb="ask"
+        entry-kind="editor_toggle"
+        object-kind="alert"
+        thread="current"
+        dock-host="json_editor"
+        :label="t('assistant.entry.assistant')"
+        :tooltip="t('assistant.entry.tooltip.dockedAsk')"
+        :pressed="jsonDock.pressed.value"
+        :build="jsonDock.build"
+        data-test="ai-entry-json-editor-ask"
+        @closed="jsonDock.close"
+      />
+    </template>
     <JsonEditor
       :data="jsonEditorData"
       :title="t('alerts.editJson')"
@@ -723,7 +739,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw } from "@/types/i18n";
-import { defineComponent, computed, watch, provide, ref, onMounted } from "vue";
+import {
+  defineAsyncComponent,
+  defineComponent,
+  computed,
+  watch,
+  provide,
+  ref,
+  onMounted,
+} from "vue";
 import { useStore } from "vuex";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -771,6 +795,11 @@ import { childOptionsFrom } from "./composite/expression";
 import alertsService from "@/services/alerts";
 import { unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
 import { useOnCallSetup } from "@/composables/useOnCallSetup";
+import {
+  assistantObjectNameKey,
+  useAssistantDockToggle,
+  useAssistantLeaveGuard,
+} from "@/composables/assistant/pure";
 import { getFoldersListByType } from "@/utils/commons";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 
@@ -829,15 +858,23 @@ export default defineComponent({
     OTruncatedText,
     CompositeAlertForm,
     EditorDraftDialogs,
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
   },
   setup(props, { emit }) {
     const store = useStore();
+    let saved = false;
     // Bound once the draft exists; a save reports to the draft first, which decides whether the host navigates.
     let onFormSaved: ((folderId?: string) => void) | null = null;
     const formEmit = ((event: string, ...args: unknown[]) => {
-      if (event === "update:list" && onFormSaved) {
-        onFormSaved(args[0] as string | undefined);
-        return;
+      if (event === "update:list") {
+        // A save leaves the form on purpose, so the leave guard lets that navigation through.
+        saved = true;
+        if (onFormSaved) {
+          onFormSaved(args[0] as string | undefined);
+          return;
+        }
       }
       emit(event as Parameters<typeof emit>[0], ...args);
     }) as AlertFormEmit;
@@ -865,6 +902,16 @@ export default defineComponent({
     const cancelEditor = async () => {
       if (await alertEditorDraft.draft.confirmLeave()) emit("cancel:hideform");
     };
+    const jsonDock = useAssistantDockToggle("json_editor");
+    const alertName = computed(() => String(alertForm.formData.value?.name ?? ""));
+    provide(assistantObjectNameKey, alertName);
+    useAssistantLeaveGuard({
+      host: "alert",
+      // The form's own isDirty is already set by a new alert's defaults; the draft's baseline is not.
+      isDirty: () => !saved && alertEditorDraft.draft.hasUnsavedChanges(),
+      name: () =>
+        alertName.value ? raw(alertName.value) : alertForm.t("assistant.shell.leaveGuardThisAlert"),
+    });
 
     // Share server SQL-validation squiggle ranges with the descendant query
     // editors (QueryEditorDialog / QueryConfig) via inject.
@@ -1185,6 +1232,7 @@ export default defineComponent({
       calibrationBanner: calibrationHandoff.banner,
       draftFormKey: alertEditorDraft.formKey,
       cancelEditor,
+      jsonDock,
       alertAutoName,
       headerModeLabel,
       isAnomalyDetectionEnabled,

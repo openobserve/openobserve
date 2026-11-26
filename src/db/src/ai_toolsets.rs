@@ -19,7 +19,6 @@
 use infra::{
     errors::Result,
     table::{
-        ai_toolset_health,
         org_ai_toolsets::{
             self as table, ListFilter, OrgToolset, TOMBSTONE_KEEP_MICROS, Tombstone,
         },
@@ -239,9 +238,6 @@ async fn apply_delete(tombstone: Tombstone) -> Result<Applied> {
         return Ok(Applied::Ignored);
     }
     table::remove(&row.org, &row.id).await?;
-    if let Err(e) = ai_toolset_health::remove(&row.org, &tombstone.key).await {
-        log::warn!("failed to remove the health of toolset '{}': {e}", row.name);
-    }
     Ok(Applied::Deleted {
         name: row.name,
         region: tombstone.region,

@@ -993,7 +993,7 @@ async fn toolset_key(org_id: &str, id: &str) -> Result<MemoryKey, Response> {
             "only MCP toolsets have a memory",
         ));
     }
-    let names = infra::table::org_ai_toolsets::list_names(org_id)
+    let names = infra::table::org_ai_toolsets::list_raw_names(org_id)
         .await
         .map_err(MetaHttpResponse::internal_error)?;
     let normalized = normalize_tool_name(&toolset.name);
@@ -1340,7 +1340,7 @@ async fn mcp_toolset_id(org: &str, name: &str) -> Option<String> {
             return None;
         }
     };
-    let names = infra::table::org_ai_toolsets::list_names(org).await.ok()?;
+    let names = infra::table::org_ai_toolsets::list_raw_names(org).await.ok()?;
     if colliding_names(names.iter().map(String::as_str)).contains(name) {
         return None;
     }

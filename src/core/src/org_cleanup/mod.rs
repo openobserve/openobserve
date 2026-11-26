@@ -1245,6 +1245,51 @@ async fn delete_org_search_jobs(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn delete_org_ai_assistant_resources(org_id: &str) -> Result<(), anyhow::Error> {
+    use infra::table::{ai_chat_sessions, ai_chat_shares, ai_chat_turns};
+
+    // Before the rows: the purge lists the chats from them, and a retry skips confirmed ones.
+    #[cfg(feature = "enterprise")]
+    crate::ai_chat::purge_org_replicas(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_replicas: {e}"))?;
+    infra::table::ai_access_requests::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_access_requests: {e}"))?;
+    infra::table::ai_actions::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_actions: {e}"))?;
+    infra::table::ai_grants::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_grants: {e}"))?;
+    infra::table::ai_turn_marks::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_turn_marks: {e}"))?;
+    infra::table::ai_chat_feedback::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_feedback: {e}"))?;
+    infra::table::ai_chat_imports::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_imports: {e}"))?;
+    infra::table::ai_approvals::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_approvals: {e}"))?;
+    // Turns and shares before their chat rows, so none is left without the chat it belongs to.
+    ai_chat_turns::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_turns: {e}"))?;
+    ai_chat_shares::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_shares: {e}"))?;
+    // Chats the retention sweep still re-purges stay until the tombstone sweep, as for any delete.
+    let repurge_since =
+        config::utils::time::now_micros() - ai_chat_sessions::REPLICA_REPURGE_WINDOW_MICROS;
+    ai_chat_sessions::delete_by_org_except_repurging(org_id, repurge_since)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_sessions: {e}"))?;
+    Ok(())
+}
+
 async fn delete_org_pipelines(org_id: &str) -> Result<(), anyhow::Error> {
     // Through the service layer, so triggers, backfill jobs, ownership and caches go cluster-wide.
     let pipelines = infra::pipeline::list_by_org_fully_decoded(org_id).await?;
@@ -1276,15 +1321,14 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     #[cfg(feature = "cloud")]
     use infra::table::trial_quota_usage;
     use infra::table::{
-        ai_chat_sessions, ai_chat_shares, ai_chat_turns, ai_memory, ai_toolset_health, alert_acks,
-        alert_calibration, alert_incidents, alert_leases, anomaly_detection, compactor_manual_jobs,
-        distinct_values, external_alerts, gen_ai_agents, incident_events, incident_integrations,
-        llm_eval, llm_prompts, llm_secrets, oncall_teams, online_eval_jobs, org_ai_toolsets,
-        org_telephony, providers, query_history, ratelimit, rca_runs, rca_steering, re_pattern,
-        re_pattern_stream_map, rum_pa, score_configs, scorers, search_queue, slack_alert_messages,
-        slo, slo_backfill_jobs, slo_budget, slos, status_pages, synthetics_agents,
-        synthetics_checks, synthetics_environments, synthetics_locations, synthetics_probe_tokens,
-        synthetics_variables, timed_annotations, workflows,
+        ai_memory, alert_acks, alert_calibration, alert_incidents, alert_leases, anomaly_detection,
+        compactor_manual_jobs, distinct_values, external_alerts, gen_ai_agents, incident_events,
+        incident_integrations, llm_eval, llm_prompts, llm_secrets, oncall_teams, online_eval_jobs,
+        org_ai_toolsets, org_telephony, providers, query_history, ratelimit, rca_runs,
+        rca_steering, re_pattern, re_pattern_stream_map, rum_pa, score_configs, scorers,
+        search_queue, slack_alert_messages, slo, slo_backfill_jobs, slo_budget, slos, status_pages,
+        synthetics_agents, synthetics_checks, synthetics_environments, synthetics_locations,
+        synthetics_probe_tokens, synthetics_variables, timed_annotations, workflows,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -1404,30 +1448,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     org_ai_toolsets::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ai_toolsets: {e}"))?;
-    ai_toolset_health::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_toolset_health: {e}"))?;
     org_ai_toolsets::delete_tombstones_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_toolset_tombstones: {e}"))?;
-    // Before the rows: the purge lists the chats from them, and a retry skips confirmed ones.
-    #[cfg(feature = "enterprise")]
-    crate::ai_chat::purge_org_replicas(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_replicas: {e}"))?;
-    // Turns and shares before their chat rows, so none is left without the chat it belongs to.
-    ai_chat_turns::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_turns: {e}"))?;
-    ai_chat_shares::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_shares: {e}"))?;
-    // Chats the retention sweep still re-purges stay until the tombstone sweep, as for any delete.
-    let repurge_since =
-        config::utils::time::now_micros() - ai_chat_sessions::REPLICA_REPURGE_WINDOW_MICROS;
-    ai_chat_sessions::delete_by_org_except_repurging(org_id, repurge_since)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_chat_sessions: {e}"))?;
+    delete_org_ai_assistant_resources(org_id).await?;
     // A queued write would re-insert the rows; other nodes' flushes refuse an inactive org.
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::llm_evaluations::agent_registry::evict_org(org_id).await;
@@ -1554,6 +1578,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     trial_quota_usage::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/trial_quota_usage: {e}"))?;
+    #[cfg(feature = "cloud")]
+    infra::table::paid_overage_attribution::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/paid_overage_attribution: {e}"))?;
     // Through the db layer, not the table layer: it also evicts the token caches cluster-wide.
     crate::db::org_ingestion_tokens::delete_by_org(org_id)
         .await
@@ -2459,7 +2487,7 @@ mod tests {
     ];
 
     /// Every infra and db-layer source the org-deletion program touches, by path under `src/`.
-    const TEARDOWN_SOURCES: [(&str, &str); 94] = [
+    const TEARDOWN_SOURCES: [(&str, &str); 93] = [
         (
             "db/src/alerts/alert.rs",
             include_str!("../../../db/src/alerts/alert.rs"),
@@ -2723,10 +2751,6 @@ mod tests {
         (
             "infra/src/table/org_ai_toolsets.rs",
             include_str!("../../../infra/src/table/org_ai_toolsets.rs"),
-        ),
-        (
-            "infra/src/table/ai_toolset_health.rs",
-            include_str!("../../../infra/src/table/ai_toolset_health.rs"),
         ),
         (
             "infra/src/table/org_cleanup_tasks.rs",
@@ -5177,11 +5201,17 @@ mod tests {
 
     #[test]
     fn test_ai_chat_replicas_then_children_go_before_their_chats() {
-        let sessions = position_of("ai_chat_sessions::delete_by_org_except_repurging(org_id");
-        let turns = position_of("ai_chat_turns::delete_by_org(org_id)");
-        let shares = position_of("ai_chat_shares::delete_by_org(org_id)");
+        position_of("delete_org_ai_assistant_resources(org_id)");
+        let body = fn_body(SOURCE, "delete_org_ai_assistant_resources");
+        let at = |call: &str| {
+            body.find(call)
+                .unwrap_or_else(|| panic!("delete_org_ai_assistant_resources never calls {call}"))
+        };
+        let sessions = at("ai_chat_sessions::delete_by_org_except_repurging(org_id");
+        let turns = at("ai_chat_turns::delete_by_org(org_id)");
+        let shares = at("ai_chat_shares::delete_by_org(org_id)");
         assert!(turns < sessions && shares < sessions);
-        assert!(position_of("crate::ai_chat::purge_org_replicas(org_id)") < turns.min(shares));
+        assert!(at("crate::ai_chat::purge_org_replicas(org_id)") < turns.min(shares));
     }
 
     #[test]

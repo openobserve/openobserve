@@ -258,7 +258,7 @@ interface Props {
   getEventBadgeColor: (event: any) => string;
   getEventBadgeText: (event: any) => string;
   getEventLayout: (event: any) => EventLayout;
-  /** True only for the fixed-label "AI SRE"-style badge (uses aiSreBadgeText
+  /** True only for the fixed-label investigation badge (uses aiSreBadgeText
    * instead of getEventBadgeText). Optional — most domains don't need it. */
   isAiLabelled?: (event: any) => boolean;
   aiSreBadgeText?: I18nText;

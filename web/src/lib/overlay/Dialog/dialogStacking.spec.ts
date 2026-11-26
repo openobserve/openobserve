@@ -13,13 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
-import { defineComponent, h, inject } from "vue";
-import { mount } from "@vue/test-utils";
+import { afterEach, describe, expect, it } from "vitest";
+import { defineComponent, h, inject, provide } from "vue";
+import { flushPromises, mount } from "@vue/test-utils";
+
+import OSheet from "@/lib/overlay/Sheet/OSheet.vue";
+import { raw } from "@/types/i18n";
+
+import ODialog from "./ODialog.vue";
 import {
   DIALOG_DEPTH_KEY,
+  DRAWER_DEPTH_KEY,
   countOpenOverlays,
+  injectOverlayDepth,
+  overlayLayerZIndex,
   provideDialogLayerAboveOpenOverlays,
+  useOverlayLayer,
 } from "./dialogStacking";
 
 const overlay = (state: string) => {
@@ -49,5 +58,61 @@ describe("dialogStacking", () => {
       },
     });
     expect(mount(Parent).text()).toBe("2");
+  });
+});
+
+describe("one overlay ladder (N6)", () => {
+  const zOf = (selector: string) =>
+    Number(document.body.querySelector<HTMLElement>(selector)?.style.zIndex);
+
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("a confirm opened from a sheet dims the sheet: its scrim and panel stack above it", async () => {
+    const wrapper = mount(
+      defineComponent({
+        components: { OSheet, ODialog },
+        template: `<OSheet :open="true" snap="half" aria-label="Thread" data-test="sheet"
+            :expand-label="label" :collapse-label="label">
+            <ODialog :open="true" title="Cancel run?" data-test="confirm"><p>Body</p></ODialog>
+          </OSheet>`,
+        setup: () => ({ label: raw("More") }),
+      }),
+      { attachTo: document.body },
+    );
+    await flushPromises();
+    const sheet = zOf('[data-test="sheet"]');
+    expect(zOf("[data-o2-dialog]")).toBeGreaterThan(sheet);
+    const scrim = [...document.body.querySelectorAll<HTMLElement>("[style]")]
+      .map((el) => Number(el.style.zIndex))
+      .filter((z) => z > 0 && z < zOf("[data-o2-dialog]"));
+    expect(Math.max(...scrim)).toBeGreaterThan(sheet);
+    wrapper.unmount();
+  });
+
+  it("a dialog inside a drawer, and a popover inside either, take the layer above it", () => {
+    const seen: number[] = [];
+    const Leaf = defineComponent({
+      setup: () => {
+        seen.push(injectOverlayDepth());
+        return () => h("span");
+      },
+    });
+    const Layer = defineComponent({
+      setup: (_, { slots }) => {
+        useOverlayLayer();
+        return () => slots.default?.();
+      },
+    });
+    const Drawer = defineComponent({
+      setup: (_, { slots }) => {
+        provide(DRAWER_DEPTH_KEY, 1);
+        return () => slots.default?.();
+      },
+    });
+    mount(defineComponent({ setup: () => () => h(Drawer, () => h(Layer, () => h(Leaf))) }));
+    expect(seen).toEqual([2]);
+    expect(overlayLayerZIndex(1)).toEqual({ overlayZIndex: 6999, contentZIndex: 7000 });
   });
 });

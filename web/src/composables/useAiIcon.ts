@@ -16,8 +16,7 @@
 /**
  * useAiIcon — returns the theme-aware AI button icon src.
  *
- * Light mode → ai_icon_gradient.svg  (colour gradient sparkle)
- * Dark mode  → ai_icon_dark.svg      (light sparkle for dark backgrounds)
+ * Draws the assistant spark (AssistantSpark.vue) with its light or dark gradient.
  *
  * Use in any component that renders an "Ask AI" button to keep the icon
  * consistent with the header AI button.
@@ -28,17 +27,32 @@
  */
 
 import { computed } from "vue";
-import { useTheme } from "@/composables/useTheme";
-import { getImageURL } from "@/utils/zincutils";
+import { useThemeRevision } from "@/composables/useTheme";
+import { SPARK_PATH } from "@/components/ai-assistant/common/AssistantSpark.vue";
+
+const sparkToken = (name: string): string =>
+  getComputedStyle(document.documentElement)
+    .getPropertyValue(`--color-assistant-spark-${name}`)
+    .trim();
+
+const sparkDataUri = (): string => {
+  const [from, via, to] = ["from", "via", "to"].map(sparkToken);
+  return (
+    "data:image/svg+xml," +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><defs><linearGradient id="s" x1="8" y1="2" x2="16" y2="22" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${from}"/><stop offset="0.45" stop-color="${via}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><path d="${SPARK_PATH}" fill="url(#s)"/></svg>`,
+    )
+  );
+};
 
 export function useAiIcon() {
-  const { isDark } = useTheme();
+  const themeRevision = useThemeRevision();
 
-  const aiIconSrc = computed<string>(() =>
-    isDark.value
-      ? getImageURL("images/common/ai_icon_dark.svg")
-      : getImageURL("images/common/ai_icon_gradient.svg"),
-  );
+  // An <img> cannot read CSS variables, so the token values are resolved per theme revision.
+  const aiIconSrc = computed<string>(() => {
+    void themeRevision.value;
+    return sparkDataUri();
+  });
 
   return { aiIconSrc };
 }

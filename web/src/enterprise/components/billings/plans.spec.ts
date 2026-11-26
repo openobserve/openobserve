@@ -50,7 +50,6 @@ vi.mock("@/services/billings", async (importOriginal) => {
       get_hosted_url: vi.fn(),
       get_session_url: vi.fn(),
       retrieve_hosted_page: vi.fn(),
-      get_ai_usage: vi.fn(),
     },
   });
 });
@@ -150,15 +149,6 @@ describe("Plans Component", () => {
     (BillingService.retrieve_hosted_page as any).mockResolvedValue({
       data: { data: { hosted_page: { state: "succeeded" } } },
     });
-    (BillingService.get_ai_usage as any).mockResolvedValue({
-      data: {
-        credits_used: 0,
-        credits_limit: 100,
-        credits_remaining: 100,
-        mode: "free",
-        requires_additional_credits: false,
-      },
-    });
     (paidOverage.get as any).mockResolvedValue({
       data: {
         feature: "ai_credits",
@@ -216,19 +206,6 @@ describe("Plans Component", () => {
     );
     bounded.unmount();
     vi.unstubAllGlobals();
-  });
-
-  it("skips the AI usage read while the assistant is not licensed", async () => {
-    vi.mocked(BillingService.get_ai_usage).mockClear();
-    store.state.zoConfig.features = { ai_assistant: "locked" };
-    const locked = mount(Plans, {
-      global: { plugins: [i18n], provide: { store }, mocks: { $router: mockRouter } },
-    });
-    await flushPromises();
-
-    expect(BillingService.get_ai_usage).not.toHaveBeenCalled();
-    locked.unmount();
-    delete store.state.zoConfig.features;
   });
 
   it("fires billing_checkout_returned once with the plan when Stripe sends the user back", async () => {
@@ -770,43 +747,6 @@ describe("Plans Component", () => {
     expect(BillingService.resume_subscription).toHaveBeenCalledTimes(2);
   });
 
-  it("hands the paid usage switch the card's current mode", async () => {
-    wrapper.vm.aiUsage = {
-      credits_used: 5,
-      credits_limit: 5,
-      credits_remaining: 0,
-      mode: "consent_required",
-      requires_additional_credits: false,
-    };
-    await nextTick();
-
-    expect(wrapper.findComponent({ name: "PaidAiUsageControl" }).props("mode")).toBe(
-      "consent_required",
-    );
-  });
-
-  it("keeps a full bar neutral while paid usage carries on, and red only when blocked", async () => {
-    const usage = { credits_used: 5, credits_limit: 5, credits_remaining: 0 };
-    wrapper.vm.aiUsage = { ...usage, mode: "pay_as_you_go", requires_additional_credits: false };
-    expect(wrapper.vm.aiUsageVariant).toBe("default");
-    wrapper.vm.aiUsage = { ...usage, mode: "exhausted", requires_additional_credits: false };
-    expect(wrapper.vm.aiUsageVariant).toBe("danger");
-  });
-
-  it("offers Contact Sales when a contract org runs out", async () => {
-    const open = vi.spyOn(window, "open").mockImplementation(() => null);
-    wrapper.vm.aiUsage = {
-      credits_used: 5,
-      credits_limit: 5,
-      credits_remaining: 0,
-      mode: "exhausted",
-      requires_additional_credits: true,
-    };
-    await nextTick();
-    await wrapper.get('[data-test="billing-ai-contact-sales"]').trigger("click");
-    expect(open).toHaveBeenCalledWith("https://openobserve.ai/contactus/", "_blank");
-    open.mockRestore();
-  });
   describe("pricing JSON", () => {
     const proFeaturesOld = [
       { title: "Logs, Metrics, Traces, RUM, Session Replay, Error tracking" },

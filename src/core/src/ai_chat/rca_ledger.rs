@@ -22,12 +22,12 @@ use config::{
         },
         oncall::{
             confidence::{
-                ToolCallRecord, ToolClassMap, ToolClassRule, signal_class, stream_type,
-                toolset_signal_class,
+                SignalClass, ToolCallRecord, ToolClassMap, ToolClassRule, signal_class,
+                stream_type, toolset_signal_class,
             },
             rca_run::{
-                LedgerCall, LedgerTool, RcaSubmit, evidence_target, exit_code, observed_window,
-                parse_submit, summarize_result,
+                LedgerCall, LedgerTool, RcaSubmit, change_rows, evidence_target, exit_code,
+                observed_window, parse_submit, summarize_result,
             },
         },
     },
@@ -41,9 +41,9 @@ use o2_enterprise::enterprise::ai::{
 use super::{
     projection::{Folded, obj},
     rca_thread::{
-        SUBMIT_REPORT, ThreadPart, ToolPart, error_text, key_arg, ms_to_us, tool_body,
-        updated_part, user_text,
+        SUBMIT_REPORT, ThreadPart, ToolPart, error_text, key_arg, ms_to_us, tool_body, user_text,
     },
+    record_v2::event_parts,
 };
 
 const RECORD_HYPOTHESIS: &str = "record_hypothesis";
@@ -250,11 +250,13 @@ pub async fn run_tool_classes(run: &rca_runs::Model) -> ToolClassMap {
 /// Decode the committed events of an RCA session, grading toolset calls by `classes`.
 pub fn decode_run_with(events: &[DurableEvent], classes: &ToolClassMap) -> RunTranscript {
     let folded = Folded::fold(events);
-    let seqs: HashMap<&str, i64> = events
+    let seqs: HashMap<String, i64> = events
         .iter()
-        .filter_map(|event| {
-            let id = updated_part(event)?.get("id")?.as_str()?;
-            Some((id, event.seq))
+        .flat_map(|event| {
+            let ids = event_parts(event)
+                .into_iter()
+                .filter_map(|part| Some(part.get("id")?.as_str()?.to_string()));
+            ids.map(|id| (id, event.seq)).collect::<Vec<_>>()
         })
         .collect();
 
@@ -361,6 +363,8 @@ pub fn decode_run_with(events: &[DurableEvent], classes: &ToolClassMap) -> RunTr
         }
     }
     transcript.calls.sort_by_key(|call| call.seq);
+    // A 2.x record holds a whole message: of its calls, the later one is the later submit.
+    submits.reverse();
     submits.sort_by_key(|(seq, _)| std::cmp::Reverse(*seq));
     transcript.submit = submits.iter().find_map(|(_, input)| parse_submit(input));
     acks.sort_by_key(|(seq, _)| *seq);
@@ -401,6 +405,16 @@ fn tool_record(call: &ToolPart<'_>, classes: &ToolClassMap) -> Option<ToolCallRe
         .as_ref()
         .and_then(|body| completed_call_failure(call.tool, state, body));
     let success = completed && failure.is_none();
+    let change_rows = body
+        .as_ref()
+        .filter(|_| success)
+        .and_then(|body| change_rows(call.tool, body));
+    // A SQL read of a change record is as much a read of the change as a diff is.
+    let signal = if change_rows.is_some() {
+        SignalClass::Change
+    } else {
+        signal_class(call.tool, &input)
+    };
     let (result_summary, result_count, error_type, observed) = match (body, failure) {
         (Some(body), None) => {
             let (summary, count) = summarize_result(call.tool, &body);
@@ -435,6 +449,7 @@ fn tool_record(call: &ToolPart<'_>, classes: &ToolClassMap) -> Option<ToolCallRe
         signal,
         target,
         observed,
+        change_rows,
         result_summary,
     })
 }
@@ -468,7 +483,7 @@ fn completed_call_failure(tool: &str, state: &Map<String, Value>, body: &Value) 
 #[cfg(test)]
 pub(crate) mod tests {
     use config::{
-        meta::{alerts::rca_steering::SteerKind, oncall::confidence::SignalClass},
+        meta::alerts::rca_steering::SteerKind,
         utils::json::{Value, json},
     };
 
@@ -1046,6 +1061,46 @@ pub(crate) mod tests {
             decode_run(&s.events).tool_log[0].signal,
             SignalClass::Unclassified
         );
+    }
+
+    /// A SearchSQL that returned a deploy row with old and new values is a change read.
+    #[test]
+    fn a_searched_change_record_is_a_change_read() {
+        let deploys = "SELECT version, previous_version, config_diff FROM ta_persona_deploy_events";
+        let rows = json!({"took": 5, "total": 1, "hits": [{"_timestamp": 1_792_140_000_000_000_i64,
+            "service": "inventory-svc", "version": "v3.8.1", "previous_version": "v3.8.0",
+            "config_diff": "DB_POOL_MAX_SIZE: 50 -> 5"}]});
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        s.tool(
+            "msg_a1",
+            "prt_t1",
+            "o2_SearchSQL",
+            "completed",
+            search_sql(deploys),
+            json!({"output": rows.to_string()}),
+            1_100,
+            1_142,
+        );
+        s.tool(
+            "msg_a1",
+            "prt_t2",
+            "o2_SearchSQL",
+            "completed",
+            search_sql(SQL_ERRORS),
+            hits(3),
+            1_200,
+            1_210,
+        );
+        let run = decode_run(&s.events);
+
+        let deploy = &run.tool_log[0];
+        assert_eq!(deploy.signal, SignalClass::Change);
+        assert!(deploy.reads_change("v3.8.1"), "{:?}", deploy.change_rows);
+        assert!(!deploy.reads_change("v3.9.0"));
+        assert_eq!(run.tool_log[1].signal, SignalClass::Logs);
+        assert_eq!(run.tool_log[1].change_rows, None);
     }
 
     /// An org AI Toolset call keeps opencode's `<server>_<tool>` name in the tool log.
@@ -1722,5 +1777,43 @@ pub(crate) mod tests {
             Some("call_prt_q1"),
             "only a completed call is a sentinel"
         );
+    }
+
+    /// One 2.x record holds every call of a message; the last completed report still wins.
+    #[test]
+    fn a_2x_run_decodes_like_its_1x_source() {
+        let mut s = ledger_session(&["context", "topology", "context"]);
+        let first = json!({"markdown": "first", "verdict": verdict(H1, "low", "inconclusive")});
+        submit(&mut s, "prt_p1", "completed", first, 4_000);
+        let second =
+            json!({"markdown": "second", "verdict": verdict(H1, "high", "root_cause_identified")});
+        submit(&mut s, "prt_p2", "completed", second, 4_100);
+        submit(
+            &mut s,
+            "prt_p3",
+            "error",
+            json!({"markdown": "third"}),
+            4_200,
+        );
+        ask(
+            &mut s,
+            "msg_a1",
+            "prt_q1",
+            "When did checkout-api deploy?",
+            4_300,
+        );
+        let v2 = crate::ai_chat::record_v2::tests::to_v2(&s.events);
+        let without_seqs = |mut run: RunTranscript| {
+            for call in &mut run.calls {
+                call.seq = 0;
+            }
+            run
+        };
+        let expected = decode_run(&s.events);
+        let actual = decode_run(&v2);
+        assert_eq!(actual.submit.as_ref().unwrap().markdown, "second");
+        assert_eq!(actual.calls.len(), 4);
+        assert!(actual.open_question.is_some());
+        assert_eq!(without_seqs(actual), without_seqs(expected));
     }
 }
