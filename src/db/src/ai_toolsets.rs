@@ -18,10 +18,8 @@
 
 use infra::{
     errors::Result,
-    table::{
-        org_ai_toolsets::{
-            self as table, ListFilter, OrgToolset, TOMBSTONE_KEEP_MICROS, Tombstone,
-        },
+    table::org_ai_toolsets::{
+        self as table, ListFilter, OrgToolset, TOMBSTONE_KEEP_MICROS, Tombstone,
     },
 };
 use o2_enterprise::enterprise::{
@@ -198,6 +196,12 @@ async fn apply_put(msg: AiToolsetMessage) -> Result<Applied> {
                 updated_at,
                 region_only: false,
                 origin_region: Some(region.clone()),
+                // The switch and health stay in each region; the message carries neither.
+                enabled: true,
+                status_state: None,
+                status_since: None,
+                last_error: None,
+                last_used_at: None,
             };
             table::add(entry).await?;
             return Ok(Applied::Created);
@@ -331,6 +335,11 @@ mod tests {
             updated_at: 7,
             region_only: false,
             origin_region: Some("us-1".into()),
+            enabled: true,
+            status_state: None,
+            status_since: None,
+            last_error: None,
+            last_used_at: None,
         }
     }
 

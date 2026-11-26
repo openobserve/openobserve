@@ -664,6 +664,8 @@ async fn memory_owner(user_email: &str, agent_type: &str) -> Option<String> {
     openobserve_core::ai_chat::admission::resolve_owner(user_email)
         .await
         .ok()
+}
+
 /// One `chat_stream` turn, ready to go to o2-ai with or without persistence.
 #[cfg(feature = "enterprise")]
 struct StreamTurn {

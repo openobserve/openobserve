@@ -413,7 +413,7 @@ fn tool_record(call: &ToolPart<'_>, classes: &ToolClassMap) -> Option<ToolCallRe
     let signal = if change_rows.is_some() {
         SignalClass::Change
     } else {
-        signal_class(call.tool, &input)
+        signal
     };
     let (result_summary, result_count, error_type, observed) = match (body, failure) {
         (Some(body), None) => {

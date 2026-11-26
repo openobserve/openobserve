@@ -1340,7 +1340,9 @@ async fn mcp_toolset_id(org: &str, name: &str) -> Option<String> {
             return None;
         }
     };
-    let names = infra::table::org_ai_toolsets::list_raw_names(org).await.ok()?;
+    let names = infra::table::org_ai_toolsets::list_raw_names(org)
+        .await
+        .ok()?;
     if colliding_names(names.iter().map(String::as_str)).contains(name) {
         return None;
     }
@@ -1903,6 +1905,11 @@ pub(crate) mod tests {
             updated_at: 1,
             region_only: false,
             origin_region: None,
+            enabled: true,
+            status_state: None,
+            status_since: None,
+            last_error: None,
+            last_used_at: None,
         };
         infra::table::org_ai_toolsets::add(toolset).await.unwrap();
         id

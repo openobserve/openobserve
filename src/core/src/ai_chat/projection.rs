@@ -3513,7 +3513,7 @@ mod tests {
                 json!({"id": "msg_i", "type": "idle", "outcome": "failed"}),
             ),
         ];
-        let projected = project(&events, "");
+        let projected = project(&events, "", &Default::default());
         assert_eq!(projected["turns"][0]["error_code"], "provider_error");
         assert_eq!(
             projected["turns"][0]["error"],
@@ -3649,7 +3649,10 @@ mod tests {
             assert!(0 <= first && first <= last, "{turn}");
         }
         assert_eq!(project(&[], "", &ToolsetNames::default())["last_seq"], -1);
-        assert_eq!(project(&[], "", &ToolsetNames::default())["turns"], json!([]));
+        assert_eq!(
+            project(&[], "", &ToolsetNames::default())["turns"],
+            json!([])
+        );
     }
 
     #[test]
@@ -3908,8 +3911,15 @@ mod tests {
             assert!(v2.iter().all(is_v2_record), "{name}");
             assert!(!calls(&v1).is_empty(), "{name}");
             assert_eq!(calls(&v2), calls(&v1), "{name}");
-            assert!(!cards(&project(&v1, "")).is_empty(), "{name}");
-            assert_eq!(cards(&project(&v2, "")), cards(&project(&v1, "")), "{name}");
+            assert!(
+                !cards(&project(&v1, "", &Default::default())).is_empty(),
+                "{name}"
+            );
+            assert_eq!(
+                cards(&project(&v2, "", &Default::default())),
+                cards(&project(&v1, "", &Default::default())),
+                "{name}"
+            );
         }
         // A timed delete gives both generations the same expiring card.
         let mut timed = golden_events("tool_heavy.json");
@@ -3920,12 +3930,15 @@ mod tests {
                 e.data["part"]["state"]["time"] = json!({"start": 900, "end": 1_000});
             }
         }
-        let v1_cards = cards(&project(&timed, ""));
+        let v1_cards = cards(&project(&timed, "", &Default::default()));
         assert_eq!(
             v1_cards[0]["expires_at"],
             1_000 + DELETE_CONFIRMATION_TTL_MS
         );
-        assert_eq!(cards(&project(&to_v2(&timed), "")), v1_cards);
+        assert_eq!(
+            cards(&project(&to_v2(&timed), "", &Default::default())),
+            v1_cards
+        );
     }
 
     /// What the web client's rendered record and the server's frames must agree on.
@@ -4185,7 +4198,7 @@ mod tests {
     #[test]
     fn a_delete_awaiting_approval_is_kept_as_its_request() {
         let (events, _) = load("tool_heavy.json");
-        let projected = project(&events, "");
+        let projected = project(&events, "", &Default::default());
         let asked: Vec<&Value> = projected["turns"]
             .as_array()
             .unwrap()
@@ -4476,7 +4489,7 @@ mod tests {
     }
 
     fn last_frames(events: &[DurableEvent]) -> Vec<Value> {
-        let projected = project(events, "");
+        let projected = project(events, "", &Default::default());
         let turns = projected["turns"].as_array().unwrap();
         turns.last().unwrap()["frames"].as_array().unwrap().clone()
     }
@@ -4666,7 +4679,7 @@ mod tests {
         ] {
             let error = json!({"name": "APIError", "data": {"message": message}});
             let events = session_answering("Partial.", "o2-ai", error);
-            let projected = project(&events, "");
+            let projected = project(&events, "", &Default::default());
             let turn = projected["turns"].as_array().unwrap().last().unwrap();
             assert_eq!(turn["error_code"], code, "{message}");
             let frame = turn["frames"]
@@ -4724,10 +4737,10 @@ mod tests {
     fn a_2x_shell_call_is_hidden_in_chat_but_stays_an_rca_row() {
         let mut events =
             crate::ai_chat::record_v2::tests::golden_events("v2_user_text_and_tools.json");
-        let projected = project(&events, "").to_string();
+        let projected = project(&events, "", &Default::default()).to_string();
         assert!(projected.contains("tool_call"), "{projected}");
         events[2].data["message"]["content"][0]["name"] = json!("shell");
-        let projected = project(&events, "").to_string();
+        let projected = project(&events, "", &Default::default()).to_string();
         assert!(!projected.contains("tool_call"), "{projected}");
         assert_eq!(
             crate::ai_chat::rca_thread::ThreadPart::of("shell", "completed", None),
@@ -4757,7 +4770,7 @@ mod tests {
             event_type: SESSION_UPDATED.into(),
             data: json!({"info": {"title": "Pool exhaustion"}}),
         });
-        let sorted = project(&mixed, "");
+        let sorted = project(&mixed, "", &Default::default());
         let created: Vec<Option<i64>> = sorted["turns"]
             .as_array()
             .unwrap()

@@ -871,8 +871,8 @@ pub async fn patch(Path((org_id, id)): Path<(String, String)>, body: Bytes) -> R
     log::info!("[org_id:{org_id}] toolset {id} enabled={}", body.enabled);
     let primary = infra::db::get_orm_client_rw().await;
     match infra::table::org_ai_toolsets::get_with(primary, &org_id, &id).await {
+        // The switch stays in this region: replication carries no `enabled`.
         Ok(Some(t)) => {
-            db::ai_toolsets::published_put(&t).await;
             let mut toolsets = [ToolsetResponse::from_toolset(t)];
             flag_renames(&org_id, &mut toolsets).await;
             let [toolset] = toolsets;
@@ -2390,7 +2390,12 @@ mod tests {
             let overrides = json!({"headers": {"DD-API-KEY": "***", host: "internal.example"}});
             let err = discover_entry(Some(&stored), by_id(Some(overrides))).unwrap_err();
             assert_eq!(err.status, StatusCode::BAD_REQUEST, "{host}");
-            assert!(err.message.contains("`Host`"), "{}", err.message);
+            // A new header next to a kept `***` is refused before the `Host` check runs.
+            assert!(
+                err.message.contains("`headers` gains or loses an entry"),
+                "{}",
+                err.message
+            );
 
             let unsaved = DiscoverRequest {
                 url: Some("https://mcp.example.com/mcp".to_string()),

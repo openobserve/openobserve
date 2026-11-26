@@ -33,7 +33,7 @@ use o2_enterprise::enterprise::{
     },
 };
 
-use super::rca_thread::{ToolPart, updated_part};
+use super::{rca_thread::ToolPart, record_v2::event_parts};
 
 /// What opencode writes on a call that was running when its turn was stopped.
 const ABORTED_TEXT: &str = "Tool execution aborted";
@@ -154,7 +154,13 @@ pub fn with_toolset_calls(
 pub fn toolset_calls(events: &[DurableEvent], toolsets: &ToolsetNames) -> Vec<ToolsetCall> {
     events
         .iter()
-        .filter_map(|event| call_of(updated_part(event)?, toolsets))
+        .flat_map(|event| {
+            let parts = event_parts(event);
+            parts
+                .iter()
+                .filter_map(|part| call_of(part, toolsets))
+                .collect::<Vec<_>>()
+        })
         .collect()
 }
 
@@ -198,7 +204,10 @@ async fn record(owner: &TurnOwner, calls: Vec<ToolsetCall>) {
     let ids = match org_ai_toolsets::list_names(&owner.org_id).await {
         Ok(names) => names,
         Err(e) => {
-            log::warn!("[AI] org={}: listing toolsets for health failed: {e}", owner.org_id);
+            log::warn!(
+                "[AI] org={}: listing toolsets for health failed: {e}",
+                owner.org_id
+            );
             Vec::new()
         }
     };
@@ -218,7 +227,7 @@ async fn record(owner: &TurnOwner, calls: Vec<ToolsetCall>) {
         let matching = ids
             .iter()
             .filter(|(_, name, _)| normalize_tool_name(name) == call.toolset);
-        for (id, _, _) in matching {
+        for (id, ..) in matching {
             if let Err(e) = org_ai_toolsets::record_health(&owner.org_id, id, outcome, at).await {
                 log::warn!(
                     "[AI] org={} toolset={}: recording health failed: {e}",

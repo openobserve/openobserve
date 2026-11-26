@@ -96,10 +96,8 @@ use crate::ai_chat::{
     cancel::cancel_chat_turn,
     fork,
     projection::Folded,
-    rca_ledger::{RunTranscript, TranscriptQuestion, decode_run, decode_run_with, run_tool_classes},
-    rca_thread::{
-        SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread, updated_part,
-    },
+    rca_ledger::{RunTranscript, TranscriptQuestion, decode_run_with, run_tool_classes},
+    rca_thread::{SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread},
     read_committed_events,
     record_v2::{event_parts, record_message},
 };

@@ -446,30 +446,6 @@ pub async fn get_many_with<C: ConnectionTrait>(
         .collect())
 }
 
-pub async fn get(
-    org_id: &str,
-    session_id: &str,
-    turn_id: &str,
-) -> Result<Option<Model>, errors::Error> {
-    get_with(get_orm_client_ro().await, org_id, session_id, turn_id).await
-}
-
-pub async fn get_with<C: ConnectionTrait>(
-    conn: &C,
-    org_id: &str,
-    session_id: &str,
-    turn_id: &str,
-) -> Result<Option<Model>, errors::Error> {
-    Entity::find_by_id((
-        org_id.to_string(),
-        session_id.to_string(),
-        turn_id.to_string(),
-    ))
-    .one(conn)
-    .await
-    .map_err(db_err)
-}
-
 /// Remove the turn records of chats whose index row is gone (retention).
 pub async fn purge_orphans(org_id: &str) -> Result<u64, errors::Error> {
     purge_orphans_with(get_orm_client_rw().await, org_id).await

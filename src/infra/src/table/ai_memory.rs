@@ -2563,6 +2563,11 @@ mod tests {
                 updated_at: Set(1),
                 region_only: Set(false),
                 origin_region: Set(None),
+                enabled: Set(true),
+                status_state: Set(None),
+                status_since: Set(None),
+                last_error: Set(None),
+                last_used_at: Set(None),
             })
             .exec(&db)
             .await
@@ -2633,6 +2638,11 @@ mod tests {
                     updated_at: Set(1),
                     region_only: Set(false),
                     origin_region: Set(None),
+                    enabled: Set(true),
+                    status_state: Set(None),
+                    status_since: Set(None),
+                    last_error: Set(None),
+                    last_used_at: Set(None),
                 })
                 .exec(&db)
                 .await
