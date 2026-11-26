@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Nog geen enkel kanaal heeft een standaardorganisatie",
-      "description": "Vragen in een kanaal zonder standaard gaan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met /o2 org)."
+      "description": "Vragen in een kanaal zonder standaard gaan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nog niemand in deze organisatie heeft Slack gekoppeld"
@@ -28789,7 +28789,7 @@
     "mineJoinTeam": "Lid worden van een team",
     "mineTestTeam": "Stuur een testoproep naar {team}",
     "mineCoverSaved": "Vervanging opgeslagen",
-    "mineSlackLinkHow": "Typ /o2 link in Slack",
+    "mineSlackLinkHow": "Typ {command} link in Slack",
     "mineSlackSetUpHint": "Opent Instellingen › Slack",
     "myDeliveriesWhen": "Wanneer",
     "phoneAddHint": "Voeg een nummer toe voor sms'jes en gesprekken",
@@ -29360,7 +29360,7 @@
     "channelUnavailable": "{channel} — er is geen provider aan gekoppeld",
     "channelUnverified": "{channel} — opgeslagen, maar niemand heeft het geverifieerd",
     "channelAddPhone": "{reason}. Voeg je telefoonnummer toe bij Mijn piket",
-    "channelLinkSlack": "{reason}. Voer /o2 link uit in Slack",
+    "channelLinkSlack": "{reason}. Voer {command} link uit in Slack",
     "loadUneven": "{name} ontving {factor}× het mediane aantal meldingen in de afgelopen {days} dagen",
     "loadUnevenLabel": "De werklast is onevenwichtig:",
     "membersUnreachableMore": "{name} zit in dit team, maar geen melding kan hen bereiken — {why}. {count} ander lid verkeert in dezelfde situatie. | {name} zit in dit team, maar geen melding kan hen bereiken — {why}. {count} andere leden verkeren in dezelfde situatie.",
@@ -31146,7 +31146,7 @@
         "settings": "Instellingen",
         "install": "Bij installatie",
         "destination": "Vanuit een alarmbestemming",
-        "oncall": "Vanuit /o2 oncall hier"
+        "oncall": "Vanuit {command} oncall hier"
       },
       "channel": "Kanaal",
       "channelPlaceholder": "Kanalen zoeken",
@@ -31160,7 +31160,7 @@
       "editDefault": "Standaardkanaal bewerken",
       "removeConfirm": "Standaard verwijderen",
       "removeTitle": "De standaard voor #{channel} verwijderen?",
-      "removeMessage": "Vragen in {name} gaan dan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met /o2 org).",
+      "removeMessage": "Vragen in {name} gaan dan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met {command} org).",
       "instanceAdminOnly": "Alleen voor instantiebeheerders",
       "ownOrgOnlyHint": "Op een instantiewerkruimte koppel je kanalen aan je eigen organisatie",
       "claimableHint": "Niet-geclaimde kanalen en kanalen die {org} bezit",

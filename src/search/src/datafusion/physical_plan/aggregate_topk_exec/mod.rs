@@ -20,8 +20,8 @@ use datafusion::{
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::PhysicalExpr,
     physical_plan::{
-        DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
-        PlanProperties,
+        DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, LimitBehavior,
+        Partitioning, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
     },
 };
@@ -207,7 +207,7 @@ impl ExecutionPlan for AggregateTopkExec {
         vec![false; self.children().len()]
     }
 
-    fn supports_limit_pushdown(&self) -> bool {
-        true
+    fn limit_behavior(&self) -> LimitBehavior {
+        LimitBehavior::CopyToChildren
     }
 }

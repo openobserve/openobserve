@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Żaden kanał nie ma jeszcze domyślnej organizacji",
-      "description": "Pytania w kanale bez domyślnej organizacji trafiają do domyślnej organizacji każdej osoby (można ją zmienić za pomocą /o2 org)."
+      "description": "Pytania w kanale bez domyślnej organizacji trafiają do domyślnej organizacji każdej osoby (można ją zmienić za pomocą {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nikt w tej organizacji nie połączył jeszcze Slacka"
@@ -28789,7 +28789,7 @@
     "mineJoinTeam": "Dołącz do zespołu",
     "mineTestTeam": "Wyślij testowe wezwanie do {team}",
     "mineCoverSaved": "Zastępstwo zapisane",
-    "mineSlackLinkHow": "Wpisz /o2 link w Slacku",
+    "mineSlackLinkHow": "Wpisz {command} link w Slacku",
     "mineSlackSetUpHint": "Otwiera Ustawienia › Slack",
     "myDeliveriesWhen": "Kiedy",
     "phoneAddHint": "Dodaj numer do wiadomości SMS i połączeń",
@@ -29360,7 +29360,7 @@
     "channelUnavailable": "{channel} — brak dostawcy",
     "channelUnverified": "{channel} — zapisany, ale nikt go nie zweryfikował",
     "channelAddPhone": "{reason}. Dodaj swój telefon w sekcji Moje dyżury",
-    "channelLinkSlack": "{reason}. Uruchom /o2 link w Slacku",
+    "channelLinkSlack": "{reason}. Uruchom {command} link w Slacku",
     "loadUneven": "{name} obsłużył {factor}× medianę w ciągu ostatnich {days} dni",
     "loadUnevenLabel": "Obciążenie jest nierównomierne:",
     "membersUnreachableMore": "{name} jest w tym zespole, ale żadne wezwanie do tej osoby nie może dotrzeć — {why}. {count} inny członek jest w tej samej sytuacji. | {name} jest w tym zespole, ale żadne wezwanie do tej osoby nie może dotrzeć — {why}. {count} innych członków jest w tej samej sytuacji.",
@@ -31146,7 +31146,7 @@
         "settings": "Ustawienia",
         "install": "Przy instalacji",
         "destination": "Z miejsca docelowego alertu",
-        "oncall": "Z /o2 oncall w tym kanale"
+        "oncall": "Z {command} oncall w tym kanale"
       },
       "channel": "Kanał",
       "channelPlaceholder": "Szukaj kanałów",
@@ -31160,7 +31160,7 @@
       "editDefault": "Edytuj domyślny kanał",
       "removeConfirm": "Usuń domyślny",
       "removeTitle": "Usunąć domyślną organizację dla #{channel}?",
-      "removeMessage": "Pytania w kanale {name} trafiają następnie do domyślnej organizacji każdej osoby (można ją zmienić za pomocą /o2 org).",
+      "removeMessage": "Pytania w kanale {name} trafiają następnie do domyślnej organizacji każdej osoby (można ją zmienić za pomocą {command} org).",
       "instanceAdminOnly": "Tylko administrator instancji",
       "ownOrgOnlyHint": "W obszarze roboczym instancji mapujesz kanały na własną organizację",
       "claimableHint": "Nieprzypisane kanały i kanały należące do {org}",

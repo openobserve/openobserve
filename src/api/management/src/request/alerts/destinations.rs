@@ -39,7 +39,9 @@ use serde::{Deserialize, Serialize};
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::ssrf_guard::SsrfGuard},
     models::destinations::{Destination, DestinationType, DestinationUseResponse},
-    request::{BulkDeleteRequest, BulkDeleteResponse},
+    request::{
+        BulkDeleteRequest, BulkDeleteResponse, OutboundOutcome, OutboundTarget, with_outbound_audit,
+    },
 };
 
 /// Per-destination PUT checks in flight at once when the org-wide one fails.
@@ -181,6 +183,23 @@ async fn test_slack_app_destination(org_id: &str, test_req: &TestDestinationRequ
 }
 
 async fn test_http_destination(org_id: &str, test_req: &TestDestinationRequest) -> Response {
+    if test_req.url.is_empty() {
+        return MetaHttpResponse::json(TestDestinationResponse {
+            success: false,
+            status_code: None,
+            error: Some("HTTP destination must have a url".to_string()),
+        });
+    }
+    let (res, outcome) = send_test_request(org_id, test_req).await;
+    let target = OutboundTarget::new(&test_req.url, outcome);
+    log::info!("[{org_id}] destination test called {target}");
+    with_outbound_audit(MetaHttpResponse::json(res), &[target])
+}
+
+async fn send_test_request(
+    org_id: &str,
+    test_req: &TestDestinationRequest,
+) -> (TestDestinationResponse, OutboundOutcome) {
     let method = test_req
         .method
         .clone()
@@ -190,26 +209,21 @@ async fn test_http_destination(org_id: &str, test_req: &TestDestinationRequest) 
     let body = test_req.body.clone().unwrap_or_default();
     let headers = test_req.headers.clone().unwrap_or_default();
     let skip_tls_verify = test_req.skip_tls_verify.unwrap_or(false);
-
-    if url.is_empty() {
-        return MetaHttpResponse::json(TestDestinationResponse {
+    let failed = |error: String, outcome| {
+        let res = TestDestinationResponse {
             success: false,
             status_code: None,
-            error: Some("HTTP destination must have a url".to_string()),
-        });
-    }
+            error: Some(error),
+        };
+        (res, outcome)
+    };
 
     // The policy real sends use.
     if let Err(error_msg) = SsrfGuard::validate_destination_url_with_config_async(url).await {
-        return MetaHttpResponse::json(TestDestinationResponse {
-            success: false,
-            status_code: None,
-            error: Some(error_msg),
-        });
+        return failed(error_msg, OutboundOutcome::Blocked);
     }
 
-    // Build HTTP client through the SSRF-aware factory so redirect targets
-    // and any DNS resolution that happens at connect time are re-validated.
+    // The client real sends use: connect-time DNS is re-checked and a 3xx is not followed.
     let mut client_builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
 
     if skip_tls_verify {
@@ -219,11 +233,10 @@ async fn test_http_destination(org_id: &str, test_req: &TestDestinationRequest) 
     let client = match common::utils::ssrf_guard::build_safe_destination_client(client_builder) {
         Ok(client) => client,
         Err(e) => {
-            return MetaHttpResponse::json(TestDestinationResponse {
-                success: false,
-                status_code: None,
-                error: Some(format!("Failed to build HTTP client: {}", e)),
-            });
+            return failed(
+                format!("Failed to build HTTP client: {}", e),
+                OutboundOutcome::NotSent,
+            );
         }
     };
 
@@ -235,11 +248,10 @@ async fn test_http_destination(org_id: &str, test_req: &TestDestinationRequest) 
         "PATCH" => client.patch(url),
         "DELETE" => client.delete(url),
         _ => {
-            return MetaHttpResponse::json(TestDestinationResponse {
-                success: false,
-                status_code: None,
-                error: Some(format!("Unsupported HTTP method: {}", method)),
-            });
+            return failed(
+                format!("Unsupported HTTP method: {}", method),
+                OutboundOutcome::NotSent,
+            );
         }
     };
 
@@ -257,30 +269,40 @@ async fn test_http_destination(org_id: &str, test_req: &TestDestinationRequest) 
     match request_builder.send().await {
         Ok(response) => {
             let status = response.status();
-            MetaHttpResponse::json(TestDestinationResponse {
+            let res = TestDestinationResponse {
                 success: status.is_success(),
                 status_code: Some(status.as_u16()),
                 error: (!status.is_success())
                     .then(|| format!("The destination answered with HTTP {}", status.as_u16())),
-            })
+            };
+            (res, OutboundOutcome::Status(status.as_u16()))
         }
         Err(e) => {
-            let error = if e.is_timeout() {
-                "The destination did not respond in time"
+            // A connect-time or redirect refusal surfaces as a plain connect or redirect error.
+            if let Some(refusal) = config::utils::ssrf_guard::find_ssrf_refusal(&e) {
+                return failed(refusal.to_string(), OutboundOutcome::Blocked);
+            }
+            let (error, outcome) = if e.is_timeout() {
+                (
+                    "The destination did not respond in time",
+                    OutboundOutcome::Timeout,
+                )
             } else if e.is_connect() {
-                "Couldn't connect to the destination"
+                (
+                    "Couldn't connect to the destination",
+                    OutboundOutcome::ConnectFailed,
+                )
             } else {
-                "Couldn't complete the request to the destination"
+                (
+                    "Couldn't complete the request to the destination",
+                    OutboundOutcome::Failed,
+                )
             };
             log::warn!(
                 "[{org_id}] destination test request failed: {}",
                 e.without_url()
             );
-            MetaHttpResponse::json(TestDestinationResponse {
-                success: false,
-                status_code: None,
-                error: Some(error.to_string()),
-            })
+            failed(error.to_string(), outcome)
         }
     }
 }
@@ -1008,7 +1030,7 @@ mod tests {
     use openobserve_core::http::destination_error_response;
 
     use super::{TestDestinationRequest, jira, saved_token_refusal, test_destination};
-    use crate::models::destinations::DestinationType;
+    use crate::{models::destinations::DestinationType, request::OutboundAudit};
 
     fn status(err: DestinationError) -> StatusCode {
         destination_error_response(err).status()
@@ -1050,22 +1072,10 @@ mod tests {
         }
     }
 
-    /// The JSON the destination test returns for a GET to a local server that answers
-    /// `status_line` with the body `secret`.
-    async fn tested_secret_server(status_line: &str) -> serde_json::Value {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        let reply = format!("HTTP/1.1 {status_line}\r\nContent-Length: 6\r\n\r\nsecret");
-        tokio::spawn(async move {
-            while let Ok((mut sock, _)) = listener.accept().await {
-                let mut buf = [0u8; 4096];
-                let _ = sock.read(&mut buf).await;
-                let _ = sock.write_all(reply.as_bytes()).await;
-            }
-        });
+    /// The JSON and audit target a destination test of `url` returns.
+    async fn tested(url: String) -> (serde_json::Value, Option<OutboundAudit>) {
         let req = TestDestinationRequest {
-            url: format!("http://127.0.0.1:{port}/"),
+            url,
             method: Some("GET".to_string()),
             headers: None,
             body: None,
@@ -1075,11 +1085,40 @@ mod tests {
             template: None,
             slack_app: None,
         };
-        let resp = test_destination(Path("default".to_string()), Json(req)).await;
+        let mut resp = test_destination(Path("default".to_string()), Json(req)).await;
+        let target = resp.extensions_mut().remove::<OutboundAudit>();
         let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
             .await
             .unwrap();
-        serde_json::from_slice(&bytes).unwrap()
+        (serde_json::from_slice(&bytes).unwrap(), target)
+    }
+
+    /// The port of a local server that answers every request with `reply`.
+    async fn local_server(reply: String) -> u16 {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = [0u8; 4096];
+                let _ = sock.read(&mut buf).await;
+                let _ = sock.write_all(reply.as_bytes()).await;
+            }
+        });
+        port
+    }
+
+    /// What a destination test returns for a GET to a local server that answers `status_line`
+    /// with the body `secret`, and the server's origin.
+    async fn tested_secret_server(
+        status_line: &str,
+    ) -> (serde_json::Value, Option<OutboundAudit>, String) {
+        let port = local_server(format!(
+            "HTTP/1.1 {status_line}\r\nContent-Length: 6\r\n\r\nsecret"
+        ))
+        .await;
+        let (res, target) = tested(format!("http://user:pw@127.0.0.1:{port}/x?token=abc")).await;
+        (res, target, format!("http://127.0.0.1:{port}"))
     }
 
     #[test]
@@ -1095,13 +1134,80 @@ mod tests {
             ],
             || async {
                 for (status_line, code) in [("200 OK", 200), ("503 Service Unavailable", 503)] {
-                    let res = tested_secret_server(status_line).await;
+                    let (res, target, origin) = tested_secret_server(status_line).await;
+                    assert_eq!(
+                        target,
+                        Some(OutboundAudit(format!("{origin} HTTP {code}"))),
+                        "{res}"
+                    );
                     assert!(!res.to_string().contains("secret"), "{res}");
                     assert_eq!(res["statusCode"], code, "{res}");
                     assert_eq!(res["success"], code == 200, "{res}");
                     let error = res["error"].as_str();
                     assert_eq!(error.is_none(), code == 200, "{res}");
                     assert!(error.is_none_or(|e| e.contains("503")), "{res}");
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn a_blocked_destination_test_still_records_where_it_tried_to_go() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_blocked_destination_test_still_records_where_it_tried_to_go"
+            ),
+            &[&[]],
+            || async {
+                let (res, target) =
+                    tested("http://user:pw@169.254.169.254:9/x?token=abc".into()).await;
+                assert_eq!(res["success"], false, "{res}");
+                assert_eq!(
+                    target,
+                    Some(OutboundAudit(
+                        "http://169.254.169.254:9 blocked".to_string()
+                    ))
+                );
+                let (_, target) = tested(String::new()).await;
+                assert_eq!(target, None, "an empty URL calls nothing");
+            },
+        );
+    }
+
+    #[test]
+    fn test_destination_test_reports_a_redirect_without_following_it() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::test_destination_test_reports_a_redirect_without_following_it"
+            ),
+            &[
+                &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+                &[("ZO_SKIP_SSRF_CHECKS", "true")],
+                &[("ZO_SSRF_ALLOW_LOOPBACK", "true")],
+            ],
+            || async {
+                let ok = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".to_string();
+                let reachable = format!("http://127.0.0.1:{}/", local_server(ok).await);
+                let metadata = "http://169.254.169.254/latest".to_string();
+                for (code, location) in [
+                    (301, &reachable),
+                    (302, &metadata),
+                    (307, &reachable),
+                    (308, &reachable),
+                ] {
+                    let status_line = format!("{code} Redirect\r\nLocation: {location}");
+                    let (res, target, origin) = tested_secret_server(&status_line).await;
+                    assert_eq!(
+                        target,
+                        Some(OutboundAudit(format!("{origin} HTTP {code}"))),
+                        "{res}"
+                    );
+                    assert_eq!(res["statusCode"], code, "{res}");
+                    assert_eq!(res["success"], false, "{res}");
+                    let expected = format!("The destination answered with HTTP {code}");
+                    assert_eq!(res["error"], expected.as_str(), "{res}");
                 }
             },
         );

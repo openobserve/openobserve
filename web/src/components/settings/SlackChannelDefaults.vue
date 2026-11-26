@@ -50,7 +50,11 @@ import {
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { SlackChannel, SlackChannelDefaultRow } from "@/types/slack";
 import { serverMessageOf, statusOf } from "@/utils/slackLink";
-import { makeChannelDefaultSchema, type ChannelDefaultForm } from "./SlackSettings.schema";
+import {
+  DEFAULT_SLACK_COMMAND,
+  makeChannelDefaultSchema,
+  type ChannelDefaultForm,
+} from "./SlackSettings.schema";
 
 /** `org_id` is read only for a `_meta` viewer of an instance workspace, who picks the owning org. */
 type DefaultForm = ChannelDefaultForm & { org_id: string };
@@ -67,11 +71,11 @@ const orgName = computed<string>(() => store.state.selectedOrganization?.label |
 const { isMetaOrg } = useIsMetaOrg();
 
 const installations = useQuery(() => slackInstallationsQuery(org.value));
-const onInstance = computed(
-  () =>
-    installations.data.value?.installations.find((i) => i.id === props.installationId)?.scope ===
-    "instance",
+const installation = computed(() =>
+  installations.data.value?.installations.find((i) => i.id === props.installationId),
 );
+const onInstance = computed(() => installation.value?.scope === "instance");
+const slackCommand = computed(() => raw(installation.value?.command || DEFAULT_SLACK_COMMAND));
 // R-80: on an instance workspace a channel another org owns changes only through _meta.
 const instanceAdmin = computed(() => onInstance.value && isMetaOrg.value);
 const ownOrgOnly = computed(() => onInstance.value && !isMetaOrg.value);
@@ -277,7 +281,9 @@ const save = async (value: DefaultForm): Promise<void> => {
         </template>
         <template #cell-set_by="{ row }">
           <span v-if="!canChange(row) && ownOrgOnly" class="text-text-muted">{{ raw("—") }}</span>
-          <template v-else>{{ t(`slackApp.channels.setFrom.${row.set_from}`) }}</template>
+          <template v-else>{{
+            t(`slackApp.channels.setFrom.${row.set_from}`, { command: slackCommand })
+          }}</template>
         </template>
         <template #cell-actions="{ row }">
           <div v-if="canChange(row)" class="flex items-center justify-end">
@@ -351,7 +357,14 @@ const save = async (value: DefaultForm): Promise<void> => {
           />
         </template>
         <template #empty>
-          <OEmptyState size="compact" preset="no-slack-channel-defaults" :backdrop="false" />
+          <OEmptyState
+            size="compact"
+            preset="no-slack-channel-defaults"
+            :description="
+              t('emptyState.noSlackChannelDefaults.description', { command: slackCommand })
+            "
+            :backdrop="false"
+          />
         </template>
       </OTable>
     </div>
@@ -455,6 +468,7 @@ const save = async (value: DefaultForm): Promise<void> => {
       :title="t('slackApp.channels.removeTitle', { channel: removing?.channel_name ?? '' })"
       message-keypath="slackApp.channels.removeMessage"
       :message-name="removing ? `#${removing.channel_name}` : ''"
+      :message-values="{ command: slackCommand }"
       :ok-label="t('slackApp.channels.removeConfirm')"
       ok-variant="destructive"
       focus-cancel
