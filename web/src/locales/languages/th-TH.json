@@ -700,6 +700,7 @@
       "cipherKeys": "คีย์เข้ารหัส",
       "announcementBanners": "แบนเนอร์ประกาศ",
       "regexPatterns": "แพตเทิร์น Regex",
+      "keyValues": "ค่าคีย์",
       "evalJobs": "งานประมวลผลการประเมินแบบออนไลน์",
       "billingGroup": "กลุ่มการเรียกเก็บเงิน",
       "syntheticChecks": "การตรวจสอบสังเคราะห์",
@@ -757,6 +758,7 @@
       "cipherKeys": "คีย์เข้ารหัส",
       "announcementBanners": "แบนเนอร์ประกาศ",
       "regexPatterns": "รูปแบบ regex",
+      "keyValues": "ค่าคีย์",
       "unnamed": "ทรัพยากรนี้",
       "onCall": "เวรประจำการ (On-Call)",
       "incidentIntegrations": "การเชื่อมต่อเหตุการณ์ขัดข้อง",
@@ -10939,6 +10941,11 @@
       "tryOneOfThese": "Or try one of these"
     },
     "capabilities": {
+      "starter": {
+        "title": "ตั้งค่าแพ็กเริ่มต้น",
+        "description": "แดชบอร์ด การแจ้งเตือน และมุมมองที่บันทึกไว้ซึ่งสร้างขึ้นสำหรับข้อมูล {packs} ของคุณ",
+        "prompt": "แพ็กเริ่มต้นใดเหมาะกับข้อมูลของฉัน และแต่ละแพ็กจะสร้างอะไรบ้าง"
+      },
       "query": {
         "title": "เขียนคิวรี",
         "description": "SQL for logs, traces, RUM, or PromQL for metrics.",
@@ -10966,6 +10973,17 @@
       "mapStreamSchema": "Map my \"default\" stream schema",
       "promqlCpu": "Write PromQL for pods using > 80% CPU",
       "lastAlertFired": "Why was my last alert fired?"
+    },
+    "starterSuggestions": {
+      "whichPacks": "แพ็กเริ่มต้นใดเหมาะกับข้อมูลของฉัน",
+      "setUpPack": "ตั้งค่าแพ็ก {pack}",
+      "whatInPack": "แพ็ก {pack} มีอะไรบ้าง",
+      "errorsLastHour": "แสดงข้อผิดพลาดจากชั่วโมงที่ผ่านมา"
+    },
+    "starter": {
+      "checking": "กำลังตรวจสอบข้อมูลของคุณเพื่อค้นหาแพ็กเริ่มต้น…",
+      "contextNote": "O2 Assistant ใช้แพ็กเริ่มต้นที่ตรงกับคุณเป็นบริบท",
+      "readyWhenYouAre": "พร้อมเมื่อคุณพร้อม:"
     },
     "placeholderRotation": {
       "one": "Show me errors from the last hour…",
@@ -15097,6 +15115,376 @@
     "countIncidentIntegration": "{count} incident integration | {count} incident integrations",
     "sectionOtherConsumers": "Also used by",
     "countDowntime": "{count} downtime | {count} downtimes"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "ชื่อคลัสเตอร์",
+          "k8s_namespace_name": "เนมสเปซ",
+          "k8s_pod_name": "ชื่อพอด",
+          "k8s_node_name": "ชื่อโหนด",
+          "k8s_container_name": "ชื่อคอนเทนเนอร์",
+          "kind": "ชนิดเหตุการณ์",
+          "reason": "สาเหตุของเหตุการณ์",
+          "message": "ข้อความเหตุการณ์"
+        },
+        "roles": {
+          "events": "เหตุการณ์ Kubernetes"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "โฮสต์"
+      },
+      "traces": {
+        "title": "เทรซ (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "เมทริกซ์ CloudWatch"
+        }
+      },
+      "genai": {
+        "title": "AI (แอป LLM)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "ล็อกงานประมวลผลของ GitHub Actions"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "ลองตรวจสอบแพ็กอีกครั้ง",
+    "countAlerts": "{count} การแจ้งเตือน | {count} การแจ้งเตือน",
+    "scope": "ขอบเขตการแจ้งเตือน: {value}",
+    "scopeAll": "ทุกคลัสเตอร์",
+    "scopeSeen": "ทุกคลัสเตอร์ · พบแล้ว {count} รายการ: {clusters}",
+    "noPermission": "คุณไม่สามารถตั้งค่าแพ็กนี้ในองค์กรนี้ได้ โปรดสอบถามผู้ดูแลระบบ",
+    "askAdmin": "ขอให้ผู้ดูแลระบบตั้งค่านี้",
+    "busyBy": "{who} กำลังตั้งค่าแพ็กนี้อยู่ในขณะนี้ กรุณากลับมาตรวจสอบใหม่ในอีกหนึ่งนาที",
+    "busySomeone": "มีผู้อื่นกำลังตั้งค่าแพ็กนี้อยู่ในขณะนี้ กรุณากลับมาตรวจสอบใหม่ในอีกหนึ่งนาที",
+    "busyYou": "คุณกำลังตั้งค่าแพ็กนี้ในแท็บอื่น กรุณากลับมาตรวจสอบใหม่ในอีกหนึ่งนาที",
+    "startedBy": "{who} เริ่มตั้งค่าแพ็กนี้แล้ว",
+    "startedBySomeone": "มีผู้อื่นเริ่มตั้งค่าแพ็กนี้แล้ว",
+    "card": {
+      "dashboards": "{count} แดชบอร์ด | {count} แดชบอร์ด"
+    },
+    "manifest": {
+      "leftOut": "ไม่รวม {count} รายการ | ไม่รวม {count} รายการ",
+      "tagEnterprise": "Enterprise",
+      "tagNeedsData": "ต้องมีข้อมูล",
+      "tagHaveIt": "มีข้อมูลแล้ว",
+      "tagUnavailable": "ไม่พร้อมใช้งาน",
+      "adapted": "ปรับให้เหมาะกับข้อมูลของคุณ"
+    },
+    "installDialog": {
+      "title": "สร้างแล้ว {made} จาก {total} รายการ",
+      "attention": "{title} · {count} รายการต้องได้รับการดูแลจากคุณ | {title} · {count} รายการต้องได้รับการดูแลจากคุณ",
+      "failedReason": "ไม่สามารถสร้างได้ กดลองใหม่เพื่อลองอีกครั้ง.",
+      "kindDashboards": "แดชบอร์ด",
+      "kindAlerts": "การแจ้งเตือน",
+      "rowFailed": "ล้มเหลว · {name}"
+    },
+    "home": {
+      "label": "แพ็กเริ่มต้น",
+      "error": "ไม่สามารถตรวจสอบข้อมูลของคุณสำหรับแพ็กได้",
+      "fromClusters": "จาก {clusters}",
+      "moreStreams": "+{count} สตรีม | +{count} สตรีม",
+      "moreStreamsLabel": "สตรีมที่ตรงกันเพิ่มเติม",
+      "interrupted": "การตั้งค่า {title} หยุดกลางทาง · ทำเสร็จแล้ว {made} จาก {total}",
+      "startedBy": "{who} เริ่มตั้งค่า {title}.",
+      "startedBySomeone": "มีคนอื่นเริ่มตั้งค่า {title}.",
+      "busyBy": "{who} กำลังตั้งค่า {title} อยู่ในขณะนี้.",
+      "busySomeone": "มีคนอื่นกำลังตั้งค่า {title} อยู่ในขณะนี้.",
+      "busyYou": "คุณกำลังตั้งค่า {title} ในแท็บอื่น.",
+      "askAdminLine": "แพ็กเริ่มต้นเหมาะกับข้อมูลของคุณ ขอให้ผู้ดูแลระบบเพิ่มให้.",
+      "noAccessLine": "คุณไม่มีสิทธิ์เข้าถึงแพ็กเริ่มต้นในองค์กรนี้ โปรดสอบถามผู้ดูแลระบบ.",
+      "heroTitle": "ข้อมูลพร้อมใช้งานแบบเรียลไทม์ ตั้งค่าแดชบอร์ดและการแจ้งเตือนสำเร็จรูปได้ในเวลาประมาณหนึ่งนาที",
+      "heroLead": "จาก {count} แพ็กที่เหมาะกับข้อมูลของคุณ | จาก {count} แพ็กที่เหมาะกับข้อมูลของคุณ",
+      "readyToAdd": "พร้อมเพิ่ม",
+      "clusterKind": "คลัสเตอร์",
+      "connected": "เชื่อมต่อแล้ว",
+      "moreClusters": "+{count} คลัสเตอร์ | +{count} คลัสเตอร์",
+      "railClusters": "{count} คลัสเตอร์ | {count} คลัสเตอร์",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "สตรีมที่แพ็กนี้ใช้ · {count}",
+      "moreStreamsChip": "+อีก {count}",
+      "streamTypeLogs": "ล็อก",
+      "streamTypeMetrics": "เมทริกซ์",
+      "streamTypeTraces": "เทรซ",
+      "reviewSetUp": "ตรวจสอบแพ็ก",
+      "reviewSetUpLabel": "ตรวจสอบแพ็ก {title}",
+      "bestStart": "จุดเริ่มต้นที่ดีที่สุด",
+      "cards": {
+        "andMore": "{list} และอีก {count}",
+        "panels": "{count} พาเนล | {count} พาเนล",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {panels} สำหรับ {clusters} คลัสเตอร์. | {title}: {panels} สำหรับ {clusters} คลัสเตอร์.",
+            "fallback": "{title}: ทุกโหนด พอด และเวิร์กโหลด."
+          },
+          "alerts": {
+            "template": "{alert_names} จะแจ้งเตือนสำหรับทุกคลัสเตอร์ ({clusters}) ปิดอยู่จนกว่าคุณจะเปิดใช้งาน.",
+            "fallback": "{alert_names} จะแจ้งเตือนสำหรับทุกโฮสต์ ปิดอยู่จนกว่าคุณจะเปิดใช้งาน.",
+            "plain": "จะแจ้งเตือนสำหรับทุกคลัสเตอร์ ปิดอยู่จนกว่าคุณจะเปิดใช้งาน."
+          },
+          "savedViews": {
+            "template": "เหตุการณ์ Kubernetes: ทุกเหตุการณ์ใน {stream} เข้าถึงได้ในคลิกเดียวจากล็อก.",
+            "fallback": "เหตุการณ์ Kubernetes เข้าถึงได้ในคลิกเดียวจากล็อก."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "เมทริกซ์โฮสต์: CPU, หน่วยความจำ และดิสก์สำหรับแต่ละโฮสต์."
+          },
+          "alerts": {
+            "template": "{alert_names} จะแจ้งเตือนสำหรับทุกโฮสต์ ปิดอยู่จนกว่าคุณจะเปิดใช้งาน.",
+            "fallback": "จะแจ้งเตือนสำหรับทุกโฮสต์ ปิดอยู่จนกว่าคุณจะเปิดใช้งาน."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: {panels} สำหรับข้อมูลของคุณ.",
+            "fallback": "{title} สร้างมาสำหรับสตรีมของคุณ."
+          },
+          "alerts": {
+            "template": "{alert_names} จะเริ่มทำงานกับข้อมูลที่ตรงกันทั้งหมดของคุณ ปิดอยู่จนกว่าคุณจะเปิดใช้งาน.",
+            "fallback": "จะเริ่มทำงานกับข้อมูลที่ตรงกันทั้งหมดของคุณ ปิดอยู่จนกว่าคุณจะเปิดใช้งาน."
+          },
+          "savedViews": {
+            "template": "{stream} ในล็อก เปิดได้ในคลิกเดียว.",
+            "fallback": "เปิดจากล็อกได้ในคลิกเดียว."
+          }
+        }
+      },
+      "previewFailed": "ไม่สามารถโหลดสิ่งที่แพ็กนี้ตั้งค่าไว้ได้ ตรวจสอบแล้วลองอีกครั้ง.",
+      "nothingFitsYet": "ยังไม่มีรายการใดในแพ็กนี้ที่เข้ากับข้อมูลของคุณ รายการจะแสดงที่นี่เมื่อมีข้อมูลเข้ามา."
+    },
+    "whatGetsCreated": {
+      "subtitle": "แพ็กเริ่มต้น {title}",
+      "subtitleScoped": "แพ็กเริ่มต้น {title} · สร้างมาสำหรับ {scope}",
+      "savedIn": "บันทึกไว้ในโฟลเดอร์ {folder}",
+      "skippedNote": "ข้าม {count} รายการ · รายการที่มีอยู่ของคุณจะถูกเก็บไว้ | ข้าม {count} รายการ · รายการที่มีอยู่ของคุณจะถูกเก็บไว้",
+      "nameInUse": "{name} มีอยู่แล้ว · รายการของคุณจะถูกเก็บไว้",
+      "skipped": "ข้าม",
+      "notSeenYet": "ยังไม่พบข้อมูล",
+      "footprint": "ขอบเขตการใช้งาน",
+      "reachStarted": "คิวรีเบื้องหลัง: การแจ้งเตือนที่เริ่มทำงานแต่ละรายการจะทำงานตามกำหนดเวลาของตัวเอง",
+      "reachStartedScoped": "ขอบเขตการแจ้งเตือน: {scope} · คิวรีเบื้องหลัง: การแจ้งเตือนที่เริ่มทำงานแต่ละรายการจะทำงานตามกำหนดเวลาของตัวเอง",
+      "selectGroup": "เลือกทั้งหมดใน {group}",
+      "selectRow": "เลือก {name}"
+    },
+    "drawer": {
+      "packTitle": "แพ็ก {title}",
+      "view": "มุมมอง Kubernetes",
+      "viewPath": "โครงสร้างพื้นฐาน › Kubernetes",
+      "dashboard": "แดชบอร์ด {title}",
+      "dashboardNote": "เปิดหลังการตั้งค่า",
+      "panelsFit": "มี {count} พาเนลที่เข้ากับข้อมูลของคุณ เปิดหลังการตั้งค่า. | มี {count} พาเนลที่เข้ากับข้อมูลของคุณ เปิดหลังการตั้งค่า.",
+      "alerts": "การแจ้งเตือน ปิดอยู่จนกว่าคุณจะเปิดใช้งาน",
+      "savedViews": "มุมมองที่บันทึกไว้ในล็อก",
+      "savedViewsNote": "แชร์ให้ทุกคนในองค์กรนี้",
+      "folder": "โฟลเดอร์",
+      "folderValue": "{name} (แพ็กเริ่มต้น)",
+      "reach": "คิวรีเบื้องหลัง: ยังไม่มีในขณะนี้",
+      "reachScoped": "ขอบเขตการแจ้งเตือน: {scope} · คิวรีเบื้องหลัง: ยังไม่มีในขณะนี้",
+      "notIncluded": "ไม่รวมอยู่",
+      "reasonAlreadyHave": "{name}: คุณมีอยู่แล้ว",
+      "reasonNoData": "{name}: ยังไม่พบข้อมูลสำหรับรายการนี้",
+      "reasonUnavailable": "{name}: ไม่มีอยู่ในไลบรารีในขณะนี้",
+      "reasonNeedsPlan": "{name}: ต้องใช้แพ็กเกจ Enterprise",
+      "source": "จากไลบรารีที่ {host} แพ็กที่ฝังอยู่ในเวอร์ชันนี้ใช้งานได้แบบออฟไลน์.",
+      "sourceOffline": "ไม่สามารถเข้าถึง {host} ได้ กำลังใช้แพ็กที่ฝังอยู่ในเวอร์ชันนี้ ซึ่งใช้งานได้แบบออฟไลน์.",
+      "nothingToCreate": "คุณมีทุกรายการในแพ็กนี้อยู่แล้ว",
+      "openDashboard": "เปิดแดชบอร์ด",
+      "error": "ไม่สามารถโหลดสิ่งที่แพ็กนี้สร้างขึ้นได้",
+      "reasonNoFlavour": "{name}: ยังไม่พร้อมใช้งานสำหรับชื่อเมทริกซ์ของคุณ",
+      "loadingFit": "กำลังตรวจสอบว่ารายการใดเข้ากับข้อมูลของคุณ",
+      "noteForbidden": "{title} · คุณไม่มีสิทธิ์ตั้งค่าแพ็กนี้",
+      "setUp": "ตั้งค่า",
+      "allExist": "คุณมีทั้ง {count} รายการในแพ็กนี้อยู่แล้ว การแจ้งเตือนที่มีอยู่จะยังคงการตั้งค่าเดิมไว้.",
+      "continue": "ดำเนินการต่อ",
+      "setUpCount": "ตั้งค่า {count} รายการ | ตั้งค่า {count} รายการ",
+      "ordinaryNote": "เพิ่มแดชบอร์ด การแจ้งเตือน และมุมมองทั่วไป ซึ่งแสดงอยู่ในหน้าแพ็ก แก้ไขหรือลบได้จากหน้าของแต่ละรายการ.",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "กำลังตั้งค่าการเฝ้าระวัง {title}",
+      "summary": "สร้างแล้ว {made} จาก {total}",
+      "created": "สร้างแล้ว",
+      "creating": "กำลังสร้าง",
+      "waiting": "กำลังรอ",
+      "rowAlerts": "การแจ้งเตือน {made} จาก {total}",
+      "rowViews": "มุมมองที่บันทึกไว้ {made} จาก {total}",
+      "rowDashboards": "แดชบอร์ด {made} จาก {total}",
+      "retry": "ลองใหม่ {count} รายการ | ลองใหม่ {count} รายการ",
+      "finish": "เสร็จสิ้น",
+      "interrupted": "การตั้งค่าถูกขัดจังหวะ · ดำเนินการแล้ว {made} จาก {total}",
+      "installError": "การตั้งค่าไม่เสร็จสิ้น โปรดลองอีกครั้ง",
+      "comeBack": "สร้างแล้ว {made} จาก {total} · คุณสามารถปิดส่วนนี้และทำงานต่อได้ ค้นหาอีกครั้งได้จากแพ็กเริ่มต้นในส่วนหัว",
+      "alertsOnTo": "กำลังสร้าง · เปิดใช้งาน ส่งไปยัง {destination}",
+      "emailMe": "ส่งอีเมลถึงฉัน ({email})",
+      "creatingOn": "กำลังสร้าง · เปิดใช้งาน"
+    },
+    "severity": {
+      "critical": "วิกฤต",
+      "warning": "คำเตือน",
+      "info": "ข้อมูล"
+    },
+    "adapted": {
+      "someField": "ฟิลด์",
+      "flavour": "ใช้เวอร์ชัน {name}",
+      "change": "เปลี่ยน",
+      "streams": "สตรีม",
+      "fields": "ฟิลด์",
+      "version": "เวอร์ชัน",
+      "streamCount": "{count} สตรีม | {count} สตรีม",
+      "fieldCount": "{count} ฟิลด์ | {count} ฟิลด์",
+      "matchedBoth": "{streams} และ {fields} ตรงกับข้อมูลของคุณ",
+      "matchedOne": "{what} ตรงกับข้อมูลของคุณ",
+      "needsChoiceCount": "{count} รายการต้องเลือก | {count} รายการต้องเลือก",
+      "notFoundCount": "ไม่พบ {count} รายการ",
+      "matchedCount": "{count} ตรงกัน",
+      "whichStream": "สตรีมใดคือ {what}?",
+      "lookRight": "{count} ดูถูกต้อง | {count} ดูถูกต้อง",
+      "noneFound": "ไม่พบ {what}",
+      "showMore": "แสดงอีก {count} รายการ",
+      "needsChoice": "ต้องเลือก",
+      "severalMatch": "{count} สตรีมดูเหมือน {what}",
+      "oneMatch": "{stream} ดูเหมือน {what}",
+      "sharedAsk": "เรกคอร์ดใดคือ {what}?",
+      "choose": "เลือก",
+      "dialogFields": "{matched} จาก {total} ฟิลด์",
+      "dialogUse": "ใช้ {stream}",
+      "dialogUseAll": "ใช้ทั้งหมด {count}",
+      "dialogUseChecked": "ใช้ {count} รายการนี้",
+      "dialogAllNote": "ทั้งหมด: แดชบอร์ดจะมีตัวเลือกสตรีม และการแจ้งเตือนแต่ละรายการที่อ่านค่านี้จะถูกตั้งค่าหนึ่งครั้งต่อสตรีม",
+      "dialogPickFive": "เลือกสตรีมได้สูงสุด {count} สตรีม",
+      "dialogPickStream": "เลือกสตรีม",
+      "dialogPickPlaceholder": "เลือกสตรีม",
+      "dialogFiltersOn": "อ่านจาก {stream} เฉพาะระเบียนที่ {field} มีค่าเป็น {value}",
+      "dialogNoValues": "ไม่พบค่าสำหรับฟิลด์นี้ใน 24 ชั่วโมงที่ผ่านมา",
+      "dialogSend": "หรือส่งไปยัง {stream}: ตั้งค่าส่วนหัวนี้ในคอลเล็กเตอร์ของคุณ",
+      "dialogFieldTitle": "เลือกฟิลด์สำหรับ {what}",
+      "dialogFieldLabel": "ฟิลด์ใน {stream}",
+      "values": "ที่พบ: {values}",
+      "or": "หรือ",
+      "filterTitle": "เพิ่มตัวกรองเพื่อให้ชุดนี้อ่านเฉพาะ {what}",
+      "showFewer": "แสดงน้อยลง"
+    },
+    "matchCheck": {
+      "checked": "ตรวจสอบเมื่อ {when}",
+      "checkedAt": "ตรวจสอบเมื่อ {time} (เวลาท้องถิ่นของคุณ)",
+      "justNow": "เมื่อสักครู่",
+      "minutesAgo": "{count} นาทีที่แล้ว",
+      "hoursAgo": "{count} ชม. ที่แล้ว",
+      "daysAgo": "{count} วันที่แล้ว"
+    },
+    "headerChip": {
+      "label": "ชุดเริ่มต้น",
+      "ariaLabel": "ชุดเริ่มต้น, {count} ชุดตรงกับข้อมูลของคุณ | ชุดเริ่มต้น, {count} ชุดตรงกับข้อมูลของคุณ",
+      "progress": "{made} จาก {total}",
+      "ariaLabelRunning": "ชุดเริ่มต้น กำลังตั้งค่า {made} จาก {total}"
+    },
+    "guide": {
+      "rowSavedViews": "{count} มุมมองที่บันทึกไว้ | {count} มุมมองที่บันทึกไว้"
+    },
+    "stepper": {
+      "content": "เลือกเนื้อหา",
+      "setup": "กำลังตั้งค่า",
+      "settingUp": "กำลังตั้งค่า…",
+      "interrupted": "ถูกขัดจังหวะ",
+      "ready": "พร้อม",
+      "noteRunning": "กำลังตั้งค่า · สร้างแล้ว {made} จาก {total}",
+      "noteAlertsOn": "สร้างแล้ว {made} จาก {total} · เปิดการแจ้งเตือน {count} รายการ | สร้างแล้ว {made} จาก {total} · เปิดการแจ้งเตือน {count} รายการ",
+      "noteAlertsOff": "สร้างแล้ว {made} จาก {total} · ปิดการแจ้งเตือน",
+      "noteAlreadyHere": "สร้างแล้ว {made} จาก {total} · มีอยู่แล้ว {count} รายการ"
+    },
+    "alertStep": {
+      "turnOn": "เปิดการแจ้งเตือนของชุด {count} รายการ | เปิดการแจ้งเตือนของชุด {count} รายการ",
+      "sendTo": "ส่งไปยัง",
+      "sendToEmail": "ส่งไปยัง: {icon} ส่งอีเมลถึงฉัน — {email}",
+      "emailCreateNote": "ยังไม่มีปลายทางในองค์กรนี้ การตั้งค่าจะเพิ่มปลายทางอีเมลให้คุณ (หรือใช้ปลายทางที่มีอยู่ซึ่งส่งถึงคุณเท่านั้น)",
+      "noDestination": "ยังไม่มีปลายทาง เพิ่มปลายทางได้ที่ การแจ้งเตือน → ปลายทาง",
+      "destinationsFailed": "โหลดปลายทางไม่ได้ จึงปิดตัวเลือกส่งไปยังไว้ การแจ้งเตือนสามารถเพิ่มปลายทางภายหลังได้ที่ การแจ้งเตือน → ปลายทาง",
+      "destinations": "{count} ปลายทางในองค์กรนี้ | {count} ปลายทางในองค์กรนี้",
+      "chooseDestination": "เลือกปลายทาง",
+      "pickDestination": "เลือกปลายทางสำหรับส่งไปยัง หรือยกเลิกการติ๊ก"
+    },
+    "ready": {
+      "title": "การเฝ้าระวัง {title} พร้อมแล้ว",
+      "emailFailed": "ไม่สามารถสร้างปลายทางอีเมลของคุณได้ จึงเพิ่มการแจ้งเตือนโดยปิดไว้",
+      "emailForbidden": "คุณไม่สามารถเพิ่มปลายทางสำหรับการแจ้งเตือนในองค์กรนี้ได้ จึงไม่ได้สร้างปลายทางอีเมลของคุณ และเพิ่มการแจ้งเตือนโดยปิดไว้"
+    },
+    "popup": {
+      "title": "ชุดเริ่มต้น",
+      "subtitle": "{count} ชุดตรงกับข้อมูลที่คุณส่งอยู่แล้ว | {count} ชุดตรงกับข้อมูลที่คุณส่งอยู่แล้ว",
+      "subtitleAllSetUp": "ชุดทั้งหมดที่ตรงกับข้อมูลของคุณได้รับการตั้งค่าแล้ว",
+      "subtitleNone": "ยังไม่มีชุดที่ตรงกัน",
+      "items": "{count} รายการ | {count} รายการ",
+      "setUpAgo": "ตั้งค่าเมื่อ {when}",
+      "stopped": "การตั้งค่าหยุดกลางทาง",
+      "whatGetsCreated": "สิ่งที่จะถูกสร้าง",
+      "tileDashboards": "{count} แดชบอร์ด | {count} แดชบอร์ด",
+      "tileAlerts": "{count} การแจ้งเตือน | {count} การแจ้งเตือน",
+      "tileSavedViews": "{count} มุมมองที่บันทึกไว้ | {count} มุมมองที่บันทึกไว้",
+      "noneDashboards": "แดชบอร์ด",
+      "noneAlerts": "การแจ้งเตือน",
+      "noneSavedViews": "มุมมองที่บันทึกไว้",
+      "noneInPack": "ไม่มีในแพ็กนี้",
+      "sevCritical": "{count} วิกฤต",
+      "sevWarning": "{count} คำเตือน",
+      "sevInfo": "{count} ข้อมูล",
+      "chooseNext": "เลือกรายการที่จะสร้างในขั้นตอนถัดไป",
+      "reviewSetUp": "ตรวจทานแพ็ก",
+      "viewPack": "ดูแพ็ก",
+      "checkAgain": "ตรวจสอบอีกครั้ง",
+      "checkFailed": "ไม่สามารถตรวจสอบได้ โปรดลองอีกครั้ง",
+      "emptyTitle": "ยังไม่มีแพ็กที่ตรงกับข้อมูลของคุณ",
+      "emptyText": "แพ็กจะแสดงขึ้นเมื่อ OpenObserve พบข้อมูลจากแหล่งที่รู้จัก เช่น Kubernetes, โฮสต์, Docker, PostgreSQL หรือ AWS ส่งข้อมูลแล้วตรวจสอบอีกครั้ง",
+      "back": "กลับ",
+      "backToPacks": "กลับไปที่แพ็ก",
+      "keepsGoing": "คุณปิดหน้านี้ได้ การตั้งค่ายังดำเนินต่อ"
+    },
+    "viewPack": {
+      "open": "เปิด",
+      "openLabel": "เปิด {name}",
+      "dashboard": "แดชบอร์ด",
+      "dashboards": "แดชบอร์ด",
+      "dashboardsMeta": "{count} แดชบอร์ด | {count} แดชบอร์ด",
+      "alerts": "การแจ้งเตือน",
+      "alertsMeta": "{count} · {on} เปิดใช้งาน · {silent} ไม่แจ้งเตือน",
+      "alertsMetaFailed": "{count} · {on} เปิดใช้งาน · {silent} ไม่แจ้งเตือน · {failed} ไม่ได้สร้าง",
+      "savedView": "มุมมองที่บันทึกไว้ · แชร์ให้ทุกคนในองค์กรนี้",
+      "savedViews": "มุมมองที่บันทึกไว้",
+      "savedViewsMeta": "{count} มุมมองที่บันทึกไว้ · แชร์ให้ทุกคนในองค์กรนี้ | {count} มุมมองที่บันทึกไว้ · แชร์ให้ทุกคนในองค์กรนี้",
+      "on": "เปิดใช้งาน",
+      "silent": "ไม่แจ้งเตือน",
+      "notCreated": "ไม่ได้สร้าง",
+      "showMore": "แสดงเพิ่มอีก {count}",
+      "showLess": "แสดงน้อยลง",
+      "ordinary": "สิ่งเหล่านี้เป็นการแจ้งเตือน แดชบอร์ด และมุมมองทั่วไป แก้ไขหรือลบได้ในหน้าของแต่ละรายการ",
+      "setUpByYou": "ตั้งค่าโดยคุณ {when}",
+      "setUpBy": "ตั้งค่าโดย {who} {when}",
+      "setUpWhen": "ตั้งค่าเมื่อ {when}",
+      "partialTitle": "{title} ตั้งค่าการเฝ้าระวังแล้ว แต่ไม่ได้สร้าง {count} รายการ | {title} ตั้งค่าการเฝ้าระวังแล้ว แต่ไม่ได้สร้าง {count} รายการ",
+      "partialNote": "ส่วนที่เหลือพร้อมแล้ว ลองใหม่รายการด้านล่าง หรือลองใหม่ทั้งหมด",
+      "partialSubtitle": "{made} จาก {total} สร้างแล้ว · {failed} ไม่ได้สร้าง"
+    }
   },
   "alert_library": {
     "header": "Alert Library",

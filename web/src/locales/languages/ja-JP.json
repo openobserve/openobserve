@@ -700,6 +700,7 @@
       "cipherKeys": "暗号化キー",
       "announcementBanners": "お知らせバナー",
       "regexPatterns": "正規表現パターン",
+      "keyValues": "キー値",
       "evalJobs": "オンライン評価ジョブ",
       "billingGroup": "請求グループ",
       "syntheticChecks": "合成モニタリングチェック",
@@ -757,6 +758,7 @@
       "cipherKeys": "暗号化キー",
       "announcementBanners": "お知らせバナー",
       "regexPatterns": "正規表現パターン",
+      "keyValues": "キー値",
       "unnamed": "このリソース",
       "onCall": "オンコール",
       "incidentIntegrations": "インシデント連携",
@@ -10941,6 +10943,11 @@
       "tryOneOfThese": "または、次のいずれかを試してください"
     },
     "capabilities": {
+      "starter": {
+        "title": "スターターパックをセットアップ",
+        "description": "{packs} データに合わせて作成されたダッシュボード、アラート、保存済みビュー。",
+        "prompt": "どのスターターパックが自分のデータに合いますか？それぞれ何が作成されますか？"
+      },
       "query": {
         "title": "クエリを作成",
         "description": "ログ、トレース、RUM向けのSQL、またはメトリクス向けのPromQL。",
@@ -10968,6 +10975,17 @@
       "mapStreamSchema": "「default」ストリームのスキーマをマップする",
       "promqlCpu": "80% 以上の CPU を使用するポッド用の PromQL を記述する",
       "lastAlertFired": "前回のアラートはなぜ起動されたのですか？"
+    },
+    "starterSuggestions": {
+      "whichPacks": "どのスターターパックが自分のデータに合いますか？",
+      "setUpPack": "{pack} パックをセットアップ",
+      "whatInPack": "{pack} パックには何が含まれますか？",
+      "errorsLastHour": "過去1時間のエラーを表示"
+    },
+    "starter": {
+      "checking": "スターターパックのためにデータを確認しています…",
+      "contextNote": "O2 アシスタントは一致したスターターパックをコンテキストとして保持しています。",
+      "readyWhenYouAre": "準備ができたら始めましょう:"
     },
     "placeholderRotation": {
       "one": "過去 1 時間のエラーを表示...",
@@ -15099,6 +15117,376 @@
     "countIncidentIntegration": "{count} 件のインシデント連携 | {count} 件のインシデント連携",
     "sectionOtherConsumers": "その他の使用元",
     "countDowntime": "{count} 件のダウンタイム | {count} 件のダウンタイム"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "クラスター名",
+          "k8s_namespace_name": "Namespace",
+          "k8s_pod_name": "Pod 名",
+          "k8s_node_name": "ノード名",
+          "k8s_container_name": "コンテナ名",
+          "kind": "イベント種別",
+          "reason": "イベントの理由",
+          "message": "イベントメッセージ"
+        },
+        "roles": {
+          "events": "Kubernetes イベント"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "ホスト"
+      },
+      "traces": {
+        "title": "トレース (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "CloudWatch メトリクス"
+        }
+      },
+      "genai": {
+        "title": "AI (LLM アプリ)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "GitHub Actions ジョブログ"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "パックのチェックを再試行",
+    "countAlerts": "{count} 件のアラート | {count} 件のアラート",
+    "scope": "アラートスコープ: {value}",
+    "scopeAll": "すべてのクラスター",
+    "scopeSeen": "すべてのクラスター · 現在 {count} 件を確認: {clusters}",
+    "noPermission": "この組織ではこのパックをセットアップできません。管理者に問い合わせてください。",
+    "askAdmin": "管理者にセットアップを依頼",
+    "busyBy": "{who} がこのパックをセットアップ中です。しばらくしてから再度確認してください。",
+    "busySomeone": "他のユーザーがこのパックをセットアップ中です。しばらくしてから再度確認してください。",
+    "busyYou": "別のタブでこのパックをセットアップ中です。しばらくしてから再度確認してください。",
+    "startedBy": "{who} がこのパックのセットアップを開始しました。",
+    "startedBySomeone": "他のユーザーがこのパックのセットアップを開始しました。",
+    "card": {
+      "dashboards": "{count} 件のダッシュボード | {count} 件のダッシュボード"
+    },
+    "manifest": {
+      "leftOut": "{count} 件の項目が除外されました | {count} 件の項目が除外されました",
+      "tagEnterprise": "エンタープライズ",
+      "tagNeedsData": "データが必要",
+      "tagHaveIt": "データあり",
+      "tagUnavailable": "利用不可",
+      "adapted": "データに合わせて調整済み"
+    },
+    "installDialog": {
+      "title": "{made} / {total} 項目を作成しました",
+      "attention": "{title} · {count} 件に対応が必要です | {title} · {count} 件に対応が必要です",
+      "failedReason": "作成できませんでした。再試行してもう一度お試しください。",
+      "kindDashboards": "ダッシュボード",
+      "kindAlerts": "アラート",
+      "rowFailed": "失敗 · {name}"
+    },
+    "home": {
+      "label": "スターターパック",
+      "error": "データに合うパックを確認できませんでした",
+      "fromClusters": "{clusters} から",
+      "moreStreams": "+{count} ストリーム | +{count} ストリーム",
+      "moreStreamsLabel": "一致したその他のストリーム",
+      "interrupted": "{title} のセットアップが途中で停止しました · {made} / {total} 完了",
+      "startedBy": "{who} が {title} のセットアップを開始しました。",
+      "startedBySomeone": "他のユーザーが {title} のセットアップを開始しました。",
+      "busyBy": "{who} が現在 {title} をセットアップしています。",
+      "busySomeone": "他のユーザーが現在 {title} をセットアップしています。",
+      "busyYou": "別のタブで {title} をセットアップしています。",
+      "askAdminLine": "スターターパックはお使いのデータに合っています。管理者に追加を依頼してください。",
+      "noAccessLine": "この組織ではスターターパックにアクセスできません。管理者に問い合わせてください。",
+      "heroTitle": "データはライブです。約 1 分で既製のダッシュボードとアラートをセットアップできます",
+      "heroLead": "データに合う {count} 個のパックから | データに合う {count} 個のパックから",
+      "readyToAdd": "追加できます",
+      "clusterKind": "クラスタ",
+      "connected": "接続済み",
+      "moreClusters": "+{count} クラスタ | +{count} クラスタ",
+      "railClusters": "{count} クラスタ | {count} クラスタ",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "このパックが使用するストリーム · {count}",
+      "moreStreamsChip": "+{count} 件",
+      "streamTypeLogs": "ログ",
+      "streamTypeMetrics": "メトリクス",
+      "streamTypeTraces": "トレース",
+      "reviewSetUp": "パックを確認",
+      "reviewSetUpLabel": "{title} パックを確認",
+      "bestStart": "開始に最適",
+      "cards": {
+        "andMore": "{list} と他 {count} 件",
+        "panels": "{count} パネル | {count} パネル",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {panels}（{clusters} 用）。 | {title}: {panels}（{clusters} クラスタ用）。",
+            "fallback": "{title}: すべてのノード、Pod、ワークロード。"
+          },
+          "alerts": {
+            "template": "{alert_names}。すべてのクラスタ（{clusters}）で発火します。有効にするまでオフです。",
+            "fallback": "{alert_names}。すべてのクラスタで発火します。有効にするまでオフです。",
+            "plain": "すべてのクラスタで発火します。有効にするまでオフです。"
+          },
+          "savedViews": {
+            "template": "Kubernetes イベント: {stream} 内のすべてのイベントをログからワンクリックで表示。",
+            "fallback": "Kubernetes イベントをログからワンクリックで表示。"
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "ホストメトリクス: 各ホストの CPU、メモリ、ディスク。"
+          },
+          "alerts": {
+            "template": "{alert_names}。すべてのホストで発火します。有効にするまでオフです。",
+            "fallback": "Fire for every host. Off until you turn them on."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: お使いのデータ向けの {panels}。",
+            "fallback": "{title}。あなたのストリーム向けに構築されています。"
+          },
+          "alerts": {
+            "template": "{alert_names}。一致するすべてのデータで発火します。有効にするまでオフです。",
+            "fallback": "一致するすべてのデータで発火します。有効にするまでオフです。"
+          },
+          "savedViews": {
+            "template": "ログの {stream} へ、ワンクリックで。",
+            "fallback": "ログからワンクリック。"
+          }
+        }
+      },
+      "previewFailed": "このパックがセットアップする内容を読み込めませんでした。確認して再試行してください。",
+      "nothingFitsYet": "このパックにはまだデータに合うものがありません。データが届くと、その項目がここに表示されます。"
+    },
+    "whatGetsCreated": {
+      "subtitle": "{title} スターターパック",
+      "subtitleScoped": "{title} スターターパック · {scope} 向けに構築",
+      "savedIn": "フォルダ {folder} に保存されました",
+      "skippedNote": "{count} 件の項目をスキップしました · 既存のものは保持されます | {count} 件の項目をスキップしました · 既存のものは保持されます",
+      "nameInUse": "{name} は既に存在します · 既存のものは保持されます",
+      "skipped": "スキップ",
+      "notSeenYet": "未検出",
+      "footprint": "フットプリント",
+      "reachStarted": "バックグラウンドクエリ: 開始された各アラートは独自のスケジュールで実行されます",
+      "reachStartedScoped": "アラートスコープ: {scope} · バックグラウンドクエリ: 開始された各アラートは独自のスケジュールで実行されます",
+      "selectGroup": "{group} 内のすべてを選択",
+      "selectRow": "{name} を選択"
+    },
+    "drawer": {
+      "packTitle": "{title} パック",
+      "view": "Kubernetes ビュー",
+      "viewPath": "インフラ › Kubernetes",
+      "dashboard": "{title} ダッシュボード",
+      "dashboardNote": "セットアップ後に開きます",
+      "panelsFit": "{count} 個のパネルがデータに適合します。セットアップ後に開きます。 | {count} 個のパネルがデータに適合します。セットアップ後に開きます。",
+      "alerts": "アラート、有効にするまでオフ",
+      "savedViews": "ログの保存ビュー",
+      "savedViewsNote": "この組織の全員と共有されます",
+      "folder": "フォルダ",
+      "folderValue": "{name} (スターターパック)",
+      "reach": "バックグラウンドクエリ: 現時点ではなし",
+      "reachScoped": "アラートスコープ: {scope} · バックグラウンドクエリ: 現時点ではなし",
+      "notIncluded": "含まれていません",
+      "reasonAlreadyHave": "{name}: 既に所有しています",
+      "reasonNoData": "{name}: 対応するデータがまだ検出されていません",
+      "reasonUnavailable": "{name}: 現在ライブラリにありません",
+      "reasonNeedsPlan": "{name}: Enterprise プランが必要です",
+      "source": "{host} のライブラリから。このバージョンに組み込まれたパックはオフラインで動作します。",
+      "sourceOffline": "{host} に接続できません。このバージョンに組み込まれたパックを使用します。これはオフラインで動作します。",
+      "nothingToCreate": "このパックのすべての項目を既に所有しています",
+      "openDashboard": "ダッシュボードを開く",
+      "error": "このパックが作成する内容を読み込めませんでした",
+      "reasonNoFlavour": "{name}: お使いのメトリクス名ではまだ利用できません",
+      "loadingFit": "データに適合する項目を確認しています",
+      "noteForbidden": "{title} · このパックをセットアップする権限がありません",
+      "setUp": "セットアップ",
+      "allExist": "このパックの {count} 件の項目はすべて既に所有しています。既存のアラートは設定を保持します。",
+      "continue": "続行",
+      "setUpCount": "{count} 件の項目をセットアップ | {count} 件の項目をセットアップ",
+      "ordinaryNote": "通常のダッシュボード、アラート、ビューを追加します。パックのページに一覧表示されます。編集や削除はそれぞれのページで行えます。",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "{title} のモニタリングを設定中",
+      "summary": "{total} 件中 {made} 件作成済み",
+      "created": "作成済み",
+      "creating": "作成中",
+      "waiting": "待機中",
+      "rowAlerts": "アラート {total} 件中 {made} 件",
+      "rowViews": "保存済みビュー {total} 件中 {made} 件",
+      "rowDashboards": "ダッシュボード {total} 件中 {made} 件",
+      "retry": "{count} 件を再試行 | {count} 件を再試行",
+      "finish": "完了",
+      "interrupted": "セットアップが中断されました · {total} 件中 {made} 件完了",
+      "installError": "セットアップが完了しませんでした。もう一度お試しください。",
+      "comeBack": "{total} 件中 {made} 件作成済み · この画面を閉じて作業を続けられます。ヘッダーのスターターパックから再度開けます。",
+      "alertsOnTo": "作成中 · オン、{destination} に送信中",
+      "emailMe": "{email} にメールを送信",
+      "creatingOn": "作成中 · オン"
+    },
+    "severity": {
+      "critical": "クリティカル",
+      "warning": "警告",
+      "info": "情報"
+    },
+    "adapted": {
+      "someField": "フィールド",
+      "flavour": "{name} バージョンを使用",
+      "change": "変更",
+      "streams": "ストリーム",
+      "fields": "フィールド",
+      "version": "バージョン",
+      "streamCount": "{count} ストリーム | {count} ストリーム",
+      "fieldCount": "{count} フィールド | {count} フィールド",
+      "matchedBoth": "{streams} と {fields} がデータに一致しました",
+      "matchedOne": "{what} がデータに一致しました",
+      "needsChoiceCount": "{count} 件は選択が必要です | {count} 件は選択が必要です",
+      "notFoundCount": "{count} 件が見つかりません",
+      "matchedCount": "{count} 件一致",
+      "whichStream": "{what} はどのストリームですか？",
+      "lookRight": "{count} 件が正しいようです | {count} 件が正しいようです",
+      "noneFound": "{what} が見つかりません",
+      "showMore": "さらに {count} 件表示",
+      "needsChoice": "選択が必要",
+      "severalMatch": "{count} 件のストリームが {what} のようです",
+      "oneMatch": "{stream} が {what} のようです",
+      "sharedAsk": "どのレコードが {what} ですか？",
+      "choose": "選択",
+      "dialogFields": "{total} 件中 {matched} 件のフィールド",
+      "dialogUse": "{stream} を使用",
+      "dialogUseAll": "{count} 件すべてを使用",
+      "dialogUseChecked": "これらの {count} 件を使用",
+      "dialogAllNote": "すべて: ダッシュボードにストリーム選択が追加され、これを参照する各アラートはストリームごとに 1 回設定されます。",
+      "dialogPickFive": "最大 {count} 件のストリームを選択してください。",
+      "dialogPickStream": "ストリームを選択",
+      "dialogPickPlaceholder": "ストリームを選択",
+      "dialogFiltersOn": "{stream} から読み取り、{field} が {value} のレコードのみ",
+      "dialogNoValues": "過去24時間でこのフィールドの値は見つかりませんでした。",
+      "dialogSend": "または {stream} に送信します:コレクターでこのヘッダーを設定してください",
+      "dialogFieldTitle": "{what} のフィールドを選択",
+      "dialogFieldLabel": "{stream} のフィールド",
+      "values": "検出: {values}",
+      "or": "または",
+      "filterTitle": "パックが {what} のみを読み取るようにフィルターを追加",
+      "showFewer": "表示を減らす"
+    },
+    "matchCheck": {
+      "checked": "{when} に確認済み",
+      "checkedAt": "{time} に確認済み(ローカル時刻)",
+      "justNow": "たった今",
+      "minutesAgo": "{count} 分前",
+      "hoursAgo": "{count} 時間前",
+      "daysAgo": "{count} 日前"
+    },
+    "headerChip": {
+      "label": "スターターパック",
+      "ariaLabel": "スターターパック、{count} 件がデータに適合 | スターターパック、{count} 件がデータに適合",
+      "progress": "{total} 中 {made}",
+      "ariaLabelRunning": "スターターパック、{total} 中 {made} を設定中"
+    },
+    "guide": {
+      "rowSavedViews": "{count} 件の保存済みビュー | {count} 件の保存済みビュー"
+    },
+    "stepper": {
+      "content": "コンテンツを選択",
+      "setup": "設定中",
+      "settingUp": "設定中…",
+      "interrupted": "中断",
+      "ready": "準備完了",
+      "noteRunning": "設定中 · {total} 中 {made} を作成済み",
+      "noteAlertsOn": "{total} 中 {made} を作成済み · {count} 件のアラートがオン | {total} 中 {made} を作成済み · {count} 件のアラートがオン",
+      "noteAlertsOff": "{total} 中 {made} を作成済み · アラートはオフ",
+      "noteAlreadyHere": "{total} 中 {made} を作成済み · {count} 件は既に存在"
+    },
+    "alertStep": {
+      "turnOn": "パックの {count} 件のアラートをオンにする | パックの {count} 件のアラートをオンにする",
+      "sendTo": "送信先",
+      "sendToEmail": "送信先: {icon} メールで通知 — {email}",
+      "emailCreateNote": "この組織にはまだ宛先がありません。セットアップでメール宛先が追加されます(あなたのみに送信する既存の宛先が再利用される場合もあります)。",
+      "noDestination": "宛先がまだありません。アラート → 宛先 で追加してください。",
+      "destinationsFailed": "宛先を読み込めなかったため、送信先はオフです。アラートは後でアラート → 宛先 から宛先を設定できます。",
+      "destinations": "この組織の宛先 {count} 件 | この組織の宛先 {count} 件",
+      "chooseDestination": "宛先を選択",
+      "pickDestination": "送信先の宛先を選択するか、チェックを外してください"
+    },
+    "ready": {
+      "title": "{title} のモニタリングの準備ができました",
+      "emailFailed": "メール宛先を作成できなかったため、アラートはオフの状態で追加されました。",
+      "emailForbidden": "この組織ではアラートの宛先を追加できません。そのためメール宛先は作成されず、アラートはオフの状態で追加されました。"
+    },
+    "popup": {
+      "title": "スターターパック",
+      "subtitle": "既に送信しているデータに適合するパック {count} 件 | 既に送信しているデータに適合するパック {count} 件",
+      "subtitleAllSetUp": "データに適合するすべてのパックが設定済みです",
+      "subtitleNone": "一致するパックはまだありません",
+      "items": "{count} 件の項目 | {count} 件の項目",
+      "setUpAgo": "{when} に設定",
+      "stopped": "セットアップが途中で停止しました",
+      "whatGetsCreated": "作成されるもの",
+      "tileDashboards": "ダッシュボード {count} 件 | ダッシュボード {count} 件",
+      "tileAlerts": "{count} アラート | {count} アラート",
+      "tileSavedViews": "{count} 保存ビュー | {count} 保存ビュー",
+      "noneDashboards": "ダッシュボード",
+      "noneAlerts": "アラート",
+      "noneSavedViews": "保存ビュー",
+      "noneInPack": "このパックにはありません",
+      "sevCritical": "{count} 件の重大",
+      "sevWarning": "{count} 件の警告",
+      "sevInfo": "{count} 件の情報",
+      "chooseNext": "次のステップで作成する項目を選択してください",
+      "reviewSetUp": "パックを確認",
+      "viewPack": "パックを表示",
+      "checkAgain": "再確認",
+      "checkFailed": "確認できませんでした。もう一度お試しください",
+      "emptyTitle": "データに一致するパックはまだありません",
+      "emptyText": "OpenObserve が認識しているソース（Kubernetes、ホスト、Docker、PostgreSQL、AWS など）からのデータを検出すると、パックが表示されます。データを送信してから、再確認してください。",
+      "back": "戻る",
+      "backToPacks": "パックに戻る",
+      "keepsGoing": "これは閉じてもかまいません。セットアップは続行されます。"
+    },
+    "viewPack": {
+      "open": "開く",
+      "openLabel": "{name} を開く",
+      "dashboard": "ダッシュボード",
+      "dashboards": "ダッシュボード",
+      "dashboardsMeta": "{count} ダッシュボード | {count} ダッシュボード",
+      "alerts": "アラート",
+      "alertsMeta": "{count} · {on} オン · {silent} サイレント",
+      "alertsMetaFailed": "{count} · {on} オン · {silent} サイレント · {failed} 件未作成",
+      "savedView": "保存ビュー · この組織の全員と共有",
+      "savedViews": "保存ビュー",
+      "savedViewsMeta": "{count} 保存ビュー · この組織の全員と共有 | {count} 保存ビュー · この組織の全員と共有",
+      "on": "オン",
+      "silent": "サイレント",
+      "notCreated": "未作成",
+      "showMore": "{count} 件をさらに表示",
+      "showLess": "表示を減らす",
+      "ordinary": "これらは通常のアラート、ダッシュボード、ビューです。それぞれのページで編集または削除できます。",
+      "setUpByYou": "あなたが {when} に設定",
+      "setUpBy": "{who} が {when} に設定",
+      "setUpWhen": "{when} に設定",
+      "partialTitle": "{title} のモニタリングは設定済みです。{count} 件の項目が作成されませんでした | {title} のモニタリングは設定済みです。{count} 件の項目が作成されませんでした",
+      "partialNote": "残りは準備完了です。下の項目を再試行するか、すべてを再試行してください。",
+      "partialSubtitle": "作成済み: {made} / {total} · 未作成: {failed}"
+    }
   },
   "alert_library": {
     "header": "アラートライブラリ",

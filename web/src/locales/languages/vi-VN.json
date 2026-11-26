@@ -700,6 +700,7 @@
       "cipherKeys": "Khóa mã hóa",
       "announcementBanners": "Biểu ngữ thông báo",
       "regexPatterns": "Mẫu regex",
+      "keyValues": "Giá trị khóa",
       "evalJobs": "Tác vụ đánh giá trực tuyến",
       "billingGroup": "Nhóm thanh toán",
       "syntheticChecks": "Kiểm tra Synthetics",
@@ -757,6 +758,7 @@
       "cipherKeys": "khóa mã hóa",
       "announcementBanners": "biểu ngữ thông báo",
       "regexPatterns": "mẫu regex",
+      "keyValues": "giá trị khóa",
       "unnamed": "tài nguyên này",
       "onCall": "trực",
       "incidentIntegrations": "tích hợp sự cố",
@@ -10941,6 +10943,11 @@
       "tryOneOfThese": "Hoặc thử một trong những"
     },
     "capabilities": {
+      "starter": {
+        "title": "Thiết lập Gói khởi đầu",
+        "description": "Bảng điều khiển, cảnh báo và chế độ xem đã lưu được tạo cho dữ liệu {packs} của bạn.",
+        "prompt": "Gói khởi đầu nào phù hợp với dữ liệu của tôi, và mỗi gói sẽ tạo ra những gì?"
+      },
       "query": {
         "title": "Viết truy vấn",
         "description": "SQL cho nhật ký, trace, RUM, hoặc PromQL cho chỉ số.",
@@ -10968,6 +10975,17 @@
       "mapStreamSchema": "Ánh xạ lược đồ stream \"default\" của tôi",
       "promqlCpu": "Viết PromQL cho các pods sử dụng > 80% CPU",
       "lastAlertFired": "Tại sao cảnh báo cuối cùng của tôi lại kích hoạt?"
+    },
+    "starterSuggestions": {
+      "whichPacks": "Gói khởi đầu nào phù hợp với dữ liệu của tôi?",
+      "setUpPack": "Thiết lập gói {pack}",
+      "whatInPack": "Gói {pack} gồm có những gì?",
+      "errorsLastHour": "Cho tôi xem lỗi trong một giờ qua"
+    },
+    "starter": {
+      "checking": "Đang kiểm tra dữ liệu của bạn cho các gói khởi đầu…",
+      "contextNote": "Trợ lý O2 có các gói khởi đầu phù hợp của bạn làm ngữ cảnh.",
+      "readyWhenYouAre": "Sẵn sàng khi bạn muốn:"
     },
     "placeholderRotation": {
       "one": "Hiển thị lỗi từ giờ qua…",
@@ -15099,6 +15117,376 @@
     "countIncidentIntegration": "{count} tích hợp sự cố | {count} tích hợp sự cố",
     "sectionOtherConsumers": "Cũng được sử dụng bởi",
     "countDowntime": "{count} thời gian bảo trì | {count} thời gian bảo trì"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "Tên cụm",
+          "k8s_namespace_name": "Namespace",
+          "k8s_pod_name": "Tên pod",
+          "k8s_node_name": "Tên node",
+          "k8s_container_name": "Tên container",
+          "kind": "Loại sự kiện",
+          "reason": "Lý do sự kiện",
+          "message": "Thông điệp sự kiện"
+        },
+        "roles": {
+          "events": "Sự kiện Kubernetes"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "Máy chủ"
+      },
+      "traces": {
+        "title": "Trace (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "Chỉ số CloudWatch"
+        }
+      },
+      "genai": {
+        "title": "AI (ứng dụng LLM)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "Nhật ký job GitHub Actions"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "Thử kiểm tra gói lại lần nữa",
+    "countAlerts": "{count} cảnh báo | {count} cảnh báo",
+    "scope": "Phạm vi cảnh báo: {value}",
+    "scopeAll": "Tất cả cụm",
+    "scopeSeen": "Tất cả cụm · đã thấy {count} cho đến nay: {clusters}",
+    "noPermission": "Bạn không thể thiết lập gói này trong tổ chức này. Hãy hỏi quản trị viên.",
+    "askAdmin": "Yêu cầu quản trị viên thiết lập",
+    "busyBy": "{who} đang thiết lập gói này ngay bây giờ. Quay lại sau một phút.",
+    "busySomeone": "Người khác đang thiết lập gói này ngay bây giờ. Quay lại sau một phút.",
+    "busyYou": "Bạn đang thiết lập gói này trong một tab khác. Quay lại sau một phút.",
+    "startedBy": "{who} đã bắt đầu thiết lập gói này.",
+    "startedBySomeone": "Người khác đã bắt đầu thiết lập gói này.",
+    "card": {
+      "dashboards": "{count} bảng điều khiển | {count} bảng điều khiển"
+    },
+    "manifest": {
+      "leftOut": "{count} mục bị bỏ qua | {count} mục bị bỏ qua",
+      "tagEnterprise": "Enterprise",
+      "tagNeedsData": "Cần dữ liệu",
+      "tagHaveIt": "Bạn đã có",
+      "tagUnavailable": "Không khả dụng",
+      "adapted": "Đã điều chỉnh theo dữ liệu của bạn"
+    },
+    "installDialog": {
+      "title": "Đã tạo {made}/{total} mục",
+      "attention": "{title} · {count} cần bạn chú ý | {title} · {count} cần bạn chú ý",
+      "failedReason": "Không thể tạo. Hãy thử lại.",
+      "kindDashboards": "Bảng điều khiển",
+      "kindAlerts": "Cảnh báo",
+      "rowFailed": "Thất bại · {name}"
+    },
+    "home": {
+      "label": "Gói khởi đầu",
+      "error": "Không thể kiểm tra dữ liệu của bạn để tìm gói khởi đầu",
+      "fromClusters": "từ {clusters}",
+      "moreStreams": "+{count} stream | +{count} stream",
+      "moreStreamsLabel": "Các stream khớp khác",
+      "interrupted": "Quá trình thiết lập {title} đã dừng giữa chừng · đã xong {made}/{total}",
+      "startedBy": "{who} đã bắt đầu thiết lập {title}.",
+      "startedBySomeone": "Người khác đã bắt đầu thiết lập {title}.",
+      "busyBy": "{who} đang thiết lập {title} ngay bây giờ.",
+      "busySomeone": "Người khác đang thiết lập {title} ngay bây giờ.",
+      "busyYou": "Bạn đang thiết lập {title} trong một tab khác.",
+      "askAdminLine": "Gói khởi đầu phù hợp với dữ liệu của bạn. Hãy nhờ quản trị viên thêm chúng.",
+      "noAccessLine": "Bạn không có quyền truy cập gói khởi đầu trong tổ chức này. Hãy nhờ quản trị viên.",
+      "heroTitle": "Dữ liệu đang trực tiếp. Thiết lập bảng điều khiển và cảnh báo có sẵn trong khoảng một phút",
+      "heroLead": "từ {count} gói phù hợp với dữ liệu của bạn | từ {count} gói phù hợp với dữ liệu của bạn",
+      "readyToAdd": "Sẵn sàng thêm",
+      "clusterKind": "cụm",
+      "connected": "Đã kết nối",
+      "moreClusters": "+{count} cụm | +{count} cụm",
+      "railClusters": "{count} cụm | {count} cụm",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "Các stream mà gói này sử dụng · {count}",
+      "moreStreamsChip": "+{count} nữa",
+      "streamTypeLogs": "nhật ký",
+      "streamTypeMetrics": "chỉ số",
+      "streamTypeTraces": "trace",
+      "reviewSetUp": "Xem lại gói",
+      "reviewSetUpLabel": "Xem lại gói {title}",
+      "bestStart": "Nơi tốt nhất để bắt đầu",
+      "cards": {
+        "andMore": "{list} và {count} mục khác",
+        "panels": "{count} panel | {count} panel",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {panels} cho {clusters} cụm. | {title}: {panels} cho {clusters} cụm.",
+            "fallback": "{title}: mọi node, pod và workload."
+          },
+          "alerts": {
+            "template": "{alert_names}. Kích hoạt cho mọi cụm ({clusters}). Tắt cho đến khi bạn bật chúng.",
+            "fallback": "{alert_names}. Kích hoạt cho mọi cụm. Tắt cho đến khi bạn bật chúng.",
+            "plain": "Kích hoạt cho mọi cụm. Tắt cho đến khi bạn bật chúng."
+          },
+          "savedViews": {
+            "template": "Sự kiện Kubernetes: mọi sự kiện trong {stream}, chỉ một cú nhấp từ Nhật ký.",
+            "fallback": "Sự kiện Kubernetes, chỉ một cú nhấp từ Nhật ký."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "Chỉ số máy chủ: CPU, bộ nhớ và đĩa cho từng máy chủ."
+          },
+          "alerts": {
+            "template": "{alert_names}. Kích hoạt cho mọi máy chủ. Tắt cho đến khi bạn bật chúng.",
+            "fallback": "Kích hoạt cho mọi máy chủ. Tắt cho đến khi bạn bật chúng."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: {panels} cho dữ liệu của bạn.",
+            "fallback": "{title}, được tạo cho các stream của bạn."
+          },
+          "alerts": {
+            "template": "{alert_names}. Kích hoạt trên tất cả dữ liệu khớp của bạn. Tắt cho đến khi bạn bật chúng.",
+            "fallback": "Kích hoạt trên tất cả dữ liệu khớp của bạn. Tắt cho đến khi bạn bật chúng."
+          },
+          "savedViews": {
+            "template": "{stream} trong Nhật ký, chỉ một cú nhấp.",
+            "fallback": "Một cú nhấp từ Nhật ký."
+          }
+        }
+      },
+      "previewFailed": "Không thể tải những gì gói này thiết lập. Hãy xem lại rồi thử lại.",
+      "nothingFitsYet": "Chưa có mục nào trong gói này phù hợp với dữ liệu của bạn. Các mục của gói sẽ hiển thị ở đây khi dữ liệu của chúng đến."
+    },
+    "whatGetsCreated": {
+      "subtitle": "Gói khởi đầu {title}",
+      "subtitleScoped": "Gói khởi đầu {title} · được tạo cho {scope}",
+      "savedIn": "Đã lưu trong thư mục {folder}",
+      "skippedNote": "{count} mục bị bỏ qua · mục hiện có của bạn được giữ | {count} mục bị bỏ qua · các mục hiện có của bạn được giữ",
+      "nameInUse": "{name} đã tồn tại · mục của bạn được giữ",
+      "skipped": "Đã bỏ qua",
+      "notSeenYet": "Chưa thấy",
+      "footprint": "Dấu chân",
+      "reachStarted": "Truy vấn nền: mỗi cảnh báo được khởi động chạy theo lịch riêng của nó",
+      "reachStartedScoped": "Phạm vi cảnh báo: {scope} · Truy vấn nền: mỗi cảnh báo được khởi động chạy theo lịch riêng của nó",
+      "selectGroup": "Chọn tất cả trong {group}",
+      "selectRow": "Chọn {name}"
+    },
+    "drawer": {
+      "packTitle": "Gói {title}",
+      "view": "Chế độ xem Kubernetes",
+      "viewPath": "Hạ tầng › Kubernetes",
+      "dashboard": "Bảng điều khiển {title}",
+      "dashboardNote": "Mở sau khi thiết lập",
+      "panelsFit": "{count} panel phù hợp với dữ liệu của bạn. Mở sau khi thiết lập. | {count} panel phù hợp với dữ liệu của bạn. Mở sau khi thiết lập.",
+      "alerts": "Cảnh báo, tắt cho đến khi bạn bật chúng",
+      "savedViews": "Chế độ xem đã lưu trong Nhật ký",
+      "savedViewsNote": "Chia sẻ với mọi người trong tổ chức này",
+      "folder": "Thư mục",
+      "folderValue": "{name} (gói khởi đầu)",
+      "reach": "Truy vấn nền: Chưa có",
+      "reachScoped": "Phạm vi cảnh báo: {scope} · Truy vấn nền: Chưa có",
+      "notIncluded": "Không bao gồm",
+      "reasonAlreadyHave": "{name}: bạn đã có rồi",
+      "reasonNoData": "{name}: chưa thấy dữ liệu cho mục này",
+      "reasonUnavailable": "{name}: hiện không có trong Thư viện",
+      "reasonNeedsPlan": "{name}: cần gói Enterprise",
+      "source": "Từ Thư viện tại {host}. Gói tích hợp trong phiên bản này hoạt động ngoại tuyến.",
+      "sourceOffline": "Không thể kết nối tới {host}. Đang dùng gói tích hợp trong phiên bản này, hoạt động ngoại tuyến.",
+      "nothingToCreate": "Bạn đã có mọi mục trong gói này",
+      "openDashboard": "Mở bảng điều khiển",
+      "error": "Không thể tải những gì gói này tạo",
+      "reasonNoFlavour": "{name}: chưa khả dụng cho các tên chỉ số của bạn",
+      "loadingFit": "Đang kiểm tra những mục nào phù hợp với dữ liệu của bạn",
+      "noteForbidden": "{title} · bạn không có quyền thiết lập gói này",
+      "setUp": "Thiết lập",
+      "allExist": "Bạn đã có tất cả {count} mục trong gói này. Các cảnh báo hiện có giữ nguyên cài đặt của chúng.",
+      "continue": "Tiếp tục",
+      "setUpCount": "Thiết lập {count} mục | Thiết lập {count} mục",
+      "ordinaryNote": "Thêm các bảng điều khiển, cảnh báo và chế độ xem thông thường, được liệt kê trên trang của gói. Chỉnh sửa hoặc xóa chúng trên trang riêng của chúng.",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "Đang thiết lập giám sát {title}",
+      "summary": "Đã tạo {made}/{total}",
+      "created": "Đã tạo",
+      "creating": "Đang tạo",
+      "waiting": "Đang chờ",
+      "rowAlerts": "Cảnh báo {made}/{total}",
+      "rowViews": "Chế độ xem đã lưu {made}/{total}",
+      "rowDashboards": "Bảng điều khiển {made}/{total}",
+      "retry": "Thử lại {count} mục | Thử lại {count} mục",
+      "finish": "Hoàn tất",
+      "interrupted": "Thiết lập bị gián đoạn · đã xong {made}/{total}",
+      "installError": "Thiết lập chưa hoàn tất. Hãy thử lại.",
+      "comeBack": "Đã tạo {made}/{total} · bạn có thể đóng cửa sổ này và tiếp tục làm việc. Tìm lại từ Gói khởi đầu trên thanh tiêu đề.",
+      "alertsOnTo": "Đang tạo · bật, gửi đến {destination}",
+      "emailMe": "Gửi email cho tôi ({email})",
+      "creatingOn": "Đang tạo · bật"
+    },
+    "severity": {
+      "critical": "Nghiêm trọng",
+      "warning": "Cảnh báo",
+      "info": "Thông tin"
+    },
+    "adapted": {
+      "someField": "Một trường",
+      "flavour": "Dùng phiên bản {name}",
+      "change": "Thay đổi",
+      "streams": "Stream",
+      "fields": "Trường",
+      "version": "Phiên bản",
+      "streamCount": "{count} stream | {count} stream",
+      "fieldCount": "{count} trường | {count} trường",
+      "matchedBoth": "Đã khớp {streams} và {fields} với dữ liệu của bạn",
+      "matchedOne": "Đã khớp {what} với dữ liệu của bạn",
+      "needsChoiceCount": "{count} cần bạn chọn | {count} cần bạn chọn",
+      "notFoundCount": "Không tìm thấy {count}",
+      "matchedCount": "Đã khớp {count}",
+      "whichStream": "{what} là stream nào?",
+      "lookRight": "{count} có vẻ đúng | {count} có vẻ đúng",
+      "noneFound": "Không tìm thấy {what}",
+      "showMore": "Hiện thêm {count}",
+      "needsChoice": "Cần chọn",
+      "severalMatch": "{count} stream có vẻ là {what}",
+      "oneMatch": "{stream} có vẻ là {what}",
+      "sharedAsk": "Bản ghi nào là {what}?",
+      "choose": "Chọn",
+      "dialogFields": "{matched}/{total} trường",
+      "dialogUse": "Dùng {stream}",
+      "dialogUseAll": "Dùng tất cả {count}",
+      "dialogUseChecked": "Dùng {count} mục này",
+      "dialogAllNote": "Tất cả: bảng điều khiển sẽ có bộ chọn stream, và mỗi cảnh báo đọc dữ liệu này được thiết lập một lần cho mỗi stream.",
+      "dialogPickFive": "Chọn tối đa {count} stream.",
+      "dialogPickStream": "Chọn stream",
+      "dialogPickPlaceholder": "Chọn một stream",
+      "dialogFiltersOn": "Đọc từ {stream}, chỉ các bản ghi mà {field} là {value}",
+      "dialogNoValues": "Không tìm thấy giá trị nào cho trường này trong 24 giờ qua.",
+      "dialogSend": "Hoặc gửi chúng đến {stream}: đặt header này trong collector của bạn",
+      "dialogFieldTitle": "Chọn trường cho {what}",
+      "dialogFieldLabel": "Trường trong {stream}",
+      "values": "Đã thấy: {values}",
+      "or": "hoặc",
+      "filterTitle": "Thêm bộ lọc để gói chỉ đọc {what}",
+      "showFewer": "Hiển thị ít hơn"
+    },
+    "matchCheck": {
+      "checked": "Đã kiểm tra {when}",
+      "checkedAt": "Đã kiểm tra {time} (giờ địa phương của bạn)",
+      "justNow": "vừa xong",
+      "minutesAgo": "{count} phút trước",
+      "hoursAgo": "{count} giờ trước",
+      "daysAgo": "{count} ngày trước"
+    },
+    "headerChip": {
+      "label": "Gói khởi đầu",
+      "ariaLabel": "Gói khởi đầu, {count} phù hợp với dữ liệu của bạn | Gói khởi đầu, {count} phù hợp với dữ liệu của bạn",
+      "progress": "{made} trên {total}",
+      "ariaLabelRunning": "Gói khởi đầu, đang thiết lập {made} trên {total}"
+    },
+    "guide": {
+      "rowSavedViews": "{count} chế độ xem đã lưu | {count} chế độ xem đã lưu"
+    },
+    "stepper": {
+      "content": "Chọn nội dung",
+      "setup": "Đang thiết lập",
+      "settingUp": "Đang thiết lập…",
+      "interrupted": "Bị gián đoạn",
+      "ready": "Sẵn sàng",
+      "noteRunning": "Đang thiết lập · đã tạo {made} trên {total}",
+      "noteAlertsOn": "đã tạo {made} trên {total} · {count} cảnh báo đang bật | đã tạo {made} trên {total} · {count} cảnh báo đang bật",
+      "noteAlertsOff": "đã tạo {made} trên {total} · cảnh báo tắt",
+      "noteAlreadyHere": "đã tạo {made} trên {total} · {count} đã có sẵn"
+    },
+    "alertStep": {
+      "turnOn": "Bật {count} cảnh báo của gói | Bật {count} cảnh báo của gói",
+      "sendTo": "Gửi đến",
+      "sendToEmail": "Gửi đến: {icon} Gửi email cho tôi — {email}",
+      "emailCreateNote": "Chưa có đích nào trong tổ chức này. Thiết lập sẽ thêm một đích email cho bạn (hoặc dùng lại một đích chỉ gửi cho bạn).",
+      "noDestination": "Chưa có đích nào. Thêm một đích trong Cảnh báo → Đích.",
+      "destinationsFailed": "Không thể tải các đích, nên Gửi đến đang tắt. Cảnh báo có thể nhận đích sau trong Cảnh báo → Đích.",
+      "destinations": "{count} đích trong tổ chức này | {count} đích trong tổ chức này",
+      "chooseDestination": "Chọn một đích",
+      "pickDestination": "Chọn một đích cho Gửi đến, hoặc bỏ chọn"
+    },
+    "ready": {
+      "title": "Giám sát {title} đã sẵn sàng",
+      "emailFailed": "Không thể tạo đích email của bạn, nên các cảnh báo được thêm ở trạng thái tắt.",
+      "emailForbidden": "Bạn không thể thêm đích cảnh báo trong tổ chức này, nên đích email của bạn không được tạo và các cảnh báo được thêm ở trạng thái tắt."
+    },
+    "popup": {
+      "title": "Gói khởi đầu",
+      "subtitle": "{count} gói phù hợp với dữ liệu bạn đã gửi | {count} gói phù hợp với dữ liệu bạn đã gửi",
+      "subtitleAllSetUp": "Mọi gói phù hợp với dữ liệu của bạn đều đã được thiết lập",
+      "subtitleNone": "Chưa có gói nào khớp",
+      "items": "{count} mục | {count} mục",
+      "setUpAgo": "Đã thiết lập {when}",
+      "stopped": "Thiết lập dừng giữa chừng",
+      "whatGetsCreated": "Những gì được tạo",
+      "tileDashboards": "{count} bảng điều khiển | {count} bảng điều khiển",
+      "tileAlerts": "{count} cảnh báo | {count} cảnh báo",
+      "tileSavedViews": "{count} chế độ xem đã lưu | {count} chế độ xem đã lưu",
+      "noneDashboards": "Bảng điều khiển",
+      "noneAlerts": "Cảnh báo",
+      "noneSavedViews": "Chế độ xem đã lưu",
+      "noneInPack": "Không có trong gói này",
+      "sevCritical": "{count} nghiêm trọng",
+      "sevWarning": "{count} cảnh báo",
+      "sevInfo": "{count} thông tin",
+      "chooseNext": "Chọn những mục sẽ tạo ở bước tiếp theo",
+      "reviewSetUp": "Xem lại gói",
+      "viewPack": "Xem gói",
+      "checkAgain": "Kiểm tra lại",
+      "checkFailed": "Không thể kiểm tra. Hãy thử lại",
+      "emptyTitle": "Chưa có gói nào khớp với dữ liệu của bạn",
+      "emptyText": "Các gói sẽ xuất hiện khi OpenObserve nhận thấy dữ liệu từ một nguồn mà nó biết, chẳng hạn như Kubernetes, máy chủ, Docker, PostgreSQL hoặc AWS. Hãy gửi dữ liệu, rồi kiểm tra lại.",
+      "back": "Quay lại",
+      "backToPacks": "Quay lại các gói",
+      "keepsGoing": "Bạn có thể đóng mục này. Quá trình thiết lập vẫn tiếp tục."
+    },
+    "viewPack": {
+      "open": "Mở",
+      "openLabel": "Mở {name}",
+      "dashboard": "Bảng điều khiển",
+      "dashboards": "Bảng điều khiển",
+      "dashboardsMeta": "{count} bảng điều khiển | {count} bảng điều khiển",
+      "alerts": "Cảnh báo",
+      "alertsMeta": "{count} · {on} đang bật · {silent} im lặng",
+      "alertsMetaFailed": "{count} · {on} đang bật · {silent} im lặng · {failed} chưa tạo",
+      "savedView": "Chế độ xem đã lưu · chia sẻ với mọi người trong tổ chức này",
+      "savedViews": "Chế độ xem đã lưu",
+      "savedViewsMeta": "{count} chế độ xem đã lưu · chia sẻ với mọi người trong tổ chức này | {count} chế độ xem đã lưu · chia sẻ với mọi người trong tổ chức này",
+      "on": "Bật",
+      "silent": "Im lặng",
+      "notCreated": "Chưa tạo",
+      "showMore": "Hiện thêm {count}",
+      "showLess": "Hiện ít hơn",
+      "ordinary": "Đây là các cảnh báo, bảng điều khiển và chế độ xem thông thường. Hãy chỉnh sửa hoặc xóa chúng trên trang riêng của chúng.",
+      "setUpByYou": "Bạn thiết lập {when}",
+      "setUpBy": "Được thiết lập bởi {who} {when}",
+      "setUpWhen": "Thiết lập {when}",
+      "partialTitle": "Giám sát {title} đã được thiết lập, {count} mục chưa được tạo | Giám sát {title} đã được thiết lập, {count} mục chưa được tạo",
+      "partialNote": "Phần còn lại đã sẵn sàng. Hãy thử lại một mục bên dưới, hoặc thử lại tất cả.",
+      "partialSubtitle": "Đã tạo {made} trên {total} · {failed} chưa tạo"
+    }
   },
   "alert_library": {
     "header": "Thư viện cảnh báo",
