@@ -204,47 +204,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-hidden="selectedType !== 'relative'"
                 :inert="selectedType !== 'relative'"
               >
-                <div class="date-time-table relative flex h-full flex-col justify-evenly py-1.5">
+                <div class="date-time-table relative flex h-full flex-col gap-2 py-2">
+                  <!-- One bordered table: hairline rows and a row tint keep the 36 values scannable. -->
                   <div
-                    class="relative-row flex items-center gap-1 px-3 py-0.5"
-                    v-for="(period, index) in relativePeriods"
-                    :key="'date_' + index"
+                    class="border-border-default rounded-default mx-3 flex flex-1 flex-col overflow-hidden border"
+                    data-test="date-time-relative-grid"
                   >
-                    <div class="text-text-secondary min-w-16 text-xs font-medium">
-                      {{ period.label }}
-                    </div>
-                    <div v-for="(item, item_index) in relativeDates[period.value]" :key="item">
-                      <OButton
-                        :disabled="blockedChips.has(`${item}${period.value}`)"
-                        :data-test="`date-time-relative-${item}-${period.value}-btn`"
-                        class="h-7! w-7! text-xs! font-normal! disabled:opacity-35"
-                        :class="
-                          selectedType == 'relative' &&
-                          calendarToken === null &&
-                          relativePeriod == period.value &&
-                          relativeValue == item
-                            ? 'bg-selected-bg! text-selected-fg! font-medium!'
-                            : relativePeriod
-                        "
-                        variant="ghost"
-                        size="xs"
-                        @click="pickRelativeChip(period.value, item)"
-                        :key="'period_' + item_index"
-                      >
-                        {{ item }}
-                        <OTooltip
-                          v-if="blockedChips.has(`${item}${period.value}`)"
-                          side="right"
-                          align="center"
-                          max-width="18.75rem"
-                          :content="raw(queryRangeRestrictionMsg)"
-                        />
-                      </OButton>
+                    <div
+                      class="relative-row border-border-subtle even:bg-surface-panel hover:bg-surface-hover flex flex-1 items-center gap-1 border-b px-2 transition-colors last:border-b-0"
+                      v-for="(period, index) in relativePeriods"
+                      :key="'date_' + index"
+                    >
+                      <div class="text-text-secondary min-w-16 text-xs font-medium">
+                        {{ period.label }}
+                      </div>
+                      <div v-for="(item, item_index) in relativeDates[period.value]" :key="item">
+                        <OButton
+                          :disabled="blockedChips.has(`${item}${period.value}`)"
+                          :data-test="`date-time-relative-${item}-${period.value}-btn`"
+                          class="h-7! w-7! text-xs! font-normal! disabled:opacity-35"
+                          :class="
+                            selectedType == 'relative' &&
+                            calendarToken === null &&
+                            relativePeriod == period.value &&
+                            relativeValue == item
+                              ? 'bg-selected-bg! text-selected-fg! font-medium!'
+                              : relativePeriod
+                          "
+                          variant="ghost"
+                          size="xs"
+                          @click="pickRelativeChip(period.value, item)"
+                          :key="'period_' + item_index"
+                        >
+                          {{ item }}
+                          <OTooltip
+                            v-if="blockedChips.has(`${item}${period.value}`)"
+                            side="right"
+                            align="center"
+                            max-width="18.75rem"
+                            :content="raw(queryRangeRestrictionMsg)"
+                          />
+                        </OButton>
+                      </div>
                     </div>
                   </div>
-
                   <div
-                    class="relative-row flex items-center gap-1 px-3 pt-1.5 pb-0.5"
+                    class="relative-row flex items-center gap-1 px-3"
                     @focusout="onCustomRowFocusout"
                   >
                     <div class="text-text-secondary min-w-16 text-xs font-medium">
