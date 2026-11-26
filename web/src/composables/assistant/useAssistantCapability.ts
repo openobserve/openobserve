@@ -15,6 +15,7 @@
 
 import { computed, effectScope, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 
+import { agentNameOf } from "@/components/settings/assistant/assistantToolsets";
 import type { AssistantCapabilitiesResponse } from "@/services/assistant";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
@@ -363,10 +364,21 @@ function resolveCapability(input: CapabilityInput): AssistantCapability {
   const level = input.b06?.data_sharing_level;
   if (level === "schema" || level === "aggregates" || level === "raw") capability.dataLevel = level;
   if (input.agents) capability.agents = input.agents;
+  const toolsets = toolsetAgentNames(input.b06?.toolsets);
+  if (toolsets.length) capability.toolsets = toolsets;
   if (gate !== "available") return capability;
   if (!persistence) capability.reasonCode = "local_only";
   else if (canShare === "no") capability.reasonCode = "no_share";
   return capability;
+}
+
+// The listing is shown only to a reader of toolsets, so for anyone else it is empty.
+function toolsetAgentNames(toolsets: unknown[] | undefined): string[] {
+  if (!Array.isArray(toolsets)) return [];
+  return toolsets.flatMap((row) => {
+    const { name, enabled } = (row ?? {}) as { name?: unknown; enabled?: unknown };
+    return typeof name === "string" && enabled !== false ? [agentNameOf(name)] : [];
+  });
 }
 
 // OpenObserve forwards only the budgets, so a user budget above zero is the server's word that a card can be extended.

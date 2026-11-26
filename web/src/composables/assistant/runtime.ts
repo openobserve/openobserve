@@ -554,6 +554,7 @@ function engineDeps(
         rcaChatMode: () => handle.capability.value.rcaChatMode === true,
         dataLevel: () => handle.capability.value.dataLevel,
         agents: () => handle.capability.value.agents,
+        toolsets: () => handle.capability.value.toolsets,
       };
     },
     history: () => deps.history,

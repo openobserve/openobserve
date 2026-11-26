@@ -2454,3 +2454,52 @@ describe("answer text around a tool call", () => {
     );
   });
 });
+
+describe("live toolset calls", () => {
+  const live = (toolsets?: string[]) =>
+    makeCtx({ phase: "live", ...(toolsets && { toolsets: new Set(toolsets) }) });
+
+  it("names a toolset's tool as toolset · tool, as the stored chat does, and completes the same row", () => {
+    const state = makeState({ messages: [assistant()] });
+    const ctx = live(["datadog-prod"]);
+    reduce(state, { type: "tool_call", tool: "datadog-prod_search_logs", call_id: "c1" }, ctx);
+    reduce(
+      state,
+      { type: "tool_result", tool: "datadog-prod_search_logs", call_id: "c1", message: "ok" },
+      ctx,
+    );
+    const blocks = state.messages[0].contentBlocks ?? [];
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({
+      tool: "datadog-prod · search_logs",
+      stepState: "done",
+      success: true,
+    });
+  });
+
+  it("leaves first-party tools and names of no known toolset as they are", () => {
+    const state = makeState({ messages: [assistant()] });
+    const ctx = live(["update"]);
+    reduce(state, { type: "tool_call", tool: "update_memory", call_id: "c1" }, ctx);
+    reduce(state, { type: "tool_call", tool: "grafana_query", call_id: "c2" }, ctx);
+    reduce(state, { type: "tool_call", tool: "grafana_query", call_id: "c3" }, live());
+    expect((state.messages[0].contentBlocks ?? []).map((block) => block.tool)).toEqual([
+      "update_memory",
+      "grafana_query",
+      "grafana_query",
+    ]);
+  });
+
+  it("names a refused toolset call the same way", () => {
+    const state = makeState({ messages: [assistant()] });
+    reduce(
+      state,
+      { type: "permission_denied", tool: "pagerduty_create_incident", call_id: "c1" },
+      live(["pagerduty"]),
+    );
+    expect(state.messages[0].contentBlocks?.[0]).toMatchObject({
+      tool: "pagerduty · create_incident",
+      stepState: "failed",
+    });
+  });
+});

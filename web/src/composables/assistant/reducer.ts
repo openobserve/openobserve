@@ -36,6 +36,7 @@ import {
 } from "./evidence";
 import { contextUsedKeys } from "./frames";
 import { approvalToolEntity } from "./approvalAnatomy";
+import { vendorToolLabel } from "./vendorTools";
 import type {
   ApprovalKind,
   ApprovalResultItem,
@@ -266,6 +267,8 @@ export interface ReducerCtx {
   ) => NavigationAction | null;
   /** The card the session still waits on; a live frame equal to it is a redelivery. */
   pendingApprovalId?: string | null;
+  /** The org's toolsets by the name the agent uses, so a live toolset call reads as stored. */
+  toolsets?: ReadonlySet<string>;
 }
 
 export interface StreamState {
@@ -750,7 +753,8 @@ export function answerProgress(state: StreamState): { steps: number; partial: bo
 }
 
 // Today's frames go through the legacy cases as `stream`; tool steps are appended at once so a running step renders.
-function reduceTyped(state: StreamState, data: any, ctx: ReducerCtx): StreamEffect[] {
+function reduceTyped(state: StreamState, frame: any, ctx: ReducerCtx): StreamEffect[] {
+  const data = withVendorLabel(frame, ctx.toolsets);
   const extras = (state.extras ??= emptyExtras());
   const live: ReducerCtx = { ...ctx, isActive: true, phase: "stream" };
   switch (data?.type) {
@@ -797,6 +801,15 @@ function reduceTyped(state: StreamState, data: any, ctx: ReducerCtx): StreamEffe
     default:
       return reduceExtras(extras, data) ? [] : reduce(state, data, live);
   }
+}
+
+const VENDOR_FRAMES = new Set(["tool_call", "tool_result", "permission_denied"]);
+
+// o2-ai names a toolset's tool `<toolset>_<tool>`; the server stores it as `toolset · tool`.
+function withVendorLabel(data: any, toolsets: ReadonlySet<string> | undefined): any {
+  if (!VENDOR_FRAMES.has(data?.type) || typeof data.tool !== "string") return data;
+  const label = vendorToolLabel(data.tool, toolsets);
+  return label ? { ...data, tool: label } : data;
 }
 
 function reduceExtras(extras: StreamExtras, data: any): boolean {

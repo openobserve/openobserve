@@ -596,6 +596,8 @@ export interface AssistantCapability {
   retentionDays?: number;
   /** `agents[]` of the capabilities read; absent means no picker and no `agent` on the wire. */
   agents?: CapabilityAgent[];
+  /** Enabled toolsets by the name the agent calls them, from `toolsets[]` of the capabilities read. */
+  toolsets?: string[];
   /** B-09: the server takes typed `attachments` and echoes `context_used`. */
   attachments?: boolean;
   /** `/confirm {id, extend:true}` gives a card more time. */
