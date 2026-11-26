@@ -186,9 +186,6 @@ const MAX_FILE_SIZE_DEFAULT_FLOOR: usize = 32 * 1024 * 1024;
 const JOB_RUNTIME_BLOCKING_PER_CPU: usize = 8;
 const JOB_RUNTIME_BLOCKING_FLOOR: usize = 32;
 const JOB_RUNTIME_BLOCKING_CAP: usize = 256;
-// The current value is recorded in each tantivy index file (puffin `row_group_size`
-// property) so it can be changed safely without breaking row_id → row_group mapping
-// for older files.
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;

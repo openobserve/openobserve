@@ -50,9 +50,7 @@ use crate::{
 
 /// Attach the access plan for this file as a typed [`PartitionedFile`] extension.
 pub fn generate_access_plan(file: &mut PartitionedFile) {
-    let Some(storage::file_list::ScanSelection { selection, .. }) =
-        storage::file_list::get_scan_selection(file.path().as_ref())
-    else {
+    let Some(selection) = storage::file_list::get_scan_selection(file.path().as_ref()) else {
         return;
     };
 
@@ -260,7 +258,7 @@ mod tests {
     ) -> PartitionedFile {
         let format = FileFormat::from_extension(file_key).unwrap().to_string();
         let mut file = FileKey::from_file_name(file_key);
-        file.with_selection(selection, None);
+        file.with_selection(selection);
         storage::file_list::set(trace_id, "schema", &format, vec![file]).await;
         let location =
             storage::file_list::get(&format!("{trace_id}/schema=schema/format={format}"))

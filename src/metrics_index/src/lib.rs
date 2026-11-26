@@ -122,7 +122,6 @@ mod tests {
             schema: Arc::clone(&schema),
             batches: vec![batch],
             parent_records: 8,
-            row_group_size: None,
         };
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "a")]);
         let filter = create_physical_filter(&schema, &matchers).unwrap();
@@ -227,7 +226,6 @@ mod tests {
             &account,
             &data_path,
             &path,
-            config::FileFormat::Vortex,
             crate::block::ParentMetadata {
                 rows: rows as u64,
                 compressed_size: 123,
