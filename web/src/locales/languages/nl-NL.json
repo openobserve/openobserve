@@ -17556,7 +17556,6 @@
     "backToLogs": "Terug naar de logs",
     "openInTraces": "Openen in Traces",
     "loadingStream": "Stream wordt geladen...",
-    "noLogsAvailableForService": "Geen logs beschikbaar voor deze service",
     "noCorrelatedLogsFound": "Geen gecorreleerde logs gevonden voor dit span",
     "spanHasNoLogsShowingTrace": "Deze span heeft geen logs. Logs voor de hele trace worden weergegeven.",
     "noLogStreamForTrace": "Geen enkele logstream heeft logs voor deze trace.",
@@ -17980,7 +17979,11 @@
       "metricsLoadFailed": "Kan de gecorreleerde metrieken van deze service niet laden. {reason}",
       "noResourceRecorded": "De spans van deze service in dit tijdsbereik registreren {resource} niet.",
       "resourceLoadFailed": "Kan {resource} voor deze service niet laden. {reason}",
-      "noVersionTraffic": "De spans van deze service in deze stream registreren geen versie, dus er is geen verkeer om op versie te splitsen."
+      "noVersionTraffic": "De spans van deze service in deze stream registreren geen versie, dus er is geen verkeer om op versie te splitsen.",
+      "logsMatchedByName": "{service} alleen op servicenaam gekoppeld. Correlatie heeft er geen locatie voor gevonden.",
+      "logsEmptyTitle": "Geen logs gevonden voor {service}",
+      "logsEmptyReason": "Geen logstream heeft een veld {field}.",
+      "logsEmptyAction": "Logs openen"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP-statuscode",
@@ -18554,7 +18557,16 @@
     "panelTimeSeriesFor": "Tijdreeks voor {stream}",
     "panelTimeSeriesForWithType": "Tijdreeks voor {stream} ({type})",
     "logsPanelTitle": "Logs - {stream}",
-    "logsPanelDescription": "Gecorreleerde logs voor service {service}"
+    "logsPanelDescription": "Gecorreleerde logs voor service {service}",
+    "noDataInScope": "Geen gegevens in dit bereik",
+    "noDataInScopeReason": "Geen rijen komen overeen met deze filters in dit tijdsbereik.",
+    "droppedCount": "+{count} weggelaten | +{count} weggelaten",
+    "droppedTitle": "Niet als filter gebruikt",
+    "droppedNoRows": "Geen rijen met {value}",
+    "droppedNoField": "Veld niet in deze streams",
+    "allNoDataTitle": "Geen metriek heeft gegevens in dit bereik",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Metrieken zonder gegevens tonen"
   },
   "search_scheduler_job": {
     "title": "Planner voor zoektaken",
@@ -20620,6 +20632,13 @@
       "sampleExpected": "Verwachte output",
       "fromTrace": "Van trace-span {id}",
       "openInPlaygroundFailed": "Kon deze span niet openen in de Playground."
+    },
+    "largeStream": {
+      "notice": "{stream}: ongeveer {size} in dit bereik, geen agentfilter. Kan minuten duren.",
+      "pickAgent": "Kies een agent",
+      "addFilter": "Filter toevoegen",
+      "runAnyway": "Toch uitvoeren",
+      "notRun": "Niet uitgevoerd"
     }
   },
   "onlineEvals": {

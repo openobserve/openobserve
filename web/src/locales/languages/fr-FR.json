@@ -17556,7 +17556,6 @@
     "backToLogs": "Retour aux Logs",
     "openInTraces": "Ouvrir dans Traces",
     "loadingStream": "Chargement du flux...",
-    "noLogsAvailableForService": "Aucun journal disponible pour ce service",
     "noCorrelatedLogsFound": "Aucun log corrélé trouvé pour ce span",
     "spanHasNoLogsShowingTrace": "Ce span n'a aucun log. Affichage des logs pour toute la trace.",
     "noLogStreamForTrace": "Aucun flux de logs ne contient de logs pour cette trace.",
@@ -17980,7 +17979,11 @@
       "metricsLoadFailed": "Impossible de charger les métriques corrélées de ce service. {reason}",
       "noResourceRecorded": "Les spans de ce service sur cette plage de temps n'enregistrent pas {resource}.",
       "resourceLoadFailed": "Impossible de charger {resource} pour ce service. {reason}",
-      "noVersionTraffic": "Les spans de ce service dans ce flux n'enregistrent pas de version, il n'y a donc pas de trafic à répartir par version."
+      "noVersionTraffic": "Les spans de ce service dans ce flux n'enregistrent pas de version, il n'y a donc pas de trafic à répartir par version.",
+      "logsMatchedByName": "{service} associé uniquement par nom de service. La corrélation n'a trouvé aucun emplacement.",
+      "logsEmptyTitle": "Aucun journal trouvé pour {service}",
+      "logsEmptyReason": "Aucun flux de journaux n'a de champ {field}.",
+      "logsEmptyAction": "Ouvrir les journaux"
     },
     "traceErrorTab": {
       "httpStatusCode": "Code de statut HTTP",
@@ -18554,7 +18557,16 @@
     "panelTimeSeriesFor": "Séries chronologiques pour {stream}",
     "panelTimeSeriesForWithType": "Séries chronologiques pour {stream} ({type})",
     "logsPanelTitle": "Logs - {stream}",
-    "logsPanelDescription": "Journaux corrélés pour le service {service}"
+    "logsPanelDescription": "Journaux corrélés pour le service {service}",
+    "noDataInScope": "Aucune donnée dans ce périmètre",
+    "noDataInScopeReason": "Aucune ligne ne correspond à ces filtres sur cette période.",
+    "droppedCount": "+{count} ignoré | +{count} ignorés",
+    "droppedTitle": "Non utilisés comme filtres",
+    "droppedNoRows": "Aucune ligne avec {value}",
+    "droppedNoField": "Champ absent de ces flux",
+    "allNoDataTitle": "Aucune métrique n'a de données dans ce périmètre",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Afficher les métriques sans données"
   },
   "search_scheduler_job": {
     "title": "Rechercher un planificateur de tâches",
@@ -20620,6 +20632,13 @@
       "sampleExpected": "Sortie attendue",
       "fromTrace": "Depuis le span de trace {id}",
       "openInPlaygroundFailed": "Impossible d'ouvrir ce span dans le Playground."
+    },
+    "largeStream": {
+      "notice": "{stream} : environ {size} sur cette période, sans filtre d'agent. Peut prendre plusieurs minutes.",
+      "pickAgent": "Choisir un agent",
+      "addFilter": "Ajouter un filtre",
+      "runAnyway": "Exécuter quand même",
+      "notRun": "Non exécuté"
     }
   },
   "onlineEvals": {

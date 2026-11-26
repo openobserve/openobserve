@@ -84,14 +84,15 @@ vi.mock("@/services/service_streams", () => ({
 // resolveStreamSchema calls useStreams(t).getStream() to fetch and cache the
 // stream schema. Mock it so those calls complete instantly instead of making
 // real HTTP requests that hang in tests.
-const { getStreamMock } = vi.hoisted(() => ({
+const { getStreamMock, getStreamsMock } = vi.hoisted(() => ({
   getStreamMock: vi.fn().mockResolvedValue({ schema: [] }),
+  getStreamsMock: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/composables/useStreams", () => ({
   default: vi.fn(() => ({
     getStream: getStreamMock,
-    getStreams: vi.fn().mockResolvedValue([]),
+    getStreams: getStreamsMock,
   })),
 }));
 
@@ -107,7 +108,7 @@ vi.mock("vue-i18n", async () => {
   // A few tests assert on the raw i18n key (locale-independent), matching the
   // original identity-mock behavior. Keep those keys mapping to themselves so
   // those assertions still hold.
-  const identityKeys = new Set<string>(["traces.noLogsAvailableForService"]);
+  const identityKeys = new Set<string>(["traces.serviceGraphNodeSidePanel.logsMatchedByName"]);
   const resolve = (key: string): string => {
     if (identityKeys.has(key)) return key;
     const val = key
@@ -142,6 +143,8 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
+import { saveLogsSelectedStreams } from "@/utils/streamPersist";
+import { b64DecodeUnicode } from "@/utils/formatters";
 import { streamTraceRows } from "@/plugins/correlation/correlationStream";
 import {
   correlate as correlateStreams,
@@ -576,6 +579,18 @@ describe("ServiceGraphNodeSidePanel", () => {
       );
     });
 
+    it("asks correlate for has_data over the panel window on the metrics tab", async () => {
+      await wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]').trigger("click");
+      await flushPromises();
+
+      const request = vi.mocked(correlateStreams).mock.calls.at(-1)?.[1];
+      expect(request).toMatchObject({
+        check_data: true,
+        start_time: baseTimeRange.startTime,
+        end_time: baseTimeRange.endTime,
+      });
+    });
+
     it("should show error state when metricsCorrelationError is set", async () => {
       vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Network failure"));
 
@@ -902,68 +917,139 @@ describe("ServiceGraphNodeSidePanel", () => {
   // "View Related Logs" navigation
   // -------------------------------------------------------------------------
 
-  describe("viewRelatedLogs — no logs stream found", () => {
+  describe("viewRelatedLogs — correlation finds no logs stream", () => {
+    const clickLogs = async () => {
+      await wrapper
+        .find('[data-test="service-graph-node-panel-view-related-logs-btn"]')
+        .trigger("click");
+      await flushPromises();
+    };
+    const withLogsStreams = (schemas: Record<string, string[]>, sizes: Record<string, number>) => {
+      getStreamsMock.mockResolvedValue({
+        list: Object.keys(schemas).map((name) => ({
+          name,
+          stats: { storage_size: sizes[name] ?? 0 },
+        })),
+      });
+      getStreamMock.mockImplementation(async (name: string, type: string) =>
+        type === "logs" && schemas[name]
+          ? { schema: schemas[name].map((f) => ({ name: f })) }
+          : { schema: [] },
+      );
+    };
+
     beforeEach(() => {
+      localStorage.clear();
       wrapper = mountPanel({ streamFilter: "default" });
     });
 
-    it("should show a warning notification when correlate returns an empty logs array", async () => {
-      // Default mock already returns logs: [] — no override needed
-      const viewRelatedLogsBtn = wrapper.find(
-        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
-      );
-      expect(viewRelatedLogsBtn.exists()).toBe(true);
-      await viewRelatedLogsBtn.trigger("click");
-      await flushPromises();
-
-      expect(toastMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "warning",
-          message: "traces.noLogsAvailableForService",
-        }),
-      );
+    afterEach(() => {
+      getStreamsMock.mockResolvedValue([]);
+      getStreamMock.mockResolvedValue({ schema: [] });
     });
 
-    it("should NOT navigate to /logs when no logs stream is found", async () => {
-      const viewRelatedLogsBtn = wrapper.find(
-        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
-      );
-      expect(viewRelatedLogsBtn.exists()).toBe(true);
-      await viewRelatedLogsBtn.trigger("click");
-      await flushPromises();
+    it("shows the inline empty state and does not navigate when no logs stream has the field", async () => {
+      withLogsStreams({ app_logs: ["message"] }, { app_logs: 10 });
+      await clickLogs();
 
       expect(routerPushMock).not.toHaveBeenCalled();
+      expect(toastMock).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="service-graph-node-panel-logs-empty"]').exists()).toBe(true);
     });
 
-    it("should show a warning notification when correlate throws an error", async () => {
-      vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Network failure"));
-
-      const viewRelatedLogsBtn = wrapper.find(
-        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+    it("opens the largest logs stream with the service field and shows an info toast", async () => {
+      withLogsStreams(
+        { small_logs: ["service_name"], big_logs: ["service_name"], other: ["message"] },
+        { small_logs: 5, big_logs: 500, other: 9000 },
       );
-      expect(viewRelatedLogsBtn.exists()).toBe(true);
-      await viewRelatedLogsBtn.trigger("click");
-      await flushPromises();
+      await clickLogs();
 
-      expect(toastMock).toHaveBeenCalledWith(
+      expect(routerPushMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          variant: "warning",
-          message: "traces.noLogsAvailableForService",
+          path: "/logs",
+          query: expect.objectContaining({ stream: "big_logs", stream_type: "logs" }),
         }),
       );
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "info",
+          message: "traces.serviceGraphNodeSidePanel.logsMatchedByName",
+        }),
+      );
+      expect(wrapper.find('[data-test="service-graph-node-panel-logs-empty"]').exists()).toBe(
+        false,
+      );
     });
 
-    it("should NOT navigate to /logs when correlate throws an error", async () => {
-      vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Network failure"));
-
-      const viewRelatedLogsBtn = wrapper.find(
-        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+    it("prefers the logs stream the user last opened", async () => {
+      withLogsStreams(
+        { small_logs: ["service_name"], big_logs: ["service_name"] },
+        { small_logs: 5, big_logs: 500 },
       );
-      expect(viewRelatedLogsBtn.exists()).toBe(true);
-      await viewRelatedLogsBtn.trigger("click");
-      await flushPromises();
+      saveLogsSelectedStreams(store.state.selectedOrganization.identifier, "logs", ["small_logs"]);
+      await clickLogs();
 
-      expect(routerPushMock).not.toHaveBeenCalled();
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ stream: "small_logs" }) }),
+      );
+    });
+
+    it("treats a failed correlate request like an empty match", async () => {
+      vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Network failure"));
+      withLogsStreams({ app_logs: ["service_name"] }, { app_logs: 1 });
+      await clickLogs();
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ stream: "app_logs" }) }),
+      );
+      expect(toastMock).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+    });
+
+    it("navigates to the correlated stream without a toast when correlation matches", async () => {
+      vi.mocked(correlateStreams).mockResolvedValueOnce({
+        data: {
+          service_name: "frontend",
+          matched_dimensions: {},
+          additional_dimensions: {},
+          related_streams: {
+            logs: [{ stream_name: "k8s_logs", stream_type: "logs", filters: {} }],
+            metrics: [],
+            traces: [],
+            profiles: [],
+          },
+        },
+      } as any);
+      await clickLogs();
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ stream: "k8s_logs" }) }),
+      );
+      expect(toastMock).not.toHaveBeenCalled();
+      expect(getStreamsMock).not.toHaveBeenCalledWith("logs", false, false);
+      expect(vi.mocked(correlateStreams).mock.calls.at(-1)?.[1]).not.toHaveProperty("check_data");
+    });
+
+    it("empty-state action opens Logs with the filter and no stream", async () => {
+      withLogsStreams({}, {});
+      await clickLogs();
+      await wrapper.find('[data-test="service-graph-node-panel-logs-empty-open"]').trigger("click");
+
+      const query = routerPushMock.mock.calls[0][0].query;
+      expect(query.stream).toBeUndefined();
+      expect(b64DecodeUnicode(query.query)).toContain("='frontend'");
+    });
+
+    it("clears the empty state when the selected service changes", async () => {
+      withLogsStreams({}, {});
+      await clickLogs();
+      expect(wrapper.find('[data-test="service-graph-node-panel-logs-empty"]').exists()).toBe(true);
+
+      await wrapper.setProps({
+        selectedNode: { ...baseNode, id: "other-service", name: "other-service" },
+      });
+      expect(wrapper.find('[data-test="service-graph-node-panel-logs-empty"]').exists()).toBe(
+        false,
+      );
     });
   });
 

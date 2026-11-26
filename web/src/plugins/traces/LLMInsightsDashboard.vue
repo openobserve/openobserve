@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Page filter: a WHERE clause over the spans, kept in the URL. -->
     <LLMInsightsSearchBar
       v-if="availableStreams.length > 0 && scopeReady && !compareMode && !emptyOrg"
+      ref="searchBarRef"
       :stream="effectiveStream"
       :applied="searchQuery"
       :start-time="startTime"
@@ -42,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          solidAgentTrigger keeps the "All Agents" empty state in solid text. -->
     <AiScopeBar
       v-if="availableStreams.length > 0 && scopeReady"
+      ref="scopeBarRef"
       :filter-mode="filterMode"
       v-model:active-stream="activeStream"
       v-model:selected-env="selectedEnv"
@@ -153,6 +155,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AiScopeBar>
+
+    <div v-if="largeStreamBytes !== null && scopeReady && !compareMode" class="px-page-edge pt-2">
+      <OBanner
+        variant="warning"
+        icon="warning"
+        dense
+        inline-actions
+        data-test="llm-insights-large-stream-notice"
+      >
+        <i18n-t keypath="aiObservability.largeStream.notice" tag="span">
+          <template #stream
+            ><span class="font-medium">{{ effectiveStream }}</span></template
+          >
+          <template #size>{{ largeStreamSize }}</template>
+        </i18n-t>
+        <template #actions>
+          <OButton
+            v-if="genAiAgentMappingAccess.allowed"
+            variant="outline"
+            size="sm"
+            data-test="llm-insights-large-stream-pick-agent"
+            @click="pickAgentForLargeStream"
+          >
+            {{ t("aiObservability.largeStream.pickAgent") }}
+          </OButton>
+          <OButton
+            v-else
+            variant="outline"
+            size="sm"
+            data-test="llm-insights-large-stream-add-filter"
+            @click="searchBarRef?.focus()"
+          >
+            {{ t("aiObservability.largeStream.addFilter") }}
+          </OButton>
+          <OButton
+            variant="ghost"
+            size="sm"
+            data-test="llm-insights-large-stream-run"
+            @click="runLargeStreamAnyway"
+          >
+            {{ t("aiObservability.largeStream.runAnyway") }}
+          </OButton>
+        </template>
+      </OBanner>
+    </div>
 
     <!-- Stream mode because these LLM spans carry no agent identity: say so and
          link to GenAI Agent Mapping. Not over the first-run empty state, which
@@ -293,6 +340,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Dashboard content — scrollable panel area. Horizontal padding lives
          here (inside the scroll container) so the scrollbar sits at the
          content-area edge with content padded away from it. -->
+      <div v-else-if="largeStreamBytes !== null" class="px-page-edge flex-1 overflow-y-auto pb-3">
+        <KpiCardRow :columns="5" class="mt-2.5 mb-2.5">
+          <div
+            v-for="card in kpiCards"
+            :key="card.id"
+            :data-test="`llm-insights-kpi-${card.id}`"
+            class="bg-card-glass-bg rounded-default border-border-default flex min-w-0 flex-col gap-1 border px-3.5 py-2.5 max-lg:shrink-0 max-lg:basis-auto max-lg:gap-0.5 max-lg:px-2 max-lg:py-1.5"
+          >
+            <OTruncatedText
+              as="div"
+              class="text-2xs text-text-secondary mb-1 leading-normal font-semibold max-lg:mb-0"
+            >
+              {{ card.label }}
+            </OTruncatedText>
+            <span
+              class="text-text-muted text-2xl leading-none font-bold max-lg:text-lg"
+              data-test="llm-insights-not-run"
+              >{{ raw("—") }}</span
+            >
+          </div>
+        </KpiCardRow>
+        <div class="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
+          <div
+            v-for="panel in LLM_INSIGHTS_PANELS"
+            :key="panel.id"
+            :class="panel.layout.colSpan === 2 ? 'xl:col-span-2' : ''"
+            class="bg-card-glass-bg rounded-default border-border-default flex h-60 flex-col border px-3.5 py-2.5"
+          >
+            <OTruncatedText class="text-text-heading text-sm font-medium">{{
+              t(panel.titleKey)
+            }}</OTruncatedText>
+            <span
+              class="text-text-muted flex flex-1 items-center justify-center text-sm"
+              data-test="llm-insights-not-run"
+              >{{ t("aiObservability.largeStream.notRun") }}</span
+            >
+          </div>
+        </div>
+      </div>
+
       <div v-else class="px-page-edge flex-1 overflow-y-auto pb-3">
         <!-- AI data health: hidden when every check passes. -->
         <LLMDataHealthStrip
@@ -492,7 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -531,6 +618,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
@@ -543,6 +631,12 @@ import {
 } from "./llmInsightsEmptyState";
 import { LLM_INSIGHTS_PANELS, autoHistogramBucketMicros } from "./config/llmInsightsPanels";
 import { kpiCache, selectionKey } from "./llmInsightsCache";
+import {
+  largeStreamThreshold,
+  useLargeStreamGate,
+  type StreamSizeStats,
+} from "./composables/useLargeStreamGate";
+import { formatSizeFromMB } from "@/utils/formatters";
 import useStreams from "@/composables/useStreams";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
@@ -849,6 +943,47 @@ const filterClause = computed(() => searchFilterSql(effectiveStream.value, searc
 const scopeClause = computed(() =>
   [agentFilterClause.value, filterClause.value].filter(Boolean).join(" AND "),
 );
+
+// --- Large-stream notice ------------------------------------------------------
+const scopeBarRef = ref<{ openAgentPicker: () => void } | null>(null);
+const searchBarRef = ref<{ focus: () => void } | null>(null);
+const streamStats = ref<Record<string, StreamSizeStats>>({});
+// Streams flagged as LLM-only never need the notice: every span there is one the page reads.
+const llmOnlyStreams = ref<string[]>([]);
+const largeStreamGate = useLargeStreamGate(
+  () => store.state.selectedOrganization?.identifier ?? "",
+  () => largeStreamThreshold(store.state.zoConfig),
+);
+
+function largeStreamHold(start: number, end: number): number | null {
+  const stream = effectiveStream.value;
+  return largeStreamGate.heldBytes({
+    mode: filterMode.value,
+    agentSelected: !!selectedAgent.value,
+    searchQuery: searchQuery.value,
+    stream,
+    agentStreams: llmOnlyStreams.value,
+    stats: streamStats.value[stream],
+    start,
+    end,
+  });
+}
+
+const largeStreamBytes = computed(() => largeStreamHold(props.startTime, props.endTime));
+const largeStreamSize = computed(() =>
+  raw(largeStreamBytes.value === null ? "" : formatSizeFromMB(largeStreamBytes.value / 1024 ** 2)),
+);
+
+function runLargeStreamAnyway() {
+  largeStreamGate.runAnyway(effectiveStream.value);
+  loadInsights();
+}
+
+async function pickAgentForLargeStream() {
+  await onFilterModeChange("agent");
+  await nextTick();
+  scopeBarRef.value?.openAgentPicker();
+}
 
 function applySearch(query: string) {
   if (query === searchQuery.value) return;
@@ -1224,6 +1359,12 @@ async function loadTraceStreams() {
     const res: any = await getStreams("traces", false, false);
     const list = res?.list || [];
     const llmStreams = list.filter((stream: any) => stream?.settings?.is_llm_stream !== false);
+    streamStats.value = Object.fromEntries(
+      llmStreams.map((stream: any) => [stream.name, stream.stats ?? {}]),
+    );
+    llmOnlyStreams.value = llmStreams
+      .filter((stream: any) => stream?.settings?.is_llm_stream === true)
+      .map((stream: any) => stream.name);
     availableStreams.value = llmStreams.map((stream: any) => stream.name);
     if (!availableStreams.value.includes(activeStream.value)) {
       activeStream.value = availableStreams.value[0] || "";
@@ -1284,7 +1425,11 @@ const isEmpty = computed<boolean>(
     streamsLoaded.value &&
     (availableStreams.value.length === 0 ||
       streamHasNoLLMFields.value ||
-      (hasLoadedOnce.value && !hasData.value && !loading.value && !hasActiveFilters.value)),
+      (largeStreamBytes.value === null &&
+        hasLoadedOnce.value &&
+        !hasData.value &&
+        !loading.value &&
+        !hasActiveFilters.value)),
 );
 // No LLM data at all here: the filter bar has nothing to narrow.
 const emptyOrg = computed(
@@ -1568,6 +1713,12 @@ async function loadInsights(
       resetDataHealth();
       return;
     }
+    // A large non-agent scan waits for "Pick an agent" or "Run anyway"; nothing queries meanwhile.
+    if (largeStreamHold(start, end) !== null) {
+      cancelAll();
+      resetDataHealth();
+      return;
+    }
     // Data health runs alongside (server-cached ~1 min; a manual refresh re-runs it).
     loadDataHealth(force, start, end);
 
@@ -1607,7 +1758,7 @@ function onFilterModeChange(mode: boolean | AcceptableValue | AcceptableValue[])
   // Entering the Agent tab can wait on the agents list before any KPI fetch —
   // show the skeleton for that stretch so the switch is immediate, not stale.
   if (next === "agent") switching.value = true;
-  loadInsights();
+  return loadInsights();
 }
 
 function onStreamChange() {

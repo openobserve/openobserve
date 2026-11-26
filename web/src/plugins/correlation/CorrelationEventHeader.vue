@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          left after the shrink-0 subject section (toggles + dynamic badge). Its
          measured width drives the responsive overflow math. -->
     <div
-      v-if="contextChips && contextChips.length > 0"
+      v-if="(contextChips && contextChips.length > 0) || droppedCount > 0"
       ref="containerRef"
       class="flex min-w-0 flex-1 items-center gap-3 py-2"
     >
@@ -74,8 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="cursor-default"
             :data-test="`correlation-event-header-overflow-${hiddenChipCount}`"
           >
-            <template v-if="hiddenChipCount !== contextChips.length">+</template>{{ hiddenChipCount
-            }}<template v-if="hiddenChipCount === contextChips.length">
+            <template v-if="hiddenChipCount !== contextChips?.length">+</template
+            >{{ hiddenChipCount
+            }}<template v-if="hiddenChipCount === contextChips?.length">
               {{ t("correlation.fieldsLabel") }}</template
             >
           </OTag>
@@ -95,6 +96,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OTooltip>
         </span>
+        <OPopover
+          v-if="droppedCount > 0"
+          v-model:open="droppedOpen"
+          side="bottom"
+          align="start"
+          :aria-label="t('correlation.droppedTitle')"
+          @open-auto-focus="(e: Event) => e.preventDefault()"
+        >
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="chip"
+              class="text-text-secondary shrink-0 text-xs underline decoration-dotted underline-offset-2"
+              data-test="correlation-event-header-dropped"
+              @mouseenter="droppedOpen = true"
+              @mouseleave="droppedOpen = false"
+              @focus="droppedOpen = true"
+              @blur="droppedOpen = false"
+              >{{ t("correlation.droppedCount", { count: droppedCount }, droppedCount) }}</OButton
+            >
+          </template>
+          <div
+            class="flex max-w-[min(26rem,calc(100vw-1.5rem))] flex-col gap-2 p-3"
+            data-test="correlation-event-header-dropped-popover"
+          >
+            <span class="text-text-heading text-sm font-medium">{{
+              t("correlation.droppedTitle")
+            }}</span>
+            <div
+              v-for="dim in droppedDimensions"
+              :key="dim.id"
+              class="flex items-center gap-3 text-xs"
+              :data-test="`correlation-event-header-dropped-${dim.field}`"
+            >
+              <code
+                class="bg-surface-subtle rounded-default text-text-body min-w-0 shrink px-1.5 py-0.5 font-mono"
+                >{{ dim.field }}</code
+              >
+              <span class="text-text-secondary">{{
+                dim.reason === "relaxed"
+                  ? t("correlation.droppedNoRows", { value: dim.value ?? "" })
+                  : t("correlation.droppedNoField")
+              }}</span>
+            </div>
+          </div>
+        </OPopover>
       </div>
     </div>
 
@@ -159,6 +206,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import type { AcceptableValue } from "reka-ui";
 import {
   convertTimeFromNsToMs,
@@ -166,7 +215,7 @@ import {
   timestampToTimezoneDate,
 } from "@/utils/zincutils";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { repeatsChip } from "./correlationHeader";
+import { repeatsChip, type DroppedDimension } from "./correlationHeader";
 import type { FieldAlias } from "@/services/service_streams";
 
 const { t } = useI18nTyped();
@@ -196,6 +245,7 @@ const props = withDefaults(
     overflowMode?: "responsive" | "threshold";
     overflowThreshold?: number;
     getSubjectButtonLabel?: (id: string) => string;
+    droppedDimensions?: DroppedDimension[];
   }>(),
   {
     overflowMode: "threshold",
@@ -266,7 +316,12 @@ const activeSubjectBadge = computed(
     ),
 );
 
-const hasChips = computed(() => (props.contextChips?.length ?? 0) > 0 || showSubjectSection.value);
+const droppedCount = computed(() => props.droppedDimensions?.length ?? 0);
+const droppedOpen = ref(false);
+
+const hasChips = computed(
+  () => (props.contextChips?.length ?? 0) > 0 || droppedCount.value > 0 || showSubjectSection.value,
+);
 
 const displayedChips = computed<DimensionChip[]>(() => {
   const chips = props.contextChips ?? [];

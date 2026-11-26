@@ -17556,7 +17556,6 @@
     "backToLogs": "Назад к логам",
     "openInTraces": "Открыть в трейсах",
     "loadingStream": "Загрузка потока...",
-    "noLogsAvailableForService": "Нет доступных логов для этого сервиса",
     "noCorrelatedLogsFound": "Не найдено связанных логов для этого спана",
     "spanHasNoLogsShowingTrace": "У этого спана нет логов. Отображаются логи для всего трейса.",
     "noLogStreamForTrace": "Ни в одном потоке логов нет логов для этого трейса.",
@@ -17980,7 +17979,11 @@
       "metricsLoadFailed": "Не удалось загрузить коррелированные метрики этого сервиса. {reason}",
       "noResourceRecorded": "Спаны этого сервиса в этом диапазоне времени не содержат {resource}.",
       "resourceLoadFailed": "Не удалось загрузить {resource} для этого сервиса. {reason}",
-      "noVersionTraffic": "Спаны этого сервиса в этом потоке не содержат версии, поэтому нет трафика для разбивки по версии."
+      "noVersionTraffic": "Спаны этого сервиса в этом потоке не содержат версии, поэтому нет трафика для разбивки по версии.",
+      "logsMatchedByName": "{service} сопоставлен только по имени сервиса. Корреляция не нашла для него расположение.",
+      "logsEmptyTitle": "Логи для {service} не найдены",
+      "logsEmptyReason": "Ни в одном потоке логов нет поля {field}.",
+      "logsEmptyAction": "Открыть логи"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP-статус код",
@@ -18554,7 +18557,16 @@
     "panelTimeSeriesFor": "Временные ряды для {stream}",
     "panelTimeSeriesForWithType": "Временные ряды для {stream} ({type})",
     "logsPanelTitle": "Логи - {stream}",
-    "logsPanelDescription": "Связанные логи для сервиса {service}"
+    "logsPanelDescription": "Связанные логи для сервиса {service}",
+    "noDataInScope": "Нет данных в этой области",
+    "noDataInScopeReason": "Нет строк, соответствующих этим фильтрам, в этом диапазоне времени.",
+    "droppedCount": "+{count} отброшено | +{count} отброшено",
+    "droppedTitle": "Не используются как фильтры",
+    "droppedNoRows": "Нет строк с {value}",
+    "droppedNoField": "Поля нет в этих потоках",
+    "allNoDataTitle": "Ни у одной метрики нет данных в этой области",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Показать метрики без данных"
   },
   "search_scheduler_job": {
     "title": "Планировщик заданий поиска",
@@ -20620,6 +20632,13 @@
       "sampleExpected": "Ожидаемый вывод",
       "fromTrace": "Из span {id} трейса",
       "openInPlaygroundFailed": "Не удалось открыть этот span в Playground"
+    },
+    "largeStream": {
+      "notice": "{stream}: около {size} в этом диапазоне, без фильтра агента. Может занять несколько минут.",
+      "pickAgent": "Выбрать агента",
+      "addFilter": "Добавить фильтр",
+      "runAnyway": "Всё равно запустить",
+      "notRun": "Не запущено"
     }
   },
   "onlineEvals": {

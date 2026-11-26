@@ -17554,7 +17554,6 @@
     "backToLogs": "Back to Logs",
     "openInTraces": "Open in Traces",
     "loadingStream": "Loading Stream...",
-    "noLogsAvailableForService": "No Logs available for this service",
     "noCorrelatedLogsFound": "No correlated logs found for this span",
     "spanHasNoLogsShowingTrace": "This span has no logs. Showing logs for the whole trace.",
     "noLogStreamForTrace": "No log stream has logs for this trace.",
@@ -17978,7 +17977,11 @@
       "metricsLoadFailed": "Couldn't load this service's correlated metrics. {reason}",
       "noResourceRecorded": "This service's spans in this time range don't record {resource}.",
       "resourceLoadFailed": "Couldn't load {resource} for this service. {reason}",
-      "noVersionTraffic": "This service's spans in this stream don't record a version, so there is no traffic to split by version."
+      "noVersionTraffic": "This service's spans in this stream don't record a version, so there is no traffic to split by version.",
+      "logsMatchedByName": "Matched {service} by service name only. Correlation found no location for it.",
+      "logsEmptyTitle": "No logs found for {service}",
+      "logsEmptyReason": "No logs stream has a {field} field.",
+      "logsEmptyAction": "Open Logs"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP Status Code",
@@ -18552,7 +18555,16 @@
     "panelTimeSeriesFor": "Time series for {stream}",
     "panelTimeSeriesForWithType": "Time series for {stream} ({type})",
     "logsPanelTitle": "Logs - {stream}",
-    "logsPanelDescription": "Correlated logs for service {service}"
+    "logsPanelDescription": "Correlated logs for service {service}",
+    "noDataInScope": "No data in this scope",
+    "noDataInScopeReason": "No rows match these filters in this time range.",
+    "droppedCount": "+{count} dropped | +{count} dropped",
+    "droppedTitle": "Not used as filters",
+    "droppedNoRows": "No rows with {value}",
+    "droppedNoField": "Field not on these streams",
+    "allNoDataTitle": "No metric has data in this scope",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Show metrics without data"
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",
@@ -20618,6 +20630,13 @@
       "sampleExpected": "Expected Output",
       "fromTrace": "From trace span {id}",
       "openInPlaygroundFailed": "Could not open this span in the Playground"
+    },
+    "largeStream": {
+      "notice": "{stream}: about {size} in this range, no agent filter. May take minutes.",
+      "pickAgent": "Pick an agent",
+      "addFilter": "Add a filter",
+      "runAnyway": "Run anyway",
+      "notRun": "Not run"
     }
   },
   "onlineEvals": {

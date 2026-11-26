@@ -17554,7 +17554,6 @@
     "backToLogs": "Back to Logs",
     "openInTraces": "Open in Traces",
     "loadingStream": "Loading Stream...",
-    "noLogsAvailableForService": "No Logs available for this service",
     "noCorrelatedLogsFound": "No correlated logs found for this span",
     "spanHasNoLogsShowingTrace": "This span has no logs. Showing logs for the whole trace.",
     "noLogStreamForTrace": "ไม่มีสตรีมล็อกที่มีล็อกสำหรับเทรซนี้",
@@ -17978,7 +17977,11 @@
       "metricsLoadFailed": "ไม่สามารถโหลดเมทริกซ์ที่เชื่อมโยงของบริการนี้ได้ {reason}",
       "noResourceRecorded": "สแปนของบริการนี้ในช่วงเวลานี้ไม่ได้บันทึก {resource}",
       "resourceLoadFailed": "ไม่สามารถโหลด {resource} สำหรับบริการนี้ได้ {reason}",
-      "noVersionTraffic": "สแปนของบริการนี้ในสตรีมนี้ไม่ได้บันทึกเวอร์ชัน จึงไม่มีทราฟฟิกให้แยกตามเวอร์ชัน"
+      "noVersionTraffic": "สแปนของบริการนี้ในสตรีมนี้ไม่ได้บันทึกเวอร์ชัน จึงไม่มีทราฟฟิกให้แยกตามเวอร์ชัน",
+      "logsMatchedByName": "จับคู่ {service} ด้วยชื่อบริการเท่านั้น การหาความสัมพันธ์ไม่พบตำแหน่งของบริการนี้",
+      "logsEmptyTitle": "ไม่พบล็อกสำหรับ {service}",
+      "logsEmptyReason": "ไม่มีสตรีมล็อกใดที่มีฟิลด์ {field}",
+      "logsEmptyAction": "เปิดล็อก"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP Status Code",
@@ -18552,7 +18555,16 @@
     "panelTimeSeriesFor": "Time series for {stream}",
     "panelTimeSeriesForWithType": "Time series for {stream} ({type})",
     "logsPanelTitle": "Logs - {stream}",
-    "logsPanelDescription": "Correlated logs for service {service}"
+    "logsPanelDescription": "Correlated logs for service {service}",
+    "noDataInScope": "ไม่มีข้อมูลในขอบเขตนี้",
+    "noDataInScopeReason": "ไม่มีแถวที่ตรงกับตัวกรองเหล่านี้ในช่วงเวลานี้",
+    "droppedCount": "+{count} ที่ตัดออก | +{count} ที่ตัดออก",
+    "droppedTitle": "ไม่ได้ใช้เป็นตัวกรอง",
+    "droppedNoRows": "ไม่มีแถวที่มี {value}",
+    "droppedNoField": "ไม่มีฟิลด์นี้ในสตรีมเหล่านี้",
+    "allNoDataTitle": "ไม่มีเมตริกใดมีข้อมูลในขอบเขตนี้",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "แสดงเมตริกที่ไม่มีข้อมูล"
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",
@@ -20618,6 +20630,13 @@
       "sampleExpected": "Expected Output",
       "fromTrace": "From trace span {id}",
       "openInPlaygroundFailed": "Could not open this span in the Playground"
+    },
+    "largeStream": {
+      "notice": "{stream}: ประมาณ {size} ในช่วงนี้ ไม่มีตัวกรองเอเจนต์ อาจใช้เวลาหลายนาที",
+      "pickAgent": "เลือกเอเจนต์",
+      "addFilter": "เพิ่มตัวกรอง",
+      "runAnyway": "เรียกใช้ต่อไป",
+      "notRun": "ยังไม่ได้เรียกใช้"
     }
   },
   "onlineEvals": {

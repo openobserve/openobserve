@@ -17556,7 +17556,6 @@
     "backToLogs": "Torna ai log",
     "openInTraces": "Apri in Tracce",
     "loadingStream": "Caricamento dello stream...",
-    "noLogsAvailableForService": "Nessun log disponibile per questo servizio",
     "noCorrelatedLogsFound": "Nessun log correlato trovato per questo span",
     "spanHasNoLogsShowingTrace": "Questo span non ha log. Vengono mostrati i log dell'intera traccia.",
     "noLogStreamForTrace": "Nessuno stream di log contiene log per questa traccia.",
@@ -17980,7 +17979,11 @@
       "metricsLoadFailed": "Impossibile caricare le metriche correlate di questo servizio. {reason}",
       "noResourceRecorded": "Gli span di questo servizio in questo intervallo di tempo non registrano {resource}.",
       "resourceLoadFailed": "Impossibile caricare {resource} per questo servizio. {reason}",
-      "noVersionTraffic": "Gli span di questo servizio in questo stream non registrano una versione, quindi non c'è traffico da suddividere per versione."
+      "noVersionTraffic": "Gli span di questo servizio in questo stream non registrano una versione, quindi non c'è traffico da suddividere per versione.",
+      "logsMatchedByName": "{service} associato solo tramite il nome del servizio. La correlazione non ha trovato alcuna posizione.",
+      "logsEmptyTitle": "Nessun log trovato per {service}",
+      "logsEmptyReason": "Nessuno stream di log ha un campo {field}.",
+      "logsEmptyAction": "Apri log"
     },
     "traceErrorTab": {
       "httpStatusCode": "Codice di stato HTTP",
@@ -18554,7 +18557,16 @@
     "panelTimeSeriesFor": "Serie temporali per {stream}",
     "panelTimeSeriesForWithType": "Serie temporali per {stream} ({type})",
     "logsPanelTitle": "Log - {stream}",
-    "logsPanelDescription": "Log correlati per il servizio {service}"
+    "logsPanelDescription": "Log correlati per il servizio {service}",
+    "noDataInScope": "Nessun dato in questo ambito",
+    "noDataInScopeReason": "Nessuna riga corrisponde a questi filtri in questo intervallo di tempo.",
+    "droppedCount": "+{count} escluso | +{count} esclusi",
+    "droppedTitle": "Non usati come filtri",
+    "droppedNoRows": "Nessuna riga con {value}",
+    "droppedNoField": "Campo non presente in questi stream",
+    "allNoDataTitle": "Nessuna metrica ha dati in questo ambito",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Mostra metriche senza dati"
   },
   "search_scheduler_job": {
     "title": "Cerca Job Scheduler",
@@ -20620,6 +20632,13 @@
       "sampleExpected": "Output atteso",
       "fromTrace": "Dallo span della traccia {id}",
       "openInPlaygroundFailed": "Impossibile aprire questo span nel Playground."
+    },
+    "largeStream": {
+      "notice": "{stream}: circa {size} in questo intervallo, nessun filtro agente. Potrebbe richiedere minuti.",
+      "pickAgent": "Scegli un agente",
+      "addFilter": "Aggiungi un filtro",
+      "runAnyway": "Esegui comunque",
+      "notRun": "Non eseguito"
     }
   },
   "onlineEvals": {

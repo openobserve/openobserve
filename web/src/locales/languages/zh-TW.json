@@ -17551,7 +17551,6 @@
     "backToLogs": "返回日誌",
     "openInTraces": "在追蹤中開啟",
     "loadingStream": "載入串流中...",
-    "noLogsAvailableForService": "此服務無可用的日誌",
     "noCorrelatedLogsFound": "找不到此 span 的相關日誌",
     "spanHasNoLogsShowingTrace": "此 Span 沒有日誌。顯示整個追蹤的日誌。",
     "noLogStreamForTrace": "沒有日誌串流含有此追蹤的日誌。",
@@ -17975,7 +17974,11 @@
       "metricsLoadFailed": "無法載入此服務的關聯指標。{reason}",
       "noResourceRecorded": "此服務在此時間範圍內的 Span 未記錄 {resource}。",
       "resourceLoadFailed": "無法為此服務載入 {resource}。{reason}",
-      "noVersionTraffic": "此服務在此串流中的 Span 未記錄版本，因此沒有可依版本拆分的流量。"
+      "noVersionTraffic": "此服務在此串流中的 Span 未記錄版本，因此沒有可依版本拆分的流量。",
+      "logsMatchedByName": "僅依服務名稱比對 {service}。關聯未找到其位置。",
+      "logsEmptyTitle": "找不到 {service} 的日誌",
+      "logsEmptyReason": "沒有日誌串流包含 {field} 欄位。",
+      "logsEmptyAction": "開啟日誌"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP 狀態碼",
@@ -18549,7 +18552,16 @@
     "panelTimeSeriesFor": "{stream} 的時間序列",
     "panelTimeSeriesForWithType": "{stream} 的時間序列（{type}）",
     "logsPanelTitle": "日誌 - {stream}",
-    "logsPanelDescription": "與服務 {service} 相關聯的日誌"
+    "logsPanelDescription": "與服務 {service} 相關聯的日誌",
+    "noDataInScope": "此範圍內無資料",
+    "noDataInScopeReason": "此時間範圍內沒有符合這些篩選條件的資料列。",
+    "droppedCount": "+{count} 個已捨棄 | +{count} 個已捨棄",
+    "droppedTitle": "未用作篩選條件",
+    "droppedNoRows": "沒有值為 {value} 的資料列",
+    "droppedNoField": "這些串流中沒有此欄位",
+    "allNoDataTitle": "此範圍內沒有指標有資料",
+    "allNoDataScope": "{scope}，{window}",
+    "allNoDataAction": "顯示無資料的指標"
   },
   "search_scheduler_job": {
     "title": "搜尋工作排程器",
@@ -20615,6 +20627,13 @@
       "sampleExpected": "預期輸出",
       "fromTrace": "來自追蹤 Span {id}",
       "openInPlaygroundFailed": "無法在 Playground 中開啟此 Span。"
+    },
+    "largeStream": {
+      "notice": "{stream}：此範圍內約 {size}，沒有代理篩選。可能需要數分鐘。",
+      "pickAgent": "選擇代理",
+      "addFilter": "新增篩選條件",
+      "runAnyway": "仍要執行",
+      "notRun": "未執行"
     }
   },
   "onlineEvals": {

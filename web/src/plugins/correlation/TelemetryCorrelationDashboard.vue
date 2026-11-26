@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :semantic-groups="semanticGroups"
       overflow-mode="responsive"
       :get-subject-button-label="getSubjectButtonLabel"
+      :dropped-dimensions="droppedTabDimensions"
     />
 
     <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
@@ -256,10 +257,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </template>
                   </template>
-                  <div v-else class="px-2 pt-3 text-center">
+                  <div v-else-if="noDataListedStreams.length === 0" class="px-2 pt-3 text-center">
                     <OIcon name="info" size="sm" class="me-1 align-middle" />
                     {{ t("search.noResult") }}
                   </div>
+                  <CorrelationNoDataGroup
+                    v-model:open="noDataGroupOpen"
+                    :streams="noDataListedStreams"
+                    :selected-names="selectedMetricNames"
+                    @toggle="toggleMetricStream"
+                  />
                 </div>
 
                 <!-- Footer: selected count -->
@@ -385,6 +392,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :allowAlertCreation="false"
                     searchType="dashboards"
                   />
+                  <OEmptyState
+                    v-else-if="allMetricsNoData"
+                    size="inline"
+                    icon="search-off"
+                    class="h-full"
+                    :title="t('correlation.allNoDataTitle')"
+                    :description="allNoDataDescription"
+                    data-test="telemetry-correlation-all-no-data"
+                  >
+                    <template #actions>
+                      <OButton
+                        variant="outline"
+                        size="sm"
+                        data-test="telemetry-correlation-all-no-data-show"
+                        @click="noDataGroupOpen = true"
+                        >{{ t("correlation.allNoDataAction") }}</OButton
+                      >
+                    </template>
+                  </OEmptyState>
                   <div
                     v-else-if="hasNoMetricStreams"
                     data-test="correlation-no-metric-streams"
@@ -553,6 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :semantic-groups="semanticGroups"
       overflow-mode="responsive"
       :get-subject-button-label="getSubjectButtonLabel"
+      :dropped-dimensions="droppedTabDimensions"
     />
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
@@ -711,10 +738,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </template>
                 </template>
-                <div v-else class="px-2 pt-3 text-center">
+                <div v-else-if="noDataListedStreams.length === 0" class="px-2 pt-3 text-center">
                   <OIcon name="info" size="sm" class="me-1 align-middle" />
                   {{ t("search.noResult") }}
                 </div>
+                <CorrelationNoDataGroup
+                  v-model:open="noDataGroupOpen"
+                  :streams="noDataListedStreams"
+                  :selected-names="selectedMetricNames"
+                  @toggle="toggleMetricStream"
+                />
               </div>
 
               <!-- Footer: selected count -->
@@ -840,6 +873,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchType="dashboards"
                   class="border-none"
                 />
+                <OEmptyState
+                  v-else-if="allMetricsNoData"
+                  size="inline"
+                  icon="search-off"
+                  class="h-full"
+                  :title="t('correlation.allNoDataTitle')"
+                  :description="allNoDataDescription"
+                  data-test="telemetry-correlation-all-no-data"
+                >
+                  <template #actions>
+                    <OButton
+                      variant="outline"
+                      size="sm"
+                      data-test="telemetry-correlation-all-no-data-show"
+                      @click="noDataGroupOpen = true"
+                      >{{ t("correlation.allNoDataAction") }}</OButton
+                    >
+                  </template>
+                </OEmptyState>
                 <div
                   v-else-if="hasNoMetricStreams"
                   data-test="correlation-no-metric-streams"
@@ -1075,6 +1127,7 @@ import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import useTraces from "@/composables/useTraces";
 import {
+  metricWhereConditions,
   useMetricsCorrelationDashboard,
   type MetricsCorrelationConfig,
 } from "@/composables/useMetricsCorrelationDashboard";
@@ -1111,6 +1164,9 @@ import { filterByIntent, pickDefaultIntent, type IntentId } from "@/utils/metric
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import CorrelationEventHeader from "./CorrelationEventHeader.vue";
+import CorrelationNoDataGroup from "./CorrelationNoDataGroup.vue";
+import { findNoDataMetricStreams, metricExistenceSql } from "./metricDataCheck";
+import { streamTraceRows } from "./correlationStream";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1143,6 +1199,7 @@ import {
 import {
   correlatedByKeys,
   correlatedByLabel,
+  droppedDimensions,
   repeatsChip,
   useLocationDimensions,
 } from "./correlationHeader";
@@ -1214,6 +1271,7 @@ let currentTracesStreamTraceId: string | null = null;
 
 // The in-flight traces stream outlives this component otherwise; cancel it on unmount.
 onUnmounted(() => {
+  noDataCheckController?.abort();
   if (currentTracesStreamTraceId) {
     cancelStreamQueryBasedOnRequestId({
       trace_id: currentTracesStreamTraceId,
@@ -1541,6 +1599,12 @@ const uniqueMetricStreams = computed(() => {
 
   return [...base, ...extra];
 });
+
+// Streams with no rows in the tab's scope; they leave the default selection.
+const noDataStreamNames = ref<Set<string>>(new Set());
+const noDataGroupOpen = ref(false);
+let noDataCheckController: AbortController | null = null;
+let noDataCheckKey = "";
 
 // Selected metric streams — declared before chip/intent block because applyActivePill references it.
 const selectedMetricStreams = ref<StreamInfo[]>(
@@ -1894,7 +1958,9 @@ const streamsForActivePill = computed<StreamInfo[]>(() => {
 });
 
 const applyActivePill = () => {
-  selectedMetricStreams.value = applyUnstableDimensionDefaults(streamsForActivePill.value);
+  selectedMetricStreams.value = applyUnstableDimensionDefaults(
+    streamsForActivePill.value.filter((s) => !noDataStreamNames.value.has(s.stream_name)),
+  );
 };
 
 let lastIntentInitKey: string | null = null;
@@ -1929,7 +1995,41 @@ const filteredMetricStreams = computed(() => {
 // Group the filtered metric streams into configured categories
 // In nested mode, also apply scope filter so the sidebar shows only pod/node streams
 const groupedFilteredMetricStreams = computed(() =>
-  groupMetricsByCategory(applyScopeFilter(filteredMetricStreams.value), effectiveGroupDefs.value),
+  groupMetricsByCategory(
+    applyScopeFilter(filteredMetricStreams.value).filter(
+      (s) => !noDataStreamNames.value.has(s.stream_name),
+    ),
+    effectiveGroupDefs.value,
+  ),
+);
+
+const noDataListedStreams = computed(() =>
+  applyScopeFilter(filteredMetricStreams.value).filter((s) =>
+    noDataStreamNames.value.has(s.stream_name),
+  ),
+);
+
+const selectedMetricNames = computed(
+  () => new Set(selectedMetricStreams.value.map((s) => s.stream_name)),
+);
+
+const allMetricsNoData = computed(() => {
+  const scoped = applyScopeFilter(uniqueMetricStreams.value);
+  return (
+    selectedMetricStreams.value.length === 0 &&
+    scoped.length > 0 &&
+    scoped.every((s) => noDataStreamNames.value.has(s.stream_name))
+  );
+});
+
+const allNoDataDescription = computed(() => {
+  const range = formatTimeRange(props.timeRange);
+  const scope = contextChips.value.map((chip) => `${chip.label} ${chip.value}`).join(", ");
+  return scope ? t("correlation.allNoDataScope", { scope, window: range }) : range;
+});
+
+const droppedTabDimensions = computed(() =>
+  droppedDimensions(tabStreams.value, semanticGroups.value),
 );
 
 // Group ALL available unique metric streams — drives which tabs are visible
@@ -2318,6 +2418,50 @@ const applyDimensionChanges = () => {
 
   // Reload the dashboard with updated filters
   loadDashboard();
+  if (initialLoadCompleted.value) void runNoDataCheck();
+};
+
+watch(uniqueMetricStreams, () => {
+  if (initialLoadCompleted.value) void runNoDataCheck();
+});
+
+const runNoDataCheck = async () => {
+  const streams = applyUnstableDimensionDefaults(uniqueMetricStreams.value);
+  if (streams.length === 0) return;
+  const key = JSON.stringify([
+    streams.map((s) => [s.stream_name, s.filters, s.has_data]),
+    activeDimensions.value,
+    props.timeRange,
+  ]);
+  if (key === noDataCheckKey) return;
+  noDataCheckKey = key;
+  noDataCheckController?.abort();
+  const controller = new AbortController();
+  noDataCheckController = controller;
+  const scope = { matchedDimensions: activeDimensions.value, semanticGroups: semanticGroups.value };
+  const found = await findNoDataMetricStreams({
+    streams,
+    signal: controller.signal,
+    probe: async (stream) => {
+      const rows = await streamTraceRows({
+        org: currentOrgIdentifier.value,
+        sql: metricExistenceSql(stream.stream_name, metricWhereConditions(stream, scope)),
+        startTime: props.timeRange.startTime,
+        endTime: props.timeRange.endTime,
+        size: 1,
+        keepPartial: true,
+        signal: controller.signal,
+        streamType: "metrics",
+      });
+      return rows.length > 0;
+    },
+  });
+  if (noDataCheckController !== controller || controller.signal.aborted) return;
+  noDataStreamNames.value = found ?? new Set();
+  if (!found?.size) return;
+  selectedMetricStreams.value = selectedMetricStreams.value.filter(
+    (s) => !found.has(s.stream_name),
+  );
 };
 
 const loadDashboard = async () => {
@@ -3134,6 +3278,7 @@ watch(
         selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
       }
 
+      void runNoDataCheck();
       await loadDashboard();
       initialLoadCompleted.value = true;
     }

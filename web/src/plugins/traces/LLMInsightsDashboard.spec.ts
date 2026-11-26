@@ -1079,3 +1079,95 @@ describe("LLMInsightsDashboard — Total Cost tile", () => {
     expect(tooltip).toContain('\\"shown\\":1,\\"total\\":\\"25\\"');
   });
 });
+
+// ===========================================================================
+// Large-stream notice — the page waits for a choice before any scan
+// ===========================================================================
+
+describe("LLMInsightsDashboard — large stream notice", () => {
+  const START = 1_700_000_000_000_000;
+  const END = 1_700_001_000_000_000;
+  const bigStream = (storageMb: number) => ({
+    name: "big",
+    stats: { storage_size: storageMb, doc_time_min: START, doc_time_max: END },
+  });
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.setItem(STREAM_LS_KEY, "big");
+  });
+
+  it("shows the notice and does not fetch the KPIs before a choice", async () => {
+    mockGetStreams.mockResolvedValue({ list: [bigStream(300 * 1024)] });
+    const wrapper = mountDashboard({ streamName: "big" });
+    await flushPromises();
+    await (wrapper.vm as any).refresh(START, END, false);
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="llm-insights-large-stream-notice"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test="llm-insights-not-run"]').length).toBeGreaterThan(0);
+    expect(wrapper.find('[data-test="llm-schema-panel"]').exists()).toBe(false);
+    expect(mockFetchAll).not.toHaveBeenCalled();
+  });
+
+  it("runs the page and remembers the choice after Run anyway", async () => {
+    mockGetStreams.mockResolvedValue({ list: [bigStream(300 * 1024)] });
+    const wrapper = mountDashboard({ streamName: "big" });
+    await flushPromises();
+    await (wrapper.vm as any).refresh(START, END, false);
+    await flushPromises();
+
+    await wrapper.find('[data-test="llm-insights-large-stream-run"]').trigger("click");
+    await flushPromises();
+
+    expect(mockFetchAll).toHaveBeenCalledWith("big", START, END, null, "");
+    expect(wrapper.find('[data-test="llm-insights-large-stream-notice"]').exists()).toBe(false);
+    expect(sessionStorage.getItem("llmInsights_runAnyway:test-org:big")).toBe("1");
+  });
+
+  it("runs as today below the threshold", async () => {
+    mockGetStreams.mockResolvedValue({ list: [bigStream(1024)] });
+    const wrapper = mountDashboard({ streamName: "big" });
+    await flushPromises();
+    await (wrapper.vm as any).refresh(START, END, false);
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="llm-insights-large-stream-notice"]').exists()).toBe(false);
+    expect(mockFetchAll).toHaveBeenCalled();
+  });
+
+  it("runs as today when the stream has no stats", async () => {
+    mockGetStreams.mockResolvedValue({ list: [{ name: "big" }] });
+    const wrapper = mountDashboard({ streamName: "big" });
+    await flushPromises();
+    await (wrapper.vm as any).refresh(START, END, false);
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="llm-insights-large-stream-notice"]').exists()).toBe(false);
+    expect(mockFetchAll).toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: "with agent mapping access", enterprise: "true", lead: "pick-agent" },
+    { name: "without agent mapping access", enterprise: "false", lead: "add-filter" },
+  ])("leads with the right action $name", async ({ enterprise, lead }) => {
+    const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
+    config.isEnterprise = enterprise;
+    config.isCloud = "false";
+    try {
+      mockGetStreams.mockResolvedValue({ list: [bigStream(300 * 1024)] });
+      const wrapper = mountDashboard({ streamName: "big" });
+      await flushPromises();
+      await (wrapper.vm as any).refresh(START, END, false);
+      await flushPromises();
+
+      const other = lead === "pick-agent" ? "add-filter" : "pick-agent";
+      expect(wrapper.find(`[data-test="llm-insights-large-stream-${lead}"]`).exists()).toBe(true);
+      expect(wrapper.find(`[data-test="llm-insights-large-stream-${other}"]`).exists()).toBe(false);
+      expect(mockFetchAll).not.toHaveBeenCalled();
+    } finally {
+      config.isEnterprise = original.isEnterprise;
+      config.isCloud = original.isCloud;
+    }
+  });
+});

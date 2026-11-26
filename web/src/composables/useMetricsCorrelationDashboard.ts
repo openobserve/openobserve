@@ -46,6 +46,60 @@ function shownName(config: MetricsCorrelationConfig): string {
   return config.displayServiceName || config.serviceName;
 }
 
+/** The WHERE conditions a correlated metric chart applies; the existence check reuses them. */
+export function metricWhereConditions(
+  stream: StreamInfo,
+  config: Pick<MetricsCorrelationConfig, "matchedDimensions" | "semanticGroups" | "metricSchemas">,
+): string {
+  // Resolve active subject dimensions (semantic IDs like "k8s-pod-name") to raw
+  // field names that exist on this specific metric stream. Walk each semantic
+  // group's field aliases and pick the first one present in the stream schema.
+  const subjectOverrides: Record<string, string> = {};
+  const semanticGroups = config.semanticGroups ?? [];
+  const streamSchema: Set<string> = new Set(
+    (
+      config.metricSchemas?.[stream.stream_name]?.schema as Array<{ name: string }> | undefined
+    )?.map((c) => c.name) ?? [],
+  );
+  for (const [semanticId, value] of Object.entries(config.matchedDimensions)) {
+    if (!value || value === SELECT_ALL_VALUE) continue;
+    const group = semanticGroups.find((g) => g.id === semanticId);
+    if (!group) continue; // not a semantic ID key — raw field names handled below
+    // F31: only override when the stream schema is loaded AND contains the field.
+    // Guessing a field name here produced `WHERE guessed = 'x' AND real = 'x'`
+    // (nonexistent guess → "No field named …" kills the panel).
+    if (streamSchema.size === 0) continue;
+    const hit = group.fields.find((f) => streamSchema.has(f));
+    if (hit) subjectOverrides[hit] = value;
+  }
+
+  // Build WHERE clause from stream filters merged with active subject overrides.
+  // Overrides REPLACE the stream's own alias of the same semantic group (F31) —
+  // a plain spread would AND two aliases of one concept together and match nothing.
+  // Quote field names that contain special characters (hyphens, dots, etc.)
+  // Skip filters with SELECT_ALL_VALUE (wildcard - means match all values)
+  const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups);
+  const effectiveFilters = mergeSubjectOverrides(
+    stream.filters ?? {},
+    subjectOverrides,
+    fieldToGroupId,
+  );
+
+  const whereConditions = Object.entries(effectiveFilters)
+    .filter(([, value]) => {
+      const skip = value === SELECT_ALL_VALUE;
+      // if (skip) {
+      //   console.log(`[useMetricsCorrelationDashboard] Skipping filter ${field}=${value} (SELECT_ALL_VALUE)`);
+      // }
+      return !skip;
+    })
+    .map(([field, value]) => {
+      return buildStreamFilterCondition(stream, field, value);
+    })
+    .join(" AND ");
+  return whereConditions;
+}
+
 /**
  * Composable for generating dashboard JSON for metrics correlation
  *
@@ -136,53 +190,7 @@ export function useMetricsCorrelationDashboard(t: TranslateFn) {
     const isCounter = metricType === "counter";
     const aggregationFunc = isCounter ? "sum" : "avg";
 
-    // Resolve active subject dimensions (semantic IDs like "k8s-pod-name") to raw
-    // field names that exist on this specific metric stream. Walk each semantic
-    // group's field aliases and pick the first one present in the stream schema.
-    const subjectOverrides: Record<string, string> = {};
-    const semanticGroups = config.semanticGroups ?? [];
-    const streamSchema: Set<string> = new Set(
-      (
-        config.metricSchemas?.[stream.stream_name]?.schema as Array<{ name: string }> | undefined
-      )?.map((c) => c.name) ?? [],
-    );
-    for (const [semanticId, value] of Object.entries(config.matchedDimensions)) {
-      if (!value || value === SELECT_ALL_VALUE) continue;
-      const group = semanticGroups.find((g) => g.id === semanticId);
-      if (!group) continue; // not a semantic ID key — raw field names handled below
-      // F31: only override when the stream schema is loaded AND contains the field.
-      // Guessing a field name here produced `WHERE guessed = 'x' AND real = 'x'`
-      // (nonexistent guess → "No field named …" kills the panel).
-      if (streamSchema.size === 0) continue;
-      const hit = group.fields.find((f) => streamSchema.has(f));
-      if (hit) subjectOverrides[hit] = value;
-    }
-
-    // Build WHERE clause from stream filters merged with active subject overrides.
-    // Overrides REPLACE the stream's own alias of the same semantic group (F31) —
-    // a plain spread would AND two aliases of one concept together and match nothing.
-    // Quote field names that contain special characters (hyphens, dots, etc.)
-    // Skip filters with SELECT_ALL_VALUE (wildcard - means match all values)
-    const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups);
-    const effectiveFilters = mergeSubjectOverrides(
-      stream.filters ?? {},
-      subjectOverrides,
-      fieldToGroupId,
-    );
-
-    const whereConditions = Object.entries(effectiveFilters)
-      .filter(([, value]) => {
-        const skip = value === SELECT_ALL_VALUE;
-        // if (skip) {
-        //   console.log(`[useMetricsCorrelationDashboard] Skipping filter ${field}=${value} (SELECT_ALL_VALUE)`);
-        // }
-        return !skip;
-      })
-      .map(([field, value]) => {
-        return buildStreamFilterCondition(stream, field, value);
-      })
-      .join(" AND ");
-
+    const whereConditions = metricWhereConditions(stream, config);
     const whereClause = whereConditions ? `WHERE ${whereConditions}` : "";
 
     // Time-series SQL query for metrics

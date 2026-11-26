@@ -2757,6 +2757,7 @@ export default defineComponent({
           5, // 5 minute time window
           props.streamName,
           correlationWindow(convertTimeFromNsToUs(props.span.start_time)),
+          true,
         );
         if (isStale()) return;
 

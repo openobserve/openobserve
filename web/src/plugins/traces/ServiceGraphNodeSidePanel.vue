@@ -73,8 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :description="
               logsLocked ? logsLockedReason : correlationLocked ? correlationLockedReason : null
             "
+            :aria-busy="relatedLogsLoading || undefined"
             @select="viewRelatedLogs"
             data-test="service-graph-node-panel-view-related-logs-btn"
+            ><template v-if="relatedLogsLoading" #icon-left
+              ><OIcon name="progress-activity" size="sm" class="animate-spin" /></template
             >{{ t("traces.serviceGraphNodeSidePanel.logs") }}</ODropdownItem
           >
           <ODropdownItem
@@ -152,6 +155,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="h-3.5 w-64!"
           data-test="svcver-panel-identity-loading"
         />
+      </div>
+      <div v-if="logsEmptyService" class="px-page-edge pb-2">
+        <div
+          class="rounded-surface border-border-default bg-surface-panel border"
+          data-test="service-graph-node-panel-logs-empty"
+        >
+          <OEmptyState
+            size="slim"
+            icon="search-off"
+            :title="
+              t('traces.serviceGraphNodeSidePanel.logsEmptyTitle', { service: logsEmptyService })
+            "
+          >
+            <template #description>
+              <i18n-t keypath="traces.serviceGraphNodeSidePanel.logsEmptyReason" tag="span">
+                <template #field
+                  ><code class="font-mono">{{ serviceNameField }}</code></template
+                >
+              </i18n-t>
+            </template>
+            <template #actions>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="service-graph-node-panel-logs-empty-open"
+                @click="openLogsWithServiceFilter"
+                >{{ t("traces.serviceGraphNodeSidePanel.logsEmptyAction") }}</OButton
+              >
+            </template>
+          </OEmptyState>
+        </div>
       </div>
       <ul
         v-if="dependencies.length > 0"
@@ -908,6 +942,7 @@ import {
   getDimensionAnalytics,
   type FieldAlias,
   type FoundGroup,
+  type StreamInfo,
   buildChipDimensionsFromFilters,
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
@@ -945,6 +980,8 @@ import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
+import { pickBestGuessLogsStream } from "@/utils/traces/bestGuessLogsStream";
+import { restoreLogsSelectedStreams } from "@/utils/streamPersist";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -1518,7 +1555,7 @@ export default defineComponent({
       { immediate: true },
     );
 
-    const { getStream } = useStreams(t);
+    const { getStream, getStreams } = useStreams(t);
 
     // RED Charts State
     const dashboardData = ref<any>({});
@@ -2063,16 +2100,20 @@ export default defineComponent({
 
     // Under service_optional the backend drops a bare service name, so send the latest span's
     // dimensions. An inferred dependency's span is its caller's, so it keeps the bare name.
-    const correlateSelectedService = async () => {
+    const correlateSelectedService = async (checkData = false) => {
       const node = props.selectedNode;
       const serviceName = node?.name || node?.label || node?.id || "";
       const org = store.state.selectedOrganization.identifier;
       const base = { source_stream: props.streamFilter || "default", source_type: "traces" };
       const { startTime, endTime } = props.timeRange;
       const [latestSpan] = await Promise.all([fetchLatestSpan(), loadOrgSemanticGroups()]);
+      const dataCheck = checkData
+        ? { check_data: true, start_time: startTime, end_time: endTime }
+        : {};
       if (node?.service_type) {
         const response = await correlateStreams(org, {
           ...base,
+          ...dataCheck,
           available_dimensions: { service: serviceName },
         });
         return { data: response.data, latestSpan };
@@ -2091,6 +2132,7 @@ export default defineComponent({
         resolve_from_source: true,
         start_time: startTime,
         end_time: endTime,
+        ...(checkData ? { check_data: true } : {}),
       });
       return { data: response.data, latestSpan };
     };
@@ -2105,7 +2147,7 @@ export default defineComponent({
       metricsCorrelationData.value = null;
 
       try {
-        const { data, latestSpan } = await correlateSelectedService();
+        const { data, latestSpan } = await correlateSelectedService(true);
         if (!data) {
           metricsCorrelationData.value = null;
           return;
@@ -3181,73 +3223,102 @@ export default defineComponent({
       });
     };
 
-    const viewRelatedLogs = async () => {
-      const serviceName = buildServiceName();
-      if (!serviceName || logsLocked.value || correlationLocked.value) return;
+    const relatedLogsLoading = ref(false);
+    const logsEmptyService = ref("");
 
-      const org = store.state.selectedOrganization.identifier;
+    watch([() => props.selectedNode?.id, () => props.visible], () => {
+      logsEmptyService.value = "";
+    });
 
-      let streamName: string | undefined;
-      let filterQuery = `${serviceNameField.value}='${serviceName}'`;
-
-      try {
-        const { data } = await correlateSelectedService();
-        const logStreams = data?.related_streams?.logs || [];
-        if (logStreams.length > 0) {
-          const sourceStream = props.streamFilter || "default";
-          const firstLogStream =
-            logStreams.find((s) => s.stream_name === sourceStream) ?? logStreams[0];
-          streamName = firstLogStream.stream_name;
-
-          // Build filter from the stream's resolved field names
-          const filters: Record<string, string> = firstLogStream.filters || {};
-          const filterParts = Object.entries(filters)
-            .map(([field, value]) => buildStreamFilterCondition(firstLogStream, field, value))
-            .join(" AND ");
-          if (filterParts) {
-            filterQuery = filterParts;
-          }
-        } else {
-          toast({
-            variant: "warning",
-            message: t("traces.noLogsAvailableForService"),
-          });
-          return;
-        }
-      } catch {
-        toast({
-          variant: "warning",
-          message: t("traces.noLogsAvailableForService"),
-        });
-        return;
-      }
-
-      const queryParams: any = {
+    const pushLogsRoute = (filterQuery: string, streamName?: string) => {
+      const queryParams: Record<string, string | number> = {
         stream_type: "logs",
         from: props.timeRange.startTime,
         to: props.timeRange.endTime,
         sql_mode: "false",
-        query: b64EncodeUnicode(filterQuery),
-        org_identifier: org,
+        query: b64EncodeUnicode(filterQuery) ?? "",
+        org_identifier: store.state.selectedOrganization.identifier,
         // The Logs route is keep-alive, so a repeat visit only runs onActivated —
         // which restores the URL params solely on the trace-explorer branch.
         type: "trace_explorer",
       };
-
-      if (streamName) {
-        queryParams.stream = streamName;
-      }
-
-      // The Logs page keeps `isInitialized` in the store across unmounts, and while
-      // it is set it restores the previous session from the store instead of reading
-      // these params — dropping the stream, time range and filter. Clearing it makes
-      // the URL the source of truth, same as the trace-details "View Logs" button.
+      if (streamName) queryParams.stream = streamName;
+      // Logs restores its last session from the store while `isInitialized` is set; clearing it makes the URL win.
       store.dispatch("logs/setIsInitialized", false);
+      router.push({ path: "/logs", query: queryParams });
+    };
 
-      router.push({
-        path: "/logs",
-        query: queryParams,
-      });
+    const serviceFilterQuery = (serviceName: string) =>
+      `${serviceNameField.value}='${serviceName}'`;
+
+    const findBestGuessLogsStream = async (): Promise<string | null> => {
+      const org = store.state.selectedOrganization.identifier;
+      const field = serviceNameField.value;
+      try {
+        const res = (await getStreams("logs", false, false)) as {
+          list?: { name: string; stats?: { storage_size?: number } }[];
+        };
+        return await pickBestGuessLogsStream({
+          streams: (res?.list ?? []).map((s) => ({
+            name: s.name,
+            storageSize: Number(s.stats?.storage_size) || 0,
+          })),
+          recent: restoreLogsSelectedStreams(org, "logs"),
+          hasField: async (name) => {
+            const stream = await getStream(name, "logs", true);
+            return (stream?.schema ?? []).some((f: { name: string }) => f.name === field);
+          },
+        });
+      } catch {
+        return null;
+      }
+    };
+
+    const viewRelatedLogs = async () => {
+      const serviceName = buildServiceName();
+      if (!serviceName || logsLocked.value || correlationLocked.value) return;
+      if (relatedLogsLoading.value) return;
+      relatedLogsLoading.value = true;
+      logsEmptyService.value = "";
+      try {
+        let logStreams: StreamInfo[] = [];
+        try {
+          const { data } = await correlateSelectedService();
+          logStreams = data?.related_streams?.logs || [];
+        } catch {
+          // A failed correlation falls back to the best-guess stream, same as an empty match.
+        }
+        if (logStreams.length > 0) {
+          const sourceStream = props.streamFilter || "default";
+          const firstLogStream =
+            logStreams.find((s) => s.stream_name === sourceStream) ?? logStreams[0];
+          const filters: Record<string, string> = firstLogStream.filters || {};
+          const filterParts = Object.entries(filters)
+            .map(([field, value]) => buildStreamFilterCondition(firstLogStream, field, value))
+            .join(" AND ");
+          pushLogsRoute(filterParts || serviceFilterQuery(serviceName), firstLogStream.stream_name);
+          return;
+        }
+        const guess = await findBestGuessLogsStream();
+        if (!guess) {
+          logsEmptyService.value = serviceName;
+          return;
+        }
+        pushLogsRoute(serviceFilterQuery(serviceName), guess);
+        toast({
+          variant: "info",
+          message: t("traces.serviceGraphNodeSidePanel.logsMatchedByName", {
+            service: serviceName,
+          }),
+        });
+      } finally {
+        relatedLogsLoading.value = false;
+      }
+    };
+
+    const openLogsWithServiceFilter = () => {
+      if (!logsEmptyService.value) return;
+      pushLogsRoute(serviceFilterQuery(logsEmptyService.value));
     };
 
     const handleShowTelemetry = async () => {
@@ -3303,6 +3374,9 @@ export default defineComponent({
     }
 
     return {
+      relatedLogsLoading,
+      logsEmptyService,
+      openLogsWithServiceFilter,
       serviceDoor,
       mdUp,
       dependencies,

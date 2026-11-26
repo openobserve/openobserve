@@ -17556,7 +17556,6 @@
     "backToLogs": "ログに戻る",
     "openInTraces": "トレースで開く",
     "loadingStream": "ストリームをロード中...",
-    "noLogsAvailableForService": "このサービスで利用できるログはありません",
     "noCorrelatedLogsFound": "このスパンに関連するログは見つかりませんでした",
     "spanHasNoLogsShowingTrace": "このスパンにはログがありません。トレース全体のログを表示しています。",
     "noLogStreamForTrace": "このトレースのログを含むログストリームはありません。",
@@ -17980,7 +17979,11 @@
       "metricsLoadFailed": "このサービスの相関メトリクスを読み込めませんでした。{reason}",
       "noResourceRecorded": "この時間範囲におけるこのサービスのスパンには {resource} が記録されていません。",
       "resourceLoadFailed": "このサービスの {resource} を読み込めませんでした。{reason}",
-      "noVersionTraffic": "このストリームにおけるこのサービスのスパンにはバージョンが記録されていないため、バージョン別に分割するトラフィックがありません。"
+      "noVersionTraffic": "このストリームにおけるこのサービスのスパンにはバージョンが記録されていないため、バージョン別に分割するトラフィックがありません。",
+      "logsMatchedByName": "{service} はサービス名のみで一致しました。相関では場所が見つかりませんでした。",
+      "logsEmptyTitle": "{service} のログが見つかりません",
+      "logsEmptyReason": "{field} フィールドを持つログストリームがありません。",
+      "logsEmptyAction": "ログを開く"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTPステータスコード",
@@ -18554,7 +18557,16 @@
     "panelTimeSeriesFor": "{stream} の時系列",
     "panelTimeSeriesForWithType": "{stream} の時系列 ({type})",
     "logsPanelTitle": "ログ - {stream}",
-    "logsPanelDescription": "サービス {service} に関連するログ"
+    "logsPanelDescription": "サービス {service} に関連するログ",
+    "noDataInScope": "この範囲にデータがありません",
+    "noDataInScopeReason": "この時間範囲で、これらのフィルターに一致する行はありません。",
+    "droppedCount": "+{count} 件除外 | +{count} 件除外",
+    "droppedTitle": "フィルターとして使用されていません",
+    "droppedNoRows": "{value} の行がありません",
+    "droppedNoField": "これらのストリームにないフィールド",
+    "allNoDataTitle": "この範囲にデータのあるメトリクスがありません",
+    "allNoDataScope": "{scope}、{window}",
+    "allNoDataAction": "データのないメトリクスを表示"
   },
   "search_scheduler_job": {
     "title": "ジョブスケジューラを検索する",
@@ -20620,6 +20632,13 @@
       "sampleExpected": "期待出力",
       "fromTrace": "トレーススパン {id} から",
       "openInPlaygroundFailed": "このスパンをプレイグラウンドで開けませんでした"
+    },
+    "largeStream": {
+      "notice": "{stream}: この範囲で約 {size}、エージェントフィルターなし。数分かかる場合があります。",
+      "pickAgent": "エージェントを選択",
+      "addFilter": "フィルターを追加",
+      "runAnyway": "このまま実行",
+      "notRun": "未実行"
     }
   },
   "onlineEvals": {
