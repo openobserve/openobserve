@@ -28575,7 +28575,7 @@
     "mineJoinTeam": "チームに参加",
     "mineTestTeam": "{team} にテスト呼び出しを送信",
     "mineCoverSaved": "カバーを保存しました",
-    "mineSlackLinkHow": "Slack で {command} link と入力",
+    "mineSlackLinkHow": "Slack で {command} link と入力してください",
     "mineSlackSetUpHint": "設定 › Slack を開きます",
     "myDeliveriesWhen": "日時",
     "phoneAddHint": "テキストと通話用の番号を追加",
@@ -34587,7 +34587,15 @@
     "offline": "オフラインです。最近のアクセスは表示できます。",
     "sourceUnavailable": "この種類は現在利用できません",
     "emptyHelp": "名前または ID でリソースを検索",
-    "globalShortcut": "グローバル検索を開く"
+    "globalShortcut": "グローバル検索を開く",
+    "trigger": "検索またはジャンプ…",
+    "allTypes": "すべて",
+    "capped": "最初の一致を表示しています。 | 最初の {count} 件の一致を表示しています。",
+    "hintNavigate": "移動",
+    "hintOpen": "開く",
+    "hintNewTab": "新しいタブで開く",
+    "hintTypes": "タイプでフィルター",
+    "hintClose": "閉じる"
   },
   "timeRangeInput": {
     "label": "時間範囲を入力",
