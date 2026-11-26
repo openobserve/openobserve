@@ -97,7 +97,7 @@ describe("SecuritySuppressions", () => {
   it("shows when each suppression ends, relative and absolute", async () => {
     const w = await mountList();
     const expiry = byTest(w, "security-suppression-expiry-s1").text();
-    expect(expiry).toMatch(/in 2 hours/);
+    expect(expiry).toMatch(/in 2h/);
     expect(expiry).toContain(securityTime((nowUs() + 2 * HOUR_US) / 1000).slice(0, 5));
   });
 
