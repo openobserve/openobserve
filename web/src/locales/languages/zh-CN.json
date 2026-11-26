@@ -34587,7 +34587,15 @@
     "offline": "当前离线，仍可查看最近访问。",
     "sourceUnavailable": "此资源类型当前不可用",
     "emptyHelp": "输入名称或 ID 搜索资源",
-    "globalShortcut": "打开全局搜索"
+    "globalShortcut": "打开全局搜索",
+    "trigger": "搜索或跳转到…",
+    "allTypes": "全部",
+    "capped": "显示第一个匹配项。 | 显示前 {count} 个匹配项。",
+    "hintNavigate": "导航",
+    "hintOpen": "打开",
+    "hintNewTab": "在新标签页中打开",
+    "hintTypes": "按类型过滤",
+    "hintClose": "关闭"
   },
   "timeRangeInput": {
     "label": "输入时间范围",
