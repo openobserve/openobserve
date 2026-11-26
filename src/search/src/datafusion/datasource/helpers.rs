@@ -15,7 +15,6 @@
 
 use std::{ops::Range, sync::Arc};
 
-use arrow::buffer::BooleanBuffer;
 use arrow_schema::{DataType, SchemaRef};
 use config::{FileFormat, TIMESTAMP_COL_NAME, meta::stream::FileSelection};
 use datafusion::{
@@ -73,7 +72,8 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
     match file_format {
         FileFormat::Parquet => match selection {
             FileSelection::Rows(row_ids) => {
-                attach_parquet_row_mask(file, &row_ids, row_group_size);
+                let selection = RowSelection::from_boolean_buffer((*row_ids).clone());
+                file.extensions.insert(ParquetRowSelection::new(selection));
             }
             FileSelection::RowRanges(ranges) => {
                 if let Some(access_plan) = generate_parquet_access_plan_from_ranges(
@@ -115,38 +115,6 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
             FileSelection::RowGroups(_) => {}
         },
     }
-}
-
-/// Hand the tantivy bitmap to DataFusion as a file-level mask: it is split by
-/// the real row groups zero-copy, instead of one selector per scattered run.
-fn attach_parquet_row_mask(
-    file: &mut PartitionedFile,
-    row_ids: &BooleanBuffer,
-    row_group_size: Option<u32>,
-) {
-    let Some(num_rows) = exact_num_rows(file) else {
-        return;
-    };
-    if row_ids.len() == num_rows {
-        file.extensions
-            .insert(ParquetRowSelection::new(RowSelection::from_boolean_buffer(
-                row_ids.clone(),
-            )));
-    } else if let Some(access_plan) = generate_parquet_access_plan(file, row_ids, row_group_size) {
-        file.extensions.insert(access_plan);
-    }
-}
-
-fn generate_parquet_access_plan(
-    file: &PartitionedFile,
-    row_ids: &BooleanBuffer,
-    row_group_size: Option<u32>,
-) -> Option<ParquetAccessPlan> {
-    generate_parquet_access_plan_from_ranges(
-        file,
-        row_ids.set_slices().map(|(start, end)| start..end),
-        row_group_size,
-    )
 }
 
 /// Build a Parquet access plan directly from sorted, non-overlapping row
@@ -394,7 +362,10 @@ pub(crate) fn file_scan_config(plan: &Arc<dyn ExecutionPlan>) -> Option<&FileSca
 
 #[cfg(test)]
 mod tests {
-    use arrow::datatypes::{DataType, Field, Schema};
+    use arrow::{
+        buffer::BooleanBuffer,
+        datatypes::{DataType, Field, Schema},
+    };
     use config::meta::stream::FileKey;
     use datafusion::{
         common::Statistics, parquet::arrow::arrow_reader::RowSelector,
@@ -411,51 +382,6 @@ mod tests {
         stats.num_rows = Precision::Exact(num_rows);
         file.statistics = Some(Arc::new(stats));
         file
-    }
-
-    #[test]
-    fn test_generate_parquet_access_plan_from_sorted_row_ids() {
-        // 10 rows, row groups of 4: rg0=[0..4), rg1=[4..8), rg2=[8..10)
-        let file = make_partitioned_file(10);
-        let row_ids = BooleanBuffer::from_iter((0..10u32).map(|i| [0u32, 1, 5, 9].contains(&i)));
-
-        let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
-
-        let mut expected = ParquetAccessPlan::new_none(3);
-        expected.scan(0);
-        expected.scan_selection(
-            0,
-            RowSelection::from(vec![RowSelector::select(2), RowSelector::skip(2)]),
-        );
-        expected.scan(1);
-        expected.scan_selection(
-            1,
-            RowSelection::from(vec![
-                RowSelector::skip(1),
-                RowSelector::select(1),
-                RowSelector::skip(2),
-            ]),
-        );
-        expected.scan(2);
-        expected.scan_selection(
-            2,
-            RowSelection::from(vec![RowSelector::skip(1), RowSelector::select(1)]),
-        );
-        assert_eq!(plan, expected);
-    }
-
-    #[test]
-    fn test_generate_parquet_access_plan_skips_untouched_row_groups() {
-        // only the middle row group has matches
-        let file = make_partitioned_file(12);
-        let row_ids = BooleanBuffer::from_iter((0..12u32).map(|i| [4u32, 5, 6, 7].contains(&i)));
-
-        let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
-
-        let mut expected = ParquetAccessPlan::new_none(3);
-        expected.scan(1);
-        expected.scan_selection(1, RowSelection::from(vec![RowSelector::select(4)]));
-        assert_eq!(plan, expected);
     }
 
     #[test]
@@ -489,19 +415,17 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "invalid sorted row range")]
-    fn test_generate_parquet_access_plan_rejects_out_of_bounds_row_ids() {
+    fn test_generate_parquet_access_plan_rejects_out_of_bounds_ranges() {
         let file = make_partitioned_file(4);
-        let row_ids = BooleanBuffer::from_iter((0..5).map(|i| i == 4));
 
-        generate_parquet_access_plan(&file, &row_ids, Some(4));
+        generate_parquet_access_plan_from_ranges(&file, std::iter::once(4..5), Some(4));
     }
 
     #[test]
     fn test_generate_parquet_access_plan_keeps_disjoint_ranges_in_same_row_group() {
         let file = make_partitioned_file(8);
-        let row_ids = BooleanBuffer::from_iter((0..8u32).map(|i| [0u32, 2].contains(&i)));
 
-        let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
+        let plan = generate_parquet_access_plan_from_ranges(&file, [0..1, 2..3], Some(4)).unwrap();
 
         let mut expected = ParquetAccessPlan::new_none(2);
         expected.scan(0);
@@ -519,12 +443,10 @@ mod tests {
 
     #[test]
     fn test_generate_parquet_access_plan_run_crossing_row_group_boundary() {
-        // a consecutive run 2..=5 spans rg0 [0..4) and rg1 [4..8); it must be
-        // split at the boundary so both row groups get their own selection
         let file = make_partitioned_file(10);
-        let row_ids = BooleanBuffer::from_iter((0..10u32).map(|i| [2u32, 3, 4, 5].contains(&i)));
 
-        let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
+        let plan = generate_parquet_access_plan_from_ranges(&file, std::iter::once(2..6), Some(4))
+            .unwrap();
 
         let mut expected = ParquetAccessPlan::new_none(3);
         expected.scan(0);
@@ -540,49 +462,41 @@ mod tests {
         assert_eq!(plan, expected);
     }
 
-    #[test]
-    fn test_attach_parquet_row_mask_passes_bitmap_through() {
-        let mut file = make_partitioned_file(10);
-        let row_ids = BooleanBuffer::from_iter((0..10u32).map(|i| [0u32, 1, 5, 9].contains(&i)));
+    #[tokio::test]
+    async fn test_generate_access_plan_attaches_parquet_row_mask() {
+        let trace_id = "test_parquet_row_mask";
+        let file_key = "files/org/logs/app/2026/01/01/00/indexed-v1-1.parquet";
+        let row_ids = Arc::new(BooleanBuffer::from_iter(
+            (0..10u32).map(|i| [0u32, 1, 5, 9].contains(&i)),
+        ));
+        let mut file = FileKey::from_file_name(file_key);
+        file.with_selection(FileSelection::Rows(row_ids.clone()), Some(4));
+        storage::file_list::set(trace_id, "schema", "parquet", vec![file]).await;
+        let location = storage::file_list::get(&format!("{trace_id}/schema=schema/format=parquet"))
+            .unwrap()
+            .remove(0)
+            .location;
+        let mut partitioned_file = PartitionedFile::new(location.to_string(), 100);
 
-        attach_parquet_row_mask(&mut file, &row_ids, Some(4));
+        generate_access_plan(&mut partitioned_file);
 
-        assert!(file.extensions.get::<ParquetAccessPlan>().is_none());
-        let selection = file
+        assert!(
+            partitioned_file
+                .extensions
+                .get::<ParquetAccessPlan>()
+                .is_none()
+        );
+        let selection = partitioned_file
             .extensions
             .get::<ParquetRowSelection>()
-            .expect("row mask should be attached");
+            .expect("Parquet row mask should be attached");
         let mask = selection
             .selection()
             .as_mask()
             .expect("selection is mask-backed");
-        assert_eq!(mask, &row_ids);
+        assert_eq!(mask, row_ids.as_ref());
         assert_eq!(mask.inner().as_ptr(), row_ids.inner().as_ptr());
-    }
-
-    #[test]
-    fn test_attach_parquet_row_mask_falls_back_on_length_mismatch() {
-        let mut file = make_partitioned_file(10);
-        let row_ids = BooleanBuffer::from_iter((0..8u32).map(|i| [4u32, 5, 6, 7].contains(&i)));
-
-        attach_parquet_row_mask(&mut file, &row_ids, Some(4));
-
-        assert!(file.extensions.get::<ParquetRowSelection>().is_none());
-        let mut expected = ParquetAccessPlan::new_none(3);
-        expected.scan(1);
-        expected.scan_selection(1, RowSelection::from(vec![RowSelector::select(4)]));
-        assert_eq!(file.extensions.get::<ParquetAccessPlan>(), Some(&expected));
-    }
-
-    #[test]
-    fn test_attach_parquet_row_mask_needs_exact_row_count() {
-        let mut file = PartitionedFile::new("test.parquet".to_string(), 100);
-        let row_ids = BooleanBuffer::from_iter((0..4).map(|i| i == 1));
-
-        attach_parquet_row_mask(&mut file, &row_ids, Some(4));
-
-        assert!(file.extensions.get::<ParquetRowSelection>().is_none());
-        assert!(file.extensions.get::<ParquetAccessPlan>().is_none());
+        storage::file_list::clear(trace_id);
     }
 
     #[tokio::test]
