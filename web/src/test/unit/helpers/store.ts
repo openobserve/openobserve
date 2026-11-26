@@ -49,7 +49,6 @@ const organizationObj = {
 const store = createStore({
   state: {
     API_ENDPOINT: "http://localhost:5080",
-    isAiChatEnabled: false,
 
     theme: "dark",
     timezone: "UTC",
@@ -375,9 +374,6 @@ const store = createStore({
     setModulesToDisplay(state, payload) {
       state.modulesToDisplay = payload;
     },
-    setIsAiChatEnabled(state, payload) {
-      state.isAiChatEnabled = payload;
-    },
     setCurrentChatTimestamp(state, payload) {
       state.currentChatTimestamp = payload;
     },
@@ -626,9 +622,6 @@ const store = createStore({
     },
     setModulesToDisplay(context, payload) {
       context.commit("setModulesToDisplay", payload);
-    },
-    setIsAiChatEnabled(context, payload) {
-      context.commit("setIsAiChatEnabled", payload);
     },
     setCurrentChatTimestamp(context, payload) {
       context.commit("setCurrentChatTimestamp", payload);

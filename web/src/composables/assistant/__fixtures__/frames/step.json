@@ -1,0 +1,12 @@
+{
+  "_source": "B-02 lifecycle frame (00 §18)",
+  "_item": "B-02",
+  "frame": {
+    "type": "step",
+    "kind": "query",
+    "label": "query_logs",
+    "params": {
+      "stream": "default"
+    }
+  }
+}

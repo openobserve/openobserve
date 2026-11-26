@@ -32,6 +32,10 @@ import { stopSessionServices } from "@/utils/sessionServices";
 
 const realLocation = window.location;
 
+// No answer is running, so the assistant lets the sign-out through at once.
+vi.mock("@/composables/assistant", () => ({
+  assistantLifecycle: { onSignOut: async () => "proceed" },
+}));
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
 }));

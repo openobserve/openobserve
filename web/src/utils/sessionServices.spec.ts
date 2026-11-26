@@ -32,14 +32,10 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ dismissAll: vi.fn() }));
 describe("stopSessionServices", () => {
   afterEach(() => vi.clearAllMocks());
 
-  it("closes the search socket, stops AI streams, clears toasts and resets the RUM user", () => {
-    const aborted = vi.fn();
-    window.addEventListener("o2:abort-ai-streams", aborted);
+  it("closes the search socket, clears toasts and resets the RUM user", () => {
     stopSessionServices({ state: { zoConfig: { rum: { enabled: true } } } });
-    window.removeEventListener("o2:abort-ai-streams", aborted);
 
     expect(closeSearchSocket).toHaveBeenCalledTimes(1);
-    expect(aborted).toHaveBeenCalledTimes(1);
     expect(dismissAll).toHaveBeenCalledTimes(1);
     expect(openobserveRum.stopSessionReplayRecording).toHaveBeenCalledTimes(1);
     expect(openobserveRum.clearUser).toHaveBeenCalledTimes(1);
@@ -83,6 +79,19 @@ describe("expireSession", () => {
     expect(localStorage.getItem("o2_draft_signed_out")).toBe('["gone@x.io"]');
     expect(prompt).not.toHaveBeenCalled();
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the assistant drafts when it clears sessionStorage", () => {
+    vi.stubGlobal("location", { ...window.location, reload: vi.fn() });
+    sessionStorage.setItem("o2.assistant.draft:k1:s1", "draft");
+    sessionStorage.setItem("searchState", "x");
+    const store = { state: { zoConfig: { rum: { enabled: false } } }, dispatch: vi.fn() };
+
+    expireSession(store, { clearLocalStorage: true });
+
+    expect(sessionStorage.getItem("o2.assistant.draft:k1:s1")).toBe("draft");
+    expect(sessionStorage.getItem("searchState")).toBeNull();
+    sessionStorage.clear();
   });
 
   it("goes to the login page instead of reloading when asked, keeping the drafts", () => {

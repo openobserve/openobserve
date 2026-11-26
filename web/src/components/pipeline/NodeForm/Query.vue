@@ -25,23 +25,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @keydown.stop
   >
     <template #header-right>
-      <OButton
-        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-        variant="ghost"
-        size="icon-toolbar"
-        @click="scheduledPipelineRef?.toggleAIChat()"
-        data-test="menu-link-ai-item"
-        :aria-label="t('menu.aiAssistant')"
-        class="bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 hover:shadow-md"
-        :class="store.state.isAiChatEnabled ? 'ai-btn-active bg-gradient-ai-subtle!' : ''"
-      >
-        <img
-          alt=""
-          :src="scheduledPipelineRef?.getBtnLogo"
-          class="header-icon ai-icon opacity-70 transition-[transform] duration-[0.6s] ease-[ease]"
-          :class="store.state.isAiChatEnabled ? 'opacity-100!' : ''"
-        />
-      </OButton>
+      <AiEntryButton
+        appearance="toggle"
+        verb="ask"
+        entry-kind="editor_toggle"
+        object-kind="pipeline_node"
+        thread="current"
+        dock-host="scheduled_query"
+        :label="t('assistant.entry.assistant')"
+        :tooltip="t('assistant.entry.tooltip.dockedAsk')"
+        :pressed="queryDock.pressed.value"
+        :build="queryDock.build"
+        data-test="ai-entry-scheduled-query-ask"
+        @closed="queryDock.close"
+      />
       <div class="app-tabs-container flex items-center">
         <AppTabs
           data-test="scheduled-pipeline-tabs"
@@ -136,7 +133,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import { computed, onMounted, ref, watch, type Ref, onActivated, provide } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  onMounted,
+  ref,
+  watch,
+  type Ref,
+  onActivated,
+  provide,
+} from "vue";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
@@ -147,7 +153,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import DateTime from "@/components/DateTime.vue";
-import config from "@/aws-exports";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -160,6 +165,7 @@ import { makeQuerySchema, type QueryForm } from "./Query.schema";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useAssistantDockToggle } from "@/composables/assistant/pure";
 
 interface RouteCondition {
   column: string;
@@ -224,6 +230,10 @@ const props = defineProps({
 });
 
 const { t } = useI18nTyped();
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+const queryDock = useAssistantDockToggle("scheduled_query");
 
 const store = useStore();
 

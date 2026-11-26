@@ -25,6 +25,10 @@ import UpdatePasswordDialog from "./UpdatePasswordDialog.vue";
 import type { UpdatePasswordForm } from "./UpdatePasswordDialog.schema";
 
 // Reka portals dialog content into <body>; rendered inline so the assertions can reach it.
+// No answer is running, so the assistant lets the sign-out through without building its runtime.
+vi.mock("@/composables/assistant", () => ({
+  assistantLifecycle: { onSignOut: async () => "proceed" },
+}));
 vi.mock("reka-ui", async (importOriginal) => {
   const actual = await importOriginal<typeof import("reka-ui")>();
   return { ...actual, DialogPortal: actual.DialogContent };

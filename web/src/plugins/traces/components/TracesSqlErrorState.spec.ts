@@ -32,7 +32,6 @@ const mountState = (props: Record<string, unknown>) =>
       errorCode: 400,
       errorMsg: FIELD_ERROR,
       errorDetail: "",
-      aiEnabled: false,
       streamName: "default",
       query: QUERY,
       suggestions: [],
@@ -137,10 +136,20 @@ describe("TracesSqlErrorState", () => {
     expect(wrapper.find('[data-test="query-error-fix-query-card"]').exists()).toBe(false);
   });
 
-  it("offers Ask AI only when AI is enabled", async () => {
-    expect(mountState({}).find('[data-test="query-error-ask-ai-btn"]').exists()).toBe(false);
-    const wrapper = mountState({ aiEnabled: true });
-    await wrapper.find('[data-test="query-error-ask-ai-btn"]').trigger("click");
-    expect(wrapper.emitted("ask-ai")).toHaveLength(1);
+  it("shows the assistant door only when the page passes one", () => {
+    expect(mountState({}).find('[data-test="sql-ai-door"]').exists()).toBe(false);
+    const wrapper = mount(TracesSqlErrorState, {
+      props: {
+        errorCode: 400,
+        errorMsg: FIELD_ERROR,
+        query: QUERY,
+        suggestions: [],
+        fields: ["service_name"],
+        rangeUs: ONE_HOUR_US,
+      },
+      slots: { "ai-door": '<button data-test="sql-ai-door">door</button>' },
+      global: { plugins: [i18n, store] },
+    });
+    expect(wrapper.find('[data-test="sql-ai-door"]').exists()).toBe(true);
   });
 });
