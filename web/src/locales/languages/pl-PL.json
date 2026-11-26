@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "Górny wąs",
       "boxplotMedian": "Mediana",
       "boxplotSamples": "Próbki",
+      "boxplotValueNotNumeric": "Wartość wykresu pudełkowego musi być polem liczbowym",
       "boxplotOutlier": "Wartość odstająca",
       "fieldNotAllowedForDistribution": "Pole {label} jest niedozwolone na wykresie rozkładu",
       "distributionCount": "Liczba",

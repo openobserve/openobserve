@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "Bovenste snorhaar",
       "boxplotMedian": "Mediaan",
       "boxplotSamples": "Steekproeven",
+      "boxplotValueNotNumeric": "De waarde van de boxplot moet een numeriek veld zijn",
       "boxplotOutlier": "Uitschieter",
       "fieldNotAllowedForDistribution": "Het veld {label} is niet toegestaan voor de verdelingsgrafiek",
       "distributionCount": "Aantal",
