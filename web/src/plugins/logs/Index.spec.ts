@@ -1847,7 +1847,7 @@ describe("Logs Index", async () => {
       const button = wrapper.find('[data-test="o2-empty-state-action-turn-off-sql-mode"]');
       expect(button.exists()).toBe(true);
       expect(wrapper.find('[data-test="logs-drill-down-sql-mode-text"]').text()).toContain(
-        "Switch to the query builder",
+        "the SQL query is cleared",
       );
       await button.trigger("click");
       await flushPromises();

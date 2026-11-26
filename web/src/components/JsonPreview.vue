@@ -48,7 +48,7 @@
         <span class="log-key">{{ key }}</span
         ><span class="log-separator">: </span
         ><span
-          ><span v-if="value[key] === null" class="log-null">null</span
+          ><span v-if="value[key] === null" class="log-null">{{ raw("null") }}</span
           ><ChunkedContent
             v-else-if="getContentSize(value[key]) > 50000"
             :data="value[key]"
@@ -70,7 +70,7 @@
 <script lang="ts">
 import { computed, reactive, useSlots } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard as copyTextToClipboard } from "@/utils/clipboard";
 import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -139,6 +139,7 @@ export default {
 
     return {
       t,
+      raw,
       store,
       hasFieldDropdownSlot,
       copyToClipboard,

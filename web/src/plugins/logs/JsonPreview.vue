@@ -206,7 +206,7 @@
           <span class="log-key">{{ key }}</span
           ><span class="log-separator">: </span
           ><span
-            ><span v-if="value[key] === null" class="log-null">null</span
+            ><span v-if="value[key] === null" class="log-null">{{ raw("null") }}</span
             ><ChunkedContent
               v-else-if="getContentSize(value[key]) > 50000"
               :data="value[key]"
@@ -963,6 +963,7 @@ export default {
     return {
       scopeHighlightQuery,
       t,
+      raw,
       copyLogToClipboard,
       getImageURL,
       addSearchTerm,
