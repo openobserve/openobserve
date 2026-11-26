@@ -12,13 +12,13 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createMemoryHistory } from "vue-router";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
-import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
+import { resetLogsAutoRunForTests, useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 
 const router = createRouter({
   history: createMemoryHistory(),
@@ -29,7 +29,6 @@ describe("SearchBar - Reset in SQL mode", () => {
   let wrapper: VueWrapper<any> | undefined;
 
   const resetWith = async (sql: string) => {
-    resetLogsAutoRunForTests();
     wrapper = mount(SearchBar, {
       global: { provide: { store }, plugins: [i18n, router], stubs: { QueryEditor: true } },
     });
@@ -43,6 +42,8 @@ describe("SearchBar - Reset in SQL mode", () => {
     await flushPromises();
     return searchObj.data.query as string;
   };
+
+  beforeEach(() => resetLogsAutoRunForTests());
 
   afterEach(() => {
     wrapper?.unmount();
@@ -61,5 +62,15 @@ describe("SearchBar - Reset in SQL mode", () => {
     );
     expect(query).not.toMatch(/where/i);
     expect(query).not.toMatch(/limit/i);
+  });
+
+  it("still runs the search straight away when a query has nothing to clear and stream selection does not auto-run", async () => {
+    const saved = store.state.zoConfig.query_on_stream_selection;
+    store.state.zoConfig.query_on_stream_selection = false;
+    const requestRun = vi.spyOn(useLogsAutoRun().engine, "requestRun");
+    const sql = 'SELECT count(*) AS cnt FROM "app_logs"';
+    expect(await resetWith(sql)).toBe(sql);
+    expect(requestRun.mock.calls.some(([reason]) => reason === "run")).toBe(true);
+    store.state.zoConfig.query_on_stream_selection = saved;
   });
 });

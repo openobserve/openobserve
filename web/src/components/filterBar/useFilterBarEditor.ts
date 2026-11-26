@@ -551,9 +551,9 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   function commitDraft() {
     const current = draft.value;
     if (!current?.operator) return;
-    commitSeq++;
     const filled = current.values;
     if (arityOf(current.operator) !== "none" && !filled.length) return;
+    commitSeq++;
     let next: FilterGroup;
     if (editingId.value) {
       const previous = findNode(tree.value, editingId.value);

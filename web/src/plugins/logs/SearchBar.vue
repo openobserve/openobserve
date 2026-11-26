@@ -4640,27 +4640,24 @@ export default defineComponent({
             Array.isArray(limit?.value) ? limit.value.length > 0 : !!limit;
           const hasClearable = (node: any): boolean =>
             !!node?.where || hasLimit(node?.limit) || (!!node?._next && hasClearable(node._next));
-          if (!hasClearable(parsedSQL)) {
-            queryEditorRef.value?.setValue(searchObj.data.query);
-            autoRun.request("filter");
-            return;
-          }
-          if (Object.hasOwn(parsedSQL, "where") && parsedSQL.where != "") {
-            parsedSQL.where = null;
-          }
+          if (hasClearable(parsedSQL)) {
+            if (Object.hasOwn(parsedSQL, "where") && parsedSQL.where != "") {
+              parsedSQL.where = null;
+            }
 
-          if (Object.hasOwn(parsedSQL, "limit") && parsedSQL.limit != "") {
-            parsedSQL.limit = null;
-          }
+            if (Object.hasOwn(parsedSQL, "limit") && parsedSQL.limit != "") {
+              parsedSQL.limit = null;
+            }
 
-          if (Object.hasOwn(parsedSQL, "_next") && parsedSQL._next != "") {
-            parsedSQL._next.where = null;
-            parsedSQL._next.limit = null;
-          }
+            if (Object.hasOwn(parsedSQL, "_next") && parsedSQL._next != "") {
+              parsedSQL._next.where = null;
+              parsedSQL._next.limit = null;
+            }
 
-          searchObj.data.query = fnUnparsedSQL(parsedSQL);
-          searchObj.data.query = searchObj.data.query.replaceAll("`", '"');
-          searchObj.data.editorValue = searchObj.data.query;
+            searchObj.data.query = fnUnparsedSQL(parsedSQL);
+            searchObj.data.query = searchObj.data.query.replaceAll("`", '"');
+            searchObj.data.editorValue = searchObj.data.query;
+          }
         } else {
           // Handle both single and multiple stream scenarios
           const queries = searchObj.data.stream.selectedStream
