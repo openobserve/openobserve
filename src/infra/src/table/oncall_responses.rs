@@ -4279,7 +4279,7 @@ mod tests {
             let (a, b) = (a.await.unwrap(), b.await.unwrap());
             race.assert_all_met();
             assert_eq!(
-                [a, b].iter().flatten().count(),
+                [&a, &b].into_iter().flatten().count(),
                 1,
                 "exactly one claim: {a:?} {b:?}"
             );
@@ -4295,7 +4295,11 @@ mod tests {
                 crate::race::Order::AThenB => (&run.a, &run.b),
                 crate::race::Order::BThenA => (&run.b, &run.a),
             };
-            assert_eq!(first.0.map(|c| c.arm), Some(ClaimArm::Inserted), "{run:?}");
+            assert_eq!(
+                first.0.as_ref().map(|c| c.arm),
+                Some(ClaimArm::Inserted),
+                "{run:?}"
+            );
             assert!(first.1.is_none(), "{run:?}");
         }
     }
