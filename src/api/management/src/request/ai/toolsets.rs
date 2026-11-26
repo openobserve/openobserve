@@ -462,11 +462,13 @@ pub async fn update(
         Ok(data) => data,
         Err(changed) => return destination_changed(&changed),
     };
-    // `write_headers` keeps its stored values where the body sends `***` or leaves it out.
+    // `write_headers` keeps its stored values where the body sends `***` or leaves it out, never
+    // for a changed destination.
     if kind == Some(ToolsetKind::Mcp)
         && let Some(data) = data.as_mut()
+        && let Err(changed) = keep_stored_write_headers(existing.data.as_deref(), data)
     {
-        keep_stored_write_headers(existing.data.as_deref(), data);
+        return destination_changed(&changed);
     }
     if data.is_some()
         && let Some(kind) = kind

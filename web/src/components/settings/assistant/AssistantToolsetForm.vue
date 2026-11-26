@@ -319,7 +319,9 @@ const skillError = computed(
 );
 const needsRetype = computed(() => isEdit && !props.mergeSecrets && headers.value.length > 0);
 const reenter = computed<ReenterReason | "refused" | null>(
-  () => reenterReason(values.value, loaded.value, props.mergeSecrets) ?? forced.value,
+  () =>
+    reenterReason(values.value, loaded.value, props.mergeSecrets, writeHeadersOn.value) ??
+    forced.value,
 );
 
 watch(
@@ -376,10 +378,12 @@ async function requireKeptSecrets(paths: string[]) {
 async function save(values: ToolsetFormValues) {
   formError.value = "";
   if (org !== page.org.value) return;
-  const reason = reenterReason(values, loaded.value, props.mergeSecrets);
+  const reason = reenterReason(values, loaded.value, props.mergeSecrets, writeHeadersOn.value);
   if (reason) {
     forced.value = reason;
-    await requireKeptSecrets(keptSecretPaths(values));
+    // Only a changed destination refuses the kept write headers too.
+    const withWrite = reason === "destination" && writeHeadersOn.value;
+    await requireKeptSecrets(keptSecretPaths(values, withWrite));
     return;
   }
   const data = toolsetDataOf(values, props.mergeSecrets, writeHeadersOn.value);
@@ -410,7 +414,7 @@ async function showSaveError(err: unknown, values: ToolsetFormValues) {
   }
   if (res?.data?.error_code === "destination_changed") {
     forced.value = "refused";
-    await requireKeptSecrets(keptSecretPaths(values));
+    await requireKeptSecrets(keptSecretPaths(values, writeHeadersOn.value));
     return;
   }
   const message = typeof res?.data?.message === "string" ? res.data.message.slice(0, 500) : "";

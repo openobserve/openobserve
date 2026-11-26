@@ -26,6 +26,10 @@ class AutoResolvePage {
     this.goalBox = page.locator('[data-test="autoresolve-goal-box"]');
     this.goalInput = page.locator('[data-test="autoresolve-goal-box-input-field"]');
     this.startButton = page.locator('[data-test="autoresolve-goal-box-start"]');
+    this.connectionChips = page.locator('[data-test="autoresolve-goal-box-connection-chips"]');
+    this.connectionChip = page.locator('[data-test="autoresolve-goal-box-connection-chip"]');
+    this.connectionsTrigger = page.locator('[data-test="autoresolve-goal-box-connections-trigger"]');
+    this.connectionsSearch = page.locator('[data-test="autoresolve-goal-box-connections-search"]');
     this.runPage = page.locator('[data-test="autoresolve-run-page"]');
     this.approvalRequest = page.locator('[data-test="autoresolve-approval-request"]');
     this.options = page.locator('[data-test="autoresolve-approval-option"]');
@@ -111,6 +115,20 @@ class AutoResolvePage {
     await this.menuItem.click({ force: true });
     await expect(this.homePage).toBeVisible();
     await expect(this.goalBox).toBeVisible();
+  }
+
+  // The org may hold other toolsets, so the run is given exactly this one; a lone toolset comes chosen.
+  async chooseConnection(name) {
+    if (!(await this.connectionChips.getByText(name, { exact: true }).count())) {
+      await this.connectionsTrigger.click();
+      await this.connectionsSearch.fill(name);
+      await this.page
+        .locator(`[data-test="autoresolve-goal-box-connections-option"][data-test-label="${name}"]`)
+        .click();
+      await this.page.keyboard.press('Escape');
+    }
+    await expect(this.connectionChips).toContainText(name);
+    await expect(this.connectionChip).toHaveCount(1);
   }
 
   async startRun(goal) {

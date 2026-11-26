@@ -175,23 +175,32 @@ export function toolsetDataOf(
 /** Why a merging server would refuse to keep the stored secrets, or `null` when it keeps them. */
 export type ReenterReason = "destination" | "secret";
 
-/** A kept secret cannot travel with a changed destination or next to a new or replaced secret. */
+const isKept = (row: SecretRow) => !!row.key.trim() && row.state === "unchanged";
+
+/** A kept secret cannot travel with a changed destination or next to a new or replaced secret.
+ * `writeHeaders`: the body carries AutoResolve's write headers, which never follow a changed destination either. */
 export function reenterReason(
   values: ToolsetFormValues,
   loaded: ToolsetFormValues | null,
   mergeSecrets: boolean,
+  writeHeaders = false,
 ): ReenterReason | null {
-  if (!mergeSecrets || !loaded || values.kind !== "mcp") return null;
-  const rows = values.mcp.headers.filter((row) => row.key.trim());
-  if (!rows.some((row) => row.state === "unchanged")) return null;
+  if (!loaded || values.kind !== "mcp") return null;
+  const keptHeader = mergeSecrets && values.mcp.headers.some(isKept);
+  const keptWrite = writeHeaders && values.mcp.writeHeaders.some(isKept);
+  if (!keptHeader && !keptWrite) return null;
   if (values.mcp.url.trim() !== loaded.mcp.url.trim()) return "destination";
+  if (!keptHeader) return null;
+  const rows = values.mcp.headers.filter((row) => row.key.trim());
   return rows.some((row) => row.state !== "unchanged" && !!row.value) ? "secret" : null;
 }
 
 /** Field paths of every kept secret, which must be typed again before the server accepts the save. */
-export function keptSecretPaths(values: ToolsetFormValues): string[] {
+export function keptSecretPaths(values: ToolsetFormValues, writeHeaders = false): string[] {
   if (values.kind !== "mcp") return [];
-  return values.mcp.headers.flatMap((row, i) =>
-    row.state === "unchanged" ? [`mcp.headers[${i}]`] : [],
-  );
+  const kept = (field: "headers" | "writeHeaders") =>
+    values.mcp[field].flatMap((row, i) =>
+      row.state === "unchanged" ? [`mcp.${field}[${i}]`] : [],
+    );
+  return writeHeaders ? [...kept("headers"), ...kept("writeHeaders")] : kept("headers");
 }

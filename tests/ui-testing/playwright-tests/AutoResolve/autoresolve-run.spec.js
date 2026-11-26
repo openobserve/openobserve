@@ -2,23 +2,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const AutoResolvePage = require('../../pages/autoresolvePages/autoresolvePage.js');
-
-const uniq = () => `${Date.now().toString(36).slice(-5)}${Math.random().toString(36).slice(2, 5)}`;
-
-// The org may hold other toolsets, so the run is given exactly this one; a lone toolset comes chosen.
-async function chooseConnection(page, name) {
-  const chips = page.locator('[data-test="autoresolve-goal-box-connection-chips"]');
-  if (!(await chips.getByText(name, { exact: true }).count())) {
-    await page.locator('[data-test="autoresolve-goal-box-connections-trigger"]').click();
-    await page.locator('[data-test="autoresolve-goal-box-connections-search"]').fill(name);
-    await page
-      .locator(`[data-test="autoresolve-goal-box-connections-option"][data-test-label="${name}"]`)
-      .click();
-    await page.keyboard.press('Escape');
-  }
-  await expect(chips).toContainText(name);
-  await expect(page.locator('[data-test="autoresolve-goal-box-connection-chip"]')).toHaveCount(1);
-}
+const { uniqueSuffix: uniq } = require('../utils/unique-suffix.js');
 
 test.describe('AutoResolve person run', { tag: ['@autoresolve', '@enterprise'] }, () => {
   let autoresolve;
@@ -53,7 +37,7 @@ test.describe('AutoResolve person run', { tag: ['@autoresolve', '@enterprise'] }
     );
     await autoresolve.openFromMenu();
 
-    await chooseConnection(page, connectionName);
+    await autoresolve.chooseConnection(connectionName);
     await autoresolve.startRun(goal);
     await expect(autoresolve.options).toHaveCount(2);
     await expect(autoresolve.recommendedTag('A')).toBeVisible();
@@ -85,7 +69,7 @@ test.describe('AutoResolve person run', { tag: ['@autoresolve', '@enterprise'] }
 
     await autoresolve.expectMenuEntry();
     await autoresolve.openFromMenu();
-    await chooseConnection(page, connectionName);
+    await autoresolve.chooseConnection(connectionName);
     await autoresolve.startRun(goal);
     await autoresolve.approve('B');
     await autoresolve.expectOutcome('worked');
@@ -196,7 +180,7 @@ test.describe('AutoResolve person run', { tag: ['@autoresolve', '@enterprise'] }
     await navigateToBase(page);
     await autoresolve.expectMenuEntry();
     await autoresolve.openFromMenu();
-    await chooseConnection(page, connectionName);
+    await autoresolve.chooseConnection(connectionName);
     await autoresolve.startRun(`Checkout errors are above their threshold; bring them down (${id})`);
     await autoresolve.approve('B');
     await autoresolve.expectOutcome('worked');

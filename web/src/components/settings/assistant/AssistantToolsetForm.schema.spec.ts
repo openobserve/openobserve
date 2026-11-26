@@ -185,4 +185,19 @@ describe("toolset form schema and payload", () => {
       "mcp.writeHeaders.1.value=assistant.toolsets.form.maskValue",
     ]);
   });
+
+  it("asks for kept write headers again when the URL changes, and only when they are sent", () => {
+    const record = {
+      ...STORED,
+      data: { ...STORED.data, headers: {}, write_header_names: ["X-Write"] },
+    };
+    const loaded = toolsetFormOf(record, true);
+    const values = structuredClone(loaded);
+    values.mcp.url = "https://other.example/mcp";
+    expect(reenterReason(values, loaded, true, true)).toBe("destination");
+    expect(keptSecretPaths(values, true)).toEqual(["mcp.writeHeaders[0]"]);
+    // Without AutoResolve the body leaves them out, and the server drops them for a new URL.
+    expect(reenterReason(values, loaded, true, false)).toBeNull();
+    expect(keptSecretPaths(values)).toEqual([]);
+  });
 });
