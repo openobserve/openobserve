@@ -102,6 +102,17 @@ describe("DateTime validity gate", () => {
     expect(wrapper!.vm.triggerLabel).toBe("Past 2 Hours");
   });
 
+  it("names the Start time and End time inputs for assistive technology", async () => {
+    create({ autoApply: false, queryRangeRestrictionInHour: 0 });
+    await openMenu(wrapper!);
+    wrapper!.vm.selectTab("absolute");
+    await flushPromises();
+    const inputOf = (testId: string) =>
+      document.body.querySelector<HTMLInputElement>(`[data-test="${testId}"] input`);
+    expect(inputOf("datetime-start-time")?.getAttribute("aria-label")).toBe("Start time");
+    expect(inputOf("datetime-end-time")?.getAttribute("aria-label")).toBe("End time");
+  });
+
   it("disables Apply for a range that ends before it starts", async () => {
     create({ autoApply: false, queryRangeRestrictionInHour: 0 });
     await openMenu(wrapper!);
