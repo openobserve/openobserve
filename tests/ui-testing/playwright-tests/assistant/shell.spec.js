@@ -190,7 +190,7 @@ test.describe("assistant shell", () => {
       await expect(
         tab.page.locator('[data-test="assistant-welcome"][data-variant="roomy"]'),
       ).toBeVisible();
-      await expect(tab.page).toHaveTitle("OpenObserve - Home");
+      await expect(tab.page).toHaveTitle(/ · Home · OpenObserve$/);
       const landmarks = tab.page.locator(
         `aside[aria-label="${BRAND.autobot}"], [role="region"][aria-label="${BRAND.autobot}"]`,
       );
