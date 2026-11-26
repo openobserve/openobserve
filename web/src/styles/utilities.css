@@ -251,8 +251,10 @@
     font-weight: var(--font-normal) !important;
     color: var(--color-text-secondary) !important;
     border: 0 !important;
-    /* eslint-disable-next-line local/no-hardcoded-px -- hairline ring width */
-    box-shadow: inset 0 0 0 1px var(--toolbar-btn-rest-edge) !important;
+    box-shadow:
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline ring width */
+      inset 0 0 0 1px var(--toolbar-btn-rest-edge),
+      var(--toolbar-btn-rest-shadow) !important;
     background-color: var(--toolbar-btn-rest-bg) !important;
   }
 

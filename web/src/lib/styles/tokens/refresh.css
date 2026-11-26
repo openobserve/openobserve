@@ -683,7 +683,7 @@
   height: 0.875rem;
 }
 
-/* Toolbar secondary buttons: a borderless tonal fill, so a dense row reads as one set instead of a run of outlines; hover and open keep the ghost fills. */
+/* Toolbar secondary buttons use the standard outline button: a 1px edge in both themes, white in light, a tonal fill in dark; hover and open keep the ghost fills. */
 :root
   .toolbar-btn-rest:not(:hover):not([aria-expanded="true"]):not([data-state="open"]):not(
     [aria-pressed="true"]
@@ -691,21 +691,45 @@
   background-color: var(--toolbar-btn-rest-bg);
 }
 :root .toolbar-btn-rest:not(:focus-visible):not([aria-pressed="true"]) {
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline ring width */
-  box-shadow: inset 0 0 0 1px var(--toolbar-btn-rest-edge);
+  box-shadow:
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline ring width */
+    inset 0 0 0 1px var(--toolbar-btn-rest-edge),
+    var(--toolbar-btn-rest-shadow);
 }
 :root {
   --toolbar-btn-rest-bg: var(--color-surface-band);
-  --toolbar-btn-rest-edge: transparent;
+  --toolbar-btn-rest-edge: var(--color-border-button);
+  --toolbar-btn-rest-shadow: 0 0 #0000;
+  --toolbar-btn-rest-fg: var(--color-text-body);
 }
-/* Toolbar time pickers (not the full-width form field) and outlined actions in page headers and table toolbars join the same tonal set. */
+/* Thin glyphs in secondary grey read as disabled, so enabled toolbar icons use body text; disabled ones keep their fade and the quieter results bar keeps its grey. */
+:root
+  [data-o2-btn].toolbar-btn-rest:not(:disabled)
+  span.inline-flex.shrink-0.align-middle:not([data-destructive-icon]) {
+  color: var(--toolbar-btn-rest-fg);
+}
+/* A grey fill on a light page reads as disabled, so light-mode buttons are white instead. */
+:root:not(.dark) {
+  --toolbar-btn-rest-bg: var(--color-surface-raised);
+  /* On white, near-black glyphs feel heavy; mid grey still reads as enabled. */
+  --toolbar-btn-rest-fg: var(--color-text-body);
+}
+/* Between the step arrows the borderless picker draws its top, bottom and left edge (its 1px overlap hides the left arrow's), so arrows + picker read as one outlined group. */
+:root .date-time-container > #date-time-button:not(:first-child):not(:focus-visible) {
+  box-shadow:
+    inset 0 0.0625rem 0 var(--toolbar-btn-rest-edge),
+    inset 0 -0.0625rem 0 var(--toolbar-btn-rest-edge),
+    inset 0.0625rem 0 0 var(--toolbar-btn-rest-edge),
+    var(--toolbar-btn-rest-shadow);
+}
+/* Toolbar time pickers (not the full-width form field) and outlined actions in page headers and table toolbars join the same set. */
 :root
   :is(
     #date-time-button:not(.w-full),
     :is([data-o-page-actions], [data-test="o2-table-toolbar"])
       [data-o2-btn]:is([class*="bg-button-outline-bg"], [class*="bg-button-secondary "])
   ) {
-  border-color: transparent !important;
+  border-color: var(--toolbar-btn-rest-edge) !important;
 }
 :root
   :is(
@@ -732,10 +756,6 @@
   /* eslint-disable-next-line local/no-hardcoded-px -- icon stroke width */
   stroke-width: 0.75px;
   stroke-linejoin: round;
-}
-/* The results bar is a step quieter than the query toolbar, so the eye lands on the results: secondary text. */
-:root :is(.results-bar-quiet .toolbar-btn-rest, [data-test="logs-search-field-list-collapse-btn"]) {
-  color: var(--color-text-secondary) !important;
 }
 /* Light mode: resting toolbar and header icons sit one step below the secondary text, so the heavier strokes do not read as black. */
 :root:not(.dark)
@@ -765,6 +785,25 @@
 }
 :root [aria-current="page"]:is(.o-pagination__btn, [class*="bg-pagination-item-active-bg"]) {
   box-shadow: none !important;
+}
+/* Nested corners: an inner element's radius is the outer radius minus the gap between them. */
+/* Page cells sit 3px inside the pager (1px border + 2px padding). */
+:root .o-pagination {
+  padding: 0.125rem;
+}
+:root .o-pagination__btn {
+  height: 1.375rem;
+  border-radius: calc(var(--radius-default) - 0.1875rem);
+}
+/* Toggle-group segments and the sliding selected pill sit 3px inside a padded track (22px cells keep the 28px track); unpadded, transparent tracks keep the full radius. */
+:root [class*="bg-toggle-track-bg"]:not([class*="p-0!"]) {
+  padding: 0.1875rem;
+}
+:root
+  [class*="bg-toggle-track-bg"]:not([class*="p-0!"])
+  :is([data-otoggle-value], .bg-toggle-item-active-bg) {
+  height: 1.375rem;
+  border-radius: calc(var(--radius-default) - 0.1875rem) !important;
 }
 /* Nested corners: an inner element's radius is the outer radius minus the gap between them. */
 /* Page cells sit 3px inside the pager (1px border + 2px padding). */
