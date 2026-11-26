@@ -528,10 +528,20 @@ impl TurnTail {
         let stride = (self.events.len() - first)
             .div_ceil(MAX_REPLAY_STEPS)
             .max(1);
+        let whole = if first < self.events.len() {
+            self.runs_of(&self.events)
+        } else {
+            Vec::new()
+        };
         let mut end = first;
         while end < self.events.len() {
             end = (end + stride).min(self.events.len());
-            let runs = self.runs_of(&self.events[..end]);
+            let mut runs = self.runs_of(&self.events[..end]);
+            // A card the whole read no longer holds was a delete batch still growing; the live
+            // stream never sent it.
+            runs.retain(
+                |run| !matches!(run, FrameRun::Frame(f) if is_card(f) && !whole.contains(run)),
+            );
             let seq = self.events[end - 1].seq;
             // As on the live stream, a frame carries the last seq it comes after.
             for frame in frames_between(&self.runs, &runs) {

@@ -3805,7 +3805,19 @@ mod tests {
                     out.user.push(text.to_string());
                 }
                 let mut answer = String::new();
+                let mut in_text = false;
                 for frame in turn["frames"].as_array().unwrap() {
+                    // The web reducer opens a new paragraph for text that follows a block.
+                    match frame_type(frame) {
+                        "message_delta" if !in_text => {
+                            if !answer.is_empty() && !answer.ends_with('\n') {
+                                answer.push_str("\n\n");
+                            }
+                            in_text = true;
+                        }
+                        "tool_call" | CONFIRMATION_REQUIRED | NAVIGATION_ACTION => in_text = false,
+                        _ => {}
+                    }
                     out.add_frame(frame, &mut answer);
                 }
                 if !answer.is_empty() {
