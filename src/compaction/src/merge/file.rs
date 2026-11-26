@@ -15,7 +15,10 @@
 
 use std::sync::Arc;
 
-use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
+use ::datafusion::{
+    arrow::datatypes::{Metadata, Schema},
+    error::DataFusionError,
+};
 use bytes::Bytes;
 use config::{
     FileFormat, get_config, ider, is_local_disk_storage,
@@ -167,7 +170,7 @@ pub async fn merge_files(
                 return Err(e);
             }
         };
-        let schema = schema.as_ref().clone().with_metadata(Default::default());
+        let schema = schema.as_ref().clone().with_metadata(Metadata::default());
         let schema_key = schema.hash_key();
         if !schemas.contains_key(&schema_key) {
             schemas.insert(schema_key.clone(), schema);

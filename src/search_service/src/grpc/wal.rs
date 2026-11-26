@@ -16,7 +16,7 @@
 use std::{path::Path, sync::Arc};
 
 use arrow::array::{ArrayRef, new_null_array};
-use arrow_schema::{DataType, Field};
+use arrow_schema::{DataType, Field, Metadata};
 use chrono::DateTime;
 use common::infra::wal;
 use config::{
@@ -515,7 +515,7 @@ async fn create_tables_from_batch_groups(
     source: &str,
 ) -> Result<Vec<Arc<dyn TableProvider>>, Error> {
     // construct latest schema map
-    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
+    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Metadata::default()));
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
