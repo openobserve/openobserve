@@ -1479,12 +1479,12 @@ export default defineComponent({
 
       indexData.value.stats.doc_time_max = formatTimestampInTimezone(
         parseInt(streamResponse.stats.doc_time_max),
-        "YYYY-MM-DDTHH:mm:ss:SS",
+        "YYYY-MM-DD HH:mm:ss",
         displayTimezone.value,
       );
       indexData.value.stats.doc_time_min = formatTimestampInTimezone(
         parseInt(streamResponse.stats.doc_time_min),
-        "YYYY-MM-DDTHH:mm:ss:SS",
+        "YYYY-MM-DD HH:mm:ss",
         displayTimezone.value,
       );
 
