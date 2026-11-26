@@ -20,8 +20,8 @@ use datafusion::common::TableReference;
 use hashbrown::{HashMap, HashSet};
 use infra::schema::SchemaCache;
 use sqlparser::ast::{
-    Expr, GroupByExpr, LimitClause, OrderByKind, Query, SelectItem, SetExpr, Value, ValueWithSpan,
-    VisitMut, VisitorMut,
+    Expr, GroupByExpr, LimitClause, OrderByKind, OrderBySort, Query, SelectItem, SetExpr, Value,
+    ValueWithSpan, VisitMut, VisitorMut,
 };
 
 use crate::{sql::visitor::utils::FieldNameVisitor, utils::trim_quotes};
@@ -113,7 +113,7 @@ impl VisitorMut for ColumnVisitor<'_> {
             for order in exprs {
                 self.order_by.push((
                     order_by_key_name(&order.expr, projection),
-                    if order.options.asc.unwrap_or(true) {
+                    if !matches!(order.options.sort, Some(OrderBySort::Desc)) {
                         OrderBy::Asc
                     } else {
                         OrderBy::Desc

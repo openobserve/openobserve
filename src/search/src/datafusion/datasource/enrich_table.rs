@@ -77,7 +77,7 @@ impl TableProvider for EnrichTable {
     async fn scan(
         &self,
         _state: &dyn Session,
-        projection: Option<&Vec<usize>>,
+        projection: Option<&[usize]>,
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
@@ -106,11 +106,11 @@ impl TableProvider for EnrichTable {
             });
             (Some(filter_projection), projection)
         } else {
-            (projection.cloned(), None)
+            (projection.map(<[usize]>::to_vec), None)
         };
 
         let enrich_projection = enrich_projection.as_ref();
-        let filter_projection = filter_projection.as_ref();
+        let filter_projection = filter_projection.as_deref();
 
         // Create the base execution plan
         let schema = project_schema(&self.schema, enrich_projection)?;
