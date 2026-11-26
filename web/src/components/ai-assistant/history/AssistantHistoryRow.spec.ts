@@ -19,7 +19,7 @@ import { nextTick } from "vue";
 
 import type { HistoryRow } from "@/composables/assistant";
 
-import { historyRow, historyStubs } from "../__tests__/historyStubs";
+import { historyRow, historyStubs } from "../__tests__/fakeAssistant";
 import AssistantHistoryRow, { type AssistantHistoryRowProps } from "./AssistantHistoryRow.vue";
 
 function setup(row: Partial<HistoryRow> = {}, props: Partial<AssistantHistoryRowProps> = {}) {

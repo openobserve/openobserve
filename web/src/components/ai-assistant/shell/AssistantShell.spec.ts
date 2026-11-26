@@ -31,9 +31,14 @@ import type { HistoryDeps } from "@/composables/assistant/useAssistantHistory";
 import { usePaidOverageConsent } from "@/composables/usePaidOverageConsent";
 import { raw } from "@/types/i18n";
 
-import { fakeAssistant, fakeRouter, fakeVuex, hintBus } from "../__tests__/fakeAssistant";
-import { historyStubs } from "../__tests__/historyStubs";
-import { fakeRuns } from "../runs/runsTestKit";
+import {
+  fakeAssistant,
+  fakeRouter,
+  fakeVuex,
+  hintBus,
+  historyStubs,
+  fakeRuns,
+} from "../__tests__/fakeAssistant";
 import AssistantShareControl from "../share/AssistantShareControl.vue";
 import AssistantThreadHeader from "../thread/AssistantThreadHeader.vue";
 import AssistantShell, {

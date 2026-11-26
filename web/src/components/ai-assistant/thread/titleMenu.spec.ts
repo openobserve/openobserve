@@ -17,9 +17,7 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 
-import { fakeVuex } from "../__tests__/fakeAssistant";
-import { historyRow, historyStubs } from "../__tests__/historyStubs";
-import { fakeRuns, runRow } from "../runs/runsTestKit";
+import { fakeVuex, historyRow, historyStubs, fakeRuns, runRow } from "../__tests__/fakeAssistant";
 import AssistantTitleMenu from "./AssistantTitleMenu.vue";
 import { titleMenuRows, type TitleMenuInput } from "./titleMenu";
 

@@ -23,8 +23,7 @@ import assistant from "@/services/assistant";
 import { raw } from "@/types/i18n";
 import { setOrgTimeZoneSource } from "@/utils/formatters";
 
-import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
-import { historyStubs } from "../__tests__/historyStubs";
+import { fakeAssistant, fakeRouter, fakeVuex, historyStubs } from "../__tests__/fakeAssistant";
 import { followedRcaRun, stopFollowingRca } from "../shell/rcaFollow";
 
 import AssistantHistoryConfirm from "./AssistantHistoryConfirm.vue";

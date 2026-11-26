@@ -43,8 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
+import type { OrgRcaRun } from "@/services/rca_runs_org";
 
-import type { RunMark } from "./autoRuns";
+/** How a run's state reads in a list: a working dot, a check, a plain stop, or the error glyph (never red text). */
+export type RunMark = "working" | "done" | "stopped" | "failed";
 
 const MARK_GLYPH: Record<Exclude<RunMark, "working">, IconName> = {
   done: assistantGlyph.done,
@@ -67,11 +69,44 @@ import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatus
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import type { OrgRcaRun } from "@/services/rca_runs_org";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
 import { formatOrgTime } from "@/utils/formatters";
 
-import { runMark, runStateLabel, runTitle } from "./autoRuns";
+/** The mark a run shows in its status slot. */
+function runMark(run: Pick<OrgRcaRun, "state">): RunMark {
+  switch (run.state) {
+    case "running":
+    case "waiting_input":
+      return "working";
+    case "completed":
+      return "done";
+    case "cancelled":
+      return "stopped";
+    default:
+      return "failed";
+  }
+}
+
+/** The run's state in the words the incident page already uses. */
+function runStateLabel(run: Pick<OrgRcaRun, "state">, t: TranslateFn): I18nText {
+  switch (run.state) {
+    case "running":
+      return t("alerts.incidents.rcaRun.state.investigating");
+    case "waiting_input":
+      return t("alerts.incidents.rcaRun.state.waitingInput");
+    case "completed":
+      return t("alerts.incidents.rcaRun.state.analyzed");
+    case "cancelled":
+      return t("alerts.incidents.rcaRun.state.cancelled");
+    default:
+      return t("alerts.incidents.rcaRun.state.failed");
+  }
+}
+
+/** The run's title: the incident's own, else its id. */
+function runTitle(run: Pick<OrgRcaRun, "incident_title" | "incident_id">): I18nText {
+  return raw(run.incident_title?.trim() || run.incident_id);
+}
 
 const props = defineProps<{ run: OrgRcaRun }>();
 

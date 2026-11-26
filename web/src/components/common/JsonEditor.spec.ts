@@ -17,7 +17,7 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { nextTick } from "vue";
 import JsonEditor from "@/components/common/JsonEditor.vue";
-import { settleAsyncParts } from "@/components/ai-assistant/__tests__/assistantPartStubs";
+import { settleAsyncParts } from "@/components/ai-assistant/__tests__/fakeAssistant";
 import { fakeRuntime } from "@/composables/assistant/__tests__/fakeRuntime";
 import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 import {
@@ -47,13 +47,13 @@ vi.mock("@/plugins/pipelines/useDnD", () => ({
 
 vi.mock("@/types/chat", () => ({}));
 vi.mock("@/components/ai-assistant/shell/AssistantDock.vue", () =>
-  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.assistantDockStub),
+  import("@/components/ai-assistant/__tests__/fakeAssistant").then((m) => m.assistantDockStub),
 );
 vi.mock("@/components/ai-assistant/entry/AiLabel.vue", () =>
-  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiLabelStub),
+  import("@/components/ai-assistant/__tests__/fakeAssistant").then((m) => m.aiLabelStub),
 );
 vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
-  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.diffBlockStub),
+  import("@/components/ai-assistant/__tests__/fakeAssistant").then((m) => m.diffBlockStub),
 );
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

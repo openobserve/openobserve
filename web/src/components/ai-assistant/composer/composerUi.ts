@@ -13,7 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, inject, reactive, toRaw, type ComputedRef, type InjectionKey } from "vue";
+import {
+  computed,
+  inject,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  toRaw,
+  type ComputedRef,
+  type InjectionKey,
+  type Ref,
+} from "vue";
 
 import type { AssistantError, TurnState, useAssistantStore } from "@/composables/assistant";
 import type { I18nText } from "@/types/i18n";
@@ -178,4 +189,41 @@ export function forgetComposerUi(live: ReadonlySet<string>): void {
 export function resetComposerUiForTests(): void {
   states.clear();
   seq = 0;
+}
+
+export interface ComposerWidth {
+  /** The composer's own width in px; 0 until measured. */
+  width: Ref<number>;
+  narrow: ComputedRef<boolean>;
+  tight: ComputedRef<boolean>;
+  wide: ComputedRef<boolean>;
+  agentIconOnly: ComputedRef<boolean>;
+}
+
+/** Follows the composer's own width, since a window or a sidebar is narrow on any screen. */
+export function useComposerWidth(root: Ref<HTMLElement | null>): ComposerWidth {
+  const width = ref(0);
+  const rem = ref(16);
+  let observer: ResizeObserver | null = null;
+
+  const atMost = (limit: number) => width.value > 0 && width.value <= limit * rem.value;
+
+  onMounted(() => {
+    const target = root.value;
+    if (!target || typeof ResizeObserver === "undefined") return;
+    rem.value = parseFloat(getComputedStyle(document.documentElement).fontSize) || rem.value;
+    observer = new ResizeObserver(() => (width.value = target.getBoundingClientRect().width));
+    observer.observe(target);
+  });
+  onBeforeUnmount(() => observer?.disconnect());
+
+  return {
+    width,
+    narrow: computed(() => atMost(COMPOSER_NARROW_REM)),
+    tight: computed(() => atMost(COMPOSER_TIGHT_REM)),
+    wide: computed(() => width.value >= COMPOSER_WIDE_REM * rem.value),
+    agentIconOnly: computed(
+      () => width.value > 0 && width.value < COMPOSER_AGENT_LABEL_REM * rem.value,
+    ),
+  };
 }

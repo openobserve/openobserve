@@ -16,8 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fakeAssistant } from "@/components/ai-assistant/__tests__/fakeAssistant";
-import { fakeVoiceEngine } from "@/components/ai-assistant/__tests__/fakeVoice";
+import { fakeAssistant, fakeVoiceEngine } from "@/components/ai-assistant/__tests__/fakeAssistant";
 import { resetVoiceForTests } from "@/components/ai-assistant/composer/useAssistantVoice";
 import { readVoiceOptIn } from "@/composables/assistant";
 

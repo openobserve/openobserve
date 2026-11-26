@@ -24,11 +24,10 @@ import { requestOverviewFocus } from "@/composables/goto/goToRequests";
 import type { CapabilityAgent, GateCode, Starter } from "@/composables/assistant";
 import { raw } from "@/types/i18n";
 
-import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
+import { fakeAssistant, fakeRouter, fakeVuex, fakeVoiceEngine } from "../__tests__/fakeAssistant";
 import AssistantComposerPlusMenu, {
   type ComposerPlusAction,
 } from "../composer/AssistantComposerPlusMenu.vue";
-import { fakeVoiceEngine } from "../__tests__/fakeVoice";
 import { resetVoiceForTests, setVoiceOptIn } from "../composer/useAssistantVoice";
 import AssistantLauncher, { launcherState } from "./AssistantLauncher.vue";
 import AssistantLauncherAgent from "./AssistantLauncherAgent.vue";

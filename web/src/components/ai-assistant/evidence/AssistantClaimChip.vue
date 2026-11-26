@@ -44,7 +44,7 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { raw, type I18nText } from "@/types/i18n";
 
-import { revealStep } from "./revealStep";
+import { revealStep } from "./evidenceText";
 
 const HIT_AREA =
   "relative max-md:before:absolute max-md:before:top-1/2 max-md:before:left-1/2 max-md:before:size-11 max-md:before:-translate-x-1/2 max-md:before:-translate-y-1/2 max-md:before:content-[''] pointer-coarse:before:absolute pointer-coarse:before:top-1/2 pointer-coarse:before:left-1/2 pointer-coarse:before:size-11 pointer-coarse:before:-translate-x-1/2 pointer-coarse:before:-translate-y-1/2 pointer-coarse:before:content-['']";
