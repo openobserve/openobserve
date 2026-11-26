@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-surface-chrome-deeper flex h-10 w-42 shrink-0 items-center px-4 max-md:hidden"
         data-test="main-layout-logo"
       >
-        <OSidebarLogo class="[&>img:only-child]:h-8" />
+        <OSidebarLogo class="-ms-[0.2875rem] [&>img:only-child]:h-8" />
       </div>
       <div
         class="o2-app-header min-w-0 flex-1"
