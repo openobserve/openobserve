@@ -420,7 +420,7 @@ describe("AiToolsets presets", () => {
     store.state.zoConfig.features = {};
   });
 
-  it("offers the server's presets, flags updated and retired rows, and applies a review", async () => {
+  it("flags updated and retired rows, opens the add page, and applies a review", async () => {
     resetListViewState();
     queryClient.clear();
     store.state.zoConfig.features = { ai_toolsets: "enabled" };
@@ -473,7 +473,6 @@ describe("AiToolsets presets", () => {
     });
     await flushPromises();
     const vm = w.vm as any;
-    expect(vm.mcpPresets.map((p: any) => p.id)).toEqual(["datadog"]);
     expect(w.find("[data-test='ai-toolsets-old-warning-icon']").attributes("aria-label")).toBe(
       "This preset is retired.",
     );
@@ -484,20 +483,10 @@ describe("AiToolsets presets", () => {
     expect(reviewAction.visible({ presetBadge: "updated" })).toBe(true);
     expect(reviewAction.visible({ presetBadge: "retired" })).toBe(false);
 
-    const push = vi.spyOn(router, "push");
-    vm.addToolset({ preset: "datadog" });
-    expect(push).toHaveBeenCalledWith({
-      query: expect.objectContaining({ action: "add", preset: "datadog" }),
-    });
-
-    push.mockClear();
+    // Add opens the add page with no type chosen; the page's tiles pick it.
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
     await w.find("[data-test='ai-toolsets-add-btn']").trigger("click");
-    expect(vm.showTypePicker).toBe(true);
-    await w.find("[data-test='ai-toolsets-add-skill']").trigger("click");
-    expect(vm.showTypePicker).toBe(false);
-    expect(push).toHaveBeenCalledWith({
-      query: expect.objectContaining({ action: "add", kind: "skill" }),
-    });
+    expect(push).toHaveBeenCalledWith({ query: { action: "add", org_identifier: "default" } });
     push.mockRestore();
 
     reviewAction.onSelect(vm.tabledata.find((r: any) => r.name === "dd"));

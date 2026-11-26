@@ -23,8 +23,9 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 
-// Mutable route query the mocked router reads (create-mode by default).
+// Mutable route query the mocked router reads (create-mode, Custom MCP tile by default).
 let mockQuery: Record<string, any> = {};
+const mockPush = vi.hoisted(() => vi.fn());
 
 vi.mock("vue-router", async () => {
   const actual = await vi.importActual<any>("vue-router");
@@ -32,7 +33,8 @@ vi.mock("vue-router", async () => {
     ...actual,
     useRouter: vi.fn(() => ({
       currentRoute: { value: { query: mockQuery } },
-      push: vi.fn(),
+      push: mockPush,
+      replace: vi.fn(),
     })),
   };
 });
@@ -93,7 +95,7 @@ describe("AddAiToolset", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockQuery = {};
+    mockQuery = { action: "add", kind: "mcp" };
     store.state.selectedOrganization = { identifier: "test-org" } as any;
     vi.mocked(aiToolsetsService.create).mockResolvedValue({ data: {} } as any);
     vi.mocked(aiToolsetsService.update).mockResolvedValue({ data: {} } as any);
@@ -119,10 +121,9 @@ describe("AddAiToolset", () => {
   const getForm = () => (wrapper.vm as any).form;
 
   describe("rendering", () => {
-    it("renders name, kind and description fields with their data-test ids", () => {
+    it("renders name and description fields with their data-test ids", () => {
       wrapper = createWrapper();
       expect(wrapper.find('[data-test="ai-toolset-name-input"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="ai-toolset-kind-select"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="ai-toolset-description-input"]').exists()).toBe(true);
     });
 
@@ -153,6 +154,131 @@ describe("AddAiToolset", () => {
       expect(wrapper.vm.selectedKind).toBe("skill");
       expect(wrapper.find('[data-test="ai-toolset-skill-content"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="ai-toolset-mcp-url"]').exists()).toBe(false);
+    });
+  });
+
+  describe("type step", () => {
+    const tileIds = () =>
+      wrapper.findAll('[data-test^="ai-toolsets-add-"]').map((x: any) => x.attributes("data-type"));
+    const selected = () =>
+      wrapper
+        .findAll('[role="radio"][aria-checked="true"]')
+        .map((x: any) => x.attributes("data-type"));
+    const openTypeStep = async () => {
+      mockQuery = { action: "add" };
+      wrapper = createWrapper();
+      await flushPromises();
+    };
+    const continueBtn = () => wrapper.find('[data-test="ai-toolset-continue-btn"]');
+
+    it("starts on step 1 with every MCP preset, Custom MCP, Custom skill and the first picked", async () => {
+      await openTypeStep();
+      expect(tileIds()).toEqual(["dynatrace", "custom-mcp", "skill"]);
+      expect(selected()).toEqual(["dynatrace"]);
+      expect(continueBtn().exists()).toBe(true);
+      expect(wrapper.find('[data-test="ai-toolset-section-details"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="ai-toolset-save-btn"]').exists()).toBe(false);
+    });
+
+    it("keeps each description on one line inside its card", async () => {
+      await openTypeStep();
+      const card = wrapper.find('[data-test="ai-toolsets-add-dynatrace"]');
+      expect(card.classes()).toEqual(expect.arrayContaining(["min-w-0", "overflow-hidden"]));
+      const short = card.find('[data-test="ai-toolset-type-short"]');
+      expect(short.classes()).toEqual(
+        expect.arrayContaining(["truncate", "min-w-0", "block", "w-full", "overflow-hidden"]),
+      );
+    });
+
+    it("shows a preset's first sentence on the card and the full text in its tooltip", async () => {
+      vi.mocked(aiToolsetsService.prebuilt).mockResolvedValue({
+        data: {
+          presets: [
+            {
+              id: "acme",
+              kind: "mcp",
+              label: "Acme",
+              revision: 1,
+              description: "Acme: query logs. Also traces.",
+            },
+            { id: "plain", kind: "mcp", label: "Plain", revision: 1 },
+          ],
+        },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      const tiles = (wrapper.vm as any).typeTiles;
+      expect(tiles[0]).toMatchObject({ short: "Query logs.", tip: "Query logs. Also traces." });
+      expect(tiles[0].icon).toBe("mcp");
+      expect(tiles[1]).toMatchObject({
+        short: "Connect the Plain MCP server",
+        tip: "Connect the Plain MCP server",
+      });
+    });
+
+    it("Continue fills the form for the picked card and puts it in the URL", async () => {
+      await openTypeStep();
+      await wrapper
+        .find('[data-test="ai-toolsets-add-skill"]')
+        .trigger("keydown", { key: "Enter" });
+      expect(selected()).toEqual(["skill"]);
+      await continueBtn().trigger("click");
+      await flushPromises();
+      expect(mockPush).toHaveBeenLastCalledWith({ query: { action: "add", kind: "skill" } });
+      expect(getForm().state.values.kind).toBe("skill");
+      expect(wrapper.find('[data-test="ai-toolset-skill-content"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="ai-toolset-step-back-btn"]').exists()).toBe(true);
+    });
+
+    it("opens step 2 straight from a deep link", async () => {
+      mockQuery = { action: "add", preset: "dynatrace" };
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(tileIds()).toEqual([]);
+      expect(getForm().state.values.name).toBe("dynatrace");
+      expect(wrapper.find('[data-test="ai-toolset-preset-param-environment"]').exists()).toBe(true);
+    });
+
+    it("Back keeps typed fields for the same card; another card starts its fields fresh", async () => {
+      mockQuery = { action: "add", preset: "dynatrace" };
+      wrapper = createWrapper();
+      await flushPromises();
+      getForm().setFieldValue("mcp.url", "https://typed.example.com/mcp");
+      await wrapper.find('[data-test="ai-toolset-step-back-btn"]').trigger("click");
+      await flushPromises();
+      expect(mockPush).toHaveBeenLastCalledWith({ query: { action: "add" } });
+      expect(selected()).toEqual(["dynatrace"]);
+
+      await continueBtn().trigger("click");
+      await flushPromises();
+      expect(getForm().state.values.mcp.url).toBe("https://typed.example.com/mcp");
+
+      await wrapper.find('[data-test="ai-toolset-step-back-btn"]').trigger("click");
+      await flushPromises();
+      await wrapper.find('[data-test="ai-toolsets-add-custom-mcp"]').trigger("click");
+      await continueBtn().trigger("click");
+      await flushPromises();
+      expect(mockPush).toHaveBeenLastCalledWith({ query: { action: "add", kind: "mcp" } });
+      expect(getForm().state.values.name).toBe("");
+      expect(getForm().state.values.mcp.url).toBe("");
+    });
+
+    it("skips the type step when editing", async () => {
+      mockQuery = { action: "edit", id: "tool-1" };
+      vi.mocked(aiToolsetsService.get).mockResolvedValue({
+        data: {
+          id: "tool-1",
+          name: "saved",
+          kind: "mcp",
+          data: { url: "https://mcp.example.com/mcp" },
+        },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(tileIds()).toEqual([]);
+      expect(continueBtn().exists()).toBe(false);
+      expect(wrapper.find('[data-test="ai-toolset-step-back-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="ai-toolset-mcp-url"]').exists()).toBe(true);
     });
   });
 

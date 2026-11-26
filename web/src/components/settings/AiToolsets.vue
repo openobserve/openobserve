@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? t('common.editorDraft.newDot', { label: t('aiToolset.add') })
               : undefined
           "
-          @click="showTypePicker = true"
+          @click="addToolset()"
         >
           {{ t("aiToolset.add") }}
           <EditorDraftDot
@@ -199,18 +199,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:ok="resync"
     @update:cancel="confirmResync = false"
   />
-  <ODialog
-    v-model:open="showTypePicker"
-    :title="t('aiToolset.addModalTitle')"
-    size="lg"
-    data-test="ai-toolsets-type-picker-dialog"
-  >
-    <AiToolsetTypePicker
-      :mcp-presets="mcpPresets"
-      data-test="ai-toolsets-type-picker"
-      @select="onTypeSelected"
-    />
-  </ODialog>
 </template>
 
 <script lang="ts">
@@ -248,8 +236,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import AiToolsetPresetReview from "@/components/ai_toolsets/AiToolsetPresetReview.vue";
 import { presetBadge, type Preset } from "@/components/ai_toolsets/presets";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import AiToolsetTypePicker from "@/components/ai_toolsets/AiToolsetTypePicker.vue";
 import { failingSince, toolsetBadges } from "@/components/ai_toolsets/toolPicker";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -269,8 +255,6 @@ export default defineComponent({
     ConfirmDialog,
     AddAiToolset,
     AiToolsetPresetReview,
-    ODialog,
-    AiToolsetTypePicker,
     OButton,
     ORefreshButton,
     OTag,
@@ -304,7 +288,6 @@ export default defineComponent({
       }),
     );
     const presets = computed<Preset[] | undefined>(() => presetsList.data.value);
-    const mcpPresets = computed(() => (presets.value ?? []).filter((p) => p.kind === "mcp"));
 
     const review = ref<{ open: boolean; row: any; preset: Preset | null }>({
       open: false,
@@ -553,20 +536,10 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     // Navigation helpers
     // -----------------------------------------------------------------------
-    const addToolset = (from: { preset?: string; kind?: string } = {}) => {
+    const addToolset = () => {
       router.push({
-        query: {
-          action: "add",
-          ...from,
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
+        query: { action: "add", org_identifier: store.state.selectedOrganization.identifier },
       });
-    };
-
-    const showTypePicker = ref(false);
-    const onTypeSelected = (from: { preset?: string; kind?: string }) => {
-      showTypePicker.value = false;
-      addToolset(from);
     };
 
     const formatTime = (us: number) =>
@@ -726,12 +699,9 @@ export default defineComponent({
       visibleRows,
       confirmDelete,
       addToolset,
-      showTypePicker,
-      onTypeSelected,
       editToolset,
       chooseTools,
       rowNotes,
-      mcpPresets,
       review,
       openReview,
       formatTime,

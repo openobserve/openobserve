@@ -122,7 +122,7 @@ const Stub = { render: () => h("div") };
 let router: Router;
 let wrapper: VueWrapper | null = null;
 
-const mountPage = async (query: Record<string, string> = { action: "add" }) => {
+const mountPage = async (query: Record<string, string> = { action: "add", kind: "mcp" }) => {
   router = createRouter({
     history: createMemoryHistory(),
     routes: [

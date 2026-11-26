@@ -17,7 +17,6 @@ export class AiToolsetsFormValidationPage {
 
         // ── List page ─────────────────────────────────────────────────────────
         this.addToolsetBtn = '[data-test="ai-toolsets-add-btn"]';
-        this.addCustomMcpItem = '[data-test="ai-toolsets-add-custom-mcp"]';
         this.settingsMenuEntry = '[data-test="ai-toolsets-tab"]';
 
         // ── AddAiToolset form ─────────────────────────────────────────────────
@@ -25,18 +24,14 @@ export class AiToolsetsFormValidationPage {
         this.nameInput      = '[data-test="ai-toolset-name-input-field"]';
         this.nameError      = '[data-test="ai-toolset-name-input-error"]';
 
-        // OSelect data-test="ai-toolset-kind-select" → -popover / -error
-        this.kindSelect     = '[data-test="ai-toolset-kind-select"]';
-        this.kindError      = '[data-test="ai-toolset-kind-select-error"]';
+        // Step 1 type cards: ai-toolsets-add-<presetId|custom-mcp|skill>, then Continue
+        this.addCustomMcpItem = '[data-test="ai-toolsets-add-custom-mcp"]';
+        this.continueBtn = '[data-test="ai-toolset-continue-btn"]';
 
-        // MCP URL — shown when kind === 'mcp' (default)
+        // MCP URL — shown once an MCP tile is picked
         // OInput data-test="ai-toolset-mcp-url" → -field / -error
         this.mcpUrlInput    = '[data-test="ai-toolset-mcp-url-field"]';
         this.mcpUrlError    = '[data-test="ai-toolset-mcp-url-error"]';
-
-        // OSelect kind — trigger popover and option selectors
-        this.kindSelectPopover = '[data-test="ai-toolset-kind-select-popover"]';
-        this.kindSelectOption  = '[data-test="ai-toolset-kind-select-option"]';
 
         // Action buttons (plain OButton — not dialog built-ins)
         this.saveBtn        = '[data-test="ai-toolset-save-btn"]';
@@ -104,6 +99,7 @@ export class AiToolsetsFormValidationPage {
         await clearEditorDrafts(this.page);
         await this.page.locator(this.addToolsetBtn).click();
         await this.page.locator(this.addCustomMcpItem).click();
+        await this.page.locator(this.continueBtn).click();
         // Wait for the form to mount — name input is the first interactive field
         await this.page.locator(this.nameInput).waitFor({ state: 'visible', timeout: 10000 });
     }
@@ -125,17 +121,13 @@ export class AiToolsetsFormValidationPage {
         await this.page.locator(this.mcpUrlInput).fill(url);
     }
 
-    getKindOptionLocator(value) {
-        return this.page.locator(`${this.kindSelectOption}[data-test-value="${value}"]`);
-    }
-
+    // On step 1: picks a type card and continues to the form.
     async selectKind(label) {
-        testLogger.debug('Selecting toolset kind', { label });
-        const labelToValue = { 'MCP Server': 'mcp', 'Skill': 'skill' };
-        const value = labelToValue[label] || label;
-        await this.page.locator(this.kindSelect).click();
-        await this.page.locator(this.kindSelectPopover).waitFor({ state: 'visible', timeout: 8000 });
-        await this.getKindOptionLocator(value).click();
+        testLogger.debug('Selecting toolset type card', { label });
+        const labelToTile = { 'MCP Server': 'custom-mcp', 'Skill': 'skill' };
+        const tile = labelToTile[label] || label;
+        await this.page.locator(`[data-test="ai-toolsets-add-${tile}"]`).click();
+        await this.page.locator(this.continueBtn).click();
     }
 
     async clickSave() {
@@ -153,7 +145,6 @@ export class AiToolsetsFormValidationPage {
 
     getNameInputLocator()    { return this.page.locator(this.nameInput); }
     getNameErrorLocator()    { return this.page.locator(this.nameError); }
-    getKindErrorLocator()    { return this.page.locator(this.kindError); }
     getMcpUrlInputLocator()      { return this.page.locator(this.mcpUrlInput); }
     getMcpUrlErrorLocator()      { return this.page.locator(this.mcpUrlError); }
     getSaveBtnLocator()      { return this.page.locator(this.saveBtn); }
