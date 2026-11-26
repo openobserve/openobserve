@@ -27,27 +27,32 @@
  */
 
 import { computed } from "vue";
-import { useTheme } from "@/composables/useTheme";
+import { useThemeRevision } from "@/composables/useTheme";
+import { chartColor } from "@/utils/chartTheme";
 import { SPARK_PATH } from "@/components/ai-assistant/common/AssistantSpark.vue";
 
-// An <img> cannot read CSS variables, so these mirror the --color-assistant-spark-* tokens.
-const SPARK_STOPS = {
-  light: ["#2a86d6", "#6b76e3", "#e04a38"],
-  dark: ["#5bb2f6", "#8c95f0", "#ff7866"],
+const sparkDataUri = (): string => {
+  const [from, via, to] = [
+    chartColor("--color-assistant-spark-from"),
+    chartColor("--color-assistant-spark-via"),
+    chartColor("--color-assistant-spark-to"),
+  ];
+  return (
+    "data:image/svg+xml," +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><defs><linearGradient id="s" x1="8" y1="2" x2="16" y2="22" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${from}"/><stop offset="0.45" stop-color="${via}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><path d="${SPARK_PATH}" fill="url(#s)"/></svg>`,
+    )
+  );
 };
 
-const sparkDataUri = ([from, via, to]: string[]): string =>
-  "data:image/svg+xml," +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><defs><linearGradient id="s" x1="8" y1="2" x2="16" y2="22" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${from}"/><stop offset="0.45" stop-color="${via}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><path d="${SPARK_PATH}" fill="url(#s)"/></svg>`,
-  );
-
 export function useAiIcon() {
-  const { isDark } = useTheme();
+  const themeRevision = useThemeRevision();
 
-  const aiIconSrc = computed<string>(() =>
-    sparkDataUri(isDark.value ? SPARK_STOPS.dark : SPARK_STOPS.light),
-  );
+  // An <img> cannot read CSS variables, so the token values are resolved per theme revision.
+  const aiIconSrc = computed<string>(() => {
+    void themeRevision.value;
+    return sparkDataUri();
+  });
 
   return { aiIconSrc };
 }
