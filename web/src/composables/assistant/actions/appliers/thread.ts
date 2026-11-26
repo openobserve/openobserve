@@ -21,7 +21,7 @@ import { isRunning } from "../../assistantStore";
 import type { AssistantSession, ComposerSnapshot } from "../../assistantStore.types";
 import { periodMs, timeChipOf } from "../../context/contextChips";
 import { footerOf, promptRange, stepsOf, turnAnnotationKey, windowsOf } from "../../evidence";
-import { starterPayload, WIDER_PERIOD } from "../../starterPayload";
+import { starterPayload, WIDER_PERIOD } from "../../chatHelpers";
 import { registerApplier, type Applier } from "../registry";
 import type { AssistantAction } from "../types";
 

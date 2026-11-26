@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import { raw } from "@/types/i18n";
 
-import { starterPayload } from "./starterPayload";
+import { starterPayload } from "./chatHelpers";
 
 const NOW = 1_800_000_000_000;
 

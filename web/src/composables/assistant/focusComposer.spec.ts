@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { canAutoFocus, focusWhenReady } from "./focusComposer";
+import { canAutoFocus, focusWhenReady } from "./uiHelpers";
 
 let field: HTMLTextAreaElement;
 function coarse(on: boolean) {

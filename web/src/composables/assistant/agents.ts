@@ -25,7 +25,7 @@ import type {
   EntryVerb,
   ObjectKind,
 } from "./assistantStore.types";
-import { useAssistantName } from "./useAssistantName";
+import { useAssistantName } from "./uiHelpers";
 
 export const DEFAULT_AGENT: AgentId = "o2-ai";
 

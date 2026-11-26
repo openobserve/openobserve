@@ -27,7 +27,7 @@ import { computeUserOrgKey } from "@/utils/userOrgKey";
 import { queryRunOf, runQueryApplier } from "./actions/appliers/query";
 import * as storeModule from "./assistantStore";
 import { assistantStore, openAssistant, useAssistantCapability } from "./index";
-import { openTabWithoutOpener } from "./openTab";
+import { openTabWithoutOpener } from "./uiHelpers";
 import { pushRecall, readRecall } from "./prefs";
 import { useAssistantRuns } from "./runs";
 import { getAssistantRuntime, resetAssistantRuntimeForTests } from "./runtime";

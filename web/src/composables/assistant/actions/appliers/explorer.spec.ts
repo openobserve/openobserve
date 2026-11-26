@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 import { b64DecodeUnicode } from "@/utils/formatters";
 
 import { makeEnv } from "../__tests__/actionEnv";
-import { explorerApplier } from "./explorer";
+import { explorerApplier } from "./navigation";
 
 const query = {
   language: "sql" as const,

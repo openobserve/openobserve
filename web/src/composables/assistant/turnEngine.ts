@@ -64,7 +64,7 @@ import {
 import { footerOf, turnAnnotationKey } from "./evidence";
 import type { AssistantFrame } from "./frames";
 import { generateNavigationFromToolResult } from "./navigationRoutes";
-import { useAssistantName } from "./useAssistantName";
+import { useAssistantName } from "./uiHelpers";
 import {
   answerProgress,
   emptyExtras,

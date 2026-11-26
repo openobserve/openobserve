@@ -32,7 +32,7 @@ import type { GateCode, Sid } from "./assistantStore.types";
 import { openAssistant } from "./openAssistant";
 import { setLauncherDismissed } from "./prefs";
 import { getAssistantRuntime } from "./runtime";
-import { ASSISTANT_ROOT_SELECTOR } from "./surfaces";
+import { ASSISTANT_ROOT_SELECTOR } from "./uiHelpers";
 
 /** The Escape ladder's rungs, innermost first (`10` §6.3). */
 export const ESCAPE_RUNGS = ["a", "a2", "b", "c", "d", "e", "f", "g", "h", "i"] as const;

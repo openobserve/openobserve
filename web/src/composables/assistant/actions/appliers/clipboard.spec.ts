@@ -16,7 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import { makeEnv } from "../__tests__/actionEnv";
-import { clipboardApplier } from "./clipboard";
+import { clipboardApplier } from "./index";
 
 describe("clipboard applier", () => {
   it("copies and reports success", async () => {

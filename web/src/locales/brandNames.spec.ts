@@ -21,7 +21,7 @@ import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import enMessages from "@/locales/languages/en-US.json";
-import { useAssistantName } from "@/composables/assistant/useAssistantName";
+import { useAssistantName } from "@/composables/assistant/uiHelpers";
 import { localeStems, readLocaleMessages } from "@/test/unit/helpers/localeFiles";
 
 // Flip to true once every old name is gone; until then the old-name checks are skipped.

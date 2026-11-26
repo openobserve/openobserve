@@ -20,7 +20,7 @@ export {
   useAssistantStore,
 } from "./assistantStore";
 export { assistantStore } from "./runtime";
-export { openTabWithoutOpener } from "./openTab";
+export { openTabWithoutOpener } from "./uiHelpers";
 export { useAssistantCapability } from "./useAssistantCapability";
 export {
   useAssistantCredits,
@@ -30,12 +30,12 @@ export {
 } from "./useAssistantCredits";
 export { openAssistant, type OpenAssistantCall } from "./openAssistant";
 export { useDeepLinkDoor } from "./useDeepLinkDoor";
-export { useAssistantName } from "./useAssistantName";
+export { useAssistantName } from "./uiHelpers";
 export { useAssistantClient } from "./useAssistantClient";
 export { parseStream, extractFrames } from "./sseParser";
 export { toAssistantError, ASSISTANT_ERROR_CODES } from "./assistantErrors";
 export { STALL_MS, elapsedText, turnStatusText } from "./turnStateMachine";
-export { starterPayload, widerPeriodText } from "./starterPayload";
+export { starterPayload, widerPeriodText } from "./chatHelpers";
 export { useAssistantStarters } from "./useAssistantStarters";
 export { groupOf, isHelperChat, originOf, useAssistantHistory } from "./useAssistantHistory";
 export type {
@@ -73,7 +73,7 @@ export {
 } from "./shortcuts";
 export { refreshPageContext, useAssistantContext } from "./context/useAssistantContext";
 export type { ContextDraft } from "./context/useAssistantContext";
-export { focusWhenReady } from "./focusComposer";
+export { focusWhenReady } from "./uiHelpers";
 export {
   INTERNAL_FIELDS,
   MAX_ATTACHED_BYTES,
@@ -117,7 +117,7 @@ export {
   openWindowsOf,
   sessionView,
 } from "./assistantStore";
-export { defaultWidthRem, sidebarWidthFor } from "./sidebarWidth";
+export { defaultWidthRem, sidebarWidthFor } from "./uiHelpers";
 export {
   MAX_FLOATING_CHATS,
   TEAR_OFF_REM,

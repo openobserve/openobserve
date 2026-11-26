@@ -20,7 +20,7 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import type { Placement } from "./assistantStore.types";
 import { openDockWidthRem } from "./hostAdapter";
 import { ensureRuntime, runtimeHandle } from "./runtimeHandle";
-import { sidebarWidthFor } from "./sidebarWidth";
+import { sidebarWidthFor } from "./uiHelpers";
 
 /** A transition that never ends (a removed node, a cancelled change) still signals after this long. */
 export const RESIZE_SIGNAL_FALLBACK_MS = 400;

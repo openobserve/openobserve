@@ -91,7 +91,7 @@ import { serverCardOf } from "./historyRecords";
 import { createLifecycle, type AssistantLifecycleRuntime } from "./lifecycle";
 import { forgetHistoryKeys, historyKeysOf, markKeptOnSignOut, readClearOnSignOut } from "./prefs";
 import { createOpenAssistant, type OpenAssistantCall } from "./openAssistant";
-import { openTabWithoutOpener } from "./openTab";
+import { openTabWithoutOpener, viewedChatSids } from "./uiHelpers";
 import type { ApprovalBlockData } from "./reducer";
 import { createRuns, shownSids, type AssistantRuns, type RunsDeps } from "./runs";
 import { setRuntimeHandle } from "./runtimeHandle";
@@ -107,7 +107,6 @@ import { createApprovalsRuntime, type ApprovalsRuntime } from "./useAssistantApp
 import { createAssistantHistory, type AssistantHistory } from "./useAssistantHistory";
 import { useAssistantClient } from "./useAssistantClient";
 import { assistantKeydownAt } from "./useAssistantIdleFocus";
-import { viewedChatSids } from "./viewedChats";
 
 const TELEMETRY_ROLES: Record<string, TelemetryRole> = {
   admin: "admin",

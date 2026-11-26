@@ -47,7 +47,7 @@ import type {
 } from "./assistantStore.types";
 import type { ContextChip } from "./context/types";
 import { createDraftStore, type DraftStore } from "./drafts";
-import { sidebarWidthFor } from "./sidebarWidth";
+import { sidebarWidthFor } from "./uiHelpers";
 import {
   TAB_HEARTBEAT_MS,
   markTabAlive,

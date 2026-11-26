@@ -20,7 +20,7 @@ import {
   decodeAssistantSet,
   encodeAssistantSet,
   type AssistantSetField,
-} from "./assistantSet";
+} from "./chatHelpers";
 
 describe("assistantSet", () => {
   it("names the query key", () => {

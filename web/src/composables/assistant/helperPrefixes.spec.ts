@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { HELPER_PREFIXES, HELPER_REQUEST_STARTS, type HelperLanguage } from "./helperPrefixes";
+import { HELPER_PREFIXES, HELPER_REQUEST_STARTS, type HelperLanguage } from "./chatHelpers";
 import { isHelperChat } from "./historyContext";
 
 describe("helper prefixes", () => {

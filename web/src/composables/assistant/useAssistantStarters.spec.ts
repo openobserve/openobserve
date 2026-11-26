@@ -25,7 +25,7 @@ import { raw } from "@/types/i18n";
 import { createAssistantStore, inertAssistantDeps } from "./assistantStore";
 import { wireContextOf } from "./context/serialize";
 import { refreshPageContext, resetAssistantContextForTests } from "./context/useAssistantContext";
-import { starterPayload } from "./starterPayload";
+import { starterPayload } from "./chatHelpers";
 import type { AssistantCapability, AssistantHostAdapter } from "./assistantStore.types";
 import type { PageContext } from "./context/types";
 import { useAssistantStarters } from "./useAssistantStarters";

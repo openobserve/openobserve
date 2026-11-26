@@ -45,7 +45,7 @@ import type { ApprovalBlockData } from "./reducer";
 import { getAssistantRuntime } from "./runtime";
 
 export { isHelperChat, originOf } from "./historyContext";
-export { HELPER_REQUEST_STARTS } from "./helperPrefixes";
+export { HELPER_REQUEST_STARTS } from "./chatHelpers";
 export type {
   DeletedNotice,
   HistoryAnnouncement,

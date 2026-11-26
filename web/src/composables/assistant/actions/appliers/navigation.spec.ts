@@ -18,7 +18,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 
 import appStore from "@/stores";
 import { armHomeReturn, decodeHomeReturn } from "@/composables/goto/homeReturn";
-import { decodeAssistantSet } from "../../assistantSet";
+import { decodeAssistantSet } from "../../chatHelpers";
 import { timeWindowOf } from "../../context/contextChips";
 import { pageContext } from "../../context/pageContext";
 import { makeEnv } from "../__tests__/actionEnv";

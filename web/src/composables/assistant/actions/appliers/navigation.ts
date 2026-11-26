@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { isNavigationFailure, type Router } from "vue-router";
-
 import {
   encodeHomeReturn,
   HOME_RETURN_QUERY_KEY,
@@ -22,14 +21,17 @@ import {
   type HomeReturnState,
 } from "@/composables/goto/homeReturn";
 import store from "@/stores";
-import { AI_CHAT_QUERY, EXPLORER_ROUTE_NAMES } from "@/utils/assistant/explorerRoutes";
+import {
+  AI_CHAT_QUERY,
+  EXPLORER_ROUTE_NAMES,
+  explorerTarget,
+} from "@/utils/assistant/explorerRoutes";
 import { featureState, routeLicenseFeature } from "@/utils/featureGate";
-
 import {
   ASSISTANT_SET_QUERY_KEY,
   encodeAssistantSet,
   type AssistantSetField,
-} from "../../assistantSet";
+} from "../../chatHelpers";
 import type { Sid } from "../../assistantStore.types";
 import { holdChatWindow } from "../../context/pageContext";
 import { pushFromThread } from "../../fullThreadRoute";
@@ -131,4 +133,20 @@ function isLicenseLocked(router: Pick<Router, "resolve">, target: RouteTarget): 
 export function mustOpenElsewhere(env: Pick<ActionEnv, "store" | "hosts">): boolean {
   if (env.store().state.shell.placement.kind === "docked") return true;
   return env.hosts.mounted.value.some((id) => env.hosts.get(id)?.isDirty() === true);
+}
+
+/** Open in {explorer}: the typed route with stream, absolute range and query; the page applies it and never runs it. */
+export const explorerApplier: Applier<Extract<AssistantAction, { kind: "open_in_explorer" }>> = (
+  sid,
+  action,
+  env,
+) => {
+  const session = env.store().state.sessions[sid];
+  if (!session) return { ok: false, reason: "failed" };
+  const target = explorerTarget({ ...action.query, org: session.org }, action.explorer, "");
+  return openTarget(sid, target, env, { newTab: false });
+};
+
+export function registerExplorerAppliers(): void {
+  registerApplier("open_in_explorer", explorerApplier);
 }

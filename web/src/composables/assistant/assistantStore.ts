@@ -88,11 +88,11 @@ import {
 } from "./prefs";
 import type { TurnLockReason } from "./lifecycle";
 import { getAssistantRuntime } from "./runtime";
-import { SIDEBAR_MIN_REM } from "./sidebarWidth";
+import { SIDEBAR_MIN_REM } from "./uiHelpers";
 import { isRunning, isTerminal, type TurnState, type TurnTerminal } from "./turnStates";
 import { MAX_FLOATING_CHATS, cascadeGeometry, freeGeometry, openWindowCap } from "./windows";
 
-export { MAIN_MIN_REM, NAV_RAIL_REM, SIDEBAR_MIN_REM } from "./sidebarWidth";
+export { MAIN_MIN_REM, NAV_RAIL_REM, SIDEBAR_MIN_REM } from "./uiHelpers";
 export { isRunning } from "./turnStates";
 
 export const MAX_CHIP_ROWS = 20;

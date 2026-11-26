@@ -14,14 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { registerApprovalAppliers } from "./approval";
-import { registerClipboardAppliers } from "./clipboard";
 import { registerDraftAppliers } from "./drafts";
 import { registerEditorAppliers } from "./editor";
-import { registerExplorerAppliers } from "./explorer";
-import { registerNavigationAppliers } from "./navigation";
+import { registerExplorerAppliers, registerNavigationAppliers } from "./navigation";
 import { registerQueryAppliers } from "./query";
 import { registerThreadAppliers } from "./thread";
 import { registerUndoAppliers } from "./undo";
+import { registerApplier, type Applier } from "../registry";
+import type { AssistantAction } from "../types";
 
 export function registerBuiltInAppliers(): void {
   registerApprovalAppliers();
@@ -33,4 +33,15 @@ export function registerBuiltInAppliers(): void {
   registerQueryAppliers();
   registerThreadAppliers();
   registerUndoAppliers();
+}
+
+/** Copy: the clipboard, or `failed` so the control shows the text to copy by hand. */
+export const clipboardApplier: Applier<Extract<AssistantAction, { kind: "copy" }>> = async (
+  _sid,
+  action,
+  env,
+) => ((await env.copy(action.text)) ? { ok: true } : { ok: false, reason: "failed" });
+
+export function registerClipboardAppliers(): void {
+  registerApplier("copy", clipboardApplier);
 }

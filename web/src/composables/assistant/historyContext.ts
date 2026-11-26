@@ -29,7 +29,7 @@ import type {
   Sid,
   TurnEngine,
 } from "./assistantStore.types";
-import { HELPER_REQUEST_STARTS } from "./helperPrefixes";
+import { HELPER_REQUEST_STARTS } from "./chatHelpers";
 import type { HistoryDb, LocalRecord, LocalTurn } from "./historyDb";
 import { rememberHistoryKey } from "./prefs";
 import type { ApprovalsRuntime } from "./useAssistantApprovals";

@@ -29,14 +29,14 @@ import type {
 } from "./assistantStore.types";
 export type { CreditMode, GateCode } from "./assistantStore.types";
 
-export { ASSISTANT_SURFACES_SELECTOR } from "./surfaces";
+export { ASSISTANT_SURFACES_SELECTOR } from "./uiHelpers";
 export {
   ASSISTANT_SET_QUERY_KEY,
   decodeAssistantSet,
   encodeAssistantSet,
   type AssistantSetField,
-} from "./assistantSet";
-export { HELPER_PREFIXES, HELPER_REQUEST_STARTS, type HelperLanguage } from "./helperPrefixes";
+} from "./chatHelpers";
+export { HELPER_PREFIXES, HELPER_REQUEST_STARTS, type HelperLanguage } from "./chatHelpers";
 export {
   AI_HOME_TAB,
   HOME_TAB_QUERY_KEY,
@@ -58,11 +58,11 @@ export {
   homeQueryFrom,
 } from "./fullThreadRoute";
 export type { FullTabHandoff } from "./fullThreadRoute";
-export { INLINE_HOST_IDS, isDockHostId } from "./hostIds";
-export { openTabWithoutOpener } from "./openTab";
-export { answerTextOf, lastAnswerOf, markdownMessage } from "./answers";
-export { useAssistantName } from "./useAssistantName";
-export { useViewedChat, viewedChatSids } from "./viewedChats";
+export { INLINE_HOST_IDS, isDockHostId } from "./chatHelpers";
+export { openTabWithoutOpener } from "./uiHelpers";
+export { answerTextOf, lastAnswerOf, markdownMessage } from "./chatHelpers";
+export { useAssistantName } from "./uiHelpers";
+export { useViewedChat, viewedChatSids } from "./uiHelpers";
 export {
   epochMsOf,
   foldTurns,
@@ -104,7 +104,7 @@ export {
   type TurnProgress,
 } from "./turnStateMachine";
 export { isRunning, isTerminal } from "./turnStates";
-export { widerPeriodText } from "./starterPayload";
+export { widerPeriodText } from "./chatHelpers";
 export { diffCounts, diffLines, type DiffLine } from "./lineDiff";
 export {
   assistantObjectNameKey,
