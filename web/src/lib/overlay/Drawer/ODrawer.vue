@@ -527,6 +527,8 @@ watch(shown, (open) => {
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
           'data-[state=closed]:duration-(--duration-dialog-out) data-[state=open]:duration-(--duration-dialog-in)',
+          // duration-* also sets transition-duration, so without this every inline style change would animate.
+          'transition-none',
         ]"
         :style="overlayStyle"
       />
@@ -579,6 +581,7 @@ watch(shown, (open) => {
               ],
           'data-[state=open]:duration-(--duration-dialog-in) data-[state=open]:ease-(--ease-out-expo)',
           'data-[state=closed]:duration-(--duration-dialog-out) data-[state=closed]:ease-(--ease-overlay-out)',
+          'transition-none',
         ]"
         @keydown="trapInsetTab"
         @escape-key-down="handleEscapeKeyDown"

@@ -15,7 +15,7 @@
 
 use std::{ops::Range, sync::Arc};
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, ensure};
 use arrow::{
     array::{Array, ArrayRef, BooleanArray, RecordBatch, UInt32Array},
     compute::cast,
@@ -39,8 +39,6 @@ pub(super) struct MetricsIndexData {
     pub(super) schema: SchemaRef,
     pub(super) batches: Vec<RecordBatch>,
     pub(super) parent_records: usize,
-    /// Vortex does not use Parquet row groups.
-    pub(super) row_group_size: Option<u32>,
 }
 
 pub(super) struct IndexLabels {
@@ -70,7 +68,6 @@ pub(super) async fn load_metrics_index_file(
     account: &str,
     data_path: &str,
     path: &str,
-    format: config::FileFormat,
     parent: crate::block::ParentMetadata,
     index_size: i64,
     labels: IndexLabels,
@@ -102,8 +99,7 @@ pub(super) async fn load_metrics_index_file(
             .insert(key, loaded, limit)?
     };
     let index = entry.index.project(&labels.requested)?;
-    tokio::task::spawn_blocking(move || metrics_block_index_data(&index, format, &labels.flat))
-        .await?
+    tokio::task::spawn_blocking(move || metrics_block_index_data(&index, &labels.flat)).await?
 }
 
 /// Evaluate `filter` over the run rows and collect the selected physical row
@@ -330,19 +326,8 @@ async fn read_columns(
 
 fn metrics_block_index_data(
     index: &crate::block::Index,
-    format: config::FileFormat,
     flat_labels: &[String],
 ) -> Result<MetricsIndexData> {
-    let row_group_size = match format {
-        config::FileFormat::Parquet => Some(
-            index
-                .header
-                .row_group_size
-                .context("Parquet block index lacks parent row group size")?,
-        ),
-        config::FileFormat::Vortex if index.header.row_group_size.is_none() => None,
-        _ => bail!("Invalid block parent format/row-group binding"),
-    };
     let mut fields = vec![Field::new(METRICS_INDEX_ROW_COUNT, DataType::UInt32, false)];
     let mut columns: Vec<ArrayRef> = vec![Arc::new(UInt32Array::from_iter_values(
         index.blocks.row_counts(),
@@ -370,7 +355,6 @@ fn metrics_block_index_data(
         schema,
         batches: vec![batch],
         parent_records: usize::try_from(index.header.parent.rows)?,
-        row_group_size,
     })
 }
 
@@ -523,10 +507,6 @@ mod tests {
                     assert!(
                         matches!(&files[0].selection, Some(FileSelection::RowRanges(ranges)) if ranges.as_ref() == &expected)
                     );
-                    assert_eq!(
-                        files[0].row_group_size.is_some(),
-                        format == config::FileFormat::Parquet
-                    );
                 }
             }
         }
@@ -541,7 +521,6 @@ mod tests {
             &file.account,
             &file.key,
             &path,
-            config::FileFormat::Parquet,
             crate::block::ParentMetadata {
                 rows: file.meta.records as u64,
                 compressed_size: file.meta.compressed_size as u64,
@@ -567,7 +546,6 @@ mod tests {
                 &file.account,
                 &file.key,
                 &path,
-                config::FileFormat::Vortex,
                 crate::block::ParentMetadata {
                     rows: file.meta.records as u64,
                     compressed_size: file.meta.compressed_size as u64,

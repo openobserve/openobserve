@@ -34589,7 +34589,15 @@
     "offline": "أنت غير متصل. الزيارات الأخيرة لا تزال متاحة.",
     "sourceUnavailable": "نوع المورد غير متاح حاليًا",
     "emptyHelp": "أدخل اسمًا أو معرّفًا للبحث",
-    "globalShortcut": "فتح البحث العام"
+    "globalShortcut": "فتح البحث العام",
+    "trigger": "ابحث أو انتقل إلى…",
+    "allTypes": "الكل",
+    "capped": "عرض أول تطابق. | عرض أول {count} من التطابقات.",
+    "hintNavigate": "تنقّل",
+    "hintOpen": "فتح",
+    "hintNewTab": "فتح في علامة تبويب جديدة",
+    "hintTypes": "تصفية حسب النوع",
+    "hintClose": "إغلاق"
   },
   "timeRangeInput": {
     "label": "اكتب نطاقًا زمنيًا",

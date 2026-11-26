@@ -1056,7 +1056,6 @@ impl From<&FileRecord> for FileKey {
             meta: r.into(),
             deleted: r.deleted,
             selection: None,
-            row_group_size: None,
         }
     }
 }
@@ -1478,7 +1477,6 @@ mod tests {
             },
             deleted: false,
             selection: None,
-            row_group_size: None,
         }
     }
 

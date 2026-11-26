@@ -1327,10 +1327,9 @@ mod tests {
             },
             false,
         );
-        file.with_selection(
-            FileSelection::RowRanges(Arc::new(std::iter::once(0..records).collect())),
-            Some(131072),
-        );
+        file.with_selection(FileSelection::RowRanges(Arc::new(
+            std::iter::once(0..records).collect(),
+        )));
         (file, bytes)
     }
     fn columns() -> Arc<LabelColumns> {

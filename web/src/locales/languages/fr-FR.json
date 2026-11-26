@@ -34589,7 +34589,15 @@
     "offline": "Hors ligne. Les visites récentes restent disponibles.",
     "sourceUnavailable": "Ce type de ressource est indisponible",
     "emptyHelp": "Saisissez un nom ou un ID",
-    "globalShortcut": "Ouvrir la recherche globale"
+    "globalShortcut": "Ouvrir la recherche globale",
+    "trigger": "Rechercher ou accéder à…",
+    "allTypes": "Tous",
+    "capped": "Affichage de la première correspondance. | Affichage des {count} premières correspondances.",
+    "hintNavigate": "Naviguer",
+    "hintOpen": "Ouvrir",
+    "hintNewTab": "Ouvrir dans un nouvel onglet",
+    "hintTypes": "Filtrer par type",
+    "hintClose": "Fermer"
   },
   "timeRangeInput": {
     "label": "Saisissez une plage temporelle",

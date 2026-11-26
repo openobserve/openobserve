@@ -34584,7 +34584,15 @@
     "offline": "目前離線，仍可查看最近瀏覽。",
     "sourceUnavailable": "此資源類型目前無法使用",
     "emptyHelp": "輸入名稱或 ID 搜尋資源",
-    "globalShortcut": "開啟全域搜尋"
+    "globalShortcut": "開啟全域搜尋",
+    "trigger": "搜尋或跳至…",
+    "allTypes": "全部",
+    "capped": "顯示第一個符合項目。 | 顯示前 {count} 個符合項目。",
+    "hintNavigate": "導覽",
+    "hintOpen": "開啟",
+    "hintNewTab": "在新分頁開啟",
+    "hintTypes": "依類型篩選",
+    "hintClose": "關閉"
   },
   "timeRangeInput": {
     "label": "輸入時間範圍",

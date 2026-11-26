@@ -23,13 +23,7 @@ use parking_lot::RwLock;
 
 use super::{ACCOUNT_SEPARATOR, TRACE_ID_SEPARATOR};
 
-#[derive(Clone)]
-pub struct ScanSelection {
-    pub selection: FileSelection,
-    pub row_group_size: Option<u32>,
-}
-
-type ScanSelectionMap = HashMap<String, ScanSelection>;
+type ScanSelectionMap = HashMap<String, FileSelection>;
 
 static FILES: Lazy<RwLock<HashMap<String, Vec<ObjectMeta>>>> = Lazy::new(Default::default);
 static SCAN_SELECTIONS: Lazy<RwLock<HashMap<String, ScanSelectionMap>>> =
@@ -65,13 +59,7 @@ pub async fn set(trace_id: &str, schema_key: &str, format: &str, files: Vec<File
             version: None,
         });
         if let Some(selection) = file.selection {
-            scan_selections.insert(
-                file.key,
-                ScanSelection {
-                    selection,
-                    row_group_size: file.row_group_size,
-                },
-            );
+            scan_selections.insert(file.key, selection);
         }
     }
     FILES.write().insert(key.clone(), values);
@@ -106,7 +94,7 @@ pub fn clear(trace_id: &str) {
 
 /// Look up the selection registered by [`set`] for an object location of the
 /// form `{trace_key}/$$/[{account}/::/]{file.key}`.
-pub fn get_scan_selection(file_key: &str) -> Option<ScanSelection> {
+pub fn get_scan_selection(file_key: &str) -> Option<FileSelection> {
     let (trace_id, filename) = file_key.split_once("/$$/")?;
     // `set` keys selections by the bare `file.key`; strip the account prefix
     // it inserts into the object location for multi-account storage
@@ -152,16 +140,10 @@ mod tests {
     async fn test_get_scan_selection_round_trip_with_account() {
         let trace_id = "trace_scan_selection_round_trip";
         let mut plain = FileKey::from_file_name("files/org/logs/s/2024/01/01/00/plain.parquet");
-        plain.with_selection(
-            FileSelection::RowGroups(std::sync::Arc::new(vec![1])),
-            Some(1024),
-        );
+        plain.with_selection(FileSelection::RowGroups(std::sync::Arc::new(vec![1])));
         let mut multi = FileKey::from_file_name("files/org/logs/s/2024/01/01/00/multi.parquet");
         multi.account = "acct".to_string();
-        multi.with_selection(
-            FileSelection::RowGroups(std::sync::Arc::new(vec![2])),
-            Some(2048),
-        );
+        multi.with_selection(FileSelection::RowGroups(std::sync::Arc::new(vec![2])));
         set(trace_id, "schema", "parquet", vec![plain, multi]).await;
 
         let locations: Vec<String> = get(&format!("{trace_id}/schema=schema/format=parquet"))
@@ -173,12 +155,16 @@ mod tests {
         for location in &locations {
             let selection = get_scan_selection(location)
                 .unwrap_or_else(|| panic!("no selection for {location}"));
-            if location.contains("/acct/::/") {
-                assert_eq!(selection.row_group_size, Some(2048));
+            let expected = if location.contains("/acct/::/") {
+                vec![2]
             } else {
                 assert!(!location.contains("::"));
-                assert_eq!(selection.row_group_size, Some(1024));
-            }
+                vec![1]
+            };
+            assert_eq!(
+                selection,
+                FileSelection::RowGroups(std::sync::Arc::new(expected))
+            );
         }
         clear(trace_id);
     }
