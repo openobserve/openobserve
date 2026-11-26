@@ -31,7 +31,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-h-0 flex-1 overflow-auto px-4 pt-3 pb-4">
         <div class="w-full max-w-5xl">
           <!-- Edit fixes the type, so step 1 is skipped and the header hidden. -->
-          <OStepper v-model="step" animated :hide-header="isEditing">
+          <div
+            v-if="isEditing && !formReady"
+            class="flex flex-col gap-4"
+            data-test="ai-toolset-loading"
+          >
+            <OInlineNotice
+              v-if="editLoadFailed"
+              variant="error"
+              :text="t('toastMessages.aitoolsets.failedToLoadToolset')"
+              :action-label="t('common.retry')"
+              data-test="ai-toolset-load-error"
+              action-data-test="ai-toolset-load-retry"
+              @action="initForm"
+            />
+            <template v-else>
+              <OSkeleton class="rounded-default h-6 w-1/2" />
+              <OSkeleton class="rounded-default h-24 w-full" />
+            </template>
+          </div>
+          <OStepper
+            v-show="!isEditing || formReady"
+            v-model="step"
+            animated
+            :hide-header="isEditing"
+          >
             <OStep
               :name="1"
               :title="t('aiToolset.chooseTypeTitle')"
@@ -367,6 +391,8 @@ import { urlCarriesCredential } from "@/utils/drafts/urlCredentials";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import AiToolsetToolPicker from "./AiToolsetToolPicker.vue";
 import AiToolsetTypeTiles, { type ToolsetTypeTile } from "./AiToolsetTypeTiles.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { getImageURL } from "@/utils/queryUtils";
@@ -433,6 +459,8 @@ export default defineComponent({
     AiToolsetToolPicker,
     AiToolsetTypeTiles,
     OStepper,
+    OSkeleton,
+    OInlineNotice,
     OStep,
   },
   emits: ["cancel:hideform", "update:list"],
@@ -445,7 +473,10 @@ export default defineComponent({
 
     // Co-located Zod schema (factory keeps the messages i18n-driven).
     const editingId = ref<string | null>(null);
-    const isEditing = ref(false);
+    // Decided from the route at setup, so an edit never renders step 1 while the toolset loads.
+    const isEditing = ref(
+      router.currentRoute.value.query.action === "edit" && !!router.currentRoute.value.query.id,
+    );
 
     // The stored URL and auth an edit started from.
     let loadedMcp: { url?: string; auth: ToolsetAuth } | null = null;
@@ -1182,10 +1213,16 @@ export default defineComponent({
       if (await toolsetDraft.confirmLeave()) emit("cancel:hideform");
     };
 
-    onMounted(async () => {
+    const editLoadFailed = ref(false);
+
+    const initForm = async () => {
+      editLoadFailed.value = false;
       const id = editId();
       const loaded = id ? await loadForEdit(id) : "loaded";
-      if (loaded === "failed") return;
+      if (loaded === "failed") {
+        editLoadFailed.value = true;
+        return;
+      }
       // The route's preset fills the form first, so a draft the user continues lands on top of it.
       await loadPresets();
       const query = router.currentRoute.value.query;
@@ -1215,10 +1252,14 @@ export default defineComponent({
         await nextTick();
         toolPickerAnchor.value?.scrollIntoView?.({ block: "start" });
       }
-    });
+    };
+
+    onMounted(initForm);
 
     return {
       superCluster,
+      editLoadFailed,
+      initForm,
       raw,
       t,
       // 🔑 Options-API: the form MUST be returned so `:form` resolves in the

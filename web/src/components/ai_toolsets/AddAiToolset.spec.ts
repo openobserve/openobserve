@@ -280,6 +280,59 @@ describe("AddAiToolset", () => {
       expect(wrapper.find('[data-test="ai-toolset-step-back-btn"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="ai-toolset-mcp-url"]').exists()).toBe(true);
     });
+
+    it("never shows the type step while the toolset to edit is loading", async () => {
+      mockQuery = { action: "edit", id: "tool-1" };
+      let resolveGet!: (v: unknown) => void;
+      vi.mocked(aiToolsetsService.get).mockReturnValue(new Promise((r) => (resolveGet = r)) as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(tileIds()).toEqual([]);
+      expect(continueBtn().exists()).toBe(false);
+      expect(wrapper.find('[data-test="ai-toolset-loading"]').exists()).toBe(true);
+      resolveGet({
+        data: {
+          id: "tool-1",
+          name: "saved",
+          kind: "mcp",
+          data: { url: "https://mcp.example.com/mcp" },
+        },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="ai-toolset-loading"]').exists()).toBe(false);
+      expect(tileIds()).toEqual([]);
+      expect(wrapper.find('[data-test="ai-toolset-mcp-url"]').exists()).toBe(true);
+    });
+
+    it("a failed edit load shows an error with Retry instead of a lasting skeleton", async () => {
+      mockQuery = { action: "edit", id: "tool-1" };
+      vi.mocked(aiToolsetsService.get)
+        .mockRejectedValueOnce({ response: { status: 500 } })
+        .mockResolvedValueOnce({
+          data: {
+            id: "tool-1",
+            name: "saved",
+            kind: "mcp",
+            data: { url: "https://mcp.example.com/mcp" },
+          },
+        } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="ai-toolset-load-error"]').exists()).toBe(true);
+      expect(tileIds()).toEqual([]);
+      await wrapper.find('[data-test="ai-toolset-load-retry"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="ai-toolset-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="ai-toolset-mcp-url"]').exists()).toBe(true);
+    });
+
+    it("create mode opens on the type step without a loading state", async () => {
+      mockQuery = { action: "add" };
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(tileIds().length).toBeGreaterThan(0);
+      expect(wrapper.find('[data-test="ai-toolset-loading"]').exists()).toBe(false);
+    });
   });
 
   describe("schema wiring (real OForm)", () => {
