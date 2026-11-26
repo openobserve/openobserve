@@ -194,6 +194,17 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 const MAX_FILE_SIZE_DEFAULT_CAP: usize = 512 * 1024 * 1024;
 const MAX_FILE_SIZE_DEFAULT_FLOOR: usize = 32 * 1024 * 1024;
 const JOB_RUNTIME_BLOCKING_PER_CPU: usize = 8;
+/// Entry-count cache limits replaced by byte limits: (removed env, replacement env).
+const REMOVED_CACHE_ENTRY_LIMIT_ENVS: [(&str, &str); 2] = [
+    (
+        "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
+        "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_SIZE",
+    ),
+    (
+        "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES",
+        "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_SIZE",
+    ),
+];
 const JOB_RUNTIME_BLOCKING_FLOOR: usize = 32;
 const JOB_RUNTIME_BLOCKING_CAP: usize = 256;
 // The current value is recorded in each tantivy index file (puffin `row_group_size`
@@ -2015,11 +2026,11 @@ pub struct Search {
     )]
     pub inverted_index_result_cache_enabled: bool,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
-        default = 10000,
-        help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 1% of total memory, clamped to [16, 256] MB
+        help = "Maximum memory size in MB for the inverted index result cache. Higher values increase memory usage but may improve query performance."
     )]
-    pub inverted_index_result_cache_max_entries: usize,
+    pub inverted_index_result_cache_max_size: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRY_SIZE",
         default = 20480, // bytes, default is 20KB
@@ -3321,11 +3332,11 @@ pub struct Limit {
     )]
     pub datafusion_file_stat_cache_max_size: usize,
     #[env_config(
-        name = "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES",
-        default = 10000,
-        help = "Maximum number of entries in the streaming aggs cache. Higher values increase memory usage but may improve query performance."
+        name = "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 1% of total memory, clamped to [8, 128] MB
+        help = "Maximum memory size in MB for the streaming aggs cache metadata: cache file lists and partition plans per streaming query."
     )]
-    pub datafusion_streaming_aggs_cache_max_entries: usize,
+    pub datafusion_streaming_aggs_cache_max_size: usize,
     #[env_config(name = "ZO_DATAFUSION_MIN_PARTITION_NUM", default = 2)]
     pub datafusion_min_partition_num: usize,
     #[env_config(
@@ -5048,6 +5059,25 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.metrics_result_cache_max_size =
             cfg.limit.metrics_result_cache_max_size.max(32) * (SIZE_IN_MB as usize);
     }
+    cfg.search.inverted_index_result_cache_max_size = small_cache_max_size(
+        cfg.search.inverted_index_result_cache_max_size,
+        cfg.limit.mem_total,
+        0.01,
+        (16, 256),
+    );
+    cfg.limit.datafusion_streaming_aggs_cache_max_size = small_cache_max_size(
+        cfg.limit.datafusion_streaming_aggs_cache_max_size,
+        cfg.limit.mem_total,
+        0.01,
+        (8, 128),
+    );
+    for (removed, replacement) in REMOVED_CACHE_ENTRY_LIMIT_ENVS {
+        if std::env::var(removed).is_ok() {
+            log::warn!(
+                "{removed} is no longer supported and has no effect, use {replacement} (MB)"
+            );
+        }
+    }
     cfg.search.metrics_blocks_cache_max_size = metrics_blocks_cache_size_mb(
         cfg.search.metrics_blocks_cache_max_size,
         cfg.limit.mem_total,
@@ -5057,6 +5087,20 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.memory_circuit_breaker_release_ratio,
     );
     Ok(())
+}
+
+/// Bytes for a cache configured in MB; 0 means `ratio` of `mem_total`, clamped to `clamp_mb`.
+fn small_cache_max_size(
+    configured_mb: usize,
+    mem_total: usize,
+    ratio: f64,
+    (min_mb, max_mb): (usize, usize),
+) -> usize {
+    let mb = match configured_mb {
+        0 => ((mem_total as f64 / SIZE_IN_MB * ratio) as usize).clamp(min_mb, max_mb),
+        mb => mb,
+    };
+    mb.saturating_mul(SIZE_IN_MB as usize)
 }
 
 fn metrics_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
@@ -5509,9 +5553,6 @@ fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.search.inverted_index_result_cache_max_entries == 0 {
-        cfg.search.inverted_index_result_cache_max_entries = 10000;
-    }
     if cfg.search.inverted_index_result_cache_max_entry_size == 0 {
         cfg.search.inverted_index_result_cache_max_entry_size = 20480;
     }
@@ -5713,6 +5754,36 @@ mod tests {
         assert_eq!(metrics_blocks_cache_size_mb(9, 48 * gib), 0);
         assert_eq!(metrics_blocks_cache_size_mb(10, 48 * gib), 10);
         assert_eq!(metrics_blocks_cache_size_mb(2048, 48 * gib), 2048);
+    }
+
+    #[test]
+    fn small_cache_max_size_defaults_to_clamped_ratio_and_keeps_explicit_mb() {
+        let (mb, gib) = (1024 * 1024, 1024 * 1024 * 1024);
+        assert_eq!(small_cache_max_size(0, gib, 0.01, (16, 256)), 16 * mb);
+        assert_eq!(small_cache_max_size(0, 4 * gib, 0.01, (16, 256)), 40 * mb);
+        assert_eq!(small_cache_max_size(0, 64 * gib, 0.01, (16, 256)), 256 * mb);
+        assert_eq!(small_cache_max_size(0, 0, 0.01, (8, 128)), 8 * mb);
+        assert_eq!(small_cache_max_size(2, 64 * gib, 0.01, (16, 256)), 2 * mb);
+        assert_eq!(small_cache_max_size(1024, gib, 0.01, (16, 256)), 1024 * mb);
+    }
+
+    #[test]
+    fn check_memory_config_sets_result_and_streaming_aggs_cache_bytes() {
+        let mut cfg = Config::default();
+        cfg.common.node_role = "all".to_string();
+        cfg.limit.cpu_num = 8;
+        cfg.search.inverted_index_result_cache_max_size = 0;
+        cfg.limit.datafusion_streaming_aggs_cache_max_size = 3;
+        check_memory_config(&mut cfg).unwrap();
+        let mem_mb = cfg.limit.mem_total / (1024 * 1024);
+        assert_eq!(
+            cfg.search.inverted_index_result_cache_max_size,
+            (mem_mb / 100).clamp(16, 256) * 1024 * 1024
+        );
+        assert_eq!(
+            cfg.limit.datafusion_streaming_aggs_cache_max_size,
+            3 * 1024 * 1024
+        );
     }
 
     use super::*;
@@ -6622,13 +6693,11 @@ mod tests {
     #[test]
     fn test_check_inverted_index_config_defaults() {
         let mut cfg = Config::default();
-        cfg.search.inverted_index_result_cache_max_entries = 0;
         cfg.search.inverted_index_result_cache_max_entry_size = 0;
         cfg.search.inverted_index_skip_threshold = 0;
         cfg.limit.inverted_index_min_token_length = 0;
         cfg.limit.inverted_index_max_token_length = 0;
         check_inverted_index_config(&mut cfg).unwrap();
-        assert_eq!(cfg.search.inverted_index_result_cache_max_entries, 10000);
         assert_eq!(cfg.search.inverted_index_result_cache_max_entry_size, 20480);
         assert_eq!(cfg.search.inverted_index_skip_threshold, 35);
         assert_eq!(cfg.limit.inverted_index_min_token_length, 2);
@@ -6638,11 +6707,9 @@ mod tests {
     #[test]
     fn test_check_inverted_index_config_preserves_existing() {
         let mut cfg = Config::default();
-        cfg.search.inverted_index_result_cache_max_entries = 5000;
         cfg.limit.inverted_index_min_token_length = 3;
         cfg.limit.inverted_index_max_token_length = 32;
         check_inverted_index_config(&mut cfg).unwrap();
-        assert_eq!(cfg.search.inverted_index_result_cache_max_entries, 5000);
         assert_eq!(cfg.limit.inverted_index_min_token_length, 3);
         assert_eq!(cfg.limit.inverted_index_max_token_length, 32);
     }
