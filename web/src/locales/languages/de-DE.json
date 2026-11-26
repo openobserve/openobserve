@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "Oberer Whisker",
       "boxplotMedian": "Median",
       "boxplotSamples": "Stichproben",
+      "boxplotValueNotNumeric": "Der Boxplot-Wert muss ein numerisches Feld sein",
       "boxplotOutlier": "Ausreißer",
       "fieldNotAllowedForDistribution": "Das Feld {label} ist für das Verteilungsdiagramm nicht zulässig",
       "distributionCount": "Anzahl",

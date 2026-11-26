@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "上须线",
       "boxplotMedian": "中位数",
       "boxplotSamples": "样本数",
+      "boxplotValueNotNumeric": "箱线图的值必须是数值字段",
       "boxplotOutlier": "离群值",
       "fieldNotAllowedForDistribution": "分布图不允许使用 {label} 字段",
       "distributionCount": "计数",

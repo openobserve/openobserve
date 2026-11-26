@@ -390,11 +390,16 @@ import { usePanelLivePreview } from "@/composables/dashboard/usePanelLivePreview
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import {
   validateConditions,
+  builderQueryRejection,
   validateJoinFields,
   validateSQLPanelFields,
 } from "@/utils/dashboard/panelValidation";
 import { restoreDashboardPanelStreamType, saveDashboardPanelStream } from "@/utils/streamPersist";
 import { findPanelById } from "@/utils/dashboard/findPanel";
+import {
+  applyEditorMountDefaults,
+  applyPanelConfigDefaults,
+} from "@/utils/dashboard/panelConfigDefaults";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { getVariableSuggestions } from "@/utils/dashboard/variableSuggestions";
 import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
@@ -509,6 +514,7 @@ export default defineComponent({
       resetAggregationFunction,
       validatePanel,
       makeAutoSQLQuery,
+      isPivotMode,
     } = useDashboardPanelData("dashboard", t);
     const editMode = ref(!!route.query.panelId);
     const selectedDate: any = ref(null);
@@ -797,19 +803,26 @@ export default defineComponent({
     let isUnsavedTrackingActive = false;
     let panelBaseline: unknown = null;
 
+    // Opening the Config sidebar fills keys a saved panel lacks (and remounts the query editor, which does
+    // the same); with them on both sides that is not an edit. Comparison only: the panel itself is untouched.
+    const snapshotPanel = () => {
+      const copy = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      applyPanelConfigDefaults(copy, store, !!isPivotMode?.value);
+      applyEditorMountDefaults(copy);
+      return copy;
+    };
+
     // Mutations before the user's first input are the editor loading itself (defaults, stream auto-select), not edits.
     const captureBaselineOnFirstInput = () => {
       if (isUnsavedTrackingActive && panelBaseline === null) {
-        panelBaseline = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        panelBaseline = snapshotPanel();
       }
       // A saved panel's load-time normalisation is not an edit, so it must not trigger a run.
       if (isUnsavedTrackingActive) livePreview.arm();
     };
 
     const hasUnsavedChanges = () =>
-      isUnsavedTrackingActive &&
-      panelBaseline !== null &&
-      !isEqual(panelBaseline, JSON.parse(JSON.stringify(dashboardPanelData.data)));
+      isUnsavedTrackingActive && panelBaseline !== null && !isEqual(panelBaseline, snapshotPanel());
 
     // The form's submit handler takes no arguments, so the requested save mode is parked here.
     let pendingSaveMode: PanelSaveMode = "view";
@@ -994,7 +1007,7 @@ export default defineComponent({
 
     const applyDraft = (draft: PanelDraft) => {
       // Snapshot first, so the restored work counts as unsaved against the state it replaces.
-      panelBaseline = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      panelBaseline = snapshotPanel();
       const gridLayout = dashboardPanelData.data.layout;
       Object.assign(dashboardPanelData.data, withoutGridLayout(draft.data));
       // The grid position is owned by the dashboard: a draft's copy would undo later moves and resizes.
@@ -1650,7 +1663,7 @@ export default defineComponent({
         discardDraft();
       }
       // A guard redirect re-runs this guard, which must not ask again.
-      panelBaseline = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      panelBaseline = snapshotPanel();
       cleanupSessionVariables();
       return true;
     };
@@ -1826,7 +1839,7 @@ export default defineComponent({
       // Reloaded so variables and the dashboard version used by the conflict check match the server.
       await loadDashboard({ keepTime: true });
       draftBasePanel = JSON.parse(JSON.stringify(dashboardPanelData.data));
-      panelBaseline = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      panelBaseline = snapshotPanel();
       showPositiveNotification(t("toastMessages.dashboard.panelSaved"));
     };
 
@@ -2277,7 +2290,11 @@ export default defineComponent({
           "dashboard",
         );
         if (panel.queryType !== "promql") validateJoinFields(t, query?.joins, errors);
-        if ((query?.query ?? "").trim() === "") {
+        // A query the builder left empty on purpose says why, not that it is empty.
+        const rejection = builderQueryRejection(t, dashboardPanelData, query);
+        if (rejection) {
+          errors.push(rejection);
+        } else if ((query?.query ?? "").trim() === "") {
           errors.push(t("dashboard.utils.queryIsEmpty", { index: index + 1 }));
         }
       });

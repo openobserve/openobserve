@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "Baffo superiore",
       "boxplotMedian": "Mediana",
       "boxplotSamples": "Campioni",
+      "boxplotValueNotNumeric": "Il valore del box plot deve essere un campo numerico",
       "boxplotOutlier": "Valore anomalo",
       "fieldNotAllowedForDistribution": "Il campo {label} non è consentito per il grafico di distribuzione",
       "distributionCount": "Conteggio",

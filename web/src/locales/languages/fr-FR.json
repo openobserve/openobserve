@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "Moustache supérieure",
       "boxplotMedian": "Médiane",
       "boxplotSamples": "Échantillons",
+      "boxplotValueNotNumeric": "La valeur de la boîte à moustaches doit être un champ numérique",
       "boxplotOutlier": "Valeur aberrante",
       "fieldNotAllowedForDistribution": "Le champ {label} n'est pas autorisé pour le graphique de distribution",
       "distributionCount": "Nombre",

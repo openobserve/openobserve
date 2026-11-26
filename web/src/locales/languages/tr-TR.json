@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "Üst bıyık",
       "boxplotMedian": "Medyan",
       "boxplotSamples": "Örnekler",
+      "boxplotValueNotNumeric": "Kutu grafiği değeri sayısal bir alan olmalıdır",
       "boxplotOutlier": "Aykırı değer",
       "fieldNotAllowedForDistribution": "{label} alanına dağılım grafiğinde izin verilmez",
       "distributionCount": "Sayı",
