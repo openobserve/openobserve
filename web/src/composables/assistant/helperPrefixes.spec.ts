@@ -15,16 +15,17 @@
 
 import { describe, expect, it } from "vitest";
 
-import { helperRequest } from "@/components/ai-assistant/helper/helperText";
-
 import { HELPER_PREFIXES, HELPER_REQUEST_STARTS, type HelperLanguage } from "./helperPrefixes";
 import { isHelperChat } from "./historyContext";
 
 describe("helper prefixes", () => {
   it("keeps every request the helper sends out of the history list, in either form", () => {
     for (const language of Object.keys(HELPER_PREFIXES) as HelperLanguage[]) {
-      expect(isHelperChat({ firstPrompt: helperRequest("top errors", language, null) })).toBe(true);
-      expect(isHelperChat({ title: helperRequest("top errors", language, "SELECT 1") })).toBe(true);
+      const prefix = HELPER_PREFIXES[language];
+      expect(isHelperChat({ firstPrompt: `${prefix} : top errors` })).toBe(true);
+      expect(
+        isHelperChat({ title: `${prefix} : Modify this query to top errors:\n\nSELECT 1` }),
+      ).toBe(true);
     }
   });
 

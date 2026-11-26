@@ -15,7 +15,6 @@
 
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import { proposalSeedTurn } from "@/components/ai-assistant/helper/handoffSeed";
 import { raw } from "@/types/i18n";
 
 import { createAssistantStore, inertAssistantDeps } from "./assistantStore";
@@ -43,6 +42,7 @@ import {
   type OpenAssistantEnv,
 } from "./openAssistant";
 import { resetPrefsForTests } from "./prefs";
+import type { StoredTurn } from "./pure";
 import { projectRecord } from "./record";
 import type { TurnTerminal } from "./turnStates";
 
@@ -1095,16 +1095,28 @@ describe("openAssistant: a door's seeded answer is stored on the server (B-shell
     { id: "o2-ai", pickable: true, available: true },
     { id: "generate-query", pickable: true, available: true },
   ];
-  const seedTurn = proposalSeedTurn({
-    turnId: "0190f3a0-0000-7000-8000-00000000abcd",
-    now: 1_700_000_000_000,
-    prompt: "count the logs per service",
-    query: "SELECT service, count(*) FROM logs GROUP BY service",
-    language: "sql",
-    stream: "logs",
-    range: { from: 1_700_000_000_000, to: 1_700_000_900_000 },
-    validated: true,
-  });
+  const seedTurn: StoredTurn = {
+    turn_id: "0190f3a0-0000-7000-8000-00000000abcd",
+    created: 1_700_000_000_000,
+    user: { text: "count the logs per service" },
+    status: "completed",
+    frames: [
+      {
+        type: "turn_started",
+        turn_id: "0190f3a0-0000-7000-8000-00000000abcd",
+        agent_type: "generate-query",
+      },
+      {
+        type: "query",
+        language: "sql",
+        text: "SELECT service, count(*) FROM logs GROUP BY service",
+        stream: "logs",
+        time_range: { from: 1_700_000_000_000, to: 1_700_000_900_000 },
+        validated: true,
+      },
+      { type: "complete" },
+    ],
+  };
   const handoff = (seed = [seedTurn]): OpenAssistantCall => ({
     ...headerOpen,
     entryKind: "nl_toggle",
