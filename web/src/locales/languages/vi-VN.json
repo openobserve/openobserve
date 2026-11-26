@@ -34586,7 +34586,15 @@
     "offline": "Bạn đang ngoại tuyến. Vẫn xem được truy cập gần đây.",
     "sourceUnavailable": "Loại tài nguyên này hiện không khả dụng",
     "emptyHelp": "Nhập tên hoặc ID để tìm",
-    "globalShortcut": "Mở tìm kiếm toàn cục"
+    "globalShortcut": "Mở tìm kiếm toàn cục",
+    "trigger": "Tìm kiếm hoặc chuyển đến…",
+    "allTypes": "Tất cả",
+    "capped": "Đang hiển thị kết quả khớp đầu tiên. | Đang hiển thị {count} kết quả khớp đầu tiên.",
+    "hintNavigate": "Điều hướng",
+    "hintOpen": "Mở",
+    "hintNewTab": "Mở trong tab mới",
+    "hintTypes": "Lọc theo loại",
+    "hintClose": "Đóng"
   },
   "timeRangeInput": {
     "label": "Nhập khoảng thời gian",

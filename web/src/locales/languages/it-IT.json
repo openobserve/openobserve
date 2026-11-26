@@ -34586,7 +34586,15 @@
     "offline": "Offline. Le visite recenti restano disponibili.",
     "sourceUnavailable": "Questo tipo di risorsa non è disponibile",
     "emptyHelp": "Inserisci un nome o ID per cercare",
-    "globalShortcut": "Apri ricerca globale"
+    "globalShortcut": "Apri ricerca globale",
+    "trigger": "Cerca o vai a…",
+    "allTypes": "Tutti",
+    "capped": "Visualizzazione della prima corrispondenza. | Visualizzazione delle prime {count} corrispondenze.",
+    "hintNavigate": "Naviga",
+    "hintOpen": "Apri",
+    "hintNewTab": "Apri in una nuova scheda",
+    "hintTypes": "Filtra per tipo",
+    "hintClose": "Chiudi"
   },
   "timeRangeInput": {
     "label": "Digita un intervallo di tempo",
