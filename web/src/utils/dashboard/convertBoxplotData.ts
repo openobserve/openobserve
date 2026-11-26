@@ -24,7 +24,7 @@ import { getGridLineStyle, getSeriesColor } from "./colorPalette";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { getFieldLabel } from "./fieldLabel";
 import { BOXPLOT_STATS, boxplotStatAlias, type BoxplotStatKey } from "./boxplotStats";
-import { hasTopLevelOrderBy } from "./sqlOrderBy";
+import { firstTopLevelOrderByKey } from "./sqlOrderBy";
 import { parseTimestampValue } from "./tableConfigUtils";
 import { echartsPaletteColor } from "./thresholds";
 
@@ -34,6 +34,13 @@ export const DEFAULT_BOXPLOT_WHISKER = "minmax";
 const IQR_FENCE = 1.5;
 // The label width bar and line charts truncate category labels to.
 const DEFAULT_LABEL_WIDTH = 120;
+const LABEL_CHAR_WIDTH = 7;
+// Room the y-axis labels and grid padding take from the plot width.
+const Y_AXIS_ALLOWANCE = 80;
+const CROWDED_ROTATION = 45;
+// Spacing a 45° label needs so every category keeps one: about 1.5 line heights of the 12 px axis font.
+const TILTED_SLOT_MIN = 24;
+const FALLBACK_PANEL_WIDTH = 800;
 const TIME_BUCKET_FUNCTIONS = new Set(["histogram", "date_bin"]);
 
 /** Five-number summary of one category; outliers are only split off in iqr mode. */
@@ -104,9 +111,12 @@ interface BoxGroup {
 const byName = (a: BoxGroup, b: BoxGroup) =>
   a.name.localeCompare(b.name, undefined, { numeric: true });
 
-/** Whether the query sets the category order itself: a builder category with a sort direction, or a top-level ORDER BY in custom SQL. */
+/** Whether the query sorts the categories itself: a builder category with a sort direction, or custom SQL whose first ORDER BY key is the category. */
 const keepsRowOrder = (query: any, category: any): boolean => {
-  if (query?.customQuery) return hasTopLevelOrderBy(String(query?.query ?? ""));
+  if (query?.customQuery) {
+    const key = firstTopLevelOrderByKey(String(query?.query ?? ""))?.toLowerCase();
+    return !!key && [category?.alias, category?.column].some((name) => name?.toLowerCase() === key);
+  }
   const direction = String(category?.sortBy ?? "").toUpperCase();
   return !category?.isDerived && (direction === "ASC" || direction === "DESC");
 };
@@ -179,24 +189,36 @@ const seriesName = (panelSchema: any): string => {
   return getFieldLabel(field, panelSchema?.config, query?.customQuery) || field?.alias || "";
 };
 
-/** The x labels a bar or line chart draws for its last x field: ECharts skips labels that would overlap, so a crowded axis shows a readable subset; time buckets stay flat at the default width. */
-export const categoryLabelLayout = (config: any, isTimeBucket: boolean) => ({
-  interval: "auto" as const,
-  hideOverlap: true,
-  overflow: "none" as const,
-  rotate: isTimeBucket ? 0 : Number(config?.axis_label_rotate) || 0,
-  width: isTimeBucket
-    ? DEFAULT_LABEL_WIDTH
-    : Number(config?.axis_label_truncate_width) || DEFAULT_LABEL_WIDTH,
-});
+/** The x labels of a bar chart: ECharts skips labels that would overlap, so ~600 categories show a readable subset; labels too long to sit flat tilt and truncate unless the panel sets rotation or width. */
+export const categoryLabelLayout = (
+  names: string[],
+  panelWidth: number,
+  config: any,
+  isTimeBucket: boolean,
+) => {
+  const base = { interval: "auto" as const, hideOverlap: true };
+  if (isTimeBucket) {
+    return { ...base, rotate: 0, width: DEFAULT_LABEL_WIDTH, overflow: "none" as const };
+  }
+  const slot = Math.max(panelWidth - Y_AXIS_ALLOWANCE, 40) / Math.max(names.length, 1);
+  const longest = Math.max(0, ...names.map((name) => String(name).length)) * LABEL_CHAR_WIDTH;
+  // Tilting only helps when every tilted label fits; otherwise overlaps are skipped and the rest stay full length.
+  const crowded = longest + 8 > slot && slot >= TILTED_SLOT_MIN;
+  const width = Number(config?.axis_label_truncate_width) || 0;
+  return {
+    ...base,
+    rotate: Number(config?.axis_label_rotate) || (crowded ? CROWDED_ROTATION : 0),
+    width: width || DEFAULT_LABEL_WIDTH,
+    overflow: width || crowded ? ("truncate" as const) : ("none" as const),
+  };
+};
 
 /** Converts SQL rows into a box plot: one box per x value, from a per-category SQL summary or a custom query's raw values. */
 export const convertBoxplotData = (
   panelSchema: any,
   data: any,
   store: any,
-  // Kept for the converter signature; ECharts sizes the labels itself.
-  _chartPanelRef?: any,
+  chartPanelRef?: any,
 ) => {
   const config = panelSchema?.config ?? {};
   const whisker = config.boxplot_whisker === "iqr" ? "iqr" : DEFAULT_BOXPLOT_WHISKER;
@@ -296,6 +318,8 @@ export const convertBoxplotData = (
       boundaryGap: true,
       axisLabel: {
         ...categoryLabelLayout(
+          groups.map((group) => group.name),
+          chartPanelRef?.value?.offsetWidth || FALLBACK_PANEL_WIDTH,
           config,
           TIME_BUCKET_FUNCTIONS.has(panelSchema?.queries?.[0]?.fields?.x?.[0]?.functionName),
         ),

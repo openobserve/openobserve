@@ -672,7 +672,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
           ? collapseBoxplotSummaryColumns(customFieldNames)
           : customFieldNames;
 
-      // Loop through each custom query field in the dashboard panel data's stream meta
       mappedFieldNames.forEach((name: string, index: number) => {
         // Determine the current field type based on the name
         let field;

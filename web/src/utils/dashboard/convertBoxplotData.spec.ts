@@ -162,59 +162,96 @@ describe("box plot", () => {
     ]);
   });
 
-  describe("x-axis labels, laid out like a bar chart's", () => {
+  describe("x-axis labels", () => {
     const servicesRows = (names: string[]) =>
       names.flatMap((name) => [
         { x_axis_1: name, y_axis_1: 1 },
         { x_axis_1: name, y_axis_1: 3 },
       ]);
     const five = ["alpha", "bravo", "charlie", "delta", "echo"];
-    const many = Array.from({ length: 600 }, (_, i) => `trace-${String(i).padStart(4, "0")}`);
-    const shownLabels = (options: any, names: string[]) => {
+    const fiveLong = five.map((name) => `${name}-checkout-service-production-eu-west-1`);
+    const many = Array.from(
+      { length: 600 },
+      (_, i) => `rtoss16687_1794506_trace_${String(i).padStart(4, "0")}`,
+    );
+    const renderSvg = (options: any, width: number) => {
       const chart = echarts.init(null as any, null, {
         renderer: "svg",
         ssr: true,
-        width: 800,
+        width,
         height: 400,
       });
       chart.setOption({ ...options, animation: false });
       const svg = chart.renderToSVGString();
       chart.dispose();
-      return names.filter((name) => svg.includes(`>${name}</text>`));
+      return svg;
+    };
+    // A truncated label keeps its start, so a name counts as drawn when its unique prefix is.
+    const shownLabels = (options: any, names: string[], width: number) => {
+      const svg = renderSvg(options, width);
+      return names.filter((name) => svg.includes(`>${name.slice(0, 10)}`));
     };
 
-    it("skips overlapping labels without tilting them, unless the panel sets a rotation", async () => {
-      const crowded = (await convert(panel(), [servicesRows(many)])).options.xAxis.axisLabel;
+    it("keeps labels that fit flat and untruncated", async () => {
+      const roomy = (await convert(panel(), [servicesRows(five)], 800)).options.xAxis.axisLabel;
+      expect(roomy).toMatchObject({
+        interval: "auto",
+        hideOverlap: true,
+        rotate: 0,
+        overflow: "none",
+      });
+    });
+
+    it("tilts and truncates long labels only when every tilted label then fits", async () => {
+      const narrow = (await convert(panel(), [servicesRows(fiveLong)], 420)).options.xAxis
+        .axisLabel;
+      expect(narrow).toMatchObject({ rotate: 45, width: 120, overflow: "truncate" });
+      const crowded = (await convert(panel(), [servicesRows(many)], 1000)).options.xAxis.axisLabel;
       expect(crowded.interval).not.toBe(0);
       expect(crowded).toMatchObject({
         interval: "auto",
         hideOverlap: true,
         rotate: 0,
-        width: 120,
         overflow: "none",
       });
+    });
+
+    it("uses the panel's rotation and truncate width, truncating at that width", async () => {
       const chosen = (
-        await convert(panel({ axis_label_rotate: 30, axis_label_truncate_width: 60 }), [
+        await convert(panel({ axis_label_rotate: 30, axis_label_truncate_width: 40 }), [
           servicesRows(five),
         ])
       ).options.xAxis.axisLabel;
-      expect(chosen).toMatchObject({ rotate: 30, width: 60 });
+      expect(chosen).toMatchObject({ rotate: 30, width: 40, overflow: "truncate" });
+      const widthOnly = (
+        await convert(panel({ axis_label_truncate_width: 40 }), [servicesRows(five)], 1200)
+      ).options.xAxis.axisLabel;
+      expect(widthOnly).toMatchObject({ rotate: 0, width: 40, overflow: "truncate" });
+    });
+
+    it("keeps time-bucket labels flat at the default width", async () => {
       const time = (
         await convert(
           panel({ axis_label_rotate: 30 }, [field("x_axis_1", "_timestamp", "histogram")]),
           [[{ x_axis_1: "2026-10-01T00:00:00", y_axis_1: 1 }]],
         )
       ).options.xAxis.axisLabel;
-      expect(time).toMatchObject({ rotate: 0, width: 120 });
+      expect(time).toMatchObject({ rotate: 0, width: 120, overflow: "none" });
     });
 
-    it("draws every label of a few categories and a readable subset of 600", async () => {
-      const few = await convert(panel(), [servicesRows(five)]);
-      expect(shownLabels(few.options, five)).toEqual(five);
-      const crowded = await convert(panel(), [servicesRows(many)]);
-      const shown = shownLabels(crowded.options, many);
-      expect(shown.length).toBeGreaterThan(0);
-      expect(shown.length).toBeLessThan(60);
+    it("draws all of a few long labels on a narrow panel and a readable subset of 600", async () => {
+      const short = await convert(panel(), [servicesRows(five)], 800);
+      expect(shownLabels(short.options, five, 800)).toEqual(five);
+      const narrow = await convert(panel(), [servicesRows(fiveLong)], 420);
+      expect(shownLabels(narrow.options, fiveLong, 420)).toEqual(fiveLong);
+      const crowded = await convert(panel(), [servicesRows(many)], 1000);
+      const svg = renderSvg(crowded.options, 1000);
+      // Every drawn trace label must be a whole name, never a truncated shared prefix.
+      const drawn = svg.split(">rtoss16687_").length - 1;
+      const whole = many.filter((name) => svg.includes(`>${name}</text>`));
+      expect(drawn).toBeGreaterThan(2);
+      expect(drawn).toBeLessThan(100);
+      expect(whole).toHaveLength(drawn);
     });
   });
 
@@ -378,22 +415,31 @@ describe("box plot", () => {
       expect(none.options.xAxis.data).toEqual(["alpha", "charlie", "echo"]);
     });
 
-    it("keeps custom SQL row order only when the SQL has a top-level ORDER BY", async () => {
+    it("keeps custom SQL row order only when its first top-level ORDER BY key is the category", async () => {
       const rawRows = [
         { x_axis_1: "web", y_axis_1: 1 },
         { x_axis_1: "api", y_axis_1: 2 },
         { x_axis_1: "web", y_axis_1: 3 },
       ];
-      const ordered = await convert(
-        custom('SELECT service as "x_axis_1", v as "y_axis_1" FROM t ORDER BY v DESC'),
-        [rawRows],
-      );
-      expect(ordered.options.xAxis.data).toEqual(["web", "api"]);
-      const unordered = await convert(
-        custom('SELECT service as "x_axis_1", v as "y_axis_1" FROM (SELECT * FROM t ORDER BY v)'),
-        [rawRows],
-      );
-      expect(unordered.options.xAxis.data).toEqual(["api", "web"]);
+      const order = async (sql: string) =>
+        (await convert(custom(sql), [rawRows])).options.xAxis.data;
+      const select = 'SELECT service as "x_axis_1", v as "y_axis_1" FROM t';
+      expect(await order(`${select} ORDER BY x_axis_1 DESC`)).toEqual(["web", "api"]);
+      expect(await order(`${select} ORDER BY "x_axis_1" desc LIMIT 10`)).toEqual(["web", "api"]);
+      expect(await order(`${select} ORDER BY service DESC, v`)).toEqual(["web", "api"]);
+      expect(await order(`${select} ORDER BY _timestamp DESC LIMIT 10000`)).toEqual(["api", "web"]);
+      expect(await order(`${select} ORDER BY v DESC`)).toEqual(["api", "web"]);
+      expect(await order(`${select} ORDER BY x_axis_1 || v`)).toEqual(["api", "web"]);
+      expect(
+        await order(
+          'SELECT service as "x_axis_1", v as "y_axis_1" FROM (SELECT * FROM t ORDER BY v)',
+        ),
+      ).toEqual(["api", "web"]);
+      expect(
+        await order(
+          'SELECT service as "x_axis_1", v as "y_axis_1", 1 as "sort order by x_axis_1" FROM t',
+        ),
+      ).toEqual(["api", "web"]);
     });
 
     it("keeps time buckets chronological whatever the row order", async () => {
