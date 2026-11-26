@@ -18355,6 +18355,7 @@
     "headerValue": "Header value",
     "addHeader": "Add header",
     "skillContentRequired": "Skill content is required",
+    "skillContentLong": "This skill is long ({chars} characters). Every AI chat message includes the whole skill, which makes each message slower and costlier.",
     "renameNeededHint": "Another toolset has the same name once normalized; delete and re-create one of them",
     "chooseTools": "Choose tools",
     "reviewPresetUpdate": "Review preset update",

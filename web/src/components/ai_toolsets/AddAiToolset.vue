@@ -312,6 +312,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div v-if="skillContentError" class="text-input-error-text text-xs">
                         {{ t("aiToolset.skillContentRequired") }}
                       </div>
+                      <div
+                        v-else-if="skillContentLong"
+                        class="text-status-warning-text text-xs"
+                        data-test="ai-toolset-skill-long"
+                      >
+                        {{ t("aiToolset.skillContentLong", { chars: skillContent.length }) }}
+                      </div>
                     </div>
                   </OFormSection>
                 </template>
@@ -432,6 +439,8 @@ import {
 } from "./AddAiToolset.schema";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+// About 10k tokens, as much again as a normal chat turn.
+const SKILL_LONG_CHARS = 40_000;
 
 type SecretPair = { key: string; value: string };
 
@@ -658,6 +667,8 @@ export default defineComponent({
     const skillContentError = computed(
       () => submitted.value && selectedKind.value === "skill" && !(skillContent.value ?? "").trim(),
     );
+    // A warning only: the whole skill goes into every chat turn, so a long one costs every turn.
+    const skillContentLong = computed(() => (skillContent.value ?? "").length > SKILL_LONG_CHARS);
 
     // -----------------------------------------------------------------------
     // Presets, from `GET /ai/toolsets/prebuilt` (the server's file is the only copy)
@@ -1298,6 +1309,7 @@ export default defineComponent({
       skillContent,
       setSkillContent,
       skillContentError,
+      skillContentLong,
       toolsetDraft,
       closeEditor,
     };

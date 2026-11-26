@@ -552,6 +552,28 @@ describe("AddAiToolset", () => {
       expect(wrapper.vm.skillContentError).toBe(false);
     });
 
+    it("warns about a long skill but still saves it", async () => {
+      wrapper = createWrapper();
+      const form = getForm();
+      form.setFieldValue("kind", "skill");
+      form.setFieldValue("name", "valid");
+      wrapper.vm.setSkillContent("x".repeat(40_000));
+      await flushPromises();
+      expect(wrapper.vm.skillContentLong).toBe(false);
+
+      const long = "x".repeat(40_001);
+      wrapper.vm.setSkillContent(long);
+      await flushPromises();
+      expect(wrapper.vm.skillContentLong).toBe(true);
+
+      await form.handleSubmit();
+      await flushPromises();
+      expect(aiToolsetsService.create).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({ kind: "skill", data: { content: long } }),
+      );
+    });
+
     it("saves an edit that changes only the skill content", async () => {
       mockQuery = { action: "edit", id: "skill-1" };
       vi.mocked(aiToolsetsService.get).mockResolvedValue({
