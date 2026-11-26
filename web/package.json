@@ -35,7 +35,6 @@
     "lint:tokens": "node scripts/check-css-tokens.mjs",
     "lint:token-purity": "node scripts/check-token-purity.mjs",
     "lint:design": "node scripts/check-design-consistency.mjs",
-    "check:assistant-bundle": "node scripts/check-assistant-bundle.mjs",
     "lint:design:strict": "node scripts/check-design-consistency.mjs",
     "check:bundle-budget": "node scripts/check-bundle-budget.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,vue,js,json,scss,css,md}\"",
