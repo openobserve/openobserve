@@ -23,7 +23,7 @@ import {
   type AiEventProps,
   type LengthBucket,
 } from "@/services/assistantAnalytics";
-import { createSeededChat, type SeededChatRequest } from "@/services/ai_chat_seed";
+import { createSeededChat, type SeededChatRequest } from "@/services/ai_chat_branch";
 import { gt, raw, type I18nKey } from "@/types/i18n";
 import type { PageContext } from "@/composables/contextProviders/types";
 

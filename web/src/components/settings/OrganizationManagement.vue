@@ -607,7 +607,7 @@ import AssistantAllowanceFloor, {
   ALLOWANCE_FLOOR_WARNING_ID,
 } from "./assistant/AssistantAllowanceFloor.vue";
 import { formatCount } from "@/utils/formatters";
-import { belowUsageOf } from "@/services/assistant_billing.queries";
+import { belowUsageOf } from "@/services/assistant_settings.queries";
 
 /** Backend TrialQuotaPool keys — also the usage-allowance dialog's tab names. */
 type QuotaPool =

@@ -45,7 +45,7 @@ import { computed, inject, watch } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import { orgAiUsageQuery } from "@/services/assistant_billing.queries";
+import { orgAiUsageQuery } from "@/services/assistant_settings.queries";
 import { useI18nTyped } from "@/types/i18n";
 import { formatCount } from "@/utils/formatters";
 

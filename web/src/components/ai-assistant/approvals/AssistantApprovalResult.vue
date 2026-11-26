@@ -291,7 +291,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { queryClient } from "@/composables/query/queryClient";
 import type { AssistantGrant } from "@/services/assistant_settings";
 import { assistantGrantsQuery, revokeGrantMutation } from "@/services/assistant_settings.queries";
-import { assistantSettingsKeys } from "@/services/assistant_settings.querykeys";
+import { assistantSettingsKeys } from "@/services/assistant.querykeys";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";

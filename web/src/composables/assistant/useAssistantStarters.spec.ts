@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed, effectScope, ref, shallowRef } from "vue";
 
 import { queryClient } from "@/composables/query/queryClient";
-import { assistantSettingsKeys } from "@/services/assistant_settings.querykeys";
+import { assistantSettingsKeys } from "@/services/assistant.querykeys";
 import { streamKeys } from "@/services/stream.querykeys";
 import { raw } from "@/types/i18n";
 

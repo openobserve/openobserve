@@ -104,7 +104,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import { roleChatAccessQuery } from "@/services/assistant_roles.queries";
+import { roleChatAccessQuery } from "@/services/assistant_settings.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import { useAssistantSettingsPage } from "./useAssistantSettingsPage";

@@ -18,7 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import { LIVE_STALE_TIME, MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
 import assistant from "./assistant";
-import { assistantKeys } from "./assistant.querykeys";
+import { assistantKeys, assistantSettingsKeys } from "./assistant.querykeys";
 import { aiToolsetKeys } from "./ai_toolsets.querykeys";
 import assistantSettings from "./assistant_settings";
 import {
@@ -31,7 +31,6 @@ import {
   undoActivityMutation,
   updateAssistantSettingsMutation,
 } from "./assistant_settings.queries";
-import { assistantSettingsKeys } from "./assistant_settings.querykeys";
 
 vi.mock("./assistant_settings", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./assistant_settings")>()),

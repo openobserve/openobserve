@@ -22,7 +22,7 @@ vi.mock("./paidOverage", () => ({ default: api }));
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
 import { paidOverageQuery, setPaidOverageMutation } from "./paidOverage.queries";
-import { paidOverageKeys } from "./paidOverage.querykeys";
+import { paidOverageKeys } from "./paidOverage.queries";
 
 describe("paidOverage queries", () => {
   beforeEach(() => vi.clearAllMocks());

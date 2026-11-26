@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions } from "@tanstack/vue-query";
-
 import { assistantKeys } from "./assistant.querykeys";
 import http from "./http";
+import type { StoredTurn } from "@/composables/assistant/pure";
 
 /** Body of `POST /api/{org}/ai/chats/{session_id}/branch`; `version` is the 1-based answer shown, the active one when absent. */
 export interface BranchChatRequest {
@@ -74,3 +74,28 @@ export const branchChatMutation = (org: string) =>
   });
 
 export default aiChatBranch;
+
+/** Body of `POST /api/{org}/ai/chats/seeded`: a new chat that starts from a door's finished answer. */
+export interface SeededChatRequest {
+  session_id: string;
+  title: string;
+  agent_type?: string;
+  origin: string;
+  turns: StoredTurn[];
+}
+
+export interface SeededChatResponse {
+  session_id: string;
+  title: string;
+  agent_type: string;
+}
+
+/** A 201 makes the chat; a 200 means this caller already holds that session id. */
+export function createSeededChat(org: string, body: SeededChatRequest) {
+  // The server accepts only a JSON body (415 otherwise), which a cross-site form post cannot send.
+  return http().post<SeededChatResponse>(`/api/${enc(org)}/ai/chats/seeded`, body, {
+    headers: { "Content-Type": "application/json" },
+    silentForbidden: true,
+    assistantManaged: true,
+  });
+}

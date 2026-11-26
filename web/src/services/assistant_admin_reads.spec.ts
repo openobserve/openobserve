@@ -15,8 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { belowUsageOf } from "./assistant_billing.queries";
-import { grantsChat } from "./assistant_roles.queries";
+import { belowUsageOf, grantsChat } from "./assistant_settings.queries";
 
 const rejection = (status: number, data: unknown) => ({ response: { status, data } });
 

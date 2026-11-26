@@ -196,7 +196,7 @@ import {
   createToolsetMutation,
   toolsetQuery,
   updateToolsetMutation,
-} from "@/services/assistant_toolsets.queries";
+} from "@/services/assistant_settings.queries";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 import {

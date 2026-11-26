@@ -14,11 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
-
 import paidOverage, { type PaidOverageFeature, type PaidOverageStatus } from "./paidOverage";
-import { paidOverageKeys } from "./paidOverage.querykeys";
+import { orgKey } from "@/composables/query/keys";
+
+export const paidOverageKeys = {
+  all: (org: string) => orgKey(org, "paidOverage"),
+  status: (org: string, feature: PaidOverageFeature) => orgKey(org, "paidOverage", feature),
+};
 
 /** `GET paid_overage`; the meter and Billing read it. */
 export const paidOverageQuery = (org: string, feature: PaidOverageFeature) =>

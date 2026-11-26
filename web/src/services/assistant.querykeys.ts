@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { orgKey } from "@/composables/query/keys";
+import type { AssistantActivityFilter } from "./assistant_settings";
 
 export const assistantKeys = {
   all: (org: string) => orgKey(org, "assistant"),
@@ -23,4 +24,14 @@ export const assistantKeys = {
   activeChats: (org: string) => orgKey(org, "assistant", "chats", "active"),
   settings: (org: string) => orgKey(org, "assistant", "settings"),
   usage: (org: string) => orgKey(org, "assistant", "usage"),
+};
+
+/** Every read under Settings › Assistant sits below `assistantKeys.settings`, so one scope refetches the page. */
+export const assistantSettingsKeys = {
+  all: (org: string) => assistantKeys.settings(org),
+  org: (org: string) => [...assistantKeys.settings(org), "org"] as const,
+  grants: (org: string) => [...assistantKeys.settings(org), "grants"] as const,
+  activityAll: (org: string) => [...assistantKeys.settings(org), "activity"] as const,
+  activity: (org: string, filter: AssistantActivityFilter) =>
+    [...assistantKeys.settings(org), "activity", filter] as const,
 };

@@ -283,7 +283,7 @@ import {
   setToolsetEnabledMutation,
   testToolsetMutation,
 } from "@/services/assistant_settings.queries";
-import { deleteToolsetMutation } from "@/services/assistant_toolsets.queries";
+import { deleteToolsetMutation } from "@/services/assistant_settings.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
