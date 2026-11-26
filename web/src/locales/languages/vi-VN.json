@@ -12409,7 +12409,7 @@
     "suggestCheckPermissions": "Kiểm tra rằng thông tin đăng nhập của bạn có các quyền cần thiết.",
     "suggestCheckEndpoint": "Vui lòng xác minh URL điểm cuối là chính xác.",
     "suggestRateLimit": "Bạn đã vượt quá giới hạn tốc độ. Vui lòng đợi trước khi thử lại.",
-    "suggestServerIssue": "Dịch vụ đích đang gặp sự cố. Vui lòng thử lại sau.",
+    "suggestServerIssue": "Hãy thử lại sau vài phút. Nếu vẫn lỗi, hãy kiểm tra dịch vụ đích.",
     "description": "Mô tả",
     "stream_name": "Tên stream",
     "cloneTitle": "Nhân bản cảnh báo",
@@ -20205,7 +20205,7 @@
         "latency": "Độ trễ",
         "output": "Đầu ra đã trích xuất",
         "rawRequest": "Yêu cầu đã gửi",
-        "idle": "Yêu cầu và phản hồi sẽ hiển thị tại đây sau khi bạn chạy thử.",
+        "idle": "Yêu cầu đã gửi và đầu ra được trích xuất sẽ xuất hiện ở đây sau khi bạn chạy thử.",
         "disabledHint": "Vui lòng nhập tên và điểm cuối trước.",
         "failure": {
           "transport": "Không thể kết nối tới endpoint.",

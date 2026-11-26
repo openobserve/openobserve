@@ -12409,7 +12409,7 @@
     "suggestCheckPermissions": "Verifica che le tue credenziali dispongano delle autorizzazioni necessarie.",
     "suggestCheckEndpoint": "Verifica che l'URL dell'endpoint sia corretto.",
     "suggestRateLimit": "Hai superato il rate limit. Attendi prima di riprovare.",
-    "suggestServerIssue": "Il servizio di destinazione sta riscontrando problemi. Riprova più tardi.",
+    "suggestServerIssue": "Riprova tra qualche minuto. Se continua a fallire, controlla il servizio di destinazione.",
     "description": "Descrizione",
     "stream_name": "Nome dello stream",
     "cloneTitle": "Clona avviso",
@@ -20205,7 +20205,7 @@
         "latency": "Latenza",
         "output": "Output estratto",
         "rawRequest": "Richiesta inviata",
-        "idle": "La richiesta e la risposta compaiono entrambe qui dopo aver eseguito un test.",
+        "idle": "La richiesta inviata e l'output estratto compaiono qui dopo aver eseguito un test.",
         "disabledHint": "Compila prima il nome e l'endpoint.",
         "failure": {
           "transport": "Impossibile raggiungere l'endpoint.",

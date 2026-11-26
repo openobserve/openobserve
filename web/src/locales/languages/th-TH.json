@@ -12407,7 +12407,7 @@
     "suggestCheckPermissions": "Check that your credentials have the necessary permissions.",
     "suggestCheckEndpoint": "Please verify the endpoint URL is correct.",
     "suggestRateLimit": "You've exceeded the rate limit. Please wait before retrying.",
-    "suggestServerIssue": "The destination service is experiencing issues. Please try again later.",
+    "suggestServerIssue": "ลองอีกครั้งในอีกไม่กี่นาที หากยังล้มเหลวต่อเนื่อง โปรดตรวจสอบบริการปลายทาง",
     "description": "คำอธิบาย",
     "stream_name": "Stream Name",
     "cloneTitle": "Clone alert",
@@ -20203,7 +20203,7 @@
         "latency": "Latency",
         "output": "Extracted Output",
         "rawRequest": "Request Sent",
-        "idle": "The request and the response both appear here once you run a test.",
+        "idle": "คำขอที่ส่งและผลลัพธ์ที่แยกออกมาจะแสดงที่นี่เมื่อคุณทำการทดสอบ",
         "disabledHint": "Fill in the name and endpoint first.",
         "failure": {
           "transport": "Could not reach the endpoint.",
