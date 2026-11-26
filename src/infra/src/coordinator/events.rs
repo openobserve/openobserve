@@ -13,10 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, LazyLock as Lazy};
+use std::{
+    borrow::Cow,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use bytes::Bytes;
-use config::utils::json;
+use config::utils::{json, str::mask_secret};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{RwLock, mpsc};
 
@@ -26,6 +29,9 @@ use crate::{
 };
 
 pub const COORDINATOR_STREAM: &str = "coordinator_events";
+pub const ORG_INGESTION_TOKENS_KEY_PREFIX: &str = "/org_ingestion_tokens/";
+/// Keys under these prefixes end in a plaintext secret, so only a masked form may be logged.
+const SECRET_KEY_PREFIXES: [&str; 1] = [ORG_INGESTION_TOKENS_KEY_PREFIX];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CoordinatorEvent {
@@ -96,7 +102,7 @@ pub async fn init() -> Result<()> {
                             log::debug!(
                                 "[COORDINATOR::EVENTS] sending event to watcher: {:?}:{}, start_dt: {:?}",
                                 event.action,
-                                event.key,
+                                loggable_key(&event.key),
                                 event.start_dt
                             );
                             if let Err(e) = tx.send(event.clone().into()).await {
@@ -225,7 +231,10 @@ async fn publish(event: CoordinatorEvent) -> Result<()> {
 }
 
 pub async fn put_event(key: &str, start_dt: Option<i64>, value: Option<Bytes>) -> Result<()> {
-    log::debug!("[COORDINATOR::EVENTS] publishing put event for key: {key}");
+    log::debug!(
+        "[COORDINATOR::EVENTS] publishing put event for key: {}",
+        loggable_key(key)
+    );
     if let Err(e) = publish(CoordinatorEvent::Meta(MetaEvent {
         action: MetaAction::Put,
         key: key.to_string(),
@@ -234,7 +243,10 @@ pub async fn put_event(key: &str, start_dt: Option<i64>, value: Option<Bytes>) -
     }))
     .await
     {
-        log::error!("[COORDINATOR::EVENTS] failed to publish put event for key: {key}: {e}");
+        log::error!(
+            "[COORDINATOR::EVENTS] failed to publish put event for key: {}: {e}",
+            loggable_key(key)
+        );
         return Err(e);
     }
     Ok(())
@@ -242,7 +254,8 @@ pub async fn put_event(key: &str, start_dt: Option<i64>, value: Option<Bytes>) -
 
 pub async fn delete_event(key: &str, start_dt: Option<i64>) -> Result<()> {
     log::debug!(
-        "[COORDINATOR::EVENTS] publishing delete event for key: {key}, start_dt: {start_dt:?}"
+        "[COORDINATOR::EVENTS] publishing delete event for key: {}, start_dt: {start_dt:?}",
+        loggable_key(key)
     );
     if let Err(e) = publish(CoordinatorEvent::Meta(MetaEvent {
         action: MetaAction::Delete,
@@ -252,15 +265,42 @@ pub async fn delete_event(key: &str, start_dt: Option<i64>) -> Result<()> {
     }))
     .await
     {
-        log::error!("[COORDINATOR::EVENTS] failed to publish delete event for key: {key}: {e}");
+        log::error!(
+            "[COORDINATOR::EVENTS] failed to publish delete event for key: {}: {e}",
+            loggable_key(key)
+        );
         return Err(e);
     }
     Ok(())
 }
 
+/// The key with a secret last segment masked; every other key is returned as is.
+pub fn loggable_key(key: &str) -> Cow<'_, str> {
+    if !SECRET_KEY_PREFIXES.iter().any(|p| key.starts_with(p)) {
+        return Cow::Borrowed(key);
+    }
+    match key.rsplit_once('/') {
+        Some((head, secret)) => Cow::Owned(format!("{head}/{}", mask_secret(secret))),
+        None => Cow::Borrowed(key),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_loggable_key_masks_only_the_ingestion_token() {
+        assert_eq!(
+            loggable_key("/org_ingestion_tokens/default/o2oi_abcdefghijklmnopwxyz"),
+            "/org_ingestion_tokens/default/o2oi****wxyz"
+        );
+        assert_eq!(
+            loggable_key("/org_ingestion_tokens/default/short"),
+            "/org_ingestion_tokens/default/****"
+        );
+        assert_eq!(loggable_key("/alerts/default/a1"), "/alerts/default/a1");
+    }
 
     #[test]
     fn test_meta_event_put_converts_to_db_event_put() {

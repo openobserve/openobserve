@@ -18,7 +18,10 @@ use std::ops::ControlFlow;
 use config::{TIMESTAMP_COL_NAME, utils::sql::is_complex_query_stmt};
 use infra::errors::Error;
 use sqlparser::{
-    ast::{Expr, Ident, OrderByExpr, OrderByKind, Query, VisitMut, VisitorMut},
+    ast::{
+        Expr, Ident, OrderBy, OrderByExpr, OrderByKind, OrderByOptions, OrderBySort, Query,
+        VisitMut, VisitorMut,
+    },
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -53,12 +56,16 @@ impl VisitorMut for AddOrderingTermVisitor {
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if query.order_by.is_none() {
-            query.order_by = Some(sqlparser::ast::OrderBy {
+            query.order_by = Some(OrderBy {
                 kind: OrderByKind::Expressions(vec![OrderByExpr {
                     expr: Expr::Identifier(Ident::new(self.field.clone())),
                     with_fill: None,
-                    options: sqlparser::ast::OrderByOptions {
-                        asc: Some(self.is_asc),
+                    options: OrderByOptions {
+                        sort: Some(if self.is_asc {
+                            OrderBySort::Asc
+                        } else {
+                            OrderBySort::Desc
+                        }),
                         nulls_first: None,
                     },
                 }]),
@@ -78,7 +85,7 @@ mod tests {
     #[test]
     fn test_add_ordering_term_visitor() {
         let sql = "SELECT * FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -94,7 +101,7 @@ mod tests {
     #[test]
     fn test_add_ordering_term_visitor_desc() {
         let sql = "SELECT * FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -111,7 +118,7 @@ mod tests {
     #[test]
     fn test_add_ordering_term_visitor_order_by_already_present() {
         let sql = "SELECT * FROM users ORDER BY age ASC";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();

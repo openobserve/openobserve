@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "ยังไม่มีช่องใดที่ตั้งองค์กรเริ่มต้นไว้",
-      "description": "คำถามในช่องที่ไม่มีค่าเริ่มต้นจะถูกส่งไปยังองค์กรเริ่มต้นของแต่ละคน (เปลี่ยนได้ด้วย /o2 org)."
+      "description": "คำถามในแชนเนลที่ไม่ได้ตั้งค่าเริ่มต้นจะถูกส่งไปยังองค์กรเริ่มต้นของแต่ละคน (ผู้ใช้เปลี่ยนได้ด้วย {command} org)"
     },
     "noSlackLinkedPeople": {
       "title": "ยังไม่มีใครในองค์กรนี้เชื่อมโยง Slack"
@@ -300,7 +300,7 @@
       "title": "สร้างคิวแอนโนเทชันแรกของคุณ",
       "description": "คิวแอนโนเทชันคือรายการสิ่งที่ต้องตรวจทาน — ผูก Score Configs ชุดข้อมูลเป้าหมาย และตัวกรองที่ป้อนรายการเข้ามาเพื่อการตรวจทานโดยมนุษย์",
       "action": "สร้างคิวแอนโนเทชันใหม่",
-      "actionDesc": "เริ่มต้นคิวแอนโนเทชันแบบว่างเปล่า"
+      "actionDesc": "เริ่มคิวแอนโนเทชันเปล่า"
     },
     "noPrompts": {
       "title": "Create your first prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Nothing Unhealthy Here",
-      "description": "ไม่มีรายการที่ผิดปกติในช่วงเวลานี้ ขยายช่วงเวลา หรือเปลี่ยนตัวกรองคิวแอนโนเทชันเพื่อดูรายการที่คุณคัดกรองแล้ว"
+      "description": "ไม่มีรายการที่ผิดปกติในช่วงเวลานี้ ขยายช่วงเวลา หรือสลับตัวกรองคิวแอนโนเทชันเพื่อดูรายการที่คุณคัดกรองแล้ว"
     },
     "noTraces": {
       "title": "No traces found",
@@ -1920,6 +1920,7 @@
     "patternCount": "จำนวน",
     "errorConstructingSearchQuery": "An error occurred while constructing the search query.",
     "errorExtractingPatterns": "Error extracting patterns. Please try again.",
+    "patternsNoReadPermission": "คุณไม่มีสิทธิ์อ่านสตรีมนี้",
     "errorWhileApplyingSavedView": "Error while applying saved view.",
     "errorWhileExtractingStreamFields": "Error while extracting stream fields.",
     "errorWhileGeneratingHistogramData": "Error while generating histogram data.",
@@ -6333,6 +6334,8 @@
     "fieldRequired": "Field is required!",
     "sqlQuery": "Sql Query",
     "promqlQuery": "PromQL Query",
+    "queryRowLimitNote": "การรันแต่ละครั้งประมวลผลได้สูงสุด {limit} แถว เว้นแต่คิวรีจะกำหนด LIMIT ของตัวเอง",
+    "queryRowLimitNoteNoLimit": "การรันแต่ละครั้งประมวลผลได้สูงสุดตามจำนวนแถวเริ่มต้น เว้นแต่คิวรีจะกำหนด LIMIT ของตัวเอง",
     "output": "Output",
     "validating": "Validating...",
     "validateAndClose": "Validate and Close",
@@ -9983,6 +9986,10 @@
     },
     "browserDeniedFileDownload": "Browser denied file download...",
     "chartDataDownloadedCsv": "Chart data downloaded as a CSV file",
+    "tableDownloadPartial": "ดึงผลลัพธ์มาเพียง {count} แถวแรก ไฟล์จึงไม่ครบถ้วน",
+    "tableDownloadServerPartial": "เซิร์ฟเวอร์ส่งข้อมูลกลับมาไม่ครบ ไฟล์จึงอาจไม่สมบูรณ์",
+    "tableDownloadWaitForLoad": "แผงยังโหลดอยู่ ดาวน์โหลดอีกครั้งเมื่อโหลดเสร็จ",
+    "preparingTableDownload": "กำลังดึงทุกแถวสำหรับการดาวน์โหลด…",
     "chartDataDownloadedJson": "Chart data downloaded as a JSON file",
     "dynamicFilters": "Dynamic filters",
     "failedToCancelRunningQuery": "Failed to cancel running query",
@@ -16089,8 +16096,10 @@
         "searchSuffixesAria": "Search suffix filters",
         "searchTypesAria": "Search type filters",
         "facetAria": "{label}, {count} metrics",
+        "facetAriaUnchecked": "{label}, {count} ที่มีข้อมูล, {unchecked} ที่ยังไม่ได้เลือก",
         "noPrefixMatch": "No prefixes match.",
         "noSuffixMatch": "No suffixes match.",
+        "uncheckedTooltip": "{count} ที่มีข้อมูล · {unchecked} ที่ยังไม่ได้เลือก",
         "noTypeMatch": "No types match."
       },
       "views": {
@@ -19358,15 +19367,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "เพิ่มไปยังคิวแอนโนเทชัน",
-        "title": "เพิ่มไปยังคิวแอนโนเทชัน",
-        "hint": "เพิ่ม {ref} เพื่อการตรวจทานโดยมนุษย์ รายการจะยังอยู่ที่เดิม — คิวแอนโนเทชันจะติดตามสถานะการตรวจทาน",
+        "button": "เพิ่มลงในคิวแอนโนเทชัน",
+        "title": "เพิ่มลงในคิวแอนโนเทชัน",
+        "hint": "เพิ่ม {ref} เพื่อการตรวจทานโดยมนุษย์ รายการนั้นจะอยู่ที่เดิม — คิวแอนโนเทชันจะติดตามสถานะการตรวจทาน",
         "queueLabel": "คิวแอนโนเทชัน",
         "queuePlaceholder": "เลือกคิวแอนโนเทชัน...",
-        "noQueues": "ไม่มีคิวแอนโนเทชันที่รองรับ {scope} — โปรดสร้างคิวจากหน้าคิวแอนโนเทชันก่อน",
-        "confirm": "เพิ่มไปยังคิวแอนโนเทชัน",
+        "noQueues": "ไม่มีคิวแอนโนเทชันที่รองรับ {scope} — สร้างคิวก่อนจากหน้าคิวแอนโนเทชัน",
+        "confirm": "เพิ่มลงในคิวแอนโนเทชัน",
         "success": "Added to {queue}",
-        "error": "ไม่สามารถเพิ่มรายการนี้ไปยังคิวแอนโนเทชันได้"
+        "error": "ไม่สามารถเพิ่มรายการนี้ลงในคิวแอนโนเทชัน"
       },
       "dataset": {
         "button": "Add To Dataset",
@@ -19404,7 +19413,7 @@
       },
       "inQueueFilter": {
         "label": "สถานะคิวแอนโนเทชัน",
-        "notEnqueued": "ยังไม่ได้เข้าคิว",
+        "notEnqueued": "ยังไม่อยู่ในคิว",
         "enqueued": "อยู่ในคิวแอนโนเทชัน",
         "pending": "รอตรวจทาน",
         "reviewed": "ตรวจทานแล้ว",
@@ -19424,7 +19433,7 @@
         "service": "Service",
         "input": "Input",
         "quality": "Quality",
-        "inQueue": "อยู่ในคิวแอนโนเทชัน?",
+        "inQueue": "อยู่ในคิวแอนโนเทชันหรือไม่",
         "actions": "การดำเนินการ"
       },
       "spanParent": "In {trace}",
@@ -19438,24 +19447,24 @@
         "reviewed": "Already Reviewed",
         "multiple": "อยู่ใน {count} คิวแอนโนเทชัน"
       },
-      "addToQueue": "เพิ่มไปยังคิวแอนโนเทชัน",
+      "addToQueue": "เพิ่มลงในคิวแอนโนเทชัน",
       "addToQueueMenu": {
         "loading": "กำลังโหลดคิวแอนโนเทชัน...",
-        "noQueues": "ยังไม่มีคิวแอนโนเทชัน — โปรดสร้างคิวจากหน้าคิวแอนโนเทชันก่อน",
+        "noQueues": "ยังไม่มีคิวแอนโนเทชัน — สร้างคิวก่อนจากหน้าคิวแอนโนเทชัน",
         "dimensions": "{count} dimension | {count} dimensions",
         "accepts": "Accepts {types} only",
-        "sectionTitle": "เพิ่มไปยังคิวแอนโนเทชัน",
+        "sectionTitle": "เพิ่มลงในคิวแอนโนเทชัน",
         "manageQueues": "จัดการคิวแอนโนเทชัน"
       },
-      "addSuccess": "เพิ่มไปยัง {queue} แล้ว — แถวยังคงอยู่ใน Discovery และคิวแอนโนเทชันจะติดตามสถานะการตรวจทาน",
-      "addError": "ไม่สามารถเพิ่มรายการไปยังคิวแอนโนเทชันได้",
+      "addSuccess": "เพิ่มลงใน {queue} แล้ว — แถวยังคงอยู่ใน Discovery และคิวแอนโนเทชันจะติดตามสถานะการตรวจทาน",
+      "addError": "ไม่สามารถเพิ่มรายการลงในคิวแอนโนเทชัน",
       "openQueue": "เปิดคิวแอนโนเทชัน",
-      "queuesError": "ไม่สามารถโหลดคิวแอนโนเทชันได้"
+      "queuesError": "ไม่สามารถโหลดคิวแอนโนเทชัน"
     },
     "queues": {
       "searchPlaceholder": "ค้นหาคิวแอนโนเทชัน...",
       "newButton": "สร้างคิวแอนโนเทชันใหม่",
-      "loadError": "ไม่สามารถโหลดคิวแอนโนเทชันได้",
+      "loadError": "ไม่สามารถโหลดคิวแอนโนเทชัน",
       "optionsLoadError": "Failed to load score configs",
       "review": "Review",
       "cleared": "Cleared",
@@ -19480,7 +19489,7 @@
         "descriptionLabel": "คำอธิบาย",
         "descriptionPlaceholder": "คิวแอนโนเทชันนี้มีไว้เพื่ออะไร และใครเป็นผู้ตรวจทาน...",
         "scoreConfigsLabel": "Score Configs",
-        "scoreConfigsHint": "คิวแอนโนเทชันให้คะแนนรายการตามหนึ่งมิติหรือหลายมิติ แต่ละ Score Config คือหนึ่งมิติ — เลือกคอนฟิกที่จะผูก และปักหมุดแต่ละคอนฟิกไปยังเวอร์ชัน",
+        "scoreConfigsHint": "คิวแอนโนเทชันให้คะแนนรายการในหนึ่งมิติหรือมากกว่า Score Config แต่ละรายการคือหนึ่งมิติ — เลือก Score Config ที่จะผูก และปักหมุดแต่ละรายการกับเวอร์ชัน",
         "scoreConfigsEmpty": "Pick the Score Configs to bind.",
         "addScoreConfig": "Add Score Config",
         "allScoreConfigsAdded": "All score configs are added.",
@@ -19488,10 +19497,10 @@
         "noScoreConfigs": "No score configs yet — create one in Score Configs first.",
         "targetDatasetLabel": "Target Dataset",
         "targetDatasetNone": "None (review-only)",
-        "targetDatasetHint": "หากไม่มีชุดข้อมูลเป้าหมาย รายการในคิวแอนโนเทชันนี้จะได้รับการตรวจทานเท่านั้น",
+        "targetDatasetHint": "หากไม่มีชุดข้อมูลเป้าหมาย รายการในคิวแอนโนเทชันนี้จะถูกตรวจทานเท่านั้น",
         "autoRoutingLabel": "Auto-routing",
-        "autoRoutingHint": "จัดคิวออบเจ็กต์ที่คะแนนตรงกับเงื่อนไขโดยอัตโนมัติ เว้นว่างไว้เพื่อเพิ่มรายการไปยังคิวแอนโนเทชันนี้จาก Discovery",
-        "autoRoutingEmpty": "รายการจะถูกเพิ่มไปยังคิวแอนโนเทชันนี้ด้วยตนเอง",
+        "autoRoutingHint": "เพิ่มออบเจกต์ที่คะแนนตรงตามเงื่อนไขเข้าคิวโดยอัตโนมัติ เว้นว่างไว้เพื่อเพิ่มรายการลงในคิวแอนโนเทชันนี้จาก Discovery",
+        "autoRoutingEmpty": "รายการจะถูกเพิ่มลงในคิวแอนโนเทชันนี้ด้วยตนเอง",
         "addCondition": "Add Condition",
         "conditionAnd": "AND",
         "operatorIs": "is",
@@ -19501,11 +19510,11 @@
         "pin": "Pin Version",
         "versionLatest": "v{version} (latest)",
         "success": "สร้างคิวแอนโนเทชันแล้ว",
-        "error": "ไม่สามารถสร้างคิวแอนโนเทชันได้"
+        "error": "ไม่สามารถสร้างคิวแอนโนเทชัน"
       },
       "detail": {
         "fallbackTitle": "คิวแอนโนเทชัน",
-        "loadError": "ไม่สามารถโหลดรายการในคิวแอนโนเทชันได้",
+        "loadError": "ไม่สามารถโหลดรายการในคิวแอนโนเทชัน",
         "startReviewing": "Start Reviewing",
         "scoreConfigs": "Score Configs ({count})",
         "targetDataset": "Target Dataset",
@@ -19515,7 +19524,7 @@
         "inTrace": "In Trace {traceId}",
         "reviewAgain": "Review Again",
         "emptyTitle": "Nothing To Review",
-        "emptyBody": "เพิ่มเทรซ สแปน หรือเซสชันไปยังคิวแอนโนเทชันนี้จาก Discovery หรือมุมมองเทรซ",
+        "emptyBody": "เพิ่มเทรซ สแปน หรือเซสชันลงในคิวแอนโนเทชันนี้จาก Discovery หรือมุมมองเทรซ",
         "columns": {
           "refType": "Ref",
           "refId": "Reference",
@@ -19586,7 +19595,7 @@
         "true": "True",
         "false": "False",
         "allReviewedTitle": "All items reviewed",
-        "allReviewedBody": "ทุกรายการในคิวแอนโนเทชันนี้ได้รับการตรวจทานเสร็จสมบูรณ์แล้ว"
+        "allReviewedBody": "ทุกรายการในคิวแอนโนเทชันนี้ได้รับการตรวจทานเสร็จสิ้นแล้ว"
       }
     },
     "experiments": {
@@ -25742,8 +25751,8 @@
     "sloDetail": "SLO Detail",
     "alertDetail": "Alert Detail",
     "editAlert": "Edit Alert",
-    "aiQueueDetail": "คิวแอนโนเทชัน",
-    "aiQueueReview": "การตรวจสอบคิวแอนโนเทชัน",
+    "aiQueueDetail": "คิวการกำกับข้อมูล",
+    "aiQueueReview": "การตรวจทานคิวการกำกับข้อมูล",
     "aiDatasetDetail": "Dataset",
     "aiPromptCreate": "New Prompt",
     "aiPromptVersionCreate": "New Prompt Version",
@@ -28130,7 +28139,7 @@
     "teamChannelSilent": "This team's channel is empty on purpose — pages will not be announced anywhere.",
     "slackChannelTitle": "ช่อง Slack",
     "slackChannelSetWith": "ตั้งค่าช่อง Slack ด้วย {command}",
-    "slackChannelLinkHint": "พิมพ์ในช่อง Slack นั้น ต้องเชื่อมโยงบัญชี Slack ของคุณ: พิมพ์ /o2 link ใน Slack",
+    "slackChannelLinkHint": "พิมพ์ในแชนเนล Slack นั้น จำเป็นต้องเชื่อมโยงบัญชี Slack ของคุณ: พิมพ์ {command} link ใน Slack",
     "slackChannelSendTest": "ส่งข้อความทดสอบ",
     "slackChannelClear": "ล้าง",
     "slackChannelBackup": "ใช้ {webhook} เป็นตัวสำรองเท่านั้น",
@@ -28705,7 +28714,7 @@
     "mineJoinTeam": "เข้าร่วมทีม",
     "mineTestTeam": "ส่งการแจ้งเตือนทดสอบไปยัง {team}",
     "mineCoverSaved": "บันทึกการครอบเวรแล้ว",
-    "mineSlackLinkHow": "พิมพ์ /o2 link ใน Slack",
+    "mineSlackLinkHow": "พิมพ์ {command} link ใน Slack",
     "mineSlackSetUpHint": "เปิดการตั้งค่า › Slack",
     "myDeliveriesWhen": "เวลา",
     "phoneAddHint": "เพิ่มหมายเลขสำหรับข้อความและการโทร",
@@ -29276,7 +29285,7 @@
     "channelUnavailable": "{channel} — no provider behind it",
     "channelUnverified": "{channel} — on file, but nobody has verified it",
     "channelAddPhone": "{reason}. Add your phone on My on-call",
-    "channelLinkSlack": "{reason} เรียกใช้ /o2 link ใน Slack",
+    "channelLinkSlack": "{reason} จากนั้นรัน {command} link ใน Slack",
     "loadUneven": "{name} carried {factor}× the median over the last {days} days",
     "loadUnevenLabel": "Load is uneven:",
     "membersUnreachableMore": "{name} is on this team, but no page to them can land — {why}. {count} other member is in the same state. | {name} is on this team, but no page to them can land — {why}. {count} other members are in the same state.",
@@ -30886,6 +30895,13 @@
         "http": "HTTP",
         "httpDescription": "Slack calls your public URL. Needs one Verify click in Slack",
         "channelHistory": "Let the bot read replies in threads it started",
+        "appName": "ชื่อแอป",
+        "appNameHelp": "ชื่อที่ผู้คนเห็นใน Slack ตั้งชื่อให้แต่ละเซิร์ฟเวอร์ OpenObserve แยกกัน เช่น OpenObserve Staging",
+        "appNameTooLong": "ชื่อแอปต้องมีความยาวไม่เกิน {max} อักขระ",
+        "appNameMarkup": "ชื่อแอปต้องไม่มี <, > หรือ &",
+        "command": "คำสั่งสแลช",
+        "commandInvalid": "เริ่มต้นด้วย / และใช้ไม่เกิน {max} อักขระ: ตัวอักษรพิมพ์เล็ก ตัวเลข - และ _",
+        "commandWarning": "Slack เรียกใช้คำสั่งสแลชได้เพียงแอปเดียวต่อเวิร์กสเปซ หากแอปอื่นในเวิร์กสเปซนี้ใช้ {command} อยู่แล้ว {command} จะหยุดทำงานสำหรับแอปนั้นหลังจากคุณติดตั้งแอปนี้",
         "tokenLabel": "App configuration refresh token (xoxe-…)",
         "tokenHelp": "On Slack's Your Apps page, Your App Configuration Tokens › Generate Token shows an access token and a refresh token: paste the refresh token. OpenObserve rotates it and keeps the newest one encrypted to update the app later.",
         "generateToken": "Generate a token",
@@ -31055,7 +31071,7 @@
         "settings": "การตั้งค่า",
         "install": "At install",
         "destination": "From an alert destination",
-        "oncall": "จาก /o2 oncall ที่นี่"
+        "oncall": "จาก {command} oncall ที่นี่"
       },
       "channel": "Channel",
       "channelPlaceholder": "Search channels",
@@ -31069,7 +31085,7 @@
       "editDefault": "แก้ไขค่าเริ่มต้นของช่อง",
       "removeConfirm": "ลบค่าเริ่มต้น",
       "removeTitle": "Remove the default for #{channel}?",
-      "removeMessage": "Questions in {name} then go to each person's default org (they can change it with /o2 org).",
+      "removeMessage": "คำถามใน {name} จะถูกส่งไปยังองค์กรเริ่มต้นของแต่ละคน (ผู้ใช้เปลี่ยนได้ด้วย {command} org)",
       "instanceAdminOnly": "Instance admin only",
       "ownOrgOnlyHint": "On an instance workspace you map channels to your own org",
       "claimableHint": "Unclaimed channels and channels {org} owns",
@@ -34696,6 +34712,25 @@
       },
       "noHighConfidence": "ไม่มีชื่อที่มีความมั่นใจสูง"
     }
+  },
+  "commandPalette": {
+    "title": "ค้นหาหน้า ทรัพยากร และการดำเนินการ",
+    "placeholder": "ค้นหาชื่อและ ID",
+    "moreTypes": "ประเภทเพิ่มเติม",
+    "pages": "หน้า",
+    "actions": "สร้าง",
+    "recent": "การเข้าชมล่าสุด",
+    "localHistory": "ประวัติในเครื่อง",
+    "clearRecent": "ล้างการเข้าชมล่าสุด",
+    "historyStorageUnavailable": "ไม่สามารถบันทึกการเข้าชมได้",
+    "recentUnavailable": "รายการนี้ไม่พร้อมใช้งาน",
+    "loading": "กำลังค้นหา…",
+    "partial": "ผลลัพธ์บางส่วนไม่พร้อมใช้งาน",
+    "failed": "ไม่สามารถค้นหาให้เสร็จได้",
+    "offline": "ออฟไลน์ ยังดูการเข้าชมล่าสุดได้",
+    "sourceUnavailable": "ทรัพยากรประเภทนี้ไม่พร้อมใช้งาน",
+    "emptyHelp": "ป้อนชื่อหรือ ID เพื่อค้นหา",
+    "globalShortcut": "เปิดการค้นหาทั่วระบบ"
   },
   "timeRangeInput": {
     "label": "พิมพ์ช่วงเวลา",

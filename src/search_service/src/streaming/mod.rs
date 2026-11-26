@@ -114,13 +114,17 @@ pub async fn process_search_stream_request(
             if let Ok(schema) = infra::schema::get(&org_id, stream_name, stream_type).await {
                 let stream_settings = infra::schema::unwrap_stream_settings(&schema);
                 let fts_fields = infra::schema::get_stream_setting_fts_fields(&stream_settings);
-                all_fts_fields.extend(fts_fields);
+                let configured = stream_settings
+                    .as_ref()
+                    .map(|s| s.full_text_search_keys.as_slice())
+                    .unwrap_or_default();
+                all_fts_fields.extend(order_fts_fields_for_patterns(configured, fts_fields));
             }
         }
 
-        // Deduplicate FTS fields
-        all_fts_fields.sort();
-        all_fts_fields.dedup();
+        // The miner takes the first usable field, so keep priority order.
+        let mut seen = std::collections::HashSet::new();
+        all_fts_fields.retain(|f| seen.insert(f.clone()));
 
         log::info!(
             "[HTTP2_STREAM trace_id {trace_id}] Using FTS fields for pattern extraction: {all_fts_fields:?}",
@@ -130,17 +134,11 @@ pub async fn process_search_stream_request(
         let o2_config = get_o2_config();
         let zo_config = config::get_config();
 
-        // Determine max_logs - same logic for both sampling and non-sampling modes
-        // Prioritize: 1) user's size, 2) O2 config, 3) OpenObserve default
-        let max_logs = if req.query.size > 0 && req.query.size < 10_000_000 {
-            req.query.size as usize
-        } else if o2_config.log_patterns.max_logs_for_extraction > 0 {
-            // Use O2 config value if set (default is 10K for consistent pattern quality)
-            o2_config.log_patterns.max_logs_for_extraction
-        } else {
-            // Fall back to OpenObserve's query_default_limit
-            zo_config.limit.query_default_limit as usize
-        };
+        let max_logs = extraction_size(
+            req.query.size,
+            o2_config.log_patterns.max_logs_for_extraction,
+            zo_config.limit.query_default_limit,
+        ) as usize;
 
         log::info!(
             "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction config: max_logs={}, sampling_ratio={:?}, min_cluster={}, threshold={}, min_field_len={}",
@@ -846,6 +844,13 @@ pub async fn process_search_stream_request(
             log::info!(
                 "[HTTP2_STREAM trace_id {trace_id}] No logs accumulated for pattern extraction"
             );
+            if let Some(patterns) = execution::empty_partial_patterns(&accumulated_results) {
+                let _ = sender
+                    .send(Ok(
+                        config::meta::search::StreamResponses::PatternExtractionResult { patterns },
+                    ))
+                    .await;
+            }
         }
     }
 
@@ -1187,6 +1192,21 @@ pub async fn process_search_stream_request_multi(
     }
 }
 
+/// Logs to mine: the caller's size capped at `max_logs` (0 = query default). [pure]
+#[cfg(feature = "enterprise")]
+pub fn extraction_size(requested: i64, max_logs: usize, query_default_limit: i64) -> i64 {
+    let max = if max_logs > 0 {
+        max_logs as i64
+    } else {
+        query_default_limit
+    };
+    if requested <= 0 {
+        max
+    } else {
+        requested.min(max)
+    }
+}
+
 /// Synchronous VRL compilation and execution for multi-stream results.
 ///
 /// This is extracted as a non-async function because `VRLRuntimeConfig` is `!Send` and
@@ -1452,6 +1472,30 @@ async fn apply_vrl_to_multi_results(
     }
 }
 
+/// Orders FTS fields for pattern mining: configured keys first, then `message`/`log`,
+/// then the rest. The miner takes the first field long enough, so order picks the text.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn order_fts_fields_for_patterns(configured: &[String], all: Vec<String>) -> Vec<String> {
+    let mut ordered: Vec<String> = Vec::with_capacity(all.len() + configured.len());
+    let preferred = configured
+        .iter()
+        .map(String::as_str)
+        .chain(["message", "log"]);
+    for name in preferred {
+        if (all.iter().any(|f| f == name) || configured.iter().any(|f| f == name))
+            && !ordered.iter().any(|f| f == name)
+        {
+            ordered.push(name.to_string());
+        }
+    }
+    for name in all {
+        if !ordered.contains(&name) {
+            ordered.push(name);
+        }
+    }
+    ordered
+}
+
 #[cfg(test)]
 mod tests {
     use config::{
@@ -1462,11 +1506,34 @@ mod tests {
     use tracing_subscriber::Registry;
 
     use super::{
-        apply_vrl_to_multi_results, process_search_stream_request,
+        apply_vrl_to_multi_results, order_fts_fields_for_patterns, process_search_stream_request,
         process_search_stream_request_multi,
     };
 
     type StreamItem = Result<StreamResponses, infra::errors::Error>;
+
+    fn names(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn fts_order_prefers_message_over_alphabetical_error() {
+        let all = names(&["content", "error", "log", "message"]);
+        assert_eq!(
+            order_fts_fields_for_patterns(&[], all),
+            names(&["message", "log", "content", "error"])
+        );
+    }
+
+    #[test]
+    fn fts_order_puts_configured_keys_first_in_order() {
+        let all = names(&["error", "message", "yy_text", "zz_text"]);
+        let configured = names(&["zz_text", "yy_text"]);
+        assert_eq!(
+            order_fts_fields_for_patterns(&configured, all),
+            names(&["zz_text", "yy_text", "message", "error"])
+        );
+    }
 
     fn full_channel() -> (mpsc::Sender<StreamItem>, mpsc::Receiver<StreamItem>) {
         let (tx, rx) = mpsc::channel(1);
@@ -1757,5 +1824,26 @@ for_each(result) -> |_idx, query_hits| {
 
         assert!(futures::poll!(fut.as_mut()).is_pending());
         assert!(tracing::Span::current().is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extraction_size_caps_caller_size() {
+        // (requested, max_logs, query_default_limit, expected)
+        let cases = [
+            (-1, 10_000, 1_000, 10_000),
+            (0, 10_000, 1_000, 10_000),
+            (500, 10_000, 1_000, 500),
+            (9_999_999, 10_000, 1_000, 10_000),
+            (-1, 0, 1_000, 1_000),
+            (9_999_999, 0, 1_000, 1_000),
+        ];
+        for (requested, max_logs, default_limit, expected) in cases {
+            assert_eq!(
+                super::extraction_size(requested, max_logs, default_limit),
+                expected,
+                "requested={requested} max_logs={max_logs}"
+            );
+        }
     }
 }

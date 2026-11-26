@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Żaden kanał nie ma jeszcze domyślnej organizacji",
-      "description": "Pytania w kanale bez domyślnej organizacji trafiają do domyślnej organizacji każdej osoby (można ją zmienić za pomocą /o2 org)."
+      "description": "Pytania w kanale bez domyślnego ustawienia trafiają do domyślnej organizacji każdej osoby (można ją zmienić za pomocą {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nikt w tej organizacji nie połączył jeszcze Slacka"
@@ -298,7 +298,7 @@
     },
     "noQueues": {
       "title": "Utwórz pierwszą kolejkę adnotacji",
-      "description": "Kolejki adnotacji to listy zadań do przeglądu — przypisz konfiguracje oceny, docelowy zbiór danych i filtr, który dostarcza elementy do przeglądu przez człowieka.",
+      "description": "Kolejki adnotacji to listy zadań do przeglądu — przypisz konfiguracje oceniania, docelowy zbiór danych i filtr, który dostarcza elementy do przeglądu przez człowieka.",
       "action": "Nowa kolejka adnotacji",
       "actionDesc": "Utwórz pustą kolejkę adnotacji"
     },
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Nic niezdrowego tutaj",
-      "description": "Brak nieprawidłowych elementów w tym przedziale czasu. Poszerz zakres czasu lub zmień filtr kolejki adnotacji, aby zobaczyć elementy już poddane wstępnej ocenie."
+      "description": "Brak niezdrowych elementów w tym oknie. Rozszerz zakres czasu lub zmień filtr kolejki adnotacji, aby zobaczyć elementy już zweryfikowane."
     },
     "noTraces": {
       "title": "Brak trace",
@@ -1920,6 +1920,7 @@
     "patternCount": "Liczba",
     "errorConstructingSearchQuery": "Wystąpił błąd podczas konstruowania zapytania wyszukiwania.",
     "errorExtractingPatterns": "Błąd podczas wyodrębniania wzorców. Spróbuj ponownie.",
+    "patternsNoReadPermission": "Nie masz uprawnień do odczytu tego strumienia.",
     "errorWhileApplyingSavedView": "Błąd podczas stosowania zapisanego widoku.",
     "errorWhileExtractingStreamFields": "Błąd podczas wyodrębniania pól strumienia.",
     "errorWhileGeneratingHistogramData": "Błąd podczas generowania danych histogramu.",
@@ -6333,6 +6334,8 @@
     "fieldRequired": "Pole jest wymagane!",
     "sqlQuery": "Zapytanie SQL",
     "promqlQuery": "Zapytanie PromQL",
+    "queryRowLimitNote": "Każde uruchomienie przetwarza najwyżej {limit} wierszy, chyba że zapytanie ustawia własny LIMIT.",
+    "queryRowLimitNoteNoLimit": "Każde uruchomienie przetwarza najwyżej domyślną liczbę wierszy, chyba że zapytanie ustawia własny LIMIT.",
     "output": "Wyjście",
     "validating": "Sprawdzanie...",
     "validateAndClose": "Sprawdź i zamknij",
@@ -9985,6 +9988,10 @@
     },
     "browserDeniedFileDownload": "Przeglądarka zablokowała pobieranie pliku...",
     "chartDataDownloadedCsv": "Dane wykresu pobrano jako plik CSV",
+    "tableDownloadPartial": "Pobrano tylko pierwsze {count} wierszy wyniku, więc plik jest niepełny.",
+    "tableDownloadServerPartial": "Serwer zwrócił częściowe dane, więc plik może być niekompletny.",
+    "tableDownloadWaitForLoad": "Panel nadal się ładuje. Pobierz ponownie po zakończeniu.",
+    "preparingTableDownload": "Pobieranie wszystkich wierszy do pliku…",
     "chartDataDownloadedJson": "Dane wykresu pobrano jako plik JSON",
     "dynamicFilters": "Filtry dynamiczne",
     "failedToCancelRunningQuery": "Nie udało się anulować uruchomionego zapytania",
@@ -16091,8 +16098,10 @@
         "searchSuffixesAria": "Szukaj filtrów sufiksu",
         "searchTypesAria": "Filtry typów wyszukiwania",
         "facetAria": "{label}, metryki: {count}",
+        "facetAriaUnchecked": "{label}, {count} z danymi, {unchecked} jeszcze nieoznaczonych",
         "noPrefixMatch": "Brak pasujących prefiksów.",
         "noSuffixMatch": "Brak pasujących sufiksów.",
+        "uncheckedTooltip": "{count} z danymi · {unchecked} jeszcze nieoznaczonych",
         "noTypeMatch": "Brak pasujących typów."
       },
       "views": {
@@ -17763,7 +17772,7 @@
       "viewByStream": "Widok według strumienia",
       "search": {
         "noResultsTitle": "Brak sesji pasujących do wyszukiwania",
-        "noResultsDescription": "Wypróbuj inny filtr lub szerszy zakres czasu.",
+        "noResultsDescription": "Spróbuj innego filtra lub szerszego zakresu czasu.",
         "clear": "Wyczyść filtr"
       }
     },
@@ -19362,10 +19371,10 @@
       "annotate": {
         "button": "Dodaj do kolejki adnotacji",
         "title": "Dodaj do kolejki adnotacji",
-        "hint": "Dodaj {ref} do przeglądu przez człowieka. Pozostaje tam, gdzie jest — kolejka adnotacji śledzi status jego przeglądu.",
+        "hint": "Dodaj {ref} do przeglądu przez człowieka. Element pozostaje na swoim miejscu — kolejka adnotacji śledzi jego status przeglądu.",
         "queueLabel": "Kolejka adnotacji",
         "queuePlaceholder": "Wybierz kolejkę adnotacji...",
-        "noQueues": "Żadna kolejka adnotacji nie akceptuje {scope} — najpierw utwórz ją na stronie Kolejki adnotacji.",
+        "noQueues": "Żadna kolejka adnotacji nie akceptuje {scope} — najpierw utwórz kolejkę na stronie Kolejki adnotacji.",
         "confirm": "Dodaj do kolejki adnotacji",
         "success": "Dodano do kolejki {queue}",
         "error": "Nie udało się dodać tego elementu do kolejki adnotacji"
@@ -19406,10 +19415,10 @@
       },
       "inQueueFilter": {
         "label": "Status kolejki adnotacji",
-        "notEnqueued": "Poza kolejką",
+        "notEnqueued": "Nie dodano do kolejki",
         "enqueued": "W kolejce adnotacji",
         "pending": "Oczekuje na przegląd",
-        "reviewed": "Przejrzane",
+        "reviewed": "Przejrzano",
         "all": "Wszystkie elementy"
       },
       "columns": {
@@ -19438,18 +19447,18 @@
       "inQueue": {
         "none": "Niezakolejkowany",
         "reviewed": "Już przejrzane",
-        "multiple": "W {count} kolejkach adnotacji"
+        "multiple": "W kolejkach adnotacji: {count}"
       },
       "addToQueue": "Dodaj do kolejki adnotacji",
       "addToQueueMenu": {
         "loading": "Ładowanie kolejek adnotacji...",
-        "noQueues": "Nie ma jeszcze żadnych kolejek adnotacji — najpierw utwórz ją na stronie Kolejki adnotacji.",
+        "noQueues": "Brak kolejek adnotacji — najpierw utwórz kolejkę na stronie Kolejki adnotacji.",
         "dimensions": "{count} wymiar | wymiary: {count}",
         "accepts": "Akceptuje tylko {types}",
         "sectionTitle": "Dodaj do kolejki adnotacji",
         "manageQueues": "Zarządzaj kolejkami adnotacji"
       },
-      "addSuccess": "Dodano do {queue} — wiersz pozostaje w Discovery, a kolejka adnotacji śledzi status jego przeglądu.",
+      "addSuccess": "Dodano do {queue} — wiersz pozostaje w Discovery, a kolejka adnotacji śledzi jego status przeglądu.",
       "addError": "Nie udało się dodać elementów do kolejki adnotacji",
       "openQueue": "Otwórz kolejkę adnotacji",
       "queuesError": "Nie udało się załadować kolejek adnotacji"
@@ -19482,7 +19491,7 @@
         "descriptionLabel": "Opis",
         "descriptionPlaceholder": "Do czego służy ta kolejka adnotacji i kto ją przegląda...",
         "scoreConfigsLabel": "Konfiguracje ocen",
-        "scoreConfigsHint": "Kolejka adnotacji ocenia elementy w jednym lub kilku wymiarach. Każda konfiguracja oceny to jeden wymiar — wybierz konfiguracje do powiązania i przypisz każdą do wersji.",
+        "scoreConfigsHint": "Kolejka adnotacji ocenia elementy w jednym lub kilku wymiarach. Każda konfiguracja oceniania to jeden wymiar — wybierz konfiguracje do przypisania i przypnij każdą do wersji.",
         "scoreConfigsEmpty": "Wybierz konfiguracje ocen do powiązania.",
         "addScoreConfig": "Dodaj konfigurację ocen",
         "allScoreConfigsAdded": "Wszystkie konfiguracje ocen zostały dodane.",
@@ -19492,7 +19501,7 @@
         "targetDatasetNone": "Brak (tylko przegląd)",
         "targetDatasetHint": "Bez docelowego zbioru danych elementy w tej kolejce adnotacji są tylko przeglądane.",
         "autoRoutingLabel": "Automatyczne kierowanie",
-        "autoRoutingHint": "Automatycznie dodawaj do kolejki obiekty, których wyniki oceny spełniają warunek. Pozostaw puste, aby dodawać elementy do tej kolejki adnotacji z Discovery.",
+        "autoRoutingHint": "Automatycznie dodawaj do kolejki obiekty, których oceny spełniają warunek. Pozostaw puste, aby dodawać elementy do tej kolejki adnotacji z Discovery.",
         "autoRoutingEmpty": "Elementy są dodawane do tej kolejki adnotacji ręcznie.",
         "addCondition": "Dodaj warunek",
         "conditionAnd": "ORAZ",
@@ -19517,7 +19526,7 @@
         "inTrace": "W trace {traceId}",
         "reviewAgain": "Przeglądnij ponownie",
         "emptyTitle": "Nic do przeglądu",
-        "emptyBody": "Dodaj trace, spany lub sesje do tej kolejki adnotacji z Discovery lub widoku trace.",
+        "emptyBody": "Dodaj trace'y, spany lub sesje do tej kolejki adnotacji z Discovery lub widoku trace'a.",
         "columns": {
           "refType": "Ref",
           "refId": "Referencja",
@@ -28132,7 +28141,7 @@
     "teamChannelSilent": "Kanał tego zespołu jest celowo pusty — wezwania nie będą nigdzie ogłaszane.",
     "slackChannelTitle": "Kanał Slack",
     "slackChannelSetWith": "Ustaw kanał Slack za pomocą {command}",
-    "slackChannelLinkHint": "Wpisz to na tym kanale Slack. Musisz mieć powiązane konto Slack: wpisz /o2 link w Slacku.",
+    "slackChannelLinkHint": "Wpisz to na tym kanale Slack. Musisz mieć powiązane konto Slack: wpisz {command} link w Slacku.",
     "slackChannelSendTest": "Wyślij wiadomość testową",
     "slackChannelClear": "Wyczyść",
     "slackChannelBackup": "Używaj {webhook} tylko jako kopii zapasowej",
@@ -28707,7 +28716,7 @@
     "mineJoinTeam": "Dołącz do zespołu",
     "mineTestTeam": "Wyślij testowe wezwanie do {team}",
     "mineCoverSaved": "Zastępstwo zapisane",
-    "mineSlackLinkHow": "Wpisz /o2 link w Slacku",
+    "mineSlackLinkHow": "Wpisz {command} link w Slacku",
     "mineSlackSetUpHint": "Otwiera Ustawienia › Slack",
     "myDeliveriesWhen": "Kiedy",
     "phoneAddHint": "Dodaj numer do wiadomości SMS i połączeń",
@@ -29278,7 +29287,7 @@
     "channelUnavailable": "{channel} — brak dostawcy",
     "channelUnverified": "{channel} — zapisany, ale nikt go nie zweryfikował",
     "channelAddPhone": "{reason}. Dodaj swój telefon w sekcji Moje dyżury",
-    "channelLinkSlack": "{reason}. Uruchom /o2 link w Slacku",
+    "channelLinkSlack": "{reason}. Uruchom {command} link w Slacku",
     "loadUneven": "{name} obsłużył {factor}× medianę w ciągu ostatnich {days} dni",
     "loadUnevenLabel": "Obciążenie jest nierównomierne:",
     "membersUnreachableMore": "{name} jest w tym zespole, ale żadne wezwanie do tej osoby nie może dotrzeć — {why}. {count} inny członek jest w tej samej sytuacji. | {name} jest w tym zespole, ale żadne wezwanie do tej osoby nie może dotrzeć — {why}. {count} innych członków jest w tej samej sytuacji.",
@@ -30888,6 +30897,13 @@
         "http": "HTTP",
         "httpDescription": "Slack wywołuje Twój publiczny adres URL. Wymaga jednego kliknięcia przycisku Verify w Slacku",
         "channelHistory": "Pozwól botowi czytać odpowiedzi w wątkach, które rozpoczął",
+        "appName": "Nazwa aplikacji",
+        "appNameHelp": "Nazwa widoczna dla użytkowników w Slacku. Nadaj każdemu serwerowi OpenObserve własną nazwę, np. OpenObserve Staging.",
+        "appNameTooLong": "Nazwa aplikacji może mieć maksymalnie {max} znaków",
+        "appNameMarkup": "Nazwa aplikacji nie może zawierać <, > ani &",
+        "command": "Polecenie ukośnikowe",
+        "commandInvalid": "Zacznij od / i użyj maksymalnie {max} znaków: małe litery, cyfry, - i _",
+        "commandWarning": "Slack obsługuje polecenie ukośnikowe tylko dla jednej aplikacji w obszarze roboczym. Jeśli inna aplikacja w tym obszarze roboczym już używa {command}, po zainstalowaniu tej aplikacji {command} przestanie działać dla tamtej aplikacji.",
         "tokenLabel": "Token odświeżania konfiguracji aplikacji (xoxe-…)",
         "tokenHelp": "Na stronie Your Apps w Slacku sekcja Your App Configuration Tokens › Generate Token pokazuje token dostępu i token odświeżania: wklej token odświeżania. OpenObserve rotuje go i przechowuje najnowszy w postaci zaszyfrowanej, aby później zaktualizować aplikację.",
         "generateToken": "Wygeneruj token",
@@ -31057,7 +31073,7 @@
         "settings": "Ustawienia",
         "install": "Przy instalacji",
         "destination": "Z miejsca docelowego alertu",
-        "oncall": "Z /o2 oncall w tym kanale"
+        "oncall": "Z {command} oncall tutaj"
       },
       "channel": "Kanał",
       "channelPlaceholder": "Szukaj kanałów",
@@ -31071,7 +31087,7 @@
       "editDefault": "Edytuj domyślny kanał",
       "removeConfirm": "Usuń domyślny",
       "removeTitle": "Usunąć domyślną organizację dla #{channel}?",
-      "removeMessage": "Pytania w kanale {name} trafiają następnie do domyślnej organizacji każdej osoby (można ją zmienić za pomocą /o2 org).",
+      "removeMessage": "Pytania w {name} trafiają wtedy do domyślnej organizacji każdej osoby (można ją zmienić za pomocą {command} org).",
       "instanceAdminOnly": "Tylko administrator instancji",
       "ownOrgOnlyHint": "W obszarze roboczym instancji mapujesz kanały na własną organizację",
       "claimableHint": "Nieprzypisane kanały i kanały należące do {org}",
@@ -34698,6 +34714,25 @@
       },
       "noHighConfidence": "Brak nazw o wysokiej pewności"
     }
+  },
+  "commandPalette": {
+    "title": "Szukaj stron, zasobów i działań",
+    "placeholder": "Szukaj nazw i identyfikatorów",
+    "moreTypes": "Więcej typów",
+    "pages": "Strony",
+    "actions": "Utwórz",
+    "recent": "Ostatnie wizyty",
+    "localHistory": "Historia lokalna",
+    "clearRecent": "Wyczyść ostatnie wizyty",
+    "historyStorageUnavailable": "Nie można zapisać wizyt",
+    "recentUnavailable": "Ten element jest niedostępny",
+    "loading": "Wyszukiwanie…",
+    "partial": "Część wyników jest niedostępna",
+    "failed": "Nie udało się ukończyć wyszukiwania",
+    "offline": "Tryb offline. Ostatnie wizyty są nadal dostępne.",
+    "sourceUnavailable": "Ten typ zasobu jest niedostępny",
+    "emptyHelp": "Wpisz nazwę lub identyfikator",
+    "globalShortcut": "Otwórz wyszukiwanie globalne"
   },
   "timeRangeInput": {
     "label": "Wpisz zakres czasu",

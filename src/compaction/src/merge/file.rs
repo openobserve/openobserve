@@ -15,7 +15,10 @@
 
 use std::sync::Arc;
 
-use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
+use ::datafusion::{
+    arrow::datatypes::{Metadata, Schema},
+    error::DataFusionError,
+};
 use bytes::Bytes;
 use config::{
     FileFormat, get_config, ider, is_local_disk_storage,
@@ -167,7 +170,7 @@ pub async fn merge_files(
                 return Err(e);
             }
         };
-        let schema = schema.as_ref().clone().with_metadata(Default::default());
+        let schema = schema.as_ref().clone().with_metadata(Metadata::default());
         let schema_key = schema.hash_key();
         if !schemas.contains_key(&schema_key) {
             schemas.insert(schema_key.clone(), schema);
@@ -477,6 +480,14 @@ async fn publish_merged_output(
 #[cfg(test)]
 mod tests {
     use config::meta::stream::FileMeta;
+    use datafusion::{
+        arrow::{
+            array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+            datatypes::{DataType, Field, Schema},
+        },
+        datasource::MemTable,
+    };
+    use object_store::memory::InMemory;
 
     use super::*;
 
@@ -487,13 +498,6 @@ mod tests {
     }
 
     async fn produced_metrics_output(format: FileFormat, kind: &str) -> MergedFile {
-        use datafusion::{
-            arrow::{
-                array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
-                datatypes::{DataType, Field, Schema},
-            },
-            datasource::MemTable,
-        };
         let schema = Arc::new(Schema::new(vec![
             Field::new("__hash__", DataType::UInt64, false),
             Field::new("_timestamp", DataType::Int64, false),
@@ -545,7 +549,7 @@ mod tests {
 
     async fn memory_storage_account() -> String {
         let id = ider::uuid();
-        storage::add_account(&id, Box::new(object_store::memory::InMemory::new())).await;
+        storage::add_account(&id, Box::new(InMemory::new())).await;
         format!("{id}:default")
     }
 

@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "目前尚無頻道設定預設組織",
-      "description": "在未設定預設組織的頻道中提問時，問題會送往每個人的預設組織（可使用 /o2 org 變更）。"
+      "description": "在沒有預設組織的頻道中提出的問題，會送至每個人的預設組織（他們可以用 {command} org 變更）。"
     },
     "noSlackLinkedPeople": {
       "title": "此組織尚無人連結 Slack"
@@ -298,9 +298,9 @@
     },
     "noQueues": {
       "title": "建立您的第一個標註佇列",
-      "description": "標註佇列是審核待辦清單——綁定分數設定、目標資料集，以及將項目送入人工審核的篩選條件。",
+      "description": "標註佇列是審查待辦清單 — 綁定評分配置、目標資料集，以及一個將項目送入以供人工審查的篩選條件。",
       "action": "新增標註佇列",
-      "actionDesc": "建立空的標註佇列"
+      "actionDesc": "建立一個空的標註佇列"
     },
     "noPrompts": {
       "title": "建立您的第一個提示詞",
@@ -1920,6 +1920,7 @@
     "patternCount": "計數",
     "errorConstructingSearchQuery": "建構搜尋查詢時發生錯誤。",
     "errorExtractingPatterns": "擷取模式時發生錯誤。請再試一次。",
+    "patternsNoReadPermission": "您無權讀取此資料流。",
     "errorWhileApplyingSavedView": "套用已儲存檢視時發生錯誤。",
     "errorWhileExtractingStreamFields": "擷取串流欄位時發生錯誤。",
     "errorWhileGeneratingHistogramData": "產生直方圖資料時發生錯誤。",
@@ -6333,6 +6334,8 @@
     "fieldRequired": "欄位為必填！",
     "sqlQuery": "SQL 查詢",
     "promqlQuery": "PromQL 查詢",
+    "queryRowLimitNote": "除非查詢自行設定 LIMIT，否則每次執行最多處理 {limit} 列。",
+    "queryRowLimitNoteNoLimit": "除非查詢自行設定 LIMIT，否則每次執行最多處理預設列數。",
     "output": "輸出",
     "validating": "驗證中...",
     "validateAndClose": "驗證並關閉",
@@ -9980,6 +9983,10 @@
     },
     "browserDeniedFileDownload": "瀏覽器拒絕檔案下載...",
     "chartDataDownloadedCsv": "圖表資料已下載為 CSV 檔案",
+    "tableDownloadPartial": "僅取得結果的前 {count} 列，因此檔案不完整。",
+    "tableDownloadServerPartial": "伺服器回傳了部分資料，因此檔案可能不完整。",
+    "tableDownloadWaitForLoad": "面板仍在載入。載入完成後請重新下載。",
+    "preparingTableDownload": "正在取得所有列以供下載…",
     "chartDataDownloadedJson": "圖表資料已下載為 JSON 檔案",
     "dynamicFilters": "動態篩選",
     "failedToCancelRunningQuery": "無法取消執行中的查詢",
@@ -16086,8 +16093,10 @@
         "searchSuffixesAria": "搜尋後置篩選器",
         "searchTypesAria": "搜尋類型篩選器",
         "facetAria": "{label}，{count} 個指標",
+        "facetAriaUnchecked": "{label}，{count} 個有資料，{unchecked} 個尚未勾選",
         "noPrefixMatch": "沒有相符的前置詞。",
         "noSuffixMatch": "沒有相符的後置詞。",
+        "uncheckedTooltip": "{count} 個有資料 · {unchecked} 個尚未勾選",
         "noTypeMatch": "沒有相符的類型。"
       },
       "views": {
@@ -17758,7 +17767,7 @@
       "viewByStream": "依串流檢視",
       "search": {
         "noResultsTitle": "沒有符合搜尋的工作階段",
-        "noResultsDescription": "請嘗試其他篩選條件或更大的時間範圍。",
+        "noResultsDescription": "請嘗試不同的篩選條件或更廣的時間範圍。",
         "clear": "清除篩選條件"
       }
     },
@@ -19357,10 +19366,10 @@
       "annotate": {
         "button": "加入標註佇列",
         "title": "加入標註佇列",
-        "hint": "將 {ref} 加入人工審核。它會留在原位——標註佇列會追蹤其審核狀態。",
+        "hint": "將 {ref} 加入以供人工審查。它會留在原處 — 標註佇列會追蹤其審查狀態。",
         "queueLabel": "標註佇列",
-        "queuePlaceholder": "請選擇標註佇列...",
-        "noQueues": "沒有標註佇列接受 {scope}——請先從「標註佇列」頁面建立一個。",
+        "queuePlaceholder": "選擇標註佇列...",
+        "noQueues": "沒有標註佇列接受 {scope} — 請先從「標註佇列」頁面建立一個。",
         "confirm": "加入標註佇列",
         "success": "已加入 {queue}",
         "error": "無法將此項目加入標註佇列"
@@ -19403,8 +19412,8 @@
         "label": "標註佇列狀態",
         "notEnqueued": "未加入佇列",
         "enqueued": "已在標註佇列中",
-        "pending": "待審核",
-        "reviewed": "已審核",
+        "pending": "待審查",
+        "reviewed": "已審查",
         "all": "所有項目"
       },
       "columns": {
@@ -19438,13 +19447,13 @@
       "addToQueue": "加入標註佇列",
       "addToQueueMenu": {
         "loading": "正在載入標註佇列...",
-        "noQueues": "尚無標註佇列——請先從「標註佇列」頁面建立一個。",
+        "noQueues": "尚無標註佇列 — 請先從「標註佇列」頁面建立一個。",
         "dimensions": "{count} 個維度 | {count} 個維度",
         "accepts": "僅接受 {types}",
         "sectionTitle": "加入標註佇列",
         "manageQueues": "管理標註佇列"
       },
-      "addSuccess": "已加入 {queue}——該資料列會留在 Discovery，標註佇列會追蹤其審核狀態。",
+      "addSuccess": "已加入 {queue} — 該列會留在 Discovery，標註佇列會追蹤其審查狀態。",
       "addError": "無法將項目加入標註佇列",
       "openQueue": "開啟標註佇列",
       "queuesError": "無法載入標註佇列"
@@ -19475,9 +19484,9 @@
         "nameLabel": "名稱",
         "namePlaceholder": "例如 hallucination_review",
         "descriptionLabel": "描述",
-        "descriptionPlaceholder": "說明此標註佇列的用途及審核人員...",
+        "descriptionPlaceholder": "說明此標註佇列的用途，以及由誰審查...",
         "scoreConfigsLabel": "評分配置",
-        "scoreConfigsHint": "標註佇列會依一或多個維度為項目評分。每個分數設定代表單一維度——請選擇要綁定的設定，並將每個設定固定至特定版本。",
+        "scoreConfigsHint": "標註佇列會依據一或多個維度為項目評分。每個評分配置代表單一維度 — 選擇要綁定的配置，並將每個配置固定至某個版本。",
         "scoreConfigsEmpty": "選擇要綁定的評分配置。",
         "addScoreConfig": "新增評分配置",
         "allScoreConfigsAdded": "所有評分配置都已新增。",
@@ -19485,7 +19494,7 @@
         "noScoreConfigs": "尚無評分配置——請先在評分配置中建立一個。",
         "targetDatasetLabel": "目標資料集",
         "targetDatasetNone": "無（僅審核）",
-        "targetDatasetHint": "若沒有目標資料集，此標註佇列中的項目僅供審核。",
+        "targetDatasetHint": "若沒有目標資料集，此標註佇列中的項目僅供審查。",
         "autoRoutingLabel": "自動路由",
         "autoRoutingHint": "自動將分數符合條件的物件加入佇列。留空則可從 Discovery 將項目加入此標註佇列。",
         "autoRoutingEmpty": "項目會手動加入此標註佇列。",
@@ -19583,7 +19592,7 @@
         "true": "是",
         "false": "否",
         "allReviewedTitle": "所有項目已審閱",
-        "allReviewedBody": "此標註佇列中的每個項目都已完成審核。"
+        "allReviewedBody": "此標註佇列中的每個項目都已完成審查。"
       }
     },
     "experiments": {
@@ -28127,7 +28136,7 @@
     "teamChannelSilent": "此團隊的頻道刻意留空——呼叫通知不會在任何地方公布。",
     "slackChannelTitle": "Slack 頻道",
     "slackChannelSetWith": "使用 {command} 設定 Slack 頻道",
-    "slackChannelLinkHint": "請在該 Slack 頻道中輸入。需要先連結你的 Slack 帳號：在 Slack 中輸入 /o2 link。",
+    "slackChannelLinkHint": "在那個 Slack 頻道中輸入。需要先連結你的 Slack 帳號：在 Slack 中輸入 {command} link。",
     "slackChannelSendTest": "傳送測試訊息",
     "slackChannelClear": "清除",
     "slackChannelBackup": "僅將 {webhook} 用作備援",
@@ -28702,7 +28711,7 @@
     "mineJoinTeam": "加入團隊",
     "mineTestTeam": "傳送測試傳呼給 {team}",
     "mineCoverSaved": "代班已儲存",
-    "mineSlackLinkHow": "在 Slack 輸入 /o2 link",
+    "mineSlackLinkHow": "在 Slack 中輸入 {command} link",
     "mineSlackSetUpHint": "開啟 管理 › Slack",
     "myDeliveriesWhen": "時間",
     "phoneAddHint": "新增號碼以接收簡訊與來電",
@@ -29273,7 +29282,7 @@
     "channelUnavailable": "{channel} — 沒有對應的提供者",
     "channelUnverified": "{channel} — 已設定，但尚未有人驗證",
     "channelAddPhone": "{reason}。請在「我的值班」中新增您的電話",
-    "channelLinkSlack": "{reason}。請在 Slack 中執行 /o2 link",
+    "channelLinkSlack": "{reason}。請在 Slack 中執行 {command} link",
     "loadUneven": "{name} 過去 {days} 天的呼叫量為中位數的 {factor} 倍",
     "loadUnevenLabel": "負載不均：",
     "membersUnreachableMore": "{name} 是此團隊成員，但無法向該成員傳送任何呼叫 — {why}。其他 {count} 位成員也有相同狀況。 | {name} 是此團隊成員，但無法向該成員傳送任何呼叫 — {why}。其他 {count} 位成員也有相同狀況。",
@@ -30883,6 +30892,13 @@
         "http": "HTTP",
         "httpDescription": "Slack 會呼叫您的公開 URL。需要在 Slack 中點一次「驗證」",
         "channelHistory": "允許機器人讀取其發起的討論串中的回覆",
+        "appName": "應用程式名稱",
+        "appNameHelp": "人們在 Slack 中看到的名稱。請為每個 OpenObserve 伺服器取專屬名稱，例如 OpenObserve Staging。",
+        "appNameTooLong": "應用程式名稱最多只能有 {max} 個字元",
+        "appNameMarkup": "應用程式名稱不得包含 <、> 或 &",
+        "command": "斜線指令",
+        "commandInvalid": "以 / 開頭，最多 {max} 個字元：小寫字母、數字、- 和 _",
+        "commandWarning": "Slack 在一個工作區中只會為一個應用程式執行斜線指令。若此工作區中的其他應用程式已使用 {command}，在你安裝此應用程式後，該應用程式的 {command} 將停止運作。",
         "tokenLabel": "應用程式設定更新權杖（xoxe-…）",
         "tokenHelp": "在 Slack 的 Your Apps 頁面中，Your App Configuration Tokens › Generate Token 會顯示存取權杖與更新權杖：請貼上更新權杖。OpenObserve 會輪替該權杖，並將最新的權杖加密保存，以便日後更新應用程式。",
         "generateToken": "產生權杖",
@@ -31052,7 +31068,7 @@
         "settings": "管理",
         "install": "安裝時",
         "destination": "來自警示目標",
-        "oncall": "來自此處的 /o2 oncall"
+        "oncall": "由 {command} oncall 在此設定"
       },
       "channel": "頻道",
       "channelPlaceholder": "搜尋頻道",
@@ -31066,7 +31082,7 @@
       "editDefault": "編輯頻道預設值",
       "removeConfirm": "移除預設值",
       "removeTitle": "要移除 #{channel} 的預設值嗎？",
-      "removeMessage": "{name} 中的問題會改為傳送到每個人的預設組織（他們可以用 /o2 org 變更）。",
+      "removeMessage": "在 {name} 中提出的問題，之後會送至每個人的預設組織（他們可以用 {command} org 變更）。",
       "instanceAdminOnly": "僅限執行個體管理員",
       "ownOrgOnlyHint": "在執行個體工作區中，您可以將頻道對應到自己的組織",
       "claimableHint": "未認領的頻道，以及 {org} 擁有的頻道",
@@ -34693,6 +34709,25 @@
       },
       "noHighConfidence": "沒有高信心的名稱"
     }
+  },
+  "commandPalette": {
+    "title": "搜尋頁面、資源和操作",
+    "placeholder": "搜尋名稱和 ID",
+    "moreTypes": "更多類型",
+    "pages": "頁面",
+    "actions": "建立",
+    "recent": "最近瀏覽",
+    "localHistory": "本機歷史",
+    "clearRecent": "清除最近瀏覽",
+    "historyStorageUnavailable": "無法儲存最近瀏覽",
+    "recentUnavailable": "此項目目前無法使用",
+    "loading": "搜尋中…",
+    "partial": "部分結果無法使用",
+    "failed": "無法完成搜尋",
+    "offline": "目前離線，仍可查看最近瀏覽。",
+    "sourceUnavailable": "此資源類型目前無法使用",
+    "emptyHelp": "輸入名稱或 ID 搜尋資源",
+    "globalShortcut": "開啟全域搜尋"
   },
   "timeRangeInput": {
     "label": "輸入時間範圍",

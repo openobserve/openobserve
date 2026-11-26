@@ -9006,6 +9006,25 @@
     "typeTitle": "340f463033e0fd5d",
     "variablesLabel": "29802f417657a871"
   },
+  "commandPalette": {
+    "actions": "4759498ac2a719c6",
+    "clearRecent": "4cf1529e6f624067",
+    "emptyHelp": "1acfcac58d315783",
+    "failed": "0e4b48c490e81d95",
+    "globalShortcut": "90d31a87a719a155",
+    "historyStorageUnavailable": "f210033cbc7d85ee",
+    "loading": "c31723ab330289fe",
+    "localHistory": "151e228bad8b98d0",
+    "moreTypes": "653343c34ccf999e",
+    "offline": "f7e4c01da1172611",
+    "pages": "9046da16aea909ba",
+    "partial": "58a07f199f47d552",
+    "placeholder": "84611f88e904dc2d",
+    "recent": "38ef8405e1625c8f",
+    "recentUnavailable": "39da35d2f133e47b",
+    "sourceUnavailable": "d5c6942375701062",
+    "title": "e7608f20367d6e18"
+  },
   "common": {
     "absolute": "f288738f604233a7",
     "actionDetails": "7adbedfc26d02542",
@@ -11578,6 +11597,7 @@
     "pointSize": "11f33bb761764d05",
     "pointSizeDefault": "1f6bdacb343e160b",
     "pointSizeInvalid": "0b255c96bd6b1a0e",
+    "preparingTableDownload": "53774ff0f8e37efa",
     "print": "447ce30a1c39c584",
     "promQLChartConfig": {
       "aggAvgDesc": "3784448275b7d95b",
@@ -12214,6 +12234,9 @@
     "tableDensityComfortable": "459a23a5980fd5c6",
     "tableDensityCompact": "99452646e34b6970",
     "tableDensityStandard": "ef6691545d2c5523",
+    "tableDownloadPartial": "6e90739ea50d507d",
+    "tableDownloadServerPartial": "56debfdf73cc9dca",
+    "tableDownloadWaitForLoad": "46c98b2a11cbeaad",
     "tableDynamicColumns": "a398e5b03d72ee0c",
     "tableExpandableRows": "635cf0994fbe3838",
     "tableExpandableRowsTooltip": "e4acd91249353b38",
@@ -14366,7 +14389,7 @@
       "title": "425c927ed923b28b"
     },
     "noSlackChannelDefaults": {
-      "description": "b78ae2516ee79459",
+      "description": "4f7f554c893b6687",
       "title": "76cec8f316d1430b"
     },
     "noSlackLinkedPeople": {
@@ -19925,6 +19948,7 @@
       "facets": {
         "clearFilters": "7179ea0035fca783",
         "facetAria": "5ab6e1b320e5d596",
+        "facetAriaUnchecked": "80d7d42151a6232f",
         "noPrefixMatch": "7a44d517e7d74621",
         "noSuffixMatch": "4ad790c24d5aef64",
         "noTypeMatch": "1e20de172df2dab2",
@@ -19934,7 +19958,8 @@
         "searchSuffixesAria": "d76c1241ae131936",
         "searchTypes": "8b89333be09379c2",
         "searchTypesAria": "d77a3065bc8e5f08",
-        "selectedCount": "529aacfdfd2b17bf"
+        "selectedCount": "529aacfdfd2b17bf",
+        "uncheckedTooltip": "5f6adced4f6b81d8"
       },
       "filterByPrefix": "936797619f25c760",
       "filterBySuffix": "433c2b241082fb2a",
@@ -20964,7 +20989,7 @@
     "causesTitle": "f22ef62160f78290",
     "channelAddPhone": "5caf5fac6f8240a8",
     "channelDelivers": "a3dd7980ab171a39",
-    "channelLinkSlack": "c369f44f18ce2d0b",
+    "channelLinkSlack": "2ac22a1bdae5f6f4",
     "channelMatrix": "8f9a1525e78225a6",
     "channelMatrixHint": "3f2947ee3022aceb",
     "channelNotImplemented": "8dd92419e34aab63",
@@ -21401,7 +21426,7 @@
     "mineShiftsMore": "73d065d41bbad790",
     "mineShiftsTitle": "19b719d20c01f1e3",
     "mineSlackAskAdmin": "3c03860fa93477c1",
-    "mineSlackLinkHow": "793af31ed8213395",
+    "mineSlackLinkHow": "cb2514df8bfafaae",
     "mineSlackLoadFailed": "d2fbefe594bbaaaf",
     "mineSlackSetUp": "68382ef84e6c56c4",
     "mineSlackSetUpHint": "422e2e5dfd511ddf",
@@ -22084,7 +22109,7 @@
     "simulatorWakesNow": "88bda87661c88989",
     "slackChannelBackup": "c5314bb275da91c4",
     "slackChannelClear": "83b12c2216efb4fd",
-    "slackChannelLinkHint": "63739129d9854f13",
+    "slackChannelLinkHint": "d322cfa08977f10a",
     "slackChannelSaveFailed": "03bd3f4e165c8877",
     "slackChannelSendTest": "98684a405f8a0963",
     "slackChannelSetWith": "7e3878ca3f64c59c",
@@ -24228,6 +24253,8 @@
     "query": "7f1d5fe0ce5e9284",
     "queryEditorPlaceholder": "8ad129c1b0e2a91f",
     "queryNode": "b80a37564fbb3c07",
+    "queryRowLimitNote": "c586b4521f209d36",
+    "queryRowLimitNoteNoLimit": "dfa4d7b30bb0308f",
     "queryTimeInMs": "0e5786bc64744963",
     "queryTimeLabel": "ce6c7979494088af",
     "remoteDestination": "51fbc108850d981c",
@@ -27126,6 +27153,7 @@
     "patternZScore": "8138c7a40e6334ab",
     "pattern_summary": "9b0a168a14f71ff3",
     "patternsLogsOnly": "cf022b467dc53819",
+    "patternsNoReadPermission": "39ce48055386f4fd",
     "patternsPartialResult": "6b4b286a61cf3da1",
     "physicalPlan": "47e3067509093eb8",
     "pinToToolbar": "637e9e5bb5ffaf97",
@@ -31253,7 +31281,7 @@
       "privateHint": "6f5507991cf9621c",
       "remove": "c3812fc4acb861d5",
       "removeConfirm": "5e4d73e4508df39a",
-      "removeMessage": "eb5cfe7c9c018fbe",
+      "removeMessage": "5314eabc2039ac9b",
       "removeTitle": "5c6b24de2d551de9",
       "saveFailed": "293223d24ca45f9e",
       "servedOrgsHint": "111654e8cb2e78b2",
@@ -31261,7 +31289,7 @@
       "setFrom": {
         "destination": "99efdf71ff783b04",
         "install": "7d94cf78b5f9b7f0",
-        "oncall": "777c1e4bb72ab59a",
+        "oncall": "a0a99c6f00f893d0",
         "settings": "74a883a037bc227f"
       },
       "thisOrg": "498281304f5519de",
@@ -31686,12 +31714,19 @@
         "title": "8880bc1ae2cd14f5"
       },
       "create": {
+        "appName": "e6ad399685374164",
+        "appNameHelp": "9656b6db1bd00c94",
+        "appNameMarkup": "92e8bb10f13cf073",
+        "appNameTooLong": "883ee1905777bffb",
         "appToken": "3688090f84694564",
         "channelHistory": "783e95a930eeac91",
         "clientId": "8726db013948f070",
         "clientIdRequired": "2e338c5bb60e98dc",
         "clientSecret": "4aded5faf15623c5",
         "clientSecretRequired": "886189310100f47a",
+        "command": "85dec3aee05fe0d3",
+        "commandInvalid": "cc81ea25332888eb",
+        "commandWarning": "92dba9d6b35accb3",
         "createButton": "169cba285e41cebd",
         "generateToken": "dcf9b386371807c3",
         "http": "56d6f32151ad8474",

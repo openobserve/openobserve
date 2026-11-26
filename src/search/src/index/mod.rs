@@ -25,7 +25,7 @@ pub use condition::Condition;
 use datafusion::{arrow::datatypes::SchemaRef, physical_plan::PhysicalExpr};
 use hashbrown::HashSet;
 use physical::conjunction;
-pub(crate) use physical::{like_contains_term, like_substring};
+pub(crate) use physical::{like_contains_pattern, like_contains_term, like_substring};
 use tantivy::{
     query::{BooleanQuery, Occur, Query},
     schema::{Field, Schema},
@@ -189,6 +189,8 @@ impl IndexCondition {
 
 #[cfg(test)]
 mod tests {
+    use datafusion::{physical_plan::expressions::Literal, scalar::ScalarValue};
+
     use super::*;
 
     #[test]
@@ -272,8 +274,6 @@ mod tests {
 
     #[test]
     fn test_to_physical_expr_leaves_like_to_the_plan_filter() {
-        use datafusion::{physical_plan::expressions::Literal, scalar::ScalarValue};
-
         let schema = arrow_schema::Schema::new(vec![arrow_schema::Field::new(
             "service",
             arrow_schema::DataType::Utf8,

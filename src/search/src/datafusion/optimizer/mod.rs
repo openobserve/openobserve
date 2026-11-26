@@ -25,7 +25,7 @@ pub mod utils;
 
 use std::{collections::HashMap, sync::Arc};
 
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use config::meta::sql::TableReferenceExt;
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, datafusion::request::Request};
 use datafusion::{
@@ -36,6 +36,7 @@ use datafusion::{
         common_subexpr_eliminate::CommonSubexprEliminate,
         decorrelate_lateral_join::DecorrelateLateralJoin,
         decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
+        eliminate_aggregate_distinct::EliminateAggregateDistinct,
         eliminate_cross_join::EliminateCrossJoin,
         eliminate_duplicated_expr::EliminateDuplicatedExpr,
         eliminate_filter::EliminateFilter,
@@ -60,15 +61,16 @@ use datafusion::{
     },
     physical_optimizer::{
         PhysicalOptimizerRule, aggregate_statistics::AggregateStatistics,
-        combine_partial_final_agg::CombinePartialFinalAggregate, ensure_coop::EnsureCooperative,
+        combine_partial_final_agg::CombinePartialFinalAggregate,
+        eliminate_constant_join::EliminateConstantJoin, ensure_coop::EnsureCooperative,
         ensure_requirements::EnsureRequirements, filter_pushdown::FilterPushdown,
         hash_join_buffering::HashJoinBuffering, join_selection::JoinSelection,
         limit_pushdown::LimitPushdown, limit_pushdown_past_window::LimitPushPastWindows,
         limited_distinct_aggregation::LimitedDistinctAggregation,
         output_requirements::OutputRequirements, projection_pushdown::ProjectionPushdown,
-        pushdown_sort::PushdownSort, sanity_checker::SanityCheckPlan,
-        topk_aggregation::TopKAggregation, topk_repartition::TopKRepartition,
-        update_aggr_exprs::OptimizeAggregateOrder, window_topn::WindowTopN,
+        pushdown_sort::PushdownSort, topk_aggregation::TopKAggregation,
+        topk_repartition::TopKRepartition, update_aggr_exprs::OptimizeAggregateOrder,
+        window_topn::WindowTopN,
     },
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
@@ -78,7 +80,7 @@ use infra::schema::get_stream_setting_index_fields;
 
 #[cfg(feature = "enterprise")]
 use crate::datafusion::optimizer::cipher::{RewriteCipherCall, RewriteCipherKey};
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use crate::datafusion::physical_optimizer::sdr_redact::protected_columns;
 use crate::{
     datafusion::{
@@ -191,6 +193,8 @@ pub fn generate_optimizer_rules(
     // PushDownLimit
     rules.push(Arc::new(PushDownLimit::new()));
     rules.push(Arc::new(PushDownFilter::new()));
+    // Must be before SingleDistinctToGroupBy, or min(DISTINCT x) still gets an inner dedup group by
+    rules.push(Arc::new(EliminateAggregateDistinct::new()));
     rules.push(Arc::new(SingleDistinctToGroupBy::new()));
     // The previous optimizations added expressions and projections,
     // that might benefit from the following rules
@@ -236,9 +240,10 @@ pub fn generate_physical_optimizer_rules(
 ) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
     let mut rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> = Vec::with_capacity(32);
 
-    // DataFusion 55.1 defaults in PhysicalOptimizer::new() order; a test guards drift on upgrade.
+    // DataFusion 56 defaults in PhysicalOptimizer::new() order; a test guards drift on upgrade.
     rules.push(Arc::new(OutputRequirements::new_add_mode()));
     rules.push(Arc::new(AggregateStatistics::new()));
+    rules.push(Arc::new(EliminateConstantJoin::new()));
     // Must be before EnsureRequirements: the chosen join mode decides the required distribution
     rules.push(Arc::new(JoinSelection::new()));
     rules.push(Arc::new(LimitedDistinctAggregation::new()));
@@ -295,9 +300,6 @@ pub fn generate_physical_optimizer_rules(
     }
     // ************************************
 
-    // Validates the final plan, so custom rules cannot break order or distribution requirements
-    rules.push(Arc::new(SanityCheckPlan::new()));
-
     rules
 }
 
@@ -329,7 +331,7 @@ fn stream_index_fields(sql: &Sql) -> HashMap<TableReference, HashSet<String>> {
             .filter(|index_field| schema.contains_field(index_field))
             .collect::<HashSet<_>>();
         // Keeps leader planning in line with the scan: the follower never indexes a redacted field.
-        #[cfg(feature = "vectorscan")]
+        #[cfg(feature = "enterprise")]
         let idx_fields = {
             let stream_type = stream_name.get_stream_type(sql.stream_type);
             let name = stream_name.stream_name();
@@ -351,7 +353,7 @@ fn stream_index_fields(sql: &Sql) -> HashMap<TableReference, HashSet<String>> {
 #[cfg(test)]
 mod tests {
     use arrow::{
-        array::{ArrayRef, Int64Array, RecordBatch, StringArray, StructArray},
+        array::{ArrayRef, Int64Array, RecordBatch, StringArray, StringViewArray, StructArray},
         util::pretty::pretty_format_batches,
     };
     use arrow_schema::{DataType, Field, Fields, Schema};
@@ -408,6 +410,7 @@ mod tests {
         "eliminate_outer_join",
         "push_down_limit",
         "push_down_filter",
+        "eliminate_aggregate_distinct",
         "single_distinct_aggregation_to_group_by",
         "eliminate_group_by_constant",
         "common_sub_expression_eliminate",
@@ -706,11 +709,9 @@ mod tests {
         let upstream = PhysicalOptimizer::new()
             .rules
             .iter()
-            .filter(|rule| rule.name() != "SanityCheckPlan")
             .map(|rule| format!("{rule:?}"))
             .collect::<Vec<_>>();
         let rules = generate_physical_optimizer_rules(&Request::default(), &test_sql(), vec![]);
-        assert_eq!(rules.last().unwrap().name(), "SanityCheckPlan");
         // Debug, not name(): both OutputRequirements modes share one name.
         let ours = rules[..upstream.len()]
             .iter()
@@ -742,7 +743,7 @@ mod tests {
             Arc::new(schema),
             vec![
                 Arc::new(Int64Array::from(vec![1, 2, 3])) as ArrayRef,
-                Arc::new(arrow::array::StringViewArray::from_iter([
+                Arc::new(StringViewArray::from_iter([
                     Some("auth-gw"),
                     Some("billing"),
                     None,
@@ -816,6 +817,7 @@ mod tests {
         let mut expected = vec![
             "OutputRequirements",
             "aggregate_statistics",
+            "EliminateConstantJoin",
             "join_selection",
             "LimitedDistinctAggregation",
             "FilterPushdown",
@@ -843,7 +845,6 @@ mod tests {
         if config::get_config().search.feature_shared_cte_enabled {
             expected.push("SharedSubplanRule");
         }
-        expected.push("SanityCheckPlan");
         let actual = ctx
             .state()
             .physical_optimizers()

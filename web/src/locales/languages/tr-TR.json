@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Henüz hiçbir kanalın varsayılan kuruluşu yok",
-      "description": "Varsayılanı olmayan bir kanaldaki sorular, her kişinin varsayılan kuruluşuna gider (/o2 org ile değiştirebilirler)."
+      "description": "Varsayılanı olmayan bir kanaldaki sorular her kişinin varsayılan kuruluşuna gider ({command} org ile değiştirebilirler)."
     },
     "noSlackLinkedPeople": {
       "title": "Bu kuruluşta henüz kimse Slack'i bağlamadı"
@@ -297,10 +297,10 @@
       "importDesc": "Bir işlem hattı tanımı yükleyin"
     },
     "noQueues": {
-      "title": "İlk etiketleme kuyruğunuzu oluşturun",
-      "description": "Etiketleme kuyrukları, inceleme yapılacaklar listeleridir — Puan Yapılandırmalarını, bir hedef veri kümesini ve öğeleri insan incelemesine sunan bir filtreyi bağlayın.",
-      "action": "Yeni etiketleme kuyruğu",
-      "actionDesc": "Boş bir etiketleme kuyruğu başlatın"
+      "title": "İlk açıklama kuyruğunuzu oluşturun",
+      "description": "Açıklama kuyrukları, inceleme yapılacaklar listeleridir — Puan Yapılandırmalarını, bir hedef veri kümesini ve insan incelemesi için öğeleri içeri besleyen bir filtreyi bağlayın.",
+      "action": "Yeni açıklama kuyruğu",
+      "actionDesc": "Boş bir açıklama kuyruğu başlatın"
     },
     "noPrompts": {
       "title": "İlk isteminizi oluşturun",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Burada Sağlıksız Bir Şey Yok",
-      "description": "Bu zaman aralığında sağlıksız öğe yok. Zaman aralığını genişletin veya önceden değerlendirdiğiniz öğeleri görmek için etiketleme kuyruğu filtresini değiştirin."
+      "description": "Bu pencerede sağlıksız öğe yok. Zaman aralığını genişletin veya ön incelemesini zaten yaptığınız öğeleri görmek için açıklama kuyruğu filtresini değiştirin."
     },
     "noTraces": {
       "title": "İz bulunamadı",
@@ -1920,6 +1920,7 @@
     "patternCount": "Sayı",
     "errorConstructingSearchQuery": "Arama sorgusu oluşturulurken bir hata oluştu.",
     "errorExtractingPatterns": "Desenler çıkarılırken hata oluştu. Lütfen tekrar deneyin.",
+    "patternsNoReadPermission": "Bu akışı okuma izniniz yok.",
     "errorWhileApplyingSavedView": "Kayıtlı görünüm uygulanırken hata oluştu.",
     "errorWhileExtractingStreamFields": "Akış alanları çıkarılırken hata oluştu.",
     "errorWhileGeneratingHistogramData": "Histogram verileri oluşturulurken hata oluştu.",
@@ -6333,6 +6334,8 @@
     "fieldRequired": "Alan zorunludur!",
     "sqlQuery": "Sql sorgusu",
     "promqlQuery": "PromQL Sorgulama",
+    "queryRowLimitNote": "Sorgu kendi LIMIT değerini belirlemedikçe her çalıştırma en fazla {limit} satır işler.",
+    "queryRowLimitNoteNoLimit": "Sorgu kendi LIMIT değerini belirlemedikçe her çalıştırma en fazla varsayılan satır sayısını işler.",
     "output": "Çıktı",
     "validating": "Doğrulanıyor...",
     "validateAndClose": "Doğrula ve Kapat",
@@ -9985,6 +9988,10 @@
     },
     "browserDeniedFileDownload": "Tarayıcı dosya indirmeyi reddetti...",
     "chartDataDownloadedCsv": "Grafik verileri CSV dosyası olarak indirildi",
+    "tableDownloadPartial": "Sonucun yalnızca ilk {count} satırı alındı, bu nedenle dosya eksik.",
+    "tableDownloadServerPartial": "Sunucu kısmi veri döndürdü, bu nedenle dosya eksik olabilir.",
+    "tableDownloadWaitForLoad": "Panel hâlâ yükleniyor. Bittiğinde yeniden indirin.",
+    "preparingTableDownload": "İndirme için tüm satırlar alınıyor…",
     "chartDataDownloadedJson": "Grafik verileri JSON dosyası olarak indirildi",
     "dynamicFilters": "Dinamik filtreler",
     "failedToCancelRunningQuery": "Çalışan sorgu iptal edilemedi",
@@ -16091,8 +16098,10 @@
         "searchSuffixesAria": "Sonek filtrelerini ara",
         "searchTypesAria": "Tür filtrelerinde ara",
         "facetAria": "{label}, {count} metrik",
+        "facetAriaUnchecked": "{label}, {count} verili, {unchecked} henüz işaretlenmedi",
         "noPrefixMatch": "Eşleşen önek yok.",
         "noSuffixMatch": "Eşleşen sonek yok.",
+        "uncheckedTooltip": "{count} verili · {unchecked} henüz işaretlenmedi",
         "noTypeMatch": "Eşleşen tür yok."
       },
       "views": {
@@ -19075,7 +19084,7 @@
       "users": "Kullanıcılar",
       "budgets": "Bütçeler",
       "discovery": "Keşif",
-      "queues": "Etiketleme Kuyrukları",
+      "queues": "Açıklama Kuyrukları",
       "datasets": "Veri Kümeleri",
       "experiments": "Deneyler",
       "quality": "KALİTE",
@@ -19360,15 +19369,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Etiketleme kuyruğuna ekle",
-        "title": "Etiketleme kuyruğuna ekle",
-        "hint": "{ref} öğesini insan incelemesi için ekleyin. Olduğu yerde kalır — etiketleme kuyruğu inceleme durumunu izler.",
-        "queueLabel": "Etiketleme Kuyruğu",
-        "queuePlaceholder": "Bir etiketleme kuyruğu seçin...",
-        "noQueues": "{scope} kabul eden bir etiketleme kuyruğu yok — önce Etiketleme Kuyrukları sayfasından bir tane oluşturun.",
-        "confirm": "Etiketleme kuyruğuna ekle",
+        "button": "Açıklama kuyruğuna ekle",
+        "title": "Açıklama kuyruğuna ekle",
+        "hint": "{ref} öğesini insan incelemesi için ekleyin. Olduğu yerde kalır — açıklama kuyruğu inceleme durumunu izler.",
+        "queueLabel": "Açıklama Kuyruğu",
+        "queuePlaceholder": "Bir açıklama kuyruğu seçin...",
+        "noQueues": "Hiçbir açıklama kuyruğu {scope} kabul etmiyor — önce Açıklama Kuyrukları sayfasından bir tane oluşturun.",
+        "confirm": "Açıklama kuyruğuna ekle",
         "success": "{queue} kuyruğuna eklendi",
-        "error": "Bu öğe etiketleme kuyruğuna eklenemedi"
+        "error": "Bu öğe açıklama kuyruğuna eklenemedi"
       },
       "dataset": {
         "button": "Veri Kümesine Ekle",
@@ -19405,9 +19414,9 @@
         "session": "Oturumlar"
       },
       "inQueueFilter": {
-        "label": "Etiketleme kuyruğu durumu",
+        "label": "Açıklama kuyruğu durumu",
         "notEnqueued": "Kuyruğa alınmadı",
-        "enqueued": "Bir etiketleme kuyruğunda",
+        "enqueued": "Bir açıklama kuyruğunda",
         "pending": "İnceleme bekliyor",
         "reviewed": "İncelendi",
         "all": "Tüm öğeler"
@@ -19426,7 +19435,7 @@
         "service": "Hizmet",
         "input": "Girdi",
         "quality": "Kalite",
-        "inQueue": "Etiketleme kuyruğunda mı?",
+        "inQueue": "Açıklama kuyruğunda mı?",
         "actions": "Eylemler"
       },
       "spanParent": "İçinde {trace}",
@@ -19438,26 +19447,26 @@
       "inQueue": {
         "none": "Sıraya Alınmadı",
         "reviewed": "Zaten İncelendi",
-        "multiple": "{count} etiketleme kuyruğunda"
+        "multiple": "{count} açıklama kuyruğunda"
       },
-      "addToQueue": "Etiketleme kuyruğuna ekle",
+      "addToQueue": "Açıklama kuyruğuna ekle",
       "addToQueueMenu": {
-        "loading": "Etiketleme kuyrukları yükleniyor...",
-        "noQueues": "Henüz etiketleme kuyruğu yok — önce Etiketleme Kuyrukları sayfasından bir tane oluşturun.",
+        "loading": "Açıklama kuyrukları yükleniyor...",
+        "noQueues": "Henüz açıklama kuyruğu yok — önce Açıklama Kuyrukları sayfasından bir tane oluşturun.",
         "dimensions": "{count} boyut | {count} boyut",
         "accepts": "Yalnızca {types} kabul eder",
-        "sectionTitle": "Etiketleme kuyruğuna ekle",
-        "manageQueues": "Etiketleme kuyruklarını yönet"
+        "sectionTitle": "Açıklama kuyruğuna ekle",
+        "manageQueues": "Açıklama kuyruklarını yönet"
       },
-      "addSuccess": "{queue} kuyruğuna eklendi — satır Discovery'de kalır ve etiketleme kuyruğu inceleme durumunu izler.",
-      "addError": "Öğeler etiketleme kuyruğuna eklenemedi",
-      "openQueue": "Etiketleme kuyruğunu aç",
-      "queuesError": "Etiketleme kuyrukları yüklenemedi"
+      "addSuccess": "{queue} kuyruğuna eklendi — satır Discovery'de kalır ve açıklama kuyruğu inceleme durumunu izler.",
+      "addError": "Öğeler açıklama kuyruğuna eklenemedi",
+      "openQueue": "Açıklama kuyruğunu aç",
+      "queuesError": "Açıklama kuyrukları yüklenemedi"
     },
     "queues": {
-      "searchPlaceholder": "Etiketleme kuyruklarında ara...",
-      "newButton": "Yeni etiketleme kuyruğu",
-      "loadError": "Etiketleme kuyrukları yüklenemedi",
+      "searchPlaceholder": "Açıklama kuyruklarında ara...",
+      "newButton": "Yeni açıklama kuyruğu",
+      "loadError": "Açıklama kuyrukları yüklenemedi",
       "optionsLoadError": "Puan yapılandırmaları yüklenemedi",
       "review": "İncele",
       "cleared": "Temizlendi",
@@ -19472,7 +19481,7 @@
         "actions": "Eylemler"
       },
       "create": {
-        "title": "Yeni etiketleme kuyruğu",
+        "title": "Yeni açıklama kuyruğu",
         "errors": {
           "name": "Ad zorunludur",
           "scoreConfigs": "En az bir Puan Yapılandırması bağlayın"
@@ -19480,9 +19489,9 @@
         "nameLabel": "Ad",
         "namePlaceholder": "ör. hallucination_review",
         "descriptionLabel": "Açıklama",
-        "descriptionPlaceholder": "Bu etiketleme kuyruğunun amacı ve kimin inceleyeceği...",
+        "descriptionPlaceholder": "Bu açıklama kuyruğunun ne için olduğu ve kimin inceleyeceği...",
         "scoreConfigsLabel": "Puan Yapılandırmaları",
-        "scoreConfigsHint": "Bir etiketleme kuyruğu öğeleri bir veya daha fazla boyutta puanlar. Her Puan Yapılandırması tek bir boyuttur — bağlanacak yapılandırmaları seçin ve her birini bir sürüme sabitleyin.",
+        "scoreConfigsHint": "Bir açıklama kuyruğu öğeleri bir veya daha fazla boyutta puanlar. Her Puan Yapılandırması tek bir boyuttur — bağlanacak yapılandırmaları seçin ve her birini bir sürüme sabitleyin.",
         "scoreConfigsEmpty": "Bağlanacak Puan Yapılandırmalarını seçin.",
         "addScoreConfig": "Puan Yapılandırması Ekle",
         "allScoreConfigsAdded": "Tüm puan yapılandırmaları eklendi.",
@@ -19490,10 +19499,10 @@
         "noScoreConfigs": "Henüz puan yapılandırması yok — önce Puan Yapılandırmaları bölümünde bir tane oluşturun.",
         "targetDatasetLabel": "Hedef Veri Seti",
         "targetDatasetNone": "Yok (yalnızca inceleme)",
-        "targetDatasetHint": "Hedef veri kümesi olmadan, bu etiketleme kuyruğundaki öğeler yalnızca incelenir.",
+        "targetDatasetHint": "Hedef veri kümesi olmadan, bu açıklama kuyruğundaki öğeler yalnızca incelenir.",
         "autoRoutingLabel": "Otomatik Yönlendirme",
-        "autoRoutingHint": "Puanları bir koşulla eşleşen nesneleri otomatik olarak kuyruğa alın. Bu etiketleme kuyruğuna öğeleri Discovery'den eklemek için boş bırakın.",
-        "autoRoutingEmpty": "Bu etiketleme kuyruğuna öğeler manuel olarak eklenir.",
+        "autoRoutingHint": "Puanları bir koşulla eşleşen nesneleri otomatik olarak kuyruğa alın. Bu açıklama kuyruğuna öğeleri Discovery'den eklemek için boş bırakın.",
+        "autoRoutingEmpty": "Öğeler bu açıklama kuyruğuna elle eklenir.",
         "addCondition": "Koşul Ekle",
         "conditionAnd": "VE",
         "operatorIs": "eşittir",
@@ -19502,12 +19511,12 @@
         "conditionValuePlaceholder": "Değer",
         "pin": "Sürümü Sabitle",
         "versionLatest": "v{version} (en son)",
-        "success": "Etiketleme kuyruğu oluşturuldu",
-        "error": "Etiketleme kuyruğu oluşturulamadı"
+        "success": "Açıklama kuyruğu oluşturuldu",
+        "error": "Açıklama kuyruğu oluşturulamadı"
       },
       "detail": {
-        "fallbackTitle": "Etiketleme Kuyruğu",
-        "loadError": "Etiketleme kuyruğu öğeleri yüklenemedi",
+        "fallbackTitle": "Açıklama Kuyruğu",
+        "loadError": "Açıklama kuyruğu öğeleri yüklenemedi",
         "startReviewing": "İncelemeye Başla",
         "scoreConfigs": "Puan Yapılandırmaları ({count})",
         "targetDataset": "Hedef Veri Seti",
@@ -19517,7 +19526,7 @@
         "inTrace": "İz içinde {traceId}",
         "reviewAgain": "Tekrar İncele",
         "emptyTitle": "İncelenecek Bir Şey Yok",
-        "emptyBody": "Discovery'den veya bir iz görünümünden bu etiketleme kuyruğuna izler, span'ler veya oturumlar ekleyin.",
+        "emptyBody": "İzleri, span'leri veya oturumları Discovery'den ya da bir iz görünümünden bu açıklama kuyruğuna ekleyin.",
         "columns": {
           "refType": "Ref",
           "refId": "Referans",
@@ -19588,7 +19597,7 @@
         "true": "Doğru",
         "false": "Yanlış",
         "allReviewedTitle": "Tüm öğeler incelendi",
-        "allReviewedBody": "Bu etiketleme kuyruğundaki her öğenin incelemesi tamamlandı."
+        "allReviewedBody": "Bu açıklama kuyruğundaki her öğenin incelemesi tamamlandı."
       }
     },
     "experiments": {
@@ -25745,7 +25754,7 @@
     "alertDetail": "Uyarı Detayı",
     "editAlert": "Uyarıyı Düzenle",
     "aiQueueDetail": "Etiketleme Kuyruğu",
-    "aiQueueReview": "Anotasyon Kuyruğu İncelemesi",
+    "aiQueueReview": "Etiketleme Kuyruğu İncelemesi",
     "aiDatasetDetail": "Veri Seti",
     "aiPromptCreate": "Yeni Prompt",
     "aiPromptVersionCreate": "Yeni Prompt Sürümü",
@@ -28132,7 +28141,7 @@
     "teamChannelSilent": "Bu ekibin kanalı bilerek boş bırakılmıştır — çağrılar hiçbir yerde duyurulmayacaktır.",
     "slackChannelTitle": "Slack kanalı",
     "slackChannelSetWith": "Bir Slack kanalını {command} ile ayarlayın",
-    "slackChannelLinkHint": "Bunu o Slack kanalında yazın. Slack hesabınızın bağlı olması gerekir: Slack'te /o2 link yazın.",
+    "slackChannelLinkHint": "Bunu o Slack kanalında yazın. Slack hesabınızın bağlı olması gerekir: Slack'te {command} link yazın.",
     "slackChannelSendTest": "Test mesajı gönder",
     "slackChannelClear": "Temizle",
     "slackChannelBackup": "{webhook} yalnızca yedek olarak kullanılsın",
@@ -28707,7 +28716,7 @@
     "mineJoinTeam": "Bir ekibe katıl",
     "mineTestTeam": "{team} ekibine test çağrısı gönder",
     "mineCoverSaved": "Vekalet kaydedildi",
-    "mineSlackLinkHow": "Slack'te /o2 link komutunu yazın",
+    "mineSlackLinkHow": "Slack'te {command} link yazın",
     "mineSlackSetUpHint": "Ayarlar › Slack bölümünü açar",
     "myDeliveriesWhen": "Ne zaman",
     "phoneAddHint": "SMS ve aramalar için bir numara ekleyin",
@@ -29278,7 +29287,7 @@
     "channelUnavailable": "{channel} — arkasında hiçbir sağlayıcı yok",
     "channelUnverified": "{channel} — kayıtlı, ama kimse doğrulamadı",
     "channelAddPhone": "{reason}. Telefonunuzu Nöbetim sayfasından ekleyin",
-    "channelLinkSlack": "{reason}. Slack'te /o2 link komutunu çalıştırın",
+    "channelLinkSlack": "{reason}. Slack'te {command} link komutunu çalıştırın",
     "loadUneven": "{name} son {days} gün içinde medyanın {factor} katı yük taşıdı",
     "loadUnevenLabel": "Yük dengesiz:",
     "membersUnreachableMore": "{name} bu ekipte, ancak ona hiçbir çağrı ulaşamıyor — {why}. {count} diğer üye de aynı durumda. | {name} bu ekipte, ancak ona hiçbir çağrı ulaşamıyor — {why}. {count} diğer üye de aynı durumda.",
@@ -30888,6 +30897,13 @@
         "http": "HTTP",
         "httpDescription": "Slack, genel URL'nizi çağırır. Slack'te bir kez Doğrula tıklaması gerekir",
         "channelHistory": "Botun başlattığı konulardaki yanıtları okumasına izin ver",
+        "appName": "Uygulama adı",
+        "appNameHelp": "Kişilerin Slack'te gördüğü ad. Her OpenObserve sunucusuna kendi adını verin, örneğin OpenObserve Staging.",
+        "appNameTooLong": "Uygulama adı en fazla {max} karakter olmalıdır",
+        "appNameMarkup": "Uygulama adı <, > veya & içermemelidir",
+        "command": "Eğik çizgi komutu",
+        "commandInvalid": "/ ile başlayın ve en fazla {max} karakter kullanın: küçük harfler, rakamlar, - ve _",
+        "commandWarning": "Slack bir çalışma alanında bir eğik çizgi komutunu yalnızca tek bir uygulama için çalıştırır. Bu çalışma alanındaki başka bir uygulama {command} komutunu zaten kullanıyorsa, siz bunu yükledikten sonra {command} o uygulama için çalışmayı durdurur.",
         "tokenLabel": "Uygulama yapılandırma yenileme token'ı (xoxe-…)",
         "tokenHelp": "Slack'in Your Apps sayfasında, Your App Configuration Tokens › Generate Token bir erişim token'ı ve bir yenileme token'ı gösterir: yenileme token'ını yapıştırın. OpenObserve bu token'ı döndürerek yeniler ve uygulamayı daha sonra güncellemek üzere en yenisini şifreli olarak saklar.",
         "generateToken": "Token oluştur",
@@ -31057,7 +31073,7 @@
         "settings": "Ayarlar",
         "install": "Kurulum sırasında",
         "destination": "Bir uyarı hedefinden",
-        "oncall": "Buradan /o2 oncall ile"
+        "oncall": "Buradan {command} oncall"
       },
       "channel": "Kanal",
       "channelPlaceholder": "Kanal ara",
@@ -31071,7 +31087,7 @@
       "editDefault": "Kanal varsayılanını düzenle",
       "removeConfirm": "Varsayılanı kaldır",
       "removeTitle": "#{channel} için varsayılan kaldırılsın mı?",
-      "removeMessage": "{name} kanalındaki sorular bu durumda her kişinin varsayılan kuruluşuna gider (bunu /o2 org ile değiştirebilirler).",
+      "removeMessage": "{name} içindeki sorular bundan sonra her kişinin varsayılan kuruluşuna gider ({command} org ile değiştirebilirler).",
       "instanceAdminOnly": "Yalnızca örnek yöneticisi",
       "ownOrgOnlyHint": "Bir örnek çalışma alanında kanalları kendi kuruluşunuza eşlersiniz",
       "claimableHint": "Sahiplenilmemiş kanallar ve {org} kuruluşunun sahip olduğu kanallar",
@@ -34698,6 +34714,25 @@
       },
       "noHighConfidence": "Yüksek güvenilirlikli ad yok"
     }
+  },
+  "commandPalette": {
+    "title": "Sayfa, kaynak ve eylem ara",
+    "placeholder": "Ad ve kimlik ara",
+    "moreTypes": "Diğer türler",
+    "pages": "Sayfalar",
+    "actions": "Oluştur",
+    "recent": "Son ziyaretler",
+    "localHistory": "Yerel geçmiş",
+    "clearRecent": "Son ziyaretleri temizle",
+    "historyStorageUnavailable": "Ziyaretler kaydedilemiyor",
+    "recentUnavailable": "Bu öğe şu anda kullanılamıyor",
+    "loading": "Aranıyor…",
+    "partial": "Bazı sonuçlar kullanılamıyor",
+    "failed": "Arama tamamlanamadı",
+    "offline": "Çevrimdışısınız. Son ziyaretler kullanılabilir.",
+    "sourceUnavailable": "Bu kaynak türü şu anda kullanılamıyor",
+    "emptyHelp": "Kaynak aramak için ad veya kimlik girin",
+    "globalShortcut": "Genel aramayı aç"
   },
   "timeRangeInput": {
     "label": "Bir zaman aralığı yazın",

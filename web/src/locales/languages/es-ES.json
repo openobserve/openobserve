@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Ningún canal tiene aún una organización predeterminada",
-      "description": "Las preguntas en un canal sin organización predeterminada van a la organización predeterminada de cada persona (pueden cambiarla con /o2 org)."
+      "description": "Las preguntas en un canal sin una organización predeterminada se dirigen a la organización predeterminada de cada persona (pueden cambiarla con {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nadie en esta organización ha vinculado Slack todavía"
@@ -298,9 +298,9 @@
     },
     "noQueues": {
       "title": "Crea tu primera cola de anotación",
-      "description": "Las colas de anotación son listas de tareas pendientes de revisión: vincula configuraciones de puntuación, un conjunto de datos de destino y un filtro que introduce elementos para revisión humana.",
+      "description": "Las colas de anotación son listas de tareas de revisión: vincula configuraciones de puntuación, un conjunto de datos de destino y un filtro que introduce elementos para la revisión humana.",
       "action": "Nueva cola de anotación",
-      "actionDesc": "Crear una cola de anotación vacía"
+      "actionDesc": "Inicia una cola de anotación vacía"
     },
     "noPrompts": {
       "title": "Crea tu primer prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "No hay nada insalubre aquí",
-      "description": "No hay elementos no saludables en este intervalo. Amplía el intervalo de tiempo o cambia el filtro de la cola de anotación para ver los elementos que ya has clasificado."
+      "description": "No hay elementos con problemas en esta ventana. Amplía el rango de tiempo o cambia el filtro de la cola de anotación para ver los elementos que ya has clasificado."
     },
     "noTraces": {
       "title": "No se encontraron trazas",
@@ -1920,6 +1920,7 @@
     "patternCount": "Conteo",
     "errorConstructingSearchQuery": "Ocurrió un error al construir la consulta de búsqueda.",
     "errorExtractingPatterns": "Error al extraer patrones. Inténtelo de nuevo.",
+    "patternsNoReadPermission": "No tienes permiso para leer este stream.",
     "errorWhileApplyingSavedView": "Error al aplicar la vista guardada.",
     "errorWhileExtractingStreamFields": "Error al extraer los campos del stream.",
     "errorWhileGeneratingHistogramData": "Error al generar los datos del histograma.",
@@ -6333,6 +6334,8 @@
     "fieldRequired": "¡El campo es obligatorio!",
     "sqlQuery": "Consulta SQL",
     "promqlQuery": "Consulta ProMQL",
+    "queryRowLimitNote": "Cada ejecución procesa como máximo {limit} filas, a menos que la consulta defina su propio LIMIT.",
+    "queryRowLimitNoteNoLimit": "Cada ejecución procesa como máximo el número predeterminado de filas, a menos que la consulta defina su propio LIMIT.",
     "output": "Salida",
     "validating": "Validando...",
     "validateAndClose": "Validar y cerrar",
@@ -9985,6 +9988,10 @@
     },
     "browserDeniedFileDownload": "El navegador denegó la descarga del archivo...",
     "chartDataDownloadedCsv": "Datos del gráfico descargados como archivo CSV",
+    "tableDownloadPartial": "Solo se obtuvieron las primeras {count} filas del resultado, por lo que el archivo es parcial.",
+    "tableDownloadServerPartial": "El servidor devolvió datos parciales, por lo que el archivo puede estar incompleto.",
+    "tableDownloadWaitForLoad": "El panel aún se está cargando. Vuelve a descargar cuando termine.",
+    "preparingTableDownload": "Obteniendo todas las filas para la descarga…",
     "chartDataDownloadedJson": "Datos del gráfico descargados como archivo JSON",
     "dynamicFilters": "Filtros dinámicos",
     "failedToCancelRunningQuery": "No se pudo cancelar la consulta en ejecución",
@@ -16091,8 +16098,10 @@
         "searchSuffixesAria": "Buscar filtros de sufijo",
         "searchTypesAria": "Filtros de tipo de búsqueda",
         "facetAria": "{label}, {count} métricas",
+        "facetAriaUnchecked": "{label}, {count} con datos, {unchecked} aún sin marcar",
         "noPrefixMatch": "No coinciden prefijos.",
         "noSuffixMatch": "No coinciden sufijos.",
+        "uncheckedTooltip": "{count} con datos · {unchecked} aún sin marcar",
         "noTypeMatch": "Ningún tipo coincide."
       },
       "views": {
@@ -17763,7 +17772,7 @@
       "viewByStream": "Ver por stream",
       "search": {
         "noResultsTitle": "Ninguna sesión coincide con su búsqueda",
-        "noResultsDescription": "Prueba con otro filtro o con un intervalo de tiempo más amplio.",
+        "noResultsDescription": "Prueba con otro filtro o un rango de tiempo más amplio.",
         "clear": "Limpiar filtro"
       }
     },
@@ -19362,7 +19371,7 @@
       "annotate": {
         "button": "Añadir a la cola de anotación",
         "title": "Añadir a la cola de anotación",
-        "hint": "Añade {ref} para revisión humana. Permanece donde está: la cola de anotación hace seguimiento de su estado de revisión.",
+        "hint": "Añade {ref} para revisión humana. Permanece donde está: la cola de anotación registra su estado de revisión.",
         "queueLabel": "Cola de anotación",
         "queuePlaceholder": "Selecciona una cola de anotación...",
         "noQueues": "Ninguna cola de anotación acepta un {scope}: crea una primero desde la página Colas de anotación.",
@@ -19406,9 +19415,9 @@
       },
       "inQueueFilter": {
         "label": "Estado de la cola de anotación",
-        "notEnqueued": "No está en cola",
+        "notEnqueued": "No encolado",
         "enqueued": "En una cola de anotación",
-        "pending": "Pendiente de revisión",
+        "pending": "Revisión pendiente",
         "reviewed": "Revisado",
         "all": "Todos los elementos"
       },
@@ -19449,9 +19458,9 @@
         "sectionTitle": "Añadir a la cola de anotación",
         "manageQueues": "Gestionar colas de anotación"
       },
-      "addSuccess": "Se ha añadido a {queue}: la fila permanece en Discovery y la cola de anotación hace seguimiento de su estado de revisión.",
+      "addSuccess": "Añadido a {queue}: la fila permanece en Discovery y la cola de anotación registra su estado de revisión.",
       "addError": "No se pudieron añadir los elementos a la cola de anotación",
-      "openQueue": "Abrir cola de anotación",
+      "openQueue": "Abrir la cola de anotación",
       "queuesError": "No se pudieron cargar las colas de anotación"
     },
     "queues": {
@@ -19482,7 +19491,7 @@
         "descriptionLabel": "Descripción",
         "descriptionPlaceholder": "Para qué sirve esta cola de anotación y quién la revisa...",
         "scoreConfigsLabel": "Configuraciones de puntuación",
-        "scoreConfigsHint": "Una cola de anotación puntúa los elementos en una o más dimensiones. Cada configuración de puntuación es una sola dimensión: elige las configuraciones que quieres vincular y fija cada una a una versión.",
+        "scoreConfigsHint": "Una cola de anotación puntúa los elementos en una o más dimensiones. Cada configuración de puntuación es una sola dimensión: elige las configuraciones que quieras vincular y fija cada una a una versión.",
         "scoreConfigsEmpty": "Elige las configuraciones de puntuación a vincular.",
         "addScoreConfig": "Añadir configuración de puntuación",
         "allScoreConfigsAdded": "Todas las configuraciones de puntuación se han añadido.",
@@ -19517,7 +19526,7 @@
         "inTrace": "En la traza {traceId}",
         "reviewAgain": "Revisar de nuevo",
         "emptyTitle": "Nada que revisar",
-        "emptyBody": "Añade trazas, spans o sesiones a esta cola de anotación desde Discovery o desde una vista de trazas.",
+        "emptyBody": "Añade trazas, spans o sesiones a esta cola de anotación desde Discovery o desde una vista de traza.",
         "columns": {
           "refType": "Ref",
           "refId": "Referencia",
@@ -25744,7 +25753,7 @@
     "sloDetail": "Detalle del SLO",
     "alertDetail": "Detalle de la alerta",
     "editAlert": "Editar alerta",
-    "aiQueueDetail": "Cola de anotación",
+    "aiQueueDetail": "Cola de anotaciones",
     "aiQueueReview": "Revisión de la cola de anotaciones",
     "aiDatasetDetail": "Conjunto de datos",
     "aiPromptCreate": "Nuevo Prompt",
@@ -28132,7 +28141,7 @@
     "teamChannelSilent": "El canal de este equipo está vacío a propósito: los avisos no se anunciarán en ningún sitio.",
     "slackChannelTitle": "Canal de Slack",
     "slackChannelSetWith": "Configura un canal de Slack con {command}",
-    "slackChannelLinkHint": "Escríbelo en ese canal de Slack. Tu cuenta de Slack debe estar vinculada: escribe /o2 link en Slack.",
+    "slackChannelLinkHint": "Escríbelo en ese canal de Slack. Es necesario tener tu cuenta de Slack vinculada: escribe {command} link en Slack.",
     "slackChannelSendTest": "Enviar mensaje de prueba",
     "slackChannelClear": "Borrar",
     "slackChannelBackup": "Usa {webhook} solo como respaldo",
@@ -28707,7 +28716,7 @@
     "mineJoinTeam": "Unirse a un equipo",
     "mineTestTeam": "Enviar un aviso de prueba a {team}",
     "mineCoverSaved": "Cobertura guardada",
-    "mineSlackLinkHow": "Escribe /o2 link en Slack",
+    "mineSlackLinkHow": "Escribe {command} link en Slack",
     "mineSlackSetUpHint": "Abre Ajustes › Slack",
     "myDeliveriesWhen": "Cuándo",
     "phoneAddHint": "Añade un número para mensajes de texto y llamadas",
@@ -29278,7 +29287,7 @@
     "channelUnavailable": "{channel} — no hay proveedor que lo respalde",
     "channelUnverified": "{channel} — registrado, pero nadie lo ha verificado",
     "channelAddPhone": "{reason}. Añade tu teléfono en Mi guardia",
-    "channelLinkSlack": "{reason}. Ejecuta /o2 link en Slack",
+    "channelLinkSlack": "{reason}. Ejecuta {command} link en Slack",
     "loadUneven": "{name} tuvo {factor}× la mediana en los últimos {days} días",
     "loadUnevenLabel": "La carga es desigual:",
     "membersUnreachableMore": "{name} está en este equipo, pero ningún aviso puede llegarle — {why}. {count} miembro más está en el mismo estado. | {name} está en este equipo, pero ningún aviso puede llegarle — {why}. {count} miembros más están en el mismo estado.",
@@ -30888,6 +30897,13 @@
         "http": "HTTP",
         "httpDescription": "Slack llama a tu URL pública. Requiere un clic en Verificar en Slack",
         "channelHistory": "Permite que el bot lea las respuestas en los hilos que ha iniciado",
+        "appName": "Nombre de la aplicación",
+        "appNameHelp": "El nombre que se ve en Slack. Asigna a cada servidor de OpenObserve su propio nombre, como OpenObserve Staging.",
+        "appNameTooLong": "El nombre de la aplicación debe tener como máximo {max} caracteres",
+        "appNameMarkup": "El nombre de la aplicación no debe contener <, > ni &",
+        "command": "Comando de barra",
+        "commandInvalid": "Empieza por / y usa como máximo {max} caracteres: letras minúsculas, dígitos, - y _",
+        "commandWarning": "Slack ejecuta un comando de barra para una sola aplicación en un espacio de trabajo. Si otra aplicación de este espacio de trabajo ya usa {command}, {command} dejará de funcionar en esa aplicación después de que instales esta.",
         "tokenLabel": "Token de actualización de la configuración de la app (xoxe-…)",
         "tokenHelp": "En la página Your Apps de Slack, Your App Configuration Tokens › Generate Token muestra un token de acceso y un token de actualización: pega el token de actualización. OpenObserve lo rota y guarda el más reciente cifrado para actualizar la app más adelante.",
         "generateToken": "Generar un token",
@@ -31057,7 +31073,7 @@
         "settings": "Ajustes",
         "install": "Al instalar",
         "destination": "Desde un destino de alertas",
-        "oncall": "Desde /o2 oncall aquí"
+        "oncall": "Desde {command} oncall aquí"
       },
       "channel": "Canal",
       "channelPlaceholder": "Buscar canales",
@@ -31071,7 +31087,7 @@
       "editDefault": "Editar el canal predeterminado",
       "removeConfirm": "Quitar predeterminado",
       "removeTitle": "¿Quitar el predeterminado de #{channel}?",
-      "removeMessage": "Las preguntas en {name} pasan entonces a la organización predeterminada de cada persona (pueden cambiarla con /o2 org).",
+      "removeMessage": "Las preguntas en {name} se dirigen entonces a la organización predeterminada de cada persona (pueden cambiarla con {command} org).",
       "instanceAdminOnly": "Solo administrador de la instancia",
       "ownOrgOnlyHint": "En un espacio de trabajo de instancia, asignas los canales a tu propia organización",
       "claimableHint": "Canales sin reclamar y canales que posee {org}",
@@ -34698,6 +34714,25 @@
       },
       "noHighConfidence": "No hay nombres con alta confianza"
     }
+  },
+  "commandPalette": {
+    "title": "Buscar páginas, recursos y acciones",
+    "placeholder": "Buscar nombres e ID",
+    "moreTypes": "Más tipos",
+    "pages": "Páginas",
+    "actions": "Crear",
+    "recent": "Visitas recientes",
+    "localHistory": "Historial local",
+    "clearRecent": "Borrar visitas recientes",
+    "historyStorageUnavailable": "No se pueden guardar las visitas",
+    "recentUnavailable": "Este elemento no está disponible",
+    "loading": "Buscando…",
+    "partial": "Algunos resultados no están disponibles",
+    "failed": "No se pudo completar la búsqueda",
+    "offline": "Sin conexión. Las visitas recientes siguen disponibles.",
+    "sourceUnavailable": "Este tipo de recurso no está disponible",
+    "emptyHelp": "Introduce un nombre o ID para buscar",
+    "globalShortcut": "Abrir búsqueda global"
   },
   "timeRangeInput": {
     "label": "Escribe un rango de tiempo",

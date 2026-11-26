@@ -95,7 +95,11 @@ pub fn string_to_array_v2_impl(args: &[ColumnarValue]) -> datafusion::error::Res
 #[cfg(test)]
 mod tests {
     use datafusion::{
-        arrow::{array::StringArray, datatypes::Schema, record_batch::RecordBatch},
+        arrow::{
+            array::{ListArray, StringArray},
+            datatypes::Schema,
+            record_batch::RecordBatch,
+        },
         assert_batches_eq,
         datasource::MemTable,
         prelude::SessionContext,
@@ -113,7 +117,6 @@ mod tests {
         ];
         let result = string_to_array_v2_impl(&args).unwrap();
         if let ColumnarValue::Array(out) = result {
-            use arrow::array::ListArray;
             let list = out.as_any().downcast_ref::<ListArray>().unwrap();
             assert!(!list.is_null(0));
             assert_eq!(list.value(0).len(), 3);
@@ -186,8 +189,6 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_basic() {
-        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
-
         // Test basic splitting
         let string_array = Arc::new(StringArray::from(vec!["a,b,c"]));
         let delimiter_array = Arc::new(StringArray::from(vec![","]));
@@ -207,8 +208,6 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_edge_cases() {
-        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
-
         // Test empty delimiter - should return the whole string
         let string_array = Arc::new(StringArray::from(vec!["hello"]));
         let delimiter_array = Arc::new(StringArray::from(vec![""]));
@@ -245,8 +244,6 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_multiple_delimiters() {
-        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
-
         // Test multiple delimiter characters
         let string_array = Arc::new(StringArray::from(vec!["a,b;c:d"]));
         let delimiter_array = Arc::new(StringArray::from(vec![",;:"]));
@@ -262,8 +259,6 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_empty_parts() {
-        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
-
         // Test string with consecutive delimiters (should skip empty parts)
         let string_array = Arc::new(StringArray::from(vec!["a,,b,,,c"]));
         let delimiter_array = Arc::new(StringArray::from(vec![","]));
@@ -279,8 +274,6 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_wrong_arg_count() {
-        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
-
         // Test with too many arguments (4 args instead of 2-3)
         let string_array = Arc::new(StringArray::from(vec!["a,b,c"]));
         let delimiter_array = Arc::new(StringArray::from(vec![","]));
@@ -309,8 +302,6 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_unicode() {
-        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
-
         // Test with Unicode characters
         let string_array = Arc::new(StringArray::from(vec!["α,β,γ"]));
         let delimiter_array = Arc::new(StringArray::from(vec![","]));
@@ -336,8 +327,6 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_batch_processing() {
-        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
-
         // Test processing multiple strings in batch
         let string_array = Arc::new(StringArray::from(vec!["a,b,c", "x:y:z", "single", ""]));
         let delimiter_array = Arc::new(StringArray::from(vec![",", ":", ",", ","]));

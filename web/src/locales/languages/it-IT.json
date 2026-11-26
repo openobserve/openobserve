@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Nessun canale ha ancora un'organizzazione predefinita",
-      "description": "Le domande poste in un canale senza predefinita vanno all'organizzazione predefinita di ciascuna persona (può essere cambiata con /o2 org)."
+      "description": "Le domande in un canale senza un valore predefinito vanno all'organizzazione predefinita di ciascuna persona (possono cambiarla con {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nessuno in questa organizzazione ha ancora collegato Slack"
@@ -298,9 +298,9 @@
     },
     "noQueues": {
       "title": "Crea la tua prima coda di annotazione",
-      "description": "Le code di annotazione sono elenchi di attività di revisione — collega Score Config, un dataset di destinazione e un filtro che inserisce gli elementi per la revisione umana.",
+      "description": "Le code di annotazione sono elenchi di attività di revisione: collega Score Config, un dataset di destinazione e un filtro che inserisce gli elementi per la revisione umana.",
       "action": "Nuova coda di annotazione",
-      "actionDesc": "Crea una coda di annotazione vuota"
+      "actionDesc": "Inizia con una coda di annotazione vuota"
     },
     "noPrompts": {
       "title": "Crea il tuo primo prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Nessun elemento non sano qui",
-      "description": "Nessun elemento con problemi in questa finestra. Amplia l'intervallo di tempo oppure cambia il filtro della coda di annotazione per vedere gli elementi già valutati."
+      "description": "Nessun elemento non integro in questa finestra. Amplia l'intervallo di tempo o cambia il filtro della coda di annotazione per vedere gli elementi che hai già valutato."
     },
     "noTraces": {
       "title": "Nessuna traccia trovata",
@@ -1920,6 +1920,7 @@
     "patternCount": "Conteggio",
     "errorConstructingSearchQuery": "Si è verificato un errore durante la costruzione della query di ricerca.",
     "errorExtractingPatterns": "Errore nell'estrazione dei pattern. Riprova.",
+    "patternsNoReadPermission": "Non hai l’autorizzazione per leggere questo stream.",
     "errorWhileApplyingSavedView": "Errore durante l'applicazione della vista salvata.",
     "errorWhileExtractingStreamFields": "Errore durante l'estrazione dei campi dello stream.",
     "errorWhileGeneratingHistogramData": "Errore durante la generazione dei dati dell'istogramma.",
@@ -6333,6 +6334,8 @@
     "fieldRequired": "Il campo è obbligatorio!",
     "sqlQuery": "Query SQL",
     "promqlQuery": "Query PromQL",
+    "queryRowLimitNote": "Ogni esecuzione elabora al massimo {limit} righe, a meno che la query non imposti un proprio LIMIT.",
+    "queryRowLimitNoteNoLimit": "Ogni esecuzione elabora al massimo il numero predefinito di righe, a meno che la query non imposti un proprio LIMIT.",
     "output": "Uscita",
     "validating": "Convalida in corso...",
     "validateAndClose": "Convalida e chiudi",
@@ -9985,6 +9988,10 @@
     },
     "browserDeniedFileDownload": "Il browser ha negato il download del file...",
     "chartDataDownloadedCsv": "Dati del grafico scaricati come file CSV",
+    "tableDownloadPartial": "Sono state recuperate solo le prime {count} righe del risultato, quindi il file è parziale.",
+    "tableDownloadServerPartial": "Il server ha restituito dati parziali, quindi il file potrebbe essere incompleto.",
+    "tableDownloadWaitForLoad": "Il pannello è ancora in caricamento. Scarica di nuovo al termine.",
+    "preparingTableDownload": "Recupero di tutte le righe per il download…",
     "chartDataDownloadedJson": "Dati del grafico scaricati come file JSON",
     "dynamicFilters": "Filtri dinamici",
     "failedToCancelRunningQuery": "Impossibile annullare la query in esecuzione",
@@ -16091,8 +16098,10 @@
         "searchSuffixesAria": "Cerca filtri suffisso",
         "searchTypesAria": "Filtri per tipo di ricerca",
         "facetAria": "{label}, {count} metriche",
+        "facetAriaUnchecked": "{label}, {count} con dati, {unchecked} non ancora spuntati",
         "noPrefixMatch": "Nessun prefisso corrisponde.",
         "noSuffixMatch": "Nessun suffisso corrisponde.",
+        "uncheckedTooltip": "{count} con dati · {unchecked} non ancora spuntati",
         "noTypeMatch": "Nessun tipo corrisponde."
       },
       "views": {
@@ -19362,10 +19371,10 @@
       "annotate": {
         "button": "Aggiungi alla coda di annotazione",
         "title": "Aggiungi alla coda di annotazione",
-        "hint": "Aggiungi {ref} per la revisione umana. Resta dove si trova — la coda di annotazione ne registra lo stato di revisione.",
+        "hint": "Aggiungi {ref} per la revisione umana. Resta dov'è: la coda di annotazione ne tiene traccia dello stato di revisione.",
         "queueLabel": "Coda di annotazione",
         "queuePlaceholder": "Seleziona una coda di annotazione...",
-        "noQueues": "Nessuna coda di annotazione accetta un {scope} — creane prima una dalla pagina Code di annotazione.",
+        "noQueues": "Nessuna coda di annotazione accetta un {scope}: creane prima una dalla pagina Code di annotazione.",
         "confirm": "Aggiungi alla coda di annotazione",
         "success": "Aggiunto a {queue}",
         "error": "Impossibile aggiungere questo elemento alla coda di annotazione"
@@ -19443,19 +19452,19 @@
       "addToQueue": "Aggiungi alla coda di annotazione",
       "addToQueueMenu": {
         "loading": "Caricamento delle code di annotazione...",
-        "noQueues": "Nessuna coda di annotazione — creane prima una dalla pagina Code di annotazione.",
+        "noQueues": "Nessuna coda di annotazione: creane prima una dalla pagina Code di annotazione.",
         "dimensions": "{count} dimensione | {count} dimensioni",
         "accepts": "Accetta {types} soltanto",
         "sectionTitle": "Aggiungi alla coda di annotazione",
         "manageQueues": "Gestisci le code di annotazione"
       },
-      "addSuccess": "Aggiunto a {queue} — la riga resta in Discovery e la coda di annotazione ne registra lo stato di revisione.",
+      "addSuccess": "Aggiunto a {queue}: la riga resta in Discovery e la coda di annotazione ne tiene traccia dello stato di revisione.",
       "addError": "Impossibile aggiungere gli elementi alla coda di annotazione",
       "openQueue": "Apri coda di annotazione",
       "queuesError": "Impossibile caricare le code di annotazione"
     },
     "queues": {
-      "searchPlaceholder": "Cerca nelle code di annotazione...",
+      "searchPlaceholder": "Cerca code di annotazione...",
       "newButton": "Nuova coda di annotazione",
       "loadError": "Impossibile caricare le code di annotazione",
       "optionsLoadError": "Impossibile caricare le configurazioni di punteggio",
@@ -19482,7 +19491,7 @@
         "descriptionLabel": "Descrizione",
         "descriptionPlaceholder": "A cosa serve questa coda di annotazione e chi la revisiona...",
         "scoreConfigsLabel": "Configurazioni punteggio",
-        "scoreConfigsHint": "Una coda di annotazione valuta gli elementi su una o più dimensioni. Ogni Score Config è una singola dimensione — scegli le configurazioni da collegare e fissa ciascuna a una versione.",
+        "scoreConfigsHint": "Una coda di annotazione assegna un punteggio agli elementi su una o più dimensioni. Ogni Score Config è una singola dimensione: scegli le configurazioni da collegare e fissa ciascuna a una versione.",
         "scoreConfigsEmpty": "Scegli le configurazioni punteggio da associare.",
         "addScoreConfig": "Aggiungi configurazione punteggio",
         "allScoreConfigsAdded": "Tutte le configurazioni punteggio sono state aggiunte.",
@@ -19517,7 +19526,7 @@
         "inTrace": "Nella traccia {traceId}",
         "reviewAgain": "Rivedi",
         "emptyTitle": "Niente da revisionare",
-        "emptyBody": "Aggiungi tracce, span o sessioni a questa coda di annotazione da Discovery o dalla vista traccia.",
+        "emptyBody": "Aggiungi tracce, span o sessioni a questa coda di annotazione da Discovery o dalla vista di una traccia.",
         "columns": {
           "refType": "Rif.",
           "refId": "Riferimento",
@@ -25745,7 +25754,7 @@
     "alertDetail": "Dettaglio avviso",
     "editAlert": "Modifica avviso",
     "aiQueueDetail": "Coda di annotazione",
-    "aiQueueReview": "Revisione della coda di annotazione",
+    "aiQueueReview": "Revisione coda di annotazione",
     "aiDatasetDetail": "Dataset",
     "aiPromptCreate": "Nuovo prompt",
     "aiPromptVersionCreate": "Nuova versione del prompt",
@@ -28132,7 +28141,7 @@
     "teamChannelSilent": "Il canale di questo team è vuoto di proposito: le notifiche non verranno annunciate da nessuna parte.",
     "slackChannelTitle": "Canale Slack",
     "slackChannelSetWith": "Imposta un canale Slack con {command}",
-    "slackChannelLinkHint": "Scrivilo in quel canale Slack. Richiede che il tuo account Slack sia collegato: digita /o2 link in Slack.",
+    "slackChannelLinkHint": "Scrivilo in quel canale Slack. È necessario collegare il tuo account Slack: digita {command} link in Slack.",
     "slackChannelSendTest": "Invia messaggio di prova",
     "slackChannelClear": "Rimuovi",
     "slackChannelBackup": "Usa {webhook} solo come backup",
@@ -28707,7 +28716,7 @@
     "mineJoinTeam": "Unisciti a un team",
     "mineTestTeam": "Invia una notifica di test a {team}",
     "mineCoverSaved": "Copertura salvata",
-    "mineSlackLinkHow": "Digita /o2 link in Slack",
+    "mineSlackLinkHow": "Digita {command} link in Slack",
     "mineSlackSetUpHint": "Apre Impostazioni › Slack",
     "myDeliveriesWhen": "Quando",
     "phoneAddHint": "Aggiungi un numero per SMS e chiamate",
@@ -29278,7 +29287,7 @@
     "channelUnavailable": "{channel} — nessun provider configurato",
     "channelUnverified": "{channel} — registrato, ma nessuno lo ha verificato",
     "channelAddPhone": "{reason}. Aggiungi il tuo telefono in La mia reperibilità",
-    "channelLinkSlack": "{reason}. Esegui /o2 link in Slack",
+    "channelLinkSlack": "{reason}. Esegui {command} link in Slack",
     "loadUneven": "{name} ha gestito {factor}× la mediana negli ultimi {days} giorni",
     "loadUnevenLabel": "Il carico non è uniforme:",
     "membersUnreachableMore": "{name} è in questo team, ma nessuna notifica può essere recapitata — {why}. {count} altro membro è nella stessa situazione. | {name} è in questo team, ma nessuna notifica può essere recapitata — {why}. {count} altri membri sono nella stessa situazione.",
@@ -30888,6 +30897,13 @@
         "http": "HTTP",
         "httpDescription": "Slack chiama il tuo URL pubblico. Richiede un clic su Verifica in Slack",
         "channelHistory": "Consenti al bot di leggere le risposte nei thread che ha avviato",
+        "appName": "Nome dell'app",
+        "appNameHelp": "Il nome che le persone vedono in Slack. Assegna a ogni server OpenObserve un nome proprio, ad esempio OpenObserve Staging.",
+        "appNameTooLong": "Il nome dell'app può contenere al massimo {max} caratteri",
+        "appNameMarkup": "Il nome dell'app non può contenere <, > o &",
+        "command": "Comando slash",
+        "commandInvalid": "Inizia con / e usa al massimo {max} caratteri: lettere minuscole, cifre, - e _",
+        "commandWarning": "Slack esegue un comando slash per una sola app in un workspace. Se un'altra app in questo workspace usa già {command}, {command} smette di funzionare per quell'app dopo che installi questa.",
         "tokenLabel": "Token di aggiornamento della configurazione dell'app (xoxe-…)",
         "tokenHelp": "Nella pagina Le tue app di Slack, Token di configurazione della tua app › Genera token mostra un token di accesso e un token di aggiornamento: incolla il token di aggiornamento. OpenObserve ne esegue la rotazione e conserva crittografato quello più recente per aggiornare l'app in seguito.",
         "generateToken": "Genera un token",
@@ -31057,7 +31073,7 @@
         "settings": "Impostazioni",
         "install": "All'installazione",
         "destination": "Da una destinazione di avviso",
-        "oncall": "Da /o2 oncall qui"
+        "oncall": "Da {command} oncall qui"
       },
       "channel": "Canale",
       "channelPlaceholder": "Cerca canali",
@@ -31071,7 +31087,7 @@
       "editDefault": "Modifica canale predefinito",
       "removeConfirm": "Rimuovi predefinito",
       "removeTitle": "Rimuovere il predefinito per #{channel}?",
-      "removeMessage": "Le domande in {name} vanno poi all'organizzazione predefinita di ciascuna persona (possono cambiarla con /o2 org).",
+      "removeMessage": "Le domande in {name} vanno quindi all'organizzazione predefinita di ciascuna persona (possono cambiarla con {command} org).",
       "instanceAdminOnly": "Solo amministratore dell'istanza",
       "ownOrgOnlyHint": "Su un workspace dell'istanza, i canali vengono mappati alla tua organizzazione",
       "claimableHint": "Canali non assegnati e canali di proprietà di {org}",
@@ -34698,6 +34714,25 @@
       },
       "noHighConfidence": "Nessun nome ad alta confidenza"
     }
+  },
+  "commandPalette": {
+    "title": "Cerca pagine, risorse e azioni",
+    "placeholder": "Cerca nomi e ID",
+    "moreTypes": "Altri tipi",
+    "pages": "Pagine",
+    "actions": "Crea",
+    "recent": "Visite recenti",
+    "localHistory": "Cronologia locale",
+    "clearRecent": "Cancella visite recenti",
+    "historyStorageUnavailable": "Impossibile salvare le visite",
+    "recentUnavailable": "Questo elemento non è disponibile",
+    "loading": "Ricerca…",
+    "partial": "Alcuni risultati non sono disponibili",
+    "failed": "Impossibile completare la ricerca",
+    "offline": "Offline. Le visite recenti restano disponibili.",
+    "sourceUnavailable": "Questo tipo di risorsa non è disponibile",
+    "emptyHelp": "Inserisci un nome o ID per cercare",
+    "globalShortcut": "Apri ricerca globale"
   },
   "timeRangeInput": {
     "label": "Digita un intervallo di tempo",

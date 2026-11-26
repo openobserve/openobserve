@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Noch hat kein Kanal eine Standardorganisation",
-      "description": "Fragen in einem Kanal ohne Standard gehen an die Standardorganisation der jeweiligen Person (sie kann sie mit /o2 org ändern)."
+      "description": "Fragen in einem Channel ohne Standard gehen an die Standard-Organisation der jeweiligen Person (sie kann sie mit {command} org ändern)."
     },
     "noSlackLinkedPeople": {
       "title": "Noch niemand in dieser Organisation hat Slack verknüpft"
@@ -297,10 +297,10 @@
       "importDesc": "Laden Sie eine Pipeline-Definition hoch"
     },
     "noQueues": {
-      "title": "Erste Annotationswarteschlange erstellen",
-      "description": "Annotationswarteschlangen sind To-do-Listen für die Prüfung – binden Sie Score-Konfigurationen, einen Zieldatensatz und einen Filter ein, der Elemente zur menschlichen Prüfung einspeist.",
-      "action": "Neue Annotationswarteschlange",
-      "actionDesc": "Eine leere Annotationswarteschlange erstellen"
+      "title": "Erste Annotations-Warteschlange erstellen",
+      "description": "Annotations-Warteschlangen sind To-do-Listen für die Überprüfung – binden Sie Score-Konfigurationen, ein Ziel-Dataset und einen Filter ein, der Elemente zur menschlichen Überprüfung einspeist.",
+      "action": "Neue Annotations-Warteschlange",
+      "actionDesc": "Eine leere Annotations-Warteschlange starten"
     },
     "noPrompts": {
       "title": "Erstellen Sie Ihren ersten Prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Nichts Ungesundes hier",
-      "description": "Keine fehlerhaften Elemente in diesem Zeitfenster. Erweitern Sie den Zeitbereich oder wechseln Sie den Filter der Annotationswarteschlange, um bereits triagierte Elemente zu sehen."
+      "description": "Keine fehlerhaften Elemente in diesem Zeitfenster. Erweitern Sie den Zeitbereich oder wechseln Sie den Filter der Annotations-Warteschlange, um bereits triagierte Elemente zu sehen."
     },
     "noTraces": {
       "title": "Keine Traces gefunden",
@@ -1920,6 +1920,7 @@
     "patternCount": "Anzahl",
     "errorConstructingSearchQuery": "Beim Erstellen der Suchabfrage ist ein Fehler aufgetreten.",
     "errorExtractingPatterns": "Fehler beim Extrahieren von Mustern. Bitte versuchen Sie es erneut.",
+    "patternsNoReadPermission": "Sie haben keine Berechtigung, diesen Stream zu lesen.",
     "errorWhileApplyingSavedView": "Fehler beim Anwenden der gespeicherten Ansicht.",
     "errorWhileExtractingStreamFields": "Fehler beim Extrahieren der Stream-Felder.",
     "errorWhileGeneratingHistogramData": "Fehler beim Generieren der Histogrammdaten.",
@@ -6333,6 +6334,8 @@
     "fieldRequired": "Feld ist erforderlich!",
     "sqlQuery": "SQL-Abfrage",
     "promqlQuery": "PromQL-Abfrage",
+    "queryRowLimitNote": "Jeder Lauf verarbeitet höchstens {limit} Zeilen, sofern die Abfrage kein eigenes LIMIT setzt.",
+    "queryRowLimitNoteNoLimit": "Jeder Lauf verarbeitet höchstens die Standardanzahl an Zeilen, sofern die Abfrage kein eigenes LIMIT setzt.",
     "output": "Ausgang",
     "validating": "Es wird validiert...",
     "validateAndClose": "Bestätigen und schließen",
@@ -9985,6 +9988,10 @@
     },
     "browserDeniedFileDownload": "Der Browser hat den Dateidownload verweigert...",
     "chartDataDownloadedCsv": "Diagrammdaten als CSV-Datei heruntergeladen",
+    "tableDownloadPartial": "Nur die ersten {count} Zeilen des Ergebnisses wurden abgerufen, die Datei ist daher unvollständig.",
+    "tableDownloadServerPartial": "Der Server hat Teildaten geliefert, die Datei ist daher möglicherweise unvollständig.",
+    "tableDownloadWaitForLoad": "Das Panel lädt noch. Laden Sie erneut herunter, sobald es fertig ist.",
+    "preparingTableDownload": "Alle Zeilen für den Download werden abgerufen…",
     "chartDataDownloadedJson": "Diagrammdaten als JSON-Datei heruntergeladen",
     "dynamicFilters": "Dynamische Filter",
     "failedToCancelRunningQuery": "Fehler beim Abbrechen der laufenden Abfrage",
@@ -16091,8 +16098,10 @@
         "searchSuffixesAria": "Suffix-Filter suchen",
         "searchTypesAria": "Typfilter durchsuchen",
         "facetAria": "{label}, {count} Metriken",
+        "facetAriaUnchecked": "{label}, {count} mit Daten, {unchecked} noch nicht angehakt",
         "noPrefixMatch": "Keine Präfixe gefunden.",
         "noSuffixMatch": "Keine Suffixe gefunden.",
+        "uncheckedTooltip": "{count} mit Daten · {unchecked} noch nicht angehakt",
         "noTypeMatch": "Keine passenden Typen."
       },
       "views": {
@@ -19075,7 +19084,7 @@
       "users": "Benutzer",
       "budgets": "Budgets",
       "discovery": "Entdeckung",
-      "queues": "Annotationswarteschlangen",
+      "queues": "Annotations-Warteschlangen",
       "datasets": "Datensätze",
       "experiments": "Experimente",
       "quality": "Qualität",
@@ -19360,15 +19369,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Zur Annotationswarteschlange hinzufügen",
-        "title": "Zur Annotationswarteschlange hinzufügen",
-        "hint": "Fügen Sie {ref} zur menschlichen Prüfung hinzu. Das Element bleibt an seinem Platz – die Annotationswarteschlange verfolgt seinen Prüfstatus.",
-        "queueLabel": "Annotationswarteschlange",
-        "queuePlaceholder": "Annotationswarteschlange auswählen...",
-        "noQueues": "Keine Annotationswarteschlange akzeptiert {scope} – erstellen Sie zuerst eine auf der Seite Annotationswarteschlangen.",
-        "confirm": "Zur Annotationswarteschlange hinzufügen",
+        "button": "Zur Annotations-Warteschlange hinzufügen",
+        "title": "Zur Annotations-Warteschlange hinzufügen",
+        "hint": "Fügen Sie {ref} zur menschlichen Überprüfung hinzu. Der Eintrag bleibt, wo er ist – die Annotations-Warteschlange verfolgt seinen Überprüfungsstatus.",
+        "queueLabel": "Annotations-Warteschlange",
+        "queuePlaceholder": "Annotations-Warteschlange auswählen...",
+        "noQueues": "Keine Annotations-Warteschlange akzeptiert {scope} – erstellen Sie zuerst eine auf der Seite „Annotations-Warteschlangen“.",
+        "confirm": "Zur Annotations-Warteschlange hinzufügen",
         "success": "Zu {queue} hinzugefügt",
-        "error": "Element konnte nicht zur Annotationswarteschlange hinzugefügt werden"
+        "error": "Das Element konnte nicht zur Annotations-Warteschlange hinzugefügt werden"
       },
       "dataset": {
         "button": "Zum Dataset hinzufügen",
@@ -19405,11 +19414,11 @@
         "session": "Sessions"
       },
       "inQueueFilter": {
-        "label": "Annotationswarteschlangen-Status",
+        "label": "Status der Annotations-Warteschlange",
         "notEnqueued": "Nicht eingereiht",
-        "enqueued": "In einer Annotationswarteschlange",
-        "pending": "Prüfung ausstehend",
-        "reviewed": "Geprüft",
+        "enqueued": "In einer Annotations-Warteschlange",
+        "pending": "Überprüfung ausstehend",
+        "reviewed": "Überprüft",
         "all": "Alle Elemente"
       },
       "columns": {
@@ -19426,7 +19435,7 @@
         "service": "Service",
         "input": "Eingabe",
         "quality": "Qualität",
-        "inQueue": "In Annotationswarteschlange?",
+        "inQueue": "In einer Annotations-Warteschlange?",
         "actions": "Aktionen"
       },
       "spanParent": "In {trace}",
@@ -19438,26 +19447,26 @@
       "inQueue": {
         "none": "Nicht eingereiht",
         "reviewed": "Bereits geprüft",
-        "multiple": "In {count} Annotationswarteschlangen"
+        "multiple": "In {count} Annotations-Warteschlangen"
       },
-      "addToQueue": "Zur Annotationswarteschlange hinzufügen",
+      "addToQueue": "Zur Annotations-Warteschlange hinzufügen",
       "addToQueueMenu": {
-        "loading": "Annotationswarteschlangen werden geladen...",
-        "noQueues": "Noch keine Annotationswarteschlangen – erstellen Sie zuerst eine auf der Seite Annotationswarteschlangen.",
+        "loading": "Annotations-Warteschlangen werden geladen...",
+        "noQueues": "Noch keine Annotations-Warteschlangen – erstellen Sie zuerst eine auf der Seite „Annotations-Warteschlangen“.",
         "dimensions": "{count} Dimension | {count} Dimensionen",
         "accepts": "Akzeptiert nur {types}",
-        "sectionTitle": "Zur Annotationswarteschlange hinzufügen",
-        "manageQueues": "Annotationswarteschlangen verwalten"
+        "sectionTitle": "Zur Annotations-Warteschlange hinzufügen",
+        "manageQueues": "Annotations-Warteschlangen verwalten"
       },
-      "addSuccess": "Zu {queue} hinzugefügt – die Zeile bleibt in Discovery, und die Annotationswarteschlange verfolgt ihren Prüfstatus.",
-      "addError": "Elemente konnten nicht zur Annotationswarteschlange hinzugefügt werden",
-      "openQueue": "Annotationswarteschlange öffnen",
-      "queuesError": "Annotationswarteschlangen konnten nicht geladen werden"
+      "addSuccess": "Zu {queue} hinzugefügt – die Zeile bleibt in Discovery, und die Annotations-Warteschlange verfolgt ihren Überprüfungsstatus.",
+      "addError": "Elemente konnten nicht zur Annotations-Warteschlange hinzugefügt werden",
+      "openQueue": "Annotations-Warteschlange öffnen",
+      "queuesError": "Annotations-Warteschlangen konnten nicht geladen werden"
     },
     "queues": {
-      "searchPlaceholder": "Annotationswarteschlangen durchsuchen...",
-      "newButton": "Neue Annotationswarteschlange",
-      "loadError": "Annotationswarteschlangen konnten nicht geladen werden",
+      "searchPlaceholder": "Annotations-Warteschlangen durchsuchen...",
+      "newButton": "Neue Annotations-Warteschlange",
+      "loadError": "Annotations-Warteschlangen konnten nicht geladen werden",
       "optionsLoadError": "Fehler beim Laden der Score-Konfigurationen",
       "review": "Prüfen",
       "cleared": "Bereinigt",
@@ -19472,7 +19481,7 @@
         "actions": "Aktionen"
       },
       "create": {
-        "title": "Neue Annotationswarteschlange",
+        "title": "Neue Annotations-Warteschlange",
         "errors": {
           "name": "Name ist erforderlich",
           "scoreConfigs": "Binden Sie mindestens eine Score-Konfiguration"
@@ -19480,9 +19489,9 @@
         "nameLabel": "Name",
         "namePlaceholder": "z. B. hallucination_review",
         "descriptionLabel": "Beschreibung",
-        "descriptionPlaceholder": "Wofür diese Annotationswarteschlange dient und wer sie prüft...",
+        "descriptionPlaceholder": "Wofür diese Annotations-Warteschlange gedacht ist und wer sie überprüft...",
         "scoreConfigsLabel": "Score-Konfigurationen",
-        "scoreConfigsHint": "Eine Annotationswarteschlange bewertet Elemente anhand einer oder mehrerer Dimensionen. Jede Score-Konfiguration ist eine einzelne Dimension – wählen Sie die zu bindenden Konfigurationen aus und fixieren Sie jede auf eine Version.",
+        "scoreConfigsHint": "Eine Annotations-Warteschlange bewertet Elemente anhand einer oder mehrerer Dimensionen. Jede Score-Konfiguration ist eine einzelne Dimension – wählen Sie die zu bindenden Konfigurationen aus und legen Sie jeweils eine Version fest.",
         "scoreConfigsEmpty": "Wählen Sie die zu bindenden Score-Konfigurationen aus.",
         "addScoreConfig": "Score-Konfiguration hinzufügen",
         "allScoreConfigsAdded": "Alle Score-Konfigurationen sind hinzugefügt.",
@@ -19490,10 +19499,10 @@
         "noScoreConfigs": "Noch keine Score-Konfigurationen — erstellen Sie zuerst eine in Score-Konfigurationen.",
         "targetDatasetLabel": "Zieldatensatz",
         "targetDatasetNone": "Keine (nur Überprüfung)",
-        "targetDatasetHint": "Ohne Zieldatensatz werden Elemente in dieser Annotationswarteschlange nur geprüft.",
+        "targetDatasetHint": "Ohne Ziel-Dataset werden Elemente in dieser Annotations-Warteschlange nur überprüft.",
         "autoRoutingLabel": "Automatische Weiterleitung",
-        "autoRoutingHint": "Objekte automatisch einreihen, deren Scores eine Bedingung erfüllen. Leer lassen, um Elemente aus Discovery zu dieser Annotationswarteschlange hinzuzufügen.",
-        "autoRoutingEmpty": "Elemente werden dieser Annotationswarteschlange manuell hinzugefügt.",
+        "autoRoutingHint": "Objekte automatisch einreihen, deren Scores eine Bedingung erfüllen. Leer lassen, um Elemente aus Discovery zu dieser Annotations-Warteschlange hinzuzufügen.",
+        "autoRoutingEmpty": "Elemente werden manuell zu dieser Annotations-Warteschlange hinzugefügt.",
         "addCondition": "Bedingung hinzufügen",
         "conditionAnd": "UND",
         "operatorIs": "ist",
@@ -19502,12 +19511,12 @@
         "conditionValuePlaceholder": "Wert",
         "pin": "Version anheften",
         "versionLatest": "v{version} (neueste)",
-        "success": "Annotationswarteschlange erstellt",
-        "error": "Annotationswarteschlange konnte nicht erstellt werden"
+        "success": "Annotations-Warteschlange erstellt",
+        "error": "Annotations-Warteschlange konnte nicht erstellt werden"
       },
       "detail": {
-        "fallbackTitle": "Annotationswarteschlange",
-        "loadError": "Elemente der Annotationswarteschlange konnten nicht geladen werden",
+        "fallbackTitle": "Annotations-Warteschlange",
+        "loadError": "Elemente der Annotations-Warteschlange konnten nicht geladen werden",
         "startReviewing": "Überprüfung starten",
         "scoreConfigs": "Score-Konfigurationen ({count})",
         "targetDataset": "Zieldatensatz",
@@ -19517,7 +19526,7 @@
         "inTrace": "In Trace {traceId}",
         "reviewAgain": "Erneut überprüfen",
         "emptyTitle": "Nichts zu überprüfen",
-        "emptyBody": "Fügen Sie dieser Annotationswarteschlange Traces, Spans oder Sessions aus Discovery oder einer Trace-Ansicht hinzu.",
+        "emptyBody": "Fügen Sie dieser Annotations-Warteschlange Traces, Spans oder Sitzungen aus Discovery oder einer Trace-Ansicht hinzu.",
         "columns": {
           "refType": "Ref",
           "refId": "Referenz",
@@ -19588,7 +19597,7 @@
         "true": "Wahr",
         "false": "Falsch",
         "allReviewedTitle": "Alle Elemente überprüft",
-        "allReviewedBody": "Jedes Element in dieser Annotationswarteschlange wurde vollständig geprüft."
+        "allReviewedBody": "Jedes Element in dieser Annotations-Warteschlange wurde vollständig überprüft."
       }
     },
     "experiments": {
@@ -28132,7 +28141,7 @@
     "teamChannelSilent": "Dieser Teamkanal ist absichtlich leer — Alarmierungen werden nirgendwo angekündigt.",
     "slackChannelTitle": "Slack-Kanal",
     "slackChannelSetWith": "Slack-Kanal mit {command} festlegen",
-    "slackChannelLinkHint": "Geben Sie den Befehl in diesem Slack-Kanal ein. Dafür muss Ihr Slack-Konto verknüpft sein: Geben Sie in Slack /o2 link ein.",
+    "slackChannelLinkHint": "Geben Sie den Befehl in diesem Slack-Kanal ein. Dafür muss Ihr Slack-Konto verknüpft sein: Geben Sie {command} link in Slack ein.",
     "slackChannelSendTest": "Testnachricht senden",
     "slackChannelClear": "Leeren",
     "slackChannelBackup": "{webhook} nur als Backup verwenden",
@@ -28707,7 +28716,7 @@
     "mineJoinTeam": "Einem Team beitreten",
     "mineTestTeam": "Eine Testalarmierung an {team} senden",
     "mineCoverSaved": "Vertretung gespeichert",
-    "mineSlackLinkHow": "/o2 link in Slack eingeben",
+    "mineSlackLinkHow": "{command} link in Slack eingeben",
     "mineSlackSetUpHint": "Öffnet Einstellungen › Slack",
     "myDeliveriesWhen": "Wann",
     "phoneAddHint": "Eine Nummer für SMS und Anrufe hinzufügen",
@@ -29278,7 +29287,7 @@
     "channelUnavailable": "{channel} — kein Anbieter dahinter",
     "channelUnverified": "{channel} — hinterlegt, aber von niemandem verifiziert",
     "channelAddPhone": "{reason}. Fügen Sie Ihr Telefon unter Mein On-Call hinzu",
-    "channelLinkSlack": "{reason}. Führen Sie /o2 link in Slack aus",
+    "channelLinkSlack": "{reason}. {command} link in Slack ausführen",
     "loadUneven": "{name} hatte in den letzten {days} Tagen das {factor}-fache des Medians",
     "loadUnevenLabel": "Ungleichmäßige Last:",
     "membersUnreachableMore": "{name} ist in diesem Team, aber keine Alarmierung kann diese Person erreichen — {why}. {count} weiteres Mitglied ist in derselben Lage. | {name} ist in diesem Team, aber keine Alarmierung kann diese Person erreichen — {why}. {count} weitere Mitglieder sind in derselben Lage.",
@@ -30888,6 +30897,13 @@
         "http": "HTTP",
         "httpDescription": "Slack ruft Ihre öffentliche URL auf. Erfordert einen Klick auf „Verify“ in Slack",
         "channelHistory": "Dem Bot erlauben, Antworten in von ihm gestarteten Threads zu lesen",
+        "appName": "App-Name",
+        "appNameHelp": "Der Name, den Personen in Slack sehen. Geben Sie jedem OpenObserve-Server einen eigenen Namen, z. B. OpenObserve Staging.",
+        "appNameTooLong": "Der App-Name darf höchstens {max} Zeichen lang sein",
+        "appNameMarkup": "Der App-Name darf <, > oder & nicht enthalten",
+        "command": "Slash-Befehl",
+        "commandInvalid": "Beginnen Sie mit / und verwenden Sie höchstens {max} Zeichen: Kleinbuchstaben, Ziffern, - und _",
+        "commandWarning": "Slack führt einen Slash-Befehl in einem Workspace nur für eine App aus. Wenn eine andere App in diesem Workspace {command} bereits verwendet, funktioniert {command} für diese App nicht mehr, nachdem Sie diese App installiert haben.",
         "tokenLabel": "App-Konfigurations-Refresh-Token (xoxe-…)",
         "tokenHelp": "Auf der Seite „Your Apps“ von Slack zeigt „Your App Configuration Tokens“ › „Generate Token“ ein Zugriffstoken und ein Refresh-Token an: Fügen Sie das Refresh-Token ein. OpenObserve rotiert es und speichert das neueste verschlüsselt, um die App später zu aktualisieren.",
         "generateToken": "Token generieren",
@@ -31057,7 +31073,7 @@
         "settings": "Einstellungen",
         "install": "Bei Installation",
         "destination": "Von einem Alarmziel",
-        "oncall": "Von /o2 oncall hier"
+        "oncall": "Von {command} oncall hier"
       },
       "channel": "Kanal",
       "channelPlaceholder": "Kanäle durchsuchen",
@@ -31071,7 +31087,7 @@
       "editDefault": "Kanalstandard bearbeiten",
       "removeConfirm": "Standard entfernen",
       "removeTitle": "Standard für #{channel} entfernen?",
-      "removeMessage": "Fragen in {name} gehen dann an die Standardorganisation jeder Person (sie kann sie mit /o2 org ändern).",
+      "removeMessage": "Fragen in {name} gehen dann an die Standard-Organisation der jeweiligen Person (sie kann sie mit {command} org ändern).",
       "instanceAdminOnly": "Nur für Instanz-Administratoren",
       "ownOrgOnlyHint": "In einem Instanz-Workspace ordnen Sie Kanäle Ihrer eigenen Organisation zu",
       "claimableHint": "Nicht übernommene Kanäle und Kanäle im Besitz von {org}",
@@ -34698,6 +34714,25 @@
       },
       "noHighConfidence": "Keine Namen mit hoher Konfidenz"
     }
+  },
+  "commandPalette": {
+    "title": "Seiten, Ressourcen und Aktionen suchen",
+    "placeholder": "Namen und IDs suchen",
+    "moreTypes": "Weitere Typen",
+    "pages": "Seiten",
+    "actions": "Erstellen",
+    "recent": "Letzte Besuche",
+    "localHistory": "Lokaler Verlauf",
+    "clearRecent": "Letzte Besuche löschen",
+    "historyStorageUnavailable": "Besuche können nicht gespeichert werden",
+    "recentUnavailable": "Dieser Eintrag ist derzeit nicht verfügbar",
+    "loading": "Suche…",
+    "partial": "Einige Ergebnisse sind nicht verfügbar",
+    "failed": "Suche konnte nicht abgeschlossen werden",
+    "offline": "Offline. Letzte Besuche bleiben verfügbar.",
+    "sourceUnavailable": "Dieser Ressourcentyp ist nicht verfügbar",
+    "emptyHelp": "Name oder ID zum Suchen eingeben",
+    "globalShortcut": "Globale Suche öffnen"
   },
   "timeRangeInput": {
     "label": "Zeitbereich eingeben",

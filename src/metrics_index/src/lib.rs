@@ -32,13 +32,16 @@ mod tests {
     use std::{ops::Range, sync::Arc};
 
     use arrow::{
-        array::{Array, RecordBatch, StringViewArray, UInt32Array},
+        array::{
+            Array, Float64Array, Int64Array, RecordBatch, StringViewArray, UInt32Array, UInt64Array,
+        },
         datatypes::{DataType, Field, Schema},
     };
     use config::{
         TIMESTAMP_COL_NAME,
         meta::{promql::VALUE_LABEL, stream::FileKey},
     };
+    use object_store::{ObjectStore, PutOptions, memory::InMemory};
     use promql_parser::label::{MatchOp, Matcher, Matchers};
 
     use super::{
@@ -164,8 +167,6 @@ mod tests {
         counts: Vec<u32>,
         requested: &[String],
     ) -> MetricsIndexData {
-        use arrow::array::{Float64Array, Int64Array, UInt64Array};
-        use object_store::{ObjectStore, PutOptions};
         let rows = counts.iter().map(|n| *n as usize).sum::<usize>();
         let mut fields = vec![
             Field::new("__hash__", DataType::UInt64, false),
@@ -212,7 +213,7 @@ mod tests {
         let account = format!("{id}:default");
         let path = format!("files/test/mindex/m/2026/09/22/00/indexed-v1-{id}.midx");
         let data_path = format!("files/test/metrics/m/2026/09/22/00/indexed-v1-{id}.vortex");
-        let store = object_store::memory::InMemory::new();
+        let store = InMemory::new();
         store
             .put_opts(
                 &path.clone().into(),

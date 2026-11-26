@@ -181,6 +181,20 @@ pub(super) fn create_str_match_expr(
     Ok(udf_expr)
 }
 
+/// Builds a `%term%` LIKE pattern matching `term` literally: `%`, `_` and `\` are escaped.
+pub(crate) fn like_contains_pattern(term: &str) -> String {
+    let mut pattern = String::with_capacity(term.len() + 2);
+    pattern.push('%');
+    for c in term.chars() {
+        if matches!(c, '%' | '_' | '\\') {
+            pattern.push('\\');
+        }
+        pattern.push(c);
+    }
+    pattern.push('%');
+    pattern
+}
+
 /// Returns `x` of a `%x%` LIKE pattern when `x` holds no LIKE wildcard or escape.
 pub(crate) fn like_substring(pattern: &str) -> Option<&str> {
     let term = pattern.strip_prefix('%')?.strip_suffix('%')?;
@@ -213,6 +227,34 @@ mod tests {
         assert!(is_alphanumeric("123abc"));
         assert!(!is_alphanumeric("123 abc"));
         assert!(!is_alphanumeric("123 abc 123"));
+    }
+
+    #[test]
+    fn test_like_contains_pattern_escapes_wildcards() {
+        assert_eq!(like_contains_pattern("plain"), "%plain%");
+        assert_eq!(like_contains_pattern("100% done"), r"%100\% done%");
+        assert_eq!(like_contains_pattern("task_1"), r"%task\_1%");
+        assert_eq!(like_contains_pattern(r"a\b"), r"%a\\b%");
+        assert_eq!(like_substring(&like_contains_pattern("a_b")), None);
+    }
+
+    #[test]
+    fn test_like_contains_pattern_matches_only_literal_rows() {
+        use datafusion::arrow::{
+            array::{BooleanArray, Scalar, StringArray},
+            compute::kernels::comparison::ilike,
+        };
+        let rows = StringArray::from(vec![
+            "Progress 100% done for task_7",
+            "Progress 100x done for taskA7",
+            "progress 100% DONE for TASK_7 x",
+        ]);
+        let pattern = StringArray::from(vec![like_contains_pattern("100% done for task_")]);
+        let got: BooleanArray = ilike(&rows, &Scalar::new(pattern)).unwrap();
+        assert_eq!(
+            (0..got.len()).map(|i| got.value(i)).collect::<Vec<_>>(),
+            vec![true, false, true]
+        );
     }
 
     #[test]
@@ -254,8 +296,6 @@ mod tests {
 
     #[test]
     fn test_disjunction_single() {
-        use datafusion::{physical_expr::expressions::Literal, scalar::ScalarValue};
-
         let expr = Arc::new(Literal::new(ScalarValue::Boolean(Some(true))));
         let result = disjunction(vec![expr.clone()]);
         assert_eq!(result.as_ref() as *const _, expr.as_ref() as *const _);
@@ -270,8 +310,6 @@ mod tests {
 
     #[test]
     fn test_balanced_binary_is_logarithmic_and_ordered() {
-        use datafusion::physical_expr::expressions::Literal;
-
         let exprs = (0..1000)
             .map(|i| Arc::new(Literal::new(ScalarValue::Int64(Some(i)))) as Arc<dyn PhysicalExpr>)
             .collect::<Vec<_>>();
@@ -296,8 +334,6 @@ mod tests {
 
     #[test]
     fn test_conjunction_empty_is_true() {
-        use datafusion::physical_expr::expressions::Literal;
-
         let result = conjunction(vec![]);
         let lit = result.downcast_ref::<Literal>().unwrap();
         assert_eq!(*lit.value(), ScalarValue::Boolean(Some(true)));

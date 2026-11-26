@@ -119,7 +119,7 @@ impl TableProvider for ListingTableAdapter {
     async fn scan(
         &self,
         state: &dyn Session,
-        projection: Option<&Vec<usize>>,
+        projection: Option<&[usize]>,
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
@@ -168,10 +168,10 @@ impl TableProvider for ListingTableAdapter {
                 });
                 (Some(filter_projection), projection)
             } else {
-                (projection.cloned(), None)
+                (projection.map(<[usize]>::to_vec), None)
             };
-        let parquet_projection = parquet_projection.as_ref();
-        let filter_projection = filter_projection.as_ref();
+        let parquet_projection = parquet_projection.as_deref();
+        let filter_projection = filter_projection.as_deref();
 
         let parquet_exec = self
             .listing_table
@@ -307,7 +307,12 @@ fn handler_tantivy_index(
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Float64Array, Int64Array, RecordBatch, UInt64Array};
+    use arrow::{
+        array::{
+            Array, BooleanArray, Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array,
+        },
+        compute::cast,
+    };
     use arrow_schema::{DataType, Field, Schema};
     use config::{FileFormat, meta::promql::HASH_LABEL};
     use datafusion::{
@@ -315,7 +320,8 @@ mod tests {
             file_format::{FileFormat as DataFusionFileFormat, parquet::ParquetFormat},
             listing::{ListingOptions, ListingTableUrl},
         },
-        physical_plan::{collect, displayable},
+        physical_plan::{ExecutionPlanProperties, collect, displayable},
+        prelude::{SessionConfig, SessionContext},
     };
     use parquet::arrow::ArrowWriter;
     use vortex::{
@@ -583,8 +589,6 @@ mod tests {
     // Utf8View schema
     #[tokio::test]
     async fn test_vortex_utf8view_stats_plan_and_scan() {
-        use arrow::array::StringArray;
-
         let dir = tempfile::tempdir().unwrap();
         let file_schema = Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
@@ -695,8 +699,6 @@ mod tests {
     }
 
     async fn assert_vortex_numeric_file_columns_under_string_type(string_type: DataType) {
-        use arrow::array::{Array, BooleanArray, Float64Array, StringArray};
-
         let dir = tempfile::tempdir().unwrap();
         let file_schema = Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
@@ -796,7 +798,7 @@ mod tests {
                     let columns: Vec<_> = b
                         .columns()
                         .iter()
-                        .map(|c| arrow::compute::cast(c, &DataType::Utf8).unwrap())
+                        .map(|c| cast(c, &DataType::Utf8).unwrap())
                         .collect();
                     (0..b.num_rows())
                         .map(|i| {
@@ -817,11 +819,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_table_scan_partitions_are_independent_of_session() {
-        use datafusion::{
-            physical_plan::ExecutionPlanProperties,
-            prelude::{SessionConfig, SessionContext},
-        };
-
         use crate::datafusion::datasource::uniontable::NewUnionTable;
 
         let ctx = SessionContext::new_with_config(

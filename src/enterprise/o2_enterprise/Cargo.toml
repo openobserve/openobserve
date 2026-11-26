@@ -9,7 +9,6 @@ publish = false
 default = []
 cloud = []
 test-utils = []
-vectorscan = []
 
 [lib]
 path = "lib.rs"

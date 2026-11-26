@@ -34,15 +34,6 @@ enterprise = [
     "enrichment-data/enterprise",
     "usage_reporting/enterprise",
 ]
-vectorscan = [
-    "openobserve-api-http/vectorscan",
-    "openobserve-api-grpc/vectorscan",
-    "openobserve-core/vectorscan",
-    "openobserve-jobs/vectorscan",
-    "super_cluster_queue?/vectorscan",
-    "search_service/vectorscan",
-    "enrichment-data/vectorscan",
-]
 cloud = [
     "openobserve-api-http/cloud",
     "openobserve-api-grpc/cloud",
@@ -441,24 +432,24 @@ collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
 # DataFusion and related storage dependencies
-datafusion = "55.1.0"
-datafusion-proto = "55.1.0"
-datafusion-functions-json = "0.55.1"
-arrow = { version = "59.3.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "59.3.0"
-arrow-json = "59.3.0"
-arrow-schema = { version = "59.3.0", features = ["serde"] }
-parquet = { version = "59.3.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.13.2", features = ["aws", "azure", "gcp"] }
-sqlparser = { version = "0.62", features = ["serde", "visitor"] }
-vortex = { git = "https://github.com/openobserve/vortex", rev = "fcbcd3d0676a58858eaf589c7a68e417a8c43739", features = [
+datafusion = "56.0.0"
+datafusion-proto = "56.0.0"
+datafusion-functions-json = { git = "https://github.com/openobserve/datafusion-functions-json", rev = "4a33bee18309f501444c00d98eaf03a42b21fac2" }
+arrow = { version = "60.1.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "60.1.0"
+arrow-json = "60.1.0"
+arrow-schema = { version = "60.1.0", features = ["serde"] }
+parquet = { version = "60.1.0", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.14.2", features = ["aws", "azure", "gcp"] }
+sqlparser = { version = "0.63", features = ["serde", "visitor"] }
+vortex = { git = "https://github.com/openobserve/vortex", rev = "d981c5244ce0727165ea51033e5a14f09b3bd2eb", features = [
     "tokio",
 ] }
-vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "fcbcd3d0676a58858eaf589c7a68e417a8c43739", features = [
+vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "d981c5244ce0727165ea51033e5a14f09b3bd2eb", features = [
     "pco",
     "zstd",
 ] }
-vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "fcbcd3d0676a58858eaf589c7a68e417a8c43739" }
+vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "d981c5244ce0727165ea51033e5a14f09b3bd2eb" }
 hashbrown = { version = "0.17.1", features = ["serde"] }
 dotenv_config = "0.2"
 dotenvy = "0.15"
@@ -563,7 +554,7 @@ sea-orm-migration = { version = "1.1.20", features = [
 ] }
 segment = "~0.2.4"
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["arbitrary_precision"] }
+serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order"] }
 sha1 = "0.10.6"
 sha2 = "0.10"
 sha256 = "1.6"
@@ -620,7 +611,5 @@ zip = "9.0"
 zstd = "0.13"
 
 [patch.crates-io]
-object_store = { git = "https://github.com/openobserve/arrow-rs-object-store", branch = "openobserve-v0.13.2" }
-sqlparser = { git = "https://github.com/openobserve/sqlparser-rs", branch = "0.62.0-patch" }
 # crates.io 3.5.0 reads past short inputs via _mm_loadu_si128 and trips debug UB checks on x86; 3.5.0-fix adds ogxd/gxhash#118 with unchanged hashes
 gxhash = { git = "https://github.com/openobserve/gxhash", branch = "3.5.0-fix" }

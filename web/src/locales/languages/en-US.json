@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "No channel has a default org yet",
-      "description": "Questions in a channel without a default go to each person's default org (they can change it with /o2 org)."
+      "description": "Questions in a channel without a default go to each person's default org (they can change it with {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nobody in this org has linked Slack yet"
@@ -1920,6 +1920,7 @@
     "patternCount": "Count",
     "errorConstructingSearchQuery": "An error occurred while constructing the search query.",
     "errorExtractingPatterns": "Error extracting patterns. Please try again.",
+    "patternsNoReadPermission": "You don't have permission to read this stream.",
     "errorWhileApplyingSavedView": "Error while applying saved view.",
     "errorWhileExtractingStreamFields": "Error while extracting stream fields.",
     "errorWhileGeneratingHistogramData": "Error while generating histogram data.",
@@ -6333,6 +6334,8 @@
     "fieldRequired": "Field is required!",
     "sqlQuery": "Sql Query",
     "promqlQuery": "PromQL Query",
+    "queryRowLimitNote": "Each run processes at most {limit} rows unless the query sets its own LIMIT.",
+    "queryRowLimitNoteNoLimit": "Each run processes at most the default number of rows unless the query sets its own LIMIT.",
     "output": "Output",
     "validating": "Validating...",
     "validateAndClose": "Validate and Close",
@@ -9983,6 +9986,10 @@
     },
     "browserDeniedFileDownload": "Browser denied file download...",
     "chartDataDownloadedCsv": "Chart data downloaded as a CSV file",
+    "tableDownloadPartial": "Only the first {count} rows of the result were fetched, so the file is partial.",
+    "tableDownloadServerPartial": "The server returned partial data, so the file may be incomplete.",
+    "tableDownloadWaitForLoad": "The panel is still loading. Download again once it finishes.",
+    "preparingTableDownload": "Fetching all rows for the download…",
     "chartDataDownloadedJson": "Chart data downloaded as a JSON file",
     "dynamicFilters": "Dynamic filters",
     "failedToCancelRunningQuery": "Failed to cancel running query",
@@ -16089,8 +16096,10 @@
         "searchSuffixesAria": "Search suffix filters",
         "searchTypesAria": "Search type filters",
         "facetAria": "{label}, {count} metrics",
+        "facetAriaUnchecked": "{label}, {count} with data, {unchecked} not checked yet",
         "noPrefixMatch": "No prefixes match.",
         "noSuffixMatch": "No suffixes match.",
+        "uncheckedTooltip": "{count} with data · {unchecked} not checked yet",
         "noTypeMatch": "No types match."
       },
       "views": {
@@ -28130,7 +28139,7 @@
     "teamChannelSilent": "This team's channel is empty on purpose — pages will not be announced anywhere.",
     "slackChannelTitle": "Slack channel",
     "slackChannelSetWith": "Set a Slack channel with {command}",
-    "slackChannelLinkHint": "Type it in that Slack channel. It needs your Slack account linked: type /o2 link in Slack.",
+    "slackChannelLinkHint": "Type it in that Slack channel. It needs your Slack account linked: type {command} link in Slack.",
     "slackChannelSendTest": "Send test message",
     "slackChannelClear": "Clear",
     "slackChannelBackup": "Use {webhook} only as a backup",
@@ -28705,7 +28714,7 @@
     "mineJoinTeam": "Join a team",
     "mineTestTeam": "Send a test page to {team}",
     "mineCoverSaved": "Cover saved",
-    "mineSlackLinkHow": "Type /o2 link in Slack",
+    "mineSlackLinkHow": "Type {command} link in Slack",
     "mineSlackSetUpHint": "Opens Settings › Slack",
     "myDeliveriesWhen": "When",
     "phoneAddHint": "Add a number for texts and calls",
@@ -29276,7 +29285,7 @@
     "channelUnavailable": "{channel} — no provider behind it",
     "channelUnverified": "{channel} — on file, but nobody has verified it",
     "channelAddPhone": "{reason}. Add your phone on My on-call",
-    "channelLinkSlack": "{reason}. Run /o2 link in Slack",
+    "channelLinkSlack": "{reason}. Run {command} link in Slack",
     "loadUneven": "{name} carried {factor}× the median over the last {days} days",
     "loadUnevenLabel": "Load is uneven:",
     "membersUnreachableMore": "{name} is on this team, but no page to them can land — {why}. {count} other member is in the same state. | {name} is on this team, but no page to them can land — {why}. {count} other members are in the same state.",
@@ -30886,6 +30895,13 @@
         "http": "HTTP",
         "httpDescription": "Slack calls your public URL. Needs one Verify click in Slack",
         "channelHistory": "Let the bot read replies in threads it started",
+        "appName": "App name",
+        "appNameHelp": "The name people see in Slack. Give each OpenObserve server its own name, such as OpenObserve Staging.",
+        "appNameTooLong": "The app name must have at most {max} characters",
+        "appNameMarkup": "The app name must not contain <, > or &",
+        "command": "Slash command",
+        "commandInvalid": "Start with / and use at most {max} characters: lowercase letters, digits, - and _",
+        "commandWarning": "Slack runs a slash command for only one app in a workspace. If another app in this workspace already uses {command}, {command} stops working for that app after you install this one.",
         "tokenLabel": "App configuration refresh token (xoxe-…)",
         "tokenHelp": "On Slack's Your Apps page, Your App Configuration Tokens › Generate Token shows an access token and a refresh token: paste the refresh token. OpenObserve rotates it and keeps the newest one encrypted to update the app later.",
         "generateToken": "Generate a token",
@@ -31055,7 +31071,7 @@
         "settings": "Settings",
         "install": "At install",
         "destination": "From an alert destination",
-        "oncall": "From /o2 oncall here"
+        "oncall": "From {command} oncall here"
       },
       "channel": "Channel",
       "channelPlaceholder": "Search channels",
@@ -31069,7 +31085,7 @@
       "editDefault": "Edit channel default",
       "removeConfirm": "Remove default",
       "removeTitle": "Remove the default for #{channel}?",
-      "removeMessage": "Questions in {name} then go to each person's default org (they can change it with /o2 org).",
+      "removeMessage": "Questions in {name} then go to each person's default org (they can change it with {command} org).",
       "instanceAdminOnly": "Instance admin only",
       "ownOrgOnlyHint": "On an instance workspace you map channels to your own org",
       "claimableHint": "Unclaimed channels and channels {org} owns",
@@ -34696,6 +34712,25 @@
       },
       "noHighConfidence": "No high-confidence names"
     }
+  },
+  "commandPalette": {
+    "title": "Search pages, resources, and actions",
+    "placeholder": "Search names and IDs",
+    "moreTypes": "More types",
+    "pages": "Pages",
+    "actions": "Create",
+    "recent": "Recent visits",
+    "localHistory": "Local history",
+    "clearRecent": "Clear recent visits",
+    "historyStorageUnavailable": "Recent visits cannot be saved",
+    "recentUnavailable": "This item is currently unavailable",
+    "loading": "Searching…",
+    "partial": "Some results are unavailable",
+    "failed": "Search could not be completed",
+    "offline": "You are offline. Recent visits are still available.",
+    "sourceUnavailable": "This resource type is currently unavailable",
+    "emptyHelp": "Enter a name or ID to search resources",
+    "globalShortcut": "Open global search"
   },
   "timeRangeInput": {
     "label": "Type a time range",

@@ -253,7 +253,7 @@ fn exact_num_rows(file: &PartitionedFile) -> Option<usize> {
 pub fn apply_projection(
     schema: &SchemaRef,
     diff_rules: &HashMap<String, DataType>,
-    projection: Option<&Vec<usize>>,
+    projection: Option<&[usize]>,
     memory_exec: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     if diff_rules.is_empty() {
@@ -264,9 +264,7 @@ pub fn apply_projection(
         Vec::with_capacity(projected_schema.fields().len());
     for (idx, field) in projected_schema.fields().iter().enumerate() {
         let name = field.name().to_string();
-        let col = Arc::new(datafusion::physical_expr::expressions::Column::new(
-            &name, idx,
-        ));
+        let col = Arc::new(Column::new(&name, idx));
         if let Some(data_type) = diff_rules.get(&name) {
             exprs.push((Arc::new(CastExpr::new(col, data_type.clone(), None)), name));
         } else {
@@ -282,7 +280,7 @@ pub fn apply_combined_filter(
     schema: &arrow_schema::Schema,
     fst_fields: &[String],
     exec_plan: Arc<dyn ExecutionPlan>,
-    filter_projection: Option<&Vec<usize>>,
+    filter_projection: Option<&[usize]>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     if index_condition.is_none() && timestamp_filter.is_none() {
         return Ok(exec_plan);
@@ -324,7 +322,7 @@ pub fn apply_combined_filter(
 
     Ok(Arc::new(
         FilterExecBuilder::new(combined_expr, exec_plan)
-            .apply_projection(filter_projection.cloned())?
+            .apply_projection(filter_projection.map(<[usize]>::to_vec))?
             .build()?,
     ))
 }
@@ -379,7 +377,10 @@ pub(crate) fn file_scan_config(plan: &Arc<dyn ExecutionPlan>) -> Option<&FileSca
 mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use config::meta::stream::FileKey;
-    use datafusion::{common::Statistics, parquet::arrow::arrow_reader::RowSelector};
+    use datafusion::{
+        common::Statistics, parquet::arrow::arrow_reader::RowSelector,
+        physical_plan::empty::EmptyExec,
+    };
     use vortex::scan::selection::Selection;
     use vortex_datafusion::VortexAccessPlan;
 
@@ -551,7 +552,7 @@ mod tests {
 
     fn make_exec() -> Arc<dyn ExecutionPlan> {
         let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
-        Arc::new(datafusion::physical_plan::empty::EmptyExec::new(schema))
+        Arc::new(EmptyExec::new(schema))
     }
 
     #[test]
@@ -581,14 +582,11 @@ mod tests {
 
     #[test]
     fn test_apply_combined_filter_timestamp_only_wraps_filter() {
-        use arrow_schema::{Field, Schema};
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("col", DataType::Utf8, false),
         ]));
-        let exec = Arc::new(datafusion::physical_plan::empty::EmptyExec::new(
-            schema.clone(),
-        )) as Arc<dyn ExecutionPlan>;
+        let exec = Arc::new(EmptyExec::new(schema.clone())) as Arc<dyn ExecutionPlan>;
         let schema_ref: arrow_schema::Schema = schema.as_ref().clone();
         let result = apply_combined_filter(None, Some((1000, 2000)), &schema_ref, &[], exec, None);
         assert!(result.is_ok());
@@ -597,12 +595,9 @@ mod tests {
 
     #[test]
     fn test_apply_projection_with_diff_rules_produces_projection() {
-        use arrow_schema::{Field, Schema};
         use hashbrown::HashMap;
         let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
-        let exec = Arc::new(datafusion::physical_plan::empty::EmptyExec::new(
-            schema.clone(),
-        )) as Arc<dyn ExecutionPlan>;
+        let exec = Arc::new(EmptyExec::new(schema.clone())) as Arc<dyn ExecutionPlan>;
         let mut diff_rules: HashMap<String, DataType> = HashMap::new();
         diff_rules.insert("col".to_string(), DataType::LargeUtf8);
         let result = apply_projection(&schema, &diff_rules, None, exec);

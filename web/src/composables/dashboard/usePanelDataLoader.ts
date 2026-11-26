@@ -405,8 +405,12 @@ export const usePanelDataLoader = (
   const cancelSupersededSearches = () => {
     const traceIds = state.searchRequestTraceIds ?? [];
     if (!traceIds.length) return;
-    const orgId = store?.state?.selectedOrganization?.identifier;
     state.searchRequestTraceIds = [];
+    cancelSearches(traceIds);
+  };
+
+  const cancelSearches = (traceIds: string[]) => {
+    const orgId = store?.state?.selectedOrganization?.identifier;
     try {
       traceIds.forEach((traceId: string) => {
         cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId });
@@ -416,7 +420,7 @@ export const usePanelDataLoader = (
         queryService.delete_running_queries(orgId, traceIds)?.catch?.(() => {});
       }
     } catch (error) {
-      console.error("Error cancelling superseded searches:", error);
+      console.error("Error cancelling searches:", error);
     }
   };
 
@@ -748,7 +752,7 @@ export const usePanelDataLoader = (
     removeTraceId,
   });
 
-  const { executeSQL, executeMultiSQL, invalidateRun } = usePanelSQLExecutor({
+  const { executeSQL, executeMultiSQL, invalidateRun, ...exportApi } = usePanelSQLExecutor({
     state,
     panelSchema,
     store,
@@ -780,6 +784,7 @@ export const usePanelDataLoader = (
     refreshAnnotations,
     log,
     getRegionClusterParams,
+    cancelExportStreams: cancelSearches,
   });
 
   const hasAtLeastOneQuery = () => panelSchema.value.queries?.some((q: any) => q?.query);
@@ -875,6 +880,8 @@ export const usePanelDataLoader = (
       }
     }
 
+    // Only unmount stops an export: it has no cancel control, so the dashboard-wide Cancel leaves it running.
+    exportApi.cancelExports();
     // remove cancelquery event
     window.removeEventListener("cancelQuery", cancelQueryAbort);
   });
@@ -1007,5 +1014,6 @@ export const usePanelDataLoader = (
     isFirstLoadSettled,
     loadData,
     reloadAnnotations,
+    fetchExportRows: exportApi.fetchExportRows,
   };
 };

@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use arrow::datatypes::{DataType, Schema};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -26,7 +27,10 @@ use config::{
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
 };
-use datafusion::error::{DataFusionError, Result};
+use datafusion::{
+    arrow::datatypes::Metadata,
+    error::{DataFusionError, Result},
+};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
@@ -56,7 +60,7 @@ struct StorageScan<'a> {
     trace_id: &'a str,
     org_id: &'a str,
     stream_name: &'a str,
-    schema: Arc<arrow::datatypes::Schema>,
+    schema: Arc<Schema>,
     files: Vec<FileKey>,
     scan_stats: ScanStats,
     sort_order: FileSortOrder,
@@ -319,7 +323,7 @@ pub(crate) async fn create_context(
         trace_id,
         org_id,
         stream_name,
-        schema: Arc::new(schema.with_metadata(Default::default())),
+        schema: Arc::new(schema.with_metadata(Metadata::default())),
         files,
         scan_stats,
         sort_order,
@@ -333,7 +337,7 @@ pub(crate) async fn create_context(
 
 /// Picks the source the evaluator reads, before any file is cached or index-selected.
 fn scan_source(
-    schema: &arrow::datatypes::Schema,
+    schema: &Schema,
     files: &[FileKey],
     matchers: &Matchers,
     preference: &SourcePreference<'_>,
@@ -363,23 +367,18 @@ fn block_parent_eligible(file: &FileKey) -> bool {
         && file.meta.mindex_size > 0
 }
 
-fn block_output_labels_supported(
-    schema: &arrow::datatypes::Schema,
-    label_selector: &HashSet<String>,
-) -> bool {
+fn block_output_labels_supported(schema: &Schema, label_selector: &HashSet<String>) -> bool {
     !schema.fields().iter().any(|field| {
         (label_selector.is_empty() || label_selector.contains(field.name()))
             && is_metrics_hash_excluded_label(field.name())
             && matches!(
                 field.data_type(),
-                arrow::datatypes::DataType::Utf8
-                    | arrow::datatypes::DataType::LargeUtf8
-                    | arrow::datatypes::DataType::Utf8View
+                DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View
             )
     })
 }
 
-fn block_matchers_supported(schema: &arrow::datatypes::Schema, matchers: &Matchers) -> bool {
+fn block_matchers_supported(schema: &Schema, matchers: &Matchers) -> bool {
     matchers.or_matchers.is_empty()
         && matchers.matchers.iter().all(|matcher| {
             if [NAME_LABEL, VALUE_LABEL, TIMESTAMP_COL_NAME].contains(&matcher.name.as_str()) {
@@ -391,18 +390,16 @@ fn block_matchers_supported(schema: &arrow::datatypes::Schema, matchers: &Matche
             !is_metrics_hash_excluded_label(&matcher.name)
                 && matches!(
                     field.data_type(),
-                    arrow::datatypes::DataType::Utf8
-                        | arrow::datatypes::DataType::LargeUtf8
-                        | arrow::datatypes::DataType::Utf8View
+                    DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View
                 )
         })
 }
 
 /// The series streams key on a `u64` hash; a stream without the column has nothing to key.
-fn hash_column_streams(schema: &arrow::datatypes::Schema) -> bool {
+fn hash_column_streams(schema: &Schema) -> bool {
     schema
         .field_with_name(HASH_LABEL)
-        .is_ok_and(|field| field.data_type() == &arrow::datatypes::DataType::UInt64)
+        .is_ok_and(|field| field.data_type() == &DataType::UInt64)
 }
 
 /// Prefetch the `.midx` sidecars like the Tantivy path prefetches `.ttv` files:

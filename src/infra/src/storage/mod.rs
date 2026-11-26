@@ -30,7 +30,10 @@ use object_store::{
     ObjectMeta, ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
     WriteMultipart, path::Path,
 };
-use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
+use parquet::file::{
+    FOOTER_SIZE,
+    metadata::{FooterTail, ParquetMetaDataReader},
+};
 
 pub mod accounts;
 mod local;
@@ -563,13 +566,8 @@ async fn get_parquet_metadata(
     let file_size = info.size;
 
     // read metadata len
-    let mut data = get_range(
-        account,
-        file,
-        (file_size - parquet::file::FOOTER_SIZE as u64)..file_size,
-    )
-    .await?;
-    let mut buf = [0_u8; parquet::file::FOOTER_SIZE];
+    let mut data = get_range(account, file, (file_size - FOOTER_SIZE as u64)..file_size).await?;
+    let mut buf = [0_u8; FOOTER_SIZE];
     data.copy_to_slice(&mut buf);
     let metadata_len = FooterTail::try_from(buf).map(|f| f.metadata_length())?;
 
@@ -577,8 +575,7 @@ async fn get_parquet_metadata(
     let data = get_range(
         account,
         file,
-        (file_size - parquet::file::FOOTER_SIZE as u64 - metadata_len as u64)
-            ..(file_size - parquet::file::FOOTER_SIZE as u64),
+        (file_size - FOOTER_SIZE as u64 - metadata_len as u64)..(file_size - FOOTER_SIZE as u64),
     )
     .await?;
 
@@ -715,6 +712,8 @@ async fn del_paths_strict(account: &str, paths: Vec<Path>) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use object_store::memory::InMemory;
+
     use super::*;
 
     #[tokio::test]
@@ -919,10 +918,7 @@ mod tests {
         let (org, kept) = ("delorgpfx_t1", "delorgpfx_t9");
         for name in [org, kept] {
             MULTI_ACCOUNTS
-                .add_account(
-                    name.to_string(),
-                    Box::new(object_store::memory::InMemory::new()),
-                )
+                .add_account(name.to_string(), Box::new(InMemory::new()))
                 .await;
         }
         let key = |o: &str| format!("synthetics/{o}/c1/run1/shot.png");

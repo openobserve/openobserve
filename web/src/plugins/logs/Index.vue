@@ -1246,10 +1246,14 @@ export default defineComponent({
     let stopHistoryRestore: (() => void) | undefined;
     onMounted(() => {
       registerBeforeAppReload();
-      stopHistoryRestore = useLogsHistoryRestore(router, () => {
-        replaceNextLogsWrite();
-        requestLogsReapply(true, "url");
-      });
+      stopHistoryRestore = useLogsHistoryRestore(
+        router,
+        () => {
+          replaceNextLogsWrite();
+          requestLogsReapply(true, "url");
+        },
+        () => searchObj.data.stream.selectedStream.join(","),
+      );
     });
 
     onActivated(() => {
@@ -1309,7 +1313,7 @@ export default defineComponent({
               router.currentRoute.value.query.to,
             );
             searchObj.data.datetime.type = "absolute";
-          } else {
+          } else if (router.currentRoute.value.query.period) {
             // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
             searchBarRef.value.dateTimeRef.setRelativeTime(router.currentRoute.value.query.period);
             searchObj.data.datetime.type = "relative";
@@ -1492,6 +1496,7 @@ export default defineComponent({
         if (generationId !== null && generationId !== undefined && !engine.isCurrent(generationId))
           return;
         searchObj.loading = false;
+        searchObj.meta.searchApplied = true;
         if (generationId !== null && generationId !== undefined)
           engine.recordPatternsComplete(generationId);
 
@@ -1499,7 +1504,10 @@ export default defineComponent({
       } catch (error) {
         console.error("[Index] Error extracting patterns:", error);
         searchObj.loading = false;
-        showErrorNotification(t("logs.index.errorExtractingPatterns"));
+        // The Patterns list shows the stored error itself; a toast would repeat it generically.
+        if (!patternsState.value?.error) {
+          showErrorNotification(t("logs.index.errorExtractingPatterns"));
+        }
         if (generationId !== null && generationId !== undefined)
           engine.recordPatternsFailure(generationId);
         settle();

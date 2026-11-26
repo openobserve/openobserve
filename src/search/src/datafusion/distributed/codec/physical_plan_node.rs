@@ -99,7 +99,16 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
 
 #[cfg(test)]
 mod tests {
-    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema},
+        logical_expr::JoinType,
+        physical_expr::expressions::Column,
+        physical_plan::{
+            empty::EmptyExec,
+            joins::{HashJoinExecBuilder, NestedLoopJoinExec},
+        },
+        prelude::SessionContext,
+    };
     use datafusion_proto::bytes::{
         physical_plan_from_bytes_with_extension_codec, physical_plan_to_bytes_with_extension_codec,
     };
@@ -109,18 +118,9 @@ mod tests {
 
     #[test]
     fn join_projection_presence_survives_roundtrip() -> Result<()> {
-        use datafusion::{
-            logical_expr::JoinType,
-            physical_expr::expressions::Column,
-            physical_plan::{
-                empty::EmptyExec,
-                joins::{HashJoinExecBuilder, NestedLoopJoinExec},
-            },
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
         let codec = super::super::get_physical_extension_codec();
         // COUNT(*) needs an empty projection to remain distinct from an absent projection.
         for projection in [None, Some(vec![]), Some(vec![0])] {
@@ -159,7 +159,7 @@ mod tests {
         let plan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
             "test",
             Arc::clone(&schema),
-            Some(&vec![0]),
+            Some(&[0]),
             &[],
             Some(10),
             FileSortOrder::None,
@@ -171,7 +171,7 @@ mod tests {
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
-        let ctx = datafusion::prelude::SessionContext::new();
+        let ctx = SessionContext::new();
         let plan2 =
             physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.downcast_ref::<NewEmptyExec>().unwrap();

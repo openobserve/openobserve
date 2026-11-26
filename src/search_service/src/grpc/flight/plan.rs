@@ -315,6 +315,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{datasource::empty::EmptyTable, physical_plan::collect};
 
     use super::*;
     use crate::datafusion::{
@@ -332,16 +333,12 @@ mod tests {
         let placeholder = NewEmptyTable::new("logs", schema.clone());
         for projection in [None, Some(vec![2]), Some(vec![2, 0]), Some(vec![])] {
             let plan = placeholder
-                .scan(&ctx.state(), projection.as_ref(), &[], None)
+                .scan(&ctx.state(), projection.as_deref(), &[], None)
                 .await?;
             let empty_exec = plan.downcast_ref::<NewEmptyExec>().unwrap();
             for table_count in [0, 1, 2] {
                 let tables = (0..table_count)
-                    .map(|_| {
-                        Arc::new(datafusion::datasource::empty::EmptyTable::new(
-                            schema.clone(),
-                        )) as Arc<dyn TableProvider>
-                    })
+                    .map(|_| Arc::new(EmptyTable::new(schema.clone())) as Arc<dyn TableProvider>)
                     .collect();
                 let union_table = NewUnionTable::new(empty_exec.full_schema(), tables);
                 let scan = union_table
@@ -353,7 +350,7 @@ mod tests {
                     )
                     .await?;
                 assert_eq!(scan.schema(), empty_exec.schema());
-                let batches = datafusion::physical_plan::collect(scan, ctx.task_ctx()).await?;
+                let batches = collect(scan, ctx.task_ctx()).await?;
                 assert!(batches.iter().all(|batch| batch.num_rows() == 0));
             }
         }

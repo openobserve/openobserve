@@ -39,10 +39,15 @@ const useNotifications = () => {
     return toast({ variant: "info", message, timeout: 5000, ...options });
   };
 
+  const showWarningNotification = (message: I18nText, options?: NotificationOptions) => {
+    return toast({ variant: "warning", message, timeout: 5000, ...options });
+  };
+
   return {
     showErrorNotification,
     showPositiveNotification,
     showInfoNotification,
+    showWarningNotification,
     showConfictErrorNotificationWithRefreshBtn,
     showAliasErrorForVisualization,
   };

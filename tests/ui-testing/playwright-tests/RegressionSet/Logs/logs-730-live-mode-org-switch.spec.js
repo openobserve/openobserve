@@ -41,7 +41,8 @@ test.describe('Logs live mode survives an org switch and back (ENT#730)', () => 
     await waitForStreamData(page, STREAM, 30);
     await page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId()}&stream_type=logs&stream=${STREAM}&period=15m&refresh=0&sql_mode=false&quick_mode=false&show_histogram=true`);
     const refresh = pm.logsAutoRefreshPage;
-    await pm.logsPage.applyQueryAndWaitForSearchResponse();
+    // A stream in the URL auto-runs the search, and clicking the run button mid-flight cancels it.
+    await refresh.waitForIdleResults();
     await refresh.expectHistogramRendered();
 
     await refresh.openPopover();
@@ -59,6 +60,7 @@ test.describe('Logs live mode survives an org switch and back (ENT#730)', () => 
     await refresh.expectTriggerLabel(/off/i);
     // The org switch clears the selected stream by design, so nothing can search until one is picked and run.
     await pm.logsPage.selectStream(STREAM, 3, 0, true);
+    await expect(page.locator(refresh.runInFlight)).toHaveCount(0, { timeout: 30000 });
     await pm.logsPage.applyQueryAndWaitForSearchResponse();
 
     await expect.poll(() => searches.filter((s) => s.org === orgId() && !s.histogram).length, {

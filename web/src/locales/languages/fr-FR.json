@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Aucun canal n'a encore d'organisation par défaut",
-      "description": "Les questions posées dans un canal sans organisation par défaut sont dirigées vers l'organisation par défaut de chaque personne (modifiable avec /o2 org)."
+      "description": "Les questions dans un canal sans organisation par défaut sont envoyées vers l'organisation par défaut de chaque personne (elles peuvent la modifier avec {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Personne dans cette organisation n'a encore lié Slack"
@@ -298,7 +298,7 @@
     },
     "noQueues": {
       "title": "Créez votre première file d'attente d'annotation",
-      "description": "Les files d'attente d'annotation sont des listes de tâches de revue — associez des configurations de score, un jeu de données cible et un filtre qui y injecte des éléments à des fins de revue humaine.",
+      "description": "Les files d'attente d'annotation sont des listes de tâches de revue — associez des configurations de score, un jeu de données cible et un filtre qui y fait entrer des éléments pour une revue humaine.",
       "action": "Nouvelle file d'attente d'annotation",
       "actionDesc": "Créer une file d'attente d'annotation vide"
     },
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Rien d'anormal ici",
-      "description": "Aucun élément en anomalie dans cette fenêtre. Élargissez la plage temporelle ou changez le filtre de file d'attente d'annotation pour voir les éléments déjà triés."
+      "description": "Aucun élément défaillant dans cette fenêtre. Élargissez la plage temporelle ou modifiez le filtre de file d'attente d'annotation pour voir les éléments déjà triés."
     },
     "noTraces": {
       "title": "Aucune trace trouvée",
@@ -1920,6 +1920,7 @@
     "patternCount": "Nombre",
     "errorConstructingSearchQuery": "Une erreur est survenue lors de la construction de la requête de recherche.",
     "errorExtractingPatterns": "Erreur lors de l'extraction des modèles. Veuillez réessayer.",
+    "patternsNoReadPermission": "Vous n’avez pas l’autorisation de lire ce flux.",
     "errorWhileApplyingSavedView": "Erreur lors de l'application de la vue enregistrée.",
     "errorWhileExtractingStreamFields": "Erreur lors de l'extraction des champs de flux.",
     "errorWhileGeneratingHistogramData": "Erreur lors de la génération des données d'histogramme.",
@@ -6333,6 +6334,8 @@
     "fieldRequired": "Ce champ est obligatoire !",
     "sqlQuery": "Requête SQL",
     "promqlQuery": "Requête PromQL",
+    "queryRowLimitNote": "Chaque exécution traite au plus {limit} lignes, sauf si la requête définit son propre LIMIT.",
+    "queryRowLimitNoteNoLimit": "Chaque exécution traite au plus le nombre de lignes par défaut, sauf si la requête définit son propre LIMIT.",
     "output": "sortie",
     "validating": "Validation...",
     "validateAndClose": "Valider et fermer",
@@ -9985,6 +9988,10 @@
     },
     "browserDeniedFileDownload": "Le navigateur a refusé le téléchargement du fichier...",
     "chartDataDownloadedCsv": "Données du graphique téléchargées en tant que fichier CSV",
+    "tableDownloadPartial": "Seules les {count} premières lignes du résultat ont été récupérées ; le fichier est donc partiel.",
+    "tableDownloadServerPartial": "Le serveur a renvoyé des données partielles ; le fichier peut donc être incomplet.",
+    "tableDownloadWaitForLoad": "Le panneau est encore en cours de chargement. Téléchargez à nouveau une fois terminé.",
+    "preparingTableDownload": "Récupération de toutes les lignes pour le téléchargement…",
     "chartDataDownloadedJson": "Données du graphique téléchargées en tant que fichier JSON",
     "dynamicFilters": "Filtres dynamiques",
     "failedToCancelRunningQuery": "Échec de l'annulation de la requête en cours d'exécution",
@@ -16091,8 +16098,10 @@
         "searchSuffixesAria": "Rechercher des filtres de suffixe",
         "searchTypesAria": "Rechercher dans les filtres de type",
         "facetAria": "{label}, {count} métriques",
+        "facetAriaUnchecked": "{label}, {count} avec des données, {unchecked} non cochés pour l'instant",
         "noPrefixMatch": "Aucun préfixe ne correspond.",
         "noSuffixMatch": "Aucun suffixe ne correspond.",
+        "uncheckedTooltip": "{count} avec des données · {unchecked} non cochés pour l'instant",
         "noTypeMatch": "Aucun type ne correspond."
       },
       "views": {
@@ -19365,7 +19374,7 @@
         "hint": "Ajoutez {ref} pour une revue humaine. L'élément reste à sa place — la file d'attente d'annotation suit son statut de revue.",
         "queueLabel": "File d'attente d'annotation",
         "queuePlaceholder": "Sélectionnez une file d'attente d'annotation...",
-        "noQueues": "Aucune file d'attente d'annotation n'accepte un {scope} — créez-en une d'abord depuis la page Files d'attente d'annotation.",
+        "noQueues": "Aucune file d'attente d'annotation n'accepte de {scope} — créez-en une d'abord depuis la page Files d'attente d'annotation.",
         "confirm": "Ajouter à la file d'attente d'annotation",
         "success": "Ajouté à {queue}",
         "error": "Impossible d'ajouter cet élément à la file d'attente d'annotation"
@@ -19405,8 +19414,8 @@
         "session": "Sessions"
       },
       "inQueueFilter": {
-        "label": "Statut dans la file d'attente d'annotation",
-        "notEnqueued": "Non ajouté à une file d'attente",
+        "label": "Statut de la file d'attente d'annotation",
+        "notEnqueued": "Non mis en file d'attente",
         "enqueued": "Dans une file d'attente d'annotation",
         "pending": "En attente de revue",
         "reviewed": "Revu",
@@ -19443,13 +19452,13 @@
       "addToQueue": "Ajouter à la file d'attente d'annotation",
       "addToQueueMenu": {
         "loading": "Chargement des files d'attente d'annotation...",
-        "noQueues": "Aucune file d'attente d'annotation pour l'instant — créez-en une depuis la page Files d'attente d'annotation.",
+        "noQueues": "Aucune file d'attente d'annotation pour l'instant — créez-en une d'abord depuis la page Files d'attente d'annotation.",
         "dimensions": "{count} dimension | {count} dimensions",
         "accepts": "Accepte uniquement {types}",
         "sectionTitle": "Ajouter à la file d'attente d'annotation",
         "manageQueues": "Gérer les files d'attente d'annotation"
       },
-      "addSuccess": "Ajouté à {queue} — la ligne reste dans Discovery et la file d'attente d'annotation suit son statut de revue.",
+      "addSuccess": "Ajouté à {queue} — la ligne reste dans Découverte, et la file d'attente d'annotation suit son statut de revue.",
       "addError": "Impossible d'ajouter des éléments à la file d'attente d'annotation",
       "openQueue": "Ouvrir la file d'attente d'annotation",
       "queuesError": "Impossible de charger les files d'attente d'annotation"
@@ -19480,9 +19489,9 @@
         "nameLabel": "Nom",
         "namePlaceholder": "p. ex. hallucination_review",
         "descriptionLabel": "Description",
-        "descriptionPlaceholder": "À quoi sert cette file d'attente d'annotation et qui effectue les revues...",
+        "descriptionPlaceholder": "À quoi sert cette file d'attente d'annotation et qui en effectue la revue...",
         "scoreConfigsLabel": "Configurations de score",
-        "scoreConfigsHint": "Une file d'attente d'annotation évalue les éléments selon une ou plusieurs dimensions. Chaque configuration de score représente une seule dimension — choisissez les configurations à lier et fixez chacune à une version.",
+        "scoreConfigsHint": "Une file d'attente d'annotation évalue les éléments sur une ou plusieurs dimensions. Chaque configuration de score représente une seule dimension — choisissez les configurations à associer et fixez chacune à une version.",
         "scoreConfigsEmpty": "Choisissez les configurations de score à lier.",
         "addScoreConfig": "Ajouter une configuration de score",
         "allScoreConfigsAdded": "Toutes les configurations de score sont ajoutées.",
@@ -19490,9 +19499,9 @@
         "noScoreConfigs": "Aucune configuration de score pour le moment — créez-en une dans Configurations de score d'abord.",
         "targetDatasetLabel": "Jeu de données cible",
         "targetDatasetNone": "Aucun (révision uniquement)",
-        "targetDatasetHint": "Sans jeu de données cible, les éléments de cette file d'attente d'annotation font uniquement l'objet d'une revue.",
+        "targetDatasetHint": "Sans jeu de données cible, les éléments de cette file d'attente d'annotation sont uniquement revus.",
         "autoRoutingLabel": "Routage automatique",
-        "autoRoutingHint": "Mettez automatiquement en file d'attente les objets dont les scores correspondent à une condition. Laissez vide pour ajouter des éléments à cette file d'attente d'annotation depuis Discovery.",
+        "autoRoutingHint": "Mettez automatiquement en file d'attente les objets dont les scores correspondent à une condition. Laissez vide pour ajouter des éléments à cette file d'attente d'annotation depuis Découverte.",
         "autoRoutingEmpty": "Les éléments sont ajoutés manuellement à cette file d'attente d'annotation.",
         "addCondition": "Ajouter une condition",
         "conditionAnd": "ET",
@@ -19517,7 +19526,7 @@
         "inTrace": "Dans la trace {traceId}",
         "reviewAgain": "Réviser à nouveau",
         "emptyTitle": "Rien à réviser",
-        "emptyBody": "Ajoutez des traces, des spans ou des sessions à cette file d'attente d'annotation depuis Discovery ou une vue de trace.",
+        "emptyBody": "Ajoutez des traces, des spans ou des sessions à cette file d'attente d'annotation depuis Découverte ou une vue de trace.",
         "columns": {
           "refType": "Réf",
           "refId": "Référence",
@@ -19588,7 +19597,7 @@
         "true": "Vrai",
         "false": "Faux",
         "allReviewedTitle": "Tous les éléments révisés",
-        "allReviewedBody": "Tous les éléments de cette file d'attente d'annotation ont fait l'objet d'une revue terminée."
+        "allReviewedBody": "Tous les éléments de cette file d'attente d'annotation ont une revue terminée."
       }
     },
     "experiments": {
@@ -25744,7 +25753,7 @@
     "sloDetail": "Détail du SLO",
     "alertDetail": "Détail de l'alerte",
     "editAlert": "Modifier l'alerte",
-    "aiQueueDetail": "File d'attente d'annotation",
+    "aiQueueDetail": "File d'annotation",
     "aiQueueReview": "Revue de la file d'annotation",
     "aiDatasetDetail": "Jeu de données",
     "aiPromptCreate": "Nouveau prompt",
@@ -28132,7 +28141,7 @@
     "teamChannelSilent": "Le canal de cette équipe est délibérément vide — les notifications ne seront diffusées nulle part.",
     "slackChannelTitle": "Canal Slack",
     "slackChannelSetWith": "Définissez un canal Slack avec {command}",
-    "slackChannelLinkHint": "Saisissez-le dans ce canal Slack. Votre compte Slack doit être lié : saisissez /o2 link dans Slack.",
+    "slackChannelLinkHint": "Saisissez-le dans ce canal Slack. Votre compte Slack doit être lié : saisissez {command} link dans Slack.",
     "slackChannelSendTest": "Envoyer un message de test",
     "slackChannelClear": "Effacer",
     "slackChannelBackup": "Utiliser {webhook} uniquement comme solution de secours",
@@ -28707,7 +28716,7 @@
     "mineJoinTeam": "Rejoindre une équipe",
     "mineTestTeam": "Envoyer une notification de test à {team}",
     "mineCoverSaved": "Remplacement enregistré",
-    "mineSlackLinkHow": "Tapez /o2 link dans Slack",
+    "mineSlackLinkHow": "Saisissez {command} link dans Slack",
     "mineSlackSetUpHint": "Ouvre Réglages › Slack",
     "myDeliveriesWhen": "Quand",
     "phoneAddHint": "Ajoutez un numéro pour les SMS et les appels",
@@ -29278,7 +29287,7 @@
     "channelUnavailable": "{channel} — aucun fournisseur associé",
     "channelUnverified": "{channel} — enregistré, mais personne ne l'a vérifié",
     "channelAddPhone": "{reason}. Ajoutez votre téléphone dans Mon astreinte",
-    "channelLinkSlack": "{reason}. Exécutez /o2 link dans Slack",
+    "channelLinkSlack": "{reason}. Exécutez {command} link dans Slack",
     "loadUneven": "{name} a géré {factor}× la charge médiane au cours des {days} derniers jours",
     "loadUnevenLabel": "La charge est inégale :",
     "membersUnreachableMore": "{name} est dans cette équipe, mais aucune notification ne peut lui parvenir — {why}. {count} autre membre est dans le même état. | {name} est dans cette équipe, mais aucune notification ne peut lui parvenir — {why}. {count} autres membres sont dans le même état.",
@@ -30888,6 +30897,13 @@
         "http": "HTTP",
         "httpDescription": "Slack appelle votre URL publique. Nécessite un clic sur Vérifier dans Slack",
         "channelHistory": "Autoriser le bot à lire les réponses dans les fils de discussion qu’il a lancés",
+        "appName": "Nom de l'application",
+        "appNameHelp": "Le nom que les utilisateurs voient dans Slack. Donnez à chaque serveur OpenObserve son propre nom, par exemple OpenObserve Staging.",
+        "appNameTooLong": "Le nom de l'application doit comporter au maximum {max} caractères",
+        "appNameMarkup": "Le nom de l'application ne doit pas contenir <, > ni &",
+        "command": "Commande slash",
+        "commandInvalid": "Commencez par / et utilisez au maximum {max} caractères : lettres minuscules, chiffres, - et _",
+        "commandWarning": "Slack n'exécute une commande slash que pour une seule application par espace de travail. Si une autre application de cet espace de travail utilise déjà {command}, {command} cessera de fonctionner pour cette application après l'installation de celle-ci.",
         "tokenLabel": "Jeton d’actualisation de configuration de l’application (xoxe-…)",
         "tokenHelp": "Sur la page Vos applications de Slack, Jetons de configuration de votre application › Générer un jeton affiche un jeton d’accès et un jeton d’actualisation : collez le jeton d’actualisation. OpenObserve le renouvelle et conserve le plus récent chiffré pour mettre à jour l’application ultérieurement.",
         "generateToken": "Générer un jeton",
@@ -31057,7 +31073,7 @@
         "settings": "Réglages",
         "install": "À l'installation",
         "destination": "Depuis une destination d'alerte",
-        "oncall": "Depuis /o2 oncall ici"
+        "oncall": "Depuis {command} oncall ici"
       },
       "channel": "Canal",
       "channelPlaceholder": "Rechercher des canaux",
@@ -31071,7 +31087,7 @@
       "editDefault": "Modifier le canal par défaut",
       "removeConfirm": "Supprimer le canal par défaut",
       "removeTitle": "Supprimer la valeur par défaut pour #{channel} ?",
-      "removeMessage": "Les questions dans {name} vont alors vers l'organisation par défaut de chaque personne (elle peut la modifier avec /o2 org).",
+      "removeMessage": "Les questions dans {name} sont ensuite envoyées vers l'organisation par défaut de chaque personne (elles peuvent la modifier avec {command} org).",
       "instanceAdminOnly": "Administrateur d'instance uniquement",
       "ownOrgOnlyHint": "Sur un espace de travail d'instance, vous associez les canaux à votre propre organisation",
       "claimableHint": "Canaux non revendiqués et canaux détenus par {org}",
@@ -34698,6 +34714,25 @@
       },
       "noHighConfidence": "Aucun nom à confiance élevée"
     }
+  },
+  "commandPalette": {
+    "title": "Rechercher des pages, ressources et actions",
+    "placeholder": "Rechercher des noms et ID",
+    "moreTypes": "Autres types",
+    "pages": "Pages",
+    "actions": "Créer",
+    "recent": "Visites récentes",
+    "localHistory": "Historique local",
+    "clearRecent": "Effacer les visites récentes",
+    "historyStorageUnavailable": "Impossible d’enregistrer les visites",
+    "recentUnavailable": "Cet élément est indisponible",
+    "loading": "Recherche…",
+    "partial": "Certains résultats sont indisponibles",
+    "failed": "La recherche a échoué",
+    "offline": "Hors ligne. Les visites récentes restent disponibles.",
+    "sourceUnavailable": "Ce type de ressource est indisponible",
+    "emptyHelp": "Saisissez un nom ou un ID",
+    "globalShortcut": "Ouvrir la recherche globale"
   },
   "timeRangeInput": {
     "label": "Saisissez une plage temporelle",

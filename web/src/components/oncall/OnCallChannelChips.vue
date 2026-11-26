@@ -66,6 +66,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { ABSENT } from "@/composables/useSloFormat";
+import { DEFAULT_SLACK_COMMAND } from "@/components/settings/SlackSettings.schema";
 import type { Channel, ChannelReadiness } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -167,9 +168,9 @@ function chipOf(c: ChannelReadiness): Chip {
 
 /// DM-7: a person links their own Slack account from Slack, so only their own "not linked" chip says how. [pure]
 function ownFixTip(c: ChannelReadiness, reason: I18nText): I18nText {
-  return props.own && c.channel === "slack" && c.blocked_because === "not linked"
-    ? t("oncall.channelLinkSlack", { reason })
-    : reason;
+  if (!props.own || c.channel !== "slack" || c.blocked_because !== "not linked") return reason;
+  const command = raw(c.slack_command || DEFAULT_SLACK_COMMAND);
+  return t("oncall.channelLinkSlack", { reason, command });
 }
 
 /// One word for the worst blocked state; a cause no word names (no provider, failing sends) stays quiet rather than wrong.

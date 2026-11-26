@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "尚无频道设置默认组织",
-      "description": "在没有默认组织的频道中，问题会发送到每个人的默认组织（他们可以用 /o2 org 更改）。"
+      "description": "没有默认组织的频道中提出的问题会发送到每个人的默认组织（他们可以通过 {command} org 更改）。"
     },
     "noSlackLinkedPeople": {
       "title": "此组织中尚无人关联 Slack"
@@ -298,9 +298,9 @@
     },
     "noQueues": {
       "title": "创建您的第一个标注队列",
-      "description": "标注队列是审核待办列表——绑定评分配置、目标数据集，以及将条目送入人工审核的过滤器。",
+      "description": "标注队列是复核待办列表 — 绑定评分配置、目标数据集，以及一个将条目送入人工复核的过滤器。",
       "action": "新建标注队列",
-      "actionDesc": "创建一个空白标注队列"
+      "actionDesc": "创建一个空的标注队列"
     },
     "noPrompts": {
       "title": "创建你的第一个提示词",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "这里没有不健康项",
-      "description": "此时间窗口内没有异常项。扩大时间范围，或切换标注队列过滤器以查看您已分诊的条目。"
+      "description": "此时间窗口内没有不健康条目。请扩大时间范围，或切换标注队列过滤器以查看您已分类处理的条目。"
     },
     "noTraces": {
       "title": "未发现任何追踪",
@@ -1920,6 +1920,7 @@
     "patternCount": "计数",
     "errorConstructingSearchQuery": "构造搜索查询时发生错误。",
     "errorExtractingPatterns": "提取模式时出错。请重试。",
+    "patternsNoReadPermission": "您无权读取此数据流。",
     "errorWhileApplyingSavedView": "应用已保存视图时出错。",
     "errorWhileExtractingStreamFields": "提取流字段时出错。",
     "errorWhileGeneratingHistogramData": "生成直方图数据时出错。",
@@ -6333,6 +6334,8 @@
     "fieldRequired": "字段为必填字段！",
     "sqlQuery": "Sql 查询",
     "promqlQuery": "PromQL 查询",
+    "queryRowLimitNote": "除非查询自行设置 LIMIT，否则每次运行最多处理 {limit} 行。",
+    "queryRowLimitNoteNoLimit": "除非查询自行设置 LIMIT，否则每次运行最多处理默认行数。",
     "output": "输出",
     "validating": "正在验证...",
     "validateAndClose": "验证并关闭",
@@ -9985,6 +9988,10 @@
     },
     "browserDeniedFileDownload": "浏览器拒绝了文件下载...",
     "chartDataDownloadedCsv": "图表数据已下载为 CSV 文件",
+    "tableDownloadPartial": "仅获取了结果的前 {count} 行，因此文件不完整。",
+    "tableDownloadServerPartial": "服务器返回了部分数据，因此文件可能不完整。",
+    "tableDownloadWaitForLoad": "面板仍在加载。加载完成后请重新下载。",
+    "preparingTableDownload": "正在获取所有行以供下载…",
     "chartDataDownloadedJson": "图表数据已下载为 JSON 文件",
     "dynamicFilters": "动态过滤器",
     "failedToCancelRunningQuery": "取消正在运行的查询失败",
@@ -16091,8 +16098,10 @@
         "searchSuffixesAria": "搜索后缀过滤器",
         "searchTypesAria": "搜索类型过滤器",
         "facetAria": "{label}，{count} 个指标",
+        "facetAriaUnchecked": "{label}，{count} 个有数据，{unchecked} 个尚未检查",
         "noPrefixMatch": "没有匹配的前缀。",
         "noSuffixMatch": "没有匹配的后缀。",
+        "uncheckedTooltip": "{count} 个有数据 · {unchecked} 个尚未检查",
         "noTypeMatch": "没有匹配的类型。"
       },
       "views": {
@@ -17763,7 +17772,7 @@
       "viewByStream": "按流查看",
       "search": {
         "noResultsTitle": "没有与搜索匹配的会话",
-        "noResultsDescription": "请尝试其他过滤器或更大的时间范围。",
+        "noResultsDescription": "请尝试其他过滤器或扩大时间范围。",
         "clear": "清除过滤器"
       }
     },
@@ -19362,13 +19371,13 @@
       "annotate": {
         "button": "添加到标注队列",
         "title": "添加到标注队列",
-        "hint": "添加 {ref} 以进行人工审核。它会保留在原处——标注队列会跟踪其审核状态。",
+        "hint": "将 {ref} 添加以供人工复核。它会保留在原处 — 标注队列会跟踪其复核状态。",
         "queueLabel": "标注队列",
         "queuePlaceholder": "选择标注队列...",
-        "noQueues": "没有标注队列可接受 {scope}——请先从“标注队列”页面创建一个。",
+        "noQueues": "没有标注队列可接收 {scope} — 请先从标注队列页面创建一个。",
         "confirm": "添加到标注队列",
         "success": "已添加到 {queue}",
-        "error": "未能将此条目添加到标注队列"
+        "error": "添加此条目到标注队列失败"
       },
       "dataset": {
         "button": "添加到数据集",
@@ -19407,10 +19416,10 @@
       "inQueueFilter": {
         "label": "标注队列状态",
         "notEnqueued": "未加入队列",
-        "enqueued": "已在标注队列中",
-        "pending": "待审核",
-        "reviewed": "已审核",
-        "all": "全部条目"
+        "enqueued": "已加入标注队列",
+        "pending": "待复核",
+        "reviewed": "已复核",
+        "all": "所有条目"
       },
       "columns": {
         "timestamp": "时间戳",
@@ -19426,7 +19435,7 @@
         "service": "服务",
         "input": "输入",
         "quality": "质量",
-        "inQueue": "是否已加入标注队列？",
+        "inQueue": "是否在标注队列中？",
         "actions": "操作"
       },
       "spanParent": "在 {trace} 中",
@@ -19443,14 +19452,14 @@
       "addToQueue": "添加到标注队列",
       "addToQueueMenu": {
         "loading": "正在加载标注队列...",
-        "noQueues": "尚无标注队列——请先从“标注队列”页面创建一个。",
+        "noQueues": "尚无标注队列 — 请先从标注队列页面创建一个。",
         "dimensions": "{count} 维度 | {count} 维度",
         "accepts": "仅接受 {types}",
         "sectionTitle": "添加到标注队列",
         "manageQueues": "管理标注队列"
       },
-      "addSuccess": "已添加到 {queue}——该行仍保留在“发现”页面中，标注队列会跟踪其审核状态。",
-      "addError": "未能将条目添加到标注队列",
+      "addSuccess": "已添加到 {queue} — 该行仍保留在 Discovery 中，标注队列会跟踪其复核状态。",
+      "addError": "添加条目到标注队列失败",
       "openQueue": "打开标注队列",
       "queuesError": "加载标注队列失败"
     },
@@ -19480,9 +19489,9 @@
         "nameLabel": "名称",
         "namePlaceholder": "例如：hallucination_review",
         "descriptionLabel": "描述",
-        "descriptionPlaceholder": "说明此标注队列的用途以及由谁审核...",
+        "descriptionPlaceholder": "说明此标注队列的用途以及由谁复核...",
         "scoreConfigsLabel": "评分配置",
-        "scoreConfigsHint": "标注队列会按一个或多个维度对条目评分。每个评分配置代表一个维度——选择要绑定的配置，并将每个配置固定到某个版本。",
+        "scoreConfigsHint": "标注队列会从一个或多个维度为条目评分。每个评分配置是一个单一维度 — 选择要绑定的配置，并将每个配置固定到某个版本。",
         "scoreConfigsEmpty": "选择要绑定的评分配置。",
         "addScoreConfig": "添加评分配置",
         "allScoreConfigsAdded": "所有评分配置均已添加。",
@@ -19490,10 +19499,10 @@
         "noScoreConfigs": "尚无评分配置——请先在评分配置中创建一个。",
         "targetDatasetLabel": "目标数据集",
         "targetDatasetNone": "无（仅审核）",
-        "targetDatasetHint": "若没有目标数据集，此标注队列中的条目仅会进行审核。",
+        "targetDatasetHint": "如果没有目标数据集，此标注队列中的条目仅会进行复核。",
         "autoRoutingLabel": "自动路由",
-        "autoRoutingHint": "自动将评分符合条件的对象加入队列。留空则从“发现”页面向此标注队列添加条目。",
-        "autoRoutingEmpty": "条目将手动添加到此标注队列。",
+        "autoRoutingHint": "自动将评分满足条件的对象加入队列。留空则从 Discovery 向此标注队列添加条目。",
+        "autoRoutingEmpty": "条目需手动添加到此标注队列。",
         "addCondition": "添加条件",
         "conditionAnd": "并且",
         "operatorIs": "是",
@@ -19517,7 +19526,7 @@
         "inTrace": "在追踪 {traceId} 中",
         "reviewAgain": "重新审核",
         "emptyTitle": "没有可审核的内容",
-        "emptyBody": "从“发现”页面或追踪视图向此标注队列添加追踪、Span 或会话。",
+        "emptyBody": "从 Discovery 或追踪视图向此标注队列添加追踪、Span 或会话。",
         "columns": {
           "refType": "参考",
           "refId": "参考",
@@ -19588,7 +19597,7 @@
         "true": "真",
         "false": "假",
         "allReviewedTitle": "所有条目均已评审",
-        "allReviewedBody": "此标注队列中的每个条目都已完成审核。"
+        "allReviewedBody": "此标注队列中的每个条目都已完成复核。"
       }
     },
     "experiments": {
@@ -28132,7 +28141,7 @@
     "teamChannelSilent": "该团队的频道是特意留空的——呼叫不会在任何地方发布。",
     "slackChannelTitle": "Slack 频道",
     "slackChannelSetWith": "使用 {command} 设置 Slack 频道",
-    "slackChannelLinkHint": "在该 Slack 频道中输入。这需要先关联您的 Slack 账户：在 Slack 中输入 /o2 link。",
+    "slackChannelLinkHint": "在该 Slack 频道中输入。需要先关联你的 Slack 账户：在 Slack 中输入 {command} link。",
     "slackChannelSendTest": "发送测试消息",
     "slackChannelClear": "清除",
     "slackChannelBackup": "仅将 {webhook} 用作备用",
@@ -28707,7 +28716,7 @@
     "mineJoinTeam": "加入团队",
     "mineTestTeam": "向 {team} 发送测试呼叫",
     "mineCoverSaved": "代班已保存",
-    "mineSlackLinkHow": "在 Slack 中输入 /o2 link",
+    "mineSlackLinkHow": "在 Slack 中输入 {command} link",
     "mineSlackSetUpHint": "打开 设置 › Slack",
     "myDeliveriesWhen": "时间",
     "phoneAddHint": "添加用于短信和电话的号码",
@@ -29278,7 +29287,7 @@
     "channelUnavailable": "{channel} — 没有对应的提供方",
     "channelUnverified": "{channel} — 已登记，但还没有人验证",
     "channelAddPhone": "{reason}。请在“我的值班”中添加您的电话号码",
-    "channelLinkSlack": "{reason}。请在 Slack 中运行 /o2 link",
+    "channelLinkSlack": "{reason}。请在 Slack 中运行 {command} link",
     "loadUneven": "{name} 承担的工作量是中位数的 {factor} 倍（过去 {days} 天）",
     "loadUnevenLabel": "工作量不均衡：",
     "membersUnreachableMore": "{name} 在此团队中，但发给此人的通知无法送达 — {why}。另有 {count} 位成员也处于相同状态。 | {name} 在此团队中，但发给此人的通知无法送达 — {why}。另有 {count} 位成员也处于相同状态。",
@@ -30888,6 +30897,13 @@
         "http": "HTTP",
         "httpDescription": "Slack 会调用您的公共 URL。需要在 Slack 中点击一次“验证”",
         "channelHistory": "允许机器人读取其发起的消息串中的回复",
+        "appName": "应用名称",
+        "appNameHelp": "人们在 Slack 中看到的名称。为每个 OpenObserve 服务器指定各自的名称，例如 OpenObserve Staging。",
+        "appNameTooLong": "应用名称最多只能包含 {max} 个字符",
+        "appNameMarkup": "应用名称不能包含 <、> 或 &",
+        "command": "斜杠命令",
+        "commandInvalid": "以 / 开头，最多使用 {max} 个字符：小写字母、数字、- 和 _",
+        "commandWarning": "Slack 在一个工作区中只会为一个应用运行某个斜杠命令。如果此工作区中的另一个应用已使用 {command}，那么在你安装此应用后，{command} 将停止为该应用工作。",
         "tokenLabel": "应用配置刷新令牌（xoxe-…）",
         "tokenHelp": "在 Slack 的“Your Apps”页面中，“Your App Configuration Tokens › Generate Token”会显示访问令牌和刷新令牌：请粘贴刷新令牌。OpenObserve 会轮换该令牌，并加密保留最新令牌，以便之后更新应用。",
         "generateToken": "生成令牌",
@@ -31057,7 +31073,7 @@
         "settings": "设置",
         "install": "安装时",
         "destination": "来自告警目标",
-        "oncall": "来自此处的 /o2 值班"
+        "oncall": "通过在此处运行 {command} oncall 设置"
       },
       "channel": "频道",
       "channelPlaceholder": "搜索频道",
@@ -31071,7 +31087,7 @@
       "editDefault": "编辑频道默认设置",
       "removeConfirm": "移除默认设置",
       "removeTitle": "移除 #{channel} 的默认设置？",
-      "removeMessage": "此后，{name} 中的问题将转到每个人的默认组织（可通过 /o2 org 更改）。",
+      "removeMessage": "此后，{name} 中的问题会发送到每个人的默认组织（他们可以通过 {command} org 更改）。",
       "instanceAdminOnly": "仅实例管理员",
       "ownOrgOnlyHint": "在实例工作区中，您可以将频道映射到自己的组织",
       "claimableHint": "未认领的频道以及 {org} 拥有的频道",
@@ -34698,6 +34714,25 @@
       },
       "noHighConfidence": "没有高置信度的名称"
     }
+  },
+  "commandPalette": {
+    "title": "搜索页面、资源和操作",
+    "placeholder": "搜索名称和 ID",
+    "moreTypes": "更多类型",
+    "pages": "页面",
+    "actions": "创建",
+    "recent": "最近访问",
+    "localHistory": "本地历史",
+    "clearRecent": "清除最近访问",
+    "historyStorageUnavailable": "无法保存最近访问",
+    "recentUnavailable": "此项目当前不可用",
+    "loading": "搜索中…",
+    "partial": "部分结果不可用",
+    "failed": "无法完成搜索",
+    "offline": "当前离线，仍可查看最近访问。",
+    "sourceUnavailable": "此资源类型当前不可用",
+    "emptyHelp": "输入名称或 ID 搜索资源",
+    "globalShortcut": "打开全局搜索"
   },
   "timeRangeInput": {
     "label": "输入时间范围",

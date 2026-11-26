@@ -18,7 +18,9 @@ use std::sync::LazyLock as Lazy;
 use arrow::datatypes::DataType;
 use datafusion::{
     common::{DataFusionError, Result},
-    logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, Volatility},
+    logical_expr::{
+        ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, Volatility,
+    },
 };
 
 pub const MATCH_ALL_UDF_NAME: &str = "match_all";
@@ -55,10 +57,7 @@ impl ScalarUDFImpl for MatchAllUdf {
         Ok(DataType::Boolean)
     }
 
-    fn invoke_with_args(
-        &self,
-        _args: datafusion::logical_expr::ScalarFunctionArgs,
-    ) -> Result<ColumnarValue> {
+    fn invoke_with_args(&self, _args: ScalarFunctionArgs) -> Result<ColumnarValue> {
         Err(DataFusionError::Internal(
             "match_all function don't support sql with multiple streams".to_string(),
         ))
@@ -94,10 +93,7 @@ impl ScalarUDFImpl for FuzzyMatchAllUdf {
         Ok(DataType::Boolean)
     }
 
-    fn invoke_with_args(
-        &self,
-        _args: datafusion::logical_expr::ScalarFunctionArgs,
-    ) -> Result<ColumnarValue> {
+    fn invoke_with_args(&self, _args: ScalarFunctionArgs) -> Result<ColumnarValue> {
         Err(DataFusionError::Internal(
             "fuzzy_match_all function don't support sql with multiple streams".to_string(),
         ))

@@ -41,6 +41,7 @@ use crate::{
         TestRemoteTaskSecretCandidateResponseBody, TestRunRequestBody, TestRunResponseBody,
         TestRunRowResultBody, VerificationReportBody, WrittenRemoteTaskSecretResponseBody,
     },
+    request::{OutboundOutcome, OutboundTarget, with_outbound_audit},
     service::llm_evaluations::remote_tasks::{self, RemoteTaskError, stats::RemoteTaskStatsError},
 };
 
@@ -129,6 +130,19 @@ fn test_verdict(outcome: VerificationOutcome) -> (bool, Option<String>, Verifica
     match outcome {
         VerificationOutcome::Passed(report) => (true, None, report.into()),
         VerificationOutcome::Failed { error, report } => (false, Some(error), report.into()),
+    }
+}
+
+/// The endpoint's status when it answered; a call that got no response only says it failed.
+fn verification_outcome(outcome: &VerificationOutcome) -> OutboundOutcome {
+    let (report, passed) = match outcome {
+        VerificationOutcome::Passed(report) => (report, true),
+        VerificationOutcome::Failed { report, .. } => (report, false),
+    };
+    match report.status_code {
+        Some(code) => OutboundOutcome::Status(code),
+        None if passed => OutboundOutcome::Succeeded,
+        None => OutboundOutcome::Failed,
     }
 }
 
@@ -796,17 +810,22 @@ pub async fn test_remote_task(
         Err(error) => return MetaHttpResponse::bad_request(error),
     };
     let sample = sample_context(TestConnectionRequestBody { input, metadata });
-    match remote_tasks::test_registration(&org_id, registration, &sample).await {
+    let endpoint = registration.spec.endpoint.clone();
+    let (res, outcome) = match remote_tasks::test_registration(&org_id, registration, &sample).await
+    {
         Ok(outcome) => {
+            let called = verification_outcome(&outcome);
             let (verified, error, report) = test_verdict(outcome);
-            MetaHttpResponse::json(TestRemoteTaskResponseBody {
+            let res = MetaHttpResponse::json(TestRemoteTaskResponseBody {
                 verified,
                 error,
                 report,
-            })
+            });
+            (res, called)
         }
-        Err(error) => remote_task_error_response(error),
-    }
+        Err(error) => (remote_task_error_response(error), OutboundOutcome::NotSent),
+    };
+    with_outbound_audit(res, &[OutboundTarget::new(&endpoint, outcome)])
 }
 
 /// GetRemoteTask
@@ -1194,6 +1213,33 @@ mod tests {
         });
         assert_eq!(ctx.input, serde_json::json!({"q": "2 + 2"}));
         assert_eq!(ctx.metadata["lang"], serde_json::json!("en"));
+    }
+
+    #[test]
+    fn a_task_test_audits_the_status_or_that_no_response_came() {
+        use openobserve_core::llm_evaluations::remote_tasks::verify::VerificationReport;
+        let answered = |status_code| VerificationReport {
+            status_code,
+            ..Default::default()
+        };
+        let failed = |status_code| VerificationOutcome::Failed {
+            error: "e".to_string(),
+            report: answered(status_code),
+        };
+        for (outcome, want) in [
+            (
+                VerificationOutcome::Passed(answered(Some(200))),
+                OutboundOutcome::Status(200),
+            ),
+            (failed(Some(503)), OutboundOutcome::Status(503)),
+            (failed(None), OutboundOutcome::Failed),
+            (
+                VerificationOutcome::Passed(answered(None)),
+                OutboundOutcome::Succeeded,
+            ),
+        ] {
+            assert_eq!(verification_outcome(&outcome), want, "{outcome:?}");
+        }
     }
 
     #[test]
