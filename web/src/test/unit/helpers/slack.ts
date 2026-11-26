@@ -228,6 +228,7 @@ export const ConfirmDialogStub = defineComponent({
     modelValue: { type: Boolean, default: false },
     title: { type: String, default: "" },
     message: { type: String, default: "" },
+    messageValues: { type: Object, default: undefined },
     okLabel: { type: String, default: "" },
   },
   emits: ["update:ok", "update:cancel", "update:modelValue"],

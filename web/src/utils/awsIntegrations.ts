@@ -224,7 +224,7 @@ export const awsIntegrations: AWSIntegration[] = [
     descriptionKey: "ingestion.integrations.aws.lambda.description",
     cloudFormationTemplate: "",
     hasDashboard: false,
-    documentationUrl: "https://openobserve.ai/docs/ingestion/logs/lambda/",
+    documentationUrl: "https://openobserve.ai/docs/integration/cloud/aws/lambda/",
     category: "logs",
     comingSoon: false,
   },

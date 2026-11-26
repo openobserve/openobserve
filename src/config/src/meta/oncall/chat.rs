@@ -181,6 +181,8 @@ pub struct TeamSlackView {
     pub slack_unavailable_reason: Option<String>,
     /// RO-2: "Pages can't post to #{channel}: {reason}".
     pub slack_post_problem: Option<String>,
+    /// The slash command of the installation serving the org, such as `/o2` (issue 3608).
+    pub slack_command: String,
 }
 
 /// Where a team's page posts go now: its native Slack room, its webhooks, and the fallback.

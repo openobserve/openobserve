@@ -1553,6 +1553,7 @@ mod tests {
             visibility: ai_chat_shares::VISIBILITY_ORG,
             expires_at: None,
             redact_tools: false,
+            hide_attachments: false,
         };
         let share = ai_chat_shares::insert(&share, now).await.unwrap();
         ai_chat_shares::revoke(org, &share.id, now).await.unwrap();
@@ -1660,6 +1661,7 @@ mod tests {
             created_at: Set(now),
             updated_at: Set(now),
             template: Set(None),
+            saved_by_person: Set(false),
         })
         .await;
         insert_active(oncall_ownership_rules::ActiveModel {

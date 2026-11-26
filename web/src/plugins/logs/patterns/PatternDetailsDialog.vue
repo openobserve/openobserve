@@ -233,12 +233,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default border-s-accent bg-surface-subtle border-s-4 border-solid px-2.5 py-1.5"
             >
               {{
-                selectedPattern.pattern.examples?.[0]?.variables
-                  ? t("search.patternVariablesDetected", {
-                      count: Object.keys(selectedPattern.pattern.examples[0].variables).length,
-                    })
+                variableCount > 0
+                  ? t("search.patternVariablesDetected", { count: variableCount })
                   : t("search.patternNoVariablesDetected")
               }}
+            </div>
+            <div
+              v-if="variableSlots.length"
+              data-test="pattern-details-variables"
+              class="mt-1.5 flex flex-col gap-1"
+            >
+              <div
+                v-for="slot in variableSlots"
+                :key="slot.position"
+                class="flex flex-wrap items-baseline gap-1.5 text-xs"
+              >
+                <span class="rounded-default bg-pattern-var-bg text-pattern-var-text px-1">
+                  {{ slot.label }}
+                </span>
+                <span class="text-text-secondary font-mono break-all">
+                  {{ slot.values.join(", ") }}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -517,6 +533,29 @@ const patternPathToken = computed(() => {
   const first = tokens.find((t) => t.kind === "text" && t.value.trim());
   return first?.value?.trim() ?? "";
 });
+
+const variableSlots = computed(() =>
+  selectedTemplateTokens.value.flatMap((tok) =>
+    tok.kind === "text"
+      ? []
+      : [
+          {
+            position: tok.position,
+            label: tok.mask ?? wildcardLabel(tok.value, tok.sampleValues),
+            values: tok.sampleValues
+              .slice(0, 5)
+              .map((v: any) => (typeof v === "string" ? v : String(v?.value ?? v))),
+          },
+        ],
+  ),
+);
+
+// Slots come from the template; the older per-example `variables` map is only a fallback.
+const variableCount = computed(
+  () =>
+    variableSlots.value.length ||
+    Object.keys(props.selectedPattern?.pattern?.examples?.[0]?.variables ?? {}).length,
+);
 
 const patternWildcardCount = computed(
   () => selectedTemplateTokens.value.filter((t) => t.kind !== "text").length,

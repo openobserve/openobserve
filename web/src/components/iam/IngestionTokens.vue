@@ -125,6 +125,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="font-medium">{{ row.name }}</span>
           </template>
 
+          <template #cell-description="{ row }">
+            <span
+              class="text-text-body block min-w-0 truncate"
+              :data-test="`ingestion-token-${row.name}-description`"
+            >
+              {{ row.description || "—" }}
+              <OTooltip v-if="row.description" overflow-only />
+            </span>
+          </template>
+
           <!-- Copy yields a ready-to-paste "Basic base64(name:token)" credential
                (OCodeCell copies exactly what it shows), so no manual email +
                base64 step is needed. -->
@@ -285,7 +295,7 @@ import { ingestionTokensQuery } from "@/services/organizations.queries";
 import analytics from "@/services/product_analytics";
 import { ref, computed, defineComponent, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -323,7 +333,7 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 interface Token {
   name: string;
   token: string;
-  description: I18nText;
+  description: string;
   is_default: boolean;
   enabled: boolean;
   created_by: string;
@@ -410,6 +420,20 @@ export default defineComponent({
         meta: { align: "left", flex: true },
       },
       {
+        id: "description",
+        header: t("ingestion.tokenDescriptionLabel"),
+        accessorKey: "description",
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 240,
+        // Flex floors (name 160 + description 80 + token 110 + splunk 110) plus the
+        // fixed columns must stay under ~950px, or narrow windows scroll sideways.
+        // Description truncates behind a tooltip, so it has the lowest floor.
+        minSize: 80,
+        meta: { align: "left", flex: true },
+      },
+      {
         id: "token",
         header: t("ingestion.tokenAuthHeader"),
         accessorKey: "token",
@@ -417,7 +441,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 240,
-        minSize: 140,
+        minSize: 110,
         meta: { align: "left", flex: true, cellOverflowTooltip: false },
       },
       {
@@ -428,7 +452,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 200,
-        minSize: 140,
+        minSize: 110,
         meta: { align: "left", flex: true, cellOverflowTooltip: false },
       },
       {

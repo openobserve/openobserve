@@ -14,7 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { routeGuard, getPath } from "@/utils/zincutils";
-import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
+// eslint-disable-next-line no-restricted-imports -- the pure barrel's side-effect imports would land in the entry chunk
+import { fullThreadLocation } from "@/composables/assistant/fullThreadRoute";
+import type {
+  LocationQuery,
+  LocationQueryRaw,
+  RouteLocationNamedRaw,
+  RouteLocationNormalizedLoaded,
+  RouteLocationRaw,
+} from "vue-router";
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
@@ -243,6 +251,20 @@ const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
 const ImportPipeline = () => import("@/components/pipeline/ImportPipeline.vue");
 
+/** The old full view; it now opens the thread on Home at Full density. */
+function assistantRoute() {
+  return {
+    path: "assistant/:chatId?",
+    name: "assistant",
+    redirect: (to: any) => {
+      const chatId = typeof to.params.chatId === "string" ? to.params.chatId : null;
+      // A named redirect inherits `to.params` unless told otherwise, and Home has no `chatId`.
+      const home = fullThreadLocation(chatId, to.query) as RouteLocationNamedRaw;
+      return { ...home, params: {} };
+    },
+  };
+}
+
 import useIngestionRoutes from "./useIngestionRoutes";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import useManagementRoutes from "./useManagementRoutes";
@@ -307,6 +329,13 @@ const useRoutes = () => {
         public: true,
         titleKey: "routeTitles.sharedChat",
       },
+    },
+    // The new-tab sign-in of `80` §2.3 lands here; it is authenticated, so a signed-out visit goes through login first.
+    {
+      path: "/close-tab",
+      name: "closeTab",
+      component: () => import("@/views/CloseTabView.vue"),
+      meta: { titleKey: "assistant.closeTab.title" },
     },
     {
       path: "/slack/oauth/callback",
@@ -475,6 +504,8 @@ const useRoutes = () => {
       name: "traces",
       component: AppTraces,
       meta: {
+        assistantPrefersFloating: (route: RouteLocationNormalizedLoaded) =>
+          route.query.tab === "service-graph",
         keepAlive: true,
         titleKey: "menu.traces",
         allowOnEmptyData: true,
@@ -659,6 +690,7 @@ const useRoutes = () => {
       component: TraceDetails,
       props: { showAskAi: true },
       meta: {
+        assistantPrefersFloating: true,
         titleKey: "routeTitles.traceDetails",
         licenseFeature: "traces",
       },
@@ -750,6 +782,7 @@ const useRoutes = () => {
       component: ViewDashboard,
       props: true,
       meta: {
+        assistantPrefersFloating: true,
         titleKey: "routeTitles.viewDashboard",
         accessScopeQuery: ["dashboard"],
         licenseFeature: "dashboards",
@@ -810,6 +843,7 @@ const useRoutes = () => {
       component: AddPanel,
       props: true,
       meta: {
+        assistantPrefersFloating: true,
         titleKey: "panel.addPanel",
         accessScopeQuery: ["dashboard"],
         licenseFeature: "dashboards",
@@ -1274,6 +1308,7 @@ const useRoutes = () => {
       props: (to: any) => ({ token: to.params.token }),
       meta: {
         titleKey: "routeTitles.sharedChat",
+        navLink: "/",
       },
       beforeEnter: withFeatureGate("aiAssistant", (to: any, from: any, next: any) => next()),
     },
@@ -1595,6 +1630,7 @@ const useRoutes = () => {
         ]
       : []),
 
+    assistantRoute(),
     {
       path: "/:catchAll(.*)*",
       component: Error404,

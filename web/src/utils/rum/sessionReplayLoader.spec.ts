@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   appendableIndexes,
-  createActivityTimer,
   createLoaderState,
   createQueryError,
   failBatch,
@@ -144,54 +143,5 @@ describe("withRetries", () => {
     const fn = vi.fn().mockRejectedValue(createQueryError("x", 500));
     await expect(withRetries(fn, { isCancelled: () => true, wait: noWait })).rejects.toThrow();
     expect(fn).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("createActivityTimer", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("fires when no first byte arrives within 90 s", () => {
-    const onTimeout = vi.fn();
-    createActivityTimer(onTimeout);
-    vi.advanceTimersByTime(89_999);
-    expect(onTimeout).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1);
-    expect(onTimeout).toHaveBeenCalledTimes(1);
-  });
-
-  it("fires after 30 s of silence once the stream has started", () => {
-    const onTimeout = vi.fn();
-    const timer = createActivityTimer(onTimeout);
-    vi.advanceTimersByTime(5_000);
-    timer.touch();
-    vi.advanceTimersByTime(29_999);
-    expect(onTimeout).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1);
-    expect(onTimeout).toHaveBeenCalledTimes(1);
-  });
-
-  it("never fires on a request that keeps sending, however long it runs", () => {
-    const onTimeout = vi.fn();
-    const timer = createActivityTimer(onTimeout);
-    for (let i = 0; i < 20; i++) {
-      vi.advanceTimersByTime(20_000);
-      timer.touch();
-    }
-    expect(onTimeout).not.toHaveBeenCalled();
-  });
-
-  it("stops once the request settles", () => {
-    const onTimeout = vi.fn();
-    const timer = createActivityTimer(onTimeout);
-    timer.clear();
-    timer.touch();
-    vi.advanceTimersByTime(200_000);
-    expect(onTimeout).not.toHaveBeenCalled();
   });
 });

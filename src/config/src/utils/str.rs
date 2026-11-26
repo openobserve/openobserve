@@ -140,8 +140,8 @@ pub fn url_origin(raw: &str) -> String {
     if !url.has_host() || url.set_username("").is_err() || url.set_password(None).is_err() {
         return String::new();
     }
-    // The parser lowercases a special scheme's host.
-    let host = url.host_str().unwrap_or_default();
+    // The parser lowercases a special scheme's host and keeps a trailing root dot.
+    let host = url.host_str().unwrap_or_default().trim_end_matches('.');
     if SUBDOMAIN_KEYED_HOSTS
         .iter()
         .any(|suffix| host.ends_with(suffix))
@@ -234,6 +234,7 @@ mod tests {
             "{{webhook}}",
             "https://eoabcdefgh.m.pipedream.net/x",
             "https://EOABC.M.Pipedream.net",
+            "https://eoabc.m.pipedream.net./x",
         ] {
             assert_eq!(url_origin(raw), "", "{raw}");
         }

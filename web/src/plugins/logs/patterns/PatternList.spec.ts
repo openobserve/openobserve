@@ -170,6 +170,28 @@ describe("PatternList", () => {
     });
   });
 
+  describe("Error State", () => {
+    const mountWithError = (error: string, errorStatus: number | null) =>
+      mount(PatternList, {
+        props: { patterns: [], loading: false, error, errorStatus },
+        global: { plugins: [i18n], provide: { store } },
+      });
+
+    it("shows the permission message instead of 'No patterns found' on a 403", () => {
+      const w = mountWithError("You don't have permission to read this stream.", 403);
+      expect(w.find('[data-test="log-patterns-error-state"]').exists()).toBe(true);
+      expect(w.text()).toContain("You don't have permission to read this stream.");
+      expect(w.text()).not.toContain("No patterns found");
+      expect(w.find('[data-test="log-patterns-empty-state"]').exists()).toBe(false);
+    });
+
+    it("shows the server message for other failures", () => {
+      const w = mountWithError("Search stream not found", 400);
+      expect(w.text()).toContain("Search stream not found");
+      expect(w.text()).not.toContain("No patterns found");
+    });
+  });
+
   describe("Empty State", () => {
     beforeEach(() => {
       wrapper = mount(PatternList, {
