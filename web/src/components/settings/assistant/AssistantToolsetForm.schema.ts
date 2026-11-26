@@ -176,6 +176,8 @@ export function toolsetDataOf(
 export type ReenterReason = "destination" | "secret";
 
 const isKept = (row: SecretRow) => !!row.key.trim() && row.state === "unchanged";
+const replaces = (rows: SecretRow[]) =>
+  rows.some((row) => !!row.key.trim() && row.state !== "unchanged" && !!row.value);
 
 /** A kept secret cannot travel with a changed destination or next to a new or replaced secret.
  * `writeHeaders`: the body carries AutoResolve's write headers, which never follow a changed destination either. */
@@ -190,9 +192,27 @@ export function reenterReason(
   const keptWrite = writeHeaders && values.mcp.writeHeaders.some(isKept);
   if (!keptHeader && !keptWrite) return null;
   if (values.mcp.url.trim() !== loaded.mcp.url.trim()) return "destination";
-  if (!keptHeader) return null;
-  const rows = values.mcp.headers.filter((row) => row.key.trim());
-  return rows.some((row) => row.state !== "unchanged" && !!row.value) ? "secret" : null;
+  const headerRefused = keptHeader && replaces(values.mcp.headers);
+  const writeRefused = keptWrite && replaces(values.mcp.writeHeaders);
+  return headerRefused || writeRefused ? "secret" : null;
+}
+
+/** Field paths of the kept secrets the server would refuse with this save: only the list a reason applies to. */
+export function refusedSecretPaths(
+  values: ToolsetFormValues,
+  loaded: ToolsetFormValues | null,
+  mergeSecrets: boolean,
+  writeHeaders = false,
+): string[] {
+  const reason = reenterReason(values, loaded, mergeSecrets, writeHeaders);
+  if (!reason || values.kind !== "mcp") return [];
+  const refused = (field: "headers" | "writeHeaders", on: boolean) =>
+    on && (reason === "destination" || replaces(values.mcp[field]))
+      ? values.mcp[field].flatMap((row, i) =>
+          row.state === "unchanged" ? [`mcp.${field}[${i}]`] : [],
+        )
+      : [];
+  return [...refused("headers", mergeSecrets), ...refused("writeHeaders", writeHeaders)];
 }
 
 /** Field paths of every kept secret, which must be typed again before the server accepts the save. */

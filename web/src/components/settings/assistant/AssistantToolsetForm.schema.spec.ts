@@ -20,6 +20,7 @@ import {
   keptSecretPaths,
   makeToolsetFormSchema,
   reenterReason,
+  refusedSecretPaths,
   toolsetDataOf,
   toolsetFormDefaults,
   toolsetFormOf,
@@ -199,5 +200,23 @@ describe("toolset form schema and payload", () => {
     // Without AutoResolve the body leaves them out, and the server drops them for a new URL.
     expect(reenterReason(values, loaded, true, false)).toBeNull();
     expect(keptSecretPaths(values)).toEqual([]);
+  });
+
+  it("asks again only for the list whose kept secret would travel next to a new one", () => {
+    const record = {
+      ...STORED,
+      data: { ...STORED.data, headers: { Authorization: "***" }, write_header_names: ["X-Write"] },
+    };
+    const loaded = toolsetFormOf(record, true);
+    const values = structuredClone(loaded);
+    values.mcp.writeHeaders.push({ key: "X-New", value: "n-1", state: "new" });
+    expect(reenterReason(values, loaded, true, true)).toBe("secret");
+    expect(refusedSecretPaths(values, loaded, true, true)).toEqual(["mcp.writeHeaders[0]"]);
+    // A changed URL refuses every kept secret in both lists.
+    values.mcp.url = "https://other.example/mcp";
+    expect(refusedSecretPaths(values, loaded, true, true)).toEqual([
+      "mcp.headers[0]",
+      "mcp.writeHeaders[0]",
+    ]);
   });
 });

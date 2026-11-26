@@ -228,6 +228,7 @@ import {
   keptSecretPaths,
   makeToolsetFormSchema,
   reenterReason,
+  refusedSecretPaths,
   toolsetDataOf,
   toolsetFormDefaults,
   toolsetFormOf,
@@ -381,9 +382,9 @@ async function save(values: ToolsetFormValues) {
   const reason = reenterReason(values, loaded.value, props.mergeSecrets, writeHeadersOn.value);
   if (reason) {
     forced.value = reason;
-    // Only a changed destination refuses the kept write headers too.
-    const withWrite = reason === "destination" && writeHeadersOn.value;
-    await requireKeptSecrets(keptSecretPaths(values, withWrite));
+    await requireKeptSecrets(
+      refusedSecretPaths(values, loaded.value, props.mergeSecrets, writeHeadersOn.value),
+    );
     return;
   }
   const data = toolsetDataOf(values, props.mergeSecrets, writeHeadersOn.value);

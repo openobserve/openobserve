@@ -6579,6 +6579,7 @@ mod tests {
             "POST /v2/{org_id}/autoobserve/decisions/{decision_id}/undo",
             "POST /v2/{org_id}/autoresolve/runs/{run_id}/approve",
             "POST /v2/{org_id}/autoresolve/runs/{run_id}/decline",
+            "POST /v2/{org_id}/autoresolve/saved/{autoresolve_id}/run",
         ]);
         assert_eq!(scope_allows(in_slack_action_scope), sorted(&expected));
     }
