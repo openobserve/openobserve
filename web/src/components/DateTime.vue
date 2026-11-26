@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <OTruncatedText
             class="date-time-label flex-1 text-left"
-            :class="fieldAppearance ? 'font-normal' : 'font-semibold'"
+            :class="fieldAppearance ? 'font-normal' : 'font-medium'"
             >{{ triggerLabel }}</OTruncatedText
           >
           <template #icon-right

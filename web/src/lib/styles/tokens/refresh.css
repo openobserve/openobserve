@@ -25,18 +25,18 @@
   --color-grey-950: #09090b;
 
   /* Surface ladder, darker to lighter: shell < card < raised. */
-  --color-surface-shell: #eff0f2;
+  --color-surface-shell: #fafafa;
   --color-surface-card: #ffffff;
-  --color-surface-panel: #f7f8f9;
-  --color-surface-band: #eff0f2;
+  --color-surface-panel: #f7f7fa;
+  --color-surface-band: #f4f4f5;
   --color-surface-raised: #ffffff;
   --color-surface-overlay: #ffffff;
-  --color-surface-hover: #e4e6e9;
-  --color-surface-subtle-hover: #e9eaed;
+  --color-surface-hover: #f0f0f2;
+  --color-surface-subtle-hover: #f4f4f5;
 
-  --color-text-heading: #16171d;
-  --color-text-body: #2b2d36;
-  --color-text-secondary: #545866;
+  --color-text-heading: #3f3f46;
+  --color-text-body: #52525b;
+  --color-text-secondary: #71717a;
   --color-text-disabled: #9a9da8;
 
   /* Loading bars at 1.4:1 on the card, so they read as content-to-come, not a faint wash. */
@@ -46,8 +46,8 @@
   /* Structure hairline < button edge < control edge (3:1) < hover edge. */
   /* Neutral selected-item fill, 1.3:1 on the panel so it never matches a header or hover. */
   --color-surface-selected-neutral: #d5d8df;
-  --color-border-subtle: #e3e4e9;
-  --color-border-button: #c9ccd4;
+  --color-border-subtle: #e4e4e7;
+  --color-border-button: #d4d4d8;
   --color-border-control: #8a8d99;
   --color-border-strong: #6b6e7a;
   /* Accent mixes keep text at 4.5:1 and the fill at 1.34:1 on the card under every light preset, so selection reads on a projector. */
@@ -424,6 +424,51 @@
   background-color: var(--color-button-primary-hover) !important;
 }
 
+/* Light work area is white; the table header keeps a light band so it separates from the chart above, and rows split on a visible hairline. */
+:root:not(.dark) {
+  --color-button-outline-text: var(--color-text-body);
+  --color-field-list-label-text: var(--color-text-body);
+  --color-field-list-group-text: var(--color-grey-600);
+  --color-table-header-text: var(--color-grey-600);
+  --color-field-list-row-selected-bg: var(--selected-tint);
+  /* Quiet surfaces: a faint cool page behind white panels, one light hairline everywhere, no card lift. */
+  --color-surface-shell: #fafafd;
+  --color-surface-band: #f3f3f6;
+  --color-surface-hover: #ececf0;
+  --color-surface-subtle-hover: #f6f6f9;
+  --color-border-subtle: #ebebee;
+  --color-border-button: #e6e6e7;
+  --color-card-edge: #ebebee;
+  --shadow-card: none;
+  --color-table-header-bg: #fafafd;
+  --color-table-header-border: #ebebee;
+  --color-table-row-divider: #ebebee;
+}
+/* Light chrome text steps down from data text; table headers get a heavier weight to stay distinct. */
+:root:not(.dark) thead[data-test="o2-table-header"] th {
+  font-weight: var(--font-medium);
+}
+/* Light toolbar buttons and the date picker at regular weight: 500 Geist read as bold next to the 400 tabs and menu. */
+:root:not(.dark) :is(.toolbar-btn-rest, #date-time-button, #date-time-button .date-time-label) {
+  font-weight: var(--font-normal);
+}
+/* The query editor box shares the panel tone with the Monaco surface inside it, as dark does. */
+:root:not(.dark) .logs-query-editor {
+  background-color: var(--color-surface-panel);
+}
+/* Layered `text-*!` utilities beat unlayered !important, so scope the variables they read instead. */
+:root:not(.dark) .toolbar-btn-rest {
+  --color-button-ghost-text: var(--color-text-body);
+}
+/* Active sidebar row: a light tint of the theme accent with accent text and icon. */
+:root:not(.dark) [data-test="sidebar"] a[aria-current="page"] {
+  --color-text-body: var(--color-selected-fg);
+  background-color: var(--selected-tint);
+}
+:root:not(.dark) [data-test="sidebar"] a[aria-current="page"] :is(span, svg) {
+  color: var(--color-selected-fg);
+}
+
 /* ── Shell: content sits in an inset card with its own edge and, in light, a faint lift ── */
 :root main[data-test="main-content"] > div {
   border-radius: 0.625rem;
@@ -695,13 +740,13 @@
     /* eslint-disable-next-line local/no-hardcoded-px -- hairline ring width */
     inset 0 0 0 1px var(--toolbar-btn-rest-edge),
     var(--toolbar-btn-rest-shadow);
+    inset 0 0 0 1px var(--toolbar-btn-rest-edge),
+    var(--toolbar-btn-rest-shadow);
 }
-:root {
-  --toolbar-btn-rest-bg: var(--color-surface-band);
   --toolbar-btn-rest-edge: var(--color-border-button);
   --toolbar-btn-rest-shadow: 0 0 #0000;
   --toolbar-btn-rest-fg: var(--color-text-body);
-}
+  --toolbar-btn-rest-bg: var(--color-surface-band);
 /* Thin glyphs in secondary grey read as disabled, so enabled toolbar icons use body text; disabled ones keep their fade and the quieter results bar keeps its grey. */
 :root
   [data-o2-btn].toolbar-btn-rest:not(:disabled)
@@ -723,9 +768,29 @@
     var(--toolbar-btn-rest-shadow);
 }
 /* Toolbar time pickers (not the full-width form field) and outlined actions in page headers and table toolbars join the same set. */
+  --toolbar-btn-rest-shadow: 0 0 #0000;
+  --toolbar-btn-rest-fg: var(--color-text-body);
+}
+/* Thin glyphs in secondary grey read as disabled, so enabled toolbar icons use body text; disabled ones keep their fade and the quieter results bar keeps its grey. */
 :root
-  :is(
-    #date-time-button:not(.w-full),
+  [data-o2-btn].toolbar-btn-rest:not(:disabled)
+  border-color: var(--toolbar-btn-rest-edge) !important;
+  color: var(--toolbar-btn-rest-fg);
+}
+/* A grey fill on a light page reads as disabled, so light-mode buttons are white instead. */
+:root:not(.dark) {
+  --toolbar-btn-rest-bg: var(--color-surface-raised);
+  /* On white, near-black glyphs feel heavy; mid grey still reads as enabled. */
+  --toolbar-btn-rest-fg: var(--color-text-body);
+}
+/* Between the step arrows the borderless picker draws its top, bottom and left edge (its 1px overlap hides the left arrow's), so arrows + picker read as one outlined group. */
+:root .date-time-container > #date-time-button:not(:first-child):not(:focus-visible) {
+  box-shadow:
+    inset 0 0.0625rem 0 var(--toolbar-btn-rest-edge),
+    inset 0 -0.0625rem 0 var(--toolbar-btn-rest-edge),
+    inset 0.0625rem 0 0 var(--toolbar-btn-rest-edge),
+    var(--toolbar-btn-rest-shadow);
+}
     :is([data-o-page-actions], [data-test="o2-table-toolbar"])
       [data-o2-btn]:is([class*="bg-button-outline-bg"], [class*="bg-button-secondary "])
   ) {
@@ -766,6 +831,25 @@
         [data-test="menu-link-slack-item"],
         [data-test="header-my-account-profile-icon"],
         [data-test="menu-link-help-item"]
+/* Nested corners: an inner element's radius is the outer radius minus the gap between them. */
+/* Page cells sit 3px inside the pager (1px border + 2px padding). */
+:root .o-pagination {
+  padding: 0.125rem;
+}
+:root .o-pagination__btn {
+  height: 1.375rem;
+  border-radius: calc(var(--radius-default) - 0.1875rem);
+}
+/* Toggle-group segments and the sliding selected pill sit 3px inside a padded track (22px cells keep the 28px track); unpadded, transparent tracks keep the full radius. */
+:root [class*="bg-toggle-track-bg"]:not([class*="p-0!"]) {
+  padding: 0.1875rem;
+}
+:root
+  [class*="bg-toggle-track-bg"]:not([class*="p-0!"])
+  :is([data-otoggle-value], .bg-toggle-item-active-bg) {
+  height: 1.375rem;
+  border-radius: calc(var(--radius-default) - 0.1875rem) !important;
+}
       ),
     #date-time-button
   ):not(:hover):not([aria-expanded="true"])

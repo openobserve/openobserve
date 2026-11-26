@@ -245,8 +245,8 @@ const followThemeClass = (monaco: any): void => {
 const defineEditorThemes = (monaco: any): void => {
   const dark = document.documentElement.classList.contains("dark");
   const suggest = suggestThemeColors(dark);
-  // The card is surface-base in light and lifts to surface-panel in dark; the editor sits flush on it.
-  const cardBg = tokenHex(dark ? "--color-surface-panel" : "--color-surface-base");
+  // The editor sits on the panel tone in both themes, like the field list and folder lists.
+  const cardBg = tokenHex("--color-surface-panel");
   const cardBgColors = cardBg ? { "editor.background": cardBg } : {};
   monaco.editor.defineTheme("myCustomTheme", {
     base: "vs",
