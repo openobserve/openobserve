@@ -223,6 +223,18 @@ describe("QueryFilterBar", () => {
     expect(rowKeys()).not.toContain("\u0000shorthand");
   });
 
+  it("reads an empty-string value on its chip as (empty), not as nothing", async () => {
+    mountBar({ modelValue: parseSqlFilter("level = ''")! });
+    await flushPromises();
+    expect(segment("level", "value").text()).toBe("(empty)");
+  });
+
+  it("marks an empty string inside a list value too", async () => {
+    mountBar({ modelValue: parseSqlFilter("level IN ('', 'warn')")! });
+    await flushPromises();
+    expect(segment("level", "value").text()).toBe("(empty), warn");
+  });
+
   it("picks several values for is any of and applies on Enter", async () => {
     const state = mountBar();
     await openBar();
