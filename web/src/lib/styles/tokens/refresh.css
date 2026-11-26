@@ -766,6 +766,25 @@
 :root [aria-current="page"]:is(.o-pagination__btn, [class*="bg-pagination-item-active-bg"]) {
   box-shadow: none !important;
 }
+/* Nested corners: an inner element's radius is the outer radius minus the gap between them. */
+/* Page cells sit 3px inside the pager (1px border + 2px padding). */
+:root .o-pagination {
+  padding: 0.125rem;
+}
+:root .o-pagination__btn {
+  height: 1.375rem;
+  border-radius: calc(var(--radius-default) - 0.1875rem);
+}
+/* Toggle-group segments and the sliding selected pill sit 3px inside a padded track (22px cells keep the 28px track); unpadded, transparent tracks keep the full radius. */
+:root [class*="bg-toggle-track-bg"]:not([class*="p-0!"]) {
+  padding: 0.1875rem;
+}
+:root
+  [class*="bg-toggle-track-bg"]:not([class*="p-0!"])
+  :is([data-otoggle-value], .bg-toggle-item-active-bg) {
+  height: 1.375rem;
+  border-radius: calc(var(--radius-default) - 0.1875rem) !important;
+}
 :root .o-field-row--selected {
   font-weight: var(--font-normal);
 }
