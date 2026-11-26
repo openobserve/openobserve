@@ -204,11 +204,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-hidden="selectedType !== 'relative'"
                 :inert="selectedType !== 'relative'"
               >
-                <div class="date-time-table relative flex h-full flex-col gap-2 py-2">
+                <div class="date-time-table relative flex h-full flex-col gap-2 pb-2">
                   <!-- Hairline rows and an alternating tint keep the 36 values scannable. -->
-                  <div class="mx-3 flex flex-1 flex-col" data-test="date-time-relative-grid">
+                  <div class="flex flex-1 flex-col" data-test="date-time-relative-grid">
                     <div
-                      class="relative-row border-border-subtle even:bg-surface-panel flex flex-1 items-center gap-1 border-b px-2 last:border-b-0"
+                      class="relative-row border-border-subtle even:bg-surface-panel flex flex-1 items-center gap-1 border-b px-3 last:border-b-0"
                       v-for="(period, index) in relativePeriods"
                       :key="'date_' + index"
                     >
