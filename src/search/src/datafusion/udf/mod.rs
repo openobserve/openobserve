@@ -23,6 +23,7 @@ pub mod fulltext;
 pub mod ip;
 pub mod regex;
 pub mod spath_udf;
+pub mod string_arg;
 pub mod time;
 pub mod transform_udf;
 

@@ -15,15 +15,12 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use arrow_schema::DataType;
 use datafusion::{
     common::{
         Result, TableReference,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion},
     },
-    logical_expr::{
-        BinaryExpr, Expr, Like, LogicalPlan, Operator, cast, expr::ScalarFunction, lit,
-    },
+    logical_expr::{BinaryExpr, Expr, Like, LogicalPlan, Operator, expr::ScalarFunction, lit},
     optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder},
 };
 use hashbrown::HashSet;
@@ -83,11 +80,7 @@ impl RewriteLikeToStrMatch {
         } else {
             STR_MATCH_UDF.clone()
         };
-        // `str_match` only accepts Utf8
-        let args = vec![
-            cast(Expr::Column(column.clone()), DataType::Utf8),
-            lit(value),
-        ];
+        let args = vec![Expr::Column(column.clone()), lit(value)];
         Some(Expr::ScalarFunction(ScalarFunction::new_udf(
             Arc::new(udf),
             args,
@@ -124,7 +117,7 @@ mod tests {
         array::{ArrayRef, LargeStringArray, RecordBatch, StringArray, StringViewArray},
         util::pretty::pretty_format_batches,
     };
-    use arrow_schema::{Field, Schema};
+    use arrow_schema::{DataType, Field, Schema};
     use datafusion::{
         datasource::MemTable,
         execution::SessionStateBuilder,
@@ -208,6 +201,7 @@ mod tests {
             let plan = optimized_plan(&ctx, &sql).await;
             assert!(plan.contains("str_match"), "{predicate}\n{plan}");
             assert!(!plan.contains("LIKE"), "{predicate}\n{plan}");
+            assert!(!plan.contains("CAST"), "{predicate}\n{plan}");
         }
         let plan = optimized_plan(&ctx, "SELECT * FROM t AS a WHERE a.name LIKE '%auth%'").await;
         assert!(plan.contains("str_match"), "{plan}");

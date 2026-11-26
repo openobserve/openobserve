@@ -17,21 +17,20 @@ use std::sync::{Arc, LazyLock as Lazy};
 
 use datafusion::{
     arrow::{
-        array::{ArrayRef, BooleanArray},
+        array::{ArrayRef, BooleanArray, StringArrayType},
         datatypes::DataType,
     },
-    common::cast::as_string_array,
     error::{DataFusionError, Result},
     logical_expr::{
         ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, Volatility,
     },
-    scalar::ScalarValue,
     sql::sqlparser::parser::ParserError,
 };
 
 use crate::datafusion::udf::{
     MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
     STR_MATCH_UDF_NAME,
+    string_arg::{coerce_string_params, scalar_str, with_string_arrays},
 };
 
 /// Implementation of str_match
@@ -49,7 +48,7 @@ struct StrMatchUdf {
 impl StrMatchUdf {
     fn new() -> Self {
         Self {
-            signature: Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Stable),
+            signature: Signature::user_defined(Volatility::Stable),
         }
     }
 }
@@ -66,6 +65,10 @@ impl ScalarUDFImpl for StrMatchUdf {
 
     fn signature(&self) -> &Signature {
         &self.signature
+    }
+
+    fn coerce_types(&self, arg_types: &[DataType]) -> Result<Vec<DataType>> {
+        coerce_string_params(self.name(), 2, arg_types)
     }
 
     fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType> {
@@ -85,7 +88,7 @@ struct StrMatchIgnoreCaseUdf {
 impl StrMatchIgnoreCaseUdf {
     fn new() -> Self {
         Self {
-            signature: Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Stable),
+            signature: Signature::user_defined(Volatility::Stable),
         }
     }
 }
@@ -103,6 +106,10 @@ impl ScalarUDFImpl for StrMatchIgnoreCaseUdf {
 
     fn signature(&self) -> &Signature {
         &self.signature
+    }
+
+    fn coerce_types(&self, arg_types: &[DataType]) -> Result<Vec<DataType>> {
+        coerce_string_params(self.name(), 2, arg_types)
     }
 
     fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType> {
@@ -126,8 +133,11 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
 
     // Parquet pushdown replaces constant or missing columns with scalars.
     let haystack = args[0].clone().into_array(1)?;
-    let haystack = as_string_array(&haystack)?;
-    let ColumnarValue::Scalar(needle) = &args[1] else {
+    let needle = match &args[1] {
+        ColumnarValue::Scalar(needle) => scalar_str(needle),
+        ColumnarValue::Array(_) => None,
+    };
+    let Some(needle) = needle else {
         return Err(DataFusionError::SQL(
             Box::new(ParserError::ParserError(
                 "Invalid argument types[needle] to str_match function".to_string(),
@@ -135,56 +145,39 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
             None,
         ));
     };
-    let mut needle = match needle {
-        ScalarValue::Utf8(v) => v,
-        ScalarValue::Utf8View(v) => v,
-        ScalarValue::LargeUtf8(v) => v,
-        _ => {
-            return Err(DataFusionError::SQL(
-                Box::new(ParserError::ParserError(
-                    "Invalid argument types[needle] to str_match function".to_string(),
-                )),
-                None,
-            ));
-        }
-    }
-    .as_ref()
-    .ok_or_else(|| {
-        DataFusionError::SQL(
-            Box::new(ParserError::ParserError(
-                "Invalid argument types[needle] to str_match function".to_string(),
-            )),
-            None,
-        )
-    })?
-    .to_string();
+    let mut needle = needle.to_string();
 
     // pre-compute the needle
     if case_insensitive {
         needle.make_ascii_lowercase();
     };
 
-    let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
+    let finder = memchr::memmem::Finder::new(needle.as_bytes());
+    let array = with_string_arrays!(
+        haystack.data_type(),
+        [haystack],
+        Ok(str_match_array(haystack, &finder, case_insensitive))
+    )?;
+    Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
+}
 
-    // 2. perform the computation
-    let array = haystack
+fn str_match_array<'a, S: StringArrayType<'a>>(
+    haystack: S,
+    finder: &memchr::memmem::Finder<'_>,
+    case_insensitive: bool,
+) -> BooleanArray {
+    haystack
         .iter()
         .map(|haystack| {
             haystack.map(|haystack| {
                 if case_insensitive {
-                    mem_finder
-                        .find(haystack.to_lowercase().as_bytes())
-                        .is_some()
+                    finder.find(haystack.to_lowercase().as_bytes()).is_some()
                 } else {
-                    mem_finder.find(haystack.as_bytes()).is_some()
+                    finder.find(haystack.as_bytes()).is_some()
                 }
             })
         })
-        .collect::<BooleanArray>();
-
-    // `Ok` because no error occurred during the calculation
-    // `Arc` because arrays are immutable, thread-safe, trait objects.
-    Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
+        .collect()
 }
 
 #[cfg(test)]
@@ -198,6 +191,7 @@ mod tests {
             datatypes::{Field, Schema},
             record_batch::RecordBatch,
         },
+        common::ScalarValue,
         datasource::MemTable,
         prelude::{ParquetReadOptions, SessionConfig, SessionContext},
     };
