@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "لا توجد قناة لديها مؤسسة افتراضية بعد",
-      "description": "تنتقل الأسئلة في قناة بلا مؤسسة افتراضية إلى المؤسسة الافتراضية لكل شخص (يمكنهم تغييرها باستخدام {command} org)."
+      "description": "الأسئلة في قناة بدون مؤسسة افتراضية تذهب إلى المؤسسة الافتراضية لكل شخص (يمكنهم تغييرها باستخدام {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "لم يربط أي شخص في هذه المؤسسة Slack بعد"
@@ -29286,7 +29286,7 @@
     "channelUnavailable": "{channel} — لا يوجد مزوّد يدعمها",
     "channelUnverified": "{channel} — مسجّل لكن لم يتحقق منه أحد",
     "channelAddPhone": "{reason}. أضف هاتفك في المناوبة الخاصة بي",
-    "channelLinkSlack": "{reason}. نفّذ {command} link في Slack",
+    "channelLinkSlack": "{reason}. شغّل {command} link في Slack",
     "loadUneven": "{name} تحمّل {factor}× المتوسط خلال الأيام الـ {days} الماضية",
     "loadUnevenLabel": "العبء غير متوازن:",
     "membersUnreachableMore": "{name} موجود في هذا الفريق، لكن لا يمكن أن يصل إليه أي نداء — {why}. هناك {count} عضو آخر في الحالة نفسها. | {name} موجود في هذا الفريق، لكن لا يمكن أن يصل إليه أي نداء — {why}. هناك {count} من الأعضاء الآخرين في الحالة نفسها.",
@@ -31086,7 +31086,7 @@
       "editDefault": "تعديل الافتراضي للقناة",
       "removeConfirm": "إزالة الافتراضي",
       "removeTitle": "إزالة الافتراضي للقناة #{channel}؟",
-      "removeMessage": "تنتقل الأسئلة في {name} بعد ذلك إلى المؤسسة الافتراضية لكل شخص (يمكنهم تغييرها عبر {command} org).",
+      "removeMessage": "الأسئلة في {name} تذهب بعد ذلك إلى المؤسسة الافتراضية لكل شخص (يمكنهم تغييرها باستخدام {command} org).",
       "instanceAdminOnly": "لمسؤول المثيل فقط",
       "ownOrgOnlyHint": "في مساحة عمل المثيل، تربط القنوات بمؤسستك الخاصة",
       "claimableHint": "القنوات غير المطالب بها والقنوات التي تملكها {org}",

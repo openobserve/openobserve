@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "デフォルトの組織が設定されたチャンネルはまだありません",
-      "description": "デフォルトがないチャンネルでの質問は、各ユーザーのデフォルト組織に送られます（{command} org で変更できます）。"
+      "description": "デフォルトが設定されていないチャンネルでの質問は、各ユーザーのデフォルト組織に送信されます（{command} org で変更できます）。"
     },
     "noSlackLinkedPeople": {
       "title": "この組織ではまだ誰も Slack を連携していません"
@@ -31086,7 +31086,7 @@
       "editDefault": "チャネルのデフォルトを編集",
       "removeConfirm": "デフォルトを削除",
       "removeTitle": "#{channel} のデフォルトを削除しますか？",
-      "removeMessage": "{name} での質問は、その後、各人のデフォルト組織に送られます（{command} org で変更できます）。",
+      "removeMessage": "{name} での質問は、その後、各ユーザーのデフォルト組織に送信されます（{command} org で変更できます）。",
       "instanceAdminOnly": "インスタンス管理者のみ",
       "ownOrgOnlyHint": "インスタンスワークスペースでは、チャンネルを自身の組織にマッピングします",
       "claimableHint": "未割り当てのチャンネルと {org} が所有するチャンネル",

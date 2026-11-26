@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "目前尚無頻道設定預設組織",
-      "description": "在未設定預設組織的頻道中提問時，問題會送往每個人的預設組織（可使用 {command} org 變更）。"
+      "description": "在沒有預設組織的頻道中提出的問題，會送至每個人的預設組織（他們可以用 {command} org 變更）。"
     },
     "noSlackLinkedPeople": {
       "title": "此組織尚無人連結 Slack"
@@ -28710,7 +28710,7 @@
     "mineJoinTeam": "加入團隊",
     "mineTestTeam": "傳送測試傳呼給 {team}",
     "mineCoverSaved": "代班已儲存",
-    "mineSlackLinkHow": "在 Slack 輸入 {command} link",
+    "mineSlackLinkHow": "在 Slack 中輸入 {command} link",
     "mineSlackSetUpHint": "開啟 管理 › Slack",
     "myDeliveriesWhen": "時間",
     "phoneAddHint": "新增號碼以接收簡訊與來電",
@@ -31067,7 +31067,7 @@
         "settings": "管理",
         "install": "安裝時",
         "destination": "來自警示目標",
-        "oncall": "來自此處的 {command} oncall"
+        "oncall": "由 {command} oncall 在此設定"
       },
       "channel": "頻道",
       "channelPlaceholder": "搜尋頻道",
@@ -31081,7 +31081,7 @@
       "editDefault": "編輯頻道預設值",
       "removeConfirm": "移除預設值",
       "removeTitle": "要移除 #{channel} 的預設值嗎？",
-      "removeMessage": "{name} 中的問題會改為傳送到每個人的預設組織（他們可以用 {command} org 變更）。",
+      "removeMessage": "在 {name} 中提出的問題，之後會送至每個人的預設組織（他們可以用 {command} org 變更）。",
       "instanceAdminOnly": "僅限執行個體管理員",
       "ownOrgOnlyHint": "在執行個體工作區中，您可以將頻道對應到自己的組織",
       "claimableHint": "未認領的頻道，以及 {org} 擁有的頻道",

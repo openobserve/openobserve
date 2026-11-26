@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "아직 기본 조직이 설정된 채널이 없습니다",
-      "description": "기본 조직이 없는 채널의 질문은 각 사용자의 기본 조직으로 전달됩니다({command} org로 변경할 수 있습니다)."
+      "description": "기본값이 없는 채널의 질문은 각 사용자의 기본 조직으로 전달됩니다({command} org로 변경할 수 있습니다)."
     },
     "noSlackLinkedPeople": {
       "title": "이 조직에서 아직 Slack을 연결한 사람이 없습니다"
@@ -28715,7 +28715,7 @@
     "mineJoinTeam": "팀에 참여",
     "mineTestTeam": "{team}에 테스트 호출 보내기",
     "mineCoverSaved": "대체 근무 저장됨",
-    "mineSlackLinkHow": "Slack에서 {command} link 입력",
+    "mineSlackLinkHow": "Slack에서 {command} link를 입력하세요",
     "mineSlackSetUpHint": "설정 › Slack 열기",
     "myDeliveriesWhen": "시각",
     "phoneAddHint": "문자와 전화에 사용할 번호 추가",
@@ -31072,7 +31072,7 @@
         "settings": "설정",
         "install": "설치 시",
         "destination": "알림 대상에서",
-        "oncall": "여기에서 {command} oncall로 설정"
+        "oncall": "{command} oncall here에서 설정됨"
       },
       "channel": "채널",
       "channelPlaceholder": "채널 검색",

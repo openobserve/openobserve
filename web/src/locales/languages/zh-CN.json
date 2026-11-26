@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "尚无频道设置默认组织",
-      "description": "在没有默认组织的频道中，问题会发送到每个人的默认组织（他们可以用 {command} org 更改）。"
+      "description": "没有默认组织的频道中提出的问题会发送到每个人的默认组织（他们可以通过 {command} org 更改）。"
     },
     "noSlackLinkedPeople": {
       "title": "此组织中尚无人关联 Slack"
@@ -31072,7 +31072,7 @@
         "settings": "设置",
         "install": "安装时",
         "destination": "来自告警目标",
-        "oncall": "来自此处的 {command} 值班"
+        "oncall": "通过在此处运行 {command} oncall 设置"
       },
       "channel": "频道",
       "channelPlaceholder": "搜索频道",
@@ -31086,7 +31086,7 @@
       "editDefault": "编辑频道默认设置",
       "removeConfirm": "移除默认设置",
       "removeTitle": "移除 #{channel} 的默认设置？",
-      "removeMessage": "此后，{name} 中的问题将转到每个人的默认组织（可通过 {command} org 更改）。",
+      "removeMessage": "此后，{name} 中的问题会发送到每个人的默认组织（他们可以通过 {command} org 更改）。",
       "instanceAdminOnly": "仅实例管理员",
       "ownOrgOnlyHint": "在实例工作区中，您可以将频道映射到自己的组织",
       "claimableHint": "未认领的频道以及 {org} 拥有的频道",

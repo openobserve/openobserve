@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Ningún canal tiene aún una organización predeterminada",
-      "description": "Las preguntas en un canal sin organización predeterminada van a la organización predeterminada de cada persona (pueden cambiarla con {command} org)."
+      "description": "Las preguntas en un canal sin una organización predeterminada se dirigen a la organización predeterminada de cada persona (pueden cambiarla con {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nadie en esta organización ha vinculado Slack todavía"
@@ -31086,7 +31086,7 @@
       "editDefault": "Editar el canal predeterminado",
       "removeConfirm": "Quitar predeterminado",
       "removeTitle": "¿Quitar el predeterminado de #{channel}?",
-      "removeMessage": "Las preguntas en {name} pasan entonces a la organización predeterminada de cada persona (pueden cambiarla con {command} org).",
+      "removeMessage": "Las preguntas en {name} se dirigen entonces a la organización predeterminada de cada persona (pueden cambiarla con {command} org).",
       "instanceAdminOnly": "Solo administrador de la instancia",
       "ownOrgOnlyHint": "En un espacio de trabajo de instancia, asignas los canales a tu propia organización",
       "claimableHint": "Canales sin reclamar y canales que posee {org}",

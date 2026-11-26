@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Chưa có kênh nào có tổ chức mặc định",
-      "description": "Các câu hỏi trong kênh chưa có tổ chức mặc định sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng {command} org)."
+      "description": "Các câu hỏi trong kênh không có mặc định sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Chưa có ai trong tổ chức này liên kết Slack"
@@ -31086,7 +31086,7 @@
       "editDefault": "Sửa mặc định kênh",
       "removeConfirm": "Xóa mặc định",
       "removeTitle": "Xóa mặc định cho #{channel}?",
-      "removeMessage": "Sau đó, câu hỏi trong {name} sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng {command} org).",
+      "removeMessage": "Các câu hỏi trong {name} sau đó sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng {command} org).",
       "instanceAdminOnly": "Chỉ quản trị viên instance",
       "ownOrgOnlyHint": "Trên không gian làm việc instance, bạn gán kênh cho tổ chức của riêng bạn",
       "claimableHint": "Các kênh chưa được nhận và các kênh do {org} sở hữu",

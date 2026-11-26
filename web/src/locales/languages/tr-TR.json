@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Henüz hiçbir kanalın varsayılan kuruluşu yok",
-      "description": "Varsayılanı olmayan bir kanaldaki sorular, her kişinin varsayılan kuruluşuna gider ({command} org ile değiştirebilirler)."
+      "description": "Varsayılanı olmayan bir kanaldaki sorular her kişinin varsayılan kuruluşuna gider ({command} org ile değiştirebilirler)."
     },
     "noSlackLinkedPeople": {
       "title": "Bu kuruluşta henüz kimse Slack'i bağlamadı"
@@ -28715,7 +28715,7 @@
     "mineJoinTeam": "Bir ekibe katıl",
     "mineTestTeam": "{team} ekibine test çağrısı gönder",
     "mineCoverSaved": "Vekalet kaydedildi",
-    "mineSlackLinkHow": "Slack'te {command} link komutunu yazın",
+    "mineSlackLinkHow": "Slack'te {command} link yazın",
     "mineSlackSetUpHint": "Ayarlar › Slack bölümünü açar",
     "myDeliveriesWhen": "Ne zaman",
     "phoneAddHint": "SMS ve aramalar için bir numara ekleyin",
@@ -31072,7 +31072,7 @@
         "settings": "Ayarlar",
         "install": "Kurulum sırasında",
         "destination": "Bir uyarı hedefinden",
-        "oncall": "Buradan {command} oncall ile"
+        "oncall": "Buradan {command} oncall"
       },
       "channel": "Kanal",
       "channelPlaceholder": "Kanal ara",
@@ -31086,7 +31086,7 @@
       "editDefault": "Kanal varsayılanını düzenle",
       "removeConfirm": "Varsayılanı kaldır",
       "removeTitle": "#{channel} için varsayılan kaldırılsın mı?",
-      "removeMessage": "{name} kanalındaki sorular bu durumda her kişinin varsayılan kuruluşuna gider (bunu {command} org ile değiştirebilirler).",
+      "removeMessage": "{name} içindeki sorular bundan sonra her kişinin varsayılan kuruluşuna gider ({command} org ile değiştirebilirler).",
       "instanceAdminOnly": "Yalnızca örnek yöneticisi",
       "ownOrgOnlyHint": "Bir örnek çalışma alanında kanalları kendi kuruluşunuza eşlersiniz",
       "claimableHint": "Sahiplenilmemiş kanallar ve {org} kuruluşunun sahip olduğu kanallar",

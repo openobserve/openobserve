@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Aucun canal n'a encore d'organisation par défaut",
-      "description": "Les questions posées dans un canal sans organisation par défaut sont dirigées vers l'organisation par défaut de chaque personne (modifiable avec {command} org)."
+      "description": "Les questions dans un canal sans organisation par défaut sont envoyées vers l'organisation par défaut de chaque personne (elles peuvent la modifier avec {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Personne dans cette organisation n'a encore lié Slack"
@@ -28715,7 +28715,7 @@
     "mineJoinTeam": "Rejoindre une équipe",
     "mineTestTeam": "Envoyer une notification de test à {team}",
     "mineCoverSaved": "Remplacement enregistré",
-    "mineSlackLinkHow": "Tapez {command} link dans Slack",
+    "mineSlackLinkHow": "Saisissez {command} link dans Slack",
     "mineSlackSetUpHint": "Ouvre Réglages › Slack",
     "myDeliveriesWhen": "Quand",
     "phoneAddHint": "Ajoutez un numéro pour les SMS et les appels",
@@ -31086,7 +31086,7 @@
       "editDefault": "Modifier le canal par défaut",
       "removeConfirm": "Supprimer le canal par défaut",
       "removeTitle": "Supprimer la valeur par défaut pour #{channel} ?",
-      "removeMessage": "Les questions dans {name} vont alors vers l'organisation par défaut de chaque personne (elle peut la modifier avec {command} org).",
+      "removeMessage": "Les questions dans {name} sont ensuite envoyées vers l'organisation par défaut de chaque personne (elles peuvent la modifier avec {command} org).",
       "instanceAdminOnly": "Administrateur d'instance uniquement",
       "ownOrgOnlyHint": "Sur un espace de travail d'instance, vous associez les canaux à votre propre organisation",
       "claimableHint": "Canaux non revendiqués et canaux détenus par {org}",
