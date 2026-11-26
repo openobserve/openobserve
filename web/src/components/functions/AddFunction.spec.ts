@@ -1,6 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AddFunction from "./AddFunction.vue";
+import { settleAsyncParts } from "@/components/ai-assistant/__tests__/assistantPartStubs";
+import { fakeRuntime } from "@/composables/assistant/__tests__/fakeRuntime";
+import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
+import { resetEditorProposalsForTests } from "@/composables/assistant/useEditorProposal";
+import { contextRegistry } from "@/composables/contextProviders/registry";
+import i18n from "@/locales";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
@@ -30,6 +36,18 @@ vi.mock("@/services/product_analytics", () => ({
 vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "false", isCloud: "false" },
 }));
+vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiEntryButtonStub),
+);
+vi.mock("@/components/ai-assistant/shell/AssistantDock.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.assistantDockStub),
+);
+vi.mock("@/components/ai-assistant/entry/AiLabel.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiLabelStub),
+);
+vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.diffBlockStub),
+);
 
 const makeStore = (orgIdentifier = "test-org") =>
   createStore({
@@ -638,5 +656,116 @@ describe("AddFunction.vue Branch Coverage", () => {
       await flushPromises();
       expect((wrapper.vm.$ as any).exposed.getCode()).toBe("// seed");
     });
+  });
+});
+
+describe("AddFunction with the revamped assistant", () => {
+  const vuex = () =>
+    createStore({
+      state: {
+        theme: "light",
+        zoConfig: { ai_enabled: true },
+        selectedOrganization: { identifier: "org1" },
+        userInfo: { email: "ada@example.com" },
+      },
+      actions: {},
+    });
+
+  async function setupWithAssistant(dockHost: boolean, path = "/pipeline/pipelines/edit") {
+    const runtime = fakeRuntime();
+    setRuntimeHandle(runtime as never);
+    const router = createRouter({
+      history: createWebHistory(),
+      routes: [
+        { path: "/functions", component: { render: () => null } },
+        { path: "/pipeline/pipelines/edit", component: { render: () => null } },
+      ],
+    });
+    await router.push(path);
+    const wrapper = mount(AddFunction, {
+      props: {
+        modelValue: { name: "parse_json", function: ".a = 1", params: "row", transType: "0" },
+        isUpdated: true,
+        dockHost,
+      },
+      global: {
+        plugins: [i18n, router],
+        provide: { store: vuex() },
+        stubs: {
+          UnifiedQueryEditor: {
+            template: "<div><textarea /></div>",
+            methods: { replaceValue() {} },
+          },
+          TestFunction: { template: "<div />", methods: { testFunction: vi.fn() } },
+        },
+      },
+      attachTo: document.body,
+    });
+    await settleAsyncParts();
+    return { wrapper, runtime };
+  }
+
+  beforeEach(() => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "false";
+    sessionStorage.clear();
+    contextRegistry.cleanup();
+  });
+
+  afterEach(() => {
+    resetEditorProposalsForTests();
+    setRuntimeHandle(null);
+    document.body.innerHTML = "";
+    (config as any).isEnterprise = "false";
+  });
+
+  it("docks in a pipeline node: the toggle docks and the function host registers", async () => {
+    const { wrapper, runtime } = await setupWithAssistant(true);
+    const toggle = wrapper.get('[data-test="ai-entry-function-ask"]');
+    expect(toggle.attributes("data-appearance")).toBe("toggle");
+    expect(toggle.attributes("data-dock-host")).toBe("function");
+    const adapter = runtime.hosts.get("function")!;
+    expect(adapter.language).toBe("vrl");
+    expect(String(adapter.objectTitle())).toBe("Function · parse_json");
+    runtime.store.open({ kind: "docked", hostId: "function" }, { focus: "none" });
+    await settleAsyncParts();
+    expect(wrapper.find('[data-test="assistant-dock-stub"]').exists()).toBe(true);
+  });
+
+  it("opens the sidebar on the functions page: no dock host, but the function's context is pushed", async () => {
+    const { wrapper, runtime } = await setupWithAssistant(false, "/functions");
+    const toggle = wrapper.get('[data-test="ai-entry-function-ask"]');
+    expect(toggle.attributes("data-appearance")).toBe("button");
+    expect(toggle.attributes("data-dock-host")).toBe("");
+    expect(runtime.hosts.has("function")).toBe(false);
+    expect((await contextRegistry.getActiveContext())?.currentVRLQuery).toBe(".a = 1");
+  });
+
+  it("moves the language toggle below the title only when it would touch the actions", async () => {
+    const toggle = '[data-test="function-transform-type-toggle"]';
+    const rects = vi.spyOn(Element.prototype, "getBoundingClientRect");
+    // One-row geometry: toggle 470-622, actions of `actionsW` px ending 15 px before the header edge.
+    const at = (headerW: number, actionsW: number) =>
+      rects.mockImplementation(function (this: Element) {
+        const box = (left: number, width: number) =>
+          ({ left, right: left + width, width, height: 60 }) as DOMRect;
+        const t = this.getAttribute("data-test");
+        if (
+          t === "function-toolbar-tabs" ||
+          this.parentElement?.dataset.test === "function-toolbar-tabs"
+        )
+          return box(470, 152);
+        if (t === "function-toolbar-actions") return box(headerW - 15 - actionsW, actionsW);
+        return this.classList.contains("app-page-header") ? box(0, headerW) : box(0, 0);
+      });
+    // 1100 px is wide enough for the old fixed 1024 cut-off but the actions are 500 px wide.
+    at(1100, 500);
+    const tight = await setupWithAssistant(true);
+    expect(tight.wrapper.find(`.-mt-2 ${toggle}`).exists()).toBe(true);
+    tight.wrapper.unmount();
+    at(1100, 200);
+    const fits = await setupWithAssistant(true);
+    expect(fits.wrapper.find(`.-mt-2 ${toggle}`).exists()).toBe(false);
+    rects.mockRestore();
   });
 });

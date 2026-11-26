@@ -17,6 +17,14 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { nextTick } from "vue";
 import JsonEditor from "@/components/common/JsonEditor.vue";
+import { settleAsyncParts } from "@/components/ai-assistant/__tests__/assistantPartStubs";
+import { fakeRuntime } from "@/composables/assistant/__tests__/fakeRuntime";
+import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
+import {
+  proposalFor,
+  resetEditorProposalsForTests,
+} from "@/composables/assistant/useEditorProposal";
+import { contextRegistry } from "@/composables/contextProviders/registry";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -38,6 +46,15 @@ vi.mock("@/plugins/pipelines/useDnD", () => ({
 }));
 
 vi.mock("@/types/chat", () => ({}));
+vi.mock("@/components/ai-assistant/shell/AssistantDock.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.assistantDockStub),
+);
+vi.mock("@/components/ai-assistant/entry/AiLabel.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiLabelStub),
+);
+vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.diffBlockStub),
+);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -487,5 +504,87 @@ describe("JsonEditor", () => {
       wrapper = createWrapper({ data: {} });
       expect((wrapper.vm as any).storedFields).toEqual({});
     });
+  });
+});
+
+describe("JsonEditor with the revamped assistant", () => {
+  const replaceValue = vi.fn();
+
+  function setupWithAssistant(type: "alerts" | "pipelines" = "alerts") {
+    const runtime = fakeRuntime();
+    setRuntimeHandle(runtime as never);
+    const wrapper = mount(JsonEditor, {
+      props: {
+        data: { id: "a1", name: "checkout-latency", org_id: "org1", threshold: 5 },
+        title: "Edit JSON",
+        type,
+        validationErrors: [],
+        isEditing: true,
+      },
+      global: {
+        plugins: [i18n],
+        provide: { store },
+        stubs: {
+          "query-editor": {
+            template: '<div data-test="common-json-editor"><textarea /></div>',
+            methods: { replaceValue },
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    return { wrapper, runtime };
+  }
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    contextRegistry.cleanup();
+    replaceValue.mockClear();
+  });
+
+  afterEach(() => {
+    resetEditorProposalsForTests();
+    setRuntimeHandle(null);
+    document.body.innerHTML = "";
+  });
+
+  it("registers the JSON host with the object's title and its id in the context", async () => {
+    const { runtime } = setupWithAssistant();
+    await settleAsyncParts();
+    const adapter = runtime.hosts.get("json_editor")!;
+    expect(adapter.language).toBe("json");
+    expect(adapter.objectKind).toBe("alert");
+    expect(String(adapter.objectTitle())).toBe("Alert · checkout-latency");
+    expect(adapter.getContext()).toEqual({ alertId: "a1" });
+  });
+
+  it("lands an accepted proposal through the protected-field merge and says what it kept", async () => {
+    const { wrapper } = setupWithAssistant();
+    await settleAsyncParts();
+    const proposal = proposalFor("json_editor")!;
+    const changed = JSON.stringify({ id: "zz", name: "renamed", org_id: "org1", threshold: 9 });
+    const handle = await proposal.propose(changed, {
+      mode: "replace",
+      provenance: { prompt: "raise the threshold" },
+      canRun: false,
+    });
+    await settleAsyncParts();
+    expect(wrapper.find('[data-test="assistant-diff-block"]').exists()).toBe(true);
+    handle.accept();
+    await settleAsyncParts();
+    const landed = JSON.parse(replaceValue.mock.calls.at(-1)![0]);
+    expect(landed).toMatchObject({ id: "a1", name: "checkout-latency", threshold: 9 });
+    expect(proposal.label.value?.note).toBe("assistant.editor.protectedFields");
+    expect(wrapper.find('[data-test="ai-label-editor"]').exists()).toBe(true);
+  });
+
+  it("docks beside the JSON in the drawer's body row", async () => {
+    const { wrapper, runtime } = setupWithAssistant("pipelines");
+    await settleAsyncParts();
+    runtime.store.open({ kind: "docked", hostId: "json_editor" }, { focus: "none" });
+    await settleAsyncParts();
+    expect(wrapper.find('[data-test="assistant-dock-stub"]').attributes("data-host")).toBe(
+      "json_editor",
+    );
   });
 });
