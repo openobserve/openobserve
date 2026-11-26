@@ -1221,10 +1221,18 @@ pub async fn label_values(
             }
             MetricGrants::All
         }
-        None => match metric_grants(&org_id, &_user_email.user_id).await {
-            Ok(grants) => grants,
-            Err(res) => return res,
-        },
+        None if label_name == config::meta::promql::NAME_LABEL => {
+            match metric_grants(&org_id, &_user_email.user_id).await {
+                Ok(grants) => grants,
+                Err(res) => return res,
+            }
+        }
+        None => {
+            if !reads_all_metrics(&org_id, &_user_email.user_id).await {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+            MetricGrants::All
+        }
     };
 
     match metrics::prom::get_label_values(&org_id, label_name, selector, start, end).await {
