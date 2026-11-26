@@ -398,6 +398,13 @@ describe("navigation applier", () => {
 });
 
 describe("explorer applier", () => {
+  // Session ids are deterministic and home_return arming is module state, so use ids no earlier test armed.
+  const freshEnv = () => {
+    let n = 0;
+    return makeEnv({
+      deps: { uuid: () => `0190f3a0-0000-7000-8000-e${String((n += 1)).padStart(11, "0")}` },
+    });
+  };
   const query = {
     language: "sql" as const,
     text: 'SELECT * FROM "default"',
@@ -408,7 +415,7 @@ describe("explorer applier", () => {
   };
 
   it("opens Logs with the exact SQL, stream and absolute range, applied and never run", async () => {
-    const { env, sid, router } = makeEnv();
+    const { env, sid, router } = freshEnv();
     await expect(
       explorerApplier(sid, { kind: "open_in_explorer", query, explorer: "logs" }, env),
     ).resolves.toEqual({
@@ -430,7 +437,7 @@ describe("explorer applier", () => {
   });
 
   it("opens Logs from the full-page thread with that thread floating over it", async () => {
-    const { env, sid, store, router } = makeEnv();
+    const { env, sid, store, router } = freshEnv();
     store.open({ kind: "full" }, { sid, focus: "none" });
     router.push.mockImplementation(async () => store.close("route"));
     await explorerApplier(sid, { kind: "open_in_explorer", query, explorer: "logs" }, env);
@@ -438,7 +445,7 @@ describe("explorer applier", () => {
   });
 
   it("opens a new tab with noopener from a docked container", async () => {
-    const { env, sid, store, router } = makeEnv();
+    const { env, sid, store, router } = freshEnv();
     store.state.shell.placement = { kind: "docked", hostId: "alert_query" };
     await explorerApplier(sid, { kind: "open_in_explorer", query, explorer: "metrics" }, env);
     expect(router.push).not.toHaveBeenCalled();
