@@ -91,6 +91,18 @@ describe("OnCallSlackCard (LN-1)", () => {
     expect(w.find("button").exists()).toBe(false);
   });
 
+  it("names the serving app's own slash command in the link hint", async () => {
+    vi.mocked(slack.getMyLinks).mockReturnValue(
+      ok({ links: [], slack_serves_org: true, command: "/staging-o2" }) as any,
+    );
+    const w = render();
+    await flushPromises();
+
+    expect(w.find('[data-test="oncall-slack-not-linked"]').text()).toBe(
+      "Type /staging-o2 link in Slack",
+    );
+  });
+
   /// A failed read is not "Not linked": that would send a linked person to link again.
   it("says the link could not be read when the request fails", async () => {
     vi.mocked(slack.getMyLinks).mockReturnValue(Promise.reject(axiosError(403)) as any);

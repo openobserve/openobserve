@@ -500,7 +500,10 @@ pub async fn update(
         }
     };
 
-    let cd = merge_updates(existing, incoming);
+    let cd = match merge_updates(existing, incoming) {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    };
 
     match cd.get_key().await {
         // here we are just checking that the key can encrypt a string, i.e.
