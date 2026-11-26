@@ -1,0 +1,130 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div class="relative isolate flex h-full min-h-0 min-w-0">
+    <aside
+      v-if="railShown"
+      :aria-label="t('assistant.history.title')"
+      :class="HOME_RAIL_CLASS"
+      data-test="assistant-home-chats"
+    >
+      <HomeChatsRail />
+    </aside>
+    <div
+      class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 py-4"
+      data-test="assistant-home-tab"
+      :data-state="state"
+    >
+      <div
+        class="relative mx-auto flex min-h-0 w-full max-w-5xl min-w-0 flex-1 flex-col justify-center-safe gap-4 max-md:justify-start md:pb-[8vh]"
+        data-test="assistant-home-main"
+      >
+        <AgentHomeGreeting :class="entering && RISE.greeting" />
+        <AgentHomeAskNote
+          v-if="offReason"
+          :reason="offReason"
+          :org="org"
+          :class="HOME_COLUMN_CLASS"
+        />
+        <AssistantLauncher v-else ref="launcher" :class="HOME_COLUMN_CLASS" />
+        <AssistantNewChatBelow
+          v-if="state === 'ai'"
+          :class="[HOME_COLUMN_CLASS, 'pt-2']"
+          @ask="(prompt) => launcher?.send(prompt)"
+          @open-chat="openChat"
+          @view-all="viewAllOpen = true"
+        />
+      </div>
+    </div>
+    <AssistantChatSearch v-model:open="viewAllOpen" mode="rail" />
+  </div>
+</template>
+
+<script setup lang="ts">
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onActivated,
+  onDeactivated,
+  onMounted,
+  ref,
+} from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
+
+import AssistantChatSearch from "@/components/ai-assistant/history/AssistantChatSearch.vue";
+import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
+import AssistantNewChatBelow from "@/components/ai-assistant/welcome/AssistantNewChatBelow.vue";
+import type { Sid } from "@/composables/assistant";
+import { homeQueryFrom } from "@/composables/assistant/pure";
+import useBreakpoint from "@/composables/useBreakpoint";
+import { useI18nTyped } from "@/types/i18n";
+
+import AgentHomeAskNote from "./AgentHomeAskNote.vue";
+import AgentHomeGreeting from "./AgentHomeGreeting.vue";
+import { HOME_RAIL_CLASS } from "./homeState";
+import { useAgentHomeState } from "./useAgentHomeState";
+
+const HomeChatsRail = defineAsyncComponent(() => import("./HomeChatsRail.vue"));
+
+// A 0.5s fade-up, none under reduced motion; a literal string so Tailwind emits it.
+const RISE = {
+  greeting: "motion-safe:animate-[assistant-fade-up_0.5s_ease-out_both]",
+} as const;
+
+// The full-page chat's 45 rem column less its composer's own gutter, so the box keeps its width when a chat opens.
+const HOME_COLUMN_CLASS = "mx-auto w-full max-w-174";
+
+const { t } = useI18nTyped();
+const store = useStore();
+const { lgUp } = useBreakpoint();
+const { state, offReason } = useAgentHomeState();
+
+const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+
+// Past chats stay readable with the credits used up; no agent, Open Source or a loading gate draws no rail.
+const railShown = computed(() => lgUp.value && (state.value === "ai" || state.value === "budget"));
+onMounted(() => focusAsk());
+// A kept-alive return to Home is an arrival too; the first activation follows the mount, which already asked.
+let activatedOnce = false;
+onActivated(() => {
+  if (activatedOnce) focusAsk();
+  activatedOnce = true;
+});
+
+// The entrance plays once per mount; a kept-alive return re-inserts the nodes, which would replay it.
+const entering = ref(true);
+onDeactivated(() => (entering.value = false));
+
+const launcher = ref<InstanceType<typeof AssistantLauncher> | null>(null);
+
+function focusAsk(): void {
+  void nextTick(() => launcher.value?.focusAsk?.());
+}
+
+const route = useRoute();
+const router = useRouter();
+
+function openChat(sid: Sid): void {
+  void router
+    .push({ name: "assistant", params: { chatId: sid }, query: homeQueryFrom(route) })
+    .catch(() => undefined);
+}
+
+const viewAllOpen = ref(false);
+</script>

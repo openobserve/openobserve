@@ -89,6 +89,7 @@ const ALERT_ID_LITERALS: &[&str] = &[
     "history",
     "incidents",
     "move",
+    "rca_runs",
     "tags",
 ];
 const ALERT_ID: Seg = Id(ALERT_ID_LITERALS);

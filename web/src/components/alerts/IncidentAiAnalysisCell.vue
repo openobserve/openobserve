@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      cell opens the incident on its Analysis tab; "Analyze" starts a run instead. -->
 <template>
   <div
-    class="group flex min-w-0 cursor-pointer items-center gap-1.5"
+    class="group flex min-w-0 cursor-pointer flex-nowrap items-center gap-1"
+    data-o-tooltip-off
     data-test="incident-ai-analysis-cell"
     @click.stop="emit('open')"
   >
@@ -35,11 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ model.label }}
     </OButton>
     <template v-else>
-      <OBadge
-        :variant="RCA_BADGE_VARIANT[model.tone]"
+      <OTag
+        :variant="CHIP_VARIANT[model.tone]"
         size="sm"
+        :dot="!model.spinner && !model.locked"
         clickable
-        :aria-describedby="model.detail || model.rerunNote ? detailId : undefined"
+        class="max-w-full min-w-0"
         :data-tone="model.tone"
         data-test="incident-ai-analysis-label"
         @click.stop="emit('open')"
@@ -50,24 +52,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-else-if="model.locked" #icon>
           <OIcon name="lock" size="xs" class="lock-chip" data-test="incident-ai-analysis-lock" />
         </template>
-        {{ model.label }}
-      </OBadge>
-      <span
-        v-if="model.detail || model.rerunNote"
-        :id="detailId"
-        class="text-text-secondary flex min-w-0 gap-1 truncate text-xs"
-        data-test="incident-ai-analysis-detail"
-      >
-        <OTruncatedText v-if="model.detail">{{ model.detail }}</OTruncatedText>
-        <span v-if="model.detail && model.rerunNote" aria-hidden="true">·</span>
-        <!-- A newer run did not finish; the result shown is the earlier one. -->
-        <span
-          v-if="model.rerunNote"
-          class="text-status-warning-text truncate"
-          data-test="incident-ai-analysis-rerun-note"
-          >{{ model.rerunNote }}</span
-        >
-      </span>
+        <span class="min-w-0 truncate">
+          {{ model.label
+          }}<span v-if="model.detail" data-test="incident-ai-analysis-detail">
+            · {{ model.detail }}</span
+          ><span v-if="model.rerunNote" data-test="incident-ai-analysis-rerun-note">
+            · {{ model.rerunNote }}</span
+          >
+        </span>
+        <OTooltip overflow-only :content="chipText" />
+      </OTag>
       <OButton
         v-if="model.showAnalyzeOnHover"
         variant="ghost-primary"
@@ -81,24 +75,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("alerts.incidents.aiAnalysis.analyze") }}
       </OButton>
+      <!-- A run already exists, so the door follows it in the assistant instead of starting another. -->
+      <AssistantIconButton
+        v-if="followTarget"
+        :icon="assistantGlyph.thread"
+        :label="t('alerts.incidents.rcaRun.followInThread')"
+        class="shrink-0"
+        data-test="incident-ai-analysis-follow-btn"
+        @click.stop="follow"
+      />
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { isAxiosError } from "axios";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { Incident } from "@/services/incidents";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useRcaTrigger } from "@/composables/useRcaTrigger";
-import { RCA_BADGE_VARIANT, rcaCellModel } from "@/utils/incidents/rcaCell";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { rcaCellModel, rcaFollowTarget, type RcaCellTone } from "@/utils/incidents/rcaCell";
+import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import { useRcaFollow } from "@/components/ai-assistant/shell/rcaFollow";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 
@@ -119,25 +126,64 @@ const emit = defineEmits<{
   failed: [];
 }>();
 
+// One soft family per tone, the same chip style as the row's severity and status tags.
+const CHIP_VARIANT: Record<RcaCellTone, BadgeVariant> = {
+  muted: "default-soft",
+  warn: "warning-soft",
+  "warn-strong": "orange-soft",
+  ok: "success-soft",
+  err: "error-soft",
+};
+
 const { t } = useI18nTyped();
 const store = useStore();
 const { requestRca } = useRcaTrigger();
 const timezone = useViewerTimezone();
 const aiLock = useLicenseLock("ai_assistant");
 
+// The list clock ticks every 30 s, too coarse for a seconds label, so a stage-less live run ticks its own.
+const ownNow = ref(0);
+let ownTimer: ReturnType<typeof setInterval> | undefined;
+const stopOwnClock = () => {
+  clearInterval(ownTimer);
+  ownTimer = undefined;
+};
+watch(
+  () => props.incident.rca?.state === "running" && !props.incident.rca.summary.stage_index,
+  (ticking) => {
+    stopOwnClock();
+    if (!ticking) return;
+    ownNow.value = Date.now();
+    ownTimer = setInterval(() => (ownNow.value = Date.now()), 1000);
+  },
+  { immediate: true },
+);
+onUnmounted(stopOwnClock);
+
 const model = computed(() =>
   rcaCellModel(props.incident, {
     rcaEnabled: props.rcaEnabled,
     lockedReason: aiLock.locked.value ? aiLock.lockedReason.value : undefined,
-    now: props.now,
+    now: Math.max(props.now, ownNow.value),
     timezone: timezone.value,
+    namedBand: true,
   }),
+);
+
+const chipText = computed(() =>
+  raw([model.value.label, model.value.detail, model.value.rerunNote].filter(Boolean).join(" · ")),
 );
 
 const starting = ref(false);
 
-// The badge's accessible name is its visible label; the detail describes it.
-const detailId = `${useId()}-rca-detail`;
+const followTarget = computed(() =>
+  rcaFollowTarget(props.incident, store.state.selectedOrganization.identifier),
+);
+const follow = (event: MouseEvent) => {
+  const target = followTarget.value;
+  // The assistant runtime is built on first use, so a list that never follows a run never builds it.
+  if (target) useRcaFollow().follow(target, event.currentTarget as HTMLElement | null);
+};
 
 // Spawned path (`reanalysis=true`, 202): the run continues on the server.
 const analyze = async () => {

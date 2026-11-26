@@ -7,6 +7,7 @@ import prettier from "eslint-plugin-prettier";
 import vuePrettierSkipFormatting from "@vue/eslint-config-prettier/skip-formatting";
 import cypress from "eslint-plugin-cypress";
 import vueI18n from "@intlify/eslint-plugin-vue-i18n";
+import vueA11y from "eslint-plugin-vuejs-accessibility";
 // Deep import: the plugin does not re-export its utils. It declares no `exports`
 // map so this resolves, and a path change in a future 4.x fails loudly at load.
 import {
@@ -345,7 +346,6 @@ const COLOR_LITERAL =
 const COLOR_ALLOWLIST = [
   "web/src/components/CodeQueryEditor.vue",
   "web/src/components/EnterpriseUpgradeDialog.vue",
-  "web/src/components/O2AIChat.vue",
   "web/src/components/alerts/FilterGroup.vue",
   "web/src/components/alerts/IncidentDetailDrawer.vue",
   "web/src/components/alerts/IncidentServiceGraph.vue",
@@ -665,6 +665,48 @@ noLegacyO2Tokens.rules["no-missing-gt-keys"] = {
   },
 };
 
+// Flat config replaces rule options per block instead of merging them, so every block repeats these shared entries.
+const I18N_IMPORT_BAN = {
+  name: "vue-i18n",
+  importNames: ["useI18n"],
+  message:
+    "Import useI18nTyped from '@/types/i18n' instead (or gt() outside a setup context) — useI18n() returns an unbranded string and defeats the I18nText check.",
+};
+// Outside the folder only the barrel and the pure entry are public; the public chunk must never load the runtime.
+const ASSISTANT_IMPORT_BAN = {
+  group: ["@/composables/assistant/*", "!@/composables/assistant/pure"],
+  message:
+    "Import the assistant through '@/composables/assistant' (or its /pure entry); everything else in the folder is private.",
+};
+const DARK_MODE_SELECTORS = [
+  {
+    selector: "BinaryExpression[operator=/^[!=]==?$/] > MemberExpression[property.name='theme']",
+    message:
+      "Dark mode has one JS seam: useTheme().isDark or chartColor(). Do not compare store.state.theme (§3.R).",
+  },
+  {
+    selector: "VariableDeclarator[id.name=/^(isDark|isDarkMode|darkMode)$/]",
+    message: "Import useTheme() instead of a private isDark flag (§3.R).",
+  },
+];
+const AI_EVENT_MESSAGE =
+  "ai_* events are built only by trackAssistant (services/assistantAnalytics.ts); components emit intent events through it.";
+const AI_EVENT_SELECTORS = [
+  "CallExpression[callee.property.name=/^(track|addAction)$/][arguments.0.value=/^ai_/]",
+  "CallExpression[callee.name=/^(track|addAction)$/][arguments.0.value=/^ai_/]",
+  "CallExpression[callee.property.name=/^(track|addAction)$/][arguments.0.quasis.0.value.raw=/^ai_/]",
+  "CallExpression[callee.name=/^(track|addAction)$/][arguments.0.quasis.0.value.raw=/^ai_/]",
+].map((selector) => ({ selector, message: AI_EVENT_MESSAGE }));
+// Legacy emitters of the old ai_* names; the list only shrinks.
+const LEGACY_AI_EVENT_FILES = ["src/composables/useNLQuery.ts", "src/services/ai_toolsets.ts"];
+const ASSISTANT_UI_FILES = [
+  "src/components/ai-assistant/**/*.{vue,ts}",
+  "src/views/AssistantView.vue",
+  "src/lib/overlay/Sheet/**/*.{vue,ts}",
+];
+// Legacy assistant UI that predates the assistant rules; the list only shrinks.
+const LEGACY_ASSISTANT_UI_FILES = ["src/components/ai-assistant/welcome/**"];
+
 // Read .gitignore to use as ignore patterns
 const gitignore = fs.existsSync(".gitignore")
   ? fs
@@ -785,16 +827,7 @@ export default [
       // with a type-level cast — no runtime cost.
       "no-restricted-imports": [
         "error",
-        {
-          paths: [
-            {
-              name: "vue-i18n",
-              importNames: ["useI18n"],
-              message:
-                "Import useI18nTyped from '@/types/i18n' instead (or gt() outside a setup context) — useI18n() returns an unbranded string and defeats the I18nText check.",
-            },
-          ],
-        },
+        { paths: [I18N_IMPORT_BAN], patterns: [ASSISTANT_IMPORT_BAN] },
       ],
       //
       // Catches components used in <template> but never imported/registered
@@ -824,19 +857,7 @@ export default [
 
       // Dark-mode schema (O2_TOKEN_MIGRATION_PLAN §3.R.3) — warn now, error at Phase G.
       // The two sanctioned seams (useTheme.ts / chartTheme.ts) turn this off below.
-      "no-restricted-syntax": [
-        "warn",
-        {
-          selector:
-            "BinaryExpression[operator=/^[!=]==?$/] > MemberExpression[property.name='theme']",
-          message:
-            "Dark mode has one JS seam: useTheme().isDark or chartColor(). Do not compare store.state.theme (§3.R).",
-        },
-        {
-          selector: "VariableDeclarator[id.name=/^(isDark|isDarkMode|darkMode)$/]",
-          message: "Import useTheme() instead of a private isDark flag (§3.R).",
-        },
-      ],
+      "no-restricted-syntax": ["warn", ...DARK_MODE_SELECTORS, ...AI_EVENT_SELECTORS],
       // Every <style> block must be scoped (§3.H) — warn now, error at Phase F.
       "vue/enforce-style-attribute": ["warn", { allow: ["scoped", "module"] }],
       // No CSS preprocessor in an SFC. A <style lang="scss"> block is invisible
@@ -920,6 +941,39 @@ export default [
       "vue/no-mutating-props": "error",
       "vue/no-unused-components": "error",
       "vue/no-unused-vars": "error",
+    },
+  },
+  {
+    // Inside the folder the runtime modules import each other directly.
+    files: ["src/composables/assistant/**"],
+    rules: {
+      "no-restricted-imports": ["error", { paths: [I18N_IMPORT_BAN] }],
+    },
+  },
+  {
+    // The assistant's own code fails on an ai_* literal; the repo guard (repoGuards.spec.ts) covers the rest of src.
+    files: [...ASSISTANT_UI_FILES, "src/composables/assistant/**", "src/services/assistant*.ts"],
+    ignores: ["src/services/assistantAnalytics.ts", ...LEGACY_ASSISTANT_UI_FILES],
+    rules: {
+      "no-restricted-syntax": ["error", ...DARK_MODE_SELECTORS, ...AI_EVENT_SELECTORS],
+    },
+  },
+  {
+    files: ["src/services/assistantAnalytics.ts", ...LEGACY_AI_EVENT_FILES],
+    rules: {
+      "no-restricted-syntax": ["warn", ...DARK_MODE_SELECTORS],
+    },
+  },
+  {
+    // Model output is untrusted; only transcript/markdown.ts may produce HTML (00 §15).
+    files: ASSISTANT_UI_FILES,
+    ignores: ["src/components/ai-assistant/transcript/markdown.ts", ...LEGACY_ASSISTANT_UI_FILES],
+    plugins: { "vuejs-accessibility": vueA11y },
+    rules: {
+      "vue/no-v-html": "error",
+      ...vueA11y.configs["flat/recommended"].find((c) => c.rules).rules,
+      "vuejs-accessibility/no-autofocus": "error",
+      "vuejs-accessibility/click-events-have-key-events": "error",
     },
   },
   {

@@ -17,6 +17,14 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { nextTick } from "vue";
 import JsonEditor from "@/components/common/JsonEditor.vue";
+import { settleAsyncParts } from "@/components/ai-assistant/__tests__/assistantPartStubs";
+import { fakeRuntime } from "@/composables/assistant/__tests__/fakeRuntime";
+import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
+import {
+  proposalFor,
+  resetEditorProposalsForTests,
+} from "@/composables/assistant/useEditorProposal";
+import { contextRegistry } from "@/composables/contextProviders/registry";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -38,6 +46,15 @@ vi.mock("@/plugins/pipelines/useDnD", () => ({
 }));
 
 vi.mock("@/types/chat", () => ({}));
+vi.mock("@/components/ai-assistant/shell/AssistantDock.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.assistantDockStub),
+);
+vi.mock("@/components/ai-assistant/entry/AiLabel.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiLabelStub),
+);
+vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.diffBlockStub),
+);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,9 +75,6 @@ const globalConfig = {
         '<div class="monaco-editor" data-test="common-json-editor" @update:query="$emit(\'update:query\', $event)"><slot /></div>',
       emits: ["update:query"],
     },
-    O2AIChat: {
-      template: '<div class="o2-ai-chat"><slot /></div>',
-    },
   },
 };
 
@@ -69,7 +83,6 @@ describe("JsonEditor", () => {
 
   beforeEach(() => {
     store.state.theme = "light";
-    store.state.isAiChatEnabled = false;
     store.state.zoConfig = {
       ...store.state.zoConfig,
       sql_mode: false,
@@ -400,84 +413,15 @@ describe("JsonEditor", () => {
     });
   });
 
-  // ─── toggleAIChat ────────────────────────────────────────────────────────────
+  // ─── AI toggle placement ─────────────────────────────────────────────────────
 
-  describe("toggleAIChat", () => {
-    it("toggles isAiChatEnabled from false to true in store", async () => {
-      store.state.isAiChatEnabled = false;
-      wrapper = createWrapper();
-      (wrapper.vm as any).toggleAIChat();
-      await nextTick();
-      expect(store.state.isAiChatEnabled).toBe(true);
-    });
-
-    it("toggles isAiChatEnabled from true to false in store", async () => {
-      store.state.isAiChatEnabled = true;
-      wrapper = createWrapper();
-      (wrapper.vm as any).toggleAIChat();
-      await nextTick();
-      expect(store.state.isAiChatEnabled).toBe(false);
-    });
-  });
-
-  // ─── AI chat conditional rendering ───────────────────────────────────────────
-
-  describe("AI chat conditional rendering", () => {
-    it("renders O2AIChat stub when isAiChatEnabled is true", async () => {
-      store.state.isAiChatEnabled = true;
-      wrapper = createWrapper();
-      await nextTick();
-      expect(wrapper.find(".o2-ai-chat").exists()).toBe(true);
-    });
-
-    it("does not render O2AIChat when isAiChatEnabled is false", async () => {
-      store.state.isAiChatEnabled = false;
-      wrapper = createWrapper();
-      await nextTick();
-      expect(wrapper.find(".o2-ai-chat").exists()).toBe(false);
-    });
-
+  describe("AI toggle placement", () => {
     it("renders AI toggle button when isEnterprise and ai_enabled", async () => {
       store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
       wrapper = createWrapper();
       // AI toggle button has been moved to the parent ODrawer header slot, not inside JsonEditor
       const aiBtn = wrapper.find('[data-test="menu-link-ai-item"]');
       expect(aiBtn.exists()).toBe(false);
-    });
-  });
-
-  // ─── getBtnLogo computed ─────────────────────────────────────────────────────
-
-  describe("getBtnLogo computed", () => {
-    it("returns dark AI icon when hovered", async () => {
-      wrapper = createWrapper();
-      (wrapper.vm as any).isHovered = true;
-      await nextTick();
-      expect((wrapper.vm as any).getBtnLogo).toContain("ai_icon_dark.svg");
-    });
-
-    it("returns dark AI icon when AI chat is enabled", async () => {
-      store.state.isAiChatEnabled = true;
-      wrapper = createWrapper();
-      expect((wrapper.vm as any).getBtnLogo).toContain("ai_icon_dark.svg");
-    });
-
-    it("returns dark AI icon for dark theme when not hovered", async () => {
-      store.state.theme = "dark";
-      store.state.isAiChatEnabled = false;
-      wrapper = createWrapper();
-      (wrapper.vm as any).isHovered = false;
-      await nextTick();
-      expect((wrapper.vm as any).getBtnLogo).toContain("ai_icon_dark.svg");
-    });
-
-    it("returns light AI icon when not hovered, AI disabled, light theme", async () => {
-      store.state.theme = "light";
-      store.state.isAiChatEnabled = false;
-      wrapper = createWrapper();
-      (wrapper.vm as any).isHovered = false;
-      await nextTick();
-      expect((wrapper.vm as any).getBtnLogo).toContain("ai_icon_gradient.svg");
     });
   });
 
@@ -556,14 +500,91 @@ describe("JsonEditor", () => {
       expect((wrapper.vm as any).isValidJson).toBe(true);
     });
 
-    it("initializes isHovered to false", () => {
-      wrapper = createWrapper();
-      expect((wrapper.vm as any).isHovered).toBe(false);
-    });
-
     it("initializes storedFields as empty object", () => {
       wrapper = createWrapper({ data: {} });
       expect((wrapper.vm as any).storedFields).toEqual({});
     });
+  });
+});
+
+describe("JsonEditor with the revamped assistant", () => {
+  const replaceValue = vi.fn();
+
+  function setupWithAssistant(type: "alerts" | "pipelines" = "alerts") {
+    const runtime = fakeRuntime();
+    setRuntimeHandle(runtime as never);
+    const wrapper = mount(JsonEditor, {
+      props: {
+        data: { id: "a1", name: "checkout-latency", org_id: "org1", threshold: 5 },
+        title: "Edit JSON",
+        type,
+        validationErrors: [],
+        isEditing: true,
+      },
+      global: {
+        plugins: [i18n],
+        provide: { store },
+        stubs: {
+          "query-editor": {
+            template: '<div data-test="common-json-editor"><textarea /></div>',
+            methods: { replaceValue },
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    return { wrapper, runtime };
+  }
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    contextRegistry.cleanup();
+    replaceValue.mockClear();
+  });
+
+  afterEach(() => {
+    resetEditorProposalsForTests();
+    setRuntimeHandle(null);
+    document.body.innerHTML = "";
+  });
+
+  it("registers the JSON host with the object's title and its id in the context", async () => {
+    const { runtime } = setupWithAssistant();
+    await settleAsyncParts();
+    const adapter = runtime.hosts.get("json_editor")!;
+    expect(adapter.language).toBe("json");
+    expect(adapter.objectKind).toBe("alert");
+    expect(String(adapter.objectTitle())).toBe("Alert · checkout-latency");
+    expect(adapter.getContext()).toEqual({ alertId: "a1" });
+  });
+
+  it("lands an accepted proposal through the protected-field merge and says what it kept", async () => {
+    const { wrapper } = setupWithAssistant();
+    await settleAsyncParts();
+    const proposal = proposalFor("json_editor")!;
+    const changed = JSON.stringify({ id: "zz", name: "renamed", org_id: "org1", threshold: 9 });
+    const handle = await proposal.propose(changed, {
+      mode: "replace",
+      provenance: { prompt: "raise the threshold" },
+      canRun: false,
+    });
+    await settleAsyncParts();
+    expect(wrapper.find('[data-test="assistant-diff-block"]').exists()).toBe(true);
+    handle.accept();
+    await settleAsyncParts();
+    const landed = JSON.parse(replaceValue.mock.calls.at(-1)![0]);
+    expect(landed).toMatchObject({ id: "a1", name: "checkout-latency", threshold: 9 });
+    expect(proposal.label.value?.note).toBe("assistant.editor.protectedFields");
+    expect(wrapper.find('[data-test="ai-label-editor"]').exists()).toBe(true);
+  });
+
+  it("docks beside the JSON in the drawer's body row", async () => {
+    const { wrapper, runtime } = setupWithAssistant("pipelines");
+    await settleAsyncParts();
+    runtime.store.open({ kind: "docked", hostId: "json_editor" }, { focus: "none" });
+    await settleAsyncParts();
+    expect(wrapper.find('[data-test="assistant-dock-stub"]').attributes("data-host")).toBe(
+      "json_editor",
+    );
   });
 });

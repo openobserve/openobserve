@@ -36,7 +36,7 @@ const mockProFeatures = [
   { name: "Sensitive Data Redaction", price: "$0.15 / GB", is_parent: true },
   { name: "Incident Management", price: "$0 during preview", is_parent: true },
   { name: "AI Assistant", price: "$0 during preview", is_parent: true },
-  { name: "AI SRE Agent", price: "$0 during preview", is_parent: true },
+  { name: "SRE Agent", price: "$0 during preview", is_parent: true },
   { name: "Audit Trail", price: "2% of monthly spend", is_parent: true },
   { name: "Retention", price: "", is_parent: true },
   { name: "15-Days Retention", price: "Included", is_parent: false },
@@ -193,9 +193,9 @@ describe("proPlan.vue", () => {
       expect(f.is_parent).toBe(true);
     });
 
-    it("tenth feature: AI SRE Agent preview", () => {
+    it("tenth feature: SRE Agent preview", () => {
       const f = wrapper.vm.features[9];
-      expect(f.name).toBe("AI SRE Agent");
+      expect(f.name).toBe("SRE Agent");
       expect(f.price).toBe("$0 during preview");
       expect(f.is_parent).toBe(true);
     });

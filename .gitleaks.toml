@@ -1,0 +1,16 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test fixtures holding fake keys and tokens on purpose"
+paths = [
+  '''^src/mcp/src/testdata/approval_assertion_vector\.json$''',
+  '''^web/src/utils/assistant/prompts/redact\.spec\.ts$''',
+]
+
+[[allowlists]]
+description = "Translation-state content hash that matches generic-api-key"
+condition = "AND"
+regexTarget = "line"
+paths = ['''^scripts/translations/\.translation_state\.json$''']
+regexes = ['''"needsAccess":\s*"480ac91fdb59c436"''']

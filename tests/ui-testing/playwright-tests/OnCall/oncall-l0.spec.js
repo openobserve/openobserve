@@ -1,5 +1,5 @@
 /**
- * On-Call — L0 / AI SRE (§9)
+ * On-Call — L0 / incident investigation (§9)
  *
  * Plan: docs/test_generator/features/oncall-test-plan.md §9
  *   9.1 P1 `parallel` — the first rung pages at +0s and a verdict attaches
@@ -87,7 +87,7 @@ function usableL0(preview) {
 
 test.describe.configure({ mode: 'parallel' });
 
-test.describe('On-call L0 / AI SRE', {
+test.describe('On-call L0 / incident investigation', {
   tag: ['@oncall', '@oncallL0', '@oncall-l0', '@enterprise'],
 }, () => {
   let pm;
@@ -273,7 +273,7 @@ test.describe('On-call L0 / AI SRE', {
     test.setTimeout(900_000);
     const { team } = await seedTeamWithL0(page, testInfo);
     const preview = await escalationPreview(page, team.id, 1);
-    test.skip(!usableL0(preview), 'needs a reachable AI SRE agent (O2_AGENT_URL); this deployment has none');
+    test.skip(!usableL0(preview), 'needs a reachable investigation agent (O2_AGENT_URL); this deployment has none');
 
     const stream = uniqueName(`${workerPrefix(testInfo)}_stream`);
     await seedOnCallStream(page, stream);
