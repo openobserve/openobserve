@@ -39,11 +39,11 @@ describe("useNow", () => {
 
   it("keeps a relative time current and stops ticking once nothing uses it", async () => {
     const w = mount(Updated, { props: { value: START - 5_000 } });
-    expect(w.text()).toBe("5 seconds ago");
+    expect(w.text()).toBe("5s ago");
 
     vi.advanceTimersByTime(60_000);
     await nextTick();
-    expect(w.text()).toBe("1 minute ago");
+    expect(w.text()).toBe("1m ago");
 
     w.unmount();
     expect(vi.getTimerCount()).toBe(0);

@@ -45,16 +45,16 @@ describe("OTimeCell", () => {
   });
 
   it("tells a relative time in the largest unit it reaches", () => {
-    expect(relative(30_000)).toBe("30 seconds ago");
-    expect(relative(24 * MIN)).toBe("24 minutes ago");
-    expect(relative(3 * 60 * MIN)).toBe("3 hours ago");
-    expect(relative(2 * 24 * 60 * MIN)).toBe("2 days ago");
-    expect(relative(-5 * MIN)).toBe("in 5 minutes");
+    expect(relative(30_000)).toBe("30s ago");
+    expect(relative(24 * MIN)).toBe("24m ago");
+    expect(relative(3 * 60 * MIN)).toBe("3h ago");
+    expect(relative(2 * 24 * 60 * MIN)).toBe("2d ago");
+    expect(relative(-5 * MIN)).toBe("in 5m");
   });
 
   it("speaks the active UI language", () => {
     i18n.global.locale = "de";
-    expect(relative(24 * MIN)).toBe("vor 24 Minuten");
+    expect(relative(24 * MIN)).toBe("vor 24 m");
   });
 
   it("absolute mode shows the full datetime and no tooltip", () => {

@@ -25,11 +25,11 @@ const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["second", 1000],
 ];
 
-/** "2 minutes ago" for an epoch in milliseconds, in the app's locale. */
+/** "2m ago" for an epoch in milliseconds, in the app's locale. */
 export const relativeTimeText = (epochMs: number, now: number): string => {
   const ageMs = Math.abs(now - epochMs);
   const [unit, size] = RELATIVE_UNITS.find(([, ms]) => ageMs >= ms) ?? RELATIVE_UNITS[5];
-  return new Intl.RelativeTimeFormat(getIntlLocale()).format(
+  return new Intl.RelativeTimeFormat(getIntlLocale(), { style: "narrow" }).format(
     Math.round((epochMs - now) / size),
     unit,
   );
