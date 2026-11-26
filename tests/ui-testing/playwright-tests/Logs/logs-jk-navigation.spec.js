@@ -481,6 +481,7 @@ test.describe("Logs J/K navigation (item 4a)", () => {
       await expect(page.locator(logs.logDetailPreviousBtn)).toBeDisabled();
 
       await page.keyboard.press("Escape");
+      await expect(page.locator(logs.logDetailDialog)).toBeHidden();
       await openRow(page, logs, 49);
       await expect(page.locator(logs.logDetailNextBtn)).toBeEnabled();
       await page.locator(logs.logDetailNextBtn).click();
