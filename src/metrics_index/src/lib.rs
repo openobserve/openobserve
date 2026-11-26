@@ -226,6 +226,7 @@ mod tests {
             &account,
             &data_path,
             &path,
+            config::FileFormat::Vortex,
             crate::block::ParentMetadata {
                 rows: rows as u64,
                 compressed_size: 123,

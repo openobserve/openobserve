@@ -178,6 +178,8 @@ pub async fn search(
                         &account,
                         &data_path,
                         &sidecar_path,
+                        config::FileFormat::from_extension(&data_path)
+                            .context("Unsupported metrics source format")?,
                         crate::block::ParentMetadata {
                             rows: u64::try_from(expected_rows)?,
                             compressed_size: u64::try_from(compressed_size)?,

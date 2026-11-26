@@ -68,6 +68,7 @@ pub(super) async fn load_metrics_index_file(
     account: &str,
     data_path: &str,
     path: &str,
+    format: config::FileFormat,
     parent: crate::block::ParentMetadata,
     index_size: i64,
     labels: IndexLabels,
@@ -99,7 +100,8 @@ pub(super) async fn load_metrics_index_file(
             .insert(key, loaded, limit)?
     };
     let index = entry.index.project(&labels.requested)?;
-    tokio::task::spawn_blocking(move || metrics_block_index_data(&index, &labels.flat)).await?
+    tokio::task::spawn_blocking(move || metrics_block_index_data(&index, format, &labels.flat))
+        .await?
 }
 
 /// Evaluate `filter` over the run rows and collect the selected physical row
@@ -326,8 +328,15 @@ async fn read_columns(
 
 fn metrics_block_index_data(
     index: &crate::block::Index,
+    format: config::FileFormat,
     flat_labels: &[String],
 ) -> Result<MetricsIndexData> {
+    // Same-named Parquet and Vortex parents share one .midx path, and only
+    // Parquet headers carry a row group size.
+    ensure!(
+        index.header.row_group_size.is_some() == (format == config::FileFormat::Parquet),
+        "Invalid block parent format/row-group binding"
+    );
     let mut fields = vec![Field::new(METRICS_INDEX_ROW_COUNT, DataType::UInt32, false)];
     let mut columns: Vec<ArrayRef> = vec![Arc::new(UInt32Array::from_iter_values(
         index.blocks.row_counts(),
@@ -521,6 +530,7 @@ mod tests {
             &file.account,
             &file.key,
             &path,
+            config::FileFormat::Parquet,
             crate::block::ParentMetadata {
                 rows: file.meta.records as u64,
                 compressed_size: file.meta.compressed_size as u64,
@@ -537,6 +547,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn index_built_for_other_parent_format_is_rejected() {
+        for (built, read) in [
+            (config::FileFormat::Parquet, config::FileFormat::Vortex),
+            (config::FileFormat::Vortex, config::FileFormat::Parquet),
+        ] {
+            let (_, file, bytes) = fixture(built).await;
+            store(&file, Some(bytes)).await;
+            let path = MetricsFileLayout::metrics_index_path(&file.key).unwrap();
+            let result = load_metrics_index_file(
+                &file.account,
+                &file.key,
+                &path,
+                read,
+                crate::block::ParentMetadata {
+                    rows: file.meta.records as u64,
+                    compressed_size: file.meta.compressed_size as u64,
+                },
+                file.meta.mindex_size,
+                IndexLabels {
+                    requested: Arc::new(vec!["path".to_string()]),
+                    flat: Arc::new(Vec::new()),
+                },
+            )
+            .await;
+            let error = result.err().expect("mismatched parent format must fail");
+            assert!(
+                error.to_string().contains("format/row-group binding"),
+                "{built:?} read as {read:?}: {error}"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn equality_keeps_dictionary_and_regex_flattens_label() {
         let (_, file, bytes) = fixture(config::FileFormat::Vortex).await;
         store(&file, Some(bytes)).await;
@@ -546,6 +589,7 @@ mod tests {
                 &file.account,
                 &file.key,
                 &path,
+                config::FileFormat::Vortex,
                 crate::block::ParentMetadata {
                     rows: file.meta.records as u64,
                     compressed_size: file.meta.compressed_size as u64,

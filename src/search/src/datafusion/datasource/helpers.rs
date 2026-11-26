@@ -282,7 +282,7 @@ mod tests {
             (0..10u32).map(|i| [0u32, 1, 5, 9].contains(&i)),
         ));
         let file = attach_plan(
-            "test_parquet_row_mask",
+            "helpers_parquet_mask",
             "files/org/logs/app/2026/01/01/00/indexed-v1-1.parquet",
             FileSelection::Rows(row_ids.clone()),
             None,
@@ -304,7 +304,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_access_plan_attaches_parquet_row_ranges() {
         let file = attach_plan(
-            "test_parquet_row_ranges",
+            "helpers_parquet_ranges",
             "files/org/metrics/cpu/2026/01/01/00/indexed-v1-1.parquet",
             FileSelection::RowRanges(Arc::new(vec![1..3, 5..8, 10..12])),
             Some(14),
@@ -330,7 +330,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_access_plan_skips_parquet_row_ranges_without_row_count() {
         let file = attach_plan(
-            "test_parquet_row_ranges_no_stats",
+            "helpers_no_stats_ranges",
             "files/org/metrics/cpu/2026/01/01/00/indexed-v1-2.parquet",
             FileSelection::RowRanges(Arc::new(vec![1..3, 5..6])),
             None,
@@ -343,7 +343,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_access_plan_attaches_vortex_metrics_ranges() {
         let file = attach_plan(
-            "test_vortex_metrics_ranges",
+            "helpers_vortex_ranges",
             "files/org/metrics/cpu/2026/01/01/00/indexed-v1-1.vortex",
             FileSelection::RowRanges(Arc::new(vec![1..3, 5..8])),
             Some(8),
