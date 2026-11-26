@@ -2133,11 +2133,16 @@ export default defineComponent({
 }
 .logs-index-menu :deep(.o-field-row__actions) {
   gap: 0.125rem;
-  padding-inline: 0.875rem 0.25rem;
+  /* 11px + the 24px button's 5px icon inset = 16px, the resting in-table icon's edge, so the icon does not jump on hover. */
+  padding-inline: 0.875rem 0.6875rem;
   border-radius: 0 var(--radius-default) var(--radius-default) 0;
   background:
     linear-gradient(to right, transparent, var(--field-row-bg) 0.875rem),
     linear-gradient(to right, transparent, var(--color-surface-base) 0.875rem);
+}
+/* Matches the chevron's visible inset on the left, so a selected row's pill looks even on both sides. */
+.logs-index-menu :deep(.o-field-row__in-table) {
+  margin-inline-end: 1rem;
 }
 .logs-index-menu :deep(.o-field-row__actions [data-o2-btn]) {
   width: 1.5rem;
@@ -2154,7 +2159,8 @@ export default defineComponent({
 }
 .logs-index-menu :deep(.o-field-list__row) {
   margin-top: 0.125rem;
-  padding-inline: 0.5rem;
+  /* 5px + the thumb's 3px inset in its lane = the 8px left gap, so a selected pill sits evenly between edge and scrollbar. */
+  padding-inline: 0.5rem 0.3125rem;
 }
 .logs-index-menu :deep(.o-field-row) {
   height: 1.75rem;
