@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Chưa có kênh nào có tổ chức mặc định",
-      "description": "Các câu hỏi trong kênh chưa có tổ chức mặc định sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng /o2 org)."
+      "description": "Các câu hỏi trong kênh chưa có tổ chức mặc định sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Chưa có ai trong tổ chức này liên kết Slack"
@@ -28714,7 +28714,7 @@
     "mineJoinTeam": "Tham gia một nhóm",
     "mineTestTeam": "Gửi thông báo trực thử đến {team}",
     "mineCoverSaved": "Đã lưu ca thay",
-    "mineSlackLinkHow": "Nhập /o2 link trong Slack",
+    "mineSlackLinkHow": "Nhập {command} link trong Slack",
     "mineSlackSetUpHint": "Mở Cài đặt › Slack",
     "myDeliveriesWhen": "Thời điểm",
     "phoneAddHint": "Thêm số để nhận tin nhắn và cuộc gọi",
@@ -29285,7 +29285,7 @@
     "channelUnavailable": "{channel} — không có nhà cung cấp nào phía sau",
     "channelUnverified": "{channel} — đã lưu, nhưng chưa ai xác minh",
     "channelAddPhone": "{reason}. Thêm số điện thoại của bạn trong Ca trực của tôi",
-    "channelLinkSlack": "{reason}. Chạy /o2 link trong Slack",
+    "channelLinkSlack": "{reason}. Chạy {command} link trong Slack",
     "loadUneven": "{name} đảm nhận gấp {factor}× mức trung vị trong {days} ngày qua",
     "loadUnevenLabel": "Tải không đồng đều:",
     "membersUnreachableMore": "{name} thuộc nhóm này, nhưng không thông báo trực nào đến được họ — {why}. {count} thành viên khác cũng trong tình trạng tương tự. | {name} thuộc nhóm này, nhưng không thông báo trực nào đến được họ — {why}. {count} thành viên khác cũng trong tình trạng tương tự.",
@@ -31071,7 +31071,7 @@
         "settings": "Cài đặt",
         "install": "Khi cài đặt",
         "destination": "Từ đích cảnh báo",
-        "oncall": "Từ /o2 oncall tại đây"
+        "oncall": "Từ {command} oncall tại đây"
       },
       "channel": "Kênh",
       "channelPlaceholder": "Tìm kênh",
@@ -31085,7 +31085,7 @@
       "editDefault": "Sửa mặc định kênh",
       "removeConfirm": "Xóa mặc định",
       "removeTitle": "Xóa mặc định cho #{channel}?",
-      "removeMessage": "Sau đó, câu hỏi trong {name} sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng /o2 org).",
+      "removeMessage": "Sau đó, câu hỏi trong {name} sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng {command} org).",
       "instanceAdminOnly": "Chỉ quản trị viên instance",
       "ownOrgOnlyHint": "Trên không gian làm việc instance, bạn gán kênh cho tổ chức của riêng bạn",
       "claimableHint": "Các kênh chưa được nhận và các kênh do {org} sở hữu",
