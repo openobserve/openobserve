@@ -14388,7 +14388,7 @@
       "title": "425c927ed923b28b"
     },
     "noSlackChannelDefaults": {
-      "description": "b78ae2516ee79459",
+      "description": "4f7f554c893b6687",
       "title": "76cec8f316d1430b"
     },
     "noSlackLinkedPeople": {
@@ -20988,7 +20988,7 @@
     "causesTitle": "f22ef62160f78290",
     "channelAddPhone": "5caf5fac6f8240a8",
     "channelDelivers": "a3dd7980ab171a39",
-    "channelLinkSlack": "c369f44f18ce2d0b",
+    "channelLinkSlack": "2ac22a1bdae5f6f4",
     "channelMatrix": "8f9a1525e78225a6",
     "channelMatrixHint": "3f2947ee3022aceb",
     "channelNotImplemented": "8dd92419e34aab63",
@@ -21425,7 +21425,7 @@
     "mineShiftsMore": "73d065d41bbad790",
     "mineShiftsTitle": "19b719d20c01f1e3",
     "mineSlackAskAdmin": "3c03860fa93477c1",
-    "mineSlackLinkHow": "793af31ed8213395",
+    "mineSlackLinkHow": "cb2514df8bfafaae",
     "mineSlackLoadFailed": "d2fbefe594bbaaaf",
     "mineSlackSetUp": "68382ef84e6c56c4",
     "mineSlackSetUpHint": "422e2e5dfd511ddf",
@@ -27152,6 +27152,7 @@
     "patternZScore": "8138c7a40e6334ab",
     "pattern_summary": "9b0a168a14f71ff3",
     "patternsLogsOnly": "cf022b467dc53819",
+    "patternsNoReadPermission": "39ce48055386f4fd",
     "patternsPartialResult": "6b4b286a61cf3da1",
     "physicalPlan": "47e3067509093eb8",
     "pinToToolbar": "637e9e5bb5ffaf97",
@@ -31279,7 +31280,7 @@
       "privateHint": "6f5507991cf9621c",
       "remove": "c3812fc4acb861d5",
       "removeConfirm": "5e4d73e4508df39a",
-      "removeMessage": "eb5cfe7c9c018fbe",
+      "removeMessage": "5314eabc2039ac9b",
       "removeTitle": "5c6b24de2d551de9",
       "saveFailed": "293223d24ca45f9e",
       "servedOrgsHint": "111654e8cb2e78b2",
@@ -31287,7 +31288,7 @@
       "setFrom": {
         "destination": "99efdf71ff783b04",
         "install": "7d94cf78b5f9b7f0",
-        "oncall": "777c1e4bb72ab59a",
+        "oncall": "a0a99c6f00f893d0",
         "settings": "74a883a037bc227f"
       },
       "thisOrg": "498281304f5519de",

@@ -26,6 +26,11 @@ const ChartRenderer = defineAsyncComponent(
 );
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/formatters";
+import {
+  buildPatternLogsSql,
+  FILTER_BLOCKED_MESSAGE,
+  patternFilterBlockedReason,
+} from "@/plugins/logs/patterns/patternUtils";
 import searchService from "@/services/search";
 import patternsService from "@/services/patterns";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -162,6 +167,7 @@ const anomalyColumns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 const insightPatterns = ref<any[]>([]);
+const allPatternTemplates = ref<string[]>([]);
 const surroundEvents = ref<any[]>([]);
 const surroundMinutes = ref(3);
 const surroundLoading = ref(false);
@@ -346,6 +352,7 @@ async function loadInsights(ev: Record<string, any>) {
   insightsLoading.value = true;
   timeline.value = [];
   insightPatterns.value = [];
+  allPatternTemplates.value = [];
   surroundEvents.value = [];
 
   const intv = getTimeBucket();
@@ -398,7 +405,9 @@ async function loadInsights(ev: Record<string, any>) {
       .sort((a: any, b: any) => a.keyMs - b.keyMs);
   }
   if (patR.status === "fulfilled") {
-    insightPatterns.value = (patR.value.data?.patterns ?? []).slice(0, 8).map((p: any) => ({
+    const allPatterns: any[] = patR.value.data?.patterns ?? [];
+    allPatternTemplates.value = allPatterns.map((p: any) => p.template || p.description || "—");
+    insightPatterns.value = allPatterns.slice(0, 8).map((p: any) => ({
       template: p.template || p.description || "—",
       count: p.frequency ?? p.count ?? 0,
       pct: Math.round(p.percentage ?? 0),
@@ -740,13 +749,17 @@ function isSurroundExpanded(pageIdx: number) {
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
-function patternToSql(template: string): string {
-  // Replace SDR wildcards like <:IP>, <:NUM>, <:URI> with SQL LIKE wildcards (%)
-  const likePattern = template.replace(/<:[^>]+>/g, "%").replace(/'/g, "''");
-  return `SELECT * FROM "${props.stream}" WHERE _all LIKE '${likePattern}' ORDER BY _timestamp DESC`;
+function patternToSql(template: string): string | null {
+  return buildPatternLogsSql(template, props.stream, allPatternTemplates.value, effectiveWhere());
 }
 
 function openPatternInLogs(template: string) {
+  const sql = patternToSql(template);
+  if (!sql) {
+    const reason = patternFilterBlockedReason(template, allPatternTemplates.value) ?? "shared";
+    toast({ variant: "warning", message: t(FILTER_BLOCKED_MESSAGE[reason]) });
+    return;
+  }
   const pos = window.location.pathname.indexOf("/web/");
   const base =
     pos > -1
@@ -758,7 +771,7 @@ function openPatternInLogs(template: string) {
   url.searchParams.set("stream", props.stream);
   url.searchParams.set("from", String(rangeStart.value));
   url.searchParams.set("to", String(rangeEnd.value));
-  url.searchParams.set("query", b64EncodeUnicode(patternToSql(template)) ?? "");
+  url.searchParams.set("query", b64EncodeUnicode(sql) ?? "");
   url.searchParams.set("sql_mode", "true");
   url.searchParams.set("quick_mode", "false");
   url.searchParams.set("show_histogram", "true");

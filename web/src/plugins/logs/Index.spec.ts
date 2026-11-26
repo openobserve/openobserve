@@ -1630,6 +1630,20 @@ describe("Logs Index", async () => {
       expect(data.queryResults.total).toBe(210);
     });
 
+    it("marks the search applied once a Patterns run completes, so an empty result is not 'no query applied'", async () => {
+      const { searchObj } = searchState();
+      searchObj.meta.sqlMode = false;
+      searchObj.data.stream.selectedStream = ["stream1"];
+      searchObj.data.stream.streamLists = [{ label: "stream1", value: "stream1" }];
+      searchObj.data.query = "";
+      searchObj.meta.searchApplied = false;
+
+      await wrapper.vm.extractPatternsForCurrentQuery();
+      await flushPromises();
+
+      expect(searchObj.meta.searchApplied).toBe(true);
+    });
+
     it("consumes the clear-cache flag so the next Search run keeps its cache", async () => {
       const meta = searchState().searchObj.meta;
       meta.clearCache = true;

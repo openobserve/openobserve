@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "ยังไม่มีช่องใดที่ตั้งองค์กรเริ่มต้นไว้",
-      "description": "คำถามในช่องที่ไม่มีค่าเริ่มต้นจะถูกส่งไปยังองค์กรเริ่มต้นของแต่ละคน (เปลี่ยนได้ด้วย {command} org)."
+      "description": "คำถามในแชนเนลที่ไม่ได้ตั้งค่าเริ่มต้นจะถูกส่งไปยังองค์กรเริ่มต้นของแต่ละคน (ผู้ใช้เปลี่ยนได้ด้วย {command} org)"
     },
     "noSlackLinkedPeople": {
       "title": "ยังไม่มีใครในองค์กรนี้เชื่อมโยง Slack"
@@ -1920,6 +1920,7 @@
     "patternCount": "จำนวน",
     "errorConstructingSearchQuery": "An error occurred while constructing the search query.",
     "errorExtractingPatterns": "Error extracting patterns. Please try again.",
+    "patternsNoReadPermission": "คุณไม่มีสิทธิ์อ่านสตรีมนี้",
     "errorWhileApplyingSavedView": "Error while applying saved view.",
     "errorWhileExtractingStreamFields": "Error while extracting stream fields.",
     "errorWhileGeneratingHistogramData": "Error while generating histogram data.",
@@ -29283,7 +29284,7 @@
     "channelUnavailable": "{channel} — no provider behind it",
     "channelUnverified": "{channel} — on file, but nobody has verified it",
     "channelAddPhone": "{reason}. Add your phone on My on-call",
-    "channelLinkSlack": "{reason} เรียกใช้ {command} link ใน Slack",
+    "channelLinkSlack": "{reason} จากนั้นรัน {command} link ใน Slack",
     "loadUneven": "{name} carried {factor}× the median over the last {days} days",
     "loadUnevenLabel": "Load is uneven:",
     "membersUnreachableMore": "{name} is on this team, but no page to them can land — {why}. {count} other member is in the same state. | {name} is on this team, but no page to them can land — {why}. {count} other members are in the same state.",
@@ -31083,7 +31084,7 @@
       "editDefault": "แก้ไขค่าเริ่มต้นของช่อง",
       "removeConfirm": "ลบค่าเริ่มต้น",
       "removeTitle": "Remove the default for #{channel}?",
-      "removeMessage": "Questions in {name} then go to each person's default org (they can change it with {command} org).",
+      "removeMessage": "คำถามใน {name} จะถูกส่งไปยังองค์กรเริ่มต้นของแต่ละคน (ผู้ใช้เปลี่ยนได้ด้วย {command} org)",
       "instanceAdminOnly": "Instance admin only",
       "ownOrgOnlyHint": "On an instance workspace you map channels to your own org",
       "claimableHint": "Unclaimed channels and channels {org} owns",

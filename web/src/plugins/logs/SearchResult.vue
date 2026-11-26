@@ -785,10 +785,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'min-h-[calc(100%-6.25rem)]!',
           ]"
         >
+          <div
+            v-if="!patternsState?.loading && !patternsStale && patternsWarnings.length"
+            role="status"
+            data-test="logs-patterns-partial-warning"
+            class="px-page-edge bg-status-warning-bg text-status-warning-text py-2 text-xs"
+          >
+            <div v-for="w in patternsWarnings" :key="w">{{ w }}</div>
+          </div>
+          <div
+            v-if="patternsStale"
+            role="status"
+            data-test="logs-patterns-stale"
+            class="text-text-secondary flex flex-1 items-center justify-center py-10 text-sm"
+          >
+            {{ t("search.autoRunStaleTooltip") }}
+          </div>
           <!-- Patterns List -->
           <PatternList
+            v-else
             :patterns="patternsState?.patterns?.patterns || []"
             :loading="patternsState?.loading"
+            :error="patternsState?.error"
+            :error-status="patternsState?.errorStatus"
             :totalLogsAnalyzed="patternsState?.patterns?.statistics?.total_logs_analyzed"
             :wrap="searchObj.meta.toggleSourceWrap"
             :scroll-target="scrollContainerRef"
@@ -2949,6 +2968,11 @@ export default defineComponent({
     const { processedResults, processHitsInChunks } = useLogsHighlighter(t);
 
     const isFunctionErrorOpen = ref(false);
+    const patternsStale = computed(() => autoRun.engine.isPatternsStale());
+    const patternsWarnings = computed<string[]>(() => {
+      const fe = patternsState.value?.patterns?.function_error;
+      return Array.isArray(fe) ? fe.filter((m): m is string => typeof m === "string") : [];
+    });
 
     const logsTimestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
 
@@ -3233,6 +3257,8 @@ export default defineComponent({
       turnOffQuickMode,
       openLogDetailsByRow,
       isFunctionErrorOpen,
+      patternsWarnings,
+      patternsStale,
       contextCell,
       contextCellIsStreamField,
       aiEnabled,
