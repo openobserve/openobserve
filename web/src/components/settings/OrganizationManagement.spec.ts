@@ -68,6 +68,8 @@ vi.mock("@/services/organizations", async (importOriginal) => {
       create_external_contract: vi.fn(),
       extend_external_contract: vi.fn(),
       revoke_external_contract: vi.fn(),
+      sync_org_contract: vi.fn(),
+      get_contract_sync_status: vi.fn(),
       set_quota_usage_limit: vi.fn(),
       resurrect_org: vi.fn(),
       block_org: vi.fn(),
@@ -199,6 +201,8 @@ describe("OrganizationManagement.vue", () => {
   let mockCreateExternalContract: any;
   let mockExtendExternalContract: any;
   let mockRevokeExternalContract: any;
+  let mockGetContractStatus: any;
+  let mockSyncOrgContract: any;
   let mockSetQuotaUsageLimit: any;
 
   // Global setup to ensure consistent timestamp behavior across environments
@@ -222,6 +226,8 @@ describe("OrganizationManagement.vue", () => {
     mockCreateExternalContract = (mockedOrgService as any).create_external_contract;
     mockExtendExternalContract = (mockedOrgService as any).extend_external_contract;
     mockRevokeExternalContract = (mockedOrgService as any).revoke_external_contract;
+    mockGetContractStatus = (mockedOrgService as any).get_contract_sync_status;
+    mockSyncOrgContract = (mockedOrgService as any).sync_org_contract;
     mockSetQuotaUsageLimit = (mockedOrgService as any).set_quota_usage_limit;
 
     // Setup default mock responses
@@ -838,6 +844,193 @@ describe("OrganizationManagement.vue", () => {
 
       expect(wrapper.find('[data-test="org-management-extend-contract-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="org-management-revoke-contract-btn"]').exists()).toBe(true);
+    });
+
+    describe("contract sync", () => {
+      const noOpRow = {
+        data: {
+          data: [
+            {
+              id: 1,
+              name: "Test Org",
+              identifier: "test-org",
+              plan: "3",
+              created_at: 123456789,
+              trial_expires_at: 987654321,
+              billing_provider: "no_op",
+              org_storage_enabled: false,
+              contract_end_date: 1234567890000000,
+            },
+          ],
+        },
+      };
+      const statusService = () => mockGetContractStatus;
+      const syncService = () => mockSyncOrgContract;
+      const syncOn = {
+        sync_active: true,
+        last_success: 1234567890000000,
+        last_error: { at: 1234567890000000, message: "license server returned status 500" },
+        blocked: [
+          { contract_id: "c1", org_id: "acme", ends_at: 2, reason: "org has another subscription" },
+        ],
+      };
+
+      const mounted = async (status: any) => {
+        store.state.zoConfig.meta_org = "default";
+        mockGetAdminOrg.mockResolvedValue(noOpRow);
+        statusService().mockReset();
+        statusService().mockResolvedValue({ data: status });
+        wrapper = createWrapper();
+        await flushPromises();
+        await nextTick();
+      };
+
+      it("replaces create, extend and revoke with sync while sync is on", async () => {
+        await mounted(syncOn);
+        expect(wrapper.find('[data-test="org-management-sync-contract-btn"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="org-management-extend-contract-btn"]').exists()).toBe(
+          false,
+        );
+        expect(wrapper.find('[data-test="org-management-revoke-contract-btn"]').exists()).toBe(
+          false,
+        );
+        expect(wrapper.find('[data-test="org-management-add-contract-btn"]').exists()).toBe(false);
+      });
+
+      it("shows the last sync, last error and blocked contracts while sync is on", async () => {
+        await mounted(syncOn);
+        expect(wrapper.find('[data-test="org-management-contract-last-sync"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="org-management-contract-last-error"]').exists()).toBe(
+          true,
+        );
+        expect(wrapper.find('[data-test="org-management-contract-blocked"]').text()).toContain(
+          "acme: org has another subscription",
+        );
+      });
+
+      it("offers each org's overage invoices while sync is on", async () => {
+        await mounted(syncOn);
+        expect(wrapper.find('[data-test="org-management-contract-invoices-btn"]').exists()).toBe(
+          true,
+        );
+      });
+
+      it("opens the invoices dialog for the row's org", async () => {
+        store.state.zoConfig.meta_org = "default";
+        mockGetAdminOrg.mockResolvedValue(noOpRow);
+        statusService().mockReset();
+        statusService().mockResolvedValue({ data: syncOn });
+        const InvoicesStub = {
+          name: "OrgContractInvoicesDialog",
+          props: ["open", "orgId", "orgName"],
+          template: `<div data-test="invoices-dialog-stub" :data-open="String(open)" :data-org="orgId" :data-name="orgName" />`,
+        };
+        wrapper = createWrapper({}, { OrgContractInvoicesDialog: InvoicesStub });
+        await flushPromises();
+        expect(wrapper.find('[data-test="invoices-dialog-stub"]').exists()).toBe(false);
+        await wrapper.find('[data-test="org-management-contract-invoices-btn"]').trigger("click");
+        await nextTick();
+        const dialog = wrapper.find('[data-test="invoices-dialog-stub"]');
+        expect(dialog.attributes("data-open")).toBe("true");
+        expect(dialog.attributes("data-org")).toBe("test-org");
+        expect(dialog.attributes("data-name")).toBe("Test Org");
+      });
+
+      it("lists orgs over a contract limit and says which are only reported", async () => {
+        await mounted({
+          ...syncOn,
+          usage_blocks: [
+            {
+              org_id: "acme",
+              contract_id: "c1",
+              meters: ["ingestion", "query"],
+              until: 1,
+              applied: true,
+            },
+            { org_id: "beta", contract_id: "c2", meters: ["ai_credits"], until: 1, applied: false },
+          ],
+        });
+        const applied = wrapper.find('[data-test="org-management-usage-block-acme"]').text();
+        expect(applied).toContain("acme: ingestion, query until");
+        expect(applied).not.toContain("reported only");
+        expect(wrapper.find('[data-test="org-management-usage-block-beta"]').text()).toContain(
+          "(reported only; enforcement is set to notify)",
+        );
+      });
+
+      it("shows no usage blocks section when there are none", async () => {
+        await mounted({ ...syncOn, usage_blocks: [] });
+        expect(wrapper.find('[data-test="org-management-usage-blocks"]').exists()).toBe(false);
+      });
+
+      it("keeps the old buttons and no panel while sync is off", async () => {
+        await mounted({ sync_active: false, last_success: null, last_error: null, blocked: [] });
+        expect(wrapper.find('[data-test="org-management-sync-contract-btn"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="org-management-extend-contract-btn"]').exists()).toBe(
+          true,
+        );
+        expect(wrapper.find('[data-test="org-management-contract-invoices-btn"]').exists()).toBe(
+          false,
+        );
+        expect(wrapper.find('[data-test="org-management-revoke-contract-btn"]').exists()).toBe(
+          true,
+        );
+        expect(wrapper.find('[data-test="org-management-contract-sync-status"]').exists()).toBe(
+          false,
+        );
+      });
+
+      it("keeps the old buttons when the status can't be read", async () => {
+        store.state.zoConfig.meta_org = "default";
+        mockGetAdminOrg.mockResolvedValue(noOpRow);
+        statusService().mockReset();
+        statusService().mockRejectedValue(new Error("nope"));
+        wrapper = createWrapper();
+        await flushPromises();
+        expect(wrapper.find('[data-test="org-management-extend-contract-btn"]').exists()).toBe(
+          true,
+        );
+      });
+
+      it("syncs the row's org, then reloads the list and status", async () => {
+        await mounted(syncOn);
+        syncService().mockResolvedValue({ data: { outcome: "removed" } });
+        mockGetAdminOrg.mockClear();
+        statusService().mockClear();
+        await wrapper.find('[data-test="org-management-sync-contract-btn"]').trigger("click");
+        await flushPromises();
+        expect(syncService()).toHaveBeenCalledWith("default", "test-org");
+        expect(mockGetAdminOrg).toHaveBeenCalled();
+        expect(statusService()).toHaveBeenCalled();
+      });
+
+      it("warns instead of reporting the outcome when a contract wasn't stored", async () => {
+        await mounted(syncOn);
+        for (const counts of [
+          { store_failures: 1, skipped: 0 },
+          { store_failures: 0, skipped: 1 },
+        ]) {
+          syncService().mockResolvedValue({ data: { outcome: "unchanged", ...counts } });
+          mockToastFn.mockClear();
+          await wrapper.vm.syncContract({ identifier: "test-org" });
+          await flushPromises();
+          expect(mockToastFn).toHaveBeenCalledWith(
+            expect.objectContaining({
+              variant: "warning",
+              message: expect.stringContaining("couldn't be stored"),
+            }),
+          );
+        }
+      });
+
+      it("still reloads the status when a sync fails", async () => {
+        await mounted(syncOn);
+        syncService().mockRejectedValue({ response: { data: { message: "boom" } } });
+        statusService().mockClear();
+        await wrapper.vm.syncContract({ identifier: "test-org" });
+        await flushPromises();
+        expect(statusService()).toHaveBeenCalled();
+      });
     });
 
     it("should render storage enabled button for orgs with storage enabled", async () => {

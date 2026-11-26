@@ -611,6 +611,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
         openobserve_core::org_domain_ownership::init().await;
         tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
         tokio::task::spawn(openobserve_core::org_domain_ownership::watch());
+
+        use o2_enterprise::enterprise::cloud::contracts::entitlements;
+        // usage blocks share the watch and reloads, so they run without gating too
+        if entitlements::cache_active() {
+            tokio::task::spawn(entitlements::watch());
+            entitlements::reload_all().await;
+            tokio::task::spawn(entitlements::reload_periodically());
+        }
     }
 
     // check version
@@ -1711,6 +1719,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             get_metering_lock,
             get_usage,
             ingest_data_retention_usages,
+            send_contract_usage_email,
         )
         .await
         .expect("cloud usage metering job init failed");
@@ -1729,6 +1738,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");
 
+    Ok(())
+}
+
+/// Sends the contract usage emails o2-enterprise builds; wording and recipients come from there.
+#[cfg(feature = "cloud")]
+async fn send_contract_usage_email(
+    subject: String,
+    recipients: Vec<String>,
+    text: String,
+    html: String,
+) -> Result<(), anyhow::Error> {
+    let email = config::meta::destinations::Email { recipients };
+    alerts::alert::send_email_notification(&subject, &email, Some(text), html).await?;
     Ok(())
 }
 

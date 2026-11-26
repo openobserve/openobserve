@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { addLicenseDeniedError, clearLicenseDenials } from "./useLicenseDenials";
+import {
+  addLicenseDeniedError,
+  addUsageLimitError,
+  clearLicenseDenials,
+} from "./useLicenseDenials";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isPageLocked } from "@/composables/useFeatureLock";
 
@@ -60,9 +64,39 @@ describe("license denials", () => {
     expect(toast).toHaveBeenCalledTimes(2);
   });
 
+  it("words a contract denial apart from a license one for the same features", () => {
+    addLicenseDeniedError(["oncall"]);
+    addLicenseDeniedError(["oncall"], Date.now(), true);
+    expect(toast).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(toast).mock.calls[0][0].title).not.toEqual(
+      vi.mocked(toast).mock.calls[1][0].title,
+    );
+  });
+
   it("stays silent on a locked page", () => {
     vi.mocked(isPageLocked).mockReturnValue(true);
     addLicenseDeniedError(["workflows"]);
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("shows a usage-limit refusal once per page, with the server's message", () => {
+    addUsageLimitError("Usage limit exceeded on your contract (ingestion).");
+    addUsageLimitError("Usage limit exceeded on your contract (ingestion).");
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls[0][0]).toMatchObject({ variant: "warning" });
+    expect(String(vi.mocked(toast).mock.calls[0][0].message)).toContain("(ingestion)");
+
+    vi.advanceTimersByTime(1);
+    clearLicenseDenials();
+    addUsageLimitError("again");
+    expect(toast).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores a usage-limit refusal of a request the previous page started", () => {
+    const started = Date.now();
+    vi.advanceTimersByTime(10);
+    clearLicenseDenials();
+    addUsageLimitError("late", started);
     expect(toast).not.toHaveBeenCalled();
   });
 });

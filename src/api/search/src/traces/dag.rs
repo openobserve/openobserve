@@ -101,7 +101,7 @@ pub async fn get_trace_dag(
         if let Err(e) =
             search_service::check_search_allowed(&org_id, Some((&stream_name, StreamType::Traces)))
         {
-            return MetaHttpResponse::too_many_requests(e.to_string());
+            return MetaHttpResponse::search_refused(e);
         }
     }
 

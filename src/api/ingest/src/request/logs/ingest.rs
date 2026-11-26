@@ -157,7 +157,7 @@ pub async fn bulk(
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => {
             // we do not want to log trial period expired errors
-            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            if !e.is_quota_refusal() {
                 log::error!("Error processing request {org_id}/_bulk: {e}");
             }
             if matches!(e, infra::errors::Error::ResourceError(_)) {
@@ -241,7 +241,7 @@ pub async fn multi(
         },
         Err(e) => {
             // we do not want to log trial period expired errors
-            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            if !e.is_quota_refusal() {
                 log::error!("Error processing request {org_id}/{stream_name}/_multi: {e}");
             }
             if matches!(e, infra::errors::Error::ResourceError(_)) {
@@ -325,7 +325,7 @@ pub async fn json(
         },
         Err(e) => {
             // we do not want to log trial period expired errors
-            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            if !e.is_quota_refusal() {
                 log::error!("Error processing request {org_id}/{stream_name}/_json: {e}");
             }
             if matches!(e, infra::errors::Error::ResourceError(_)) {
@@ -420,7 +420,7 @@ pub async fn handle_kinesis_request(
         },
         Err(e) => {
             // we do not want to log trial period expired errors
-            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            if !e.is_quota_refusal() {
                 log::error!("Error processing kinesis request:  org_id: {org_id} {e}");
             }
             (
@@ -489,7 +489,7 @@ pub async fn handle_gcp_request(
         },
         Err(e) => {
             // we do not want to log trial period expired errors
-            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            if !e.is_quota_refusal() {
                 log::error!("Error processing request {org_id}/{stream_name}/_gcp: {e:?}");
             }
             if matches!(e, infra::errors::Error::ResourceError(_)) {
@@ -556,7 +556,7 @@ pub async fn otlp_logs_write(
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
         let req_type = otlp_request_type_from_content_type(content_type)
             .unwrap_or(OtlpRequestType::HttpProtobuf);
-        let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+        let status = if e.is_quota_refusal() {
             StatusCode::TOO_MANY_REQUESTS
         } else {
             StatusCode::SERVICE_UNAVAILABLE
@@ -636,14 +636,14 @@ pub async fn otlp_logs_write(
         Ok(v) => v,
         Err(e) => {
             // we do not want to log trial period expired errors
-            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            if !e.is_quota_refusal() {
                 log::error!(
                     "Error processing otlp {content_type} logs write request {org_id}/{in_stream_name:?}: {e:?}"
                 );
             }
             let status = match e {
                 infra::errors::Error::ResourceError(_) => StatusCode::SERVICE_UNAVAILABLE,
-                infra::errors::Error::TrialPeriodExpired => StatusCode::TOO_MANY_REQUESTS,
+                ref e if e.is_quota_refusal() => StatusCode::TOO_MANY_REQUESTS,
                 _ => StatusCode::BAD_REQUEST,
             };
             otlp_rejection_response(request_type, status, e.to_string())
@@ -703,7 +703,7 @@ pub async fn hec(
         }
         Err(e) => {
             // we do not want to log trial period expired errors
-            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            if !e.is_quota_refusal() {
                 log::error!("Error processing request {org_id}/_hec: {e}");
             }
             let res = HecResponse::from(HecStatus::Custom(e.to_string(), 400));

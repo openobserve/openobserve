@@ -68,6 +68,9 @@ use crate::{
 
 /// How soon a blocked org's trigger is looked at again when its org's status cannot be read.
 const UNREADABLE_ORG_RECHECK_MICROS: i64 = 60 * 1_000_000;
+/// How soon a trigger held by a contract usage block is looked at again; a raised limit or a new
+/// buffer lifts a block early, so the trigger must not sleep until the block's end.
+const USAGE_BLOCK_RECHECK_MICROS: i64 = 5 * 60 * 1_000_000;
 const DISABLED_PIPELINE_RECHECK_DAYS: i64 = 7;
 
 /// One anomaly detection run as the trigger history records it, scheduled or manual.
@@ -1014,6 +1017,15 @@ pub async fn handle_triggers(
         );
         return Ok(());
     }
+    if park_while_usage_blocked(trace_id, &trigger).await? {
+        log::debug!(
+            "[scheduler] org={} is over a contract usage limit; holding {:?} trigger {}",
+            trigger.org,
+            trigger.module,
+            trigger.module_key
+        );
+        return Ok(());
+    }
 
     match trigger.module {
         db::scheduler::TriggerModule::Report => handle_report_triggers(trace_id, trigger).await,
@@ -1153,6 +1165,65 @@ async fn park_while_blocked(
     .await
 }
 
+/// Holds a metered trigger of an org over a contract usage limit; false when it may run.
+async fn park_while_usage_blocked(
+    trace_id: &str,
+    trigger: &db::scheduler::Trigger,
+) -> Result<bool, anyhow::Error> {
+    if !runs_metered_work(&trigger.module) {
+        return Ok(false);
+    }
+    let Some(until) = usage_block_until(&trigger.org) else {
+        return Ok(false);
+    };
+    let mut parked = trigger.clone();
+    parked.status = db::scheduler::TriggerStatus::Waiting;
+    parked.next_run_at = usage_park_at(trigger.next_run_at, until, now_micros());
+    if parked.module.completes_by_claim() {
+        infra::scheduler::complete_claim(parked).await?;
+    } else {
+        db::scheduler::update_trigger(parked, false, trace_id).await?;
+    }
+    Ok(true)
+}
+
+/// When a held trigger is looked at again: soon, never after the block ends, never before it was
+/// due.
+fn usage_park_at(next_run_at: i64, until: i64, now: i64) -> i64 {
+    next_run_at.max(until.min(now + USAGE_BLOCK_RECHECK_MICROS))
+}
+
+/// Modules whose run searches, ingests or pipelines data, so a usage block holds them (design 7.2).
+fn runs_metered_work(module: &db::scheduler::TriggerModule) -> bool {
+    use db::scheduler::TriggerModule as M;
+    // exhaustive, so a new module has to decide
+    match module {
+        M::Report
+        | M::Alert
+        | M::DerivedStream
+        | M::QueryRecommendations
+        | M::Backfill
+        | M::AnomalyDetection
+        | M::Slo
+        | M::SloBackfill
+        | M::CompositeAlert
+        | M::AlertCalibration
+        | M::AutoObserve => true,
+        // on-call checks its own entitlement per org; fleet and Slack sync meter nothing
+        M::OncallEscalation | M::FleetRollout | M::OncallSlackSync => false,
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn usage_block_until(org_id: &str) -> Option<i64> {
+    o2_enterprise::enterprise::license::usage_block(org_id).map(|block| block.until)
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn usage_block_until(_org_id: &str) -> Option<i64> {
+    None
+}
+
 /// `park_while_blocked` with its org read, conditional release and trigger write passed in.
 async fn park_with<R, RF, W, F>(
     trigger: &db::scheduler::Trigger,
@@ -1210,8 +1281,8 @@ async fn handle_oncall_escalation_triggers(
     use o2_enterprise::enterprise::oncall;
 
     let response_id = trigger.module_key.clone();
-    if !oncall::is_enabled() {
-        if oncall::is_unlicensed()
+    if !oncall::is_enabled_for(&trigger.org) {
+        if oncall::denial_for(&trigger.org).is_some()
             && let Err(e) =
                 oncall::escalation::note_unlicensed_pause(&trigger.org, &response_id, now_micros())
                     .await
@@ -1632,7 +1703,8 @@ async fn handle_composite_alert_trigger(
         #[cfg(feature = "enterprise")]
         let opens_incident = composite_opens_incident(
             has_targets,
-            definition.definition.creates_incident && crate::alerts::incidents::incidents_enabled(),
+            definition.definition.creates_incident
+                && crate::alerts::incidents::incidents_enabled(&trigger.org),
         );
         if delivery.should_deliver() && has_targets {
             let notification_alert =
@@ -1791,7 +1863,9 @@ async fn handle_composite_alert_trigger(
                 evaluated.result,
                 &evaluated.children,
             )];
-            if !composite_incident_handled && o2_enterprise::enterprise::oncall::is_enabled() {
+            if !composite_incident_handled
+                && o2_enterprise::enterprise::oncall::is_enabled_for(&trigger.org)
+            {
                 page_for_alert_firing(trace_id, &notification_alert, &rows).await;
             }
             delivery_error = crate::alerts::alert::with_unlicensed_page_reason(
@@ -2622,7 +2696,9 @@ pub(crate) async fn unlicensed_reason_for_firing(
     alert: &config::meta::alerts::alert::Alert,
     rows: &[config::utils::json::Map<String, config::utils::json::Value>],
 ) -> Option<&'static str> {
-    if !o2_enterprise::enterprise::oncall::is_unlicensed() || rows.is_empty() || alert.id.is_none()
+    if o2_enterprise::enterprise::oncall::denial_for(&alert.org_id).is_none()
+        || rows.is_empty()
+        || alert.id.is_none()
     {
         return None;
     }
@@ -2708,7 +2784,7 @@ async fn trigger_rca_for_alert_firing(
 
     let cfg = get_o2_config();
     // Must agree with the condition `analysis_at_start` used to mark these records `Pending`.
-    if !cfg.incidents.rca_enabled || !crate::alerts::incidents::rca_agent_available() {
+    if !cfg.incidents.rca_enabled || !crate::alerts::incidents::rca_agent_available(&alert.org_id) {
         release_alert_firing_hold(&alert.org_id, &opened).await;
         return;
     }
@@ -3230,7 +3306,7 @@ pub(crate) async fn correlate_muted_incident(
     let Some(first_row) = rows.first() else {
         return;
     };
-    let incidents_enabled = crate::alerts::incidents::incidents_enabled();
+    let incidents_enabled = crate::alerts::incidents::incidents_enabled(&alert.org_id);
     if !correlates_muted_firing(alert.creates_incident, incidents_enabled, downtime) {
         return;
     }
@@ -3268,7 +3344,7 @@ async fn correlate_repeated_incident(
     let Some(first_row) = rows.first() else {
         return;
     };
-    let incidents_enabled = crate::alerts::incidents::incidents_enabled();
+    let incidents_enabled = crate::alerts::incidents::incidents_enabled(&alert.org_id);
     if !correlates_repeated_firing(alert.creates_incident, incidents_enabled) {
         return;
     }
@@ -4096,7 +4172,7 @@ async fn handle_alert_triggers(
     // Every clear run: on-call pages BEFORE the send, so an undelivered page leaves it open.
     #[cfg(feature = "enterprise")]
     if matched_level.is_none()
-        && o2_enterprise::enterprise::oncall::is_enabled()
+        && o2_enterprise::enterprise::oncall::is_enabled_for(&alert.org_id)
         && let Some(alert_id) = alert.id.as_ref()
         && !crate::alerts::recovery::oncall_recovery_withheld(&alert, &folder_id, now).await
         && let Err(e) = o2_enterprise::enterprise::oncall::escalation::recover_for_alert(
@@ -4427,7 +4503,7 @@ async fn handle_alert_triggers(
         let correlation_rows = unmuted_rows.as_deref().unwrap_or(data.as_slice());
         #[cfg(feature = "enterprise")]
         let (incident_handled_notification, incident_notify_error) = if alert.creates_incident
-            && crate::alerts::incidents::incidents_enabled()
+            && crate::alerts::incidents::incidents_enabled(&alert.org_id)
             && let Some(first_row) = correlation_rows.first()
         {
             match crate::alerts::incidents::correlate_alert_to_incident(
@@ -4483,7 +4559,9 @@ async fn handle_alert_triggers(
 
         // Asked after correlation, not predicted: a prediction suppresses a page nobody made.
         #[cfg(feature = "enterprise")]
-        if o2_enterprise::enterprise::oncall::is_enabled() && !incident_handled_notification {
+        if o2_enterprise::enterprise::oncall::is_enabled_for(&alert.org_id)
+            && !incident_handled_notification
+        {
             let identity = unmuted_identity(&alert, &folder_id, &data, now).await;
             if !identity.is_empty() {
                 page_for_alert_identity(&scheduler_trace_id, &alert, &identity).await;
@@ -4491,18 +4569,20 @@ async fn handle_alert_triggers(
         }
         // Not `unlicensed_reason_for_firing`: a muted group loses no page, a zero-row match does.
         #[cfg(feature = "enterprise")]
-        let unlicensed_reason =
-            if o2_enterprise::enterprise::oncall::is_unlicensed() && alert.id.is_some() {
-                let identity = unmuted_identity(&alert, &folder_id, &data, now).await;
-                o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(
-                    &alert.org_id,
-                    alert.oncall_team.as_deref(),
-                    &identity,
-                )
-                .await
-            } else {
-                None
-            };
+        let unlicensed_reason = if o2_enterprise::enterprise::oncall::denial_for(&alert.org_id)
+            .is_some()
+            && alert.id.is_some()
+        {
+            let identity = unmuted_identity(&alert, &folder_id, &data, now).await;
+            o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(
+                &alert.org_id,
+                alert.oncall_team.as_deref(),
+                &identity,
+            )
+            .await
+        } else {
+            None
+        };
         #[cfg(feature = "enterprise")]
         let incident_notify_error = crate::alerts::alert::with_unlicensed_page_reason(
             incident_notify_error,
@@ -7890,6 +7970,46 @@ mod tests {
     use config::meta::stream::StreamType;
 
     use super::*;
+
+    #[test]
+    fn a_usage_held_trigger_is_rechecked_soon_and_never_after_the_block_ends() {
+        let now = 1_000_000_000;
+        let soon = now + USAGE_BLOCK_RECHECK_MICROS;
+        assert_eq!(usage_park_at(now, now + 3_600_000_000, now), soon);
+        assert_eq!(
+            usage_park_at(now, now + 1_000, now),
+            now + 1_000,
+            "the block ends first"
+        );
+        assert_eq!(
+            usage_park_at(now + 3_600_000_000, now + 1_000, now),
+            now + 3_600_000_000,
+            "a trigger not yet due keeps its time"
+        );
+    }
+
+    #[test]
+    fn metered_modules_are_held_and_the_others_run() {
+        use db::scheduler::TriggerModule as M;
+        for module in [
+            M::Alert,
+            M::CompositeAlert,
+            M::Report,
+            M::DerivedStream,
+            M::Backfill,
+            M::Slo,
+        ] {
+            assert!(runs_metered_work(&module), "{module:?}");
+        }
+        for module in [M::OncallEscalation, M::FleetRollout, M::OncallSlackSync] {
+            assert!(!runs_metered_work(&module), "{module:?}");
+        }
+    }
+
+    #[test]
+    fn an_org_without_a_usage_block_is_not_held() {
+        assert_eq!(usage_block_until("no-usage-block-org"), None);
+    }
 
     /// A stored multi-alert grouped by host; `None` without the meta store CI configures.
     async fn stored_host_alert(

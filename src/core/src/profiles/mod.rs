@@ -93,7 +93,7 @@ impl std::fmt::Display for ProfilesExportError {
 impl std::error::Error for ProfilesExportError {}
 
 fn ingestion_gate_error(err: infra::errors::Error) -> ProfilesExportError {
-    if matches!(err, infra::errors::Error::TrialPeriodExpired) {
+    if err.is_quota_refusal() {
         ProfilesExportError::TrialPeriodExpired(err.to_string())
     } else {
         ProfilesExportError::Unavailable(err.to_string())
@@ -298,7 +298,7 @@ pub async fn handle_otlp_request(
     // Pass the resolved stream name so deleting-stream ingestion is rejected.
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Profiles, Some(&stream_name)).await
     {
-        if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+        if !e.is_quota_refusal() {
             log::error!("[PROFILES:OTLP] ingestion error: {e}");
         }
         return Err(ingestion_gate_error(e));

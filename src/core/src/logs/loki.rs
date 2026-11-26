@@ -60,7 +60,7 @@ pub async fn handle_request(
         .await
         .map_err(|e| {
             // we do not want to log trial period expired errors
-            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            if !e.is_quota_refusal() {
                 log::error!("[Loki] Stream {stream_name} ingestion failed for org {org_id}: {e}");
             }
             LokiError::from(anyhow::anyhow!(

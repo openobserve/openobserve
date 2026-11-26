@@ -792,7 +792,7 @@ pub async fn handle_otlp_request(
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
         // we do not want to log trial period expired errors
-        let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+        let status = if e.is_quota_refusal() {
             http::StatusCode::TOO_MANY_REQUESTS
         } else {
             log::error!("[TRACES:OTLP] ingestion error: org_id: {org_id}, error: {e}");
@@ -1501,7 +1501,7 @@ pub async fn ingest_json(
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
         // we do not want to log trial period expired errors
-        if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+        if e.is_quota_refusal() {
             return Ok(MetaHttpResponse::too_many_requests(e));
         } else {
             log::error!("[TRACES:JSON] ingestion error: org_id: {org_id}, error: {e}");

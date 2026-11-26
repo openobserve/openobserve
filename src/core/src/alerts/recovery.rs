@@ -141,7 +141,7 @@ async fn deliver_recovery(alert: &Alert, event: &RecoveryEvent, downtime_id: Opt
     // Once per episode, not once per evaluation: that is the whole fix.
     #[cfg(feature = "enterprise")]
     if route.oncall
-        && o2_enterprise::enterprise::oncall::is_enabled()
+        && o2_enterprise::enterprise::oncall::is_enabled_for(&alert.org_id)
         && let Err(e) = o2_enterprise::enterprise::oncall::escalation::recover_for_alert(
             &event.org_id,
             &event.alert_id,

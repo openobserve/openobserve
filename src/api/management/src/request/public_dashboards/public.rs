@@ -95,12 +95,26 @@ async fn resolve_on<C: ConnectionTrait>(db: &C, slug: &str) -> Servable {
             return Servable::Error;
         }
     };
-    let trial = if db::org_status::is_blocked(&pd.org_id) {
+    // a contract leaving out dashboards stops the links, as blocking the org does
+    let trial = if db::org_status::is_blocked(&pd.org_id) || !serves_links(&pd.org_id) {
         Ok(false)
     } else {
         trial_ok(&pd.org_id).await
     };
     decide(pd, settings.as_ref(), trial, now_micros()).await
+}
+
+#[cfg(feature = "enterprise")]
+fn serves_links(org_id: &str) -> bool {
+    o2_enterprise::enterprise::license::check_org_features(
+        org_id,
+        &[config::meta::feature::Feature::Dashboards],
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn serves_links(_org_id: &str) -> bool {
+    true
 }
 
 /// The verdict for a loaded link; a failed trial check is an error that keeps the link's files.

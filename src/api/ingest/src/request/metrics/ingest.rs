@@ -156,7 +156,7 @@ pub async fn otlp_metrics_write(
         } else {
             OtlpRequestType::HttpJson
         };
-        let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+        let status = if e.is_quota_refusal() {
             StatusCode::TOO_MANY_REQUESTS
         } else {
             StatusCode::SERVICE_UNAVAILABLE
