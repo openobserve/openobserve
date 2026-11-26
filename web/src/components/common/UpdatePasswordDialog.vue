@@ -108,6 +108,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { reuseRejection } from "@/utils/passwordComplexity";
 import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSignOutDialog.vue";
+import { assistantSignOut } from "@/utils/assistant/assistantSignOut";
 
 import PasswordRequirementList from "./PasswordRequirementList.vue";
 import {
@@ -164,6 +165,8 @@ watch(
 
 // The server refuses every save until the password changes, so editors offer only Discard; once it has changed the old session is dead, so editors keep their work as drafts and go.
 const signOut = async ({ passwordChanged = false } = {}) => {
+  // Neither path leaves a usable session, so the assistant asks nothing and still cancels and purges.
+  await assistantSignOut({ forced: true });
   const options = passwordChanged ? { forced: true } : { discardOnly: true };
   if (await signOutThroughLeaveGuards(router, store, options)) close();
 };

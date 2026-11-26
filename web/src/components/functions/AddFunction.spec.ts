@@ -1,6 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AddFunction from "./AddFunction.vue";
+import { settleAsyncParts } from "@/components/ai-assistant/__tests__/assistantPartStubs";
+import { fakeRuntime } from "@/composables/assistant/__tests__/fakeRuntime";
+import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
+import { resetEditorProposalsForTests } from "@/composables/assistant/useEditorProposal";
+import { contextRegistry } from "@/composables/contextProviders/registry";
+import i18n from "@/locales";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
@@ -30,12 +36,23 @@ vi.mock("@/services/product_analytics", () => ({
 vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "false", isCloud: "false" },
 }));
+vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiEntryButtonStub),
+);
+vi.mock("@/components/ai-assistant/shell/AssistantDock.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.assistantDockStub),
+);
+vi.mock("@/components/ai-assistant/entry/AiLabel.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiLabelStub),
+);
+vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.diffBlockStub),
+);
 
 const makeStore = (orgIdentifier = "test-org") =>
   createStore({
     state: {
       theme: "light",
-      isAiChatEnabled: false,
       zoConfig: {
         ai_enabled: false,
       },
@@ -46,9 +63,7 @@ const makeStore = (orgIdentifier = "test-org") =>
         email: "test@example.com",
       },
     },
-    actions: {
-      setIsAiChatEnabled: vi.fn(),
-    },
+    actions: {},
   });
 
 const mockStore = makeStore();
@@ -114,7 +129,6 @@ describe("AddFunction.vue Branch Coverage", () => {
     FunctionsToolbar: true,
     FullViewContainer: true,
     ConfirmDialog: true,
-    O2AIChat: true,
   };
   // `org` lets a test pick the selected organization (the _meta org keeps JS on
   // OSS); omitted, it uses the default "test-org" store.
@@ -141,6 +155,11 @@ describe("AddFunction.vue Branch Coverage", () => {
     beforeEach(() => {
       (config as any).isEnterprise = "false";
       (config as any).isCloud = "false";
+    });
+
+    it("is a page container, so its header wraps when the side panel narrows the page", () => {
+      const page = mountAddFunction().find('[class~="@container/page"]');
+      expect(page.find('[id="add-function-form"]').exists()).toBe(true);
     });
 
     it("OSS: offers VRL + a locked JavaScript option", () => {
@@ -345,7 +364,6 @@ describe("AddFunction.vue Branch Coverage", () => {
             FunctionsToolbar: true,
             FullViewContainer: true,
             ConfirmDialog: true,
-            O2AIChat: true,
           },
         },
       });
@@ -375,7 +393,6 @@ describe("AddFunction.vue Branch Coverage", () => {
             FunctionsToolbar: true,
             FullViewContainer: true,
             ConfirmDialog: true,
-            O2AIChat: true,
           },
         },
       });
@@ -407,7 +424,6 @@ describe("AddFunction.vue Branch Coverage", () => {
             FunctionsToolbar: true,
             FullViewContainer: true,
             ConfirmDialog: true,
-            O2AIChat: true,
           },
         },
       });
@@ -438,7 +454,6 @@ describe("AddFunction.vue Branch Coverage", () => {
             FunctionsToolbar: true,
             FullViewContainer: true,
             ConfirmDialog: true,
-            O2AIChat: true,
           },
         },
       });
@@ -470,7 +485,6 @@ describe("AddFunction.vue Branch Coverage", () => {
             FunctionsToolbar: true,
             FullViewContainer: true,
             ConfirmDialog: true,
-            O2AIChat: true,
           },
         },
       });
@@ -501,7 +515,6 @@ describe("AddFunction.vue Branch Coverage", () => {
             FunctionsToolbar: true,
             FullViewContainer: true,
             ConfirmDialog: true,
-            O2AIChat: true,
           },
         },
       });
@@ -513,84 +526,6 @@ describe("AddFunction.vue Branch Coverage", () => {
 
       // Test the component exists and covers the initial state branch
       expect(vm.formData).toBeDefined();
-    });
-  });
-
-  describe("AI Chat Integration", () => {
-    it("should show AI chat when enabled and not in add function component", async () => {
-      const aiEnabledStore = createStore({
-        state: {
-          ...mockStore.state,
-          isAiChatEnabled: true, // Branch condition: true
-        },
-        actions: mockStore.actions,
-      });
-
-      // Mock router to simulate not being in functions route
-      const nonFunctionRouter = createRouter({
-        history: createWebHistory(),
-        routes: [{ path: "/pipeline/test", name: "test" }],
-      });
-      await nonFunctionRouter.push("/pipeline/test");
-
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n, nonFunctionRouter],
-          provide: {
-            store: aiEnabledStore,
-          },
-          stubs: {
-            "query-editor": true,
-            TestFunction: true,
-            FunctionsToolbar: true,
-            FullViewContainer: true,
-            ConfirmDialog: true,
-            O2AIChat: true,
-          },
-        },
-      });
-
-      // Branch: store.state.isAiChatEnabled && !isAddFunctionComponent
-      const mainContainerClasses = wrapper.find(".flex.overflow-hidden.min-h-0");
-      expect(mainContainerClasses.classes()).toContain("w-3/4");
-
-      const chatContainer = wrapper.find(".w-1\\/4");
-      expect(chatContainer.exists()).toBe(true);
-    });
-
-    it("should hide AI chat when disabled or in add function component", async () => {
-      // Mock router to simulate being in functions route
-      const functionRouter = createRouter({
-        history: createWebHistory(),
-        routes: [{ path: "/functions", name: "functions" }],
-      });
-      await functionRouter.push("/functions");
-
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n, functionRouter],
-          provide: {
-            store: mockStore, // isAiChatEnabled: false
-          },
-          stubs: {
-            "query-editor": true,
-            TestFunction: true,
-            FunctionsToolbar: true,
-            FullViewContainer: true,
-            ConfirmDialog: true,
-            O2AIChat: true,
-          },
-        },
-      });
-
-      // Branch: !store.state.isAiChatEnabled || isAddFunctionComponent
-      const mainContainerClasses = wrapper.find(".flex.overflow-hidden.min-h-0");
-      expect(mainContainerClasses.classes()).toContain("w-full");
-
-      const chatContainer = wrapper.find(".w-1\\/4");
-      expect(chatContainer.exists()).toBe(false);
     });
   });
 
@@ -614,7 +549,6 @@ describe("AddFunction.vue Branch Coverage", () => {
             FunctionsToolbar: true,
             FullViewContainer: true,
             ConfirmDialog: true,
-            O2AIChat: true,
           },
         },
       });
@@ -631,86 +565,56 @@ describe("AddFunction.vue Branch Coverage", () => {
 
       expect(vm.testFunctionRef.testFunction).toHaveBeenCalled();
     });
-
-    it("should handle AI chat interactions", async () => {
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n, mockRouter],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            "query-editor": true,
-            TestFunction: true,
-            FunctionsToolbar: true,
-            FullViewContainer: true,
-            ConfirmDialog: true,
-            O2AIChat: true,
-          },
-        },
-      });
-
-      const vm = wrapper.vm as any;
-
-      // Test openChat function (line 464-466)
-      vm.openChat(true);
-      expect(mockStore._actions.setIsAiChatEnabled).toHaveLength(1);
-
-      // Test sendToAiChat function (line 468-479)
-      const testValue = "test AI chat message";
-      vm.sendToAiChat(testValue);
-
-      expect(vm.aiChatInputContext).toBe("");
-
-      await nextTick();
-
-      expect(vm.aiChatInputContext).toBe(testValue);
-      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
-      expect(wrapper.emitted("sendToAiChat")?.[0]).toEqual([testValue]);
-    });
   });
 
-  // The typewriter placeholder is the only affordance telling a user what to
-  // write in an empty function editor. It used to be suppressed whenever
-  // `forcedLanguage` was set — but BOTH flow hosts force a language, so the
-  // pipeline Function node (forces vrl, seeds no code) rendered a blank editor
-  // with no hint at all. Workflows hid the regression because they seed
-  // `defaultCode`, which fills the editor.
-  describe("typewriter placeholder with a host-forced language", () => {
-    const placeholder = (wrapper: any) => wrapper.find(".pointer-events-none.select-none");
+  // The placeholder is the only affordance telling a user what to write in an
+  // empty function editor. It must not be suppressed whenever `forcedLanguage`
+  // is set: BOTH flow hosts force a language, so the pipeline Function node
+  // (forces vrl, seeds no code) would render a blank editor with no hint.
+  // Workflows seed `defaultCode`, which fills the editor.
+  describe("editor placeholder with a host-forced language", () => {
+    const PlaceholderEditorStub = {
+      name: "UnifiedQueryEditor",
+      props: ["placeholder"],
+      template: "<div class='uqe-stub' :data-placeholder='placeholder' />",
+    };
+    const placeholder = async (props: any) => {
+      const wrapper = mount(AddFunction, {
+        props,
+        global: {
+          plugins: [mockI18n, mockRouter],
+          provide: { store: mockStore },
+          stubs: { ...stubs, UnifiedQueryEditor: PlaceholderEditorStub },
+        },
+      });
+      await flushPromises();
+      return wrapper.find(".uqe-stub").attributes("data-placeholder");
+    };
 
-    it("🔑 still renders for a forced language when no defaultCode is seeded", () => {
+    it("🔑 still shows for a forced language when no defaultCode is seeded", async () => {
       // the pipeline Function node's exact props
-      const wrapper = mountAddFunction({
-        ...defaultProps,
-        forcedLanguage: "vrl",
-      });
-      expect(placeholder(wrapper).exists()).toBe(true);
+      expect(await placeholder({ ...defaultProps, forcedLanguage: "vrl" })).toBeTruthy();
     });
 
-    it("renders for a forced JS language too", () => {
+    it("shows for a forced JS language too", async () => {
       (config as any).isEnterprise = "true";
-      const wrapper = mountAddFunction({
-        ...defaultProps,
-        forcedLanguage: "javascript",
-      });
-      expect(placeholder(wrapper).exists()).toBe(true);
+      expect(await placeholder({ ...defaultProps, forcedLanguage: "javascript" })).toBeTruthy();
     });
 
-    it("is hidden once a host seeds defaultCode (the workflow case)", () => {
+    it("is hidden once a host seeds defaultCode (the workflow case)", async () => {
       // `!formData.function` — not `!forcedLanguage` — is what suppresses it.
       (config as any).isEnterprise = "true";
-      const wrapper = mountAddFunction({
-        ...defaultProps,
-        forcedLanguage: "javascript",
-        defaultCode: "// do something\n",
-      });
-      expect(placeholder(wrapper).exists()).toBe(false);
+      expect(
+        await placeholder({
+          ...defaultProps,
+          forcedLanguage: "javascript",
+          defaultCode: "// do something\n",
+        }),
+      ).toBeUndefined();
     });
 
-    it("renders with no forced language at all (unchanged behaviour)", () => {
-      expect(placeholder(mountAddFunction()).exists()).toBe(true);
+    it("shows with no forced language at all (unchanged behaviour)", async () => {
+      expect(await placeholder(defaultProps)).toBeTruthy();
     });
   });
 
@@ -752,5 +656,117 @@ describe("AddFunction.vue Branch Coverage", () => {
       await flushPromises();
       expect((wrapper.vm.$ as any).exposed.getCode()).toBe("// seed");
     });
+  });
+});
+
+// The first test pays the cold import of the assistant runtime; CI shards run it under load.
+describe("AddFunction with the revamped assistant", { timeout: 20_000 }, () => {
+  const vuex = () =>
+    createStore({
+      state: {
+        theme: "light",
+        zoConfig: { ai_enabled: true },
+        selectedOrganization: { identifier: "org1" },
+        userInfo: { email: "ada@example.com" },
+      },
+      actions: {},
+    });
+
+  async function setupWithAssistant(dockHost: boolean, path = "/pipeline/pipelines/edit") {
+    const runtime = fakeRuntime();
+    setRuntimeHandle(runtime as never);
+    const router = createRouter({
+      history: createWebHistory(),
+      routes: [
+        { path: "/functions", component: { render: () => null } },
+        { path: "/pipeline/pipelines/edit", component: { render: () => null } },
+      ],
+    });
+    await router.push(path);
+    const wrapper = mount(AddFunction, {
+      props: {
+        modelValue: { name: "parse_json", function: ".a = 1", params: "row", transType: "0" },
+        isUpdated: true,
+        dockHost,
+      },
+      global: {
+        plugins: [i18n, router],
+        provide: { store: vuex() },
+        stubs: {
+          UnifiedQueryEditor: {
+            template: "<div><textarea /></div>",
+            methods: { replaceValue() {} },
+          },
+          TestFunction: { template: "<div />", methods: { testFunction: vi.fn() } },
+        },
+      },
+      attachTo: document.body,
+    });
+    await settleAsyncParts();
+    return { wrapper, runtime };
+  }
+
+  beforeEach(() => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "false";
+    sessionStorage.clear();
+    contextRegistry.cleanup();
+  });
+
+  afterEach(() => {
+    resetEditorProposalsForTests();
+    setRuntimeHandle(null);
+    document.body.innerHTML = "";
+    (config as any).isEnterprise = "false";
+  });
+
+  it("docks in a pipeline node: the toggle docks and the function host registers", async () => {
+    const { wrapper, runtime } = await setupWithAssistant(true);
+    const toggle = wrapper.get('[data-test="ai-entry-function-ask"]');
+    expect(toggle.attributes("data-appearance")).toBe("toggle");
+    expect(toggle.attributes("data-dock-host")).toBe("function");
+    const adapter = runtime.hosts.get("function")!;
+    expect(adapter.language).toBe("vrl");
+    expect(String(adapter.objectTitle())).toBe("Function · parse_json");
+    runtime.store.open({ kind: "docked", hostId: "function" }, { focus: "none" });
+    await settleAsyncParts();
+    expect(wrapper.find('[data-test="assistant-dock-stub"]').exists()).toBe(true);
+  });
+
+  it("opens the sidebar on the functions page: no dock host, but the function's context is pushed", async () => {
+    const { wrapper, runtime } = await setupWithAssistant(false, "/functions");
+    const toggle = wrapper.get('[data-test="ai-entry-function-ask"]');
+    expect(toggle.attributes("data-appearance")).toBe("button");
+    expect(toggle.attributes("data-dock-host")).toBe("");
+    expect(runtime.hosts.has("function")).toBe(false);
+    expect((await contextRegistry.getActiveContext())?.currentVRLQuery).toBe(".a = 1");
+  });
+
+  it("moves the language toggle below the title only when it would touch the actions", async () => {
+    const toggle = '[data-test="function-transform-type-toggle"]';
+    const rects = vi.spyOn(Element.prototype, "getBoundingClientRect");
+    // One-row geometry: toggle 470-622, actions of `actionsW` px ending 15 px before the header edge.
+    const at = (headerW: number, actionsW: number) =>
+      rects.mockImplementation(function (this: Element) {
+        const box = (left: number, width: number) =>
+          ({ left, right: left + width, width, height: 60 }) as DOMRect;
+        const t = this.getAttribute("data-test");
+        if (
+          t === "function-toolbar-tabs" ||
+          this.parentElement?.dataset.test === "function-toolbar-tabs"
+        )
+          return box(470, 152);
+        if (t === "function-toolbar-actions") return box(headerW - 15 - actionsW, actionsW);
+        return this.classList.contains("app-page-header") ? box(0, headerW) : box(0, 0);
+      });
+    // 1100 px is wide enough for the old fixed 1024 cut-off but the actions are 500 px wide.
+    at(1100, 500);
+    const tight = await setupWithAssistant(true);
+    expect(tight.wrapper.find(`.-mt-2 ${toggle}`).exists()).toBe(true);
+    tight.wrapper.unmount();
+    at(1100, 200);
+    const fits = await setupWithAssistant(true);
+    expect(fits.wrapper.find(`.-mt-2 ${toggle}`).exists()).toBe(false);
+    rects.mockRestore();
   });
 });

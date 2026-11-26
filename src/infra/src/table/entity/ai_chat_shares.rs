@@ -27,6 +27,8 @@ pub struct Model {
     pub updated_at: i64,
     /// Readers see assistant text and tool names, never tool inputs or outputs.
     pub redact_tools: bool,
+    /// Readers see `[Attached {kind} hidden]` for attachment blocks and no images.
+    pub hide_attachments: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
