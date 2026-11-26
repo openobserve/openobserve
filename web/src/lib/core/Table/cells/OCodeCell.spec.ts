@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import OCodeCell from "./OCodeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -35,5 +35,55 @@ describe("OCodeCell", () => {
     expect(valueSpan(wrapper).attributes("title")).toBeUndefined();
     expect(valueSpan(wrapper).attributes("data-o-tooltip-off")).toBe("");
     expect(valueSpan(wrapper).text()).toBe("Basic dXNlcjpzZWNyZXQ=");
+  });
+
+  describe("secret", () => {
+    const secret = "Basic dXNlcjpzZWNyZXQ=";
+    const mountSecret = () =>
+      mount(OCodeCell, { props: { value: secret, secret: true, tooltip: false } });
+
+    it("masks the value by default and keeps the secret out of the DOM", () => {
+      const wrapper = mountSecret();
+      expect(valueSpan(wrapper).text()).toBe("Basic ••••••••••••");
+      expect(wrapper.html()).not.toContain("dXNlcjpzZWNyZXQ=");
+    });
+
+    it("reveals and re-hides with the eye toggle", async () => {
+      const wrapper = mountSecret();
+      await wrapper.get('[data-test="o-code-cell-reveal"]').trigger("click");
+      expect(valueSpan(wrapper).text()).toBe(secret);
+      await wrapper.get('[data-test="o-code-cell-reveal"]').trigger("click");
+      expect(valueSpan(wrapper).text()).toBe("Basic ••••••••••••");
+    });
+
+    it("copies the full value while still masked", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("navigator", { clipboard: { writeText } });
+      const wrapper = mountSecret();
+      await wrapper.get('button[title="Copy"]').trigger("click");
+      expect(writeText).toHaveBeenCalledWith(secret);
+      expect(valueSpan(wrapper).text()).toBe("Basic ••••••••••••");
+      vi.unstubAllGlobals();
+    });
+
+    it("re-masks when the value changes", async () => {
+      const wrapper = mountSecret();
+      await wrapper.get('[data-test="o-code-cell-reveal"]').trigger("click");
+      await wrapper.setProps({ value: "Basic bmV3OnNlY3JldA==" });
+      expect(valueSpan(wrapper).text()).toBe("Basic ••••••••••••");
+    });
+
+    it("masks a bare token entirely", () => {
+      const wrapper = mount(OCodeCell, { props: { value: "7b3d-uuid", secret: true } });
+      expect(valueSpan(wrapper).text()).toBe("••••••••••••");
+    });
+
+    it("shows no eye toggle for a non-secret value", () => {
+      expect(
+        mount(OCodeCell, { props: { value: "abc" } })
+          .find('[data-test="o-code-cell-reveal"]')
+          .exists(),
+      ).toBe(false);
+    });
   });
 });

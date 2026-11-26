@@ -125,14 +125,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="font-medium">{{ row.name }}</span>
           </template>
 
-          <!-- Copy yields a ready-to-paste "Basic base64(name:token)" credential
-               (OCodeCell copies exactly what it shows), so no manual email +
-               base64 step is needed. -->
+          <!-- Copy yields the full ready-to-paste "Basic base64(name:token)" credential
+               even while the cell is masked, so no manual base64 step is needed. -->
           <template #cell-token="{ row }">
             <OCodeCell
               :value="
                 isReservedIngestionTokenName(row.name) ? null : toBasicAuth(row.name, row.token)
               "
+              secret
               :tooltip="false"
             />
           </template>
@@ -141,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OCodeCell
               :value="row.splunk_token"
               :empty-label="t('ingestion.splunkTokenNone')"
+              secret
               :tooltip="false"
             />
           </template>

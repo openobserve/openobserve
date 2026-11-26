@@ -292,7 +292,7 @@ describe("IngestionTokens — analytics", () => {
 const OTableRowsStub = {
   name: "OTable",
   props: ["data", "rowActions"],
-  template: `<div><div v-for="row in data" :key="row.name" :data-test="'row-' + row.name"><slot name="cell-name" :row="row" /><slot name="cell-token" :row="row" /><template v-for="action in rowActions" :key="action.id"><i v-if="!action.visible || action.visible(row)" :data-test="action.dataTest(row)" /></template></div></div>`,
+  template: `<div><div v-for="row in data" :key="row.name" :data-test="'row-' + row.name"><slot name="cell-name" :row="row" /><slot name="cell-token" :row="row" /><slot name="cell-splunk_token" :row="row" /><template v-for="action in rowActions" :key="action.id"><i v-if="!action.visible || action.visible(row)" :data-test="action.dataTest(row)" /></template></div></div>`,
 };
 
 function mountRows(rows: Record<string, unknown>[], table: unknown = OTableRowsStub) {
@@ -410,6 +410,18 @@ describe("IngestionTokens — system tokens", () => {
       expect(hasButton(wrapper, row.name, "splunk")).toBe(true);
       expect(hasButton(wrapper, row.name, "toggle")).toBe(true);
     }
+    wrapper.unmount();
+  });
+
+  it("masks both credential columns and gives each its own eye", async () => {
+    const row = { ...USER, splunk_token: "7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90" };
+    const wrapper = mountRows([row]);
+    await flushPromises();
+    const text = rowOf(wrapper, row.name).text();
+    expect(text).toContain("Basic ••••••••••••");
+    expect(text).not.toContain(btoa(`${row.name}:${row.token}`));
+    expect(text).not.toContain(row.splunk_token);
+    expect(rowOf(wrapper, row.name).findAll('[data-test="o-code-cell-reveal"]')).toHaveLength(2);
     wrapper.unmount();
   });
 
