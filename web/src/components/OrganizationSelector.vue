@@ -279,7 +279,7 @@ const focusSearch = () => {
   searchWrapRef.value?.querySelector("input")?.focus();
 };
 
-// The first tabbable in the panel is "+", so focus is sent to the search instead.
+// The gear is the panel's first tabbable, so opening must redirect focus to search.
 const onOpenAutoFocus = (e: Event) => {
   e.preventDefault();
   focusSearch();
@@ -437,6 +437,16 @@ useShortcuts([
           <OButton
             variant="ghost"
             size="icon-xs-sq"
+            icon-left="settings"
+            :aria-label="t('organization.manageOrganizations')"
+            data-test="organization-menu-manage-btn"
+            @click="openManage"
+          >
+            <OTooltip :content="t('organization.manageOrganizations')" />
+          </OButton>
+          <OButton
+            variant="ghost"
+            size="icon-xs-sq"
             icon-left="add"
             :aria-label="t('organization.add')"
             data-test="organization-menu-create-btn"
@@ -585,17 +595,6 @@ useShortcuts([
           class="text-compact text-text-secondary w-full py-7 text-center"
         >
           {{ t("organization.noOrganizationsFound") }}
-        </div>
-
-        <div class="border-select-content-border flex border-t px-3 py-2">
-          <OButton
-            variant="link"
-            size="xs"
-            data-test="organization-menu-manage-link"
-            @click="openManage"
-          >
-            {{ t("organization.manageOrganizations") }}
-          </OButton>
         </div>
       </div>
     </OPopover>
