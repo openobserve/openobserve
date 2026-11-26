@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Chưa có kênh nào có tổ chức mặc định",
-      "description": "Các câu hỏi trong kênh chưa có tổ chức mặc định sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng /o2 org)."
+      "description": "Các câu hỏi trong kênh chưa có tổ chức mặc định sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Chưa có ai trong tổ chức này liên kết Slack"
@@ -9987,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "Trình duyệt đã chặn tải tệp...",
     "chartDataDownloadedCsv": "Dữ liệu biểu đồ đã được tải xuống dưới dạng tệp CSV",
+    "tableDownloadPartial": "Chỉ lấy được {count} hàng đầu tiên của kết quả nên tệp không đầy đủ.",
+    "tableDownloadServerPartial": "Máy chủ trả về dữ liệu không đầy đủ nên tệp có thể bị thiếu.",
+    "tableDownloadWaitForLoad": "Bảng vẫn đang tải. Hãy tải xuống lại khi hoàn tất.",
+    "preparingTableDownload": "Đang lấy tất cả các hàng để tải xuống…",
     "chartDataDownloadedJson": "Dữ liệu biểu đồ đã được tải xuống dưới dạng tệp JSON",
     "dynamicFilters": "Bộ lọc động",
     "failedToCancelRunningQuery": "Không thể hủy truy vấn đang chạy",
@@ -28135,7 +28139,7 @@
     "teamChannelSilent": "Kênh của nhóm này được cố ý để trống — các thông báo trực sẽ không được công bố ở bất kỳ đâu.",
     "slackChannelTitle": "Kênh Slack",
     "slackChannelSetWith": "Đặt kênh Slack bằng {command}",
-    "slackChannelLinkHint": "Nhập lệnh này trong kênh Slack đó. Bạn cần liên kết tài khoản Slack: nhập /o2 link trong Slack.",
+    "slackChannelLinkHint": "Nhập lệnh đó trong kênh Slack đó. Bạn cần liên kết tài khoản Slack của mình: nhập {command} link trong Slack.",
     "slackChannelSendTest": "Gửi tin nhắn thử",
     "slackChannelClear": "Xóa",
     "slackChannelBackup": "Chỉ dùng {webhook} làm dự phòng",
@@ -28710,7 +28714,7 @@
     "mineJoinTeam": "Tham gia một nhóm",
     "mineTestTeam": "Gửi thông báo trực thử đến {team}",
     "mineCoverSaved": "Đã lưu ca thay",
-    "mineSlackLinkHow": "Nhập /o2 link trong Slack",
+    "mineSlackLinkHow": "Nhập {command} link trong Slack",
     "mineSlackSetUpHint": "Mở Cài đặt › Slack",
     "myDeliveriesWhen": "Thời điểm",
     "phoneAddHint": "Thêm số để nhận tin nhắn và cuộc gọi",
@@ -29281,7 +29285,7 @@
     "channelUnavailable": "{channel} — không có nhà cung cấp nào phía sau",
     "channelUnverified": "{channel} — đã lưu, nhưng chưa ai xác minh",
     "channelAddPhone": "{reason}. Thêm số điện thoại của bạn trong Ca trực của tôi",
-    "channelLinkSlack": "{reason}. Chạy /o2 link trong Slack",
+    "channelLinkSlack": "{reason}. Chạy {command} link trong Slack",
     "loadUneven": "{name} đảm nhận gấp {factor}× mức trung vị trong {days} ngày qua",
     "loadUnevenLabel": "Tải không đồng đều:",
     "membersUnreachableMore": "{name} thuộc nhóm này, nhưng không thông báo trực nào đến được họ — {why}. {count} thành viên khác cũng trong tình trạng tương tự. | {name} thuộc nhóm này, nhưng không thông báo trực nào đến được họ — {why}. {count} thành viên khác cũng trong tình trạng tương tự.",
@@ -30891,6 +30895,13 @@
         "http": "HTTP",
         "httpDescription": "Slack gọi URL công khai của bạn. Cần một lần nhấp Xác minh trong Slack",
         "channelHistory": "Cho phép bot đọc các trả lời trong chuỗi hội thoại do bot khởi tạo",
+        "appName": "Tên ứng dụng",
+        "appNameHelp": "Tên mọi người thấy trong Slack. Đặt cho mỗi máy chủ OpenObserve một tên riêng, chẳng hạn OpenObserve Staging.",
+        "appNameTooLong": "Tên ứng dụng phải có tối đa {max} ký tự",
+        "appNameMarkup": "Tên ứng dụng không được chứa <, > hoặc &",
+        "command": "Lệnh slash",
+        "commandInvalid": "Bắt đầu bằng / và dùng tối đa {max} ký tự: chữ thường, chữ số, - và _",
+        "commandWarning": "Slack chỉ chạy lệnh slash cho duy nhất một ứng dụng trong một workspace. Nếu ứng dụng khác trong workspace này đã dùng {command}, thì {command} sẽ ngừng hoạt động với ứng dụng đó sau khi bạn cài đặt ứng dụng này.",
         "tokenLabel": "Token làm mới cấu hình ứng dụng (xoxe-…)",
         "tokenHelp": "Trên trang Your Apps của Slack, mục Your App Configuration Tokens › Generate Token hiển thị một access token và một refresh token: hãy dán refresh token. OpenObserve luân chuyển token này và giữ bản mới nhất ở dạng mã hóa để cập nhật ứng dụng sau này.",
         "generateToken": "Tạo token",
@@ -31060,7 +31071,7 @@
         "settings": "Cài đặt",
         "install": "Khi cài đặt",
         "destination": "Từ đích cảnh báo",
-        "oncall": "Từ /o2 oncall tại đây"
+        "oncall": "Từ {command} oncall tại đây"
       },
       "channel": "Kênh",
       "channelPlaceholder": "Tìm kênh",
@@ -31074,7 +31085,7 @@
       "editDefault": "Sửa mặc định kênh",
       "removeConfirm": "Xóa mặc định",
       "removeTitle": "Xóa mặc định cho #{channel}?",
-      "removeMessage": "Sau đó, câu hỏi trong {name} sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng /o2 org).",
+      "removeMessage": "Sau đó, câu hỏi trong {name} sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng {command} org).",
       "instanceAdminOnly": "Chỉ quản trị viên instance",
       "ownOrgOnlyHint": "Trên không gian làm việc instance, bạn gán kênh cho tổ chức của riêng bạn",
       "claimableHint": "Các kênh chưa được nhận và các kênh do {org} sở hữu",

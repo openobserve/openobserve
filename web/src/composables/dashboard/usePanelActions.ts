@@ -38,9 +38,49 @@ import {
 import { ref } from "vue";
 import { downloadFile } from "@/utils/dom";
 import { getNumberLocale } from "@/locales/numberFormat";
-import type { TranslateFn } from "@/types/i18n";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { ExportCancelledError } from "@/utils/dashboard/tableExport";
 
 const PERIOD_WARNINGS = ["absoluteToRolling", "periodClamped"];
+
+// Upper bound for re-fetching a capped table for download; a download is never unbounded.
+export const TABLE_EXPORT_ROW_LIMIT = 100000;
+
+export interface TableExportColumn {
+  name: string;
+  label?: string;
+  field?: string;
+}
+
+export interface TableExport {
+  columns: TableExportColumn[];
+  rows: Record<string, unknown>[];
+  capped: boolean;
+  /** The server marked a re-fetched result partial, or a capped query could not be fetched again. */
+  partial: boolean;
+  /** Rows asked per query; `capped` means a query had more. */
+  rowLimit: number;
+}
+
+// Identical toasts collapse into one record, so every running table export shares one progress toast.
+const tableExportProgress: { running: number; dismiss: (() => void) | null } = {
+  running: 0,
+  dismiss: null,
+};
+
+/** Whether a shown query stopped at the server's default row limit; hidden queries do not count. */
+export const shownQueriesCapped = (
+  diagnostics: { queries?: { rowsCapped: boolean }[] } | undefined,
+  keptIndexes: number[] | null,
+): boolean =>
+  (diagnostics?.queries ?? []).some(
+    (query, index) => query.rowsCapped && (keptIndexes === null || keptIndexes.includes(index)),
+  );
+
+interface TableDownloader {
+  downloadTableAsCSV: (title: string, table?: TableExport) => number;
+  downloadTableAsJSON: (title: string, table?: TableExport) => number;
+}
 
 // Helper function to properly wrap CSV values
 export const wrapCsvValue = (val: any): string => {
@@ -372,6 +412,12 @@ export function usePanelDownload({
   tableRendererRef,
   showErrorNotification,
   showPositiveNotification,
+  showWarningNotification,
+  showInfoNotification,
+  isPanelLoading,
+  isTableCapped,
+  exportKey,
+  fetchFullTable,
   t,
 }: {
   panelSchema: any;
@@ -380,12 +426,102 @@ export function usePanelDownload({
   tableRendererRef: any;
   showErrorNotification: any;
   showPositiveNotification: any;
+  showWarningNotification?: (message: I18nText) => unknown;
+  showInfoNotification?: (message: I18nText, options: { timeout: number }) => () => void;
+  isPanelLoading?: () => boolean;
+  isTableCapped?: () => boolean;
+  /** Identifies the panel's current queries, time range and variables; a fetch is shared only within one key. */
+  exportKey?: () => string;
+  fetchFullTable?: () => Promise<TableExport>;
   t: TranslateFn;
 }) {
-  const downloadDataAsCSV = (title: string) => {
+  let fullTableRequest: { key: string; promise: Promise<TableExport> } | null = null;
+  const pendingSaves = new Set<string>();
+
+  // The toast's "loading" variant renders nothing, so a persistent info toast marks the fetch.
+  const showProgress = () => {
+    tableExportProgress.dismiss?.();
+    tableExportProgress.dismiss =
+      showInfoNotification?.(t("dashboard.preparingTableDownload"), { timeout: 0 }) ?? null;
+  };
+
+  const endProgress = () => {
+    tableExportProgress.running -= 1;
+    if (tableExportProgress.running > 0) return;
+    tableExportProgress.dismiss?.();
+    tableExportProgress.dismiss = null;
+  };
+
+  // One re-fetch serves every format requested while it runs, as long as the panel's queries are unchanged.
+  const requestFullTable = (key: string, fetchTable: () => Promise<TableExport>) => {
+    if (fullTableRequest?.key === key) return fullTableRequest.promise;
+    tableExportProgress.running += 1;
+    const request = {
+      key,
+      promise: fetchTable().finally(() => {
+        if (fullTableRequest === request) fullTableRequest = null;
+        endProgress();
+      }),
+    };
+    fullTableRequest = request;
+    return request.promise;
+  };
+
+  // The held rows stop at the server's default limit, so a capped table is fetched again for the file.
+  const downloadTable = async (title: string, format: "csv" | "json") => {
+    const saveWith = (table?: TableExport): number | undefined => {
+      const renderer: TableDownloader | undefined = tableRendererRef?.value ?? undefined;
+      const save = format === "csv" ? renderer?.downloadTableAsCSV : renderer?.downloadTableAsJSON;
+      return table ? save?.(title, table) : save?.(title);
+    };
+    if (!isTableCapped?.() || !fetchFullTable) {
+      saveWith();
+      return;
+    }
+    // The held metadata and rows belong to a run that is being replaced, so they cannot seed a re-fetch.
+    if (isPanelLoading?.()) {
+      showWarningNotification?.(t("dashboard.tableDownloadWaitForLoad"));
+      return;
+    }
+    const key = exportKey?.() ?? "";
+    const saveKey = `${format}:${key}`;
+    // A repeat click re-shows the progress toast in case it was closed, without a second fetch.
+    showProgress();
+    if (pendingSaves.has(saveKey)) return;
+    pendingSaves.add(saveKey);
+    try {
+      const full = await requestFullTable(key, fetchFullTable);
+      if (saveWith(full) === undefined) throw new Error("Table renderer is gone");
+      if (full.capped) {
+        showWarningNotification?.(
+          t("dashboard.tableDownloadPartial", {
+            count: full.rowLimit.toLocaleString(getNumberLocale()),
+          }),
+        );
+      } else if (full.partial) {
+        showWarningNotification?.(t("dashboard.tableDownloadServerPartial"));
+      }
+    } finally {
+      pendingSaves.delete(saveKey);
+    }
+  };
+
+  // A cancelled export ends quietly; a server error payload (not a client Error) carries a reason worth showing.
+  const reportTableDownloadError = (error: unknown, fallbackKey: string) => {
+    if (error instanceof ExportCancelledError) return;
+    const message =
+      error instanceof Error ? null : (error as { message?: unknown } | null)?.message;
+    showErrorNotification(typeof message === "string" && message ? raw(message) : t(fallbackKey));
+  };
+
+  const downloadDataAsCSV = async (title: string) => {
     // if panel type is table then download data as csv
     if (panelSchema.value.type == "table") {
-      tableRendererRef?.value?.downloadTableAsCSV(title);
+      try {
+        await downloadTable(title, "csv");
+      } catch (error) {
+        reportTableDownloadError(error, "dashboard.failedToDownloadCsv");
+      }
     } else {
       // For non-table charts
       try {
@@ -437,11 +573,13 @@ export function usePanelDownload({
     }
   };
 
-  const downloadDataAsJSON = (title: string) => {
+  const downloadDataAsJSON = async (title: string) => {
     try {
       // Handle table type charts
       if (panelSchema?.value?.type === "table") {
-        tableRendererRef?.value?.downloadTableAsJSON(title);
+        await downloadTable(title, "json").catch((error: unknown) =>
+          reportTableDownloadError(error, "dashboard.failedToDownloadJson"),
+        );
       } else {
         // Handle non-table charts
         // Use filteredData for PromQL to exclude hidden queries, otherwise use data

@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Nessun canale ha ancora un'organizzazione predefinita",
-      "description": "Le domande poste in un canale senza predefinita vanno all'organizzazione predefinita di ciascuna persona (può essere cambiata con /o2 org)."
+      "description": "Le domande poste in un canale senza predefinita vanno all'organizzazione predefinita di ciascuna persona (può essere cambiata con {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nessuno in questa organizzazione ha ancora collegato Slack"
@@ -9987,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "Il browser ha negato il download del file...",
     "chartDataDownloadedCsv": "Dati del grafico scaricati come file CSV",
+    "tableDownloadPartial": "Sono state recuperate solo le prime {count} righe del risultato, quindi il file è parziale.",
+    "tableDownloadServerPartial": "Il server ha restituito dati parziali, quindi il file potrebbe essere incompleto.",
+    "tableDownloadWaitForLoad": "Il pannello è ancora in caricamento. Scarica di nuovo al termine.",
+    "preparingTableDownload": "Recupero di tutte le righe per il download…",
     "chartDataDownloadedJson": "Dati del grafico scaricati come file JSON",
     "dynamicFilters": "Filtri dinamici",
     "failedToCancelRunningQuery": "Impossibile annullare la query in esecuzione",
@@ -28135,7 +28139,7 @@
     "teamChannelSilent": "Il canale di questo team è vuoto di proposito: le notifiche non verranno annunciate da nessuna parte.",
     "slackChannelTitle": "Canale Slack",
     "slackChannelSetWith": "Imposta un canale Slack con {command}",
-    "slackChannelLinkHint": "Scrivilo in quel canale Slack. Richiede che il tuo account Slack sia collegato: digita /o2 link in Slack.",
+    "slackChannelLinkHint": "Scrivilo in quel canale Slack. È necessario collegare il tuo account Slack: digita {command} link in Slack.",
     "slackChannelSendTest": "Invia messaggio di prova",
     "slackChannelClear": "Rimuovi",
     "slackChannelBackup": "Usa {webhook} solo come backup",
@@ -28710,7 +28714,7 @@
     "mineJoinTeam": "Unisciti a un team",
     "mineTestTeam": "Invia una notifica di test a {team}",
     "mineCoverSaved": "Copertura salvata",
-    "mineSlackLinkHow": "Digita /o2 link in Slack",
+    "mineSlackLinkHow": "Digita {command} link in Slack",
     "mineSlackSetUpHint": "Apre Impostazioni › Slack",
     "myDeliveriesWhen": "Quando",
     "phoneAddHint": "Aggiungi un numero per SMS e chiamate",
@@ -29281,7 +29285,7 @@
     "channelUnavailable": "{channel} — nessun provider configurato",
     "channelUnverified": "{channel} — registrato, ma nessuno lo ha verificato",
     "channelAddPhone": "{reason}. Aggiungi il tuo telefono in La mia reperibilità",
-    "channelLinkSlack": "{reason}. Esegui /o2 link in Slack",
+    "channelLinkSlack": "{reason}. Esegui {command} link in Slack",
     "loadUneven": "{name} ha gestito {factor}× la mediana negli ultimi {days} giorni",
     "loadUnevenLabel": "Il carico non è uniforme:",
     "membersUnreachableMore": "{name} è in questo team, ma nessuna notifica può essere recapitata — {why}. {count} altro membro è nella stessa situazione. | {name} è in questo team, ma nessuna notifica può essere recapitata — {why}. {count} altri membri sono nella stessa situazione.",
@@ -30891,6 +30895,13 @@
         "http": "HTTP",
         "httpDescription": "Slack chiama il tuo URL pubblico. Richiede un clic su Verifica in Slack",
         "channelHistory": "Consenti al bot di leggere le risposte nei thread che ha avviato",
+        "appName": "Nome dell'app",
+        "appNameHelp": "Il nome che le persone vedono in Slack. Assegna a ogni server OpenObserve un nome proprio, ad esempio OpenObserve Staging.",
+        "appNameTooLong": "Il nome dell'app può contenere al massimo {max} caratteri",
+        "appNameMarkup": "Il nome dell'app non può contenere <, > o &",
+        "command": "Comando slash",
+        "commandInvalid": "Inizia con / e usa al massimo {max} caratteri: lettere minuscole, cifre, - e _",
+        "commandWarning": "Slack esegue un comando slash per una sola app in un workspace. Se un'altra app in questo workspace usa già {command}, {command} smette di funzionare per quell'app dopo che installi questa.",
         "tokenLabel": "Token di aggiornamento della configurazione dell'app (xoxe-…)",
         "tokenHelp": "Nella pagina Le tue app di Slack, Token di configurazione della tua app › Genera token mostra un token di accesso e un token di aggiornamento: incolla il token di aggiornamento. OpenObserve ne esegue la rotazione e conserva crittografato quello più recente per aggiornare l'app in seguito.",
         "generateToken": "Genera un token",
@@ -31060,7 +31071,7 @@
         "settings": "Impostazioni",
         "install": "All'installazione",
         "destination": "Da una destinazione di avviso",
-        "oncall": "Da /o2 oncall qui"
+        "oncall": "Da {command} oncall qui"
       },
       "channel": "Canale",
       "channelPlaceholder": "Cerca canali",
@@ -31074,7 +31085,7 @@
       "editDefault": "Modifica canale predefinito",
       "removeConfirm": "Rimuovi predefinito",
       "removeTitle": "Rimuovere il predefinito per #{channel}?",
-      "removeMessage": "Le domande in {name} vanno poi all'organizzazione predefinita di ciascuna persona (possono cambiarla con /o2 org).",
+      "removeMessage": "Le domande in {name} vanno poi all'organizzazione predefinita di ciascuna persona (possono cambiarla con {command} org).",
       "instanceAdminOnly": "Solo amministratore dell'istanza",
       "ownOrgOnlyHint": "Su un workspace dell'istanza, i canali vengono mappati alla tua organizzazione",
       "claimableHint": "Canali non assegnati e canali di proprietà di {org}",

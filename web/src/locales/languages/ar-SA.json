@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "لا توجد قناة لديها مؤسسة افتراضية بعد",
-      "description": "تنتقل الأسئلة في قناة بلا مؤسسة افتراضية إلى المؤسسة الافتراضية لكل شخص (يمكنهم تغييرها باستخدام /o2 org)."
+      "description": "تنتقل الأسئلة في قناة بلا مؤسسة افتراضية إلى المؤسسة الافتراضية لكل شخص (يمكنهم تغييرها باستخدام {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "لم يربط أي شخص في هذه المؤسسة Slack بعد"
@@ -9987,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "تم رفض تحميل الملف...",
     "chartDataDownloadedCsv": "بيانات المخطط تم تحميلها كملف CSV",
+    "tableDownloadPartial": "تم جلب أول {count} صف فقط من النتيجة، لذا فالملف جزئي.",
+    "tableDownloadServerPartial": "أعاد الخادم بيانات جزئية، لذا قد يكون الملف غير مكتمل.",
+    "tableDownloadWaitForLoad": "لا تزال اللوحة قيد التحميل. نزّل مرة أخرى بعد انتهائها.",
+    "preparingTableDownload": "جارٍ جلب جميع الصفوف للتنزيل…",
     "chartDataDownloadedJson": "بيانات المخطط التي تم تحميلها كملف JSON",
     "dynamicFilters": "الفلاتر الديناميكية",
     "failedToCancelRunningQuery": "فشل إلغاء الاستعلام الجاري",
@@ -28135,7 +28139,7 @@
     "teamChannelSilent": "قناة هذا الفريق فارغة عن قصد — لن يتم الإعلان عن الاستدعاءات في أي مكان.",
     "slackChannelTitle": "قناة Slack",
     "slackChannelSetWith": "عيّن قناة Slack باستخدام {command}",
-    "slackChannelLinkHint": "اكتبه في قناة Slack تلك. يلزم ربط حساب Slack الخاص بك: اكتب /o2 link في Slack.",
+    "slackChannelLinkHint": "اكتبه في قناة Slack تلك. يتطلب ذلك ربط حساب Slack الخاص بك: اكتب {command} link في Slack.",
     "slackChannelSendTest": "أرسل رسالة اختبار",
     "slackChannelClear": "امسح",
     "slackChannelBackup": "استخدم {webhook} كنسخة احتياطية فقط",
@@ -28710,7 +28714,7 @@
     "mineJoinTeam": "الانضمام إلى فريق",
     "mineTestTeam": "أرسل نداءً تجريبيًا إلى {team}",
     "mineCoverSaved": "تم حفظ التغطية",
-    "mineSlackLinkHow": "اكتب /o2 link في Slack",
+    "mineSlackLinkHow": "اكتب {command} link في Slack",
     "mineSlackSetUpHint": "يفتح الإعدادات › Slack",
     "myDeliveriesWhen": "الوقت",
     "phoneAddHint": "أضف رقمًا للرسائل النصية والمكالمات",
@@ -29281,7 +29285,7 @@
     "channelUnavailable": "{channel} — لا يوجد مزوّد يدعمها",
     "channelUnverified": "{channel} — مسجّل لكن لم يتحقق منه أحد",
     "channelAddPhone": "{reason}. أضف هاتفك في المناوبة الخاصة بي",
-    "channelLinkSlack": "{reason}. نفّذ /o2 link في Slack",
+    "channelLinkSlack": "{reason}. نفّذ {command} link في Slack",
     "loadUneven": "{name} تحمّل {factor}× المتوسط خلال الأيام الـ {days} الماضية",
     "loadUnevenLabel": "العبء غير متوازن:",
     "membersUnreachableMore": "{name} موجود في هذا الفريق، لكن لا يمكن أن يصل إليه أي نداء — {why}. هناك {count} عضو آخر في الحالة نفسها. | {name} موجود في هذا الفريق، لكن لا يمكن أن يصل إليه أي نداء — {why}. هناك {count} من الأعضاء الآخرين في الحالة نفسها.",
@@ -30891,6 +30895,13 @@
         "http": "HTTP",
         "httpDescription": "يستدعي Slack عنوان URL العام لديك. يتطلب نقرة تحقق واحدة في Slack.",
         "channelHistory": "السماح للبوت بقراءة الردود في سلاسل المحادثات التي بدأها",
+        "appName": "اسم التطبيق",
+        "appNameHelp": "الاسم الذي يراه الأشخاص في Slack. امنح كل خادم OpenObserve اسمًا خاصًا به، مثل OpenObserve Staging.",
+        "appNameTooLong": "يجب ألا يتجاوز اسم التطبيق {max} حرفًا",
+        "appNameMarkup": "يجب ألا يحتوي اسم التطبيق على < أو > أو &",
+        "command": "أمر الشرطة المائلة",
+        "commandInvalid": "ابدأ بـ / واستخدم {max} حرفًا كحد أقصى: أحرف صغيرة، وأرقام، و- و_",
+        "commandWarning": "يشغّل Slack أمر الشرطة المائلة لتطبيق واحد فقط في مساحة العمل. إذا كان تطبيق آخر في مساحة العمل هذه يستخدم {command} بالفعل، فسيتوقف {command} عن العمل لذلك التطبيق بعد تثبيت هذا التطبيق.",
         "tokenLabel": "رمز تحديث تكوين التطبيق (xoxe-…)",
         "tokenHelp": "في صفحة Your Apps في Slack، يعرض Your App Configuration Tokens › Generate Token رمز وصول ورمز تحديث: الصق رمز التحديث. يقوم OpenObserve بتدويره ويحتفظ بأحدث نسخة منه مشفّرة لتحديث التطبيق لاحقًا.",
         "generateToken": "إنشاء رمز",
@@ -31060,7 +31071,7 @@
         "settings": "الإعدادات",
         "install": "عند التثبيت",
         "destination": "من وجهة تنبيه",
-        "oncall": "من /o2 oncall هنا"
+        "oncall": "من {command} oncall هنا"
       },
       "channel": "القناة",
       "channelPlaceholder": "ابحث عن القنوات",
@@ -31074,7 +31085,7 @@
       "editDefault": "تعديل الافتراضي للقناة",
       "removeConfirm": "إزالة الافتراضي",
       "removeTitle": "إزالة الافتراضي للقناة #{channel}؟",
-      "removeMessage": "تنتقل الأسئلة في {name} بعد ذلك إلى المؤسسة الافتراضية لكل شخص (يمكنهم تغييرها عبر /o2 org).",
+      "removeMessage": "تنتقل الأسئلة في {name} بعد ذلك إلى المؤسسة الافتراضية لكل شخص (يمكنهم تغييرها عبر {command} org).",
       "instanceAdminOnly": "لمسؤول المثيل فقط",
       "ownOrgOnlyHint": "في مساحة عمل المثيل، تربط القنوات بمؤسستك الخاصة",
       "claimableHint": "القنوات غير المطالب بها والقنوات التي تملكها {org}",

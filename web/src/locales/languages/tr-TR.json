@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Henüz hiçbir kanalın varsayılan kuruluşu yok",
-      "description": "Varsayılanı olmayan bir kanaldaki sorular, her kişinin varsayılan kuruluşuna gider (/o2 org ile değiştirebilirler)."
+      "description": "Varsayılanı olmayan bir kanaldaki sorular, her kişinin varsayılan kuruluşuna gider ({command} org ile değiştirebilirler)."
     },
     "noSlackLinkedPeople": {
       "title": "Bu kuruluşta henüz kimse Slack'i bağlamadı"
@@ -9987,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "Tarayıcı dosya indirmeyi reddetti...",
     "chartDataDownloadedCsv": "Grafik verileri CSV dosyası olarak indirildi",
+    "tableDownloadPartial": "Sonucun yalnızca ilk {count} satırı alındı, bu nedenle dosya eksik.",
+    "tableDownloadServerPartial": "Sunucu kısmi veri döndürdü, bu nedenle dosya eksik olabilir.",
+    "tableDownloadWaitForLoad": "Panel hâlâ yükleniyor. Bittiğinde yeniden indirin.",
+    "preparingTableDownload": "İndirme için tüm satırlar alınıyor…",
     "chartDataDownloadedJson": "Grafik verileri JSON dosyası olarak indirildi",
     "dynamicFilters": "Dinamik filtreler",
     "failedToCancelRunningQuery": "Çalışan sorgu iptal edilemedi",
@@ -28135,7 +28139,7 @@
     "teamChannelSilent": "Bu ekibin kanalı bilerek boş bırakılmıştır — çağrılar hiçbir yerde duyurulmayacaktır.",
     "slackChannelTitle": "Slack kanalı",
     "slackChannelSetWith": "Bir Slack kanalını {command} ile ayarlayın",
-    "slackChannelLinkHint": "Bunu o Slack kanalında yazın. Slack hesabınızın bağlı olması gerekir: Slack'te /o2 link yazın.",
+    "slackChannelLinkHint": "Bunu o Slack kanalında yazın. Slack hesabınızın bağlı olması gerekir: Slack'te {command} link yazın.",
     "slackChannelSendTest": "Test mesajı gönder",
     "slackChannelClear": "Temizle",
     "slackChannelBackup": "{webhook} yalnızca yedek olarak kullanılsın",
@@ -28710,7 +28714,7 @@
     "mineJoinTeam": "Bir ekibe katıl",
     "mineTestTeam": "{team} ekibine test çağrısı gönder",
     "mineCoverSaved": "Vekalet kaydedildi",
-    "mineSlackLinkHow": "Slack'te /o2 link komutunu yazın",
+    "mineSlackLinkHow": "Slack'te {command} link komutunu yazın",
     "mineSlackSetUpHint": "Ayarlar › Slack bölümünü açar",
     "myDeliveriesWhen": "Ne zaman",
     "phoneAddHint": "SMS ve aramalar için bir numara ekleyin",
@@ -29281,7 +29285,7 @@
     "channelUnavailable": "{channel} — arkasında hiçbir sağlayıcı yok",
     "channelUnverified": "{channel} — kayıtlı, ama kimse doğrulamadı",
     "channelAddPhone": "{reason}. Telefonunuzu Nöbetim sayfasından ekleyin",
-    "channelLinkSlack": "{reason}. Slack'te /o2 link komutunu çalıştırın",
+    "channelLinkSlack": "{reason}. Slack'te {command} link komutunu çalıştırın",
     "loadUneven": "{name} son {days} gün içinde medyanın {factor} katı yük taşıdı",
     "loadUnevenLabel": "Yük dengesiz:",
     "membersUnreachableMore": "{name} bu ekipte, ancak ona hiçbir çağrı ulaşamıyor — {why}. {count} diğer üye de aynı durumda. | {name} bu ekipte, ancak ona hiçbir çağrı ulaşamıyor — {why}. {count} diğer üye de aynı durumda.",
@@ -30891,6 +30895,13 @@
         "http": "HTTP",
         "httpDescription": "Slack, genel URL'nizi çağırır. Slack'te bir kez Doğrula tıklaması gerekir",
         "channelHistory": "Botun başlattığı konulardaki yanıtları okumasına izin ver",
+        "appName": "Uygulama adı",
+        "appNameHelp": "Kişilerin Slack'te gördüğü ad. Her OpenObserve sunucusuna kendi adını verin, örneğin OpenObserve Staging.",
+        "appNameTooLong": "Uygulama adı en fazla {max} karakter olmalıdır",
+        "appNameMarkup": "Uygulama adı <, > veya & içermemelidir",
+        "command": "Eğik çizgi komutu",
+        "commandInvalid": "/ ile başlayın ve en fazla {max} karakter kullanın: küçük harfler, rakamlar, - ve _",
+        "commandWarning": "Slack bir çalışma alanında bir eğik çizgi komutunu yalnızca tek bir uygulama için çalıştırır. Bu çalışma alanındaki başka bir uygulama {command} komutunu zaten kullanıyorsa, siz bunu yükledikten sonra {command} o uygulama için çalışmayı durdurur.",
         "tokenLabel": "Uygulama yapılandırma yenileme token'ı (xoxe-…)",
         "tokenHelp": "Slack'in Your Apps sayfasında, Your App Configuration Tokens › Generate Token bir erişim token'ı ve bir yenileme token'ı gösterir: yenileme token'ını yapıştırın. OpenObserve bu token'ı döndürerek yeniler ve uygulamayı daha sonra güncellemek üzere en yenisini şifreli olarak saklar.",
         "generateToken": "Token oluştur",
@@ -31060,7 +31071,7 @@
         "settings": "Ayarlar",
         "install": "Kurulum sırasında",
         "destination": "Bir uyarı hedefinden",
-        "oncall": "Buradan /o2 oncall ile"
+        "oncall": "Buradan {command} oncall ile"
       },
       "channel": "Kanal",
       "channelPlaceholder": "Kanal ara",
@@ -31074,7 +31085,7 @@
       "editDefault": "Kanal varsayılanını düzenle",
       "removeConfirm": "Varsayılanı kaldır",
       "removeTitle": "#{channel} için varsayılan kaldırılsın mı?",
-      "removeMessage": "{name} kanalındaki sorular bu durumda her kişinin varsayılan kuruluşuna gider (bunu /o2 org ile değiştirebilirler).",
+      "removeMessage": "{name} kanalındaki sorular bu durumda her kişinin varsayılan kuruluşuna gider (bunu {command} org ile değiştirebilirler).",
       "instanceAdminOnly": "Yalnızca örnek yöneticisi",
       "ownOrgOnlyHint": "Bir örnek çalışma alanında kanalları kendi kuruluşunuza eşlersiniz",
       "claimableHint": "Sahiplenilmemiş kanallar ve {org} kuruluşunun sahip olduğu kanallar",

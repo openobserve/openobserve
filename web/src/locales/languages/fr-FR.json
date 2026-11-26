@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Aucun canal n'a encore d'organisation par défaut",
-      "description": "Les questions posées dans un canal sans organisation par défaut sont dirigées vers l'organisation par défaut de chaque personne (modifiable avec /o2 org)."
+      "description": "Les questions posées dans un canal sans organisation par défaut sont dirigées vers l'organisation par défaut de chaque personne (modifiable avec {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Personne dans cette organisation n'a encore lié Slack"
@@ -9987,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "Le navigateur a refusé le téléchargement du fichier...",
     "chartDataDownloadedCsv": "Données du graphique téléchargées en tant que fichier CSV",
+    "tableDownloadPartial": "Seules les {count} premières lignes du résultat ont été récupérées ; le fichier est donc partiel.",
+    "tableDownloadServerPartial": "Le serveur a renvoyé des données partielles ; le fichier peut donc être incomplet.",
+    "tableDownloadWaitForLoad": "Le panneau est encore en cours de chargement. Téléchargez à nouveau une fois terminé.",
+    "preparingTableDownload": "Récupération de toutes les lignes pour le téléchargement…",
     "chartDataDownloadedJson": "Données du graphique téléchargées en tant que fichier JSON",
     "dynamicFilters": "Filtres dynamiques",
     "failedToCancelRunningQuery": "Échec de l'annulation de la requête en cours d'exécution",
@@ -28135,7 +28139,7 @@
     "teamChannelSilent": "Le canal de cette équipe est délibérément vide — les notifications ne seront diffusées nulle part.",
     "slackChannelTitle": "Canal Slack",
     "slackChannelSetWith": "Définissez un canal Slack avec {command}",
-    "slackChannelLinkHint": "Saisissez-le dans ce canal Slack. Votre compte Slack doit être lié : saisissez /o2 link dans Slack.",
+    "slackChannelLinkHint": "Saisissez-le dans ce canal Slack. Votre compte Slack doit être lié : saisissez {command} link dans Slack.",
     "slackChannelSendTest": "Envoyer un message de test",
     "slackChannelClear": "Effacer",
     "slackChannelBackup": "Utiliser {webhook} uniquement comme solution de secours",
@@ -28710,7 +28714,7 @@
     "mineJoinTeam": "Rejoindre une équipe",
     "mineTestTeam": "Envoyer une notification de test à {team}",
     "mineCoverSaved": "Remplacement enregistré",
-    "mineSlackLinkHow": "Tapez /o2 link dans Slack",
+    "mineSlackLinkHow": "Tapez {command} link dans Slack",
     "mineSlackSetUpHint": "Ouvre Réglages › Slack",
     "myDeliveriesWhen": "Quand",
     "phoneAddHint": "Ajoutez un numéro pour les SMS et les appels",
@@ -29281,7 +29285,7 @@
     "channelUnavailable": "{channel} — aucun fournisseur associé",
     "channelUnverified": "{channel} — enregistré, mais personne ne l'a vérifié",
     "channelAddPhone": "{reason}. Ajoutez votre téléphone dans Mon astreinte",
-    "channelLinkSlack": "{reason}. Exécutez /o2 link dans Slack",
+    "channelLinkSlack": "{reason}. Exécutez {command} link dans Slack",
     "loadUneven": "{name} a géré {factor}× la charge médiane au cours des {days} derniers jours",
     "loadUnevenLabel": "La charge est inégale :",
     "membersUnreachableMore": "{name} est dans cette équipe, mais aucune notification ne peut lui parvenir — {why}. {count} autre membre est dans le même état. | {name} est dans cette équipe, mais aucune notification ne peut lui parvenir — {why}. {count} autres membres sont dans le même état.",
@@ -30891,6 +30895,13 @@
         "http": "HTTP",
         "httpDescription": "Slack appelle votre URL publique. Nécessite un clic sur Vérifier dans Slack",
         "channelHistory": "Autoriser le bot à lire les réponses dans les fils de discussion qu’il a lancés",
+        "appName": "Nom de l'application",
+        "appNameHelp": "Le nom que les utilisateurs voient dans Slack. Donnez à chaque serveur OpenObserve son propre nom, par exemple OpenObserve Staging.",
+        "appNameTooLong": "Le nom de l'application doit comporter au maximum {max} caractères",
+        "appNameMarkup": "Le nom de l'application ne doit pas contenir <, > ni &",
+        "command": "Commande slash",
+        "commandInvalid": "Commencez par / et utilisez au maximum {max} caractères : lettres minuscules, chiffres, - et _",
+        "commandWarning": "Slack n'exécute une commande slash que pour une seule application par espace de travail. Si une autre application de cet espace de travail utilise déjà {command}, {command} cessera de fonctionner pour cette application après l'installation de celle-ci.",
         "tokenLabel": "Jeton d’actualisation de configuration de l’application (xoxe-…)",
         "tokenHelp": "Sur la page Vos applications de Slack, Jetons de configuration de votre application › Générer un jeton affiche un jeton d’accès et un jeton d’actualisation : collez le jeton d’actualisation. OpenObserve le renouvelle et conserve le plus récent chiffré pour mettre à jour l’application ultérieurement.",
         "generateToken": "Générer un jeton",
@@ -31060,7 +31071,7 @@
         "settings": "Réglages",
         "install": "À l'installation",
         "destination": "Depuis une destination d'alerte",
-        "oncall": "Depuis /o2 oncall ici"
+        "oncall": "Depuis {command} oncall ici"
       },
       "channel": "Canal",
       "channelPlaceholder": "Rechercher des canaux",
@@ -31074,7 +31085,7 @@
       "editDefault": "Modifier le canal par défaut",
       "removeConfirm": "Supprimer le canal par défaut",
       "removeTitle": "Supprimer la valeur par défaut pour #{channel} ?",
-      "removeMessage": "Les questions dans {name} vont alors vers l'organisation par défaut de chaque personne (elle peut la modifier avec /o2 org).",
+      "removeMessage": "Les questions dans {name} vont alors vers l'organisation par défaut de chaque personne (elle peut la modifier avec {command} org).",
       "instanceAdminOnly": "Administrateur d'instance uniquement",
       "ownOrgOnlyHint": "Sur un espace de travail d'instance, vous associez les canaux à votre propre organisation",
       "claimableHint": "Canaux non revendiqués et canaux détenus par {org}",

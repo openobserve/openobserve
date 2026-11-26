@@ -36,6 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             shown.messageName
           }}</span>
         </template>
+        <template v-for="(value, slot) in shown.messageValues" :key="slot" #[slot]>{{
+          value
+        }}</template>
       </i18n-t>
       <div v-else class="para">{{ shown.message }}</div>
       <div v-if="shown.warningMessage && shown.warningMessage.length > 0" class="mt-4 text-left">
@@ -74,6 +77,8 @@ export default defineComponent({
     // Takes precedence over `message`; the key must contain a {name} placeholder.
     messageKeypath: { type: String as PropType<I18nKey> },
     messageName: { type: String },
+    // Plain-text values for the keypath's other placeholders, such as {command}.
+    messageValues: { type: Object as PropType<Record<string, I18nText>> },
     warningMessage: { type: String as unknown as PropType<I18nText> },
     modelValue: { type: Boolean, default: false },
     // No `default: ""` — an empty-string default would need a cast to I18nText,
@@ -99,6 +104,7 @@ export default defineComponent({
       message: props.message,
       messageKeypath: props.messageKeypath,
       messageName: props.messageName,
+      messageValues: props.messageValues,
       warningMessage: props.warningMessage,
       okLabel: props.okLabel,
       okColor: props.okColor,

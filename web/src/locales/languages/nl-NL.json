@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Nog geen enkel kanaal heeft een standaardorganisatie",
-      "description": "Vragen in een kanaal zonder standaard gaan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met /o2 org)."
+      "description": "Vragen in een kanaal zonder standaard gaan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nog niemand in deze organisatie heeft Slack gekoppeld"
@@ -9987,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "Browser weigerde het downloaden van het bestand...",
     "chartDataDownloadedCsv": "Grafiekgegevens gedownload als CSV-bestand",
+    "tableDownloadPartial": "Alleen de eerste {count} rijen van het resultaat zijn opgehaald, dus het bestand is onvolledig.",
+    "tableDownloadServerPartial": "De server gaf gedeeltelijke gegevens terug, dus het bestand kan onvolledig zijn.",
+    "tableDownloadWaitForLoad": "Het paneel wordt nog geladen. Download opnieuw zodra het klaar is.",
+    "preparingTableDownload": "Alle rijen ophalen voor de download…",
     "chartDataDownloadedJson": "Grafiekgegevens gedownload als JSON-bestand",
     "dynamicFilters": "Dynamische filters",
     "failedToCancelRunningQuery": "Kan de lopende query niet annuleren",
@@ -28135,7 +28139,7 @@
     "teamChannelSilent": "Het kanaal van dit team is expres leeg — oproepen worden nergens aangekondigd.",
     "slackChannelTitle": "Slack-kanaal",
     "slackChannelSetWith": "Stel een Slack-kanaal in met {command}",
-    "slackChannelLinkHint": "Typ het in dat Slack-kanaal. Je Slack-account moet gekoppeld zijn: typ /o2 link in Slack.",
+    "slackChannelLinkHint": "Typ het in dat Slack-kanaal. Je Slack-account moet gekoppeld zijn: typ {command} link in Slack.",
     "slackChannelSendTest": "Testbericht verzenden",
     "slackChannelClear": "Wissen",
     "slackChannelBackup": "Gebruik {webhook} alleen als back-up",
@@ -28710,7 +28714,7 @@
     "mineJoinTeam": "Lid worden van een team",
     "mineTestTeam": "Stuur een testoproep naar {team}",
     "mineCoverSaved": "Vervanging opgeslagen",
-    "mineSlackLinkHow": "Typ /o2 link in Slack",
+    "mineSlackLinkHow": "Typ {command} link in Slack",
     "mineSlackSetUpHint": "Opent Instellingen › Slack",
     "myDeliveriesWhen": "Wanneer",
     "phoneAddHint": "Voeg een nummer toe voor sms'jes en gesprekken",
@@ -29281,7 +29285,7 @@
     "channelUnavailable": "{channel} — er is geen provider aan gekoppeld",
     "channelUnverified": "{channel} — opgeslagen, maar niemand heeft het geverifieerd",
     "channelAddPhone": "{reason}. Voeg je telefoonnummer toe bij Mijn piket",
-    "channelLinkSlack": "{reason}. Voer /o2 link uit in Slack",
+    "channelLinkSlack": "{reason}. Voer {command} link uit in Slack",
     "loadUneven": "{name} ontving {factor}× het mediane aantal meldingen in de afgelopen {days} dagen",
     "loadUnevenLabel": "De werklast is onevenwichtig:",
     "membersUnreachableMore": "{name} zit in dit team, maar geen melding kan hen bereiken — {why}. {count} ander lid verkeert in dezelfde situatie. | {name} zit in dit team, maar geen melding kan hen bereiken — {why}. {count} andere leden verkeren in dezelfde situatie.",
@@ -30891,6 +30895,13 @@
         "http": "HTTP",
         "httpDescription": "Slack roept je openbare URL aan. Vereist één klik op Verifiëren in Slack",
         "channelHistory": "Laat de bot reacties lezen in threads die hij is gestart",
+        "appName": "App-naam",
+        "appNameHelp": "De naam die mensen in Slack zien. Geef elke OpenObserve-server een eigen naam, zoals OpenObserve Staging.",
+        "appNameTooLong": "De app-naam mag maximaal {max} tekens bevatten",
+        "appNameMarkup": "De app-naam mag geen <, > of & bevatten",
+        "command": "Slash-opdracht",
+        "commandInvalid": "Begin met / en gebruik maximaal {max} tekens: kleine letters, cijfers, - en _",
+        "commandWarning": "Slack voert een slash-opdracht uit voor slechts één app in een werkruimte. Als een andere app in deze werkruimte {command} al gebruikt, werkt {command} niet meer voor die app nadat je deze hebt geïnstalleerd.",
         "tokenLabel": "Refresh token voor appconfiguratie (xoxe-…)",
         "tokenHelp": "Op de pagina 'Your Apps' van Slack, onder 'Your App Configuration Tokens' › 'Generate Token', zie je een access token en een refresh token: plak het refresh token. OpenObserve roteert het en bewaart het nieuwste versleuteld om de app later bij te werken.",
         "generateToken": "Een token genereren",
@@ -31060,7 +31071,7 @@
         "settings": "Instellingen",
         "install": "Bij installatie",
         "destination": "Vanuit een alarmbestemming",
-        "oncall": "Vanuit /o2 oncall hier"
+        "oncall": "Vanuit {command} oncall hier"
       },
       "channel": "Kanaal",
       "channelPlaceholder": "Kanalen zoeken",
@@ -31074,7 +31085,7 @@
       "editDefault": "Standaardkanaal bewerken",
       "removeConfirm": "Standaard verwijderen",
       "removeTitle": "De standaard voor #{channel} verwijderen?",
-      "removeMessage": "Vragen in {name} gaan dan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met /o2 org).",
+      "removeMessage": "Vragen in {name} gaan dan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met {command} org).",
       "instanceAdminOnly": "Alleen voor instantiebeheerders",
       "ownOrgOnlyHint": "Op een instantiewerkruimte koppel je kanalen aan je eigen organisatie",
       "claimableHint": "Niet-geclaimde kanalen en kanalen die {org} bezit",
