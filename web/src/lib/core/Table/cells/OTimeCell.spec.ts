@@ -54,7 +54,7 @@ describe("OTimeCell", () => {
 
   it("speaks the active UI language", () => {
     i18n.global.locale = "de";
-    expect(relative(24 * MIN)).toBe("vor 24 m");
+    expect(relative(24 * MIN)).toBe("vor 24 Minuten");
   });
 
   it("absolute mode shows the full datetime and no tooltip", () => {

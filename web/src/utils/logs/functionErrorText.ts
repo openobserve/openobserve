@@ -13,21 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-const asText = (value: unknown): string => {
-  if (typeof value === "string") return value;
-  if (value && typeof value === "object" && "message" in value) return String(value.message);
-  return String(value);
-};
-
 /** Query-function messages as plain text: the server's list, or its JSON text, reads one message per line. */
 export const functionErrorText = (value: unknown): string => {
-  if (Array.isArray(value)) return value.map(asText).join("\n");
-  if (typeof value !== "string") return value ? asText(value) : "";
-  if (!/^\s*[[{"]/.test(value)) return value;
+  if (Array.isArray(value)) return value.map(String).join("\n");
+  if (typeof value !== "string") return "";
+  if (!/^\s*[["]/.test(value)) return value;
   try {
     const parsed: unknown = JSON.parse(value);
-    if (Array.isArray(parsed)) return parsed.map(asText).join("\n");
-    if (typeof parsed === "string" || (parsed && typeof parsed === "object")) return asText(parsed);
+    if (Array.isArray(parsed)) return parsed.map(String).join("\n");
+    if (typeof parsed === "string") return parsed;
   } catch {
     // Not JSON after all: a message that merely starts with a bracket or a quote.
   }

@@ -701,7 +701,9 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   }
 
   function applyValues() {
+    const seq = commitSeq;
     if (multiValue.value && draft.value?.values.length) commitDraft();
+    if (commitSeq !== seq) options.enterCommit?.();
   }
 
   /** Applies what a half-built chip already holds, so leaving the bar never drops a filter unseen. */

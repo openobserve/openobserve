@@ -1079,9 +1079,7 @@
     "username": "Username",
     "password": "Password",
     "shortUrl": {
-      "redirecting": "Redirecting...",
-      "invalid": "This link is invalid or has expired",
-      "failed": "Could not open this link"
+      "redirecting": "Redirecting..."
     },
     "copied": "Copied",
     "couldntCopy": "Couldn't copy",
@@ -1651,7 +1649,7 @@
     "enableSqlModeOrSelectSingleStream": "Please enable SQL mode to use timechart",
     "drillDown": "Drill down",
     "drillDownUnavailableInSqlMode": "Drill down is not available in SQL mode",
-    "drillDownSqlModeDescription": "Drill down compares dimension values across the events of a search. Switch to the query builder to use it.",
+    "drillDownSqlModeDescription": "Drill down compares dimension values across the events of your search. Turn off SQL mode to use it; the SQL query is cleared.",
     "drillDownTurnOffSqlMode": "Turn off SQL mode",
     "drillDownRunTitle": "Run a query to start Drill down",
     "drillDownRunDescription": "Drill down compares dimension values across the events of your search. Run a query to load them.",
@@ -25122,6 +25120,8 @@
       "endpointUrlCopied": "Endpoint URL copied"
     },
     "views": {
+      "shortUrlInvalid": "This link is invalid or has expired",
+      "shortUrlFailed": "Could not open this link",
       "youAreNotAuthorizedToManage": "You are not authorized to manage the license.",
       "copiedToClipboard": "Copied to clipboard",
       "errorWhilePullingDestinations": "Error while pulling destinations.",

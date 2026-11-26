@@ -78,8 +78,8 @@ async function type(text: string) {
   await flushPromises();
 }
 
-async function press(key: string) {
-  input()!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+async function press(key: string, init: KeyboardEventInit = {}) {
+  input()!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, ...init }));
   await flushPromises();
   await nextTick();
 }
@@ -249,6 +249,24 @@ describe("QueryFilterBar", () => {
     await type("level=warn");
     await press("Enter");
     expect(order).toEqual(["update", "enter-commit"]);
+  });
+
+  it("tells the host when Ctrl+Enter applies ticked values from an any-of list", async () => {
+    const onEnterCommit = vi.fn();
+    mountBar({ onEnterCommit });
+    await openBar();
+    await type("level");
+    await press("Enter");
+    await type("any");
+    await press("Enter");
+    await vi.waitFor(() => expect(rowKeys()).toContain("warn"));
+    await press("Enter");
+    await press("ArrowDown");
+    await press("ArrowDown");
+    await press("Enter");
+    expect(onEnterCommit).not.toHaveBeenCalled();
+    await press("Enter", { ctrlKey: true });
+    expect(onEnterCommit).toHaveBeenCalledTimes(1);
   });
 
   it("does not report a click on a row as an Enter commit", async () => {

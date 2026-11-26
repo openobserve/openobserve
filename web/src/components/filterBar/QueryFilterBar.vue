@@ -478,7 +478,11 @@ const draftOperator = computed(() => {
                   ref="draftRef"
                   :field="raw(newDraft.field)"
                   :operator="draftOperator"
-                  :value="newDraft.values.length ? raw(newDraft.values.join(', ')) : undefined"
+                  :value="
+                    newDraft.values.length
+                      ? raw(newDraft.values.map((v) => v || t('filterBar.emptyValue')).join(', '))
+                      : undefined
+                  "
                   :active-part="step"
                   :editable="false"
                   :data-test="`${dataTest}-draft`"
@@ -535,7 +539,11 @@ const draftOperator = computed(() => {
             ref="draftRef"
             :field="raw(newDraft.field)"
             :operator="draftOperator"
-            :value="newDraft.values.length ? raw(newDraft.values.join(', ')) : undefined"
+            :value="
+              newDraft.values.length
+                ? raw(newDraft.values.map((v) => v || t('filterBar.emptyValue')).join(', '))
+                : undefined
+            "
             :active-part="step"
             :editable="false"
             :data-test="`${dataTest}-draft`"

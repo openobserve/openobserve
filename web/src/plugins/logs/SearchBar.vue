@@ -4566,8 +4566,11 @@ export default defineComponent({
           })
           .catch((err) => {
             dismiss();
+            const detail = err?.response?.data?.message;
             toast({
-              message: t("search.errorUpdatingSavedView"),
+              message: detail
+                ? t("search.errorUpdatingSavedViewDetail", { detail })
+                : t("search.errorUpdatingSavedView"),
               variant: "error",
             });
             console.log("Error while updating saved view", err);

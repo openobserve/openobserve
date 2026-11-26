@@ -77,8 +77,10 @@ const sliceNames = async (
     { value: [] },
     false,
   );
-  return result.options.series[0].data.map((d: any) => d.name);
+  return result.options.series[0].data;
 };
+const namesOf = async (...args: Parameters<typeof sliceNames>) =>
+  (await sliceNames(...args)).map((d: any) => d.name);
 
 const bucketRows = [
   { x_axis_1: "2026-11-18T10:51:30", y_axis_1: 4 },
@@ -88,17 +90,17 @@ const bucketRows = [
 describe("pie and donut time-bucket slice names", () => {
   for (const type of ["pie", "donut"] as const) {
     it(`${type}: shows the user's timezone, not raw UTC`, async () => {
-      const names = await sliceNames(type, timeX, bucketRows, "Asia/Kolkata");
+      const names = await namesOf(type, timeX, bucketRows, "Asia/Kolkata");
       expect(names).toEqual(["2026-11-18 16:21:30", "2026-11-18 16:22:00"]);
     });
 
     it(`${type}: keeps UTC times as they are when the timezone is UTC`, async () => {
-      const names = await sliceNames(type, timeX, bucketRows, "UTC");
+      const names = await namesOf(type, timeX, bucketRows, "UTC");
       expect(names).toEqual(["2026-11-18 10:51:30", "2026-11-18 10:52:00"]);
     });
 
     it(`${type}: converts a custom query's ISO bucket column too`, async () => {
-      const names = await sliceNames(
+      const names = await namesOf(
         type,
         { ...timeX, functionName: undefined },
         bucketRows,
@@ -108,8 +110,16 @@ describe("pie and donut time-bucket slice names", () => {
       expect(names).toEqual(["2026-11-18 16:21:30", "2026-11-18 16:22:00"]);
     });
 
+    it(`${type}: keeps the raw bucket value on each slice so a drilldown still matches its row`, async () => {
+      const slices = await sliceNames(type, timeX, bucketRows, "Asia/Kolkata");
+      expect(slices.map((d: any) => d.rawName)).toEqual([
+        "2026-11-18T10:51:30",
+        "2026-11-18T10:52:00",
+      ]);
+    });
+
     it(`${type}: leaves category names alone`, async () => {
-      const names = await sliceNames(
+      const names = await namesOf(
         type,
         categoryX,
         [

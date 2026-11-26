@@ -333,6 +333,8 @@ describe("formatEventCount", () => {
     expect(formatEventCount(2_003)).toBe("2,003");
     expect(formatEventCount(999)).toBe("999");
     expect(formatEventCount(0)).toBe("0");
+    // A fractional measure keeps its decimals untouched rather than getting commas inside them.
+    expect(formatEventCount(1234.5678)).toBe("1234.5678");
   });
 
   it("formats larger counts with one decimal and drops a trailing .0", () => {

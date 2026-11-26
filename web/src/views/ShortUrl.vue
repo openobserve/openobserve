@@ -59,15 +59,15 @@ export default defineComponent({
         if (typeof response.data === "string") {
           handleOriginalUrl(response.data);
         } else {
-          routeToHomeWithError(t("common.shortUrl.invalid"));
+          routeToHomeWithError(t("toastMessages.views.shortUrlInvalid"));
         }
       } catch (error) {
         console.error("Error fetching short URL:", error);
         const status = (error as { response?: { status?: number } })?.response?.status;
         routeToHomeWithError(
           status === 404 || status === 400
-            ? t("common.shortUrl.invalid")
-            : t("common.shortUrl.failed"),
+            ? t("toastMessages.views.shortUrlInvalid")
+            : t("toastMessages.views.shortUrlFailed"),
         );
       }
     };

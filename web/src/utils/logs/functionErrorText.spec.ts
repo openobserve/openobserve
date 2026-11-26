@@ -25,9 +25,8 @@ describe("functionErrorText", () => {
     expect(functionErrorText(encoded)).toBe('error[E203]: syntax error\n  "x" is not valid');
   });
 
-  it("unwraps a JSON string literal and an error object", () => {
+  it("unwraps a JSON string literal", () => {
     expect(functionErrorText(JSON.stringify("a\nb"))).toBe("a\nb");
-    expect(functionErrorText(JSON.stringify({ message: "bad\nfn" }))).toBe("bad\nfn");
   });
 
   it("keeps plain text, and text that only starts like JSON", () => {

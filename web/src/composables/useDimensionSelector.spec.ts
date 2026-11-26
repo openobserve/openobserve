@@ -96,6 +96,14 @@ describe("useDimensionSelector", () => {
       expect(selectDimensionsFromData(samples, [], 8)).not.toContain("score");
     });
 
+    it("still picks a numeric code field with many values, such as status_code", () => {
+      const samples = Array.from({ length: 40 }, (_, i) => ({
+        status_code: 100 + i,
+        level: i % 2 ? "info" : "warn",
+      }));
+      expect(selectDimensionsFromData(samples, [], 8)).toContain("status_code");
+    });
+
     it("still picks a low-cardinality numeric field such as status_code", () => {
       const samples = Array.from({ length: 20 }, (_, i) => ({ status_code: i % 2 ? 200 : 500 }));
       expect(selectDimensionsFromData(samples, [], 8)).toContain("status_code");

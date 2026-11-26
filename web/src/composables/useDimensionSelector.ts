@@ -265,7 +265,10 @@ function scoreField(
   const isNumeric =
     isNumericType(fieldMeta?.type) ||
     (stats.occurrences > 0 && stats.numericCount === stats.occurrences);
-  if (isNumeric && (isMeasurePattern(fieldName) || cardinality > 10)) {
+  if (
+    isNumeric &&
+    (isMeasurePattern(fieldName) || (cardinality > 10 && !matchesGoodPattern(fieldName)))
+  ) {
     return {
       fieldName,
       score: -1000,

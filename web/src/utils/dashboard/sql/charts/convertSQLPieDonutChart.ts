@@ -29,10 +29,7 @@ import { escapeHtml } from "@/utils/html";
 import { toZonedTime } from "date-fns-tz";
 import { formatDate, isTimeSeries, isTimeStamp } from "../../dateTimeUtils";
 
-/**
- * Time-bucket slice names in the user's timezone, matching the time axis on other charts.
- * Returns the names unchanged when the x field is not a time bucket.
- */
+// Time-bucket slice names in the user's timezone, as the time axis on other charts shows them.
 function localizeTimeBucketNames(ctx: SQLContext, names: any[]): any[] {
   const { panelSchema, store, metadata } = ctx;
   const timestampColumn = store.state?.zoConfig?.timestamp_column;
@@ -78,9 +75,16 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     getAxisDataFromKey,
     getPieChartRadius,
   } = ctx;
+  // A slice keeps its source value as rawName, so a drilldown still matches the row it came from.
+  const rawNames: any[] = [...(options?.xAxis?.[0]?.data ?? [])];
   if (Array.isArray(options?.xAxis) && options.xAxis[0]?.data?.length) {
     options.xAxis[0].data = localizeTimeBucketNames(ctx, options.xAxis[0].data);
   }
+  const sliceOf = (value: any, i: number) => ({
+    value,
+    name: options?.xAxis[0]?.data[i],
+    ...(rawNames[i] !== options?.xAxis[0]?.data[i] ? { rawName: rawNames[i] } : {}),
+  });
   const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
   const percentDecimals = piePercentPrecision(panelSchema?.config);
   const slicePercent = createPieSlicePercent(panelSchema?.config);
@@ -127,9 +131,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     options.series = yAxisKeys?.map((key: any) => {
       const seriesObj: any = {
         ...defaultSeriesProps,
-        data: getAxisDataFromKey(key).map((it: any, i: number) => {
-          return { value: it, name: options?.xAxis[0]?.data[i] };
-        }),
+        data: getAxisDataFromKey(key).map((it: any, i: number) => sliceOf(it, i)),
         itemStyle: {
           color: ["palette-classic"].includes(panelSchema.config?.color?.mode)
             ? null
@@ -273,9 +275,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     options.series = yAxisKeys?.map((key: any) => {
       const seriesObj: any = {
         ...defaultSeriesProps,
-        data: getAxisDataFromKey(key).map((it: any, i: number) => {
-          return { value: it, name: options?.xAxis[0]?.data[i] };
-        }),
+        data: getAxisDataFromKey(key).map((it: any, i: number) => sliceOf(it, i)),
         itemStyle: {
           color: ["palette-classic"].includes(panelSchema.config?.color?.mode)
             ? null

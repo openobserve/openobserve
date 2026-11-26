@@ -29,7 +29,10 @@ const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
 export const relativeTimeText = (epochMs: number, now: number): string => {
   const ageMs = Math.abs(now - epochMs);
   const [unit, size] = RELATIVE_UNITS.find(([, ms]) => ageMs >= ms) ?? RELATIVE_UNITS[5];
-  return new Intl.RelativeTimeFormat(getIntlLocale(), { style: "narrow" }).format(
+  const locale = getIntlLocale();
+  // Other languages' narrow forms drop the direction ("-24 min"), so only English takes the short form.
+  const style = /^en\b/i.test(locale) ? "narrow" : "long";
+  return new Intl.RelativeTimeFormat(locale, { style }).format(
     Math.round((epochMs - now) / size),
     unit,
   );
