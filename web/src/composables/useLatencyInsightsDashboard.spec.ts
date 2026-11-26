@@ -57,6 +57,7 @@ describe("useLatencyInsightsDashboard — logs Drill down", () => {
     expect(panel.config.show_legends).toBe(false);
     expect(panel.queries[0].fields.breakdown).toEqual([]);
     expect(panel.config.unit).toBe("numbers");
+    expect(panel.config.axis_label_show_all).toBe(true);
     expect(panel.queries[0].fields.y[0].alias).toBe("trace_count");
   });
 

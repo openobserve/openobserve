@@ -696,7 +696,9 @@ export function buildSQLContext(
             panelSchema.type == "h-stacked"
               ? "auto"
               : index == xAxisKeys.length + breakDownKeys.length - 1
-                ? "auto"
+                ? panelSchema.config?.axis_label_show_all
+                  ? 0
+                  : "auto"
                 : function (i: any) {
                     return shownLabelIndexes.has(i);
                   },
