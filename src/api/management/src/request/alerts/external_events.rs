@@ -217,6 +217,7 @@ async fn handle_events(
                         &org_id,
                         &record,
                         base_destinations.clone(),
+                        integration.oncall_team.as_deref(),
                     )
                     .await
                 {

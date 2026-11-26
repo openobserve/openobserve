@@ -141,6 +141,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ row.destinations.join(", ") }}
             </span>
             <OTag
+              v-else-if="row.integration && oncallEnabled"
+              variant="default-soft"
+              data-test="alert-sources-oncall-only-tag"
+            >
+              {{ t("alert_sources.oncallOnly") }}
+            </OTag>
+            <OTag
               v-else-if="row.integration"
               variant="error-soft"
               dot
@@ -512,6 +519,10 @@ export default defineComponent({
     orgIdentifier(): string {
       return this.store.state.selectedOrganization.identifier;
     },
+    // An integration with no destination still pages On-Call, so it is not misconfigured then.
+    oncallEnabled(): boolean {
+      return this.store.state.zoConfig?.oncall_enabled === true;
+    },
     defaultSource(): AlertSourceIntegration | undefined {
       return this.integrations.find((i) => i.name === "default");
     },
@@ -769,9 +780,10 @@ export default defineComponent({
       this.editTargetIntegration = integration;
       this.showAddDrawer = true;
     },
-    // Tints rows that have no incident destination configured.
+    // Tints rows that have no incident destination configured; with On-Call on, they still page.
     noDestinationRowClass(row: SourceTableRow): string {
-      return row.integration && row.destinations.length === 0 ? "bg-banner-error-soft-bg" : "";
+      const unrouted = row.integration && row.destinations.length === 0 && !this.oncallEnabled;
+      return unrouted ? "bg-banner-error-soft-bg" : "";
     },
     // `id` is optional: OEmptyState's simple-button mode emits no id.
     onEmptyAction(id?: string) {
