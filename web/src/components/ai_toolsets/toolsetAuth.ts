@@ -27,7 +27,7 @@ export interface ToolsetAuth {
 
 interface HeaderRow {
   key?: string;
-  value?: string;
+  value?: string | null;
 }
 
 export const emptyAuth = () => ({

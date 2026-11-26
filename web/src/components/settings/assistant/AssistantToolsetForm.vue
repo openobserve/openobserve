@@ -311,13 +311,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
     </OForm>
+    <EditorDraftDialogs :draft="toolsetDraft" />
   </section>
 </template>
 
 <script setup lang="ts">
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
-import { onBeforeRouteUpdate, useRouter } from "vue-router";
+import { useRouter, type LocationQuery } from "vue-router";
 import { useStore } from "vuex";
 
 import AiToolsetToolPicker from "@/components/ai_toolsets/AiToolsetToolPicker.vue";
@@ -335,7 +336,9 @@ import {
 import { CLIENT_CREDENTIALS, sameUrl } from "@/components/ai_toolsets/toolsetAuth";
 import type { ToolLists } from "@/components/ai_toolsets/toolPicker";
 
-import { askLeaveGuard, useAssistantLeaveGuard, type LeaveGuard } from "@/composables/assistant";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useAssistantLeaveGuard, type LeaveGuard } from "@/composables/assistant";
+import { useEditorDraft } from "@/composables/useEditorDraft";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -369,6 +372,14 @@ import {
   type ToolsetFormValues,
 } from "./AssistantToolsetForm.schema";
 import AssistantToolsetSecretRows from "./AssistantToolsetSecretRows.vue";
+import {
+  draftFieldName,
+  draftRedactedLabels,
+  redactToolsetDraft,
+  toolsetDraftOf,
+  toolsetFormOfDraft,
+  type ToolsetDraft,
+} from "./assistantToolsetDraft";
 import { agentNameOf, type ToolsetRow } from "./assistantToolsets";
 import { useAssistantSettingsPage } from "./useAssistantSettingsPage";
 import { readyToDiscover, useToolsetTools } from "./useToolsetTools";
@@ -384,6 +395,11 @@ const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEdi
 const SKILL_LONG_CHARS = 40_000;
 const CUSTOM_MCP = "custom-mcp";
 const SKILL = "skill";
+const DRAFT_FIELD_LABELS = {
+  url: "aiToolset.mcpUrl",
+  token_url: "aiToolset.tokenUrl",
+  client_secret: "aiToolset.clientSecret",
+} as const satisfies Record<string, I18nKey>;
 // The server's preset has no logo field, so known ones are mapped by id.
 const PRESET_LOGOS: Record<string, string> = {
   datadog: "datadog",
@@ -429,6 +445,11 @@ const taken = computed(
     new Set(props.existing.filter((row) => row.id !== props.editId).map((row) => row.agentName)),
 );
 const loaded = ref<ToolsetFormValues | null>(null);
+// The edited toolset as loaded, so a draft left over an older copy is flagged as changed on the server.
+let serverDraft: ToolsetDraft | null = null;
+// Set while the leave dialog's Save runs, so a successful save does not close the form itself.
+let leaveSave: { saved: boolean } | null = null;
+let draftStarted = false;
 // A row replicated without this region's secrets; it saves without them while its URLs stay.
 const needsCredentials = ref(false);
 const formError = ref<I18nText | string>("");
@@ -441,9 +462,9 @@ const form = useOForm<ToolsetFormValues>({
     isTaken: (agent) => taken.value.has(agent),
     editing: isEdit,
     mergeSecrets: props.mergeSecrets,
-    missingSecretOk: () => {
+    missingSecretOk: (): boolean => {
       const stored = loaded.value?.mcp;
-      const mcp = values.value.mcp;
+      const mcp = (form.state.values as ToolsetFormValues).mcp;
       return (
         needsCredentials.value &&
         !!stored &&
@@ -461,7 +482,6 @@ const values = form.useStore((s) => s.values);
 const skillContent = form.useStore((s) => s.values.skill.content ?? "");
 const typedName = form.useStore((s) => s.values.name);
 const submitted = form.useStore((s) => s.submissionAttempts > 0);
-const dirty = form.useStore((s) => s.isDirty);
 
 const agentName = computed(() => (typedName.value ? agentNameOf(typedName.value) : ""));
 const skillError = computed(
@@ -512,16 +532,28 @@ const typeTiles = computed<ToolsetTypeTile[]>(() => [
   },
 ]);
 
-// `?preset=` or `?kind=` opens the form on that type, so a link skips the type step.
-const routeTile = (() => {
-  const query = router.currentRoute.value.query;
+// `?preset=` or `?kind=` names the type, so a link skips the type step and Back returns to it.
+function tileFromQuery(query: LocationQuery): string | null {
   if (query.preset) return String(query.preset);
   if (query.kind === "skill") return SKILL;
   return query.kind === "mcp" ? CUSTOM_MCP : null;
-})();
-const step = ref(isEdit || routeTile ? 2 : 1);
-const pickedTile = ref<string | null>(routeTile ?? null);
+}
+function queryWithTile(tile: string | null): LocationQuery {
+  const { preset: _preset, kind: _kind, ...rest } = router.currentRoute.value.query;
+  if (!tile) return rest;
+  if (tile === SKILL || tile === CUSTOM_MCP)
+    return { ...rest, kind: tile === SKILL ? "skill" : "mcp" };
+  return { ...rest, preset: tile };
+}
+// The tile the URL names, so the first render already opens the right step.
+const appliedTile = ref<string | null>(
+  isEdit ? null : tileFromQuery(router.currentRoute.value.query),
+);
+const step = computed(() => (isEdit || appliedTile.value ? 2 : 1));
+const pickedTile = ref<string | null>(appliedTile.value);
 const filledTile = ref<string | null>(null);
+const knownTile = (tile: string | null) =>
+  tile === SKILL || tile === CUSTOM_MCP || !!presetById(tile);
 
 const tools = useToolsetTools({
   org,
@@ -544,6 +576,10 @@ watch(
     loaded.value = structuredClone(next);
     form.reset(next);
     syncPresetParams();
+    serverDraft = toolsetDraftOf(values.value);
+    // After setup, which declares the draft below; the restore offer waits for no one.
+    if (!draftStarted) void nextTick().then(() => toolsetDraft.start());
+    draftStarted = true;
     // A saved toolset already has its credentials, so its tools load on open.
     if (next.kind === "mcp" && next.mcp.url) {
       await nextTick();
@@ -561,18 +597,77 @@ watch(
 watch(
   mcpPresets,
   () => {
-    if (!isEdit && step.value === 2 && routeTile && filledTile.value !== routeTile)
-      applyTile(routeTile);
+    const tile = appliedTile.value;
+    if (!isEdit && tile && knownTile(tile) && filledTile.value !== tile) applyTile(tile);
     if (isEdit && !preset.value)
       preset.value = presetById((values.value.mcp.extra.preset as { id?: unknown })?.id);
   },
   { immediate: true },
 );
 watch(() => values.value.mcp.url, syncPresetParams);
+// Back and Forward between the type step and a type's form fill the form for the type the URL names.
+watch(
+  () => router.currentRoute.value.query,
+  (query) => {
+    if (isEdit || query.action !== "add") return;
+    const tile = tileFromQuery(query);
+    if (tile === appliedTile.value) return;
+    appliedTile.value = tile;
+    if (!tile) pickedTile.value = filledTile.value;
+    else if (knownTile(tile)) applyTile(tile);
+  },
+);
+
+const toolsetDraft = useEditorDraft<ToolsetDraft>({
+  kind: "ai_toolset",
+  entityLabel: () => t("common.editorDraft.entities.ai_toolset"),
+  entityId: () => props.editId ?? null,
+  snapshot: () => toolsetDraftOf(values.value),
+  apply: applyDraft,
+  base: () => (props.editId ? serverDraft : undefined),
+  redactBase: (base) => redactToolsetDraft(base as ToolsetDraft).data,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  redact: redactToolsetDraft,
+  describeRedacted: (paths, data) =>
+    draftRedactedLabels(paths, data).map((label) =>
+      label.kind === "header"
+        ? label.name
+          ? t("common.editorDraft.headerField", { name: label.name })
+          : t("common.editorDraft.headersField")
+        : t(DRAFT_FIELD_LABELS[label.kind]),
+    ),
+  // The form lives on the settings route, so Back, Cancel, a tab or `?action` change leave it.
+  leaveOnRouteUpdate: (to, from) =>
+    to.params.tab !== from.params.tab ||
+    to.query.action !== from.query.action ||
+    to.query.id !== from.query.id,
+});
+
+// A new toolset's draft starts once the presets are in, so a preset's draft reopens on its own type.
+if (!isEdit) {
+  const stopStart = watch(
+    () => presetList.isPending.value,
+    (pending) => {
+      if (pending) return;
+      queueMicrotask(() => stopStart());
+      void toolsetDraft.start();
+    },
+    { immediate: true },
+  );
+}
 
 const leaveGuard: LeaveGuard = {
   host: "settings",
-  isDirty: () => dirty.value,
+  isDirty: () => toolsetDraft.hasUnsavedChanges(),
   name: () =>
     t("assistant.toolsets.form.leaveName", {
       name: typedName.value || t("assistant.toolsets.form.newTitle"),
@@ -580,14 +675,6 @@ const leaveGuard: LeaveGuard = {
     }),
 };
 useAssistantLeaveGuard(leaveGuard);
-// The form lives on the settings route, so Back, Cancel, a tab or `?action` change are route updates.
-onBeforeRouteUpdate((to, from) => {
-  const same =
-    to.params.tab === from.params.tab &&
-    to.query.action === from.query.action &&
-    to.query.id === from.query.id;
-  return same || askLeaveGuard(leaveGuard);
-});
 
 function close() {
   emit("done");
@@ -659,14 +746,47 @@ function syncPresetParams() {
 }
 
 function continueToForm() {
-  if (!pickedTile.value) return;
-  applyTile(pickedTile.value);
-  step.value = 2;
+  const tile = pickedTile.value;
+  if (!tile) return;
+  applyTile(tile);
+  appliedTile.value = tile;
+  void router.push({ query: queryWithTile(tile) });
 }
 
 function backToTypes() {
   pickedTile.value = filledTile.value;
-  step.value = 1;
+  appliedTile.value = null;
+  void router.push({ query: queryWithTile(null) });
+}
+
+/** A saved toolset's name and type are locked, so its draft never changes them. */
+async function applyDraft(
+  draft: ToolsetDraft,
+  { notKeptPaths }: { notKeptPaths: string[] },
+): Promise<void> {
+  const current = values.value;
+  const next = toolsetFormOfDraft(draft);
+  if (isEdit) Object.assign(next, { name: current.name, kind: current.kind });
+  form.reset(next);
+  preset.value = presetById((next.mcp.extra.preset as { id?: unknown } | undefined)?.id);
+  if (!isEdit) {
+    const tile = next.kind === "skill" ? SKILL : (preset.value?.id ?? CUSTOM_MCP);
+    filledTile.value = tile;
+    pickedTile.value = tile;
+    appliedTile.value = tile;
+    if (tileFromQuery(router.currentRoute.value.query) !== tile)
+      void router.replace({ query: queryWithTile(tile) });
+  }
+  syncPresetParams();
+  // After the form's own error sweep, which runs on the reset values.
+  await nextTick();
+  for (const path of notKeptPaths) {
+    const name = draftFieldName(path);
+    const meta = name ? form.getFieldMeta(name as never) : undefined;
+    if (!name || !meta) continue;
+    const errorMap = { ...meta.errorMap, onSubmit: t("common.editorDraft.reenterField") };
+    form.setFieldMeta(name as never, { ...meta, errorMap } as never);
+  }
 }
 
 const connectionAnchor = ref<HTMLElement | null>(null);
@@ -700,7 +820,7 @@ async function requireKeptSecrets(paths: string[]) {
   first?.focus();
 }
 
-async function save(values: ToolsetFormValues) {
+async function save(values: ToolsetFormValues): Promise<void> {
   formError.value = "";
   if (org !== page.org.value) return;
   const reason = reenterReason(values, loaded.value, props.mergeSecrets);
@@ -723,6 +843,11 @@ async function save(values: ToolsetFormValues) {
       toast({ variant: "success", message: t("assistant.toolsets.form.added") });
     }
     form.reset(values);
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    toolsetDraft.markSaved();
     emit("done");
   } catch (err) {
     await showSaveError(err, values);

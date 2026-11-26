@@ -21,6 +21,8 @@ import aiToolsets from "@/services/ai_toolsets";
 import assistant from "@/services/assistant";
 import assistantSettings from "@/services/assistant_settings";
 
+import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
+
 import ToolsetsTab from "./ToolsetsTab.vue";
 import { settingsHarness } from "./assistantSettings.test-helpers";
 import en from "@/locales/languages/en-US.json";
@@ -52,7 +54,14 @@ vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
 vi.mock("@/composables/useConfirmDialog", () => ({ useConfirmDialog: () => ({ confirm }) }));
 vi.mock("@/components/CodeQueryEditor.vue", () => ({ default: { render: () => null } }));
 vi.mock("@/services/ai_toolsets", () => ({
-  default: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  default: {
+    list: vi.fn(),
+    get: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    prebuilt: vi.fn(),
+  },
 }));
 vi.mock("@/services/assistant_settings", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services/assistant_settings")>();
@@ -190,6 +199,26 @@ describe("ToolsetsTab", () => {
     expect(aiToolsets.delete).toHaveBeenCalledWith("acme", "1");
   });
 
+  it("marks the Add button and a row that hold a draft, and drops a deleted toolset's draft", async () => {
+    const scope = { kind: "ai_toolset" as const, org: "acme", userEmail: "" };
+    localStorage.clear();
+    writeEditorDraft({ ...scope, entityId: null }, { data: { name: "new_one" } });
+    writeEditorDraft({ ...scope, entityId: "1" }, { data: { name: "pagerduty" } });
+    confirm.mockResolvedValue(true);
+    vi.mocked(aiToolsets.delete).mockResolvedValue({} as never);
+    const { w } = await mountTab();
+    wrapper = w;
+    const add = w.get('[data-test="ai-toolsets-add-btn"]');
+    expect(add.find('[data-test="ai-toolsets-add-draft-dot"]').exists()).toBe(true);
+    expect(add.attributes("aria-label")).toBe("New toolset · unsaved draft");
+    expect(w.find('[data-test="ai-toolsets-pagerduty-draft-dot"]').exists()).toBe(true);
+    expect(w.find('[data-test="ai-toolsets-my-tool-draft-dot"]').exists()).toBe(false);
+    await w.find('[data-test="ai-toolset-pagerduty-delete"]').trigger("click");
+    await settle();
+    expect(readEditorDraft({ ...scope, entityId: "1" })).toBeNull();
+    expect(readEditorDraft({ ...scope, entityId: null })).not.toBeNull();
+  });
+
   it("filters by the displayed kind label", async () => {
     const { w } = await mountTab();
     wrapper = w;
@@ -278,5 +307,17 @@ describe("ToolsetsTab", () => {
     await settle();
     expect(router.currentRoute.value.query.action).toBe("add");
     expect(w.find('[data-test="ai-toolset-form"]').exists()).toBe(true);
+  });
+
+  it("closes the form with its type step's query too", async () => {
+    vi.mocked(aiToolsets.prebuilt).mockResolvedValue({ data: { presets: [] } } as never);
+    const { w, router } = await mountTab();
+    wrapper = w;
+    await router.push({ query: { action: "add", kind: "mcp" } });
+    await settle();
+    await w.get('[data-test="ai-toolset-cancel-btn"]').trigger("click");
+    await settle();
+    expect(router.currentRoute.value.query).toEqual({});
+    expect(w.find('[data-test="ai-toolset-form"]').exists()).toBe(false);
   });
 });

@@ -103,9 +103,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           class="max-md:min-h-11"
           data-test="ai-toolsets-add-btn"
+          :aria-label="
+            toolsetDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('assistant.toolsets.add') })
+              : undefined
+          "
           @click="openForm('add')"
-          >{{ t("assistant.toolsets.add") }}</OButton
-        >
+          >{{ t("assistant.toolsets.add") }}
+          <EditorDraftDot
+            v-if="toolsetDrafts.hasNew"
+            :saved-at="toolsetDrafts.savedAt(null)"
+            corner
+            data-test="ai-toolsets-add-draft-dot"
+        /></OButton>
       </template>
       <template #error>
         <div class="flex flex-col items-center gap-3 p-6" data-test="ai-toolsets-load-error">
@@ -133,6 +143,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-name="{ row }">
         <span class="flex min-w-0 items-center gap-1">
           <OTruncatedText class="block">{{ raw(row.name) }}</OTruncatedText>
+          <EditorDraftDot
+            v-if="toolsetDrafts.ids.has(row.id)"
+            :saved-at="toolsetDrafts.savedAt(row.id)"
+            :data-test="`ai-toolsets-${row.name}-draft-dot`"
+          />
           <template v-for="note in notesOf(row)" :key="note.kind">
             <span
               class="inline-flex shrink-0"
@@ -323,9 +338,11 @@ import AiToolsetPresetReview from "@/components/ai_toolsets/AiToolsetPresetRevie
 import { presetBadge, type Preset } from "@/components/ai_toolsets/presets";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useAssistantName } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useListViewState } from "@/composables/useListViewState";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -354,6 +371,7 @@ import {
 } from "@/services/assistant_settings.queries";
 import { deleteToolsetMutation } from "@/services/assistant_settings.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 import AssistantToolsetForm from "./AssistantToolsetForm.vue";
@@ -374,6 +392,7 @@ const name = useAssistantName();
 const router = useRouter();
 const page = useAssistantSettingsPage();
 const { confirm } = useConfirmDialog();
+const toolsetDrafts = useEditorDraftIds("ai_toolset");
 // Below md the button shows only its icon; above it the visible age is its name, so a label there would contradict it.
 const { mdUp } = useBreakpoint();
 
@@ -605,7 +624,14 @@ async function resync() {
 }
 
 function closeForm() {
-  const { action: _action, id: _id, section: _section, ...query } = router.currentRoute.value.query;
+  const {
+    action: _action,
+    id: _id,
+    section: _section,
+    preset: _preset,
+    kind: _kind,
+    ...query
+  } = router.currentRoute.value.query;
   void router.push({ query });
 }
 
@@ -666,6 +692,7 @@ async function remove(row: ToolsetRow) {
   if (!ok) return;
   try {
     await deleteMutation.mutateAsync(row.id);
+    deleteEditorDraftsFor({ kind: "ai_toolset", org: page.org.value, entityId: row.id });
     toast({ variant: "success", message: t("assistant.toolsets.deleted", { name: row.name }) });
   } catch (err) {
     if (statusOf(err) === 403) {
