@@ -31,6 +31,7 @@ use config::{
     },
     utils::{json, sql::is_explain_query},
 };
+use futures::StreamExt;
 use log;
 use tokio::sync::mpsc;
 use tracing::Instrument;
@@ -63,6 +64,9 @@ const EXTRACTION_OVERSAMPLE: i64 = 3;
 /// Caps the extra count queries one dense slice costs.
 const EXTRACTION_MAX_SUB_SLICES: usize = 8;
 
+/// Caps the ranges one run counts and fetches, so a busy window costs a bounded number of queries.
+const EXTRACTION_MAX_RANGES: usize = 24;
+
 /// How one time slice is read for the extraction sample.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SliceFetch {
@@ -81,47 +85,42 @@ struct SliceSearch<'a> {
 }
 
 impl SliceSearch<'_> {
-    /// Runs `reqs` a few at a time and returns their results in input order.
+    /// Runs `reqs` with a few in flight at once and returns their results in input order.
     async fn run(
         &self,
         label: &str,
         reqs: Vec<config::meta::search::Request>,
     ) -> Vec<Result<Response, infra::errors::Error>> {
-        let mut results = Vec::with_capacity(reqs.len());
-        let mut reqs = reqs.into_iter().enumerate().peekable();
-        while reqs.peek().is_some() {
-            // Each task owns its inputs: borrowing across the spawn breaks the caller's Send bound.
-            let handles: Vec<_> = reqs
-                .by_ref()
-                .take(EXTRACTION_FETCH_CONCURRENCY)
-                .map(|(i, req)| {
-                    let trace_id = format!("{}-{label}{i}", self.trace_id);
-                    let org_id = self.org_id.to_string();
-                    let user_id = self.user_id.to_string();
-                    let (stream_type, multi) = (self.stream_type, self.is_multi_stream_search);
-                    tokio::spawn(async move {
-                        do_search(
-                            &trace_id,
-                            &org_id,
-                            stream_type,
-                            &req,
-                            &user_id,
-                            false,
-                            multi,
-                        )
-                        .await
-                    })
-                })
-                .collect();
-            for handle in handles {
-                results.push(handle.await.unwrap_or_else(|e| {
+        // Each task owns its inputs: borrowing across the spawn breaks the caller's Send bound.
+        let tasks = reqs.into_iter().enumerate().map(|(i, req)| {
+            let trace_id = format!("{}-{label}{i}", self.trace_id);
+            let org_id = self.org_id.to_string();
+            let user_id = self.user_id.to_string();
+            let (stream_type, multi) = (self.stream_type, self.is_multi_stream_search);
+            tokio::spawn(async move {
+                do_search(
+                    &trace_id,
+                    &org_id,
+                    stream_type,
+                    &req,
+                    &user_id,
+                    false,
+                    multi,
+                )
+                .await
+            })
+        });
+        futures::stream::iter(tasks)
+            .buffered(EXTRACTION_FETCH_CONCURRENCY)
+            .map(|joined| {
+                joined.unwrap_or_else(|e| {
                     Err(infra::errors::Error::Message(format!(
                         "pattern extraction slice task failed: {e}"
                     )))
-                }));
-            }
-        }
-        results
+                })
+            })
+            .collect()
+            .await
     }
 }
 
@@ -628,10 +627,9 @@ fn split_dense_slices(
     rows: &[usize],
     limit: i64,
 ) -> Vec<([i64; 2], Option<usize>)> {
+    let pieces = allocate_pieces(rows, limit.max(1) as usize, EXTRACTION_MAX_RANGES);
     let mut out = Vec::with_capacity(ranges.len());
-    for (&range, &n) in ranges.iter().zip(rows) {
-        let pieces = n.div_ceil(limit.max(1) as usize);
-        let pieces = pieces.min(EXTRACTION_MAX_SUB_SLICES);
+    for ((&range, &n), &pieces) in ranges.iter().zip(rows).zip(&pieces) {
         if pieces < 2 || range[1] - range[0] < pieces as i64 {
             out.push((range, Some(n)));
             continue;
@@ -639,6 +637,29 @@ fn split_dense_slices(
         out.extend(even_ranges(range, pieces).into_iter().map(|r| (r, None)));
     }
     out
+}
+
+/// Pieces per slice, densest slices first, `max_ranges` ranges in all [pure].
+fn allocate_pieces(rows: &[usize], limit: usize, max_ranges: usize) -> Vec<usize> {
+    let wanted: Vec<usize> = rows
+        .iter()
+        .map(|&n| n.div_ceil(limit).clamp(1, EXTRACTION_MAX_SUB_SLICES))
+        .collect();
+    let mut pieces = vec![1usize; rows.len()];
+    for _ in rows.len()..max_ranges {
+        let densest = (0..rows.len())
+            .filter(|&i| pieces[i] < wanted[i])
+            .max_by(|&a, &b| {
+                (rows[a] * pieces[b])
+                    .cmp(&(rows[b] * pieces[a]))
+                    .then(b.cmp(&a))
+            });
+        let Some(i) = densest else {
+            break;
+        };
+        pieces[i] += 1;
+    }
+    pieces
 }
 
 /// Counts in range order: known ones kept, the rest taken in turn from `sub_rows` [pure].
@@ -1541,6 +1562,25 @@ mod tests {
                 expected,
                 "{range:?} {rows}"
             );
+        }
+    }
+
+    #[test]
+    fn test_allocate_pieces_caps_total_ranges() {
+        // (rows per slice, limit, max ranges) -> pieces per slice, densest slices first
+        let cases: Vec<(Vec<usize>, usize, usize, Vec<usize>)> = vec![
+            (vec![1000; 12], 10, 24, vec![2; 12]),
+            (
+                [vec![1000], vec![5; 11]].concat(),
+                10,
+                24,
+                [vec![8], vec![1; 11]].concat(),
+            ),
+            (vec![1000, 500], 10, 4, vec![3, 1]),
+            (vec![15, 0], 10, 24, vec![2, 1]),
+        ];
+        for (rows, limit, max, expected) in cases {
+            assert_eq!(allocate_pieces(&rows, limit, max), expected, "{rows:?}");
         }
     }
 
