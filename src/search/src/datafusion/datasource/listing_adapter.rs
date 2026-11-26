@@ -119,7 +119,7 @@ impl TableProvider for ListingTableAdapter {
     async fn scan(
         &self,
         state: &dyn Session,
-        projection: Option<&Vec<usize>>,
+        projection: Option<&[usize]>,
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
@@ -168,10 +168,10 @@ impl TableProvider for ListingTableAdapter {
                 });
                 (Some(filter_projection), projection)
             } else {
-                (projection.cloned(), None)
+                (projection.map(<[usize]>::to_vec), None)
             };
-        let parquet_projection = parquet_projection.as_ref();
-        let filter_projection = filter_projection.as_ref();
+        let parquet_projection = parquet_projection.as_deref();
+        let filter_projection = filter_projection.as_deref();
 
         let parquet_exec = self
             .listing_table

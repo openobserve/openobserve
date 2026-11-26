@@ -140,6 +140,9 @@ pub struct ToolCallRecord {
     /// Data timestamps the result showed inside `target`'s range; `None` when none or no range.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observed: Option<TimeWindow>,
+    /// The SQL result rows that record a change (a diff, or old and new values), max 4 KB.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub change_rows: Option<String>,
     pub result_summary: String,
 }
 
@@ -153,6 +156,16 @@ impl ToolCallRecord {
                 _ => None,
             },
         )
+    }
+
+    /// A change read whose query, or a change row it returned, names `reference`.
+    pub fn reads_change(&self, reference: &str) -> bool {
+        self.signal == SignalClass::Change
+            && (names_change(reference, &self.key_arg)
+                || self
+                    .change_rows
+                    .as_deref()
+                    .is_some_and(|rows| names_change(reference, rows)))
     }
 }
 
@@ -833,9 +846,10 @@ pub fn grade_confidence(
     // The suspect change belongs to one of the causes, so a read of it by any cause counts.
     let change_read = verdict.suspect_change.as_ref().is_some_and(|change| {
         graded_ids.iter().any(|&i| {
-            verified[i].iter().flatten().any(|r| {
-                r.signal == SignalClass::Change && names_change(&change.reference, &r.key_arg)
-            })
+            verified[i]
+                .iter()
+                .flatten()
+                .any(|r| r.reads_change(&change.reference))
         })
     });
     let change_unreachable = blind_spots.iter().any(|b| b.axis == BlindSpotAxis::Change);
@@ -1607,6 +1621,84 @@ mod tests {
             ]
         );
         assert_eq!(other.graded, Confidence::Medium);
+    }
+
+    /// A deploy-events row with `config_diff`, as the persona run's SearchSQL returned it.
+    #[test]
+    fn a_searched_change_record_reads_the_suspect_change() {
+        let sql = "SELECT version, previous_version, config_diff FROM ta_persona_deploy_events \
+                   WHERE service = 'inventory-svc'";
+        let output = serde_json::Value::String(
+            json!({"took": 5, "total": 1, "hits": [{"version": "v3.8.1",
+                "previous_version": "v3.8.0", "config_diff": "DB_POOL_MAX_SIZE: 50 -> 5"}]})
+            .to_string(),
+        );
+        let searched = logs("c1", sql, 3);
+        let mut deploy = searched.clone();
+        deploy.change_rows = crate::meta::oncall::rca_run::change_rows(SQL, &output);
+        deploy.signal = SignalClass::Change;
+        let grade_with = |record: &ToolCallRecord, reference: &str| {
+            let calls = [
+                hyp(
+                    1,
+                    "h1",
+                    "root_cause",
+                    vec![
+                        decisive("e1", PROM, "pool_active"),
+                        decisive("e2", SQL, sql),
+                    ],
+                ),
+                hyp(
+                    2,
+                    "h2",
+                    "ruled_out",
+                    vec![item("e3", PROM, "pool_waiting", "rules_out", "supporting")],
+                ),
+            ];
+            let (ledger, spots, _) = crate::meta::oncall::rca_run::build_ledger(
+                &calls,
+                Some(crate::meta::oncall::rca_run::fixtures::RUN_END_US),
+            );
+            let mut verdict = named(Confidence::High);
+            let mut change = suspect(SuspectChangeState::Confirmed);
+            change.reference = reference.into();
+            verdict.suspect_change = Some(change);
+            let tool_log = [
+                prom("m1", "pool_active", 1),
+                prom("m2", "pool_waiting", 2),
+                record.clone(),
+            ];
+            grade_confidence(
+                &verdict,
+                ledger.as_ref(),
+                &spots,
+                &tool_log,
+                &BTreeMap::new(),
+            )
+        };
+
+        let read = grade_with(&deploy, "v3.8.1");
+        assert!(read.unverified.is_empty(), "{:?}", read.unverified);
+        assert_eq!(
+            read.decisive_classes,
+            vec![SignalClass::Metrics, SignalClass::Change]
+        );
+        assert_eq!(
+            read.reasons,
+            vec![GradeReason::TwoDecisiveClassesAndRuledOut]
+        );
+        assert_eq!(read.graded, Confidence::High);
+
+        // The row is another change, or the rows held no change record.
+        for (record, reference) in [(&deploy, "v3.9.0"), (&searched, "v3.8.1")] {
+            let capped = grade_with(record, reference);
+            assert!(
+                capped.reasons.contains(&GradeReason::SuspectChangeNotRead),
+                "{reference}: {:?}",
+                capped.reasons
+            );
+            assert_eq!(capped.graded, Confidence::Medium);
+        }
     }
 
     fn log() -> Vec<ToolCallRecord> {

@@ -18,7 +18,7 @@
 
 use std::sync::Arc;
 
-use ::datafusion::arrow::datatypes::Schema;
+use ::datafusion::arrow::datatypes::{Metadata, Schema};
 use config::{
     meta::stream::{FileKey, StreamParams, StreamType},
     metrics,
@@ -71,7 +71,7 @@ pub async fn merge_by_stream(
         return Ok(());
     }
 
-    let scan_schema = Arc::new(schema.with_metadata(Default::default()));
+    let scan_schema = Arc::new(schema.with_metadata(Metadata::default()));
     let outcome = merge_partitions(worker_tx, &policy, scan_schema, files).await?;
     let needs_another_round = outcome.needs_another_round;
     build_blooms(policy.window(), outcome).await;

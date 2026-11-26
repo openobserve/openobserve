@@ -479,7 +479,7 @@ function rungEscalatingToTeam(priority, rotationId, { channels = ['email'] } = {
  *
  * `l0` is deliberately omitted unless a caller passes it: absent means
  * unchanged, and sending it on an ordinary rung edit would silently
- * un-configure the AI-SRE gate.
+ * un-configure the investigation gate.
  */
 async function setTeamPolicy(page, teamId, {
   rungs,

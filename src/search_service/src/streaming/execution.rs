@@ -176,6 +176,7 @@ pub async fn do_partitioned_search(
             user_id,
             req_size,
             (modified_start_time, modified_end_time),
+            &range_error,
             accumulated_results,
             is_multi_stream_search,
         )
@@ -245,17 +246,12 @@ pub async fn do_partitioned_search(
         search_res.set_took(start_timer.elapsed().as_millis() as usize);
 
         // check range error
-        if !range_error.is_empty() {
-            search_res.is_partial = true;
-            search_res.function_error = if search_res.function_error.is_empty() {
-                vec![range_error.clone()]
-            } else {
-                search_res.function_error.push(range_error.clone());
-                search_res.function_error
-            };
-            search_res.new_start_time = Some(modified_start_time);
-            search_res.new_end_time = Some(modified_end_time);
-        }
+        apply_range_warning(
+            &mut search_res,
+            &range_error,
+            modified_start_time,
+            modified_end_time,
+        );
 
         // Accumulate the result
         if is_streaming_aggs {
@@ -385,13 +381,14 @@ async fn fetch_extraction_sample(
     user_id: &str,
     req_size: i64,
     window: (i64, i64),
+    range_error: &str,
     accumulated_results: &mut Vec<SearchResultType>,
     is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
     let (w_start, w_end) = window;
     let span = w_end - w_start;
     // A window too narrow to slice (or inverted) stays a single fetch.
-    let slices = if span > EXTRACTION_TIME_SLICES as i64 {
+    let slices = if span > EXTRACTION_TIME_SLICES as i64 && can_slice_extraction(&req.query.sql) {
         EXTRACTION_TIME_SLICES
     } else {
         1
@@ -471,6 +468,13 @@ async fn fetch_extraction_sample(
         }
     }
 
+    // A slice that ran but carries `function_error` (e.g. a failed CAST) is a
+    // failure, not an empty window.
+    let slice_errors = drop_failed_slices(&mut responses, &mut failed_slices);
+    if responses.is_empty() && last_error.is_none() && !slice_errors.is_empty() {
+        last_error = Some(infra::errors::Error::Message(slice_errors.join("; ")));
+    }
+
     // Every slice failed: surface the error instead of reporting an empty
     // sample, which the handler would render as "this window has no logs".
     if responses.is_empty()
@@ -489,9 +493,13 @@ async fn fetch_extraction_sample(
     // within the cap keeps every slice represented.
     trim_slices_to_budget(&mut responses, req_size as usize);
     mark_partial_slices(&mut responses, failed_slices, slices);
+    if let Some(first) = responses.first_mut() {
+        first.function_error.extend(slice_errors);
+    }
 
     let fetched: usize = responses.iter().map(|r| r.hits.len()).sum();
-    for res in responses {
+    for mut res in responses {
+        apply_range_warning(&mut res, range_error, w_start, w_end);
         accumulated_results.push(SearchResultType::Search(res));
     }
 
@@ -499,6 +507,43 @@ async fn fetch_extraction_sample(
         "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: fetched {fetched} rows from {slices} time slices"
     );
     Ok(())
+}
+
+/// A LIMIT or a subquery/join/window changes meaning per slice, so such SQL runs once over the
+/// window.
+fn can_slice_extraction(sql: &str) -> bool {
+    config::utils::sql::is_time_splittable(sql).unwrap_or(false)
+        && !config::utils::sql::has_limit_clause(sql)
+}
+
+/// Removes slices that returned no rows and carry `function_error`, counts them as failed and
+/// returns the distinct messages. A partial slice that still has rows is kept.
+fn drop_failed_slices(responses: &mut Vec<Response>, failed: &mut usize) -> Vec<String> {
+    let mut errors: Vec<String> = Vec::new();
+    responses.retain(|r| {
+        if r.function_error.is_empty() || !r.hits.is_empty() {
+            return true;
+        }
+        *failed += 1;
+        for e in &r.function_error {
+            if !errors.contains(e) {
+                errors.push(e.clone());
+            }
+        }
+        false
+    });
+    errors
+}
+
+/// Marks `res` partial when the stream's max query range shortened the window.
+fn apply_range_warning(res: &mut Response, range_error: &str, new_start: i64, new_end: i64) {
+    if range_error.is_empty() {
+        return;
+    }
+    res.is_partial = true;
+    res.function_error.push(range_error.to_string());
+    res.new_start_time = Some(new_start);
+    res.new_end_time = Some(new_end);
 }
 
 /// Trim per-slice hits so the total fits `budget`, giving every slice as equal a
@@ -573,6 +618,25 @@ pub(super) fn tag_partial_extraction(
         obj.insert("is_partial".to_string(), true.into());
         obj.insert("function_error".to_string(), reasons.into());
     }
+}
+
+#[cfg(feature = "enterprise")]
+/// An empty Patterns body carrying the partial reasons, so a window cut or failed slice is
+/// not lost when the surviving slices returned no rows. None when nothing was partial.
+pub(super) fn empty_partial_patterns(
+    results: &[SearchResultType],
+) -> Option<config::utils::json::Value> {
+    let mut body = serde_json::json!({
+        "patterns": [],
+        "statistics": {
+            "total_logs_analyzed": 0,
+            "total_patterns_found": 0,
+            "coverage_percentage": 0.0,
+            "extraction_time_ms": 0
+        }
+    });
+    tag_partial_extraction(&mut body, results);
+    body.get("is_partial").is_some().then_some(body)
 }
 
 /// Get partitions for search
@@ -1011,6 +1075,75 @@ mod tests {
             total: n,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn test_can_slice_extraction() {
+        assert!(can_slice_extraction("SELECT * FROM t WHERE a = 1"));
+        assert!(!can_slice_extraction("SELECT * FROM t LIMIT 10"));
+        assert!(!can_slice_extraction(
+            "SELECT * FROM t WHERE k IN (SELECT k FROM t WHERE b = 1)"
+        ));
+    }
+
+    #[test]
+    fn test_drop_failed_slices_removes_errored_and_dedupes() {
+        let mut bad = slice_with(0);
+        bad.function_error = vec!["cast error".into()];
+        let mut bad2 = slice_with(0);
+        bad2.function_error = vec!["cast error".into()];
+        let mut slices = vec![slice_with(3), bad, bad2];
+        let mut failed = 0;
+        let errors = drop_failed_slices(&mut slices, &mut failed);
+        assert_eq!((slices.len(), failed), (1, 2));
+        assert_eq!(errors, vec!["cast error".to_string()]);
+    }
+
+    #[test]
+    fn test_drop_failed_slices_keeps_partial_slice_with_rows() {
+        let mut partial = slice_with(3);
+        partial.function_error = vec!["partial".into()];
+        let mut slices = vec![partial];
+        let mut failed = 0;
+        assert!(drop_failed_slices(&mut slices, &mut failed).is_empty());
+        assert_eq!((slices.len(), failed), (1, 0));
+    }
+
+    #[test]
+    fn test_drop_failed_slices_keeps_clean_slices() {
+        let mut slices = vec![slice_with(0), slice_with(2)];
+        let mut failed = 0;
+        assert!(drop_failed_slices(&mut slices, &mut failed).is_empty());
+        assert_eq!(failed, 0);
+        assert_eq!(slices.len(), 2);
+    }
+
+    #[test]
+    fn test_apply_range_warning_marks_partial() {
+        let mut r = slice_with(1);
+        apply_range_warning(&mut r, "clamped", 5, 9);
+        assert!(r.is_partial);
+        assert_eq!(r.function_error, vec!["clamped".to_string()]);
+        assert_eq!((r.new_start_time, r.new_end_time), (Some(5), Some(9)));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_empty_partial_patterns_keeps_warning_without_rows() {
+        let mut r = slice_with(0);
+        apply_range_warning(&mut r, "clamped", 5, 9);
+        let body = empty_partial_patterns(&[SearchResultType::Search(r)]).unwrap();
+        assert_eq!(body["is_partial"], true);
+        assert_eq!(body["function_error"][0], "clamped");
+        assert_eq!(body["patterns"].as_array().unwrap().len(), 0);
+        assert!(empty_partial_patterns(&[SearchResultType::Search(slice_with(0))]).is_none());
+    }
+
+    #[test]
+    fn test_apply_range_warning_noop_without_range_error() {
+        let mut r = slice_with(1);
+        apply_range_warning(&mut r, "", 5, 9);
+        assert!(!r.is_partial && r.function_error.is_empty() && r.new_start_time.is_none());
     }
 
     #[test]

@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="service-health-badge"
           >{{ serviceHealth.text }}</OTag
         >
+        <AiEntryButton v-bind="serviceDoor" :appearance="mdUp ? 'button' : 'toolbar-icon'" />
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton
@@ -152,6 +153,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="svcver-panel-identity-loading"
         />
       </div>
+      <ul
+        v-if="dependencies.length > 0"
+        class="px-page-edge border-border-default mb-2 flex flex-col gap-1 border-b pb-2"
+        :aria-label="t('assistant.entry.dependencies')"
+        data-test="service-graph-node-panel-dependencies"
+      >
+        <li
+          v-for="dep in dependencies"
+          :key="dep.key"
+          class="text-text-body flex items-center gap-2 text-sm"
+        >
+          <OTruncatedText class="min-w-0 flex-1">{{ dep.name }}</OTruncatedText>
+          <AiEntryButton v-bind="dependencyDoor(dep)" appearance="toolbar-icon" />
+        </li>
+      </ul>
       <!-- RED Charts Section -->
       <div
         v-if="streamFilter !== 'all'"
@@ -844,6 +860,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import {
   isOutsideK8s,
   versionImageLabel,
@@ -858,6 +875,8 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -892,7 +911,10 @@ import {
   buildChipDimensionsFromFilters,
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
-import { buildStreamFilterCondition } from "@/utils/telemetryCorrelation";
+import {
+  buildStreamFilterCondition,
+  extractSemanticDimensions,
+} from "@/utils/telemetryCorrelation";
 import { serviceNamesSql } from "@/utils/serviceCount";
 import {
   escapeSingleQuotes,
@@ -920,7 +942,6 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
@@ -1203,10 +1224,10 @@ export default defineComponent({
     ServiceEnvChip,
     ServiceScopeChip,
     OTag,
+    OTruncatedText,
     OSeparator,
     OSkeleton,
     ODimensionChip,
-    OTruncatedText,
     OEmptyState,
     OTabs,
     OTab,
@@ -1227,6 +1248,9 @@ export default defineComponent({
     ServiceCatalogBarCell,
     AgentNodeBehaviorTab,
     OAgentBadges,
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
   },
   props: {
     selectedNode: {
@@ -1266,6 +1290,90 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
+
+    // The selection card's door: the service with its inbound and outbound calls over the window.
+    const loadedOrg = useLoadedOrg(
+      () => props.graphData,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
+    const { mdUp } = useBreakpoint();
+    const serviceDoor = computed(() => {
+      const node = props.selectedNode ?? {};
+      const id = node.id;
+      const sum = (edges: any[]) => edges.reduce((n, e) => n + (e.total_requests || 0), 0);
+      const inbound = sum(props.graphData.edges.filter((e: any) => e.to === id));
+      const outbound = sum(props.graphData.edges.filter((e: any) => e.from === id));
+      return {
+        verb: "explain" as const,
+        entryKind: "object_verb" as const,
+        boundOrg: loadedOrg.value,
+        objectKind: "service_edge" as const,
+        label: t("assistant.entry.explainService"),
+        tooltip: t("assistant.entry.tooltip.explainService"),
+        dataTest: "ai-entry-service-edge-explain" as const,
+        build: async () =>
+          (await import("@/utils/assistant/prompts")).buildServiceEdgePrompt({
+            org: store.state.selectedOrganization?.identifier ?? "",
+            source: String(node.name || node.label || id || ""),
+            inbound,
+            outbound,
+            range: {
+              from: Math.round(props.timeRange.startTime / 1000),
+              to: Math.round(props.timeRange.endTime / 1000),
+            },
+            timeZone: store.state.timezone || "UTC",
+          }),
+      };
+    });
+    // Each edge touching the selected node, so every dependency has its own named door.
+    const dependencies = computed(() => {
+      const id = props.selectedNode?.id;
+      if (id === undefined) return [];
+      const nameOf = (nodeId: unknown) => {
+        const node = props.graphData.nodes?.find((n: any) => n.id === nodeId);
+        return String(node?.name || node?.label || nodeId || "");
+      };
+      return (props.graphData.edges ?? [])
+        .filter((e: any) => e.from != null && (e.from === id || e.to === id) && e.from !== e.to)
+        .map((e: any) => {
+          const source = nameOf(e.from);
+          const target = nameOf(e.to);
+          return {
+            key: `${e.from}->${e.to}`,
+            name: `${source} → ${target}`,
+            source,
+            target,
+            edge: e,
+          };
+        });
+    });
+    const dependencyDoor = (dep: { name: string; source: string; target: string; edge: any }) => ({
+      verb: "explain" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: loadedOrg.value,
+      objectKind: "service_edge" as const,
+      label: t("assistant.entry.explainDependencyNamed", { name: dep.name }),
+      tooltip: t("assistant.entry.tooltip.explainEdge"),
+      dataTest: "ai-entry-service-edge-explain" as const,
+      build: async () => {
+        const requests = Number(dep.edge.total_requests) || 0;
+        const failed = Number(dep.edge.failed_requests) || 0;
+        const p95 = Number(dep.edge.p95_latency_ns) || 0;
+        return (await import("@/utils/assistant/prompts")).buildServiceEdgePrompt({
+          org: store.state.selectedOrganization?.identifier ?? "",
+          source: dep.source,
+          target: dep.target,
+          requests,
+          ...(requests > 0 && { errorRate: failed / requests }),
+          ...(p95 > 0 && { p95Ms: p95 / 1e6 }),
+          range: {
+            from: Math.round(props.timeRange.startTime / 1000),
+            to: Math.round(props.timeRange.endTime / 1000),
+          },
+          timeZone: store.state.timezone || "UTC",
+        });
+      },
+    });
     const router = useRouter();
     const versionPanel = useServicePanelRoute();
     const routeOwnsNode = computed(() => versionPanel.owns(props.selectedNode));
@@ -1898,19 +2006,7 @@ export default defineComponent({
       correlationError.value = null;
 
       try {
-        const org = store.state.selectedOrganization.identifier;
-        await loadOrgSemanticGroups();
-        const serviceName =
-          props.selectedNode.name || props.selectedNode.label || props.selectedNode.id;
-
-        // Send service name directly to _correlate
-        const correlateResponse = await correlateStreams(org, {
-          source_stream: props.streamFilter || "default",
-          source_type: "traces",
-          available_dimensions: { service: serviceName },
-        });
-
-        const data = correlateResponse.data;
+        const { data } = await correlateSelectedService();
         if (!data) {
           correlationError.value = t("traces.serviceGraphNodeSidePanel.noCorrelatedStreams");
           correlationData.value = null;
@@ -1942,13 +2038,10 @@ export default defineComponent({
     };
 
     // Reset correlation data when node changes
-    watch(
-      () => props.selectedNode?.id,
-      () => {
-        correlationData.value = null;
-        correlationError.value = null;
-      },
-    );
+    watch([() => props.selectedNode?.id, () => props.streamFilter], () => {
+      correlationData.value = null;
+      correlationError.value = null;
+    });
 
     // The latest span only enriches the metric chips, so a failed read degrades to no span.
     const fetchLatestSpan = async (): Promise<Record<string, any> | null> => {
@@ -1968,6 +2061,40 @@ export default defineComponent({
       }
     };
 
+    // Under service_optional the backend drops a bare service name, so send the latest span's
+    // dimensions. An inferred dependency's span is its caller's, so it keeps the bare name.
+    const correlateSelectedService = async () => {
+      const node = props.selectedNode;
+      const serviceName = node?.name || node?.label || node?.id || "";
+      const org = store.state.selectedOrganization.identifier;
+      const base = { source_stream: props.streamFilter || "default", source_type: "traces" };
+      const { startTime, endTime } = props.timeRange;
+      const [latestSpan] = await Promise.all([fetchLatestSpan(), loadOrgSemanticGroups()]);
+      if (node?.service_type) {
+        const response = await correlateStreams(org, {
+          ...base,
+          available_dimensions: { service: serviceName },
+        });
+        return { data: response.data, latestSpan };
+      }
+      const dimensions = {
+        ...extractSemanticDimensions(
+          { timestamp: 0, fields: latestSpan ?? {} },
+          orgSemanticGroups.value,
+        ),
+        service: serviceName,
+      };
+      const response = await correlateStreams(org, {
+        ...base,
+        available_dimensions: dimensions,
+        source_dimensions: dimensions,
+        resolve_from_source: true,
+        start_time: startTime,
+        end_time: endTime,
+      });
+      return { data: response.data, latestSpan };
+    };
+
     // Fetch correlated metric streams for the Metrics tab
     const fetchMetricsCorrelation = async (force = false) => {
       if (!props.selectedNode || correlationLocked.value) return;
@@ -1978,22 +2105,7 @@ export default defineComponent({
       metricsCorrelationData.value = null;
 
       try {
-        const org = store.state.selectedOrganization.identifier;
-        const serviceName = buildServiceName();
-
-        // Fetch latest span to extract richer semantic dimensions
-        const latestSpan = await fetchLatestSpan();
-        const spanDimensions = {
-          service: serviceName,
-        };
-
-        const correlateResponse = await correlateStreams(org, {
-          source_stream: props.streamFilter || "default",
-          source_type: "traces",
-          available_dimensions: spanDimensions,
-        });
-
-        const data = correlateResponse.data;
+        const { data, latestSpan } = await correlateSelectedService();
         if (!data) {
           metricsCorrelationData.value = null;
           return;
@@ -2903,6 +3015,17 @@ export default defineComponent({
       { immediate: true },
     );
 
+    // Correlation reads the window's latest span, so a new window needs a new answer.
+    watch(
+      () => [props.timeRange.startTime, props.timeRange.endTime],
+      () => {
+        correlationData.value = null;
+        metricsCorrelationLoaded.value = false;
+        if (props.visible && props.streamFilter !== "all" && activeTab.value === "metrics")
+          fetchMetricsCorrelation();
+      },
+    );
+
     // Declared before discovery so the reset runs first; one source per value, so a refreshed row of the same node keeps its tab.
     watch(
       [
@@ -3068,15 +3191,12 @@ export default defineComponent({
       let filterQuery = `${serviceNameField.value}='${serviceName}'`;
 
       try {
-        const correlateResponse = await correlateStreams(org, {
-          source_stream: props.streamFilter || "default",
-          source_type: "traces",
-          available_dimensions: { service: serviceName },
-        });
-
-        const logStreams = correlateResponse.data?.related_streams?.logs || [];
+        const { data } = await correlateSelectedService();
+        const logStreams = data?.related_streams?.logs || [];
         if (logStreams.length > 0) {
-          const firstLogStream = logStreams[0];
+          const sourceStream = props.streamFilter || "default";
+          const firstLogStream =
+            logStreams.find((s) => s.stream_name === sourceStream) ?? logStreams[0];
           streamName = firstLogStream.stream_name;
 
           // Build filter from the stream's resolved field names
@@ -3183,6 +3303,10 @@ export default defineComponent({
     }
 
     return {
+      serviceDoor,
+      mdUp,
+      dependencies,
+      dependencyDoor,
       raw,
       t,
       whereUnscopedNotice,

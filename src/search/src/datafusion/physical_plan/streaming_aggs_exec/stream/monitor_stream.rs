@@ -182,6 +182,7 @@ mod tests {
     use datafusion::{
         error::DataFusionError,
         execution::SendableRecordBatchStream,
+        physical_expr::expressions::col,
         physical_plan::{
             aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
             empty::EmptyExec,
@@ -193,6 +194,12 @@ mod tests {
 
     use super::*;
     use crate::datafusion::physical_plan::streaming_aggs_exec::merge::cache_buf::CacheStream;
+
+    // DataFusion rejects an AggregateExec with neither grouping nor aggregates.
+    fn group_by_col1(schema: &Schema) -> PhysicalGroupBy {
+        let col1 = col("col1", schema).unwrap();
+        PhysicalGroupBy::new_single(vec![(col1, "col1".to_string())])
+    }
 
     #[test]
     fn test_monitor_stream_new() {
@@ -222,7 +229,7 @@ mod tests {
                 Arc::new(
                     AggregateExec::try_new(
                         AggregateMode::Partial,
-                        PhysicalGroupBy::new_single(vec![]),
+                        group_by_col1(&schema),
                         vec![],
                         vec![],
                         Arc::new(EmptyExec::new(schema.clone())),
@@ -253,14 +260,19 @@ mod tests {
     #[tokio::test]
     async fn test_failed_partition_does_not_complete_cache() {
         let schema = Arc::new(Schema::empty());
+        let agg_schema = Arc::new(Schema::new(vec![Field::new(
+            "col1",
+            DataType::Int64,
+            false,
+        )]));
         let aggregate = Arc::new(
             AggregateExec::try_new(
                 AggregateMode::Partial,
-                PhysicalGroupBy::new_single(vec![]),
+                group_by_col1(&agg_schema),
                 vec![],
                 vec![],
-                Arc::new(EmptyExec::new(schema.clone())),
-                schema.clone(),
+                Arc::new(EmptyExec::new(agg_schema.clone())),
+                agg_schema.clone(),
             )
             .unwrap(),
         );

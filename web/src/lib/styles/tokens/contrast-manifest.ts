@@ -114,7 +114,7 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "SC 1.4.11 decorative: a container hairline, not information required to identify a component or its state",
   },
   {
-    fg: "--color-chat-bubble-user-border",
+    fg: "--color-trace-thread-user-border",
     category: "exempt",
     why: "SC 1.4.11 decorative: a container hairline, not information required to identify a component or its state",
   },
@@ -1405,5 +1405,17 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     bg: "--color-onboarding-choice-active-bg",
     category: "text",
     why: "onboarding text sits on the brand panel top and the brand-filled option; the option fill is as light as or lighter than the panel top in both themes. Panel text stays in the top part; the lighter end stop carries only the example screen",
+  },
+  {
+    fg: "--color-toast-action-fg",
+    bg: "--color-toast-action-bg",
+    category: "text",
+    why: "the toast action button paints its label on its own solid fill, never on the page",
+  },
+  {
+    fg: "--color-assistant-mark-fg",
+    bg: "--color-assistant-mark-bg",
+    category: "non-text",
+    why: "the assistant mark is a glyph drawn on its own tinted tile, never on the page",
   },
 ];

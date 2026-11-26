@@ -20,6 +20,7 @@ import { resetAccess } from "@/composables/useAccessStore";
 import { PANEL_DRAFT_PREFIX } from "@/composables/dashboard/usePanelDraft";
 import { EDITOR_DRAFT_INDEX_KEY, EDITOR_DRAFT_PREFIX } from "@/utils/drafts/editorDraftStore";
 import { DRAFT_SIGNED_OUT_KEY } from "@/utils/drafts/draftSession";
+import { clearSessionStorageKeepingDrafts } from "@/utils/clearSessionStorage";
 import { getPath, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
 
 const DRAFT_KEY_PREFIXES = [
@@ -37,11 +38,9 @@ interface ExpiringStore extends SessionServicesStore {
   dispatch: (type: "logout") => unknown;
 }
 
-/** Stops what outlives a page change: the search socket, AI chat streams, open toasts, access denials and the RUM user. */
+/** Stops what outlives a page change: the search socket, open toasts, access denials and the RUM user. */
 export const stopSessionServices = (store: SessionServicesStore): void => {
   closeSearchSocket();
-  // AI chat streams outlive their component by design, so sign-out stops them explicitly.
-  window.dispatchEvent(new Event("o2:abort-ai-streams"));
   dismissAll();
   resetAccess();
   if (store.state.zoConfig?.rum?.enabled) {
@@ -86,7 +85,7 @@ export const expireSession = (
   useLocalCurrentUser("", true);
   useLocalUserInfo("", true);
   if (clearLocalStorage) clearLocalStorageKeepingDrafts();
-  sessionStorage.clear();
+  clearSessionStorageKeepingDrafts();
   // The session is gone, so an editor's "leave site?" prompt could only keep the user on a dead page.
   silenceUnloadPrompts();
   if (toLogin) window.location.assign(`${getPath()}login`);

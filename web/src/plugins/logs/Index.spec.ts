@@ -1167,11 +1167,6 @@ describe("Logs Index", async () => {
     });
   });
 
-  it("Should emit sendToAiChat event with payload", async () => {
-    wrapper.vm.sendToAiChat({ foo: "bar" });
-    expect(wrapper.emitted("sendToAiChat")?.[0]?.[0]).toEqual({ foo: "bar" });
-  });
-
   it("removeFieldByName should remove matching column_ref and aggr_func entries", () => {
     const cols = [
       { expr: { type: "column_ref", column: "*" } },
@@ -1630,6 +1625,20 @@ describe("Logs Index", async () => {
       expect(data.queryResults.total).toBe(210);
     });
 
+    it("marks the search applied once a Patterns run completes, so an empty result is not 'no query applied'", async () => {
+      const { searchObj } = searchState();
+      searchObj.meta.sqlMode = false;
+      searchObj.data.stream.selectedStream = ["stream1"];
+      searchObj.data.stream.streamLists = [{ label: "stream1", value: "stream1" }];
+      searchObj.data.query = "";
+      searchObj.meta.searchApplied = false;
+
+      await wrapper.vm.extractPatternsForCurrentQuery();
+      await flushPromises();
+
+      expect(searchObj.meta.searchApplied).toBe(true);
+    });
+
     it("consumes the clear-cache flag so the next Search run keeps its cache", async () => {
       const meta = searchState().searchObj.meta;
       meta.clearCache = true;
@@ -1863,6 +1872,20 @@ describe("Logs Index", async () => {
       expect(wrapper.find('[data-test="logs-drill-down-filter-error-message"]').exists()).toBe(
         true,
       );
+    });
+
+    it("offers the Ask AI chip when the org has no streams", async () => {
+      await enterDrillDown({ withHits: false, selectedStream: [] });
+      wrapper.vm.searchObj.data.stream.streamLists = [];
+      await flushPromises();
+
+      const state = wrapper
+        .findAllComponents({ name: "LogsNoDataState" })
+        .find((c: any) => c.attributes("data-test") === "logs-drill-down-no-streams-in-org-text");
+      // The chip renders nothing while AI is off, so the slot content is what proves it is wired.
+      const [door] = state.vm.$slots["ai-door"]();
+      expect(door.type).toBe(wrapper.vm.$options.components.AiEntryButton);
+      expect(door.props.appearance).toBe("chip");
     });
 
     it("shows the pick-a-stream state when no stream is selected", async () => {

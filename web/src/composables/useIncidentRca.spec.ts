@@ -860,7 +860,7 @@ describe("useIncidentRca (RR-35)", () => {
         { code: "transcript_expired", message: "The transcript expired" },
         "The transcript expired",
       ],
-      [412, { message: "AI SRE is not configured" }, "AI SRE is not configured"],
+      [412, { message: "Investigation is not configured" }, "Investigation is not configured"],
       [500, {}, "Could not resume the run."],
     ])(
       "a refused resume (%i) toasts the server message and re-reads nothing",
