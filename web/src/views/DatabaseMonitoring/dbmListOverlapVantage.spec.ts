@@ -140,9 +140,11 @@ describe("QueriesPage sources its overlap measures from the database", () => {
     expect(cellSlot(source, "calls")).toContain("row.overlapCalls.source === 'client'");
   });
 
-  it("labels the columns with their provenance in the header", () => {
-    expect(source).toContain("dbm.queries.columnSubLabels.calls");
-    expect(source).toContain("dbm.queries.columnSubLabels.load");
+  // The header tooltip states the vantage in full, so no second header line repeats it.
+  it("states the columns' provenance in the header tooltip", () => {
+    expect(source).toContain("dbm.queries.columnHints.calls");
+    expect(source).toContain("dbm.queries.columnHints.load");
+    expect(source).not.toContain("headerSubLabel");
   });
 
   describe("the summary tiles", () => {
@@ -203,14 +205,15 @@ describe("QueriesPage sources its overlap measures from the database", () => {
       expect(source).not.toContain("dbm.list.overlap.clientObserved");
     });
 
-    it("explains the glyph with a legend in the toolbar while app-sourced rows show", () => {
-      expect(source).toContain('data-test="dbm-queries-app-source-legend"');
-      expect(source).toContain('v-if="hasAppSourcedRows && !serverListShown"');
+    // The row glyph carries its own tooltip, so the toolbar repeats nothing.
+    it("explains the glyph on the row, not with a toolbar legend", () => {
+      expect(source).not.toContain('data-test="dbm-queries-app-source-legend"');
     });
 
-    // Here the glyph separates trace-only rows from server-counted ones, so it must stay on.
-    it("keeps the marker on trace-only rows", () => {
-      expect(source).not.toContain(':with-marker="false"');
+    // The glyph separates trace-only rows from server-counted ones; it shows once, beside the query.
+    it("shows the marker once per trace-sourced row, beside the query", () => {
+      expect(source).toContain('<DbmAppSourceMarker v-if="fromTraces(row)"');
+      expect(cellSlot(source, "calls")).toContain(':with-marker="false"');
     });
 
     /**
@@ -354,9 +357,9 @@ describe("DatabasesPage qualifies its overlap measures", () => {
    * hide: `attention` is the server's own saturation and `load` is
    * client-observed span time. Extending the page must not cost these.
    */
-  it("keeps the attention/load provenance sub-labels", () => {
-    expect(source).toContain("dbm.databases.columnSubLabels.attention");
-    expect(source).toContain("dbm.databases.columnSubLabels.load");
+  it("keeps the attention/load provenance in the header tooltips", () => {
+    expect(source).toContain("dbm.databases.columnHints.attention");
+    expect(source).toContain("dbm.databases.columnHints.load");
   });
 
   describe("the two vantage states", () => {

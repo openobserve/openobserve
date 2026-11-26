@@ -536,8 +536,7 @@ describe("no page re-fetches the badges the shell already owns", () => {
    * page must show is that its refresh button is wired to THAT handler, and
    * the composable must show the force itself.
    *
-   * The button is the library `ORefreshButton`, whose `click` carries the
-   * MouseEvent, so pages call `onRefresh()` rather than passing the handler.
+   * The header button emits `refresh`, so pages call `onRefresh()` rather than passing the handler.
    */
   it.each(Object.keys(OWN_READ))("%s wires its refresh button to the shared handler", (page) => {
     const source = read(page);
@@ -545,7 +544,7 @@ describe("no page re-fetches the badges the shell already owns", () => {
     expect(
       source,
       `${page} never binds onRefresh, so its refresh button leaves the badges stale`,
-    ).toMatch(/@click="onRefresh\(\)"/);
+    ).toMatch(/@refresh="onRefresh\(\)"/);
   });
 
   it("the shared refresh handler forces the badge cache", () => {
@@ -716,7 +715,7 @@ describe("an empty vantage withholds its overlap badge (D6/L2)", () => {
     });
     const counts = await fetchDbmTabCounts("dbm_notraces", WINDOW);
     expect(counts.activityCount).toBe(4032);
-    expect(badgeCount(counts.activityCount)).toBe("4032");
+    expect(badgeCount(counts.activityCount)).toBe("4.03k");
   });
 
   /**

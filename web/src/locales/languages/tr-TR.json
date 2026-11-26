@@ -26843,9 +26843,6 @@
         "failed": "Başarısız"
       },
       "databaseCount": "1 veritabanı | {count} veritabanı",
-      "openQueries": "Sorgularını gör",
-      "viewMetrics": "Metrikleri görüntüle",
-      "alertMe": "Beni uyar",
       "columnHints": {
         "qps": "Saniye başına çağrı — bu penceredeki çağrıların pencere uzunluğuna bölünmesiyle hesaplanır, böylece 15 dakikalık bir görünüm ile 4 saatlik bir görünüm karşılaştırılabilir kalır.",
         "p50": "Tüm çağrıların yarısı bundan daha hızlı tamamlandı. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
@@ -26856,14 +26853,7 @@
       },
       "failedChip": "{count} başarısız",
       "columnSubLabels": {
-        "attention": "veritabanından",
-        "load": "uygulamalarınızdan",
         "calls": "uygulamalarınızdan"
-      },
-      "attention": {
-        "connections": "bağlantılar",
-        "noLimit": "limit yayınlanmadı",
-        "unknown": "ölçülmedi"
       }
     },
     "queries": {
@@ -26931,19 +26921,13 @@
       "errorsNone": "yok",
       "errorsAll": "tümü",
       "actions": {
-        "open": "Ayrıntıları aç",
         "traces": "Örnek izleri görüntüle",
         "copy": "Sorguyu kopyala",
         "copied": "Sorgu kopyalandı",
-        "copyFailed": "Sorgu kopyalanamadı.",
-        "alert": "Bu yavaşlarsa beni uyar"
+        "copyFailed": "Sorgu kopyalanamadı."
       },
       "otherRowTextFor": "{database} üzerindeki diğer tüm sorgular",
-      "otherRowDetailShort": "— {calls} çağrı.",
-      "columnSubLabels": {
-        "calls": "raporlandığı sunucu",
-        "load": "raporlandığı sunucu"
-      }
+      "otherRowDetailShort": "— {calls} çağrı."
     },
     "insights": {
       "showRows": "Bu sorguyu göster | Bu {count} sorguyu göster",
@@ -26996,26 +26980,9 @@
       }
     },
     "coverage": {
-      "unknownNote": "Seçtiğiniz aralık ve filtrelerde ölçülecek bir şey yok.",
-      "lineHealthy": "Bu veritabanının süresinin %{percent}'ini görüyorsunuz — en ağır {count} sorgu türü.",
-      "lineRemainder": "Bu veritabanının süresinin %{percent}'ini görüyorsunuz. Geri kalanı tek tek listelemediğimiz daha hafif sorgularda.",
-      "lineStale": "Sayımımız {minutes} dakika geride, bu yüzden en yeni sorgular henüz burada olmayabilir.",
       "lineTruncated": "Son bölümde alabileceğimizden daha fazla veri vardı, bu yüzden en yeni sayılar eksik hesaplandı.",
-      "lineTruncatedStale": "Son bölümde alabileceğimizden daha fazla veri vardı ve sayımımız {minutes} dakika geride — en yeni sayılar eksik hesaplandı ve en son sorgular henüz burada olmayabilir.",
       "lineGap": "Bu pencerede {minutes} dakika eksik. Sayımımız {stopped} saatinde durdu ve yalnızca {reach} dakika geriye gidebiliyor, bu yüzden {from}–{to} aralığını hiçbir şey kapsamıyor.",
-      "lineSubset": "{filter} filtresini uyguladınız, bu yüzden bu yüzdeler gösterilen satırları tanımlıyor, tüm veritabanını değil.",
-      "lineHealthyAll": "Çalışan her sorguyu görüyorsunuz. Buradaki hızlar her çağrı üzerinden ölçülür, bu yüzden tamdırlar.",
-      "lineHealthyAllEstimated": "Çalışan her sorguyu görüyorsunuz. Buradaki hızlar birkaç zaman diliminden harmanlanır, bu yüzden yaklaşıktır ancak tam değildir.",
-      "lineCountedTo": "{time} saatine kadar sayıldı; son yarım dakika hâlâ işleniyor.",
-      "lineExact": "Tüm veritabanları raporluyor. Buradaki hızlar her çağrı üzerinden ölçülür, bu yüzden tamdırlar.",
-      "lineExactEstimated": "Tüm veritabanları raporluyor. Buradaki hızlar birkaç zaman diliminden harmanlanır, bu yüzden yaklaşıktır ancak tam değildir.",
-      "lineExactSlowestSchema": "Tüm veritabanları rapor veriyor. Hızlar şema başına kesindir; birden çok şeması olan bir veritabanı en yavaş olanı gösterir.",
-      "lineSubsetUnnamed": "Filtreleriniz bunu bu toplamların toplandığı seviyenin altına daraltıyor, bu yüzden yüzdeler tüm veritabanı yerine gösterilen satırları tanımlıyor.",
-      "lineQuery": "Zamanlamalar uygulamanızdan ölçülür, bu yüzden ağ süresini ve boş bir bağlantı için bekleme süresini içerir.",
-      "lineUncodedErrors": "Buradaki hataların %{percent}'i bir neden kodu olmadan döndü, bu yüzden sayılabilirler ancak açıklanamazlar.",
-      "lineSubsetStale": "{filter} filtresini uyguladınız ve sayımımız {minutes} dakika geride — bu yüzdeler gösterilen satırları tanımlıyor ve en son sorgular henüz burada olmayabilir.",
-      "lineSubsetUnnamedStale": "Filtreleriniz bunu bu toplamların toplandığı seviyenin altına daraltıyor ve sayımımız {minutes} dakika geride — yüzdeler gösterilen satırları tanımlıyor ve en son sorgular henüz burada olmayabilir.",
-      "lineCountedToBehind": "{time} saatine kadar sayıldı; {minutes} dakika gerideyiz."
+      "lineUncodedErrors": "Buradaki hataların %{percent}'i bir neden kodu olmadan döndü, bu yüzden sayılabilirler ancak açıklanamazlar."
     },
     "breakdown": {
       "loading": "Zamanın nereye gittiği hesaplanıyor…",
@@ -27534,11 +27501,9 @@
       },
       "rowActions": {
         "topQueries": "Bunları En İyi Sorgular'da bulun",
-        "copy": "Her iki sorguyu kopyala",
-        "alert": "Deadlock'lar hakkında beni uyar"
+        "copy": "Her iki sorguyu kopyala"
       },
       "detail": {
-        "mostRecent": "En son · {time}",
         "nthOf": "{index} / {total}",
         "earlier": "Daha önce",
         "later": "Daha sonra",
@@ -27559,12 +27524,7 @@
         "fixBody": "Bu iki ifade {object} satırlarına ters sırada dokunuyor. Her iki tarafın da aynı sırada güncellemesini sağlayın — önce en düşük id — ve bu çift artık deadlock olamaz.",
         "fixGeneric": "Her iki taraf da diğerinin istediğini tutuyor. Her transaction'ın bu kilitleri aynı sırada almasını sağlayın ve bu çift artık deadlock olamaz.",
         "copyForSlack": "Kopyala",
-        "occurrencesTitle": "Bu çiftin deadlock olduğu tüm {count} kez",
-        "occurrencesHint": "Yukarıdakini yüklemek için bir nokta seçin",
-        "lostLabel": "{pid} kaybetti",
-        "bothSidesLose": "Her iki taraf da yaklaşık eşit şekilde iptal ediliyor — {a} vs {b}. Hiçbir uygulama sorun değil; sorun sıralama.",
-        "oneSideLoses": "{pid} her seferinde iptal ediliyor.",
-        "showAbove": "Yukarıda göster",
+        "oneSideLoses": "{app} her seferinde iptal ediliyor.",
         "copy": "SQL'i kopyala",
         "seeInTopQueries": "En çok sorgularda gör",
         "whichService": "Hangi hizmet?",
@@ -27575,8 +27535,6 @@
         "copyForSlackHint": "Her iki ifade, bu çiftin ne sıklıkla deadlock'a girdiği ve son gerçekleşme zamanı — bir kanala veya bilete yapıştırabileceğiniz bir mesaj olarak yazılır."
       },
       "storm": {
-        "title": "Deadlock fırtınası.",
-        "body": "Bu pencerede {count} — normalde hiç yok.",
         "copyForSlack": "Kopyala",
         "biasWarning": "En çok sorgular sekmesinin şu anda gerçekte olduğundan daha sakin görünmesini bekleyin. İptal edilen bir sorgu yine de tamamlanır, ancak bu kilitlerin arkasında kuyruğa alınanlar tamamlanmadı — bu yüzden oradaki çağrı sayıları, kullanıcılarınızın deneyimlediğinden daha düşüktür."
       },
@@ -27680,8 +27638,7 @@
       },
       "rowActions": {
         "showChain": "Zinciri göster",
-        "copy": "Sorguyu kopyala",
-        "alertMe": "Kilit beklemeleri hakkında beni uyar"
+        "copy": "Sorguyu kopyala"
       },
       "waitEvent": {
         "transaction": "başka bir işlemin bitmesini",
@@ -27802,8 +27759,6 @@
         "application": "Uygulama",
         "state": "Durum",
         "waitEvent": "Beklenen",
-        "running": "Çalışma süresi",
-        "lastQuery": "Son sorgu",
         "query": "Sorgu",
         "blockedBy": "Engelleyen"
       },
@@ -27820,7 +27775,6 @@
         "capped": "Aynı anda okuyabildiğimizden daha fazla oturum örneklendi. Elimizdeki {count} oturum bunlar.",
         "filtered": "{total} oturumdan {count} tanesi gösteriliyor."
       },
-      "transactionOpen": "işlem açık {age}",
       "healthy": {
         "title": "Şu anda hiçbir şey çalışmıyor",
         "description": "Veritabanlarınızın oturum tablolarını örnekledik ve etkin oturum bulamadık. Bu, boş bir veritabanı için sağlıklı normaldir, topladıklarımızda bir boşluk değil.",
@@ -27870,15 +27824,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "Örnek sağlığı",
-      "columnHint": "Toplayıcınızın zaten gönderdiği metriklerden, sınıra karşı bağlantılar. Bu örneği bir alıcı raporlayana kadar boş.",
       "connectionsOf": "{used} / {limit} bağlantı",
       "connectionsNoLimit": "{used} bağlantı",
       "noLimitHint": "Bu motorun alıcısı kendi başına bir bağlantı limiti yayınlamaz, bu yüzden yalnızca sayı gösterilir. Kurulum kartının bağlantı limiti tarifi (sqlquery/mysql_limits) max_connections'ı toplar ve bunu yüzdeye dönüştürür.",
       "trendLabel": "Seçilen zaman aralığındaki bağlantılar",
       "cacheHit": "Önbellek isabeti {percent}",
-      "lagBytes": "Replica {value} geride",
-      "lagSeconds": "Replica {value} geride",
       "deadlocks": "{count} kilitlenme | {count} kilitlenme",
       "noTraffic": "Bu zaman aralığında uygulama trafiği yok",
       "noTrafficHint": "Toplayıcınız bu örneği raporluyor, ancak bu zaman aralığında hiçbir uygulama onu sorgulamadı. Sorgu sütunları boş çünkü hiçbir şey onları ölçmedi, hızlı olduğu için değil.",
@@ -27917,7 +27867,6 @@
       "checkRange": "Zaman aralığını genişletin — tarif her 60 saniyede bir rapor verir.",
       "columns": {
         "relation": "Tablo",
-        "instance": "Örnek",
         "totalBytes": "Toplam boyut",
         "heapBytes": "Yığın boyutu",
         "overheadBytes": "İndeks + TOAST",
@@ -27936,10 +27885,7 @@
       }
     },
     "recommendations": {
-      "title": "Öneriler",
-      "subtitle": "Toplayıcının zaten raporladığı veriler üzerinde deterministik kontroller. Her biri ölçümü ve aştığı eşiği belirtir.",
       "countersCumulative": "İndeks tarama sayıları, son istatistik sıfırlamasından bu yana toplam değerlerdir; seçilen zaman aralığı için sayılar değildir.",
-      "andMore": "ve {count} benzeri daha",
       "unused-index": {
         "title": "Taranmamış indeks",
         "body": "{index}, {relation} üzerinde kayıtlı taramaya sahip değil ve {size} yer kaplıyor.",

@@ -309,20 +309,20 @@ test.describe('Database Monitoring', () => {
   // P1: SCOPE SURVIVES A TAB SWITCH
   // =========================================================================
 
-  test('P1: the scope chip survives moving between tabs', {
+  test('P1: the instance filter survives moving between tabs', {
     tag: ['@dbm', '@infra', '@P1', '@all'],
   }, async ({ page }) => {
     await dbm.navigateWithScope('tableHealth', { system: 'postgresql' });
     await dbm.expectLoaded();
 
-    const before = await dbm.getInstanceChipText();
+    const before = await dbm.getInstanceFilterText();
     await dbm.openTab(DBM_TABS.activity);
     await expect(page).toHaveURL(/\/infra\/databases\/activity/, { timeout: 20000 });
 
     // The tabs are views of ONE dataset over ONE scope; a filter that silently
     // resets on tab switch makes the numbers across tabs incomparable.
-    const after = await dbm.getInstanceChipText();
-    expect(after, 'the instance chip changed across a tab switch').toBe(before);
+    const after = await dbm.getInstanceFilterText();
+    expect(after, 'the instance filter changed across a tab switch').toBe(before);
     expect(page.url(), 'the system scope was dropped from the URL').toContain('postgresql');
   });
 });

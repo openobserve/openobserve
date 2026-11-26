@@ -36,8 +36,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   reasoning. The destructive action is copyable SQL, never an execution.
 -->
 <template>
-  <DbmPageChrome title-data-test="dbm-blocked-title" :tab-counts="tabCounts">
+  <DbmPageChrome
+    title-data-test="dbm-blocked-title"
+    :tab-counts="tabCounts"
+    :range="range"
+    :last-run-at="lastRunAt"
+    :loading="loading"
+    @date-change="onDateChange"
+    @refresh="onRefresh()"
+  >
     <div class="flex min-h-0 flex-1 flex-col">
+      <DbmFilterBar
+        v-model:search="search"
+        :placeholder="t('dbm.blocked.searchPlaceholder')"
+        search-data-test="dbm-blocked-search"
+        :filters="dimensionFilters"
+        @search="load"
+      >
+        <!-- Which question the table answers. Defaults to "who's stuck". -->
+        <OToggleGroup
+          v-model="perspective"
+          class="shrink-0"
+          mobile-dropdown
+          data-test="dbm-blocked-perspective"
+        >
+          <OToggleGroupItem value="waiting" size="sm" data-test="dbm-blocked-perspective-waiting">
+            {{ t("dbm.blocked.perspective.waiting") }}
+            <OTooltip side="bottom" :content="t('dbm.blocked.perspective.waitingHint')" />
+          </OToggleGroupItem>
+          <OToggleGroupItem value="blocking" size="sm" data-test="dbm-blocked-perspective-blocking">
+            {{ t("dbm.blocked.perspective.blocking") }}
+            <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <DbmRecommendationMenu
+          :items="recommendationItems"
+          :empty-text="t('dbm.recommendations.menuEmptyBlocked')"
+        />
+      </DbmFilterBar>
       <OTable
         :enable-column-resize="true"
         :data="tableRows"
@@ -64,71 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @action="onRefresh()"
           />
         </template>
-        <template #toolbar>
-          <DbmTableToolbar
-            v-model:search="search"
-            :placeholder="t('dbm.blocked.searchPlaceholder')"
-            :debounce="400"
-            search-data-test="dbm-blocked-search"
-            @search="load"
-          >
-            <template #filters>
-              <DbmScopeFilters
-                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
-                :filters="dimensionFilters"
-                @clear="clearScope"
-              />
-            </template>
-            <!-- Which question the table answers. Defaults to "who's stuck". -->
-            <OToggleGroup
-              v-model="perspective"
-              class="shrink-0"
-              mobile-dropdown
-              data-test="dbm-blocked-perspective"
-            >
-              <OToggleGroupItem
-                value="waiting"
-                size="sm"
-                data-test="dbm-blocked-perspective-waiting"
-              >
-                {{ t("dbm.blocked.perspective.waiting") }}
-                <OTooltip side="bottom" :content="t('dbm.blocked.perspective.waitingHint')" />
-              </OToggleGroupItem>
-              <OToggleGroupItem
-                value="blocking"
-                size="sm"
-                data-test="dbm-blocked-perspective-blocking"
-              >
-                {{ t("dbm.blocked.perspective.blocking") }}
-                <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
-              </OToggleGroupItem>
-            </OToggleGroup>
-          </DbmTableToolbar>
-        </template>
-
-        <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
-            <DateTime
-              auto-apply
-              menu-align="end"
-              :default-type="range.type"
-              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-              :default-relative-time="range.relativeTimePeriod ?? undefined"
-              data-test-name="dbm-blocked-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
-              @on:date-change="onDateChange"
-            />
-            <ORefreshButton
-              layout="inline"
-              variant="outline"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-blocked-refresh"
-              @click="onRefresh()"
-            />
-          </div>
-        </template>
-
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
@@ -139,10 +110,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dbm-blocked-summary"
           />
 
+          <OBanner
+            v-if="samples.length && truncated"
+            variant="warning"
+            icon="warning-amber"
+            bar
+            dense
+            class="shrink-0"
+            data-test="dbm-blocked-coverage"
+          >
+            <span data-test="dbm-blocked-banner-text">{{
+              t("dbm.blocked.coverage.cappedShort")
+            }}</span>
+            <template #actions>
+              <OPopover side="bottom" align="end">
+                <template #trigger>
+                  <OButton variant="ghost" size="xs" data-test="dbm-blocked-banner-details">
+                    {{ t("dbm.coverage.details") }}
+                  </OButton>
+                </template>
+                <div
+                  class="text-text-body flex max-w-80 flex-col gap-2 p-3 text-sm"
+                  data-test="dbm-blocked-banner-detail-text"
+                >
+                  <p>
+                    {{ coverageLine }}
+                    <template v-if="checkedLabel">{{ checkedLabel }}</template>
+                  </p>
+                </div>
+              </OPopover>
+            </template>
+          </OBanner>
           <DbmLockCoverageLine
-            v-if="samples.length"
+            v-else-if="samples.length"
             :summary="coverageLine"
-            dot-class="bg-status-warning-text"
+            variant="info"
             :trailing-label="checkedLabel"
             data-test="dbm-blocked-coverage"
           />
@@ -204,40 +206,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ raw(row.query ?? "—") }}
               </OTruncatedText>
 
-              <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
-                <OTag type="dbSystem" :value="row.db_system" size="xs" />
-                <template v-if="row.application || row.db_instance || row.waitingOnPid != null">
-                  <span class="opacity-45">·</span>
-                  <OTruncatedText
-                    :tooltip="
-                      raw(
-                        [
-                          row.application,
-                          row.db_instance,
-                          row.waitingOnPid != null
-                            ? t('dbm.blocked.waitingOn', { pid: row.waitingOnPid })
-                            : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' · '),
-                      )
-                    "
-                  >
-                    <span v-if="row.application" class="text-text-secondary font-medium">{{
-                      raw(row.application)
-                    }}</span>
-                    <template v-if="row.db_instance">
-                      <span v-if="row.application" class="px-1 opacity-45">·</span>
-                      <span>{{ raw(row.db_instance) }}</span>
-                    </template>
-                    <template v-if="row.waitingOnPid != null">
-                      <span v-if="row.application || row.db_instance" class="px-1 opacity-45"
-                        >·</span
-                      >
-                      <span>{{ t("dbm.blocked.waitingOn", { pid: row.waitingOnPid }) }}</span>
-                    </template>
-                  </OTruncatedText>
-                </template>
+              <div
+                v-if="metaVisible(row)"
+                class="text-text-secondary flex min-h-4 min-w-0 items-center gap-1 text-xs"
+                data-test="dbm-blocked-meta"
+              >
+                <OTruncatedText v-if="!uniformInstance && row.db_instance">
+                  {{ raw(row.db_instance) }}
+                  <OTooltip :content="raw(engineName(row.db_system))" />
+                </OTruncatedText>
+                <span
+                  v-if="!uniformInstance && row.db_instance && !uniformApp && row.application"
+                  class="opacity-45"
+                  >·</span
+                >
+                <OTruncatedText v-if="!uniformApp && row.application">
+                  {{ raw(row.application) }}
+                </OTruncatedText>
+                <span
+                  v-if="row.waitingOnPid != null"
+                  class="shrink-0"
+                  data-test="dbm-blocked-waiting-on"
+                >
+                  {{ t("dbm.blocked.waitingOn", { pid: row.waitingOnPid }) }}
+                </span>
                 <span
                   v-if="row.longestWait"
                   class="bg-status-error-bg text-status-error-text rounded-default text-3xs ms-0.5 shrink-0 px-1 py-px font-semibold"
@@ -251,11 +243,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #cell-session="{ row }">
           <span
-            class="rounded-default text-2xs px-1.5 py-px font-mono font-semibold"
+            class="text-xs tabular-nums"
             :class="
-              row.kind === 'root'
-                ? 'bg-status-error-bg text-status-error-text'
-                : 'bg-surface-subtle text-text-heading'
+              row.kind === 'root' ? 'text-status-error-text font-semibold' : 'text-text-heading'
             "
             data-test="dbm-blocked-pid"
           >
@@ -269,9 +259,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              printing one sentence for every row. The database's own name for it
              stays underneath, for the DBA who wants to look it up. -->
         <template #cell-waitingFor="{ row }">
-          <div class="flex flex-col items-end leading-tight">
+          <div class="flex flex-col leading-tight">
             <OTruncatedText v-if="row.waitEventLabel" class="text-text-body max-w-full text-xs">
               {{ row.waitEventLabel }}
+              <OTooltip
+                v-if="row.waitEventRaw"
+                :content="t('dbm.blocked.lockType', { type: row.waitEventRaw })"
+              />
             </OTruncatedText>
             <OTruncatedText
               v-else-if="row.waitEventRaw"
@@ -281,30 +275,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ raw(row.waitEventRaw) }}
             </OTruncatedText>
             <span v-else class="text-text-muted text-xs">{{ raw("—") }}</span>
-            <OTruncatedText
-              v-if="row.waitEventLabel && row.waitEventRaw"
-              class="text-text-secondary text-3xs max-w-full font-mono"
-            >
-              {{ raw(row.waitEventRaw) }}
-            </OTruncatedText>
           </div>
         </template>
 
         <!-- The direct blocker, plus how far the real culprit is. -->
         <template #cell-heldUpBy="{ row }">
-          <div class="flex flex-col items-end leading-tight">
-            <OTruncatedText class="text-text-body max-w-full text-xs">
-              {{ raw(row.blockerApplication ?? "—") }}
-            </OTruncatedText>
-            <span class="text-text-muted text-3xs flex items-center justify-end gap-1">
-              <span v-if="row.blockerPid != null">
-                {{ t("dbm.deadlocks.detail.pid", { pid: row.blockerPid }) }}
-              </span>
-              <span
-                v-if="row.depth > 1"
-                class="bg-surface-subtle text-text-secondary rounded-default px-1 py-px font-semibold"
-              >
+          <div class="flex flex-col leading-tight">
+            <span class="flex min-w-0 items-center gap-1">
+              <OTruncatedText class="text-text-body max-w-full text-xs">
+                {{
+                  raw(
+                    blockerName(row) ??
+                      (row.blockerPid != null
+                        ? t("dbm.deadlocks.detail.pid", { pid: row.blockerPid })
+                        : "—"),
+                  )
+                }}
+                <OTooltip
+                  v-if="blockerState(row)"
+                  :content="t('dbm.blocked.blockerState', { state: blockerState(row) })"
+                />
+              </OTruncatedText>
+              <span v-if="!blockerName(row) && row.depth > 1" :class="DEPTH_CHIP_CLASS">
                 {{ t("dbm.blocked.deep", { count: row.depth }) }}
+                <OTooltip :content="t('dbm.blocked.deepHint', { count: row.depth }, row.depth)" />
+              </span>
+            </span>
+            <span
+              v-if="blockerName(row) && row.blockerPid != null"
+              class="text-text-muted text-3xs flex items-center gap-1"
+            >
+              <span>{{ t("dbm.deadlocks.detail.pid", { pid: row.blockerPid }) }}</span>
+              <span v-if="row.depth > 1" :class="DEPTH_CHIP_CLASS">
+                {{ t("dbm.blocked.deep", { count: row.depth }) }}
+                <OTooltip :content="t('dbm.blocked.deepHint', { count: row.depth }, row.depth)" />
               </span>
             </span>
           </div>
@@ -313,6 +317,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-application="{ row }">
           <span class="text-text-body font-mono text-xs">
             {{ raw(row.application ?? "—") }}
+            <OTooltip
+              v-if="row.applicationState"
+              :content="t('dbm.blocked.blockerState', { state: row.applicationState })"
+            />
           </span>
         </template>
 
@@ -370,10 +378,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :instance="row.db_instance"
               data-test="dbm-blocked-terminate"
             />
-            <DbmRowActions
+            <OTableRowActions
               :actions="rowActions"
-              data-test="dbm-blocked-row-actions"
-              @action="(id) => onRowAction(id, row)"
+              :row="row"
+              more-data-test="dbm-blocked-row-more-actions"
             />
           </div>
         </template>
@@ -407,8 +415,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
+          <!-- A search that matched nothing is not an absence of waits. -->
+          <OEmptyState
+            v-if="!loading && searchHidEverything"
+            preset="no-search-results"
+            data-test="dbm-blocked-no-matches"
+            @action="clearSearch"
+          />
           <DbmLockEmptyState
-            v-if="!loading && notCollecting"
+            v-else-if="!loading && notCollecting"
             :healthy="false"
             :title="t('dbm.blocked.notCollecting.title')"
             :description="t('dbm.blocked.notCollecting.description')"
@@ -450,26 +465,27 @@ import { useStore } from "vuex";
 
 import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
+import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DateTime from "@/components/DateTime.vue";
-import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
-import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
+import DbmRecommendationMenu, {
+  type DbmRecommendationMenuItem,
+} from "@/components/dbm/DbmRecommendationMenu.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
-import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTableRowActions from "@/lib/core/Table/sub-components/OTableRowActions.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
   type BlockingChain,
@@ -490,6 +506,8 @@ import {
   chainsFromSamples,
   DEFAULT_BLOCKING_PERSPECTIVE,
   flattenChains,
+  isEngineState,
+  formatSeconds,
   isIdleBlocker,
   isNotablyLongestWait,
   parseBlockingSamples,
@@ -501,7 +519,9 @@ import {
 } from "@/utils/dbm/blocking";
 import { countClaim, formatAge, formatClock } from "@/utils/dbm/format";
 import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
+import { buildRecommendations, recommendationRuleParams } from "@/utils/dbm/recommendations";
 import { DBM_STATUS_TONES } from "@/utils/dbm/tones";
+import { engineName, uniformValue } from "@/utils/dbm/uniformValue";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -602,6 +622,8 @@ interface BlockedRow {
   kind: "root" | "waiting-blocking" | "waiting";
   blockerPid: number | null;
   blockerApplication?: string | null;
+  /** MySQL's transaction state for the row, kept out of the app columns. */
+  applicationState?: string | null;
   longestWait: boolean;
   pill: { label: I18nText; tone: string } | null;
   pillNote: I18nText | null;
@@ -648,7 +670,7 @@ const waitingRows = computed<BlockedRow[]>(() => {
       isLast: true,
       pid: row.blocked_pid,
       query: row.blocked_query,
-      application: row.blocked_application,
+      application: isEngineState(row.blocked_application) ? null : row.blocked_application,
       db_system: row.db_system,
       db_instance: row.db_instance,
       waitingOnPid: null,
@@ -688,7 +710,8 @@ const blockingRows = computed<BlockedRow[]>(() =>
       isLast: row.isLast,
       pid: row.pid,
       query: row.query,
-      application: row.application,
+      application: isEngineState(row.application) ? null : row.application,
+      applicationState: isEngineState(row.application) ? row.application : null,
       db_system: row.db_system,
       db_instance: row.db_instance,
       waitingOnPid: row.waitingOnPid,
@@ -724,6 +747,46 @@ const tableRows = computed<BlockedRow[]>(() =>
   perspective.value === "blocking" ? blockingRows.value : waitingRows.value,
 );
 
+/** A value shared by every visible row is said once in the header tooltip instead. */
+const uniformInstance = computed(() => uniformValue(tableRows.value, (r) => r.db_instance));
+const uniformApp = computed(() => uniformValue(tableRows.value, (r) => r.application));
+
+const metaVisible = (row: BlockedRow) =>
+  Boolean(
+    (!uniformInstance.value && row.db_instance) ||
+    (!uniformApp.value && row.application) ||
+    row.waitingOnPid != null ||
+    row.longestWait,
+  );
+
+const blockerName = (row: BlockedRow) =>
+  isEngineState(row.blockerApplication) ? null : (row.blockerApplication ?? null);
+const DEPTH_CHIP_CLASS =
+  "bg-surface-subtle text-text-secondary rounded-default text-3xs shrink-0 px-1 py-px font-semibold";
+
+const blockerState = (row: BlockedRow) =>
+  isEngineState(row.blockerApplication) ? row.blockerApplication : null;
+
+const queryHeaderTip = computed(() =>
+  [
+    uniformInstance.value &&
+      t("dbm.blocked.columns.allOnInstance", { instance: uniformInstance.value }),
+    uniformApp.value && t("dbm.blocked.columns.allInApp", { app: uniformApp.value }),
+  ]
+    .filter(Boolean)
+    .join(" "),
+);
+
+/** The bar turns amber and red at fixed shares of the longest wait shown. */
+const waitingHeaderTip = computed(() =>
+  raw(
+    t("dbm.blocked.columns.waitingHint", {
+      red: formatSeconds(longestWait.value * WAIT_TONE_RULES.critical),
+      amber: formatSeconds(longestWait.value * WAIT_TONE_RULES.warning),
+    }),
+  ),
+);
+
 const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
   perspective.value === "blocking"
     ? [
@@ -731,6 +794,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
           id: "query",
           accessorKey: "query",
           header: t("dbm.blocked.columns.sessionQuery"),
+          meta: { headerTooltip: queryHeaderTip.value ? raw(queryHeaderTip.value) : undefined },
           // Unsized, it took an even share and cut the statement after a few words.
           size: 420,
           enableSorting: false,
@@ -765,15 +829,16 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
           accessorKey: "waitSeconds",
           header: t("dbm.blocked.columns.waiting"),
           size: 120,
-          meta: { align: "right" },
+          meta: { align: "right", headerTooltip: waitingHeaderTip.value },
         },
         {
           id: "actions",
           header: t("dbm.common.actions"),
           isAction: true,
-          size: 92,
+          // Ask-AI button + the copyable statement + the row menu, not three icons.
+          size: 440,
           enableSorting: false,
-          meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
         },
       ]
     : [
@@ -781,6 +846,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
           id: "query",
           accessorKey: "query",
           header: t("dbm.blocked.columns.stuckQuery"),
+          meta: { headerTooltip: queryHeaderTip.value ? raw(queryHeaderTip.value) : undefined },
           size: 420,
           enableSorting: false,
         },
@@ -798,7 +864,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
           header: t("dbm.blocked.columns.waitingFor"),
           size: 144,
           enableSorting: false,
-          meta: { align: "right" },
+          meta: { align: "left" },
         },
         {
           id: "heldUpBy",
@@ -806,7 +872,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
           accessorKey: "blockerApplication",
           header: t("dbm.blocked.columns.heldUpBy"),
           size: 176,
-          meta: { align: "right" },
+          meta: { align: "left" },
         },
         {
           id: "waiting",
@@ -814,7 +880,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
           accessorKey: "waitSeconds",
           header: t("dbm.blocked.columns.waiting"),
           size: 120,
-          meta: { align: "right" },
+          meta: { align: "right", headerTooltip: waitingHeaderTip.value },
         },
         {
           id: "actions",
@@ -829,10 +895,48 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
 
 /** Only what the handler actually implements — a control that does nothing is
  *  worse than no control. */
-const rowActions = computed<DbmRowAction[]>(() => [
-  { id: "copy", icon: "content-copy", label: t("dbm.blocked.rowActions.copy") },
-  { id: "alert", icon: "shield", label: t("dbm.blocked.rowActions.alertMe") },
+const rowActions = computed<OTableRowAction[]>(() => [
+  {
+    id: "copy",
+    icon: "content-copy",
+    label: t("dbm.blocked.rowActions.copy"),
+    onSelect: (row) => onRowAction("copy", row),
+    dataTest: () => "dbm-blocked-row-actions-copy",
+  },
+  {
+    id: "alert",
+    icon: "notifications-active",
+    label: t("dbm.common.createAlert"),
+    onSelect: (row) => onRowAction("alert", row),
+    dataTest: () => "dbm-blocked-row-actions-alert",
+  },
 ]);
+
+// The search runs on the server, so no rows plus a typed term means the term hid them.
+const searchHidEverything = computed(() => !!search.value.trim() && !tableRows.value.length);
+const clearSearch = () => {
+  search.value = "";
+  void load();
+};
+
+const recommendationItems = computed<DbmRecommendationMenuItem[]>(() =>
+  buildRecommendations({ blocking: samples.value, sessions: [], indexes: [], serverMetrics: null })
+    .filter((rec) => rec.id === "high-impact-blocker")
+    .map((rec, i) => {
+      const { key, params } = recommendationRuleParams(rec.id);
+      return {
+        key: `${rec.id}-${i}`,
+        id: rec.id,
+        tone: rec.tone,
+        title: t("dbm.recommendations.high-impact-blocker.title"),
+        body: t("dbm.recommendations.high-impact-blocker.body", {
+          pid: rec.evidence.pid ?? "—",
+          count: rec.evidence.blockedCount ?? 0,
+        }),
+        rule: t(key as Parameters<typeof t>[0], params),
+      };
+    }),
+);
 
 const longestWait = computed(() =>
   samples.value.reduce((max, s) => Math.max(max, s.wait_seconds ?? 0), 0),
@@ -1012,10 +1116,6 @@ const notCollectingChecks = computed<DbmLockCheck[]>(() =>
 
 // ── formatting ──────────────────────────────────────────────────────────────
 
-/** Sub-minute waits read in seconds with one decimal — 4.8s, not 5s. */
-const formatSeconds = (seconds: number): string =>
-  seconds >= 60 ? `${Math.round(seconds / 60)}m` : `${seconds.toFixed(1)}s`;
-
 const waitTone = (share: number) =>
   share >= WAIT_TONE_RULES.critical
     ? "bg-status-error-text"
@@ -1076,7 +1176,6 @@ const {
   filters: dimensionFilters,
   requestParams: scopeParams,
   queryParams: scopeQuery,
-  clear: clearScopeModels,
 } = useDbmScopeFilters({
   query: route.query,
   // Re-read on activation: this page is kept alive, so its setup-time seed
@@ -1106,13 +1205,6 @@ const {
     load();
   },
 });
-
-const clearScope = () => {
-  clearScopeModels();
-  search.value = "";
-  syncUrl();
-  load();
-};
 
 /**
  * Mirror the scope into the URL so it survives a tab switch, a reload and a

@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import type { Freshness } from "@/services/db_monitoring";
 
 import DbmCoverageLine from "./DbmCoverageLine.vue";
-import DbmToolbarNote from "./DbmToolbarNote.vue";
 
 const freshness = (over: Partial<Freshness> = {}): Freshness => ({
   data_through: Date.now() * 1000,
@@ -39,7 +38,11 @@ const mountLine = (props: Record<string, unknown> = {}) =>
     global: { plugins: [i18n] },
   });
 
+// The long sentence, which sits behind the banner's Details button.
 const lineText = (wrapper: ReturnType<typeof mountLine>) =>
+  String((wrapper.vm as unknown as { entry: { long: string } | null }).entry?.long ?? "");
+
+const bannerText = (wrapper: ReturnType<typeof mountLine>) =>
   wrapper.find("[data-test='dbm-coverage-text']").text();
 
 /** `data_through` set so the component computes exactly `minutes` of lag. */
@@ -47,71 +50,6 @@ const behindBy = (minutes: number) =>
   freshness({ data_through: (Date.now() - minutes * 60_000) * 1000 });
 
 describe("DbmCoverageLine", () => {
-  /**
-   * The backend fuses percentiles by request-weighting across windows, which is
-   * an average and not a quantile — it says so by setting `percentiles_estimated`.
-   * Any sentence claiming exactness has to be gated on that flag, or the page
-   * contradicts the clipboard summary built from the same response.
-   */
-  describe("the exactness claim answers to percentiles_estimated", () => {
-    it("says speeds are exact when the server did not fuse windows", () => {
-      const wrapper = mountLine({
-        exactPercentiles: true,
-        freshness: freshness({ percentiles_estimated: false }),
-      });
-      expect(lineText(wrapper)).toContain("they're exact");
-    });
-
-    it("says a several-schema database shows its slowest schema's speeds", () => {
-      const wrapper = mountLine({ exactPercentiles: true, slowestSchemaSpeeds: true });
-      expect(lineText(wrapper)).toBe(
-        "All databases reporting. Speeds are exact per schema; a database with several schemas shows its slowest one.",
-      );
-    });
-
-    it("keeps the estimated copy when the server fused windows, several schemas or not", () => {
-      const wrapper = mountLine({
-        exactPercentiles: true,
-        slowestSchemaSpeeds: true,
-        freshness: freshness({ percentiles_estimated: true }),
-      });
-      expect(lineText(wrapper)).toContain("close but not exact");
-    });
-
-    it("never claims exactness when the server fused windows", () => {
-      const wrapper = mountLine({
-        exactPercentiles: false,
-        freshness: freshness({ percentiles_estimated: true }),
-      });
-      expect(lineText(wrapper)).not.toContain("they're exact");
-      expect(lineText(wrapper)).toContain("close but not exact");
-    });
-
-    /**
-     * `lineHealthyAll` carries the SAME "measured across every call, so they're
-     * exact" claim as `lineExact` and is reachable with no flag at all — any
-     * list page whose remainder bucket happens to be empty prints it — so it
-     * must answer to `percentiles_estimated` too.
-     */
-    it("does not claim exactness on a full list when percentiles were fused", () => {
-      const wrapper = mountLine({
-        exactPercentiles: false,
-        other: [],
-        freshness: freshness({ percentiles_estimated: true }),
-      });
-      expect(lineText(wrapper)).not.toContain("they're exact");
-      expect(lineText(wrapper)).toContain("close but not exact");
-    });
-
-    it("still says the whole list is shown when the remainder is empty", () => {
-      const wrapper = mountLine({
-        other: [],
-        freshness: freshness({ percentiles_estimated: true }),
-      });
-      expect(lineText(wrapper)).toContain("every query that ran");
-    });
-  });
-
   /**
    * The summary is a single-sentence priority chain, and a narrowing filter
    * must not win it outright — that would silently drop the staleness warning.
@@ -166,10 +104,10 @@ describe("DbmCoverageLine", () => {
       expect(text.indexOf("checkout-service")).toBeLessThan(text.indexOf("45 minutes behind"));
     });
 
-    it("keeps the plain filter sentence when the counting is current", () => {
-      const wrapper = mountLine({ filterLabel: "checkout-service" });
-      expect(lineText(wrapper)).toContain("checkout-service");
-      expect(lineText(wrapper)).not.toContain("behind");
+    it("shows no banner for a filter while the counting is current", () => {
+      expect(
+        mountLine({ filterLabel: "checkout-service" }).find("[data-test='dbm-coverage']").exists(),
+      ).toBe(false);
     });
 
     /**
@@ -178,7 +116,7 @@ describe("DbmCoverageLine", () => {
      */
     it("does not add the lag at the staleness threshold itself", () => {
       const wrapper = mountLine({ filterLabel: "checkout-service", freshness: behindBy(30) });
-      expect(lineText(wrapper)).not.toContain("minutes behind");
+      expect(wrapper.find("[data-test='dbm-coverage']").exists()).toBe(false);
     });
 
     it("adds the lag one minute past the staleness threshold", () => {
@@ -201,93 +139,71 @@ describe("DbmCoverageLine", () => {
     });
   });
 
-  /**
-   * The trailer's "the last half-minute is still coming in" is only true while
-   * the counting really is current — at 25 minutes behind it is simply false.
-   * The copy must never assert a freshness the data does not support.
-   */
-  describe("the counted-up-to note never overstates freshness", () => {
-    const trailer = (wrapper: ReturnType<typeof mountLine>) =>
-      wrapper.find("[data-test='dbm-coverage']").text();
-
-    it("claims only the last half-minute when the counting really is current", () => {
-      const wrapper = mountLine({ freshness: behindBy(0) });
-      expect(trailer(wrapper)).toContain("last half-minute");
-    });
-
-    it("reports the real lag instead of half a minute when it is 25 minutes behind", () => {
-      const wrapper = mountLine({ freshness: behindBy(25) });
-      expect(trailer(wrapper)).not.toContain("last half-minute");
-      expect(trailer(wrapper)).toContain("25 minutes behind");
-    });
-
-    it("does not cry lag over a minute or two of ordinary rollup delay", () => {
-      const wrapper = mountLine({ freshness: behindBy(3) });
-      expect(trailer(wrapper)).toContain("last half-minute");
-      expect(trailer(wrapper)).not.toContain("behind");
-    });
-
-    /** The boundary itself is still ordinary delay; only PAST it is the claim false. */
-    it("still claims the half-minute exactly at the ordinary-delay boundary", () => {
-      const wrapper = mountLine({ freshness: behindBy(4) });
-      expect(trailer(wrapper)).toContain("last half-minute");
-    });
-
-    it("reports the lag one minute past the boundary", () => {
-      const wrapper = mountLine({ freshness: behindBy(5) });
-      expect(trailer(wrapper)).not.toContain("last half-minute");
-      expect(trailer(wrapper)).toContain("5 minutes behind");
-    });
-  });
-
-  describe("the legend slot", () => {
-    it("renders a legend on the line, beside the counted-up-to note", () => {
-      const wrapper = mount(DbmCoverageLine, {
-        props: { freshness: freshness(), hits: [{ total_time_ns: 1_000 }] },
-        slots: { legend: '<span data-test="probe-legend">key</span>' },
-        global: { plugins: [i18n] },
+  describe("the banner", () => {
+    const now = () => Date.now() * 1000;
+    const gapFresh = (fromMinAgo: number, toMinAgo: number) =>
+      freshness({
+        data_through: now() - fromMinAgo * 60_000_000,
+        tail_covers_from: now() - toMinAgo * 60_000_000,
+        tail_through: now(),
       });
-      const line = wrapper.get("[data-test='dbm-coverage-line']");
-      expect(line.find("[data-test='probe-legend']").exists()).toBe(true);
+    const banner = (w: ReturnType<typeof mountLine>) => w.findComponent({ name: "OBanner" });
+
+    it("renders nothing when all is well", () => {
+      expect(mountLine().find("[data-test='dbm-coverage']").exists()).toBe(false);
     });
 
-    it("renders nothing extra without one", () => {
-      expect(mountLine().find("[data-test='probe-legend']").exists()).toBe(false);
-    });
-  });
-
-  describe("inline, as a toolbar note", () => {
-    const note = (wrapper: ReturnType<typeof mountLine>) => wrapper.findComponent(DbmToolbarNote);
-
-    it("carries the same sentence as the line, as a note instead of a band", () => {
-      const wrapper = mountLine({ inline: true });
-      expect(wrapper.find("[data-test='dbm-coverage-line']").exists()).toBe(false);
-      expect(note(wrapper).props("text")).toBe(
-        mountLine().find("[data-test='dbm-coverage-text']").text(),
-      );
-      expect(note(wrapper).props("tone")).toBe("neutral");
-    });
-
-    it("renders nothing while empty, where the empty state already speaks", () => {
-      expect(note(mountLine({ inline: true, hits: [] })).exists()).toBe(false);
-    });
-
-    it("keeps the counted-up-to time in the tooltip", () => {
-      const detail = String(note(mountLine({ inline: true })).props("detail"));
-      expect(detail).toContain("Counted up to");
-    });
-
-    it("turns amber when behind and red when data is missing", () => {
-      expect(note(mountLine({ inline: true, freshness: behindBy(45) })).props("tone")).toBe(
-        "warning",
-      );
+    it("renders nothing while empty", () => {
       expect(
-        note(mountLine({ inline: true, freshness: freshness({ data_through: 0 }) })).props("tone"),
-      ).toBe("error");
+        mountLine({ hits: [], freshness: behindBy(45) })
+          .find("[data-test='dbm-coverage']")
+          .exists(),
+      ).toBe(false);
     });
 
-    it("passes compact through for a toolbar with no room for text", () => {
-      expect(note(mountLine({ inline: true, compact: true })).props("compact")).toBe(true);
+    it("warns with a short dated gap message clipped to the window", () => {
+      const w = mountLine({
+        freshness: gapFresh(300, 100),
+        windowStart: now() - 150 * 60_000_000,
+        windowEnd: now(),
+      });
+      expect(banner(w).props("variant")).toBe("warning");
+      expect(bannerText(w)).toMatch(/\(50 min\)\. Collection may have stopped\.$/);
+    });
+
+    it("ignores a gap that lies outside the window", () => {
+      const w = mountLine({
+        freshness: gapFresh(300, 100),
+        windowStart: now() - 60 * 60_000_000,
+        windowEnd: now(),
+      });
+      expect(lineText(w)).not.toContain("missing from this window");
+    });
+
+    it("warns when behind and shows no banner for a subset", () => {
+      expect(banner(mountLine({ freshness: behindBy(45) })).props("variant")).toBe("warning");
+      expect(
+        mountLine({ filterLabel: "checkout-service" }).find("[data-test='dbm-coverage']").exists(),
+      ).toBe(false);
+    });
+
+    it("warns about failures with no driver status code", () => {
+      const w = mountLine({ codedErrorShare: 0.5, errorCount: 4 });
+      expect(banner(w).props("variant")).toBe("warning");
+    });
+
+    it("warns about uncoded failures even when 20% or more of the time is outside the shown rows", () => {
+      const w = mountLine({
+        other: [{ total_time_ns: 1_000 }],
+        codedErrorShare: 0.5,
+        errorCount: 4,
+      });
+      expect(banner(w).props("variant")).toBe("warning");
+    });
+
+    it("keeps the long sentence behind a Details button", () => {
+      const w = mountLine({ freshness: behindBy(45) });
+      expect(w.find("[data-test='dbm-coverage-details']").exists()).toBe(true);
     });
   });
 });

@@ -26843,9 +26843,6 @@
         "failed": "Fallidas"
       },
       "databaseCount": "1 base de datos | {count} bases de datos",
-      "openQueries": "Ver sus consultas",
-      "viewMetrics": "Ver métricas",
-      "alertMe": "Alertarme",
       "columnHints": {
         "qps": "Llamadas por segundo — las llamadas de esta ventana divididas por su duración, de modo que una vista de 15 minutos y una de 4 horas sigan siendo comparables.",
         "p50": "La mitad de todas las llamadas terminó antes que esto. Medido a partir de las llamadas completadas en las trazas de tu aplicación.",
@@ -26856,14 +26853,7 @@
       },
       "failedChip": "{count} fallidas",
       "columnSubLabels": {
-        "attention": "desde la base de datos",
-        "load": "desde tus aplicaciones",
         "calls": "desde tus aplicaciones"
-      },
-      "attention": {
-        "connections": "conexiones",
-        "noLimit": "sin límite publicado",
-        "unknown": "no medido"
       }
     },
     "queries": {
@@ -26931,19 +26921,13 @@
       "errorsNone": "ninguna",
       "errorsAll": "todas",
       "actions": {
-        "open": "Abrir detalles",
         "traces": "Ver trazas de ejemplo",
         "copy": "Copiar consulta",
         "copied": "Consulta copiada",
-        "copyFailed": "No se pudo copiar la consulta.",
-        "alert": "Avísame si esto se ralentiza"
+        "copyFailed": "No se pudo copiar la consulta."
       },
       "otherRowTextFor": "Todas las demás consultas en {database}",
-      "otherRowDetailShort": "— {calls} llamadas.",
-      "columnSubLabels": {
-        "calls": "servidor donde se informó",
-        "load": "servidor donde se informó"
-      }
+      "otherRowDetailShort": "— {calls} llamadas."
     },
     "insights": {
       "showRows": "Mostrar esta consulta | Mostrar estas {count} consultas",
@@ -26996,26 +26980,9 @@
       }
     },
     "coverage": {
-      "unknownNote": "No hay nada que medir en el rango y los filtros que has elegido.",
-      "lineHealthy": "Estás viendo el {percent}% del tiempo de esta base de datos: los {count} tipos de consulta más pesados.",
-      "lineRemainder": "Estás viendo el {percent}% del tiempo de esta base de datos. El resto está en consultas más livianas que no enumeramos una por una.",
-      "lineStale": "Nuestro conteo va {minutes} minutos atrasado, por lo que las consultas más recientes pueden no estar aquí todavía.",
       "lineTruncated": "Hubo más datos en el último tramo de los que pudimos asimilar, por lo que los números más recientes están subestimados.",
-      "lineTruncatedStale": "Hubo más datos en el último tramo de los que pudimos asimilar, y nuestro conteo va {minutes} minutos atrasado: los números más recientes están subestimados y las consultas más recientes pueden no estar aquí todavía.",
       "lineGap": "Faltan {minutes} minutos en esta ventana. Nuestro conteo se detuvo en {stopped} y solo puede retroceder {reach} minutos, por lo que nada cubre {from}–{to}.",
-      "lineSubset": "Has filtrado a {filter}, por lo que estos porcentajes describen las filas mostradas, no toda la base de datos.",
-      "lineHealthyAll": "Estás viendo todas las consultas que se ejecutaron. Las velocidades aquí se miden en cada llamada, por lo que son exactas.",
-      "lineHealthyAllEstimated": "Estás viendo todas las consultas que se ejecutaron. Las velocidades aquí se combinan de varios tramos de tiempo, por lo que son aproximadas pero no exactas.",
-      "lineCountedTo": "Contado hasta {time}; el último medio minuto aún está llegando.",
-      "lineExact": "Todas las bases de datos informando. Las velocidades aquí se miden en cada llamada, por lo que son exactas.",
-      "lineExactEstimated": "Todas las bases de datos informando. Las velocidades aquí se combinan de varios tramos de tiempo, por lo que son aproximadas pero no exactas.",
-      "lineExactSlowestSchema": "Todas las bases de datos están informando. Las velocidades son exactas por esquema; si una base de datos tiene varios esquemas, se muestra la velocidad del más lento.",
-      "lineSubsetUnnamed": "Tus filtros reducen esto por debajo del nivel en que se suman estos totales, por lo que los porcentajes describen las filas mostradas en lugar de toda la base de datos.",
-      "lineQuery": "Los tiempos se miden desde tu aplicación, por lo que incluyen el tiempo de red y cualquier espera por una conexión libre.",
-      "lineUncodedErrors": "{percent} de los fallos aquí devolvieron sin un código de razón, por lo que pueden contarse pero no explicarse.",
-      "lineSubsetStale": "Has filtrado a {filter}, y nuestro conteo va {minutes} minutos atrasado: estos porcentajes describen las filas mostradas, y las consultas más recientes pueden no estar aquí todavía.",
-      "lineSubsetUnnamedStale": "Tus filtros reducen esto por debajo del nivel en que se suman estos totales, y nuestro conteo va {minutes} minutos atrasado: los porcentajes describen las filas mostradas, y las consultas más recientes pueden no estar aquí todavía.",
-      "lineCountedToBehind": "Contado hasta {time}; vamos {minutes} minutos atrasados."
+      "lineUncodedErrors": "{percent} de los fallos aquí devolvieron sin un código de razón, por lo que pueden contarse pero no explicarse."
     },
     "breakdown": {
       "loading": "Calculando a dónde se fue el tiempo…",
@@ -27534,11 +27501,9 @@
       },
       "rowActions": {
         "topQueries": "Encuentra estos en Consultas principales.",
-        "copy": "Copiar ambas consultas",
-        "alert": "Alertarme sobre interbloqueos"
+        "copy": "Copiar ambas consultas"
       },
       "detail": {
-        "mostRecent": "Más reciente · {time}",
         "nthOf": "{index} de {total}",
         "earlier": "Anterior",
         "later": "Posterior",
@@ -27559,12 +27524,7 @@
         "fixBody": "Estas dos sentencias tocan filas de {object} en orden opuesto. Haz que ambos lados actualicen en el mismo orden — el id más bajo primero — y este par ya no podrá interbloquearse.",
         "fixGeneric": "Ambos lados tienen lo que el otro quiere. Haz que cada transacción tome estos bloqueos en el mismo orden y este par ya no podrá interbloquearse.",
         "copyForSlack": "Copiar",
-        "occurrencesTitle": "Las {count} veces que este par tuvo un interbloqueo",
-        "occurrencesHint": "Selecciona un punto para cargar ese de arriba",
-        "lostLabel": "{pid} perdió",
-        "bothSidesLose": "Ambos lados se cancelan casi por igual — {a} contra {b}. Ninguna aplicación es el problema; el orden lo es.",
-        "oneSideLoses": "{pid} se cancela cada vez.",
-        "showAbove": "Mostrar arriba",
+        "oneSideLoses": "{app} se cancela cada vez.",
         "copy": "Copiar SQL",
         "seeInTopQueries": "Ver en Consultas principales",
         "whichService": "¿Qué servicio?",
@@ -27575,8 +27535,6 @@
         "copyForSlackHint": "Ambas sentencias, con qué frecuencia este par ha entrado en interbloqueo y cuándo fue la última vez — escrito como un mensaje que puedes pegar en un canal o en un ticket."
       },
       "storm": {
-        "title": "Tormenta de interbloqueos.",
-        "body": "{count} en esta ventana — normalmente ninguno.",
         "copyForSlack": "Copiar",
         "biasWarning": "Espera que la pestaña de Consultas principales parezca más tranquila de lo que realmente está ahora. Una consulta cancelada aún termina, pero las que están en cola detrás de estos bloqueos no lo han hecho, por lo que los contadores de llamadas allí son más bajos de lo que tus usuarios están experimentando."
       },
@@ -27680,8 +27638,7 @@
       },
       "rowActions": {
         "showChain": "Mostrar la cadena",
-        "copy": "Copiar consulta",
-        "alertMe": "Alertarme sobre esperas de bloqueo"
+        "copy": "Copiar consulta"
       },
       "waitEvent": {
         "transaction": "a que otra transacción finalice",
@@ -27802,8 +27759,6 @@
         "application": "Aplicación",
         "state": "Estado",
         "waitEvent": "Esperando en",
-        "running": "Tiempo de ejecución",
-        "lastQuery": "Última consulta",
         "query": "Consulta",
         "blockedBy": "Bloqueado por"
       },
@@ -27820,7 +27775,6 @@
         "capped": "Se muestrearon más sesiones de las que pudimos leer a la vez. Estas son las {count} que tenemos.",
         "filtered": "Mostrando {count} de {total} sesiones."
       },
-      "transactionOpen": "transacción abierta durante {age}",
       "healthy": {
         "title": "Nada se está ejecutando en este momento",
         "description": "Muestreamos las tablas de sesiones de tus bases de datos y no encontramos sesiones activas. Eso es lo normal y saludable para una base de datos inactiva, no una brecha en lo que recopilamos.",
@@ -27870,15 +27824,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "Salud de la instancia",
-      "columnHint": "Conexiones respecto al límite, a partir de las métricas que tu colector ya envía. En blanco hasta que un receptor informe de esta instancia.",
       "connectionsOf": "{used} de {limit} conexiones",
       "connectionsNoLimit": "{used} conexiones",
       "noLimitHint": "El receptor de este motor no publica un límite de conexiones por sí mismo, por lo que solo se muestra el recuento. La receta de límite de conexiones de la tarjeta de configuración (sqlquery/mysql_limits) recopila max_connections y lo convierte en un porcentaje.",
       "trendLabel": "Conexiones en la ventana seleccionada",
       "cacheHit": "Acierto de caché {percent}",
-      "lagBytes": "Réplica {value} por detrás",
-      "lagSeconds": "Réplica {value} por detrás",
       "deadlocks": "{count} interbloqueo | {count} interbloqueos",
       "noTraffic": "Sin tráfico de aplicaciones en esta ventana",
       "noTrafficHint": "Tu colector informa de esta instancia, pero ninguna aplicación la consultó durante esta ventana. Sus columnas de consulta están vacías porque nada las midió, no porque fuera rápida.",
@@ -27917,7 +27867,6 @@
       "checkRange": "Amplía el rango de tiempo — la receta informa una vez cada 60 segundos.",
       "columns": {
         "relation": "Tabla",
-        "instance": "Instancia",
         "totalBytes": "Tamaño total",
         "heapBytes": "Tamaño del heap",
         "overheadBytes": "Índice + TOAST",
@@ -27936,10 +27885,7 @@
       }
     },
     "recommendations": {
-      "title": "Recomendaciones",
-      "subtitle": "Comprobaciones deterministas sobre lo que ya informa el colector. Cada una indica la medición y el umbral que superó.",
       "countersCumulative": "Los recuentos de escaneos de índice son totales acumulados desde el último reinicio de estadísticas, no recuentos para el intervalo de tiempo seleccionado.",
-      "andMore": "y {count} más como este",
       "unused-index": {
         "title": "Índice no escaneado",
         "body": "{index} en {relation} no tiene escaneos registrados y ocupa {size}.",

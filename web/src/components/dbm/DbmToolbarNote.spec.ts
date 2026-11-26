@@ -26,11 +26,15 @@ const mountNote = (props: Record<string, unknown> = {}) =>
   mount(DbmToolbarNote, { props: { text: raw("Sampled on a schedule"), ...props } });
 
 describe("DbmToolbarNote", () => {
-  it("shows the short form and keeps the full text for the tooltip", () => {
+  it("is a button named by the short form, with no visible text", () => {
     const wrapper = mountNote({ detail: raw("Sampled every 10 seconds, idle sessions dropped.") });
-    expect(wrapper.find('[data-test="dbm-toolbar-note-text"]').text()).toBe(
-      "Sampled on a schedule",
-    );
+    const button = wrapper.find("button");
+    expect(button.attributes("aria-label")).toBe("Sampled on a schedule");
+    expect(button.text()).toBe("");
+  });
+
+  it("shows the detail in the tooltip", () => {
+    const wrapper = mountNote({ detail: raw("Sampled every 10 seconds, idle sessions dropped.") });
     expect(wrapper.findComponent(OTooltip).props("content")).toBe(
       "Sampled every 10 seconds, idle sessions dropped.",
     );
@@ -40,22 +44,6 @@ describe("DbmToolbarNote", () => {
     expect(mountNote().findComponent(OTooltip).props("content")).toBe("Sampled on a schedule");
   });
 
-  it("collapses to its icon below xl so the filter chips keep their room", () => {
-    expect(mountNote().find('[data-test="dbm-toolbar-note-text"]').classes()).toContain(
-      "max-xl:hidden",
-    );
-  });
-
-  it("never takes more than 20rem of the toolbar, so the search keeps its room", () => {
-    expect(mountNote().classes()).toContain("max-w-80");
-  });
-
-  it("renders only the icon when compact, keeping the text for the tooltip", () => {
-    const wrapper = mountNote({ compact: true });
-    expect(wrapper.find('[data-test="dbm-toolbar-note-text"]').exists()).toBe(false);
-    expect(wrapper.findComponent(OTooltip).props("content")).toBe("Sampled on a schedule");
-  });
-
   it.each([
     ["neutral", "info-outline", "text-text-secondary"],
     ["warning", "warning-amber", "text-status-warning-text"],
@@ -63,7 +51,7 @@ describe("DbmToolbarNote", () => {
   ])("renders the %s tone with its own icon and colour", (tone, icon, colour) => {
     const wrapper = mountNote({ tone });
     expect(wrapper.findComponent(OIcon).props("name")).toBe(icon);
-    expect(wrapper.classes()).toContain(colour);
+    expect(wrapper.find("button").classes()).toContain(colour);
   });
 
   it("takes an icon override", () => {

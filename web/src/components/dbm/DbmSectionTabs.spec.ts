@@ -276,7 +276,7 @@ describe("DbmSectionTabs", () => {
         props: { databaseCount: 2, queryCount: 34, activityCount: 5791 },
         global: { plugins: [i18n] },
       });
-      expect(wrapper.text()).toContain("5791");
+      expect(wrapper.text()).toContain("5.79k");
     });
 
     // The samples badge is the finished-call population, not the capped
@@ -286,7 +286,7 @@ describe("DbmSectionTabs", () => {
         props: { databaseCount: 2, queryCount: 34, sampleCallsCount: 12483 },
         global: { plugins: [i18n] },
       });
-      expect(wrapper.text()).toContain("12483");
+      expect(wrapper.text()).toContain("12.5k");
     });
   });
 
@@ -324,7 +324,7 @@ describe("DbmSectionTabs", () => {
     /** STATE 1 — the trace rollup (`/badges → databases[].calls`). */
     it("marks nothing on the badge when the trace rollup counted it", () => {
       const wrapper = mountWith({ count: 141984, complete: true, vantage: "client" });
-      expect(wrapper.text()).toContain("141984");
+      expect(wrapper.text()).toContain("142k");
       expect(wrapper.text()).not.toMatch(/client-observed/i);
       expect(vantageOf(wrapper).exists()).toBe(false);
       expect(wrapper.find("[data-test='dbm-app-source-marker']").exists()).toBe(false);
@@ -584,6 +584,68 @@ describe("DbmSectionTabs", () => {
         "dbm-section-tab-blocked",
         "dbm-section-tab-tableHealth",
       ]);
+    });
+  });
+  describe("count loading placeholder", () => {
+    const mountLoading = (props: Record<string, unknown>) => {
+      currentRoute = { name: "dbmQueries", query: {} };
+      return mount(DbmSectionTabs, { props, global: { plugins: [i18n] } });
+    };
+
+    it("holds the badge's place with a skeleton while the count is in flight, only on countable tabs", () => {
+      const wrapper = mountLoading({ countsLoading: true });
+      for (const key of [
+        "overview",
+        "queries",
+        "samples",
+        "activity",
+        "deadlocks",
+        "blocked",
+        "tableHealth",
+      ]) {
+        expect(wrapper.find(`[data-test="dbm-section-tab-count-loading-${key}"]`).exists()).toBe(
+          true,
+        );
+        expect(wrapper.find(`[data-test="dbm-section-tab-badge-${key}"]`).exists()).toBe(false);
+      }
+      expect(wrapper.find('[data-test="dbm-section-tab-count-loading-metrics"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("gives the skeleton and the badge the same height and minimum width", async () => {
+      const wrapper = mountLoading({ countsLoading: true });
+      const skeleton = wrapper.find('[data-test="dbm-section-tab-count-loading-queries"]');
+      expect(skeleton.classes()).toEqual(expect.arrayContaining(["h-5", "w-12"]));
+      await wrapper.setProps({ queryCount: 34, countsLoading: false });
+      const badge = wrapper.find('[data-test="dbm-section-tab-badge-queries"]');
+      expect(badge.classes()).toEqual(expect.arrayContaining(["h-5", "min-w-12"]));
+    });
+
+    it("swaps the skeleton for the badge when the count arrives", async () => {
+      const wrapper = mountLoading({ countsLoading: true });
+      await wrapper.setProps({ queryCount: 34, countsLoading: false });
+      expect(wrapper.find('[data-test="dbm-section-tab-count-loading-queries"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="dbm-section-tab-badge-queries"]').text()).toBe("34");
+    });
+
+    it("renders nothing for an unavailable count once loading ends", () => {
+      const wrapper = mountLoading({ countsLoading: false });
+      expect(wrapper.find('[data-test^="dbm-section-tab-count-loading-"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dbm-section-tab-badge-queries"]').exists()).toBe(false);
+    });
+
+    it("reserves nothing on a locked OSS tab", () => {
+      mockConfig.isEnterprise = "false";
+      const wrapper = mountLoading({ countsLoading: true });
+      expect(wrapper.find('[data-test="dbm-section-tab-count-loading-deadlocks"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="dbm-section-tab-count-loading-queries"]').exists()).toBe(
+        true,
+      );
     });
   });
 });

@@ -109,7 +109,7 @@ describe("the Plans empty state means zero captures, not zero drift", () => {
     const section = plansSection();
     const hintAt = section.indexOf("plans.noPlans");
     const caveatAt = section.indexOf("dbm-detail-plans-stable");
-    const loopAt = section.indexOf('v-for="plan in plans"');
+    const loopAt = section.indexOf('v-for="(plan, planIndex) in plans"');
 
     expect(caveatAt, "the stable caveat must exist").toBeGreaterThan(-1);
     expect(loopAt, "the plan list must exist").toBeGreaterThan(-1);

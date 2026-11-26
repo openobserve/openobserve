@@ -46,15 +46,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <span class="flex min-w-0 flex-col items-end leading-tight" :data-test="dataTest">
     <template v-if="renders">
+      <OTooltip v-if="sublabelInTooltip && qualifierLabel" :content="qualifierLabel" />
       <span class="text-text-body font-mono text-xs tabular-nums">{{ value }}</span>
       <!-- The marker names the MEASUREMENT, and its tooltip spells the whole
            sentence out — the short form fits the column, the long form is what
            settles an argument about which number is being quoted. -->
-      <span class="flex items-center gap-1.5">
+      <span v-if="showsMarkerRow" class="flex items-center gap-1.5">
         <template v-if="fromApp">
           <DbmAppSourceMarker v-if="withMarker" />
         </template>
-        <span v-else class="text-text-secondary text-3xs" data-test="dbm-overlap-qualifier">
+        <span
+          v-else-if="!sublabelInTooltip"
+          class="text-text-secondary text-3xs"
+          data-test="dbm-overlap-qualifier"
+        >
           <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />
           {{ qualifierLabel }}
         </span>
@@ -68,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, useSlots } from "vue";
 
 import DbmAppSourceMarker from "@/components/dbm/DbmAppSourceMarker.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -90,6 +95,8 @@ const props = withDefaults(
     engine?: string | null;
     /** Off where the column header already names the app source for every row. */
     withMarker?: boolean;
+    /** `tooltip` moves the "server count" / "wait time" line into the value's hover. */
+    sublabel?: "inline" | "tooltip";
     dataTest?: string;
   }>(),
   {
@@ -98,11 +105,13 @@ const props = withDefaults(
     qualifierKey: null,
     engine: null,
     withMarker: true,
+    sublabel: "inline",
     dataTest: undefined,
   },
 );
 
 const { t } = useI18nTyped();
+const slots = useSlots();
 
 /**
  * Both conditions, together: a figure AND something true to say about it.
@@ -114,10 +123,17 @@ const renders = computed(() => props.value !== null && props.qualifierKey !== nu
 // An app-sourced figure carries the marker, not a text qualifier.
 const fromApp = computed(() => props.qualifierKey === APP_SOURCE_QUALIFIER);
 
+const sublabelInTooltip = computed(() => props.sublabel === "tooltip");
+
 const qualifierLabel = computed(() =>
   props.qualifierKey === null || fromApp.value
     ? raw("")
     : t(`dbm.list.overlap.${props.qualifierKey}` as "dbm.list.overlap.serverWait"),
+);
+
+// The trailing slot (Δ) keeps the row even when the marker and sublabel are off.
+const showsMarkerRow = computed(
+  () => !!slots.trailing || (fromApp.value ? props.withMarker : !sublabelInTooltip.value),
 );
 
 /**

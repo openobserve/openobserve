@@ -498,6 +498,7 @@ export function buildDbmPromqlPanelSchema(args: DbmPanelSchemaArgs): Record<stri
     config: {
       ...basePanelConfig(),
       unit: args.unit,
+      decimals: decimalsFor(args.unit),
       unit_custom: args.unitCustom ?? null,
       ...(args.heatmap ?? {}),
     },
@@ -544,7 +545,7 @@ export interface DbmLoadPanelLabels {
 export const dbmSqlEscape = (value: string) => value.replace(/'/g, "''");
 
 /**
- * The Datadog-style load chart: AVERAGE ACTIVE SESSIONS per time bucket,
+ * The database load chart: AVERAGE ACTIVE SESSIONS per time bucket,
  * stacked by the chosen dimension, from the server-vantage activity samples.
  *
  * Three claims the SQL must keep true:
@@ -589,7 +590,7 @@ export function buildDbmLoadPanelSchema(
     `FROM "${DBM_SERVER_STREAM}" WHERE ${where} GROUP BY histogram(_timestamp), ${dim}, o2_dbm_timestamp) AS b) AS w) AS x ` +
     `GROUP BY ts, segment ORDER BY ts ASC LIMIT 30000`;
 
-  return buildDbmSqlPanelSchema({
+  const schema = buildDbmSqlPanelSchema({
     id: "dbm-metric-load",
     chartType: "line",
     unit: "numbers",
@@ -600,6 +601,9 @@ export function buildDbmLoadPanelSchema(
     yLabel: labels.sessions ?? raw("sessions"),
     segmentLabel: labels.segment ?? raw("segment"),
   });
+  // Average active sessions is fractional (0.5 = one session busy half the time), unlike the other counts.
+  schema.config.decimals = 1;
+  return schema;
 }
 
 /** Inputs for a self-querying SQL timeseries panel: `ts` / y-alias / `segment` columns. */
@@ -632,12 +636,13 @@ export function buildDbmSqlPanelSchema(args: DbmSqlPanelArgs): Record<string, an
     config: {
       ...basePanelConfig(),
       unit: args.unit,
+      decimals: decimalsFor(args.unit),
       unit_custom: "",
-      // SQL panels chart SPARSE event data (samples, rollup windows). Lines
-      // stay connected for readability, but every real bucket draws a DOT —
-      // the dots are what keep a bridged stretch honest (no dot = no sample),
-      // and a lone single-poll wait event still renders instead of vanishing.
-      connect_nulls: true,
+      // Top 5 series keep the legend readable; the rest fold into "Other" only where a sum means something (counts, not averages).
+      top_results: 5,
+      top_results_others: args.unit === "numbers",
+      // A gap in sparse SQL data breaks the line: a bridge drawn across it reads as values that were never sampled.
+      connect_nulls: false,
       show_symbol: true,
     },
     queryType: "sql",
@@ -672,12 +677,17 @@ export function buildDbmSqlPanelSchema(args: DbmSqlPanelArgs): Record<string, an
   };
 }
 
+/** Counts read as whole numbers; everything else (durations, rates, sizes) needs one decimal at most. */
+const decimalsFor = (unit: string | null | undefined): number => (unit === "numbers" ? 0 : 1);
+
 function basePanelConfig(): Record<string, any> {
   return {
     show_legends: true,
     legends_position: "bottom",
     decimals: 2,
-    connect_nulls: true,
+    connect_nulls: false,
+    // The card title already names the metric, and every x-axis is time: axis titles only took room.
+    axis_label_mode: "hide",
     no_value_replacement: "",
     show_symbol: false,
     line_interpolation: "smooth",

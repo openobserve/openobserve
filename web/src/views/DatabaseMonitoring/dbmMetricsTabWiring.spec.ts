@@ -72,9 +72,13 @@ describe("dbm metrics tab wiring", () => {
   it("renders a clearable control for every dimension the panels scope by", () => {
     // The applied-but-invisible rule (dbmEventTabScope.spec.ts): scope that
     // narrows the charts must be visible and clearable on the same page.
-    expect(page).toContain("DbmScopeFilters");
-    expect(page).toMatch(/@clear="clearScope"/);
+    expect(page).toContain("<DbmFilterBar");
+    expect(page).toContain(':filters="displayFilters"');
     expect(page).toContain("useDbmScopeFilters");
+  });
+
+  it("sends the engine the Engine select shows, not a stale system", () => {
+    expect(page).toMatch(/system:\s*lockedEngine\.value \?\? scopeParams\.value\.system/);
   });
 
   it("hands the dashboards engine microseconds, not milliseconds", () => {
@@ -92,7 +96,9 @@ describe("dbm metrics tab wiring", () => {
   });
 
   it("jumps sections INSTANTLY — a smooth scroll would detonate every lazy panel passed", () => {
-    expect(page).toContain('scrollIntoView({ behavior: "auto"');
+    expect(page).toContain('behavior: "auto"');
+    // scrollIntoView also scrolls the app's own ancestors, shifting the whole shell.
+    expect(page).not.toContain("scrollIntoView(");
     expect(page).not.toContain('"smooth"');
     expect(page).toContain("DbmMetricsRail");
   });

@@ -48,7 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sort and didn't would be a lie the UI tells by omission.
 -->
 <template>
-  <DbmPageChrome title-data-test="dbm-queries-title" :tab-counts="tabCounts">
+  <DbmPageChrome
+    title-data-test="dbm-queries-title"
+    :tab-counts="tabCounts"
+    :range="range"
+    :last-run-at="lastRunAt"
+    :loading="loading"
+    @date-change="onDateChange"
+    @refresh="onRefresh()"
+  >
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Blocked queries emit no span until they finish, so a lock storm makes
            QPS FALL — and a falling line reads as recovery at the worst possible
@@ -80,41 +88,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            toolbar: both tables below own a toolbar and only one of them is
            mounted at a time, so a control in either would vanish with it.
            One row, above both, serving whichever table is showing. -->
-      <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-1.5">
-        <DbmScopeFilters
-          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
-          :filters="dimensionFilters"
-          :insight-chip="activeInsightChip"
-          @clear="clearScope"
-          @clear-insight="activeInsightId = null"
-        />
-        <div class="min-w-48 flex-1 max-lg:order-last max-lg:w-full">
-          <OSearchInput
-            :model-value="search"
-            :placeholder="t('dbm.queries.searchPlaceholder')"
-            clearable
-            :debounce="400"
-            data-test="dbm-queries-search"
-            @update:model-value="onSearchInput"
-          />
-        </div>
-        <!-- Off = real SQL only; on also includes the driver's connection bookkeeping. -->
-        <span
-          class="border-border-default rounded-default inline-flex shrink-0 items-center border px-2.5 py-2"
-          data-test="dbm-queries-stmt-class"
-        >
-          <OCheckbox
-            :model-value="stmtClass"
-            true-value="all"
-            false-value="query"
-            data-test="dbm-queries-stmt-class-checkbox"
-            size="sm"
-            :label="t('dbm.queries.stmtClass.overheadLabel')"
-            @update:model-value="onStmtClassChange"
-          />
-          <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.allHint')" />
-        </span>
-
+      <DbmFilterBar
+        :search="search"
+        :placeholder="t('dbm.queries.searchPlaceholder')"
+        search-data-test="dbm-queries-search"
+        :filters="dimensionFilters"
+        :more-count="stmtClass === 'all' ? 1 : 0"
+        @update:search="onSearchInput"
+      >
         <!-- What every Δ and every insight is measured AGAINST (W5). Each rule
              line names the choice, so a number can always be traced to the
              comparison that produced it. -->
@@ -135,64 +116,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- Icons only: at 1280 any text here would take the filter chips' last room. Each follows the list on screen. -->
-        <DbmCoverageLine
-          v-if="!serverListShown"
-          inline
-          compact
-          :freshness="freshness"
-          :hits="rows"
-          :other="other"
-          :top-n-subset="topNSubset"
-          :error-count="errorCount"
-          :filter-label="narrowingFilterLabel"
-          data-test="dbm-queries-coverage"
+        <DbmInsightMenu
+          :insights="stripInsights"
+          :active-id="activeInsightId"
+          :baseline="baseline"
+          @filter="toggleInsightFilter"
+          @clear="activeInsightId = null"
         />
-        <DbmCoverageLine
-          v-else
-          inline
-          compact
-          :freshness="freshness"
-          :hits="serverCoverageHits"
-          :top-n-subset="serverTruncated"
-          :filter-label="narrowingFilterLabel"
-          data-test="dbm-server-queries-coverage"
+        <!-- Nothing failed means nothing to narrow to; it stays while active so it can be cleared. -->
+        <OCheckbox
+          v-if="errorCount > 0 || statFilter === 'failed'"
+          :model-value="statFilter === 'failed'"
+          size="sm"
+          :label="t('dbm.filters.failedOnly')"
+          data-test="dbm-queries-failed-only"
+          @update:model-value="(on) => (statFilter = on === true ? 'failed' : null)"
         />
-        <DbmAppSourceLegend
-          v-if="hasAppSourcedRows && !serverListShown"
-          compact
-          data-test="dbm-queries-app-source-legend"
-        />
-        <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
-        <OTableColumnToggle
-          v-if="!serverListShown"
-          :columns="columns"
-          :column-visibility="columnVisibility"
-          :has-resized-columns="tableRef?.hasResizedColumns ?? false"
-          @update:column-visibility="setColumnVisibility"
-          @reset:column-sizes="tableRef?.resetColumnSizes?.()"
-        />
-        <DateTime
-          auto-apply
-          menu-align="end"
-          :default-type="range.type"
-          :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-          :default-relative-time="range.relativeTimePeriod ?? undefined"
-          data-test-name="dbm-queries-date-time"
-          class="h-8 max-md:[&_.date-time-label]:hidden"
-          @on:date-change="onDateChange"
-        />
-        <!-- ms-auto: when the row wraps, refresh lands right-aligned instead of orphaned at the start. -->
-        <ORefreshButton
-          layout="inline"
-          variant="outline"
-          class="ms-auto"
-          :loading="loading"
-          :last-run-at="lastRunAt"
-          data-test="dbm-queries-refresh"
-          @click="onRefresh()"
-        />
-      </div>
+
+        <template #more>
+          <!-- Off = real SQL only; on also includes the driver's connection bookkeeping. -->
+          <span class="inline-flex items-center" data-test="dbm-queries-stmt-class">
+            <OCheckbox
+              :model-value="stmtClass"
+              true-value="all"
+              false-value="query"
+              data-test="dbm-queries-stmt-class-checkbox"
+              size="sm"
+              :label="t('dbm.queries.stmtClass.overheadLabel')"
+              @update:model-value="onStmtClassChange"
+            />
+            <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.allHint')" />
+          </span>
+        </template>
+
+        <template #trailing>
+          <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
+          <OTableColumnToggle
+            v-if="!serverListShown"
+            :columns="columns"
+            :column-visibility="columnVisibility"
+            :default-column-visibility="defaultColumnVisibility"
+            :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+            @update:column-visibility="setColumnVisibility"
+            @reset:column-sizes="tableRef?.resetColumnSizes?.()"
+          />
+        </template>
+        <template #coverage>
+          <DbmCoverageLine
+            :window-start="current.startTime"
+            :window-end="current.endTime"
+            v-if="!serverListShown"
+            :freshness="freshness"
+            :hits="rows"
+            :other="other"
+            :top-n-subset="topNSubset"
+            :error-count="errorCount"
+            :filter-label="narrowingFilterLabel"
+            data-test="dbm-queries-coverage"
+          />
+          <DbmCoverageLine
+            :window-start="current.startTime"
+            :window-end="current.endTime"
+            v-else
+            :freshness="freshness"
+            :hits="serverCoverageHits"
+            :top-n-subset="serverTruncated"
+            :filter-label="narrowingFilterLabel"
+            data-test="dbm-server-queries-coverage"
+          />
+        </template>
+      </DbmFilterBar>
 
       <!-- In fallback mode the client table UNMOUNTS: its tall empty-state
            checklist would otherwise consume the viewport and squeeze the
@@ -203,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!serverListShown"
         ref="tableRef"
         :data="tableRows"
-        :columns="columns"
+        :columns="visibleTableColumns"
         row-key="rowKey"
         :loading="loading"
         :frame="false"
@@ -220,6 +213,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :row-class="rowClass"
         :get-row-style="rowStyle"
+        :row-actions="rowActions"
+        row-actions-more-data-test="dbm-queries-row-more-actions"
         data-test="dbm-queries-table"
         @update:sort-by="onSortChange"
         @row-click="onRowClick"
@@ -240,24 +235,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
           <div data-test="dbm-queries-summary">
-            <OStatStrip
-              :items="visibleSummaryStats"
-              :loading="loading"
-              selectable
-              :selected-key="statFilter"
-              default-key="queries"
-              @select="onStatSelect"
-            />
+            <OStatStrip :items="visibleSummaryStats" :loading="loading" row />
           </div>
-          <DbmInsightStrip
-            v-if="!insightsHidden && stripInsights.length"
-            :insights="stripInsights"
-            :active-id="activeInsightId"
-            :baseline="baseline"
-            data-test="dbm-queries-insights"
-            @filter="toggleInsightFilter"
-            @dismiss-all="insightsHidden = true"
-          />
         </template>
 
         <!-- The statement, what ran it, and the facts that are about THIS row. -->
@@ -299,20 +278,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <div
               v-if="!row.isOther"
-              class="text-text-secondary text-3xs flex min-w-0 items-center gap-1"
+              class="text-text-secondary flex min-h-4 min-w-0 items-center gap-1 text-xs"
               :class="row.isTail ? 'ps-4' : ''"
+              data-test="dbm-queries-meta"
             >
-              <OTag type="dbSystem" :value="row.db_system" size="xs" />
-              <span class="opacity-45">·</span>
               <OTruncatedText
-                :tooltip="raw([row.serviceLabel, row.db_instance].filter(Boolean).join(' · '))"
+                :tooltip="
+                  raw(
+                    [!uniformInstance && row.db_instance, !uniformApp && row.serviceLabel]
+                      .filter(Boolean)
+                      .join(' · '),
+                  )
+                "
               >
-                <span class="text-text-secondary font-medium">{{ row.serviceLabel }}</span>
-                <template v-if="row.db_instance">
-                  <span class="px-1 opacity-45">·</span>
-                  <span>{{ row.db_instance }}</span>
+                <span v-if="!uniformInstance && row.db_instance">
+                  {{ row.db_instance }}
+                  <OTooltip :content="raw(engineName(row.db_system))" />
+                </span>
+                <template
+                  v-if="!uniformInstance && row.db_instance && !uniformApp && row.serviceLabel"
+                >
+                  <span class="px-1">·</span>
                 </template>
+                <span v-if="!uniformApp && row.serviceLabel">{{ row.serviceLabel }}</span>
               </OTruncatedText>
+              <DbmAppSourceMarker v-if="fromTraces(row)" data-test="dbm-queries-app-source" />
               <DbmRowChips :chips="chipsByFingerprint.get(row.fingerprint) ?? []" />
             </div>
             <!-- Every remainder states its own call count; only the first
@@ -344,6 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :source="row.overlapCalls.source"
             :qualifier-key="row.overlapCalls.qualifierKey"
             :engine="row.db_system"
+            :with-marker="false"
+            sublabel="tooltip"
             data-test="dbm-queries-calls"
           >
             <template #trailing>
@@ -445,18 +437,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :source="row.overlapTime.source"
             :qualifier-key="row.overlapTime.qualifierKey"
             :engine="row.db_system"
+            :with-marker="false"
+            sublabel="tooltip"
             :flagged="row.flagged"
             :critical="row.critical"
             data-test="dbm-queries-load"
-          />
-        </template>
-
-        <template #cell-actions="{ row }">
-          <DbmRowActions
-            v-if="!row.isOther && !row.isFold"
-            :actions="rowActions"
-            data-test="dbm-queries-row-actions"
-            @action="(id) => onRowAction(id, row)"
           />
         </template>
 
@@ -592,33 +577,29 @@ import { computed, nextTick, onBeforeUnmount, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import DbmAppSourceLegend from "@/components/dbm/DbmAppSourceLegend.vue";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmDeltaCell from "@/components/dbm/DbmDeltaCell.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
-import DbmInsightStrip from "@/components/dbm/DbmInsightStrip.vue";
+import DbmInsightMenu from "@/components/dbm/DbmInsightMenu.vue";
+import DbmAppSourceMarker from "@/components/dbm/DbmAppSourceMarker.vue";
 import DbmLoadCell from "@/components/dbm/DbmLoadCell.vue";
 import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
+import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
-import DateTime from "@/components/DateTime.vue";
-import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
-import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { useDbmColumnToggle } from "@/composables/dbm/useDbmColumnToggle";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -647,10 +628,11 @@ import { createDbmContextProvider } from "@/composables/contextProviders";
 import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
+import { emptyColumnIds } from "@/utils/dbm/emptyColumns";
+import { engineName, uniformValue } from "@/utils/dbm/uniformValue";
 import {
   countClaim,
   discriminatingPart,
-  failedCellKind,
   formatCount,
   formatMultiplier,
   formatNs,
@@ -957,17 +939,6 @@ const completionBias = ref<{ dropPercent: number } | null>(null);
 // Every badge comes from the shell's shared snapshot; this page publishes only its own queryCount into it.
 const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
-/**
- * Only the two things this page asks of the table. `InstanceType<typeof OTable>`
- * does not type-check — OTable is a generic component, so its instance type has
- * no construct signature to instantiate.
- */
-const tableRef = ref<{
-  scrollToTop?: () => void;
-  $el?: HTMLElement;
-  hasResizedColumns?: boolean;
-  resetColumnSizes?: () => void;
-} | null>(null);
 const stmtClass = ref<string>("query");
 const sortBy = ref<QuerySortKey>("total_time_ns");
 
@@ -995,7 +966,6 @@ useDbmOwnFilterSync(
 );
 
 const insights = ref<DbmInsight[]>([]);
-const insightsHidden = ref(false);
 const activeInsightId = ref<DbmInsightId | null>(null);
 
 interface QueryRow extends QueryStatsRow {
@@ -1140,9 +1110,6 @@ const fallbackTimeQualifier = computed(() =>
  */
 // The Failed tile narrows the table to the queries with a failed call; Calls and Database time are totals, not rows.
 const statFilter = ref<"failed" | null>(null);
-const onStatSelect = (key: string) => {
-  statFilter.value = key === "failed" && statFilter.value !== "failed" ? "failed" : null;
-};
 
 const summaryStats = computed<StatItem[]>(() => {
   const totals = overlapTotals.value;
@@ -1197,7 +1164,6 @@ const summaryStats = computed<StatItem[]>(() => {
         : {}),
       icon: "bar-chart",
       tone: "info",
-      selectable: false,
       dataTest: "dbm-queries-summary-calls",
     },
     {
@@ -1209,7 +1175,6 @@ const summaryStats = computed<StatItem[]>(() => {
         : {}),
       icon: "timer",
       tone: "teal",
-      selectable: false,
       dataTest: "dbm-queries-summary-time",
     },
     // TRACE-ONLY: the server feed carries no error counts. In fallback mode
@@ -1221,7 +1186,6 @@ const summaryStats = computed<StatItem[]>(() => {
       value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
       icon: "error-outline",
       tone: errorCount.value ? "error" : "neutral",
-      selectable: errorCount.value > 0 || statFilter.value === "failed",
       dataTest: "dbm-queries-summary-failed",
     },
   ];
@@ -1348,27 +1312,6 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => {
     ...(envFilter.value ? [{ ...env, options: [] }] : []),
     ...(serviceFilter.value ? [{ ...service, options: [] }] : []),
   ];
-});
-
-/**
- * The active insight, as a toolbar chip. Clicking an insight filters the table
- * IN PLACE, and this chip is what keeps that scope visible and removable — an
- * insight filter that left no trace would be a mode the user cannot see or
- * escape.
- */
-const activeInsightChip = computed(() => {
-  if (!activeInsightId.value) return null;
-  const insight = insights.value.find((i) => i.id === activeInsightId.value);
-  if (!insight) return null;
-  return {
-    dimension: t("dbm.filters.dimension.insight"),
-    label: t(`dbm.insights.${insight.id}.title`, insightTitleParams(insight)),
-  };
-});
-
-const insightTitleParams = (insight: DbmInsight) => ({
-  ratio: (insight.evidence.ratio ?? 0).toFixed(0),
-  multiplier: Math.round(insight.evidence.callsPerTrace ?? 0),
 });
 
 const requestParams = () => ({
@@ -1878,13 +1821,6 @@ const tableRows = computed<QueryRow[]>(() => {
   return [...base, ...remainder];
 });
 
-/** Whether any row on screen carries the app-source marker, so the legend explains it. */
-const hasAppSourcedRows = computed(() =>
-  tableRows.value.some(
-    (row) => row.overlapCalls.source === "client" || row.overlapTime.source === "client",
-  ),
-);
-
 /**
  * Only two row tints, and neither washes the row: a left rail. Amber marks a
  * row an insight named; red marks one where every call is failing. The old
@@ -1940,13 +1876,10 @@ const rowStyle = (row: QueryRow) => {
  * genuinely is yes/no rather than how-many, and "0" in a column of counts reads
  * as a measurement where "none" reads as an all-clear.
  */
-const errorLabel = (row: QueryRow): I18nText =>
-  failedCellKind(row.errors) === "none"
-    ? t("dbm.queries.errorsNone")
-    : raw(formatCount(row.errors));
+const errorLabel = (row: QueryRow): I18nText => raw(formatCount(row.errors ?? 0));
 
 const errorClass = (row: QueryRow) => {
-  if ((row.errors ?? 0) <= 0) return "text-text-secondary";
+  if ((row.errors ?? 0) <= 0) return "text-text-muted";
   return row.critical ? "text-status-error-text font-bold" : "text-status-error-text";
 };
 
@@ -1979,31 +1912,37 @@ const toggleInsightFilter = (insight: DbmInsight) => {
   activeInsightId.value = activeInsightId.value === insight.id ? null : insight.id;
 };
 
-/** The four things a reader does next, on the row they are already looking at. */
-const rowActions = computed<DbmRowAction[]>(() => [
-  { id: "open", icon: "chevron-right", label: t("dbm.queries.actions.open") },
-  { id: "traces", icon: "account-tree", label: t("dbm.queries.actions.traces") },
-  { id: "copy", icon: "content-copy", label: t("dbm.queries.actions.copy") },
-  { id: "alert", icon: "shield", label: t("dbm.queries.actions.alert") },
-  // Absent when AI is off, locked when the license lacks it.
-  ...(aiLock.locked.value
-    ? [
-        {
-          id: "ai",
-          icon: "brain-circuit",
-          label: t("dbm.ai.rowSuggestFix"),
-          lockedReason: aiLock.lockedReason.value,
-        } as DbmRowAction,
-      ]
-    : aiEnabled.value
-      ? [{ id: "ai", icon: "brain-circuit", label: t("dbm.ai.rowSuggestFix") } as DbmRowAction]
-      : []),
-]);
+/** What a reader does next, on the row they are already looking at; the row click opens the query. */
+const rowActions = computed<OTableRowAction[]>(() => {
+  const action = (
+    id: string,
+    icon: OTableRowAction["icon"],
+    label: OTableRowAction["label"],
+  ): OTableRowAction => ({
+    id,
+    icon,
+    label,
+    visible: (row) => !row.isOther && !row.isFold,
+    onSelect: (row) => onRowAction(id, row),
+    dataTest: () => `dbm-queries-row-actions-${id}`,
+  });
+  return [
+    action("traces", "account-tree", t("dbm.queries.actions.traces")),
+    action("copy", "content-copy", t("dbm.queries.actions.copy")),
+    action("alert", "notifications-active", t("dbm.common.createAlert")),
+    {
+      ...action("ai", "brain-circuit", t("dbm.ai.rowSuggestFix")),
+      // Absent when AI is off, locked when the license lacks it.
+      visible: (row) => !row.isOther && !row.isFold && (aiLock.locked.value || aiEnabled.value),
+      disabled: () => (aiLock.locked.value ? aiLock.lockedReason.value : false),
+    },
+  ];
+});
 
 const onRowAction = async (id: string, row: QueryRow) => {
   analytics.track("dbm_row_action_clicked", { page: "queries", action: id });
-  if (id === "open" || id === "traces") {
-    openQueryDetail(row, id === "traces" ? "samples" : undefined);
+  if (id === "traces") {
+    openQueryDetail(row, "samples");
     return;
   }
   if (id === "ai") {
@@ -2063,8 +2002,12 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     // identifying, and at 380 every row truncated inside its SELECT list.
     size: 520,
     sortable: false,
-    meta: { isName: true },
+    meta: {
+      isName: true,
+      headerTooltip: queryHeaderTip.value ? raw(queryHeaderTip.value) : undefined,
+    },
   },
+
   // An OVERLAP column: the value shown is the DATABASE's count where it has
   // one. The sub-label states that provenance once, in the header; the
   // per-row marker states it again on the rows where it differs, because the
@@ -2094,8 +2037,7 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     sortable: false,
     meta: {
       align: "right",
-      headerSubLabel: t("dbm.queries.columnSubLabels.calls"),
-      headerTooltip: t("dbm.queries.columnHints.calls"),
+      headerTooltip: raw(`${t("dbm.queries.columnHints.calls")}`),
     },
   },
   {
@@ -2106,8 +2048,9 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p95"),
-      headerTooltip: t("dbm.queries.columnHints.p95"),
+      headerTooltip: raw(
+        `p95: ${t("dbm.queries.columnHints.p95")} ${t("dbm.coverage.tipBlendedSpeeds")}`,
+      ),
     },
   },
   {
@@ -2144,8 +2087,7 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     sortable: false,
     meta: {
       align: "right",
-      headerSubLabel: t("dbm.queries.columnSubLabels.load"),
-      headerTooltip: t("dbm.queries.columnHints.load"),
+      headerTooltip: raw(`${t("dbm.queries.columnHints.load")} ${t("dbm.coverage.tipRowsShown")}`),
     },
   },
   {
@@ -2164,8 +2106,9 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     hideable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p99"),
-      headerTooltip: t("dbm.queries.columnHints.p99"),
+      headerTooltip: raw(
+        `p99: ${t("dbm.queries.columnHints.p99")} ${t("dbm.coverage.tipBlendedSpeeds")}`,
+      ),
     },
   },
   {
@@ -2177,8 +2120,7 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     hideable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("max"),
-      headerTooltip: t("dbm.queries.columnHints.max"),
+      headerTooltip: raw(`max: ${t("dbm.queries.columnHints.max")}`),
     },
   },
   {
@@ -2194,8 +2136,38 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
 /** The extra percentiles are available but off: the mockup's column set is
  *  what fits without horizontal scrolling at 1440. */
 const defaultColumnVisibility = { p99_ns: false, max_ns: false, services: false };
-const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-queries");
-if (!Object.keys(columnVisibility.value).length) columnVisibility.value = defaultColumnVisibility;
+const { tableRef, columnVisibility, setColumnVisibility } = useDbmColumnToggle(
+  "dbm-queries",
+  defaultColumnVisibility,
+);
+
+/** Traced figures show one source marker per row, beside the query. */
+const dataRows = computed(() => tableRows.value.filter((r) => !r.isOther && !r.isFold));
+const uniformApp = computed(() => uniformValue(dataRows.value, (r) => r.serviceLabel));
+const uniformInstance = computed(() => uniformValue(dataRows.value, (r) => r.db_instance));
+
+const queryHeaderTip = computed(() =>
+  [
+    uniformApp.value && t("dbm.queries.allFromApp", { app: uniformApp.value }),
+    uniformInstance.value && t("dbm.queries.allOnInstance", { instance: uniformInstance.value }),
+  ]
+    .filter(Boolean)
+    .join(" "),
+);
+
+const fromTraces = (row: QueryRow) =>
+  row.overlapCalls.source === "client" || row.overlapTime.source === "client";
+
+// Empty columns are dropped from the table only; the toggle and saved visibility keep the full list.
+const emptyColumns = computed(() =>
+  emptyColumnIds<QueryRow>(tableRows.value, {
+    perTrace: (row) => (showsPerRequest(row.callsPerTrace) ? row.callsPerTrace : null),
+    errors: (row) => ((row.errors ?? 0) > 0 ? row.errors : null),
+  }),
+);
+const visibleTableColumns = computed(() =>
+  columns.value.filter((c) => !emptyColumns.value.includes(c.id)),
+);
 
 /**
  * The table emits the column id; the ids of sortable columns are deliberately
@@ -2295,11 +2267,7 @@ const onStmtClassChange = (value: unknown) => {
  * above): assign, publish to the URL, refetch — so a shared link carries the
  * term and the rows below match it.
  *
- * The refetch is not per keystroke: `OSearchInput` is bound with
- * `:debounce="400"`, so `update:model-value` fires 400ms after typing stops.
- * This restores the `@search="load"` behaviour the control had inside
- * `DbmTableToolbar`, which emitted `update:search` and `search` together and
- * was lost when the box was hoisted out of the table toolbar.
+ * Refetches once typing stops, because `DbmFilterBar` debounces the search box by 400ms.
  */
 const onSearchInput = (value: unknown) => {
   search.value = typeof value === "string" ? value : "";
@@ -2307,13 +2275,7 @@ const onSearchInput = (value: unknown) => {
   load();
 };
 
-/**
- * Drop every refinement at once, from the toolbar's clear affordance.
- *
- * "Clear all" means all: the search box and the active insight are refinements
- * too, and leaving them set while the scope chips disappear left the table
- * looking filtered with nothing on screen explaining why.
- */
+/** Reset every filter, search and insight together so the table never looks filtered without a visible cause. */
 const clearScope = () => {
   systemFilter.value = null;
   instanceFilter.value = null;

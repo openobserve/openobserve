@@ -58,7 +58,7 @@ const plansSection = (): string => {
 /** The per-plan `<article>` loop body. */
 const planLoop = (): string => {
   const section = plansSection();
-  const at = section.indexOf('v-for="plan in plans"');
+  const at = section.indexOf('v-for="(plan, planIndex) in plans"');
   expect(at, "the plan list must exist").toBeGreaterThan(-1);
   return section.slice(at);
 };
@@ -66,7 +66,7 @@ const planLoop = (): string => {
 describe("per-row plan provenance", () => {
   it("moves the gap tag off the section header and onto generic rows only", () => {
     const section = plansSection();
-    const loopAt = section.indexOf('v-for="plan in plans"');
+    const loopAt = section.indexOf('v-for="(plan, planIndex) in plans"');
     const beforeLoop = section.slice(0, loopAt);
 
     // The header must not brand EVERY plan an estimate — with two producers
@@ -117,5 +117,16 @@ describe("per-row plan provenance", () => {
       nearest,
       `est→act is gated on "${nearest}" — null actuals mean "not measured", never 0`,
     ).toMatch(/actualRows\s*!==\s*null/);
+  });
+
+  it("keeps the tag in a fixed-width slot and shows plan durations to one decimal", () => {
+    const loop = planLoop();
+    expect(loop).toMatch(/min-w-32[^>]*data-test="dbm-detail-plan-tag-slot"/);
+    expect(loop).toContain("planDuration(plan.avgDurationMs)");
+    expect(source()).toContain("Number(ms.toFixed(1))");
+  });
+
+  it("has no header sub-label on the Callers table", () => {
+    expect(source()).not.toContain("headerSubLabel");
   });
 });

@@ -19,8 +19,8 @@ import { createMemoryHistory, createRouter, RouterView, type Router } from "vue-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DatabasesResponse, QueryStatsRow } from "@/services/db_monitoring";
-import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
-import type { DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
+import type { OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 
 vi.mock("vuex", () => ({
   useStore: () => ({
@@ -171,6 +171,7 @@ const OTableStub = defineComponent({
     data: { type: Array as PropType<TreeRow[]>, default: () => [] },
     getRowWarning: { type: Function as PropType<(row: TreeRow) => boolean>, default: null },
     expandedIds: { type: Array as PropType<string[]>, default: () => [] },
+    rowActions: { type: Array as PropType<OTableRowAction<TreeRow>[]>, default: () => [] },
   },
   emits: ["row-click", "update:expandedIds", "sort-change"],
   setup(props, { slots }) {
@@ -185,7 +186,14 @@ const OTableStub = defineComponent({
         ...walk(props.data).map((row) =>
           h("div", { key: row.rowKey }, [
             props.getRowWarning?.(row) ? slots["tree-warning"]?.({ row }) : null,
-            slots["cell-actions"]?.({ row }),
+            ...props.rowActions
+              .filter((a) => a.visible?.(row) ?? true)
+              .map((a) =>
+                h("button", {
+                  "data-action": a.id,
+                  onClick: () => a.onSelect(row),
+                }),
+              ),
           ]),
         ),
       ]);
@@ -201,33 +209,16 @@ const DbmPageChromeStub = defineComponent({
       h("div", slots.default?.()),
 });
 
-const DbmTableToolbarStub = defineComponent({
-  name: "DbmTableToolbar",
-  setup:
-    (_, { slots }) =>
-    () =>
-      h("div", slots.filters?.()),
-});
-
-const DbmScopeFiltersStub = defineComponent({
-  name: "DbmScopeFilters",
+const DbmFilterBarStub = defineComponent({
+  name: "DbmFilterBar",
   props: { filters: { type: Array as PropType<DbmScopeFilter[]>, default: () => [] } },
-  setup: () => () => h("div"),
-});
-
-const DbmRowActionsStub = defineComponent({
-  name: "DbmRowActions",
-  props: { actions: { type: Array as PropType<DbmRowAction[]>, default: () => [] } },
-  emits: ["action"],
   setup: () => () => h("div"),
 });
 
 const stubs = {
   OTable: OTableStub,
   DbmPageChrome: DbmPageChromeStub,
-  DbmTableToolbar: DbmTableToolbarStub,
-  DbmScopeFilters: DbmScopeFiltersStub,
-  DbmRowActions: DbmRowActionsStub,
+  DbmFilterBar: DbmFilterBarStub,
   DbmCoverageLine: true,
   DbmEmptyState: true,
   DbmInstanceHealthCell: true,
@@ -283,7 +274,7 @@ const topRows = () => table().props("data") as TreeRow[];
 const serverRow = (instance: string) => topRows().find((row) => row.db_instance === instance)!;
 
 const setSchema = async (value: string | null) => {
-  const filters = wrapper!.findComponent(DbmScopeFiltersStub).props("filters") as DbmScopeFilter[];
+  const filters = wrapper!.findComponent(DbmFilterBarStub).props("filters") as DbmScopeFilter[];
   filters.find((filter) => filter.key === "namespace")!.onChange(value as string);
   await settle();
 };
@@ -376,7 +367,7 @@ describe("a hand-off from the overview scopes the target, not the overview", () 
   it("opens Top queries for a single-schema server without naming its schema", async () => {
     const { router } = await mountOverview();
     const index = topRows().findIndex((row) => row.db_instance === "pg-orders");
-    wrapper!.findAllComponents(DbmRowActionsStub)[index].vm.$emit("action", "open");
+    await wrapper!.findAll('[data-action="queries"]')[index].trigger("click");
     await settle();
     expect(pushed(router).name).toBe("dbmQueries");
     expect(pushed(router).query.instance).toBe("pg-orders");

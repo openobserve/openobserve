@@ -106,10 +106,6 @@ export const foldByInstance = (
   return [...groups.values()].map(foldOne);
 };
 
-/** Whether any server's speeds are the worst of several db_totals rows rather than its own. */
-export const hasWorstOfPercentiles = (rows: { schemas?: DbTotalsRow[] }[]): boolean =>
-  rows.some((row) => (row.schemas?.length ?? 0) > 1);
-
 /** The servers with a schema slowing against its own baseline, by `instanceKey`. */
 export const drowningInstanceKeys = (
   rows: DbTotalsRow[],

@@ -26841,9 +26841,6 @@
         "failed": "Failed"
       },
       "databaseCount": "1 database | {count} databases",
-      "openQueries": "See its queries",
-      "viewMetrics": "View metrics",
-      "alertMe": "Alert me",
       "columnHints": {
         "qps": "Calls per second — this window's calls divided by its length, so a 15-minute view and a 4-hour view stay comparable.",
         "p50": "Half of all calls finished faster than this. Measured from completed calls in your application's traces.",
@@ -26854,14 +26851,7 @@
       },
       "failedChip": "{count} failed",
       "columnSubLabels": {
-        "attention": "from the database",
-        "load": "from your apps",
         "calls": "from your apps"
-      },
-      "attention": {
-        "connections": "connections",
-        "noLimit": "no limit published",
-        "unknown": "not measured"
       }
     },
     "queries": {
@@ -26929,19 +26919,13 @@
       "errorsNone": "none",
       "errorsAll": "all",
       "actions": {
-        "open": "Open details",
         "traces": "See example traces",
         "copy": "Copy query",
         "copied": "Query copied",
-        "copyFailed": "Could not copy the query.",
-        "alert": "Alert me if this slows"
+        "copyFailed": "Could not copy the query."
       },
       "otherRowTextFor": "All other queries on {database}",
-      "otherRowDetailShort": "— {calls} calls.",
-      "columnSubLabels": {
-        "calls": "server where reported",
-        "load": "server where reported"
-      }
+      "otherRowDetailShort": "— {calls} calls."
     },
     "insights": {
       "showRows": "Show this query | Show these {count} queries",
@@ -26994,26 +26978,9 @@
       }
     },
     "coverage": {
-      "unknownNote": "Nothing to measure in the range and filters you've picked.",
-      "lineHealthy": "You're seeing {percent}% of this database's time — the {count} heaviest kinds of query.",
-      "lineRemainder": "You're seeing {percent}% of this database's time. The rest is in lighter queries we don't list one by one.",
-      "lineStale": "Our counting is {minutes} minutes behind, so the most recent queries may not be here yet.",
       "lineTruncated": "There was more data in the last stretch than we could take in, so the newest numbers are undercounts.",
-      "lineTruncatedStale": "There was more data in the last stretch than we could take in, and our counting is {minutes} minutes behind — the newest numbers are undercounts, and the most recent queries may not be here yet.",
       "lineGap": "{minutes} minutes are missing from this window. Our counting stopped at {stopped} and can only reach back {reach} minutes, so nothing covers {from}–{to}.",
-      "lineSubset": "You've filtered to {filter}, so these percentages describe the rows shown, not the whole database.",
-      "lineHealthyAll": "You're seeing every query that ran. Speeds here are measured across every call, so they're exact.",
-      "lineHealthyAllEstimated": "You're seeing every query that ran. Speeds here are blended from several stretches of time, so they're close but not exact.",
-      "lineCountedTo": "Counted up to {time}; the last half-minute is still coming in.",
-      "lineExact": "All databases reporting. Speeds here are measured across every call, so they're exact.",
-      "lineExactEstimated": "All databases reporting. Speeds here are blended from several stretches of time, so they're close but not exact.",
-      "lineExactSlowestSchema": "ฐานข้อมูลทั้งหมดรายงานแล้ว ความเร็วเป็นค่าที่แน่นอนรายสคีมา ฐานข้อมูลที่มีหลายสคีมาจะแสดงสคีมาที่ช้าที่สุด",
-      "lineSubsetUnnamed": "Your filters narrow this below the level these totals add up at, so the percentages describe the rows shown rather than the whole database.",
-      "lineQuery": "Timings are measured from your application, so they include network time and any wait for a free connection.",
-      "lineUncodedErrors": "{percent} of the failures here came back without a reason code, so they can be counted but not explained.",
-      "lineSubsetStale": "You've filtered to {filter}, and our counting is {minutes} minutes behind — these percentages describe the rows shown, and the most recent queries may not be here yet.",
-      "lineSubsetUnnamedStale": "Your filters narrow this below the level these totals add up at, and our counting is {minutes} minutes behind — the percentages describe the rows shown, and the most recent queries may not be here yet.",
-      "lineCountedToBehind": "Counted up to {time}; we're {minutes} minutes behind."
+      "lineUncodedErrors": "{percent} of the failures here came back without a reason code, so they can be counted but not explained."
     },
     "breakdown": {
       "loading": "Working out where the time went…",
@@ -27532,11 +27499,9 @@
       },
       "rowActions": {
         "topQueries": "Find these in Top queries",
-        "copy": "Copy both queries",
-        "alert": "Alert me about deadlocks"
+        "copy": "Copy both queries"
       },
       "detail": {
-        "mostRecent": "Most recent · {time}",
         "nthOf": "{index} of {total}",
         "earlier": "Earlier",
         "later": "Later",
@@ -27557,12 +27522,7 @@
         "fixBody": "These two statements touch {object} rows in opposite order. Make both sides update in the same order — lowest id first — and this pair can no longer deadlock.",
         "fixGeneric": "Both sides hold what the other wants. Make every transaction take these locks in the same order and this pair can no longer deadlock.",
         "copyForSlack": "คัดลอก",
-        "occurrencesTitle": "All {count} times this pair deadlocked",
-        "occurrencesHint": "Select a point to load that one above",
-        "lostLabel": "{pid} lost",
-        "bothSidesLose": "Both sides get cancelled about equally — {a} vs {b}. Neither application is the problem; the ordering is.",
-        "oneSideLoses": "{pid} is cancelled every time.",
-        "showAbove": "Show above",
+        "oneSideLoses": "{app} is cancelled every time.",
         "copy": "Copy SQL",
         "seeInTopQueries": "See in Top queries",
         "whichService": "Which service?",
@@ -27573,8 +27533,6 @@
         "copyForSlackHint": "Both statements, how often this pair has deadlocked and when it last happened — written as a message you can paste into a channel or a ticket."
       },
       "storm": {
-        "title": "Deadlock storm.",
-        "body": "{count} in this window — normally none.",
         "copyForSlack": "คัดลอก",
         "biasWarning": "Expect the Top queries tab to look calmer than reality right now. A cancelled query still finishes, but the ones queued behind these locks haven't — so call counts there are lower than what your users are experiencing."
       },
@@ -27678,8 +27636,7 @@
       },
       "rowActions": {
         "showChain": "Show the chain",
-        "copy": "Copy query",
-        "alertMe": "Alert me about lock waits"
+        "copy": "Copy query"
       },
       "waitEvent": {
         "transaction": "another transaction to finish",
@@ -27800,8 +27757,6 @@
         "application": "Application",
         "state": "State",
         "waitEvent": "Waiting on",
-        "running": "Running for",
-        "lastQuery": "Last query",
         "query": "Query",
         "blockedBy": "Blocked by"
       },
@@ -27818,7 +27773,6 @@
         "capped": "More sessions were sampled than we could read at once. These are the {count} we have.",
         "filtered": "Showing {count} of {total} sessions."
       },
-      "transactionOpen": "transaction open {age}",
       "healthy": {
         "title": "Nothing is running right now",
         "description": "We sampled your databases' session tables and found no active sessions. That is the healthy normal for an idle database, not a gap in what we collect.",
@@ -27868,15 +27822,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "Instance health",
-      "columnHint": "Connections against the limit, from the metrics your collector already sends. Blank until a receiver reports this instance.",
       "connectionsOf": "{used} of {limit} connections",
       "connectionsNoLimit": "{used} connections",
       "noLimitHint": "The receiver for this engine does not publish a connection limit on its own, so only the count is shown. The setup card's connection-limit recipe (sqlquery/mysql_limits) collects max_connections and turns this into a percentage.",
       "trendLabel": "Connections across the selected window",
       "cacheHit": "Cache hit {percent}",
-      "lagBytes": "Replica {value} behind",
-      "lagSeconds": "Replica {value} behind",
       "deadlocks": "{count} deadlock | {count} deadlocks",
       "noTraffic": "No application traffic in this window",
       "noTrafficHint": "Your collector reports this instance, but no application queried it during this window. Its query columns are empty because nothing measured them, not because it was fast.",
@@ -27915,7 +27865,6 @@
       "checkRange": "Widen the time range — the recipe reports once every 60 seconds.",
       "columns": {
         "relation": "Table",
-        "instance": "Instance",
         "totalBytes": "Total size",
         "heapBytes": "Heap size",
         "overheadBytes": "Index + TOAST",
@@ -27934,10 +27883,7 @@
       }
     },
     "recommendations": {
-      "title": "Recommendations",
-      "subtitle": "Deterministic checks over what the collector already reports. Each states the measurement and the threshold it crossed.",
       "countersCumulative": "Index scan counts are lifetime totals since the last statistics reset, not counts for the selected time range.",
-      "andMore": "and {count} more like it",
       "unused-index": {
         "title": "Index not scanned",
         "body": "{index} on {relation} has no recorded scans and occupies {size}.",

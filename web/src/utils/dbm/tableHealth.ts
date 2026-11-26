@@ -49,7 +49,7 @@
 
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { useI18nTyped, I18nText } from "@/types/i18n";
-import { formatCount } from "@/utils/dbm/format";
+import { formatAge, formatCount } from "@/utils/dbm/format";
 // Type-only, so the recommendations → services → tableHealth import chain
 // cannot become a runtime cycle.
 import type { IndexHealthRow } from "@/utils/dbm/recommendations";
@@ -188,16 +188,29 @@ export const tableSizeLabel = (bytes: number | null | undefined): string => {
   return `${value.toFixed(1)} ${BYTE_UNITS[unit]}`;
 };
 
-/**
- * Render a vacuum/analyze timestamp.
- *
- * `null` is NEVER, and says so. The recipe COALESCEs a null vacuum time to the
- * empty string and canonicalization drops it, so absence here is a measured
- * fact about the table — a table nobody has ever vacuumed. A blank cell would
- * read as "we do not know", which is the opposite claim and hides the finding.
- */
-export const vacuumLabel = (value: string | null | undefined, t: Translate): string =>
-  value ?? (t("dbm.tableHealth.never") as unknown as string);
+/** Epoch microseconds of a Postgres timestamp text such as `2026-08-11 23:39:57.939725+00`, or null. */
+export const vacuumTimeMicros = (value: string | null | undefined): number | null => {
+  if (!value) return null;
+  const iso = value.replace(" ", "T").replace(/([+-]\d\d)$/, "$1:00");
+  const ms = Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(iso) ? iso : `${iso}Z`);
+  return Number.isNaN(ms) ? null : ms * 1000;
+};
+
+/** Vacuum statistics exist only on Postgres rows; an unknown engine is treated as Postgres. */
+export const hasVacuumStats = (row: Pick<TableHealthRow, "engine">): boolean =>
+  !row.engine || row.engine === "postgresql";
+
+// Null on a Postgres row is "Never" (absence is measured); on engines without vacuum it is "—".
+export const vacuumLabel = (
+  value: string | null | undefined,
+  row: Pick<TableHealthRow, "engine">,
+  t: Translate,
+): string => {
+  if (!hasVacuumStats(row)) return "—";
+  if (!value) return t("dbm.tableHealth.never") as unknown as string;
+  const micros = vacuumTimeMicros(value);
+  return micros == null ? value : formatAge(micros);
+};
 
 /**
  * The lifetime-counter disclosure, or `null` when the API did not make the
@@ -275,7 +288,10 @@ export const tableHealthEmptyCause = (
  */
 export type TableHealthBarScale = "max" | "percent";
 
-export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDisplayRow>[] => [
+export const tableHealthColumns = (
+  t: Translate,
+  relationTip?: I18nText,
+): OTableColumnDef<TableHealthDisplayRow>[] => [
   {
     id: "qualifiedName",
     header: t("dbm.tableHealth.columns.relation"),
@@ -284,17 +300,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     resizable: true,
     size: 260,
     minSize: 180,
-    meta: { align: "left", flex: true },
-  },
-  {
-    id: "instance",
-    hideable: true,
-    header: t("dbm.tableHealth.columns.instance"),
-    accessorKey: "instance",
-    sortable: true,
-    resizable: true,
-    size: 160,
-    meta: { align: "left" },
+    meta: { align: "left", flex: true, headerTooltip: relationTip },
   },
   {
     id: "total_bytes",
@@ -304,7 +310,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     sortable: true,
     resizable: true,
     size: 120,
-    meta: { align: "right", bar: "max", format: (value: number | null) => tableSizeLabel(value) },
+    meta: { align: "right", format: (value: number | null) => tableSizeLabel(value) },
   },
   {
     id: "heap_bytes",
@@ -314,7 +320,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     sortable: true,
     resizable: true,
     size: 120,
-    meta: { align: "right", bar: "max", format: (value: number | null) => tableSizeLabel(value) },
+    meta: { align: "right", format: (value: number | null) => tableSizeLabel(value) },
   },
   {
     id: "overheadBytes",
@@ -324,7 +330,11 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     sortable: true,
     resizable: true,
     size: 120,
-    meta: { align: "right", bar: "max", format: (value: number | null) => tableSizeLabel(value) },
+    meta: {
+      headerTooltip: t("dbm.tableHealth.columns.overheadBytesHint"),
+      align: "right",
+      format: (value: number | null) => tableSizeLabel(value),
+    },
   },
   {
     id: "live_tuples",
@@ -363,10 +373,10 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     resizable: true,
     size: 120,
     meta: {
-      headerTooltip: t("dbm.tableHealth.tuplesEstimated"),
+      headerTooltip: t("dbm.tableHealth.columns.deadTupPctHint"),
       align: "right",
       bar: "percent",
-      format: (value: number | null) => (value == null ? "—" : `${value.toFixed(2)}%`),
+      format: (value: number | null) => (value == null ? "—" : `${value.toFixed(1)}%`),
     },
   },
   {
@@ -453,7 +463,10 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     sortable: true,
     resizable: true,
     size: 170,
-    meta: { align: "left", format: (value: string | null) => vacuumLabel(value, t) },
+    meta: {
+      align: "left",
+      format: (value: string | null, row: TableHealthRow) => vacuumLabel(value, row, t),
+    },
   },
   {
     id: "last_vacuum",
@@ -463,7 +476,10 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     sortable: true,
     resizable: true,
     size: 170,
-    meta: { align: "left", format: (value: string | null) => vacuumLabel(value, t) },
+    meta: {
+      align: "left",
+      format: (value: string | null, row: TableHealthRow) => vacuumLabel(value, row, t),
+    },
   },
   {
     id: "last_analyze",
@@ -473,6 +489,21 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     sortable: true,
     resizable: true,
     size: 170,
-    meta: { align: "left", format: (value: string | null) => vacuumLabel(value, t) },
+    meta: {
+      align: "left",
+      format: (value: string | null, row: TableHealthRow) => vacuumLabel(value, row, t),
+    },
   },
 ];
+
+/** One decimal, shared by the label and its tone so 9.96 reads "10.0%" AND turns amber. */
+export const roundBloat = (pct: number): number => Math.round(pct * 10) / 10;
+
+export const bloatTone = (pct: number): string => {
+  const shown = roundBloat(pct);
+  return shown >= 20
+    ? "bg-status-error-text"
+    : shown >= 10
+      ? "bg-status-warning-text"
+      : "bg-accent";
+};

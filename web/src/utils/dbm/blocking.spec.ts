@@ -22,6 +22,8 @@ import {
   chainsFromSamples,
   DEFAULT_BLOCKING_PERSPECTIVE,
   flattenChains,
+  isEngineState,
+  formatSeconds,
   IDLE_BLOCKER_SECONDS,
   isIdleBlocker,
   isNotablyLongestWait,
@@ -520,5 +522,32 @@ describe("wait events", () => {
       (row) => row.kind === "root",
     );
     expect(root?.waitEvent).toBeNull();
+  });
+});
+
+describe("instance label and engine state", () => {
+  it("labels rows with the instance, not the database", () => {
+    const chain = {
+      root_pid: 1,
+      blocked_count: 1,
+      depth: 1,
+      root: { pid: 1, depth: 0, children: [{ pid: 2, depth: 1, children: [] }] },
+      database: "shop",
+      instance: "pg",
+    };
+    expect(flattenChains([chain]).map((r) => r.db_instance)).toEqual(["pg", "pg"]);
+  });
+
+  it("treats only known MySQL states as states", () => {
+    expect(isEngineState("LOCK WAIT")).toBe(true);
+    expect(isEngineState("RUNNING")).toBe(true);
+    expect(isEngineState("ETL")).toBe(false);
+    expect(isEngineState(null)).toBe(false);
+  });
+
+  it("rolls 59.96s over to minutes and keeps one decimal", () => {
+    expect(formatSeconds(4.8)).toBe("4.8s");
+    expect(formatSeconds(59.96)).toBe("1.0m");
+    expect(formatSeconds(6480)).toBe("108.0m");
   });
 });

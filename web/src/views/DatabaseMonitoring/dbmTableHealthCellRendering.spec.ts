@@ -173,21 +173,35 @@ describe("every table-health cell renders its value, not its renderer", () => {
   it("renders the bloat estimate as a percentage", () => {
     const wrapper = mountTable([hit]);
 
-    expect(cellText(wrapper, "dead_tup_pct")).toBe("2.98%");
+    expect(cellText(wrapper, "dead_tup_pct")).toBe("3.0%");
   });
 
-  it("renders vacuum timestamps, and NEVER for a table nobody has vacuumed", () => {
-    const wrapper = mountTable([hit]);
+  it("renders vacuum times as a relative age, and NEVER for a Postgres table nobody has vacuumed", () => {
+    const sevenHoursAgo = new Date(Date.now() - 7 * 3_600_000).toISOString();
+    const wrapper = mountTable([
+      { ...hit, last_vacuum: sevenHoursAgo, last_autovacuum: sevenHoursAgo },
+    ]);
 
-    expect(cellText(wrapper, "last_vacuum")).toBe("2026-08-09 03:11:02");
-    expect(cellText(wrapper, "last_autovacuum")).toBe("2026-08-10 01:44:19");
-    expect(cellText(wrapper, "last_analyze")).toBe("2026-08-10 01:44:20");
+    expect(cellText(wrapper, "last_vacuum")).toBe("7h ago");
+    expect(cellText(wrapper, "last_autovacuum")).toBe("7h ago");
 
-    // `null` here is a measured fact — a table nobody has ever vacuumed — and
-    // has to read as "Never" rather than as a blank "we do not know".
+    // `null` on Postgres is a measured fact, so it reads "Never" rather than blank.
     const neverWrapper = mountTable([{ ...hit, last_vacuum: null, last_autovacuum: null }]);
     expect(cellText(neverWrapper, "last_vacuum")).toBe("Never");
     expect(cellText(neverWrapper, "last_autovacuum")).toBe("Never");
+  });
+
+  it("renders an em-dash, not Never, for engines without vacuum", () => {
+    const wrapper = mountTable([
+      { ...hit, engine: "mysql", last_vacuum: null, last_autovacuum: null },
+    ]);
+
+    expect(cellText(wrapper, "last_vacuum")).toBe("—");
+    expect(cellText(wrapper, "last_autovacuum")).toBe("—");
+  });
+
+  it("offers no instance column; the page shows it under the table name", () => {
+    expect(tableHealthColumns(t).some((c) => c.id === "instance")).toBe(false);
   });
 
   /**
@@ -196,11 +210,10 @@ describe("every table-health cell renders its value, not its renderer", () => {
    * Pinned here so a fix that routes every column through a formatter cannot
    * quietly break the two that never needed one.
    */
-  it("renders the qualified relation name and instance plainly", () => {
+  it("renders the qualified relation name plainly", () => {
     const wrapper = mountTable([hit]);
 
     expect(cellText(wrapper, "qualifiedName")).toBe("public.order_lines");
-    expect(cellText(wrapper, "instance")).toBe("pg-primary");
   });
 
   /**

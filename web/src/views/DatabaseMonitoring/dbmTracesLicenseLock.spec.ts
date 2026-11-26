@@ -33,7 +33,6 @@ const block = (source: string, start: string) => {
 };
 
 describe.each([
-  ["SamplesPage.vue", "const openSampleTrace", ["dbm-samples-trace-lock-"]],
   [
     "QueryDetailPage.vue",
     "const openTraces",
@@ -72,5 +71,18 @@ describe.each([
 
   it("navigates nowhere from a row or chart click while traces are locked", () => {
     expect(block(source, opener)).toMatch(/tracesLock\.locked\.value\) return;/);
+  });
+});
+
+describe("SamplesPage.vue trace pivot", () => {
+  const source = read("SamplesPage.vue");
+
+  it("disables the row action with the licence reason while traces are locked", () => {
+    expect(source).toContain('const tracesLock = useLicenseLock("traces");');
+    expect(source).toContain("tracesLock.locked.value ? tracesLock.lockedReason.value : false");
+  });
+
+  it("navigates nowhere from a row click while traces are locked", () => {
+    expect(block(source, "const openSampleTrace")).toMatch(/tracesLock\.locked\.value\) return;/);
   });
 });

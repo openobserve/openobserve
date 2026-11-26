@@ -41,7 +41,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-tabs>
       <!-- The sibling badges come from the shell's one shared fan-out; the
            page's own count is substituted into what it passes here. -->
-      <DbmSectionTabs v-bind="tabCounts" />
+      <DbmSectionTabs v-bind="tabCounts" :counts-loading="countsLoading" />
+    </template>
+
+    <template #actions>
+      <DbmHeaderActions
+        :range="range"
+        :last-run-at="lastRunAt"
+        :loading="loading"
+        @date-change="emit('date-change', $event)"
+        @refresh="emit('refresh')"
+      />
     </template>
 
     <slot />
@@ -49,7 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import DbmHeaderActions from "@/components/dbm/DbmHeaderActions.vue";
 import DbmSectionTabs from "@/components/dbm/DbmSectionTabs.vue";
+import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
+import type { DbmDateChange, DbmRange } from "@/composables/dbm/useDbmScope";
 import type { DbmTabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -59,7 +72,18 @@ defineProps<{
   titleDataTest: string;
   /** What the tab strip paints — the shell's fan-out with this page's own count substituted. */
   tabCounts: DbmTabCountProps;
+  /** The tab's own range, which tracks the URL; the header picker reads and writes it. */
+  range: DbmRange;
+  /** The tab's last-run time and loading state, so the header always describes the tab on screen. */
+  lastRunAt: number | null;
+  loading: boolean;
+}>();
+
+const emit = defineEmits<{
+  "date-change": [value: DbmDateChange];
+  refresh: [];
 }>();
 
 const { t } = useI18nTyped();
+const { loading: countsLoading } = useDbmTabCountsContext();
 </script>

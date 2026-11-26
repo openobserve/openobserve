@@ -21,6 +21,8 @@
  * disagree about units or precision, or the two screens look like two products.
  */
 
+import i18n from "@/locales";
+
 /**
  * Durations arrive in NANOSECONDS from the rollup (`total_time_ns`, `p95_ns`).
  *
@@ -331,8 +333,8 @@ export const claimedCount = (value: DbmCountClaim | number | null | undefined): 
  */
 export const badgeCount = (value: DbmCountClaim | number | null | undefined): string | null => {
   if (value == null) return null;
-  if (typeof value === "number") return String(value);
-  return value.complete ? String(value.count) : `${value.count}+`;
+  if (typeof value === "number") return formatCompact(value);
+  return value.complete ? formatCompact(value.count) : `${formatCompact(value.count)}+`;
 };
 
 /**
@@ -477,12 +479,13 @@ export const formatClock = (micros: number): string =>
  */
 export const formatAge = (micros: number): string => {
   const seconds = Math.max(0, Math.round((Date.now() - micros / 1000) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
+  const t = i18n.global.t;
+  if (seconds < 60) return t("dbm.age.seconds", { n: seconds });
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return t("dbm.age.minutes", { n: minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
+  if (hours < 24) return t("dbm.age.hours", { n: hours });
+  return t("dbm.age.days", { n: Math.round(hours / 24) });
 };
 
 /**
@@ -535,3 +538,7 @@ export const dbmHttpError = (err: unknown): DbmHttpError => {
     message: serverMessage ?? String(err),
   };
 };
+
+/** Full date and time, for tooltips on a relative age. */
+export const formatDateTime = (micros: number): string =>
+  new Date(micros / 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });

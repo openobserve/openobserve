@@ -3,7 +3,7 @@
 //
 // Selectors verified against:
 //   web/src/components/dbm/DbmSectionTabs.vue     (tab strip + badges)
-//   web/src/components/dbm/DbmScopeFilters.vue    (scope chips — see note below)
+//   web/src/components/dbm/DbmFilterBar.vue       (scope selects — see note below)
 //   web/src/views/DatabaseMonitoring/*.vue        (per-tab tables/empty states)
 //
 // Strict selector policy:
@@ -12,10 +12,8 @@
 //
 // TWO NAMING TRAPS this object exists to hide from the specs:
 //
-//   1. The scope-filter data-tests are hardcoded `dbm-queries-*` in
-//      DbmScopeFilters.vue, on EVERY tab — Table health's instance chip is
-//      still `dbm-queries-scope-chip-instance`. Not a bug, just a shared
-//      component that never parameterised its prefix.
+//   1. The scope filters are selects rendered by DbmFilterBar.vue, with
+//      `dbm-filter-<key>` ids on EVERY tab. There are no chips and no Clear all.
 //
 //   2. The chip the UI LABELS "database" is the `instance` dimension
 //      (`dbm.filters.dimension.instance` => "database" in en-US.json). The
@@ -56,22 +54,11 @@ export class DatabaseMonitoringPage {
     this.sectionTabs = page.locator('[data-test="dbm-section-tabs"]');
 
     // =====================================================================
-    // Scope filters (shared component -> `dbm-queries-*` on every tab)
+    // Scope filters (DbmFilterBar -> `dbm-filter-<key>` on every tab)
     // =====================================================================
-    this.scope = page.locator('[data-test="dbm-queries-scope"]');
-    this.scopeTrigger = page.locator('[data-test="dbm-queries-scope-trigger"]');
-    this.scopeCount = page.locator('[data-test="dbm-queries-scope-count"]');
-    // Inside the Filters popover (only reachable once it is open).
-    this.scopeClear = page.locator('[data-test="dbm-queries-scope-clear"]');
-    // Beside the chips, always visible while a filter is set.
-    this.scopeClearInline = page.locator('[data-test="dbm-queries-scope-clear-inline"]');
-    // Any active scope chip, whichever dimension it is for.
-    this.scopeChip = page.locator('[data-test^="dbm-queries-scope-chip-"]').first();
-    this.instanceChip = page.locator('[data-test="dbm-queries-scope-chip-instance"]');
-    this.instanceChipRemove = page.locator(
-      '[data-test="dbm-queries-scope-chip-instance-remove"]',
-    );
-    this.systemChip = page.locator('[data-test="dbm-queries-scope-chip-system"]');
+    this.instanceFilter = page.locator('[data-test="dbm-filter-instance"]');
+    this.systemFilter = page.locator('[data-test="dbm-filter-system"]');
+    this.namespaceFilter = page.locator('[data-test="dbm-filter-namespace"]');
 
     // =====================================================================
     // Per-tab tables and empty states
@@ -330,11 +317,10 @@ export class DatabaseMonitoringPage {
   // Scope filters
   // =======================================================================
 
-  /** The instance chip's rendered text ("" when no instance filter is set). */
-  async getInstanceChipText() {
-    if (!(await this.instanceChip.count())) return '';
-    if (!(await this.instanceChip.isVisible().catch(() => false))) return '';
-    return ((await this.instanceChip.textContent()) || '').trim();
+  /** The instance select's rendered text ("" when it is not on screen). */
+  async getInstanceFilterText() {
+    if (!(await this.instanceFilter.isVisible().catch(() => false))) return '';
+    return ((await this.instanceFilter.textContent()) || '').trim();
   }
 
   /**
@@ -595,22 +581,23 @@ export class DatabaseMonitoringPage {
     const el = this.page.locator(`[data-test="dbm-section-tab-badge-${tab}"]`);
     if (!(await el.isVisible().catch(() => false))) return null;
     const text = (await el.innerText()).trim();
-    // Strip the vantage suffix ("client count") and any cap marker ("50+").
-    const m = text.match(/(\d[\d,]*)/);
-    return m ? Number(m[1].replace(/,/g, '')) : null;
+    // Compact forms: "1.2k", "3M", "50+", "1,234"; the vantage suffix is ignored.
+    const m = text.match(/(\d[\d,]*(?:\.\d+)?)\s*([kKmMbB])?/);
+    if (!m) return null;
+    const mult = { k: 1e3, m: 1e6, b: 1e9 }[(m[2] || '').toLowerCase()] || 1;
+    return Math.round(Number(m[1].replace(/,/g, '')) * mult);
   }
 
   /**
-   * Every instance the scope picker OFFERS on the current tab.
+   * Every instance the instance select OFFERS on the current tab.
    *
-   * Read from the open popover rather than the URL, because the bug this
+   * Read from the open select rather than the URL, because the bug this
    * guards was exactly that the picker's contents disagreed with the org's
    * fleet — a value the reader could not choose is invisible to any assertion
    * made against the query string.
    */
   async instanceOptions() {
-    await this.page.locator('[data-test="dbm-queries-scope-trigger"]').click();
-    const select = this.page.locator('[data-test="dbm-queries-filter-instance"]');
+    const select = this.instanceFilter;
     await select.waitFor({ state: 'visible', timeout: 10000 });
     await select.click();
     // The listbox renders in a portal, so it is not inside the select.

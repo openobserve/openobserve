@@ -15,11 +15,13 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
+import { createStore } from "vuex";
 
 import type { DbmTabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import i18n from "@/locales";
 
+import DbmHeaderActions from "./DbmHeaderActions.vue";
 import DbmPageChrome from "./DbmPageChrome.vue";
 import DbmSectionTabs from "./DbmSectionTabs.vue";
 
@@ -29,6 +31,9 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ push: vi.fn(() => Promise.resolve()) }),
 }));
 
+// The header date picker reads the user timezone from the store.
+const store = createStore({ state: { timezone: "UTC" } });
+
 const tabCounts: DbmTabCountProps = { queryCount: 12, databaseCount: 3 };
 
 const mountChrome = (props: Record<string, unknown> = {}, slots: Record<string, string> = {}) =>
@@ -36,11 +41,14 @@ const mountChrome = (props: Record<string, unknown> = {}, slots: Record<string, 
     props: {
       titleDataTest: "dbm-deadlocks-title",
       tabCounts,
+      range: { type: "relative", relativeTimePeriod: "15m", startTime: 0, endTime: 0 },
+      lastRunAt: null,
+      loading: false,
       ...props,
     },
     slots,
     global: {
-      plugins: [i18n],
+      plugins: [i18n, store],
       stubs: { RouterLink: true },
     },
   });
@@ -78,6 +86,25 @@ describe("DbmPageChrome", () => {
       queryCount: 12,
       databaseCount: 3,
     });
+  });
+
+  it("hands the range, last-run time and loading state to the header actions", () => {
+    const wrapper = mountChrome({ lastRunAt: 5, loading: true });
+
+    expect(wrapper.findComponent(DbmHeaderActions).props()).toMatchObject({
+      lastRunAt: 5,
+      loading: true,
+    });
+  });
+
+  it("forwards refresh and date changes from the header actions", () => {
+    const wrapper = mountChrome();
+    const actions = wrapper.findComponent(DbmHeaderActions);
+    actions.vm.$emit("refresh");
+    actions.vm.$emit("date-change", { relativeTimePeriod: "1h" });
+
+    expect(wrapper.emitted("refresh")).toHaveLength(1);
+    expect(wrapper.emitted("date-change")).toHaveLength(1);
   });
 
   it("renders the page's body", () => {

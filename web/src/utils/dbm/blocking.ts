@@ -249,12 +249,19 @@ export const chainsFromSamples = (samples: BlockingSample[]): BlockingChain[] =>
       depth: depths.length ? Math.max(...depths) : 0,
       max_wait_seconds: waiters.reduce((max, w) => Math.max(max, w.wait_seconds ?? 0), 0),
       engine: waiters[0].db_system,
-      database: waiters[0].db_instance ?? null,
+      database: waiters[0].db_namespace ?? null,
+      instance: waiters[0].db_instance ?? null,
     });
   }
 
   return chains.sort((a, b) => b.blocked_count - a.blocked_count || b.root_pid - a.root_pid);
 };
+
+const MYSQL_TRX_STATES = new Set(["RUNNING", "LOCK WAIT", "ROLLING BACK", "COMMITTING"]);
+
+/** MySQL reports the InnoDB transaction state where Postgres reports an app name; an exact list keeps "ETL" an app. */
+export const isEngineState = (value: string | null | undefined): boolean =>
+  !!value && MYSQL_TRX_STATES.has(value);
 
 /** Seconds since the root last ran a statement, when the sample carried it. */
 export const rootIdleSeconds = (chain: BlockingChain, samples: BlockingSample[]): number | null =>
@@ -277,6 +284,9 @@ export const flattenChains = (
     const engine = chain.engine ?? "";
     const database = chain.database ?? "";
     const prefix = `${engine}:${database}`;
+    // The server's `database` is a schema name; the instance is the host-level label.
+    const instance =
+      chain.instance ?? samples.find((s) => s.blocking_pid === chain.root_pid)?.db_instance ?? null;
 
     /** Every session stuck below this node, at any depth. */
     const countBelow = (node: BlockingChainNode, seen: Set<number>): number => {
@@ -300,7 +310,7 @@ export const flattenChains = (
       application: chain.root_app ?? root?.app ?? null,
       fingerprint: chain.root_fingerprint ?? root?.fingerprint ?? null,
       db_system: engine,
-      db_instance: chain.database ?? null,
+      db_instance: instance,
       waitingOnPid: null,
       // The root is the session everything else waits on; it waits for nothing.
       waitSeconds: null,
@@ -338,7 +348,7 @@ export const flattenChains = (
           application: kid.app ?? null,
           fingerprint: kid.fingerprint ?? null,
           db_system: engine,
-          db_instance: chain.database ?? null,
+          db_instance: instance,
           waitingOnPid: node.pid,
           waitSeconds: kid.wait_seconds ?? null,
           blockingCount: below,
@@ -468,3 +478,10 @@ export const WAIT_TONE_RULES = {
   critical: 0.9,
   warning: 0.25,
 } as const;
+
+/** Sub-minute waits read in seconds with one decimal — 4.8s, not 5s. */
+export const formatSeconds = (seconds: number): string => {
+  // Round first so 59.96 rolls over to minutes instead of printing "60.0s".
+  const tenths = Math.round(seconds * 10) / 10;
+  return tenths >= 60 ? `${(tenths / 60).toFixed(1)}m` : `${tenths.toFixed(1)}s`;
+};

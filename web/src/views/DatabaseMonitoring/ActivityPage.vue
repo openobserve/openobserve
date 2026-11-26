@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     • It is SAMPLED, not continuous. The disclosure line states the interval the
       server inferred, and says plainly that a query shorter than the gap
       between two samples can run and finish unseen. Our shipped default is 10s,
-      not Datadog's 1 Hz, so no interval is ever assumed — an uninferable one
+      not a 1 Hz feed, so no interval is ever assumed — an uninferable one
       degrades to non-numeric copy instead.
     • The sample is already FILTERED by the collector: idle sessions older than
       the newest running query are dropped unless they block someone. So this is
@@ -36,15 +36,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   an active backend means it is ON CPU — 36% of active Postgres sessions — so
   that bucket is named rather than left blank. And a duration means opposite
   things by state: still-running for a live session, last-completed for an idle
-  one, which is why they occupy two columns and never one.
+  one, which is why the Time cell labels which of the two it shows.
 -->
 <template>
-  <DbmPageChrome title-data-test="dbm-activity-title" :tab-counts="tabCounts">
+  <DbmPageChrome
+    title-data-test="dbm-activity-title"
+    :tab-counts="tabCounts"
+    :range="range"
+    :last-run-at="lastRunAt"
+    :loading="loading"
+    @date-change="onDateChange"
+    @refresh="onRefresh()"
+  >
     <div class="flex min-h-0 flex-1 flex-col">
+      <DbmFilterBar
+        v-model:search="search"
+        :placeholder="t('dbm.activity.searchPlaceholder')"
+        search-data-test="dbm-activity-search"
+        :filters="dimensionFilters"
+      >
+        <template #trailing>
+          <div class="ms-auto flex items-center gap-1">
+            <DbmRecommendationMenu :items="recommendationItems" />
+            <OTableColumnToggle
+              :columns="columns"
+              :column-visibility="columnVisibility"
+              :default-column-visibility="defaultColumnVisibility"
+              :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+              @update:column-visibility="setColumnVisibility"
+              @reset:column-sizes="tableRef?.resetColumnSizes?.()"
+            />
+            <DbmToolbarNote
+              :text="disclosureSummary"
+              :detail="disclosureDetail"
+              data-test="dbm-activity-disclosure"
+            />
+          </div>
+        </template>
+      </DbmFilterBar>
       <OTable
+        ref="tableRef"
         :enable-column-resize="true"
         :data="rows"
-        :columns="columns"
+        :columns="visibleTableColumns"
         row-key="rowKey"
         :loading="loading"
         :frame="false"
@@ -55,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
         table-id="dbm-activity"
         persist-columns
-        :column-visibility="defaultColumnVisibility"
+        :column-visibility="columnVisibility"
         :total-count-exact="!truncated"
         data-test="dbm-activity-table"
         @row-click="onRowClick"
@@ -68,52 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @action="onRefresh()"
           />
         </template>
-        <template #toolbar>
-          <DbmTableToolbar
-            v-model:search="search"
-            :placeholder="t('dbm.activity.searchPlaceholder')"
-            :debounce="400"
-            search-data-test="dbm-activity-search"
-          >
-            <template #filters>
-              <DbmScopeFilters
-                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
-                :filters="dimensionFilters"
-                @clear="clearScope"
-              />
-            </template>
-            <DbmToolbarNote
-              class="ms-auto"
-              :text="disclosureSummary"
-              :detail="disclosureDetail"
-              data-test="dbm-activity-disclosure"
-            />
-          </DbmTableToolbar>
-        </template>
-
-        <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
-            <DateTime
-              auto-apply
-              menu-align="end"
-              :default-type="range.type"
-              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-              :default-relative-time="range.relativeTimePeriod ?? undefined"
-              data-test-name="dbm-activity-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
-              @on:date-change="onDateChange"
-            />
-            <ORefreshButton
-              layout="inline"
-              variant="outline"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-activity-refresh"
-              @click="onRefresh()"
-            />
-          </div>
-        </template>
-
         <template #subheader>
           <!-- Always rendered — `:loading` draws the skeleton — so arriving
                data never shifts the rows below it. -->
@@ -169,25 +157,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- The statement, with the identity of the session under it. -->
         <template #cell-query="{ row }">
-          <DbmQueryCell
-            :text="raw(row.query ?? '')"
-            :db-system="row.db_system"
-            :meta-items="[
-              { key: 'instance', label: raw(row.db_instance ?? '') },
-              {
-                key: 'txnAge',
-                label: row.transactionAge ?? raw(''),
-                class: 'text-status-warning-text',
-              },
-            ]"
-          />
+          <div class="flex min-w-0 flex-col gap-px">
+            <OTruncatedText class="text-text-code font-mono text-xs">
+              {{ raw(row.query ?? "") || raw("—") }}
+            </OTruncatedText>
+            <div
+              v-if="!uniformInstance && row.db_instance"
+              class="text-text-secondary flex min-h-4 min-w-0 items-center gap-1 text-xs"
+              data-test="dbm-activity-meta"
+            >
+              <OTruncatedText>
+                {{ row.db_instance }}
+                <OTooltip :content="raw(engineName(row.db_system))" />
+              </OTruncatedText>
+            </div>
+          </div>
         </template>
 
         <template #cell-session="{ row }">
-          <span
-            class="bg-surface-subtle text-text-heading rounded-default text-2xs px-1.5 py-px font-mono font-semibold"
-            data-test="dbm-activity-pid"
-          >
+          <span class="text-text-heading text-xs tabular-nums" data-test="dbm-activity-pid">
             {{ row.session_pid ?? raw("—") }}
           </span>
         </template>
@@ -199,6 +187,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dbm-activity-state"
           >
             {{ row.stateLabel }}
+            <OTooltip v-if="row.stateRaw" :content="raw(row.stateRaw)" />
+          </span>
+          <span
+            v-if="row.transactionAge"
+            class="text-status-warning-text text-2xs ms-1"
+            data-test="dbm-activity-txn-age"
+          >
+            {{ row.transactionAge }}
           </span>
         </template>
 
@@ -207,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-waitEvent="{ row }">
           <span
             class="text-xs"
-            :class="row.onCpu ? 'text-text-secondary' : 'text-text-body font-mono'"
+            :class="row.onCpu ? 'text-text-secondary' : 'text-text-body'"
             data-test="dbm-activity-wait-event"
           >
             {{ row.waitLabel }}
@@ -226,26 +222,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-else class="text-text-muted">{{ raw("—") }}</span>
         </template>
 
-        <!-- Two columns, deliberately. "Running 40s and still going" and "the
-             last query took 40s" demand opposite responses. -->
-        <template #cell-running="{ row }">
+        <!-- One column: running and last-query times differ by label and weight. -->
+        <template #cell-time="{ row }">
           <span
             v-if="row.runningMs !== null"
-            class="text-text-heading text-compact font-mono font-semibold tabular-nums"
+            class="text-text-body text-compact tabular-nums"
+            data-test="dbm-activity-time"
           >
-            {{ formatDurationMs(row.runningMs) }}
+            {{ t("dbm.activity.timeRunning", { duration: formatDurationMs(row.runningMs) }) }}
+            <OTooltip :content="timeSnapshotTip" />
           </span>
-          <span v-else class="text-text-muted">{{ raw("—") }}</span>
-        </template>
-
-        <template #cell-lastQuery="{ row }">
           <span
-            v-if="row.lastQueryMs !== null"
-            class="text-text-secondary text-compact font-mono tabular-nums"
+            v-else-if="row.lastQueryMs !== null"
+            class="text-text-secondary text-compact tabular-nums"
+            data-test="dbm-activity-time"
           >
-            {{ formatDurationMs(row.lastQueryMs) }}
+            {{ t("dbm.activity.timeLast", { duration: formatDurationMs(row.lastQueryMs) }) }}
+            <OTooltip :content="timeSnapshotTip" />
           </span>
-          <span v-else class="text-text-muted">{{ raw("—") }}</span>
+          <span v-else class="text-text-muted" data-test="dbm-activity-time">{{ raw("—") }}</span>
         </template>
 
         <template #cell-user="{ row }">
@@ -319,14 +314,17 @@ import { useRoute, useRouter } from "vue-router";
 
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
-import DateTime from "@/components/DateTime.vue";
-import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
-import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
+import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
+import DbmRecommendationMenu, {
+  type DbmRecommendationMenuItem,
+} from "@/components/dbm/DbmRecommendationMenu.vue";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import { useDbmColumnToggle } from "@/composables/dbm/useDbmColumnToggle";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -347,6 +345,7 @@ import {
   activityEmptyCause,
   activityQueryDetailTarget,
   activitySampleTotal,
+  activityTimeSortKey,
   buildActivityRows,
   buildStateSummary,
   buildWaitBreakdown,
@@ -360,7 +359,10 @@ import {
   waitBucketLabelParts,
   waitTotals,
 } from "@/utils/dbm/activity";
+import { buildRecommendations, recommendationRuleParams } from "@/utils/dbm/recommendations";
 import { formatAge, formatCount, formatPercent } from "@/utils/dbm/format";
+import { emptyColumnIds } from "@/utils/dbm/emptyColumns";
+import { engineName, uniformValue } from "@/utils/dbm/uniformValue";
 import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
 
 const { t } = useI18nTyped();
@@ -440,6 +442,12 @@ const truncated = ref(false);
 const notCollecting = ref(false);
 const logLinesSeen = ref<number | null>(null);
 const sampledAt = ref<number | null>(null);
+// The time cells are a snapshot, not a live timer; the tooltip says when it was taken.
+const timeSnapshotTip = computed(() =>
+  t("dbm.activity.timeSnapshot", {
+    age: sampledAt.value ? t("dbm.activity.snapshotAge", { age: formatAge(sampledAt.value) }) : "",
+  }),
+);
 const sampleInterval = ref<number | null>(null);
 
 /** Every badge, from the shell's shared snapshot — this page's own included. */
@@ -504,17 +512,48 @@ const allRows = computed(() =>
     return {
       ...row,
       waitLabel: waitBucketLabel(waitBucketLabelParts(row.wait_event_type, row.wait_event), t),
-      stateLabel: row.state ? raw(row.state) : t("dbm.activity.state.unknown"),
+      // MySQL says "running" where PostgreSQL says "active": one label for both.
+      stateLabel: row.state
+        ? row.state.toLowerCase() === "running"
+          ? t("dbm.activity.state.active")
+          : raw(row.state)
+        : t("dbm.activity.state.unknown"),
+      stateRaw: row.state && row.state.toLowerCase() === "running" ? row.state : null,
+      timeSort: activityTimeSortKey(row),
       // `blocking_pids` is the SOLE blocked-ness predicate (E2/E3) — the `{}`
       // sentinel means unblocked, and the server already parsed it to an array.
       blockedByLabel: row.blocked ? raw(row.blocking_pids?.join(", ") ?? "") : null,
       // Only when it is long enough to act on. Every active session is inside
       // some transaction, so flagging them all says nothing.
       transactionAge: isNotableTransactionAge(age)
-        ? t("dbm.activity.transactionOpen", { age: formatDurationMs((age as number) * 1000) })
+        ? t(
+            row.state?.startsWith("idle in transaction")
+              ? "dbm.activity.transactionAgeIdle"
+              : "dbm.activity.transactionAgeActive",
+            { age: formatDurationMs((age as number) * 1000) },
+          )
         : null,
     };
   }),
+);
+
+const recommendationItems = computed<DbmRecommendationMenuItem[]>(() =>
+  buildRecommendations({ sessions: sessions.value, indexes: [], blocking: [], serverMetrics: null })
+    .filter((rec) => rec.id === "long-running-query")
+    .map((rec, i) => {
+      const { key, params } = recommendationRuleParams(rec.id);
+      return {
+        key: `${rec.id}-${i}`,
+        id: rec.id,
+        tone: rec.tone,
+        title: t("dbm.recommendations.long-running-query.title"),
+        body: t("dbm.recommendations.long-running-query.body", {
+          pid: rec.subject || t("dbm.activity.pidUnknown"),
+          duration: formatDurationMs(rec.evidence.runningMs ?? 0),
+        }),
+        rule: t(key as Parameters<typeof t>[0], params),
+      };
+    }),
 );
 
 /**
@@ -549,12 +588,18 @@ const columns = computed<OTableColumnDef<ActivityTableRow>[]>(() => [
     accessorKey: "query",
     header: t("dbm.activity.columns.query"),
     sortable: false,
+    // Wide but fixed: an elastic column grows to the longest SQL and pushes the other columns off screen.
+    size: 460,
+    meta: {
+      isName: true,
+      headerTooltip: queryHeaderTip.value ? raw(queryHeaderTip.value) : undefined,
+    },
   },
   {
     id: "session",
     accessorKey: "session_pid",
     header: t("dbm.activity.columns.session"),
-    size: 88,
+    size: 80,
     sortable: true,
     meta: { align: "right" },
   },
@@ -578,7 +623,7 @@ const columns = computed<OTableColumnDef<ActivityTableRow>[]>(() => [
     id: "state",
     accessorKey: "state",
     header: t("dbm.activity.columns.state"),
-    size: 128,
+    size: 176,
     sortable: true,
   },
   {
@@ -602,25 +647,35 @@ const columns = computed<OTableColumnDef<ActivityTableRow>[]>(() => [
       ]
     : []),
   {
-    id: "running",
-    accessorKey: "runningMs",
-    header: t("dbm.activity.columns.running"),
-    size: 120,
+    id: "time",
+    accessorKey: "timeSort",
+    header: t("dbm.activity.columns.time"),
+    size: 150,
     sortable: true,
-    meta: { align: "right" },
-  },
-  {
-    id: "lastQuery",
-    accessorKey: "lastQueryMs",
-    header: t("dbm.activity.columns.lastQuery"),
-    size: 120,
-    sortable: true,
-    meta: { align: "right" },
+    meta: { align: "right", headerTooltip: t("dbm.activity.columns.timeHint") },
   },
 ]);
 
+const uniformInstance = computed(() => uniformValue(allRows.value, (r) => r.db_instance));
+const queryHeaderTip = computed(() =>
+  uniformInstance.value ? t("dbm.activity.allOnInstance", { instance: uniformInstance.value }) : "",
+);
+
+// Columns empty on every row leave the table only; the toggle and saved visibility keep `columns`.
+const emptyColumns = computed(() =>
+  emptyColumnIds(rows.value, { blockedBy: (row) => row.blockedByLabel }),
+);
+const visibleTableColumns = computed(() =>
+  columns.value.filter((c) => !emptyColumns.value.includes(c.id as string)),
+);
+
 /** The identity columns are secondary to what the session is DOING. */
 const defaultColumnVisibility = { user: false, application: false };
+
+const { tableRef, columnVisibility, setColumnVisibility } = useDbmColumnToggle(
+  "dbm-activity",
+  defaultColumnVisibility,
+);
 
 const stateTone = (state: string | null | undefined): string => {
   const s = (state ?? "").toLowerCase();
@@ -823,7 +878,6 @@ const {
   filters: dimensionFilters,
   requestParams: scopeParams,
   queryParams: scopeQuery,
-  clear: clearScopeModels,
 } = useDbmScopeFilters({
   query: route.query,
   // Re-read on activation: this page is kept alive, so its setup-time seed
@@ -851,13 +905,6 @@ const {
     load();
   },
 });
-
-const clearScope = () => {
-  clearScopeModels();
-  search.value = "";
-  syncUrl();
-  load();
-};
 
 /**
  * Mirror the scope into the URL so it survives a tab switch, a reload and a

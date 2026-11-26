@@ -305,9 +305,8 @@ describe("buildDbmLoadPanelSchema", () => {
   it("builds a line SQL panel over the server-vantage stream", () => {
     const schema = buildDbmLoadPanelSchema({});
     expect(schema.type).toBe("line");
-    // Connected lines with a dot on every real sample: the dots keep sparse
-    // data honest (each marks an actual bucket) while the line stays readable.
-    expect(schema.config.connect_nulls).toBe(true);
+    // A gap breaks the line; a dot still marks every real sample.
+    expect(schema.config.connect_nulls).toBe(false);
     expect(schema.config.show_symbol).toBe(true);
     expect(schema.queryType).toBe("sql");
     const q = schema.queries[0];

@@ -48,16 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          nothing — copy in particular composes its summary from a row that is
          not there. The empty state below carries the only action that applies. -->
     <template v-if="hasQuery" #actions>
-      <DateTime
-        auto-apply
-        menu-align="end"
-        :default-type="range.type"
-        :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-        :default-relative-time="range.relativeTimePeriod ?? undefined"
-        data-test-name="dbm-detail-date-time"
-        class="h-8 max-md:[&_.date-time-label]:hidden"
-        @on:date-change="onDateChange"
-      />
       <OButton
         variant="outline"
         size="sm"
@@ -69,13 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dbm.detail.copySummary") }}
         <OTooltip side="bottom" :content="t('dbm.detail.copySummaryHint')" />
       </OButton>
-      <ORefreshButton
-        layout="inline"
-        variant="outline"
-        :loading="loading"
+      <DbmHeaderActions
+        :range="range"
         :last-run-at="lastRunAt"
-        data-test="dbm-detail-refresh"
-        @click="load()"
+        :loading="loading"
+        @date-change="onDateChange"
+        @refresh="load()"
       />
     </template>
 
@@ -121,29 +110,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dbm-detail-identity"
       >
         <div class="flex flex-wrap items-center gap-1.5">
-          <OTag v-if="row?.db_system" type="dbSystem" :value="row.db_system" size="md" />
-          <OTag v-for="chip in identityChips" :key="chip.key" :label="chip.label" size="md" />
-          <span v-if="firstSeenTime" class="text-text-secondary text-xs">
+          <OTag v-for="chip in identityChips" :key="chip.key" size="md">
+            {{ chip.label }}
+            <OTooltip
+              v-if="chip.key === 'instance' && queryDbSystem"
+              side="bottom"
+              :content="raw(dbEngineName(queryDbSystem))"
+            />
+          </OTag>
+          <span v-if="firstSeenAt" class="text-text-secondary text-xs">
             <i18n-t keypath="dbm.detail.firstSeen" tag="span">
               <template #time>
                 <span class="text-text-heading font-semibold tabular-nums">{{
-                  firstSeenTime
+                  formatAge(firstSeenAt)
                 }}</span>
               </template>
             </i18n-t>
-            <OTooltip side="bottom" :content="t('dbm.detail.firstSeenHint')" />
+            <OTooltip
+              side="bottom"
+              :content="raw(`${formatDateTime(firstSeenAt)} — ${t('dbm.detail.firstSeenHint')}`)"
+            />
           </span>
           <span
-            v-if="lastSeenTime"
+            v-if="lastSeenAt"
             class="text-text-secondary text-xs"
             data-test="dbm-detail-last-seen"
           >
             <i18n-t keypath="dbm.detail.lastSeen" tag="span">
               <template #time>
-                <span class="text-text-heading font-semibold tabular-nums">{{ lastSeenTime }}</span>
+                <span class="text-text-heading font-semibold tabular-nums">{{
+                  formatAge(lastSeenAt)
+                }}</span>
               </template>
             </i18n-t>
-            <OTooltip side="bottom" :content="t('dbm.detail.lastSeenHint')" />
+            <OTooltip
+              side="bottom"
+              :content="raw(`${formatDateTime(lastSeenAt)} — ${t('dbm.detail.lastSeenHint')}`)"
+            />
           </span>
           <div class="flex-1"></div>
           <!-- Beside the statement, not in the page actions: the question is
@@ -521,6 +524,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the instrumented-callers-only disclaimer, and there is no client
            coverage to be stale about. -->
           <DbmCoverageLine
+            :window-start="current.startTime"
+            :window-end="current.endTime"
             v-if="traceVantage && (clientRowFound || !serverAnswering)"
             class="-mx-page-edge"
             :freshness="freshness"
@@ -528,7 +533,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :top-n-subset="topNSubset"
             :coded-error-share="uncodedErrorShare === undefined ? undefined : 1 - uncodedErrorShare"
             :error-count="row?.errors"
-            subject="query"
             data-test="dbm-detail-coverage"
           />
 
@@ -796,12 +800,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Plans are a SERVER-vantage section (captured by the collector, not
            derived from traces), so this tab is populated — and stays
            unlocked — on a fleet with no traced traffic at all. -->
-          <DbmSection
-            ref="plansSection"
-            :title="t('dbm.detail.plans.title')"
-            header-align="center"
-            data-test="dbm-detail-plans"
-          >
+          <section ref="plansSection" class="flex flex-col" data-test="dbm-detail-plans">
             <div v-if="plansError" class="text-text-muted p-6 text-center text-sm">
               {{ plansError }}
             </div>
@@ -839,15 +838,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OBanner>
               <p
                 v-else
-                class="text-text-muted mx-3 mb-2 text-xs"
+                class="text-text-muted mx-3 mb-2 flex items-center gap-1 text-xs"
                 data-test="dbm-detail-plans-stable"
               >
-                {{ t("dbm.detail.plans.stableCaveat") }}
+                {{ t("dbm.detail.plans.capturedCount", { count: plans.length }, plans.length) }}
+                <OIcon name="info-outline" size="xs" />
+                <OTooltip side="top" :content="t('dbm.detail.plans.stableCaveat')" />
               </p>
 
               <div class="flex flex-col gap-3 p-3 pt-0">
                 <article
-                  v-for="plan in plans"
+                  v-for="(plan, planIndex) in plans"
                   :key="plan.rowKey"
                   class="border-border-default rounded-default border"
                   :data-test="`dbm-detail-plan-${plan.planHash}`"
@@ -855,38 +856,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <header
                     class="border-border-default flex flex-wrap items-center gap-x-4 gap-y-1 border-b p-2"
                   >
-                    <span class="text-text-heading font-mono text-xs">{{ plan.planHash }}</span>
+                    <span class="text-text-heading text-xs font-medium">
+                      {{ t("dbm.detail.plans.planLabel", { n: planIndex + 1 }) }}
+                      <OTooltip side="top" :content="raw(plan.planHash)" />
+                    </span>
                     <!-- Per-row provenance (E-C): only GENERIC rows keep the gap
                      tag — they are the never-executed NULL-bound estimate.
                      Executed rows are labelled as what they are instead. -->
-                    <OTag
-                      v-if="plan.planSource === 'auto_explain'"
-                      variant="success-soft"
-                      size="xs"
-                      :label="t('dbm.detail.plans.executedLabel')"
-                      :data-test="`dbm-detail-plan-source-executed-${plan.planHash}`"
-                    >
-                      <OTooltip side="top" :content="t('dbm.detail.plans.executedTooltip')" />
-                    </OTag>
-                    <OTag
-                      v-else
-                      type="dataConfidence"
-                      value="gap"
-                      :label="t('dbm.detail.plans.sourceLabel')"
-                      :data-test="`dbm-detail-plan-source-generic-${plan.planHash}`"
-                    >
-                      <OTooltip side="top" :content="t('dbm.detail.plans.sourceTooltip')" />
-                    </OTag>
+                    <span class="min-w-32" data-test="dbm-detail-plan-tag-slot">
+                      <OTag
+                        v-if="plan.planSource === 'auto_explain'"
+                        variant="success-soft"
+                        size="xs"
+                        :data-test="`dbm-detail-plan-source-executed-${plan.planHash}`"
+                      >
+                        {{ t("dbm.detail.plans.executedLabel") }}
+                        <OTooltip side="top" :content="t('dbm.detail.plans.executedTooltip')" />
+                      </OTag>
+                      <OTag
+                        v-else
+                        type="dataConfidence"
+                        value="gap"
+                        :data-test="`dbm-detail-plan-source-generic-${plan.planHash}`"
+                      >
+                        {{ t("dbm.detail.plans.sourceLabel") }}
+                        <OTooltip side="top" :content="t('dbm.detail.plans.sourceTooltip')" />
+                      </OTag>
+                    </span>
                     <!-- No "share of calls" here (W2): it divided this plan's calls
                      by a window total summed from a DELTA feed whose first
                      emission per statement carries the entire
                      pg_stat_statements backlog, so the percentage was a
                      proportion of a total that never described the window. -->
                     <span class="text-text-muted text-xs">
-                      {{ t("dbm.detail.plans.firstSeen") }}: {{ formatClock(plan.firstSeen) }}
+                      {{ t("dbm.detail.plans.firstSeen") }}: {{ formatAge(plan.firstSeen) }}
+                      <OTooltip side="top" :content="raw(formatDateTime(plan.firstSeen))" />
                     </span>
                     <span class="text-text-muted text-xs">
-                      {{ t("dbm.detail.plans.lastSeen") }}: {{ formatClock(plan.lastSeen) }}
+                      {{ t("dbm.detail.plans.lastSeen") }}: {{ formatAge(plan.lastSeen) }}
+                      <OTooltip side="top" :content="raw(formatDateTime(plan.lastSeen))" />
                     </span>
                     <!-- Duration IFF the hit measured one — executed rows only,
                      phrased "across N captured executions": the capture is
@@ -899,8 +907,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{
                         t("dbm.detail.plans.capturedDurations", {
-                          avg: formatNs(plan.avgDurationMs * 1e6),
-                          max: formatNs((plan.maxDurationMs ?? plan.avgDurationMs) * 1e6),
+                          avg: planDuration(plan.avgDurationMs),
+                          max: planDuration(plan.maxDurationMs ?? plan.avgDurationMs),
                           count: plan.executions ?? 1,
                         })
                       }}
@@ -962,7 +970,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </article>
               </div>
             </template>
-          </DbmSection>
+          </section>
         </OTabPanel>
 
         <!-- ── Callers and examples ────────────────────────────────────────
@@ -1236,6 +1244,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 import DbmAppSourceLegend from "@/components/dbm/DbmAppSourceLegend.vue";
 import DbmAppSourceMarker from "@/components/dbm/DbmAppSourceMarker.vue";
+import DbmHeaderActions from "@/components/dbm/DbmHeaderActions.vue";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmHistoryPanel from "@/components/dbm/DbmHistoryPanel.vue";
 import DbmQueryText from "@/components/dbm/DbmQueryText.vue";
@@ -1253,8 +1262,6 @@ import DbmLockEmptyState, {
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
-import DateTime from "@/components/DateTime.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1285,6 +1292,7 @@ import dbMonitoringService, {
 // `/samples?fingerprint=`, which builds the predicate server-side.
 import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
+import { engineName as dbEngineName } from "@/utils/dbm/uniformValue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { takeDbmQueryDetailSeed } from "@/composables/dbm/dbmQueryDetailSeed";
 import { useDbmChartTheme } from "@/composables/dbm/useDbmChartTheme";
@@ -1312,7 +1320,9 @@ import {
 } from "@/utils/dbm/plans";
 import {
   dbmHttpError,
+  formatAge,
   formatCount,
+  formatDateTime,
   formatNs,
   formatPercent,
   formatSignedPercent,
@@ -1323,6 +1333,7 @@ import {
   serverMetricsTiles,
   type DbmServerMetrics,
 } from "@/utils/dbm/serverMetrics";
+import { formatDurationMs } from "@/utils/dbm/activity";
 import { foldCallingServices, showsCallingServices } from "@/utils/dbm/callingServices";
 import { buildHistorySeries, errorRateValues, qpsValues, seriesValues } from "@/utils/dbm/history";
 import {
@@ -1618,12 +1629,10 @@ const planDrift = ref<PlanDriftLevel>("none");
 const planEmpty = ref<ReturnType<typeof planEmptyReason>>("captureOff");
 const plansError = ref<string | null>(null);
 /**
- * Anchor for the promoted drift callout's "View plans" jump. A component ref
- * now that the section is a `DbmSection`, so the element is reached through
- * `$el` — its root IS the `<section>`, single-rooted, so there is no fragment
- * to disambiguate.
+ * Anchor for the promoted drift callout's "View plans" jump: the plain
+ * `<section>` element itself, so there is no component root to unwrap.
  */
-const plansSection = ref<InstanceType<typeof DbmSection> | null>(null);
+const plansSection = ref<HTMLElement | null>(null);
 /**
  * The top callout promotes the drift FINDING; the plan evidence stays in its
  * own tab, so the action switches tab and THEN scrolls.
@@ -1636,7 +1645,7 @@ const plansSection = ref<InstanceType<typeof DbmSection> | null>(null);
 const scrollToPlans = async () => {
   selectTab("plans");
   await nextTick();
-  (plansSection.value?.$el as HTMLElement | undefined)?.scrollIntoView({
+  plansSection.value?.scrollIntoView({
     behavior: "smooth",
     block: "start",
   });
@@ -1905,6 +1914,10 @@ const identityChips = computed(() => {
   return chips;
 });
 
+// One decimal under a second ("683.6ms"), the coarser shared duration format above it.
+const planDuration = (ms: number) =>
+  ms < 1000 ? `${Number(ms.toFixed(1))}ms` : formatDurationMs(ms);
+
 /**
  * "First seen in top queries" — never "first executed".
  *
@@ -1913,9 +1926,9 @@ const identityChips = computed(() => {
  * the cut by a traffic shift would otherwise be labelled new, and mislabeling
  * it is the fastest way this page loses a DBA's trust.
  */
-const firstSeenTime = computed<string | null>(() => {
+const firstSeenAt = computed<number | null>(() => {
   const first = history.value?.points.find((point) => point.plottable);
-  return first ? formatClock(first.timestamp) : null;
+  return first ? first.timestamp : null;
 });
 
 /**
@@ -1924,12 +1937,12 @@ const firstSeenTime = computed<string | null>(() => {
  * most recent tracked activity). Suppressed when it would restate first-seen's
  * timestamp: one tracked window means the two chips would print one fact twice.
  */
-const lastSeenTime = computed<string | null>(() => {
+const lastSeenAt = computed<number | null>(() => {
   const points = history.value?.points ?? [];
   const first = points.find((point) => point.plottable);
   const last = [...points].reverse().find((point) => point.plottable);
   if (!first || !last || last.timestamp === first.timestamp) return null;
-  return formatClock(last.timestamp);
+  return last.timestamp;
 });
 
 const hasSeries = computed(() => (history.value?.points.length ?? 0) > 0);
@@ -2386,8 +2399,9 @@ const endpointColumns = computed<OTableColumnDef<EndpointCallerRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p95"),
-      headerTooltip: t("dbm.queries.columnHints.p95"),
+      headerTooltip: raw(
+        `${t("dbm.queries.columnHints.p95")} ${t("dbm.coverage.tipQueryTimings")}`,
+      ),
     },
   },
   {

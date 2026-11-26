@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   Metrics — the databases' own gauges and counters over the window, plus the
-  Datadog-style load-by-wait-event chart.
+  load-by-wait-event chart.
 
   Every chart is a SELF-QUERYING dashboard panel: this page calls no
   `db_monitoring` endpoint for chart data. The only fetch it owns is the
@@ -33,33 +33,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   activity feed, and vice versa.
 -->
 <template>
-  <DbmPageChrome title-data-test="dbm-metrics-title" :tab-counts="tabCounts">
+  <DbmPageChrome
+    title-data-test="dbm-metrics-title"
+    :tab-counts="tabCounts"
+    :range="range"
+    :last-run-at="lastRunAt"
+    :loading="loading"
+    @date-change="onDateChange"
+    @refresh="onRefresh()"
+  >
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Above the rail and the charts, so it stays put while they scroll, as on every other tab. -->
-      <div
-        class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-1.5"
-        data-test="dbm-metrics-toolbar"
-      >
-        <DbmScopeFilters class="min-w-0 flex-1" :filters="dimensionFilters" @clear="clearScope" />
-        <DateTime
-          auto-apply
-          menu-align="end"
-          :default-type="range.type"
-          :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-          :default-relative-time="range.relativeTimePeriod ?? undefined"
-          data-test-name="dbm-metrics-date-time"
-          class="h-8 max-md:[&_.date-time-label]:hidden"
-          @on:date-change="onDateChange"
-        />
-        <ORefreshButton
-          layout="inline"
-          variant="outline"
-          :loading="loading"
-          :last-run-at="lastRunAt"
-          data-test="dbm-metrics-refresh"
-          @click="onRefresh()"
-        />
-      </div>
+      <DbmFilterBar :filters="displayFilters" />
       <div class="flex min-h-0 flex-1 max-md:flex-col">
         <!-- The metrics-explorer geometry: a slim jump rail beside the page's own
            scroll column, so any section is one click away instead of a scroll. -->
@@ -77,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div ref="scrollEl" class="min-w-0 flex-1 overflow-y-auto" data-test="dbm-metrics-body">
           <OContent class="flex flex-col gap-2.5 py-2.5">
             <DbmSection
+              sticky-header
               :ref="(el: unknown) => setSectionRef('load', el)"
               :title="t('dbm.metrics.load.title')"
               header-align="center"
@@ -84,50 +70,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #hint>
                 <!-- Reads as part of the heading — "Database load · By user ▾" —
                  the way the folder picker reads inside a page description. -->
-                <OSelect
-                  v-model="loadBreakdown"
-                  :options="breakdownOptions"
-                  size="sm"
-                  appearance="inline"
-                  :searchable="false"
-                  class="shrink-0"
-                  :aria-label="t('panel.breakdown')"
-                  data-test="dbm-metrics-load-breakdown"
-                />
-                <!-- How to read the chart is reference, so it opens on demand instead of truncating beside the title. -->
-                <OPopover
-                  v-model:open="loadHintOpen"
-                  side="bottom"
-                  align="start"
-                  :aria-label="t('dbm.metrics.load.about')"
-                >
-                  <template #trigger>
-                    <OButton
-                      variant="ghost"
-                      size="xs"
-                      icon-left="info-outline"
-                      data-test="dbm-metrics-load-hint-trigger"
-                    >
-                      <span class="max-md:sr-only">{{ t("dbm.metrics.load.about") }}</span>
-                    </OButton>
-                  </template>
-                  <p
-                    class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
-                    data-test="dbm-metrics-load-hint"
-                  >
-                    <OText variant="meta">{{ t("dbm.metrics.load.hint") }}</OText>
-                  </p>
-                </OPopover>
+                <!-- OSelect fills its box, so the wrapper sets the width. -->
+                <div class="w-40 shrink-0">
+                  <OSelect
+                    v-model="loadBreakdown"
+                    :options="breakdownOptions"
+                    size="sm"
+                    :searchable="false"
+                    class="w-full"
+                    :aria-label="t('panel.breakdown')"
+                    data-test="dbm-metrics-load-breakdown"
+                  />
+                </div>
               </template>
               <template #actions>
                 <OButton
                   variant="outline"
                   size="sm"
                   icon-right="arrow-forward"
+                  class="ms-auto"
                   data-test="dbm-metrics-view-activity"
                   @click="openActivity"
                 >
                   {{ t("dbm.metrics.load.viewActivity") }}
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="info-outline"
+                  :aria-label="t('dbm.metrics.load.about')"
+                  data-test="dbm-load-info"
+                >
+                  <OTooltip side="bottom" :content="t('dbm.metrics.load.hint')" />
                 </OButton>
               </template>
               <div class="relative h-64 w-full px-3 pb-3" data-test="dbm-metrics-load-chart">
@@ -180,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              Activity's rollup and Blocks' server counters read DBM streams,
              so they answer even on an org whose receivers ship no metrics. -->
             <DbmSection
+              sticky-header
               v-for="section in catalogSections"
               :key="`catalog-${section.key}`"
               :ref="(el: unknown) => setSectionRef(section.key, el)"
@@ -273,6 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-else>
               <DbmSection
+                sticky-header
                 v-if="sections.featured.length"
                 :ref="(el: unknown) => setSectionRef('featured', el)"
                 :title="t('dbm.metrics.sections.featured')"
@@ -309,6 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <DbmSection
+                sticky-header
                 v-for="group in filteredGroups"
                 :key="group.system"
                 :ref="(el: unknown) => setSectionRef(`group-${group.system}`, el)"
@@ -349,17 +326,15 @@ import { computed, defineAsyncComponent, onBeforeUnmount, ref, shallowRef } from
 import { useRoute, useRouter } from "vue-router";
 
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
-import DateTime from "@/components/DateTime.vue";
 import DbmMetricPanel from "@/components/dbm/DbmMetricPanel.vue";
 import DbmMetricsRail, { type DbmMetricsRailItem } from "@/components/dbm/DbmMetricsRail.vue";
+import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmSection from "@/components/dbm/DbmSection.vue";
 import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
 import { useDbmScopeFilters } from "@/composables/dbm/useDbmScopeFilters";
 import useStreams from "@/composables/useStreams";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -367,8 +342,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
@@ -390,6 +364,7 @@ import {
   type DbmLoadBreakdown,
   type DbmMetricsScope,
 } from "@/utils/dbm/metricsPanels";
+import { applyInstanceEngine } from "@/utils/dbm/instanceEngine";
 import { DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { buildMetricsUrl } from "@/utils/metrics/buildMetricsUrl";
 import type { MetricStream } from "@/utils/metrics/metricFamily";
@@ -426,9 +401,9 @@ const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
 const {
   filters: dimensionFilters,
+  fleetHits,
   requestParams: scopeParams,
   queryParams: scopeQuery,
-  clear: clearScopeModels,
 } = useDbmScopeFilters({
   query: route.query,
   liveQuery: () => route.query,
@@ -449,8 +424,18 @@ const {
   },
 });
 
+// Display-only: the Engine select shows the selected instance's engine and locks; the model and URL are untouched.
+const displayFilters = computed(() =>
+  applyInstanceEngine(dimensionFilters.value, fleetHits.value, raw(t("dbm.filters.setByInstance"))),
+);
+
+// The panels must query the engine the Engine select shows, so a locked engine overrides a stale system.
+const lockedEngine = computed(
+  () => displayFilters.value.find((f) => f.key === "system" && f.disabled)?.value ?? null,
+);
+
 const scope = computed<DbmMetricsScope>(() => ({
-  system: scopeParams.value.system ?? null,
+  system: lockedEngine.value ?? scopeParams.value.system ?? null,
   instance: scopeParams.value.instance ?? null,
   namespace: scopeParams.value.namespace ?? null,
 }));
@@ -538,9 +523,8 @@ const hasMetricStreams = computed(
   () => sections.value.featured.length > 0 || sections.value.groups.length > 0,
 );
 
-/** Which dimension the load chart stacks by — the Datadog-style slicer. */
+/** Which dimension the load chart stacks by. */
 const loadBreakdown = ref<DbmLoadBreakdown>("waitEvent");
-const loadHintOpen = ref(false);
 
 const breakdownOptions = computed<SelectOption[]>(() =>
   DBM_LOAD_BREAKDOWNS.map((dim) => ({
@@ -669,7 +653,14 @@ const setSectionRef = (key: string, component: unknown) => {
  */
 const jumpTo = (key: string) => {
   activeSection.value = key;
-  sectionEls.get(key)?.scrollIntoView({ behavior: "auto", block: "start" });
+  const el = sectionEls.get(key);
+  const box = scrollEl.value;
+  if (!el || !box) return;
+  // Scroll only the chart column: scrollIntoView also scrolls every scrollable ancestor, which pushed the whole app up.
+  box.scrollTo({
+    top: box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top,
+    behavior: "auto",
+  });
 };
 
 function ensureSpy(): IntersectionObserver | null {
@@ -731,11 +722,6 @@ const notCollectingChecks = computed<DbmLockCheck[]>(() => [
       : t("dbm.metrics.notCollecting.checks.enabled.noDetail"),
   },
 ]);
-
-const clearScope = () => {
-  clearScopeModels();
-  syncUrl();
-};
 
 const syncUrl = () => {
   router

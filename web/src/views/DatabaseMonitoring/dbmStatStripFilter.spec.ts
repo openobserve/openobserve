@@ -21,37 +21,23 @@ import { describe, expect, it } from "vitest";
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (file: string) => readFileSync(join(here, file), "utf8");
 
-// [page, the count tile that means "all rows"]
+// [page, the Failed Only checkbox test id]
 const PAGES: [string, string][] = [
-  ["DatabasesPage.vue", "databases"],
-  ["QueriesPage.vue", "queries"],
+  ["DatabasesPage.vue", "dbm-databases-failed-only"],
+  ["QueriesPage.vue", "dbm-queries-failed-only"],
 ];
 
-/** The object literal of one summary tile, by its key. */
-const tile = (source: string, key: string): string => {
-  const at = source.indexOf(`key: "${key}",`);
-  expect(at, `summary tile ${key} must exist`).toBeGreaterThan(-1);
-  // Each tile ends with its dataTest; a closing brace can come earlier, inside a spread.
-  return source.slice(at, source.indexOf("dataTest:", at));
-};
-
-describe("the Failed tile filters the list", () => {
-  it.each(PAGES)("%s makes its first strip a filter over the rows", (file, allKey) => {
+describe("the Failed Only checkbox filters the list", () => {
+  it.each(PAGES)("%s keeps the strip display-only and filters from the row", (file, testId) => {
     const source = read(file);
     const strip = source.slice(
       source.indexOf("<OStatStrip"),
       source.indexOf("/>", source.indexOf("<OStatStrip")),
     );
-    expect(strip).toContain("selectable");
-    expect(strip).toContain(':selected-key="statFilter"');
-    expect(strip).toContain(`default-key="${allKey}"`);
-    expect(strip).toContain('@select="onStatSelect"');
-  });
-
-  it.each(PAGES)("%s keeps the totals out of the filter", (file) => {
-    const source = read(file);
-    expect(tile(source, "calls")).toContain("selectable: false");
-    expect(tile(source, "time")).toContain("selectable: false");
+    expect(strip).not.toContain("selectable");
+    expect(strip).not.toContain("@select");
+    expect(source).toContain(`data-test="${testId}"`);
+    expect(source).toContain("statFilter = on === true ? 'failed' : null");
   });
 
   it.each(PAGES)("%s narrows to rows that failed, and clears with the scope", (file) => {
@@ -59,5 +45,24 @@ describe("the Failed tile filters the list", () => {
     expect(source).toContain("(row.errors ?? 0) > 0");
     const clear = source.slice(source.indexOf("const clearScope = () => {"));
     expect(clear.slice(0, clear.indexOf("};"))).toContain("statFilter.value = null");
+  });
+});
+
+describe("list pages follow locale and show the active insight", () => {
+  it.each(["QueriesPage.vue", "SamplesPage.vue"])("%s builds rowActions as computed", (file) => {
+    expect(read(file)).toMatch(/const rowActions = computed<OTableRowAction\[\]>\(/);
+  });
+
+  it("the insight button shows the active insight and a clear control", () => {
+    const menu = readFileSync(join(here, "../../components/dbm/DbmInsightMenu.vue"), "utf8");
+    expect(menu).toContain("activeInsight ? titleOf(activeInsight)");
+    expect(menu).toContain('data-test="dbm-insights-clear"');
+    expect(read("QueriesPage.vue")).toContain('@clear="activeInsightId = null"');
+  });
+
+  it("Slowest calls folds uniform values into the Query header tooltip", () => {
+    const source = read("SamplesPage.vue");
+    expect(source).toContain("uniformValue(rows.value, (r) => r.serviceName)");
+    expect(source).toContain("queryHeaderTip.value");
   });
 });

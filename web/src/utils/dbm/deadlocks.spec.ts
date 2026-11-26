@@ -24,9 +24,11 @@ import {
   groupDeadlocks,
   hasOppositeRowOrder,
   isDeadlockStorm,
+  isThreadEngine,
   normalizeDeadlockQuery,
   parseDeadlockEvent,
   parseDeadlockEvents,
+  stripQuotes,
   survivorOf,
   victimOf,
 } from "./deadlocks";
@@ -313,19 +315,28 @@ describe("groupDeadlocks — rows are pairs, the badge is events", () => {
     expect(pairs.reduce((sum, p) => sum + p.share, 0)).toBeCloseTo(1, 5);
   });
 
-  it("flags that the victim alternates — the symmetric-bug signature", () => {
+  it("counts victims per application across alternating events", () => {
     const pairs = groupDeadlocks([
       event(1 * SECOND, 1071),
       event(2 * SECOND, 1072),
       event(3 * SECOND, 1071),
     ]);
-    expect(pairs[0].victimAlternates).toBe(true);
-    expect(pairs[0].victimCounts).toEqual({ "1071": 2, "1072": 1 });
+    expect(pairs[0].victimAppCounts).toEqual({
+      "dbm-sv-deadlock-a": 2,
+      "dbm-sv-deadlock-b": 1,
+    });
   });
 
-  it("does not claim alternation when one side always loses", () => {
-    const pairs = groupDeadlocks([event(1 * SECOND, 1071), event(2 * SECOND, 1071)]);
-    expect(pairs[0].victimAlternates).toBe(false);
+  it("counts victims by application, not by pid, so reconnects stay one app", () => {
+    const pairs = groupDeadlocks([
+      event(1 * SECOND, 1071),
+      event(2 * SECOND, 1071, {
+        participants: event(2 * SECOND, 1071).participants.map((p) =>
+          p.pid === 1071 ? { ...p, pid: 2001 } : p,
+        ),
+      }),
+    ]);
+    expect(pairs[0].victimAppCounts).toEqual({ "dbm-sv-deadlock-a": 2 });
   });
 
   it("orders events newest first and reports the true first/last seen", () => {
@@ -499,5 +510,15 @@ describe("storm detection under a capped read", () => {
     // A cap that fired at 4 events cannot have fired at all — but if a caller
     // ever passes one, the absolute floor still has to hold.
     expect(isDeadlockStorm(4, 60, true)).toBe(false);
+  });
+});
+
+describe("stripQuotes / isThreadEngine", () => {
+  it("strips backticks and quotes from MySQL object names", () => {
+    expect(stripQuotes("`shop`.`accounts`")).toBe("shop.accounts");
+  });
+  it("uses the thread noun for MySQL only", () => {
+    expect(isThreadEngine("mysql")).toBe(true);
+    expect(isThreadEngine("postgresql")).toBe(false);
   });
 });
