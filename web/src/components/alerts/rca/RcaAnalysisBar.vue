@@ -134,19 +134,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-else>
       <OButton
-        v-if="live"
-        data-test="rca-cancel-btn"
-        variant="ghost-destructive"
-        size="sm"
-        class="shrink-0"
-        icon-left="stop-circle"
-        :loading="cancelling"
-        @click="$emit('cancel')"
-      >
-        {{ t("alerts.incidents.rcaRun.cancelRun") }}
-      </OButton>
-
-      <OButton
         v-if="!live && canAsk"
         data-test="rca-ask-btn"
         variant="outline"
@@ -157,27 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaAsk.button") }}</span>
       </OButton>
-
-      <OTooltip
-        v-if="!live"
-        :content="startLockedReason"
-        :disabled="!startLockedReason"
-        side="bottom"
-      >
-        <span class="inline-flex shrink-0">
-          <OButton
-            data-test="rca-reanalyze-btn"
-            variant="outline"
-            size="sm"
-            :icon-left="startLockedReason ? 'lock' : 'refresh'"
-            :loading="triggering"
-            :disabled="resuming || !!startLockedReason"
-            @click="$emit('reanalyze')"
-          >
-            <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaReanalyze") }}</span>
-          </OButton>
-        </span>
-      </OTooltip>
 
       <ODropdown align="end" content-class="w-55">
         <template #trigger>
@@ -215,6 +181,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("alerts.incidents.rcaThread.copy") }}
         </ODropdownItem>
+        <!-- Cancel stops the run for everyone on the incident, so it sits here behind a confirm. -->
+        <template v-if="live">
+          <ODropdownSeparator />
+          <ODropdownItem
+            data-test="rca-cancel-btn"
+            variant="destructive"
+            icon-left="stop-circle"
+            :disabled="cancelling"
+            @select="$emit('cancel')"
+          >
+            {{ t("alerts.incidents.rcaRun.cancelRun") }}
+          </ODropdownItem>
+        </template>
       </ODropdown>
     </template>
   </div>
@@ -227,8 +206,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { RcaRunItem } from "@/services/incidents";
 import { formatTimestampInTimezone } from "@/utils/date";
@@ -252,12 +231,7 @@ const props = withDefaults(
     hasThread: boolean;
     /** The shown run has a report or a record and AI chat is available (J5). */
     canAsk?: boolean;
-    triggering?: boolean;
-    /** A resume is in flight: Re-analyze waits for it. */
-    resuming?: boolean;
     cancelling?: boolean;
-    /** Why no new run can start: Re-analyze stays visible, disabled, with this reason. */
-    startLockedReason?: I18nText;
     /** `report`: the Report tab's bar, with Copy report and Download as Markdown as buttons. */
     variant?: "analysis" | "report";
     /** The app's time zone for run times. */
@@ -270,17 +244,13 @@ const props = withDefaults(
     timezone: "UTC",
     copyPreview: null,
     canAsk: false,
-    triggering: false,
-    resuming: false,
     cancelling: false,
-    startLockedReason: undefined,
   },
 );
 
 defineEmits<{
   "select-run": [runId: string | null];
-  /** Re-analyze: open the re-analysis dialog. */
-  reanalyze: [];
+  /** Asks to cancel; the page confirms it. */
   cancel: [];
   "copy-report": [];
   "download-report": [];

@@ -19,7 +19,14 @@
  * ```
  */
 
-import type { ContextProvider, PageContext } from "./types";
+import type { ContextProvider, PageContext, PageTimeRange } from "./types";
+
+/** The dashboard's applied range, as `pickerValueToTimeObj` resolves it. */
+export interface DashboardAppliedTime {
+  start_time: Date;
+  end_time: Date;
+  relativeTimePeriod?: string | null;
+}
 
 /**
  * Creates a dashboards context provider that extracts essential context from dashboard pages
@@ -29,6 +36,7 @@ import type { ContextProvider, PageContext } from "./types";
  * @param dashboardPanelData - Panel data object (for AddPanel page, optional)
  * @param editMode - Boolean indicating if editing a panel (for AddPanel page, optional)
  * @param currentDashboardData - Current dashboard data (for ViewDashboard page, optional)
+ * @param appliedTime - Reads the range the dashboard's panels use (for ViewDashboard page, optional)
  *
  * Example:
  * ```typescript
@@ -41,6 +49,7 @@ export const createDashboardsContextProvider = (
   dashboardPanelData?: any,
   editMode?: boolean,
   currentDashboardData?: any,
+  appliedTime?: () => DashboardAppliedTime | null,
 ): ContextProvider => {
   return {
     getContext(): PageContext {
@@ -52,24 +61,15 @@ export const createDashboardsContextProvider = (
         request_timestamp: Date.now() * 1000,
       };
 
-      // Extract stream information from current query (for AI query generation)
-      if (
-        dashboardPanelData?.data?.queries &&
-        dashboardPanelData?.layout?.currentQueryIndex !== undefined
-      ) {
-        const currentQuery =
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
-        if (currentQuery?.fields?.stream) {
-          context.selectedStreams = [currentQuery.fields.stream];
-        } else {
-          context.selectedStreams = ["default"];
-        }
-        // Determine stream type based on query type (SQL = logs, PromQL = metrics)
-        context.streamType = dashboardPanelData.data.queryType === "promql" ? "metrics" : "logs";
-      } else {
-        context.selectedStreams = ["default"];
-        context.streamType = "logs";
+      const scope = dashboardPanelData
+        ? panelEditorScope(dashboardPanelData)
+        : dashboardScope(currentDashboardData?.data, route?.query?.tab);
+      if (scope) {
+        context.selectedStreams = scope.streams;
+        if (scope.streamType) context.streamType = scope.streamType;
       }
+      const timeRange = timeRangeOf(appliedTime?.());
+      if (timeRange) context.timeRange = timeRange;
 
       // Determine user intent based on route and context
       if (route?.query?.panelId) {
@@ -105,3 +105,60 @@ export const createDashboardsContextProvider = (
     },
   };
 };
+
+interface StreamScope {
+  streams: string[];
+  streamType: string | null;
+}
+
+function streamTypeOf(queryType: unknown, fields: any): string {
+  if (typeof fields?.stream_type === "string" && fields.stream_type) return fields.stream_type;
+  return queryType === "promql" ? "metrics" : "logs";
+}
+
+// No stream is no scope: a made-up "default" stream reads as a real one to the agent and the placeholder.
+function panelEditorScope(dashboardPanelData: any): StreamScope | null {
+  const index = dashboardPanelData?.layout?.currentQueryIndex;
+  const fields = index === undefined ? null : dashboardPanelData?.data?.queries?.[index]?.fields;
+  if (!fields?.stream) return null;
+  return {
+    streams: [fields.stream],
+    streamType: streamTypeOf(dashboardPanelData.data.queryType, fields),
+  };
+}
+
+function dashboardScope(dashboard: any, tabId: unknown): StreamScope | null {
+  const tabs: any[] = Array.isArray(dashboard?.tabs) ? dashboard.tabs : [];
+  // The dashboard opens on its first tab when the URL names none (or a stale one).
+  const shown = tabs.find((tab) => tab?.tabId === tabId) ?? tabs[0];
+  const panels: any[] = Array.isArray(shown?.panels) ? shown.panels : [];
+  const queries = panels.flatMap((panel) =>
+    (Array.isArray(panel?.queries) ? panel.queries : []).map((query: any) => ({
+      queryType: panel.queryType,
+      fields: query?.fields,
+    })),
+  );
+  const named = queries.filter((query) => query.fields?.stream);
+  if (!named.length) return null;
+  const types = new Set(named.map((query) => streamTypeOf(query.queryType, query.fields)));
+  return {
+    streams: [...new Set(named.map((query) => String(query.fields.stream)))],
+    // One type for a mixed scope would mislabel the other streams.
+    streamType: types.size === 1 ? [...types][0] : null,
+  };
+}
+
+function timeRangeOf(applied: DashboardAppliedTime | null | undefined): PageTimeRange | null {
+  // Dashboard Dates carry microseconds as their "ms" value (getConsumableRelativeTime), so no scaling.
+  const startTime = applied?.start_time?.getTime?.();
+  const endTime = applied?.end_time?.getTime?.();
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return null;
+  return applied?.relativeTimePeriod
+    ? {
+        type: "relative",
+        relativeTimePeriod: applied.relativeTimePeriod,
+        startTime: startTime as number,
+        endTime: endTime as number,
+      }
+    : { type: "absolute", startTime: startTime as number, endTime: endTime as number };
+}

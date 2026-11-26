@@ -47,6 +47,9 @@ export function resetManager(): void {
 
 // ---------------------------------------------------------------------------
 
+// The order parseEvent pushes modifiers in.
+const MODIFIER_ORDER = ["ctrl", "shift", "alt", "meta"];
+
 export class ShortcutManager {
   private shortcuts = new Map<string, RegisteredShortcut[]>();
   private activeScope = "global";
@@ -104,7 +107,7 @@ export class ShortcutManager {
         const r = (Math.random() * 16) | 0;
         return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
       });
-    const key = shortcut.key.toLowerCase();
+    const key = ShortcutManager.normalizeKey(shortcut.key);
     const existing = this.shortcuts.get(key) ?? [];
 
     // Conflict detection — warn and overwrite
@@ -123,13 +126,30 @@ export class ShortcutManager {
   }
 
   unregister(key: string, scope = "global"): void {
-    const list = this.shortcuts.get(key.toLowerCase()) ?? [];
+    const normalized = ShortcutManager.normalizeKey(key);
+    const list = this.shortcuts.get(normalized) ?? [];
     const filtered = list.filter((s) => (s.scope ?? "global") !== scope);
     if (filtered.length === 0) {
-      this.shortcuts.delete(key.toLowerCase());
+      this.shortcuts.delete(normalized);
     } else {
-      this.shortcuts.set(key.toLowerCase(), filtered);
+      this.shortcuts.set(normalized, filtered);
     }
+  }
+
+  /** Lower-cases a chord and puts its modifiers in the order parseEvent builds them, so "meta+shift+x" matches. */
+  static normalizeKey(key: string): string {
+    return key
+      .toLowerCase()
+      .split(" ")
+      .map((chord) => {
+        const plusKey = chord.endsWith("++") || chord === "+";
+        const parts = (plusKey ? chord.slice(0, -1) : chord).split("+").filter(Boolean);
+        const last = plusKey ? "+" : (parts.pop() ?? "");
+        const mods = MODIFIER_ORDER.filter((mod) => parts.includes(mod));
+        const rest = parts.filter((part) => !MODIFIER_ORDER.includes(part));
+        return [...mods, ...rest, last].join("+");
+      })
+      .join(" ");
   }
 
   unregisterById(id: string): void {

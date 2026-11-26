@@ -1089,8 +1089,8 @@ describe("RegexPatternList.vue Component Logic", () => {
 // The AddRegexPattern dialog was migrated to <ODrawer>. The
 // rest of the spec exercises the setup() function in isolation, so a focused
 // describe block here mounts the real component with a minimal stub surface
-// to assert the new ODrawer contract (open binding, width based on
-// isAiChatEnabled, show-close=false, AddRegexPattern rendered inside).
+// to assert the new ODrawer contract (open binding, width,
+// show-close=false, AddRegexPattern rendered inside).
 // -----------------------------------------------------------------------------
 describe("RegexPatternList.vue - ODrawer Migration", () => {
   // Lightweight stub mirroring the ODrawer prop surface — renders slots
@@ -1158,10 +1158,9 @@ describe("RegexPatternList.vue - ODrawer Migration", () => {
     `,
   };
 
-  const buildStore = (overrides: { isAiChatEnabled?: boolean } = {}) =>
+  const buildStore = () =>
     createStore({
       state: {
-        isAiChatEnabled: overrides.isAiChatEnabled ?? false,
         theme: "light",
         selectedOrganization: { identifier: "default" },
         organizationData: {
@@ -1187,8 +1186,8 @@ describe("RegexPatternList.vue - ODrawer Migration", () => {
       },
     });
 
-  const mountComponent = async (overrides: { isAiChatEnabled?: boolean } = {}) => {
-    const store = buildStore(overrides);
+  const mountComponent = async () => {
+    const store = buildStore();
 
     const wrapper = mount(RegexPatternList as any, {
       global: {
@@ -1231,7 +1230,7 @@ describe("RegexPatternList.vue - ODrawer Migration", () => {
     (regexPatternsService.list as any).mockResolvedValue({
       data: { patterns: [] },
     });
-    const mounted = await mountComponent({ isAiChatEnabled: false });
+    const mounted = await mountComponent();
     w = mounted.wrapper;
   });
 
