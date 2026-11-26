@@ -258,9 +258,12 @@ export const groupByDay = (
 export const absoluteLink = (href: string, origin = window.location.origin): string =>
   new URL(href, origin).href;
 
-/** After an edit the focus dropdown shows only on an empty editor, and reopens only when the edit empties it. */
-export const recentsOpenAfterEdit = (open: boolean, wasEmpty: boolean, isEmpty: boolean): boolean =>
-  isEmpty && (open || !wasEmpty);
+/** After an edit an open focus dropdown stays only while the editor is empty; an edit never opens it. */
+export const recentsOpenAfterEdit = (
+  open: boolean,
+  _wasEmpty: boolean,
+  isEmpty: boolean,
+): boolean => isEmpty && open;
 
 /** True inside the Monaco query editor itself, not the AI prompt or buttons that share its box. */
 export const isQueryEditorInput = (target: EventTarget | null): boolean => {

@@ -98,7 +98,7 @@ describe("logs recent-searches focus dropdown and the editor's Escape", () => {
     expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
   });
 
-  it("opens when an edit clears the focused editor and closes on the next character", async () => {
+  it("does not open when an edit clears the focused editor, and closes an open list on the next character", async () => {
     store.state.zoConfig.query_history_enabled = true;
     wrapper = mount(SearchBar, {
       attachTo: document.body,
@@ -117,16 +117,19 @@ describe("logs recent-searches focus dropdown and the editor's Escape", () => {
     expect(vm.recentFocusOpen).toBe(false);
 
     vm.onEditorUserEdit(true, false);
-    expect(vm.recentFocusOpen).toBe(true);
+    expect(vm.recentFocusOpen).toBe(false);
     vm.onEditorUserEdit(false, true);
     expect(vm.recentFocusOpen).toBe(false);
 
     vm.searchObj.data.editorValue = "";
     vm.onQueryEditorFocus();
     expect(vm.recentFocusOpen).toBe(true);
-    vm.recentFocusOpen = false;
-    vm.onEditorUserEdit(true, false);
+    vm.onEditorUserEdit(true, true);
     expect(vm.recentFocusOpen).toBe(true);
+    vm.onEditorUserEdit(false, true);
+    expect(vm.recentFocusOpen).toBe(false);
+    vm.onEditorUserEdit(true, false);
+    expect(vm.recentFocusOpen).toBe(false);
     delete store.state.zoConfig.query_history_enabled;
   });
 
@@ -174,7 +177,7 @@ describe("logs recent-searches focus dropdown and the editor's Escape", () => {
     dropdown.vm.$emit("dismiss");
     vm.onEditorUserEdit(false, true);
     vm.onEditorUserEdit(true, false);
-    expect(vm.recentFocusOpen).toBe(true);
+    expect(vm.recentFocusOpen).toBe(false);
     delete store.state.zoConfig.query_history_enabled;
     router.currentRoute.value = route;
   });

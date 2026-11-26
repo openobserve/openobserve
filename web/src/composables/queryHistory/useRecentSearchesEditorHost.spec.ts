@@ -106,28 +106,26 @@ describe("recent searches for a nested editor", () => {
     expect(escape.defaultPrevented).toBe(false);
   });
 
-  it("opens when an edit empties the editor, closes on the next character, and respects a dismissal", async () => {
+  it("does not open when an edit empties the editor, and closes an open list on the next character", async () => {
     const { seen, recent } = mountHost({ value: false });
     seen.host!.onFocus(document.createElement("div"));
     await flushPromises();
     expect(recent().open.value).toBe(false);
 
     seen.host!.onEdit(true, false);
-    expect(recent().open.value).toBe(true);
-    seen.host!.onEdit(false, true);
     expect(recent().open.value).toBe(false);
+    seen.host!.onEdit(false, true);
     seen.host!.onEdit(true, false);
-    expect(recent().open.value).toBe(true);
+    expect(recent().open.value).toBe(false);
 
-    recent().open.value = false;
+    recent().open.value = true;
     seen.host!.onEdit(true, true);
-    expect(recent().open.value).toBe(false);
-    seen.host!.onEdit(false, true);
-    seen.host!.onEdit(true, false);
     expect(recent().open.value).toBe(true);
+    seen.host!.onEdit(false, true);
+    expect(recent().open.value).toBe(false);
   });
 
-  it("reopens on a single clear after a restore wrote the editor without an edit event", async () => {
+  it("stays closed after a dismissal when a later edit empties the editor", async () => {
     const { seen, recent } = mountHost({ value: true });
     seen.host!.onFocus(document.createElement("div"));
     await flushPromises();
@@ -135,7 +133,7 @@ describe("recent searches for a nested editor", () => {
     recent().open.value = false;
 
     seen.host!.onEdit(true, false);
-    expect(recent().open.value).toBe(true);
+    expect(recent().open.value).toBe(false);
   });
 
   it("keeps the dropdown closed when a query has text, but still loads clock rows", async () => {
