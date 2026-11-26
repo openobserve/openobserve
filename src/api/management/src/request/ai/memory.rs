@@ -1411,7 +1411,7 @@ fn internal_audit_message(
             http_method: "POST".to_string(),
             http_path: "/internal/ai/memory".to_string(),
             http_query_params: String::new(),
-            http_body: String::from_utf8_lossy(body).to_string(),
+            http_body: audited_body(body),
             http_response_code: status.as_u16(),
             error_msg,
             trace_id: None,
@@ -1420,6 +1420,30 @@ fn internal_audit_message(
         fleet_id: None,
         target: None,
     }
+}
+
+/// A memory write's body without its notes: each text becomes its size; ids and revs stay.
+fn audited_body(body: &[u8]) -> String {
+    fn sized(value: &mut Value) {
+        if let Some(text) = value.as_str() {
+            *value = Value::String(format!("[REDACTED: {} bytes]", text.len()));
+        }
+    }
+    let Ok(mut request) = serde_json::from_slice::<Value>(body) else {
+        return format!("[REDACTED: non-JSON body, {} bytes]", body.len());
+    };
+    for field in ["content", "reason"] {
+        if let Some(value) = request.get_mut(field) {
+            sized(value);
+        }
+    }
+    let edits = request.get_mut("edits").and_then(Value::as_array_mut);
+    for edit in edits.into_iter().flatten().filter_map(Value::as_object_mut) {
+        edit.iter_mut()
+            .filter(|(field, _)| *field != "op")
+            .for_each(|(_, value)| sized(value));
+    }
+    request.to_string()
 }
 
 fn written(outcome: Outcome, can_read: bool) -> Response {
@@ -2271,6 +2295,51 @@ pub(crate) mod tests {
         assert_eq!(
             refused.response_meta.error_msg.as_deref(),
             Some("turn_not_running")
+        );
+    }
+
+    #[test]
+    fn an_internal_write_s_audit_keeps_its_ids_but_not_its_notes() {
+        let body = json!({
+            "org_id": "o1",
+            "session_id": "s1",
+            "turn_id": "t1",
+            "scope": "org",
+            "base_rev": 4,
+            "edits": [
+                {"op": "add", "section": "## Quirks", "text": "secret-note"},
+                {"op": "replace", "old": "old-note", "new": "new-note"},
+            ],
+            "evidence": [{"call_ref": "user"}],
+            "reason": "why-note",
+        });
+        let audited = internal_audit_message(
+            body.to_string().as_bytes(),
+            StatusCode::OK,
+            &json!({"status": "applied"}),
+        )
+        .response_meta
+        .http_body;
+        let audited: Value = serde_json::from_str(&audited).unwrap();
+        assert_eq!(
+            audited,
+            json!({
+                "org_id": "o1",
+                "session_id": "s1",
+                "turn_id": "t1",
+                "scope": "org",
+                "base_rev": 4,
+                "edits": [
+                    {"op": "add", "section": "[REDACTED: 9 bytes]", "text": "[REDACTED: 11 bytes]"},
+                    {"op": "replace", "old": "[REDACTED: 8 bytes]", "new": "[REDACTED: 8 bytes]"},
+                ],
+                "evidence": [{"call_ref": "user"}],
+                "reason": "[REDACTED: 8 bytes]",
+            })
+        );
+        assert_eq!(
+            audited_body(b"not json"),
+            "[REDACTED: non-JSON body, 8 bytes]"
         );
     }
 
