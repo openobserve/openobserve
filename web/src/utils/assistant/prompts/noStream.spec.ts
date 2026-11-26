@@ -16,7 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import { INJECTION, expectNoInjection } from "./__fixtures__/prompts";
-import { buildNoStreamPrompt } from "./noStream";
+import { buildNoStreamPrompt } from "./emptyResult";
 
 describe("buildNoStreamPrompt", () => {
   it("asks a real setup question naming the org and the stream type, never fix-my-filter (D2)", () => {

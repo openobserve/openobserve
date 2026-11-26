@@ -40,7 +40,7 @@ export { buildLogFieldPrompt, fieldValueOf, logFieldChip, type LogFieldInput } f
 export { buildRegexFieldPrompt, regexFieldChip, type RegexFieldInput } from "./regexField";
 export { buildQueryErrorPrompt, errorPlainText, type QueryErrorInput } from "./queryError";
 export { buildEmptyResultPrompt, type EmptyResultInput } from "./emptyResult";
-export { buildNoStreamPrompt, type NoStreamInput } from "./noStream";
+export { buildNoStreamPrompt, type NoStreamInput } from "./emptyResult";
 export { buildTracePrompt, type TraceInput } from "./trace";
 export { MAX_SPAN_ATTRIBUTES, buildSpanPrompt, spanHasError, type SpanInput } from "./span";
 export {

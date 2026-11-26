@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// No imports: hosts read these statically without loading the assistant runtime.
+
 /** The only free value a prompt sentence may hold: a short identifier; anything else goes to a chip. */
 export const IDENT = /^[\w.:/-]{1,80}$/;
 
@@ -20,4 +22,16 @@ export const IDENT = /^[\w.:/-]{1,80}$/;
 export function ident(value: unknown): string | null {
   const text = typeof value === "string" ? value : typeof value === "number" ? String(value) : "";
   return IDENT.test(text) ? text : null;
+}
+
+/** "Explain these {n} rows" takes at most this many rows. */
+export const MAX_EXPLAIN_ROWS = 20;
+
+/** And at most this many bytes of selected rows. */
+export const MAX_EXPLAIN_BYTES = 64 * 1024;
+
+/** True when the selection is over the multi-select cap. */
+export function rowsOverCap(rows: readonly unknown[]): boolean {
+  if (rows.length > MAX_EXPLAIN_ROWS) return true;
+  return new TextEncoder().encode(JSON.stringify(rows)).length > MAX_EXPLAIN_BYTES;
 }

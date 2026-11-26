@@ -26,7 +26,7 @@ import {
 } from "./format";
 import { modeText, type LogRowInput } from "./logRow";
 
-export { MAX_EXPLAIN_BYTES, MAX_EXPLAIN_ROWS, rowsOverCap } from "./caps";
+export { MAX_EXPLAIN_BYTES, MAX_EXPLAIN_ROWS, rowsOverCap } from "./ident";
 
 export type LogRowsInput = Omit<LogRowInput, "row" | "source"> & {
   rows: Record<string, unknown>[];
