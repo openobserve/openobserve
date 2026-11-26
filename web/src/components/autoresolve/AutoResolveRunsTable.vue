@@ -407,7 +407,7 @@ const runRoute = (row: AutoResolveRunRow) => ({
 
 const startedColumn: OTableColumnDef<AutoResolveRunRow> = {
   id: "created_at_us",
-  header: t("autoresolve.runs.column.started"),
+  header: t("autoresolve.runs.column.lastRun"),
   accessorKey: "created_at_us",
   size: 120,
 };

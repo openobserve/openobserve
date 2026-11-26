@@ -20,6 +20,12 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
 
+use crate::meta::oncall::{
+    agent::Confidence,
+    confidence::is_call_ref,
+    rca_run::{Polarity, Strength},
+};
+
 pub const AUTORESOLVE_RUNS_STREAM: &str = "_o2_autoresolve_runs";
 pub const MAX_OPTIONS: usize = 4;
 /// How o2-ai's AutoResolve guard (`PLANNING_REFUSAL`) answers a change tried while planning.
@@ -324,6 +330,29 @@ pub struct PlanInput {
     pub omitted_count: u32,
     pub omitted_reason: Option<String>,
     pub missing_capability: Option<String>,
+    // `cause` and `evidence` are skipped when absent so plans stored before them keep their
+    // fingerprint.
+    /// The cause the agent's reads confirmed; the run page shows it first.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cause: Option<String>,
+    /// The reads that show the cause, each citing a call by its ref.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence: Vec<PlanEvidence>,
+}
+
+/// One read the agent cites for the plan's cause; the server binds it to the call with that ref.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct PlanEvidence {
+    pub id: String,
+    pub tool: String,
+    #[serde(rename = "ref")]
+    pub call_ref: String,
+    pub polarity: Polarity,
+    pub strength: Strength,
+    pub observation: String,
+    /// `rules_out` only: the other cause the read rules out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alternative: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -337,6 +366,79 @@ pub struct OptionInput {
     // Skipped when absent so plans stored before this field keep their fingerprint.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub partial_fix: Option<String>,
+    /// The band the agent claims for this option; the server lowers it to what the cause's
+    /// evidence supports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<Confidence>,
+}
+
+/// One accepted plan as `autoresolve_runs.plan_history` keeps it: what the run's timeline shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct PlanRevision {
+    pub revision: i32,
+    pub planned_at_us: i64,
+    #[serde(default)]
+    pub cause: Option<String>,
+    #[serde(default)]
+    pub evidence: Vec<PlanEvidence>,
+    #[serde(default)]
+    pub missing_capability: Option<String>,
+    pub options: Vec<PlanRevisionOption>,
+    /// What happened to this plan, kept when a replan clears it from the run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempt: Option<PlanAttempt>,
+}
+
+/// The approval and the agent's check of one plan, as the run held them before a replan.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct PlanAttempt {
+    #[serde(default)]
+    pub option_id: Option<String>,
+    #[serde(default)]
+    pub approved_by: Option<String>,
+    #[serde(default)]
+    pub approved_at_us: Option<i64>,
+    /// The state the run left, such as `worked`.
+    pub state: String,
+    #[serde(default)]
+    pub verdict: Option<String>,
+    #[serde(default)]
+    pub explanation: Option<String>,
+    #[serde(default)]
+    pub ended_at_us: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct PlanRevisionOption {
+    pub title: String,
+    pub recommended: bool,
+    #[serde(default)]
+    pub partial_fix: Option<String>,
+    #[serde(default)]
+    pub confidence: Option<Confidence>,
+}
+
+impl PlanRevision {
+    pub fn of(plan: &PlanInput, revision: i32, planned_at_us: i64) -> Self {
+        Self {
+            revision,
+            planned_at_us,
+            cause: plan.cause.clone(),
+            evidence: plan.evidence.clone(),
+            missing_capability: plan.missing_capability.clone(),
+            options: plan
+                .options
+                .iter()
+                .map(|o| PlanRevisionOption {
+                    title: o.title.clone(),
+                    recommended: o.recommended,
+                    partial_fix: o.partial_fix.clone(),
+                    confidence: o.confidence,
+                })
+                .collect(),
+            attempt: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -497,6 +599,30 @@ pub fn resolve_refs(
 /// Replaces every secret-bearing value in place with a marker.
 pub fn redact_secrets(v: &mut Value) {
     redact(v);
+}
+
+/// `text` without the `[ref abc234]` / `[ref abc234, xyz567]` markers the model copies from tool
+/// results: refs belong in a plan's `evidence`, never in the prose people read.
+pub fn without_call_refs(text: &str) -> String {
+    const MARK: &str = "[ref ";
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find(MARK) {
+        let tail = &rest[at + MARK.len()..];
+        let refs = tail.find(']').map(|end| &tail[..end]);
+        match refs.filter(|r| r.split(',').all(|one| is_call_ref(one.trim()))) {
+            Some(r) => {
+                out.push_str(rest[..at].trim_end_matches(' '));
+                rest = &tail[r.len() + 1..];
+            }
+            None => {
+                out.push_str(&rest[..at + MARK.len()]);
+                rest = tail;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Stored text with its secrets redacted: JSON by key, any other text only whole (a URL carrying
@@ -793,6 +919,26 @@ mod tests {
             arg_path: arg_path.into(),
             from_step,
             result_path: result_path.into(),
+        }
+    }
+
+    #[test]
+    fn call_refs_leave_the_prose_and_other_brackets_stay() {
+        let cases = [
+            (
+                "pods crash with \"panic\" [ref l6txzf]. The service failed [ref t74ia6, h7yr53].",
+                "pods crash with \"panic\". The service failed.",
+            ),
+            ("[ref abcdef] first", " first"),
+            (
+                "a [ref note] and [ref ABCDEF] stay",
+                "a [ref note] and [ref ABCDEF] stay",
+            ),
+            ("an open [ref abcdef", "an open [ref abcdef"),
+            ("no refs at all", "no refs at all"),
+        ];
+        for (text, want) in cases {
+            assert_eq!(without_call_refs(text), want, "{text}");
         }
     }
 

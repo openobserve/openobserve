@@ -82,6 +82,7 @@ pub struct RunPatch {
     pub error: Option<Option<String>>,
     pub ended_at_us: Option<Option<i64>>,
     pub person_verdict: Option<Option<String>>,
+    pub plan_history: Option<String>,
     pub updated_at_us: i64,
 }
 
@@ -109,6 +110,7 @@ impl RunPatch {
         let update = set(update, Column::PriorVerdict, self.prior_verdict);
         let update = set(update, Column::Error, self.error);
         let update = set(update, Column::PersonVerdict, self.person_verdict);
+        let update = set(update, Column::PlanHistory, self.plan_history);
         set(update, Column::EndedAtUs, self.ended_at_us)
     }
 }
@@ -191,6 +193,7 @@ pub async fn insert_with<C: ConnectionTrait + TransactionTrait>(
         added_connections: Set(None),
         turn_started_at_us: Set(run.turn_deadline_us.map(|_| run.now_us)),
         check_retried_at_us: Set(None),
+        plan_history: Set(None),
     }
     .insert(&txn)
     .await
@@ -447,6 +450,9 @@ pub async fn create_tables_for_tests(
         .up(&SchemaManager::new(db))
         .await?;
     crate::table::migration::autoresolve_corrections_migration_for_test()
+        .up(&SchemaManager::new(db))
+        .await?;
+    crate::table::migration::autoresolve_plan_history_migration_for_test()
         .up(&SchemaManager::new(db))
         .await
 }

@@ -16,6 +16,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section ref="root" class="flex min-w-0 flex-col gap-3" data-test="autoresolve-approval-request">
+    <section
+      v-if="plan?.cause || options.some((o) => o.reason)"
+      class="flex min-w-0 flex-col gap-2"
+      data-test="autoresolve-approval-why"
+    >
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h3 class="text-text-heading m-0 text-base font-bold">
+          {{ t("autoresolve.step.reason") }}
+        </h3>
+        <RcaConfidenceBand
+          v-if="plan?.band"
+          :band="plan.band"
+          :breakdown="plan.confidence"
+          data-test="autoresolve-approval-cause-band"
+        />
+      </div>
+      <AutoResolveModelText
+        v-if="plan?.cause"
+        :text="plan.cause"
+        class="text-sm"
+        data-test="autoresolve-approval-cause"
+      />
+      <!-- No cause: the picked option's reason, stacked so a new pick never shifts the page. -->
+      <div v-else class="grid min-w-0">
+        <AutoResolveModelText
+          v-for="option in options"
+          :key="option.id"
+          :text="option.reason"
+          class="col-start-1 row-start-1 text-sm"
+          :class="option.id === pickedId ? '' : 'invisible'"
+          :aria-hidden="option.id === pickedId ? undefined : 'true'"
+          :data-test="option.id === pickedId ? 'autoresolve-approval-picked-reason' : undefined"
+        />
+      </div>
+      <p
+        v-if="ruledOut"
+        class="text-text-secondary m-0 text-xs wrap-anywhere"
+        data-test="autoresolve-approval-ruled-out"
+      >
+        {{ ruledOut }}
+      </p>
+      <!-- The evidence itself sits in the investigation below; the decision stays on top. -->
+      <div
+        v-if="evidenceSummary"
+        class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+        data-test="autoresolve-approval-evidence-summary"
+      >
+        <span class="text-text-secondary">{{ evidenceSummary }}</span>
+        <span
+          v-if="unverifiedText"
+          class="text-status-warning-text"
+          data-test="autoresolve-approval-unverified"
+          >{{ unverifiedText }}</span
+        >
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          data-test="autoresolve-approval-view-evidence"
+          @click="emit('show-evidence')"
+        >
+          {{ t("autoresolve.approval.viewEvidence") }}
+        </OButton>
+      </div>
+    </section>
+
     <AutoResolveCorrectionsUsed
       v-if="run.corrections_used?.length"
       :corrections="run.corrections_used"
@@ -47,8 +112,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-heading text-sm font-semibold wrap-anywhere">
                 {{ option.title }}
               </span>
+              <RcaConfidenceBand
+                v-if="option.band"
+                :band="option.band"
+                compact
+                data-test="autoresolve-approval-option-band"
+              />
               <OTag
-                v-if="option.recommended && !option.partial_fix"
+                v-else-if="option.recommended && !option.partial_fix"
                 variant="success-soft"
                 :label="t('autoresolve.approval.recommended')"
                 data-test="autoresolve-approval-recommended"
@@ -90,12 +161,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </ORadio>
     </ORadioGroup>
-
-    <ODescriptionList v-if="recommended?.reason" dense label-width="narrow">
-      <ODescriptionItem :label="t('autoresolve.step.reason')" data-test="autoresolve-approval-why">
-        <AutoResolveModelText :text="recommended.reason" class="text-compact" />
-      </ODescriptionItem>
-    </ODescriptionList>
 
     <p
       v-if="omittedCount > 0"
@@ -448,8 +513,7 @@ import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import type { InlineNoticeVariant } from "@/lib/feedback/InlineNotice/OInlineNotice.types";
-import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
-import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
+import RcaConfidenceBand from "@/components/alerts/rca/RcaConfidenceBand.vue";
 import AutoResolveCorrectionPanel from "@/components/autoresolve/AutoResolveCorrectionPanel.vue";
 import AutoResolveModelText from "@/components/autoresolve/AutoResolveModelText.vue";
 import AutoResolveCorrectionsUsed from "@/components/autoresolve/AutoResolveCorrectionsUsed.vue";
@@ -507,18 +571,42 @@ const emit = defineEmits<{
   approve: [optionId: string];
   replan: [body: AutoResolveReplanInput];
   decline: [];
+  /** Open the investigation at the cause's evidence. */
+  "show-evidence": [];
 }>();
 
 const { t } = useI18nTyped();
 
 const plan = computed(() => props.run.plan);
+
+const ruledOut = computed(() => {
+  const alternatives = (plan.value?.hypotheses ?? [])
+    .filter((h) => h.status === "ruled_out")
+    .map((h) => raw(h.statement));
+  return alternatives.length
+    ? t("autoresolve.approval.ruledOut", { list: namesSentence(alternatives, t) })
+    : null;
+});
+const evidenceSummary = computed(() => {
+  const evidence = plan.value?.evidence ?? [];
+  if (!evidence.length && !plan.value?.unverified?.length) return null;
+  const decisive = evidence.filter((e) => e.decisive).length;
+  return t(
+    "autoresolve.approval.evidenceSummary",
+    { count: evidence.length, decisive },
+    evidence.length,
+  );
+});
+const unverifiedText = computed(() => {
+  const count = plan.value?.unverified?.length ?? 0;
+  return count ? t("autoresolve.approval.unverified", { count }, count) : null;
+});
 const waiting = computed(() => props.run.state === "waiting_approval");
 
 // Stable sort: the recommended option leads, the rest keep the plan's order.
 const options = computed<AutoResolveOption[]>(() =>
   [...(plan.value?.options ?? [])].sort((a, b) => Number(b.recommended) - Number(a.recommended)),
 );
-const recommended = computed(() => options.value.find((o) => o.recommended) ?? options.value[0]);
 
 const pickedId = ref("");
 // Separate sources: a getter returning a fresh array would reset the pick on every snapshot.

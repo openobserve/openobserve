@@ -99,11 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @added="reread"
           />
 
-          <AutoResolveVerdicts
-            v-if="shownVerdict?.verdict === 'not_fixed'"
-            :verdict="shownVerdict"
-          />
-
           <section
             v-if="run.state === 'investigating'"
             class="flex flex-col gap-2"
@@ -113,15 +108,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("autoresolve.run.investigating") }}
             </h2>
             <ol
-              v-if="run.thread.steps.length"
+              v-if="liveSteps.length"
               class="rounded-surface border-border-default bg-surface-base m-0 flex list-none flex-col gap-3.5 border p-4"
             >
               <RcaThreadStep
-                v-for="(step, idx) in run.thread.steps"
+                v-for="step in liveSteps"
                 :key="step.index"
                 :step="step"
                 :run-live="run.thread.active"
-                :finished="isFinishedStep(run.thread, step, idx)"
+                :finished="isFinishedStep(run.thread, step, threadIndex(step.index))"
                 :timezone="timezone"
                 :working-text="t('autoresolve.run.working')"
               />
@@ -131,43 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("autoresolve.run.investigatingNote") }}
             </p>
           </section>
-
-          <div
-            v-else-if="investigation?.steps.length"
-            class="rounded-surface border-border-default bg-surface-base border"
-            data-test="autoresolve-run-investigated"
-          >
-            <OCollapsible v-model="threadOpen" trigger-class="px-4 py-2">
-              <template #trigger="{ open }">
-                <span class="flex min-w-0 flex-1 items-center gap-2">
-                  <OIcon name="check-circle" size="sm" class="text-status-positive shrink-0" />
-                  <span class="text-text-heading shrink-0 text-sm font-semibold">
-                    {{ t("autoresolve.run.investigated") }}
-                  </span>
-                  <OTruncatedText as="span" class="text-text-secondary min-w-0 flex-1 text-xs">
-                    {{ investigatedMeta }}
-                  </OTruncatedText>
-                  <OIcon
-                    name="expand-more"
-                    size="sm"
-                    class="text-icon-color shrink-0 transition-transform duration-150 motion-reduce:transition-none"
-                    :class="open ? 'rotate-180' : ''"
-                  />
-                </span>
-              </template>
-              <ol class="m-0 flex list-none flex-col gap-3.5 px-4 pt-1 pb-4">
-                <RcaThreadStep
-                  v-for="(step, idx) in investigation.steps"
-                  :key="step.index"
-                  :step="step"
-                  :run-live="run.thread.active"
-                  :finished="isFinishedStep(run.thread, step, idx)"
-                  :timezone="timezone"
-                  :working-text="t('autoresolve.run.working')"
-                />
-              </ol>
-            </OCollapsible>
-          </div>
 
           <!-- Without the model's verdict the state notice or the request says how the run ended. -->
           <AutoResolveOutcome
@@ -262,37 +220,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @approve="onApprove"
             @decline="onDecline"
             @replan="onReplan"
+            @show-evidence="showEvidence"
           />
 
-          <section
-            v-if="evidence.length"
-            class="flex flex-col gap-2"
-            data-test="autoresolve-run-evidence"
+          <!-- The current stage leads; what came before it follows. -->
+          <AutoResolveVerdicts
+            v-if="shownVerdict?.verdict === 'not_fixed'"
+            :verdict="shownVerdict"
+          />
+
+          <div
+            v-if="showInvestigation"
+            ref="investigationEl"
+            class="rounded-surface border-border-default bg-surface-base border"
+            data-test="autoresolve-run-investigated"
           >
-            <h2 class="text-text-heading m-0 text-sm font-semibold">
-              {{ t("autoresolve.run.evidence.title") }}
-            </h2>
-            <OTimeline>
-              <OTimelineItem
-                v-for="item in evidence"
-                :key="item.key"
-                :title="item.title"
-                :subtitle="item.time"
-                :variant="item.variant"
-                :framed="!!item.detail"
-                :data-test="`autoresolve-run-evidence-${item.kind}`"
-              >
-                <template #subtitle>
-                  <span
-                    v-if="item.detail"
-                    class="text-text-body text-compact block wrap-anywhere"
-                    data-test="autoresolve-run-evidence-detail"
-                    >{{ item.detail }}</span
-                  >{{ item.time }}
+            <OCollapsible v-model="threadOpen" trigger-class="px-4 py-2">
+              <template #trigger="{ open }">
+                <span class="flex min-w-0 flex-1 items-center gap-2">
+                  <OIcon name="check-circle" size="sm" class="text-status-positive shrink-0" />
+                  <span class="text-text-heading shrink-0 text-sm font-semibold">
+                    {{ t("autoresolve.run.investigated") }}
+                  </span>
+                  <OTruncatedText as="span" class="text-text-secondary min-w-0 flex-1 text-xs">
+                    {{ investigatedMeta }}
+                  </OTruncatedText>
+                  <OIcon
+                    name="expand-more"
+                    size="sm"
+                    class="text-icon-color shrink-0 transition-transform duration-150 motion-reduce:transition-none"
+                    :class="open ? 'rotate-180' : ''"
+                  />
+                </span>
+              </template>
+              <div class="flex flex-col gap-5 px-4 pt-1 pb-4">
+                <template v-if="causeFindings">
+                  <RcaHypotheses
+                    ref="hypothesesEl"
+                    :hypotheses="causeFindings.hypotheses"
+                    outcome="root_cause_identified"
+                    :evidence="causeFindings.evidence"
+                    :org="orgId"
+                  />
+                  <RcaEvidenceList
+                    :evidence="causeFindings.evidence"
+                    :unverified="causeFindings.unverified"
+                    :hypotheses="causeFindings.hypotheses"
+                    :org="orgId"
+                    @open-hypothesis="hypothesesEl?.showHypothesis($event)"
+                  />
                 </template>
-              </OTimelineItem>
-            </OTimeline>
-          </section>
+                <section
+                  v-if="investigatedPasses.length"
+                  class="flex flex-col gap-3.5"
+                  data-test="autoresolve-run-investigated-steps"
+                >
+                  <h3 v-if="causeFindings" class="text-text-heading m-0 text-base font-bold">
+                    {{ t("autoresolve.run.steps") }}
+                  </h3>
+                  <template v-for="pass in investigatedPasses" :key="pass.startUs">
+                    <h4
+                      v-if="pass.heading"
+                      class="border-border-subtle text-text-secondary m-0 border-t pt-3 text-xs font-semibold"
+                      data-test="autoresolve-run-investigated-pass"
+                    >
+                      {{ pass.heading }}
+                    </h4>
+                    <ol class="m-0 flex list-none flex-col gap-3.5 p-0">
+                      <!-- An earlier pass is over even while a replan's turn runs. -->
+                      <RcaThreadStep
+                        v-for="step in pass.steps"
+                        :key="step.index"
+                        :step="step"
+                        :run-live="false"
+                        :finished="isFinishedStep(run.thread, step, threadIndex(step.index))"
+                        :timezone="timezone"
+                        :working-text="t('autoresolve.run.working')"
+                      />
+                    </ol>
+                  </template>
+                </section>
+              </div>
+            </OCollapsible>
+          </div>
         </OContent>
       </div>
 
@@ -389,6 +399,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-else>{{ t("autoresolve.run.facts.notKnown") }}</template>
                 </ODescriptionItem>
               </ODescriptionList>
+              <section
+                v-if="timeline.length > 1"
+                class="border-border-default flex flex-col gap-2 border-t pt-3"
+                data-test="autoresolve-run-timeline"
+              >
+                <h3 class="text-text-heading m-0 text-sm font-semibold">
+                  {{ t("autoresolve.run.timeline.title") }}
+                </h3>
+                <OTimeline>
+                  <OTimelineItem
+                    v-for="item in timeline"
+                    :key="item.key"
+                    :title="item.title"
+                    :variant="item.variant"
+                    :data-test="`autoresolve-run-timeline-${item.kind}`"
+                  >
+                    <template #subtitle>
+                      <OTruncatedText
+                        v-for="(line, idx) in item.details"
+                        :key="idx"
+                        class="text-text-body block"
+                        data-test="autoresolve-run-timeline-detail"
+                        >{{ line }}</OTruncatedText
+                      >{{ item.time }}
+                    </template>
+                  </OTimelineItem>
+                </OTimeline>
+              </section>
               <p class="border-border-default text-text-secondary m-0 border-t pt-3 text-xs">
                 {{ t("autoresolve.run.facts.evidenceNote") }}
               </p>
@@ -401,7 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onScopeDispose, ref, watch } from "vue";
+import { computed, nextTick, onScopeDispose, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMutation } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -425,6 +463,8 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
+import RcaEvidenceList from "@/components/alerts/rca/RcaEvidenceList.vue";
+import RcaHypotheses from "@/components/alerts/rca/RcaHypotheses.vue";
 import RcaStageStepper from "@/components/alerts/rca/RcaStageStepper.vue";
 import RcaThreadStep from "@/components/alerts/rca/RcaThreadStep.vue";
 import AutoResolveApprovalRequest from "@/components/autoresolve/AutoResolveApprovalRequest.vue";
@@ -446,6 +486,7 @@ import {
   isTerminalRunState,
   type AutoResolveAddedConnection,
   type AutoResolveApprover,
+  type AutoResolvePlanRevision,
   type AutoResolveReplanInput,
   type AutoResolveRunCorrection,
   type AutoResolveRunState,
@@ -459,7 +500,7 @@ import {
 } from "@/services/autoresolve.queries";
 import productAnalytics from "@/services/product_analytics";
 import store from "@/stores";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import {
   AUTORESOLVE_STAGES,
   addableConnection,
@@ -474,6 +515,7 @@ import {
   deadlineText,
   investigationSummary,
   namesSentence,
+  needsText,
   removedChips,
   runConnections,
   shownRunState,
@@ -485,14 +527,15 @@ import {
 } from "@/utils/autoresolve/autoresolveText";
 import { isFinishedStep } from "@/utils/incidents/rcaThread";
 
-interface EvidenceItem {
+interface TimelineEntry {
   key: string;
   /** The line's data-test suffix: one per kind of line, such as step or correction. */
   kind: string;
   at: number;
   title: I18nText;
   time: I18nText;
-  detail?: I18nText;
+  /** One line each, cut to the panel's width. */
+  details?: I18nText[];
   variant: TimelineItemVariant;
 }
 
@@ -548,15 +591,91 @@ watch(
 );
 
 const investigation = computed(() => (run.value ? investigationSummary(run.value) : null));
-const investigatedMeta = computed(() => {
-  if (!investigation.value) return "";
-  const { calls, durationUs } = investigation.value;
-  return t(
+// A later pass is headed by who asked again: the newest correction between the two plans.
+const investigatedPasses = computed(() => {
+  const passes = investigation.value?.passes ?? [];
+  const corrections = run.value?.corrections ?? [];
+  return passes
+    .map((pass, i) => {
+      if (!i) return { ...pass, heading: null };
+      const after = passes[i - 1].endUs;
+      const by = corrections
+        .filter((c) => c.created_at_us >= after && c.created_at_us < pass.endUs)
+        .sort((a, b) => a.created_at_us - b.created_at_us)
+        .at(-1);
+      const heading = by
+        ? t(
+            by.kind === "not_fixed"
+              ? "autoresolve.run.passNotFixed"
+              : "autoresolve.run.passCorrected",
+            { name: raw(by.created_by), time: evidenceTime(by.created_at_us) },
+          )
+        : t("autoresolve.run.passPlannedAgain", { time: evidenceTime(pass.startUs) });
+      return { ...pass, heading };
+    })
+    .filter((pass) => pass.steps.length);
+});
+const callsText = (calls: number, durationUs: number) =>
+  t(
     "autoresolve.run.investigatedMeta",
     { count: calls, duration: autoresolveDuration(durationUs, t) },
     calls,
   );
+// The current plan's hypotheses and cited reads; a replan's turn has not concluded yet.
+const causeFindings = computed(() => {
+  const current = run.value;
+  const plan = current?.plan;
+  if (!plan || current.state === "investigating") return null;
+  const evidence = plan.evidence ?? [];
+  const unverified = plan.unverified ?? [];
+  if (!evidence.length && !unverified.length) return null;
+  return { evidence, unverified, hypotheses: plan.hypotheses ?? [] };
 });
+const showInvestigation = computed(
+  () =>
+    (investigatedPasses.value.length > 0 || !!causeFindings.value) &&
+    (run.value?.state !== "investigating" || !!run.value?.planned_at_us),
+);
+const investigatedMeta = computed(() => {
+  const calls = investigation.value
+    ? callsText(investigation.value.calls, investigation.value.durationUs)
+    : null;
+  const evidence = causeFindings.value?.evidence;
+  if (!evidence) return calls ?? raw("");
+  const decisive = evidence.filter((e) => e.decisive).length;
+  const cited = t(
+    "autoresolve.approval.evidenceSummary",
+    { count: evidence.length, decisive },
+    evidence.length,
+  );
+  return calls ? t("autoresolve.run.investigatedWithEvidence", { calls, cited }) : cited;
+});
+
+const investigationEl = ref<HTMLElement | null>(null);
+const hypothesesEl = ref<InstanceType<typeof RcaHypotheses> | null>(null);
+// The hypotheses and evidence lead inside the block. It grows open over a short animation and
+// the column cannot scroll to it before that ends, so a closed block scrolls on animationend.
+const showEvidence = async () => {
+  const wasOpen = threadOpen.value;
+  threadOpen.value = true;
+  await nextTick();
+  const block = investigationEl.value;
+  const scroll = () => block?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+  const content = block?.querySelector('[data-test="o-collapsible-content"]');
+  if (wasOpen || !content) scroll();
+  else content.addEventListener("animationend", scroll, { once: true });
+};
+// A weak grade or a citation that did not verify is the exception worth a look: it opens itself.
+watch(
+  () => run.value?.plan?.fingerprint,
+  () => {
+    const plan = run.value?.plan;
+    if (plan && (plan.band === "low" || (plan.unverified?.length ?? 0) > 0)) {
+      threadOpen.value = true;
+    }
+  },
+  { immediate: true },
+);
 
 const chosenOption = computed(() =>
   run.value?.plan?.options.find((o) => o.id === run.value?.chosen_option_id),
@@ -782,7 +901,7 @@ const sameDay = (a: number, b: number) =>
   autoresolveTime(a, "YYYY-MM-DD") === autoresolveTime(b, "YYYY-MM-DD");
 
 // One entry per sent step: sent and finished times share it, so the record reads one line per call.
-const stepEvidence = (step: AutoResolveStep): EvidenceItem[] => {
+const stepEvidence = (step: AutoResolveStep): TimelineEntry[] => {
   const params = { seq: step.seq, tool: raw(step.tool) };
   const failed = step.state === "failed";
   const view = stepResultView(failed ? step.error : step.result_summary);
@@ -834,26 +953,34 @@ const stepEvidence = (step: AutoResolveStep): EvidenceItem[] => {
   ];
 };
 
-const correctionEvidence = (c: AutoResolveRunCorrection, idx: number): EvidenceItem => {
+const correctionTitle = (c: AutoResolveRunCorrection): I18nText => {
   const name = raw(c.created_by);
+  if (c.kind === "not_fixed") return t("autoresolve.run.evidence.planAgain", { name });
+  const kind = t(CORRECTION_KIND_KEY[c.kind]);
+  return c.option_title
+    ? t("autoresolve.run.timeline.correctionOn", { name, kind, option: raw(c.option_title) })
+    : t("autoresolve.run.evidence.correction", { name, kind });
+};
+
+const notFixedDetail = (c: AutoResolveRunCorrection): I18nText =>
+  c.option_title
+    ? t("autoresolve.run.timeline.notFixedOn", { option: raw(c.option_title), note: raw(c.note) })
+    : t("autoresolve.run.evidence.notFixedNote", { note: raw(c.note) });
+
+const correctionEvidence = (c: AutoResolveRunCorrection, idx: number): TimelineEntry => {
   const time = evidenceTime(c.created_at_us);
-  const notFixed = c.kind === "not_fixed";
   return {
     key: `correction-${idx}`,
     kind: "correction",
     at: c.created_at_us,
-    title: notFixed
-      ? t("autoresolve.run.evidence.planAgain", { name })
-      : t("autoresolve.run.evidence.correction", { name, kind: t(CORRECTION_KIND_KEY[c.kind]) }),
-    detail: notFixed
-      ? t("autoresolve.run.evidence.notFixedNote", { note: raw(c.note) })
-      : raw(c.note),
+    title: correctionTitle(c),
+    details: [c.kind === "not_fixed" ? notFixedDetail(c) : raw(c.note)],
     time: c.remembered ? t("autoresolve.run.evidence.remembered", { time }) : raw(time),
     variant: "info",
   };
 };
 
-const addedEvidence = (a: AutoResolveAddedConnection, idx: number): EvidenceItem => {
+const addedEvidence = (a: AutoResolveAddedConnection, idx: number): TimelineEntry => {
   const params = { name: raw(a.by), mcp: theMcps([a.name], t) };
   const current = run.value;
   return {
@@ -863,21 +990,113 @@ const addedEvidence = (a: AutoResolveAddedConnection, idx: number): EvidenceItem
     title: current?.autoresolve
       ? t("autoresolve.run.evidence.connectionAdded", params)
       : t("autoresolve.run.evidence.connectionAddedRun", params),
-    detail: a.trigger_off ? t("autoresolve.run.evidence.triggerOff") : undefined,
+    details: a.trigger_off ? [t("autoresolve.run.evidence.triggerOff")] : undefined,
     time: raw(evidenceTime(a.at_us)),
     variant: "info",
   };
 };
 
-const evidence = computed<EvidenceItem[]>(() => {
+const planEntry = (plan: AutoResolvePlanRevision): TimelineEntry => {
+  const options = plan.options.map((o) =>
+    o.band
+      ? t("autoresolve.run.timeline.optionBand", {
+          title: raw(o.title),
+          band: t(`alerts.incidents.aiAnalysis.band.${o.band}`),
+        })
+      : raw(o.title),
+  );
+  const missing = plan.missing_capability;
+  const details: I18nText[] = plan.cause ? [raw(plan.cause)] : [];
+  if (options.length) details.push(namesSentence(options, t));
+  else if (missing) details.push(needsText(missing, t) ?? raw(missing));
+  return {
+    key: `plan-${plan.revision}`,
+    kind: "plan",
+    at: plan.planned_at_us,
+    title: t("autoresolve.run.timeline.planned"),
+    time: raw(evidenceTime(plan.planned_at_us)),
+    details,
+    variant: "primary",
+  };
+};
+
+const ATTEMPT_END_KEY: Partial<Record<AutoResolveRunState, I18nKey>> = {
+  worked: "autoresolve.state.worked",
+  no_change: "autoresolve.state.noChange",
+  worse: "autoresolve.state.worse",
+  outcome_unknown: "autoresolve.state.outcomeUnknown",
+};
+
+// A plan a replan moved past: its approval, the steps that ran and how it ended.
+const attemptEntries = (plan: AutoResolvePlanRevision): TimelineEntry[] => {
+  const attempt = plan.attempt;
+  if (!attempt) return [];
+  const items: TimelineEntry[] = [];
+  if (attempt.approved_at_us) {
+    const option = plan.options.find((o) => o.id === attempt.option_id);
+    const name = raw(attempt.approved_by);
+    items.push({
+      key: `approved-${plan.revision}`,
+      kind: "approved",
+      at: attempt.approved_at_us,
+      title: option
+        ? t("autoresolve.run.evidence.approved", { name, option: raw(option.title) })
+        : t("autoresolve.run.evidence.approvedPlan", { name }),
+      time: raw(evidenceTime(attempt.approved_at_us)),
+      variant: "primary",
+    });
+  }
+  items.push(...attempt.steps.flatMap(stepEvidence));
+  const endKey = ATTEMPT_END_KEY[attempt.state];
+  if (attempt.ended_at_us && endKey) {
+    items.push({
+      key: `attempt-ended-${plan.revision}`,
+      kind: "attempt-ended",
+      at: attempt.ended_at_us,
+      title: t("autoresolve.run.timeline.attemptEnded", { result: t(endKey) }),
+      time: raw(evidenceTime(attempt.ended_at_us)),
+      details: attempt.explanation ? [raw(attempt.explanation)] : undefined,
+      variant: attempt.state === "worked" ? "success" : "muted",
+    });
+  }
+  return items;
+};
+
+// A replan's live list holds only its own turn; the turns before it sit in "Investigated" above.
+const liveSteps = computed(() => {
+  const current = run.value;
+  if (!current) return [];
+  const asked = [
+    ...(current.corrections ?? []).map((c) => c.created_at_us),
+    ...(current.added_connections ?? []).map((c) => c.at_us),
+  ];
+  const replanFrom = current.turn?.started_at_us ?? (asked.length ? Math.max(...asked) : null);
+  const from = current.planned_at_us ? replanFrom : null;
+  if (from === null) return current.thread.steps;
+  return current.thread.steps
+    .map((s) => ({
+      ...s,
+      tool_calls: s.tool_calls.filter((c) => (c.started_at ?? s.started_at ?? from) >= from),
+    }))
+    .filter((s) => s.tool_calls.length || (s.started_at ?? from) >= from);
+});
+const threadIndex = (index: number) =>
+  run.value?.thread.steps.findIndex((s) => s.index === index) ?? -1;
+
+// The whole run in time order: what the agent investigated and proposed, and what people did.
+const timeline = computed<TimelineEntry[]>(() => {
   const current = run.value;
   if (!current) return [];
   const asked = [
     ...(current.corrections ?? []).map(correctionEvidence),
     ...(current.added_connections ?? []).map(addedEvidence),
   ];
-  if (!current.approved_at_us && !asked.length) return [];
-  const items: EvidenceItem[] = [
+  // A first investigation still running has no pass to show yet; the main column shows it live.
+  const passes =
+    current.state === "investigating" && !current.planned_at_us
+      ? []
+      : (investigation.value?.passes ?? []);
+  const items: TimelineEntry[] = [
     {
       key: "started",
       kind: "started",
@@ -888,6 +1107,18 @@ const evidence = computed<EvidenceItem[]>(() => {
       time: raw(evidenceTime(current.created_at_us)),
       variant: "muted",
     },
+    ...asked,
+    ...passes.map((pass, i): TimelineEntry => ({
+      key: `pass-${i}`,
+      kind: "investigated",
+      at: pass.startUs,
+      title: t("autoresolve.run.investigated"),
+      time: raw(evidenceTime(pass.startUs)),
+      details: [callsText(pass.calls, pass.durationUs)],
+      variant: "muted",
+    })),
+    ...(current.plan_history ?? []).map(planEntry),
+    ...(current.plan_history ?? []).flatMap(attemptEntries),
   ];
   if (current.approved_at_us) {
     items.push({
@@ -904,7 +1135,7 @@ const evidence = computed<EvidenceItem[]>(() => {
       variant: "primary",
     });
   }
-  items.push(...current.steps.flatMap(stepEvidence), ...asked);
+  items.push(...current.steps.flatMap(stepEvidence));
   const fixed = current.person_verdict?.verdict === "fixed" ? current.person_verdict : null;
   if (fixed) {
     items.push({

@@ -140,10 +140,21 @@ export interface HeldCall {
   connection: string | null;
 }
 
-/** The first planning turn of a run, and the changes held in the current one. */
-export interface InvestigationSummary {
-  /** The turn's steps with only its own calls; later calls belong to proceeding or a new plan. */
+/** One planning turn: from the run's start, or the prompt that asked again, to the plan it made. */
+export interface InvestigationPass {
+  startUs: number;
+  /** The plan's acceptance; for a turn no known plan ended, the next prompt. */
+  endUs: number;
+  /** The turn's steps with only its own calls. */
   steps: RcaStep[];
+  calls: number;
+  durationUs: number;
+}
+
+/** Every planning turn up to the current plan, and the changes held in the current one. */
+export interface InvestigationSummary {
+  /** Oldest first; the calls of proceeding turns between them belong to the steps list. */
+  passes: InvestigationPass[];
   calls: number;
   durationUs: number;
   held: HeldCall[];
@@ -163,7 +174,11 @@ export interface AutoResolveWhen {
   today: boolean;
 }
 
-type InvestigatedRun = Pick<AutoResolveRun, "thread" | "created_at_us" | "planned_at_us" | "plan">;
+type InvestigatedRun = Pick<
+  AutoResolveRun,
+  "thread" | "created_at_us" | "planned_at_us" | "plan" | "plan_history"
+> &
+  Partial<Pick<AutoResolveRun, "corrections" | "added_connections">>;
 type TurnRun = Pick<
   AutoResolveRun,
   "state" | "turn" | "steps" | "thread" | "approved_at_us" | "created_at_us"
@@ -603,27 +618,66 @@ export function stepResultView(summary: string | null | undefined): StepResultVi
   };
 }
 
-/** Planning ends at the plan's acceptance or the next turn's prompt (proceeding or a new plan). */
+/**
+ * Each planning turn ends at its plan's acceptance. A replan's turn starts at the correction or
+ * added MCP that asked for it; o2-ai's own re-prompts inside a turn start no new pass.
+ */
 export function investigationSummary(run: InvestigatedRun): InvestigationSummary {
   const startUs = run.created_at_us;
-  const plannedAt = run.planned_at_us ?? null;
   const prompts = run.thread.user_messages
     .filter((m) => !m.steer_id && m.at !== null)
     .map((m) => m.at as number);
   const firstPrompt = prompts[0] ?? Number.POSITIVE_INFINITY;
-  const endsAtPlan = plannedAt !== null && plannedAt <= firstPrompt;
-  const endUs = endsAtPlan ? plannedAt : firstPrompt;
-  const before = (c: { started_at: number | null }) =>
-    c.started_at === null || c.started_at < endUs;
-  const steps = run.thread.steps
-    .filter(before)
-    .map((s) => ({ ...s, tool_calls: s.tool_calls.filter(before) }));
-  const calls = steps.flatMap((s) => s.tool_calls);
-  const ends = calls.map((c) => (c.started_at ?? startUs) + (c.duration_ms ?? 0) * 1000);
+  const plannedAt = run.planned_at_us ?? null;
+  const history = run.plan_history ?? [];
+  const plans = history.length
+    ? history.map((p) => p.planned_at_us)
+    : plannedAt === null
+      ? []
+      : [plannedAt];
+  // A run planned before the history kept every plan starts its history at a later revision.
+  const fromFirstPlan = history.length > 0 && history[0].revision <= 1;
+  const asked = [
+    ...(run.corrections ?? []).map((c) => c.created_at_us),
+    ...(run.added_connections ?? []).map((c) => c.at_us),
+  ];
+  const turnStart = (after: number, to: number) => {
+    const inside = (at: number) => at > after && at < to;
+    const replan = asked.filter(inside);
+    return Math.max(after, ...(replan.length ? replan : prompts.filter(inside)));
+  };
+  const windows = plans.map((to, i) => {
+    const from = i === 0 && fromFirstPlan ? startUs : turnStart(i ? plans[i - 1] : startUs, to);
+    return { from, to, planned: true };
+  });
+  // Without the earlier plans the first turn is only known to end at the first prompt.
+  if (!windows.length || windows[0].from > startUs) {
+    windows.unshift({ from: startUs, to: firstPrompt, planned: false });
+  }
+  const passes = windows.map(({ from, to, planned }, i): InvestigationPass => {
+    // The first turn also takes what has no time, and what an agent clock put before the start.
+    const within = (at: number | null) =>
+      at === null ? i === 0 : (i === 0 || at >= from) && at < to;
+    const steps = run.thread.steps
+      .map((s) => ({
+        ...s,
+        tool_calls: s.tool_calls.filter((c) => within(c.started_at ?? s.started_at)),
+      }))
+      .filter((s) => s.tool_calls.length || within(s.started_at));
+    const calls = steps.flatMap((s) => s.tool_calls);
+    const ends = calls.map((c) => (c.started_at ?? from) + (c.duration_ms ?? 0) * 1000);
+    return {
+      startUs: from,
+      endUs: to,
+      steps,
+      calls: calls.length,
+      durationUs: (planned ? to : Math.max(from, ...ends)) - from,
+    };
+  });
   return {
-    steps,
-    calls: calls.length,
-    durationUs: (endsAtPlan ? plannedAt : Math.max(startUs, ...ends)) - startUs,
+    passes,
+    calls: passes.reduce((sum, p) => sum + p.calls, 0),
+    durationUs: passes.reduce((sum, p) => sum + p.durationUs, 0),
     held: heldInCurrentPlan(run, prompts, firstPrompt),
   };
 }

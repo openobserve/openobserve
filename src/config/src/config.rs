@@ -173,7 +173,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 170: create autoresolve, autoresolve_runs and autoresolve_steps.
 // 171: create autoresolve_corrections, and add plan_corrections, person_verdict and
 //      added_connections to autoresolve_runs.
-pub const DB_SCHEMA_VERSION: u64 = 171;
+// 172: add autoresolve_runs.plan_history.
+pub const DB_SCHEMA_VERSION: u64 = 172;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

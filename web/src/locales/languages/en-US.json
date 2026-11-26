@@ -34748,7 +34748,7 @@
       "me": "Me",
       "connection": "MCP",
       "column": {
-        "started": "Started",
+        "lastRun": "Last run",
         "goal": "Goal",
         "state": "State",
         "startedBy": "Started by",
@@ -34784,6 +34784,11 @@
       "investigatingNote": "Calls that only look go straight through. The run asks you before the first change.",
       "investigated": "Investigated",
       "investigatedMeta": "{count} call, {duration} | {count} calls, {duration}",
+      "investigatedWithEvidence": "{calls} · {cited}",
+      "steps": "Steps",
+      "passCorrected": "Corrected by {name} at {time}",
+      "passNotFixed": "Marked not fixed by {name} at {time}",
+      "passPlannedAgain": "Planned again at {time}",
       "calls": "Calls",
       "approvedBy": "Approved by {name} at {time}",
       "stepCount": "{count} step | {count} steps",
@@ -34818,8 +34823,15 @@
         "endedAt": "Ended at {time}",
         "error": "The run reported an error: {reason}"
       },
+      "timeline": {
+        "title": "Timeline",
+        "planned": "Agent proposed a plan",
+        "optionBand": "{title} ({band})",
+        "correctionOn": "Correction sent by {name} on {option}: {kind}",
+        "notFixedOn": "{option} didn't fix it: {note}",
+        "attemptEnded": "Ended: {result}"
+      },
       "evidence": {
-        "title": "Evidence",
         "started": "Started by {name}",
         "approved": "{name} approved {option}",
         "approvedPlan": "{name} approved the plan",
@@ -34874,6 +34886,10 @@
     "approval": {
       "optionsLabel": "Options",
       "recommended": "Recommended",
+      "ruledOut": "Ruled out: {list}",
+      "evidenceSummary": "{count} cited read, {decisive} decisive | {count} cited reads, {decisive} decisive",
+      "unverified": "{count} citation not verified | {count} citations not verified",
+      "viewEvidence": "View evidence",
       "stepSummary": "{count} step through {mcps} | {count} steps through {mcps}",
       "omitted": "{count} other option was left out: {reason} | {count} other options were left out: {reason}",
       "omittedNoReason": "{count} other option was left out. | {count} other options were left out.",

@@ -75,6 +75,9 @@ pub struct Model {
     pub turn_started_at_us: Option<i64>,
     /// When the run's check turn was retried; a run retries it once.
     pub check_retried_at_us: Option<i64>,
+    /// A JSON array of every plan the agent proposed, oldest first (`PlanRevision`).
+    #[sea_orm(column_type = "Text", nullable)]
+    pub plan_history: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

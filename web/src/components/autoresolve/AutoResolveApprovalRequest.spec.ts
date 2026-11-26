@@ -37,6 +37,7 @@ import {
   autoresolveRun,
   autoresolveStep,
 } from "@/test/unit/fixtures/autoresolveRun";
+import { rcaEvidenceEntry, rcaHypothesis } from "@/test/unit/fixtures/rcaThread";
 import AutoResolveApprovalRequest from "./AutoResolveApprovalRequest.vue";
 
 router.addRoute({
@@ -48,6 +49,8 @@ router.addRoute({ name: "autoresolve", path: "/autoresolve", component: { render
 
 const APPROVE = '[data-test="autoresolve-approval-approve"]';
 const OPTIONS = '[data-test="autoresolve-approval-options"]';
+const WHY = '[data-test="autoresolve-approval-why"]';
+const RECOMMENDED = '[data-test="autoresolve-approval-recommended"]';
 const CHANGES = '[data-test="autoresolve-approval-changes-line"]';
 const CORRECT = '[data-test="autoresolve-approval-correct"]';
 const PANEL = '[data-test="autoresolve-correction-panel"]';
@@ -142,6 +145,78 @@ describe("AutoResolveApprovalRequest", () => {
     );
   });
 
+  it("leads with the agent's reason: the cause, its band, what it ruled out and a way to the evidence", async () => {
+    const run = withOptions(OPTION_A, OPTION_B);
+    run.plan = {
+      ...run.plan!,
+      cause: "Commit a41c9e7 lowered the token route timeout to 50 ms.",
+      band: "medium",
+      confidence: {
+        claimed: "high",
+        evidence: "medium",
+        evidence_reason: "1 decisive source (logs)",
+        caps: [],
+      },
+      evidence: [rcaEvidenceEntry()],
+      hypotheses: [
+        rcaHypothesis(),
+        rcaHypothesis({ id: "h2", statement: "The cache was cold", status: "ruled_out" }),
+      ],
+    };
+    const w = mountRequest(run);
+
+    const why = w.find(WHY);
+    const follows = why.element.compareDocumentPosition(w.find(OPTIONS).element);
+    expect(follows & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(why.text()).toContain("Agent's reason");
+    expect(why.find('[data-test="autoresolve-approval-cause"]').text()).toBe(
+      "Commit a41c9e7 lowered the token route timeout to 50 ms.",
+    );
+    const band = why.find('[data-test="autoresolve-approval-cause-band"]');
+    expect(band.find('[data-test="rca-verdict-band"]').text()).toBe("Medium confidence");
+    expect(band.find('[data-test="rca-verdict-band-info"]').exists()).toBe(true);
+    expect(why.find('[data-test="autoresolve-approval-ruled-out"]').text()).toBe(
+      "Ruled out: The cache was cold",
+    );
+    // The evidence itself lives in the investigation; the request only points at it.
+    expect(why.find('[data-test="rca-evidence-list"]').exists()).toBe(false);
+    expect(why.find('[data-test="autoresolve-approval-evidence-summary"]').text()).toContain(
+      "1 cited read, 1 decisive",
+    );
+    await why.find('[data-test="autoresolve-approval-view-evidence"]').trigger("click");
+    expect(w.emitted("show-evidence")).toHaveLength(1);
+    expect(why.find('[data-test="autoresolve-approval-picked-reason"]').exists()).toBe(false);
+  });
+
+  it("without a cause the reason is the picked option's, with no band and no evidence", async () => {
+    const w = mountRequest(
+      withOptions(OPTION_A, { ...OPTION_B, reason: "Patching avoids a pull request." }),
+    );
+    const reason = () => w.find('[data-test="autoresolve-approval-picked-reason"]').text();
+
+    expect(reason()).toBe(OPTION_A.reason);
+    await w.find(option("B")).trigger("click");
+    expect(reason()).toBe("Patching avoids a pull request.");
+    expect(w.find('[data-test="autoresolve-approval-cause-band"]').exists()).toBe(false);
+    expect(w.find('[data-test="rca-evidence-list"]').exists()).toBe(false);
+  });
+
+  it("an option's band takes the Recommended tag's place; a plan without bands keeps the tag", () => {
+    const partial = { ...OPTION_B, band: "low" as const, partial_fix: "leaves the cache cold" };
+    const w = mountRequest(withOptions({ ...OPTION_A, band: "high" }, partial));
+    const bands = w
+      .findAll('[data-test="autoresolve-approval-option-band"]')
+      .map((b) => b.find('[data-test="rca-verdict-band"]').attributes("data-band"));
+    expect(bands).toEqual(["high", "low"]);
+    expect(w.find(RECOMMENDED).exists()).toBe(false);
+    expect(w.find('[data-test="autoresolve-approval-partial-fix"]').exists()).toBe(true);
+    wrapper?.unmount();
+
+    const old = mountRequest(withOptions(OPTION_A, OPTION_B));
+    expect(old.findAll(RECOMMENDED)).toHaveLength(1);
+    expect(old.find('[data-test="autoresolve-approval-option-band"]').exists()).toBe(false);
+  });
+
   it("a partial option carries its tag and never the Recommended one", () => {
     const partial = autoresolveOption({
       recommended: true,
@@ -149,7 +224,7 @@ describe("AutoResolveApprovalRequest", () => {
     });
     const w = mountRequest(withOptions(partial));
 
-    expect(w.find('[data-test="autoresolve-approval-recommended"]').exists()).toBe(false);
+    expect(w.find(RECOMMENDED).exists()).toBe(false);
     expect(w.find('[data-test="autoresolve-approval-partial-fix"]').exists()).toBe(true);
     expect(w.find('[data-test="autoresolve-approval-partial-fix-text"]').text()).toContain(
       "restarts the whole database",

@@ -15,7 +15,14 @@
 
 import http, { attemptTokenRefresh } from "./http";
 import store from "@/stores";
-import type { RcaThread } from "./incidents";
+import type {
+  RcaBand,
+  RcaConfidenceBreakdown,
+  RcaEvidenceEntry,
+  RcaSummaryHypothesis,
+  RcaThread,
+  RcaUnverifiedCitation,
+} from "./incidents";
 
 export type AutoResolveRunState =
   | "investigating"
@@ -148,6 +155,10 @@ export interface AutoResolveOption {
   partial_fix?: string | null;
   /** The live MCPs its steps use, once each in step order; approving changes these. */
   changes: AutoResolveChangedMcp[];
+  /** The agent's claim capped by the cause's graded band; null for a plan without a cause. */
+  band?: RcaBand | null;
+  /** What the agent claimed for this option. */
+  claimed?: RcaBand | null;
 }
 
 /** A change another run sent to one of this run's MCPs after this run's plan was made. */
@@ -181,6 +192,39 @@ export interface AutoResolvePlan {
   omitted_reason: string | null;
   missing_capability: string | null;
   missing_connection?: AutoResolveMissingConnection | null;
+  /** What the reads confirmed is wrong and why; null for a plan made before causes. */
+  cause?: string | null;
+  /** The cause's graded band; null without a cause or once the transcript is gone. */
+  band?: RcaBand | null;
+  confidence?: RcaConfidenceBreakdown | null;
+  evidence?: RcaEvidenceEntry[];
+  unverified?: RcaUnverifiedCitation[];
+  /** h1 is the cause, then the alternatives the evidence ruled out. */
+  hypotheses?: RcaSummaryHypothesis[];
+}
+
+/** One accepted plan of a run, as `plan_history` keeps it. */
+export interface AutoResolvePlanRevision {
+  revision: number;
+  planned_at_us: number;
+  cause: string | null;
+  band: RcaBand | null;
+  missing_capability: string | null;
+  options: { id: string; title: string; band: RcaBand | null; partial_fix: string | null }[];
+  /** Set once a replan moved the run past this plan: what was approved, ran and how it ended. */
+  attempt?: AutoResolvePlanAttempt | null;
+}
+
+export interface AutoResolvePlanAttempt {
+  option_id: string | null;
+  approved_by: string | null;
+  approved_at_us: number | null;
+  steps: AutoResolveStep[];
+  /** The state the run left, such as `worked`. */
+  state: AutoResolveRunState;
+  verdict: string | null;
+  explanation: string | null;
+  ended_at_us: number | null;
 }
 
 /** `not_fixed` comes from "No, it didn't" under an outcome; the others correct a waiting plan. */
@@ -209,12 +253,17 @@ export interface AutoResolveCorrectionUsed {
 
 /** A correction sent on this run. */
 export interface AutoResolveRunCorrection {
+  id: string;
   kind: AutoResolveCorrectionKind;
   note: string;
   created_by: string;
   created_at_us: number;
   /** Kept on the saved AutoResolve for later runs. */
   remembered: boolean;
+  /** The option the person was looking at when they sent it. */
+  option_title: string | null;
+  /** The plan revision it was sent on. */
+  revision: number;
 }
 
 export interface AutoResolveAddedConnection {
@@ -368,6 +417,8 @@ export interface AutoResolveRun {
   planned_at_us: number | null;
   revision: number;
   plan: AutoResolvePlan | null;
+  /** Every accepted plan, oldest first; the current one is last. */
+  plan_history?: AutoResolvePlanRevision[];
   chosen_option_id: string | null;
   approved_by: string | null;
   approved_at_us: number | null;

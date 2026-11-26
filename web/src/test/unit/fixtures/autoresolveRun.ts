@@ -49,11 +49,14 @@ export function autoresolveOption(overrides: Partial<AutoResolveOption> = {}): A
     reason: "The fault came from a commit, so reverting it fixes the cause.",
     steps: [autoresolveStep()],
     changes: [{ name: "Code host (infra repo)", short_description: null }],
+    band: null,
+    claimed: null,
     ...overrides,
   };
 }
 
-/** A run waiting for approval of one recommended option; no step runs before approval. */
+/** A run waiting for approval of one recommended option; no step runs before approval.
+ *  Its plan predates causes: no cause, band, evidence or history. */
 export function autoresolveRun(overrides: Partial<AutoResolveRun> = {}): AutoResolveRun {
   return {
     id: "run-1",
@@ -79,7 +82,14 @@ export function autoresolveRun(overrides: Partial<AutoResolveRun> = {}): AutoRes
       omitted_count: 0,
       omitted_reason: null,
       missing_capability: null,
+      cause: null,
+      band: null,
+      confidence: null,
+      evidence: [],
+      unverified: [],
+      hypotheses: [],
     },
+    plan_history: [],
     chosen_option_id: null,
     approved_by: null,
     approved_at_us: null,

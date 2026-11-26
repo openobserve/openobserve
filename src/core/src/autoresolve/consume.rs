@@ -508,12 +508,17 @@ fn copy_step(step: &StepRow, revision: i32, now: i64) -> NewStep {
 }
 
 fn revised_plan(run: &RunRow, rows: &[NewStep]) -> Result<PlanInput, AutoResolveError> {
-    let stored: PlanInput = serde_json::from_str(run.plan.as_deref().unwrap_or_default())
+    let PlanInput {
+        options,
+        cause,
+        evidence,
+        ..
+    } = serde_json::from_str(run.plan.as_deref().unwrap_or_default())
         .map_err(anyhow::Error::from)?;
     let chosen = OPTION_IDS
         .iter()
         .position(|id| Some(*id) == run.chosen_option_id.as_deref())
-        .and_then(|i| stored.options.into_iter().nth(i))
+        .and_then(|i| options.into_iter().nth(i))
         .ok_or_else(|| anyhow::anyhow!("run {} has no chosen option in its plan", run.id))?;
     let steps = rows
         .iter()
@@ -532,6 +537,8 @@ fn revised_plan(run: &RunRow, rows: &[NewStep]) -> Result<PlanInput, AutoResolve
         omitted_count: 0,
         omitted_reason: None,
         missing_capability: None,
+        cause,
+        evidence,
     })
 }
 
@@ -750,10 +757,13 @@ mod tests {
                     reason: "asked".into(),
                     steps,
                     partial_fix: None,
+                    confidence: None,
                 }],
                 omitted_count: 0,
                 omitted_reason: None,
                 missing_capability: None,
+                cause: None,
+                evidence: Vec::new(),
             };
             let patch = RunPatch {
                 plan: Some(serde_json::to_string(&plan).unwrap()),

@@ -21,8 +21,16 @@ use std::{
 };
 
 use config::{
-    meta::autoresolve::{
-        PlanInput, RunState, StepKind, StepRef, mcp_short_description, result_text,
+    meta::{
+        autoresolve::{
+            PlanInput, PlanRevision, RunState, StepKind, StepRef, mcp_short_description,
+            result_text,
+        },
+        oncall::{
+            agent::Confidence,
+            confidence::{ConfidenceBreakdown, ToolCallRecord, UnverifiedCitation},
+            rca_run::{EvidenceEntry, SummaryHypothesis},
+        },
     },
     utils::time::now_micros,
 };
@@ -44,13 +52,16 @@ use utoipa::ToSchema;
 use super::{
     AutoResolveError,
     approve::{self, Approver, Seams},
-    changed_since, corrections, distinct_ids, evidence, json_or_text,
+    changed_since, corrections, distinct_ids, evidence,
+    grading::{grade_cause, option_band, plan_claim},
+    json_or_text,
     plan::{OPTION_IDS, parse_missing_connection},
     trigger_by, trigger_label,
     turn::{Listed, not_connected},
 };
 use crate::{
     ai_chat::{
+        rca_ledger::decode_run,
         rca_thread::{self, RcaThread, Transcript},
         read_committed_prefix,
     },
@@ -159,6 +170,11 @@ pub struct AutoResolveOption {
     pub partial_fix: Option<String>,
     /// The live MCPs its steps use, once each in step order; approving changes these.
     pub changes: Vec<AutoResolveChangedMcp>,
+    /// The agent's claim lowered to what the cause's evidence allows; null when the plan has no
+    /// graded cause.
+    pub band: Option<Confidence>,
+    /// What the agent claimed for this option.
+    pub claimed: Option<Confidence>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -178,6 +194,53 @@ pub struct AutoResolvePlan {
     /// Set when `missing_capability` reads `needs <name>: <action>` for an org connection the
     /// run lacks.
     pub missing_connection: Option<AutoResolveMissingConnection>,
+    /// The cause the agent's reads confirmed; null on plans made before it was asked for.
+    pub cause: Option<String>,
+    /// The cause's band, graded from the cited evidence as incidents grade a verdict; null
+    /// without a cause or once the transcript is gone.
+    pub band: Option<Confidence>,
+    pub confidence: Option<ConfidenceBreakdown>,
+    /// The cited reads that verified, numbered in citation order.
+    pub evidence: Vec<EvidenceEntry>,
+    pub unverified: Vec<UnverifiedCitation>,
+    /// The cause first, then each alternative a read ruled out.
+    pub hypotheses: Vec<SummaryHypothesis>,
+}
+
+/// One plan the agent proposed, as the run's timeline shows it.
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct AutoResolvePlanRevision {
+    pub revision: i32,
+    pub planned_at_us: i64,
+    pub cause: Option<String>,
+    pub band: Option<Confidence>,
+    pub missing_capability: Option<String>,
+    pub options: Vec<AutoResolvePlanRevisionOption>,
+    /// Who approved which option, the steps that ran and how the agent's check ended; set once
+    /// a replan moved the run past this plan.
+    pub attempt: Option<AutoResolvePlanAttempt>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct AutoResolvePlanAttempt {
+    pub option_id: Option<String>,
+    pub approved_by: Option<String>,
+    pub approved_at_us: Option<i64>,
+    /// The approved option's steps in that revision, as they ran.
+    pub steps: Vec<AutoResolveStep>,
+    /// The state the run left, such as `worked`.
+    pub state: String,
+    pub verdict: Option<String>,
+    pub explanation: Option<String>,
+    pub ended_at_us: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct AutoResolvePlanRevisionOption {
+    pub id: String,
+    pub title: String,
+    pub band: Option<Confidence>,
+    pub partial_fix: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -238,6 +301,8 @@ pub struct AutoResolveRunCorrection {
     pub kind: String,
     pub note: String,
     pub option_title: Option<String>,
+    /// The plan revision it was sent on.
+    pub revision: i32,
     pub created_by: String,
     pub created_at_us: i64,
     /// Still read by the saved AutoResolve's later runs.
@@ -305,6 +370,8 @@ pub struct AutoResolveRunDetail {
     /// rebuilt it (then calls of the approved steps come before it).
     pub planned_at_us: Option<i64>,
     pub plan: Option<AutoResolvePlan>,
+    /// Every plan the agent proposed, oldest first; the current one is last.
+    pub plan_history: Vec<AutoResolvePlanRevision>,
     pub chosen_option_id: Option<String>,
     pub approved_by: Option<String>,
     pub approved_at_us: Option<i64>,
@@ -568,7 +635,8 @@ impl Loaded {
         let run = &self.run;
         let names = self.names().await?;
         let listable = rights.listable(&run.org, email).await;
-        let mut plan = self.plan(&names);
+        let (thread, tool_log) = self.thread(&names.current).await;
+        let mut plan = self.plan(&names, &tool_log);
         let mut outcome = self.outcome();
         if let Some(plan) = plan.as_mut() {
             self.hide_unlisted_missing(plan, outcome.as_mut(), &names, listable.as_deref());
@@ -605,6 +673,7 @@ impl Loaded {
             approval_deadline_us: run.approval_deadline_us,
             revision: run.revision,
             planned_at_us: self.planned_at_us(),
+            plan_history: self.plan_history(&tool_log, &names),
             plan,
             chosen_option_id: run.chosen_option_id.clone(),
             approved_by: run.approved_by.clone(),
@@ -613,7 +682,7 @@ impl Loaded {
             can_approve,
             steps,
             outcome,
-            thread: self.thread(&names.current).await,
+            thread,
             autoresolve: self.autoresolve().await?,
             not_connected: self.not_connected(&names, listable.as_deref()),
             corrections_used: self.corrections_used().await?,
@@ -701,6 +770,7 @@ impl Loaded {
                 kind: c.kind,
                 note: c.note,
                 option_title: c.option_title,
+                revision: c.revision,
                 created_by: c.created_by,
                 created_at_us: c.created_at_us,
                 remembered: c.active,
@@ -727,7 +797,12 @@ impl Loaded {
         })
     }
 
-    fn plan(&self, names: &ConnectionNames) -> Option<AutoResolvePlan> {
+    /// `tool_log` grades the cause; an empty one (the Slack card) leaves every band null.
+    fn plan(
+        &self,
+        names: &ConnectionNames,
+        tool_log: &[ToolCallRecord],
+    ) -> Option<AutoResolvePlan> {
         let run = &self.run;
         let stored: PlanInput = match serde_json::from_str(run.plan.as_deref()?) {
             Ok(plan) => plan,
@@ -739,6 +814,8 @@ impl Loaded {
                 return None;
             }
         };
+        let claim = plan_claim(stored.options.iter().map(|o| (o.recommended, o.confidence)));
+        let graded = grade_cause(stored.cause.as_deref(), &stored.evidence, claim, tool_log);
         let options = stored
             .options
             .into_iter()
@@ -755,10 +832,26 @@ impl Loaded {
                     uses_removed_connection: steps.iter().any(|s| s.connection.removed),
                     changes: changed_mcps(&steps, names),
                     steps,
+                    band: option_band(
+                        option.confidence,
+                        graded.as_ref().map(|g| g.graded),
+                        option.partial_fix.is_some(),
+                    ),
+                    claimed: option.confidence,
                     partial_fix: option.partial_fix,
                 }
             })
             .collect();
+        let (band, confidence, evidence, unverified, hypotheses) = match graded {
+            Some(g) => (
+                Some(g.band),
+                Some(g.breakdown),
+                g.evidence,
+                g.unverified,
+                g.hypotheses,
+            ),
+            None => (None, None, Vec::new(), Vec::new(), Vec::new()),
+        };
         Some(AutoResolvePlan {
             fingerprint: run.plan_fingerprint.clone().unwrap_or_default(),
             options,
@@ -767,7 +860,75 @@ impl Loaded {
             missing_connection: self
                 .missing_connection(stored.missing_capability.as_deref(), names),
             missing_capability: stored.missing_capability,
+            cause: stored.cause,
+            band,
+            confidence,
+            evidence,
+            unverified,
+            hypotheses,
         })
+    }
+
+    /// The stored history, each plan graded on the run's tool log. A run planned before the
+    /// history existed shows its current plan as the only entry.
+    fn plan_history(
+        &self,
+        tool_log: &[ToolCallRecord],
+        names: &ConnectionNames,
+    ) -> Vec<AutoResolvePlanRevision> {
+        let run = &self.run;
+        let mut revisions: Vec<PlanRevision> =
+            stored_json(run.plan_history.as_deref()).unwrap_or_default();
+        let current = run
+            .plan
+            .as_deref()
+            .and_then(|p| serde_json::from_str::<PlanInput>(p).ok());
+        if let (Some(plan), Some(at)) = (current, self.planned_at_us())
+            && !revisions.iter().any(|r| r.revision == run.revision)
+        {
+            revisions.push(PlanRevision::of(&plan, run.revision, at));
+        }
+        revisions
+            .into_iter()
+            .map(|r| {
+                let claim = plan_claim(r.options.iter().map(|o| (o.recommended, o.confidence)));
+                let graded = grade_cause(r.cause.as_deref(), &r.evidence, claim, tool_log);
+                let cause_graded = graded.as_ref().map(|g| g.graded);
+                let attempt = r.attempt.map(|a| AutoResolvePlanAttempt {
+                    steps: a
+                        .option_id
+                        .as_deref()
+                        .map(|id| self.revision_steps(r.revision, id, names))
+                        .unwrap_or_default(),
+                    option_id: a.option_id,
+                    approved_by: a.approved_by,
+                    approved_at_us: a.approved_at_us,
+                    state: a.state,
+                    verdict: a.verdict,
+                    explanation: a.explanation,
+                    ended_at_us: a.ended_at_us,
+                });
+                AutoResolvePlanRevision {
+                    attempt,
+                    revision: r.revision,
+                    planned_at_us: r.planned_at_us,
+                    band: graded.map(|g| g.band),
+                    cause: r.cause,
+                    missing_capability: r.missing_capability,
+                    options: r
+                        .options
+                        .into_iter()
+                        .zip(OPTION_IDS)
+                        .map(|(o, id)| AutoResolvePlanRevisionOption {
+                            id: id.to_string(),
+                            band: option_band(o.confidence, cause_graded, o.partial_fix.is_some()),
+                            title: o.title,
+                            partial_fix: o.partial_fix,
+                        })
+                        .collect(),
+                }
+            })
+            .collect()
     }
 
     /// The org connection the plan names in `needs <name>: <action>`, when the run lacks it;
@@ -836,12 +997,19 @@ impl Loaded {
     }
 
     fn option_steps(&self, option_id: &str, names: &ConnectionNames) -> Vec<AutoResolveStep> {
+        self.revision_steps(self.run.revision, option_id, names)
+    }
+
+    fn revision_steps(
+        &self,
+        revision: i32,
+        option_id: &str,
+        names: &ConnectionNames,
+    ) -> Vec<AutoResolveStep> {
         let mut rows: Vec<&StepRow> = self
             .steps
             .iter()
-            .filter(|s| {
-                s.revision == self.run.revision && s.option_id.as_deref() == Some(option_id)
-            })
+            .filter(|s| s.revision == revision && s.option_id.as_deref() == Some(option_id))
             .collect();
         rows.sort_by_key(|s| s.seq);
         rows.into_iter().map(|s| step_view(s, names)).collect()
@@ -863,13 +1031,16 @@ impl Loaded {
         })
     }
 
-    /// A transcript that cannot be read leaves the thread empty; the plan and steps still show.
-    async fn thread(&self, names: &HashMap<String, String>) -> RcaThread {
+    /// The thread and the tool log the cause is graded on, from one read of the transcript. A
+    /// transcript that cannot be read leaves both empty; the plan and steps still show.
+    async fn thread(&self, names: &HashMap<String, String>) -> (RcaThread, Vec<ToolCallRecord>) {
         let run = &self.run;
         let active = self.state().is_some_and(|s| s.is_live());
         let version = self.version().to_string();
-        let empty =
-            |version| RcaThread::without_transcript(&run.id, version, active, Transcript::None);
+        let empty = |version| {
+            let thread = RcaThread::without_transcript(&run.id, version, active, Transcript::None);
+            (thread, Vec::new())
+        };
         let Some(session) = &self.session else {
             return empty(version);
         };
@@ -880,6 +1051,7 @@ impl Loaded {
                 return empty(version);
             }
         };
+        let tool_log = decode_run(&prefix.events).tool_log;
         let turns = ai_chat_turns::list_for_session(&run.org, &session.session_id)
             .await
             .unwrap_or_else(|e| {
@@ -899,7 +1071,7 @@ impl Loaded {
             thread.truncated = true;
             thread.saved_through_seq = Some(lost_from - 1);
         }
-        thread
+        (thread, tool_log)
     }
 }
 
@@ -996,7 +1168,7 @@ pub(crate) async fn card_view(
     };
     let names = loaded.names().await?;
     Ok(Some(CardView {
-        plan: loaded.plan(&names),
+        plan: loaded.plan(&names, &[]),
         outcome: loaded.outcome(),
         run: loaded.run,
     }))
@@ -1325,7 +1497,7 @@ mod tests {
                 session: None,
                 changed: Vec::new(),
             };
-            let plan = loaded.plan(&names(&current, &[])).unwrap();
+            let plan = loaded.plan(&names(&current, &[]), &[]).unwrap();
             let flags: Vec<(&str, bool, Option<&str>, Vec<_>)> = plan
                 .options
                 .iter()
@@ -1390,7 +1562,7 @@ mod tests {
             let names = names(&current, &[]);
             let off_run = loaded.not_connected(&names, permitted.as_deref());
             assert_eq!(off_run, want, "{case}");
-            let mut plan = loaded.plan(&names).unwrap();
+            let mut plan = loaded.plan(&names, &[]).unwrap();
             // A no-option plan ends the run with its missing capability as the explanation.
             let mut outcome = AutoResolveOutcome {
                 verdict: Some("no_change".to_string()),

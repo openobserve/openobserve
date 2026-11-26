@@ -37,7 +37,10 @@ use tokio::sync::OnceCell;
 
 use super::{
     AutoResolveError, ConnectionSource, LiveConnections, LiveTurns, TurnLauncher, after_transition,
-    chosen_steps, distinct_ids, live::AutoResolveConnectionRef, mark_not_run, plan::OPTION_IDS,
+    chosen_steps, distinct_ids,
+    live::AutoResolveConnectionRef,
+    mark_not_run,
+    plan::{OPTION_IDS, history_keeping_attempt},
     run_connection_ids, transition_with, turn_deadline_us,
 };
 
@@ -724,10 +727,11 @@ pub(crate) async fn relaunch_planning(
     txn: DatabaseTransaction,
     run: &RunRow,
     from: RunState,
-    patch: RunPatch,
+    mut patch: RunPatch,
     note: Option<&str>,
 ) -> Result<(), ApproveError> {
     let (org, run_id, to) = (run.org.as_str(), run.id.as_str(), RunState::Investigating);
+    patch.plan_history = history_keeping_attempt(run);
     if !transition_with(&txn, org, run_id, &[from], to, patch).await? {
         return Err(ApproveError::NotWaiting);
     }

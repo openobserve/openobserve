@@ -269,11 +269,12 @@ describe("autoresolveText", () => {
       ],
       [prompt(200), prompt(300)],
       sec(400),
+      // Without the earlier plans the first turn ends at the first prompt; the replan's turn is kept.
       [
-        2,
-        sec(9),
+        4,
+        sec(9) + sec(100),
         [{ tool: "scale_up", connection: "Cluster" }],
-        ["read_status", "restart_service"],
+        ["read_status", "restart_service", "o2_scale_up", "worded"],
       ],
     ],
     [
@@ -295,8 +296,85 @@ describe("autoresolveText", () => {
       planned_at_us: plannedAfter === null ? null : RCA_T0 + plannedAfter,
       plan: PLAN,
     });
-    const listed = summary.steps.flatMap((s) => s.tool_calls.map((c) => c.call_id));
+    const listed = summary.passes.flatMap((p) =>
+      p.steps.flatMap((s) => s.tool_calls.map((c) => c.call_id)),
+    );
     expect([summary.calls, summary.durationUs, summary.held, listed]).toEqual(expected);
+  });
+
+  it("investigationSummary keeps every planning turn of the plan history, not the proceeding between", () => {
+    const planned = (revision: number, at: number) => ({
+      revision,
+      planned_at_us: RCA_T0 + sec(at),
+      cause: null,
+      band: null,
+      missing_capability: null,
+      options: [],
+    });
+    const thread = rcaThread({
+      active: false,
+      steps: [
+        rcaStep({ index: 1, tool_calls: [call("read_logs", 2)] }),
+        rcaStep({ index: 2, started_at: RCA_T0 + sec(130), tool_calls: [call("apply_fix", 130)] }),
+        // The replan's first call lands on the proceeding turn's step.
+        rcaStep({ index: 3, started_at: RCA_T0 + sec(140), tool_calls: [call("read_again", 210)] }),
+      ],
+      user_messages: [prompt(120), prompt(200)],
+    });
+    const summary = investigationSummary({
+      thread,
+      created_at_us: RCA_T0,
+      planned_at_us: RCA_T0 + sec(300),
+      plan: PLAN,
+      plan_history: [planned(1, 100), planned(2, 300)],
+    });
+
+    expect(
+      summary.passes.map((p) => [
+        p.startUs - RCA_T0,
+        p.steps.map((s) => s.index),
+        p.calls,
+        p.durationUs,
+      ]),
+    ).toEqual([
+      [0, [1], 1, sec(100)],
+      [sec(200), [3], 1, sec(100)],
+    ]);
+    expect([summary.calls, summary.durationUs]).toEqual([2, sec(200)]);
+  });
+
+  it("investigationSummary starts a pass at the correction, never at o2-ai's own re-prompt", () => {
+    const planned = (revision: number, at: number) => ({
+      revision,
+      planned_at_us: RCA_T0 + sec(at),
+      cause: null,
+      band: null,
+      missing_capability: null,
+      options: [],
+    });
+    const thread = rcaThread({
+      active: false,
+      steps: [
+        rcaStep({ index: 1, tool_calls: [call("read_logs", 2), call("read_metrics", 60)] }),
+        rcaStep({ index: 2, started_at: RCA_T0 + sec(220), tool_calls: [call("read_again", 220)] }),
+      ],
+      // 50 and 250: o2-ai asking again inside a turn; 200: the correction's replan.
+      user_messages: [prompt(50), prompt(200), prompt(250)],
+    });
+    const corrected = { created_at_us: RCA_T0 + sec(200) } as AutoResolveRun["corrections"][number];
+    const summary = investigationSummary({
+      thread,
+      created_at_us: RCA_T0,
+      planned_at_us: RCA_T0 + sec(300),
+      plan: PLAN,
+      plan_history: [planned(1, 100), planned(2, 300)],
+      corrections: [corrected],
+    });
+
+    expect(summary.passes.map((p) => [p.startUs - RCA_T0, p.calls])).toEqual([
+      [0, 2],
+      [sec(200), 1],
+    ]);
   });
 
   it.each([

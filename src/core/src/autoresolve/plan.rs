@@ -19,8 +19,9 @@ use std::collections::HashMap;
 
 use config::{
     meta::autoresolve::{
-        MAX_OPTIONS, OptionInput, OutcomeInput, PlanInput, RunState, StepKind, StepState, Verdict,
-        args_hash, capitalized, named_mcp, plan_fingerprint,
+        MAX_OPTIONS, OptionInput, OutcomeInput, PlanAttempt, PlanInput, PlanRevision, RunState,
+        StepKind, StepState, Verdict, args_hash, capitalized, named_mcp, plan_fingerprint,
+        without_call_refs,
     },
     utils::time::now_micros,
 };
@@ -41,6 +42,9 @@ use super::{
 pub(crate) const OPTION_IDS: [&str; MAX_OPTIONS] = ["A", "B", "C", "D"];
 const MAX_TITLE_CHARS: usize = 60;
 const MAX_PARTIAL_FIX_CHARS: usize = 120;
+const MAX_CAUSE_CHARS: usize = 400;
+const MAX_OBSERVATION_CHARS: usize = 300;
+const MAX_PLAN_EVIDENCE: usize = 12;
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
 pub struct PlanAccepted {
@@ -194,7 +198,13 @@ async fn intake_plan(
     let now = now_micros();
     let steps = new_steps(&run, revision, &plan, &connection_ids, now)?;
     let option_ids = option_ids(&plan);
-    let (to, patch) = plan_patch(plan, revision, &fingerprint, now)?;
+    let (to, patch) = plan_patch(
+        plan,
+        revision,
+        &fingerprint,
+        now,
+        run.plan_history.as_deref(),
+    )?;
 
     let txn = db.begin().await?;
     // A plan accepted between the read above and here would make `revision` stale.
@@ -232,7 +242,7 @@ async fn record_outcome(org: &str, run_id: &str, outcome: OutcomeInput) -> Resul
     let to = outcome_target(state, outcome.verdict)?;
     let patch = RunPatch {
         outcome_verdict: Some(Some(outcome.verdict.as_str().to_string())),
-        outcome_explanation: Some(Some(outcome.explanation)),
+        outcome_explanation: Some(Some(without_call_refs(&outcome.explanation))),
         error: Some(None),
         ..Default::default()
     };
@@ -387,23 +397,52 @@ fn new_steps(
     Ok(steps)
 }
 
+/// The run's history with its current plan's approval and check kept, for a replan that clears
+/// them; `None` leaves the history alone (nothing was approved or checked, or no entry to keep it).
+pub(crate) fn history_keeping_attempt(run: &RunRow) -> Option<String> {
+    if run.approved_at_us.is_none() && run.outcome_verdict.is_none() {
+        return None;
+    }
+    let mut revisions: Vec<PlanRevision> =
+        serde_json::from_str(run.plan_history.as_deref()?).ok()?;
+    let entry = revisions.iter_mut().find(|r| r.revision == run.revision)?;
+    entry.attempt = Some(PlanAttempt {
+        option_id: run.chosen_option_id.clone(),
+        approved_by: run.approved_by.clone(),
+        approved_at_us: run.approved_at_us,
+        state: run.state.clone(),
+        verdict: run.outcome_verdict.clone(),
+        explanation: run.outcome_explanation.clone(),
+        ended_at_us: run.ended_at_us,
+    });
+    serde_json::to_string(&revisions).ok()
+}
+
 /// What the run becomes: `no_change` with the missing capability as its explanation when the
-/// plan has no option, else `waiting_approval` until the approval deadline.
+/// plan has no option, else `waiting_approval` until the approval deadline. The plan joins the
+/// run's history either way.
 fn plan_patch(
     plan: PlanInput,
     revision: i32,
     fingerprint: &str,
     now: i64,
+    history: Option<&str>,
 ) -> Result<(RunState, RunPatch), PlanError> {
     let missing = plan
         .options
         .is_empty()
         .then(|| plan.missing_capability.clone())
         .flatten();
+    // An unreadable history restarts rather than refusing the plan.
+    let mut revisions: Vec<PlanRevision> = history
+        .and_then(|h| serde_json::from_str(h).ok())
+        .unwrap_or_default();
+    revisions.push(PlanRevision::of(&plan, revision, now));
     let mut patch = RunPatch {
         revision: Some(revision),
         plan: Some(serde_json::to_string(&plan).map_err(anyhow::Error::from)?),
         plan_fingerprint: Some(fingerprint.to_string()),
+        plan_history: Some(serde_json::to_string(&revisions).map_err(anyhow::Error::from)?),
         error: Some(None),
         updated_at_us: now,
         ..Default::default()
@@ -421,6 +460,20 @@ fn plan_patch(
 /// connection key, and refuses a plan whose steps cannot run as written.
 fn normalise(mut plan: PlanInput) -> Result<PlanInput, PlanError> {
     plan.missing_capability = plan.missing_capability.filter(|c| !c.trim().is_empty());
+    plan.cause = plan
+        .cause
+        .as_deref()
+        .map(|c| cut(&without_call_refs(c), MAX_CAUSE_CHARS))
+        .filter(|c| !c.is_empty());
+    plan.evidence.truncate(MAX_PLAN_EVIDENCE);
+    for item in &mut plan.evidence {
+        item.observation = cut(&without_call_refs(&item.observation), MAX_OBSERVATION_CHARS);
+        item.alternative = item
+            .alternative
+            .as_deref()
+            .map(|a| cut(a, MAX_PARTIAL_FIX_CHARS))
+            .filter(|a| !a.is_empty());
+    }
     if plan.options.is_empty() {
         return match plan.missing_capability {
             Some(_) => Ok(plan),
@@ -428,6 +481,11 @@ fn normalise(mut plan: PlanInput) -> Result<PlanInput, PlanError> {
         };
     }
     for option in &mut plan.options {
+        option.reason = without_call_refs(&option.reason);
+        option.tradeoffs = without_call_refs(&option.tradeoffs);
+        for step in &mut option.steps {
+            step.reason = without_call_refs(&step.reason);
+        }
         option.partial_fix = option
             .partial_fix
             .as_deref()
@@ -581,6 +639,7 @@ mod tests {
             reason: String::new(),
             steps,
             partial_fix: None,
+            confidence: None,
         }
     }
 
@@ -605,6 +664,8 @@ mod tests {
             omitted_count: 1,
             omitted_reason: None,
             missing_capability: missing.map(String::from),
+            cause: None,
+            evidence: Vec::new(),
         }
     }
 
@@ -796,6 +857,114 @@ mod tests {
         for (text, want) in cases {
             assert_eq!(parse_missing_connection(text), want, "{text}");
         }
+    }
+
+    #[test]
+    fn each_accepted_plan_joins_the_history_and_a_bad_history_restarts() {
+        let history = |patch: &RunPatch| -> Vec<(i32, i64, Option<String>, Vec<String>)> {
+            let stored: Vec<PlanRevision> =
+                serde_json::from_str(patch.plan_history.as_deref().unwrap()).unwrap();
+            stored
+                .into_iter()
+                .map(|r| {
+                    let titles = r.options.into_iter().map(|o| o.title).collect();
+                    (r.revision, r.planned_at_us, r.cause, titles)
+                })
+                .collect()
+        };
+        let first = PlanInput {
+            cause: Some("search is throttled".into()),
+            ..plan(vec![plain("Scale search", true)], None)
+        };
+        let (_, patch) = plan_patch(first, 1, "f1", 10, None).unwrap();
+        let after_first = patch.plan_history.clone();
+        let cause = |c: &str| Some(c.to_string());
+        let scale = vec!["Scale search".to_string()];
+        assert_eq!(
+            history(&patch),
+            [(1, 10, cause("search is throttled"), scale.clone())]
+        );
+
+        let second = PlanInput {
+            cause: Some("checkout v42 crashes".into()),
+            ..plan(vec![plain("Roll back checkout", true)], None)
+        };
+        let (_, patch) = plan_patch(second.clone(), 2, "f2", 20, after_first.as_deref()).unwrap();
+        assert_eq!(
+            history(&patch),
+            [
+                (1, 10, cause("search is throttled"), scale),
+                (
+                    2,
+                    20,
+                    cause("checkout v42 crashes"),
+                    vec!["Roll back checkout".to_string()]
+                ),
+            ]
+        );
+
+        let (_, patch) = plan_patch(second, 3, "f3", 30, Some("not json")).unwrap();
+        assert_eq!(history(&patch).len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_replan_keeps_the_approval_and_check_of_the_plan_it_leaves() {
+        use crate::autoresolve::test_support::{ORG, memory_db, new_run};
+        let db = memory_db().await;
+        autoresolve_runs::insert_with(&db, new_run("r1"))
+            .await
+            .unwrap();
+        let first = plan(vec![plain("Scale search", true)], None);
+        let (_, planned) = plan_patch(first, 1, "f1", 10, None).unwrap();
+        let worked = RunPatch {
+            plan_history: planned.plan_history,
+            chosen_option_id: Some(Some("A".into())),
+            approved_by: Some(Some("dana@acme.com".into())),
+            approved_at_us: Some(Some(20)),
+            outcome_verdict: Some(Some("worked".into())),
+            outcome_explanation: Some(Some("lag back to normal".into())),
+            ended_at_us: Some(Some(30)),
+            updated_at_us: 30,
+            ..Default::default()
+        };
+        let from = [RunState::Investigating];
+        autoresolve_runs::set_state_with(&db, ORG, "r1", &from, RunState::Worked, worked)
+            .await
+            .unwrap();
+        let run = autoresolve_runs::get_with(&db, ORG, "r1")
+            .await
+            .unwrap()
+            .unwrap();
+
+        let kept: Vec<PlanRevision> =
+            serde_json::from_str(&history_keeping_attempt(&run).unwrap()).unwrap();
+        let attempt = kept[0].attempt.clone().unwrap();
+        assert_eq!(
+            (
+                attempt.option_id.as_deref(),
+                attempt.approved_by.as_deref(),
+                attempt.approved_at_us,
+                attempt.state.as_str(),
+                attempt.verdict.as_deref(),
+                attempt.ended_at_us,
+            ),
+            (
+                Some("A"),
+                Some("dana@acme.com"),
+                Some(20),
+                "worked",
+                Some("worked"),
+                Some(30)
+            )
+        );
+
+        // A plan corrected while it still waits has nothing to keep.
+        let waiting = RunRow {
+            approved_at_us: None,
+            outcome_verdict: None,
+            ..run
+        };
+        assert_eq!(history_keeping_attempt(&waiting), None);
     }
 
     struct OrgConnections;

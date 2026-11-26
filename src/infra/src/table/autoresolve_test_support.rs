@@ -19,6 +19,7 @@ use sea_orm_migration::{MigrationTrait, SchemaManager};
 use crate::table::migration::{
     autoresolve_corrections_migration_for_test as corrections,
     autoresolve_migration_for_test as migration,
+    autoresolve_plan_history_migration_for_test as plan_history,
 };
 
 /// SQLite, then a fresh Postgres schema when `ZO_META_POSTGRES_DSN` is set; tables created.
@@ -32,6 +33,7 @@ pub(crate) async fn backends() -> Vec<(&'static str, DatabaseConnection, Option<
     for (_, db, _) in &out {
         migration().up(&SchemaManager::new(db)).await.unwrap();
         corrections().up(&SchemaManager::new(db)).await.unwrap();
+        plan_history().up(&SchemaManager::new(db)).await.unwrap();
     }
     out
 }
