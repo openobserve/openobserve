@@ -514,7 +514,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <pre
               v-if="isFunctionErrorOpen"
               class="text-status-warning-text mt-1 break-words whitespace-pre-wrap"
-              >{{ searchObj?.data?.functionError }}</pre>
+              >{{ functionErrorText(searchObj?.data?.functionError) }}</pre>
           </div>
 
           <LogsTableSkeleton v-if="showTableSkeleton" />
@@ -1008,6 +1008,7 @@ import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { functionErrorText } from "@/utils/logs/functionErrorText";
 import { quickModeHiddenFieldCount } from "@/utils/query/quickModeFieldList";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -3259,6 +3260,7 @@ export default defineComponent({
       isFunctionErrorOpen,
       patternsWarnings,
       patternsStale,
+      functionErrorText,
       contextCell,
       contextCellIsStreamField,
       aiEnabled,
