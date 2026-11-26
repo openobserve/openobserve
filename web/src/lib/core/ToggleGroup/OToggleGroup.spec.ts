@@ -1,6 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { h, nextTick, ref } from "vue";
+import { computed, h, nextTick, ref } from "vue";
+
+const breakpoint = vi.hoisted(() => ({ forceMobile: false }));
+vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/useBreakpoint")>();
+  return {
+    ...actual,
+    default: () =>
+      breakpoint.forceMobile
+        ? { ...actual.default(), isMobile: computed(() => true) }
+        : actual.default(),
+  };
+});
+
 import OToggleGroup from "./OToggleGroup.vue";
 import OToggleGroupItem from "./OToggleGroupItem.vue";
 
@@ -425,5 +438,28 @@ describe("OToggleGroup labelled group", () => {
     });
     expect(bare.get('[role="group"]').attributes("aria-describedby")).toBe("line-1");
     expect(bare.get('[role="group"]').attributes("data-test")).toBe("tier");
+  });
+});
+
+describe("OToggleGroup as a mobile dropdown", () => {
+  afterEach(() => {
+    breakpoint.forceMobile = false;
+  });
+
+  it("puts aria-describedby on the dropdown trigger a screen reader enters, once", () => {
+    breakpoint.forceMobile = true;
+    const wrapper = mount(OToggleGroup, {
+      props: { mobileDropdown: true, type: "single", modelValue: "a" },
+      attrs: { "aria-describedby": "line-1", "data-test": "tier" },
+      slots: {
+        default: () => [
+          h(OToggleGroupItem, { value: "a" }, () => "A"),
+          h(OToggleGroupItem, { value: "b" }, () => "B"),
+        ],
+      },
+    });
+    const trigger = wrapper.get('[data-test="tier-dropdown-btn"]');
+    expect(trigger.attributes("aria-describedby")).toBe("line-1");
+    expect(wrapper.findAll("[aria-describedby]")).toHaveLength(1);
   });
 });
