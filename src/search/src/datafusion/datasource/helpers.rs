@@ -23,7 +23,10 @@ use datafusion::{
     common::{DataFusionError, Result, project_schema, stats::Precision},
     datasource::{
         listing::PartitionedFile,
-        physical_plan::{FileGroup, FileScanConfig, parquet::ParquetAccessPlan},
+        physical_plan::{
+            FileGroup, FileScanConfig,
+            parquet::{ParquetAccessPlan, ParquetRowSelection},
+        },
     },
     logical_expr::Operator,
     parquet::arrow::arrow_reader::RowSelection,
@@ -70,11 +73,7 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
     match file_format {
         FileFormat::Parquet => match selection {
             FileSelection::Rows(row_ids) => {
-                if let Some(access_plan) =
-                    generate_parquet_access_plan(file, &row_ids, row_group_size)
-                {
-                    file.extensions.insert(access_plan);
-                }
+                attach_parquet_row_mask(file, &row_ids, row_group_size);
             }
             FileSelection::RowRanges(ranges) => {
                 if let Some(access_plan) = generate_parquet_access_plan_from_ranges(
@@ -115,6 +114,26 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
             // Row-group sampling remains Parquet-only.
             FileSelection::RowGroups(_) => {}
         },
+    }
+}
+
+/// Hand the tantivy bitmap to DataFusion as a file-level mask: it is split by
+/// the real row groups zero-copy, instead of one selector per scattered run.
+fn attach_parquet_row_mask(
+    file: &mut PartitionedFile,
+    row_ids: &BooleanBuffer,
+    row_group_size: Option<u32>,
+) {
+    let Some(num_rows) = exact_num_rows(file) else {
+        return;
+    };
+    if row_ids.len() == num_rows {
+        file.extensions
+            .insert(ParquetRowSelection::new(RowSelection::from_boolean_buffer(
+                row_ids.clone(),
+            )));
+    } else if let Some(access_plan) = generate_parquet_access_plan(file, row_ids, row_group_size) {
+        file.extensions.insert(access_plan);
     }
 }
 
@@ -519,6 +538,51 @@ mod tests {
             RowSelection::from(vec![RowSelector::select(2), RowSelector::skip(2)]),
         );
         assert_eq!(plan, expected);
+    }
+
+    #[test]
+    fn test_attach_parquet_row_mask_passes_bitmap_through() {
+        let mut file = make_partitioned_file(10);
+        let row_ids = BooleanBuffer::from_iter((0..10u32).map(|i| [0u32, 1, 5, 9].contains(&i)));
+
+        attach_parquet_row_mask(&mut file, &row_ids, Some(4));
+
+        assert!(file.extensions.get::<ParquetAccessPlan>().is_none());
+        let selection = file
+            .extensions
+            .get::<ParquetRowSelection>()
+            .expect("row mask should be attached");
+        let mask = selection
+            .selection()
+            .as_mask()
+            .expect("selection is mask-backed");
+        assert_eq!(mask, &row_ids);
+        assert_eq!(mask.inner().as_ptr(), row_ids.inner().as_ptr());
+    }
+
+    #[test]
+    fn test_attach_parquet_row_mask_falls_back_on_length_mismatch() {
+        let mut file = make_partitioned_file(10);
+        let row_ids = BooleanBuffer::from_iter((0..8u32).map(|i| [4u32, 5, 6, 7].contains(&i)));
+
+        attach_parquet_row_mask(&mut file, &row_ids, Some(4));
+
+        assert!(file.extensions.get::<ParquetRowSelection>().is_none());
+        let mut expected = ParquetAccessPlan::new_none(3);
+        expected.scan(1);
+        expected.scan_selection(1, RowSelection::from(vec![RowSelector::select(4)]));
+        assert_eq!(file.extensions.get::<ParquetAccessPlan>(), Some(&expected));
+    }
+
+    #[test]
+    fn test_attach_parquet_row_mask_needs_exact_row_count() {
+        let mut file = PartitionedFile::new("test.parquet".to_string(), 100);
+        let row_ids = BooleanBuffer::from_iter((0..4).map(|i| i == 1));
+
+        attach_parquet_row_mask(&mut file, &row_ids, Some(4));
+
+        assert!(file.extensions.get::<ParquetRowSelection>().is_none());
+        assert!(file.extensions.get::<ParquetAccessPlan>().is_none());
     }
 
     #[tokio::test]
