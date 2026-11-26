@@ -30602,10 +30602,7 @@
     "suggestions": {
       "title": "建议",
       "subtitle": "有空时看看——这些能减少噪音或节省您的时间。"
-    },
-    "previewLabel": "预览",
-    "previewStrip": "使用示例数据预览。此处不会更改你的组织。",
-    "previewHeader": "AutoObserve · 预览"
+    }
   },
   "telephony": {
     "title": "电话",

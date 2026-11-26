@@ -30600,10 +30600,7 @@
     "suggestions": {
       "title": "Suggestions",
       "subtitle": "When you have a minute — these cut noise or save you time."
-    },
-    "previewLabel": "Preview",
-    "previewStrip": "Preview with sample data. Nothing here changes your organization.",
-    "previewHeader": "AutoObserve · Preview"
+    }
   },
   "telephony": {
     "title": "Telephony",

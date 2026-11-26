@@ -30602,10 +30602,7 @@
     "suggestions": {
       "title": "Gợi ý",
       "subtitle": "Khi bạn có chút thời gian — những mục này giúp giảm nhiễu hoặc tiết kiệm thời gian cho bạn."
-    },
-    "previewLabel": "Xem trước",
-    "previewStrip": "Xem trước bằng dữ liệu mẫu. Không có gì ở đây thay đổi tổ chức của bạn.",
-    "previewHeader": "AutoObserve · Xem trước"
+    }
   },
   "telephony": {
     "title": "Điện thoại",

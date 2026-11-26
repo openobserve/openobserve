@@ -30602,10 +30602,7 @@
     "suggestions": {
       "title": "Suggerimenti",
       "subtitle": "Quando hai un minuto — queste riducono il rumore o ti fanno risparmiare tempo."
-    },
-    "previewLabel": "Anteprima",
-    "previewStrip": "Anteprima con dati di esempio. Nulla qui modifica la tua organizzazione.",
-    "previewHeader": "AutoObserve · Anteprima"
+    }
   },
   "telephony": {
     "title": "Telefonia",

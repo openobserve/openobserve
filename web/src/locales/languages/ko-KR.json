@@ -30602,10 +30602,7 @@
     "suggestions": {
       "title": "제안",
       "subtitle": "시간이 되실 때 확인해 보세요 — 노이즈를 줄이거나 시간을 절약해 줍니다."
-    },
-    "previewLabel": "미리보기",
-    "previewStrip": "샘플 데이터로 미리보기. 여기서는 조직에 아무런 변경도 적용되지 않습니다.",
-    "previewHeader": "AutoObserve · 미리보기"
+    }
   },
   "telephony": {
     "title": "전화 통신",

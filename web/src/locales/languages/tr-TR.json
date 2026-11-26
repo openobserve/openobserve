@@ -30602,10 +30602,7 @@
     "suggestions": {
       "title": "Öneriler",
       "subtitle": "Bir dakikanız olduğunda — bunlar gürültüyü azaltır veya size zaman kazandırır."
-    },
-    "previewLabel": "Önizleme",
-    "previewStrip": "Örnek verilerle önizleme. Buradaki hiçbir şey kuruluşunuzu değiştirmez.",
-    "previewHeader": "AutoObserve · Önizleme"
+    }
   },
   "telephony": {
     "title": "Telefon",

@@ -30597,10 +30597,7 @@
     "suggestions": {
       "title": "建議",
       "subtitle": "當您有空時——這些能減少雜訊或節省您的時間。"
-    },
-    "previewLabel": "預覽",
-    "previewStrip": "使用範例資料預覽。這裡的任何操作都不會變更您的組織。",
-    "previewHeader": "AutoObserve · 預覽"
+    }
   },
   "telephony": {
     "title": "電話語音",

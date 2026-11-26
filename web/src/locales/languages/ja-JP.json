@@ -30602,10 +30602,7 @@
     "suggestions": {
       "title": "提案",
       "subtitle": "お時間のあるときに — これらはノイズを削減するか、時間を節約します。"
-    },
-    "previewLabel": "プレビュー",
-    "previewStrip": "サンプルデータでプレビューします。ここでの操作は組織に何も変更を加えません。",
-    "previewHeader": "AutoObserve · プレビュー"
+    }
   },
   "telephony": {
     "title": "電話",

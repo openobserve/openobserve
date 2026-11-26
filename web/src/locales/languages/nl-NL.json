@@ -30602,10 +30602,7 @@
     "suggestions": {
       "title": "Suggesties",
       "subtitle": "Als je even tijd hebt — deze verminderen ruis of besparen je tijd."
-    },
-    "previewLabel": "Voorbeeld",
-    "previewStrip": "Voorbeeld met voorbeeldgegevens. Niets hier wijzigt iets in je organisatie.",
-    "previewHeader": "AutoObserve · Voorbeeld"
+    }
   },
   "telephony": {
     "title": "Telefonie",

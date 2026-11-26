@@ -30602,10 +30602,7 @@
     "suggestions": {
       "title": "اقتراحات",
       "subtitle": "عندما يكون لديك دقيقة — هذه تقلل الضجيج أو توفر وقتك."
-    },
-    "previewLabel": "معاينة",
-    "previewStrip": "معاينة ببيانات نموذجية. لا شيء هنا يغيّر مؤسستك.",
-    "previewHeader": "AutoObserve · معاينة"
+    }
   },
   "telephony": {
     "title": "الاتصال الهاتفي",

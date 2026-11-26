@@ -30602,10 +30602,7 @@
     "suggestions": {
       "title": "Vorschläge",
       "subtitle": "Wenn Sie einen Moment Zeit haben – diese reduzieren Rauschen oder sparen Ihnen Zeit."
-    },
-    "previewLabel": "Vorschau",
-    "previewStrip": "Vorschau mit Beispieldaten. Hier wird nichts in Ihrer Organisation geändert.",
-    "previewHeader": "AutoObserve · Vorschau"
+    }
   },
   "telephony": {
     "title": "Telefonie",

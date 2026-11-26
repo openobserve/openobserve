@@ -30602,10 +30602,7 @@
     "suggestions": {
       "title": "Sugestie",
       "subtitle": "Gdy znajdziesz wolną chwilę — te propozycje ograniczają szum lub oszczędzają czas."
-    },
-    "previewLabel": "Podgląd",
-    "previewStrip": "Podgląd z przykładowymi danymi. Nic tutaj nie zmienia Twojej organizacji.",
-    "previewHeader": "AutoObserve · Podgląd"
+    }
   },
   "telephony": {
     "title": "Telefonia",
