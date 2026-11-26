@@ -1281,22 +1281,25 @@ mod tests {
 
     #[tokio::test]
     async fn the_probe_matches_the_shared_fixture_of_each_role() {
-        let dir = concat!(
+        let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../../web/src/composables/assistant/__fixtures__/capabilities"
+            "/../../../web/src/composables/assistant/__fixtures__/capabilities.roles.json"
         );
+        let raw = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
+        let all: Value = serde_json::from_str(&raw).unwrap();
         for (role, name) in Role::ALL {
-            let path = format!("{dir}/{name}.json");
-            let raw = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
-            let fixture: Value = serde_json::from_str(&raw).unwrap();
+            let fixture = all
+                .get(name)
+                .unwrap_or_else(|| panic!("{path}: missing role {name}"))
+                .clone();
             let mut probed = probe(role).await;
             for key in HISTORY_FLAGS {
                 if fixture.get(key).is_none() {
-                    assert_eq!(probed[key], probed["persistence"], "{name}.json: {key}");
+                    assert_eq!(probed[key], probed["persistence"], "{path}: {name}.{key}");
                     probed.as_object_mut().unwrap().remove(key);
                 }
             }
-            assert_eq!(probed, fixture, "{name}.json drifted from the probe");
+            assert_eq!(probed, fixture, "{path}: {name} drifted from the probe");
         }
     }
 

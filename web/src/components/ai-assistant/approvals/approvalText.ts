@@ -22,6 +22,7 @@ import {
   approvalVerb,
   type ApprovalBlockData,
 } from "@/composables/assistant/pure";
+import type { ContentBlock } from "@/ts/interfaces/chat";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { formatOrgTime } from "@/utils/formatters";
 
@@ -45,6 +46,8 @@ const PAUSE_TIME_FIELDS = new Set(["minutes", "ends_at"]);
 
 // The keys a list entry is known by: a dashboard's tab `name`, a panel's `title`.
 const NAME_KEYS = ["title", "name", "label"];
+
+const DECISION_TYPES: ReadonlySet<ContentBlock["type"]> = new Set(["approval", "approval_result"]);
 
 interface LeafChange {
   path: string[];
@@ -339,4 +342,23 @@ export function approvalActionPhrase(
   if (!verb) return raw(card.tool);
   const entity = t(`assistant.entity.${approvalNoun(card)}`, 2);
   return t(`assistant.approval.actionPhrase.${verb}`, { entity });
+}
+
+/** A decision record follows the prose that proposed it; the model's words stay as written, only the record moves below them. */
+export function decisionsAfterProposal(blocks: readonly ContentBlock[]): ContentBlock[] {
+  const out: ContentBlock[] = [];
+  let held: ContentBlock[] = [];
+  for (const block of blocks) {
+    if (DECISION_TYPES.has(block.type)) {
+      held.push(block);
+      continue;
+    }
+    // Only the text written right after the card is its proposal; anything else ends the run.
+    if (held.length && block.type !== "text") {
+      out.push(...held);
+      held = [];
+    }
+    out.push(block);
+  }
+  return [...out, ...held];
 }

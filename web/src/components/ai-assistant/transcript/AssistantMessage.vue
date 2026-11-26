@@ -450,7 +450,7 @@ import type { ImageAttachment } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatOrgRange } from "@/utils/formatters";
 
-import { decisionsAfterProposal } from "@/components/ai-assistant/approvals/approvalPlacement";
+import { decisionsAfterProposal } from "@/components/ai-assistant/approvals/approvalText";
 
 import AssistantAttachmentBlock from "./AssistantAttachmentBlock.vue";
 import { PROSE_CLASSES } from "./markdownCore";

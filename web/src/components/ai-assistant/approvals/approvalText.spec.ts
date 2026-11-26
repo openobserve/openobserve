@@ -16,9 +16,10 @@
 import { describe, expect, it } from "vitest";
 
 import { approvalOf } from "@/composables/assistant/reducer";
+import type { ContentBlock } from "@/ts/interfaces/chat";
 import { raw, type TranslateFn } from "@/types/i18n";
 
-import { approvalDiffRows, pauseUntil, readableCard } from "./approvalText";
+import { approvalDiffRows, decisionsAfterProposal, pauseUntil, readableCard } from "./approvalText";
 
 const WORDS: Record<string, string> = { "common.yes": "Yes", "common.no": "No" };
 const t = ((key: string, params?: { count?: number }) =>
@@ -233,5 +234,39 @@ describe("B-approvals-rca-P3-1: a gathered pause card", () => {
     expect(pauseUntil(GATHERED, 1_000)).toBe(1_000 + 30 * 60_000);
     expect(pauseUntil({ ...GATHERED, after: undefined }, 1_000)).toBe(1_000 + 30 * 60_000);
     expect(pauseUntil({ args: {}, after: undefined }, 1_000)).toBeNull();
+  });
+});
+
+describe("decisionsAfterProposal (B-approvals-rca-16)", () => {
+  const card: ContentBlock = {
+    type: "approval",
+    approval: approvalOf({
+      type: "confirmation_required",
+      call_id: "c9",
+      tool: "UpdateAlert",
+      kind: "update",
+      targets: [{ type: "alert", id: "a1", name: "update_target" }],
+    }),
+  };
+  const resolved: ContentBlock = {
+    type: "approval_result",
+    resolved: { id: "c9", approved: true, recorded: true, outcome: "done", at: 1 },
+  };
+  const proposal: ContentBlock = {
+    type: "text",
+    text: "I proposed changing the alert's threshold to 4 and its period to 15 minutes.",
+  };
+
+  it("puts the record after the 'I proposed …' text the model wrote after the card, text unchanged", () => {
+    const lead: ContentBlock = { type: "text", text: "Looking up the alert." };
+    const out = decisionsAfterProposal([lead, card, resolved, proposal]);
+    expect(out).toEqual([lead, proposal, card, resolved]);
+    expect(out[1]).toBe(proposal);
+  });
+
+  it("keeps the record before a later step, so it never jumps past what came next", () => {
+    const step: ContentBlock = { type: "tool_call", call_id: "c10", tool: "GetAlert" };
+    expect(decisionsAfterProposal([card, proposal, step])).toEqual([proposal, card, step]);
+    expect(decisionsAfterProposal([card, step, proposal])).toEqual([card, step, proposal]);
   });
 });

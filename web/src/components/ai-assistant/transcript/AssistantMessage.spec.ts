@@ -43,6 +43,7 @@ import {
 import brandLocale from "@/locales/languages/en-US.json";
 
 const brandNames = brandLocale.brand;
+const HISTORY = join(__dirname, "../../../composables/assistant/__fixtures__/history.json");
 
 const { track } = vi.hoisted(() => ({ track: vi.fn() }));
 vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
@@ -591,17 +592,7 @@ describe("AssistantMessage", () => {
   });
 
   it('B-approvals-rca-16: the decided record follows the model\'s "I proposed …" text, as a reloaded chat stores it', () => {
-    const detail = parseChatDetail(
-      JSON.parse(
-        readFileSync(
-          join(
-            __dirname,
-            "../../../composables/assistant/__fixtures__/history/decided-approval.json",
-          ),
-          "utf8",
-        ),
-      ),
-    );
+    const detail = parseChatDetail(JSON.parse(readFileSync(HISTORY, "utf8"))["decided-approval"]);
     const messages = projectRecord(shownTurns(detail, detail.turns as StoredTurn[]), "owner", {
       timezone: "UTC",
       approvals: detail.approvals,
@@ -659,17 +650,7 @@ describe("AssistantMessage", () => {
     };
 
     it("B-shell3-6: a reloaded door follow-up's stored query card keeps the window its step ran on", async () => {
-      const detail = parseChatDetail(
-        JSON.parse(
-          readFileSync(
-            join(
-              __dirname,
-              "../../../composables/assistant/__fixtures__/history/door-followup.json",
-            ),
-            "utf8",
-          ),
-        ),
-      );
+      const detail = parseChatDetail(JSON.parse(readFileSync(HISTORY, "utf8"))["door-followup"]);
       const messages = projectRecord(shownTurns(detail, detail.turns as StoredTurn[]), "owner", {
         timezone: "UTC",
       });
