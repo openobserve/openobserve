@@ -8,6 +8,7 @@ import {
   heatmapYBucketing,
   heatmapYBucketSql,
   heatmapYRangeSql,
+  isNonNumericYField,
   isNumericYField,
 } from "@/utils/dashboard/heatmapYAxis";
 
@@ -525,6 +526,8 @@ function buildBoxplotStatsQuery(queryData: any, dashboardPanelData: any): string
   const stream = queryData.fields.stream;
   const streamAlias = queryData?.joins?.length ? stream : "";
   const valueField = queryData.fields.y.find((field: any) => !field?.isDerived);
+  // Percentiles of a text column fail on the server; panel validation explains why nothing ran.
+  if (isNonNumericYField(valueField, dashboardPanelData)) return "";
   const value = valueField ? buildSQLQueryFromInput(valueField, streamAlias) : "";
   if (!value) return "";
   const category = queryData.fields.x.find((field: any) => !field?.isDerived);

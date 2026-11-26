@@ -10105,6 +10105,7 @@
       "boxplotUpperWhisker": "Upper whisker",
       "boxplotMedian": "Median",
       "boxplotSamples": "Samples",
+      "boxplotValueNotNumeric": "Box plot value must be a numeric field",
       "boxplotOutlier": "Outlier",
       "fieldNotAllowedForDistribution": "{label} field is not allowed for the distribution chart",
       "distributionCount": "Count",

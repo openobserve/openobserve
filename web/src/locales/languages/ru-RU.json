@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "Верхний ус",
       "boxplotMedian": "Медиана",
       "boxplotSamples": "Выборки",
+      "boxplotValueNotNumeric": "Значение диаграммы размаха должно быть числовым полем",
       "boxplotOutlier": "Выброс",
       "fieldNotAllowedForDistribution": "Поле {label} недопустимо для диаграммы распределения",
       "distributionCount": "Количество",
