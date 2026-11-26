@@ -345,38 +345,28 @@ export function select({ repo, base, head }) {
       changed,
     };
   }
-  // The graph stops at web/: outside JSON counts as a change to each web file naming it; anything else runs everything.
+  // The graph stops at web/: outside JSON counts as a change to each web file naming it.
+  // Outside code or an outside glob can hide other consumers, so either one runs everything.
   const outside = new Set(changed.filter((p) => !p.startsWith("web/")));
   const outsideUsers = [];
-  if (outside.size) {
-    // Unchanged outside code can still import a changed file, so it is scanned too.
-    const queue = [...texts].map(([f, t]) => ["web/" + f, t]);
-    const seen = new Set();
-    while (queue.length) {
-      const [from, t] = queue.pop();
+  const nodesOutside = (c) => showFile(repo, head, c) != null;
+  if (outside.size)
+    for (const [f, t] of texts)
       for (const m of t.matchAll(/(["'`])(\.\.?\/[^"'`\s]+)\1/g)) {
-        const p = posix.join(posix.dirname(from), m[2].replace(/[?#].*$/, ""));
+        const spec = m[2].replace(/\?(?:raw|inline|url|worker)$/, "");
+        const p = posix.join("web", posix.dirname(f), spec);
         if (p === "web" || p.startsWith("web/") || p.startsWith("..")) continue;
-        if (/[*{[]|\?(?![a-z])/.test(m[2]))
-          return { ...full(`${from} globs files outside web/: ${m[2]}`), changed };
+        if (/[*?{[]/.test(spec))
+          return { ...full(`${f} globs files outside web/: ${m[2]}`), changed };
         const cands = [p, ...EXTS.map((e) => p + e), ...EXTS.map((e) => `${p}/index${e}`)];
         const hit = cands.find((c) => outside.has(c));
-        if (!hit) {
-          for (const c of cands.filter((c) => PARSED.test(c) && !seen.has(c))) {
-            seen.add(c);
-            const text = showFile(repo, head, c);
-            if (text != null) queue.push([c, text]);
-          }
-          continue;
-        }
-        const f = from.slice(4);
-        if (!from.startsWith("web/") || !hit.endsWith(".json"))
-          return { ...full(`${from} imports a changed file outside web/: ${hit}`), changed };
+        const code = cands.find((c) => PARSED.test(c) && nodesOutside(c));
+        if (code || (hit && !hit.endsWith(".json")))
+          return { ...full(`${f} imports code outside web/: ${hit ?? code}`), changed };
+        if (!hit) continue;
         if (inSetup(f)) return { ...full(`setupTests loads ${f}, which names ${hit}`), changed };
         outsideUsers.push([hit, f]);
       }
-    }
-  }
   const idx = new TextIndex(texts, specs);
   let switchers;
   const localeSwitchers = () =>

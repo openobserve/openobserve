@@ -82,11 +82,9 @@ write({
   "web/src/one.spec.ts": `import { one } from "./one";`,
   "src/config/parity.json": "{}",
   "web/src/utils/parity.spec.ts": `import p from "../../../src/config/parity.json";`,
-  "src/config/shared.ts": "export const s = 1;",
   "src/config/raw.json": "1",
   "web/src/utils/raw.spec.ts": `import r from "../../../src/config/raw.json?inline";`,
   "web/index.html": "<html></html>",
-  "web/src/utils/shared.spec.ts": `import { s } from "../../../src/config/shared";`,
 });
 const base = commit();
 
@@ -133,8 +131,15 @@ test("a changed file outside web/ picks the spec that imports it", () => {
 });
 
 test("a changed code file outside web/ runs everything, since it can re-export other files", () => {
-  const r = run({ "src/config/shared.ts": "export const s = 2;", "web/.prettierignore": "x" });
-  assert.equal(r.reason, "web/src/utils/shared.spec.ts imports a changed file outside web/: src/config/shared.ts");
+  git("checkout", "-q", base);
+  write({
+    "src/config/shared.ts": "export const s = 1;",
+    "web/src/utils/shared.spec.ts": `import { s } from "../../../src/config/shared";`,
+  });
+  const b2 = commit();
+  write({ "src/config/shared.ts": "export const s = 2;", "web/.prettierignore": "x" });
+  const r = select({ repo, base: b2, head: commit() });
+  assert.equal(r.reason, "src/utils/shared.spec.ts imports code outside web/: src/config/shared.ts");
 });
 
 test("a glob over files outside web/ runs everything when an outside file changes", () => {
@@ -143,11 +148,11 @@ test("a glob over files outside web/ runs everything when an outside file change
   const b2 = commit();
   write({ "src/config/parity.json": `{"b":1}`, "web/.prettierignore": "y" });
   const r = select({ repo, base: b2, head: commit() });
-  assert.equal(r.reason, `web/src/utils/cat.spec.ts globs files outside web/: ../../../src/config/*.json`);
+  assert.equal(r.reason, `src/utils/cat.spec.ts globs files outside web/: ../../../src/config/*.json`);
 });
 
 test("globs with ? or [...] over files outside web/ run everything", () => {
-  for (const pat of ["?.json", "[ab].json"]) {
+  for (const pat of ["?.json", "?arity.json", "[ab].json"]) {
     git("checkout", "-q", base);
     write({ "web/src/utils/cat.spec.ts": `const all = import.meta.glob("../../../src/config/${pat}");` });
     const b2 = commit();
@@ -165,7 +170,19 @@ test("outside JSON re-exported by unchanged outside code runs everything", () =>
   const b2 = commit();
   write({ "src/config/parity.json": `{"d":1}`, "web/.prettierignore": "z" });
   const r = select({ repo, base: b2, head: commit() });
-  assert.equal(r.reason, "src/config/bridge.ts imports a changed file outside web/: src/config/parity.json");
+  assert.equal(r.reason, "src/utils/bridge.spec.ts imports code outside web/: src/config/bridge.ts");
+});
+
+test("a chain through outside code back into web/ runs everything", () => {
+  git("checkout", "-q", base);
+  write({
+    "src/config/bridge2.ts": `export * from "../../web/src/utils/data2";`,
+    "web/src/utils/data2.ts": `export const d = "../../../src/config/parity.json";`,
+    "web/src/utils/bridge2.spec.ts": `import "../../../src/config/bridge2";`,
+  });
+  const b2 = commit();
+  write({ "src/config/parity.json": `{"e":1}`, "web/.prettierignore": "w" });
+  assert.equal(select({ repo, base: b2, head: commit() }).mode, "full");
 });
 
 test("a template-literal import of a changed file outside web/ picks its importer", () => {
