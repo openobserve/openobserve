@@ -379,7 +379,7 @@ useShortcuts([
 <template>
   <div
     data-test="navbar-organizations-select"
-    class="max-md:w-24 max-md:min-w-10 max-md:shrink md:max-xl:w-56 md:max-xl:min-w-20"
+    class="max-md:min-w-10 md:max-xl:w-56 md:max-xl:min-w-20"
   >
     <OPopover
       v-model:open="open"
