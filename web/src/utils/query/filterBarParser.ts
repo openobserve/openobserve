@@ -328,6 +328,10 @@ const shorthandValue = (rawValue: string): string => {
   return rawValue.replace(/^(['"])(.*)\1$/, "$2");
 };
 
+/** The name ingestion stores a key under: lower-cased, with anything but letters and digits as `_`. */
+export const flattenedFieldName = (name: string): string =>
+  name.replace(/[^\p{L}\p{N}]/gu, "_").toLowerCase();
+
 export interface ShorthandFilter {
   field: string;
   operator: FilterOperatorId;

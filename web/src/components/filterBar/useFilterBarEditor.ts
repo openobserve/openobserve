@@ -43,7 +43,11 @@ import {
   type FilterOperatorId,
   NUMBER_PATTERN,
 } from "@/utils/query/filterBar";
-import { parseShorthand, type ShorthandFilter } from "@/utils/query/filterBarParser";
+import {
+  flattenedFieldName,
+  parseShorthand,
+  type ShorthandFilter,
+} from "@/utils/query/filterBarParser";
 import { leafConditions } from "./codecs/types";
 import { PLACEHOLDER } from "./codecs/dashboardFilterCodec";
 import { arityFor, type FilterEditorConfig } from "./filterProfiles";
@@ -205,6 +209,13 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   // An operator the field does not offer is picked again, so only an allowed one checks its value.
   const shorthandFits = ({ field, operator, value }: ShorthandFilter) =>
     !allows(field, operator) || fitsField(field, operator, value);
+  // `http.req-id` is stored as `http_req_id`; a name typed as-is wins when the stream has it.
+  const readShorthand = (input: string): ShorthandFilter | null => {
+    const parsed = parseShorthand(input);
+    if (!parsed || fieldMap.value.has(parsed.field)) return parsed;
+    const stored = flattenedFieldName(parsed.field);
+    return fieldMap.value.has(stored) ? { ...parsed, field: stored } : parsed;
+  };
   const numberHint = () =>
     t(variables.value ? "filterBar.numberOrVariable" : "filterBar.numberOnly");
   const arityOf = (id: FilterOperatorId) => arityFor(config.value, id);
@@ -300,7 +311,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const unique = config.value.limits.uniqueFields;
     // Every way to name a field honours one-condition-per-field, not just the picked list.
     const taken = (name: string) => unique && name !== editedField && usedFields.value.has(name);
-    const shorthand = parseShorthand(needle);
+    const shorthand = readShorthand(needle);
     if (shorthand && fieldMap.value.has(shorthand.field) && !taken(shorthand.field)) {
       rows.push({
         key: SHORTHAND_KEY,
@@ -617,7 +628,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   }
 
   function addShorthand() {
-    const shorthand = parseShorthand(text.value.trim());
+    const shorthand = readShorthand(text.value.trim());
     if (!shorthand || !shorthandFits(shorthand)) return;
     const allowed = allows(shorthand.field, shorthand.operator);
     startDraft(shorthand.field);

@@ -197,6 +197,32 @@ describe("QueryFilterBar", () => {
     expect(sql(state)).toBe("level = 'warn'");
   });
 
+  it("maps a dotted or dashed shorthand field to the stored name the stream flattens it to", async () => {
+    const stored = [...fields, { name: "http_req_id", type: "string" as const }];
+    const state = mountBar({ fields: stored });
+    await openBar();
+    await type("http.req-id=abc");
+    await vi.waitFor(() => expect(rowKeys()[0]).toBe("\u0000shorthand"));
+    await press("Enter");
+    expect(sql(state, stored)).toBe("http_req_id = 'abc'");
+  });
+
+  it("maps an upper-case shorthand field to its lower-case stored name", async () => {
+    const stored = [...fields, { name: "http_req_id", type: "string" as const }];
+    const state = mountBar({ fields: stored });
+    await openBar();
+    await type("HTTP.Req_ID=abc");
+    await press("Enter");
+    expect(sql(state, stored)).toBe("http_req_id = 'abc'");
+  });
+
+  it("offers no shorthand row for a dotted name that matches no stored field", async () => {
+    mountBar();
+    await openBar();
+    await type("no.such-field=abc");
+    expect(rowKeys()).not.toContain("\u0000shorthand");
+  });
+
   it("picks several values for is any of and applies on Enter", async () => {
     const state = mountBar();
     await openBar();
