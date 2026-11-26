@@ -3053,6 +3053,7 @@ export default defineComponent({
             autoRun.notePanelScopeApplied();
             // run query
             await copyDashboardDataToVisualize(togglePanelRun);
+            if (togglePanelRun === null && hasReusableData) autoRun.noteReusedPanelResult();
 
             // Clear the restoration flag after all operations are complete
             await nextTick();

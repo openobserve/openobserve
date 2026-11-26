@@ -665,6 +665,12 @@ function createLogsAutoRun() {
     return generation.id;
   }
 
+  function noteReusedPanelResult(): void {
+    if (panelSurface() !== "visualize") return;
+    const signature = currentPanelSignature();
+    if (signature !== null) engine.recordReusedPanel(signature);
+  }
+
   function markPanelFailed(): void {
     if (panelRun) panelRun.failed = true;
   }
@@ -775,6 +781,7 @@ function createLogsAutoRun() {
     executedTimeMatches,
     hasPanelRun,
     openToggleChartRun,
+    noteReusedPanelResult,
     panelSignature: (surface: "visualize" | "build") =>
       panelConfigReader
         ? panelConfigSignature(panelConfigReader(surface), readLogsSignature(searchObj()))
