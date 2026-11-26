@@ -479,18 +479,13 @@ export default defineComponent({
     const nodesOf = (seriesIndex: number) =>
       chart?.getModel()?.getSeriesByIndex(seriesIndex)?.getData();
     const pressNode = (params: ECElementEvent) => {
-      const at =
-        props.data?.extras?.nodeGraph && params?.dataType === "node"
-          ? nodesOf(params.seriesIndex)?.getItemLayout(params.dataIndex)
+      const { seriesIndex, dataIndex, name } = params;
+      const at: number[] | undefined =
+        props.data?.extras?.nodeGraph && params.dataType === "node" && seriesIndex !== undefined
+          ? nodesOf(seriesIndex)?.getItemLayout(dataIndex)
           : undefined;
-      pressedNode = at
-        ? {
-            seriesIndex: params.seriesIndex,
-            dataIndex: params.dataIndex,
-            name: params.name,
-            at: [...at],
-          }
-        : null;
+      pressedNode =
+        at && seriesIndex !== undefined ? { seriesIndex, dataIndex, name, at: [...at] } : null;
     };
     // A restore or resize redraws from the options, so the drop must be written into them.
     const keepDroppedNode = () => {
