@@ -24,10 +24,7 @@ export default class DashboardLogsPanel {
     ].join(", ");
   }
 
-  /**
-   * Read or reset the list's scroll container (the element inside the table that scrolls vertically).
-   * @param {"read"|"top"} op - "read" returns {scrollTop, maxScrollTop}; "top" scrolls to the first row
-   */
+  /** op "read" returns {scrollTop, maxScrollTop} of the list's scroller; "top" first scrolls it to the first row. */
   async _scroller(op) {
     return this.table.evaluate((table, op) => {
       const scroller = [...table.querySelectorAll("*")].find(
@@ -64,10 +61,8 @@ export default class DashboardLogsPanel {
     return labels.map((label) => label.trim()).filter(Boolean);
   }
 
-  /**
-   * The rendered rows in data order (the table is virtual, so only rows near the viewport exist).
-   * Each entry has the row's data index, every cell's text by column id, and its severity rail colour.
-   */
+  // Rendered rows in data order, each with its index, cell texts by column id and rail colour.
+  // The table is virtual, so only rows near the viewport exist.
   async getRenderedRows() {
     return this.rows.evaluateAll(
       (trs, { cellPrefix, rowPrefix }) =>
@@ -105,10 +100,8 @@ export default class DashboardLogsPanel {
     return this.rowWithText(text).evaluate((tr) => tr.getBoundingClientRect().height);
   }
 
-  /**
-   * Click the row whose message contains `text` and wait until exactly one JSON preview is open. The panel closes open
-   * rows whenever its result reloads, so the click is repeated until the preview stays open.
-   */
+  // Open the row's JSON preview. The panel closes open rows whenever its result reloads,
+  // so the click is retried until the preview stays open.
   async openRow(text) {
     await expect(async () => {
       if ((await this.jsonPreviews.count()) === 0) await this.rowWithText(text).click();

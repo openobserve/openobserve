@@ -2441,12 +2441,8 @@ export default class DashboardPanelConfigs {
     return this.page.locator(`[data-test="${this.logsFieldIds[field]}-input"]`);
   }
 
-  /**
-   * Set a Logs panel field picker by choosing the column from its list, or clear it with an empty value
-   * (empty means "Default (auto from data)"). A name the list does not offer is committed as typed.
-   * @param {"message"|"level"|"time"} field
-   * @param {string} column
-   */
+  // Set a Logs field picker ("message" | "level" | "time") to `column`; "" clears it back to Default.
+  // A name the list does not offer is committed as typed.
   async setLogsField(field, column) {
     const id = this.logsFieldIds[field];
     const input = this.logsFieldInput(field);

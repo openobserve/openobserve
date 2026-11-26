@@ -149,24 +149,16 @@ export const ingestionHighCardinality = async (
   return await fetchResponse.json();
 };
 
-// Logs panel rows this worker has ingested, keyed by org:stream; reused while they are still inside a 15-minute window.
+// Runs this worker ingested, keyed by org:stream. Reused for 8 minutes, well inside a panel's default 15-minute range.
 const logsPanelRuns = new Map();
 const LOGS_PANEL_RUN_MAX_AGE_MS = 8 * 60 * 1000;
+export const LOGS_PANEL_STREAM = "e2e_logs_panel";
 export const LOGS_PANEL_LEVELS = ["info", "warn", "error", "debug"];
 export const LOGS_PANEL_ROW_COUNT = 30;
 
-/**
- * Ingest known log lines for the Logs panel specs. Every row carries the same `run_id`, so a spec can scope its SQL to
- * this ingestion and ignore rows other workers or earlier runs left in the stream.
- *
- * Plain rows (kind = "row"): seq 0..29, one second apart and newest first (seq 0 is the newest), with
- * level cycling info/warn/error/debug, lvl = "err"/"warn", status 500 on every fifth row, and the same instant
- * copied into ts_ms (epoch ms number) and ts_ns (epoch ns string).
- * Special rows (kind = "special"), older than every plain row: three XSS payloads, a JSON message and a long line.
- *
- * @returns {Promise<{runId: string, baseMs: number}>} baseMs is the _timestamp (ms) of seq 0
- */
-export const ingestionForLogsPanel = async (page, streamName = "e2e_logs_panel") => {
+// Seed rows tagged with one run_id so a spec's SQL only sees this ingestion. kind "row": seq 0 (newest) to 29, 1 s apart;
+// kind "special" (older): XSS payloads (seq 100-102), a JSON message (103) and a 2,000-character line (104).
+export const ingestionForLogsPanel = async (page, streamName = LOGS_PANEL_STREAM) => {
   if (!process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
@@ -221,6 +213,21 @@ export const ingestionForLogsPanel = async (page, streamName = "e2e_logs_panel")
   testLogger.info("Logs panel stream ingested", { streamName, runId, rows: records.length });
   return run;
 };
+
+// SQL and expected values for the rows ingestionForLogsPanel writes.
+export const logsPanelStarterSql = (stream = LOGS_PANEL_STREAM, order = "DESC") =>
+  `SELECT * FROM "${stream}" ORDER BY _timestamp ${order} LIMIT 100`;
+export const logsPanelRowsSql = (runId, { limit = 10, order = "DESC" } = {}) =>
+  `SELECT * FROM "${LOGS_PANEL_STREAM}" WHERE run_id = '${runId}' AND kind = 'row' ORDER BY _timestamp ${order} LIMIT ${limit}`;
+export const logsPanelSeqSql = (runId, seqs) =>
+  `SELECT * FROM "${LOGS_PANEL_STREAM}" WHERE run_id = '${runId}' AND (${seqs.map((seq) => `seq = ${seq}`).join(" OR ")}) ORDER BY _timestamp DESC LIMIT 10`;
+export const logsPanelNoRowsSql = () => `SELECT * FROM "${LOGS_PANEL_STREAM}" WHERE run_id = 'no_such_run' LIMIT 10`;
+export const logsPanelInvalidSql = () => `SELEC * FRM "${LOGS_PANEL_STREAM}"`;
+export const LOGS_PANEL_XSS_SEQS = [100, 101, 102];
+export const LOGS_PANEL_LONG_SEQ = 104;
+/** Messages of plain rows `from`..`to` in that order (either direction). */
+export const logsPanelMessages = (from, to) =>
+  Array.from({ length: Math.abs(to - from) + 1 }, (_, i) => `logs-panel row ${from <= to ? from + i : from - i}`);
 
 // Dashboard maps ingestion
 

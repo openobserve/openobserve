@@ -4,7 +4,19 @@ const {
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
 import PageManager from "../../pages/page-manager";
-import { ingestion, ingestionForLogsPanel } from "./utils/dashIngestion.js";
+import {
+  ingestion,
+  ingestionForLogsPanel,
+  LOGS_PANEL_STREAM as STREAM,
+  LOGS_PANEL_XSS_SEQS,
+  LOGS_PANEL_LONG_SEQ,
+  logsPanelStarterSql,
+  logsPanelRowsSql,
+  logsPanelSeqSql,
+  logsPanelNoRowsSql,
+  logsPanelInvalidSql,
+  logsPanelMessages,
+} from "./utils/dashIngestion.js";
 import { cleanupTestDashboard, setupTestDashboard } from "./utils/dashCreation.js";
 import {
   generateDashboardName,
@@ -14,12 +26,10 @@ import {
 } from "./utils/configPanelHelpers.js";
 const testLogger = require("../utils/test-logger.js");
 
-// Feature: Logs panel type (PR #15927) — a read-only log list from a custom SQL query, drawn with the Logs page's
-// table, highlighter, severity rail and JSON preview. Options: message, level and time field, order, show time,
-// wrap lines and prettify JSON. Known open bugs are tracked in #17298.
+// Feature: Logs panel type (PR #15927), a log list from custom SQL with field, order, time, wrap and JSON options.
+// Known open bugs are tracked in #17298.
 
-const STREAM = "e2e_logs_panel";
-const STARTER_SQL = `SELECT * FROM "${STREAM}" ORDER BY _timestamp DESC LIMIT 100`;
+const STARTER_SQL = logsPanelStarterSql();
 
 // Option labels (en-US) and the OSelect value of an option left on Default.
 const DEFAULT_CHOICE = "__default__";
@@ -33,12 +43,6 @@ const TIME_CELL = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/;
 // Severity rail per ingested level; the rail names warn "warning".
 const RAIL_BY_LEVEL = { info: "info", warn: "warning", error: "error", debug: "debug" };
 const RAIL_BY_LVL = { err: "error", warn: "warning" };
-
-/** Plain rows of this run, `limit` of them, newest first unless `order` says otherwise. */
-const rowsSql = (runId, { limit = 10, order = "DESC", where = "" } = {}) =>
-  `SELECT * FROM "${STREAM}" WHERE run_id = '${runId}' AND kind = 'row'${where} ORDER BY _timestamp ${order} LIMIT ${limit}`;
-const rowMessages = (seqs) => seqs.map((seq) => `logs-panel row ${seq}`);
-const range = (from, to) => Array.from({ length: Math.abs(to - from) + 1 }, (_, i) => (from <= to ? from + i : from - i));
 
 test.describe.configure({ mode: "parallel" });
 
@@ -107,19 +111,19 @@ test.describe("ConfigPanel — Logs Panel Settings", () => {
       const logsPanel = pm.dashboardLogsPanel;
       const dashboardName = generateDashboardName();
 
-      await setupLogsPanelWithConfig(page, pm, dashboardName, { streamName: STREAM, sql: rowsSql(run.runId, { limit: 8 }) });
+      await setupLogsPanelWithConfig(page, pm, dashboardName, { streamName: STREAM, sql: logsPanelRowsSql(run.runId, { limit: 8 }) });
       await logsPanel.waitForRows(8);
       await logsPanel.scrollToTop();
 
       const rows = await logsPanel.getRenderedRows();
-      expect(rows.map((row) => row.cells.message)).toEqual(rowMessages(range(0, 7)));
+      expect(rows.map((row) => row.cells.message)).toEqual(logsPanelMessages(0, 7));
 
       // Rows are one second apart, newest first.
       const seconds = rows.map((row) => Number(row.cells._timestamp.slice(17, 19)));
       seconds.slice(1).forEach((second, i) => expect((seconds[i] - second + 60) % 60).toBe(1));
 
       // Levels cycle info, warn, error, debug from row 0.
-      for (const seq of range(0, 3)) {
+      for (const seq of [0, 1, 2, 3]) {
         const level = ["info", "warn", "error", "debug"][seq];
         expect(await logsPanel.getRailLevel(`logs-panel row ${seq}`)).toBe(RAIL_BY_LEVEL[level]);
       }
@@ -142,20 +146,20 @@ test.describe("ConfigPanel — Logs Panel Settings", () => {
 
       // The starter fetches newest rows; reversing those would never show the oldest, so its ORDER BY is rewritten.
       await configs.selectLogsOrder("Oldest first");
-      await selector.expectQueryEditorText(STARTER_SQL.replace("DESC", "ASC"));
+      await selector.expectQueryEditorText(logsPanelStarterSql(STREAM, "ASC"));
       await configs.selectLogsOrder(ORDER_LABELS[0]);
       await selector.expectQueryEditorText(STARTER_SQL);
 
       // A query the user wrote keeps its SQL; the order only sorts the rows it returns.
-      const editedSql = rowsSql(run.runId, { limit: 5 });
+      const editedSql = logsPanelRowsSql(run.runId, { limit: 5 });
       await selector.enterCustomSQL(editedSql);
       await pm.dashboardPanelActions.applyAndWaitForSqlQuery();
       await logsPanel.waitForRows(5);
-      await expect.poll(() => logsPanel.getMessages()).toEqual(rowMessages(range(0, 4)));
+      await expect.poll(() => logsPanel.getMessages()).toEqual(logsPanelMessages(0, 4));
 
       await configs.selectLogsOrder("Oldest first");
       await configs.expectConfigSelectValue(configs.logsOrderTrigger, "oldest");
-      await expect.poll(() => logsPanel.getMessages()).toEqual(rowMessages(range(4, 0)));
+      await expect.poll(() => logsPanel.getMessages()).toEqual(logsPanelMessages(4, 0));
       await selector.expectQueryEditorText(editedSql);
 
       await pm.dashboardPanelActions.savePanel();
@@ -163,11 +167,11 @@ test.describe("ConfigPanel — Logs Panel Settings", () => {
       await reopenPanelConfig(page, pm);
       await configs.expectConfigSelectValue(configs.logsOrderTrigger, "oldest");
       await logsPanel.waitForRows(5);
-      await expect.poll(() => logsPanel.getMessages()).toEqual(rowMessages(range(4, 0)));
+      await expect.poll(() => logsPanel.getMessages()).toEqual(logsPanelMessages(4, 0));
 
       await configs.selectLogsOrder(ORDER_LABELS[0]);
       await configs.expectConfigSelectValue(configs.logsOrderTrigger, DEFAULT_CHOICE);
-      await expect.poll(() => logsPanel.getMessages()).toEqual(rowMessages(range(0, 4)));
+      await expect.poll(() => logsPanel.getMessages()).toEqual(logsPanelMessages(0, 4));
       await pm.dashboardPanelActions.savePanel();
       await cleanupTestDashboard(page, pm, dashboardName);
     }
@@ -182,9 +186,9 @@ test.describe("ConfigPanel — Logs Panel Settings", () => {
       const actions = pm.dashboardPanelActions;
       const logsPanel = pm.dashboardLogsPanel;
       const dashboardName = generateDashboardName();
-      const seqs = range(0, 5);
+      const seqs = [0, 1, 2, 3, 4, 5];
 
-      await setupLogsPanelWithConfig(page, pm, dashboardName, { streamName: STREAM, sql: rowsSql(run.runId, { limit: 6 }) });
+      await setupLogsPanelWithConfig(page, pm, dashboardName, { streamName: STREAM, sql: logsPanelRowsSql(run.runId, { limit: 6 }) });
       await logsPanel.waitForRows(6);
       await logsPanel.scrollToTop();
       const autoTimes = (await logsPanel.getRenderedRows()).map((row) => row.cells._timestamp);
@@ -201,7 +205,7 @@ test.describe("ConfigPanel — Logs Panel Settings", () => {
         expect(rows.map((row) => row.cells.svc)).toEqual(seqs.map((seq) => `svc-${seq % 3}`));
         // ts_ms holds the same instant as _timestamp, so the shown times are identical.
         expect(rows.map((row) => row.cells.ts_ms)).toEqual(autoTimes);
-        for (const seq of range(0, 1)) {
+        for (const seq of [0, 1]) {
           expect(await logsPanel.getRailLevel(`svc-${seq % 3}`)).toBe(RAIL_BY_LVL[seq % 2 === 0 ? "err" : "warn"]);
         }
       };
@@ -249,7 +253,7 @@ test.describe("ConfigPanel — Logs Panel Settings", () => {
       const logsPanel = pm.dashboardLogsPanel;
       const dashboardName = generateDashboardName();
       // Row 0 and the 2,000-character line.
-      const sql = `SELECT * FROM "${STREAM}" WHERE run_id = '${run.runId}' AND (seq = 0 OR seq = 104) ORDER BY _timestamp DESC LIMIT 10`;
+      const sql = logsPanelSeqSql(run.runId, [0, LOGS_PANEL_LONG_SEQ]);
 
       await setupLogsPanelWithConfig(page, pm, dashboardName, { streamName: STREAM, sql });
       await logsPanel.waitForRows(2);
@@ -299,7 +303,7 @@ test.describe("ConfigPanel — Logs Panel Settings", () => {
       const logsPanel = pm.dashboardLogsPanel;
       const dashboardName = generateDashboardName();
       const payloads = ["XSS-IMG", "XSS-SVG", "XSS-SCRIPT"];
-      const sql = `SELECT * FROM "${STREAM}" WHERE run_id = '${run.runId}' AND kind = 'special' AND seq <= 102 ORDER BY _timestamp DESC LIMIT 10`;
+      const sql = logsPanelSeqSql(run.runId, LOGS_PANEL_XSS_SEQS);
 
       await setupLogsPanelWithConfig(page, pm, dashboardName, { streamName: STREAM, sql });
       await logsPanel.waitForRows(3);
@@ -343,7 +347,7 @@ test.describe("ConfigPanel — Logs Panel Settings", () => {
       const selector = pm.chartTypeSelector;
       const logsPanel = pm.dashboardLogsPanel;
       const dashboardName = generateDashboardName();
-      const sql = rowsSql(run.runId, { limit: 4 });
+      const sql = logsPanelRowsSql(run.runId, { limit: 4 });
 
       await setupLogsPanelWithConfig(page, pm, dashboardName, { streamName: STREAM, sql });
       await logsPanel.waitForRows(4);
@@ -381,16 +385,16 @@ test.describe("ConfigPanel — Logs Panel Settings", () => {
 
       await setupLogsPanelWithConfig(page, pm, dashboardName, {
         streamName: STREAM,
-        sql: `SELECT * FROM "${STREAM}" WHERE run_id = 'no_such_run' LIMIT 10`,
+        sql: logsPanelNoRowsSql(),
       });
       await expect(logsPanel.noData.first()).toBeVisible({ timeout: 30000 });
       await expect(logsPanel.table).toHaveCount(0);
 
-      await selector.enterCustomSQL(`SELEC * FRM "${STREAM}"`);
+      await selector.enterCustomSQL(logsPanelInvalidSql());
       await actions.applyAndWaitForSqlQuery();
       await expect(actions.dashboardErrorItems.first()).toContainText("ParserError", { timeout: 30000 });
 
-      await selector.enterCustomSQL(rowsSql(run.runId, { limit: 3 }));
+      await selector.enterCustomSQL(logsPanelRowsSql(run.runId, { limit: 3 }));
       await actions.applyAndWaitForSqlQuery();
       await logsPanel.waitForRows(3);
       await expect(actions.dashboardErrorItems).toHaveCount(0);
@@ -408,7 +412,7 @@ test.describe("ConfigPanel — Logs Panel Settings", () => {
       const logsPanel = pm.dashboardLogsPanel;
       const dashboardName = generateDashboardName();
 
-      await setupLogsPanelWithConfig(page, pm, dashboardName, { streamName: STREAM, sql: rowsSql(run.runId, { limit: 30 }) });
+      await setupLogsPanelWithConfig(page, pm, dashboardName, { streamName: STREAM, sql: logsPanelRowsSql(run.runId, { limit: 30 }) });
       await pm.dashboardPanelActions.savePanel();
       await page.reload();
       await logsPanel.waitForRows();
@@ -433,7 +437,7 @@ test.describe("ConfigPanel — Logs Panel Settings", () => {
       await selector.selectStreamType("logs");
       await selector.selectStream("e2e_automate");
       await selector.selectChartType("logs");
-      await selector.expectQueryEditorText(`SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC LIMIT 100`);
+      await selector.expectQueryEditorText(logsPanelStarterSql("e2e_automate"));
       await selector.selectStream(STREAM);
       await selector.expectQueryEditorText(STARTER_SQL);
       expect(await selector.getQueryEditorText()).not.toContain("e2e_automate");

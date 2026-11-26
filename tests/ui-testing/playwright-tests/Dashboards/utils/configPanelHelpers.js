@@ -6,7 +6,7 @@
 
 import * as crypto from "crypto";
 import { setupTestDashboard, deleteDashboard } from "./dashCreation.js";
-import { ingestionForMaps, ingestionForStateTimeline } from "./dashIngestion.js";
+import { ingestionForMaps, ingestionForStateTimeline, LOGS_PANEL_STREAM, logsPanelStarterSql } from "./dashIngestion.js";
 import testLogger from '../../utils/test-logger.js';
 
 // ---------------------------------------------------------------------------
@@ -385,7 +385,7 @@ export async function setupBoxplotPanelWithConfig(page, pm, dashboardName, {
 // seeded from the stream selected when Logs is picked. sql = null keeps that starter; any other SQL replaces it.
 export async function setupLogsPanelWithConfig(page, pm, dashboardName, {
   panelName = "Test Panel",
-  streamName = "e2e_logs_panel",
+  streamName = LOGS_PANEL_STREAM,
   sql = null,
 } = {}) {
   await setupTestDashboard(page, pm, dashboardName);
@@ -393,9 +393,7 @@ export async function setupLogsPanelWithConfig(page, pm, dashboardName, {
   await pm.chartTypeSelector.selectStreamType("logs");
   await pm.chartTypeSelector.selectStream(streamName);
   await pm.chartTypeSelector.selectChartType("logs");
-  await pm.chartTypeSelector.expectQueryEditorText(
-    `SELECT * FROM "${streamName}" ORDER BY _timestamp DESC LIMIT 100`
-  );
+  await pm.chartTypeSelector.expectQueryEditorText(logsPanelStarterSql(streamName));
   if (sql) {
     await pm.chartTypeSelector.enterCustomSQL(sql);
     await pm.chartTypeSelector.expectQueryEditorText(sql);

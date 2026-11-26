@@ -415,11 +415,8 @@ export default class DashboardactionPage {
     return response;
   }
 
-  /**
-   * Click Apply and wait for the SQL query it starts (_search_stream) to finish. Apply stays enabled for a moment after
-   * the click, so waitForChartToRender alone can pass before the query starts, and the result then lands later.
-   * An Apply that runs no query (nothing changed) only waits for the button to settle.
-   */
+  // Apply, then wait for its _search_stream query: Apply stays enabled briefly after the click,
+  // so waitForChartToRender alone can pass before the query even starts.
   async applyAndWaitForSqlQuery() {
     const searchRequest = this.page
       .waitForRequest((req) => new URL(req.url()).pathname.endsWith("/_search_stream"), { timeout: 5000 })
