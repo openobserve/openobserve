@@ -67,7 +67,7 @@ pub enum AckOutcome {
 
 impl AckOutcome {
     /// Where `record` stands for `clicker`, given whether their ack just won. [pure] [no-fail]
-    pub fn of(record: &Page, clicker: &str, this_click: bool) -> Self {
+    pub fn of(record: &Page, clicker: &str, this_click: bool, acker_name: Option<&str>) -> Self {
         match record.state {
             ResponseState::Resolved => Self::Resolved,
             ResponseState::Triggered | ResponseState::Triaged => Self::NotAcked,
@@ -78,8 +78,13 @@ impl AckOutcome {
                         ladder_finished_at: record.exhausted_at.filter(|&e| e <= at),
                     }
                 }
+                // The name a person knows them by; the email only for a user with no name.
                 _ => Self::AlreadyAcked {
-                    by: record.acked_by.clone(),
+                    by: acker_name
+                        .map(str::trim)
+                        .filter(|n| !n.is_empty())
+                        .map(str::to_string)
+                        .or_else(|| record.acked_by.clone()),
                 },
             },
         }
@@ -110,9 +115,10 @@ pub fn get_html(
     facts: &PageFacts,
     record: &Page,
     clicker: &str,
+    acker_name: Option<&str>,
     open_url: &str,
 ) -> String {
-    match AckOutcome::of(record, clicker, false) {
+    match AckOutcome::of(record, clicker, false, acker_name) {
         AckOutcome::NotAcked => confirm_html(org_id, token, facts),
         settled => outcome_html(facts, &settled, open_url),
     }
@@ -319,7 +325,7 @@ mod tests {
             ),
         ];
         for (record, this_click, want) in cases {
-            assert_eq!(AckOutcome::of(&record, "ana@o2.ai", this_click), want);
+            assert_eq!(AckOutcome::of(&record, "ana@o2.ai", this_click, None), want);
         }
     }
 
@@ -331,7 +337,7 @@ mod tests {
         let finished = at - 50 * 60 * 1_000_000;
         let mut record = page(ResponseState::Acknowledged, Some("ana@o2.ai"), Some(at));
         record.exhausted_at = Some(finished);
-        let outcome = AckOutcome::of(&record, "ana@o2.ai", true);
+        let outcome = AckOutcome::of(&record, "ana@o2.ai", true, None);
         assert_eq!(
             outcome,
             AckOutcome::AckedNow {
@@ -352,7 +358,7 @@ mod tests {
     #[test]
     fn test_a_failed_ack_never_reads_as_success() {
         let record = page(ResponseState::Triggered, None, None);
-        let outcome = AckOutcome::of(&record, "ana@o2.ai", false);
+        let outcome = AckOutcome::of(&record, "ana@o2.ai", false, None);
         assert_eq!(outcome, AckOutcome::NotAcked);
         let html = outcome_html(&PageFacts::of(&record, None), &outcome, "https://o2/r1");
         assert!(html.contains("<h1>Not acknowledged yet.</h1>"));
@@ -419,6 +425,7 @@ mod tests {
                 &facts,
                 &record,
                 "ana@o2.ai",
+                None,
                 "https://o2/r1",
             );
             match settled {
@@ -432,6 +439,30 @@ mod tests {
                 }
                 None => assert!(html.contains(r#"action="/api/v2/default/oncall/ack""#)),
             }
+        }
+    }
+
+    /// The page names whoever acknowledged it; their email only when they have no name.
+    #[test]
+    fn test_an_acknowledged_page_names_its_acknowledger() {
+        let at = 1_700_000_000_000_000;
+        let record = page(ResponseState::Acknowledged, Some("bob@o2.ai"), Some(at));
+        let cases = [
+            (Some("Bob Lee"), "Already acknowledged by Bob Lee"),
+            (Some(" "), "Already acknowledged by bob@o2.ai"),
+            (None, "Already acknowledged by bob@o2.ai"),
+        ];
+        for (name, want) in cases {
+            let html = get_html(
+                "default",
+                "t.k",
+                &PageFacts::of(&record, None),
+                &record,
+                "ana@o2.ai",
+                name,
+                "https://o2/r1",
+            );
+            assert!(html.contains(want), "{name:?}: missing `{want}`");
         }
     }
 

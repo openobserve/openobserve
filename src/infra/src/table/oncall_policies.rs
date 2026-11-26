@@ -105,13 +105,17 @@ fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
             destinations,
             l0,
             template: m.template,
+            saved_by_person: m.saved_by_person,
         },
         Err(e) => {
             log::error!(
                 "[ONCALL] policy {} has unparseable rungs, falling back to defaults: {e}",
                 m.id
             );
-            EscalationPolicy::whole_team_fallback(m.id, m.org_id, m.team_id)
+            EscalationPolicy {
+                saved_by_person: m.saved_by_person,
+                ..EscalationPolicy::whole_team_fallback(m.id, m.org_id, m.team_id)
+            }
         }
     }
 }
@@ -197,6 +201,7 @@ async fn insert(policy: &EscalationPolicy) -> Result<EscalationPolicy, errors::E
         destinations: Set(serde_json::to_string(&policy.destinations)?),
         l0_json: Set(serde_json::to_string(&policy.l0)?),
         template: Set(policy.template.clone()),
+        saved_by_person: Set(policy.saved_by_person),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -224,11 +229,10 @@ pub async fn update_rungs(
     // `None` means **unchanged**, never reset: this column is the only copy of a team's L0 block.
     l0: Option<&config::meta::oncall::L0Policy>,
 ) -> Result<Option<EscalationPolicy>, errors::Error> {
-    update_policy(org_id, team_id, rungs, destinations, l0, None).await
+    write_policy(org_id, team_id, rungs, destinations, l0, None, false).await
 }
 
-/// `update_rungs` that also sets (`Some(Some)`) or clears (`Some(None)`) the template override in
-/// the same write, so a concurrent save cannot pair one request's rungs with another's template.
+/// A person's save (`PUT /policy`): also marks the ladder saved; `Some(None)` clears the template.
 pub async fn update_policy(
     org_id: &str,
     team_id: &str,
@@ -237,30 +241,7 @@ pub async fn update_policy(
     l0: Option<&config::meta::oncall::L0Policy>,
     template: Option<Option<&str>>,
 ) -> Result<Option<EscalationPolicy>, errors::Error> {
-    let client = get_orm_client_rw().await;
-    let Some(existing) = oncall_policies::Entity::find()
-        .filter(oncall_policies::Column::OrgId.eq(org_id))
-        .filter(oncall_policies::Column::TeamId.eq(team_id))
-        .one(client)
-        .await?
-    else {
-        return Ok(None);
-    };
-    let mut model: oncall_policies::ActiveModel = existing.into();
-    model.rungs = Set(serde_json::to_string(rungs)?);
-    if let Some(d) = destinations {
-        model.destinations = Set(serde_json::to_string(d)?);
-    }
-    if let Some(l0) = l0 {
-        model.l0_json = Set(serde_json::to_string(l0)?);
-    }
-    if let Some(template) = template {
-        model.template = Set(template.map(str::to_string));
-    }
-    model.updated_at = Set(now_micros());
-    let updated = to_policy(model.update(client).await?);
-    invalidate_and_publish(org_id, team_id).await;
-    Ok(Some(updated))
+    write_policy(org_id, team_id, rungs, destinations, l0, template, true).await
 }
 
 /// Sets or clears the team's template override; false when the team has no policy row.
@@ -359,6 +340,46 @@ pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<bool, errors:
     Ok(deleted > 0)
 }
 
+/// One write, so a concurrent save cannot pair one request's rungs with another's template.
+async fn write_policy(
+    org_id: &str,
+    team_id: &str,
+    rungs: &[PriorityRung],
+    destinations: Option<&[String]>,
+    l0: Option<&config::meta::oncall::L0Policy>,
+    template: Option<Option<&str>>,
+    saved_by_person: bool,
+) -> Result<Option<EscalationPolicy>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let Some(existing) = oncall_policies::Entity::find()
+        .filter(oncall_policies::Column::OrgId.eq(org_id))
+        .filter(oncall_policies::Column::TeamId.eq(team_id))
+        .one(client)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let mut model: oncall_policies::ActiveModel = existing.into();
+    model.rungs = Set(serde_json::to_string(rungs)?);
+    if let Some(d) = destinations {
+        model.destinations = Set(serde_json::to_string(d)?);
+    }
+    if let Some(l0) = l0 {
+        model.l0_json = Set(serde_json::to_string(l0)?);
+    }
+    if let Some(template) = template {
+        model.template = Set(template.map(str::to_string));
+    }
+    // Only ever set: code-generated writes keep whatever a person's save left.
+    if saved_by_person {
+        model.saved_by_person = Set(true);
+    }
+    model.updated_at = Set(now_micros());
+    let updated = to_policy(model.update(client).await?);
+    invalidate_and_publish(org_id, team_id).await;
+    Ok(Some(updated))
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::alerts::priority::AlertPriority;
@@ -378,6 +399,7 @@ mod tests {
             created_at: 10,
             updated_at: 20,
             template: None,
+            saved_by_person: false,
         }
     }
 
@@ -396,6 +418,19 @@ mod tests {
         let encoded = serde_json::to_string(&defaults.rungs).unwrap();
         let p = to_policy(model(&encoded));
         assert_eq!(p, defaults);
+    }
+
+    /// A person's save is read back, so regenerating the ladder knows to keep its channels.
+    #[test]
+    fn test_the_saved_by_person_marker_is_read_back() {
+        let rungs = serde_json::to_string(&Vec::<PriorityRung>::new()).unwrap();
+        for saved in [false, true] {
+            let stored = oncall_policies::Model {
+                saved_by_person: saved,
+                ..model(&rungs)
+            };
+            assert_eq!(to_policy(stored).saved_by_person, saved);
+        }
     }
 
     /// §4's L0 block is a stored column, so a team that edits its triage budget

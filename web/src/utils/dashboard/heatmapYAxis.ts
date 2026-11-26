@@ -142,13 +142,29 @@ export function isNumericYField(
   field: HeatmapYField | null | undefined,
   dashboardPanelData: HeatmapYFieldSchema | null | undefined,
 ): boolean {
-  if (!isPlainYField(field)) return false;
+  return NUMERIC_SCHEMA_TYPE.test(String(plainYFieldType(field, dashboardPanelData) ?? ""));
+}
+
+/** Whether `field` is a bare builder column whose stream schema types it as something other than a number; an untyped or unloaded column is not. */
+export function isNonNumericYField(
+  field: HeatmapYField | null | undefined,
+  dashboardPanelData: HeatmapYFieldSchema | null | undefined,
+): boolean {
+  const type = plainYFieldType(field, dashboardPanelData);
+  return !!type && !NUMERIC_SCHEMA_TYPE.test(type);
+}
+
+/** The stream schema type of a bare builder column, or undefined when it is not one or its schema has no type for it. */
+function plainYFieldType(
+  field: HeatmapYField | null | undefined,
+  dashboardPanelData: HeatmapYFieldSchema | null | undefined,
+): string | undefined {
+  if (!isPlainYField(field)) return undefined;
   const { field: name, streamAlias } = field?.args?.[0]?.value ?? {};
   const streamFields = dashboardPanelData?.meta?.streamFields?.groupedFields?.find((it) =>
     streamAlias ? it.stream_alias === streamAlias : (it.stream_alias ?? null) === null,
   );
-  const type = streamFields?.schema?.find((it) => it.name === name)?.type;
-  return NUMERIC_SCHEMA_TYPE.test(String(type ?? ""));
+  return streamFields?.schema?.find((it) => it.name === name)?.type || undefined;
 }
 
 /** The SQL for the lower bound of the bucket holding `expr`; null y stays null rather than joining the <= 0 bucket. */
