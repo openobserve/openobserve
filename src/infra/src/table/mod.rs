@@ -129,6 +129,7 @@ pub mod slo_backfill_jobs;
 pub mod slo_budget;
 pub mod slos;
 pub mod source_maps;
+pub mod status_page_domains;
 pub mod status_pages;
 pub mod super_cluster_oncall;
 pub mod synthetics_agents;

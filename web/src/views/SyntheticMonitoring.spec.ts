@@ -38,6 +38,7 @@ const {
   mockServiceGetLocations,
   mockServiceGetAgentSetup,
   mockStatusPagesList,
+  mockListDomains,
   mockStatusPagesDelete,
   mockRouterPush,
   mockRouterReplace,
@@ -58,6 +59,7 @@ const {
   mockRouterPush: vi.fn().mockResolvedValue(undefined),
   mockRouterReplace: vi.fn().mockResolvedValue(undefined),
   mockStatusPagesList: vi.fn().mockResolvedValue({ data: { pages: [] } }),
+  mockListDomains: vi.fn().mockResolvedValue({ data: [] }),
   mockStatusPagesDelete: vi.fn().mockResolvedValue({}),
   // `query` is swapped for a reactive proxy by the vue-router mock, so a test can drive `?section=` the way Back/Forward would.
   mockRoute: { query: {} as Record<string, string> },
@@ -105,7 +107,11 @@ vi.mock("@/services/synthetics", async (importOriginal) => {
 vi.mock("@/services/status_pages", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
-    default: { list: mockStatusPagesList, delete: mockStatusPagesDelete },
+    default: {
+      list: mockStatusPagesList,
+      delete: mockStatusPagesDelete,
+      listDomains: mockListDomains,
+    },
   });
 });
 
@@ -133,6 +139,7 @@ vi.mock("@/utils/synthetics/buildPayload", () => ({
 }));
 
 import SyntheticMonitoring from "./SyntheticMonitoring.vue";
+import StatusPagesList from "@/views/synthetics/status-pages/StatusPagesList.vue";
 import { getFoldersListByType } from "@/utils/commons";
 import {
   readEditorDraft,
@@ -141,6 +148,7 @@ import {
   type EditorDraftScope,
 } from "@/utils/drafts/editorDraftStore";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import config from "@/aws-exports";
 import {
   buildCreateBrowserTestPayload,
   buildCreateProtocolCheckPayload,
@@ -752,6 +760,309 @@ describe("SyntheticMonitoring", () => {
       await flushPromises();
       expect((wrapper.vm as any).activeSection).toBe("private");
       expect(mockServiceGetLocations.mock.calls.length).toBe(callsBefore + 1);
+    });
+  });
+
+  describe("domains deep link", () => {
+    const PAGES = [
+      { id: "page-1", name: "Acme Status" },
+      { id: "page-2", name: "Other Status" },
+    ];
+    const stubMounts = { count: 0 };
+    const withDialogStub = {
+      ...baseStubs,
+      DomainsDialog: {
+        template:
+          '<div data-test="domains-dialog-stub" :data-page="pageId" :data-name="pageName" :data-seeded="initialDomains?.length" />',
+        props: ["open", "orgIdentifier", "pageId", "pageName", "initialDomains"],
+        created() {
+          stubMounts.count += 1;
+        },
+      },
+    };
+    const dialog = () => wrapper.find('[data-test="domains-dialog-stub"]');
+    const replacedQueries = () =>
+      mockRouterReplace.mock.calls.map((c) => c[0]?.query as Record<string, string>);
+    // The writes that only drop ?domains; the folder pick is written separately.
+    const removals = () => replacedQueries().filter((q) => !("folder" in q));
+    const savedBuild = { isCloud: config.isCloud, isEnterprise: config.isEnterprise };
+
+    async function mountWithLink(query: Record<string, string>) {
+      Object.assign(mockRoute.query, query);
+      wrapper = mountPage(withDialogStub);
+      await flushPromises();
+    }
+
+    beforeEach(() => {
+      mockStatusPagesList.mockResolvedValue({ data: { pages: PAGES } });
+      mockListDomains.mockResolvedValue({ data: [] });
+      stubMounts.count = 0;
+      config.isEnterprise = "true";
+    });
+
+    afterEach(() => {
+      Object.assign(config, savedBuild);
+      mockRouterPush.mockResolvedValue(undefined);
+      mockRouterReplace.mockResolvedValue(undefined);
+    });
+
+    // A router with a history stack, so Back can be taken: push adds an entry, replace swaps the top.
+    // `gate` holds every navigation uncommitted until it resolves, as a slow route guard would.
+    function simulateHistory(gate: Promise<void> = Promise.resolve()) {
+      const stack: Record<string, string>[] = [{ ...mockRoute.query }];
+      const show = (query: Record<string, string>) => {
+        for (const key of Object.keys(mockRoute.query)) delete mockRoute.query[key];
+        Object.assign(mockRoute.query, query);
+      };
+      mockRouterPush.mockImplementation(async ({ query }) => {
+        await gate;
+        stack.push({ ...query });
+        show(query);
+      });
+      mockRouterReplace.mockImplementation(async ({ query }) => {
+        await gate;
+        stack[stack.length - 1] = { ...query };
+        show(query);
+      });
+      return stack;
+    }
+
+    it("opens the dialog for the page once the list has loaded, then drops only domains", async () => {
+      await mountWithLink({
+        org_identifier: "default",
+        section: "status-pages",
+        folder: "f-ops",
+        domains: "page-2",
+      });
+
+      expect(dialog().attributes("data-page")).toBe("page-2");
+      expect(dialog().attributes("data-name")).toBe("Other Status");
+      expect(replacedQueries()).toEqual([
+        { org_identifier: "default", section: "status-pages", folder: "f-ops" },
+      ]);
+      expect(mockListDomains).toHaveBeenCalledWith(expect.anything(), "page-2", {
+        silentForbidden: true,
+      });
+      expect(dialog().attributes("data-seeded")).toBe("0");
+    });
+
+    it("waits for the list: nothing opens while it is still loading", async () => {
+      const list = Promise.withResolvers<{ data: { pages: typeof PAGES } }>();
+      mockStatusPagesList.mockReturnValue(list.promise);
+      await mountWithLink({ section: "status-pages", domains: "page-1" });
+      expect(dialog().exists()).toBe(false);
+      expect(replacedQueries().every((q) => q.domains === "page-1")).toBe(true);
+
+      list.resolve({ data: { pages: PAGES } });
+      await flushPromises();
+
+      expect(dialog().attributes("data-page")).toBe("page-1");
+    });
+
+    it("opens it once, not again when the list refreshes", async () => {
+      await mountWithLink({ section: "status-pages", domains: "page-1" });
+      await (wrapper.vm as any).loadStatusPages();
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-test="domains-dialog-stub"]')).toHaveLength(1);
+      expect(removals()).toHaveLength(1);
+    });
+
+    it("opens nothing for an unknown page id, shows no error, and still drops domains", async () => {
+      await mountWithLink({ section: "status-pages", domains: "no-such-page" });
+
+      expect(dialog().exists()).toBe(false);
+      expect(vi.mocked(toast)).not.toHaveBeenCalled();
+      expect(removals()).toEqual([{ section: "status-pages" }]);
+    });
+
+    it("opens nothing when the user has no access to the list, and adds no error of its own", async () => {
+      mockStatusPagesList.mockRejectedValue({
+        response: { status: 403, data: { code: 40001, error_detail: "synthetics" } },
+      });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await mountWithLink({ section: "status-pages", domains: "page-1" });
+
+      expect(dialog().exists()).toBe(false);
+      expect(vi.mocked(toast)).not.toHaveBeenCalled();
+      expect((wrapper.vm as any).statusPagesForbidden).toEqual(["synthetics"]);
+      expect(removals()).toEqual([{ section: "status-pages" }]);
+    });
+
+    it("opens nothing in a build that is neither Cloud nor Enterprise", async () => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      await mountWithLink({ section: "status-pages", domains: "page-1" });
+
+      expect(dialog().exists()).toBe(false);
+    });
+
+    it("ignores domains on another tab: no list request, no dialog, key left alone", async () => {
+      await mountWithLink({ section: "variables", domains: "page-1" });
+
+      expect(dialog().exists()).toBe(false);
+      expect(mockStatusPagesList).not.toHaveBeenCalled();
+      expect(replacedQueries().every((q) => q.domains === "page-1")).toBe(true);
+    });
+
+    it("does nothing without a domains key", async () => {
+      await mountWithLink({ section: "status-pages" });
+
+      expect(dialog().exists()).toBe(false);
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+    });
+
+    it("opens nothing when the user may list the page but not read its domains, with no toast", async () => {
+      mockListDomains.mockRejectedValue({ response: { status: 403 } });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await mountWithLink({ section: "status-pages", domains: "page-1" });
+
+      expect(mockListDomains).toHaveBeenCalledTimes(1);
+      expect(dialog().exists()).toBe(false);
+      expect(vi.mocked(toast)).not.toHaveBeenCalled();
+      expect(removals()).toEqual([{ section: "status-pages" }]);
+    });
+
+    // The mailed link has no folder, so the page picks one. Whichever write lands first, no
+    // history entry may still hold ?domains, or Back would open the dialog again.
+    it.each(["the folder is picked first", "the list loads first"])(
+      "leaves no entry holding the link when %s",
+      async (order) => {
+        const gate = Promise.withResolvers<void>();
+        const folders = [{ folderId: "default", name: "Default" }];
+        if (order === "the folder is picked first") {
+          mockStatusPagesList.mockImplementation(async () => {
+            await gate.promise;
+            return { data: { pages: PAGES } };
+          });
+        } else {
+          vi.mocked(getFoldersListByType).mockImplementation(async () => {
+            await gate.promise;
+            return folders;
+          });
+        }
+        Object.assign(mockRoute.query, {
+          org_identifier: "default",
+          section: "status-pages",
+          domains: "page-1",
+        });
+        const stack = simulateHistory();
+        wrapper = mountPage(withDialogStub);
+        await flushPromises();
+        gate.resolve();
+        await flushPromises();
+
+        expect(dialog().attributes("data-page")).toBe("page-1");
+        expect(stack.some((entry) => "domains" in entry)).toBe(false);
+        expect(stack.at(-1)).toEqual({
+          org_identifier: "default",
+          section: "status-pages",
+          folder: "default",
+        });
+        expect(mockRoute.query.domains).toBeUndefined();
+      },
+    );
+
+    it("still pushes the folder for an ordinary visit with no link", async () => {
+      Object.assign(mockRoute.query, { org_identifier: "default", section: "status-pages" });
+      const stack = simulateHistory();
+      wrapper = mountPage(withDialogStub);
+      await flushPromises();
+
+      expect(stack).toHaveLength(2);
+      expect(stack[1]).toMatchObject({ folder: "default" });
+    });
+
+    it("shows only the new page's domains when a second link arrives with a dialog open", async () => {
+      mockListDomains.mockImplementation(async (_org: string, id: string) => ({
+        data: [{ id: `row-of-${id}` }],
+      }));
+      await mountWithLink({ section: "status-pages", domains: "page-1" });
+      expect(dialog().attributes("data-page")).toBe("page-1");
+      expect(stubMounts.count).toBe(1);
+
+      mockRoute.query.domains = "page-2";
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-test="domains-dialog-stub"]')).toHaveLength(1);
+      expect(dialog().attributes("data-page")).toBe("page-2");
+      expect(dialog().attributes("data-name")).toBe("Other Status");
+      expect(stubMounts.count).toBe(2);
+    });
+
+    it("applies a second link to the page already open, with its fresher rows", async () => {
+      mockListDomains
+        .mockResolvedValueOnce({ data: [{ id: "a" }] })
+        .mockResolvedValueOnce({ data: [{ id: "a" }, { id: "b" }] });
+      await mountWithLink({ section: "status-pages", domains: "page-1" });
+      expect(dialog().attributes("data-seeded")).toBe("1");
+
+      delete mockRoute.query.domains;
+      await nextTick();
+      mockRoute.query.domains = "page-1";
+      await flushPromises();
+
+      expect(stubMounts.count).toBe(1);
+      expect(dialog().attributes("data-seeded")).toBe("2");
+    });
+
+    it("does not let a slow link replace a dialog opened from the list meanwhile", async () => {
+      const read = Promise.withResolvers<{ data: { id: string }[] }>();
+      mockListDomains.mockReturnValue(read.promise);
+      await mountWithLink({ section: "status-pages", domains: "page-1" });
+      expect(dialog().exists()).toBe(false);
+
+      wrapper.findComponent(StatusPagesList).vm.$emit("manage-domains", PAGES[1]);
+      await flushPromises();
+      expect(dialog().attributes("data-page")).toBe("page-2");
+      read.resolve({ data: [] });
+      await flushPromises();
+
+      expect(dialog().attributes("data-page")).toBe("page-2");
+      expect(dialog().attributes("data-seeded")).toBeUndefined();
+    });
+
+    it("does not open a slow link's dialog after the user leaves Status Pages", async () => {
+      const read = Promise.withResolvers<{ data: { id: string }[] }>();
+      mockListDomains.mockReturnValue(read.promise);
+      await mountWithLink({ section: "status-pages", domains: "page-1" });
+
+      (wrapper.vm as any).activeSection = "variables";
+      await nextTick();
+      read.resolve({ data: [] });
+      await flushPromises();
+
+      expect(dialog().exists()).toBe(false);
+    });
+
+    it("keeps the link out of the next tab when the user switches while its removal is uncommitted", async () => {
+      const gate = Promise.withResolvers<void>();
+      const read = Promise.withResolvers<{ data: { id: string }[] }>();
+      mockListDomains.mockReturnValue(read.promise);
+      Object.assign(mockRoute.query, {
+        org_identifier: "default",
+        section: "status-pages",
+        domains: "page-1",
+      });
+      const stack = simulateHistory(gate.promise);
+      wrapper = mountPage(withDialogStub);
+      await flushPromises();
+      expect(mockRoute.query.domains).toBe("page-1");
+
+      (wrapper.vm as any).activeSection = "variables";
+      await nextTick();
+      gate.resolve();
+      read.resolve({ data: [] });
+      await flushPromises();
+
+      expect(stack.some((entry) => "domains" in entry)).toBe(false);
+      expect(stack.at(-1)).toMatchObject({ section: "variables" });
+      expect(mockRoute.query.domains).toBeUndefined();
+
+      (wrapper.vm as any).activeSection = "status-pages";
+      await flushPromises();
+      expect(dialog().exists()).toBe(false);
+      expect(mockListDomains).toHaveBeenCalledTimes(1);
     });
   });
 

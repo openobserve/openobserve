@@ -49,6 +49,7 @@ fn load_local_node() -> Node {
         metrics: Default::default(),
         version: crate::VERSION.to_string(),
         commit: crate::COMMIT_HASH.to_string(),
+        status_page_holders: true,
     }
 }
 

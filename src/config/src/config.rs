@@ -159,7 +159,15 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
 //      service_streams rows named by the metric-name label that list no trace stream.
 // 159: delete org_ai_toolsets rows of the removed cli kind.
-pub const DB_SCHEMA_VERSION: u64 = 159;
+// 160: add held_domain, release_seal, release_reason, proof_failed_since and expires_at to
+//      status_page_custom_domains, with a unique index on held_domain.
+// 161: create status_page_domain_certs, status_page_domain_challenges,
+//      status_page_domain_manager and status_page_domain_listeners, and add cname_label to
+//      status_page_custom_domains with a unique index.
+// 162: create status_page_domain_orders, status_page_domain_revocations and
+//      status_page_domain_acme_accounts, and add proof_notified_at and the serving columns to
+//      status_page_custom_domains.
+pub const DB_SCHEMA_VERSION: u64 = 162;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1149,6 +1157,197 @@ pub struct Config {
     pub service_versions: ServiceVersions,
     pub self_profiles: SelfProfiles,
     pub public_ai_chat: PublicAiChat,
+    pub status_page_domain: StatusPageDomain,
+}
+
+/// The values of `ZO_STATUS_PAGE_DOMAIN_PROBE`; the first is the fallback.
+const STATUS_PAGE_DOMAIN_PROBES: [&str; 2] = ["listener", "load_balancer"];
+/// The values of `ZO_STATUS_PAGE_DOMAIN_TLS`; the first is the fallback.
+const STATUS_PAGE_DOMAIN_TLS_MODES: [&str; 2] = ["built_in", "proxy"];
+
+/// Custom domains of status pages. `tls` picks built-in TLS (needs `target`; a claim is proven by
+/// its CNAME) or proxy mode (proven by a TXT record; the two host lists keep normal routing).
+#[derive(Serialize, EnvConfig, Default)]
+pub struct StatusPageDomain {
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_RESERVED_SUFFIXES",
+        default = "",
+        help = "Comma-separated hostname suffixes no custom domain may use, for example `.internal.example.com`."
+    )]
+    pub reserved_suffixes: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_TARGET",
+        default = "",
+        help = "The hostname customers point their CNAME at. Needed for built-in TLS: with the default mode an empty value turns custom domains off. Ignored in proxy mode. Changing the name lapses every custom domain whose CNAME does not follow. A change takes effect at the next restart."
+    )]
+    pub target: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_TLS",
+        default = "built_in",
+        help = "How custom domains get HTTPS. `built_in`: OpenObserve orders the certificates and terminates TLS on the domain listener; it needs ZO_STATUS_PAGE_DOMAIN_TARGET, and a custom domain is proven by a CNAME under that target. `proxy`: your own proxy terminates TLS with its own certificates and forwards to the main HTTP port with the Host header; OpenObserve orders no certificate and opens no domain port, needs no target, and a custom domain is proven by a TXT record. Not available on OpenObserve Cloud. A change takes effect at the next restart and asks every existing custom domain for the other record."
+    )]
+    pub tls: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_APP_HOSTS",
+        default = "",
+        help = "Comma-separated hostnames, besides the host of ZO_WEB_URL, that serve the OpenObserve app itself (UI, API, webhooks). Read in proxy mode only."
+    )]
+    pub app_hosts: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_OPERATIONAL_HOSTS",
+        default = "",
+        help = "Comma-separated hostnames, besides IP-literal hosts and localhost, that keep answering OpenObserve's own operational routes (for example a Service name used by the kubelet or a scraper). Read in proxy mode only."
+    )]
+    pub operational_hosts: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_ENCRYPTION_KEY",
+        default = "",
+        help = "64 random bytes, base64. Encrypts certificate keys and the CA account key. Empty derives the key from O2_MASTER_ENCRYPTION_KEY; with neither set no certificate is ordered."
+    )]
+    pub encryption_key: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_HTTPS_PORT",
+        default = 5443,
+        help = "Port of the domain listener. 0 turns the listener off on this node."
+    )]
+    pub https_port: u16,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_HTTP_PORT",
+        default = 5088,
+        help = "Port that only redirects custom domains to HTTPS. 0 turns it off."
+    )]
+    pub http_port: u16,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_HEALTH_PORT",
+        default = 5089,
+        help = "Port that answers the load balancer health check of the domain listener (200 when ready, 503 otherwise); no pod probe uses it. 0 turns it off."
+    )]
+    pub health_port: u16,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_PROXY_PROTOCOL",
+        default = false,
+        help = "Require a PROXY protocol header, version 1 or 2, on the domain listener and its redirect port. For a TCP proxy in front of the domain listener; unrelated to proxy mode."
+    )]
+    pub proxy_protocol: bool,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_PROXY_TRUSTED_CIDRS",
+        default = "",
+        help = "Comma-separated CIDRs. With PROXY protocol on, connections from other sources are closed; an empty list trusts no source, so every connection is closed."
+    )]
+    pub proxy_trusted_cidrs: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_PROBE",
+        default = "listener",
+        help = "Where the serving probe connects: `listener` (a listener node directly; needs PROXY protocol off) or `load_balancer` (through the domain target)."
+    )]
+    pub probe: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_ACME_DIRECTORY",
+        default = "https://acme-v02.api.letsencrypt.org/directory",
+        help = "ACME directory of the CA that issues custom domain certificates. Certificates from another directory are ignored and reissued."
+    )]
+    pub acme_directory: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_ALLOW_ORGS",
+        default = "",
+        help = "Comma-separated org ids. When set, only these orgs get certificates and serving."
+    )]
+    pub allow_orgs: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_DENY_ORGS",
+        default = "",
+        help = "Comma-separated org ids that get no certificate and no serving."
+    )]
+    pub deny_orgs: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_EPOCH",
+        default = 1,
+        help = "Raised by the operator after a database restore. A node whose epoch differs from the stored one loads no certificate."
+    )]
+    pub epoch: i64,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_ORDERS_PER_HOUR",
+        default = 30,
+        help = "Certificate orders the domain manager starts per hour for the whole installation."
+    )]
+    pub orders_per_hour: u32,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_ORDERS_PER_ORG_PER_DAY",
+        default = 10,
+        help = "Certificate orders the domain manager starts per organization per day."
+    )]
+    pub orders_per_org_per_day: u32,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_CERTS_PER_REGISTERED_DOMAIN_PER_WEEK",
+        default = 20,
+        help = "Certificates ordered per registered domain per week across the installation, whichever organization orders; keeps room under the CA's own limit."
+    )]
+    pub certs_per_registered_domain_per_week: u32,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_CERTS_PER_HOSTNAME_PER_WEEK",
+        default = 3,
+        help = "Certificates ordered per hostname per week. The domain target is exempt."
+    )]
+    pub certs_per_hostname_per_week: u32,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_VALIDATION_ATTEMPTS_PER_HOUR",
+        default = 3,
+        help = "Validation attempts per hostname per hour: automatic tries, the connection-error retry and \"Check again\"."
+    )]
+    pub validation_attempts_per_hour: u32,
+}
+
+impl std::fmt::Debug for StatusPageDomain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            reserved_suffixes,
+            target,
+            tls,
+            app_hosts,
+            operational_hosts,
+            https_port,
+            http_port,
+            health_port,
+            proxy_protocol,
+            proxy_trusted_cidrs,
+            probe,
+            acme_directory,
+            allow_orgs,
+            deny_orgs,
+            epoch,
+            orders_per_hour,
+            orders_per_org_per_day,
+            certs_per_registered_domain_per_week,
+            certs_per_hostname_per_week,
+            validation_attempts_per_hour,
+            encryption_key: _,
+        } = self;
+        f.debug_struct("StatusPageDomain")
+            .field("reserved_suffixes", reserved_suffixes)
+            .field("target", target)
+            .field("tls", tls)
+            .field("app_hosts", app_hosts)
+            .field("operational_hosts", operational_hosts)
+            .field("https_port", https_port)
+            .field("http_port", http_port)
+            .field("health_port", health_port)
+            .field("proxy_protocol", proxy_protocol)
+            .field("proxy_trusted_cidrs", proxy_trusted_cidrs)
+            .field("probe", probe)
+            .field("acme_directory", acme_directory)
+            .field("allow_orgs", allow_orgs)
+            .field("deny_orgs", deny_orgs)
+            .field("epoch", epoch)
+            .field("orders_per_hour", orders_per_hour)
+            .field("orders_per_org_per_day", orders_per_org_per_day)
+            .field(
+                "certs_per_registered_domain_per_week",
+                certs_per_registered_domain_per_week,
+            )
+            .field("certs_per_hostname_per_week", certs_per_hostname_per_week)
+            .field("validation_attempts_per_hour", validation_attempts_per_hour)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Unauthenticated read-only links to shared AI chats.
@@ -4285,6 +4484,8 @@ pub fn init() -> Config {
 
     check_public_dashboards_config(&mut cfg);
 
+    check_status_page_domain_config(&mut cfg);
+
     cfg
 }
 
@@ -5651,6 +5852,31 @@ fn check_synthetics_config(cfg: &mut Config) {
     }
 }
 
+/// A target is compared with hostnames, which are lowercase and have no trailing dot.
+fn check_status_page_domain_config(cfg: &mut Config) {
+    let domain = &mut cfg.status_page_domain;
+    domain.target = domain
+        .target
+        .trim()
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    if !STATUS_PAGE_DOMAIN_PROBES.contains(&domain.probe.as_str()) {
+        log::error!(
+            "ZO_STATUS_PAGE_DOMAIN_PROBE ({}) must be `listener` or `load_balancer`, using \
+             `listener`",
+            domain.probe
+        );
+        domain.probe = STATUS_PAGE_DOMAIN_PROBES[0].to_string();
+    }
+    if !STATUS_PAGE_DOMAIN_TLS_MODES.contains(&domain.tls.as_str()) {
+        log::error!(
+            "ZO_STATUS_PAGE_DOMAIN_TLS ({}) must be `built_in` or `proxy`, using `built_in`",
+            domain.tls
+        );
+        domain.tls = STATUS_PAGE_DOMAIN_TLS_MODES[0].to_string();
+    }
+}
+
 pub fn ensure_not_empty(s: &str, name: &str) -> Result<(), anyhow::Error> {
     if s.trim().is_empty() {
         return Err(anyhow::anyhow!("{} is empty", name));
@@ -5700,6 +5926,87 @@ mod tests {
     }
 
     use super::*;
+
+    fn domain_config(target: &str, probe: &str) -> Config {
+        let mut cfg = Config::init().expect("config init");
+        cfg.status_page_domain.target = target.to_string();
+        cfg.status_page_domain.probe = probe.to_string();
+        check_status_page_domain_config(&mut cfg);
+        cfg
+    }
+
+    #[test]
+    fn status_page_domain_defaults_are_the_documented_ones() {
+        let cfg = StatusPageDomain::init().expect("a status page domain default failed to parse");
+        assert_eq!(cfg.target, "");
+        assert_eq!(cfg.encryption_key, "");
+        assert_eq!(
+            (cfg.https_port, cfg.http_port, cfg.health_port),
+            (5443, 5088, 5089)
+        );
+        assert!(!cfg.proxy_protocol);
+        assert_eq!(cfg.proxy_trusted_cidrs, "");
+        assert_eq!(cfg.probe, "listener");
+        assert_eq!(
+            cfg.acme_directory,
+            "https://acme-v02.api.letsencrypt.org/directory"
+        );
+        assert_eq!((cfg.allow_orgs.as_str(), cfg.deny_orgs.as_str()), ("", ""));
+        assert_eq!(cfg.epoch, 1);
+        assert_eq!(cfg.tls, "built_in");
+        assert_eq!(
+            (cfg.app_hosts.as_str(), cfg.operational_hosts.as_str()),
+            ("", "")
+        );
+    }
+
+    #[test]
+    fn status_page_domain_probe_load_balancer_is_kept() {
+        let cfg = domain_config("", "load_balancer");
+        assert_eq!(cfg.status_page_domain.probe, "load_balancer");
+    }
+
+    #[test]
+    fn status_page_domain_unknown_probe_falls_back_to_listener() {
+        for probe in ["", "Listener", "proxy", "load-balancer"] {
+            let cfg = domain_config("", probe);
+            assert_eq!(cfg.status_page_domain.probe, "listener", "{probe:?}");
+        }
+    }
+
+    #[test]
+    fn status_page_domain_tls_proxy_is_kept_and_an_unknown_mode_is_built_in() {
+        let with_tls = |tls: &str| {
+            let mut cfg = domain_config("", "listener");
+            cfg.status_page_domain.tls = tls.to_string();
+            check_status_page_domain_config(&mut cfg);
+            cfg.status_page_domain.tls
+        };
+        assert_eq!(with_tls("proxy"), "proxy");
+        assert_eq!(with_tls("built_in"), "built_in");
+        for unknown in ["", "Proxy", "builtin", "off", "listener"] {
+            assert_eq!(with_tls(unknown), "built_in", "{unknown:?}");
+        }
+    }
+
+    #[test]
+    fn status_page_domain_target_is_a_lowercase_name_without_a_trailing_dot() {
+        let cfg = domain_config(" Domains.US1.Example.com. ", "listener");
+        assert_eq!(cfg.status_page_domain.target, "domains.us1.example.com");
+        assert_eq!(domain_config("", "listener").status_page_domain.target, "");
+    }
+
+    #[test]
+    fn status_page_domain_debug_hides_the_encryption_key() {
+        let domain = StatusPageDomain {
+            target: "domains.example.com".to_string(),
+            encryption_key: "DOMAIN-KEY-VALUE".to_string(),
+            ..Default::default()
+        };
+        let printed = format!("{domain:?}");
+        assert!(!printed.contains("DOMAIN-KEY-VALUE"), "{printed}");
+        assert!(printed.contains("domains.example.com"));
+    }
 
     #[test]
     fn memory_circuit_breaker_release_ratio_defaults_below_trip_and_stays_a_point_below_it() {

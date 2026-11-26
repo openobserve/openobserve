@@ -466,15 +466,51 @@ pub struct CreateDomainRequest {
     pub domain: String,
 }
 
-/// The DNS TXT record the admin needs to create — `txt_name`/`txt_value`
-/// spelled out because the raw `domain` + `verification_token` pairing isn't
-/// self-explanatory to a non-engineer reading it off an API response.
+/// The one DNS record the admin must create. Proxy mode: `txt_name` and `txt_value`, a TXT record.
+/// Built-in TLS: `cname_target`, the target of a CNAME at the domain. The other fields are null.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct CreateDomainResponse {
     pub id: String,
     pub domain: String,
-    pub txt_name: String,
-    pub txt_value: String,
+    pub txt_name: Option<String>,
+    pub txt_value: Option<String>,
+    pub cname_target: Option<String>,
+}
+
+/// What a custom domain is shown as. Proxy mode and off produce `Pending`, `Verified`,
+/// `NotServing` and `Expired`; `WaitingForDns` and `SettingUp` come with built-in TLS.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainServingState {
+    Pending,
+    Verified,
+    WaitingForDns,
+    SettingUp,
+    Ready,
+    Serving,
+    Delayed,
+    NotServing,
+    Expired,
+}
+
+/// Who must act to move a claim on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainActs {
+    Customer,
+    Operator,
+}
+
+/// When each fact behind a domain's state was last seen. Only the proof times are filled until
+/// certificate serving exists.
+#[derive(Debug, Clone, Default, Serialize, utoipa::ToSchema)]
+pub struct DomainEvidence {
+    pub proof_checked_at: Option<i64>,
+    pub proof_failed_since: Option<i64>,
+    pub dns_checked_at: Option<i64>,
+    pub probe_checked_at: Option<i64>,
+    pub ca_validated_at: Option<i64>,
+    pub probe_mode: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -483,16 +519,104 @@ pub struct DomainAdminView {
     pub domain: String,
     /// 0 pending, 1 verified, 2 failed.
     pub verification_state: i32,
-    /// 0 record-missing, 1 value-mismatch, 2 dns-resolution-failed.
+    /// 0 record-missing, 1 value-mismatch, 2 dns-resolution-failed, 3 held by another
+    /// organization, 4 proof lost, 5 points at the app host, 6 no CNAME, 7 CNAME elsewhere.
     pub verification_failure_reason: Option<i32>,
     pub verified_at: Option<i64>,
     pub last_checked_at: Option<i64>,
     pub created_at: i64,
-    /// The ownership TXT record, served only while the domain is unverified —
-    /// it is not a secret (proving ownership means publishing it in public DNS),
-    /// and hiding it would strand a user who lost it before their DNS was right.
+    /// Proxy mode only: the TXT record `<txt_name> TXT <verification_token>` that proves
+    /// ownership. Public by design, and it must stay in DNS. Null with built-in TLS and while off.
     pub txt_name: Option<String>,
     pub verification_token: Option<String>,
+    /// The claim holds the hostname; only a holder is routed.
+    pub is_holder: bool,
+    pub serving_state: DomainServingState,
+    /// Why the claim is in `serving_state`; null before the first check.
+    pub reason: Option<String>,
+    pub warning: Option<String>,
+    /// When the claim lapses or serving stops, if a warning says it will.
+    pub warning_at: Option<i64>,
+    /// When a claim that holds nothing is released.
+    pub expires_at: Option<i64>,
+    pub released_at: Option<i64>,
+    /// Built-in TLS only: the target of the claim's CNAME, `<label>.<domain target>`.
+    pub cname_target: Option<String>,
+    /// Built-in TLS only: the host of `ZO_WEB_URL`, which the CNAME must not name.
+    pub app_host: Option<String>,
+    pub certificate_expires_at: Option<i64>,
+    pub next_action_at: Option<i64>,
+    pub state_computed_at: Option<i64>,
+    pub evidence: DomainEvidence,
+    pub can_check_again: bool,
+    pub acts: Option<DomainActs>,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct ReleaseShadowedResponse {
+    pub released: u64,
+}
+
+/// Whether this node's domain key fits the check value stored in the manager row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum InstallationKeyCheck {
+    Ok,
+    Missing,
+    Mismatch,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct InstallationEpoch {
+    pub configured: i64,
+    pub stored: i64,
+}
+
+/// A listener node that is reporting.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct InstallationListener {
+    pub node: String,
+    pub address: String,
+    pub last_seen_at: i64,
+    pub certs_loaded: i32,
+    pub last_sync_at: i64,
+    pub private_peers_only: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct InstallationLease {
+    pub owner: Option<String>,
+    pub expires_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct InstallationCaError {
+    pub at: i64,
+    pub message: String,
+}
+
+/// The installation status root users read. Every key is always present: only `enabled` and `tls`
+/// are filled unless built-in TLS is on, and `listeners` is then empty.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct DomainInstallationView {
+    /// Custom domains are on, in either mode.
+    pub enabled: bool,
+    /// The configured certificate mode, `built_in` or `proxy`.
+    pub tls: String,
+    pub target: Option<String>,
+    pub not_ready_reason: Option<String>,
+    pub target_resolves: Option<bool>,
+    pub wildcard_resolves: Option<bool>,
+    pub target_certificate_expires_at: Option<i64>,
+    pub key_check: Option<InstallationKeyCheck>,
+    pub epoch: Option<InstallationEpoch>,
+    pub listeners: Vec<InstallationListener>,
+    pub lease: Option<InstallationLease>,
+    pub last_validation_at: Option<i64>,
+    pub last_ca_error: Option<InstallationCaError>,
+    pub visitor_addresses_visible: Option<bool>,
+    pub probe_mode: Option<String>,
+    pub next_check_at: Option<i64>,
 }
 
 fn default_snooze_hours() -> i64 {
@@ -1320,5 +1444,41 @@ mod tests {
         let json = serde_json::to_string(&view).unwrap();
         assert!(!json.contains("password_hash"), "{json}");
         assert!(json.contains("\"password_set\":true"), "{json}");
+    }
+
+    #[test]
+    fn the_installation_view_serializes_every_key_with_nulls_for_what_is_not_filled() {
+        let view = DomainInstallationView {
+            enabled: true,
+            tls: "proxy".to_string(),
+            target: None,
+            not_ready_reason: None,
+            target_resolves: None,
+            wildcard_resolves: None,
+            target_certificate_expires_at: None,
+            key_check: None,
+            epoch: None,
+            listeners: Vec::new(),
+            lease: None,
+            last_validation_at: None,
+            last_ca_error: None,
+            visitor_addresses_visible: None,
+            probe_mode: None,
+            next_check_at: None,
+        };
+
+        let json = serde_json::to_value(&view).unwrap();
+
+        let object = json.as_object().unwrap();
+        assert_eq!(object.len(), 16, "{json}");
+        for (key, value) in object {
+            let filled = ["enabled", "tls"].contains(&key.as_str());
+            assert_eq!(
+                value.is_null(),
+                !filled && key != "listeners",
+                "{key}: {json}"
+            );
+        }
+        assert_eq!(json["listeners"], serde_json::json!([]));
     }
 }

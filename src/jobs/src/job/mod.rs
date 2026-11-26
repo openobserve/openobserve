@@ -90,6 +90,8 @@ mod session_cleanup;
 pub mod slack_hooks;
 mod slo_maintenance;
 mod stats;
+#[cfg(feature = "enterprise")]
+mod status_page_mail;
 
 use enrichment_data::enrichment_table::geoip::wait_for_initialization;
 use openobserve_core::org_cleanup::{DrainPass, StreamDataCleanup};
@@ -699,6 +701,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     slack_hooks::register();
 
+    // Every node that checks a holder can start a clock, so each one can send its notice.
+    #[cfg(feature = "enterprise")]
+    status_page_mail::register();
+
     // Routers serve the hook routes, so the hook node tasks start before the router return.
     #[cfg(feature = "enterprise")]
     openobserve_core::workflows::http_trigger::spawn_node_tasks();
@@ -707,9 +713,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "cpu-profiling")]
     tokio::task::spawn(openobserve_core::self_profiles::run());
 
+    // A router can run the domain listener, so the certificate store loads before the return below.
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::status_pages::cert_store::spawn_tasks();
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
+    }
+
+    // Every scheduler node runs the loop; `run` returns unless built-in TLS is on, and only the
+    // holder of the database lease works.
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_scheduler() {
+        tokio::spawn(o2_enterprise::enterprise::status_pages::domain_manager::run());
     }
 
     // telemetry run
@@ -1927,6 +1944,26 @@ mod tests {
     }
 
     #[test]
+    fn the_proof_loss_mail_is_registered_before_the_router_return() {
+        let source = include_str!("mod.rs");
+        let init = source
+            .split("pub async fn init()")
+            .nth(1)
+            .and_then(|rest| rest.split("mod tests {").next())
+            .expect("init() body");
+        let register = init
+            .find("status_page_mail::register();")
+            .expect("init() must register the proof-loss mail");
+        let router_return = init
+            .find("if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role()")
+            .expect("router return in init()");
+        assert!(
+            register < router_return,
+            "routers serve Verify now and the epoch re-check, which check holders too"
+        );
+    }
+
+    #[test]
     fn kv_watch_is_spawned_before_the_router_return() {
         let source = include_str!("mod.rs");
         let init = source
@@ -1964,6 +2001,47 @@ mod tests {
             self_profiles < router_return,
             "single-role routers must run the self-profiles loop"
         );
+    }
+
+    #[test]
+    fn the_certificate_store_is_spawned_before_the_router_return() {
+        let source = include_str!("mod.rs");
+        let init = source
+            .split("pub async fn init()")
+            .nth(1)
+            .and_then(|rest| rest.split("mod tests {").next())
+            .expect("init() body");
+        let store = init
+            .find("status_pages::cert_store::spawn_tasks();")
+            .expect("init() must call cert_store::spawn_tasks()");
+        let router_return = init
+            .find("if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role()")
+            .expect("router return in init()");
+        assert!(
+            store < router_return,
+            "single-role routers serve custom domains and need the store"
+        );
+    }
+
+    #[test]
+    fn the_domain_manager_is_spawned_on_scheduler_nodes_after_the_router_return() {
+        let source = include_str!("mod.rs");
+        let init = source
+            .split("pub async fn init()")
+            .nth(1)
+            .and_then(|rest| rest.split("mod tests {").next())
+            .expect("init() body");
+        let manager = init
+            .find("status_pages::domain_manager::run()")
+            .expect("init() must spawn domain_manager::run()");
+        let router_return = init
+            .find("if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role()")
+            .expect("router return in init()");
+        assert!(router_return < manager, "routers do not run the manager");
+        let guard = init[..manager]
+            .rfind("if LOCAL_NODE.is_scheduler()")
+            .expect("a scheduler guard before the spawn");
+        assert!(manager - guard < 200, "the spawn sits under the guard");
     }
 
     #[test]

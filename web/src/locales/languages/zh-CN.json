@@ -23923,19 +23923,12 @@
       "verifying": "正在验证...",
       "verifyFailed": "验证失败",
       "deleteTitle": "删除此域名？",
-      "deleteBody": "{name} 域名将不再解析到此状态页面。",
       "deleting": "正在删除域名...",
       "deleted": "域名已删除",
       "deleteFailed": "删除域名失败",
       "state": {
         "pending": "待验证",
-        "verified": "已验证",
-        "failed": "失败"
-      },
-      "failureReason": {
-        "0": "未找到 TXT 记录",
-        "1": "找到 TXT 记录，但值不匹配",
-        "2": "DNS 解析失败"
+        "verified": "已验证"
       },
       "txtNameLabel": "记录名称",
       "txtValueLabel": "记录值",
@@ -23943,9 +23936,7 @@
       "copyTxtValue": "复制记录值",
       "txtNameCopied": "记录名称已复制",
       "txtValueCopied": "记录值已复制",
-      "nextStepVerify": "验证每 {seconds} 秒自动运行一次。您也可以立即验证。",
-      "nextStepCname": "验证通过后，将 {domain} 通过 CNAME 指向此应用的主机，以便为您的状态页提供服务。",
-      "serving": "已验证。只要其 CNAME 指向此应用的主机，此域名现在就会为您的状态页提供服务。"
+      "nextStepVerify": "验证每 {seconds} 秒自动运行一次。您也可以立即验证。"
     },
     "preview": {
       "title": "实时预览",

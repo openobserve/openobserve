@@ -95,7 +95,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :loading="rotating"
                   data-test="status-page-editor-rotate-slug"
                   @click="rotateSlug"
-                  >{{ t("statusPages.rotateSlug") }}</OButton
+                  >{{
+                    t(isCustomUrl ? "statusPages.rotateSlugOnly" : "statusPages.rotateSlug")
+                  }}</OButton
                 >
               </div>
             </div>
@@ -132,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : undefined
                       "
                       :image="previewValues.logo_img"
-                      :locked="!logoUploadEnabled"
+                      :locked="!advancedEnabled"
                       data-test="status-page-logo"
                       @select="(value) => onImageSelected('logo_img', value)"
                       @clear="clearLogo"
@@ -144,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :upload-label="t('statusPages.fields.faviconUpload')"
                       :clear-label="t('statusPages.fields.faviconRemove')"
                       :image="previewValues.favicon_img"
-                      :locked="!logoUploadEnabled"
+                      :locked="!advancedEnabled"
                       square
                       data-test="status-page-favicon"
                       @select="(value) => onImageSelected('favicon_img', value)"
@@ -365,7 +367,10 @@ import StatusPageImageField from "./StatusPageImageField.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getFoldersListByType } from "@/utils/commons";
-import statusPagesService, { type StatusPageListItem } from "@/services/status_pages";
+import statusPagesService, {
+  type StatusPageDomain,
+  type StatusPageListItem,
+} from "@/services/status_pages";
 import analytics from "@/services/product_analytics";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import syntheticsService from "@/services/synthetics";
@@ -375,7 +380,7 @@ import {
   modeToVisibility,
   type EditStatusPageForm,
 } from "./EditStatusPage.schema";
-import { publicStatusPageUrl } from "./statusPageBadges";
+import { publicPageUrl, publicStatusPageUrl } from "./statusPageBadges";
 import { syntheticsListRoute, syntheticsNavContextFromRoute } from "@/utils/synthetics/routes";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
@@ -415,13 +420,8 @@ const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
 );
 
-// Logo upload itself is available on any licensed build (cloud or self-hosted
-// enterprise) — same split as Notices/Custom Domains (see StatusPagesList's
-// `advancedEnabled`), using the same isCloud || isEnterprise check as the
-// Billing route (`router/index.ts`).
-const logoUploadEnabled = computed(
-  () => config.isCloud === "true" || config.isEnterprise === "true",
-);
+// Same build check as StatusPagesList's notices and custom domain actions.
+const advancedEnabled = computed(() => config.isCloud === "true" || config.isEnterprise === "true");
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 // Self-hosted enterprise only, never cloud: the org-wide logo (Settings →
@@ -446,7 +446,10 @@ const configPaneRef = ref<HTMLElement | null>(null);
 // means "remove" or "revert to org default".
 const usingOrgLogoDefault = ref(false);
 
-const publicUrl = computed(() => publicStatusPageUrl(currentSlug.value));
+// The page's custom domains, null until loaded and when they could not be loaded.
+const domains = ref<StatusPageDomain[] | null>(null);
+const publicUrl = computed(() => publicPageUrl(currentSlug.value, domains.value));
+const isCustomUrl = computed(() => publicUrl.value !== publicStatusPageUrl(currentSlug.value));
 const schema = computed(() => makeEditStatusPageSchema(t));
 
 const emptyDefaults = (): EditStatusPageForm => ({
@@ -526,7 +529,7 @@ function readFileAsBase64(file: File): Promise<string> {
 }
 
 async function onImageSelected(field: "logo_img" | "favicon_img", value: FileValue) {
-  if (!logoUploadEnabled.value) {
+  if (!advancedEnabled.value) {
     openUpgradeDialog();
     return;
   }
@@ -588,6 +591,20 @@ async function loadChecks() {
   }
 }
 
+// The same views the domains dialog loads. A failure keeps the slug URL and says nothing.
+async function loadDomains(id: string) {
+  domains.value = null;
+  if (!advancedEnabled.value) return;
+  try {
+    const res = await statusPagesService.listDomains(orgIdentifier.value, id, {
+      silentForbidden: true,
+    });
+    domains.value = res.data;
+  } catch {
+    // An unavailable custom domain list must not interrupt the editor.
+  }
+}
+
 async function addComponent() {
   // Resolve the new row by its _uid, never by index: rows are keyed on _uid
   // precisely because index identity is unstable across an add.
@@ -628,6 +645,7 @@ async function load() {
     loadedOrgLogoDefault = usingOrgLogoDefault.value;
     serverPage = serverSnapshot();
     loadChecks();
+    loadDomains(p.id);
   } catch (err) {
     console.error("[status-pages] failed to load page", err);
     page.value = null;
@@ -709,7 +727,12 @@ async function rotateSlug() {
     const res = await statusPagesService.rotateSlug(orgIdentifier.value, page.value.id);
     const slug = (res.data as any).slug;
     if (slug) currentSlug.value = slug;
-    toast({ variant: "success", message: t("statusPages.toast.slugRotated") });
+    toast({
+      variant: "success",
+      message: t(
+        isCustomUrl.value ? "statusPages.toast.slugOnlyRotated" : "statusPages.toast.slugRotated",
+      ),
+    });
   } catch (err: any) {
     toast({
       variant: "error",

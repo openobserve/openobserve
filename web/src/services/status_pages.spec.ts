@@ -80,6 +80,34 @@ describe("status_pages service analytics", () => {
     expect(analytics.track).toHaveBeenCalledWith("status_page_domain_deleted");
   });
 
+  it("posts both check actions to their own paths and tracks them once they succeed", async () => {
+    await statusPagesService.checkDomain("org1", "d1");
+    await statusPagesService.checkDomainInstallation("org1");
+    expect(mockHttp.post).toHaveBeenCalledWith("/api/org1/status_pages/domains/d1/check", {});
+    expect(mockHttp.post).toHaveBeenCalledWith(
+      "/api/org1/status_pages/domains/installation/check",
+      {},
+    );
+    expect(analytics.track).toHaveBeenCalledWith("status_page_domain_checked_again");
+    expect(analytics.track).toHaveBeenCalledWith("status_page_domain_installation_checked");
+  });
+
+  it("reads the installation without recording a 403, which is the answer for a non-root user", async () => {
+    await statusPagesService.getDomainInstallation("org1");
+    expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/status_pages/domains/installation", {
+      silentForbidden: true,
+    });
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  it("does not track a domain action the server refused", async () => {
+    mockHttp.post.mockRejectedValueOnce(new Error("validation: this action needs built-in TLS"));
+    await expect(statusPagesService.checkDomainInstallation("org1")).rejects.toThrow();
+    mockHttp.post.mockRejectedValueOnce(new Error("500"));
+    await expect(statusPagesService.checkDomain("org1", "d1")).rejects.toThrow();
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
   it("does not track a write the server refused, nor any read", async () => {
     mockHttp.post.mockRejectedValueOnce(new Error("403"));
     await expect(statusPagesService.create("org1", { name: "Public" })).rejects.toThrow();

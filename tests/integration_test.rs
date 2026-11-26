@@ -1816,9 +1816,18 @@ mod tests {
             last_checked_at: None,
             created_at: now,
             updated_at: now,
+            cname_label: Some(infra::table::status_pages::new_cname_label()),
+            ..Default::default()
         };
+        let conn = infra::db::get_orm_client_rw().await;
+        let inserted =
+            infra::table::status_pages::insert_domain_claim(conn, &claim, true, 20).await;
+        assert_eq!(
+            inserted.unwrap(),
+            infra::table::status_pages::ClaimInsert::Created
+        );
         assert!(
-            infra::table::status_pages::insert_domain_if_unclaimed(&claim)
+            infra::table::status_pages::grant_domain(conn, &claim.id, now)
                 .await
                 .unwrap()
         );
@@ -3109,7 +3118,8 @@ mod tests {
             .query_one(Statement::from_string(
                 conn.get_database_backend(),
                 "SELECT COUNT(*) AS n FROM pg_stat_activity WHERE datname = current_database() \
-                 AND wait_event_type = 'Lock' AND query LIKE 'DELETE FROM \"status_page%'",
+                 AND wait_event_type = 'Lock' AND (query LIKE 'DELETE FROM \"status_page%' \
+                 OR query LIKE 'SELECT \"status_pages\".\"id\" FROM \"status_pages\" %FOR UPDATE%')",
             ))
             .await
             .unwrap()
@@ -3806,9 +3816,18 @@ mod tests {
                 last_checked_at: None,
                 created_at: now,
                 updated_at: now,
+                cname_label: Some(infra::table::status_pages::new_cname_label()),
+                ..Default::default()
             };
+            let conn = infra::db::get_orm_client_rw().await;
+            let inserted =
+                infra::table::status_pages::insert_domain_claim(conn, &claim, true, 20).await;
+            assert_eq!(
+                inserted.unwrap(),
+                infra::table::status_pages::ClaimInsert::Created
+            );
             assert!(
-                infra::table::status_pages::insert_domain_if_unclaimed(&claim)
+                infra::table::status_pages::grant_domain(conn, &claim.id, now)
                     .await
                     .unwrap()
             );

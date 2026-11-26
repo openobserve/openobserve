@@ -212,6 +212,37 @@ pub const COVERAGE: &[Coverage] = &[
     table("status_page_component_checks", DB),
     table("status_page_components", DB),
     table("status_page_custom_domains", DB),
+    table("status_page_domain_certs", DB),
+    exempt(
+        Kind::Table,
+        "status_page_domain_challenges",
+        "expire within minutes and are answered only for a current holder, which org deletion has just released",
+    ),
+    exempt(
+        Kind::Table,
+        "status_page_domain_orders",
+        "kept 30 days for the CA's rate accounting and purged by the domain manager, which has no org to ask",
+    ),
+    exempt(
+        Kind::Table,
+        "status_page_domain_revocations",
+        "hold a certificate waiting for revocation and no org data; the domain manager purges them",
+    ),
+    exempt(
+        Kind::Table,
+        "status_page_domain_acme_accounts",
+        "CA accounts of the installation, keyed by directory, no org data",
+    ),
+    exempt(
+        Kind::Table,
+        "status_page_domain_listeners",
+        "one heartbeat row per node of the installation, no org data",
+    ),
+    exempt(
+        Kind::Table,
+        "status_page_domain_manager",
+        "the installation's single manager row, no org data",
+    ),
     table("status_page_notice_components", DB),
     table("status_page_notice_updates", DB),
     table("status_page_notices", DB),
@@ -479,7 +510,7 @@ mod tests {
     /// Steps the worker runs by name, beyond the fixed steps it enqueues.
     const ITEM_STEPS: [&str; 2] = ["delete_stream", "delete_stream_final"];
     /// Tables that name their org through a parent id or key that no `belongs_to` declares.
-    const PARENT_ID_SCOPED: [&str; 15] = [
+    const PARENT_ID_SCOPED: [&str; 16] = [
         "alert_state_transitions",
         "alert_states",
         "compactor_manual_jobs",
@@ -494,14 +525,19 @@ mod tests {
         "service_version_verdict_metrics",
         "slo_backfill_jobs",
         "slo_status",
+        "status_page_domain_challenges",
         "users",
     ];
     /// Entity tables that hold no org data at all.
-    const GLOBAL_TABLES: [&str; 5] = [
+    const GLOBAL_TABLES: [&str; 9] = [
         "oncall_phone_verifications",
         "sessions",
         "slack_installations",
         "slack_link_requests",
+        "status_page_domain_acme_accounts",
+        "status_page_domain_listeners",
+        "status_page_domain_manager",
+        "status_page_domain_revocations",
         "system_prompts",
     ];
 

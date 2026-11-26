@@ -110,6 +110,7 @@ mod tests {
             },
             version: config::VERSION.to_string(),
             commit: String::new(),
+            status_page_holders: true,
         }
     }
 

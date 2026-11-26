@@ -65,6 +65,10 @@ pub struct Node {
     /// share it. Empty from an older node.
     #[serde(default)]
     pub commit: String,
+    /// The node reads a custom domain's claim by its holder. False from an older node, which
+    /// reads by hostname and could serve a pending claim.
+    #[serde(default)]
+    pub status_page_holders: bool,
 }
 
 impl Node {
@@ -84,6 +88,7 @@ impl Node {
             metrics: Default::default(),
             version: crate::VERSION.to_string(),
             commit: crate::COMMIT_HASH.to_string(),
+            status_page_holders: true,
         }
     }
 
@@ -634,5 +639,19 @@ mod tests {
         assert_eq!(select_internal_grpc_token("", "stored", "inst"), "stored");
         assert_eq!(select_internal_grpc_token("", "", "inst"), "inst");
         assert_eq!(select_internal_grpc_token("", "", ""), "");
+    }
+
+    #[test]
+    fn test_node_json_without_the_status_page_holders_flag_reads_false() {
+        let mut json = serde_json::to_value(Node::default()).unwrap();
+        assert_eq!(
+            json["status_page_holders"], true,
+            "this build advertises it"
+        );
+        json.as_object_mut().unwrap().remove("status_page_holders");
+
+        let node: Node = serde_json::from_value(json).unwrap();
+
+        assert!(!node.status_page_holders);
     }
 }

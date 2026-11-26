@@ -23923,19 +23923,12 @@
       "verifying": "検証中...",
       "verifyFailed": "検証に失敗しました",
       "deleteTitle": "このドメインを削除しますか？",
-      "deleteBody": "{name} ドメインはこのステータスページに解決されなくなります。",
       "deleting": "ドメインを削除中...",
       "deleted": "ドメインを削除しました",
       "deleteFailed": "ドメインの削除に失敗しました",
       "state": {
         "pending": "保留中",
-        "verified": "検証済み",
-        "failed": "失敗"
-      },
-      "failureReason": {
-        "0": "TXTレコードが見つかりません",
-        "1": "TXTレコードは見つかりましたが、値が一致しません",
-        "2": "DNS解決に失敗しました"
+        "verified": "検証済み"
       },
       "txtNameLabel": "レコード名",
       "txtValueLabel": "レコード値",
@@ -23943,9 +23936,7 @@
       "copyTxtValue": "レコード値をコピー",
       "txtNameCopied": "レコード名をコピーしました",
       "txtValueCopied": "レコード値をコピーしました",
-      "nextStepVerify": "検証は自動的に{seconds}秒ごとに実行されます。今すぐ検証することもできます。",
-      "nextStepCname": "検証が完了したら、CNAMEで{domain}をこのアプリのホストに向け、このステータスページが配信されるようにしてください。",
-      "serving": "検証済み。CNAMEがこのアプリのホストを向いている限り、このドメインはこのステータスページを配信します。"
+      "nextStepVerify": "検証は自動的に{seconds}秒ごとに実行されます。今すぐ検証することもできます。"
     },
     "preview": {
       "title": "リアルタイムプレビュー",

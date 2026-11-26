@@ -466,6 +466,7 @@ mod tests {
             metrics: Default::default(),
             version: version.into(),
             commit: String::new(),
+            status_page_holders: true,
         }
     }
 

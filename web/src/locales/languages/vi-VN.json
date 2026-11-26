@@ -23923,19 +23923,12 @@
       "verifying": "Đang xác minh...",
       "verifyFailed": "Xác minh thất bại",
       "deleteTitle": "Xóa tên miền này?",
-      "deleteBody": "Tên miền {name} sẽ ngừng phân giải đến trang trạng thái này.",
       "deleting": "Đang xóa tên miền...",
       "deleted": "Đã xóa tên miền",
       "deleteFailed": "Không thể xóa tên miền",
       "state": {
         "pending": "Đang chờ",
-        "verified": "Đã xác minh",
-        "failed": "Thất bại"
-      },
-      "failureReason": {
-        "0": "Không tìm thấy bản ghi TXT",
-        "1": "Đã tìm thấy bản ghi TXT, nhưng giá trị không khớp",
-        "2": "Phân giải DNS thất bại"
+        "verified": "Đã xác minh"
       },
       "txtNameLabel": "Tên bản ghi",
       "txtValueLabel": "Giá trị bản ghi",
@@ -23943,9 +23936,7 @@
       "copyTxtValue": "Sao chép giá trị bản ghi",
       "txtNameCopied": "Đã sao chép tên bản ghi",
       "txtValueCopied": "Đã sao chép giá trị bản ghi",
-      "nextStepVerify": "Việc xác minh tự động chạy mỗi {seconds} giây. Bạn cũng có thể xác minh ngay bây giờ.",
-      "nextStepCname": "Sau khi được xác minh, trỏ {domain} đến OpenObserve bằng bản ghi CNAME tới máy chủ của ứng dụng này để nó phục vụ trang trạng thái của bạn.",
-      "serving": "Đã xác minh. Tên miền này hiện phục vụ trang trạng thái của bạn, miễn là CNAME của nó trỏ đến máy chủ của ứng dụng này."
+      "nextStepVerify": "Việc xác minh tự động chạy mỗi {seconds} giây. Bạn cũng có thể xác minh ngay bây giờ."
     },
     "preview": {
       "title": "Xem trước trực tiếp",

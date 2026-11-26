@@ -50,7 +50,7 @@ use tokio::sync::{Semaphore, SemaphorePermit};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     request::{
-        public_rate_limit::client_ip,
+        public_rate_limit::{client_ip, ip_key},
         workflows::hook_limits::{self, BUSY_RETRY_AFTER_SECS, LIMITERS, MINUTE},
     },
 };
@@ -523,10 +523,7 @@ fn preauth(ip: Option<RealIp>) -> Result<Vec<SemaphorePermit<'static>>, Response
     match ip {
         Some(RealIp(addr)) => {
             let rpm = config::get_config().limit.workflow_hook_ip_rpm;
-            if LIMITERS
-                .ip
-                .over_budget(&hook_limits::ip_key(addr), MINUTE, rpm)
-            {
+            if LIMITERS.ip.over_budget(&ip_key(addr), MINUTE, rpm) {
                 return Err(reject(HookReason::RateLimited, Some(RATE_RETRY_AFTER_SECS)));
             }
         }

@@ -22,13 +22,28 @@ vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({ t: (key: string) => key })),
 }));
 
-const { mockGet, mockRouterPush } = vi.hoisted(() => ({
+const {
+  mockGet,
+  mockListDomains,
+  mockRotateSlug,
+  mockRouterPush,
+  mockRoute,
+  mockCopyToClipboard,
+  mockToast,
+  mockConfig,
+} = vi.hoisted(() => ({
   mockGet: vi.fn(),
+  mockListDomains: vi.fn(),
+  mockRotateSlug: vi.fn(),
   mockRouterPush: vi.fn(),
+  mockRoute: { params: { id: "page-1" } as Record<string, string>, query: {} },
+  mockCopyToClipboard: vi.fn(),
+  mockToast: vi.fn(() => vi.fn()),
+  mockConfig: { isCloud: "true", isEnterprise: "false" } as Record<string, string>,
 }));
 
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ params: { id: "page-1" }, query: {} }),
+  useRoute: () => mockRoute,
   useRouter: () => ({ push: mockRouterPush }),
   onBeforeRouteLeave: vi.fn(),
   onBeforeRouteUpdate: vi.fn(),
@@ -37,9 +52,10 @@ vi.mock("vue-router", () => ({
 vi.mock("@/services/status_pages", () => ({
   default: {
     get: mockGet,
+    listDomains: mockListDomains,
     update: vi.fn(),
     updateComponents: vi.fn(),
-    rotateSlug: vi.fn(),
+    rotateSlug: mockRotateSlug,
   },
 }));
 
@@ -52,10 +68,10 @@ vi.mock("@/utils/commons", () => ({
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: vi.fn(() => vi.fn()),
+  toast: mockToast,
 }));
 
-vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn() }));
+vi.mock("@/utils/clipboard", () => ({ copyToClipboard: mockCopyToClipboard }));
 
 vi.mock("vuex", () => ({
   useStore: () => ({
@@ -67,12 +83,15 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("@/aws-exports", () => ({
-  default: { isCloud: "true", isEnterprise: "false" },
+  default: mockConfig,
 }));
 
 // ── Component under test ───────────────────────────────────────────────────
 
 import StatusPageEditor from "./StatusPageEditor.vue";
+import StatusPagePreview from "./StatusPagePreview.vue";
+import type { StatusPageDomain } from "@/services/status_pages";
+import { builtInView, proxyView } from "@/test/unit/helpers/statusPageDomains";
 
 // ── Stubs ──────────────────────────────────────────────────────────────────
 
@@ -178,10 +197,139 @@ describe("StatusPageEditor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet.mockResolvedValue({ data: pageFixture() });
+    mockListDomains.mockResolvedValue({ data: [] });
+    mockRoute.params = { id: "page-1" };
+    mockConfig.isCloud = "true";
+    mockConfig.isEnterprise = "false";
   });
 
   afterEach(() => {
     wrapper?.unmount();
+  });
+
+  describe("public URL", () => {
+    const SLUG_URL = `${window.location.origin}/status/acme`;
+    const PROBED = { ...builtInView().evidence, probe_checked_at: 1_700_100_000_000_000 };
+
+    const serving = (overrides: Partial<StatusPageDomain> = {}) =>
+      builtInView({
+        serving_state: "serving",
+        is_holder: true,
+        verification_state: 1,
+        evidence: PROBED,
+        ...overrides,
+      });
+
+    // The field, the copied text and the preview's public-url prop, as one customer sees them.
+    async function mountWithDomains(domains: StatusPageDomain[] | Error) {
+      if (domains instanceof Error) mockListDomains.mockRejectedValue(domains);
+      else mockListDomains.mockResolvedValue({ data: domains });
+      wrapper = makeWrapper();
+      await flushPromises();
+      await wrapper.find('[data-test="status-page-editor-copy-url"]').trigger("click");
+      return {
+        field: wrapper.text(),
+        copied: mockCopyToClipboard.mock.calls.at(-1)?.[0],
+        preview: wrapper.findComponent(StatusPagePreview).props("publicUrl"),
+      };
+    }
+
+    it("is https://<domain>/ in the field, the copy and the preview for a serving domain", async () => {
+      const url = await mountWithDomains([serving({ domain: "status.brand.com" })]);
+
+      expect(mockListDomains).toHaveBeenCalledWith("org-1", "page-1", { silentForbidden: true });
+      expect(url.field).toContain("https://status.brand.com/");
+      expect(url.field).not.toContain(SLUG_URL);
+      expect(url.copied).toBe("https://status.brand.com/");
+      expect(url.preview).toBe("https://status.brand.com/");
+    });
+
+    it.each([false, true])("rotates only the slug (custom URL displayed: %s)", async (custom) => {
+      const customUrl = "https://status.brand.com/";
+      await mountWithDomains(custom ? [serving({ domain: "status.brand.com" })] : []);
+      mockRotateSlug.mockResolvedValueOnce({ data: { slug: "rotated" } });
+
+      const button = wrapper.get('[data-test="status-page-editor-rotate-slug"]');
+      expect(button.text()).toBe(custom ? "statusPages.rotateSlugOnly" : "statusPages.rotateSlug");
+      await button.trigger("click");
+      await flushPromises();
+
+      expect(mockRotateSlug).toHaveBeenCalledExactlyOnceWith("org-1", "page-1");
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
+        message: custom ? "statusPages.toast.slugOnlyRotated" : "statusPages.toast.slugRotated",
+      });
+      const expectedUrl = custom ? customUrl : `${window.location.origin}/status/rotated`;
+      expect(wrapper.text()).toContain(expectedUrl);
+      expect(wrapper.findComponent(StatusPagePreview).props("publicUrl")).toBe(expectedUrl);
+      await wrapper.get('[data-test="status-page-editor-copy-url"]').trigger("click");
+      expect(mockCopyToClipboard.mock.calls.at(-1)?.[0]).toBe(expectedUrl);
+    });
+
+    it.each([
+      ["pending", builtInView({ serving_state: "pending" })],
+      ["verified with proxy_mode", proxyView({ serving_state: "verified", reason: "proxy_mode" })],
+      ["waiting_for_dns", builtInView({ serving_state: "waiting_for_dns" })],
+      ["setting_up", builtInView({ serving_state: "setting_up" })],
+      ["not_serving", builtInView({ serving_state: "not_serving" })],
+      ["serving without probe evidence", serving({ evidence: builtInView().evidence })],
+    ])("is the slug URL for a domain that is %s", async (_label, view) => {
+      const url = await mountWithDomains([view]);
+
+      expect(url.field).toContain(SLUG_URL);
+      expect(url.copied).toBe(SLUG_URL);
+      expect(url.preview).toBe(SLUG_URL);
+    });
+
+    it("is the slug URL with no domain", async () => {
+      const url = await mountWithDomains([]);
+
+      expect(url.copied).toBe(SLUG_URL);
+      expect(url.preview).toBe(SLUG_URL);
+    });
+
+    it("is the slug URL, and shows no toast, when the domains cannot be loaded", async () => {
+      const url = await mountWithDomains(new Error("boom"));
+
+      expect(url.field).toContain(SLUG_URL);
+      expect(url.copied).toBe(SLUG_URL);
+      expect(url.preview).toBe(SLUG_URL);
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it("takes the serving domain with the smaller created_at, whatever the list order", async () => {
+      const older = serving({ id: "a", domain: "old.brand.com", created_at: 1_000 });
+      const newer = serving({ id: "b", domain: "new.brand.com", created_at: 2_000 });
+
+      expect((await mountWithDomains([newer, older])).preview).toBe("https://old.brand.com/");
+      wrapper.unmount();
+      expect((await mountWithDomains([older, newer])).preview).toBe("https://old.brand.com/");
+    });
+
+    it("loads no domains for a page that is not saved yet", async () => {
+      mockRoute.params = {};
+      wrapper = makeWrapper();
+      await flushPromises();
+
+      expect(mockListDomains).not.toHaveBeenCalled();
+    });
+
+    it("loads no domains in a build that is neither Cloud nor Enterprise", async () => {
+      mockConfig.isCloud = "false";
+      const url = await mountWithDomains([serving({ domain: "status.brand.com" })]);
+
+      expect(mockListDomains).not.toHaveBeenCalled();
+      expect(url.preview).toBe(SLUG_URL);
+    });
+
+    it("loads the domains in an Enterprise build that is not Cloud", async () => {
+      mockConfig.isCloud = "false";
+      mockConfig.isEnterprise = "true";
+      const url = await mountWithDomains([serving({ domain: "status.brand.com" })]);
+
+      expect(mockListDomains).toHaveBeenCalledWith("org-1", "page-1", { silentForbidden: true });
+      expect(url.preview).toBe("https://status.brand.com/");
+    });
   });
 
   describe("branding layout", () => {

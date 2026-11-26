@@ -23923,19 +23923,12 @@
       "verifying": "Verifica in corso...",
       "verifyFailed": "Verifica non riuscita",
       "deleteTitle": "Rimuovere questo dominio?",
-      "deleteBody": "Il dominio {name} non risolverà più verso questa pagina di stato.",
       "deleting": "Rimozione del dominio...",
       "deleted": "Dominio rimosso",
       "deleteFailed": "Rimozione del dominio non riuscita",
       "state": {
         "pending": "In sospeso",
-        "verified": "Verificato",
-        "failed": "Non riuscito"
-      },
-      "failureReason": {
-        "0": "Record TXT non trovato",
-        "1": "Record TXT trovato, ma il valore non corrisponde",
-        "2": "Risoluzione DNS non riuscita"
+        "verified": "Verificato"
       },
       "txtNameLabel": "Nome record",
       "txtValueLabel": "Valore record",
@@ -23943,9 +23936,7 @@
       "copyTxtValue": "Copia valore record",
       "txtNameCopied": "Nome record copiato",
       "txtValueCopied": "Valore record copiato",
-      "nextStepVerify": "La verifica viene eseguita automaticamente ogni {seconds} secondi. Puoi anche verificare ora.",
-      "nextStepCname": "Una volta verificato, punta {domain} a OpenObserve con un CNAME all'host di questa app in modo che serva la tua pagina di stato.",
-      "serving": "Verificato. Questo dominio ora serve la tua pagina di stato, purché il suo CNAME punti all'host di questa app."
+      "nextStepVerify": "La verifica viene eseguita automaticamente ogni {seconds} secondi. Puoi anche verificare ora."
     },
     "preview": {
       "title": "Anteprima",

@@ -23921,19 +23921,12 @@
       "verifying": "Verifying...",
       "verifyFailed": "Verification failed",
       "deleteTitle": "Remove this domain?",
-      "deleteBody": "The {name} domain will stop resolving to this status page.",
       "deleting": "Removing domain...",
       "deleted": "Domain removed",
       "deleteFailed": "Failed to remove domain",
       "state": {
         "pending": "Pending",
-        "verified": "Verified",
-        "failed": "Failed"
-      },
-      "failureReason": {
-        "0": "TXT record not found",
-        "1": "TXT record found, but the value doesn't match",
-        "2": "DNS resolution failed"
+        "verified": "Verified"
       },
       "txtNameLabel": "Record name",
       "txtValueLabel": "Record value",
@@ -23941,9 +23934,7 @@
       "copyTxtValue": "Copy record value",
       "txtNameCopied": "Record name copied",
       "txtValueCopied": "Record value copied",
-      "nextStepVerify": "Verification runs automatically every {seconds} seconds. You can also verify now.",
-      "nextStepCname": "Once verified, point {domain} at OpenObserve with a CNAME to this app's host so it serves your status page.",
-      "serving": "Verified. This domain now serves your status page, as long as its CNAME points at this app's host."
+      "nextStepVerify": "Verification runs automatically every {seconds} seconds. You can also verify now."
     },
     "preview": {
       "title": "Preview",

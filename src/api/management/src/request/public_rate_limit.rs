@@ -17,6 +17,8 @@
 
 use std::{
     collections::{HashMap, VecDeque},
+    hash::{BuildHasher, RandomState},
+    net::{IpAddr, Ipv6Addr},
     sync::Mutex,
     time::{Duration, Instant},
 };
@@ -32,6 +34,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 /// How a client whose `RealIp` was not resolved shows up in logs.
 pub const UNKNOWN_IP: &str = "unknown";
 pub const MAX_KEYS: usize = 65_536;
+const SHARDS: usize = 16;
 
 /// Hit counts per key in fixed windows, holding at most a fixed number of keys; a full map evicts
 /// the oldest window.
@@ -149,9 +152,50 @@ impl CounterState {
     }
 }
 
+/// [`Counters`] split over shards by a hash of the key, so unrelated keys rarely share a lock.
+pub struct ShardedCounters {
+    // Seeded per process, so a client cannot aim its keys at one shard to fill it.
+    hasher: RandomState,
+    shards: [Counters; SHARDS],
+}
+
+impl ShardedCounters {
+    /// Counts one hit for `key`; true past its budget.
+    pub fn over_budget(&self, key: &str, window: Duration, max: u32) -> bool {
+        self.shard(key).over_budget(key, window, max)
+    }
+
+    fn shard(&self, key: &str) -> &Counters {
+        &self.shards[self.hasher.hash_one(key) as usize % SHARDS]
+    }
+}
+
+impl Default for ShardedCounters {
+    fn default() -> Self {
+        Self {
+            hasher: RandomState::new(),
+            shards: std::array::from_fn(|_| Counters::new(MAX_KEYS / SHARDS)),
+        }
+    }
+}
+
 /// The client's address for logs: the ingress-resolved `RealIp`, or [`UNKNOWN_IP`].
 pub fn client_ip(ip: Option<RealIp>) -> String {
     ip.map_or_else(|| UNKNOWN_IP.to_owned(), |ip| ip.0.to_string())
+}
+
+/// IPv6 callers own a whole /64, so one host cannot spread over 2^64 keys.
+pub fn ip_key(ip: IpAddr) -> String {
+    match ip {
+        IpAddr::V4(v4) => v4.to_string(),
+        IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+            Some(v4) => v4.to_string(),
+            None => {
+                let s = v6.segments();
+                format!("{}/64", Ipv6Addr::new(s[0], s[1], s[2], s[3], 0, 0, 0, 0))
+            }
+        },
+    }
 }
 
 /// A JSON 429 telling the client when to come back.
@@ -166,6 +210,8 @@ pub fn too_many_requests(retry_after: Duration) -> Response {
 
 #[cfg(test)]
 mod tests {
+    use std::net::Ipv4Addr;
+
     use super::*;
 
     #[test]
@@ -257,5 +303,67 @@ mod tests {
         assert!(counters.exhausted("slug", window, 2));
         assert!(counters.exhausted("slug", window, 2), "a peek is not a hit");
         assert!(!counters.exhausted("other", window, 2));
+    }
+
+    #[test]
+    fn ipv6_addresses_share_a_slash_64_key() {
+        let a: IpAddr = "2001:db8:1:2:aaaa::1".parse().unwrap();
+        let b: IpAddr = "2001:db8:1:2:bbbb:cccc:dddd:eeee".parse().unwrap();
+        let other: IpAddr = "2001:db8:1:3::1".parse().unwrap();
+        assert_eq!(ip_key(a), ip_key(b));
+        assert_ne!(ip_key(a), ip_key(other));
+        assert_eq!(ip_key(a), "2001:db8:1:2::/64");
+    }
+
+    #[test]
+    fn ipv4_addresses_are_keyed_per_host() {
+        let a = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 7));
+        let b = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 8));
+        assert_ne!(ip_key(a), ip_key(b));
+        assert_eq!(ip_key(a), "203.0.113.7");
+        let mapped = IpAddr::V6(Ipv4Addr::new(203, 0, 113, 7).to_ipv6_mapped());
+        assert_eq!(
+            ip_key(mapped),
+            "203.0.113.7",
+            "a v4-mapped address keys as v4"
+        );
+    }
+
+    #[test]
+    fn a_sharded_key_trips_after_max_hits_in_the_window() {
+        let counters = ShardedCounters::default();
+        let window = Duration::from_secs(60);
+        assert!(!counters.over_budget("ip", window, 2));
+        assert!(!counters.over_budget("ip", window, 2));
+        assert!(counters.over_budget("ip", window, 2));
+    }
+
+    #[test]
+    fn keys_in_different_shards_do_not_share_a_count() {
+        let counters = ShardedCounters::default();
+        let window = Duration::from_secs(60);
+        let other = (0..1000)
+            .map(|i| format!("k{i}"))
+            .find(|k| !std::ptr::eq(counters.shard(k), counters.shard("a")))
+            .expect("1000 keys land in more than one of 16 shards");
+        assert!(!counters.over_budget("a", window, 1));
+        assert!(counters.over_budget("a", window, 1));
+        assert!(!counters.over_budget(&other, window, 1));
+        let tracked = |key: &str| counters.shard(key).state.lock().unwrap().hits.len();
+        assert_eq!((tracked("a"), tracked(&other)), (1, 1));
+    }
+
+    #[test]
+    fn a_sharded_key_starts_over_in_a_new_window() {
+        let counters = ShardedCounters::default();
+        let window = Duration::from_secs(60);
+        assert!(!counters.over_budget("ip", window, 1));
+        assert!(counters.over_budget("ip", window, 1));
+        let next_window = Instant::now() + window;
+        assert!(
+            !counters
+                .shard("ip")
+                .over_budget_at("ip", window, 1, 1, next_window)
+        );
     }
 }

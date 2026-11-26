@@ -2245,6 +2245,30 @@ fn service_route_table() -> Router {
             .route(
                 "/{org_id}/status_pages/domains/{did}/verify",
                 post(status_pages::admin::verify_domain),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/{did}/check",
+                post(status_pages::admin::check_domain),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/release_shadowed",
+                post(status_pages::admin::release_shadowed),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/installation",
+                get(status_pages::admin::installation_status),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/installation/check",
+                post(status_pages::admin::installation_check),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/installation/reset_key_check",
+                post(status_pages::admin::installation_reset_key_check),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/installation/recheck_epoch",
+                post(status_pages::admin::installation_recheck_epoch),
             );
 
         // The private-VPC-agent path, and the only part of synthetics that
@@ -3209,7 +3233,10 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
     // wraps routes that exist at call time, so this has to come after the
     // "/" redirect, "/web" mount, and base_uri trailing-slash redirect above
     // or a custom domain's Host falls through to those unchecked.
-    if config::get_config().synthetics.enabled {
+    if status_pages::public::host_layer_wanted(
+        config::get_config().synthetics.enabled,
+        status_pages::public::host_boundary_needed(),
+    ) {
         outer = outer.layer(middleware::from_fn(
             status_pages::public::host_route_middleware,
         ));
@@ -3582,6 +3609,11 @@ mod tests {
             ("POST", "/api/default/status_pages/notices/n1/updates", 403, "require an enterprise license"),
             ("POST", "/api/default/status_pages/notices/n1/mark_false_positive", 403, "require an enterprise license"),
             ("POST", "/api/default/status_pages/s1/domains", 403, "require an enterprise license"),
+            ("POST", "/api/default/status_pages/domains/release_shadowed", 403, "require an enterprise license"),
+            ("GET", "/api/default/status_pages/domains/installation", 403, "require an enterprise license"),
+            ("POST", "/api/default/status_pages/domains/installation/check", 403, "require an enterprise license"),
+            ("POST", "/api/default/status_pages/domains/installation/reset_key_check", 403, "require an enterprise license"),
+            ("POST", "/api/default/status_pages/domains/installation/recheck_epoch", 403, "require an enterprise license"),
             ("POST", "/api/v2/default/alerts/incidents", 403, "Service incidents require the enterprise build"),
             ("PUT", "/api/default/service_identity/overrides", 403, "Service versions require the enterprise build"),
             ("POST", "/api/default/service_identity/aliases", 403, "Service versions require the enterprise build"),

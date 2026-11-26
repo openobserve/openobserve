@@ -29,6 +29,7 @@ pub mod pipelines;
 pub mod prompts;
 pub mod service_identity;
 pub mod service_streams;
+pub mod status_page_domains;
 pub mod synthetics;
 
 pub async fn get_coordinator() -> &'static Box<dyn crate::db::Db> {

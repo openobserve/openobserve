@@ -1130,6 +1130,7 @@ mod tests {
             metrics: Default::default(),
             version: String::new(),
             commit: String::new(),
+            status_page_holders: true,
         }
     }
 

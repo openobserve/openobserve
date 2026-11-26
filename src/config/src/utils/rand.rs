@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use rand::{
-    RngExt,
+    RngExt, TryRng,
     distr::{Alphanumeric, SampleString},
+    rngs::SysRng,
 };
 
 pub fn get_rand_element<T>(arr: &[T]) -> &T {
@@ -44,6 +45,16 @@ pub fn get_rand_num_within(min: u64, max: u64) -> u64 {
 pub fn random_bytes(n: usize) -> Vec<u8> {
     let mut buf = vec![0u8; n];
     rand::rng().fill(buf.as_mut_slice());
+    buf
+}
+
+/// `n` bytes straight from the operating system's random source, for values that must never
+/// repeat across processes. Panics when the OS source fails, as a key generator would.
+pub fn os_random_bytes(n: usize) -> Vec<u8> {
+    let mut buf = vec![0u8; n];
+    SysRng
+        .try_fill_bytes(&mut buf)
+        .expect("the operating system random source failed");
     buf
 }
 

@@ -196,11 +196,19 @@ pub async fn rotate_slug(org_id: &str, id: &str) -> Result<String, anyhow::Error
 }
 
 pub async fn delete_page(org_id: &str, id: &str) -> Result<bool, anyhow::Error> {
-    let deleted = table::delete_page(org_id, id).await?;
-    if deleted {
+    let deleted = table::delete_page(infra::db::get_orm_client_rw().await, org_id, id).await?;
+    if deleted.existed {
         emit_delete(org_id, "status_pages", id).await;
     }
-    Ok(deleted)
+    emit_cert_changes(&deleted.hostnames).await;
+    Ok(deleted.existed)
+}
+
+/// Tells every node that these hostnames lost their certificate, after the commit that deleted
+/// it. Only an installation with built-in TLS on has a store to tell.
+pub async fn emit_cert_changes(_hostnames: &[String]) {
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::status_pages::cert_store::announce_changed(_hostnames).await;
 }
 
 /// Bulk component replace. **R-1 (top build risk):** every mapped check is
@@ -423,13 +431,8 @@ pub async fn preview(
     Ok(Some(PreviewResponse { current, history }))
 }
 
-/// Claims a candidate domain for a page. Lowercases/punycodes before the
-/// live-uniqueness check so `Status.Brandname.COM` and
-/// `status.brandname.com` collide as the same string (R-3 note: the row is
-/// still org-scoped by `org_id`, but domain uniqueness is deliberately
-/// global — a second org must never be able to claim a domain another org
-/// already holds). Licensed (Custom Domains is an enterprise sub-feature of
-/// status pages).
+/// Claims a domain for a page. Several orgs may claim one hostname; the first to prove it holds it.
+/// Licensed.
 #[cfg(feature = "enterprise")]
 pub async fn create_domain(
     org_id: &str,
@@ -494,6 +497,89 @@ pub async fn verify_domain_now(
     _org_id: &str,
     _id: &str,
 ) -> Result<config::meta::status_pages::DomainAdminView, anyhow::Error> {
+    enterprise_required()
+}
+
+/// "Check again": the computed view of a claim, as the list gives it. With built-in TLS it also
+/// asks the next manager cycle to look at the claim; in proxy mode and while off it writes
+/// nothing. Licensed.
+#[cfg(feature = "enterprise")]
+pub async fn check_domain_again(
+    org_id: &str,
+    id: &str,
+) -> Result<config::meta::status_pages::DomainAdminView, anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::domains::check_domain_again(org_id, id).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn check_domain_again(
+    _org_id: &str,
+    _id: &str,
+) -> Result<config::meta::status_pages::DomainAdminView, anyhow::Error> {
+    enterprise_required()
+}
+
+/// Releases every claim that is not the holder of a hostname another claim holds, so a rollback
+/// to a release that reads claims by hostname alone serves the holder. Licensed.
+#[cfg(feature = "enterprise")]
+pub async fn release_shadowed_domains() -> Result<u64, anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::domains::release_shadowed().await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn release_shadowed_domains() -> Result<u64, anyhow::Error> {
+    enterprise_required()
+}
+
+/// The installation status root users read: one body in every state. Licensed.
+#[cfg(feature = "enterprise")]
+pub async fn installation_status()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::installation::status().await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn installation_status()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    enterprise_required()
+}
+
+/// Asks for the installation check of the domain target now; refused outside built-in TLS.
+#[cfg(feature = "enterprise")]
+pub async fn installation_check()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::installation::check_again().await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn installation_check()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    enterprise_required()
+}
+
+/// Forgets the stored key check value after the key was replaced; refused outside built-in TLS.
+#[cfg(feature = "enterprise")]
+pub async fn installation_reset_key_check()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::installation::reset_key_check().await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn installation_reset_key_check()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    enterprise_required()
+}
+
+/// Re-checks every holder after a restore and writes the epoch; refused outside built-in TLS.
+#[cfg(feature = "enterprise")]
+pub async fn installation_recheck_epoch()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::installation::recheck_epoch().await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn installation_recheck_epoch()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
     enterprise_required()
 }
 

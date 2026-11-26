@@ -23923,19 +23923,12 @@
       "verifying": "Verifiëren...",
       "verifyFailed": "Verificatie mislukt",
       "deleteTitle": "Dit domein verwijderen?",
-      "deleteBody": "Het domein {name} verwijst niet meer naar deze statuspagina.",
       "deleting": "Domein verwijderen...",
       "deleted": "Domein verwijderd",
       "deleteFailed": "Domein verwijderen mislukt",
       "state": {
         "pending": "In behandeling",
-        "verified": "Geverifieerd",
-        "failed": "Mislukt"
-      },
-      "failureReason": {
-        "0": "TXT-record niet gevonden",
-        "1": "TXT-record gevonden, maar de waarde komt niet overeen",
-        "2": "DNS-resolutie mislukt"
+        "verified": "Geverifieerd"
       },
       "txtNameLabel": "Recordnaam",
       "txtValueLabel": "Recordwaarde",
@@ -23943,9 +23936,7 @@
       "copyTxtValue": "Recordwaarde kopiëren",
       "txtNameCopied": "Recordnaam gekopieerd",
       "txtValueCopied": "Recordwaarde gekopieerd",
-      "nextStepVerify": "Verificatie wordt automatisch elke {seconds} seconden uitgevoerd. U kunt ook nu verifiëren.",
-      "nextStepCname": "Wijs {domain} na verificatie naar OpenObserve met een CNAME naar de host van deze app, zodat het uw statuspagina bedient.",
-      "serving": "Geverifieerd. Dit domein bedient nu uw statuspagina, zolang de CNAME naar de host van deze app verwijst."
+      "nextStepVerify": "Verificatie wordt automatisch elke {seconds} seconden uitgevoerd. U kunt ook nu verifiëren."
     },
     "preview": {
       "title": "Live voorbeeld",
