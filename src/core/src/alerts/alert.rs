@@ -3786,9 +3786,8 @@ pub(crate) async fn send_http_notification(
     if jira::is_jira(endpoint) {
         return Err(send::SendError::Blocked(jira::UNSUPPORTED_SENDER.to_string()).into());
     }
-    // Block SSRF: validate the destination URL (including DNS resolution) before
-    // making any outbound request. The client is built through `build_safe_destination_client`
-    // so that redirect targets and per-connect DNS resolution are re-validated.
+    // The client's DNS guard never sees a literal IP, so the URL is checked here first.
+    // `build_safe_destination_client` re-checks each connect and never follows a redirect.
     if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
         return Err(send::SendError::Blocked(format!(
             "Destination URL blocked by SSRF guard: {e}"

@@ -533,10 +533,17 @@ mod tests {
         arrow::datatypes::{DataType, Field, Schema},
         common::{JoinType, ScalarValue},
         execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
-        physical_expr::expressions::Literal,
-        physical_optimizer::{PhysicalOptimizerRule, sanity_checker::SanityCheckPlan},
+        functions_aggregate::count::count_udaf,
+        physical_expr::{
+            aggregate::{AggregateExprBuilder, AggregateFunctionExpr},
+            expressions::Literal,
+        },
+        physical_optimizer::{PhysicalOptimizerRule, sanity_checker::check_plan_tree_sanity},
         physical_plan::{
-            displayable, empty::EmptyExec, expressions::col, windows::BoundedWindowAggExec,
+            displayable,
+            empty::EmptyExec,
+            expressions::{col, lit},
+            windows::BoundedWindowAggExec,
         },
         prelude::{SessionConfig, SessionContext},
     };
@@ -546,6 +553,15 @@ mod tests {
     use crate::datafusion::{
         datasource::empty_table::NewEmptyTable, distributed::codec::get_physical_extension_codec,
     };
+
+    // DataFusion rejects an AggregateExec with neither grouping nor aggregates.
+    fn count_one(schema: &Arc<Schema>) -> Result<Vec<Arc<AggregateFunctionExpr>>> {
+        let count = AggregateExprBuilder::new(count_udaf(), vec![lit(1i32)])
+            .schema(Arc::clone(schema))
+            .alias("COUNT(1)")
+            .build()?;
+        Ok(vec![Arc::new(count)])
+    }
 
     #[test]
     fn test_remote_scan_rule_name() {
@@ -625,8 +641,8 @@ mod tests {
         let agg = AggregateExec::try_new(
             AggregateMode::Partial,
             group_by,
-            vec![],
-            vec![],
+            count_one(&schema)?,
+            vec![None],
             Arc::new(EmptyExec::new(Arc::clone(&schema))),
             Arc::clone(&schema),
         )?;
@@ -719,8 +735,8 @@ mod tests {
         let agg = AggregateExec::try_new(
             AggregateMode::Partial,
             group_by,
-            vec![],
-            vec![],
+            count_one(&schema)?,
+            vec![None],
             Arc::new(EmptyExec::new(Arc::clone(&schema)).with_partitions(4)),
             Arc::clone(&schema),
         )?;
@@ -1083,8 +1099,7 @@ mod tests {
 
     async fn assert_cluster_plan_is_sane(sql: &str) {
         let (ctx, plan) = cluster_plan(sql).await;
-        let check = SanityCheckPlan::new();
-        if let Err(e) = check.optimize(Arc::clone(&plan), ctx.state().config_options()) {
+        if let Err(e) = check_plan_tree_sanity(&plan, &ctx.state().config_options().optimizer) {
             panic!("{sql}: {e}\n{}", displayable(plan.as_ref()).indent(false));
         }
     }
@@ -1102,6 +1117,20 @@ mod tests {
         ] {
             assert_cluster_plan_is_sane(sql).await;
         }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_window_on_computed_key_keeps_equivalences() {
+        // DataFusion drops the outer sort through `scan_type ≡ COALESCE(..)`, which only
+        // holds above RemoteScanExec if it keeps the input's equivalence classes.
+        assert_cluster_plan_is_sane(
+            "SELECT _timestamp, COALESCE(k8s_cluster, 'unknown') AS scan_type, value, \
+                ROW_NUMBER() OVER (PARTITION BY COALESCE(k8s_cluster, 'unknown') ORDER BY value) \
+                AS rn_by_scan, \
+                AVG(value) OVER (PARTITION BY COALESCE(k8s_cluster, 'unknown')) AS avg_by_scan \
+                FROM t WHERE value IS NOT NULL ORDER BY scan_type, rn_by_scan LIMIT 10",
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -1241,8 +1270,7 @@ mod tests {
         }
         assert_eq!(count_bare_new_empty_execs(&plan), 0, "{context}");
         assert!(decode_every_remote_scan(&ctx, &plan) >= 2, "{context}");
-        let check = SanityCheckPlan::new();
-        if let Err(e) = check.optimize(Arc::clone(&plan), ctx.state().config_options()) {
+        if let Err(e) = check_plan_tree_sanity(&plan, &ctx.state().config_options().optimizer) {
             panic!("{e}: {context}");
         }
     }
