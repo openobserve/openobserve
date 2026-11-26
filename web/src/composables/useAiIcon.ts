@@ -28,15 +28,15 @@
 
 import { computed } from "vue";
 import { useThemeRevision } from "@/composables/useTheme";
-import { chartColor } from "@/utils/chartTheme";
 import { SPARK_PATH } from "@/components/ai-assistant/common/AssistantSpark.vue";
 
+const sparkToken = (name: string): string =>
+  getComputedStyle(document.documentElement)
+    .getPropertyValue(`--color-assistant-spark-${name}`)
+    .trim();
+
 const sparkDataUri = (): string => {
-  const [from, via, to] = [
-    chartColor("--color-assistant-spark-from"),
-    chartColor("--color-assistant-spark-via"),
-    chartColor("--color-assistant-spark-to"),
-  ];
+  const [from, via, to] = ["from", "via", "to"].map(sparkToken);
   return (
     "data:image/svg+xml," +
     encodeURIComponent(
