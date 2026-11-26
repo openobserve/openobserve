@@ -24334,7 +24334,9 @@
       "typeRejected": "Alleen {allowed}-bestanden worden geaccepteerd",
       "sizeRejected": "{size} overschrijdt de limiet van {max}",
       "countRejected": "Slechts {count} bestand tegelijk | Slechts {count} bestanden tegelijk",
-      "invalidJson": "Geen geldige JSON: {detail}"
+      "invalidJson": "Geen geldige JSON: {detail}",
+      "invalidImage": "Geen geldig afbeeldingsbestand",
+      "unavailable": "Bestanden uploaden is niet beschikbaar"
     },
     "date": {
       "openCalendar": "Kalender openen",

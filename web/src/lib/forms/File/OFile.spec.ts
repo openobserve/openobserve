@@ -119,12 +119,12 @@ describe("OFile", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
-  it("keeps the whole prompt but no browse button when disabled without a reason", () => {
-    wrapper = mount(OFile, { props: { disabled: true } });
-    expect(wrapper.find('[data-test="o-file-prompt"]').text()).toBe(
-      "Drop a file to attach, or browse",
-    );
+  it("says upload is unavailable, with no drop prompt, when disabled without a reason", () => {
+    wrapper = mount(OFile, { props: { disabled: true, accept: ".json" } });
+    expect(wrapper.find('[data-test="o-file-disabled"]').text()).toBe("File upload is unavailable");
+    expect(wrapper.find('[data-test="o-file-prompt"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="o-file-choose-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="o-file-types"]').exists()).toBe(false);
   });
 
   it("renders the label", () => {

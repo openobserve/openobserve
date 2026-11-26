@@ -24334,7 +24334,9 @@
       "typeRejected": "Akceptowane są tylko pliki: {allowed}",
       "sizeRejected": "{size} przekracza limit {max}",
       "countRejected": "Tylko {count} plik naraz | Tylko {count} pliki naraz",
-      "invalidJson": "Nieprawidłowy JSON: {detail}"
+      "invalidJson": "Nieprawidłowy JSON: {detail}",
+      "invalidImage": "To nie jest prawidłowy plik obrazu",
+      "unavailable": "Przesyłanie plików jest niedostępne"
     },
     "date": {
       "openCalendar": "Otwórz kalendarz",

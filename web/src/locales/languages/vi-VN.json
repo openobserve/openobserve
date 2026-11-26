@@ -24333,8 +24333,10 @@
       "dropFilesToAttach": "Thả các tệp để đính kèm",
       "typeRejected": "Chỉ chấp nhận tệp {allowed}",
       "sizeRejected": "{size} vượt quá giới hạn {max}",
-      "countRejected": "Mỗi lần chỉ {count} tệp",
-      "invalidJson": "Không phải JSON hợp lệ: {detail}"
+      "countRejected": "Mỗi lần chỉ {count} tệp | Mỗi lần chỉ {count} tệp",
+      "invalidJson": "Không phải JSON hợp lệ: {detail}",
+      "invalidImage": "Không phải tệp hình ảnh hợp lệ",
+      "unavailable": "Không thể tải tệp lên"
     },
     "date": {
       "openCalendar": "Mở lịch",

@@ -359,13 +359,15 @@ const zoneClasses = computed(() => [
             }}
           </span>
         </template>
-        <span v-else-if="isDisabled && disabledReason">{{ disabledReason }}</span>
+        <!-- No drop prompt while disabled: it would invite a drop that is ignored -->
+        <span v-else-if="isDisabled" :data-test="testId('disabled')">{{
+          disabledReason || t("components.file.unavailable")
+        }}</span>
         <template v-else>
           <span :data-test="testId('prompt')" class="text-text-body"
             >{{
               prompt.before
             }}<!-- .stop: the zone's own click handler would open the picker a second time --><OButton
-              v-if="!isDisabled"
               :id="browseId"
               variant="link"
               :aria-labelledby="browseLabelledBy"
@@ -374,7 +376,6 @@ const zoneClasses = computed(() => [
               :data-test="testId('choose-btn')"
               @click.stop="openPicker"
               >{{ t("components.file.browseLink") }}</OButton
-            ><template v-else>{{ t("components.file.browseLink") }}</template
             >{{ prompt.after }}</span
           >
           <span

@@ -24333,8 +24333,10 @@
       "dropFilesToAttach": "松开以附加文件",
       "typeRejected": "仅接受 {allowed} 文件",
       "sizeRejected": "{size} 超过 {max} 的限制",
-      "countRejected": "一次只能 {count} 个文件",
-      "invalidJson": "不是有效的 JSON:{detail}"
+      "countRejected": "一次只能 {count} 个文件 | 一次只能 {count} 个文件",
+      "invalidJson": "不是有效的 JSON:{detail}",
+      "invalidImage": "不是有效的图片文件",
+      "unavailable": "文件上传不可用"
     },
     "date": {
       "openCalendar": "打开日历",

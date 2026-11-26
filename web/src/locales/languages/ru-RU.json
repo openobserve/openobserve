@@ -24334,7 +24334,9 @@
       "typeRejected": "Принимаются только файлы: {allowed}",
       "sizeRejected": "{size} превышает лимит {max}",
       "countRejected": "Только {count} файл за раз | Только {count} файлов за раз",
-      "invalidJson": "Недопустимый JSON: {detail}"
+      "invalidJson": "Недопустимый JSON: {detail}",
+      "invalidImage": "Недопустимый файл изображения",
+      "unavailable": "Загрузка файлов недоступна"
     },
     "date": {
       "openCalendar": "Открыть календарь",

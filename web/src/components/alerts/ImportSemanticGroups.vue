@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="jsonFile"
                 :label="t('correlation.importSemanticGroups.selectJsonFile')"
                 accept=".json"
+                :validate="validateSemanticGroupsFile"
                 @update:model-value="loadFile"
                 @clear="clearFile"
                 data-test="semantic-groups-import-file"
@@ -226,7 +227,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- No Diff State -->
         <div v-else-if="!isImporting && !diffData" class="bg-card-glass-bg p-4 text-center">
-          <OIcon name="cloud-upload" class="mb-3 size-16!" />
           <div class="text-text-muted mb-2 text-xl font-semibold">
             {{ t("correlation.importSemanticGroups.uploadPrompt") }}
           </div>
@@ -345,6 +345,7 @@ import type { FileValue } from "@/lib/forms/File/OFile.types";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import BaseImport from "@/components/common/BaseImport.vue";
+import { createSemanticGroupsFileValidator } from "@/components/alerts/semanticGroupsFile";
 import alertsService from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
@@ -372,6 +373,7 @@ interface SemanticGroupDiff {
 }
 
 const { t } = useI18nTyped();
+const validateSemanticGroupsFile = createSemanticGroupsFileValidator(t);
 const router = useRouter();
 const store = useStore();
 

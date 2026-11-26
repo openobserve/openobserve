@@ -24334,7 +24334,9 @@
       "typeRejected": "Seuls les fichiers {allowed} sont acceptés",
       "sizeRejected": "{size} dépasse la limite de {max}",
       "countRejected": "Seulement {count} fichier à la fois | Seulement {count} fichiers à la fois",
-      "invalidJson": "JSON non valide : {detail}"
+      "invalidJson": "JSON non valide : {detail}",
+      "invalidImage": "Ce n'est pas un fichier image valide",
+      "unavailable": "Le téléversement de fichiers n'est pas disponible"
     },
     "date": {
       "openCalendar": "Ouvrir le calendrier",

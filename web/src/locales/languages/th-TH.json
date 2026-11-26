@@ -24331,8 +24331,10 @@
       "dropFilesToAttach": "วางเพื่อแนบไฟล์",
       "typeRejected": "รับเฉพาะไฟล์ {allowed} เท่านั้น",
       "sizeRejected": "{size} เกินขีดจำกัด {max}",
-      "countRejected": "ครั้งละ {count} ไฟล์เท่านั้น",
-      "invalidJson": "JSON ไม่ถูกต้อง: {detail}"
+      "countRejected": "ครั้งละ {count} ไฟล์เท่านั้น | ครั้งละ {count} ไฟล์เท่านั้น",
+      "invalidJson": "JSON ไม่ถูกต้อง: {detail}",
+      "invalidImage": "ไม่ใช่ไฟล์รูปภาพที่ถูกต้อง",
+      "unavailable": "ไม่สามารถอัปโหลดไฟล์ได้"
     },
     "date": {
       "openCalendar": "Open calendar",

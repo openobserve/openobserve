@@ -205,6 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :model-value="logo.file.value"
                   :disabled="!customBrandingAccess.allowed"
+                  :disabled-reason="t('enterpriseFeature.availableIn')"
                   :locked="!customBrandingAccess.allowed"
                   :data-test="logo.dataTest"
                   :test-ids="

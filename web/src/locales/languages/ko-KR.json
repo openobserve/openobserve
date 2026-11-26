@@ -24334,7 +24334,9 @@
       "typeRejected": "{allowed} 파일만 허용됩니다",
       "sizeRejected": "{size}이(가) {max} 제한을 초과합니다",
       "countRejected": "한 번에 {count}개 파일만 가능 | 한 번에 {count}개 파일만 가능",
-      "invalidJson": "올바르지 않은 JSON: {detail}"
+      "invalidJson": "올바르지 않은 JSON: {detail}",
+      "invalidImage": "유효한 이미지 파일이 아닙니다",
+      "unavailable": "파일 업로드를 사용할 수 없습니다"
     },
     "date": {
       "openCalendar": "달력 열기",

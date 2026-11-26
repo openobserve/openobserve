@@ -24332,7 +24332,9 @@
       "typeRejected": "Only {allowed} files are accepted",
       "sizeRejected": "{size} is over the {max} limit",
       "countRejected": "Only {count} file at a time | Only {count} files at a time",
-      "invalidJson": "Not valid JSON: {detail}"
+      "invalidJson": "Not valid JSON: {detail}",
+      "invalidImage": "Not a valid image file",
+      "unavailable": "File upload is unavailable"
     },
     "date": {
       "openCalendar": "Open calendar",

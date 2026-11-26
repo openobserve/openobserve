@@ -24334,7 +24334,9 @@
       "typeRejected": "{allowed} ファイルのみ受け付けます",
       "sizeRejected": "{size} は上限 {max} を超えています",
       "countRejected": "一度に {count} ファイルのみ | 一度に {count} ファイルのみ",
-      "invalidJson": "無効な JSON: {detail}"
+      "invalidJson": "無効な JSON: {detail}",
+      "invalidImage": "有効な画像ファイルではありません",
+      "unavailable": "ファイルのアップロードは利用できません"
     },
     "date": {
       "openCalendar": "カレンダーを開く",

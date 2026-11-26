@@ -393,6 +393,11 @@ export default defineComponent({
     };
 
     watch(jsonFiles, (newVal) => {
+      // Every file removed or refused: nothing is left to import.
+      if (!newVal || newVal.length === 0) {
+        clearRejectedJson();
+        return;
+      }
       if (newVal && newVal.length > 0) {
         const fileContents = []; // Array to store parsed JSON objects
 

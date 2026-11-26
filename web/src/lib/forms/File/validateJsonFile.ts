@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { FileValidator } from "./OFile.types";
-import { raw, type TranslateFn } from "@/types/i18n";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 function readText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -12,15 +12,22 @@ function readText(file: File): Promise<string> {
   });
 }
 
-/** An OFile `validate` that rejects a file whose text does not parse as JSON (guideline U1). */
-export function createJsonFileValidator(t: TranslateFn): FileValidator {
+/**
+ * An OFile `validate` that rejects a file whose text does not parse as JSON (guideline U1).
+ * `check` can also reject valid JSON of the wrong shape, with its own message.
+ */
+export function createJsonFileValidator(
+  t: TranslateFn,
+  check?: (value: unknown) => I18nText | null,
+): FileValidator {
   return async (file) => {
+    let value: unknown;
     try {
-      JSON.parse(await readText(file));
-      return null;
+      value = JSON.parse(await readText(file));
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       return t("components.file.invalidJson", { detail: raw(detail) });
     }
+    return check ? check(value) : null;
   };
 }

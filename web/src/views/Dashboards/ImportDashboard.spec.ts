@@ -423,6 +423,18 @@ describe("ImportDashboard.vue", () => {
     expect(wrapper.findComponent({ name: "SelectFolderDropdown" }).props("disabled")).toBe(false);
   });
 
+  it("clears the editor once every file is removed, so Import has nothing stale to send", async () => {
+    const content = JSON.stringify({ title: "From A", tabs: [{ tabId: "t1", panels: [] }] });
+    wrapper = mountComponent();
+    await nextTick();
+    wrapper.vm.form.setFieldValue("jsonFiles", [
+      new File([content], "a.json", { type: "application/json" }),
+    ]);
+    await vi.waitFor(() => expect(wrapper.vm.jsonStr).toContain("From A"));
+    wrapper.vm.form.setFieldValue("jsonFiles", []);
+    await vi.waitFor(() => expect(wrapper.vm.jsonStr).toBe(""));
+  });
+
   it("keeps the folder picker locked while uploaded files are importing", async () => {
     const dashboardService = (await import("@/services/dashboards")).default;
     let settle: (v: unknown) => void = () => {};

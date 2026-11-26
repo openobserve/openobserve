@@ -22,7 +22,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
-import type { FileRejection, FileValue } from "@/lib/forms/File/OFile.types";
+import type { FileRejection, FileValidator, FileValue } from "@/lib/forms/File/OFile.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 type TestIds = {
@@ -55,6 +55,7 @@ const props = withDefaults(
     locked?: boolean;
     /** Takes no picks or drops, e.g. while the feature is locked. */
     disabled?: boolean;
+    disabledReason?: I18nText;
     dataTest: string;
     testIds?: Partial<TestIds>;
   }>(),
@@ -69,6 +70,7 @@ const props = withDefaults(
     showStatus: true,
     locked: false,
     disabled: false,
+    disabledReason: undefined,
     testIds: () => ({}),
   },
 );
@@ -119,6 +121,26 @@ const details = computed<I18nText | null>(() => {
   return dims ? raw(`${props.modelValue.name} · ${dims}`) : raw(props.modelValue.name);
 });
 
+// The type check trusts the file name, so a renamed non-image would otherwise reach the preview broken.
+function decodesAsImage(file: File): Promise<boolean> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(true);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(false);
+    };
+    img.src = url;
+  });
+}
+
+const validateImage: FileValidator = async (file) =>
+  (await decodesAsImage(file)) ? null : t("components.file.invalidImage");
+
 function onPicked(value: FileValue) {
   emit("update:modelValue", value instanceof File ? value : null);
 }
@@ -167,6 +189,8 @@ function onRemove() {
       :aria-label="ariaLabel ?? title"
       :accept="accept"
       :disabled="disabled"
+      :disabled-reason="disabledReason"
+      :validate="validateImage"
       :data-test="ids.file"
       @update:model-value="onPicked"
       @rejected="emit('rejected', $event)"

@@ -454,6 +454,9 @@ export default defineComponent({
         jsonStr.value = JSON.stringify(combinedJson, null, 2);
         emit("update:jsonStr", jsonStr.value);
         emit("update:jsonArray", jsonArrayOfObj.value);
+      } else if (activeTab.value === "import_json_file") {
+        // Every file removed or refused: nothing is left to import.
+        clearRejectedJson();
       }
     });
 

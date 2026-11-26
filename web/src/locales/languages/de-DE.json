@@ -24334,7 +24334,9 @@
       "typeRejected": "Nur {allowed}-Dateien werden akzeptiert",
       "sizeRejected": "{size} überschreitet das Limit von {max}",
       "countRejected": "Nur {count} Datei auf einmal | Nur {count} Dateien auf einmal",
-      "invalidJson": "Kein gültiges JSON: {detail}"
+      "invalidJson": "Kein gültiges JSON: {detail}",
+      "invalidImage": "Keine gültige Bilddatei",
+      "unavailable": "Datei-Upload ist nicht verfügbar"
     },
     "date": {
       "openCalendar": "Kalender öffnen",

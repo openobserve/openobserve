@@ -24333,8 +24333,10 @@
       "dropFilesToAttach": "أفلت الملفات لإرفاقها",
       "typeRejected": "يُقبل فقط الملفات من نوع {allowed}",
       "sizeRejected": "{size} يتجاوز الحد {max}",
-      "countRejected": "ملف واحد فقط في كل مرة | {count} ملفات فقط في كل مرة",
-      "invalidJson": "JSON غير صالح: {detail}"
+      "countRejected": "{count} ملف فقط في كل مرة | {count} ملفات فقط في كل مرة",
+      "invalidJson": "JSON غير صالح: {detail}",
+      "invalidImage": "ليس ملف صورة صالحًا",
+      "unavailable": "رفع الملفات غير متاح"
     },
     "date": {
       "openCalendar": "فتح التقويم",

@@ -24334,7 +24334,9 @@
       "typeRejected": "Sono accettati solo file {allowed}",
       "sizeRejected": "{size} supera il limite di {max}",
       "countRejected": "Solo {count} file alla volta | Solo {count} file alla volta",
-      "invalidJson": "JSON non valido: {detail}"
+      "invalidJson": "JSON non valido: {detail}",
+      "invalidImage": "Non è un file immagine valido",
+      "unavailable": "Il caricamento dei file non è disponibile"
     },
     "date": {
       "openCalendar": "Apri calendario",

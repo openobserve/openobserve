@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import LogoUploadCard from "./LogoUploadCard.vue";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
@@ -63,6 +63,62 @@ describe("LogoUploadCard", () => {
     expect(wrapper.find('[data-test="logo_preview"]').classes()).toContain(
       "bg-logo-preview-dark-bg",
     );
+  });
+
+  describe("checking that a picked file is a real image", () => {
+    // jsdom never decodes images, so the browser's load / error outcome is stood in for.
+    const decodes = (ok: boolean) =>
+      vi.stubGlobal(
+        "Image",
+        class {
+          onload: (() => void) | null = null;
+          onerror: (() => void) | null = null;
+          set src(_url: string) {
+            queueMicrotask(() => (ok ? this.onload?.() : this.onerror?.()));
+          }
+        },
+      );
+    const pick = async (file: File) => {
+      const input = wrapper.find("input[type='file']");
+      Object.defineProperty(input.element, "files", { value: [file], configurable: true });
+      await input.trigger("change");
+      for (let i = 0; i < 5; i++) await flushPromises();
+    };
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("takes a file the browser can decode", async () => {
+      decodes(true);
+      mountCard();
+      const file = new File(["x"], "acme.png", { type: "image/png" });
+      await pick(file);
+      expect(wrapper.emitted("update:modelValue")![0]).toEqual([file]);
+    });
+
+    it("refuses a renamed non-image with an error row instead of a broken preview", async () => {
+      decodes(false);
+      mountCard();
+      await pick(new File(["not an image"], "notes.png", { type: "image/png" }));
+      expect(wrapper.emitted("update:modelValue")).toEqual([[null]]);
+      expect(wrapper.find('[data-test="o-file-chip-0"]').text()).toContain(
+        "Not a valid image file",
+      );
+    });
+  });
+
+  it("shows the reason instead of the drop prompt while disabled", () => {
+    wrapper = mount(LogoUploadCard, {
+      props: {
+        ...base,
+        disabled: true,
+        disabledReason: raw("Available in OpenObserve Enterprise"),
+      },
+      global: { plugins: [i18n] },
+    });
+    expect(wrapper.find('[data-test="logo_file_upload-disabled"]').text()).toBe(
+      "Available in OpenObserve Enterprise",
+    );
+    expect(wrapper.find('[data-test="logo_file_upload-prompt"]').exists()).toBe(false);
   });
 
   it("takes no dropped file while disabled, e.g. when branding is locked", async () => {
