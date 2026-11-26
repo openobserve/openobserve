@@ -35,8 +35,10 @@ use o2_enterprise::enterprise::{
 
 use super::{rca_thread::ToolPart, record_v2::event_parts};
 
-/// What opencode writes on a call that was running when its turn was stopped.
+/// What opencode 1.x writes on a call that was running when its turn was stopped.
 const ABORTED_TEXT: &str = "Tool execution aborted";
+/// opencode 2.x's message for that call, under its error type `aborted`.
+const INTERRUPTED_TEXT: &str = "Tool execution interrupted";
 /// What a failed call leaves as the toolset's `last_error`, the same as the live stream's.
 const CALL_FAILED: &str = "The last call through this toolset failed";
 /// o2-ai's `toolset_policy.refusal`, whole: each names the toolset, which no vendor is told.
@@ -89,7 +91,13 @@ impl Failure {
             .get("metadata")
             .and_then(|m| m.get("interrupted"))
             .and_then(Value::as_bool);
-        if interrupted == Some(true) && error == ABORTED_TEXT {
+        let kind = state.get("error_type").and_then(Value::as_str);
+        let stopped = kind == Some("aborted")
+            && (error == INTERRUPTED_TEXT
+                || error
+                    .strip_prefix(INTERRUPTED_TEXT)
+                    .is_some_and(|rest| rest.starts_with(": ")));
+        if (interrupted == Some(true) && error == ABORTED_TEXT) || stopped {
             Self::Aborted
         } else if is_policy_refusal(error, toolset, tool) {
             Self::Refused
@@ -399,6 +407,43 @@ mod tests {
     }
 
     #[test]
+    fn a_call_opencode_2_stopped_is_recorded_as_aborted() {
+        let tool = |id: &str, kind: &str| {
+            json!({
+                "type": "tool", "id": id, "name": "dd_search_logs",
+                "state": {
+                    "status": "error", "input": {},
+                    "error": {"type": kind, "message": "Tool execution interrupted"},
+                },
+                "time": {"created": 100, "completed": 350},
+            })
+        };
+        let message = json!({
+            "id": "msg_a1", "type": "assistant", "time": {"created": T},
+            "content": [tool("call_1", "aborted"), tool("call_2", "tool.execution")],
+        });
+        let record = DurableEvent {
+            id: "evt_0".to_string(),
+            aggregate_id: "ses_1".to_string(),
+            seq: 0,
+            event_type: crate::ai_chat::record_v2::MESSAGE_UPDATED.to_string(),
+            data: json!({"message": message}),
+        };
+        let failures: Vec<_> = toolset_calls(&[record], &toolsets())
+            .into_iter()
+            .map(|c| (c.call_id, c.failure))
+            .collect();
+        assert_eq!(
+            failures,
+            [
+                ("call_1".to_string(), Some(Failure::Aborted)),
+                ("call_2".to_string(), Some(Failure::Tool)),
+            ],
+            "only opencode's own `aborted` type makes it a stop"
+        );
+    }
+
+    #[test]
     fn only_our_own_refusal_or_abort_is_not_the_vendor_s_failure() {
         let failure = |error: &str, metadata: Value| {
             let state = json!({"status": "error", "error": error, "metadata": metadata});
@@ -432,6 +477,30 @@ mod tests {
             Failure::Aborted
         );
         assert_eq!(failure("HTTP 500", interrupted), Failure::Tool);
+        let v2 = |kind: &str, error: &str| {
+            let state = json!({"status": "error", "error": error, "error_type": kind});
+            Failure::of(state.as_object(), "dd-prod", "logs_delete")
+        };
+        assert_eq!(
+            v2("aborted", "Tool execution interrupted"),
+            Failure::Aborted
+        );
+        assert_eq!(
+            v2("aborted", "Tool execution interrupted: logs_delete"),
+            Failure::Aborted
+        );
+        assert_eq!(
+            v2("aborted", "The user declined this tool call"),
+            Failure::Tool
+        );
+        assert_eq!(
+            v2("tool.failed", "Tool execution interrupted"),
+            Failure::Tool
+        );
+        assert_eq!(
+            v2("aborted", "Tool execution interrupted soon"),
+            Failure::Tool
+        );
         assert_eq!(Failure::of(None, "dd", "x"), Failure::Tool);
         assert_eq!(
             (Failure::Refused.status(), Failure::Aborted.status()),

@@ -130,6 +130,10 @@ impl LegacyMessage {
             && let Some(error) = state.get("error").filter(|e| truthy(e))
         {
             legacy.insert("error".into(), Value::String(v2_error_message(error)));
+            // opencode sets the type; a vendor only chooses the message.
+            if let Some(kind) = error.get("type").filter(|t| t.is_string()) {
+                legacy.insert("error_type".into(), kind.clone());
+            }
         }
         if let Some(metadata) = state.get("metadata") {
             legacy.insert("metadata".into(), metadata.clone());
