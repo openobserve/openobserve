@@ -204,6 +204,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : null
                   "
                   :model-value="logo.file.value"
+                  :disabled="!customBrandingAccess.allowed"
+                  :locked="!customBrandingAccess.allowed"
                   :data-test="logo.dataTest"
                   :test-ids="
                     customBrandingAccess.allowed
@@ -211,7 +213,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : { file: `${logo.dataTest}_file_upload_locked` }
                   "
                   @update:model-value="logo.file.value = $event"
-                  @rejected="onRejected"
                   @remove="confirmDeleteLogo(logo.mode)"
                 />
               </div>
@@ -1298,14 +1299,6 @@ export default defineComponent({
       filesMaxSize: ref(null),
       filesMaxTotalSize: ref(null),
       filesMaxNumber: ref(null),
-      onRejected(rejectedEntries: string | any[]) {
-        toast({
-          variant: "error",
-          message: t("settings.filesValidationFailed", {
-            count: rejectedEntries.length,
-          }),
-        });
-      },
       deleteLogo,
       loadingState,
       confirmDeleteImage: ref(false),

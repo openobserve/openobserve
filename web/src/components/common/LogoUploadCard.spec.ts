@@ -22,7 +22,9 @@ describe("LogoUploadCard", () => {
 
   afterEach(() => wrapper?.unmount());
 
-  const mountCard = (props: Partial<typeof base> & { surface?: "light" | "dark" } = {}) =>
+  const mountCard = (
+    props: Partial<typeof base> & { surface?: "light" | "dark"; disabled?: boolean } = {},
+  ) =>
     (wrapper = mount(LogoUploadCard, {
       props: { ...base, ...props },
       global: { plugins: [i18n] },
@@ -61,5 +63,14 @@ describe("LogoUploadCard", () => {
     expect(wrapper.find('[data-test="logo_preview"]').classes()).toContain(
       "bg-logo-preview-dark-bg",
     );
+  });
+
+  it("takes no dropped file while disabled, e.g. when branding is locked", async () => {
+    mountCard({ disabled: true });
+    const zone = wrapper.find('[data-test="logo_file_upload-zone"]');
+    const files = [new File(["x"], "acme.png", { type: "image/png" })];
+    await zone.trigger("dragenter", { dataTransfer: { files } });
+    await zone.trigger("drop", { dataTransfer: { files } });
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
   });
 });

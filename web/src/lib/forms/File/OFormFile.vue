@@ -30,14 +30,11 @@ if (import.meta.env.DEV && !form) {
         <OFile
           v-bind="$attrs"
           :label="props.label"
-          :placeholder="props.placeholder"
           :multiple="props.multiple"
           :accept="props.accept"
           :max-size="props.maxSize"
           :max-files="props.maxFiles"
-          :variant="props.variant"
           :validate="props.validate"
-          :upload="props.upload"
           :help-text="props.helpText"
           :disabled="props.disabled"
           :disabled-reason="props.disabledReason"
@@ -58,9 +55,6 @@ if (import.meta.env.DEV && !form) {
         >
           <template v-if="$slots.label" #label>
             <slot name="label" />
-          </template>
-          <template v-if="$slots.hint" #hint>
-            <slot name="hint" />
           </template>
         </OFile>
       </div>

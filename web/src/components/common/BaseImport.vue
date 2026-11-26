@@ -130,7 +130,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="mx-2 mt-1 flex min-h-0 flex-1 flex-col pb-2">
                   <!-- Slot for custom file input section -->
-                  <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
+                  <slot
+                    name="file-input-section"
+                    :jsonFiles="jsonFiles"
+                    :updateFiles="updateFiles"
+                    :clearRejectedJson="clearRejectedJson"
+                  >
                     <div class="mb-1 flex w-full shrink-0">
                       <div class="w-full">
                         <OFile
@@ -140,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           accept=".json"
                           multiple
                           :validate="validateJsonFile"
+                          @rejected="clearRejectedJson"
                         />
                       </div>
                     </div>
@@ -399,6 +405,12 @@ export default defineComponent({
       url.value = newUrl;
     };
 
+    // A rejected pick must not leave the previous file's JSON in the editor to be imported.
+    const clearRejectedJson = () => {
+      jsonStr.value = "";
+      jsonArrayOfObj.value = [];
+    };
+
     const updateFiles = (files: any) => {
       jsonFiles.value = files;
     };
@@ -535,6 +547,7 @@ export default defineComponent({
     });
 
     return {
+      clearRejectedJson,
       validateJsonFile,
       raw,
       t,

@@ -58,9 +58,9 @@ const emit = defineEmits<{
   locked: [];
 }>();
 
-// A locked field still renders the picker so the upgrade prompt opens instead of the file dialog.
+// A locked, empty field still renders the picker so the upgrade prompt opens instead of the file dialog.
 function onCaptureClick(event: MouseEvent) {
-  if (!props.locked) return;
+  if (!props.locked || props.image) return;
   event.preventDefault();
   event.stopPropagation();
   emit("locked");

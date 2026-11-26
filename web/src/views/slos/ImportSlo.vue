@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <template #file-input-section="{ jsonFiles, updateFiles }">
+    <template #file-input-section="{ jsonFiles, updateFiles, clearRejectedJson }">
       <div class="mb-1">
         <OFile
           data-test="slo-import-json-file-input"
@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           multiple
           :validate="validateJsonFile"
           @update:model-value="updateFiles"
+          @rejected="clearRejectedJson"
         />
       </div>
     </template>

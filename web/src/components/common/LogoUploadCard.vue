@@ -53,6 +53,8 @@ const props = withDefaults(
     /** Show the Saved / Not saved tag; off where the page tracks saving itself. */
     showStatus?: boolean;
     locked?: boolean;
+    /** Takes no picks or drops, e.g. while the feature is locked. */
+    disabled?: boolean;
     dataTest: string;
     testIds?: Partial<TestIds>;
   }>(),
@@ -62,10 +64,11 @@ const props = withDefaults(
     surface: "light",
     icon: undefined,
     modelValue: null,
-    accept: ".png, .jpg, .jpeg, .gif, .bmp",
+    accept: ".png, .jpg, .jpeg, .gif, .bmp, .webp, .svg",
     removeLabel: undefined,
     showStatus: true,
     locked: false,
+    disabled: false,
     testIds: () => ({}),
   },
 );
@@ -163,6 +166,7 @@ function onRemove() {
       :model-value="modelValue"
       :aria-label="ariaLabel ?? title"
       :accept="accept"
+      :disabled="disabled"
       :data-test="ids.file"
       @update:model-value="onPicked"
       @rejected="emit('rejected', $event)"

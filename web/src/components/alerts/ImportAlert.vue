@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <template #file-input-section="{ jsonFiles, updateFiles }">
+    <template #file-input-section="{ jsonFiles, updateFiles, clearRejectedJson }">
       <div class="mb-1">
         <OFile
           data-test="alert-import-json-file-input"
@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           accept=".json"
           multiple
           :validate="validateJsonFile"
+          @rejected="clearRejectedJson"
         />
       </div>
     </template>

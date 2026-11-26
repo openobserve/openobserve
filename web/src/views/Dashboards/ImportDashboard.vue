@@ -129,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         multiple
                         :validate="validateJsonFile"
                         :disabled="!!isLoading"
+                        @rejected="clearRejectedJson"
                       />
                     </div>
                     <QueryEditor
@@ -385,6 +386,11 @@ export default defineComponent({
         value: route.query.folder,
       };
     });
+
+    // A rejected pick must not leave the previous file's JSON in the editor to be imported.
+    const clearRejectedJson = () => {
+      jsonStr.value = "";
+    };
 
     watch(jsonFiles, (newVal) => {
       if (newVal && newVal.length > 0) {
@@ -875,6 +881,7 @@ export default defineComponent({
     };
 
     return {
+      clearRejectedJson,
       validateJsonFile,
       t,
       goBack,

@@ -2,7 +2,6 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
-import { h } from "vue";
 import OFile from "./OFile.vue";
 import { DIALOG_DEPTH_KEY } from "@/lib/overlay/Dialog/dialogStacking";
 import { createJsonFileValidator } from "./validateJsonFile";
@@ -120,30 +119,17 @@ describe("OFile", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
-  it("hides the browse link but keeps the prompt when disabled without a reason", () => {
+  it("keeps the whole prompt but no browse button when disabled without a reason", () => {
     wrapper = mount(OFile, { props: { disabled: true } });
-    expect(wrapper.find('[data-test="o-file-prompt"]').text()).toBe("Drop a file to attach, or");
-    expect(wrapper.find('[data-test="o-file-choose-btn"]').exists()).toBe(false);
-  });
-
-  it("lets the hint slot replace the prompt, hint, types and button", () => {
-    wrapper = mount(OFile, {
-      slots: { hint: () => h("span", { "data-test": "custom-hint" }, "Custom") },
-    });
-    expect(wrapper.find('[data-test="custom-hint"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="o-file-prompt"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="o-file-prompt"]').text()).toBe(
+      "Drop a file to attach, or browse",
+    );
     expect(wrapper.find('[data-test="o-file-choose-btn"]').exists()).toBe(false);
   });
 
   it("renders the label", () => {
     wrapper = mount(OFile, { props: { label: raw("Attachment") } });
     expect(wrapper.text()).toContain("Attachment");
-  });
-
-  it("shows the compact placeholder when no file is selected", () => {
-    wrapper = mount(OFile, { props: { variant: "compact", placeholder: raw("Upload here") } });
-    expect(wrapper.text()).toContain("Upload here");
-    expect(wrapper.find('[data-test="o-file-choose-btn"]').text()).toBe("Select file");
   });
 
   it("emits update:modelValue with a single file when not multiple", async () => {
@@ -229,6 +215,15 @@ describe("OFile", () => {
       expect(wrapper.findAll('[data-test^="o-file-chip-"][data-state]')).toHaveLength(1);
     });
 
+    it("still shows the field's error under a picked file, but not under a rejection row", async () => {
+      wrapper = inDialog({ errorMessage: raw("Server refused the file") });
+      await wrapper.setProps({ modelValue: makeFile("ok.csv", 2, "text/csv") });
+      expect(wrapper.find('[role="alert"]').text()).toBe("Server refused the file");
+      await wrapper.setProps({ modelValue: null });
+      await pick([makeFile("notes.txt", 2)]);
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    });
+
     it("does not reserve the row for multi-file uploads or outside a dialog", () => {
       wrapper = inDialog({ multiple: true });
       expect(wrapper.find('[data-test="o-file-empty-row"]').exists()).toBe(false);
@@ -278,58 +273,77 @@ describe("OFile", () => {
     expect(next[0].name).toBe("b.txt");
   });
 
-  it("drives row progress from the upload callback", async () => {
-    let report: (fraction: number) => void = () => {};
-    let finish: () => void = () => {};
-    const upload = (_file: File, onProgress: (fraction: number) => void) =>
-      new Promise<void>((resolve) => {
-        report = onProgress;
-        finish = resolve;
-      });
-    wrapper = mount(OFile, { props: { upload } });
-    await pick([makeFile("a.txt", 10)]);
-    await wrapper.setProps({ modelValue: wrapper.emitted("update:modelValue")![0][0] as File });
-    report(0.64);
-    await flushPromises();
-    const row = wrapper.find('[data-test="o-file-chip-0"]');
-    expect(row.attributes("data-state")).toBe("uploading");
-    expect(row.text()).toContain("64%");
-    finish();
-    await flushPromises();
-    expect(wrapper.find('[data-test="o-file-chip-0"]').attributes("data-state")).toBe("done");
-  });
-
-  it("shows an upload failure on the row", async () => {
-    const upload = () => Promise.reject(new Error("boom"));
-    wrapper = mount(OFile, { props: { upload } });
-    await pick([makeFile("a.txt", 10)]);
-    await wrapper.setProps({ modelValue: wrapper.emitted("update:modelValue")![0][0] as File });
-    await flushPromises();
-    expect(wrapper.find('[data-test="o-file-chip-0"]').text()).toContain("Upload failed");
-  });
-
-  it("switches sources inside one fixed-height area", async () => {
-    wrapper = mount(OFile, { props: { sources: ["file", "url", "paste"] } });
-    expect(wrapper.find('[data-test="o-file-source"]').exists()).toBe(true);
-    const area = wrapper.find('[data-test="o-file-zone"]').element.parentElement!;
-    expect(area.className).toContain("h-43");
-    await wrapper.find('[data-test="o-file-source-url"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.emitted("update:source")![0][0]).toBe("url");
-    expect(wrapper.find('[data-test="o-file-zone"]').exists()).toBe(false);
-    const url = wrapper.find('[data-test="o-file-url-field"]');
-    expect(url.element.closest(".h-43")).toBe(area);
-    await url.setValue("https://example.com/a.json");
-    expect(wrapper.emitted("update:url")!.at(-1)![0]).toBe("https://example.com/a.json");
-  });
-
-  it("hides the source switch with a single source", () => {
-    wrapper = mount(OFile);
-    expect(wrapper.find('[data-test="o-file-source"]').exists()).toBe(false);
-  });
-
   it("renders the error message", () => {
     wrapper = mount(OFile, { props: { errorMessage: raw("Required") } });
     expect(wrapper.text()).toContain("Required");
+  });
+
+  it("keeps the newest pick when an older, slower check finishes last", async () => {
+    let releaseSlow: () => void = () => {};
+    const validate = vi.fn((file: File) =>
+      file.name === "slow.json"
+        ? new Promise<null>((resolve) => (releaseSlow = () => resolve(null)))
+        : null,
+    );
+    wrapper = mount(OFile, { props: { validate } });
+    const input = wrapper.find("input[type='file']");
+    Object.defineProperty(input.element, "files", {
+      value: [makeFile("slow.json", 2)],
+      configurable: true,
+    });
+    await input.trigger("change");
+    Object.defineProperty(input.element, "files", {
+      value: [makeFile("fast.json", 2)],
+      configurable: true,
+    });
+    await input.trigger("change");
+    await settle();
+    releaseSlow();
+    await settle();
+    const picks = wrapper.emitted("update:modelValue")!.map((e) => (e[0] as File).name);
+    expect(picks).toEqual(["fast.json"]);
+  });
+
+  it("ends the drag state when the pointer leaves the zone, even after its content swapped", async () => {
+    wrapper = mount(OFile, { attachTo: document.body });
+    const zone = wrapper.find('[data-test="o-file-zone"]');
+    const leave = (to: Element) =>
+      zone.element.dispatchEvent(
+        Object.assign(new Event("dragleave", { bubbles: true }), { relatedTarget: to }),
+      );
+    await zone.trigger("dragenter");
+    leave(zone.element.firstElementChild!);
+    await flushPromises();
+    expect(wrapper.text()).toContain("Drop the file to attach");
+    // A swapped-out child never sends its dragleave: two enters, then one real exit.
+    await zone.trigger("dragenter");
+    leave(document.body);
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("Drop the file to attach");
+  });
+
+  it("names the browse button after the field and points it at the field error", () => {
+    wrapper = mount(OFile, {
+      props: { label: raw("Select File"), errorMessage: raw("Pick a file") },
+    });
+    const btn = wrapper.find('[data-test="o-file-choose-btn"]');
+    const ids = btn.attributes("aria-labelledby")!.split(" ");
+    expect(ids).toHaveLength(2);
+    expect(wrapper.find(`#${ids[0]}`).text()).toBe("Select File");
+    expect(btn.attributes("aria-invalid")).toBe("true");
+    expect(wrapper.find(`#${btn.attributes("aria-describedby")}`).text()).toBe("Pick a file");
+  });
+
+  it("uses an aria-label as the field name instead of putting it on the wrapper", () => {
+    wrapper = mount(OFile, { attrs: { "aria-label": "Custom logo (light mode)" } });
+    expect(wrapper.attributes("aria-label")).toBeUndefined();
+    expect(wrapper.find("input[type='file']").attributes("aria-label")).toBe(
+      "Custom logo (light mode)",
+    );
+    const nameId = wrapper
+      .find('[data-test="o-file-choose-btn"]')
+      .attributes("aria-labelledby")!
+      .split(" ")[0];
+    expect(wrapper.find(`#${nameId}`).text()).toBe("Custom logo (light mode)");
   });
 });
