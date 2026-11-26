@@ -280,6 +280,36 @@ describe("SearchHistory Component", () => {
     });
   });
 
+  describe("Navigation - goToLogs keeps the run's own time range", () => {
+    const row = {
+      sql: "SELECT * FROM logs",
+      stream_name: "test-stream",
+      org_id: "test-org",
+      toBeStoredStartTime: 1700000000000000,
+      toBeStoredEndTime: 1700012600000000,
+      duration: "1 second",
+    };
+
+    it("passes the run's start and end instead of a relative period", async () => {
+      await wrapper.vm.goToLogs(row);
+      const { query } = routerPushMock.mock.calls.at(-1)[0];
+      expect(query.from).toBe(row.toBeStoredStartTime);
+      expect(query.to).toBe(row.toBeStoredEndTime);
+      expect(query.period).toBeUndefined();
+    });
+
+    it("falls back to the last 15 minutes when the row has no stored range", async () => {
+      await wrapper.vm.goToLogs({
+        ...row,
+        toBeStoredStartTime: undefined,
+        toBeStoredEndTime: undefined,
+      });
+      const { query } = routerPushMock.mock.calls.at(-1)[0];
+      expect(query.period).toBe("15m");
+      expect(query.from).toBeUndefined();
+    });
+  });
+
   describe("Stream-type aware history (Traces/Metrics support)", () => {
     // Search History must scope both the fetched data and the page's
     // subtitle indicator to whichever telemetry type/stream the user was on
