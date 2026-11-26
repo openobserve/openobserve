@@ -713,7 +713,8 @@ async function activate(): Promise<void> {
 async function runHandoff(handoff: () => void | Promise<void>): Promise<void> {
   const key = callerKey();
   if (key && key !== store.state.userOrgKey) {
-    props.onOpened?.(await openAssistant(callFor(undefined, controlEl())));
+    const result = await openAssistant(callFor(undefined, controlEl()));
+    props.onOpened?.(result);
     return;
   }
   await handoff();
