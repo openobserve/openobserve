@@ -468,7 +468,7 @@ export const SCENARIOS = {
     frames: [f.status(), { raw: "data: this is not json" }, { raw: 'data: {"type":"made_up_frame"}' }, ...chunk("Still answered.").map(f.delta), f.complete()],
     delayMs: 40,
   },
-  // WP-06: the `99` §1.2 Markdown payloads in one answer (SEC-01, SEC-02, SEC-04); see fixtures/payloads.mjs.
+  // WP-06: the `99` §1.2 Markdown payloads in one answer (SEC-01, SEC-02, SEC-04); see fixtures.mjs.
   payloads_markdown: { frames: [f.status(), f.delta(PLANTED_MARKDOWN), f.complete()], delayMs: 40 },
   // WP-06 PERF-02 variant: a 400-delta unlabelled fence, then a 400-delta ```sql fence.
   long_answer_fenced: { frames: [f.status(), ...fencedDeltas(), f.complete()], delayMs: 6 },

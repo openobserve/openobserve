@@ -225,7 +225,7 @@ pub async fn put_settings(
 
 /// The org's settings, the defaults when never saved or unreadable (today's behaviour).
 pub(crate) async fn org_ai(org_id: &str) -> OrgAiSettings {
-    openobserve_core::ai_policy::org_settings(org_id)
+    openobserve_core::ai_chat::org_settings(org_id)
         .await
         .unwrap_or_else(|e| {
             log::warn!("[org_id:{org_id}] assistant settings unreadable, using defaults: {e}");
@@ -237,7 +237,7 @@ pub(crate) async fn org_ai(org_id: &str) -> OrgAiSettings {
 pub(crate) async fn refuse_if_off(org_id: &str) -> Result<(), Response> {
     admission(
         org_id,
-        openobserve_core::ai_policy::org_settings(org_id).await,
+        openobserve_core::ai_chat::org_settings(org_id).await,
     )
 }
 
@@ -245,7 +245,7 @@ pub(crate) async fn refuse_if_off(org_id: &str) -> Result<(), Response> {
 pub(crate) async fn sharing_allowed(org_id: &str, public: bool) -> bool {
     sharing_of(
         org_id,
-        openobserve_core::ai_policy::org_settings(org_id).await,
+        openobserve_core::ai_chat::org_settings(org_id).await,
         Deployment::from_config(),
         public,
     )

@@ -299,7 +299,13 @@ import {
   threadParam,
 } from "@/composables/assistant/pure";
 import type { GateCode } from "@/composables/assistant/pure";
-import { aiTabMode, gateHidesAiTab, HOME_RAIL_CLASS, railGate } from "@/views/home/homeState";
+import {
+  aiTabMode,
+  gateHidesAiTab,
+  HOME_RAIL_CLASS,
+  railGate,
+  threadPeriodOf,
+} from "@/views/home/homeState";
 import { useThreadUrlSync } from "@/views/home/useThreadUrl";
 import { isFullConfigLoaded } from "@/services/config.queries";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -309,7 +315,6 @@ import {
   useHomeWindowProvider,
 } from "@/composables/contextProviders/homeContextProvider";
 import type { OverviewNowSnapshot } from "@/composables/contextProviders/types";
-import { threadPeriodOf } from "@/views/home/homeUrl";
 
 // Past this the tabs show in their default order; a key that resolves later never reorders them.
 const HOME_PREFS_WAIT_MS = 1_500;

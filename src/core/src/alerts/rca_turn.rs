@@ -465,7 +465,7 @@ async fn start_turn(
     )
     .await?;
 
-    let settings = crate::ai_policy::org_settings(&run.org_id)
+    let settings = crate::ai_chat::org_settings(&run.org_id)
         .await
         .inspect_err(|e| {
             log::warn!(

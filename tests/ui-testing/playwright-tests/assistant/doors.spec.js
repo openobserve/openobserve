@@ -1,20 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
 // WP-07 doors with the flag on (DOOR-01…12, SEC-05, PERF-01; `99` §6.8). Logs uses the add-to-chat sparkle: it stages, never sends.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { test, expect } from "@playwright/test";
 
 import { AssistantPage } from "../../pages/assistantPage.js";
 
 // Playwright compiles a static import to require(), which would load the .mjs harness as CommonJS; import() keeps it ESM.
 const loadHarness = () => import("./harness/setup.mjs");
+const loadFixtures = () => import("./harness/fixtures.mjs");
 
 const DOOR_ID = /^ai-entry-[a-z-]+-(explain|troubleshoot|add|ask|fix|generate)$/;
 const ROW_ADD = "logs-search-result-ai-btn";
 const RECORD_ADD = "logs-detail-ai-context-btn";
-const fixture = (name) => JSON.parse(readFileSync(join(__dirname, "harness", "fixtures", name), "utf8"));
 
 test.describe("assistant doors", () => {
   let assistant;
@@ -256,7 +253,7 @@ test.describe("assistant doors", () => {
   });
 
   test("DOOR-10 a deep link to a real alert stages its chip and prompt, sends nothing, and never fetches a path-shaped ref", { tag: ["@mock"] }, async ({ page }) => {
-    const alert = fixture("doors-alert.json");
+    const alert = (await loadFixtures()).door("doors-alert");
     const fetched = [];
     // The threads bar lists alerts/incidents on every page; only an alert read by id is the door's.
     await page.context().route(/\/api\/v2\/[^/]+\/alerts\/(?!incidents(?:[/?]|$))[^?]+/, (route) => {
@@ -284,7 +281,7 @@ test.describe("assistant doors", () => {
   });
 
   test("DOOR-04 panel Explain sends the panel as a chip into a dashboard thread", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
-    const created = await page.request.post(api("/dashboards?folder=default"), { headers: auth(), data: fixture("doors-dashboard.json") });
+    const created = await page.request.post(api("/dashboards?folder=default"), { headers: auth(), data: (await loadFixtures()).door("doors-dashboard") });
     expect(created.ok()).toBe(true);
     const id = (await created.json()).v5.dashboardId;
     try {
@@ -310,7 +307,7 @@ test.describe("assistant doors", () => {
   });
 
   test("SEC-05 a secret in a row is redacted before it reaches the wire", { tag: ["@mock"] }, async ({ page }) => {
-    const { PAYLOADS } = await import("./harness/fixtures/payloads.mjs");
+    const { PAYLOADS } = await loadFixtures();
     const row = PAYLOADS.secret_in_row;
     const ingested = await page.request.post(api("/e2e_secret_row/_json"), {
       headers: auth(),
@@ -416,7 +413,7 @@ test.describe("assistant doors", () => {
   });
 
   test("DOOR-06 the DBM fix door opens its own Database thread, not the open chat", { tag: ["@mock"] }, async ({ page }) => {
-    const deadlocks = fixture("doors-deadlocks.json");
+    const deadlocks = (await loadFixtures()).door("doors-deadlocks");
     deadlocks.hits[0].timestamp = (Date.now() - 10 * 60_000) * 1000;
     await page.context().route(/\/db_monitoring\/deadlocks/, (route) =>
       route.fulfill({

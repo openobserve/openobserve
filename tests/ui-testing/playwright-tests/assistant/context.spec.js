@@ -7,7 +7,7 @@ import { AssistantPage } from "../../pages/assistantPage.js";
 
 // Playwright compiles a static import to require(), which would load the .mjs harness as CommonJS; import() keeps it ESM.
 const loadHarness = () => import("./harness/setup.mjs");
-const loadPayloads = () => import("./harness/fixtures/payloads.mjs");
+const loadPayloads = () => import("./harness/fixtures.mjs");
 
 // One 1×1 PNG; its bytes go through the real FileReader path.
 const PNG_BASE64 =

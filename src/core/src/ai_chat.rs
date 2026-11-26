@@ -31,6 +31,7 @@ use std::{
 };
 
 use anyhow::Result;
+use common::meta::organization::OrgAiSettings;
 use config::{
     meta::{
         search::{Query, Request as SearchRequest, RequestEncoding, SearchEventType},
@@ -649,6 +650,13 @@ pub async fn ensure_stream_initialized(org_id: &str, retention_days: i64) {
                 })
         })
         .await;
+}
+
+/// The org's settings, the defaults when never saved; `Err` when they cannot be read.
+pub async fn org_settings(org_id: &str) -> Result<OrgAiSettings, infra::errors::Error> {
+    Ok(db::organization::get_org_ai_settings(org_id)
+        .await?
+        .unwrap_or_default())
 }
 
 /// The user message a 1.x `message.updated` or a 2.x `message.updated.2` event records.
