@@ -22028,7 +22028,7 @@
       "excludeFromQuery": "Exclude",
       "createAlertAction": "Create alert",
       "noMatchTerms": "This pattern has no distinctive text to filter on.",
-      "noDistinctTextTooltip": "มีรูปแบบอื่นที่มีข้อความเดียวกันแต่ระดับล็อกต่างกัน ตัวกรองจึงนับรูปแบบนี้แยกต่างหากไม่ได้",
+      "noDistinctTextTooltip": "ข้อความของรูปแบบนี้ปรากฏในล็อกของรูปแบบอื่นด้วย ซึ่งมักเป็นข้อความเดียวกันแต่ระดับล็อกต่างกัน ตัวกรองจึงนับรูปแบบนี้แยกต่างหากไม่ได้",
       "volumeUnsupported": "ไม่สามารถแสดงปริมาณสำหรับการค้นหาที่ใช้ WITH, JOIN, UNION, ชื่อแทนตาราง หรือคิวรีย่อย",
       "volumeFailedRetry": "โหลดปริมาณไม่สำเร็จ เซิร์ฟเวอร์อาจไม่ว่าง โปรดลองอีกครั้ง",
       "volumeFailed": "โหลดปริมาณของรูปแบบนี้ไม่สำเร็จ",

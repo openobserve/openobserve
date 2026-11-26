@@ -22030,7 +22030,7 @@
       "excludeFromQuery": "Loại trừ",
       "createAlertAction": "Tạo cảnh báo",
       "noMatchTerms": "Mẫu này không có văn bản đặc biệt để lọc.",
-      "noDistinctTextTooltip": "Một mẫu khác có cùng văn bản nhưng khác cấp độ nhật ký, nên bộ lọc không thể đếm riêng mẫu này.",
+      "noDistinctTextTooltip": "Văn bản của mẫu này cũng xuất hiện trong nhật ký của một mẫu khác, thường là cùng thông báo nhưng khác cấp độ nhật ký, nên bộ lọc không thể đếm riêng mẫu này.",
       "volumeUnsupported": "Không có khối lượng cho các tìm kiếm dùng WITH, JOIN, UNION, bí danh bảng hoặc truy vấn con.",
       "volumeFailedRetry": "Không tải được khối lượng. Máy chủ có thể đang bận, hãy thử lại.",
       "volumeFailed": "Không tải được khối lượng của mẫu này.",

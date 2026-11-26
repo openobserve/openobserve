@@ -22030,7 +22030,7 @@
       "excludeFromQuery": "Ausschließen",
       "createAlertAction": "Alarm erstellen",
       "noMatchTerms": "Dieses Muster hat keinen unterscheidbaren Text zum Filtern.",
-      "noDistinctTextTooltip": "Ein anderes Muster hat denselben Text mit einem anderen Log-Level, daher kann ein Filter dieses Muster nicht allein zählen.",
+      "noDistinctTextTooltip": "Der Text dieses Musters kommt auch in den Logs eines anderen Musters vor, oft dieselbe Meldung mit einem anderen Log-Level, daher kann ein Filter dieses Muster nicht allein zählen.",
       "volumeUnsupported": "Das Volumen ist für Suchen mit WITH, JOIN, UNION, einem Tabellenalias oder einer Unterabfrage nicht verfügbar.",
       "volumeFailedRetry": "Das Volumen konnte nicht geladen werden. Der Server ist möglicherweise ausgelastet, versuchen Sie es erneut.",
       "volumeFailed": "Das Volumen für dieses Muster konnte nicht geladen werden.",

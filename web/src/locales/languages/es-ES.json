@@ -22030,7 +22030,7 @@
       "excludeFromQuery": "Excluir",
       "createAlertAction": "Crear alerta",
       "noMatchTerms": "Este patrón no tiene texto distintivo para filtrar.",
-      "noDistinctTextTooltip": "Otro patrón tiene el mismo texto con un nivel de registro distinto, así que un filtro no puede contar este por separado.",
+      "noDistinctTextTooltip": "El texto de este patrón también aparece en los registros de otro patrón, a menudo el mismo mensaje con otro nivel de registro, así que un filtro no puede contarlo por separado.",
       "volumeUnsupported": "El volumen no está disponible para búsquedas que usan WITH, JOIN, UNION, un alias de tabla o una subconsulta.",
       "volumeFailedRetry": "No se pudo cargar el volumen. Es posible que el servidor esté ocupado; inténtelo de nuevo.",
       "volumeFailed": "No se pudo cargar el volumen de este patrón.",

@@ -22030,7 +22030,7 @@
       "excludeFromQuery": "제외",
       "createAlertAction": "알림 생성",
       "noMatchTerms": "이 패턴에는 필터링할 구별되는 텍스트가 없습니다.",
-      "noDistinctTextTooltip": "다른 패턴이 로그 레벨만 다르고 텍스트가 같으므로 필터로 이 패턴만 따로 셀 수 없습니다.",
+      "noDistinctTextTooltip": "이 패턴의 텍스트가 다른 패턴의 로그에도 나타나므로(로그 레벨만 다른 같은 메시지인 경우가 많음) 필터로 이 패턴만 따로 셀 수 없습니다.",
       "volumeUnsupported": "WITH, JOIN, UNION, 테이블 별칭 또는 하위 쿼리를 사용하는 검색에서는 볼륨을 표시할 수 없습니다.",
       "volumeFailedRetry": "볼륨을 불러오지 못했습니다. 서버가 바쁠 수 있으니 다시 시도하세요.",
       "volumeFailed": "이 패턴의 볼륨을 불러오지 못했습니다.",

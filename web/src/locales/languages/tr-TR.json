@@ -22030,7 +22030,7 @@
       "excludeFromQuery": "Hariç tut",
       "createAlertAction": "Uyarı oluştur",
       "noMatchTerms": "Bu desenin filtrelenecek ayırt edici metni yok.",
-      "noDistinctTextTooltip": "Başka bir desen aynı metne farklı bir günlük düzeyinde sahip, bu nedenle bir filtre bu deseni tek başına sayamaz.",
+      "noDistinctTextTooltip": "Bu desenin metni başka bir desenin günlüklerinde de geçiyor, genellikle farklı günlük düzeyindeki aynı ileti, bu nedenle bir filtre bu deseni tek başına sayamaz.",
       "volumeUnsupported": "WITH, JOIN, UNION, tablo takma adı veya alt sorgu kullanan aramalarda hacim gösterilemez.",
       "volumeFailedRetry": "Hacim yüklenemedi. Sunucu meşgul olabilir, tekrar deneyin.",
       "volumeFailed": "Bu desenin hacmi yüklenemedi.",

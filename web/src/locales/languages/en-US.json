@@ -22028,7 +22028,7 @@
       "excludeFromQuery": "Exclude",
       "createAlertAction": "Create alert",
       "noMatchTerms": "This pattern has no distinctive text to filter on.",
-      "noDistinctTextTooltip": "Another pattern has the same text at a different log level, so a filter can't count this one on its own.",
+      "noDistinctTextTooltip": "This pattern's text also appears in another pattern's logs, often the same message at a different log level, so a filter can't count it on its own.",
       "volumeUnsupported": "Volume isn't available for searches that use WITH, JOIN, UNION, a table alias or a subquery.",
       "volumeFailedRetry": "Couldn't load the volume. The server may be busy, so try again.",
       "volumeFailed": "Couldn't load the volume for this pattern.",

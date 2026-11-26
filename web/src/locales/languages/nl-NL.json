@@ -22030,7 +22030,7 @@
       "excludeFromQuery": "Uitsluiten",
       "createAlertAction": "Alarm maken",
       "noMatchTerms": "Dit patroon heeft geen onderscheidende tekst om op te filteren.",
-      "noDistinctTextTooltip": "Een ander patroon heeft dezelfde tekst met een ander logniveau, dus een filter kan dit patroon niet apart tellen.",
+      "noDistinctTextTooltip": "De tekst van dit patroon komt ook voor in de logs van een ander patroon, vaak hetzelfde bericht met een ander logniveau, dus een filter kan dit patroon niet apart tellen.",
       "volumeUnsupported": "Het volume is niet beschikbaar voor zoekopdrachten met WITH, JOIN, UNION, een tabelalias of een subquery.",
       "volumeFailedRetry": "Het volume kon niet worden geladen. De server is mogelijk bezet, probeer het opnieuw.",
       "volumeFailed": "Het volume voor dit patroon kon niet worden geladen.",
