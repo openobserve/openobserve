@@ -4632,6 +4632,16 @@ export default defineComponent({
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL = fnParsedSQL();
         if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 0) {
+          // Re-printing the parsed SQL rewrites it, so a query with nothing to clear is left as typed.
+          const hasLimit = (limit: any): boolean =>
+            Array.isArray(limit?.value) ? limit.value.length > 0 : !!limit;
+          const hasClearable = (node: any): boolean =>
+            !!node?.where || hasLimit(node?.limit) || (!!node?._next && hasClearable(node._next));
+          if (!hasClearable(parsedSQL)) {
+            queryEditorRef.value?.setValue(searchObj.data.query);
+            autoRun.request("filter");
+            return;
+          }
           if (Object.hasOwn(parsedSQL, "where") && parsedSQL.where != "") {
             parsedSQL.where = null;
           }
