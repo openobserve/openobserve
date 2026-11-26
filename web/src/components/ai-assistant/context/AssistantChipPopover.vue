@@ -183,7 +183,7 @@ import { INTERNAL_FIELDS } from "@/composables/assistant";
 import {
   useAnchorFocusReturn,
   usePopoverZIndex,
-} from "@/components/ai-assistant/common/anchoredPopover";
+} from "@/components/ai-assistant/common/assistantUi";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";

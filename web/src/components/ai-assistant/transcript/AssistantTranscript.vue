@@ -370,7 +370,7 @@ import {
 } from "vue";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import { announceComposer, composerRowOf } from "@/components/ai-assistant/composer/composerUi";
 import { rangeText } from "@/components/ai-assistant/evidence/evidenceText";
 import AssistantTurnOutcome, {

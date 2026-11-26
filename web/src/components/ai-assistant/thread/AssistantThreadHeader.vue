@@ -337,7 +337,7 @@ import { useStore } from "vuex";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
-import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
+import type { AssistantSignal } from "@/components/ai-assistant/common/assistantUi";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantHistoryConfirm from "@/components/ai-assistant/history/AssistantHistoryConfirm.vue";
 import { trayState } from "@/components/ai-assistant/shell/threadsBar";

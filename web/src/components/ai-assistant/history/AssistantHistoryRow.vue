@@ -281,7 +281,7 @@ import { computed, nextTick, ref } from "vue";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
-import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
+import type { AssistantSignal } from "@/components/ai-assistant/common/assistantUi";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";

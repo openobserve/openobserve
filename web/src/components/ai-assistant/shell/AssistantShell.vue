@@ -620,7 +620,7 @@ import {
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantUi";
 import AssistantActionTimeline from "@/components/ai-assistant/approvals/AssistantActionTimeline.vue";
 import AssistantApprovalCard from "@/components/ai-assistant/approvals/AssistantApprovalCard.vue";
 import AssistantApprovalResult from "@/components/ai-assistant/approvals/AssistantApprovalResult.vue";

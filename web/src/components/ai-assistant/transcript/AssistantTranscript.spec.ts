@@ -31,7 +31,7 @@ import {
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import { raw } from "@/types/i18n";
 
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import { composerUi } from "@/components/ai-assistant/composer/composerUi";
 
 import AssistantTranscript from "./AssistantTranscript.vue";

@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { computed, ref, useId, watch } from "vue";
 
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import { useAssistantName } from "@/composables/assistant";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import OBadge from "@/lib/core/Badge/OBadge.vue";

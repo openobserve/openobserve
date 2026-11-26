@@ -256,7 +256,7 @@ import { useRouter } from "vue-router";
 import AssistantErrorRow from "@/components/ai-assistant/common/AssistantErrorRow.vue";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import {
   isRunning,
   approvalCoversTargets,

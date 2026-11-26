@@ -50,7 +50,7 @@ import { useRouter } from "vue-router";
 
 import { assistantApprovalsHostKey } from "@/components/ai-assistant/approvals/approvals.types";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import type { ConsentNoteData } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

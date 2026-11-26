@@ -173,7 +173,7 @@ import { computed, defineAsyncComponent, inject, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import {
   widerPeriodText,
   answerQueriesAllEmpty,

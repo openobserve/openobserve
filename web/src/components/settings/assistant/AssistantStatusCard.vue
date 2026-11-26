@@ -160,7 +160,7 @@ const SETUP_ENV: { envName: string; labelKey: I18nKey }[] = [
 import { computed, nextTick, ref, watch } from "vue";
 
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";

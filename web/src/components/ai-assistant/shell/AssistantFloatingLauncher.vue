@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
+import type { AssistantSignal } from "@/components/ai-assistant/common/assistantUi";
 import type { Sid } from "@/composables/assistant";
 import type { I18nKey } from "@/types/i18n";
 

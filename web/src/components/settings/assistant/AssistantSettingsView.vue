@@ -130,7 +130,7 @@ export const SETTINGS_TABS: {
 import { computed, ref, watch, type Component } from "vue";
 import { useRouter } from "vue-router";
 
-import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantUi";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";

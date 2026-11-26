@@ -85,7 +85,7 @@ import { computed, ref } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OText from "@/lib/core/Typography/OText.vue";

@@ -139,7 +139,7 @@ export interface AiLabelEmits {
 import { computed, ref } from "vue";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import { rangeText } from "@/components/ai-assistant/evidence/evidenceText";
 import { useAssistantName } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";

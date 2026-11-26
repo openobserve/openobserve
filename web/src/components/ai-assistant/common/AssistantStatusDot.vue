@@ -60,7 +60,7 @@ import { computed } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
-import { assistantSignalShape, type AssistantStatusDotProps } from "./AssistantStatusDot.types";
+import { assistantSignalShape, type AssistantStatusDotProps } from "./assistantUi";
 import { assistantGlyph } from "./glyphs";
 
 const props = withDefaults(defineProps<AssistantStatusDotProps>(), {

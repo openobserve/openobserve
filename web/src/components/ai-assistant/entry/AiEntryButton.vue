@@ -468,7 +468,6 @@ import { computed, inject, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
-import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import { announceComposer, noteCap } from "@/components/ai-assistant/composer/composerUi";
@@ -490,9 +489,10 @@ import {
   type OpenAssistantCall,
 } from "@/composables/assistant";
 import {
+  provideAssistantSurface,
   useAnchorFocusReturn,
   usePopoverZIndex,
-} from "@/components/ai-assistant/common/anchoredPopover";
+} from "@/components/ai-assistant/common/assistantUi";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

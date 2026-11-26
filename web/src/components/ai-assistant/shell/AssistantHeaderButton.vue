@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
+import type { AssistantSignal } from "@/components/ai-assistant/common/assistantUi";
 import type { AssistantSession, GateReason } from "@/composables/assistant";
 import type { I18nText } from "@/types/i18n";
 
@@ -208,7 +208,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantUi";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";

@@ -17,7 +17,7 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 
 import AssistantStatusDot from "./AssistantStatusDot.vue";
-import { assistantSignalShape, type AssistantSignal } from "./AssistantStatusDot.types";
+import { assistantSignalShape, type AssistantSignal } from "./assistantUi";
 
 const SIGNALS: AssistantSignal[] = ["working", "attention", "failed", "unread"];
 

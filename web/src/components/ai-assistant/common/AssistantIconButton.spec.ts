@@ -21,7 +21,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw } from "@/types/i18n";
 
 import AssistantIconButton from "./AssistantIconButton.vue";
-import type { AssistantIconButtonProps } from "./AssistantIconButton.types";
+import type { AssistantIconButtonProps } from "./assistantUi";
 
 const base: AssistantIconButtonProps = {
   label: raw("Close"),

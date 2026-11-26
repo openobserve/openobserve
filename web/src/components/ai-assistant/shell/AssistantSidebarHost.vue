@@ -161,7 +161,7 @@ import { useStore } from "vuex";
 import { ASSISTANT_MOTION } from "@/components/ai-assistant/common/assistantMotion";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
-import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
+import type { AssistantSignal } from "@/components/ai-assistant/common/assistantUi";
 import { isFullThreadRoute, movedToTab } from "@/composables/assistant/pure";
 import {
   SIDEBAR_MIN_REM,

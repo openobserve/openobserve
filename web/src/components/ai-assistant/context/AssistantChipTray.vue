@@ -94,7 +94,7 @@ export function useChipCollapse<T>(
 <script setup lang="ts" generic="T extends { id: string }">
 import { ref, watch } from "vue";
 
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { useI18nTyped } from "@/types/i18n";

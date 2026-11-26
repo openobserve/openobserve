@@ -160,8 +160,10 @@ import { useQuery } from "@tanstack/vue-query";
 import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
-import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
-import { usePopoverZIndex } from "@/components/ai-assistant/common/anchoredPopover";
+import {
+  provideAssistantSurface,
+  usePopoverZIndex,
+} from "@/components/ai-assistant/common/assistantUi";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { hostOrgName, useAssistantName } from "@/composables/assistant/pure";

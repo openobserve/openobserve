@@ -19,7 +19,7 @@ import { defineComponent, h } from "vue";
 
 import { DIALOG_DEPTH_KEY } from "@/lib/overlay/Dialog/dialogStacking";
 
-import { useAnchorFocusReturn, usePopoverZIndex } from "./anchoredPopover";
+import { useAnchorFocusReturn, usePopoverZIndex } from "./assistantUi";
 
 function dom() {
   document.body.innerHTML = `

@@ -414,7 +414,7 @@ import { useRouter } from "vue-router";
 
 import AssistantAgentIdentity from "@/components/ai-assistant/agents/AssistantAgentIdentity.vue";
 import { chipGlyph } from "@/components/ai-assistant/common/glyphs";
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import AssistantAnswerMeta from "@/components/ai-assistant/evidence/AssistantAnswerMeta.vue";
 import AssistantChartCard from "@/components/ai-assistant/evidence/AssistantChartCard.vue";
 import { chartOf } from "@/components/ai-assistant/evidence/chartSeries";

@@ -126,7 +126,7 @@ const CARD_CLASS = [
 <script setup lang="ts">
 import { computed, onMounted, useId } from "vue";
 
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import {
   chatStatusClass,
   chatStatusOf,

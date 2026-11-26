@@ -113,7 +113,7 @@ export interface AssistantCreditMeterEmits {
 <script setup lang="ts">
 import { computed } from "vue";
 
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import type { CreditMode } from "@/composables/assistant";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTag from "@/lib/core/Badge/OTag.vue";

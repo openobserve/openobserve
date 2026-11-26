@@ -80,7 +80,7 @@ import type {
   AssistantIconButtonEmits,
   AssistantIconButtonProps,
   AssistantIconButtonSlots,
-} from "./AssistantIconButton.types";
+} from "./assistantUi";
 
 const ICON_SIZES = { sm: "icon-xs-sq", toolbar: "icon-toolbar", md: "icon-sm" } as const;
 

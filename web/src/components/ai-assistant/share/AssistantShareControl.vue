@@ -111,7 +111,7 @@ import {
   useAssistantSession,
   useAssistantStore,
 } from "@/composables/assistant";
-import { usePopoverZIndex } from "@/components/ai-assistant/common/anchoredPopover";
+import { usePopoverZIndex } from "@/components/ai-assistant/common/assistantUi";
 import { isTerminal } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";

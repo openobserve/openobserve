@@ -150,7 +150,7 @@ const MARKS = { same: "  ", added: "+ ", removed: "- " } as const;
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/assistantUi";
 import { registerEscapeRung, stopLadderEscape, useAssistantName } from "@/composables/assistant";
 import { PROPOSAL_LANGUAGE_NAMES, diffLines } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";

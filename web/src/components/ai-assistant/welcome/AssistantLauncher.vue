@@ -211,7 +211,7 @@ import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantUi";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantChipTray, {

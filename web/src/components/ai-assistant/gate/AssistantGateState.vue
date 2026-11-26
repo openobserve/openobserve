@@ -225,7 +225,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
-import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantUi";
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import { useAssistantCapability, useAssistantName } from "@/composables/assistant";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
