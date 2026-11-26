@@ -22,7 +22,7 @@ use super::*;
 
 /// Every route `search_routes_with` registers, as (method, template, handler).
 #[rustfmt::skip]
-const GATED: [(&str, &str, &str); 51] = [
+const GATED: [(&str, &str, &str); 50] = [
     ("POST", "/{org_id}/_search_multi", "search::multi_streams::search_multi"),
     ("POST", "/{org_id}/_search_multi_stream", "search::multi_streams::search_multi_stream"),
     ("POST", "/{org_id}/_search_partition_multi", "search::multi_streams::_search_partition_multi"),
@@ -58,7 +58,6 @@ const GATED: [(&str, &str, &str); 51] = [
     ("POST", "/{org_id}/search_jobs/{job_id}/retry", "search::search_job::retry_job"),
     ("GET", "/{org_id}/traces/service_graph/topology/current", "traces::get_current_topology"),
     ("GET", "/{org_id}/traces/service_graph/edge/history", "traces::get_edge_history"),
-    ("GET", "/{org_id}/traces/service_graph/services/trend", "traces::get_services_trend"),
     ("GET", "/{org_id}/traces/agent_signals", "traces::get_agent_signals"),
     ("POST", "/{org_id}/traces/agent_signals/compare", "traces::compare_agent_versions"),
     ("POST", "/{org_id}/streams/{stream_name}/patterns/extract", "patterns::extract_patterns"),
@@ -359,7 +358,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 82] = [
     ("core/src/traces/agent_signals/api.rs", "fetch_arm_failures", Caller::Routed("traces::get_agent_signals")),
     ("core/src/traces/agent_signals/api.rs", "get_agent_signals", Caller::Routed("traces::get_agent_signals")),
     ("core/src/traces/service_graph/mod.rs", "run_graph_search", Caller::Routed("traces::get_current_topology")),
-    ("core/src/traces/service_graph/v4/read.rs", "run_query_scoped", Caller::Background("incident topology and on-call blast radius on alert firing; the topology and services trend routes are gated")),
+    ("core/src/traces/service_graph/v4/read.rs", "run_query", Caller::Background("incident topology and on-call blast radius on alert firing; the topology routes are gated")),
     ("jobs/src/job/mod.rs", "init", Caller::Background("eval-job scoring")),
     ("jobs/src/job/red_insights.rs", "service_volumes", Caller::Background("red_insights")),
 ];

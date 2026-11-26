@@ -2660,7 +2660,6 @@ fn search_routes_with(llm_eval: bool) -> Router {
             .route("/{org_id}/search_jobs/{job_id}/retry", post(search::search_job::retry_job))
             .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
             .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
-            .route("/{org_id}/traces/service_graph/services/trend", get(traces::get_services_trend))
             .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
             .route("/{org_id}/traces/agent_signals/compare", post(traces::compare_agent_versions))
             .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns));

@@ -1549,7 +1549,6 @@ pub struct ApiDoc;
     openobserve_api_management::request::autoobserve::review::put_verdict,
     openobserve_api_management::request::autoobserve::paging::get_paging_settings,
     openobserve_api_management::request::autoobserve::paging::put_paging_settings,
-    openobserve_core::traces::service_graph::api::get_services_trend,
 ))]
 #[openapi(tags(
     (name = "AutoObserve", description = "Monitoring coverage, suggestions and entity marks from the AutoObserve engine (enterprise)"),
