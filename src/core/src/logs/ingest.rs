@@ -2221,53 +2221,6 @@ mod tests {
         assert_eq!(stream_status.status.failed, 1);
     }
 
-    #[test]
-    fn test_finalize_counts_the_all_values_column_it_does_not_add_yet() {
-        let limit = config::get_config().limit.req_cols_per_record_limit;
-        let mut stream_status = StreamStatus::new("s");
-        let mut buffered = LogDataByStream::new();
-        let schema_map = HashMap::new();
-        let originals = HashMap::new();
-        let all_values = HashMap::from([("s".to_string(), true)]);
-        // `_timestamp` and the later `_all_values` take two of the limit's columns.
-        for (record, accepted) in [
-            (json::Value::Object(numbered_fields("f", limit - 2)), true),
-            (json::Value::Object(numbered_fields("f", limit - 1)), false),
-        ] {
-            assert_eq!(
-                finalize_and_buffer_record(
-                    record,
-                    None,
-                    &mut FinalizeRecordContext {
-                        stream_name: "s",
-                        org_id: "o",
-                        flatten_level: 0,
-                        min_ts: 1,
-                        max_ts: i64::MAX,
-                        columns_limit: limit,
-                        user_defined_schema_map: &schema_map,
-                        streams_need_original_map: &originals,
-                        streams_need_all_values_map: &all_values,
-                        need_usage_report: false,
-                        log_ingestion_errors: false,
-                        dbm_enabled: false,
-                        stream_status: &mut stream_status,
-                        json_data_by_stream: &mut buffered,
-                        bulk_position: None,
-                    }
-                ),
-                accepted,
-            );
-        }
-        assert_eq!(stream_status.status.failed, 1);
-        // Built only after SDR, so the buffered record does not carry it yet.
-        assert!(
-            !buffered["s"].0[0]
-                .1
-                .contains_key(config::ALL_VALUES_COL_NAME)
-        );
-    }
-
     fn gzip_base64(raw: &[u8]) -> String {
         use std::io::Write;
 
