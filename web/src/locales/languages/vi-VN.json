@@ -297,10 +297,10 @@
       "importDesc": "Tải lên định nghĩa pipeline"
     },
     "noQueues": {
-      "title": "Tạo hàng đợi đầu tiên của bạn",
-      "description": "Hàng đợi là danh sách việc cần làm để đánh giá có trạng thái — liên kết Cấu hình Điểm, một tập dữ liệu mục tiêu và bộ lọc đưa các mục vào để con người xem xét.",
-      "action": "Hàng đợi mới",
-      "actionDesc": "Bắt đầu một hàng đợi trống"
+      "title": "Tạo hàng đợi chú thích đầu tiên của bạn",
+      "description": "Hàng đợi chú thích là danh sách việc cần làm để đánh giá — hãy liên kết Cấu hình điểm, một bộ dữ liệu đích và bộ lọc đưa các mục vào để con người đánh giá.",
+      "action": "Hàng đợi chú thích mới",
+      "actionDesc": "Bắt đầu một hàng đợi chú thích trống"
     },
     "noPrompts": {
       "title": "Tạo prompt đầu tiên của bạn",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Không có gì bất ổn ở đây",
-      "description": "Không có mục bất ổn nào trong khoảng thời gian này. Mở rộng phạm vi thời gian hoặc chuyển bộ lọc hàng đợi để xem các mục bạn đã phân loại."
+      "description": "Không có mục nào bất thường trong khoảng thời gian này. Hãy mở rộng khoảng thời gian hoặc chuyển bộ lọc hàng đợi chú thích để xem các mục bạn đã phân loại."
     },
     "noTraces": {
       "title": "Không tìm thấy trace nào.",
@@ -10088,6 +10088,7 @@
       "boxplotUpperWhisker": "Râu trên",
       "boxplotMedian": "Trung vị",
       "boxplotSamples": "Số mẫu",
+      "boxplotValueNotNumeric": "Giá trị của biểu đồ hộp phải là trường số",
       "boxplotOutlier": "Giá trị ngoại lai",
       "fieldNotAllowedForDistribution": "Không cho phép trường {label} trong biểu đồ phân phối",
       "distributionCount": "Số lượng",
@@ -17761,13 +17762,9 @@
       "noAgentsDescription": "Không phát hiện tác nhân GenAI nào trong khoảng thời gian đã chọn. Hãy thử khoảng rộng hơn hoặc chuyển lại chế độ stream.",
       "viewByStream": "Xem theo stream",
       "search": {
-        "placeholder": "Tìm kiếm theo người dùng hoặc tin nhắn",
-        "title": "Khớp các phiên có ID người dùng hoặc văn bản hội thoại chứa văn bản",
         "noResultsTitle": "Không có phiên nào khớp với tìm kiếm của bạn",
-        "noResultsDescription": "Hãy thử từ khóa khác, trường khác hoặc khoảng thời gian rộng hơn.",
-        "clear": "Xóa tìm kiếm",
-        "user": "Người dùng: {user}",
-        "clearUser": "Hiển thị tất cả người dùng"
+        "noResultsDescription": "Hãy thử bộ lọc khác hoặc khoảng thời gian rộng hơn.",
+        "clear": "Xóa bộ lọc"
       }
     },
     "sessionDetail": {
@@ -19078,7 +19075,7 @@
       "users": "Người dùng",
       "budgets": "Ngân sách",
       "discovery": "Khám phá",
-      "queues": "Hàng đợi",
+      "queues": "Hàng đợi chú thích",
       "datasets": "Tập dữ liệu",
       "experiments": "Thử nghiệm",
       "quality": "Chất lượng",
@@ -19363,15 +19360,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Thêm vào hàng đợi xem xét",
-        "title": "Thêm vào hàng đợi xem xét",
-        "hint": "Đưa {ref} vào hàng đợi để con người xem xét. Nó vẫn giữ nguyên vị trí — trạng thái xem xét nằm trong hàng đợi.",
-        "queueLabel": "Hàng đợi",
-        "queuePlaceholder": "Chọn một hàng đợi...",
-        "noQueues": "Không có hàng đợi nào chấp nhận {scope} — hãy tạo một hàng đợi từ trang Hàng đợi trước.",
-        "confirm": "Thêm vào hàng đợi",
+        "button": "Thêm vào hàng đợi chú thích",
+        "title": "Thêm vào hàng đợi chú thích",
+        "hint": "Thêm {ref} để con người đánh giá. Mục này vẫn ở nguyên vị trí — hàng đợi chú thích theo dõi trạng thái đánh giá của nó.",
+        "queueLabel": "Hàng đợi chú thích",
+        "queuePlaceholder": "Chọn một hàng đợi chú thích...",
+        "noQueues": "Không có hàng đợi chú thích nào chấp nhận {scope} — hãy tạo một hàng đợi từ trang Hàng đợi chú thích trước.",
+        "confirm": "Thêm vào hàng đợi chú thích",
         "success": "Đã thêm vào {queue}",
-        "error": "Không thêm được mục này vào hàng đợi"
+        "error": "Không thể thêm mục này vào hàng đợi chú thích"
       },
       "dataset": {
         "button": "Thêm vào bộ dữ liệu",
@@ -19408,12 +19405,12 @@
         "session": "Phiên"
       },
       "inQueueFilter": {
-        "label": "Trong hàng đợi",
-        "notEnqueued": "Trong hàng đợi: Chưa xếp hàng",
-        "enqueued": "Trong hàng đợi: Bất kỳ hàng đợi nào",
-        "pending": "Trong hàng đợi: Đang chờ",
-        "reviewed": "Trong hàng đợi: Đã xem xét",
-        "all": "Trong hàng đợi: Tất cả"
+        "label": "Trạng thái hàng đợi chú thích",
+        "notEnqueued": "Chưa vào hàng đợi",
+        "enqueued": "Trong hàng đợi chú thích",
+        "pending": "Chờ đánh giá",
+        "reviewed": "Đã đánh giá",
+        "all": "Tất cả mục"
       },
       "columns": {
         "timestamp": "Dấu thời gian",
@@ -19429,7 +19426,7 @@
         "service": "Dịch vụ",
         "input": "Đầu vào",
         "quality": "Chất lượng",
-        "inQueue": "Trong hàng đợi?",
+        "inQueue": "Trong hàng đợi chú thích?",
         "actions": "Hành động"
       },
       "spanParent": "Trong {trace}",
@@ -19441,26 +19438,26 @@
       "inQueue": {
         "none": "Chưa xếp hàng",
         "reviewed": "Đã xem xét",
-        "multiple": "Trong {count} hàng đợi"
+        "multiple": "Trong {count} hàng đợi chú thích"
       },
-      "addToQueue": "Thêm vào hàng đợi",
+      "addToQueue": "Thêm vào hàng đợi chú thích",
       "addToQueueMenu": {
-        "loading": "Đang tải hàng đợi...",
-        "noQueues": "Chưa có hàng đợi nào — hãy tạo một hàng đợi từ trang Hàng đợi trước.",
+        "loading": "Đang tải hàng đợi chú thích...",
+        "noQueues": "Chưa có hàng đợi chú thích nào — hãy tạo một hàng đợi từ trang Hàng đợi chú thích trước.",
         "dimensions": "{count} chiều | {count} chiều",
         "accepts": "Chỉ chấp nhận {types}",
-        "sectionTitle": "Thêm vào hàng đợi",
-        "manageQueues": "Quản lý hàng đợi"
+        "sectionTitle": "Thêm vào hàng đợi chú thích",
+        "manageQueues": "Quản lý hàng đợi chú thích"
       },
-      "addSuccess": "Đã thêm vào {queue} — hàng này vẫn ở trong Discovery, trạng thái của nó nằm trong hàng đợi.",
-      "addError": "Không thể thêm các mục vào hàng đợi",
-      "openQueue": "Mở hàng đợi",
-      "queuesError": "Không thể tải hàng đợi"
+      "addSuccess": "Đã thêm vào {queue} — dòng này vẫn ở trong Discovery và hàng đợi chú thích theo dõi trạng thái đánh giá của nó.",
+      "addError": "Không thể thêm các mục vào hàng đợi chú thích",
+      "openQueue": "Mở hàng đợi chú thích",
+      "queuesError": "Không thể tải hàng đợi chú thích"
     },
     "queues": {
-      "searchPlaceholder": "Tìm kiếm hàng đợi...",
-      "newButton": "Hàng đợi mới",
-      "loadError": "Không thể tải hàng đợi",
+      "searchPlaceholder": "Tìm kiếm hàng đợi chú thích...",
+      "newButton": "Hàng đợi chú thích mới",
+      "loadError": "Không thể tải hàng đợi chú thích",
       "optionsLoadError": "Không thể tải cấu hình điểm",
       "review": "Xem xét",
       "cleared": "Đã xóa",
@@ -19475,7 +19472,7 @@
         "actions": "Thao tác"
       },
       "create": {
-        "title": "Hàng đợi mới",
+        "title": "Hàng đợi chú thích mới",
         "errors": {
           "name": "Tên là bắt buộc",
           "scoreConfigs": "Liên kết ít nhất một Cấu hình điểm số"
@@ -19483,9 +19480,9 @@
         "nameLabel": "Tên",
         "namePlaceholder": "ví dụ: hallucination_review",
         "descriptionLabel": "Mô tả",
-        "descriptionPlaceholder": "Hàng đợi này dùng để làm gì và ai xem xét...",
+        "descriptionPlaceholder": "Hàng đợi chú thích này dùng để làm gì và ai sẽ đánh giá...",
         "scoreConfigsLabel": "Cấu hình điểm số",
-        "scoreConfigsHint": "Hàng đợi chấm điểm các mục trên một hoặc nhiều khía cạnh. Mỗi Cấu hình điểm số là một khía cạnh duy nhất — chọn các cấu hình để liên kết và ghim từng cấu hình vào một phiên bản.",
+        "scoreConfigsHint": "Hàng đợi chú thích chấm điểm các mục trên một hoặc nhiều khía cạnh. Mỗi Cấu hình điểm là một khía cạnh duy nhất — hãy chọn các cấu hình cần liên kết và ghim từng cấu hình vào một phiên bản.",
         "scoreConfigsEmpty": "Chọn các Cấu hình điểm số để liên kết.",
         "addScoreConfig": "Thêm Cấu hình điểm số",
         "allScoreConfigsAdded": "Tất cả các cấu hình điểm số đã được thêm.",
@@ -19493,10 +19490,10 @@
         "noScoreConfigs": "Chưa có cấu hình điểm số nào — hãy tạo một cấu hình trong Cấu hình điểm số trước.",
         "targetDatasetLabel": "Tập dữ liệu đích",
         "targetDatasetNone": "Không có (chỉ xem xét)",
-        "targetDatasetHint": "Hàng đợi chỉ xem xét — các mục đã xem xét sẽ không được chưng cất vào tập dữ liệu.",
+        "targetDatasetHint": "Nếu không có bộ dữ liệu đích, các mục trong hàng đợi chú thích này sẽ chỉ được đánh giá.",
         "autoRoutingLabel": "Tự động định tuyến",
-        "autoRoutingHint": "Tự động xếp hàng đợi các đối tượng có điểm số khớp với điều kiện. Để trống để cung cấp hàng đợi này theo cách thủ công từ Discovery.",
-        "autoRoutingEmpty": "Không có tự động định tuyến — hàng đợi này được cung cấp thủ công.",
+        "autoRoutingHint": "Tự động đưa các đối tượng có điểm khớp với điều kiện vào hàng đợi. Để trống để thêm các mục vào hàng đợi chú thích này từ Discovery.",
+        "autoRoutingEmpty": "Các mục được thêm vào hàng đợi chú thích này theo cách thủ công.",
         "addCondition": "Thêm điều kiện",
         "conditionAnd": "VÀ",
         "operatorIs": "bằng",
@@ -19505,12 +19502,12 @@
         "conditionValuePlaceholder": "Giá trị",
         "pin": "Ghim phiên bản",
         "versionLatest": "v{version} (mới nhất)",
-        "success": "Đã tạo hàng đợi",
-        "error": "Không thể tạo hàng đợi"
+        "success": "Đã tạo hàng đợi chú thích",
+        "error": "Không thể tạo hàng đợi chú thích"
       },
       "detail": {
-        "fallbackTitle": "Hàng đợi",
-        "loadError": "Không thể tải các mục trong hàng đợi",
+        "fallbackTitle": "Hàng đợi chú thích",
+        "loadError": "Không thể tải các mục trong hàng đợi chú thích",
         "startReviewing": "Bắt đầu xem xét",
         "scoreConfigs": "Cấu hình điểm số ({count})",
         "targetDataset": "Tập dữ liệu đích",
@@ -19520,7 +19517,7 @@
         "inTrace": "Trong Trace {traceId}",
         "reviewAgain": "Xem xét lại",
         "emptyTitle": "Không có gì để xem xét",
-        "emptyBody": "Thêm trace, span hoặc phiên vào hàng đợi này từ Khám phá hoặc chế độ xem trace.",
+        "emptyBody": "Thêm trace, span hoặc phiên vào hàng đợi chú thích này từ Discovery hoặc chế độ xem trace.",
         "columns": {
           "refType": "Tham chiếu",
           "refId": "Tham chiếu",
@@ -19591,7 +19588,7 @@
         "true": "Đúng",
         "false": "Sai",
         "allReviewedTitle": "Tất cả các mục đã được đánh giá",
-        "allReviewedBody": "Mọi mục trong hàng đợi này đều có một đánh giá hoàn tất."
+        "allReviewedBody": "Mọi mục trong hàng đợi chú thích này đều đã hoàn tất đánh giá."
       }
     },
     "experiments": {
@@ -25747,8 +25744,8 @@
     "sloDetail": "Chi tiết SLO",
     "alertDetail": "Chi tiết cảnh báo",
     "editAlert": "Chỉnh sửa cảnh báo",
-    "aiQueueDetail": "Hàng đợi",
-    "aiQueueReview": "Xem xét hàng đợi",
+    "aiQueueDetail": "Hàng đợi chú thích",
+    "aiQueueReview": "Đánh giá hàng đợi chú thích",
     "aiDatasetDetail": "Tập dữ liệu",
     "aiPromptCreate": "Prompt mới",
     "aiPromptVersionCreate": "Phiên bản Prompt mới",

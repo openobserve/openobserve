@@ -297,10 +297,10 @@
       "importDesc": "Carregue uma definição de pipeline"
     },
     "noQueues": {
-      "title": "Crie a sua primeira fila",
-      "description": "As filas são listas de tarefas de revisão com estado — vincule Configurações de Score, um dataset de destino e um filtro que alimenta itens para revisão humana.",
-      "action": "Nova fila",
-      "actionDesc": "Iniciar uma fila vazia"
+      "title": "Crie a sua primeira fila de anotação",
+      "description": "As filas de anotação são listas de tarefas de revisão — associe configurações de pontuação, um conjunto de dados de destino e um filtro que encaminha itens para revisão humana.",
+      "action": "Nova fila de anotação",
+      "actionDesc": "Criar uma fila de anotação vazia"
     },
     "noPrompts": {
       "title": "Crie o seu primeiro prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Nenhum item não saudável aqui",
-      "description": "Nenhum item não saudável nesta janela. Amplie o intervalo de tempo ou alterne o filtro da fila para ver itens que já triou."
+      "description": "Não há itens em mau estado neste intervalo. Alargue o intervalo temporal ou altere o filtro da fila de anotação para ver itens que já triou."
     },
     "noTraces": {
       "title": "Nenhum trace encontrado",
@@ -10088,6 +10088,7 @@
       "boxplotUpperWhisker": "Bigode superior",
       "boxplotMedian": "Mediana",
       "boxplotSamples": "Amostras",
+      "boxplotValueNotNumeric": "O valor do box plot tem de ser um campo numérico",
       "boxplotOutlier": "Valor atípico",
       "fieldNotAllowedForDistribution": "O campo {label} não é permitido no gráfico de distribuição",
       "distributionCount": "Contagem",
@@ -17761,13 +17762,9 @@
       "noAgentsDescription": "Nenhum agente GenAI foi detetado para a janela de tempo selecionada. Tente um intervalo maior ou volte para a visualização de stream.",
       "viewByStream": "Visualizar por Stream",
       "search": {
-        "placeholder": "Pesquisar por utilizador ou mensagem",
-        "title": "Corresponder sessões cujo ID de utilizador ou texto da conversa contenha o texto",
         "noResultsTitle": "Nenhuma sessão corresponde à sua pesquisa",
-        "noResultsDescription": "Tente outro termo ou um intervalo de tempo mais amplo.",
-        "clear": "Limpar pesquisa",
-        "user": "Utilizador: {user}",
-        "clearUser": "Mostrar todos os utilizadores"
+        "noResultsDescription": "Experimente um filtro diferente ou um intervalo temporal mais amplo.",
+        "clear": "Limpar filtro"
       }
     },
     "sessionDetail": {
@@ -19078,7 +19075,7 @@
       "users": "Utilizadores",
       "budgets": "Orçamentos",
       "discovery": "Descoberta",
-      "queues": "Filas",
+      "queues": "Filas de anotação",
       "datasets": "Datasets",
       "experiments": "Experimentos",
       "quality": "Qualidade",
@@ -19363,15 +19360,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Adicionar à fila de revisão",
-        "title": "Adicionar à fila de revisão",
-        "hint": "Coloque {ref} na fila para revisão humana. Permanece onde está — o estado da revisão fica na fila.",
-        "queueLabel": "Fila",
-        "queuePlaceholder": "Selecionar uma fila...",
-        "noQueues": "Nenhuma fila aceita um {scope} — crie uma na página de Filas primeiro.",
-        "confirm": "Adicionar à fila",
+        "button": "Adicionar à fila de anotação",
+        "title": "Adicionar à fila de anotação",
+        "hint": "Adicione {ref} para revisão humana. Fica onde está — a fila de anotação acompanha o estado da revisão.",
+        "queueLabel": "Fila de anotação",
+        "queuePlaceholder": "Selecione uma fila de anotação...",
+        "noQueues": "Nenhuma fila de anotação aceita {scope} — crie uma primeiro na página Filas de anotação.",
+        "confirm": "Adicionar à fila de anotação",
         "success": "Adicionado a {queue}",
-        "error": "Falha ao adicionar este item à fila"
+        "error": "Não foi possível adicionar este item à fila de anotação"
       },
       "dataset": {
         "button": "Adicionar ao dataset",
@@ -19408,12 +19405,12 @@
         "session": "Sessões"
       },
       "inQueueFilter": {
-        "label": "Na fila",
-        "notEnqueued": "Na Fila: Não Enfileirado",
-        "enqueued": "Na Fila: Qualquer Fila",
-        "pending": "Na Fila: Pendente",
-        "reviewed": "Na Fila: Revisto",
-        "all": "Na Fila: Todas"
+        "label": "Estado da fila de anotação",
+        "notEnqueued": "Não adicionado à fila",
+        "enqueued": "Numa fila de anotação",
+        "pending": "Revisão pendente",
+        "reviewed": "Revisto",
+        "all": "Todos os itens"
       },
       "columns": {
         "timestamp": "Timestamp",
@@ -19429,7 +19426,7 @@
         "service": "Serviço",
         "input": "Entrada",
         "quality": "Qualidade",
-        "inQueue": "Na Fila?",
+        "inQueue": "Na fila de anotação?",
         "actions": "Ações"
       },
       "spanParent": "Em {trace}",
@@ -19441,26 +19438,26 @@
       "inQueue": {
         "none": "Não Enfileirado",
         "reviewed": "Já Revisto",
-        "multiple": "Em {count} Filas"
+        "multiple": "Em {count} filas de anotação"
       },
-      "addToQueue": "Adicionar à Fila",
+      "addToQueue": "Adicionar à fila de anotação",
       "addToQueueMenu": {
-        "loading": "A carregar filas...",
-        "noQueues": "Ainda não há filas — crie uma na página de Filas primeiro.",
+        "loading": "A carregar filas de anotação...",
+        "noQueues": "Ainda não há filas de anotação — crie uma primeiro na página Filas de anotação.",
         "dimensions": "{count} dimensão | {count} dimensões",
         "accepts": "Aceita apenas {types}",
-        "sectionTitle": "Adicionar à Fila",
-        "manageQueues": "Gerir Filas"
+        "sectionTitle": "Adicionar à fila de anotação",
+        "manageQueues": "Gerir filas de anotação"
       },
-      "addSuccess": "Adicionado a {queue} — a linha permanece em Discovery, o seu estado fica na fila.",
-      "addError": "Falha ao adicionar itens à fila",
-      "openQueue": "Abrir Fila",
-      "queuesError": "Falha ao carregar filas"
+      "addSuccess": "Adicionado a {queue} — a linha permanece em Discovery e a fila de anotação acompanha o estado da revisão.",
+      "addError": "Não foi possível adicionar itens à fila de anotação",
+      "openQueue": "Abrir fila de anotação",
+      "queuesError": "Não foi possível carregar as filas de anotação"
     },
     "queues": {
-      "searchPlaceholder": "Pesquisar Filas...",
-      "newButton": "Nova Fila",
-      "loadError": "Falha ao carregar filas",
+      "searchPlaceholder": "Pesquisar filas de anotação...",
+      "newButton": "Nova fila de anotação",
+      "loadError": "Não foi possível carregar as filas de anotação",
       "optionsLoadError": "Falha ao carregar configurações de pontuação",
       "review": "Rever",
       "cleared": "Limpo",
@@ -19475,7 +19472,7 @@
         "actions": "Ações"
       },
       "create": {
-        "title": "Nova Fila",
+        "title": "Nova fila de anotação",
         "errors": {
           "name": "O nome é obrigatório",
           "scoreConfigs": "Vincule pelo menos uma Configuração de Pontuação"
@@ -19483,9 +19480,9 @@
         "nameLabel": "Nome",
         "namePlaceholder": "ex.: hallucination_review",
         "descriptionLabel": "Descrição",
-        "descriptionPlaceholder": "Para que serve esta fila e quem a revê...",
+        "descriptionPlaceholder": "Para que serve esta fila de anotação e quem a revê...",
         "scoreConfigsLabel": "Configurações de Pontuação",
-        "scoreConfigsHint": "Uma fila pontua itens numa ou mais dimensões. Cada Configuração de Pontuação é uma única dimensão — escolha as configurações para vincular e fixe cada uma a uma versão.",
+        "scoreConfigsHint": "Uma fila de anotação pontua itens numa ou mais dimensões. Cada configuração de pontuação é uma única dimensão — escolha as configurações a associar e fixe cada uma numa versão.",
         "scoreConfigsEmpty": "Escolha as Configurações de Pontuação para vincular.",
         "addScoreConfig": "Adicionar Configuração de Pontuação",
         "allScoreConfigsAdded": "Todas as configurações de pontuação foram adicionadas.",
@@ -19493,10 +19490,10 @@
         "noScoreConfigs": "Ainda não há configurações de pontuação — crie uma em Configurações de Pontuação primeiro.",
         "targetDatasetLabel": "Dataset de Destino",
         "targetDatasetNone": "Nenhum (apenas revisão)",
-        "targetDatasetHint": "Fila apenas de revisão — os itens revistos não serão destilados para um dataset.",
+        "targetDatasetHint": "Sem um conjunto de dados de destino, os itens desta fila de anotação são apenas revistos.",
         "autoRoutingLabel": "Encaminhamento Automático",
-        "autoRoutingHint": "Enfileira automaticamente objetos cujas pontuações correspondem a uma condição. Deixe vazio para alimentar esta fila manualmente a partir do Discovery.",
-        "autoRoutingEmpty": "Sem encaminhamento automático — esta fila é alimentada manualmente.",
+        "autoRoutingHint": "Colocar automaticamente em fila objetos cujas pontuações correspondam a uma condição. Deixe vazio para adicionar itens a esta fila de anotação a partir de Discovery.",
+        "autoRoutingEmpty": "Os itens são adicionados manualmente a esta fila de anotação.",
         "addCondition": "Adicionar Condição",
         "conditionAnd": "E",
         "operatorIs": "é",
@@ -19505,12 +19502,12 @@
         "conditionValuePlaceholder": "Valor",
         "pin": "Fixar Versão",
         "versionLatest": "v{version} (mais recente)",
-        "success": "Fila criada",
-        "error": "Falha ao criar fila"
+        "success": "Fila de anotação criada",
+        "error": "Não foi possível criar a fila de anotação"
       },
       "detail": {
-        "fallbackTitle": "Fila",
-        "loadError": "Falha ao carregar itens da fila",
+        "fallbackTitle": "Fila de anotação",
+        "loadError": "Não foi possível carregar os itens da fila de anotação",
         "startReviewing": "Começar Revisão",
         "scoreConfigs": "Configurações de Pontuação ({count})",
         "targetDataset": "Dataset de Destino",
@@ -19520,7 +19517,7 @@
         "inTrace": "No trace {traceId}",
         "reviewAgain": "Rever Novamente",
         "emptyTitle": "Nada para Rever",
-        "emptyBody": "Adicione traces, spans ou sessões a esta fila a partir do Discovery ou de uma visualização de trace.",
+        "emptyBody": "Adicione traces, spans ou sessões a esta fila de anotação a partir de Discovery ou de uma vista de trace.",
         "columns": {
           "refType": "Ref",
           "refId": "Referência",
@@ -19591,7 +19588,7 @@
         "true": "Verdadeiro",
         "false": "Falso",
         "allReviewedTitle": "Todos os itens revistos",
-        "allReviewedBody": "Cada item nesta fila tem uma revisão concluída."
+        "allReviewedBody": "Todos os itens desta fila de anotação têm uma revisão concluída."
       }
     },
     "experiments": {
@@ -25747,8 +25744,8 @@
     "sloDetail": "Detalhe do SLO",
     "alertDetail": "Detalhe do alerta",
     "editAlert": "Editar alerta",
-    "aiQueueDetail": "Fila",
-    "aiQueueReview": "Revisão da Fila",
+    "aiQueueDetail": "Fila de anotação",
+    "aiQueueReview": "Revisão da fila de anotação",
     "aiDatasetDetail": "Conjunto de dados",
     "aiPromptCreate": "Novo prompt",
     "aiPromptVersionCreate": "Nova versão de prompt",

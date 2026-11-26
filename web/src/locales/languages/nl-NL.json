@@ -297,10 +297,10 @@
       "importDesc": "Een definitie van een pipeline uploaden"
     },
     "noQueues": {
-      "title": "Maak je eerste wachtrij",
-      "description": "Wachtrijen zijn stateful review-to-do-lijsten — bind Score Configs, een doeldataset en een filter die items invoert voor menselijke review.",
-      "action": "Nieuwe wachtrij",
-      "actionDesc": "Start een lege wachtrij"
+      "title": "Maak je eerste annotatiewachtrij",
+      "description": "Annotatiewachtrijen zijn todo-lijsten voor beoordeling — koppel Score Configs, een doeldataset en een filter dat items aanlevert voor menselijke beoordeling.",
+      "action": "Nieuwe annotatiewachtrij",
+      "actionDesc": "Begin een lege annotatiewachtrij"
     },
     "noPrompts": {
       "title": "Maak je eerste prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Niets ongezonds hier",
-      "description": "Geen ongezonde items in dit venster. Verbreed het tijdbereik of wijzig het wachtrijfilter om items te zien die je al hebt getriageerd."
+      "description": "Geen ongezonde items in dit venster. Verruim het tijdsbereik of wijzig het filter van de annotatiewachtrij om items te zien die je al hebt getriageerd."
     },
     "noTraces": {
       "title": "Geen traces gevonden",
@@ -10088,6 +10088,7 @@
       "boxplotUpperWhisker": "Bovenste snorhaar",
       "boxplotMedian": "Mediaan",
       "boxplotSamples": "Steekproeven",
+      "boxplotValueNotNumeric": "De waarde van de boxplot moet een numeriek veld zijn",
       "boxplotOutlier": "Uitschieter",
       "fieldNotAllowedForDistribution": "Het veld {label} is niet toegestaan voor de verdelingsgrafiek",
       "distributionCount": "Aantal",
@@ -17761,13 +17762,9 @@
       "noAgentsDescription": "Er zijn geen GenAI-agenten gedetecteerd voor het geselecteerde tijdsvenster. Probeer een groter bereik of schakel terug naar streamweergave.",
       "viewByStream": "Bekijken op stream",
       "search": {
-        "placeholder": "Zoeken op gebruiker of bericht",
-        "title": "Sessies matchen waarvan de gebruikers-ID of gesprekstekst de tekst bevat",
         "noResultsTitle": "Geen sessies komen overeen met uw zoekopdracht",
-        "noResultsDescription": "Probeer een andere term, een ander veld of een ruimer tijdsbereik.",
-        "clear": "Zoekopdracht wissen",
-        "user": "Gebruiker: {user}",
-        "clearUser": "Alle gebruikers tonen"
+        "noResultsDescription": "Probeer een ander filter of een ruimer tijdsbereik.",
+        "clear": "Filter wissen"
       }
     },
     "sessionDetail": {
@@ -19078,7 +19075,7 @@
       "users": "Gebruikers",
       "budgets": "Budgetten",
       "discovery": "Ontdekking",
-      "queues": "Wachtrijen",
+      "queues": "Annotatiewachtrijen",
       "datasets": "Datasets",
       "experiments": "Experimenten",
       "quality": "Kwaliteit",
@@ -19363,15 +19360,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Toevoegen aan beoordelingswachtrij",
-        "title": "Toevoegen aan beoordelingswachtrij",
-        "hint": "Plaats {ref} in de wachtrij voor menselijke beoordeling. Het blijft waar het is — de beoordelingsstatus bevindt zich in de wachtrij.",
-        "queueLabel": "Wachtrij",
-        "queuePlaceholder": "Selecteer een wachtrij...",
-        "noQueues": "Geen wachtrij accepteert een {scope} — maak er eerst een aan op de pagina Wachtrijen.",
-        "confirm": "Toevoegen aan wachtrij",
+        "button": "Toevoegen aan annotatiewachtrij",
+        "title": "Toevoegen aan annotatiewachtrij",
+        "hint": "Voeg {ref} toe voor menselijke beoordeling. Het blijft waar het is — de annotatiewachtrij volgt de beoordelingsstatus.",
+        "queueLabel": "Annotatiewachtrij",
+        "queuePlaceholder": "Selecteer een annotatiewachtrij...",
+        "noQueues": "Geen enkele annotatiewachtrij accepteert een {scope} — maak er eerst een aan op de pagina Annotatiewachtrijen.",
+        "confirm": "Toevoegen aan annotatiewachtrij",
         "success": "Toegevoegd aan {queue}",
-        "error": "Kan dit item niet aan de wachtrij toevoegen"
+        "error": "Kon dit item niet aan de annotatiewachtrij toevoegen"
       },
       "dataset": {
         "button": "Toevoegen aan dataset",
@@ -19408,12 +19405,12 @@
         "session": "Sessies"
       },
       "inQueueFilter": {
-        "label": "In wachtrij",
-        "notEnqueued": "In wachtrij: Niet in de wachtrij",
-        "enqueued": "In wachtrij: Elke wachtrij",
-        "pending": "In wachtrij: In afwachting",
-        "reviewed": "In wachtrij: Beoordeeld",
-        "all": "In wachtrij: Allemaal"
+        "label": "Status van annotatiewachtrij",
+        "notEnqueued": "Niet in wachtrij",
+        "enqueued": "In een annotatiewachtrij",
+        "pending": "In afwachting van beoordeling",
+        "reviewed": "Beoordeeld",
+        "all": "Alle items"
       },
       "columns": {
         "timestamp": "Tijdstempel",
@@ -19429,7 +19426,7 @@
         "service": "Service",
         "input": "Invoer",
         "quality": "Kwaliteit",
-        "inQueue": "In wachtrij?",
+        "inQueue": "In annotatiewachtrij?",
         "actions": "Acties"
       },
       "spanParent": "In {trace}",
@@ -19441,26 +19438,26 @@
       "inQueue": {
         "none": "Niet in de wachtrij",
         "reviewed": "Al beoordeeld",
-        "multiple": "In {count} wachtrijen"
+        "multiple": "In {count} annotatiewachtrijen"
       },
-      "addToQueue": "Toevoegen aan wachtrij",
+      "addToQueue": "Toevoegen aan annotatiewachtrij",
       "addToQueueMenu": {
-        "loading": "Wachtrijen laden...",
-        "noQueues": "Nog geen wachtrijen — maak er eerst een aan via de pagina Wachtrijen.",
+        "loading": "Annotatiewachtrijen laden...",
+        "noQueues": "Nog geen annotatiewachtrijen — maak er eerst een aan op de pagina Annotatiewachtrijen.",
         "dimensions": "{count} dimensie | {count} dimensies",
         "accepts": "Accepteert alleen {types}",
-        "sectionTitle": "Toevoegen aan wachtrij",
-        "manageQueues": "Wachtrijen beheren"
+        "sectionTitle": "Toevoegen aan annotatiewachtrij",
+        "manageQueues": "Annotatiewachtrijen beheren"
       },
-      "addSuccess": "Toegevoegd aan {queue} — de rij blijft in Discovery, de status bevindt zich in de wachtrij.",
-      "addError": "Kan items niet aan de wachtrij toevoegen",
-      "openQueue": "Wachtrij openen",
-      "queuesError": "Laden van wachtrijen mislukt"
+      "addSuccess": "Toegevoegd aan {queue} — de rij blijft in Discovery staan en de annotatiewachtrij volgt de beoordelingsstatus.",
+      "addError": "Kon items niet aan de annotatiewachtrij toevoegen",
+      "openQueue": "Annotatiewachtrij openen",
+      "queuesError": "Kon annotatiewachtrijen niet laden"
     },
     "queues": {
-      "searchPlaceholder": "Zoek wachtrijen...",
-      "newButton": "Nieuwe wachtrij",
-      "loadError": "Laden van wachtrijen mislukt",
+      "searchPlaceholder": "Zoek annotatiewachtrijen...",
+      "newButton": "Nieuwe annotatiewachtrij",
+      "loadError": "Kon annotatiewachtrijen niet laden",
       "optionsLoadError": "Laden van scoreconfiguraties mislukt",
       "review": "Beoordelen",
       "cleared": "Gewist",
@@ -19475,7 +19472,7 @@
         "actions": "Acties"
       },
       "create": {
-        "title": "Nieuwe wachtrij",
+        "title": "Nieuwe annotatiewachtrij",
         "errors": {
           "name": "Naam is verplicht",
           "scoreConfigs": "Koppel ten minste één scoreconfiguratie"
@@ -19483,9 +19480,9 @@
         "nameLabel": "Naam",
         "namePlaceholder": "bijv. hallucination_review",
         "descriptionLabel": "Beschrijving",
-        "descriptionPlaceholder": "Waar deze wachtrij voor is en wie deze beoordeelt...",
+        "descriptionPlaceholder": "Waarvoor deze annotatiewachtrij dient en wie hem beoordeelt...",
         "scoreConfigsLabel": "Scoreconfiguraties",
-        "scoreConfigsHint": "Een wachtrij scoort items op een of meer dimensies. Elke scoreconfiguratie is een enkele dimensie — kies de configuraties om te koppelen en zet elke vast op een versie.",
+        "scoreConfigsHint": "Een annotatiewachtrij scoort items op een of meer dimensies. Elke Score Config is één dimensie — kies de configuraties om te koppelen en pin ze elk aan een versie.",
         "scoreConfigsEmpty": "Kies de scoreconfiguraties om te koppelen.",
         "addScoreConfig": "Scoreconfiguratie toevoegen",
         "allScoreConfigsAdded": "Alle scoreconfiguraties zijn toegevoegd.",
@@ -19493,10 +19490,10 @@
         "noScoreConfigs": "Nog geen scoreconfiguraties — maak er eerst een aan onder Scoreconfiguraties.",
         "targetDatasetLabel": "Doeldataset",
         "targetDatasetNone": "Geen (alleen beoordelen)",
-        "targetDatasetHint": "Wachtrij voor alleen beoordeling — beoordeelde items worden niet gedistilleerd naar een dataset.",
+        "targetDatasetHint": "Zonder doeldataset worden items in deze annotatiewachtrij alleen beoordeeld.",
         "autoRoutingLabel": "Automatische routering",
-        "autoRoutingHint": "Plaats automatisch objecten in de wachtrij waarvan de scores aan een voorwaarde voldoen. Laat leeg om deze wachtrij handmatig vanuit Discovery te voeden.",
-        "autoRoutingEmpty": "Geen automatische routering — deze wachtrij wordt handmatig gevoed.",
+        "autoRoutingHint": "Plaats objecten automatisch in de wachtrij waarvan de scores aan een voorwaarde voldoen. Laat leeg om items vanuit Discovery aan deze annotatiewachtrij toe te voegen.",
+        "autoRoutingEmpty": "Items worden handmatig aan deze annotatiewachtrij toegevoegd.",
         "addCondition": "Voorwaarde toevoegen",
         "conditionAnd": "EN",
         "operatorIs": "is",
@@ -19505,12 +19502,12 @@
         "conditionValuePlaceholder": "Waarde",
         "pin": "Versie vastzetten",
         "versionLatest": "v{version} (nieuwste)",
-        "success": "Wachtrij aangemaakt",
-        "error": "Aanmaken van wachtrij mislukt"
+        "success": "Annotatiewachtrij aangemaakt",
+        "error": "Kon annotatiewachtrij niet aanmaken"
       },
       "detail": {
-        "fallbackTitle": "Wachtrij",
-        "loadError": "Laden van wachtrij-items mislukt",
+        "fallbackTitle": "Annotatiewachtrij",
+        "loadError": "Kon items van de annotatiewachtrij niet laden",
         "startReviewing": "Start beoordelen",
         "scoreConfigs": "Scoreconfiguraties ({count})",
         "targetDataset": "Doeldataset",
@@ -19520,7 +19517,7 @@
         "inTrace": "In trace {traceId}",
         "reviewAgain": "Opnieuw beoordelen",
         "emptyTitle": "Niets om te beoordelen",
-        "emptyBody": "Voeg traces, spans of sessies toe aan deze wachtrij vanuit Discovery of een traceweergave.",
+        "emptyBody": "Voeg traces, spans of sessies vanuit Discovery of een trace-weergave aan deze annotatiewachtrij toe.",
         "columns": {
           "refType": "Ref",
           "refId": "Referentie",
@@ -19591,7 +19588,7 @@
         "true": "Waar",
         "false": "Onwaar",
         "allReviewedTitle": "Alle items beoordeeld",
-        "allReviewedBody": "Elk item in deze wachtrij heeft een voltooide beoordeling."
+        "allReviewedBody": "Elk item in deze annotatiewachtrij heeft een afgeronde beoordeling."
       }
     },
     "experiments": {
@@ -25747,8 +25744,8 @@
     "sloDetail": "SLO-detail",
     "alertDetail": "Alarmdetails",
     "editAlert": "Alarm bewerken",
-    "aiQueueDetail": "Wachtrij",
-    "aiQueueReview": "Wachtrijcontrole",
+    "aiQueueDetail": "Annotatiewachtrij",
+    "aiQueueReview": "Beoordeling annotatiewachtrij",
     "aiDatasetDetail": "Dataset",
     "aiPromptCreate": "Nieuwe prompt",
     "aiPromptVersionCreate": "Nieuwe promptversie",
