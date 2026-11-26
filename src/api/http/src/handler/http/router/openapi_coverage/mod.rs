@@ -508,6 +508,18 @@ const UNAVAILABLE_STUBS: &[(&str, &str, &str, &str)] = &[
     (
         "oss",
         "POST",
+        "/api/v2/{org_id}/alerts/incidents/changes",
+        "403",
+    ),
+    (
+        "oss",
+        "POST",
+        "/api/v2/{org_id}/incidents/changes/{token}",
+        "403",
+    ),
+    (
+        "oss",
+        "POST",
         "/api/v2/{org_id}/alerts/incidents/{incident_id}/contexts",
         "403",
     ),
