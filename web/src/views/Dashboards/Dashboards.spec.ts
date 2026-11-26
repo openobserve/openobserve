@@ -762,6 +762,36 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.activeFolderId).toBe("default");
     });
 
+    it("stamps the landing folder onto the URL by replacing the entry, so Back leaves the page in one press", async () => {
+      await router.push({ path: "/dashboards" });
+      const push = vi.spyOn(router, "push");
+      const replace = vi.spyOn(router, "replace");
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+
+      const stamped = (spy: typeof push) =>
+        spy.mock.calls.filter(
+          ([to]) => typeof to === "object" && (to as any).query?.folder === "default",
+        );
+      expect(stamped(replace).length).toBeGreaterThan(0);
+      expect(stamped(push)).toHaveLength(0);
+    });
+
+    it("still pushes an entry when the user switches folder", async () => {
+      await router.push({ path: "/dashboards", query: { folder: "default" } });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+      const push = vi.spyOn(router, "push");
+      wrapper.vm.updateActiveFolderId("folder1");
+      await settle();
+
+      expect(push.mock.calls.some(([to]) => (to as any).query?.folder === "folder1")).toBe(true);
+    });
+
     it("a folder deep link beats the favorites-first landing", async () => {
       useFavoriteDashboards().favorites.value = [
         { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
