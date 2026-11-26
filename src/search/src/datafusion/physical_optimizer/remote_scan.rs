@@ -18,7 +18,7 @@ use std::sync::Arc;
 use config::{datafusion::request::Request, meta::cluster::NodeInfo};
 use datafusion::{
     common::{
-        Result, TableReference,
+        Result, TableReference, internal_err,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
     config::ConfigOptions,
@@ -221,6 +221,50 @@ impl RemoteScanRewriter {
             partial_reduce_enabled: cfg.search.feature_partial_reduce_enabled,
         }
     }
+
+    // ASOF needs each side sorted; RemoteScanExec keeps an ordering only from a single-partition
+    // input, so the follower merges its sorted partitions first.
+    fn remote_scan_sorted(&self, child: &Arc<dyn ExecutionPlan>) -> Result<Arc<dyn ExecutionPlan>> {
+        let mut visitor = TableNameVisitor::new();
+        child.visit(&mut visitor)?;
+        let Some(table_name) = visitor.table_name.filter(|_| !visitor.has_remote_scan) else {
+            return Ok(Arc::clone(child));
+        };
+        let input: Arc<dyn ExecutionPlan> = match child.output_ordering() {
+            Some(ordering) if child.output_partitioning().partition_count() > 1 => Arc::new(
+                SortPreservingMergeExec::new(ordering.clone(), Arc::clone(child)),
+            ),
+            _ => Arc::clone(child),
+        };
+        Ok(Arc::new(RemoteScanExec::new(
+            input,
+            self.remote_scan_nodes.get_remote_node(&table_name),
+        )?))
+    }
+
+    // The left side keeps one sorted partition per node; the right side must be one partition.
+    fn rewrite_asof_join(
+        &self,
+        node: Arc<dyn ExecutionPlan>,
+    ) -> Result<Transformed<Arc<dyn ExecutionPlan>>> {
+        let children = node.children();
+        let left = self.remote_scan_sorted(children[0])?;
+        let mut right = self.remote_scan_sorted(children[1])?;
+        if !Arc::ptr_eq(&right, children[1]) {
+            let Some(ordering) = children[1].output_ordering() else {
+                return internal_err!("AsOfJoinExec right input is not sorted");
+            };
+            right = Arc::new(SortPreservingMergeExec::new(ordering.clone(), right));
+        }
+        if Arc::ptr_eq(&left, children[0]) && Arc::ptr_eq(&right, children[1]) {
+            return Ok(Transformed::no(node));
+        }
+        let new_node = node.replace_children(
+            vec![left, right],
+            ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+        )?;
+        Ok(Transformed::yes(new_node))
+    }
 }
 
 impl TreeNodeRewriter for RemoteScanRewriter {
@@ -316,6 +360,10 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
+        } else if node.name() == "AsOfJoinExec" {
+            let transformed = self.rewrite_asof_join(node)?;
+            self.is_changed |= transformed.transformed;
+            return Ok(transformed);
         } else if matches!(
             node.name(),
             "HashJoinExec" | "NestedLoopJoinExec" | "CrossJoinExec"
@@ -1242,8 +1290,35 @@ mod tests {
         queries
     }
 
+    fn asof_join_queries() -> Vec<String> {
+        const CONDITIONS: [(&str, &str); 4] = [
+            (">=", " ON a.event_name = b.event_name"),
+            ("<=", " ON a.event_name = b.event_name"),
+            (">", " ON a.event_name = b.event_name AND a.value = b.value"),
+            ("<", ""),
+        ];
+        let queries: Vec<String> = CONDITIONS
+            .iter()
+            .map(|(op, on)| {
+                format!(
+                    "SELECT a.event_name, b.value FROM t a ASOF JOIN t b \
+                    MATCH_CONDITION (a._timestamp {op} b._timestamp){on}"
+                )
+            })
+            .collect();
+        let counts = queries
+            .iter()
+            .map(|sql| format!("SELECT count(*) AS c FROM ({sql})"));
+        queries.iter().cloned().chain(counts).collect()
+    }
+
     async fn assert_every_join_side_is_scanned(sql: &str, target_partitions: usize) {
-        const HANDLED_JOINS: [&str; 3] = ["HashJoinExec", "NestedLoopJoinExec", "CrossJoinExec"];
+        const HANDLED_JOINS: [&str; 4] = [
+            "HashJoinExec",
+            "NestedLoopJoinExec",
+            "CrossJoinExec",
+            "AsOfJoinExec",
+        ];
         let session_config = crate::datafusion::exec::create_session_config(
             crate::datafusion::sort_order::FileSortOrder::None,
             target_partitions,
@@ -1294,6 +1369,15 @@ mod tests {
                 for target_partitions in [2, 8] {
                     assert_every_join_side_is_scanned(&sql, target_partitions).await;
                 }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_asof_join_scans_every_side() {
+        for sql in asof_join_queries() {
+            for target_partitions in [1, 2, 8] {
+                assert_every_join_side_is_scanned(&sql, target_partitions).await;
             }
         }
     }
