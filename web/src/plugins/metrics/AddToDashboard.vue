@@ -283,8 +283,9 @@ export default defineComponent({
           dashboardPanelData.value.data.id = getPanelId();
           // panel name will come from add to dashboard component
           dashboardPanelData.value.data.title = panelTitle;
-          // to create panel dashboard id, paneldata and folderId is required
-          await addPanel(store, dashboardId, dashboardPanelData.value.data, folderId, tabId);
+          // A copy: addPanel sets its layout, which would change the editor's URL state and cancel the redirect.
+          const panelData = JSON.parse(JSON.stringify(dashboardPanelData.value.data));
+          await addPanel(store, dashboardId, panelData, folderId, tabId);
           written++;
         }
         writeRememberedTarget({ folderId, dashboardId, tabId });

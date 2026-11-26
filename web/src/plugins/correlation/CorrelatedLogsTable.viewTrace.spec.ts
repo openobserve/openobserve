@@ -130,7 +130,6 @@ describe("CorrelatedLogsTable — View Trace from an expanded row (issue #13708)
         stubs: {
           DimensionFiltersBar: true,
           CellActions: true,
-          O2AIContextAddBtn: true,
           JsonPreview: jsonPreviewStub,
         },
       },

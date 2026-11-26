@@ -18,7 +18,7 @@
     >
       <!-- Show streaming status with spinner + stop button -->
       <template v-if="isGenerating">
-        <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="h-5 w-5 shrink-0" />
+        <AssistantSpark :size="20" />
         <OSpinner variant="dots" size="xs" />
         <span class="flex-1 truncate text-sm">{{
           streamingText || aiStatusText || t("search.analyzingQuery")
@@ -44,7 +44,7 @@
           @keydown.enter="handleAIInputEnter"
         >
           <template #icon-left>
-            <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="h-5 w-5" />
+            <AssistantSpark :size="20" />
           </template>
         </OInput>
         <!-- Send Button -->
@@ -82,6 +82,13 @@
 
     <!-- Code Editor with relative positioning for floating button -->
     <div class="relative min-h-0 flex-1 overflow-hidden">
+      <div
+        v-if="placeholder && !query && !editorFocused"
+        class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
+        :data-test="`${dataTestPrefix}-placeholder`"
+      >
+        <span class="query-editor-placeholder-typewriter min-w-0">{{ placeholder }}</span>
+      </div>
       <CodeQueryEditor
         :ref="(el) => (editorRef = el)"
         :key="currentLanguage"
@@ -98,6 +105,7 @@
         :field-value-resolver="fieldValueResolver ?? undefined"
         :debounce-time="debounceTime"
         :free-text-decorations="freeTextDecorations ?? null"
+        :assistant-chord="assistantChord"
         :filter-mode="filterMode"
         :values-time-range="valuesTimeRange ?? null"
         :recent-queries="recentQueries ?? []"
@@ -123,14 +131,11 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="onAiToggleClick"
-        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-1 z-100 h-7! min-h-7! w-7! min-w-7! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
+        :aria-label="t('search.aiModeIconAlt')"
+        class="rounded-default border-card-glass-border! absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
-        <img
-          :src="nlpIcon"
-          :alt="t('search.aiModeIconAlt')"
-          class="h-4.5 w-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
-        />
+        <AssistantSpark :size="16" :muted="props.disableAi" />
         <span
           v-if="!aiAccess.allowed"
           aria-hidden="true"
@@ -153,13 +158,13 @@
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { useTheme } from "@/composables/useTheme";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import type { FieldValuesWindow } from "@/composables/fieldValueStore";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
+import { getUUIDv7 } from "@/utils/zincutils";
 import { useChatHistory } from "@/composables/useChatHistory";
 import useAiChat from "@/composables/useAiChat";
 import type { ChatMessage } from "@/ts/interfaces/chat";
@@ -167,6 +172,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
+import { assistantFocusCard, focusDockComposer } from "@/composables/assistant";
+import type { QueryEditorAssistant } from "@/composables/assistant/pure";
 
 type Language = "sql" | "promql" | "vrl" | "javascript";
 
@@ -213,6 +220,11 @@ interface Props {
 
   // Testing
   dataTestPrefix?: string;
+
+  /** Drawn inside the editor area while the editor is empty and unfocused. */
+  placeholder?: string;
+  /** The host's assistant adapter; its id routes Ctrl+I to that host's pending card or dock. */
+  assistant?: QueryEditorAssistant | null;
   editorId?: string; // Monaco host id; defaults to `<dataTestPrefix>-editor-<language>`
 }
 
@@ -234,6 +246,8 @@ const props = withDefaults(defineProps<Props>(), {
   disableAiReason: raw(""),
   hasExpandButton: false,
   dataTestPrefix: "query-editor",
+  placeholder: undefined,
+  assistant: null,
 });
 
 const emit = defineEmits<{
@@ -253,7 +267,6 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t } = useI18nTyped();
-const { isDark } = useTheme();
 
 // Language state
 const currentLanguage = ref<Language>(props.defaultLanguage);
@@ -281,17 +294,26 @@ const onAiToggleClick = () => {
 const isNaturalLanguageDetected = ref(false);
 const isGenerating = ref(false);
 const editorRef = ref<any>(null);
+const editorFocused = ref(false);
+
+// Monaco keeps Ctrl+I from the global chord, so a pending card or open dock is focused here; otherwise Monaco suggests.
+const assistantChord = props.assistant
+  ? () => {
+      const id = props.assistant?.id;
+      return assistantFocusCard() || (!!id && focusDockComposer(id));
+    }
+  : undefined;
 
 // AI Input Bar state
 const aiInputText = ref("");
 const streamingText = ref(""); // Real-time streaming response from chat_stream
 const aiStatusText = ref("");
 
-// Session tracking & cancellation (matches O2 AI Chat patterns)
+// Session tracking & cancellation (matches AI chat patterns)
 const currentSessionId = ref<string | null>(null);
 const currentAbortController = ref<AbortController | null>(null);
 
-// Chat history tracking (shared IndexedDB with O2AIChat)
+// Chat history tracking (shared IndexedDB with the assistant)
 const { saveToHistory } = useChatHistory(
   () => store.state.userInfo.email ?? "",
   () => store.state.selectedOrganization.identifier ?? "",
@@ -300,12 +322,6 @@ const { saveToHistory } = useChatHistory(
 );
 const currentChatId = ref<number | null>(null);
 const chatMessages = ref<ChatMessage[]>([]);
-
-const nlpIcon = computed(() => {
-  return isDark.value
-    ? getImageURL("images/common/ai_icon_dark.svg")
-    : getImageURL("images/common/ai_icon_gradient.svg");
-});
 
 // Computed: AI input field class based on theme
 const aiInputFieldClass = computed(() => "h-7! flex-1 my-px");
@@ -350,10 +366,12 @@ const handleQueryUpdate = (newQuery: string, _event?: unknown, origin?: QueryCha
 };
 
 const handleEditorFocus = () => {
+  editorFocused.value = true;
   emit("focus");
 };
 
 const handleEditorBlur = () => {
+  editorFocused.value = false;
   emit("blur");
 };
 
@@ -444,7 +462,7 @@ const handleAIGenerate = async () => {
       const generatedQuery = editorRef.value.refusalNotice || editorRef.value.getValue?.() || "";
       chatMessages.value.push({ role: "assistant", content: generatedQuery });
 
-      // Save to IndexedDB (shared with O2AIChat history)
+      // Save to IndexedDB (shared with the assistant's history)
       const savedId = await saveToHistory(
         chatMessages.value,
         currentSessionId.value!,

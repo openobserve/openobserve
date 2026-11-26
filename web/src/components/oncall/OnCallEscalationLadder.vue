@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-border-default flex items-center gap-1.5 border-t px-4 py-2"
           :data-test="`oncall-ladder-l0-${l0.mode}`"
         >
-          <OIcon name="auto-awesome" size="sm" class="text-text-secondary" />
+          <OIcon :name="assistantGlyph.assistant" size="sm" class="text-text-secondary" />
           <OText variant="meta">{{ l0Line }}</OText>
         </span>
       </div>
@@ -296,6 +296,7 @@ import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
 import OAvatarGroup from "@/lib/core/Avatar/OAvatarGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import OnCallChannelIcons from "./OnCallChannelIcons.vue";
 import OnCallPersonName from "./OnCallPersonName.vue";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";

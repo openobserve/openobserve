@@ -1,0 +1,123 @@
+{
+  "detail": {
+    "session_id": "01a1c0ed-aeec-74c6-9a1f-6d99b0c0de06",
+    "title": "Pause the alert ta_approvals_rca_update_target for 5\u2026",
+    "agent_type": "o2-ai",
+    "created_at": 1794238167345966,
+    "updated_at": 1794238174498222,
+    "last_committed_seq": 50,
+    "branched_from": null,
+    "active_turn": false,
+    "pending_approval": false,
+    "pinned": false,
+    "state_version": "50.1794238174499058.0.0.cbf29ce484222325",
+    "not_modified": false,
+    "has_more": false,
+    "turns": [
+      {
+        "user_message_id": "msg_1c0edb942001lGcaonCTDn5PgU",
+        "created": 1794238167362,
+        "user": {
+          "text": "Pause the alert ta_approvals_rca_update_target for 5 minutes.",
+          "images": [],
+          "window": {
+            "from": 1794151767328,
+            "to": 1794238167328,
+            "relative": "24h"
+          },
+          "entry_kind": "header_button"
+        },
+        "frames": [
+          {
+            "type": "tool_call",
+            "tool": "MuteAlert",
+            "message": "Executing MuteAlert",
+            "context": {
+              "alert_id": "3LrpP3S4OgYZjmWhBm5Isxoi8vI",
+              "request_body": {
+                "minutes": 5,
+                "all_groups": true,
+                "until_clear": false
+              }
+            },
+            "call_id": "call_00_ET_dacCzOzrpoZ5r1lCtYii2602"
+          },
+          {
+            "type": "tool_result",
+            "tool": "MuteAlert",
+            "success": true,
+            "message": "MuteAlert completed successfully",
+            "call_args": {
+              "tool": "MuteAlert",
+              "args": {
+                "alert_id": "3LrpP3S4OgYZjmWhBm5Isxoi8vI",
+                "request_body": {
+                  "minutes": 5,
+                  "all_groups": true,
+                  "until_clear": false
+                }
+              }
+            },
+            "call_id": "call_00_ET_dacCzOzrpoZ5r1lCtYii2602"
+          },
+          {
+            "type": "message_delta",
+            "content": "Muted [ta_approvals_rca_update_target](/web/alerts/detail/3LrpP3S4OgYZjmWhBm5Isxoi8vI?org_identifier=default) for 5 minutes, "
+          },
+          {
+            "type": "message_delta",
+            "content": "until 21:04 [^call_00_ET_dacCzOzrpoZ5r1lCtYii2602].\n\n"
+          },
+          {
+            "type": "follow_ups",
+            "items": [
+              "What triggered ta_approvals_rca_update_target?",
+              "Extend the mute to 30 minutes",
+              "Show the other alerts that fired in the last 24 hours"
+            ]
+          },
+          {
+            "type": "complete"
+          }
+        ],
+        "error": null,
+        "first_seq": 2,
+        "last_seq": 50,
+        "turn_id": "01a1c0ed-b920-722e-9574-4379bcc26716",
+        "status": "completed",
+        "error_code": null,
+        "agent_type": "o2-ai"
+      }
+    ],
+    "approvals": []
+  },
+  "rows": [
+    {
+      "id": "3LsM9VSOQSh163QTrpfF074OBA4",
+      "at": 1794238170668269,
+      "action": "Paused alert",
+      "tool": "MuteAlert",
+      "target": {
+        "type": "alert",
+        "id": "3LrpP3S4OgYZjmWhBm5Isxoi8vI",
+        "name": "ta_approvals_rca_update_target",
+        "deleted": false
+      },
+      "on_behalf_of": "ta_rca2@example.com",
+      "approval": {
+        "kind": "standing",
+        "id": "grant_3LsLc2L6f9nvoIltQCcQQmqBYpd~7e7c90c2",
+        "scope": "always",
+        "grant_id": "3LsLc2L6f9nvoIltQCcQQmqBYpd"
+      },
+      "result": {
+        "state": "done"
+      },
+      "undo": {
+        "available": true,
+        "until": 1794324570668269
+      },
+      "chat_id": "01a1c0ed-aeec-74c6-9a1f-6d99b0c0de06"
+    }
+  ]
+}

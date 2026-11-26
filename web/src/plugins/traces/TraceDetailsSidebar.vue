@@ -48,6 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTruncatedText>{{ span.operation_name }}</OTruncatedText>
       </div>
 
+      <div class="flex shrink-0 items-center gap-0.5">
+        <AiEntryButton
+          v-if="hasSpanError"
+          v-bind="spanDoor('troubleshoot')"
+          appearance="toolbar-icon"
+        />
+        <AiEntryButton v-bind="spanDoor('explain')" appearance="toolbar-icon" />
+        <AiEntryButton v-bind="spanDoor('add_to_chat')" appearance="toolbar-icon" />
+      </div>
       <OButton
         :aria-label="t('common.close')"
         variant="ghost"
@@ -285,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-span-ask-ai-btn"
               @click.stop="askAiAboutSpan"
             >
-              <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+              <AssistantSpark :size="16" />
               <OTooltip side="bottom" :content="t('traces.askAi.askAboutSpan')" />
             </OButton>
 
@@ -1109,6 +1118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { spanBuild } from "@/plugins/traces/tracesDoors";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -1159,7 +1170,7 @@ import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { valueErrorCause } from "@/lib/data/Value/valueErrorCause";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
-import { useAiIcon } from "@/composables/useAiIcon";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import { buildSpanAiPayload } from "@/plugins/traces/utils/traceAiPayload";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
@@ -1277,6 +1288,10 @@ export default defineComponent({
       type: Object as PropType<Span>,
       default: () => null,
     },
+    parentOperation: {
+      type: String,
+      default: undefined,
+    },
     baseTracePosition: {
       type: Object,
       default: () => null,
@@ -1342,7 +1357,11 @@ export default defineComponent({
     },
   },
   components: {
+    AssistantSpark,
     TraceIssuesPanel,
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
     OSeparator,
     OInlineNotice,
     OTabs,
@@ -1423,6 +1442,41 @@ export default defineComponent({
       attrs: {},
       events: [],
     });
+
+    // Span doors sit in the detail header, never on a bar's hover.
+    const spanDoor = (verb: "explain" | "troubleshoot" | "add_to_chat") => {
+      const ids = {
+        explain: "ai-entry-span-explain",
+        troubleshoot: "ai-entry-span-troubleshoot",
+        add_to_chat: "ai-entry-span-add",
+      } as const;
+      const labels = {
+        explain: "assistant.entry.explainSpan",
+        troubleshoot: "assistant.entry.troubleshootSpan",
+        add_to_chat: "assistant.entry.addSpan",
+      } as const;
+      const tooltips = {
+        explain: "assistant.entry.tooltip.explainSpan",
+        troubleshoot: "assistant.entry.tooltip.troubleshootSpan",
+        add_to_chat: "assistant.entry.tooltip.add",
+      } as const;
+      return {
+        verb,
+        entryKind: "object_verb" as const,
+        boundOrg: loadedOrg.value,
+        objectKind: "span" as const,
+        label: t(labels[verb]),
+        tooltip: t(tooltips[verb]),
+        dataTest: ids[verb],
+        objectKey: String((props.span as Record<string, unknown> | null)?.span_id ?? ""),
+        build: spanBuild(
+          () => ({ ...(props.span as Record<string, unknown>) }),
+          () => props.parentOperation,
+          verb === "troubleshoot" ? "troubleshoot" : "explain",
+          store.state,
+        ),
+      };
+    };
 
     const { hasSpanError, hasExceptionEvents } = useTraceDetails(
       computed(() => props.span),
@@ -1541,6 +1595,10 @@ export default defineComponent({
     };
 
     const store = useStore();
+    const loadedOrg = useLoadedOrg(
+      () => props.span,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
     const promptAttributionTarget = ref<{
       entityId: string;
       version: number;
@@ -2250,8 +2308,6 @@ export default defineComponent({
       });
       return { band, variant, tooltip };
     });
-
-    const { aiIconSrc } = useAiIcon();
 
     const askAiAboutSpan = () => {
       const trace = searchObj.data?.traceDetails?.selectedTrace;
@@ -3030,11 +3086,11 @@ export default defineComponent({
       tags,
       hasExceptionEvents,
       hasSpanError,
+      spanDoor,
       spanHttpResendCount,
       navigateToError,
       getDuration,
       operationPercentile,
-      aiIconSrc,
       askAiAboutSpan,
       spanProfileMatch,
       viewSpanProfile,

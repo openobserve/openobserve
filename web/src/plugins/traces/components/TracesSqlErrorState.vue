@@ -21,13 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :error-code="code"
       :error-msg="errorMsg"
       :error-detail="errorDetail"
-      :ai-enabled="aiEnabled"
       :resource-name="streamName"
       :query="query"
       :title="copy?.title"
       :description="copy?.description"
-      @ask-ai="emit('ask-ai')"
     >
+      <template v-if="$slots['ai-door']" #ai-door>
+        <slot name="ai-door" />
+      </template>
       <template #actions>
         <!-- Always rendered: an empty slot falls back to the generic Fix query card. -->
         <div class="contents">
@@ -85,7 +86,6 @@ const props = defineProps<{
   /** The server's message as sent, which names the field or stream. */
   errorMsg: string;
   errorDetail?: string;
-  aiEnabled: boolean;
   streamName?: string;
   query: string;
   suggestions: string[];
@@ -94,7 +94,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  "ask-ai": [];
   "run-sql": [sql: string];
   "use-last-hour": [];
   "configure-resource": [];

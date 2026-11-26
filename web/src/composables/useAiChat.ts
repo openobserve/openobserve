@@ -1,8 +1,7 @@
 import store from "@/stores";
-import { contextRegistry, createDefaultContextProvider } from "@/composables/contextProviders";
+import { contextRegistry } from "@/composables/contextProviders";
 import { generateTraceContext, getUUIDv7 } from "@/utils/zincutils";
 import type { ImageAttachment } from "@/ts/interfaces/chat";
-import analytics from "@/services/product_analytics";
 import { isNetworkFailure } from "@/utils/networkFailure";
 
 let contextHandler: any;
@@ -149,49 +148,6 @@ const useAiChat = () => {
     }
   };
 
-  /** Submit a thumbs up/down for an AI response; `traceId` links it to the workflow trace. */
-  const submitFeedback = async (
-    feedbackType: "thumbs_up" | "thumbs_down",
-    org_id: string,
-    sessionId?: string,
-    queryIndex?: number,
-    traceId?: string,
-  ) => {
-    const url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/feedback`;
-
-    const body: Record<string, any> = {
-      feedback_type: feedbackType,
-      query_index: queryIndex ?? -1,
-    };
-
-    // Include trace_id so the feedback span is linked to the workflow trace
-    if (traceId) {
-      body.trace_id = traceId;
-    }
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    if (sessionId) {
-      headers["x-o2-assistant-session-id"] = sessionId;
-    }
-
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        body: JSON.stringify(body),
-        credentials: "include",
-        headers,
-      });
-      if (response.ok) analytics.track("ai_assistant_feedback_given", { type: feedbackType });
-      return response.ok;
-    } catch (error) {
-      console.error("Error submitting feedback:", error);
-      return false;
-    }
-  };
-
   const getFormattedContext = (message: any, context: any) => {
     // Initialize context section
 
@@ -210,28 +166,6 @@ const useAiChat = () => {
     } catch (error) {
       return value;
     }
-  };
-
-  /** Register the default context provider as the registry's fallback. */
-  const initializeDefaultContext = (router: any, storeInstance: any) => {
-    const defaultProvider = createDefaultContextProvider(router, storeInstance);
-    contextRegistry.register("default", defaultProvider);
-  };
-
-  // The persisted turn outlives the browser's request, so only this stops it; keepalive lets a closing tab still send it.
-  const cancelAiChat = async (org_id: string, sessionId: string) => {
-    const url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chats/${encodeURIComponent(sessionId)}/cancel`;
-    return fetch(url, {
-      method: "POST",
-      credentials: "include",
-      keepalive: true,
-      // A JSON content type is what a cross-site form post cannot send, so the server requires it.
-      headers: {
-        "Content-Type": "application/json",
-        "x-o2-assistant-session-id": sessionId,
-      },
-      body: "{}",
-    });
   };
 
   const chatsUrl = (org_id: string, sessionId?: string) =>
@@ -310,21 +244,10 @@ const useAiChat = () => {
 
   return {
     fetchAiChat,
-    cancelAiChat,
     chatHistoryServer,
-    listServerChats,
-    getServerChat,
-    renameServerChat,
-    deleteServerChat,
-    deleteAllServerChats,
-    submitFeedback,
     registerAiChatHandler,
     removeAiChatHandler,
-    getContext,
     getStructuredContext,
-    getFormattedContext,
-    tryToJson,
-    initializeDefaultContext,
   };
 };
 
