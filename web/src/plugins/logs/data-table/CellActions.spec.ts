@@ -13,9 +13,52 @@
 // limitations under the License.
 
 import { mount, config, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import i18n from "@/locales";
+import { OTableToolbarOwnerKey } from "@/lib/core/Table/OTable.types";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import CellActions from "./CellActions.vue";
+
+// The AI-button tests swap in the assistant fakes below; the rest see the real modules.
+const env = await vi.hoisted(async () => ({
+  on: false,
+  gate: (await import("vue")).ref("available"),
+  add: (await import("vitest")).vi.fn(),
+}));
+vi.mock("@/composables/assistant/pure", async (importOriginal) => {
+  const { computed } = await import("vue");
+  const actual = await importOriginal<typeof import("@/composables/assistant/pure")>();
+  return {
+    ...actual,
+    runtimeHandle: () =>
+      env.on ? { value: { store: { state: { userOrgKey: "u|org-a" } } } } : actual.runtimeHandle(),
+    useAssistantGate: () => (env.on ? computed(() => env.gate.value) : actual.useAssistantGate()),
+  };
+});
+vi.mock("@/plugins/logs/logsDoors", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/plugins/logs/logsDoors")>();
+  return {
+    ...actual,
+    addDoorToChat: (...args: Parameters<typeof actual.addDoorToChat>) =>
+      env.on ? env.add(...args) : actual.addDoorToChat(...args),
+  };
+});
+vi.mock("@/components/common/O2AIContextAddBtn.vue", async (importOriginal) => {
+  const actual = (await importOriginal<{ default: object }>()).default;
+  const { defineComponent, h } = await import("vue");
+  return {
+    default: defineComponent({
+      inheritAttrs: false,
+      emits: ["sendToAiChat"],
+      setup(_, { attrs, emit }) {
+        return () =>
+          env.on
+            ? h("button", { "data-test": "ai-sparkle-stub", onClick: () => emit("sendToAiChat") })
+            : h(actual, attrs);
+      },
+    }),
+  };
+});
 
 const { clipboardMock } = vi.hoisted(() => ({ clipboardMock: vi.fn() }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: clipboardMock }));
@@ -329,5 +372,100 @@ describe("CellActions in-place copy", () => {
 
     expect(clipboardMock).not.toHaveBeenCalled();
     expect(wrapper.emitted("copy")?.[0]).toEqual(["200"]);
+  });
+});
+
+const enterAssistant = () => {
+  env.on = true;
+  mockStore.state.selectedOrganization.identifier = "org-b";
+  clipboardMock.mockResolvedValue(true);
+};
+const leaveAssistant = () => {
+  env.on = false;
+  mockStore.state.selectedOrganization.identifier = "org-a";
+  clipboardMock.mockReset();
+};
+
+const mountActions = (props: Record<string, unknown> = {}) =>
+  mount(CellActions, {
+    global: { plugins: [i18n] },
+    props: {
+      column: { id: "status" },
+      row: { status: "200" },
+      selectedStreamFields: [{ name: "status", isSchemaField: true }],
+      ...props,
+    },
+  });
+
+describe("CellActions AI button (main's sparkle)", () => {
+  beforeEach(() => {
+    enterAssistant();
+    env.add.mockClear();
+    env.gate.value = "available";
+  });
+  afterEach(leaveAssistant);
+
+  it("adds the field bound to the org the host loaded the rows under, with the key captured at mount (W3)", async () => {
+    const w = mountActions({ boundOrg: "org-a" });
+    await w.get('[data-test="ai-sparkle-stub"]').trigger("click");
+    expect(env.add).toHaveBeenCalledWith(
+      expect.objectContaining({ objectKind: "log_field", boundOrg: "org-a" }),
+      "u|org-a",
+      null,
+    );
+  });
+
+  it("names the table cell as the invoker, since its toolbar unmounts once focus leaves it", async () => {
+    const cell = document.createElement("td");
+    const w = mount(CellActions, {
+      global: { plugins: [i18n], provide: { [OTableToolbarOwnerKey as symbol]: () => cell } },
+      props: {
+        column: { id: "status" },
+        row: { status: "200" },
+        selectedStreamFields: [{ name: "status", isSchemaField: true }],
+      },
+    });
+    await w.get('[data-test="ai-sparkle-stub"]').trigger("click");
+    expect(env.add).toHaveBeenCalledWith(expect.anything(), "u|org-a", cell);
+  });
+
+  it("holds copy, include, exclude and the AI button together in one toolbar, as on main", () => {
+    const bar = mountActions().get(".table-cell-actions");
+    expect(bar.find('[data-test="logs-cell-actions-copy-btn"]').exists()).toBe(true);
+    expect(bar.find('[data-test="log-details-include-field-200"]').exists()).toBe(true);
+    expect(bar.find('[data-test="log-details-exclude-field-200"]').exists()).toBe(true);
+    expect(bar.findAll('[data-test="ai-sparkle-stub"]')).toHaveLength(1);
+  });
+
+  it("hides the AI button while the assistant is not configured", () => {
+    env.gate.value = "not_configured";
+    expect(mountActions().find('[data-test="ai-sparkle-stub"]').exists()).toBe(false);
+  });
+});
+
+describe("CellActions copy with the assistant on", () => {
+  beforeEach(enterAssistant);
+  afterEach(leaveAssistant);
+
+  it("copies in place through the shared Copied bubble, leaving the button as it was", async () => {
+    const wrapper = mount(CellActions, {
+      global: { plugins: [i18n] },
+      props: {
+        copyInPlace: true,
+        column: { id: "status" },
+        row: { status: "200" },
+        selectedStreamFields: [],
+      },
+    });
+    const button = wrapper.get('[data-test="logs-cell-actions-copy-btn"]');
+    const icon = button.findComponent(OIcon);
+    expect(button.attributes("aria-label")).toBe(i18n.global.t("logs.cellActions.copy"));
+    expect(icon.props("name")).toBe("content-copy");
+    await button.trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("copy")).toBeUndefined();
+    expect(button.attributes("aria-label")).toBe(i18n.global.t("logs.cellActions.copy"));
+    expect(icon.props("name")).toBe("content-copy");
+    wrapper.unmount();
   });
 });
