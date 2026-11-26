@@ -162,8 +162,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-left="search"
         @click="$emit('open-command-palette')"
       >
-        <span class="min-w-0 flex-1 text-start max-md:hidden">{{ t("commandPalette.title") }}</span>
-        <OShortcut id="commandPalette" class="max-md:hidden" />
+        <span class="text-input-placeholder min-w-0 flex-1 text-start font-normal max-md:hidden">{{
+          t("commandPalette.title")
+        }}</span>
+        <OShortcut
+          id="commandPalette"
+          class="-me-[0.3125rem] max-md:hidden [&_kbd]:h-4 [&_kbd]:min-w-4 [&_kbd]:rounded-[0.125rem] [&_kbd]:px-1 [&_kbd]:shadow-none"
+        />
       </OButton>
     </div>
 
