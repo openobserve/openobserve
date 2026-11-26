@@ -659,7 +659,8 @@ describe("AddFunction.vue Branch Coverage", () => {
   });
 });
 
-describe("AddFunction with the revamped assistant", () => {
+// The first test pays the cold import of the assistant runtime; CI shards run it under load.
+describe("AddFunction with the revamped assistant", { timeout: 20_000 }, () => {
   const vuex = () =>
     createStore({
       state: {
