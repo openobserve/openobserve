@@ -164,7 +164,7 @@ describe("ODropdown", () => {
           "p-1",
           "min-w-48",
           "text-compact",
-          "max-w-[min(20rem,calc(100vw-1.5rem))]",
+          "max-w-[min(32rem,calc(100vw-1.5rem))]",
           "overflow-y-auto",
         ]),
       );
@@ -177,8 +177,8 @@ describe("ODropdown", () => {
       });
       const classes = content(wrapper).classes();
       expect(classes).toContain("w-100");
-      expect(classes).not.toContain("max-w-[min(20rem,calc(100vw-1.5rem))]");
-      expect(classes).not.toContain("max-h-[min(18rem,var(--reka-popper-available-height,18rem))]");
+      expect(classes).not.toContain("max-w-[min(32rem,calc(100vw-1.5rem))]");
+      expect(classes).not.toContain("max-h-[min(36rem,var(--reka-popper-available-height,36rem))]");
     });
   });
 

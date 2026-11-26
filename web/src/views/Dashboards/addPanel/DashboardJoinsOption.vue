@@ -23,7 +23,9 @@
             radius="sm"
             :divided="true"
           >
-            <ODropdown>
+            <ODropdown
+              content-class="w-max max-w-[calc(100vw-1.5rem)] max-h-[var(--reka-popper-available-height,80vh)] p-0"
+            >
               <template #trigger>
                 <OButton
                   variant="ghost"

@@ -232,6 +232,8 @@ function onRowMouseleave() {
     :tabindex="clickable ? 0 : undefined"
     :class="[
       'group/row',
+      // Fades in on hover but drops instantly on leave, so a fast pointer leaves no trail.
+      'hover:transition-colors hover:duration-(--duration-control) hover:ease-(--ease-control) motion-reduce:transition-none',
       clickable ? 'cursor-pointer' : '',
       isRowSelected || isActive
         ? 'bg-table-row-selected-bg [--color-text-secondary:var(--color-table-row-text-secondary-tinted)]'

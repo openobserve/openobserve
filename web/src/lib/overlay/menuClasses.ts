@@ -35,9 +35,9 @@ export function menuSizeClass(contentClass?: string): string[] {
     "min-w-48",
     OWN_WIDTH.test(own)
       ? "max-lg:max-w-[calc(100vw-1rem)]"
-      : "max-w-[min(20rem,calc(100vw-1.5rem))]",
+      : "max-w-[min(32rem,calc(100vw-1.5rem))]",
     OWN_MAX_HEIGHT.test(own)
       ? "max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
-      : "max-h-[min(18rem,var(--reka-popper-available-height,18rem))] overflow-y-auto",
+      : "max-h-[min(36rem,var(--reka-popper-available-height,36rem))] overflow-y-auto",
   ];
 }

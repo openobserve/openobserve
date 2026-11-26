@@ -1223,7 +1223,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </CreateAlertAction>
           </ODropdownGroup>
 
-          <ODropdownSeparator />
+          <ODropdownSeparator
+            v-if="
+              config.isEnterprise == 'true' &&
+              config.isCloud == 'false' &&
+              store.state.zoConfig.search_inspector_enabled
+            "
+          />
 
           <ODropdownGroup
             v-if="
@@ -1241,7 +1247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
           </ODropdownGroup>
 
-          <ODropdownSeparator />
+          <ODropdownSeparator v-if="searchObj.meta.sqlMode" />
 
           <ODropdownGroup v-if="searchObj.meta.sqlMode" :label="t('search.menuGroupExplain')">
             <ODropdownItem

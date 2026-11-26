@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </button>
               </template>
               <template #cell-actions="{ row }">
-                <span class="row-actions flex items-center justify-end gap-1">
+                <span class="row-actions flex items-center justify-center gap-1">
                   <OButton
                     v-if="row.actions == 'true'"
                     icon-left="drive-file-move"
@@ -1013,8 +1013,8 @@ export default defineComponent({
           header: t("dashboard.actions"),
           sortable: false,
           isAction: true,
-          size: 104,
-          meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+          size: 148,
+          meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
         },
       ];
 

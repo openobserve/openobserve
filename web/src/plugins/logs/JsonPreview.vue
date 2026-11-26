@@ -116,7 +116,7 @@
     <div v-show="activeTab !== 'unflattened'" class="ps-3">
       {
       <div
-        class="log_json_content group/jrow hover:bg-surface-subtle-hover rounded-default flex font-mono text-xs whitespace-pre-wrap"
+        class="log_json_content group/jrow hover:bg-surface-subtle-hover rounded-default flex font-mono text-xs whitespace-pre-wrap hover:transition-colors hover:duration-(--duration-control) hover:ease-(--ease-control) motion-reduce:transition-none"
         v-for="(key, index) in Object.keys(value)"
         :key="key"
         :data-test="`log-detail-row-${key}`"

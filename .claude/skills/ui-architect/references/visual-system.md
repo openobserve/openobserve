@@ -51,8 +51,9 @@ menu items.
 One anatomy for every popup list (`menuClasses.ts` holds the classes):
 - Rows 28px (36px below md), `px-2`, 13px text, rounded inside a `p-1` inset.
 - Surface: `dropdown-bg`, 1px border, `shadow-overlay`, `rounded-default`.
-  Menus cap at 20rem wide and 18rem tall (a caller's own `max-h-*` lifts the
-  cap, e.g. a panel menu that must show every item); selects cap at 32rem.
+  Menus cap at 32rem wide and 36rem tall, so ordinary menus never scroll; a
+  caller's own `w-*` / `max-h-*` lifts the cap (a dropdown that hosts a form,
+  like the Join panel, sizes itself with `w-max`). Selects cap at 32rem.
 - Selected: accent tint plus a trailing `check`. Use `ODropdownItem :selected`,
   never a hand-placed check icon. Multi-select uses a leading checkbox.
 - One chevron: `expand-more`, `xs`, trailing, rotating when open.
@@ -62,6 +63,12 @@ One anatomy for every popup list (`menuClasses.ts` holds the classes):
   centred `text-compact` secondary.
 - Menus keep their depth-based stacking so a menu opened from a dialog sits
   above it.
+
+## Row highlights
+
+Hovered rows (tables, field lists, the JSON viewer) fade in over
+`--duration-control` and drop instantly on leave: put the transition on the
+`hover:` state only, so a fast pointer never leaves a trail of fading rows.
 
 ## Sidebar
 

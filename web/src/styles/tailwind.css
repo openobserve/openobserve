@@ -182,45 +182,45 @@ html.theme-switching *::after {
  * `clip-path` wipe — content never scales or squishes, it just gets
  * revealed from the trigger edge. `-down-*` wipes top→bottom (bottom-placed
  * menus), `-up-*` wipes bottom→top (top-placed menus, via `data-[side=top]`).
- * `round 0.5rem` keeps the corners rounded throughout the wipe.
+ * The clip extends 1.5rem past the box so the shadow travels with the wipe.
  */
 @keyframes o2-reveal-down-in {
   from {
     opacity: 0;
-    clip-path: inset(0 0 100% 0 round 0.5rem);
+    clip-path: inset(-1.5rem -1.5rem 100% -1.5rem);
   }
   to {
     opacity: 1;
-    clip-path: inset(0 0 0 0 round 0.5rem);
+    clip-path: inset(-1.5rem);
   }
 }
 @keyframes o2-reveal-down-out {
   from {
     opacity: 1;
-    clip-path: inset(0 0 0 0 round 0.5rem);
+    clip-path: inset(-1.5rem);
   }
   to {
     opacity: 0;
-    clip-path: inset(0 0 100% 0 round 0.5rem);
+    clip-path: inset(-1.5rem -1.5rem 100% -1.5rem);
   }
 }
 @keyframes o2-reveal-up-in {
   from {
     opacity: 0;
-    clip-path: inset(100% 0 0 0 round 0.5rem);
+    clip-path: inset(100% -1.5rem -1.5rem -1.5rem);
   }
   to {
     opacity: 1;
-    clip-path: inset(0 0 0 0 round 0.5rem);
+    clip-path: inset(-1.5rem);
   }
 }
 @keyframes o2-reveal-up-out {
   from {
     opacity: 1;
-    clip-path: inset(0 0 0 0 round 0.5rem);
+    clip-path: inset(-1.5rem);
   }
   to {
     opacity: 0;
-    clip-path: inset(100% 0 0 0 round 0.5rem);
+    clip-path: inset(100% -1.5rem -1.5rem -1.5rem);
   }
 }

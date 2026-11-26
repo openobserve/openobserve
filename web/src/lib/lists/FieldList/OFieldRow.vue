@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="o-field-row group rounded-default hover:bg-field-list-row-hover-bg relative flex h-6 w-full items-center gap-1 ps-1 max-md:h-7"
+    class="o-field-row group rounded-default hover:bg-field-list-row-hover-bg relative flex h-6 w-full items-center gap-1 ps-1 hover:transition-colors hover:duration-(--duration-control) hover:ease-(--ease-control) motion-reduce:transition-none max-md:h-7"
     :class="[
       highlight &&
         'o-field-row--selected bg-field-list-row-selected-bg! font-medium [--color-field-list-label-text:var(--color-field-list-row-selected-text)] [--field-row-bg:var(--color-field-list-row-selected-bg)]!',
