@@ -541,12 +541,12 @@ impl ExecutablePipeline {
         }
 
         // Report pipeline ingestion usage LAST, with response_time set to the time
-        // spent by the pipeline processing this batch (seconds, f64).
+        // spent by the pipeline processing this batch (milliseconds, f64).
         if source_size > 0.0 {
             let req_stats = config::meta::self_reporting::usage::RequestStats {
                 size: source_size,
                 records: batch_size as i64,
-                response_time: elapsed_secs,
+                response_time: elapsed_secs * 1000.0,
                 ..config::meta::self_reporting::usage::RequestStats::default()
             };
 

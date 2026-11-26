@@ -917,7 +917,7 @@ async fn write_traces_by_stream(
             }
         };
         let time = time_stats.1.elapsed().as_secs_f64();
-        req_stats.response_time = time;
+        req_stats.response_time = time * 1000.0;
         req_stats.user_email = if user_email.is_empty() {
             None
         } else {

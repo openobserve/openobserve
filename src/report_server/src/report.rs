@@ -230,10 +230,7 @@ pub async fn generate_report(
     sleep(Duration::from_secs(5)).await;
 
     let timerange = &dashboard.timerange;
-    let search_type_params = match report_type.clone() {
-        ReportType::Cache => "search_type=ui".to_string(),
-        _ => format!("search_type=reports&report_id={org_id}-{report_name}"),
-    };
+    let search_type_params = search_type_params(&report_type, org_id, report_name);
 
     // dashboard link in the email should contain data of the same period as the report
     let (dashb_url, email_dashb_url) = match timerange.range_type {
@@ -481,10 +478,28 @@ fn sanitize_filename(filename: &str) -> String {
         .collect()
 }
 
+/// The dashboard page reads `searchtype`, not `search_type`, from its URL.
+fn search_type_params(report_type: &ReportType, org_id: &str, report_name: &str) -> String {
+    match report_type {
+        ReportType::Cache => "searchtype=ui".to_string(),
+        _ => format!("searchtype=reports&report_id={org_id}-{report_name}"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::*;
+
+    #[test]
+    fn test_search_type_params_use_the_key_the_dashboard_reads() {
+        assert_eq!(
+            search_type_params(&ReportType::Cache, "o", "r"),
+            "searchtype=ui"
+        );
+        let params = search_type_params(&ReportType::PDF, "o", "r");
+        assert_eq!(params, "searchtype=reports&report_id=o-r");
+    }
 
     #[test]
     fn test_sanitize_filename_valid_chars() {

@@ -586,7 +586,7 @@ pub async fn handle_otlp_request(
                         .as_ref()
                         .map_or(0, |exec_pl| exec_pl.num_of_func())
                 });
-        req_stats.response_time = start.elapsed().as_secs_f64();
+        req_stats.response_time = start.elapsed().as_secs_f64() * 1000.0;
         let email_str = user.to_email();
         req_stats.user_email = if email_str.is_empty() {
             None
