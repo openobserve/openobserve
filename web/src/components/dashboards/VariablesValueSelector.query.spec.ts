@@ -28,6 +28,7 @@ import {
   QUERY_VARIABLE_NO_VALUES,
   resolveQueryVariableValue,
 } from "@/utils/dashboard/variables/queryVariableUtils";
+import { clearMetricScanCache } from "@/utils/dashboard/variables/queryVariableLoader";
 
 const { labelValues, streamMock } = vi.hoisted(() => ({
   labelValues: vi.fn(),
@@ -105,6 +106,7 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
   beforeEach(() => {
     streamMock.mockReset();
     labelValues.mockReset();
+    clearMetricScanCache();
   });
 
   it("runs the SQL with the parent value and shows the label of the selected option", async () => {
@@ -486,6 +488,38 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
       expect(namespace.options.map((o: any) => o.value)).toEqual(["default", "monitoring"]);
       expect(namespace.isVariablePartialLoaded).toBe(true);
       expect(manager.isLoading.value).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("shows the unchecked-metrics hint alongside the 'All' hint on a capped scan", async () => {
+      const names = Array.from({ length: 201 }, (_, i) => `m${i}`);
+      labelValues.mockImplementation(
+        async ({ label, match }: { label: string; match?: string }) => {
+          if (label === "__name__") return promValues(names);
+          if (!match) return { data: { status: "error", error: "match[] must specify a metric" } };
+          return promValues([`ns-${match}`]);
+        },
+      );
+      const { wrapper } = await mountWith([
+        {
+          ...promNamespace,
+          multiSelect: true,
+          selectAllValueForMultiSelect: "all",
+          query_data: {
+            ...promNamespace.query_data,
+            query: "label_values(namespace)",
+            max_record_size: 2,
+          },
+        },
+      ]);
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="variable-query-all-capped-namespace"]').exists()).toBe(
+          true,
+        ),
+      );
+      const truncated = wrapper.find('[data-test="variable-query-metrics-truncated-namespace"]');
+      expect(truncated.exists()).toBe(true);
+      expect(truncated.classes()).toContain("text-text-secondary");
       wrapper.unmount();
     });
 

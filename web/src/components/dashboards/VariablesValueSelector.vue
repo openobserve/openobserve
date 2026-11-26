@@ -45,15 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </div>
         <div
-          v-else-if="
-            usesQueryVariableLoader(item) && item.queryMetricsTruncated && !item.queryError
-          "
-          class="text-text-secondary text-xs"
-          :data-test="`variable-query-metrics-truncated-${item.name}`"
-        >
-          {{ t("dashboard.queryVariable.metricsTruncatedHint") }}
-        </div>
-        <div
           v-else-if="isQueryVariableAllCapped(item) && !item.queryError"
           class="text-text-secondary text-xs"
           :data-test="`variable-query-all-capped-${item.name}`"
@@ -66,6 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`variable-query-capped-${item.name}`"
         >
           {{ t("dashboard.queryVariable.cappedHint", { count: getQueryVariableMaxRecords(item) }) }}
+        </div>
+        <div
+          v-if="usesQueryVariableLoader(item) && item.queryMetricsTruncated && !item.queryError"
+          class="text-text-secondary text-xs"
+          :data-test="`variable-query-metrics-truncated-${item.name}`"
+        >
+          {{ t("dashboard.queryVariable.metricsTruncatedHint") }}
         </div>
         <div
           v-if="item.cycleError"

@@ -255,7 +255,12 @@ interface MetricScan {
   truncated: boolean;
   next: number;
   values: Set<string>;
+}
+
+interface MetricScanEntry {
+  scan: Promise<MetricScan>;
   loadedAt: number;
+  signal?: AbortSignal;
 }
 
 interface PromValuesResult {
@@ -268,37 +273,57 @@ const METRIC_SCAN_CACHE_SIZE = 20;
 const METRIC_SCAN_CACHE_TTL_MS = 60_000;
 
 // Search keystrokes reuse one scan per label and range instead of re-reading up to 200 metrics each time.
-const metricScanCache = new Map<string, MetricScan>();
+const metricScanCache = new Map<string, MetricScanEntry>();
 
 const metricScanKey = (range: PromRange, label: string): string =>
   JSON.stringify([range.org_identifier, label, range.start_time, range.end_time]);
 
 export const clearMetricScanCache = (): void => metricScanCache.clear();
 
-const getMetricScan = async (range: PromRange, label: string): Promise<MetricScan> => {
-  const key = metricScanKey(range, label);
-  const cached = metricScanCache.get(key);
-  if (cached && Date.now() - cached.loadedAt > METRIC_SCAN_CACHE_TTL_MS) {
-    metricScanCache.delete(key);
-  } else if (cached) {
-    metricScanCache.delete(key);
-    metricScanCache.set(key, cached);
-    return cached;
-  }
-  const names = (await loadMetricNames(range)).map(String);
-  throwIfAborted(range.signal);
-  const scan: MetricScan = {
-    names: names.slice(0, METRIC_SCAN_LIMIT),
-    truncated: names.length > METRIC_SCAN_LIMIT,
-    next: 0,
-    values: new Set<string>(),
-    loadedAt: Date.now(),
-  };
-  metricScanCache.set(key, scan);
+const getLiveMetricScan = (key: string): MetricScanEntry | undefined => {
+  const entry = metricScanCache.get(key);
+  if (!entry) return undefined;
+  metricScanCache.delete(key);
+  if (Date.now() - entry.loadedAt > METRIC_SCAN_CACHE_TTL_MS) return undefined;
+  metricScanCache.set(key, entry);
+  return entry;
+};
+
+const startMetricScan = (range: PromRange, key: string): Promise<MetricScan> => {
+  const scan = loadMetricNames(range).then((loaded): MetricScan => {
+    throwIfAborted(range.signal);
+    const names = loaded.map(String);
+    return {
+      names: names.slice(0, METRIC_SCAN_LIMIT),
+      truncated: names.length > METRIC_SCAN_LIMIT,
+      next: 0,
+      values: new Set<string>(),
+    };
+  });
+  // Concurrent callers share the in-flight scan, but a failed or aborted one must not stay cached.
+  const entry: MetricScanEntry = { scan, loadedAt: Date.now(), signal: range.signal };
+  metricScanCache.set(key, entry);
   if (metricScanCache.size > METRIC_SCAN_CACHE_SIZE) {
     metricScanCache.delete(metricScanCache.keys().next().value as string);
   }
+  scan.catch(() => {
+    if (metricScanCache.get(key) === entry) metricScanCache.delete(key);
+  });
   return scan;
+};
+
+const getMetricScan = async (range: PromRange, label: string): Promise<MetricScan> => {
+  const key = metricScanKey(range, label);
+  const live = getLiveMetricScan(key);
+  if (!live) return startMetricScan(range, key);
+  try {
+    return await live.scan;
+  } catch (error) {
+    throwIfAborted(range.signal);
+    // Another caller's cancellation rejected the shared scan, so join a newer scan or start one.
+    if (live.signal?.aborted) return getMetricScan(range, label);
+    throw error;
+  }
 };
 
 const matching = (values: Set<string>, search: string): string[] =>
@@ -354,8 +379,8 @@ const loadLabelValues = async (
     return { values: promValues(await metricsService.labelValues({ ...range, label, match })) };
   }
   if (label === "__name__") return { values: await loadMetricNames(range) };
-  // A cached scan means the unscoped lookup already failed for this label and range.
-  if (metricScanCache.has(metricScanKey(range, label))) {
+  // A live scan means the unscoped lookup already failed for this label and range.
+  if (getLiveMetricScan(metricScanKey(range, label))) {
     return labelValuesAcrossMetrics(range, label, maxRecords, search);
   }
   try {

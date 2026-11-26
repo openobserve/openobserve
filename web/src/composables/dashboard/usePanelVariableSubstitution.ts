@@ -469,9 +469,12 @@ export const usePanelVariableSubstitution = ({
 
     // One under the cap because a histogram's first bucket starts before the range start.
     const rangeMs = (endISOTimestamp - startISOTimestamp) / 1000;
+    const configuredRowLimit = Number(store.state.zoConfig?.query_default_limit);
+    // A cap of 1 or less leaves no room for buckets, so the floor falls back to the default cap.
+    const rowLimit = configuredRowLimit > 1 ? configuredRowLimit : SQL_PANEL_ROW_LIMIT;
     const minIntervalMs =
       queryType !== "promql" && Number.isFinite(rangeMs) && rangeMs > 0
-        ? rangeMs / ((Number(store.state.zoConfig?.query_default_limit) || SQL_PANEL_ROW_LIMIT) - 1)
+        ? rangeMs / (rowLimit - 1)
         : 0;
 
     const formattedInterval = formatIntervalAtLeast(__interval, minIntervalMs);

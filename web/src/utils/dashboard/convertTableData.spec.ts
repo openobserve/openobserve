@@ -933,3 +933,49 @@ describe("convertMultiQueryTableData – column ordering", () => {
     ]);
   });
 });
+
+describe("convertMultiQueryTableData – NULL and empty cells", () => {
+  const store = { state: { timezone: "UTC" } };
+  const panelSchema = (config: Record<string, unknown> = {}) => ({
+    type: "table",
+    config,
+    queries: [
+      { fields: { x: [{ alias: "svc" }], y: [{ alias: "hits" }] } },
+      { fields: { x: [{ alias: "svc" }], y: [{ alias: "errors" }] } },
+    ],
+  });
+  const data = [[{ hits: 3 }, { svc: "", hits: 4 }], [{ svc: "api", errors: 1 }]];
+  const cell = (
+    result: {
+      rows: Record<string, unknown>[];
+      columns: { name: string; format: (value: unknown, row: unknown) => unknown }[];
+    },
+    rowIdx: number,
+    name: string,
+  ) => {
+    const col = result.columns.find((c) => c.name === name);
+    const row = result.rows[rowIdx];
+    return col?.format(row[name], row);
+  };
+
+  it("labels a missing value of the row's own query as (null) or (empty)", () => {
+    const result = convertMultiQueryTableData(panelSchema(), data, store);
+    expect(cell(result, 0, "svc")).toBe("(null)");
+    expect(cell(result, 1, "svc")).toBe("(empty)");
+  });
+
+  it("keeps a column from another query blank", () => {
+    const result = convertMultiQueryTableData(panelSchema(), data, store);
+    expect(cell(result, 0, "errors")).toBeUndefined();
+    expect(cell(result, 2, "hits")).toBeUndefined();
+  });
+
+  it("uses the panel's no-value text when it is set", () => {
+    const result = convertMultiQueryTableData(
+      panelSchema({ no_value_replacement: "-" }),
+      data,
+      store,
+    );
+    expect(cell(result, 0, "svc")).toBe("-");
+  });
+});

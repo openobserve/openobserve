@@ -429,10 +429,24 @@ export const convertMultiQueryTableData = (
     }
   };
 
+  // A blank cell is a real NULL only when its column belongs to the row's own query.
+  const columnQueries = new Map<string, Set<number>>();
+  const ownColumn = (alias: string, queryIdx: number) => {
+    if (!columnQueries.has(alias)) columnQueries.set(alias, new Set());
+    columnQueries.get(alias)?.add(queryIdx);
+  };
+
   // 1) Q1..Qn X-axis fields, 2) Q1..Qn breakdown fields, 3) Q1..Qn Y-axis fields
   (["x", "breakdown", "y"] as const).forEach((axis) =>
-    panelSchema.queries.forEach((q: any) =>
-      (q.fields?.[axis] || []).forEach((f: any) => addField(f, q.customQuery)),
+    panelSchema.queries.forEach(
+      (
+        q: { fields?: Partial<Record<typeof axis, { alias?: string }[]>>; customQuery: boolean },
+        queryIdx: number,
+      ) =>
+        (q.fields?.[axis] || []).forEach((f: { alias?: string }) => {
+          addField(f, q.customQuery);
+          if (f?.alias) ownColumn(f.alias, queryIdx);
+        }),
     ),
   );
 
@@ -450,6 +464,7 @@ export const convertMultiQueryTableData = (
       if (queryData && Array.isArray(queryData)) {
         queryData.forEach((row: any) => {
           Object.keys(row).forEach((key) => {
+            ownColumn(key, queryIdx);
             if (!seenColumns.has(key) && !selectedAliases.has(key)) {
               orderedColumnNames.push(key);
               seenColumns.add(key);
@@ -649,6 +664,13 @@ export const convertMultiQueryTableData = (
         return val;
       };
     }
+
+    const formatPresent = col["format"];
+    const owners = columnQueries.get(colName);
+    col["format"] = (val: unknown, row?: { __q?: number }) =>
+      isMissingCell(val) && row?.__q !== undefined && owners?.has(row.__q)
+        ? tableMissingCellText(val, valueMappingCache, missingValue)
+        : formatPresent(val, row);
 
     columns.push(col);
   });

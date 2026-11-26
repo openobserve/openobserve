@@ -1048,6 +1048,18 @@ describe("$__interval row cap", () => {
     expect(Math.ceil(SIX_HOURS_US / 1000 / ms) + 1).toBeLessThanOrEqual(500);
   });
 
+  it("falls back to the default cap when the configured cap is 1", () => {
+    const inst = usePanelVariableSubstitution({
+      panelSchema: makePanelSchema(),
+      variablesData: makeVariablesData(),
+      chartPanelRef: makeChartPanelRef(1500),
+      store: { state: { ...makeStore().state, zoConfig: { query_default_limit: 1 } } },
+      log,
+    });
+    const { query } = inst.replaceQueryValue("$__interval|$__interval_ms", 0, SIX_HOURS_US, "sql");
+    expect(query).toBe("30s|30000ms");
+  });
+
   it("leaves small panels unchanged", () => {
     expect(intervalFor(400, SIX_HOURS_US).interval).toBe("1m");
     expect(intervalFor(300, 300_000_000).interval).toBe("1s");

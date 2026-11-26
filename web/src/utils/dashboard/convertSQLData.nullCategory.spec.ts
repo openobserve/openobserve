@@ -116,4 +116,27 @@ describe("SQL charts keep the NULL and empty x-axis groups", () => {
     const api = options.series.find((s: { name: string }) => s.name === "api");
     expect(api.data).toEqual([5, 6, null]);
   });
+
+  it("bar: a wrong x column draws no lone (null) category, as before NULL groups were kept", async () => {
+    const options = await run("bar", [
+      { service: "api", v: 1 },
+      { service: "web", v: 2 },
+    ]);
+    expect(options.xAxis[0].data).toEqual([]);
+    expect(options.series).toEqual([]);
+  });
+
+  it("bar with a breakdown: keeps the counts of a NULL and a literal (null) x value apart", async () => {
+    const options = await run(
+      "bar",
+      [
+        { k: null, svc: "api", v: 3 },
+        { k: "(null)", svc: "api", v: 5 },
+      ],
+      [byService],
+    );
+    expect(options.xAxis[0].data).toEqual(["(null)", "(null)"]);
+    const api = options.series.find((s: { name: string }) => s.name === "api");
+    expect(api.data).toEqual([3, 5]);
+  });
 });

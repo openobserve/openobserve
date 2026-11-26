@@ -1337,9 +1337,10 @@ export default defineComponent({
       // Saves are scoped to the folder in the URL, so a link without one gets its folder added before it opens.
       if (!folderId) {
         const org = store.state.selectedOrganization.identifier;
-        folderId = await findDashboardFolderId(org, String(route.query.dashboard ?? "")).catch(
-          () => null,
-        );
+        const lookedUpId = String(route.query.dashboard ?? "");
+        folderId = await findDashboardFolderId(org, lookedUpId).catch(() => null);
+        // A navigation during the lookup owns the URL now, so this stale result must not touch it.
+        if (String(route.query.dashboard ?? "") !== lookedUpId || route.query.folder) return;
         if (!folderId) {
           if (playlistReporters.missing("notFound")) return;
           isLeavingForList = true;

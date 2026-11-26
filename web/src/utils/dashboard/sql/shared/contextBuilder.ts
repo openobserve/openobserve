@@ -194,35 +194,40 @@ export function buildSQLContext(
     .filter((value: unknown) => !isMissing(value))
     .slice(0, 20);
 
-  // A time axis has no place for a NULL bucket, so only a category x axis keeps those rows.
+  // A time axis has no NULL bucket, and an x column empty in every row is a wrong alias, not a NULL group.
   const keepNullXRows =
     !hasTimestampField &&
-    !(
-      timeLikeXSample.length &&
-      (isTimeSeries(timeLikeXSample) || isTimeStamp(timeLikeXSample, null))
-    );
+    timeLikeXSample.length > 0 &&
+    !isTimeSeries(timeLikeXSample) &&
+    !isTimeStamp(timeLikeXSample, null);
 
-  const xAxisCategory = (value: unknown) =>
-    breakdownValueLabel(isMissing(value) ? NULL_BREAKDOWN_VALUE : (value as string));
+  const xAxisCategoryKey = (value: unknown) => (isMissing(value) ? NULL_BREAKDOWN_VALUE : value);
+
+  const xAxisCategory = (value: unknown) => breakdownValueLabel(xAxisCategoryKey(value) as string);
+
+  const getAxisRows = (): Record<string, unknown>[] =>
+    missingValueData?.filter((item: Record<string, unknown>) => {
+      return (
+        (keepNullXRows || xAxisKeys.every((key: string) => !isMissing(getDataValue(item, key)))) &&
+        // some, not every: one null y must not erase the row, its x category and the other series
+        (!yAxisKeys.length ||
+          yAxisKeys.some((key: string) => !isMissing(getDataValue(item, key)))) &&
+        breakDownKeys.every((key: string) => !isMissing(getDataValue(item, key)))
+      );
+    }) || [];
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-    const data =
-      missingValueData?.filter((item: any) => {
-        return (
-          (keepNullXRows ||
-            xAxisKeys.every((key: string) => !isMissing(getDataValue(item, key)))) &&
-          // some, not every: one null y must not erase the row, its x category and the other series
-          (!yAxisKeys.length || yAxisKeys.some((key: any) => getDataValue(item, key) != null)) &&
-          breakDownKeys.every((key: any) => getDataValue(item, key) != null)
-        );
-      }) || [];
-
     // Read every row, since a row with a NULL x value may omit the key that the first row is read for.
-    const result = data.map((obj: Record<string, unknown>) => getDataValue(obj, key));
+    const result = getAxisRows().map((obj: Record<string, unknown>) => getDataValue(obj, key));
 
     return xAxisKeys.includes(key) ? result.map(xAxisCategory) : result;
   };
+
+  const getXAxisCategoryKeys = () =>
+    getAxisRows().map((row: Record<string, unknown>) =>
+      xAxisCategoryKey(getDataValue(row, xAxisKeys[0])),
+    );
 
   const convertedTimeStampToDataFormat = new Date(
     annotations?.value?.[0]?.start_time / 1000,
@@ -869,6 +874,7 @@ export function buildSQLContext(
     annotations,
     getMarkLineData,
     getAxisDataFromKey,
+    getXAxisCategoryKeys,
   });
 
   // Build trellis helpers (they close over options, chartPanelRef, etc.)

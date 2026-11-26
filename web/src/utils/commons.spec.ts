@@ -2376,37 +2376,102 @@ describe("Commons Utility Functions", () => {
   });
 
   describe("findDashboardFolderId", () => {
-    it("finds the folder of the dashboard among same-titled dashboards in every folder", async () => {
+    beforeEach(() => {
+      vi.mocked(dashboardService.get_Dashboard).mockRejectedValue(new Error("403"));
+    });
+
+    it("finds the folder through the dashboard's title search before scanning folders", async () => {
       vi.mocked(dashboardService.get_Dashboard).mockResolvedValue({
-        data: { version: 8, v8: { title: "Folder Lookup" }, hash: 1 },
+        data: { version: 8, v8: { title: "Checkout" } },
       } as unknown as AxiosResponse);
       vi.mocked(dashboardService.list).mockResolvedValue({
         data: {
           dashboards: [
-            { dashboard_id: "other", folder_id: "f1", title: "Folder Lookup" },
-            { dashboard_id: "d1", folder_id: "f2", title: "Folder Lookup" },
+            { dashboard_id: "other", folder_id: "f1" },
+            { dashboard_id: "d1", folder_id: "f2" },
           ],
         },
-      } as never);
+      } as unknown as AxiosResponse);
 
       await expect(findDashboardFolderId("test-org", "d1")).resolves.toBe("f2");
+      expect(dashboardService.list).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(dashboardService.list).mock.calls[0][7]).toBe("Checkout");
+      expect(commonService.list_Folders).not.toHaveBeenCalled();
+    });
+
+    const serveFolders = (rowsByFolder: Record<string, { dashboard_id: string }[]>) => {
+      vi.mocked(commonService.list_Folders).mockResolvedValue({
+        data: { list: Object.keys(rowsByFolder).map((folderId) => ({ folderId, name: folderId })) },
+      } as unknown as AxiosResponse);
+      vi.mocked(dashboardService.list).mockImplementation(async (...args) => {
+        const rows = rowsByFolder[args[6]];
+        if (!rows) throw new Error("403");
+        return { data: { dashboards: rows } } as unknown as AxiosResponse;
+      });
+    };
+
+    it("scans folder by folder when the dashboard cannot be read from the default folder", async () => {
+      serveFolders({ f1: [{ dashboard_id: "other" }], f2: [{ dashboard_id: "d1" }] });
+
+      await expect(findDashboardFolderId("test-org", "d1")).resolves.toBe("f2");
+      expect(vi.mocked(dashboardService.list).mock.calls.map((call) => call[6])).not.toContain(
+        "default",
+      );
+      expect(commonService.list_Folders).toHaveBeenCalledWith("test-org", "dashboards", {
+        silentForbidden: true,
+      });
       expect(dashboardService.list).toHaveBeenCalledWith(
         0,
-        100,
+        1000,
         "name",
         false,
         "",
         "test-org",
+        "f2",
         "",
-        "Folder Lookup",
+        {
+          silentForbidden: true,
+        },
       );
     });
 
-    it("gives null when no folder holds the dashboard", async () => {
-      vi.mocked(dashboardService.get_Dashboard).mockResolvedValue({
-        data: { version: 8, v8: { title: "Folder Lookup Missing" }, hash: 1 },
+    it("skips a folder the user may not list and keeps looking", async () => {
+      vi.mocked(commonService.list_Folders).mockResolvedValue({
+        data: {
+          list: [
+            { folderId: "barred", name: "barred" },
+            { folderId: "f2", name: "f2" },
+          ],
+        },
       } as unknown as AxiosResponse);
-      vi.mocked(dashboardService.list).mockResolvedValue({ data: { dashboards: [] } } as never);
+      vi.mocked(dashboardService.list).mockImplementation(async (...args) => {
+        if (args[6] === "barred") throw new Error("403");
+        return { data: { dashboards: [{ dashboard_id: "d1" }] } } as unknown as AxiosResponse;
+      });
+
+      await expect(findDashboardFolderId("test-org", "d1")).resolves.toBe("f2");
+    });
+
+    it("finds a dashboard past the first 100 of many folders' dashboards", async () => {
+      const many = Array.from({ length: 150 }, (_, i) => ({ dashboard_id: `x${i}` }));
+      const folders: Record<string, { dashboard_id: string }[]> = {};
+      for (let i = 0; i < 10; i++) folders[`f${i}`] = many;
+      folders.f10 = [...many, { dashboard_id: "d1" }];
+      serveFolders(folders);
+
+      await expect(findDashboardFolderId("test-org", "d1")).resolves.toBe("f10");
+    });
+
+    it("reads the folders again on every lookup, so a moved dashboard is found where it is now", async () => {
+      serveFolders({ f1: [{ dashboard_id: "d1" }] });
+      await expect(findDashboardFolderId("test-org", "d1")).resolves.toBe("f1");
+
+      serveFolders({ f1: [], f2: [{ dashboard_id: "d1" }] });
+      await expect(findDashboardFolderId("test-org", "d1")).resolves.toBe("f2");
+    });
+
+    it("gives null when no folder holds the dashboard", async () => {
+      serveFolders({ f1: [{ dashboard_id: "other" }] });
 
       await expect(findDashboardFolderId("test-org", "d1")).resolves.toBeNull();
     });

@@ -41,6 +41,8 @@ export interface SeriesDeps {
   annotations: any;
   getMarkLineData: (arg0: any) => any[];
   getAxisDataFromKey: (arg0: string) => any[];
+  /** Per-row x values with NULL as its stand-in, aligned with getAxisDataFromKey of the first x key. */
+  getXAxisCategoryKeys?: () => unknown[];
 }
 
 /**
@@ -65,10 +67,8 @@ export function buildDataLookupMap(
   for (const item of missingValueData) {
     const breakdownValue = getDataValue(item, breakdownKey);
     const xValue = getDataValue(item, xAxisKey);
-    // The x axis names a NULL or empty category by its label, so the lookup must key it the same way.
-    const xCategory = breakdownValueLabel(
-      xValue === null || xValue === undefined ? NULL_BREAKDOWN_VALUE : xValue,
-    );
+    // Keyed by raw value, not label, so a real "(null)" or "(empty)" never collides with NULL or "".
+    const xCategory = xValue === null || xValue === undefined ? NULL_BREAKDOWN_VALUE : xValue;
     const key = `${breakdownValue}||${xCategory}`;
 
     // Only set if NOT already present (keeps FIRST occurrence)
@@ -99,6 +99,7 @@ export function createSeriesBuilders(deps: SeriesDeps) {
     annotations,
     getMarkLineData,
     getAxisDataFromKey,
+    getXAxisCategoryKeys,
   } = deps;
 
   const { markLines, markAreas } = getAnnotationsData(annotations, store.state.timezone);
@@ -167,12 +168,28 @@ export function createSeriesBuilders(deps: SeriesDeps) {
     return uniqueValues;
   }
 
-  const getSeriesData = (breakdownKey: string, yAxisKey: string, xAxisKey: string) => {
+  // A deduplicated axis is rebuilt from raw values, since NULL and a real "(null)" share a label.
+  const alignXAxisCategories = (): unknown[] => {
+    const axisData: unknown[] = options.xAxis[0].data;
+    if (!getXAxisCategoryKeys) return axisData;
+    const rowKeys = getXAxisCategoryKeys();
+    if (rowKeys.length === axisData.length) return rowKeys;
+    const keys = Array.from(new Set(rowKeys));
+    options.xAxis[0].data = keys.map((key) => breakdownValueLabel(key as string));
+    return keys;
+  };
+
+  const getSeriesData = (
+    breakdownKey: string,
+    yAxisKey: string,
+    xAxisKey: string,
+    xCategoryKeys: unknown[],
+  ) => {
     if (!(breakdownKey !== null && yAxisKey !== null && xAxisKey !== null)) return [];
 
     // Use the pre-built lookup map for O(1) access instead of O(n) filter + find
     // xAxisKey parameter is the breakdown value passed from getSeries()
-    const seriesData = options.xAxis[0].data.map((xValue: any) => {
+    const seriesData = xCategoryKeys.map((xValue: unknown) => {
       const lookupKey = `${xAxisKey}||${xValue}`;
       const dataRow = dataLookupMap.get(lookupKey);
       return dataRow ? (getDataValue(dataRow, yAxisKey) ?? null) : null;
@@ -271,6 +288,8 @@ export function createSeriesBuilders(deps: SeriesDeps) {
       stackedXAxisUniqueValue = getUniqueStackedXAxisValues(breakdownKey);
     }
 
+    const xCategoryKeys = breakDownKeys?.length ? alignXAxisCategories() : [];
+
     // Name hashes can collide, so breakdown series in one chart get palette colours set apart.
     const distinctColor = createDistinctSeriesColor(
       breakDownKeys.length
@@ -292,7 +311,7 @@ export function createSeriesBuilders(deps: SeriesDeps) {
               // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
               yAxisName = getYAxisLabel(yAxis, key);
 
-              const seriesData = getSeriesData(breakdownKey, yAxis, key);
+              const seriesData = getSeriesData(breakdownKey, yAxis, key, xCategoryKeys);
               // Add stack property for stacked charts
               const updatedSeriesConfig = {
                 ...seriesConfig,
