@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{future::Future, time::Duration};
+use std::{collections::HashMap, future::Future, net::IpAddr, time::Duration};
 
 use anyhow::{Result, anyhow};
+use common::infra::config::MAXMIND_DB_CLIENT;
 use config::utils::json;
 use o2_enterprise::enterprise::common::{
     auditor::{self, AuditMessage},
@@ -56,6 +57,20 @@ impl ReportingSettings {
 /// Publishes one audit batch per `O2_AUDIT_REPORTING_MODE`, following usage reporting.
 pub(crate) async fn publish(request: IngestionRequest) -> Result<IngestionResponse> {
     publish_with(&ReportingSettings::from_config(), request, ingest_locally).await
+}
+
+/// Adds RUM's `geo_info` to each batch row from its `login_ip`, once the City DB is loaded.
+pub(crate) async fn add_geo_info(rows: &mut [json::Value]) {
+    // Clone the Arc'd reader so a DB reload is not blocked behind the lookups.
+    let Some(client) = MAXMIND_DB_CLIENT.read().await.clone() else {
+        return;
+    };
+    stamp_geo_info(rows, |ip| {
+        client
+            .city_geo_info(ip)
+            // GeoInfoData holds only strings and numbers, so serializing it cannot fail.
+            .map(|geo| json::to_value(geo).expect("GeoInfoData serializes"))
+    });
 }
 
 async fn publish_with<F, Fut>(
@@ -151,6 +166,25 @@ async fn requeue(cap: usize, body: &[u8]) {
     }
     for row in rows {
         auditor::enqueue(row).await;
+    }
+}
+
+fn stamp_geo_info(rows: &mut [json::Value], mut lookup: impl FnMut(IpAddr) -> Option<json::Value>) {
+    let mut seen: HashMap<IpAddr, Option<json::Value>> = HashMap::new();
+    for row in rows {
+        let Some(row) = row.as_object_mut() else {
+            continue;
+        };
+        let Some(ip) = row
+            .get("login_ip")
+            .and_then(json::Value::as_str)
+            .and_then(|ip| ip.parse::<IpAddr>().ok())
+        else {
+            continue;
+        };
+        if let Some(geo) = seen.entry(ip).or_insert_with(|| lookup(ip)) {
+            row.insert("geo_info".to_string(), geo.clone());
+        }
     }
 }
 
@@ -585,6 +619,30 @@ mod tests {
         }
         assert_eq!(stub.hit_count(), 0);
         assert!(drain_buffer().await.is_empty());
+    }
+
+    #[test]
+    fn geo_info_is_looked_up_once_per_distinct_ip_and_added_only_where_known() {
+        let mut rows = vec![
+            json::json!({"login_ip": "198.51.100.7"}),
+            json::json!({"login_ip": "198.51.100.7"}),
+            json::json!({"login_ip": "10.0.0.1"}),
+            json::json!({"user_email": "no-ip@example.com"}),
+            json::json!({"login_ip": "not-an-ip"}),
+        ];
+        let mut lookups = vec![];
+
+        stamp_geo_info(&mut rows, |ip| {
+            lookups.push(ip);
+            (ip.to_string() == "198.51.100.7").then(|| json::json!({"country": "Australia"}))
+        });
+
+        assert_eq!(lookups.len(), 2, "{lookups:?}");
+        assert_eq!(rows[0]["geo_info"]["country"], "Australia");
+        assert_eq!(rows[1]["geo_info"], rows[0]["geo_info"]);
+        for row in &rows[2..] {
+            assert!(row.get("geo_info").is_none(), "{row}");
+        }
     }
 
     #[tokio::test]

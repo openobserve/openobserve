@@ -59,3 +59,14 @@ impl audit::AuditPublisher for CoreAuditPublisher {
         audit_reporting::publish(request).await
     }
 }
+
+#[cfg(feature = "enterprise")]
+pub struct CoreAuditGeoEnricher;
+
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+impl o2_enterprise::enterprise::common::auditor::AuditRowEnricher for CoreAuditGeoEnricher {
+    async fn enrich(&self, rows: &mut [config::utils::json::Value]) {
+        audit_reporting::add_geo_info(rows).await;
+    }
+}

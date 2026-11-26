@@ -22,9 +22,9 @@ use config::{
 };
 use db::metas;
 
-#[cfg(feature = "enterprise")]
-use crate::self_reporting::CoreAuditPublisher;
 use crate::self_reporting::persistence::CoreBatchPublisher;
+#[cfg(feature = "enterprise")]
+use crate::self_reporting::{CoreAuditGeoEnricher, CoreAuditPublisher};
 
 const MIN_EXT_AUTH_SALT_LEN: usize = 16;
 // argon2 hashes with a salt of 8 to 48 bytes and get_hash panics outside that
@@ -196,6 +196,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     audit::set_audit_publisher(Arc::new(CoreAuditPublisher))
         .map_err(|_| anyhow::anyhow!("audit publisher is already initialized"))?;
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::common::auditor::set_row_enricher(Arc::new(CoreAuditGeoEnricher))
+        .map_err(|_| anyhow::anyhow!("audit row enricher is already initialized"))?;
 
     let env_ext_auth_salt = get_config().auth.ext_auth_salt.clone();
     cache_instance_identity(
