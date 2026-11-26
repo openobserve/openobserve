@@ -90,6 +90,8 @@ export interface FilterBarEditorOptions {
   t: TranslateFn;
   commit: (next: FilterGroup) => void;
   submit: () => void;
+  /** Enter itself turned the typed text or ticked values into a chip, after the tree was committed. */
+  enterCommit?: () => void;
 }
 
 const MAX_ROWS = 100;
@@ -538,9 +540,18 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     step.value = "operator";
   }
 
+  // Counts chips committed, so a key handler can tell whether its Enter produced one.
+  let commitSeq = 0;
+  const isEnter = (event: MouseEvent | KeyboardEvent) =>
+    "key" in event && event.key === "Enter" && !event.metaKey && !event.ctrlKey;
+  const reportEnterCommit = (seq: number, event: MouseEvent | KeyboardEvent) => {
+    if (commitSeq !== seq && isEnter(event)) options.enterCommit?.();
+  };
+
   function commitDraft() {
     const current = draft.value;
     if (!current?.operator) return;
+    commitSeq++;
     const filled = current.values;
     if (arityOf(current.operator) !== "none" && !filled.length) return;
     let next: FilterGroup;
@@ -654,6 +665,12 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   }
 
   function select(key: string, event: MouseEvent | KeyboardEvent) {
+    const seq = commitSeq;
+    selectRow(key, event);
+    reportEnterCommit(seq, event);
+  }
+
+  function selectRow(key: string, event: MouseEvent | KeyboardEvent) {
     armedId.value = null;
     if (extraRows.value.some((row) => row.key === key)) {
       open.value = false;
@@ -665,6 +682,12 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   }
 
   function onEnter() {
+    const seq = commitSeq;
+    enterOnCaret();
+    if (commitSeq !== seq) options.enterCommit?.();
+  }
+
+  function enterOnCaret() {
     if (step.value === "value") {
       const typed = text.value.trim();
       if (typed) return acceptsTyped(typed) ? addValue(typed) : undefined;

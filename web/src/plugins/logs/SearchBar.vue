@@ -1361,6 +1361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-filter-builder"
                   @update:query="onFilterBuilderQuery"
                   @submit="handleRunQueryFn()"
+                  @enter-commit="onFilterBuilderEnterCommit"
                   @exit="toggleFilterBuilder"
                   @focus="onFilterBuilderFocus"
                   @extra-select="pickRecentFilterRow"
@@ -2475,6 +2476,10 @@ export default defineComponent({
       searchObj.data.editorValue = sql;
       (queryEditorRef.value as { setValue?: (v: string) => void } | null)?.setValue?.(sql);
       autoRun.request("filter");
+    };
+    // With auto-run off nothing else follows the new chip, so the Enter that made it also runs.
+    const onFilterBuilderEnterCommit = () => {
+      if (!isAutoRunActive(store.state.zoConfig ?? {}, searchObj.meta)) handleRunQueryFn();
     };
     const syntaxGuideRef = ref(null);
 
@@ -5541,6 +5546,7 @@ export default defineComponent({
       activateFilterBuilder,
       loadFilterBuilderValues,
       onFilterBuilderQuery,
+      onFilterBuilderEnterCommit,
       onRefreshIntervalUpdate,
       updateTimezone,
       dateTimeRef,

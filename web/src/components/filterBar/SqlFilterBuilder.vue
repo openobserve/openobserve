@@ -140,6 +140,7 @@ defineExpose<SqlFilterBuilderExpose>({ activate: () => barRef.value?.activate() 
         :data-test="`${dataTest}-bar`"
         @update:model-value="onTreeChange"
         @submit="emit('submit')"
+        @enter-commit="emit('enter-commit')"
         @focus="emit('focus')"
         @extra-select="(key, event) => emit('extra-select', key, event)"
       />

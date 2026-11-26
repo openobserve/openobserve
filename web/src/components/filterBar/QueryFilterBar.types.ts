@@ -87,6 +87,8 @@ export interface QueryFilterBarEmits {
   (_e: "update:modelValue", _value: FilterGroup): void;
   /** Enter on an empty bar: run the query. */
   (_e: "submit"): void;
+  /** Enter turned the typed text into a chip; fires after `update:modelValue`. */
+  (_e: "enter-commit"): void;
   /** The field list is about to be shown; lazy pages load fields here. */
   (_e: "focus"): void;
   /** A row of `extraSuggestions` was picked; the event carries modifiers such as Shift. */

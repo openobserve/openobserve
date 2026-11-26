@@ -93,6 +93,7 @@ const editor = useFilterBarEditor({
   t,
   commit: commitTree,
   submit: () => emit("submit"),
+  enterCommit: () => emit("enter-commit"),
 });
 
 const {

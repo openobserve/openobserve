@@ -235,6 +235,32 @@ describe("QueryFilterBar", () => {
     expect(segment("level", "value").text()).toBe("(empty), warn");
   });
 
+  it("tells the host when Enter itself turned the text into a chip, after the tree update", async () => {
+    const order: string[] = [];
+    const state = mountBar({
+      "onUpdate:modelValue": async (next: FilterGroup) => {
+        order.push("update");
+        state.tree = next;
+        await wrapper!.setProps({ modelValue: next });
+      },
+      onEnterCommit: () => order.push("enter-commit"),
+    });
+    await openBar();
+    await type("level=warn");
+    await press("Enter");
+    expect(order).toEqual(["update", "enter-commit"]);
+  });
+
+  it("does not report a click on a row as an Enter commit", async () => {
+    const onEnterCommit = vi.fn();
+    mountBar({ onEnterCommit });
+    await openBar();
+    await clickRow("level");
+    await clickRow(rowKeys()[0]);
+    await clickRow(rowKeys()[0]);
+    expect(onEnterCommit).not.toHaveBeenCalled();
+  });
+
   it("picks several values for is any of and applies on Enter", async () => {
     const state = mountBar();
     await openBar();
