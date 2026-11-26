@@ -580,8 +580,9 @@ export default defineComponent({
       dateTimeToBeSent.value = value;
       searchDateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
     };
-    const formatTime = (took) => {
-      return `${took.toFixed(2)} sec`;
+    // The usage row stores `took` in milliseconds.
+    const formatTime = (tookMs) => {
+      return `${(tookMs / 1000).toFixed(2)} sec`;
     };
     const calculateDuration = (startTime, endTime) => {
       const durationMicroseconds = endTime - startTime;

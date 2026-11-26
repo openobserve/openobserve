@@ -370,7 +370,7 @@ async fn search_in_cluster(
     let req_stats = RequestStats {
         records: scan_stats.records,
         size: scan_stats.original_size as f64,
-        response_time: result_time,
+        response_time: result_time * 1000.0,
         request_body: Some(query.to_string()),
         user_email: Some(user_email.to_string()),
         min_ts: Some(start),

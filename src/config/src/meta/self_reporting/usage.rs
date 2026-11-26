@@ -199,6 +199,7 @@ pub struct UsageData {
     pub size: f64,
     pub unit: String,
     pub user_email: String,
+    /// Milliseconds.
     pub response_time: f64,
     pub stream_type: StreamType,
     pub num_records: i64,
@@ -245,6 +246,8 @@ pub struct GroupKey {
     pub stream_name: String,
     pub org_id: String,
     pub stream_type: StreamType,
+    pub year: i32,
+    pub month: u32,
     pub day: u32,
     pub hour: u32,
     pub event: UsageEvent,
@@ -252,9 +255,11 @@ pub struct GroupKey {
     pub node: String,
 }
 
+/// Sums size, records and dropped records; averages response time and the queue wait it has.
 pub struct AggregatedData {
     pub usage_data: UsageData,
     pub count: u64,
+    pub wait_count: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -447,6 +452,7 @@ pub struct RequestStats {
     pub records: i64,
     #[serde(default)]
     pub dropped_records: i64,
+    /// Milliseconds.
     pub response_time: f64,
     #[serde(default)]
     pub request_body: Option<String>,
@@ -1037,6 +1043,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -1048,6 +1056,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -1059,6 +1069,8 @@ mod tests {
             stream_name: "stream2".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -1080,6 +1092,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -1094,6 +1108,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -1145,6 +1161,7 @@ mod tests {
         let aggregated = AggregatedData {
             usage_data,
             count: 5,
+            wait_count: 0,
         };
 
         assert_eq!(aggregated.count, 5);

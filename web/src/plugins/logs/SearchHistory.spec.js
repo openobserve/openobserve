@@ -279,9 +279,9 @@ describe("SearchHistory Component", () => {
     });
 
     it("formats time duration correctly", () => {
-      expect(wrapper.vm.formatTime(1500)).toBe("1500.00 sec");
-      expect(wrapper.vm.formatTime(60000)).toBe("60000.00 sec");
-      expect(wrapper.vm.formatTime(3600000)).toBe("3600000.00 sec");
+      expect(wrapper.vm.formatTime(1500)).toBe("1.50 sec");
+      expect(wrapper.vm.formatTime(60000)).toBe("60.00 sec");
+      expect(wrapper.vm.formatTime(3600000)).toBe("3600.00 sec");
     });
 
   });

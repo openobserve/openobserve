@@ -75,6 +75,8 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             stream_name: usage_data.stream_name.clone(),
             org_id: usage_data.org_id.clone(),
             stream_type: usage_data.stream_type,
+            year: usage_data.year,
+            month: usage_data.month,
             day: usage_data.day,
             hour: usage_data.hour,
             event: usage_data.event,
@@ -86,24 +88,17 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             Entry::Vacant(vacant) => {
                 vacant.insert(AggregatedData {
                     count: 1,
+                    wait_count: usage_data.took_wait_in_queue.is_some() as u64,
                     usage_data: usage_data.clone(),
                 });
             }
-            Entry::Occupied(mut occupied) => {
-                let entry = occupied.get_mut();
-                entry.usage_data.num_records += usage_data.num_records;
-                entry.usage_data.size += usage_data.size;
-                entry.usage_data.response_time += usage_data.response_time;
-                entry.count += 1;
-            }
+            Entry::Occupied(mut occupied) => merge_aggregated(occupied.get_mut(), usage_data),
         }
     }
 
     let mut report_data = Vec::with_capacity(groups.len() + search_events.len());
     for (_, data) in groups {
-        let mut usage_data = data.usage_data;
-        usage_data.response_time /= data.count as f64;
-        report_data.push(usage_data);
+        report_data.push(finish_aggregated(data));
     }
 
     let cfg = get_config();
@@ -311,11 +306,74 @@ pub async fn ingest_data_retention_usages(data_retention_usages: Vec<DataRetenti
     }
 }
 
+fn merge_aggregated(entry: &mut AggregatedData, usage_data: &UsageData) {
+    let acc = &mut entry.usage_data;
+    acc.num_records += usage_data.num_records;
+    acc.size += usage_data.size;
+    acc.response_time += usage_data.response_time;
+    acc.dropped_records += usage_data.dropped_records;
+    acc.took_wait_in_queue = match (acc.took_wait_in_queue, usage_data.took_wait_in_queue) {
+        (Some(a), Some(b)) => Some(a + b),
+        (a, b) => a.or(b),
+    };
+    entry.count += 1;
+    entry.wait_count += usage_data.took_wait_in_queue.is_some() as u64;
+}
+
+/// The bucket row reports the average `response_time` and queue wait of its events.
+fn finish_aggregated(data: AggregatedData) -> UsageData {
+    let mut usage_data = data.usage_data;
+    usage_data.response_time /= data.count as f64;
+    usage_data.took_wait_in_queue = usage_data
+        .took_wait_in_queue
+        .map(|w| w / data.wait_count.max(1) as usize);
+    usage_data
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::{search::SearchEventContext, stream::StreamType};
 
     use super::*;
+
+    #[test]
+    fn test_aggregation_sums_dropped_records_and_averages_queue_wait() {
+        let mut first = create_test_usage_data(
+            UsageEvent::Functions,
+            "org",
+            "s",
+            "u@example.com",
+            1.0,
+            10,
+            2.0,
+        );
+        first.dropped_records = 3;
+        first.took_wait_in_queue = Some(100);
+        let mut second = first.clone();
+        second.dropped_records = 4;
+        second.took_wait_in_queue = Some(300);
+        second.response_time = 4.0;
+        let mut no_wait = second.clone();
+        no_wait.took_wait_in_queue = None;
+        no_wait.response_time = 0.0;
+
+        let mut entry = AggregatedData {
+            count: 1,
+            wait_count: 1,
+            usage_data: first,
+        };
+        merge_aggregated(&mut entry, &second);
+        merge_aggregated(&mut entry, &no_wait);
+        let row = finish_aggregated(entry);
+        assert_eq!(row.dropped_records, 11);
+        assert_eq!(
+            row.took_wait_in_queue,
+            Some(200),
+            "a row with no wait is not a 0"
+        );
+        assert!((row.response_time - 2.0).abs() < 1e-9);
+        assert_eq!(row.num_records, 30);
+    }
 
     // Helper function to create test UsageData
     fn create_test_usage_data(
@@ -590,6 +648,8 @@ mod tests {
             stream_name: usage.stream_name.clone(),
             org_id: usage.org_id.clone(),
             stream_type: usage.stream_type,
+            year: usage.year,
+            month: usage.month,
             day: usage.day,
             hour: usage.hour,
             event: usage.event,
@@ -618,6 +678,7 @@ mod tests {
 
         let aggregated = AggregatedData {
             count: 1,
+            wait_count: 0,
             usage_data: usage.clone(),
         };
 
@@ -642,6 +703,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 0,
             event: UsageEvent::Ingestion,
@@ -653,6 +716,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 0,
             event: UsageEvent::Ingestion,

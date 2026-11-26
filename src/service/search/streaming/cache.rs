@@ -379,6 +379,8 @@ async fn send_cached_responses(
     cached
         .cached_response
         .set_took(start_timer.elapsed().as_millis() as usize);
+    // the stored wait belongs to the query that filled the cache
+    cached.cached_response.set_wait_in_queue(0);
     // reset start timer
     *start_timer = Instant::now();
 
@@ -523,10 +525,10 @@ pub async fn write_partial_results_to_cache(
     }
 }
 
-/// Usage timing for a cache hit: `took_ms` in seconds, and 0 queue wait because the
+/// Usage timing for a cache hit: `took_ms` in milliseconds, and 0 queue wait because the
 /// cached `wait_in_queue` belongs to the query that filled the cache.
 fn cache_hit_usage_timing(took_ms: usize) -> (f64, Option<usize>) {
-    (took_ms as f64 / 1000.0, Some(0))
+    (took_ms as f64, Some(0))
 }
 
 #[cfg(test)]
@@ -679,11 +681,11 @@ mod tests {
         use super::cache_hit_usage_timing;
 
         let (response_time, took_wait_in_queue) = cache_hit_usage_timing(40);
-        assert!((response_time - 0.04).abs() < f64::EPSILON);
+        assert!((response_time - 40.0).abs() < f64::EPSILON);
         assert_eq!(took_wait_in_queue, Some(0));
 
         let (response_time, _) = cache_hit_usage_timing(5185);
-        assert!((response_time - 5.185).abs() < 1e-9);
+        assert!((response_time - 5185.0).abs() < 1e-9);
 
         assert_eq!(cache_hit_usage_timing(0), (0.0, Some(0)));
     }
