@@ -104,6 +104,19 @@ pub(crate) fn cannot_act(state: &str, plan: Option<&str>) -> bool {
         .is_some_and(|p| p.options.is_empty() && p.missing_capability.is_some())
 }
 
+/// An approved run that ended `no_change` before any step of its plan was sent: its execute turn
+/// re-read the symptom and found the change no longer needed.
+pub(crate) fn no_longer_needed(state: &str, chosen_option: Option<&str>, sent: bool) -> bool {
+    state == RunState::NoChange.as_str() && chosen_option.is_some() && !sent
+}
+
+/// Whether a step of the run's current revision was sent to its MCP.
+pub(crate) fn plan_sent(run: &autoresolve_runs::Model, steps: &[autoresolve_steps::Model]) -> bool {
+    steps
+        .iter()
+        .any(|s| s.revision == run.revision && s.consumed_at_us.is_some())
+}
+
 pub(crate) async fn finish_run(org: &str, run_id: &str) {
     finish_run_with(infra::db::get_orm_client_rw().await, org, run_id).await;
 }
@@ -137,7 +150,12 @@ pub(crate) async fn finish_run_with<C: ConnectionTrait>(conn: &C, org: &str, run
     };
     let cannot = cannot_act(&run.state, run.plan.as_deref());
     let summary = system_summary(&steps, run.prior_verdict.as_deref(), cannot);
-    write_record(org, run_end_record(&run, &summary)).await;
+    let not_needed = no_longer_needed(
+        &run.state,
+        run.chosen_option_id.as_deref(),
+        plan_sent(&run, &steps),
+    );
+    write_record(org, run_end_record(&run, &summary, not_needed)).await;
 }
 
 /// The audit line for a connection a person added to a run so it could plan again.
@@ -169,7 +187,7 @@ fn step_record(run: &autoresolve_runs::Model, step: &autoresolve_steps::Model) -
     })
 }
 
-fn run_end_record(run: &autoresolve_runs::Model, summary: &str) -> Value {
+fn run_end_record(run: &autoresolve_runs::Model, summary: &str, no_longer_needed: bool) -> Value {
     json!({
         "record": "run_end",
         "run_id": run.id,
@@ -183,6 +201,7 @@ fn run_end_record(run: &autoresolve_runs::Model, summary: &str) -> Value {
         "outcome_verdict": run.outcome_verdict,
         "prior_verdict": run.prior_verdict,
         "summary": summary,
+        "no_longer_needed": no_longer_needed,
         "error": run.error.as_deref().map(redacted_text),
         "created_at_us": run.created_at_us,
         "ended_at_us": run.ended_at_us,
@@ -515,6 +534,20 @@ mod tests {
             for word in absent {
                 assert!(!summary.contains(word), "{label}: {word:?} in {summary:?}");
             }
+        }
+    }
+
+    #[test]
+    fn only_an_approved_no_change_end_before_any_step_was_sent_is_no_longer_needed() {
+        #[rustfmt::skip]
+        let cases = [
+            ("the re-read found it fixed", "no_change", Some("A"), false, true),
+            ("its steps ran, then the check", "no_change", Some("A"), true, false),
+            ("never approved", "no_change", None, false, false),
+            ("still proceeding", "proceeding", Some("A"), false, false),
+        ];
+        for (label, state, chosen, sent, want) in cases {
+            assert_eq!(no_longer_needed(state, chosen, sent), want, "{label}");
         }
     }
 

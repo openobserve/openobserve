@@ -21,6 +21,7 @@ import {
   autoresolveErrorStatus,
   isTerminalRunState,
   type AutoResolveApprover,
+  type AutoResolveChangedBy,
   type AutoResolveChangedMcp,
   type AutoResolveConnectionRef,
   type AutoResolveCorrectionKind,
@@ -354,11 +355,12 @@ export function addableConnection(
   return run.state === "no_change" && !ran ? missing : null;
 }
 
-/** The state a run's chips show: a run that ended because no MCP can make the fix reads as its own end. */
+/** The state a run's chips show: can't fix and no longer needed read as their own ends. */
 export function shownRunState(
-  run: Pick<AutoResolveRunRow, "state" | "cant_fix">,
-): AutoResolveRunState | "cant_fix" {
-  return run.cant_fix ? "cant_fix" : run.state;
+  run: Pick<AutoResolveRunRow, "state" | "cant_fix" | "no_longer_needed">,
+): AutoResolveRunState | "cant_fix" | "not_needed" {
+  if (run.cant_fix) return "cant_fix";
+  return run.no_longer_needed ? "not_needed" : run.state;
 }
 
 /** A check follows steps that ran, so a run that ended before any never checked. */
@@ -379,6 +381,17 @@ export function skippedStages(
   return Object.entries(reached)
     .filter(([, yes]) => !yes)
     .map(([key]) => key);
+}
+
+/** "Another run changed the postgres MCP since this plan was made. …"; "" when none did. */
+export function changedSinceText(
+  changes: readonly AutoResolveChangedBy[],
+  t: TranslateFn,
+): I18nText {
+  if (!changes.length) return raw("");
+  const runs = new Set(changes.map((c) => c.run_id)).size;
+  const mcps = theMcps([...new Set(changes.map((c) => c.connection))], t);
+  return t("autoresolve.approval.changedSincePlan", { count: runs, mcps }, runs);
 }
 
 /** What a run can use: its MCPs, folded past `max`, then always OpenObserve data last. */

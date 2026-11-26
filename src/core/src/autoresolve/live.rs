@@ -44,7 +44,7 @@ use utoipa::ToSchema;
 use super::{
     AutoResolveError,
     approve::{self, Approver, Seams},
-    corrections, distinct_ids, evidence, json_or_text,
+    changed_since, corrections, distinct_ids, evidence, json_or_text,
     plan::{OPTION_IDS, parse_missing_connection},
     trigger_by, trigger_label,
     turn::{Listed, not_connected},
@@ -112,6 +112,8 @@ pub struct AutoResolveRunRow {
     pub ended_at_us: Option<i64>,
     /// The run ended because no MCP of the run can make the fix its plan needs.
     pub cant_fix: bool,
+    /// The run's re-read before its first approved step found the change no longer needed.
+    pub no_longer_needed: bool,
 }
 
 /// `GET …/autoresolve/runs`.
@@ -202,6 +204,15 @@ pub struct AutoResolveOutcome {
     pub prior_verdict: Option<String>,
 }
 
+/// A change another run sent to one of this run's MCPs after this run's plan was made.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct AutoResolveChangedBy {
+    /// The MCP's name.
+    pub connection: String,
+    pub run_id: String,
+    pub at_us: i64,
+}
+
 /// The saved AutoResolve a run belongs to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct AutoResolveRunOf {
@@ -284,6 +295,10 @@ pub struct AutoResolveRunDetail {
     pub ended_at_us: Option<i64>,
     /// The run ended because no MCP of the run can make the fix its plan needs.
     pub cant_fix: bool,
+    /// The run's re-read before its first approved step found the change no longer needed.
+    pub no_longer_needed: bool,
+    /// While it waits for approval: other runs' changes to its MCPs since its plan, newest first.
+    pub changed_since_plan: Vec<AutoResolveChangedBy>,
     pub approval_deadline_us: Option<i64>,
     pub revision: i32,
     /// When the current revision's steps were written: the plan's acceptance, or the hold that
@@ -491,11 +506,13 @@ impl Rights {
 /// lapses with the approval deadline) and the run's connections.
 type AddKey = (i32, Option<String>, Option<RunState>, String);
 
-/// A run with its step rows and chat session, read once per snapshot.
+/// A run with its step rows and chat session, read once per snapshot; `changed` holds other runs'
+/// changes to its MCPs since its plan, read only while it waits for approval.
 struct Loaded {
     run: RunRow,
     steps: Vec<StepRow>,
     session: Option<SessionRow>,
+    changed: Vec<StepRow>,
 }
 
 impl Loaded {
@@ -505,11 +522,18 @@ impl Loaded {
         };
         let steps = autoresolve_steps::list_for_run(org, run_id).await?;
         let session = ai_chat_sessions::get(org, &run.session_id).await?;
-        Ok(Some(Self {
+        let mut loaded = Self {
             run,
             steps,
             session,
-        }))
+            changed: Vec::new(),
+        };
+        if loaded.state() == Some(RunState::WaitingApproval)
+            && let Some(since) = loaded.planned_at_us()
+        {
+            loaded.changed = changed_since(&loaded.run, since).await?;
+        }
+        Ok(Some(loaded))
     }
 
     fn state(&self) -> Option<RunState> {
@@ -524,7 +548,7 @@ impl Loaded {
             let committed = (session.last_committed_seq, session.last_event_at);
             (committed, session.updated_at).hash(&mut hasher);
         }
-        for step in &self.steps {
+        for step in self.steps.iter().chain(&self.changed) {
             (
                 &step.id,
                 &step.state,
@@ -572,6 +596,12 @@ impl Loaded {
             created_at_us: run.created_at_us,
             ended_at_us: run.ended_at_us,
             cant_fix: evidence::cannot_act(&run.state, run.plan.as_deref()),
+            no_longer_needed: evidence::no_longer_needed(
+                &run.state,
+                run.chosen_option_id.as_deref(),
+                evidence::plan_sent(run, &self.steps),
+            ),
+            changed_since_plan: self.changed_by(&names),
             approval_deadline_us: run.approval_deadline_us,
             revision: run.revision,
             planned_at_us: self.planned_at_us(),
@@ -592,6 +622,17 @@ impl Loaded {
             person_verdict: stored_json(run.person_verdict.as_deref()),
             turn: self.turn(),
         })
+    }
+
+    fn changed_by(&self, names: &ConnectionNames) -> Vec<AutoResolveChangedBy> {
+        self.changed
+            .iter()
+            .map(|s| AutoResolveChangedBy {
+                connection: names.connection(&s.connection_id, &s.connection_name).name,
+                run_id: s.run_id.clone(),
+                at_us: s.consumed_at_us.unwrap_or_default(),
+            })
+            .collect()
     }
 
     /// The transcript's last commit stands for the model's output; each commit already changes
@@ -920,7 +961,16 @@ pub async fn list_runs(
 ) -> Result<AutoResolveRunList, AutoResolveError> {
     let (rows, total) = autoresolve_runs::list(org, filter, page, page_size).await?;
     let current = connection_names(org).await?;
-    let runs = rows.into_iter().map(|run| run_row(run, &current)).collect();
+    let approved_no_change: Vec<String> = rows
+        .iter()
+        .filter(|r| r.state == RunState::NoChange.as_str() && r.chosen_option_id.is_some())
+        .map(|r| r.id.clone())
+        .collect();
+    let sent = autoresolve_steps::sent_revisions(org, &approved_no_change).await?;
+    let runs = rows
+        .into_iter()
+        .map(|run| run_row(run, &current, &sent))
+        .collect();
     Ok(AutoResolveRunList { runs, total })
 }
 
@@ -1085,11 +1135,21 @@ fn run_connections(
         .collect()
 }
 
-fn run_row(run: RunRow, current: &HashMap<String, String>) -> AutoResolveRunRow {
+/// `sent` holds the (run, revision) pairs that sent a step.
+fn run_row(
+    run: RunRow,
+    current: &HashMap<String, String>,
+    sent: &HashSet<(String, i32)>,
+) -> AutoResolveRunRow {
     AutoResolveRunRow {
         trigger: trigger_of(&run),
         connections: run_connections(&run, current),
         cant_fix: evidence::cannot_act(&run.state, run.plan.as_deref()),
+        no_longer_needed: evidence::no_longer_needed(
+            &run.state,
+            run.chosen_option_id.as_deref(),
+            sent.contains(&(run.id.clone(), run.revision)),
+        ),
         id: run.id,
         goal: run.goal,
         state: run.state,
@@ -1263,6 +1323,7 @@ mod tests {
                     ..run.clone()
                 },
                 session: None,
+                changed: Vec::new(),
             };
             let plan = loaded.plan(&names(&current, &[])).unwrap();
             let flags: Vec<(&str, bool, Option<&str>, Vec<_>)> = plan
@@ -1307,6 +1368,7 @@ mod tests {
                 ..run
             },
             session: None,
+            changed: Vec::new(),
         };
         let granted = |object: &str| Ok(Some(vec![object.to_string()]));
         let every = format!("ai_toolsets:_all_{ORG}");
@@ -1380,7 +1442,8 @@ mod tests {
                 plan: Some(plan.clone()),
                 ..run.clone()
             };
-            assert_eq!(run_row(run, &HashMap::new()).cant_fix, want, "{case}");
+            let row = run_row(run, &HashMap::new(), &HashSet::new());
+            assert_eq!(row.cant_fix, want, "{case}");
         }
     }
 

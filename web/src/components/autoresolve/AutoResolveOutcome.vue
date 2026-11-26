@@ -90,8 +90,10 @@ const props = withDefaults(
     hideExplanation?: boolean;
     /** The run ended because none of its MCPs can make the fix. */
     cantFix?: boolean;
+    /** The re-read before its first approved step found the change no longer needed. */
+    notNeeded?: boolean;
   }>(),
-  { error: null, hideExplanation: false, cantFix: false, checked: false },
+  { error: null, hideExplanation: false, cantFix: false, notNeeded: false, checked: false },
 );
 
 const { t } = useI18nTyped();
@@ -117,6 +119,7 @@ const needs = computed(() => needsText(props.outcome.explanation, t));
 
 const verdictLabel = computed(() => {
   if (props.cantFix) return t("autoresolve.state.cantFix");
+  if (props.notNeeded) return t("autoresolve.state.notNeeded");
   switch (props.outcome.verdict) {
     case "worked":
       return t("autoresolve.state.worked");

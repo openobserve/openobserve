@@ -34,7 +34,7 @@ use sea_orm::{DatabaseConnection, TransactionTrait};
 
 use super::{
     AutoResolveError, ConnectionSource, LiveConnections, after_transition, approval_deadline_us,
-    run_connection_ids, transition, transition_with,
+    chosen_steps, mark_not_run, run_connection_ids, transition, transition_with,
 };
 
 /// The id of the option at each position of a normalised plan; a recommended one is `A`.
@@ -143,8 +143,8 @@ pub async fn accept_plan(
     }
 }
 
-/// Ends the run with the model's verdict: from `investigating` only `no_change` (an answer, no
-/// change made), from `checking` any verdict.
+/// Ends the run with the model's verdict: before any step ran (`investigating`, or `proceeding`
+/// with nothing sent) only `no_change`, from `checking` any verdict.
 pub async fn accept_outcome(
     org: &str,
     run_id: &str,
@@ -236,9 +236,49 @@ async fn record_outcome(org: &str, run_id: &str, outcome: OutcomeInput) -> Resul
         error: Some(None),
         ..Default::default()
     };
+    if state == RunState::Proceeding {
+        let db = infra::db::get_orm_client_rw().await;
+        end_before_steps_with(db, org, run_id, patch).await?;
+        after_transition(org, run_id, to).await;
+        return Ok(());
+    }
     if !transition(org, run_id, &[state], to, patch).await? {
         return Err(PlanError::NotWaitingForOutcome);
     }
+    Ok(())
+}
+
+/// Ends a run whose execute turn found the change no longer needed: `no_change`, its approved
+/// steps not run, and only while none of them was sent.
+async fn end_before_steps_with(
+    db: &DatabaseConnection,
+    org: &str,
+    run_id: &str,
+    patch: RunPatch,
+) -> Result<(), PlanError> {
+    let txn = db.begin().await?;
+    let run = autoresolve_runs::locked(&txn, org, run_id)
+        .await?
+        .filter(|r| r.state == RunState::Proceeding.as_str())
+        .ok_or(PlanError::NotWaitingForOutcome)?;
+    let steps = autoresolve_steps::list_for_run_with(&txn, org, run_id).await?;
+    let chosen = chosen_steps(&run, &steps);
+    if chosen.iter().any(|s| s.consumed_at_us.is_some()) {
+        return Err(PlanError::NotWaitingForOutcome);
+    }
+    let approved = chosen
+        .iter()
+        .filter(|s| s.state == StepState::Approved.as_str())
+        .count();
+    // A step sent after the read above would not move; the rollback keeps its run proceeding.
+    if mark_not_run(&txn, org, &chosen).await? != approved as u64 {
+        return Err(PlanError::NotWaitingForOutcome);
+    }
+    let (from, to) = ([RunState::Proceeding], RunState::NoChange);
+    if !transition_with(&txn, org, run_id, &from, to, patch).await? {
+        return Err(PlanError::NotWaitingForOutcome);
+    }
+    txn.commit().await?;
     Ok(())
 }
 
@@ -473,8 +513,10 @@ fn option_ids(plan: &PlanInput) -> Vec<String> {
 /// The state an outcome ends the run in, or why it is refused in `state`.
 fn outcome_target(state: RunState, verdict: Verdict) -> Result<RunState, PlanError> {
     match (state, verdict) {
-        (RunState::Investigating, Verdict::NoChange) => Ok(RunState::NoChange),
-        (RunState::Investigating, _) => Err(PlanError::VerdictBeforeSteps),
+        (RunState::Investigating | RunState::Proceeding, Verdict::NoChange) => {
+            Ok(RunState::NoChange)
+        }
+        (RunState::Investigating | RunState::Proceeding, _) => Err(PlanError::VerdictBeforeSteps),
         (RunState::Checking, Verdict::Worked) => Ok(RunState::Worked),
         (RunState::Checking, Verdict::NoChange) => Ok(RunState::NoChange),
         (RunState::Checking, Verdict::Worse) => Ok(RunState::Worse),
@@ -663,12 +705,75 @@ mod tests {
             (Checking, Verdict::NoChange, Ok(NoChange)),
             (Checking, Verdict::Worse, Ok(Worse)),
             (WaitingApproval, Verdict::NoChange, Err(409)),
-            (Proceeding, Verdict::Worked, Err(409)),
+            // The execute turn's re-read found the change no longer needed.
+            (Proceeding, Verdict::NoChange, Ok(NoChange)),
+            (Proceeding, Verdict::Worked, Err(422)),
             (Worked, Verdict::Worked, Err(409)),
         ];
         for (state, verdict, expect) in cases {
             let got = outcome_target(state, verdict).map_err(|e| e.status());
             assert_eq!(got, expect, "{state:?} {verdict:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn an_outcome_before_any_step_was_sent_ends_the_run_with_its_steps_not_run() {
+        use crate::autoresolve::test_support::{ORG, memory_db, new_run, new_step};
+        for (case, sent, want) in [
+            ("none sent", false, Ok("not_run")),
+            ("one sent", true, Err(409)),
+        ] {
+            let db = memory_db().await;
+            autoresolve_runs::insert_with(&db, new_run("r1"))
+                .await
+                .unwrap();
+            let approved = |id: &str, seq: i32| NewStep {
+                state: StepState::Approved,
+                ..new_step("r1", id, "A", seq, "c1", "code-host")
+            };
+            let mut first = approved("s1", 1);
+            if sent {
+                (first.state, first.consumed_at_us) = (StepState::Running, Some(3));
+            }
+            autoresolve_steps::insert_many(&db, vec![first, approved("s2", 2)])
+                .await
+                .unwrap();
+            let approval = RunPatch {
+                chosen_option_id: Some(Some("A".into())),
+                updated_at_us: 2,
+                ..Default::default()
+            };
+            let from = [RunState::Investigating];
+            autoresolve_runs::set_state_with(&db, ORG, "r1", &from, RunState::Proceeding, approval)
+                .await
+                .unwrap();
+
+            let got = end_before_steps_with(&db, ORG, "r1", RunPatch::default()).await;
+
+            let run = autoresolve_runs::get_with(&db, ORG, "r1")
+                .await
+                .unwrap()
+                .unwrap();
+            let steps = autoresolve_steps::list_for_run_with(&db, ORG, "r1")
+                .await
+                .unwrap();
+            let second = steps.iter().find(|s| s.id == "s2").unwrap();
+            match want {
+                Ok(step_state) => {
+                    assert!(got.is_ok(), "{case}: {got:?}");
+                    assert_eq!(
+                        (run.state.as_str(), second.state.as_str()),
+                        ("no_change", step_state)
+                    );
+                }
+                Err(status) => {
+                    assert_eq!(got.map_err(|e| e.status()), Err(status), "{case}");
+                    assert_eq!(
+                        (run.state.as_str(), second.state.as_str()),
+                        ("proceeding", "approved")
+                    );
+                }
+            }
         }
     }
 

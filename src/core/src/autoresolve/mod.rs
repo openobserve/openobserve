@@ -67,6 +67,8 @@ use self::live::AutoResolveConnectionRef;
 pub const MAX_GOAL_CHARS: usize = 4000;
 // `autoresolve::token::mint` refuses lifetimes over an hour, so a longer turn outlives its token.
 const MAX_TOKEN_TTL_SECS: u64 = 3600;
+/// Other runs' changes a waiting run or its turns are told about, newest first.
+const CHANGES_SHOWN: usize = 20;
 
 /// Why a run did not start or a turn did not launch; each message is one sentence a person reads.
 #[derive(Debug, thiserror::Error)]
@@ -528,6 +530,25 @@ pub(crate) fn chosen_steps<'a>(run: &RunRow, steps: &'a [StepRow]) -> Vec<&'a St
         .collect();
     chosen.sort_by_key(|s| s.seq);
     chosen
+}
+
+/// Other runs' changes to this run's MCPs sent at or after `since_us`, newest first.
+pub(crate) async fn changed_since(
+    run: &RunRow,
+    since_us: i64,
+) -> Result<Vec<StepRow>, AutoResolveError> {
+    let ids = run_connection_ids(run)?;
+    let conn = infra::db::get_orm_client_ro().await;
+    let rows = autoresolve_steps::changed_since_with(
+        conn,
+        &run.org,
+        &run.id,
+        &ids,
+        since_us,
+        CHANGES_SHOWN,
+    )
+    .await?;
+    Ok(rows)
 }
 
 /// Marks the approved steps among `chosen` as never run, once the run ended before them.

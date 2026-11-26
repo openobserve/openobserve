@@ -629,6 +629,7 @@ export const BADGE_GROUPS = {
       worked: { variant: "success-soft", labelKey: "autoresolve.state.worked" },
       nochange: { variant: "default-soft", labelKey: "autoresolve.state.noChange" },
       cantfix: { variant: "warning-soft", labelKey: "autoresolve.state.cantFix" },
+      notneeded: { variant: "default-soft", labelKey: "autoresolve.state.notNeeded" },
       worse: { variant: "error-soft", labelKey: "autoresolve.state.worse" },
       declined: { variant: "default-soft", labelKey: "autoresolve.state.declined" },
       lapsed: { variant: "warning-soft", labelKey: "autoresolve.state.lapsed" },

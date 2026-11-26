@@ -178,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :error="outcomeCardError"
             :hide-explanation="!!missingConnection"
             :cant-fix="shownState === 'cant_fix'"
+            :not-needed="shownState === 'not_needed'"
           />
           <AutoResolveVerdictCheck
             v-if="verdictRow && run.outcome?.verdict"

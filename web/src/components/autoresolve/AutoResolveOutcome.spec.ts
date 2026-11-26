@@ -63,22 +63,25 @@ describe("AutoResolveOutcome", () => {
     w.unmount();
   });
 
-  it("names a run no MCP could fix as its own end, in amber, ended not checked", () => {
+  it.each([
+    ["no MCP could fix", { cantFix: true }, "autoresolve.state.cantFix", "warning"],
+    ["no longer needed", { notNeeded: true }, "autoresolve.state.notNeeded", "neutral"],
+  ] as const)("names a run %s as its own end, ended not checked", (_case, end, label, tone) => {
     const w = mount(AutoResolveOutcome, {
       props: {
         outcome: {
           verdict: "no_change",
-          system_summary: "None of this run's MCPs can do this, so nothing was changed.",
+          system_summary: "No approved steps ran.",
           explanation: null,
         },
         endedAtUs: Date.now() * 1000,
-        cantFix: true,
+        ...end,
       },
       global: { plugins: [i18n] },
     });
 
-    expect(w.find("h2").text()).toBe(i18n.global.t("autoresolve.state.cantFix"));
-    expect(w.find('[data-test="autoresolve-outcome"]').attributes("data-tone")).toBe("warning");
+    expect(w.find("h2").text()).toBe(i18n.global.t(label));
+    expect(w.find('[data-test="autoresolve-outcome"]').attributes("data-tone")).toBe(tone);
     expect(w.find('[data-test="autoresolve-outcome-at"]').text()).toMatch(/^Ended at /);
     w.unmount();
   });

@@ -86,6 +86,8 @@ export interface AutoResolveRunRow {
   ended_at_us: number | null;
   /** The run ended because no MCP of the run can make the fix its plan needs. */
   cant_fix: boolean;
+  /** The run's re-read before its first approved step found the change no longer needed. */
+  no_longer_needed: boolean;
 }
 
 /** Filters of `GET /runs`; `page` is 1-based. */
@@ -146,6 +148,14 @@ export interface AutoResolveOption {
   partial_fix?: string | null;
   /** The live MCPs its steps use, once each in step order; approving changes these. */
   changes: AutoResolveChangedMcp[];
+}
+
+/** A change another run sent to one of this run's MCPs after this run's plan was made. */
+export interface AutoResolveChangedBy {
+  /** The MCP's name. */
+  connection: string;
+  run_id: string;
+  at_us: number;
 }
 
 export interface AutoResolveChangedMcp {
@@ -349,6 +359,10 @@ export interface AutoResolveRun {
   ended_at_us: number | null;
   /** The run ended because no MCP of the run can make the fix its plan needs. */
   cant_fix: boolean;
+  /** The run's re-read before its first approved step found the change no longer needed. */
+  no_longer_needed: boolean;
+  /** While it waits: other runs' changes to its MCPs since its plan, newest first. */
+  changed_since_plan: AutoResolveChangedBy[];
   approval_deadline_us: number | null;
   /** When the current plan was accepted; null until one is. */
   planned_at_us: number | null;

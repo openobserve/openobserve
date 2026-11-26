@@ -328,6 +328,25 @@ describe("AutoResolveApprovalRequest", () => {
     },
   );
 
+  it("warns in amber when other runs changed the plan's MCPs, and opens the newest", async () => {
+    const NOTICE = '[data-test="autoresolve-approval-changed-since-plan"]';
+    expect(mountRequest(withOptions(OPTION_A)).find(NOTICE).exists()).toBe(false);
+    wrapper?.unmount();
+    const changed_since_plan = [
+      { connection: "postgres", run_id: "r-new", at_us: 2 },
+      { connection: "postgres", run_id: "r-old", at_us: 1 },
+    ];
+    const w = mountRequest({ ...withOptions(OPTION_A), changed_since_plan });
+
+    const notice = w.find(NOTICE);
+    expect(notice.attributes("data-variant")).toBe("warning");
+    expect(notice.text()).toContain("postgres");
+    expect(w.find(APPROVE).exists()).toBe(true);
+    await w.find('[data-test="autoresolve-approval-changed-run"]').trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.params.id).toBe("r-new");
+  });
+
   const GIT = { id: "c-git", name: "Code host (infra repo)" };
   const GONE = { id: "c-old", name: "checkout-ops", removed: true };
   it("a lapsed request starts again with the same goal and the run's connections still there", async () => {

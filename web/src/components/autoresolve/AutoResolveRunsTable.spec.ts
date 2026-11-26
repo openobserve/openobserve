@@ -61,6 +61,7 @@ const run = (id: string): AutoResolveRunRow => ({
   created_at_us: 1_700_000_000_000_000,
   ended_at_us: 1_700_000_600_000_000,
   cant_fix: false,
+  no_longer_needed: false,
 });
 
 let wrapper: VueWrapper | undefined;

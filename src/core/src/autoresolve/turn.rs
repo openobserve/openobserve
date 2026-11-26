@@ -150,6 +150,8 @@ pub(super) type Listed = (String, String, Option<String>);
 struct TurnExtras {
     not_connected: Vec<(String, Option<String>)>,
     corrections: Vec<CorrectionRow>,
+    /// After approval: other runs' changes to the run's MCPs since its plan.
+    changed: Vec<StepRow>,
 }
 
 /// Launches and cancels a run's turns; tests pass a recording fake.
@@ -465,6 +467,7 @@ async fn turn_inputs(
             get_o2_config().autoresolve.max_connections,
         ),
         corrections: newest_corrections(this_run, active),
+        changed: Vec::new(),
     };
     if phase == Phase::Plan {
         let ids: Vec<&str> = extras.corrections.iter().map(|c| c.id.as_str()).collect();
@@ -503,7 +506,16 @@ async fn spawn_turn(
     steps: &[StepRow],
     first_start: bool,
 ) -> Result<(), AutoResolveError> {
-    let (mcps, extras) = turn_inputs(run, phase).await?;
+    let (mcps, mut extras) = turn_inputs(run, phase).await?;
+    if let Some(since) = steps.iter().map(|s| s.created_at_us).min() {
+        extras.changed = super::changed_since(run, since).await.unwrap_or_else(|e| {
+            log::warn!(
+                "[autoresolve] run {} other runs' changes unread: {e}",
+                run.id
+            );
+            Vec::new()
+        });
+    }
     let context = turn_context(run, phase, note, &mcps, steps, &extras);
     let (failure, retry) = start_failure(first_start);
     let token = mint(&run.turn_identity, &run.org, &run.id, token_ttl_secs()).map_err(|e| {
@@ -680,6 +692,9 @@ fn autoresolve_context(
             context["check_retry"] = true.into();
         }
     }
+    if phase != Phase::Plan {
+        context["changed_since_plan"] = extras.changed.iter().map(changed_context).collect();
+    }
     context
 }
 
@@ -715,6 +730,15 @@ fn step_context(step: &StepRow) -> Value {
         "tool": step.tool,
         "arguments": json_or_text(&step.arguments),
         "refs": json_or_text(&step.refs),
+    })
+}
+
+fn changed_context(step: &StepRow) -> Value {
+    json!({
+        "connection": normalize_tool_name(&step.connection_name),
+        "tool": step.tool,
+        "run_id": step.run_id,
+        "at_us": step.consumed_at_us,
     })
 }
 
@@ -1336,6 +1360,7 @@ mod tests {
                     cap,
                 ),
                 corrections: newest_corrections(this_run, active),
+                changed: Vec::new(),
             };
             let context = turn_context(&run, Phase::Plan, None, &[], &[], &extras);
             assert_eq!(context["org_id"], ORG, "{name}");

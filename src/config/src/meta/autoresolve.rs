@@ -150,7 +150,7 @@ impl RunState {
             WaitingApproval => matches!(next, Proceeding | Declined | Lapsed | Investigating),
             Proceeding => matches!(
                 next,
-                Checking | StepFailed | OutcomeUnknown | WaitingApproval | Failed
+                Checking | StepFailed | OutcomeUnknown | WaitingApproval | Failed | NoChange
             ),
             Checking => matches!(next, Worked | NoChange | Worse | Failed | OutcomeUnknown),
             Worse | Worked | OutcomeUnknown | NoChange => next == Investigating,
@@ -955,6 +955,7 @@ mod tests {
             (Investigating, WaitingApproval, true),
             (WaitingApproval, Proceeding, true),
             (Proceeding, WaitingApproval, true),
+            (Proceeding, NoChange, true),
             (Worse, Investigating, true),
             (Worked, Investigating, true),
             (OutcomeUnknown, Investigating, true),

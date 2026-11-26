@@ -114,6 +114,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <OInlineNotice
+      v-if="changedText"
+      variant="warning"
+      wrap
+      :text="changedText"
+      :action-label="t('autoresolve.approval.viewChangedRun', changedRuns)"
+      action-data-test="autoresolve-approval-changed-run"
+      data-test="autoresolve-approval-changed-since-plan"
+      class="self-start"
+      @action="openChangedRun"
+    />
+
+    <OInlineNotice
       v-if="plan?.missing_capability && !plan.missing_connection"
       variant="warning"
       :text="missingCapabilityText"
@@ -461,6 +473,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   approversSentence,
   approvingChangesText,
+  changedSinceText,
   deadlineText,
   investigationSummary,
   isRunRequester,
@@ -673,6 +686,19 @@ const chooseConnections = computed(() => ({
   name: "autoresolve",
   query: { org_identifier: orgId.value, goal: props.run.goal },
 }));
+
+const changes = computed(() => props.run.changed_since_plan ?? []);
+const changedText = computed(() => changedSinceText(changes.value, t));
+const changedRuns = computed(() => new Set(changes.value.map((c) => c.run_id)).size);
+const openChangedRun = () => {
+  const newest = changes.value[0];
+  if (!newest) return;
+  void router.push({
+    name: "autoresolveRun",
+    params: { id: newest.run_id },
+    query: { org_identifier: orgId.value },
+  });
+};
 
 const onStartAgain = () => {
   startAgainError.value = null;

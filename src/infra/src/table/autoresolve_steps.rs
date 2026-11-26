@@ -15,7 +15,7 @@
 
 //! `autoresolve_steps`: the planned tool calls of a run; a step is consumed at most once.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::meta::autoresolve::StepState;
 use sea_orm::{
@@ -35,6 +35,8 @@ use crate::{
 
 /// Ids per `IN` list, so a long list stays inside one query's parameter budget.
 const ID_CHUNK: usize = 1000;
+/// Rows read before one per connection and run is kept; a busy connection repeats runs.
+const CHANGED_ROWS_READ: u64 = 200;
 
 /// The row a plan step is inserted as.
 #[derive(Debug, Clone)]
@@ -114,6 +116,71 @@ pub async fn list_running_since_before_with<C: ConnectionTrait>(
         .limit(limit)
         .all(conn)
         .await?)
+}
+
+/// Other runs' steps on `connection_ids` sent at or after `since_us` that may have changed
+/// something, one per connection and run, newest first, at most `limit`.
+pub async fn changed_since_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    run_id: &str,
+    connection_ids: &[String],
+    since_us: i64,
+    limit: usize,
+) -> Result<Vec<Model>, Error> {
+    let changed = [
+        StepState::Running,
+        StepState::Done,
+        StepState::OutcomeUnknown,
+    ];
+    let rows = Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::RunId.ne(run_id))
+        .filter(Column::ConnectionId.is_in(connection_ids.iter().take(ID_CHUNK).cloned()))
+        .filter(Column::ConsumedAtUs.gte(since_us))
+        .filter(Column::State.is_in(changed.map(|s| s.as_str())))
+        .order_by_desc(Column::ConsumedAtUs)
+        .order_by_desc(Column::Id)
+        .limit(CHANGED_ROWS_READ)
+        .all(conn)
+        .await?;
+    let mut seen = HashSet::new();
+    Ok(rows
+        .into_iter()
+        .filter(|s| seen.insert((s.connection_id.clone(), s.run_id.clone())))
+        .take(limit)
+        .collect())
+}
+
+/// The (run, revision) pairs of `run_ids` with at least one step that was sent.
+pub async fn sent_revisions(
+    org: &str,
+    run_ids: &[String],
+) -> Result<HashSet<(String, i32)>, Error> {
+    sent_revisions_with(get_orm_client_ro().await, org, run_ids).await
+}
+
+pub async fn sent_revisions_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    run_ids: &[String],
+) -> Result<HashSet<(String, i32)>, Error> {
+    let mut sent = HashSet::new();
+    for chunk in run_ids.chunks(ID_CHUNK) {
+        let pairs: Vec<(String, i32)> = Entity::find()
+            .select_only()
+            .column(Column::RunId)
+            .column(Column::Revision)
+            .distinct()
+            .filter(Column::Org.eq(org))
+            .filter(Column::RunId.is_in(chunk.to_vec()))
+            .filter(Column::ConsumedAtUs.is_not_null())
+            .into_tuple()
+            .all(conn)
+            .await?;
+        sent.extend(pairs);
+    }
+    Ok(sent)
 }
 
 pub async fn delete_by_org(org: &str) -> Result<u64, Error> {
@@ -361,6 +428,40 @@ mod tests {
             let row = Entity::find_by_id("s1").one(&db).await.unwrap().unwrap();
             assert_eq!(row.state, "running", "{backend}");
             assert_eq!(row.consumed_at_us, Some(NOW), "{backend}");
+            drop_schema(schema).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn step_rows_say_which_runs_sent_changes() {
+        let step = |id: &str, run: &str, conn: &str, state: StepState, sent: Option<i64>| NewStep {
+            run_id: run.into(),
+            connection_id: conn.into(),
+            state,
+            consumed_at_us: sent,
+            ..approved_step(id)
+        };
+        let rows = vec![
+            step("mine", "r1", "c1", StepState::Done, Some(NOW + 5)),
+            step("before", "r2", "c1", StepState::Done, Some(NOW - 1)),
+            step("failed", "r3", "c1", StepState::Failed, Some(NOW + 1)),
+            step("elsewhere", "r4", "c9", StepState::Done, Some(NOW + 1)),
+            step("unsent", "r5", "c1", StepState::Approved, None),
+            step("r6-first", "r6", "c1", StepState::Done, Some(NOW + 2)),
+            step("r6-last", "r6", "c1", StepState::Done, Some(NOW + 3)),
+            step("r7", "r7", "c2", StepState::OutcomeUnknown, Some(NOW + 4)),
+        ];
+        let connections = ["c1".to_string(), "c2".to_string()];
+        for (backend, db, schema) in backends().await {
+            insert_many(&db, rows.clone()).await.unwrap();
+            let changed = changed_since_with(&db, "acme", "r1", &connections, NOW, 10)
+                .await
+                .unwrap();
+            let ids: Vec<&str> = changed.iter().map(|s| s.id.as_str()).collect();
+            assert_eq!(ids, ["r7", "r6-last"], "{backend}");
+            let runs = ["r1".to_string(), "r5".to_string()];
+            let sent = sent_revisions_with(&db, "acme", &runs).await.unwrap();
+            assert_eq!(sent, HashSet::from([("r1".to_string(), 1)]), "{backend}");
             drop_schema(schema).await;
         }
     }

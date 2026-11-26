@@ -31,6 +31,7 @@ import {
   autoresolveWhen,
   cannotApproveTexts,
   canUseSentence,
+  changedSinceText,
   connectionsSentence,
   investigationSummary,
   namesSentence,
@@ -372,9 +373,34 @@ describe("autoresolveText", () => {
 
   it.each<[string, Partial<AutoResolveRun>, string]>([
     ["a run the server marks no MCP can fix", { state: "no_change", cant_fix: true }, "cant_fix"],
+    [
+      "a run whose change was no longer needed",
+      { state: "no_change", no_longer_needed: true },
+      "not_needed",
+    ],
     ["any other run", { state: "no_change", cant_fix: false }, "no_change"],
   ])("shownRunState for %s", (_case, overrides, expected) => {
     expect(shownRunState(autoresolveRun(overrides))).toBe(expected);
+  });
+
+  const changed = (connection: string, run_id: string) => ({ connection, run_id, at_us: RCA_T0 });
+  it.each<[string, ReturnType<typeof changed>[], string[]]>([
+    ["no other run", [], []],
+    ["one run on one MCP", [changed("pg", "r2")], ["Another run changed the pg MCP"]],
+    [
+      "one run on two MCPs",
+      [changed("pg", "r2"), changed("redis", "r2")],
+      ["Another run changed the pg and redis MCPs"],
+    ],
+    [
+      "two runs on one MCP",
+      [changed("pg", "r3"), changed("pg", "r2")],
+      ["2 other runs changed the pg MCP"],
+    ],
+  ])("changedSinceText for %s", (_case, changes, parts) => {
+    const text = changedSinceText(changes, gt);
+    expect(text === "").toBe(!parts.length);
+    for (const part of parts) expect(text).toContain(part);
   });
 
   const UNASKED = { approval_deadline_us: null };
