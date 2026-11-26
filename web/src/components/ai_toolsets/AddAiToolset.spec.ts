@@ -391,8 +391,15 @@ describe("AddAiToolset", () => {
 
     const picker = () => wrapper.findComponent({ name: "AiToolsetToolPicker" });
 
-    const toolBox = (tool: string) =>
-      wrapper.find(`[data-test="ai-toolset-tool-${tool}"] button[role="checkbox"]`);
+    // Flips a row as the old checkbox did: off goes to the widest level offered, anything else to off.
+    const toolBox = (tool: string) => {
+      const row = `[data-test="ai-toolset-tool-${tool}"]`;
+      const radio = (level: string) =>
+        wrapper.find(`${row} [data-test="ai-toolset-tool-level"][data-test-value="${level}"]`);
+      const off = radio("off").attributes("data-state") === "checked";
+      if (!off) return radio("off");
+      return ["everywhere", "chat", "on"].map(radio).find((r) => r.exists())!;
+    };
 
     it("discovers an edited toolset by id, keeps unknown keys, sends schema 2 and verifies", async () => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -772,7 +779,9 @@ describe("AddAiToolset", () => {
         await legacyRow({ allowed_tools: ALLOWED, blocked_tools: ["delete_*"] });
         await discover();
         const entry = wrapper.find('[data-test="ai-toolset-blocked-delete_*"]');
-        await entry.find('button[role="checkbox"]').trigger("click");
+        await entry
+          .find('[data-test="ai-toolset-tool-level"][data-test-value="on"]')
+          .trigger("click");
         await flushPromises();
         expect(getForm().state.values.mcp.blocked_tools).toEqual([]);
         expect(getForm().state.values.mcp.write_tools).toBeNull();
@@ -1162,7 +1171,13 @@ describe("AddAiToolset", () => {
       await flushPromises();
 
       expect(aiToolsetsService.prebuilt).toHaveBeenCalledWith("test-org");
-      expect(wrapper.find('[data-test="ai-toolset-tools-count"]').text()).toBe("2 of 2 enabled");
+      expect(
+        wrapper
+          .find(
+            '[data-test="ai-toolset-tools-group-saved"] [data-test="ai-toolset-tools-group-count"]',
+          )
+          .text(),
+      ).toBe("2 of 2 on");
       const env = wrapper.find('[data-test="ai-toolset-preset-param-environment"] input');
       await env.setValue("abc12345");
       await flushPromises();

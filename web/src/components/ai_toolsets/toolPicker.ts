@@ -188,6 +188,43 @@ export function setToolOn(
   return setToolState(from, name, writes ? "write" : "allowed", tools);
 }
 
+/** Where a tool may run: write tools run only in chat, read-only ones also in Slack and RCA. */
+export type ToolLevel = "off" | "chat" | "everywhere";
+
+const LEVEL_OF: Record<ToolState, ToolLevel> = { off: "off", write: "chat", allowed: "everywhere" };
+
+export const toolLevel = (lists: ToolLists, tool: DiscoveredTool): ToolLevel =>
+  LEVEL_OF[toolState(lists, tool)];
+
+/** Sets one tool's level; only exact names change, and a blocked glob keeps it off. */
+export function setToolLevel(
+  lists: ToolLists,
+  tool: DiscoveredTool,
+  level: ToolLevel,
+  tools: DiscoveredTool[],
+): ToolLists {
+  if (toolLevel(lists, tool) === level) return lists;
+  if (level === "off") return setToolOn(lists, tool, false, tools);
+  if (blockedByGlob(lists, tool.name)) return lists;
+  const from = lists.allowed === null ? expandGlobs(lists, tool.name, tools) : lists;
+  return setToolState(from, tool.name, level === "chat" ? "write" : "allowed", tools);
+}
+
+/** Sets a group's tools; turning tools on skips destructive ones, which each need a confirm. */
+export function setGroupLevel(
+  lists: ToolLists,
+  group: DiscoveredTool[],
+  level: ToolLevel,
+  tools: DiscoveredTool[],
+): ToolLists {
+  return group
+    .filter((tool) => level === "off" || tool.destructive_hint !== true)
+    .reduce((acc, tool) => {
+      const own = level === "everywhere" && mayWrite(tool) ? "chat" : level;
+      return setToolLevel(acc, tool, own, tools);
+    }, lists);
+}
+
 /** The list page's badges for a saved MCP toolset's `data`. */
 export function toolsetBadges(data: Record<string, any> | null | undefined): ToolsetBadge[] {
   if (!data) return [];

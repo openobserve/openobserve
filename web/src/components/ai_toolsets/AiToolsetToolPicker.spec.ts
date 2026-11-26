@@ -16,6 +16,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AiToolsetToolPicker from "./AiToolsetToolPicker.vue";
 
 const lists = { allowed: ["get_metric", "apm_*"], blocked: null, write: null };
@@ -25,39 +26,58 @@ const TOOLS = [
   { name: "apm_traces" },
   { name: "apm_spans" },
 ];
+const WRITES = [
+  { name: "read_a", read_only_hint: true },
+  { name: "update_b", read_only_hint: false },
+  { name: "drop_c", read_only_hint: false, destructive_hint: true, description: "Drops it" },
+];
 
 const mountPicker = (props: Record<string, unknown> = {}) =>
   mount(AiToolsetToolPicker, {
     props: { lists, tools: null, ...props } as any,
     global: { plugins: [i18n] },
+    attachTo: document.body,
   });
+type Picker = ReturnType<typeof mountPicker>;
 
 const sel = (id: string) => `[data-test="${id}"]`;
-const last = (w: ReturnType<typeof mountPicker>) =>
+const last = (w: Picker) =>
   w.emitted("update:lists")!.at(-1)![0] as Record<string, string[] | null>;
-const box = (w: ReturnType<typeof mountPicker>, tool: string) =>
-  w.find(`${sel(`ai-toolset-tool-${tool}`)} button[role="checkbox"]`);
-const allBox = (w: ReturnType<typeof mountPicker>) =>
-  w.find(`${sel("ai-toolset-tools-all")} button[role="checkbox"]`);
+const radio = (w: Picker, row: string, level: string) =>
+  w.find(`${sel(row)} [data-test="ai-toolset-tool-level"][data-test-value="${level}"]`);
+const level = (w: Picker, tool: string) =>
+  ["off", "chat", "everywhere", "on"].find(
+    (l) => radio(w, `ai-toolset-tool-${tool}`, l).attributes("data-state") === "checked",
+  );
+const groupRadio = (w: Picker, group: string, l: string) =>
+  w.find(
+    `${sel(`ai-toolset-tools-group-${group}`)} [data-test="ai-toolset-group-level"][data-test-value="${l}"]`,
+  );
+const groupCount = (w: Picker, group: string) =>
+  w.find(`${sel(`ai-toolset-tools-group-${group}`)} ${sel("ai-toolset-tools-group-count")}`).text();
 
 describe("AiToolsetToolPicker", () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    document.body.innerHTML = "";
+  });
 
   it("before connecting shows the intro, the steps, the preset tag and note", () => {
-    const w = mountPicker({ presetTools: 2, presetName: "Dynatrace" });
-    expect(w.find(sel("ai-toolset-tools-intro")).text()).toContain("in Dynatrace.");
+    const w = mountPicker({ presetTools: 2, presetName: "Acme" });
+    expect(w.find(sel("ai-toolset-tools-intro")).text()).toContain("in Acme, and where.");
     const hint = w.find(sel("ai-toolset-tools-hint")).text();
     expect(hint).toContain("Not connected yet");
-    expect(hint).toContain("Enter your Dynatrace credentials in Connection.");
+    expect(hint).toContain("Enter your Acme credentials in Connection.");
     expect(hint).toContain("Click Connect to load every tool on the server.");
-    expect(w.find(sel("ai-toolset-tools-preset-tag")).text()).toBe("From the Dynatrace preset");
+    expect(w.find(sel("ai-toolset-tools-preset-tag")).text()).toBe("From the Acme preset");
     expect(w.find(sel("ai-toolset-tools-preset-note")).exists()).toBe(true);
-    expect(w.find(sel("ai-toolset-tools-count")).text()).toBe("2 of 2 enabled");
+    expect(groupCount(w, "saved")).toBe("2 of 2 on");
+    expect(w.find(sel("ai-toolset-tools-reach")).exists()).toBe(false);
   });
 
   it("uses generic wording for a custom server", () => {
     const w = mountPicker();
-    expect(w.find(sel("ai-toolset-tools-intro")).text()).toContain("in this server.");
+    expect(w.find(sel("ai-toolset-tools-intro")).text()).toContain("in this server");
     expect(w.find(sel("ai-toolset-tools-hint")).text()).toContain(
       "Enter the server URL and any credentials in Connection.",
     );
@@ -65,7 +85,7 @@ describe("AiToolsetToolPicker", () => {
   });
 
   it("emits go-connection from the Connection link", async () => {
-    const w = mountPicker({ presetName: "Dynatrace" });
+    const w = mountPicker({ presetName: "Acme" });
     await w.find(sel("ai-toolset-tools-goto-connection")).trigger("click");
     expect(w.emitted("go-connection")).toHaveLength(1);
   });
@@ -81,115 +101,93 @@ describe("AiToolsetToolPicker", () => {
 
   it("shows progress with elapsed seconds and skeletons while the server is listed", async () => {
     vi.useFakeTimers();
-    const w = mountPicker({ status: "loading", presetName: "Datadog" });
-    expect(w.find(sel("ai-toolset-tools-loading")).text()).toContain("Listing Datadog's tools…");
+    const w = mountPicker({ status: "loading", presetName: "Acme" });
+    expect(w.find(sel("ai-toolset-tools-loading")).text()).toContain("Listing Acme's tools…");
     expect(w.find(sel("ai-toolset-tools-elapsed")).text()).toBe("0 s");
     expect(w.find(sel("ai-toolset-tools-skeleton")).exists()).toBe(true);
+    expect(w.findAll(sel("ai-toolset-tools-skeleton-radio"))).toHaveLength(18);
     vi.advanceTimersByTime(3000);
     await w.vm.$nextTick();
     expect(w.find(sel("ai-toolset-tools-elapsed")).text()).toBe("3 s");
   });
 
-  it("shows the connected line with the tool count", () => {
+  it("shows the connected line and the reach of the tools", () => {
     const w = mountPicker({ tools: TOOLS, status: "ok" });
     const line = w.find(sel("ai-toolset-tools-success")).text();
     expect(line).toContain("Connected");
     expect(line).toContain("4 tools found");
     expect(line).toContain("checked just now");
     expect(w.find(sel("ai-toolset-tools-hint")).exists()).toBe(false);
-    expect(w.find(sel("ai-toolset-tools-count")).text()).toBe("3 of 5 enabled");
+    expect(w.find(sel("ai-toolset-tools-reach")).exists()).toBe(false);
   });
 
-  it("shows the failed panel with the message, the preset note and Retry", async () => {
+  it("maps the saved lists onto Off, Chat and Everywhere", () => {
     const w = mountPicker({
-      status: "failed",
-      error: "no secret",
-      presetName: "Datadog",
-      presetTools: 2,
-    });
-    const panel = w.find(sel("ai-toolset-tools-error")).text();
-    expect(panel).toContain("Couldn't connect to Datadog");
-    expect(panel).toContain("no secret");
-    expect(panel).toContain("The 2 tools from the preset stay on until a refresh works.");
-    await w.find(sel("ai-toolset-tools-retry")).trigger("click");
-    expect(w.emitted("refresh")).toHaveLength(1);
-  });
-
-  it("omits the preset note on a failed custom server", () => {
-    const w = mountPicker({ status: "failed", error: "x" });
-    expect(w.find(sel("ai-toolset-tools-error-keep")).exists()).toBe(false);
-  });
-
-  it("All tools is checked, indeterminate or unchecked from the ticked count", () => {
-    const connected = { tools: TOOLS, status: "ok" };
-    expect(allBox(mountPicker(connected)).attributes("data-state")).toBe("indeterminate");
-    const everything = {
-      allowed: ["get_metric", "apm_traces", "apm_spans", "search_logs", "create_monitor"],
-      blocked: null,
-      write: null,
-    };
-    expect(allBox(mountPicker({ ...connected, lists: everything })).attributes("data-state")).toBe(
-      "checked",
-    );
-    const none = { allowed: [], blocked: null, write: null };
-    expect(allBox(mountPicker({ ...connected, lists: none })).attributes("data-state")).toBe(
-      "unchecked",
-    );
-  });
-
-  it("All tools turns everything on, or everything off when all are on", async () => {
-    const w = mountPicker({ tools: TOOLS, status: "ok" });
-    await allBox(w).trigger("click");
-    expect(last(w)).toEqual({
-      allowed: ["get_metric", "apm_*", "search_logs", "create_monitor"],
-      blocked: null,
-      write: ["get_metric", "apm_*", "create_monitor"],
-    });
-    const on = mountPicker({
       tools: TOOLS,
       status: "ok",
       lists: {
-        allowed: ["search_logs", "create_monitor", "apm_traces", "apm_spans", "get_metric"],
+        allowed: ["search_logs", "create_monitor"],
         blocked: null,
-        write: null,
+        write: ["create_monitor"],
       },
     });
-    await allBox(on).trigger("click");
-    expect(last(on).allowed).toEqual([]);
+    expect(level(w, "search_logs")).toBe("everywhere");
+    expect(level(w, "create_monitor")).toBe("chat");
+    expect(level(w, "apm_traces")).toBe("off");
   });
 
-  it("All tools off clears saved entries too, before and after connecting", async () => {
-    const all = { allowed: ["get_metric", "apm_*"], blocked: ["delete_*"], write: null };
-    const before = mountPicker({ lists: all });
-    await allBox(before).trigger("click");
-    expect(last(before)).toEqual({ allowed: [], blocked: ["delete_*"], write: null });
-    const tools = [{ name: "apm_traces" }, { name: "apm_spans" }];
-    const after = mountPicker({ lists: all, tools, status: "ok" });
-    await allBox(after).trigger("click");
-    expect(last(after).allowed).toEqual([]);
+  it("puts read-only tools under Reads data and the rest, with no Everywhere, under Changes things", () => {
+    const w = mountPicker({ tools: TOOLS, status: "ok" });
+    const reads = w.find(sel("ai-toolset-tools-group-reads"));
+    expect(reads.find(sel("ai-toolset-tool-search_logs")).exists()).toBe(true);
+    expect(groupCount(w, "reads")).toBe("0 of 1 on");
+    expect(groupCount(w, "changes")).toBe("2 of 3 on");
+    expect(radio(w, "ai-toolset-tool-search_logs", "everywhere").exists()).toBe(true);
+    for (const tool of ["create_monitor", "apm_traces"]) {
+      expect(radio(w, `ai-toolset-tool-${tool}`, "everywhere").exists()).toBe(false);
+    }
+    expect(groupRadio(w, "changes", "everywhere").exists()).toBe(false);
   });
 
-  it("ticking a tool adds it to allowed only, and keeps stored globs", async () => {
+  it("labels each group radio as setting all, on the same surface as the rows", () => {
+    const w = mountPicker({ tools: TOOLS, status: "ok" });
+    const reads = w.find(sel("ai-toolset-tools-group-reads"));
+    expect(reads.findAll(sel("ai-toolset-group-level-caption")).map((c) => c.text())).toEqual([
+      "All",
+      "All",
+      "All",
+    ]);
+    expect(reads.html()).not.toContain("bg-surface-panel");
+  });
+
+  it("cuts a description to one line inside a panel that never scrolls sideways", () => {
+    const w = mountPicker({ tools: TOOLS, status: "ok" });
+    const desc = w.find(
+      `${sel("ai-toolset-tool-search_logs")} [data-test="o-truncated-text"].text-xs`,
+    );
+    expect(desc.classes()).toContain("truncate");
+    expect(w.find(sel("ai-toolset-tools-grid")).classes()).toContain("overflow-x-hidden");
+  });
+
+  it("hides a group with no tools", () => {
     const w = mountPicker({
-      tools: TOOLS,
-      status: "ok",
-      lists: { allowed: ["apm_*"], blocked: ["search_logs"], write: ["apm_traces"] },
-    });
-    await box(w, "search_logs").trigger("click");
-    expect(last(w)).toEqual({
-      allowed: ["apm_*", "search_logs"],
-      blocked: [],
-      write: ["apm_traces"],
-    });
-  });
-
-  it("ticking a tool that may write adds it to write_tools, so read-only turns refuse it", async () => {
-    const w = mountPicker({
-      tools: TOOLS,
+      tools: [{ name: "read_a", read_only_hint: true }],
       status: "ok",
       lists: { allowed: [], blocked: null, write: [] },
     });
-    await box(w, "create_monitor").trigger("click");
+    expect(w.find(sel("ai-toolset-tools-group-reads")).exists()).toBe(true);
+    expect(w.find(sel("ai-toolset-tools-group-changes")).exists()).toBe(false);
+    expect(w.find(sel("ai-toolset-tools-group-saved")).exists()).toBe(false);
+  });
+
+  it("sets a read-only tool to Everywhere or Chat, and a write tool to Chat", async () => {
+    const start = { allowed: [], blocked: null, write: [] };
+    const w = mountPicker({ tools: TOOLS, status: "ok", lists: start });
+    await radio(w, "ai-toolset-tool-search_logs", "everywhere").trigger("click");
+    expect(last(w)).toEqual({ allowed: ["search_logs"], blocked: null, write: [] });
+    await radio(w, "ai-toolset-tool-search_logs", "chat").trigger("click");
+    expect(last(w)).toEqual({ allowed: ["search_logs"], blocked: null, write: ["search_logs"] });
+    await radio(w, "ai-toolset-tool-create_monitor", "chat").trigger("click");
     expect(last(w)).toEqual({
       allowed: ["create_monitor"],
       blocked: null,
@@ -197,20 +195,7 @@ describe("AiToolsetToolPicker", () => {
     });
   });
 
-  it("locks a tool a blocked pattern keeps off, and lifts the block from its own row", async () => {
-    const w = mountPicker({
-      tools: TOOLS,
-      status: "ok",
-      lists: { allowed: ["search_logs"], blocked: ["apm_*"], write: null },
-    });
-    expect(box(w, "apm_traces").attributes("disabled")).toBeDefined();
-    expect(w.find(sel("ai-toolset-tools-count")).text()).toBe("1 of 4 enabled");
-    await w.find(`${sel("ai-toolset-blocked-apm_*")} button[role="checkbox"]`).trigger("click");
-    expect(w.emitted("remove")).toEqual([[{ list: "blocked", entry: "apm_*" }]]);
-    expect(w.emitted("update:lists")).toBeUndefined();
-  });
-
-  it("unticking a tool drops it from allowed and write", async () => {
+  it("turning a tool off drops it from allowed and write, and keeps stored globs", async () => {
     const w = mountPicker({
       tools: TOOLS,
       status: "ok",
@@ -220,7 +205,7 @@ describe("AiToolsetToolPicker", () => {
         write: ["apm_traces", "search_logs"],
       },
     });
-    await box(w, "apm_traces").trigger("click");
+    await radio(w, "ai-toolset-tool-apm_traces", "off").trigger("click");
     expect(last(w)).toEqual({
       allowed: ["search_logs", "apm_spans"],
       blocked: null,
@@ -228,35 +213,129 @@ describe("AiToolsetToolPicker", () => {
     });
   });
 
-  it("shows saved tools the server no longer has; unticking removes them", async () => {
+  it("a group radio sets every tool in the group and skips destructive ones", async () => {
+    const w = mountPicker({
+      tools: WRITES,
+      status: "ok",
+      lists: { allowed: [], blocked: null, write: [] },
+    });
+    await groupRadio(w, "changes", "chat").trigger("click");
+    expect(last(w)).toEqual({ allowed: ["update_b"], blocked: null, write: ["update_b"] });
+    await groupRadio(w, "reads", "everywhere").trigger("click");
+    expect(last(w)).toEqual({ allowed: ["read_a"], blocked: null, write: [] });
+  });
+
+  it("a group's Off turns destructive tools off too", async () => {
+    const all = ["read_a", "update_b", "drop_c"];
+    const w = mountPicker({
+      tools: WRITES,
+      status: "ok",
+      lists: { allowed: all, blocked: null, write: ["update_b", "drop_c"] },
+    });
+    expect(groupRadio(w, "changes", "chat").attributes("data-state")).toBe("checked");
+    await groupRadio(w, "changes", "off").trigger("click");
+    expect(last(w)).toEqual({ allowed: ["read_a"], blocked: null, write: [] });
+  });
+
+  it("asks before a destructive tool goes on, and Keep off changes nothing", async () => {
+    const w = mountPicker({
+      tools: WRITES,
+      status: "ok",
+      lists: { allowed: [], blocked: null, write: [] },
+    });
+    expect(
+      w.find(`${sel("ai-toolset-tool-drop_c")} ${sel("ai-toolset-tool-destructive")}`).text(),
+    ).toBe("Cannot be undone");
+    const dialog = w.findComponent(ODialog);
+    await radio(w, "ai-toolset-tool-drop_c", "chat").trigger("click");
+    expect(w.emitted("update:lists")).toBeUndefined();
+    expect(dialog.props("open")).toBe(true);
+    expect(dialog.props("title")).toBe('Allow "drop_c" in chat?');
+    dialog.vm.$emit("click:secondary");
+    await w.vm.$nextTick();
+    expect(dialog.props("open")).toBe(false);
+    expect(w.emitted("update:lists")).toBeUndefined();
+
+    await radio(w, "ai-toolset-tool-drop_c", "chat").trigger("click");
+    dialog.vm.$emit("click:primary");
+    await w.vm.$nextTick();
+    expect(last(w)).toEqual({ allowed: ["drop_c"], blocked: null, write: ["drop_c"] });
+    expect(dialog.props("open")).toBe(false);
+  });
+
+  it("counts the filters and shows only the matching rows", async () => {
     const w = mountPicker({ tools: TOOLS, status: "ok" });
-    expect(w.find(sel("ai-toolset-tool-get_metric")).exists()).toBe(true);
-    expect(w.find(sel("ai-toolset-tool-apm_*")).exists()).toBe(false);
-    await box(w, "get_metric").trigger("click");
-    expect(w.emitted("remove")).toEqual([[{ list: "allowed", entry: "get_metric" }]]);
+    const count = (id: string) => w.find(sel(`ai-toolset-tools-view-${id}`)).text();
+    expect(count("all")).toBe("All 5");
+    expect(count("on")).toBe("On 3");
+    expect(count("off")).toBe("Off 2");
+    expect(count("changes")).toBe("Changes things 3");
+    await w.find(sel("ai-toolset-tools-view-changes")).trigger("click");
+    expect(w.find(sel("ai-toolset-tools-group-reads")).exists()).toBe(false);
+    expect(w.find(sel("ai-toolset-tools-group-saved")).exists()).toBe(false);
+    expect(w.find(sel("ai-toolset-tool-create_monitor")).exists()).toBe(true);
+    await w.find(sel("ai-toolset-tools-view-off")).trigger("click");
+    expect(w.find(sel("ai-toolset-tool-search_logs")).exists()).toBe(true);
+    expect(w.find(sel("ai-toolset-tool-apm_traces")).exists()).toBe(false);
   });
 
-  it("before connecting, unticking an entry removes it", async () => {
-    const w = mountPicker();
-    await box(w, "apm_*").trigger("click");
-    expect(w.emitted("remove")).toEqual([[{ list: "allowed", entry: "apm_*" }]]);
-  });
-
-  it("sets the tooltip text for a glob, a saved tool the server lacks and a described tool", () => {
-    const tips = (w: ReturnType<typeof mountPicker>) =>
-      w.findAllComponents({ name: "OTooltip" }).map((c) => c.props("content"));
-    const before = mountPicker();
-    expect(tips(before)).toContain("Matches every tool starting with apm_");
-    const after = mountPicker({ tools: TOOLS, status: "ok" });
-    expect(tips(after)).toEqual(expect.arrayContaining(["Not on the server", "Search logs"]));
-  });
-
-  it("filters by name and description", async () => {
+  it("searches by name and description, and says when nothing matches", async () => {
     const w = mountPicker({ tools: TOOLS, status: "ok" });
-    await w.find(`${sel("ai-toolset-tools-filter")} input`).setValue("search");
+    await w.find(`${sel("ai-toolset-tools-filter")} input`).setValue("search logs");
     expect(w.find(sel("ai-toolset-tool-search_logs")).exists()).toBe(true);
     expect(w.find(sel("ai-toolset-tool-create_monitor")).exists()).toBe(false);
     await w.find(`${sel("ai-toolset-tools-filter")} input`).setValue("nothing-here");
-    expect(w.find(sel("ai-toolset-tools-empty")).text()).toBe("No tools match.");
+    expect(w.find(sel("ai-toolset-tools-empty")).text()).toBe(
+      "No tools match. Clear the search or pick another filter.",
+    );
+  });
+
+  it("highlights a row whose level changed since the tools were listed", async () => {
+    const w = mountPicker({ tools: TOOLS, status: "ok" });
+    expect(w.find(`${sel("ai-toolset-tool-search_logs")}[data-changed]`).exists()).toBe(false);
+    await w.setProps({ lists: { allowed: ["search_logs"], blocked: null, write: [] } });
+    expect(w.find(`${sel("ai-toolset-tool-search_logs")}[data-changed]`).exists()).toBe(true);
+  });
+
+  it("locks a tool a blocked pattern keeps off, and lifts the block from its own row", async () => {
+    const w = mountPicker({
+      tools: TOOLS,
+      status: "ok",
+      lists: { allowed: ["search_logs"], blocked: ["apm_*"], write: null },
+    });
+    expect(radio(w, "ai-toolset-tool-apm_traces", "chat").attributes("disabled")).toBeDefined();
+    expect(
+      w.find(`${sel("ai-toolset-tool-apm_traces")} ${sel("ai-toolset-tool-note")}`).exists(),
+    ).toBe(true);
+    await radio(w, "ai-toolset-blocked-apm_*", "on").trigger("click");
+    expect(w.emitted("remove")).toEqual([[{ list: "blocked", entry: "apm_*" }]]);
+    expect(w.emitted("update:lists")).toBeUndefined();
+  });
+
+  it("shows saved tools the server no longer has; turning one off removes it", async () => {
+    const w = mountPicker({ tools: TOOLS, status: "ok" });
+    expect(
+      w.find(`${sel("ai-toolset-tool-get_metric")} ${sel("ai-toolset-tool-note")}`).text(),
+    ).toBe("Not on the server");
+    expect(w.find(sel("ai-toolset-tool-apm_*")).exists()).toBe(false);
+    await radio(w, "ai-toolset-tool-get_metric", "off").trigger("click");
+    expect(w.emitted("remove")).toEqual([[{ list: "allowed", entry: "get_metric" }]]);
+  });
+
+  it("before connecting, a glob row says what it matches and Off removes it", async () => {
+    const w = mountPicker();
+    expect(w.find(`${sel("ai-toolset-tool-apm_*")} ${sel("ai-toolset-tool-note")}`).text()).toBe(
+      "Matches every tool starting with apm_",
+    );
+    await radio(w, "ai-toolset-tool-apm_*", "off").trigger("click");
+    expect(w.emitted("remove")).toEqual([[{ list: "allowed", entry: "apm_*" }]]);
+  });
+
+  it("the saved group's Off clears every saved entry and keeps the blocks", async () => {
+    const w = mountPicker({
+      lists: { allowed: ["get_metric", "apm_*"], blocked: ["delete_*"], write: null },
+    });
+    await groupRadio(w, "saved", "off").trigger("click");
+    expect(last(w)).toEqual({ allowed: [], blocked: ["delete_*"], write: null });
   });
 });

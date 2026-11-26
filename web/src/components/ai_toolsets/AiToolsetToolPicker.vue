@@ -132,13 +132,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="bg-surface-subtle border-border-default flex flex-wrap items-center gap-3 border-b px-3 py-2"
       >
-        <OCheckbox
-          :model-value="allState"
-          :label="t('aiToolset.allTools')"
-          :disabled="!rows.length"
-          data-test="ai-toolset-tools-all"
-          @update:model-value="setAll(allState !== true)"
-        />
+        <OToggleGroup v-model="view" mobile-dropdown data-test="ai-toolset-tools-view">
+          <OToggleGroupItem
+            v-for="item in views"
+            :key="item.id"
+            :value="item.id"
+            size="sm"
+            :data-test="`ai-toolset-tools-view-${item.id}`"
+          >
+            {{ item.label }}
+            <span class="text-text-secondary ms-1">{{ item.count }}</span>
+          </OToggleGroupItem>
+        </OToggleGroup>
         <OTag
           v-if="!tools && presetName"
           variant="default-soft"
@@ -153,9 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="ai-toolset-tools-filter"
           />
         </div>
-        <span class="text-text-secondary text-xs" data-test="ai-toolset-tools-count">
-          {{ t("aiToolset.enabledOf", { on: enabledCount, total: rows.length }) }}
-        </span>
       </div>
       <p
         v-if="!tools && presetTools !== undefined"
@@ -164,51 +166,203 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("aiToolset.presetNote") }}
       </p>
-      <!-- h-7 rows: max-h-32 shows exactly four rows (4 × 1.75rem + py-2), the rest scrolls. -->
-      <div class="max-h-32 overflow-auto px-3 py-2" data-test="ai-toolset-tools-grid">
+      <!-- ponytail: max-h-130 fits the column and group headers plus eight min-h-13 rows; a row with a note line is taller. -->
+      <div class="max-h-130 overflow-x-hidden overflow-y-auto" data-test="ai-toolset-tools-grid">
         <div
-          v-if="status === 'loading'"
-          class="grid grid-cols-3 gap-x-4 gap-y-2 max-lg:grid-cols-2 max-md:grid-cols-1"
-          data-test="ai-toolset-tools-skeleton"
+          class="bg-surface-subtle border-border-default text-text-secondary sticky top-0 z-10 flex items-end gap-3 border-b px-3 py-2 text-xs"
+          data-test="ai-toolset-tools-columns"
         >
-          <OSkeleton v-for="n in 6" :key="n" class="rounded-default h-4 w-4/5" />
-        </div>
-        <div
-          v-else-if="shownRows.length"
-          class="grid grid-cols-3 gap-x-4 max-lg:grid-cols-2 max-md:grid-cols-1"
-        >
-          <div
-            v-for="row in shownRows"
-            :key="row.dataTest"
-            class="flex h-7 min-w-0 items-center"
-            :data-test="row.dataTest"
-          >
-            <OCheckbox
-              :model-value="row.on"
-              :aria-label="row.name"
-              :disabled="row.locked"
-              class="max-w-full"
-              data-test="ai-toolset-tool-checkbox"
-              @update:model-value="(on) => toggle(row, on === true)"
-            >
-              <template #label>
-                <OTruncatedText
-                  :tooltip="row.tip ? false : undefined"
-                  class="text-compact font-mono"
-                  :class="row.on ? '' : 'text-text-secondary'"
-                >
-                  {{ row.name }}
-                </OTruncatedText>
-              </template>
-            </OCheckbox>
-            <OTooltip v-if="row.tip" :content="row.tip" />
+          <div class="text-text-heading min-w-0 flex-1 font-semibold">
+            {{ t("aiToolset.colTool") }}
+          </div>
+          <div class="flex shrink-0 gap-2">
+            <div v-for="col in columns" :key="col.level" :class="CELL" class="text-center">
+              <div class="text-text-heading font-semibold">{{ col.label }}</div>
+              <div class="max-md:hidden">{{ col.hint }}</div>
+            </div>
           </div>
         </div>
-        <div v-else class="text-text-secondary text-xs" data-test="ai-toolset-tools-empty">
-          {{ filter || tools ? t("aiToolset.noToolsMatch") : t("aiToolset.toolsAllOn") }}
+        <div v-if="status === 'loading'" data-test="ai-toolset-tools-skeleton">
+          <div
+            v-for="n in 6"
+            :key="n"
+            class="border-border-default flex min-h-13 items-center gap-3 border-b px-3 py-2"
+          >
+            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+              <OSkeleton class="rounded-default h-3.5 w-40 max-w-full" />
+              <OSkeleton class="rounded-default h-3 w-4/5" />
+            </div>
+            <div class="flex shrink-0 gap-2">
+              <div v-for="c in 3" :key="c" :class="CELL" class="flex justify-center">
+                <OSkeleton
+                  type="circle"
+                  class="size-3.5"
+                  data-test="ai-toolset-tools-skeleton-radio"
+                />
+              </div>
+            </div>
+          </div>
         </div>
+        <template v-else>
+          <section
+            v-for="group in shownGroups"
+            :key="group.id"
+            :data-test="`ai-toolset-tools-group-${group.id}`"
+          >
+            <div class="border-border-default flex min-w-0 items-center gap-3 border-b px-3 py-2">
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-baseline gap-x-2 text-sm">
+                  <span class="text-text-heading font-semibold">{{ group.title }}</span>
+                  <span
+                    class="text-text-secondary text-xs"
+                    data-test="ai-toolset-tools-group-count"
+                  >
+                    {{ t("aiToolset.groupOnOf", { on: group.on, total: group.rows.length }) }}
+                  </span>
+                </div>
+                <div class="text-text-secondary text-xs">{{ group.help }}</div>
+              </div>
+              <ORadioGroup
+                :model-value="group.level"
+                orientation="horizontal"
+                :label="t('aiToolset.setAll', { group: group.title })"
+                class="shrink-0"
+                data-test="ai-toolset-group-levels"
+                @update:model-value="(v) => setGroup(group, v as Choice)"
+              >
+                <!-- The caption sits under the radio so it stays in line with the row radios. -->
+                <div
+                  v-for="c in group.cells"
+                  :key="c.key"
+                  :class="c.wide ? WIDE : CELL"
+                  class="flex flex-col items-center gap-0.5"
+                >
+                  <template v-if="c.level">
+                    <ORadio
+                      :value="c.level"
+                      size="sm"
+                      data-test="ai-toolset-group-level"
+                      :data-test-value="c.level"
+                    >
+                      <template #label>
+                        <span class="sr-only">{{ c.label }}</span>
+                      </template>
+                    </ORadio>
+                    <span
+                      class="text-text-secondary text-2xs"
+                      aria-hidden="true"
+                      data-test="ai-toolset-group-level-caption"
+                    >
+                      {{ t("aiToolset.setAllShort") }}
+                    </span>
+                  </template>
+                </div>
+              </ORadioGroup>
+            </div>
+            <div
+              v-for="row in group.shown"
+              :key="row.dataTest"
+              class="border-border-default flex min-h-13 min-w-0 items-center gap-3 border-b px-3 py-2"
+              :class="row.changed ? 'bg-accent/5' : ''"
+              :data-test="row.dataTest"
+              :data-changed="row.changed ? 'true' : undefined"
+            >
+              <div class="min-w-0 flex-1">
+                <div class="flex min-w-0 items-center gap-2">
+                  <OTruncatedText
+                    class="text-compact font-mono"
+                    :class="row.level === 'off' ? 'text-text-secondary' : 'text-text-heading'"
+                  >
+                    {{ row.name }}
+                  </OTruncatedText>
+                  <OTag
+                    v-if="row.destructive"
+                    variant="error-soft"
+                    size="xs"
+                    :label="t('aiToolset.cannotUndo')"
+                    data-test="ai-toolset-tool-destructive"
+                  />
+                </div>
+                <OTruncatedText
+                  v-if="row.description"
+                  as="div"
+                  tooltip-class="whitespace-pre-wrap"
+                  class="text-text-secondary text-xs"
+                >
+                  {{ row.description }}
+                </OTruncatedText>
+                <div
+                  v-if="row.note"
+                  class="text-text-secondary text-xs"
+                  data-test="ai-toolset-tool-note"
+                >
+                  {{ row.note }}
+                </div>
+              </div>
+              <ORadioGroup
+                :model-value="row.level"
+                orientation="horizontal"
+                :label="raw(row.name)"
+                :disabled="row.locked"
+                class="shrink-0"
+                @update:model-value="(v) => pick(row, v as Choice)"
+              >
+                <div
+                  v-for="c in row.cells"
+                  :key="c.key"
+                  :class="c.wide ? WIDE : CELL"
+                  class="flex justify-center"
+                >
+                  <ORadio
+                    v-if="c.level"
+                    :value="c.level"
+                    size="sm"
+                    data-test="ai-toolset-tool-level"
+                    :data-test-value="c.level"
+                  >
+                    <template #label>
+                      <span class="sr-only">{{ c.label }}</span>
+                    </template>
+                  </ORadio>
+                </div>
+              </ORadioGroup>
+            </div>
+          </section>
+          <div
+            v-if="!shownGroups.length"
+            class="text-text-secondary px-3 py-3 text-xs"
+            data-test="ai-toolset-tools-empty"
+          >
+            {{
+              filter || tools || view !== "all"
+                ? t("aiToolset.noToolsMatch")
+                : t("aiToolset.toolsAllOn")
+            }}
+          </div>
+        </template>
       </div>
     </div>
+
+    <ODialog
+      :open="!!pending"
+      size="sm"
+      :title="t('aiToolset.destructiveTitle', { tool: raw(pending?.name) })"
+      :primary-button-label="t('aiToolset.allowInChat')"
+      primary-button-variant="destructive"
+      :secondary-button-label="t('aiToolset.keepOff')"
+      secondary-button-variant="outline"
+      data-test="ai-toolset-destructive-confirm"
+      @update:open="pending = null"
+      @click:primary="confirmPending"
+      @click:secondary="pending = null"
+    >
+      <div class="flex flex-col gap-2 text-sm">
+        <p v-if="pending?.description" class="text-text-secondary whitespace-pre-wrap">
+          {{ pending.description }}
+        </p>
+        <p>{{ t("aiToolset.destructiveBody") }}</p>
+      </div>
+    </ODialog>
   </div>
 </template>
 
@@ -217,37 +371,73 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   blockedByGlob,
   globMatches,
   globPrefix,
+  mayWrite,
   otherEntries,
   removeEntry,
-  setToolOn,
-  toolState,
+  setGroupLevel,
+  setToolLevel,
+  toolLevel,
   type DiscoveredTool,
   type OtherEntry,
+  type ToolLevel,
   type ToolLists,
 } from "./toolPicker";
+
+/** A row's radio value; a saved entry the server didn't list is only on or off. */
+type Choice = ToolLevel | "on";
+type View = "all" | "on" | "off" | "changes";
+
+interface Cell {
+  key: string;
+  level?: Choice;
+  label?: I18nText;
+  /** Spans the Chat and Everywhere columns. */
+  wide?: boolean;
+}
 
 interface Row {
   name: string;
   dataTest: string;
-  /** Hover text: the tool's description, a glob's meaning, or why it is unlisted or blocked. */
-  tip?: I18nText;
-  on: boolean;
+  description?: string;
+  /** Why the row is unlisted or blocked, or what a glob matches. */
+  note?: I18nText;
+  level: Choice;
   /** A blocked glob keeps this tool off. */
   locked?: boolean;
+  destructive?: boolean;
+  /** Not known to be read-only, so it runs only in chat. */
+  writes?: boolean;
+  changed?: boolean;
+  cells: Cell[];
   /** A listed tool, or else the stored entry the row stands for. */
   tool?: DiscoveredTool;
   other?: OtherEntry;
+}
+
+interface Group {
+  id: "reads" | "changes" | "saved";
+  title: I18nText;
+  help: I18nText;
+  rows: Row[];
+  shown: Row[];
+  on: number;
+  /** The level every row shares, or "mixed", which no radio carries. */
+  level: Choice | "mixed";
+  cells: Cell[];
 }
 
 const props = withDefaults(
@@ -275,6 +465,7 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const filter = ref("");
+const view = ref<View>("all");
 const server = computed(() => props.presetName || t("aiToolset.thisServer"));
 
 const startedAt = ref(0);
@@ -299,6 +490,42 @@ watch(
 );
 onBeforeUnmount(stopTimer);
 
+const CELL = "w-26 max-md:w-14";
+const WIDE = "w-54 max-md:w-30";
+
+const columns = computed(() => [
+  { level: "off", label: t("aiToolset.levelOff"), hint: t("aiToolset.levelOffHint") },
+  { level: "chat", label: t("aiToolset.levelChat"), hint: t("aiToolset.levelChatHint") },
+  {
+    level: "everywhere",
+    label: t("aiToolset.levelEverywhere"),
+    hint: t("aiToolset.levelEverywhereHint"),
+  },
+]);
+
+const cell = (level: Choice): Cell => ({
+  key: level,
+  level,
+  label:
+    level === "on" ? t("aiToolset.levelOn") : columns.value.find((c) => c.level === level)?.label,
+  wide: level === "on",
+});
+const EMPTY: Cell = { key: "none" };
+const EMPTY_WIDE: Cell = { key: "none", wide: true };
+
+// The level each tool had when it was listed, so a changed row stands out until the tools reload.
+const baseline = new Map<string, ToolLevel>();
+watch(
+  () => props.tools,
+  (tools) => {
+    if (!tools) baseline.clear();
+    for (const tool of tools ?? []) {
+      if (!baseline.has(tool.name)) baseline.set(tool.name, toolLevel(props.lists, tool));
+    }
+  },
+  { immediate: true },
+);
+
 const patternText = (entry: string) => {
   const prefix = globPrefix(entry);
   if (!prefix) return entry.includes("*") ? t("aiToolset.patternMatchesPart") : undefined;
@@ -307,78 +534,166 @@ const patternText = (entry: string) => {
 
 const others = computed(() => otherEntries(props.lists, props.tools));
 
-const rows = computed<Row[]>(() => {
-  const found = props.tools;
-  const listed: Row[] = (found ?? []).map((tool) => {
+const toolRows = computed<Row[]>(() =>
+  (props.tools ?? []).map((tool) => {
+    const level = toolLevel(props.lists, tool);
     const locked = blockedByGlob(props.lists, tool.name);
-    const description = tool.description ? raw(tool.description) : undefined;
+    const writes = mayWrite(tool);
+    const before = baseline.get(tool.name);
     return {
       name: tool.name,
       dataTest: `ai-toolset-tool-${tool.name}`,
-      tip: locked ? t("aiToolset.blockedByEntry") : description,
-      on: toolState(props.lists, tool) !== "off",
+      description: tool.description,
+      note: locked ? t("aiToolset.blockedByEntry") : undefined,
+      level,
       locked,
+      destructive: tool.destructive_hint === true,
+      writes,
+      changed: before !== undefined && before !== level,
+      // A write tool is never offered Everywhere, unless its saved lists already put it there.
+      cells: [
+        cell("off"),
+        cell("chat"),
+        writes && level !== "everywhere" ? EMPTY : cell("everywhere"),
+      ],
       tool,
     };
-  });
-  // After a refresh a glob is shown through the tools it matches, unless it matches none.
+  }),
+);
+
+// Saved entries no listed tool owns. After a refresh a glob shows through the tools it matches, unless it matches none.
+const savedRows = computed<Row[]>(() => {
+  const found = props.tools;
+  const savedCells = [cell("off"), cell("on")];
   const allowed = others.value
     .filter(({ list }) => list === "allowed")
     .filter(({ entry }) => !found?.some((tool) => globMatches(entry, tool.name)))
     .map((other) => ({
       name: other.entry,
       dataTest: `ai-toolset-tool-${other.entry}`,
-      tip:
+      note:
         found && !other.entry.includes("*") ? t("aiToolset.notOnServer") : patternText(other.entry),
-      on: true,
+      level: "on" as const,
+      cells: savedCells,
       other,
     }));
-  return [...listed, ...allowed];
-});
-
-// Blocked entries no listed tool owns; ticking one lifts the block.
-const blockedRows = computed<Row[]>(() =>
-  others.value
+  // Turning one of these on lifts the block.
+  const blocked = others.value
     .filter(({ list }) => list === "blocked")
     .map((other) => ({
       name: other.entry,
       dataTest: `ai-toolset-blocked-${other.entry}`,
-      tip: t("aiToolset.blockedEntry"),
-      on: false,
+      note: t("aiToolset.blockedEntry"),
+      level: "off" as const,
+      cells: savedCells,
       other,
-    })),
-);
+    }));
+  return [...allowed, ...blocked];
+});
 
-const shownRows = computed(() => {
+const allRows = computed(() => [...toolRows.value, ...savedRows.value]);
+
+const matches = (row: Row) => {
   const needle = filter.value.trim().toLowerCase();
-  return [...rows.value, ...blockedRows.value].filter(
-    (row) =>
-      row.name.toLowerCase().includes(needle) || (row.tip ?? "").toLowerCase().includes(needle),
-  );
-});
-
-const enabledCount = computed(() => rows.value.filter((row) => row.on).length);
-const allState = computed<boolean | "indeterminate">(() => {
-  if (!enabledCount.value) return false;
-  // A locked tool can't go on, so it doesn't keep All tools from being checked.
-  return rows.value.every((row) => row.on || row.locked) ? true : "indeterminate";
-});
-
-const withRow = (lists: ToolLists, row: Row, on: boolean) => {
-  if (row.tool) return setToolOn(lists, row.tool, on, props.tools ?? []);
-  return row.other && !on ? removeEntry(lists, row.other) : lists;
+  const text = `${row.name}\n${row.description ?? ""}\n${row.note ?? ""}`.toLowerCase();
+  if (needle && !text.includes(needle)) return false;
+  if (view.value === "on") return row.level !== "off";
+  if (view.value === "off") return row.level === "off";
+  if (view.value === "changes") return !!row.writes;
+  return true;
 };
 
-const toggle = (row: Row, on: boolean) => {
+const groups = computed<Group[]>(() => {
+  const make = (
+    id: Group["id"],
+    title: I18nText,
+    help: I18nText,
+    rows: Row[],
+    cells: Cell[],
+  ): Group => {
+    const levels = new Set(rows.map((row) => row.level));
+    return {
+      id,
+      title,
+      help,
+      rows,
+      shown: rows.filter(matches),
+      on: rows.filter((row) => row.level !== "off").length,
+      level: levels.size === 1 ? rows[0].level : "mixed",
+      cells,
+    };
+  };
+  return [
+    make(
+      "reads",
+      t("aiToolset.groupReads"),
+      t("aiToolset.groupReadsHelp"),
+      toolRows.value.filter((row) => !row.writes),
+      [cell("off"), cell("chat"), cell("everywhere")],
+    ),
+    make(
+      "changes",
+      t("aiToolset.groupChanges"),
+      t("aiToolset.groupChangesHelp"),
+      toolRows.value.filter((row) => row.writes),
+      [cell("off"), cell("chat"), EMPTY],
+    ),
+    make("saved", t("aiToolset.groupSaved"), t("aiToolset.groupSavedHelp"), savedRows.value, [
+      cell("off"),
+      EMPTY_WIDE,
+    ]),
+  ].filter((group) => group.rows.length);
+});
+
+const shownGroups = computed(() => groups.value.filter((group) => group.shown.length));
+
+const views = computed(() => {
+  const rows = allRows.value;
+  const on = rows.filter((row) => row.level !== "off").length;
+  return [
+    { id: "all", label: t("aiToolset.viewAll"), count: rows.length },
+    { id: "on", label: t("aiToolset.viewOn"), count: on },
+    { id: "off", label: t("aiToolset.viewOff"), count: rows.length - on },
+    {
+      id: "changes",
+      label: t("aiToolset.viewChanges"),
+      count: rows.filter((row) => row.writes).length,
+    },
+  ];
+});
+
+// A destructive tool going on from Off waits here for the confirm.
+const pending = ref<Row | null>(null);
+
+const pick = (row: Row, choice: Choice) => {
+  if (choice === row.level) return;
   // A lone entry is removed as stored, so the lists a discovery only spelled out stay unsaved.
-  if (row.other) emit("remove", row.other);
-  else emit("update:lists", withRow(props.lists, row, on));
+  if (row.other) return emit("remove", row.other);
+  if (!row.tool) return;
+  if (row.destructive && row.level === "off") {
+    pending.value = row;
+    return;
+  }
+  emit("update:lists", setToolLevel(props.lists, row.tool, choice as ToolLevel, props.tools ?? []));
 };
 
-const setAll = (on: boolean) => {
-  emit(
-    "update:lists",
-    rows.value.reduce((acc, row) => withRow(acc, row, on), props.lists),
-  );
+const confirmPending = () => {
+  const tool = pending.value?.tool;
+  pending.value = null;
+  if (tool) emit("update:lists", setToolLevel(props.lists, tool, "chat", props.tools ?? []));
+};
+
+const setGroup = (group: Group, choice: Choice) => {
+  if (group.id === "saved") {
+    // Only Off is offered: it removes every saved entry that is on.
+    const on = group.rows.filter((row) => row.level === "on" && row.other);
+    emit(
+      "update:lists",
+      on.reduce((acc, row) => removeEntry(acc, row.other!), props.lists),
+    );
+    return;
+  }
+  const tools = group.rows.flatMap((row) => (row.tool ? [row.tool] : []));
+  emit("update:lists", setGroupLevel(props.lists, tools, choice as ToolLevel, props.tools ?? []));
 };
 </script>

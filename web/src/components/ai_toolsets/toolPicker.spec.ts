@@ -23,7 +23,10 @@ import {
   prefillFromDiscovery,
   removeEntry,
   expandGlobs,
+  setGroupLevel,
+  setToolLevel,
   setToolOn,
+  toolLevel,
   setToolState,
   toolState,
   toolsetBadges,
@@ -293,5 +296,47 @@ describe("globPrefix", () => {
     expect(globPrefix("apm_*")).toBe("apm_");
     expect(globPrefix("*_read")).toBeNull();
     expect(globPrefix("exact")).toBeNull();
+  });
+});
+
+describe("tool levels", () => {
+  const read: DiscoveredTool = { name: "read_a", read_only_hint: true };
+  const write: DiscoveredTool = { name: "write_b", read_only_hint: false };
+  const drop: DiscoveredTool = { name: "drop_c", read_only_hint: false, destructive_hint: true };
+  const tools = [read, write, drop];
+  const none: ToolLists = { allowed: [], blocked: null, write: [] };
+
+  it("reads not allowed as off, allowed as everywhere and allowed as a write as chat", () => {
+    const lists: ToolLists = { allowed: ["read_a", "write_b"], blocked: null, write: ["write_b"] };
+    expect(toolLevel(lists, read)).toBe("everywhere");
+    expect(toolLevel(lists, write)).toBe("chat");
+    expect(toolLevel(lists, drop)).toBe("off");
+  });
+
+  it("writes each level back as the lists the agent reads", () => {
+    const everywhere = setToolLevel(none, read, "everywhere", tools);
+    expect(everywhere).toEqual({ allowed: ["read_a"], blocked: null, write: [] });
+    const chat = setToolLevel(everywhere, read, "chat", tools);
+    expect(chat).toEqual({ allowed: ["read_a"], blocked: null, write: ["read_a"] });
+    expect(setToolLevel(chat, read, "off", tools)).toEqual(none);
+  });
+
+  it("keeps a tool a blocked glob holds off", () => {
+    const lists: ToolLists = { allowed: [], blocked: ["read_*"], write: [] };
+    expect(setToolLevel(lists, read, "everywhere", tools)).toBe(lists);
+  });
+
+  it("a group set skips destructive tools going on and puts write tools in chat", () => {
+    expect(setGroupLevel(none, tools, "everywhere", tools)).toEqual({
+      allowed: ["read_a", "write_b"],
+      blocked: null,
+      write: ["write_b"],
+    });
+    const on: ToolLists = {
+      allowed: ["write_b", "drop_c"],
+      blocked: null,
+      write: ["write_b", "drop_c"],
+    };
+    expect(setGroupLevel(on, [write, drop], "off", tools)).toEqual(none);
   });
 });
