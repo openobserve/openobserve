@@ -195,6 +195,8 @@ pub struct InternalWriteRequest {
 struct Caller {
     author: Author,
     is_memory_admin: bool,
+    /// May read the text, as the scope's GET route requires; a conflict shows it only then.
+    can_read: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -248,7 +250,7 @@ pub async fn get_org_memory(
         (status = 200, description = "Applied: `{state, rev, op_id}`", content_type = "application/json"),
         (status = 400, description = "Invalid request, or `{code: memory_too_large}`", content_type = "application/json"),
         (status = 403, description = "Not a memory admin", content_type = "application/json"),
-        (status = 409, description = "`{code: rev_conflict, rev, content}`", content_type = "application/json"),
+        (status = 409, description = "`{code: rev_conflict, rev, content}`; `content` only for a caller who may read the memory", content_type = "application/json"),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
@@ -257,7 +259,7 @@ pub async fn update_org_memory(
     Headers(user_email): Headers<UserEmail>,
     Json(body): Json<MemoryUpdateRequest>,
 ) -> Response {
-    match caller(&org_id, &user_email.user_id).await {
+    match caller(&org_id, &user_email.user_id, "ai").await {
         Ok(caller) => write_memory(&MemoryKey::org(&org_id), None, body, caller).await,
         Err(resp) => resp,
     }
@@ -325,7 +327,7 @@ pub async fn revert_org_memory(
     Headers(user_email): Headers<UserEmail>,
     Json(body): Json<RevertRequest>,
 ) -> Response {
-    match caller(&org_id, &user_email.user_id).await {
+    match caller(&org_id, &user_email.user_id, "ai").await {
         Ok(caller) => revert(&MemoryKey::org(&org_id), None, body.rev, caller).await,
         Err(resp) => resp,
     }
@@ -550,7 +552,7 @@ pub async fn get_toolset_memory(
         (status = 200, description = "Applied", content_type = "application/json"),
         (status = 400, description = "Invalid request, or `{code: memory_too_large}`", content_type = "application/json"),
         (status = 403, description = "Not a memory admin", content_type = "application/json"),
-        (status = 409, description = "`{code: rev_conflict, rev, content}`", content_type = "application/json"),
+        (status = 409, description = "`{code: rev_conflict, rev, content}`; `content` only for a caller who may read the memory", content_type = "application/json"),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
@@ -563,7 +565,7 @@ pub async fn update_toolset_memory(
         Ok(key) => key,
         Err(resp) => return resp,
     };
-    match caller(&org_id, &user_email.user_id).await {
+    match caller(&org_id, &user_email.user_id, "ai_memory").await {
         Ok(caller) => write_memory(&key, Some(&id), body, caller).await,
         Err(resp) => resp,
     }
@@ -650,7 +652,7 @@ pub async fn revert_toolset_memory(
         Ok(key) => key,
         Err(resp) => return resp,
     };
-    match caller(&org_id, &user_email.user_id).await {
+    match caller(&org_id, &user_email.user_id, "ai_memory").await {
         Ok(caller) => revert(&key, Some(&id), body.rev, caller).await,
         Err(resp) => resp,
     }
@@ -765,7 +767,7 @@ pub async fn get_my_memory(
     responses(
         (status = 200, description = "Applied", content_type = "application/json"),
         (status = 400, description = "Invalid request, or `{code: memory_too_large}`", content_type = "application/json"),
-        (status = 409, description = "`{code: rev_conflict, rev, content}`", content_type = "application/json"),
+        (status = 409, description = "`{code: rev_conflict, rev, content}`; `content` only for a caller who may read the memory", content_type = "application/json"),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
@@ -779,6 +781,7 @@ pub async fn update_my_memory(
             let caller = Caller {
                 author: Author::User(key.scope_key.clone()),
                 is_memory_admin: false,
+                can_read: true,
             };
             write_memory(&key, None, body, caller).await
         }
@@ -892,6 +895,7 @@ pub async fn revert_my_memory(
             let caller = Caller {
                 author: Author::User(key.scope_key.clone()),
                 is_memory_admin: false,
+                can_read: true,
             };
             revert(&key, None, body.rev, caller).await
         }
@@ -937,11 +941,25 @@ async fn is_memory_admin(org_id: &str, user_email: &str) -> bool {
     .await
 }
 
-async fn caller(org_id: &str, user_email: &str) -> Result<Caller, Response> {
+/// `read_resource`: what the scope's GET route checks for LIST.
+async fn caller(org_id: &str, user_email: &str, read_resource: &str) -> Result<Caller, Response> {
     let user_id = resolve_owner(user_email).await.map_err(owner_error)?;
+    let can_read = check_permissions(
+        org_id,
+        org_id,
+        user_email,
+        read_resource,
+        "LIST",
+        None,
+        true,
+        false,
+        false,
+    )
+    .await;
     Ok(Caller {
         author: Author::User(user_id),
         is_memory_admin: is_memory_admin(org_id, user_email).await,
+        can_read,
     })
 }
 
@@ -1070,7 +1088,7 @@ async fn write_memory(
         evidence: None,
     };
     match memory_db::submit(submission).await {
-        Ok(Submitted::Written(outcome)) => outcome_response(outcome),
+        Ok(Submitted::Written(outcome)) => written(outcome, caller.can_read),
         Ok(Submitted::Refused | Submitted::NeedsMemoryAdmin) => {
             MetaHttpResponse::forbidden("only a memory admin can change this memory")
         }
@@ -1108,7 +1126,7 @@ async fn revert(key: &MemoryKey, toolset_id: Option<&str>, rev: i64, caller: Cal
         return MetaHttpResponse::forbidden("only a memory admin can revert this memory");
     }
     match memory_db::revert(key, toolset_id, rev, caller.author).await {
-        Ok(outcome) => outcome_response(outcome),
+        Ok(outcome) => written(outcome, caller.can_read),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
@@ -1404,6 +1422,17 @@ fn internal_audit_message(
     }
 }
 
+fn written(outcome: Outcome, can_read: bool) -> Response {
+    match outcome {
+        Outcome::RevConflict { rev, .. } if !can_read => (
+            StatusCode::CONFLICT,
+            Json(json!({"code": "rev_conflict", "rev": rev})),
+        )
+            .into_response(),
+        outcome => outcome_response(outcome),
+    }
+}
+
 fn outcome_response(outcome: Outcome) -> Response {
     let (status, body) = outcome_parts(outcome);
     (status, Json(body)).into_response()
@@ -1469,6 +1498,7 @@ pub(crate) mod tests {
         Caller {
             author: Author::User("u1".to_string()),
             is_memory_admin,
+            can_read: true,
         }
     }
 
@@ -1744,6 +1774,7 @@ pub(crate) mod tests {
         let caller = |id: &str| Caller {
             author: Author::User(id.to_string()),
             is_memory_admin: false,
+            can_read: true,
         };
         let resp = write_memory(&theirs, None, text("theirs", 0), caller(&them)).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -1831,6 +1862,29 @@ pub(crate) mod tests {
         let resp = super::super::toolsets::delete(Path((org.clone(), dashed))).await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(memory_db::get(&key).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn a_conflict_shows_the_text_only_to_a_caller_who_may_read_it() {
+        if !meta_store().await {
+            return;
+        }
+        let key = MemoryKey::org(&unique_org("memory_conflict_read"));
+        let resp = write_memory(&key, None, text("## Private\n", 0), person(true)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let reader = write_memory(&key, None, text("x", 0), person(true)).await;
+        assert_eq!(reader.status(), StatusCode::CONFLICT);
+        assert_eq!(body_of(reader).await["content"], json!("## Private\n"));
+        let blind = Caller {
+            can_read: false,
+            ..person(true)
+        };
+        let resp = write_memory(&key, None, text("x", 0), blind).await;
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        assert_eq!(
+            body_of(resp).await,
+            json!({"code": "rev_conflict", "rev": 1})
+        );
     }
 
     #[tokio::test]
@@ -2239,6 +2293,7 @@ pub(crate) mod tests {
         let mine = Caller {
             author: Author::User(user_id.clone()),
             is_memory_admin: false,
+            can_read: true,
         };
         write_memory(&MemoryKey::user(&org, &user_id), None, text("p99", 0), mine).await;
         let mcps = || {
