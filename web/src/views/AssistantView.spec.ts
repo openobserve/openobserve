@@ -26,7 +26,7 @@ import type { AssistantCapability, GateCode } from "@/composables/assistant";
 import { leaveFullTabHandoff, pushFromThread } from "@/composables/assistant/pure";
 
 import { SHELL_ROUTE_CONTEXT } from "@/components/ai-assistant/shell/AssistantShell.vue";
-import { closeLockedPanel } from "@/components/ai-assistant/shell/lockedPanel";
+import { closeLockedPanel } from "@/components/ai-assistant/shell/shellHelpers";
 
 import AssistantView, { chatRef, RAIL_DEFAULT_REM, railPx, viewFor } from "./AssistantView.vue";
 import en from "@/locales/languages/en-US.json";

@@ -19,8 +19,7 @@ import { defineComponent, h, ref } from "vue";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantSidebarHost from "./AssistantSidebarHost.vue";
-import { tearOffRequest } from "./assistantWindowHost";
-import { closeLockedPanel, openLockedPanel, useLockedPanel } from "./lockedPanel";
+import { closeLockedPanel, openLockedPanel, tearOffRequest, useLockedPanel } from "./shellHelpers";
 import { movedToTab } from "@/composables/assistant/pure";
 import {
   followedRcaRun,

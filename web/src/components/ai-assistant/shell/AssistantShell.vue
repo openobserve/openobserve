@@ -727,9 +727,8 @@ import { formatCount, formatOrgIsoDay, formatOrgTime } from "@/utils/formatters"
 
 import AssistantModeButtons from "./AssistantModeButtons.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
-import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
+import { closeLockedPanel, useLockedPanel, useOpeningMotion } from "./shellHelpers";
 import { leaveFullThreadRoute } from "./useAssistantPlaces";
-import { useOpeningMotion } from "./useOpeningMotion";
 
 // Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
 provideAssistantSurface();

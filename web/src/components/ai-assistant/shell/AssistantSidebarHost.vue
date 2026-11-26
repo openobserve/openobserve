@@ -194,11 +194,15 @@ import AssistantLifecycleDialogs from "./AssistantLifecycleDialogs.vue";
 import AssistantResizeHandle from "./AssistantResizeHandle.vue";
 import AssistantShell from "./AssistantShell.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
-import { readFromAnswerStart } from "./answerStart";
-import { tearOffRequest } from "./assistantWindowHost";
-import { closeLockedPanel, lockedPanelMoved, useLockedPanel } from "./lockedPanel";
+import {
+  closeLockedPanel,
+  lockedPanelMoved,
+  readFromAnswerStart,
+  tearOffRequest,
+  useLockedPanel,
+  useOpeningMotion,
+} from "./shellHelpers";
 import { followedRcaRun, followNewRun, keepRcaFollowFor, stopFollowingRca } from "./rcaFollow";
-import { useOpeningMotion } from "./useOpeningMotion";
 
 // The run view carries the whole RCA thread, so it loads only when a run is followed.
 const AssistantRcaThread = defineAsyncComponent(

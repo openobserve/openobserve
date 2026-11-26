@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { answerStartHidden, readFromAnswerStart } from "./answerStart";
+import { answerStartHidden, readFromAnswerStart } from "./shellHelpers";
 
 const box = (top: number, bottom: number) => ({ top, bottom }) as DOMRect;
 

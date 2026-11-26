@@ -251,7 +251,7 @@ export async function addDoorToChat(
   });
   // openAssistant refuses a locked gate silently; the locked panel says why, as the header button does.
   if (!result.ok && LOCKED_GATES.includes(result.reason)) {
-    const { openLockedPanel } = await import("@/components/ai-assistant/shell/lockedPanel");
+    const { openLockedPanel } = await import("@/components/ai-assistant/shell/shellHelpers");
     openLockedPanel(invoker);
   }
   return result;

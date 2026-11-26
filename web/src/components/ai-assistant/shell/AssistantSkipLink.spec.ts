@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeAssistant, fakeRouter } from "../__tests__/fakeAssistant";
 import AssistantSkipLink, { skipTarget } from "./AssistantSkipLink.vue";
-import { closeLockedPanel, openLockedPanel } from "./lockedPanel";
+import { closeLockedPanel, openLockedPanel } from "./shellHelpers";
 
 import brandLocale from "@/locales/languages/en-US.json";
 

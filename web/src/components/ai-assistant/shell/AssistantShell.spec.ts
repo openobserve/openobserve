@@ -42,7 +42,12 @@ import AssistantShell, {
   type AssistantShellProps,
   type ShellRouteState,
 } from "./AssistantShell.vue";
-import { closeLockedPanel, lockedPanelMoved, openLockedPanel, useLockedPanel } from "./lockedPanel";
+import {
+  closeLockedPanel,
+  lockedPanelMoved,
+  openLockedPanel,
+  useLockedPanel,
+} from "./shellHelpers";
 import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 
 import brandLocale from "@/locales/languages/en-US.json";

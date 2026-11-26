@@ -24,7 +24,7 @@ import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantHeaderButton from "./AssistantHeaderButton.vue";
-import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
+import { closeLockedPanel, useLockedPanel } from "./shellHelpers";
 
 import brandLocale from "@/locales/languages/en-US.json";
 

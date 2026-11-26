@@ -54,7 +54,7 @@ import { isFullThreadRoute } from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped } from "@/types/i18n";
 
-import { useLockedPanel } from "./lockedPanel";
+import { useLockedPanel } from "./shellHelpers";
 
 const { t } = useI18nTyped();
 const { product } = useAssistantName();

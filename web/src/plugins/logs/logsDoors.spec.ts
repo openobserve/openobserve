@@ -43,7 +43,7 @@ import {
   type ChatDoor,
   type LogsDoorBase,
 } from "./logsDoors";
-import { closeLockedPanel, useLockedPanel } from "@/components/ai-assistant/shell/lockedPanel";
+import { closeLockedPanel, useLockedPanel } from "@/components/ai-assistant/shell/shellHelpers";
 
 const chip = { kind: "log_row", ref: { org: "org-b" }, sizeBytes: 1 };
 const door = (chips: unknown[] = [chip]): ChatDoor => ({

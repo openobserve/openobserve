@@ -249,7 +249,7 @@ import { trackAssistant, type AiEventProps } from "@/services/assistantAnalytics
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
-import { useLockedPanel } from "./lockedPanel";
+import { useLockedPanel } from "./shellHelpers";
 
 // Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
 provideAssistantSurface();

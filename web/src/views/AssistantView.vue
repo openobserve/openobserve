@@ -151,7 +151,7 @@ import AssistantShell, {
   type ShellRouteState,
 } from "@/components/ai-assistant/shell/AssistantShell.vue";
 import AssistantHistoryList from "@/components/ai-assistant/history/AssistantHistoryList.vue";
-import { takeLockedMove } from "@/components/ai-assistant/shell/lockedPanel";
+import { takeLockedMove } from "@/components/ai-assistant/shell/shellHelpers";
 import {
   useAssistantCapability,
   useAssistantHistory,

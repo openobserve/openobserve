@@ -102,7 +102,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import ThreadsBar from "./ThreadsBar.vue";
 import AssistantWindow from "./AssistantWindow.vue";
-import { tearOffRequest, type WindowKeyboardMode } from "./assistantWindowHost";
+import { tearOffRequest, type WindowKeyboardMode } from "./shellHelpers";
 
 const { t } = useI18nTyped();
 const store = useAssistantStore();

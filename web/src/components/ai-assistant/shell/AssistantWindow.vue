@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import type { FloatingWindow, MinimiseReason, PageArea, ResizeEdge } from "@/composables/assistant";
 
-import type { TearOffDrag } from "./assistantWindowHost";
+import { type TearOffDrag, tearOffRequest, type WindowKeyboardMode } from "./shellHelpers";
 
 export interface AssistantWindowProps {
   win: FloatingWindow;
@@ -170,7 +170,6 @@ import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import AssistantShell from "./AssistantShell.vue";
-import { tearOffRequest, type WindowKeyboardMode } from "./assistantWindowHost";
 
 const props = withDefaults(defineProps<AssistantWindowProps>(), {
   obscured: null,
