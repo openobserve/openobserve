@@ -20,6 +20,7 @@ import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import OverviewAskAiButton from "./OverviewAskAiButton.vue";
 import { buildOverviewAskAi, type OverviewAskAiBase } from "./overviewAskAi";
+import en from "@/locales/languages/en-US.json";
 
 const base: OverviewAskAiBase = {
   orgId: "acme",
@@ -165,12 +166,12 @@ describe("OverviewAskAiButton visibility", () => {
   it("renders an icon-only, labelled button when AI is on", () => {
     const w = mountButton();
     expect(w.find(SEL).exists()).toBe(true);
-    expect(w.get(SEL).attributes("aria-label")).toBe("Ask AI");
+    expect(w.get(SEL).attributes("aria-label")).toBe(en.brand.askAutobot);
   });
 
   it("names the item in the label and tooltip when given one", () => {
     const w = mountButton({ label: "high_cpu" });
-    expect(w.get(SEL).attributes("aria-label")).toBe("Ask AI about high_cpu");
+    expect(w.get(SEL).attributes("aria-label")).toBe(`${en.brand.askAutobot} about high_cpu`);
   });
 
   it("emits ask on click without bubbling to a parent", async () => {

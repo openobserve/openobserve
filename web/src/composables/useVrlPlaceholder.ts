@@ -13,39 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
+import { computed } from "vue";
+
 import { useI18nTyped } from "@/types/i18n";
 
-// The prompts are built per call, not at module scope: a module-level array would
-// resolve `t()` at import time and freeze the boot locale. The `e.g.` samples stay
-// literal — they are VRL/JS source the user copies, not prose.
-const VRL_EXAMPLES = [
-  '.status = "active"',
-  'if .level == "error" { .alert = true }',
-  "del(.sensitive_field)",
-  ".count = int!(.count) + 1",
-  ".message = downcase!(string!(.message))",
-];
-
-const JS_EXAMPLES = [
-  'row.status = "active";',
-  'if (row.level === "error") row.alert = true;',
-  "delete row.sensitive_field;",
-  "row.count = parseInt(row.count) + 1;",
-];
-
-/** Typewriter placeholder for VRL function editors. */
+/** The VRL editor placeholder: one static line that names the language. */
 export function useVrlPlaceholder() {
   const { t } = useI18nTyped();
-  return useTypewriterPlaceholder(
-    VRL_EXAMPLES.map((example) => t("functions.vrlFunctionPlaceholder", { example })),
-  );
+  return { placeholder: computed<string>(() => t("assistant.helper.editorPlaceholder.vrl")) };
 }
 
-/** Typewriter placeholder for JavaScript function editors. */
+/** The JavaScript editor placeholder: one static line that names the language. */
 export function useJsPlaceholder() {
   const { t } = useI18nTyped();
-  return useTypewriterPlaceholder(
-    JS_EXAMPLES.map((example) => t("functions.jsFunctionPlaceholder", { example })),
-  );
+  return { placeholder: computed<string>(() => t("assistant.helper.editorPlaceholder.js")) };
 }

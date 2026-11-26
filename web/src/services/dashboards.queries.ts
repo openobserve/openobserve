@@ -19,6 +19,8 @@ import dashboards from "./dashboards";
 import { dashboardKeys } from "./dashboards.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
+const SEARCH_LIMIT = 100;
+
 export const dashboardsByFolderQuery = (org: string, folderId: string) =>
   queryOptions({
     queryKey: dashboardKeys.byFolder(org, folderId),
@@ -44,14 +46,20 @@ export const toSearchHit = (row: any): DashboardSearchHit => {
   };
 };
 
-/** Dashboards across every folder whose title matches; the backend searches all folders when none is given. */
+/** Dashboards across every folder whose title matches, or the first of every folder for an empty title. */
 export const dashboardsSearchQuery = (org: string, title: string) =>
   queryOptions({
     queryKey: dashboardKeys.search(org, title),
-    queryFn: async (): Promise<DashboardSearchHit[]> =>
-      ((await dashboards.list(0, 100, "name", false, "", org, "", title)).data?.dashboards ?? [])
+    queryFn: async (): Promise<DashboardSearchHit[]> => {
+      // The API ignores page_size without a title, so the empty listing is capped here.
+      const response = title
+        ? await dashboards.list(0, SEARCH_LIMIT, "name", false, "", org, "", title)
+        : await dashboards.listAcrossFolders(org);
+      return (response.data?.dashboards ?? [])
         .map(toSearchHit)
-        .filter((hit: DashboardSearchHit) => hit.dashboardId),
+        .filter((hit: DashboardSearchHit) => hit.dashboardId)
+        .slice(0, SEARCH_LIMIT);
+    },
     staleTime: NORMAL_STALE_TIME,
   });
 

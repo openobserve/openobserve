@@ -46,8 +46,10 @@ const KNOWN_MISMATCHES: Record<string, string[]> = Object.fromEntries(
   ]),
 );
 
-const LITERAL_ESCAPE = /\{\s*'[^']*'\s*\}/g;
-const TOKEN = /\{\s*([A-Za-z_$][\w$]*|\d+)\s*\}|@(?:\.[A-Za-z_$][\w$]*)?:[\w.]+|%[sd]/g;
+// A quoted key after "@:" is a linked message such as @:{'brand.autobot'}, not a literal escape.
+const LITERAL_ESCAPE = /(?<!@(?:\.[A-Za-z_$][\w$]*)?:)\{\s*'[^']*'\s*\}/g;
+const TOKEN =
+  /\{\s*([A-Za-z_$][\w$]*|\d+)\s*\}|@(?:\.[A-Za-z_$][\w$]*)?:(?:\{\s*'[^']*'\s*\}|[\w.]+)|%[sd]/g;
 
 function flatten(node: unknown, path = "", out = new Map<string, unknown>()): Map<string, unknown> {
   if (node && typeof node === "object" && !Array.isArray(node)) {

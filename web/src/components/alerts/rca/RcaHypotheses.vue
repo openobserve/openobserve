@@ -78,13 +78,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-if="canSteer || pending.has(hypothesis.id)" #actions>
           <span class="flex shrink-0 items-center gap-1">
-            <template v-if="canSteer">
+            <!-- A finished run takes no actions, whatever the steering view still says. -->
+            <template v-if="canSteer && live">
               <OButton
                 v-for="action in rcaHypothesisActions(hypothesis.status)"
                 :key="action"
                 :data-test="`rca-hypothesis-action-${action}`"
                 variant="outline"
                 size="xs"
+                class="max-md:min-h-11"
                 :disabled="sending || pending.has(hypothesis.id)"
                 :aria-label="actionAriaLabel(action, hypothesis.statement)"
                 @click="$emit('steer-action', { hypothesisId: hypothesis.id, action })"
@@ -217,12 +219,14 @@ const props = withDefaults(
     org: string;
     /** The run takes messages and the user may send them: rows offer actions. */
     canSteer?: boolean;
+    /** The run is still going; a finished run offers no actions. */
+    live?: boolean;
     /** Hypothesis id → local part of the author of its unread action. */
     pending?: Map<string, string>;
     /** An action is being sent. */
     sending?: boolean;
   }>(),
-  { outcome: undefined, canSteer: false, pending: () => new Map(), sending: false },
+  { outcome: undefined, canSteer: false, live: true, pending: () => new Map(), sending: false },
 );
 
 defineEmits<{

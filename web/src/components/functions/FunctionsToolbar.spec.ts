@@ -70,7 +70,6 @@ describe("FunctionsToolbar", () => {
     store = createStore({
       state: {
         theme: "light",
-        isAiChatEnabled: false,
         zoConfig: {
           ai_enabled: true,
         },
