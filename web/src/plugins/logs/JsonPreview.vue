@@ -206,8 +206,9 @@
           <span class="log-key">{{ key }}</span
           ><span class="log-separator">: </span
           ><span
+            ><span v-if="value[key] === null" class="log-null">null</span
             ><ChunkedContent
-              v-if="getContentSize(value[key]) > 50000"
+              v-else-if="getContentSize(value[key]) > 50000"
               :data="value[key]"
               :field-key="`json_preview_${key}`"
               :query-string="scopeHighlightQuery(highlightQuery, String(key))"
@@ -215,6 +216,7 @@
               v-else
               :data="getDisplayValue(key, value[key])"
               :show-braces="false"
+              :show-quotes="typeof value[key] === 'string'"
               :query-string="scopeHighlightQuery(highlightQuery, String(key))" /></span
           ><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>

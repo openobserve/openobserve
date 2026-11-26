@@ -35,7 +35,7 @@ vi.mock("@/components/logs/LogsHighLighting.vue", () => ({
   default: {
     name: "LogsHighLighting",
     template: '<span data-test="logs-highlighting-stub" />',
-    props: ["data", "showBraces", "queryString"],
+    props: ["data", "showBraces", "showQuotes", "queryString"],
   },
 }));
 
@@ -204,6 +204,29 @@ describe("JsonPreview", () => {
       wrapper = mountJsonPreview({ value: { field: "val" } });
 
       expect(wrapper.find('[data-test="custom-toolbar-btn"]').exists()).toBe(false);
+    });
+  });
+
+  describe("telling empty, the text null and a real null apart", () => {
+    const rowOf = (w: VueWrapper, key: string) => w.find(`[data-test="json-preview-key-${key}"]`);
+    const mountMixed = () =>
+      mountJsonPreview({
+        value: { empty: "", text_null: "null", real_null: null, count: 5 },
+      });
+
+    it("quotes string values and leaves numbers bare", () => {
+      const w = mountMixed();
+      const quoted = (key: string) =>
+        rowOf(w, key).findComponent({ name: "LogsHighLighting" }).props("showQuotes");
+      expect(quoted("empty")).toBe(true);
+      expect(quoted("text_null")).toBe(true);
+      expect(quoted("count")).toBe(false);
+    });
+
+    it("draws a real null as an unquoted null of its own colour", () => {
+      const row = rowOf(mountMixed(), "real_null");
+      expect(row.find(".log-null").text()).toBe("null");
+      expect(row.findComponent({ name: "LogsHighLighting" }).exists()).toBe(false);
     });
   });
 });
