@@ -54,33 +54,22 @@ impl MonitorStream {
         id: String,
         start_time: i64,
         end_time: i64,
-        schema: SchemaRef,
         root_cache_buf: Arc<Mutex<CacheBuf>>,
         stream: SendableRecordBatchStream,
         overwrite_cache: bool,
+        remote_partial_errs: Vec<Arc<Mutex<String>>>,
     ) -> Self {
         Self {
             id,
             start_time,
             end_time,
-            schema,
+            schema: stream.schema(),
             stream,
             root_cache_buf,
             done: false,
             overwrite_cache,
-            remote_partial_errs: Vec::new(),
+            remote_partial_errs,
         }
-    }
-
-    pub(crate) fn with_remote_partial_errs(mut self, errs: Vec<Arc<Mutex<String>>>) -> Self {
-        self.remote_partial_errs = errs;
-        self
-    }
-
-    fn has_remote_partial_err(&self) -> bool {
-        self.remote_partial_errs
-            .iter()
-            .any(|err| !err.lock().is_empty())
     }
 
     pub fn is_complete_partition_window(&self) -> bool {
@@ -95,6 +84,12 @@ impl MonitorStream {
 
     pub fn check_and_add_partition(&mut self) -> bool {
         self.root_cache_buf.lock().check_and_add_partition()
+    }
+
+    fn has_remote_partial_err(&self) -> bool {
+        self.remote_partial_errs
+            .iter()
+            .any(|err| !err.lock().is_empty())
     }
 }
 
@@ -117,14 +112,14 @@ impl Stream for MonitorStream {
                 self.done = true;
 
                 let partition_done = self.check_and_add_partition();
-                // A remote node that failed mid-query ends its stream cleanly, so the result lacks
-                // its data.
-                if partition_done && self.has_remote_partial_err() {
+                // A failed remote node ends its stream cleanly; keep its window query-local (_tmp)
+                // so later windows of this query still add it, but no other query reuses it.
+                let missing_remote_data = partition_done && self.has_remote_partial_err();
+                if missing_remote_data {
                     log::warn!(
-                        "[streaming_id: {}] skip caching streaming aggs result: a remote node returned a partial error",
+                        "[streaming_id: {}] a remote node returned a partial error, caching the window as a temporary file",
                         self.id
                     );
-                    return Poll::Ready(None);
                 }
                 let streaming_done = partition_done
                     && GLOBAL_CACHE
@@ -136,7 +131,7 @@ impl Stream for MonitorStream {
                     &self.id,
                     self.start_time,
                     self.end_time,
-                    self.is_complete_partition_window(),
+                    self.is_complete_partition_window() && !missing_remote_data,
                 );
 
                 // Start - Cache record batches to disk
@@ -269,10 +264,10 @@ mod tests {
             "test_monitor".to_string(),
             1000,
             2000,
-            schema.clone(),
             cache_buf,
             input_stream,
             false,
+            vec![],
         );
 
         // Verify initial state
@@ -315,10 +310,10 @@ mod tests {
             "failed-partition".to_string(),
             0,
             1,
-            schema,
             cache.clone(),
             input,
             false,
+            vec![],
         );
         assert!(stream.next().await.unwrap().is_err());
         assert!(stream.next().await.is_none());
@@ -326,8 +321,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_remote_partial_err_skips_disk_cache() {
-        async fn run(id: &str, partial_err: &str) -> String {
+    async fn test_remote_partial_err_keeps_window_query_local() {
+        async fn run(label: &str, partial_err: &str) -> (String, String, String) {
             let schema = Arc::new(Schema::empty());
             let agg_schema = Arc::new(Schema::new(vec![Field::new(
                 "col1",
@@ -350,27 +345,33 @@ mod tests {
                 cached_partition_num: 0,
                 cached_buf: CacheStream::new(false, 1, aggregate),
             }));
+            let id = format!("monitor_{label}_{}", config::ider::generate());
             let (start, end) = (0, 60_000_000);
             let dir = format!("org_t/logs/{id}/1");
-            init_cache(id, start, end, &dir, 1);
-            let key = get_cache_file_path(
-                &dir,
-                &generate_aggregation_cache_file_name(id, start, end, true),
-            );
-            let input = Box::pin(MemoryStream::try_new(vec![], schema.clone(), None).unwrap());
-            let mut stream =
-                MonitorStream::new(id.to_string(), start, end, schema, cache, input, false)
-                    .with_remote_partial_errs(vec![Arc::new(Mutex::new(partial_err.to_string()))]);
+            init_cache(&id, start, end, &dir, 1);
+            let path = |complete| {
+                let name = generate_aggregation_cache_file_name(&id, start, end, complete);
+                infra::cache::file_data::disk::get_file_path(&get_cache_file_path(&dir, &name))
+                    .unwrap()
+            };
+            let (complete, tmp) = (path(true), path(false));
+            let input = Box::pin(MemoryStream::try_new(vec![], schema, None).unwrap());
+            let errs = vec![Arc::new(Mutex::new(partial_err.to_string()))];
+            let mut stream = MonitorStream::new(id.clone(), start, end, cache, input, false, errs);
             assert!(stream.next().await.is_none());
-            infra::cache::file_data::disk::get_file_path(&key).unwrap()
+            (id, complete, tmp)
         }
+        let exists = |p: &str| std::path::Path::new(p).exists();
 
-        let healthy = run("monitor_remote_ok", "").await;
-        assert!(std::path::Path::new(&healthy).exists());
-        let _ = std::fs::remove_file(&healthy);
+        let (id, complete, tmp) = run("remote_ok", "").await;
+        assert!(exists(&complete) && !exists(&tmp));
+        GLOBAL_CACHE.remove(&id);
+        let _ = std::fs::remove_file(&complete);
 
-        let failed = run("monitor_remote_err", "node down").await;
-        assert!(!std::path::Path::new(&failed).exists());
-        assert!(GLOBAL_CACHE.get("monitor_remote_err").is_none());
+        let (id, complete, tmp) = run("remote_err", "node down").await;
+        assert!(!exists(&complete) && exists(&tmp));
+        assert_eq!(GLOBAL_CACHE.get(&id).unwrap().len(), 1);
+        GLOBAL_CACHE.remove(&id);
+        assert!(!exists(&tmp));
     }
 }

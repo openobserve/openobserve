@@ -16,7 +16,10 @@
 use std::{fmt::Debug, sync::Arc};
 
 use datafusion::{
-    common::{Result, tree_node::TreeNodeRecursion},
+    common::{
+        Result,
+        tree_node::{TreeNode, TreeNodeRecursion},
+    },
     error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::PhysicalExpr,
@@ -298,19 +301,16 @@ impl ExecutionPlan for StreamingAggsExec {
         }
 
         // Execute input for missing data
-        Ok(Box::pin(
-            MonitorStream::new(
-                self.id.clone(),
-                self.start_time,
-                self.end_time,
-                self.input.schema(),
-                self.cache_buf.clone(),
-                self.input
-                    .execute(partition - self.cached_partition_num, context)?,
-                self.overwrite_cache,
-            )
-            .with_remote_partial_errs(collect_remote_partial_errs(&self.input)),
-        ))
+        Ok(Box::pin(MonitorStream::new(
+            self.id.clone(),
+            self.start_time,
+            self.end_time,
+            self.cache_buf.clone(),
+            self.input
+                .execute(partition - self.cached_partition_num, context)?,
+            self.overwrite_cache,
+            collect_remote_partial_errs(&self.input)?,
+        )))
     }
 
     fn benefits_from_input_partitioning(&self) -> Vec<bool> {
@@ -318,14 +318,15 @@ impl ExecutionPlan for StreamingAggsExec {
     }
 }
 
-fn collect_remote_partial_errs(plan: &Arc<dyn ExecutionPlan>) -> Vec<Arc<Mutex<String>>> {
+fn collect_remote_partial_errs(plan: &Arc<dyn ExecutionPlan>) -> Result<Vec<Arc<Mutex<String>>>> {
     let mut errs = Vec::new();
-    let mut stack = vec![plan];
-    while let Some(node) = stack.pop() {
-        if let Some(remote) = node.downcast_ref::<RemoteScanExec>() {
-            errs.push(remote.state.partial_err.clone());
-        }
-        stack.extend(node.children());
-    }
-    errs
+    plan.apply(|node| {
+        let Some(remote) = node.downcast_ref::<RemoteScanExec>() else {
+            return Ok(TreeNodeRecursion::Continue);
+        };
+        errs.push(remote.state.partial_err.clone());
+        // The subtree below runs on the remote nodes; its errors surface through this handle.
+        Ok(TreeNodeRecursion::Jump)
+    })?;
+    Ok(errs)
 }
