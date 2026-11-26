@@ -945,8 +945,8 @@ export default defineComponent({
       readyToDiscover(formValues.value.mcp) ? discoverTools() : focusConnection();
 
     // Skill content (Monaco editor — no OForm* equivalent) bridged into the form.
-    const setSkillContent = (value: string) =>
-      form.setFieldValue("skill.content", value, { dontUpdateMeta: true });
+    // Its meta is kept, so an edit of only the content counts as a change to save.
+    const setSkillContent = (value: string) => form.setFieldValue("skill.content", value);
 
     // -----------------------------------------------------------------------
     // Load existing toolset when editing — seed via form.reset (the record

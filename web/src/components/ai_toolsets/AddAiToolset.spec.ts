@@ -551,6 +551,41 @@ describe("AddAiToolset", () => {
       );
       expect(wrapper.vm.skillContentError).toBe(false);
     });
+
+    it("saves an edit that changes only the skill content", async () => {
+      mockQuery = { action: "edit", id: "skill-1" };
+      vi.mocked(aiToolsetsService.get).mockResolvedValue({
+        data: {
+          id: "skill-1",
+          name: "runbook",
+          kind: "skill",
+          description: "How we triage",
+          data: { content: "# Old" },
+        },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      const status = () => wrapper.find('[data-test="ai-toolset-save-bar-status"]').text();
+      const save = () => wrapper.find('[data-test="ai-toolset-save-btn"]');
+
+      // The editor echoing the loaded text is no change.
+      wrapper.vm.setSkillContent("# Old");
+      await flushPromises();
+      expect(status()).toContain("No changes to save");
+
+      wrapper.vm.setSkillContent("# New");
+      await flushPromises();
+      expect(status()).not.toContain("No changes to save");
+      expect(save().attributes("disabled")).toBeUndefined();
+
+      await getForm().handleSubmit();
+      await flushPromises();
+      expect(aiToolsetsService.update).toHaveBeenCalledWith(
+        "test-org",
+        "skill-1",
+        expect.objectContaining({ data: { content: "# New" } }),
+      );
+    });
   });
 
   describe("MCP tool picker", () => {
