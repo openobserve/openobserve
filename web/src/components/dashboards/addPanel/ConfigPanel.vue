@@ -3715,6 +3715,11 @@ import { BAR_WIDTH_MAX, isBarWidthValid } from "@/utils/dashboard/barTrack";
 import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
 import { resolveTooltipSort, TOOLTIP_SORT_VALUES } from "@/utils/dashboard/tooltipSort";
 import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
+import {
+  applyPanelConfigDefaults,
+  applyPivotConfigDefaults,
+  clearUnusableLegendSizes,
+} from "@/utils/dashboard/panelConfigDefaults";
 
 const AlertListPanelConfig = defineAsyncComponent(() => import("./AlertListPanelConfig.vue"));
 const FlameGraphPanelConfig = defineAsyncComponent(() => import("./FlameGraphPanelConfig.vue"));
@@ -4218,158 +4223,9 @@ export default defineComponent({
         dashboardPanelData.data.config.enable_roam = value;
       },
     });
+    // Shared with AddPanel's unsaved-changes check, so these mount-time writes never count as edits.
     onBeforeMount(() => {
-      // Normalize config fields that default to null but may arrive as undefined
-      // when loaded from older panels (backend omits null fields in JSON response).
-      const nullableConfigKeys = [
-        "legends_position",
-        "legends_type",
-        "chart_align",
-        "unit",
-        "unit_custom",
-      ] as const;
-      nullableConfigKeys.forEach((key) => {
-        if (dashboardPanelData.data.config[key] === undefined) {
-          dashboardPanelData.data.config[key] = null;
-        }
-      });
-      if (dashboardPanelData.data.config.label_option?.position === undefined) {
-        if (dashboardPanelData.data.config.label_option) {
-          dashboardPanelData.data.config.label_option.position = null;
-        }
-      }
-
-      // Ensure that the nested structure is initialized
-      if (!dashboardPanelData.data.config.legend_width) {
-        dashboardPanelData.data.config.legend_width = {
-          value: null,
-          unit: "px",
-        };
-      }
-
-      // Initialize legend height configuration
-      if (!dashboardPanelData.data.config.legend_height) {
-        dashboardPanelData.data.config.legend_height = {
-          value: null,
-          unit: "px",
-        };
-      }
-
-      if (!dashboardPanelData.data.config.trellis) {
-        dashboardPanelData.data.config.trellis = {
-          layout: null,
-          num_of_columns: 1,
-          group_by_y_axis: false,
-        };
-      }
-
-      if (!dashboardPanelData.data.config.axis_border_show) {
-        dashboardPanelData.data.config.axis_border_show = false;
-      }
-
-      // by default, use top_results_others as false
-      if (!dashboardPanelData.data.config.top_results_others) {
-        dashboardPanelData.data.config.top_results_others = false;
-      }
-
-      // Ensure that the nested structure is initialized
-      if (!dashboardPanelData.data.config.map_symbol_style) {
-        dashboardPanelData.data.config.map_symbol_style = {
-          size: "by Value",
-          size_by_value: {
-            min: 1,
-            max: 100,
-          },
-          size_fixed: 2,
-        };
-      }
-
-      // Panels saved with a null map view or base map would throw when the Map section binds their fields.
-      if (!dashboardPanelData.data.config.map_view) {
-        dashboardPanelData.data.config.map_view = { zoom: 1, lat: 0, lng: 0 };
-      }
-      if (!dashboardPanelData.data.config.base_map) {
-        dashboardPanelData.data.config.base_map = { type: "osm" };
-      }
-
-      // by default, use connect_nulls as false
-      if (!dashboardPanelData.data.config.connect_nulls) {
-        dashboardPanelData.data.config.connect_nulls = false;
-      }
-
-      // by default, use no_value_replacement as empty string
-      if (!dashboardPanelData.data.config.no_value_replacement) {
-        dashboardPanelData.data.config.no_value_replacement = "";
-      }
-
-      // by default, use wrap_table_cells as false
-      if (!dashboardPanelData.data.config.wrap_table_cells) {
-        dashboardPanelData.data.config.wrap_table_cells = false;
-      }
-
-      // by default, tableFiltering is disabled
-      if (!dashboardPanelData.data.config.table_filtering) {
-        dashboardPanelData.data.config.table_filtering = false;
-      }
-
-      // by default, use table_transpose as false
-      if (!dashboardPanelData.data.config.table_transpose) {
-        dashboardPanelData.data.config.table_transpose = false;
-      }
-
-      // by default, use table_dynamic_columns  as false
-      if (!dashboardPanelData.data.config.table_dynamic_columns) {
-        dashboardPanelData.data.config.table_dynamic_columns = false;
-      }
-
-      // by default, use label_option position as null and rotate as 0
-      if (!dashboardPanelData.data.config.label_option) {
-        dashboardPanelData.data.config.label_option = {
-          position: null,
-          rotate: 0,
-        };
-      }
-
-      // by default, use chart_align as null (auto)
-      if (dashboardPanelData.data.config.chart_align === undefined) {
-        dashboardPanelData.data.config.chart_align = null;
-      }
-
-      // by default, set show_symbol as false
-      if (dashboardPanelData.data.config.show_symbol === undefined) {
-        const isNewPanel = !dashboardPanelData.data.id;
-        // if new panel, use config env
-        // else always false
-        dashboardPanelData.data.config.show_symbol = isNewPanel
-          ? (store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false)
-          : false;
-      }
-
-      // by default, set line interpolation as smooth
-      if (!dashboardPanelData.data.config.line_interpolation) {
-        dashboardPanelData.data.config.line_interpolation = "smooth";
-      }
-
-      // Initialize map_type configuration
-      if (!dashboardPanelData.data.config.map_type) {
-        dashboardPanelData.data.config.map_type = { type: "world" };
-      }
-
-      // If no step value is set, set it to 0
-      if (!dashboardPanelData.data.config.step_value) {
-        dashboardPanelData.data.config.step_value = "0";
-      }
-
-      if (!dashboardPanelData?.data?.config?.trellis?.group_by_y_axis) {
-        dashboardPanelData.data.config.trellis.group_by_y_axis = false;
-      }
-
-      if (
-        dashboardPanelData.data.config.show_gridlines === null ||
-        dashboardPanelData.data.config.show_gridlines === undefined
-      ) {
-        dashboardPanelData.data.config.show_gridlines = true;
-      }
+      applyPanelConfigDefaults(dashboardPanelData.data, store);
     });
 
     const legendWidthValue = computed({
@@ -4973,29 +4829,11 @@ export default defineComponent({
       },
       { deep: true },
     );
-    // When pivot mode activates: disable conflicting features and
-    // initialize pivot config values (undefined ? false defaults).
-    // Without this, the toggle shows undefined as OFF but conversion
-    // may treat undefined differently — causing a mismatch.
+    // Shared with AddPanel's unsaved-changes check, so the comparison writes the same defaults.
     watch(
       () => isPivotMode.value,
       (active) => {
-        if (active) {
-          dashboardPanelData.data.config.table_transpose = false;
-          dashboardPanelData.data.config.table_dynamic_columns = false;
-          if (dashboardPanelData.data.config.table_pivot_show_row_totals === undefined) {
-            dashboardPanelData.data.config.table_pivot_show_row_totals = false;
-          }
-          if (dashboardPanelData.data.config.table_pivot_show_col_totals === undefined) {
-            dashboardPanelData.data.config.table_pivot_show_col_totals = false;
-          }
-          if (dashboardPanelData.data.config.table_pivot_sticky_row_totals === undefined) {
-            dashboardPanelData.data.config.table_pivot_sticky_row_totals = false;
-          }
-          if (dashboardPanelData.data.config.table_pivot_sticky_col_totals === undefined) {
-            dashboardPanelData.data.config.table_pivot_sticky_col_totals = false;
-          }
-        }
+        if (active) applyPivotConfigDefaults(dashboardPanelData.data.config);
       },
       { immediate: true },
     );
@@ -5080,32 +4918,8 @@ export default defineComponent({
       });
     });
 
-    // Clear legend width when switching away from plain type or when position is not right
-    watchEffect(() => {
-      if (
-        dashboardPanelData.data.config.legends_type !== "plain" ||
-        dashboardPanelData.data.config.legends_position !== "right"
-      ) {
-        // Clear the legend width value when conditions no longer allow width customization
-        if (dashboardPanelData.data.config.legend_width) {
-          dashboardPanelData.data.config.legend_width.value = null;
-        }
-      }
-    });
-
-    // Clear legend height when switching away from plain type or when position is not bottom/auto
-    watchEffect(() => {
-      if (
-        dashboardPanelData.data.config.legends_type !== "plain" ||
-        (dashboardPanelData.data.config.legends_position !== null &&
-          dashboardPanelData.data.config.legends_position !== "bottom")
-      ) {
-        // Clear the legend height value when conditions no longer allow height customization
-        if (dashboardPanelData.data.config.legend_height) {
-          dashboardPanelData.data.config.legend_height.value = null;
-        }
-      }
-    });
+    // Shared with AddPanel's unsaved-changes check, so the comparison clears the same sizes.
+    watchEffect(() => clearUnusableLegendSizes(dashboardPanelData.data.config));
 
     const decimalsTouched = ref(false);
 

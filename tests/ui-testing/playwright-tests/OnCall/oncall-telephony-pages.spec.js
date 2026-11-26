@@ -134,7 +134,7 @@ test.describe(
 
           await pm.oncallResponseDetailPage.openAckLink(link);
           testLogger.info('Expect a spent link to name who acknowledged (D36)');
-          await pm.oncallResponseDetailPage.expectAckLinkHeading(person.email);
+          await pm.oncallResponseDetailPage.expectAckLinkHeading(person.name);
         });
       },
     );

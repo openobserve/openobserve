@@ -808,6 +808,8 @@ class OnCallClient:
         for rule_id in self.rules:
             self._quiet(lambda i=rule_id: self.delete_ownership(i))
         for team_id in self.teams:
+            # A team still holding an open page refuses the delete, so close its pages first.
+            self._quiet(lambda i=team_id: self._resolve_open_pages(i))
             self._quiet(lambda i=team_id: self.delete_team(i))
         for email in self.users:
             self._quiet(lambda e=email: self._c.users.delete(e, org=self.org))
@@ -815,6 +817,16 @@ class OnCallClient:
         self.rules.clear()
         self.teams.clear()
         self.users.clear()
+
+    def _resolve_open_pages(self, team_id: str) -> None:
+        """Resolve a team's open pages; read directly, since `list_responses` raises on non-200."""
+        resp = self.oc("GET", "responses", params={"team_id": team_id})
+        if resp.status_code != 200:
+            log.debug("oncall sweep could not list pages of %s: %s", team_id, resp.status_code)
+            return
+        body = resp.json()
+        for record in body if isinstance(body, list) else body.get("list", []):
+            self.resolve(record["id"])
 
     @staticmethod
     def _quiet(call: Any) -> None:

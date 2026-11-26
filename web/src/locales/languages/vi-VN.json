@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "Râu trên",
       "boxplotMedian": "Trung vị",
       "boxplotSamples": "Số mẫu",
+      "boxplotValueNotNumeric": "Giá trị của biểu đồ hộp phải là trường số",
       "boxplotOutlier": "Giá trị ngoại lai",
       "fieldNotAllowedForDistribution": "Không cho phép trường {label} trong biểu đồ phân phối",
       "distributionCount": "Số lượng",

@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "الشعيرة العليا",
       "boxplotMedian": "الوسيط",
       "boxplotSamples": "العينات",
+      "boxplotValueNotNumeric": "يجب أن تكون قيمة المخطط الصندوقي حقلًا رقميًا",
       "boxplotOutlier": "قيمة شاذة",
       "fieldNotAllowedForDistribution": "الحقل {label} غير مسموح به في مخطط التوزيع",
       "distributionCount": "العدد",

@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "Bigote superior",
       "boxplotMedian": "Mediana",
       "boxplotSamples": "Muestras",
+      "boxplotValueNotNumeric": "El valor del diagrama de caja debe ser un campo numérico",
       "boxplotOutlier": "Valor atípico",
       "fieldNotAllowedForDistribution": "El campo {label} no está permitido en el gráfico de distribución",
       "distributionCount": "Recuento",

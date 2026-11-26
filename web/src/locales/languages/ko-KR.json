@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "위쪽 수염",
       "boxplotMedian": "중앙값",
       "boxplotSamples": "샘플 수",
+      "boxplotValueNotNumeric": "박스 플롯 값은 숫자 필드여야 합니다",
       "boxplotOutlier": "이상치",
       "fieldNotAllowedForDistribution": "{label} 필드는 분포 차트에서 사용할 수 없습니다",
       "distributionCount": "개수",

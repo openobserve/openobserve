@@ -10105,6 +10105,7 @@
       "boxplotUpperWhisker": "หนวดบน",
       "boxplotMedian": "มัธยฐาน",
       "boxplotSamples": "ตัวอย่าง",
+      "boxplotValueNotNumeric": "ค่าของ box plot ต้องเป็นฟิลด์ตัวเลข",
       "boxplotOutlier": "ค่าผิดปกติ",
       "fieldNotAllowedForDistribution": "ไม่สามารถใช้ฟิลด์ {label} กับแผนภูมิการกระจายได้",
       "distributionCount": "จำนวน",

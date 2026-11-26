@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "上側のひげ",
       "boxplotMedian": "中央値",
       "boxplotSamples": "サンプル数",
+      "boxplotValueNotNumeric": "箱ひげ図の値は数値フィールドである必要があります",
       "boxplotOutlier": "外れ値",
       "fieldNotAllowedForDistribution": "{label} フィールドは分布チャートでは使用できません",
       "distributionCount": "件数",

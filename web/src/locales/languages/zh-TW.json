@@ -10102,6 +10102,7 @@
       "boxplotUpperWhisker": "上鬚線",
       "boxplotMedian": "中位數",
       "boxplotSamples": "樣本數",
+      "boxplotValueNotNumeric": "盒鬚圖的值必須是數值欄位",
       "boxplotOutlier": "離群值",
       "fieldNotAllowedForDistribution": "分布圖不允許使用 {label} 欄位",
       "distributionCount": "計數",
