@@ -34,11 +34,11 @@ export const STATUS_COLORS = {
   emergency: "#E53935", // aligned with convertLogData fatal/emergency
   alert: "#ea580c",
   critical: "#F4511E", // aligned with convertLogData critical
-  error: "#D64541", // aligned with convertLogData error
-  warning: "#B8650A", // aligned with convertLogData warn/warning
+  error: "#EE6B6F", // aligned with convertLogData error
+  warning: "#ECB955", // aligned with convertLogData warn/warning
   notice: "#16a34a",
-  info: "#2F7FD0", // aligned with convertLogData info
-  debug: "#0E8A99", // aligned with convertLogData debug
+  info: "#7aa5f5", // aligned with convertLogData info
+  debug: "#34CBBB", // aligned with convertLogData debug
   ok: "#43A047", // aligned with convertLogData success/ok
 } as const;
 
@@ -609,8 +609,10 @@ export function severityStripColor(severity: LogSeverity): string {
     case "notice":
     case "info":
     case "ok":
+      return "var(--color-log-strip-info, transparent)";
     case "debug":
     case "trace":
+      return "var(--color-log-strip-debug, transparent)";
     case "unknown":
       return "transparent";
   }
