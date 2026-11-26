@@ -681,6 +681,7 @@
       "cipherKeys": "Cipher keys",
       "announcementBanners": "Aankondigingsbanners",
       "regexPatterns": "Regex-patronen",
+      "keyValues": "Sleutelwaarden",
       "evalJobs": "Online evaluatietaken",
       "billingGroup": "Factureringsgroep",
       "syntheticChecks": "Synthetics-controles",
@@ -738,6 +739,7 @@
       "cipherKeys": "cipher keys",
       "announcementBanners": "aankondigingsbanners",
       "regexPatterns": "regex-patronen",
+      "keyValues": "sleutelwaarden",
       "unnamed": "deze resource",
       "onCall": "piket",
       "incidentIntegrations": "incidentintegraties",
@@ -10988,6 +10990,11 @@
       "tryOneOfThese": "Of probeer een van deze"
     },
     "capabilities": {
+      "starter": {
+        "title": "Starterpakketten instellen",
+        "description": "Dashboards, alarms en opgeslagen weergaven, gebouwd voor je gegevens uit {packs}.",
+        "prompt": "Welke starterpakketten passen bij mijn gegevens, en wat maakt elk ervan aan?"
+      },
       "query": {
         "title": "Een vraag schrijven",
         "description": "SQL voor logs, traces, RUM, of PromQL voor metrieken.",
@@ -11016,6 +11023,17 @@
       "promqlCpu": "Schrijf PromQL voor pods met een CPU van > 80%",
       "datadogToO2": "Converteer deze Datadog-query naar OpenObserve SQL",
       "lastAlertFired": "Waarom is mijn laatste alarm afgegaan?"
+    },
+    "starterSuggestions": {
+      "whichPacks": "Welke starterpakketten passen bij mijn gegevens?",
+      "setUpPack": "Het {pack}-pakket instellen",
+      "whatInPack": "Wat zit er in het {pack}-pakket?",
+      "errorsLastHour": "Toon me fouten van het afgelopen uur"
+    },
+    "starter": {
+      "checking": "Je gegevens controleren op starterpakketten…",
+      "contextNote": "O2 Assistant heeft de starterpakketten die bij je passen als context.",
+      "readyWhenYouAre": "Klaar wanneer jij dat bent:"
     },
     "placeholderRotation": {
       "one": "Laat me fouten zien van het afgelopen uur...",
@@ -15200,6 +15218,376 @@
     "countIncidentIntegration": "{count} incidentintegratie | {count} incidentintegraties",
     "sectionOtherConsumers": "Ook gebruikt door",
     "countDowntime": "{count} onderhoudsperiode | {count} onderhoudsperiodes"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "Clusternaam",
+          "k8s_namespace_name": "Namespace",
+          "k8s_pod_name": "Podnaam",
+          "k8s_node_name": "Nodenaam",
+          "k8s_container_name": "Containernaam",
+          "kind": "Soort gebeurtenis",
+          "reason": "Reden van gebeurtenis",
+          "message": "Bericht van gebeurtenis"
+        },
+        "roles": {
+          "events": "Kubernetes-gebeurtenissen"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "Hosts"
+      },
+      "traces": {
+        "title": "Traces (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "CloudWatch-metrieken"
+        }
+      },
+      "genai": {
+        "title": "AI (LLM-apps)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "GitHub Actions-taaklogs"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "Probeer de pakketcontrole opnieuw",
+    "countAlerts": "{count} alarm | {count} alarmen",
+    "scope": "Alarmbereik: {value}",
+    "scopeAll": "Alle clusters",
+    "scopeSeen": "Alle clusters · tot nu toe {count} gezien: {clusters}",
+    "noPermission": "Je kunt dit pakket niet instellen in deze organisatie. Vraag het een beheerder.",
+    "askAdmin": "Vraag een beheerder dit in te stellen",
+    "busyBy": "{who} stelt dit pakket nu in. Kom over een minuut terug.",
+    "busySomeone": "Iemand anders stelt dit pakket nu in. Kom over een minuut terug.",
+    "busyYou": "Je stelt dit pakket in een ander tabblad in. Kom over een minuut terug.",
+    "startedBy": "{who} is begonnen met het instellen van dit pakket.",
+    "startedBySomeone": "Iemand anders is begonnen met het instellen van dit pakket.",
+    "card": {
+      "dashboards": "{count} dashboard | {count} dashboards"
+    },
+    "manifest": {
+      "leftOut": "{count} item weggelaten | {count} items weggelaten",
+      "tagEnterprise": "Enterprise",
+      "tagNeedsData": "Gegevens nodig",
+      "tagHaveIt": "Je hebt het",
+      "tagUnavailable": "Niet beschikbaar",
+      "adapted": "Aangepast aan je gegevens"
+    },
+    "installDialog": {
+      "title": "{made} van {total} items aangemaakt",
+      "attention": "{title} · {count} vraagt je aandacht | {title} · {count} vragen je aandacht",
+      "failedReason": "Kon niet worden aangemaakt. Probeer het opnieuw.",
+      "kindDashboards": "Dashboards",
+      "kindAlerts": "Alarmen",
+      "rowFailed": "Mislukt · {name}"
+    },
+    "home": {
+      "label": "Startpakketten",
+      "error": "Kon je gegevens niet controleren op pakketten",
+      "fromClusters": "van {clusters}",
+      "moreStreams": "+{count} stream | +{count} streams",
+      "moreStreamsLabel": "Meer overeenkomende streams",
+      "interrupted": "Instellen van {title} halverwege gestopt · {made} van {total} klaar",
+      "startedBy": "{who} is begonnen met het instellen van {title}.",
+      "startedBySomeone": "Iemand anders is begonnen met het instellen van {title}.",
+      "busyBy": "{who} stelt {title} nu in.",
+      "busySomeone": "Iemand anders stelt {title} nu in.",
+      "busyYou": "Je stelt {title} in een ander tabblad in.",
+      "askAdminLine": "Startpakketten passen bij je gegevens. Vraag een beheerder ze toe te voegen.",
+      "noAccessLine": "Je hebt geen toegang tot startpakketten in deze organisatie. Vraag een beheerder.",
+      "heroTitle": "Gegevens zijn live. Stel in ongeveer een minuut kant-en-klare dashboards en alarmen in",
+      "heroLead": "uit {count} pakket dat bij je gegevens past | uit {count} pakketten die bij je gegevens passen",
+      "readyToAdd": "Klaar om toe te voegen",
+      "clusterKind": "cluster",
+      "connected": "Verbonden",
+      "moreClusters": "+{count} cluster | +{count} clusters",
+      "railClusters": "{count} cluster | {count} clusters",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "Streams die dit pakket gebruikt · {count}",
+      "moreStreamsChip": "+{count} meer",
+      "streamTypeLogs": "logs",
+      "streamTypeMetrics": "metrieken",
+      "streamTypeTraces": "traces",
+      "reviewSetUp": "Pakket bekijken",
+      "reviewSetUpLabel": "Bekijk het pakket {title}",
+      "bestStart": "Beste startpunt",
+      "cards": {
+        "andMore": "{list} en {count} meer",
+        "panels": "{count} paneel | {count} panelen",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {panels} voor {clusters}. | {title}: {panels} voor {clusters} clusters.",
+            "fallback": "{title}: elke node, pod en workload."
+          },
+          "alerts": {
+            "template": "{alert_names}. Gaan af voor elk cluster ({clusters}). Uit tot je ze aanzet.",
+            "fallback": "{alert_names}. Gaan af voor elk cluster. Uit tot je ze aanzet.",
+            "plain": "Gaan af voor elk cluster. Uit tot je ze aanzet."
+          },
+          "savedViews": {
+            "template": "Kubernetes-gebeurtenissen: elke gebeurtenis in {stream}, één klik vanaf Logs.",
+            "fallback": "Kubernetes-gebeurtenissen, één klik vanaf Logs."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "Hostmetrieken: CPU, geheugen en schijf per host."
+          },
+          "alerts": {
+            "template": "{alert_names}. Gaan af voor elke host. Uit tot je ze aanzet.",
+            "fallback": "Gaan af voor elke host. Uit tot je ze aanzet."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: {panels} voor je gegevens.",
+            "fallback": "{title}, gebouwd voor je streams."
+          },
+          "alerts": {
+            "template": "{alert_names}. Gaan af op al je overeenkomende gegevens. Uit tot je ze aanzet.",
+            "fallback": "Gaan af op al je overeenkomende gegevens. Uit tot je ze aanzet."
+          },
+          "savedViews": {
+            "template": "{stream} in logs, met één klik bereikbaar.",
+            "fallback": "Met één klik vanaf logs."
+          }
+        }
+      },
+      "previewFailed": "Kon niet laden wat dit pakket instelt. Bekijk het om het opnieuw te proberen.",
+      "nothingFitsYet": "Nog niets in dit pakket past bij je gegevens. De items verschijnen hier zodra hun gegevens binnenkomen."
+    },
+    "whatGetsCreated": {
+      "subtitle": "{title}-starterspakket",
+      "subtitleScoped": "{title}-starterspakket · gebouwd voor {scope}",
+      "savedIn": "Opgeslagen in de map {folder}",
+      "skippedNote": "{count} item overgeslagen · je bestaande item wordt behouden | {count} items overgeslagen · je bestaande items worden behouden",
+      "nameInUse": "{name} bestaat al · je bestaande versie blijft behouden",
+      "skipped": "Overgeslagen",
+      "notSeenYet": "Nog niet gezien",
+      "footprint": "Voetafdruk",
+      "reachStarted": "Achtergrondquery's: elk gestart alarm draait volgens zijn eigen schema",
+      "reachStartedScoped": "Alarmbereik: {scope} · Achtergrondquery's: elk gestart alarm draait volgens zijn eigen schema",
+      "selectGroup": "Alles in {group} selecteren",
+      "selectRow": "{name} selecteren"
+    },
+    "drawer": {
+      "packTitle": "{title}-pakket",
+      "view": "Kubernetes-weergave",
+      "viewPath": "Infrastructuur › Kubernetes",
+      "dashboard": "{title}-dashboard",
+      "dashboardNote": "Opent na het instellen.",
+      "panelsFit": "{count} paneel past bij je gegevens. Opent na het instellen. | {count} panelen passen bij je gegevens. Opent na het instellen.",
+      "alerts": "Alarmen, uit tot je ze aanzet",
+      "savedViews": "Opgeslagen weergaven in logs",
+      "savedViewsNote": "Gedeeld met iedereen in deze organisatie",
+      "folder": "Map",
+      "folderValue": "{name} (starterspakket)",
+      "reach": "Achtergrondquery's: voorlopig geen",
+      "reachScoped": "Alarmbereik: {scope} · Achtergrondquery's: voorlopig geen",
+      "notIncluded": "Niet inbegrepen",
+      "reasonAlreadyHave": "{name}: je hebt dit al",
+      "reasonNoData": "{name}: nog geen gegevens hiervoor gezien",
+      "reasonUnavailable": "{name}: momenteel niet in de bibliotheek",
+      "reasonNeedsPlan": "{name}: vereist het Enterprise-plan",
+      "source": "Uit de bibliotheek op {host}. Het pakket dat in deze versie is ingebouwd, werkt offline.",
+      "sourceOffline": "{host} is niet bereikbaar. We gebruiken het pakket dat in deze versie is ingebouwd en offline werkt.",
+      "nothingToCreate": "Je hebt al elk item in dit pakket",
+      "openDashboard": "Dashboard openen",
+      "error": "Kan niet laden wat dit pakket aanmaakt",
+      "reasonNoFlavour": "{name}: nog niet beschikbaar voor je metrieknamen",
+      "loadingFit": "Controleren welke items bij je gegevens passen",
+      "noteForbidden": "{title} · je hebt geen toegang om dit pakket in te stellen",
+      "setUp": "Instellen",
+      "allExist": "Je hebt al alle {count} items in dit pakket. Bestaande alarmen behouden hun instellingen.",
+      "continue": "Doorgaan",
+      "setUpCount": "{count} item instellen | {count} items instellen",
+      "ordinaryNote": "Voegt gewone dashboards, alarmen en weergaven toe, die op de pagina van het pakket worden vermeld. Bewerk of verwijder ze op hun eigen pagina's.",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "{title}-monitoring instellen",
+      "summary": "{made} van {total} aangemaakt",
+      "created": "Aangemaakt",
+      "creating": "Bezig met aanmaken",
+      "waiting": "Wachten",
+      "rowAlerts": "Alarmen {made} van {total}",
+      "rowViews": "Opgeslagen weergaven {made} van {total}",
+      "rowDashboards": "Dashboards {made} van {total}",
+      "retry": "{count} item opnieuw proberen | {count} items opnieuw proberen",
+      "finish": "Voltooien",
+      "interrupted": "Instellen onderbroken · {made} van {total} gedaan",
+      "installError": "Het instellen is niet voltooid. Probeer het opnieuw.",
+      "comeBack": "{made} van {total} aangemaakt · je kunt dit sluiten en verder werken. Je vindt het terug via Starter packs bovenaan.",
+      "alertsOnTo": "Bezig met aanmaken · aan, verzenden naar {destination}",
+      "emailMe": "E-mail mij ({email})",
+      "creatingOn": "Bezig met aanmaken · aan"
+    },
+    "severity": {
+      "critical": "Kritiek",
+      "warning": "Waarschuwing",
+      "info": "Info"
+    },
+    "adapted": {
+      "someField": "Een veld",
+      "flavour": "Gebruikt de {name}-versie",
+      "change": "Wijzigen",
+      "streams": "Streams",
+      "fields": "Velden",
+      "version": "Versie",
+      "streamCount": "{count} stream | {count} streams",
+      "fieldCount": "{count} veld | {count} velden",
+      "matchedBoth": "{streams} en {fields} gekoppeld aan je gegevens",
+      "matchedOne": "{what} gekoppeld aan je gegevens",
+      "needsChoiceCount": "{count} vereist je keuze | {count} vereisen je keuze",
+      "notFoundCount": "{count} niet gevonden",
+      "matchedCount": "{count} gekoppeld",
+      "whichStream": "Welke stream is {what}?",
+      "lookRight": "{count} lijkt te kloppen | {count} lijken te kloppen",
+      "noneFound": "Geen {what} gevonden",
+      "showMore": "Nog {count} tonen",
+      "needsChoice": "Vereist een keuze",
+      "severalMatch": "{count} streams lijken op {what}",
+      "oneMatch": "{stream} lijkt op {what}",
+      "sharedAsk": "Welke records zijn {what}?",
+      "choose": "Kiezen",
+      "dialogFields": "{matched} van {total} velden",
+      "dialogUse": "Gebruik {stream}",
+      "dialogUseAll": "Alle {count} gebruiken",
+      "dialogUseChecked": "Deze {count} gebruiken",
+      "dialogAllNote": "Alles: het dashboard krijgt een streamkiezer en elk alarm dat dit leest, wordt één keer per stream ingesteld.",
+      "dialogPickFive": "Kies maximaal {count} streams.",
+      "dialogPickStream": "Kies de stream",
+      "dialogPickPlaceholder": "Kies een stream",
+      "dialogFiltersOn": "Leest uit {stream}, alleen records waar {field} gelijk is aan {value}",
+      "dialogNoValues": "Er zijn de afgelopen 24 uur geen waarden gevonden voor dit veld.",
+      "dialogSend": "Of stuur ze naar {stream}: stel deze header in je collector in",
+      "dialogFieldTitle": "Kies het veld voor {what}",
+      "dialogFieldLabel": "Veld in {stream}",
+      "values": "Gezien: {values}",
+      "or": "of",
+      "filterTitle": "Voeg een filter toe zodat het pakket alleen {what} leest",
+      "showFewer": "Minder tonen"
+    },
+    "matchCheck": {
+      "checked": "Gecontroleerd {when}",
+      "checkedAt": "Gecontroleerd {time} (je lokale tijd)",
+      "justNow": "zojuist",
+      "minutesAgo": "{count} min geleden",
+      "hoursAgo": "{count} u geleden",
+      "daysAgo": "{count} d geleden"
+    },
+    "headerChip": {
+      "label": "Startpakketten",
+      "ariaLabel": "Startpakketten, {count} past bij je gegevens | Startpakketten, {count} passen bij je gegevens",
+      "progress": "{made} van {total}",
+      "ariaLabelRunning": "Startpakketten, {made} van {total} wordt ingesteld"
+    },
+    "guide": {
+      "rowSavedViews": "{count} opgeslagen weergave | {count} opgeslagen weergaven"
+    },
+    "stepper": {
+      "content": "Kies inhoud",
+      "setup": "Instellen",
+      "settingUp": "Bezig met instellen…",
+      "interrupted": "Onderbroken",
+      "ready": "Gereed",
+      "noteRunning": "Bezig met instellen · {made} van {total} aangemaakt",
+      "noteAlertsOn": "{made} van {total} aangemaakt · {count} alarm aan | {made} van {total} aangemaakt · {count} alarmen aan",
+      "noteAlertsOff": "{made} van {total} aangemaakt · alarmen uit",
+      "noteAlreadyHere": "{made} van {total} aangemaakt · {count} al aanwezig"
+    },
+    "alertStep": {
+      "turnOn": "Schakel het {count} pakket-alarm in | Schakel de {count} pakket-alarmen in",
+      "sendTo": "Versturen naar",
+      "sendToEmail": "Versturen naar: {icon} E-mail mij — {email}",
+      "emailCreateNote": "Nog geen bestemming in deze org. Instellen voegt een e-mailbestemming voor je toe (of hergebruikt er een die alleen naar jou verstuurt).",
+      "noDestination": "Nog geen bestemming. Voeg er een toe onder Alarmen → Bestemmingen.",
+      "destinationsFailed": "Kon bestemmingen niet laden, dus Versturen naar staat uit. Alarmen kunnen later een bestemming krijgen onder Alarmen → Bestemmingen.",
+      "destinations": "{count} bestemming in deze org | {count} bestemmingen in deze org",
+      "chooseDestination": "Kies een bestemming",
+      "pickDestination": "Kies een bestemming voor Versturen naar, of vink het uit"
+    },
+    "ready": {
+      "title": "Monitoring voor {title} is gereed",
+      "emailFailed": "Je e-mailbestemming kon niet worden aangemaakt, dus de alarmen zijn uitgeschakeld toegevoegd.",
+      "emailForbidden": "Je kunt geen alarmbestemmingen toevoegen in deze org, dus je e-mailbestemming is niet aangemaakt en de alarmen zijn uitgeschakeld toegevoegd."
+    },
+    "popup": {
+      "title": "Startpakketten",
+      "subtitle": "{count} pakket past bij gegevens die je al verstuurt | {count} pakketten passen bij gegevens die je al verstuurt",
+      "subtitleAllSetUp": "Elk pakket dat bij je gegevens past, is ingesteld",
+      "subtitleNone": "Nog geen pakketten die overeenkomen",
+      "items": "{count} item | {count} items",
+      "setUpAgo": "Ingesteld {when}",
+      "stopped": "Instellen halverwege gestopt",
+      "whatGetsCreated": "Wat er wordt aangemaakt",
+      "tileDashboards": "{count} Dashboard | {count} Dashboards",
+      "tileAlerts": "{count} alarm | {count} alarms",
+      "tileSavedViews": "{count} opgeslagen weergave | {count} opgeslagen weergaven",
+      "noneDashboards": "Dashboards",
+      "noneAlerts": "Alarmen",
+      "noneSavedViews": "Opgeslagen weergaven",
+      "noneInPack": "Geen in dit pakket",
+      "sevCritical": "{count} kritiek",
+      "sevWarning": "{count} waarschuwing",
+      "sevInfo": "{count} info",
+      "chooseNext": "Kies welke items in de volgende stap worden aangemaakt",
+      "reviewSetUp": "Pakket controleren",
+      "viewPack": "Pakket bekijken",
+      "checkAgain": "Opnieuw controleren",
+      "checkFailed": "Kon niet controleren. Probeer het opnieuw",
+      "emptyTitle": "Nog geen pakketten die bij je gegevens passen",
+      "emptyText": "Pakketten verschijnen wanneer OpenObserve gegevens ziet van een bron die het kent, zoals Kubernetes, hosts, Docker, PostgreSQL of AWS. Stuur gegevens en controleer opnieuw.",
+      "back": "Terug",
+      "backToPacks": "Terug naar pakketten",
+      "keepsGoing": "Je kunt dit sluiten. De installatie gaat door."
+    },
+    "viewPack": {
+      "open": "Openen",
+      "openLabel": "{name} openen",
+      "dashboard": "Dashboard",
+      "dashboards": "Dashboards",
+      "dashboardsMeta": "{count} dashboard | {count} dashboards",
+      "alerts": "Alarmen",
+      "alertsMeta": "{count} · {on} aan · {silent} stil",
+      "alertsMetaFailed": "{count} · {on} aan · {silent} stil · {failed} niet aangemaakt",
+      "savedView": "Opgeslagen weergave · gedeeld met iedereen in deze org",
+      "savedViews": "Opgeslagen weergaven",
+      "savedViewsMeta": "{count} opgeslagen weergave · gedeeld met iedereen in deze org | {count} opgeslagen weergaven · gedeeld met iedereen in deze org",
+      "on": "Aan",
+      "silent": "Stil",
+      "notCreated": "Niet aangemaakt",
+      "showMore": "Toon {count} meer",
+      "showLess": "Toon minder",
+      "ordinary": "Dit zijn gewone alarmen, dashboards en weergaven. Bewerk of verwijder ze op hun eigen pagina's.",
+      "setUpByYou": "Door jou ingesteld {when}",
+      "setUpBy": "Ingesteld door {who} {when}",
+      "setUpWhen": "Ingesteld {when}",
+      "partialTitle": "{title}-monitoring is ingesteld, {count} item is niet aangemaakt | {title}-monitoring is ingesteld, {count} items zijn niet aangemaakt",
+      "partialNote": "De rest is klaar. Probeer hieronder een item opnieuw, of probeer ze allemaal opnieuw.",
+      "partialSubtitle": "{made} van {total} aangemaakt · {failed} niet aangemaakt"
+    }
   },
   "alert_library": {
     "header": "Alarmbibliotheek",

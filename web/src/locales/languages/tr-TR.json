@@ -681,6 +681,7 @@
       "cipherKeys": "Şifreleme anahtarları",
       "announcementBanners": "Duyuru bantları",
       "regexPatterns": "Regex desenleri",
+      "keyValues": "Anahtar değerleri",
       "evalJobs": "Çevrimiçi değerlendirme işleri",
       "billingGroup": "Faturalandırma grubu",
       "syntheticChecks": "Sentetik kontrolleri",
@@ -738,6 +739,7 @@
       "cipherKeys": "şifreleme anahtarları",
       "announcementBanners": "duyuru bantları",
       "regexPatterns": "regex desenleri",
+      "keyValues": "anahtar değerleri",
       "unnamed": "bu kaynak",
       "onCall": "nöbet",
       "incidentIntegrations": "vaka entegrasyonları",
@@ -10988,6 +10990,11 @@
       "tryOneOfThese": "Veya bunlardan birini deneyin"
     },
     "capabilities": {
+      "starter": {
+        "title": "Başlangıç Paketlerini kur",
+        "description": "Gösterge panoları, uyarılar ve kaydedilmiş görünümler {packs} verileriniz için oluşturuldu.",
+        "prompt": "Hangi başlangıç paketleri verilerime uygun ve her biri ne oluşturacak?"
+      },
       "query": {
         "title": "Bir Sorgu Yazın",
         "description": "Günlükler, izler, RUM için SQL veya metrikler için PromQL.",
@@ -11016,6 +11023,17 @@
       "promqlCpu": "> %80 CPU kullanan bölmeler için PromQL yazın",
       "datadogToO2": "Bu Datadog sorgusunu OpenObserve SQL'e dönüştürün",
       "lastAlertFired": "Son uyarım neden tetiklendi?"
+    },
+    "starterSuggestions": {
+      "whichPacks": "Hangi başlangıç paketleri verilerime uygun?",
+      "setUpPack": "{pack} paketini kur",
+      "whatInPack": "{pack} paketinde neler var?",
+      "errorsLastHour": "Son bir saatteki hataları göster"
+    },
+    "starter": {
+      "checking": "Başlangıç paketleri için verileriniz kontrol ediliyor…",
+      "contextNote": "O2 Assistant, eşleşen başlangıç paketlerinizi bağlam olarak alıyor.",
+      "readyWhenYouAre": "Siz hazır olduğunuzda:"
     },
     "placeholderRotation": {
       "one": "Bana son saatteki hataları göster...",
@@ -15200,6 +15218,376 @@
     "countIncidentIntegration": "{count} vaka entegrasyonu | {count} vaka entegrasyonu",
     "sectionOtherConsumers": "Ayrıca kullananlar",
     "countDowntime": "{count} bakım penceresi | {count} bakım penceresi"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "Küme adı",
+          "k8s_namespace_name": "Ad alanı",
+          "k8s_pod_name": "Pod adı",
+          "k8s_node_name": "Düğüm adı",
+          "k8s_container_name": "Konteyner adı",
+          "kind": "Olay türü",
+          "reason": "Olay nedeni",
+          "message": "Olay mesajı"
+        },
+        "roles": {
+          "events": "Kubernetes olayları"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "Ana Bilgisayarlar"
+      },
+      "traces": {
+        "title": "İzler (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "CloudWatch metrikleri"
+        }
+      },
+      "genai": {
+        "title": "Yapay Zeka (LLM uygulamaları)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "GitHub Actions iş günlükleri"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "Paket kontrolünü yeniden deneyin",
+    "countAlerts": "{count} uyarı | {count} uyarı",
+    "scope": "Uyarı kapsamı: {value}",
+    "scopeAll": "Tüm kümeler",
+    "scopeSeen": "Tüm kümeler · şu ana kadar {count} görüldü: {clusters}",
+    "noPermission": "Bu kuruluşta bu paketi kuramazsınız. Bir yöneticiden isteyin.",
+    "askAdmin": "Bunu kurması için bir yöneticiden isteyin",
+    "busyBy": "{who} şu anda bu paketi kuruyor. Bir dakika sonra tekrar kontrol edin.",
+    "busySomeone": "Başka biri şu anda bu paketi kuruyor. Bir dakika sonra tekrar kontrol edin.",
+    "busyYou": "Bu paketi başka bir sekmede kuruyorsunuz. Bir dakika sonra tekrar kontrol edin.",
+    "startedBy": "{who} bu paketi kurmaya başladı.",
+    "startedBySomeone": "Başka biri bu paketi kurmaya başladı.",
+    "card": {
+      "dashboards": "{count} gösterge panosu | {count} gösterge panosu"
+    },
+    "manifest": {
+      "leftOut": "{count} öğe dışarıda bırakıldı | {count} öğe dışarıda bırakıldı",
+      "tagEnterprise": "Kurumsal",
+      "tagNeedsData": "Veri gerekiyor",
+      "tagHaveIt": "Sizde var",
+      "tagUnavailable": "Kullanılamıyor",
+      "adapted": "Verilerinize uyarlandı"
+    },
+    "installDialog": {
+      "title": "{total} öğeden {made} tanesi oluşturuldu",
+      "attention": "{title} · {count} öğe ilginizi bekliyor | {title} · {count} öğe ilginizi bekliyor",
+      "failedReason": "Oluşturulamadı. Tekrar denemek için yeniden deneyin.",
+      "kindDashboards": "Gösterge panoları",
+      "kindAlerts": "Uyarılar",
+      "rowFailed": "Başarısız · {name}"
+    },
+    "home": {
+      "label": "Başlangıç paketleri",
+      "error": "Paketler için verileriniz kontrol edilemedi",
+      "fromClusters": "{clusters} kaynağından",
+      "moreStreams": "+{count} akış | +{count} akış",
+      "moreStreamsLabel": "Eşleşen diğer akışlar",
+      "interrupted": "{title} kurulumu yarıda durdu · {total} öğeden {made} tanesi tamamlandı",
+      "startedBy": "{who}, {title} kurulumunu başlattı.",
+      "startedBySomeone": "Başka biri {title} kurulumunu başlattı.",
+      "busyBy": "{who} şu anda {title} kurulumunu yapıyor.",
+      "busySomeone": "Başka biri şu anda {title} kurulumunu yapıyor.",
+      "busyYou": "{title} kurulumunu başka bir sekmede yapıyorsunuz.",
+      "askAdminLine": "Başlangıç paketleri verilerinize uygun. Eklemeleri için bir yöneticiden isteyin.",
+      "noAccessLine": "Bu kuruluşta başlangıç paketlerine erişiminiz yok. Bir yöneticiye danışın.",
+      "heroTitle": "Veriler canlı. Hazır gösterge panolarını ve uyarıları yaklaşık bir dakikada kurun",
+      "heroLead": "verilerinize uyan {count} paketten | verilerinize uyan {count} paketten",
+      "readyToAdd": "Eklemeye hazır",
+      "clusterKind": "küme",
+      "connected": "Bağlı",
+      "moreClusters": "+{count} küme | +{count} küme",
+      "railClusters": "{count} küme | {count} küme",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "Bu paketin kullandığı akışlar · {count}",
+      "moreStreamsChip": "+{count} tane daha",
+      "streamTypeLogs": "günlükler",
+      "streamTypeMetrics": "metrikler",
+      "streamTypeTraces": "izler",
+      "reviewSetUp": "Paketi incele",
+      "reviewSetUpLabel": "{title} paketini incele",
+      "bestStart": "Başlamak için en iyi yer",
+      "cards": {
+        "andMore": "{list} ve {count} tane daha",
+        "panels": "{count} panel | {count} panel",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {clusters} küme için {panels}. | {title}: {clusters} küme için {panels}.",
+            "fallback": "{title}: her düğüm, pod ve iş yükü."
+          },
+          "alerts": {
+            "template": "{alert_names}. Her küme için tetiklenir ({clusters}). Açana kadar kapalı.",
+            "fallback": "{alert_names}. Her küme için tetiklenir. Açana kadar kapalı.",
+            "plain": "Her küme için tetiklenir. Açana kadar kapalı."
+          },
+          "savedViews": {
+            "template": "Kubernetes olayları: {stream} içindeki her olay, Günlükler'den tek tıkla.",
+            "fallback": "Kubernetes olayları, Günlükler'den tek tıkla."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "Ana Bilgisayar Metrikleri: her ana bilgisayar için CPU, bellek ve disk."
+          },
+          "alerts": {
+            "template": "{alert_names}. Her ana bilgisayar için tetiklenir. Açana kadar kapalı.",
+            "fallback": "Fire for every host. Off until you turn them on."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: verileriniz için {panels}.",
+            "fallback": "{title}, akışlarınız için oluşturuldu."
+          },
+          "alerts": {
+            "template": "{alert_names}. Eşleşen tüm verilerinizde tetiklenir. Siz açana kadar kapalı.",
+            "fallback": "Eşleşen tüm verilerinizde tetiklenir. Siz açana kadar kapalı."
+          },
+          "savedViews": {
+            "template": "Günlükler'de {stream}, tek tık uzağınızda.",
+            "fallback": "Günlükler'den tek tık uzakta."
+          }
+        }
+      },
+      "previewFailed": "Bu paketin kurdukları yüklenemedi. Tekrar denemek için gözden geçirin.",
+      "nothingFitsYet": "Bu pakette henüz verinize uyan bir şey yok. Öğeleri, ilgili veriler geldiğinde burada görünür."
+    },
+    "whatGetsCreated": {
+      "subtitle": "{title} başlangıç paketi",
+      "subtitleScoped": "{title} başlangıç paketi · {scope} için oluşturuldu",
+      "savedIn": "{folder} klasörüne kaydedildi",
+      "skippedNote": "{count} öğe atlandı · mevcut olanınız korunuyor | {count} öğe atlandı · mevcut olanlarınız korunuyor",
+      "nameInUse": "{name} zaten var · sizinki korunuyor",
+      "skipped": "Atlandı",
+      "notSeenYet": "Henüz görülmedi",
+      "footprint": "Ayak izi",
+      "reachStarted": "Arka plan sorguları: başlatılan her uyarı kendi zamanlamasına göre çalışır",
+      "reachStartedScoped": "Uyarı kapsamı: {scope} · Arka plan sorguları: başlatılan her uyarı kendi zamanlamasına göre çalışır",
+      "selectGroup": "{group} içindekilerin tümünü seç",
+      "selectRow": "{name} öğesini seç"
+    },
+    "drawer": {
+      "packTitle": "{title} paketi",
+      "view": "Kubernetes görünümü",
+      "viewPath": "Altyapı › Kubernetes",
+      "dashboard": "{title} gösterge panosu",
+      "dashboardNote": "Kurulumdan sonra açılır",
+      "panelsFit": "{count} panel verinize uyuyor. Kurulumdan sonra açılır. | {count} panel verinize uyuyor. Kurulumdan sonra açılır.",
+      "alerts": "Uyarılar, siz açana kadar kapalı",
+      "savedViews": "Günlükler'deki kayıtlı görünümler",
+      "savedViewsNote": "Bu kuruluştaki herkesle paylaşılır",
+      "folder": "Klasör",
+      "folderValue": "{name} (başlangıç paketi)",
+      "reach": "Arka plan sorguları: Şimdilik yok",
+      "reachScoped": "Uyarı kapsamı: {scope} · Arka plan sorguları: Şimdilik yok",
+      "notIncluded": "Dahil değil",
+      "reasonAlreadyHave": "{name}: zaten sizde var",
+      "reasonNoData": "{name}: bunun için henüz veri görülmedi",
+      "reasonUnavailable": "{name}: şu anda Kitaplık'ta değil",
+      "reasonNeedsPlan": "{name}: Enterprise planı gerektiriyor",
+      "source": "{host} adresindeki Kitaplık'tan. Bu sürüme yerleşik paket çevrimdışı çalışır.",
+      "sourceOffline": "{host} adresine ulaşılamıyor. Bu sürüme yerleşik olan ve çevrimdışı çalışan paket kullanılıyor.",
+      "nothingToCreate": "Bu paketteki tüm öğeler zaten sizde",
+      "openDashboard": "Gösterge panosunu aç",
+      "error": "Bu paketin oluşturdukları yüklenemedi",
+      "reasonNoFlavour": "{name}: metrik adlarınız için henüz kullanılamıyor",
+      "loadingFit": "Hangi öğelerin verinize uyduğu kontrol ediliyor",
+      "noteForbidden": "{title} · bu paketi kurma erişiminiz yok",
+      "setUp": "Kur",
+      "allExist": "Bu paketteki {count} öğenin tümü zaten sizde. Mevcut uyarılar ayarlarını korur.",
+      "continue": "Devam",
+      "setUpCount": "{count} öğe kur | {count} öğe kur",
+      "ordinaryNote": "Paketin sayfasında listelenen normal gösterge panoları, uyarılar ve görünümler ekler. Bunları kendi sayfalarında düzenleyebilir veya silebilirsiniz.",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "{title} izlemesi ayarlanıyor",
+      "summary": "{total} öğeden {made} tanesi oluşturuldu",
+      "created": "Oluşturuldu",
+      "creating": "Oluşturuluyor",
+      "waiting": "Bekliyor",
+      "rowAlerts": "Uyarılar {made} / {total}",
+      "rowViews": "Kayıtlı görünümler {made} / {total}",
+      "rowDashboards": "Gösterge panoları {made} / {total}",
+      "retry": "{count} öğeyi yeniden dene | {count} öğeyi yeniden dene",
+      "finish": "Bitir",
+      "interrupted": "Kurulum kesintiye uğradı · {total} öğeden {made} tanesi tamamlandı",
+      "installError": "Kurulum tamamlanmadı. Tekrar deneyin.",
+      "comeBack": "{total} öğeden {made} tanesi oluşturuldu · bunu kapatıp çalışmaya devam edebilirsiniz. Üst çubuktaki Başlangıç paketleri bölümünden yeniden bulabilirsiniz.",
+      "alertsOnTo": "Oluşturuluyor · açık, {destination} adresine gönderiliyor",
+      "emailMe": "Bana e-posta gönder ({email})",
+      "creatingOn": "Oluşturuluyor · açık"
+    },
+    "severity": {
+      "critical": "Kritik",
+      "warning": "Uyarı",
+      "info": "Bilgi"
+    },
+    "adapted": {
+      "someField": "Bir alan",
+      "flavour": "{name} sürümünü kullanır",
+      "change": "Değiştir",
+      "streams": "Akışlar",
+      "fields": "Alanlar",
+      "version": "Sürüm",
+      "streamCount": "{count} akış | {count} akış",
+      "fieldCount": "{count} alan | {count} alan",
+      "matchedBoth": "{streams} ve {fields} verilerinizle eşleşti",
+      "matchedOne": "{what} verilerinizle eşleşti",
+      "needsChoiceCount": "{count} tanesi seçim yapmanızı gerektiriyor | {count} tanesi seçim yapmanızı gerektiriyor",
+      "notFoundCount": "{count} tanesi bulunamadı",
+      "matchedCount": "{count} tanesi eşleşti",
+      "whichStream": "{what} hangi akışta?",
+      "lookRight": "{count} tanesi doğru görünüyor | {count} tanesi doğru görünüyor",
+      "noneFound": "{what} bulunamadı",
+      "showMore": "{count} tane daha göster",
+      "needsChoice": "Seçim gerekiyor",
+      "severalMatch": "{count} akış {what} gibi görünüyor",
+      "oneMatch": "{stream} {what} gibi görünüyor",
+      "sharedAsk": "Hangi kayıtlar {what}?",
+      "choose": "Seç",
+      "dialogFields": "{total} alandan {matched} tanesi",
+      "dialogUse": "{stream} kullan",
+      "dialogUseAll": "{count} tanesinin tümünü kullan",
+      "dialogUseChecked": "Bu {count} tanesini kullan",
+      "dialogAllNote": "Tümü: gösterge panosu bir akış seçici alır ve bunu okuyan her uyarı akış başına bir kez kurulur.",
+      "dialogPickFive": "En fazla {count} akış seçin.",
+      "dialogPickStream": "Akışı seçin",
+      "dialogPickPlaceholder": "Bir akış seçin",
+      "dialogFiltersOn": "{stream} akışından okur, yalnızca {field} alanı {value} olan kayıtlar",
+      "dialogNoValues": "Son 24 saatte bu alan için hiçbir değer bulunamadı.",
+      "dialogSend": "Veya bunları {stream} akışına gönderin: toplayıcınızda bu başlığı ayarlayın",
+      "dialogFieldTitle": "{what} için alanı seçin",
+      "dialogFieldLabel": "{stream} içindeki alan",
+      "values": "Görülen: {values}",
+      "or": "veya",
+      "filterTitle": "Paketin yalnızca {what} okuması için bir filtre ekleyin",
+      "showFewer": "Daha az göster"
+    },
+    "matchCheck": {
+      "checked": "{when} kontrol edildi",
+      "checkedAt": "{time} kontrol edildi (yerel saatiniz)",
+      "justNow": "az önce",
+      "minutesAgo": "{count} dk önce",
+      "hoursAgo": "{count} sa önce",
+      "daysAgo": "{count} gün önce"
+    },
+    "headerChip": {
+      "label": "Başlangıç paketleri",
+      "ariaLabel": "Başlangıç paketleri, {count} tanesi verilerinize uyuyor | Başlangıç paketleri, {count} tanesi verilerinize uyuyor",
+      "progress": "{made} / {total}",
+      "ariaLabelRunning": "Başlangıç paketleri, {total} içinden {made} ayarlanıyor"
+    },
+    "guide": {
+      "rowSavedViews": "{count} kayıtlı görünüm | {count} kayıtlı görünüm"
+    },
+    "stepper": {
+      "content": "İçerik seçin",
+      "setup": "Ayarlanıyor",
+      "settingUp": "Ayarlanıyor…",
+      "interrupted": "Kesildi",
+      "ready": "Hazır",
+      "noteRunning": "Ayarlanıyor · {total} içinden {made} oluşturuldu",
+      "noteAlertsOn": "{total} içinden {made} oluşturuldu · {count} uyarı açık | {total} içinden {made} oluşturuldu · {count} uyarı açık",
+      "noteAlertsOff": "{total} içinden {made} oluşturuldu · uyarılar kapalı",
+      "noteAlreadyHere": "{total} içinden {made} oluşturuldu · {count} tanesi zaten burada"
+    },
+    "alertStep": {
+      "turnOn": "{count} paket uyarısını etkinleştir | {count} paket uyarısını etkinleştir",
+      "sendTo": "Şuraya gönder",
+      "sendToEmail": "Şuraya gönder: {icon} Bana e-posta gönder — {email}",
+      "emailCreateNote": "Bu kuruluşta henüz hedef yok. Kurulum sizin için bir e-posta hedefi ekler (veya yalnızca size gönderen bir hedefi yeniden kullanır).",
+      "noDestination": "Henüz hedef yok. Uyarılar → Hedefler altında bir tane ekleyin.",
+      "destinationsFailed": "Hedefler yüklenemedi, bu nedenle Şuraya gönder kapalı. Uyarılar daha sonra Uyarılar → Hedefler altında bir hedef edinebilir.",
+      "destinations": "Bu kuruluşta {count} hedef | Bu kuruluşta {count} hedef",
+      "chooseDestination": "Bir hedef seçin",
+      "pickDestination": "Şuraya gönder için bir hedef seçin veya işareti kaldırın"
+    },
+    "ready": {
+      "title": "{title} izleme hazır",
+      "emailFailed": "E-posta hedefiniz oluşturulamadı, bu nedenle uyarılar kapalı olarak eklendi.",
+      "emailForbidden": "Bu kuruluşta uyarı hedefi ekleyemezsiniz, bu nedenle e-posta hedefiniz oluşturulmadı ve uyarılar kapalı olarak eklendi."
+    },
+    "popup": {
+      "title": "Başlangıç Paketleri",
+      "subtitle": "Zaten gönderdiğiniz verilere {count} paket uyuyor | Zaten gönderdiğiniz verilere {count} paket uyuyor",
+      "subtitleAllSetUp": "Verilerinize uyan her paket ayarlandı",
+      "subtitleNone": "Henüz eşleşen paket yok",
+      "items": "{count} öğe | {count} öğe",
+      "setUpAgo": "{when} ayarlandı",
+      "stopped": "Kurulum yarıda kaldı",
+      "whatGetsCreated": "Neler oluşturulur",
+      "tileDashboards": "{count} Gösterge Panosu | {count} Gösterge Panosu",
+      "tileAlerts": "{count} Uyarı | {count} Uyarı",
+      "tileSavedViews": "{count} Kayıtlı Görünüm | {count} Kayıtlı Görünüm",
+      "noneDashboards": "Gösterge panoları",
+      "noneAlerts": "Uyarılar",
+      "noneSavedViews": "Kayıtlı Görünümler",
+      "noneInPack": "Bu pakette yok",
+      "sevCritical": "{count} kritik",
+      "sevWarning": "{count} uyarı",
+      "sevInfo": "{count} bilgi",
+      "chooseNext": "Sonraki adımda hangi öğelerin oluşturulacağını seçin",
+      "reviewSetUp": "Paketi Gözden Geçir",
+      "viewPack": "Paketi Görüntüle",
+      "checkAgain": "Tekrar Kontrol Et",
+      "checkFailed": "Kontrol edilemedi. Tekrar deneyin",
+      "emptyTitle": "Henüz verilerinizle eşleşen paket yok",
+      "emptyText": "Paketler, OpenObserve tanıdığı bir kaynaktan (Kubernetes, ana bilgisayarlar, Docker, PostgreSQL veya AWS gibi) veri gördüğünde görünür. Veri gönderin, ardından tekrar kontrol edin.",
+      "back": "Geri",
+      "backToPacks": "Paketlere Dön",
+      "keepsGoing": "Bunu kapatabilirsiniz. Kurulum devam eder."
+    },
+    "viewPack": {
+      "open": "Aç",
+      "openLabel": "{name} öğesini aç",
+      "dashboard": "Gösterge panosu",
+      "dashboards": "Gösterge panoları",
+      "dashboardsMeta": "{count} gösterge panosu | {count} gösterge panosu",
+      "alerts": "Uyarılar",
+      "alertsMeta": "{count} · {on} açık · {silent} sessiz",
+      "alertsMetaFailed": "{count} · {on} açık · {silent} sessiz · {failed} oluşturulmadı",
+      "savedView": "Kayıtlı görünüm · bu kuruluştaki herkesle paylaşılır",
+      "savedViews": "Kayıtlı görünümler",
+      "savedViewsMeta": "{count} kayıtlı görünüm · bu kuruluştaki herkesle paylaşılır | {count} kayıtlı görünüm · bu kuruluştaki herkesle paylaşılır",
+      "on": "Açık",
+      "silent": "Sessiz",
+      "notCreated": "Oluşturulmadı",
+      "showMore": "{count} tane daha göster",
+      "showLess": "Daha az göster",
+      "ordinary": "Bunlar sıradan uyarılar, gösterge panoları ve görünümlerdir. Bunları kendi sayfalarında düzenleyebilir veya silebilirsiniz.",
+      "setUpByYou": "Sizin tarafınızdan kuruldu {when}",
+      "setUpBy": "{who} tarafından kuruldu {when}",
+      "setUpWhen": "Kuruldu {when}",
+      "partialTitle": "{title} izleme kuruldu, {count} öğe oluşturulmadı | {title} izleme kuruldu, {count} öğe oluşturulmadı",
+      "partialNote": "Geri kalanı hazır. Aşağıdaki bir öğeyi yeniden deneyin veya tümünü yeniden deneyin.",
+      "partialSubtitle": "{total} öğeden {made} tanesi oluşturuldu · {failed} tanesi oluşturulmadı"
+    }
   },
   "alert_library": {
     "header": "Uyarı Kitaplığı",

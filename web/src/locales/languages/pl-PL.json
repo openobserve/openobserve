@@ -681,6 +681,7 @@
       "cipherKeys": "Klucze szyfrujące",
       "announcementBanners": "Banery ogłoszeniowe",
       "regexPatterns": "Wzorce regex",
+      "keyValues": "Wartości kluczy",
       "evalJobs": "Zadania ewaluacji online",
       "billingGroup": "Grupa rozliczeniowa",
       "syntheticChecks": "Sprawdzenia syntetyczne",
@@ -738,6 +739,7 @@
       "cipherKeys": "klucze szyfrujące",
       "announcementBanners": "banery ogłoszeniowe",
       "regexPatterns": "wzorce regex",
+      "keyValues": "wartości kluczy",
       "unnamed": "ten zasób",
       "onCall": "dyżury",
       "incidentIntegrations": "integracje incydentów",
@@ -10988,6 +10990,11 @@
       "tryOneOfThese": "Lub wypróbuj jedną z tych opcji"
     },
     "capabilities": {
+      "starter": {
+        "title": "Skonfiguruj pakiety startowe",
+        "description": "Pulpity, alerty i zapisane widoki utworzone dla danych {packs}.",
+        "prompt": "Które pakiety startowe pasują do moich danych i co utworzy każdy z nich?"
+      },
       "query": {
         "title": "Napisz zapytanie",
         "description": "SQL dla logów, trace, RUM lub PromQL dla metryk.",
@@ -11016,6 +11023,17 @@
       "promqlCpu": "Napisz PromQL dla podów używających > 80% CPU",
       "datadogToO2": "Przekonwertuj to zapytanie Datadog na SQL OpenObserve",
       "lastAlertFired": "Dlaczego mój ostatni alert został wywołany?"
+    },
+    "starterSuggestions": {
+      "whichPacks": "Które pakiety startowe pasują do moich danych?",
+      "setUpPack": "Skonfiguruj pakiet {pack}",
+      "whatInPack": "Co zawiera pakiet {pack}?",
+      "errorsLastHour": "Pokaż błędy z ostatniej godziny"
+    },
+    "starter": {
+      "checking": "Sprawdzanie danych pod kątem pakietów startowych…",
+      "contextNote": "Asystent O2 ma jako kontekst dopasowane pakiety startowe.",
+      "readyWhenYouAre": "Gotowe, gdy tylko chcesz:"
     },
     "placeholderRotation": {
       "one": "Pokaż mi błędy z ostatniej godziny…",
@@ -15200,6 +15218,376 @@
     "countIncidentIntegration": "{count} integracja incydentów | integracje incydentów: {count}",
     "sectionOtherConsumers": "Używane również przez",
     "countDowntime": "{count} okno serwisowe | okna serwisowe: {count}"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "Nazwa klastra",
+          "k8s_namespace_name": "Przestrzeń nazw",
+          "k8s_pod_name": "Nazwa poda",
+          "k8s_node_name": "Nazwa węzła",
+          "k8s_container_name": "Nazwa kontenera",
+          "kind": "Rodzaj zdarzenia",
+          "reason": "Przyczyna zdarzenia",
+          "message": "Komunikat zdarzenia"
+        },
+        "roles": {
+          "events": "Zdarzenia Kubernetes"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "Hosty"
+      },
+      "traces": {
+        "title": "Trace (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "Metryki CloudWatch"
+        }
+      },
+      "genai": {
+        "title": "AI (aplikacje LLM)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "Logi zadań GitHub Actions"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "Spróbuj ponownie sprawdzić pakiet",
+    "countAlerts": "{count} alert | {count} alertów",
+    "scope": "Zakres alertu: {value}",
+    "scopeAll": "Wszystkie klastry",
+    "scopeSeen": "Wszystkie klastry · {count} dotychczas wykrytych: {clusters}",
+    "noPermission": "Nie możesz skonfigurować tego pakietu w tej organizacji. Poproś administratora.",
+    "askAdmin": "Poproś administratora o skonfigurowanie tego",
+    "busyBy": "{who} właśnie konfiguruje ten pakiet. Sprawdź ponownie za minutę.",
+    "busySomeone": "Ktoś inny właśnie konfiguruje ten pakiet. Sprawdź ponownie za minutę.",
+    "busyYou": "Konfigurujesz ten pakiet w innej karcie. Sprawdź ponownie za minutę.",
+    "startedBy": "{who} rozpoczął konfigurowanie tego pakietu.",
+    "startedBySomeone": "Ktoś inny rozpoczął konfigurowanie tego pakietu.",
+    "card": {
+      "dashboards": "{count} pulpit | {count} pulpitów"
+    },
+    "manifest": {
+      "leftOut": "{count} pominięta pozycja | {count} pominiętych pozycji",
+      "tagEnterprise": "Enterprise",
+      "tagNeedsData": "Wymaga danych",
+      "tagHaveIt": "Masz to",
+      "tagUnavailable": "Niedostępne",
+      "adapted": "Dostosowano do Twoich danych"
+    },
+    "installDialog": {
+      "title": "Utworzono {made} z {total} elementów",
+      "attention": "{title} · {count} wymaga uwagi | {title} · {count} wymagają uwagi",
+      "failedReason": "Nie udało się utworzyć. Ponów próbę.",
+      "kindDashboards": "Pulpity",
+      "kindAlerts": "Alerty",
+      "rowFailed": "Niepowodzenie · {name}"
+    },
+    "home": {
+      "label": "Pakiety startowe",
+      "error": "Nie udało się sprawdzić Twoich danych pod kątem pakietów",
+      "fromClusters": "z {clusters}",
+      "moreStreams": "+{count} strumień | +{count} strumieni",
+      "moreStreamsLabel": "Więcej dopasowanych strumieni",
+      "interrupted": "Konfiguracja {title} została przerwana · ukończono {made} z {total}",
+      "startedBy": "{who} rozpoczął konfigurację {title}.",
+      "startedBySomeone": "Ktoś inny rozpoczął konfigurację {title}.",
+      "busyBy": "{who} właśnie konfiguruje {title}.",
+      "busySomeone": "Ktoś inny właśnie konfiguruje {title}.",
+      "busyYou": "Konfigurujesz {title} w innej karcie.",
+      "askAdminLine": "Pakiety startowe pasują do Twoich danych. Poproś administratora o ich dodanie.",
+      "noAccessLine": "Nie masz dostępu do pakietów startowych w tej organizacji. Poproś administratora.",
+      "heroTitle": "Dane są już na żywo. Skonfiguruj gotowe pulpity i alerty w około minutę",
+      "heroLead": "z {count} pakietu pasującego do Twoich danych | z {count} pakietów pasujących do Twoich danych",
+      "readyToAdd": "Gotowe do dodania",
+      "clusterKind": "klaster",
+      "connected": "Połączono",
+      "moreClusters": "+{count} klaster | +{count} klastrów",
+      "railClusters": "{count} klaster | {count} klastrów",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "Strumienie używane przez ten pakiet · {count}",
+      "moreStreamsChip": "+{count} więcej",
+      "streamTypeLogs": "logi",
+      "streamTypeMetrics": "metryki",
+      "streamTypeTraces": "trace",
+      "reviewSetUp": "Przejrzyj pakiet",
+      "reviewSetUpLabel": "Przejrzyj pakiet {title}",
+      "bestStart": "Najlepsze miejsce na start",
+      "cards": {
+        "andMore": "{list} i {count} więcej",
+        "panels": "{count} panel | {count} paneli",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {panels} dla {clusters}. | {title}: {panels} dla {clusters} klastrów.",
+            "fallback": "{title}: każdy węzeł, pod i obciążenie."
+          },
+          "alerts": {
+            "template": "{alert_names}. Wyzwalają się dla każdego klastra ({clusters}). Wyłączone, dopóki ich nie włączysz.",
+            "fallback": "{alert_names}. Wyzwalają się dla każdego klastra. Wyłączone, dopóki ich nie włączysz.",
+            "plain": "Wyzwalają się dla każdego klastra. Wyłączone, dopóki ich nie włączysz."
+          },
+          "savedViews": {
+            "template": "Zdarzenia Kubernetes: każde zdarzenie w {stream}, jedno kliknięcie z Logów.",
+            "fallback": "Zdarzenia Kubernetes, jedno kliknięcie z Logów."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "Metryki hostów: CPU, pamięć i dysk dla każdego hosta."
+          },
+          "alerts": {
+            "template": "{alert_names}. Wyzwalają się dla każdego hosta. Wyłączone, dopóki ich nie włączysz.",
+            "fallback": "Wyzwalają się dla każdego hosta. Wyłączone, dopóki ich nie włączysz."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: {panels} dla Twoich danych.",
+            "fallback": "{title}, przygotowane dla Twoich strumieni."
+          },
+          "alerts": {
+            "template": "{alert_names}. Wyzwalają się na wszystkich pasujących danych. Wyłączone, dopóki ich nie włączysz.",
+            "fallback": "Wyzwalają się na wszystkich pasujących danych. Wyłączone, dopóki ich nie włączysz."
+          },
+          "savedViews": {
+            "template": "{stream} w Logach, jedno kliknięcie.",
+            "fallback": "Jedno kliknięcie z Logów."
+          }
+        }
+      },
+      "previewFailed": "Nie udało się wczytać zawartości tego pakietu. Przejrzyj go, aby spróbować ponownie.",
+      "nothingFitsYet": "Nic z tego pakietu nie pasuje jeszcze do Twoich danych. Jego elementy pojawią się tutaj, gdy ich dane dotrą."
+    },
+    "whatGetsCreated": {
+      "subtitle": "Pakiet startowy {title}",
+      "subtitleScoped": "Pakiet startowy {title} · przygotowany dla {scope}",
+      "savedIn": "Zapisano w folderze {folder}",
+      "skippedNote": "{count} element pominięty · Twój istniejący jest zachowany | {count} elementów pominiętych · Twoje istniejące są zachowane",
+      "nameInUse": "{name} już istnieje · Twój jest zachowany",
+      "skipped": "Pominięto",
+      "notSeenYet": "Jeszcze nie wykryto",
+      "footprint": "Zasięg",
+      "reachStarted": "Zapytania w tle: każdy uruchomiony alert działa według własnego harmonogramu",
+      "reachStartedScoped": "Zakres alertów: {scope} · Zapytania w tle: każdy uruchomiony alert działa według własnego harmonogramu",
+      "selectGroup": "Zaznacz wszystko w {group}",
+      "selectRow": "Zaznacz {name}"
+    },
+    "drawer": {
+      "packTitle": "Pakiet {title}",
+      "view": "Widok Kubernetes",
+      "viewPath": "Infrastruktura › Kubernetes",
+      "dashboard": "Pulpit {title}",
+      "dashboardNote": "Otwiera się po konfiguracji",
+      "panelsFit": "{count} panel pasuje do Twoich danych. Otwiera się po konfiguracji. | {count} paneli pasuje do Twoich danych. Otwiera się po konfiguracji.",
+      "alerts": "Alerty, wyłączone, dopóki ich nie włączysz",
+      "savedViews": "Zapisane widoki w Logach",
+      "savedViewsNote": "Udostępniane wszystkim w tej organizacji",
+      "folder": "Folder",
+      "folderValue": "{name} (pakiet startowy)",
+      "reach": "Zapytania w tle: na razie brak",
+      "reachScoped": "Zakres alertów: {scope} · Zapytania w tle: na razie brak",
+      "notIncluded": "Nie uwzględniono",
+      "reasonAlreadyHave": "{name}: już to masz",
+      "reasonNoData": "{name}: nie wykryto jeszcze dla niego danych",
+      "reasonUnavailable": "{name}: obecnie nie ma go w Bibliotece",
+      "reasonNeedsPlan": "{name}: wymaga planu Enterprise",
+      "source": "Z Biblioteki pod adresem {host}. Pakiet wbudowany w tę wersję działa offline.",
+      "sourceOffline": "Nie można połączyć się z {host}. Używany jest pakiet wbudowany w tę wersję, który działa offline.",
+      "nothingToCreate": "Masz już wszystkie elementy tego pakietu",
+      "openDashboard": "Otwórz pulpit",
+      "error": "Nie udało się wczytać elementów tworzonych przez ten pakiet",
+      "reasonNoFlavour": "{name}: jeszcze niedostępne dla nazw Twoich metryk",
+      "loadingFit": "Sprawdzanie, które elementy pasują do Twoich danych",
+      "noteForbidden": "{title} · nie masz uprawnień do skonfigurowania tego pakietu",
+      "setUp": "Skonfiguruj",
+      "allExist": "Masz już wszystkie elementy tego pakietu ({count}). Istniejące alerty zachowują swoje ustawienia.",
+      "continue": "Kontynuuj",
+      "setUpCount": "Skonfiguruj {count} element | Skonfiguruj {count} elementów",
+      "ordinaryNote": "Dodaje zwykłe pulpity, alerty i widoki, wymienione na stronie pakietu. Edytuj je lub usuwaj na ich własnych stronach.",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "Konfigurowanie monitoringu {title}",
+      "summary": "Utworzono {made} z {total}",
+      "created": "Utworzono",
+      "creating": "Tworzenie",
+      "waiting": "Oczekiwanie",
+      "rowAlerts": "Alerty {made} z {total}",
+      "rowViews": "Zapisane widoki {made} z {total}",
+      "rowDashboards": "Pulpity {made} z {total}",
+      "retry": "Ponów {count} element | Ponów {count} elementów",
+      "finish": "Zakończ",
+      "interrupted": "Konfiguracja przerwana · {made} z {total} gotowe",
+      "installError": "Konfiguracja nie została ukończona. Spróbuj ponownie.",
+      "comeBack": "Utworzono {made} z {total} · możesz to zamknąć i pracować dalej. Znajdziesz to ponownie w Pakietach startowych w nagłówku.",
+      "alertsOnTo": "Tworzenie · włączone, wysyłanie do {destination}",
+      "emailMe": "E-mail do mnie ({email})",
+      "creatingOn": "Tworzenie · włączone"
+    },
+    "severity": {
+      "critical": "Krytyczny",
+      "warning": "Ostrzeżenie",
+      "info": "Informacja"
+    },
+    "adapted": {
+      "someField": "Pole",
+      "flavour": "Używa wersji {name}",
+      "change": "Zmień",
+      "streams": "Strumienie",
+      "fields": "Pola",
+      "version": "Wersja",
+      "streamCount": "{count} strumień | {count} strumienie",
+      "fieldCount": "{count} pole | {count} pola",
+      "matchedBoth": "{streams} i {fields} dopasowane do Twoich danych",
+      "matchedOne": "{what} dopasowane do Twoich danych",
+      "needsChoiceCount": "{count} wymaga wyboru | {count} wymagają wyboru",
+      "notFoundCount": "Nie znaleziono: {count}",
+      "matchedCount": "Dopasowano: {count}",
+      "whichStream": "W którym strumieniu jest {what}?",
+      "lookRight": "{count} wygląda poprawnie | {count} wyglądają poprawnie",
+      "noneFound": "Nie znaleziono {what}",
+      "showMore": "Pokaż jeszcze {count}",
+      "needsChoice": "Wymaga wyboru",
+      "severalMatch": "{count} strumieni wygląda jak {what}",
+      "oneMatch": "{stream} wygląda jak {what}",
+      "sharedAsk": "Które rekordy to {what}?",
+      "choose": "Wybierz",
+      "dialogFields": "{matched} z {total} pól",
+      "dialogUse": "Użyj {stream}",
+      "dialogUseAll": "Użyj wszystkich {count}",
+      "dialogUseChecked": "Użyj tych {count}",
+      "dialogAllNote": "Wszystkie: pulpit otrzyma selektor strumieni, a każdy alert, który to odczytuje, jest konfigurowany raz na strumień.",
+      "dialogPickFive": "Wybierz maksymalnie {count} strumieni.",
+      "dialogPickStream": "Wskaż strumień",
+      "dialogPickPlaceholder": "Wybierz strumień",
+      "dialogFiltersOn": "Odczytuje ze strumienia {stream} tylko rekordy, w których {field} ma wartość {value}",
+      "dialogNoValues": "Nie znaleziono żadnych wartości dla tego pola w ciągu ostatnich 24 godzin.",
+      "dialogSend": "Możesz też wysłać je do strumienia {stream}: ustaw ten nagłówek w swoim kolektorze",
+      "dialogFieldTitle": "Wybierz pole dla {what}",
+      "dialogFieldLabel": "Pole w strumieniu {stream}",
+      "values": "Zaobserwowano: {values}",
+      "or": "lub",
+      "filterTitle": "Dodaj filtr, aby pakiet odczytywał tylko {what}",
+      "showFewer": "Pokaż mniej"
+    },
+    "matchCheck": {
+      "checked": "Sprawdzono {when}",
+      "checkedAt": "Sprawdzono {time} (czas lokalny)",
+      "justNow": "przed chwilą",
+      "minutesAgo": "{count} min temu",
+      "hoursAgo": "{count} godz. temu",
+      "daysAgo": "{count} dni temu"
+    },
+    "headerChip": {
+      "label": "Pakiety startowe",
+      "ariaLabel": "Pakiety startowe: {count} pasuje do Twoich danych | Pakiety startowe: {count} pasują do Twoich danych",
+      "progress": "{made} z {total}",
+      "ariaLabelRunning": "Pakiety startowe: konfigurowanie {made} z {total}"
+    },
+    "guide": {
+      "rowSavedViews": "{count} zapisany widok | {count} zapisanych widoków"
+    },
+    "stepper": {
+      "content": "Wybierz zawartość",
+      "setup": "Konfigurowanie",
+      "settingUp": "Konfigurowanie…",
+      "interrupted": "Przerwano",
+      "ready": "Gotowe",
+      "noteRunning": "Konfigurowanie · utworzono {made} z {total}",
+      "noteAlertsOn": "utworzono {made} z {total} · włączono alert: {count} | utworzono {made} z {total} · włączono alerty: {count}",
+      "noteAlertsOff": "utworzono {made} z {total} · alerty wyłączone",
+      "noteAlreadyHere": "utworzono {made} z {total} · {count} już tutaj"
+    },
+    "alertStep": {
+      "turnOn": "Włącz alert z pakietu ({count}) | Włącz alerty z pakietu ({count})",
+      "sendTo": "Wyślij do",
+      "sendToEmail": "Wyślij do: {icon} E-mail do mnie — {email}",
+      "emailCreateNote": "W tej organizacji nie ma jeszcze miejsca docelowego. Konfiguracja doda miejsce docelowe e-mail dla Ciebie (lub użyje ponownie takiego, które wysyła tylko do Ciebie).",
+      "noDestination": "Nie ma jeszcze miejsca docelowego. Dodaj je w Alerty → Miejsca docelowe.",
+      "destinationsFailed": "Nie udało się wczytać miejsc docelowych, więc opcja „Wyślij do” jest wyłączona. Miejsce docelowe można dodać później w Alerty → Miejsca docelowe.",
+      "destinations": "{count} miejsce docelowe w tej organizacji | {count} miejsc docelowych w tej organizacji",
+      "chooseDestination": "Wybierz miejsce docelowe",
+      "pickDestination": "Wybierz miejsce docelowe dla opcji „Wyślij do” lub odznacz ją"
+    },
+    "ready": {
+      "title": "Monitorowanie {title} jest gotowe",
+      "emailFailed": "Nie udało się utworzyć miejsca docelowego e-mail, więc alerty dodano wyłączone.",
+      "emailForbidden": "Nie możesz dodawać miejsc docelowych alertów w tej organizacji, więc miejsce docelowe e-mail nie zostało utworzone, a alerty dodano wyłączone."
+    },
+    "popup": {
+      "title": "Pakiety startowe",
+      "subtitle": "{count} pakiet pasuje do danych, które już wysyłasz | {count} pakietów pasuje do danych, które już wysyłasz",
+      "subtitleAllSetUp": "Wszystkie pakiety pasujące do Twoich danych są skonfigurowane",
+      "subtitleNone": "Brak pasujących pakietów",
+      "items": "{count} element | {count} elementów",
+      "setUpAgo": "Skonfigurowano {when}",
+      "stopped": "Konfiguracja przerwana w połowie",
+      "whatGetsCreated": "Co zostanie utworzone",
+      "tileDashboards": "{count} pulpit | {count} pulpitów",
+      "tileAlerts": "{count} alert | {count} alerty",
+      "tileSavedViews": "{count} zapisany widok | {count} zapisane widoki",
+      "noneDashboards": "Pulpity",
+      "noneAlerts": "Alerty",
+      "noneSavedViews": "Zapisane widoki",
+      "noneInPack": "Brak w tym pakiecie",
+      "sevCritical": "Krytyczne: {count}",
+      "sevWarning": "Ostrzeżenia: {count}",
+      "sevInfo": "Informacyjne: {count}",
+      "chooseNext": "Wybierz, które elementy utworzyć w następnym kroku",
+      "reviewSetUp": "Przejrzyj pakiet",
+      "viewPack": "Zobacz pakiet",
+      "checkAgain": "Sprawdź ponownie",
+      "checkFailed": "Nie udało się sprawdzić. Spróbuj ponownie",
+      "emptyTitle": "Żaden pakiet nie pasuje jeszcze do Twoich danych",
+      "emptyText": "Pakiety pojawiają się, gdy OpenObserve wykryje dane ze źródła, które zna, np. Kubernetes, hosty, Docker, PostgreSQL lub AWS. Wyślij dane i sprawdź ponownie.",
+      "back": "Wstecz",
+      "backToPacks": "Wróć do pakietów",
+      "keepsGoing": "Możesz to zamknąć. Konfiguracja trwa dalej."
+    },
+    "viewPack": {
+      "open": "Otwórz",
+      "openLabel": "Otwórz {name}",
+      "dashboard": "Pulpit",
+      "dashboards": "Pulpity",
+      "dashboardsMeta": "{count} pulpit | {count} pulpity",
+      "alerts": "Alerty",
+      "alertsMeta": "{count} · włączone: {on} · wyciszone: {silent}",
+      "alertsMetaFailed": "{count} · włączone: {on} · wyciszone: {silent} · nie utworzono: {failed}",
+      "savedView": "Zapisany widok · udostępniony wszystkim w tej organizacji",
+      "savedViews": "Zapisane widoki",
+      "savedViewsMeta": "{count} zapisany widok · udostępniony wszystkim w tej organizacji | {count} zapisane widoki · udostępnione wszystkim w tej organizacji",
+      "on": "Włączony",
+      "silent": "Wyciszony",
+      "notCreated": "Nie utworzono",
+      "showMore": "Pokaż jeszcze {count}",
+      "showLess": "Pokaż mniej",
+      "ordinary": "To zwykłe alerty, pulpity i widoki. Edytuj je lub usuwaj na ich własnych stronach.",
+      "setUpByYou": "Skonfigurowane przez Ciebie {when}",
+      "setUpBy": "Skonfigurowane przez {who} {when}",
+      "setUpWhen": "Skonfigurowano {when}",
+      "partialTitle": "Monitoring {title} jest skonfigurowany, nie utworzono {count} elementu | Monitoring {title} jest skonfigurowany, nie utworzono {count} elementów",
+      "partialNote": "Reszta jest gotowa. Ponów próbę dla elementu poniżej lub ponów je wszystkie.",
+      "partialSubtitle": "Utworzono {made} z {total} · nie utworzono: {failed}"
+    }
   },
   "alert_library": {
     "header": "Biblioteka alertów",

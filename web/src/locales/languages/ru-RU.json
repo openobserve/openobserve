@@ -681,6 +681,7 @@
       "cipherKeys": "Ключи шифрования",
       "announcementBanners": "Информационные баннеры",
       "regexPatterns": "Регулярные выражения",
+      "keyValues": "Значения ключей",
       "evalJobs": "Задания онлайн-оценки",
       "billingGroup": "Группа выставления счетов",
       "syntheticChecks": "Проверки синтетики",
@@ -738,6 +739,7 @@
       "cipherKeys": "ключи шифрования",
       "announcementBanners": "информационные баннеры",
       "regexPatterns": "регулярные выражения",
+      "keyValues": "значения ключей",
       "unnamed": "этот ресурс",
       "onCall": "дежурства",
       "incidentIntegrations": "интеграции инцидентов",
@@ -10988,6 +10990,11 @@
       "tryOneOfThese": "Или попробуйте один из этих"
     },
     "capabilities": {
+      "starter": {
+        "title": "Настроить стартовые наборы",
+        "description": "Дашборды, оповещения и сохранённые представления, созданные для ваших данных {packs}.",
+        "prompt": "Какие стартовые наборы подходят для моих данных и что создаст каждый из них?"
+      },
       "query": {
         "title": "Написать запрос",
         "description": "SQL для логов, трейсов, RUM или PromQL для метрик.",
@@ -11016,6 +11023,17 @@
       "promqlCpu": "Написать PromQL для подов, использующих > 80% CPU",
       "datadogToO2": "Преобразовать этот запрос Datadog в SQL OpenObserve",
       "lastAlertFired": "Почему сработало мое последнее оповещение?"
+    },
+    "starterSuggestions": {
+      "whichPacks": "Какие стартовые наборы подходят для моих данных?",
+      "setUpPack": "Настроить набор {pack}",
+      "whatInPack": "Что входит в набор {pack}?",
+      "errorsLastHour": "Покажи ошибки за последний час"
+    },
+    "starter": {
+      "checking": "Проверяем ваши данные на наличие стартовых наборов…",
+      "contextNote": "O2 Assistant использует ваши подобранные стартовые наборы как контекст.",
+      "readyWhenYouAre": "Готов, когда будете готовы:"
     },
     "placeholderRotation": {
       "one": "Показать ошибки за последний час…",
@@ -15200,6 +15218,376 @@
     "countIncidentIntegration": "{count} интеграция с инцидентами | Интеграций с инцидентами: {count}",
     "sectionOtherConsumers": "Также используется в",
     "countDowntime": "{count} окно обслуживания | Окон обслуживания: {count}"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "Имя кластера",
+          "k8s_namespace_name": "Пространство имён",
+          "k8s_pod_name": "Имя пода",
+          "k8s_node_name": "Имя узла",
+          "k8s_container_name": "Имя контейнера",
+          "kind": "Тип события",
+          "reason": "Причина события",
+          "message": "Сообщение события"
+        },
+        "roles": {
+          "events": "События Kubernetes"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "Хосты"
+      },
+      "traces": {
+        "title": "Трейсы (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "Метрики CloudWatch"
+        }
+      },
+      "genai": {
+        "title": "ИИ (LLM-приложения)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "Логи заданий GitHub Actions"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "Повторите проверку набора",
+    "countAlerts": "{count} оповещение | {count} оповещений",
+    "scope": "Область оповещения: {value}",
+    "scopeAll": "Все кластеры",
+    "scopeSeen": "Все кластеры · на данный момент обнаружено {count}: {clusters}",
+    "noPermission": "Вы не можете настроить этот набор в этой организации. Обратитесь к администратору.",
+    "askAdmin": "Попросите администратора настроить этот набор",
+    "busyBy": "{who} сейчас настраивает этот набор. Проверьте через минуту.",
+    "busySomeone": "Кто-то другой сейчас настраивает этот набор. Проверьте через минуту.",
+    "busyYou": "Вы настраиваете этот набор в другой вкладке. Проверьте через минуту.",
+    "startedBy": "{who} начал(а) настройку этого набора.",
+    "startedBySomeone": "Кто-то другой начал настройку этого набора.",
+    "card": {
+      "dashboards": "{count} дашборд | {count} дашбордов"
+    },
+    "manifest": {
+      "leftOut": "{count} элемент пропущен | {count} элементов пропущено",
+      "tagEnterprise": "Enterprise",
+      "tagNeedsData": "Требуются данные",
+      "tagHaveIt": "У вас есть",
+      "tagUnavailable": "Недоступно",
+      "adapted": "Адаптировано под ваши данные"
+    },
+    "installDialog": {
+      "title": "Создано {made} из {total}",
+      "attention": "{title} · {count} требует внимания | {title} · {count} требуют внимания",
+      "failedReason": "Не удалось создать. Повторите попытку.",
+      "kindDashboards": "Дашборды",
+      "kindAlerts": "Оповещения",
+      "rowFailed": "Ошибка · {name}"
+    },
+    "home": {
+      "label": "Стартовые наборы",
+      "error": "Не удалось проверить ваши данные на наличие наборов",
+      "fromClusters": "из {clusters}",
+      "moreStreams": "+{count} поток | +{count} потоков",
+      "moreStreamsLabel": "Больше подходящих потоков",
+      "interrupted": "Настройка {title} прервалась · выполнено {made} из {total}",
+      "startedBy": "{who} начал настройку {title}.",
+      "startedBySomeone": "Кто-то другой начал настройку {title}.",
+      "busyBy": "{who} сейчас настраивает {title}.",
+      "busySomeone": "Кто-то другой сейчас настраивает {title}.",
+      "busyYou": "Вы настраиваете {title} в другой вкладке.",
+      "askAdminLine": "Стартовые наборы подходят под ваши данные. Попросите администратора добавить их.",
+      "noAccessLine": "У вас нет доступа к стартовым наборам в этой организации. Обратитесь к администратору.",
+      "heroTitle": "Данные уже поступают. Настройте готовые дашборды и оповещения примерно за минуту",
+      "heroLead": "из {count} набора, подходящего под ваши данные | из {count} наборов, подходящих под ваши данные",
+      "readyToAdd": "Готово к добавлению",
+      "clusterKind": "кластер",
+      "connected": "Подключено",
+      "moreClusters": "+{count} кластер | +{count} кластеров",
+      "railClusters": "{count} кластер | {count} кластеров",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "Потоки, которые использует этот набор · {count}",
+      "moreStreamsChip": "ещё +{count}",
+      "streamTypeLogs": "логи",
+      "streamTypeMetrics": "метрики",
+      "streamTypeTraces": "трейсы",
+      "reviewSetUp": "Просмотреть набор",
+      "reviewSetUpLabel": "Просмотреть набор {title}",
+      "bestStart": "Лучше всего начать с этого",
+      "cards": {
+        "andMore": "{list} и ещё {count}",
+        "panels": "{count} панель | {count} панелей",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {panels} для {clusters}. | {title}: {panels} для {clusters} кластеров.",
+            "fallback": "{title}: все узлы, поды и рабочие нагрузки."
+          },
+          "alerts": {
+            "template": "{alert_names}. Срабатывают для каждого кластера ({clusters}). Отключены, пока вы их не включите.",
+            "fallback": "{alert_names}. Срабатывают для каждого кластера. Отключены, пока вы их не включите.",
+            "plain": "Срабатывают для каждого кластера. Отключены, пока вы их не включите."
+          },
+          "savedViews": {
+            "template": "События Kubernetes: все события в {stream}, в один клик из «Логов».",
+            "fallback": "События Kubernetes, в один клик из «Логов»."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "Метрики хостов: CPU, память и диск для каждого хоста."
+          },
+          "alerts": {
+            "template": "{alert_names}. Срабатывают для каждого хоста. Отключены, пока вы их не включите.",
+            "fallback": "Срабатывают для каждого хоста. Отключены, пока вы их не включите."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: {panels} для ваших данных.",
+            "fallback": "{title}, создан для ваших потоков."
+          },
+          "alerts": {
+            "template": "{alert_names}. Срабатывают на всех подходящих данных. Выключены, пока вы их не включите.",
+            "fallback": "Срабатывают на всех подходящих данных. Выключены, пока вы их не включите."
+          },
+          "savedViews": {
+            "template": "{stream} в логах — в один клик.",
+            "fallback": "В один клик из логов."
+          }
+        }
+      },
+      "previewFailed": "Не удалось загрузить то, что настраивает этот пакет. Проверьте его и попробуйте снова.",
+      "nothingFitsYet": "Пока ничего из этого пакета не подходит к вашим данным. Его элементы появятся здесь, когда придут их данные."
+    },
+    "whatGetsCreated": {
+      "subtitle": "Стартовый пакет {title}",
+      "subtitleScoped": "Стартовый пакет {title} · создан для {scope}",
+      "savedIn": "Сохранено в папке {folder}",
+      "skippedNote": "Пропущен {count} элемент · существующий сохранён | Пропущено {count} элементов · существующие сохранены",
+      "nameInUse": "{name} уже существует · ваш сохранён",
+      "skipped": "Пропущено",
+      "notSeenYet": "Пока не обнаружено",
+      "footprint": "Охват",
+      "reachStarted": "Фоновые запросы: каждое запущенное оповещение работает по своему расписанию",
+      "reachStartedScoped": "Область оповещений: {scope} · Фоновые запросы: каждое запущенное оповещение работает по своему расписанию",
+      "selectGroup": "Выбрать все в {group}",
+      "selectRow": "Выбрать {name}"
+    },
+    "drawer": {
+      "packTitle": "Пакет {title}",
+      "view": "Представление Kubernetes",
+      "viewPath": "Инфраструктура › Kubernetes",
+      "dashboard": "Дашборд {title}",
+      "dashboardNote": "Откроется после настройки",
+      "panelsFit": "{count} панель подходит к вашим данным. Откроется после настройки. | {count} панелей подходят к вашим данным. Откроется после настройки.",
+      "alerts": "Оповещения, выключены, пока вы их не включите",
+      "savedViews": "Сохранённые представления в логах",
+      "savedViewsNote": "Доступно всем в этой организации",
+      "folder": "Папка",
+      "folderValue": "{name} (стартовый пакет)",
+      "reach": "Фоновые запросы: пока нет",
+      "reachScoped": "Область оповещений: {scope} · Фоновые запросы: пока нет",
+      "notIncluded": "Не включено",
+      "reasonAlreadyHave": "{name}: у вас уже есть",
+      "reasonNoData": "{name}: данные для него пока не обнаружены",
+      "reasonUnavailable": "{name}: сейчас нет в библиотеке",
+      "reasonNeedsPlan": "{name}: требуется план Enterprise",
+      "source": "Из библиотеки на {host}. Пакет, встроенный в эту версию, работает офлайн.",
+      "sourceOffline": "{host} недоступен. Используется пакет, встроенный в эту версию, который работает офлайн.",
+      "nothingToCreate": "У вас уже есть все элементы этого пакета",
+      "openDashboard": "Открыть дашборд",
+      "error": "Не удалось загрузить то, что создаёт этот пакет",
+      "reasonNoFlavour": "{name}: пока недоступно для ваших имён метрик",
+      "loadingFit": "Проверяем, какие элементы подходят к вашим данным",
+      "noteForbidden": "{title} · у вас нет доступа для настройки этого пакета",
+      "setUp": "Настроить",
+      "allExist": "У вас уже есть все {count} элементов этого пакета. Существующие оповещения сохраняют свои настройки.",
+      "continue": "Продолжить",
+      "setUpCount": "Настроить {count} элемент | Настроить {count} элементов",
+      "ordinaryNote": "Добавляет обычные дашборды, оповещения и представления, перечисленные на странице пакета. Редактируйте или удаляйте их на их собственных страницах.",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "Настройка мониторинга {title}",
+      "summary": "Создано {made} из {total}",
+      "created": "Создано",
+      "creating": "Создаётся",
+      "waiting": "Ожидание",
+      "rowAlerts": "Оповещения: {made} из {total}",
+      "rowViews": "Сохранённые представления: {made} из {total}",
+      "rowDashboards": "Дашборды: {made} из {total}",
+      "retry": "Повторить {count} элемент | Повторить {count} элементов",
+      "finish": "Завершить",
+      "interrupted": "Настройка прервана · выполнено {made} из {total}",
+      "installError": "Настройка не завершена. Попробуйте ещё раз.",
+      "comeBack": "Создано {made} из {total} · это окно можно закрыть и продолжить работу. Вернуться можно через «Стартовые наборы» в шапке.",
+      "alertsOnTo": "Создаётся · включено, отправка в {destination}",
+      "emailMe": "Отправить мне на email ({email})",
+      "creatingOn": "Создаётся · включено"
+    },
+    "severity": {
+      "critical": "Критический",
+      "warning": "Предупреждение",
+      "info": "Информация"
+    },
+    "adapted": {
+      "someField": "Поле",
+      "flavour": "Используется версия {name}",
+      "change": "Изменить",
+      "streams": "Потоки",
+      "fields": "Поля",
+      "version": "Версия",
+      "streamCount": "{count} поток | {count} потоков",
+      "fieldCount": "{count} поле | {count} полей",
+      "matchedBoth": "{streams} и {fields} сопоставлены с вашими данными",
+      "matchedOne": "{what} сопоставлено с вашими данными",
+      "needsChoiceCount": "{count} требует выбора | {count} требуют выбора",
+      "notFoundCount": "{count} не найдено",
+      "matchedCount": "Сопоставлено: {count}",
+      "whichStream": "К какому потоку относится {what}?",
+      "lookRight": "{count} выглядит верно | {count} выглядят верно",
+      "noneFound": "Не найдено: {what}",
+      "showMore": "Показать ещё {count}",
+      "needsChoice": "Требует выбора",
+      "severalMatch": "{count} потоков похожи на {what}",
+      "oneMatch": "{stream} похож на {what}",
+      "sharedAsk": "Какие записи соответствуют {what}?",
+      "choose": "Выбрать",
+      "dialogFields": "{matched} из {total} полей",
+      "dialogUse": "Использовать {stream}",
+      "dialogUseAll": "Использовать все {count}",
+      "dialogUseChecked": "Использовать эти {count}",
+      "dialogAllNote": "Все: на дашборде появится выбор потока, а каждое оповещение, которое это использует, будет настроено отдельно для каждого потока.",
+      "dialogPickFive": "Выберите до {count} потоков.",
+      "dialogPickStream": "Выберите поток",
+      "dialogPickPlaceholder": "Выберите поток",
+      "dialogFiltersOn": "Читает из {stream}, только записи, где {field} равно {value}",
+      "dialogNoValues": "За последние 24 часа для этого поля не найдено значений.",
+      "dialogSend": "Или отправьте их в {stream}: задайте этот заголовок в своём коллекторе",
+      "dialogFieldTitle": "Выберите поле для {what}",
+      "dialogFieldLabel": "Поле в {stream}",
+      "values": "Встречались: {values}",
+      "or": "или",
+      "filterTitle": "Добавьте фильтр, чтобы набор читал только {what}",
+      "showFewer": "Показать меньше"
+    },
+    "matchCheck": {
+      "checked": "Проверено {when}",
+      "checkedAt": "Проверено {time} (ваше местное время)",
+      "justNow": "только что",
+      "minutesAgo": "{count} мин назад",
+      "hoursAgo": "{count} ч назад",
+      "daysAgo": "{count} дн. назад"
+    },
+    "headerChip": {
+      "label": "Стартовые наборы",
+      "ariaLabel": "Стартовые наборы, {count} подходит к вашим данным | Стартовые наборы, {count} подходят к вашим данным",
+      "progress": "{made} из {total}",
+      "ariaLabelRunning": "Стартовые наборы, настройка {made} из {total}"
+    },
+    "guide": {
+      "rowSavedViews": "{count} сохранённое представление | {count} сохранённых представлений"
+    },
+    "stepper": {
+      "content": "Выберите содержимое",
+      "setup": "Настройка",
+      "settingUp": "Настройка…",
+      "interrupted": "Прервано",
+      "ready": "Готово",
+      "noteRunning": "Настройка · создано {made} из {total}",
+      "noteAlertsOn": "Создано {made} из {total} · {count} оповещение включено | Создано {made} из {total} · {count} оповещений включено",
+      "noteAlertsOff": "Создано {made} из {total} · оповещения выключены",
+      "noteAlreadyHere": "Создано {made} из {total} · {count} уже есть"
+    },
+    "alertStep": {
+      "turnOn": "Включить {count} оповещение набора | Включить {count} оповещений набора",
+      "sendTo": "Отправлять в",
+      "sendToEmail": "Отправлять в: {icon} На мою почту — {email}",
+      "emailCreateNote": "В этой организации пока нет получателя. При настройке для вас добавляется получатель эл. почты (или используется существующий, который отправляет только вам).",
+      "noDestination": "Получателя пока нет. Добавьте его в разделе Оповещения → Получатели.",
+      "destinationsFailed": "Не удалось загрузить получателей, поэтому «Отправлять в» выключено. Получателя можно будет указать позже в разделе Оповещения → Получатели.",
+      "destinations": "{count} получатель в этой организации | {count} получателей в этой организации",
+      "chooseDestination": "Выберите получателя",
+      "pickDestination": "Выберите получателя для «Отправлять в» или снимите отметку"
+    },
+    "ready": {
+      "title": "Мониторинг {title} готов",
+      "emailFailed": "Не удалось создать получателя эл. почты, поэтому оповещения добавлены выключенными.",
+      "emailForbidden": "Вы не можете добавлять получателей оповещений в этой организации, поэтому получатель эл. почты не создан, а оповещения добавлены выключенными."
+    },
+    "popup": {
+      "title": "Стартовые наборы",
+      "subtitle": "{count} набор подходит к данным, которые вы уже отправляете | {count} наборов подходят к данным, которые вы уже отправляете",
+      "subtitleAllSetUp": "Все наборы, подходящие к вашим данным, настроены",
+      "subtitleNone": "Пока нет подходящих наборов",
+      "items": "{count} элемент | {count} элементов",
+      "setUpAgo": "Настроено {when}",
+      "stopped": "Настройка прервалась на середине",
+      "whatGetsCreated": "Что будет создано",
+      "tileDashboards": "{count} дашборд | {count} дашбордов",
+      "tileAlerts": "{count} оповещение | {count} оповещений",
+      "tileSavedViews": "{count} сохранённое представление | {count} сохранённых представлений",
+      "noneDashboards": "Дашборды",
+      "noneAlerts": "Оповещения",
+      "noneSavedViews": "Сохранённые представления",
+      "noneInPack": "В этом пакете ничего нет",
+      "sevCritical": "{count} критических",
+      "sevWarning": "{count} предупреждений",
+      "sevInfo": "{count} информационных",
+      "chooseNext": "Выберите элементы, которые нужно создать на следующем шаге",
+      "reviewSetUp": "Проверить пакет",
+      "viewPack": "Просмотреть пакет",
+      "checkAgain": "Проверить снова",
+      "checkFailed": "Не удалось проверить. Попробуйте снова",
+      "emptyTitle": "Пока нет пакетов, подходящих к вашим данным",
+      "emptyText": "Пакеты появляются, когда OpenObserve видит данные из известного ему источника, например Kubernetes, хостов, Docker, PostgreSQL или AWS. Отправьте данные и проверьте снова.",
+      "back": "Назад",
+      "backToPacks": "Назад к пакетам",
+      "keepsGoing": "Это окно можно закрыть. Настройка продолжится."
+    },
+    "viewPack": {
+      "open": "Открыть",
+      "openLabel": "Открыть {name}",
+      "dashboard": "Дашборд",
+      "dashboards": "Дашборды",
+      "dashboardsMeta": "{count} дашборд | {count} дашбордов",
+      "alerts": "Оповещения",
+      "alertsMeta": "{count} · {on} вкл. · {silent} заглушено",
+      "alertsMetaFailed": "{count} · {on} вкл. · {silent} заглушено · {failed} не создано",
+      "savedView": "Сохранённое представление · доступно всем в этой организации",
+      "savedViews": "Сохранённые представления",
+      "savedViewsMeta": "{count} сохранённое представление · доступно всем в этой организации | {count} сохранённых представлений · доступно всем в этой организации",
+      "on": "Вкл.",
+      "silent": "Заглушено",
+      "notCreated": "Не создано",
+      "showMore": "Показать ещё {count}",
+      "showLess": "Показать меньше",
+      "ordinary": "Это обычные оповещения, дашборды и представления. Редактируйте или удаляйте их на соответствующих страницах.",
+      "setUpByYou": "Настроено вами {when}",
+      "setUpBy": "Настроено {who} {when}",
+      "setUpWhen": "Настроено {when}",
+      "partialTitle": "Мониторинг {title} настроен, {count} элемент не создан | Мониторинг {title} настроен, {count} элементов не создано",
+      "partialNote": "Остальное готово. Повторите попытку для элемента ниже или для всех сразу.",
+      "partialSubtitle": "Создано {made} из {total} · не создано {failed}"
+    }
   },
   "alert_library": {
     "header": "Библиотека оповещений",
