@@ -117,6 +117,56 @@ describe("convertDashboardSchemaVersion", () => {
     expect(result.version).toBe(8);
   });
 
+  it("stacks default layouts for v1 panels saved without layouts", () => {
+    const result = convertDashboardSchemaVersion({
+      version: 1,
+      title: "No Layouts",
+      panels: [
+        { id: "panel-1", type: "bar", config: {}, fields: {} },
+        { id: "panel-2", type: "bar", config: {}, fields: {} },
+      ],
+    });
+
+    expect(result.version).toBe(8);
+    expect(result.tabs[0].panels.map((panel: { layout: unknown }) => panel.layout)).toEqual([
+      { x: 0, y: 0, w: 96, h: 18, i: 1 },
+      { x: 0, y: 18, w: 96, h: 18, i: 2 },
+    ]);
+  });
+
+  it("places unlaid-out v1 panels below the laid-out ones with fresh ids", () => {
+    const result = convertDashboardSchemaVersion({
+      version: 1,
+      title: "Mixed",
+      layouts: [{ panelId: "panel-2", x: 0, y: 2, w: 6, h: 3, i: 4 }],
+      panels: [
+        { id: "panel-1", type: "bar", config: {}, fields: {} },
+        { id: "panel-2", type: "bar", config: {}, fields: {} },
+        { id: "panel-3", type: "bar", config: {}, fields: {} },
+      ],
+    });
+
+    expect(result.tabs[0].panels.map((panel: { layout: unknown }) => panel.layout)).toEqual([
+      { x: 0, y: 10, w: 96, h: 18, i: 5 },
+      { x: 0, y: 4, w: 96, h: 6, i: 4 },
+      { x: 0, y: 28, w: 96, h: 18, i: 6 },
+    ]);
+  });
+
+  it("stacks unlaid-out v1 panels below a placed panel with no height as if it had the default height", () => {
+    const result = convertDashboardSchemaVersion({
+      version: 1,
+      title: "No Height",
+      layouts: [{ panelId: "panel-1", x: 0, y: 2, w: 6, i: 1 }],
+      panels: [
+        { id: "panel-1", type: "bar", config: {}, fields: {} },
+        { id: "panel-2", type: "bar", config: {}, fields: {} },
+      ],
+    });
+
+    expect(result.tabs[0].panels[1].layout).toEqual({ x: 0, y: 22, w: 96, h: 18, i: 2 });
+  });
+
   it("should handle panels with missing fields in convertPanelSchemaVersion", () => {
     const dataV1WithIncompletePanel = {
       version: 1,

@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Żaden kanał nie ma jeszcze domyślnej organizacji",
-      "description": "Pytania w kanale bez domyślnej organizacji trafiają do domyślnej organizacji każdej osoby (można ją zmienić za pomocą /o2 org)."
+      "description": "Pytania w kanale bez domyślnej organizacji trafiają do domyślnej organizacji każdej osoby (można ją zmienić za pomocą {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nikt w tej organizacji nie połączył jeszcze Slacka"
@@ -28142,7 +28142,7 @@
     "teamChannelSilent": "Kanał tego zespołu jest celowo pusty — wezwania nie będą nigdzie ogłaszane.",
     "slackChannelTitle": "Kanał Slack",
     "slackChannelSetWith": "Ustaw kanał Slack za pomocą {command}",
-    "slackChannelLinkHint": "Wpisz to na tym kanale Slack. Musisz mieć powiązane konto Slack: wpisz /o2 link w Slacku.",
+    "slackChannelLinkHint": "Wpisz to na tym kanale Slack. Musisz mieć powiązane konto Slack: wpisz {command} link w Slacku.",
     "slackChannelSendTest": "Wyślij wiadomość testową",
     "slackChannelClear": "Wyczyść",
     "slackChannelBackup": "Używaj {webhook} tylko jako kopii zapasowej",
@@ -28717,7 +28717,7 @@
     "mineJoinTeam": "Dołącz do zespołu",
     "mineTestTeam": "Wyślij testowe wezwanie do {team}",
     "mineCoverSaved": "Zastępstwo zapisane",
-    "mineSlackLinkHow": "Wpisz /o2 link w Slacku",
+    "mineSlackLinkHow": "Wpisz {command} link w Slacku",
     "mineSlackSetUpHint": "Otwiera Ustawienia › Slack",
     "myDeliveriesWhen": "Kiedy",
     "phoneAddHint": "Dodaj numer do wiadomości SMS i połączeń",
@@ -29288,7 +29288,7 @@
     "channelUnavailable": "{channel} — brak dostawcy",
     "channelUnverified": "{channel} — zapisany, ale nikt go nie zweryfikował",
     "channelAddPhone": "{reason}. Dodaj swój telefon w sekcji Moje dyżury",
-    "channelLinkSlack": "{reason}. Uruchom /o2 link w Slacku",
+    "channelLinkSlack": "{reason}. Uruchom {command} link w Slacku",
     "loadUneven": "{name} obsłużył {factor}× medianę w ciągu ostatnich {days} dni",
     "loadUnevenLabel": "Obciążenie jest nierównomierne:",
     "membersUnreachableMore": "{name} jest w tym zespole, ale żadne wezwanie do tej osoby nie może dotrzeć — {why}. {count} inny członek jest w tej samej sytuacji. | {name} jest w tym zespole, ale żadne wezwanie do tej osoby nie może dotrzeć — {why}. {count} innych członków jest w tej samej sytuacji.",
@@ -30898,6 +30898,13 @@
         "http": "HTTP",
         "httpDescription": "Slack wywołuje Twój publiczny adres URL. Wymaga jednego kliknięcia przycisku Verify w Slacku",
         "channelHistory": "Pozwól botowi czytać odpowiedzi w wątkach, które rozpoczął",
+        "appName": "Nazwa aplikacji",
+        "appNameHelp": "Nazwa widoczna dla użytkowników w Slacku. Nadaj każdemu serwerowi OpenObserve własną nazwę, np. OpenObserve Staging.",
+        "appNameTooLong": "Nazwa aplikacji może mieć maksymalnie {max} znaków",
+        "appNameMarkup": "Nazwa aplikacji nie może zawierać <, > ani &",
+        "command": "Polecenie ukośnikowe",
+        "commandInvalid": "Zacznij od / i użyj maksymalnie {max} znaków: małe litery, cyfry, - i _",
+        "commandWarning": "Slack obsługuje polecenie ukośnikowe tylko dla jednej aplikacji w obszarze roboczym. Jeśli inna aplikacja w tym obszarze roboczym już używa {command}, po zainstalowaniu tej aplikacji {command} przestanie działać dla tamtej aplikacji.",
         "tokenLabel": "Token odświeżania konfiguracji aplikacji (xoxe-…)",
         "tokenHelp": "Na stronie Your Apps w Slacku sekcja Your App Configuration Tokens › Generate Token pokazuje token dostępu i token odświeżania: wklej token odświeżania. OpenObserve rotuje go i przechowuje najnowszy w postaci zaszyfrowanej, aby później zaktualizować aplikację.",
         "generateToken": "Wygeneruj token",
@@ -31067,7 +31074,7 @@
         "settings": "Ustawienia",
         "install": "Przy instalacji",
         "destination": "Z miejsca docelowego alertu",
-        "oncall": "Z /o2 oncall w tym kanale"
+        "oncall": "Z {command} oncall w tym kanale"
       },
       "channel": "Kanał",
       "channelPlaceholder": "Szukaj kanałów",
@@ -31081,7 +31088,7 @@
       "editDefault": "Edytuj domyślny kanał",
       "removeConfirm": "Usuń domyślny",
       "removeTitle": "Usunąć domyślną organizację dla #{channel}?",
-      "removeMessage": "Pytania w kanale {name} trafiają następnie do domyślnej organizacji każdej osoby (można ją zmienić za pomocą /o2 org).",
+      "removeMessage": "Pytania w kanale {name} trafiają następnie do domyślnej organizacji każdej osoby (można ją zmienić za pomocą {command} org).",
       "instanceAdminOnly": "Tylko administrator instancji",
       "ownOrgOnlyHint": "W obszarze roboczym instancji mapujesz kanały na własną organizację",
       "claimableHint": "Nieprzypisane kanały i kanały należące do {org}",

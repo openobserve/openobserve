@@ -367,6 +367,8 @@ export interface TeamChannel {
   slack_unavailable_reason: string | null;
   /** RO-2's "Pages can't post to #{channel}: {reason}", written by the server. */
   slack_post_problem: string | null;
+  /** The serving Slack app's slash command, such as `/o2`; older servers omit it. */
+  slack_command?: string;
 }
 
 /** `PUT /oncall/teams/{id}/channel`. Same-room: "" unticks, omitted keeps the stored one. */
@@ -643,6 +645,8 @@ export interface ChannelReadiness {
   configured_but_unverified: boolean;
   /** A finished sentence. Render verbatim. */
   blocked_because?: string | null;
+  /** On a Slack chip that is not linked, the command of the team's own Slack app. */
+  slack_command?: string;
 }
 
 export interface MemberReachability {

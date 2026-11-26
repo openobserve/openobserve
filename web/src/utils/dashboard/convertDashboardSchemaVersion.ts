@@ -16,6 +16,7 @@
 import { raw } from "@/types/i18n";
 
 export const CURRENT_DASHBOARD_SCHEMA_VERSION = 8;
+const DEFAULT_LEGACY_PANEL_HEIGHT = 9;
 
 const convertPanelSchemaVersion = (data: any) => {
   if (!data || (typeof data === "object" && Object.keys(data).length === 0)) {
@@ -167,12 +168,26 @@ export function convertDashboardSchemaVersion(data: any) {
         };
       });
 
+      // v1 documents may be stored without `layouts`, so a panel with none gets a default layout stacked below the others.
+      const placed: { i?: unknown; y?: unknown; h?: unknown }[] =
+        Object.values(layoutsObjBasedOnPanelId);
+      let nextI = Math.max(0, ...placed.map((layout) => Number(layout.i) || 0));
+      let nextY = Math.max(
+        0,
+        ...placed.map(
+          (layout) => (Number(layout.y) || 0) + (Number(layout.h) || DEFAULT_LEGACY_PANEL_HEIGHT),
+        ),
+      );
+
       // add layout object in panels array and also migrate panels schema using panelschemaversionconverted function
-      data.panels = data?.panels?.map((panelItem: any) => ({
-        //
-        ...convertPanelSchemaVersion(panelItem),
-        layout: layoutsObjBasedOnPanelId[panelItem.id], // Use the layout item from the mapping
-      }));
+      data.panels = data?.panels?.map((panelItem: any) => {
+        let layout = layoutsObjBasedOnPanelId[panelItem.id];
+        if (!layout) {
+          layout = { x: 0, y: nextY, w: 6, h: DEFAULT_LEGACY_PANEL_HEIGHT, i: ++nextI };
+          nextY += DEFAULT_LEGACY_PANEL_HEIGHT;
+        }
+        return { ...convertPanelSchemaVersion(panelItem), layout };
+      });
 
       // update the version
       data.version = 2;

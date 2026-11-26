@@ -202,6 +202,22 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     expect(row.find('[data-col="set_by"]').text()).toBe("From /o2 oncall here");
   });
 
+  it("names the app's own slash command in its hints", async () => {
+    const own = installationView({ command: "/staging-o2" });
+    const w = await mountOn(own, makeSlackStore(), [{ ...rows[0], set_from: "oncall" }]);
+    const [row] = w.findAll('[data-test-stub="otable-row"]');
+    expect(row.find('[data-col="set_by"]').text()).toBe("From /staging-o2 oncall here");
+    await w.find('[data-test="slack-channel-remove-C1"]').trigger("click");
+    expect(w.findComponent({ name: "ConfirmDialog" }).props("messageValues")).toEqual({
+      command: "/staging-o2",
+    });
+  });
+
+  it("names the app's own slash command when no channel has a default", async () => {
+    const w = await mountOn(installationView({ command: "/staging-o2" }), makeSlackStore(), []);
+    expect(w.text()).toContain("they can change it with /staging-o2 org");
+  });
+
   it("AC-5.5 offers Edit and Remove only on rows this org set", async () => {
     const w = await mountDefaults();
     expect(w.find('[data-test="slack-channel-edit-C1"]').exists()).toBe(true);
@@ -220,7 +236,12 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     expect(w.findComponent({ name: "ConfirmDialog" }).props("okLabel")).toBe("Remove default");
     expect(w.find('[data-test="slack-channel-remove-C1"]').attributes("aria-label")).toBe("Remove");
     expect(w.find('[data-test="slack-channel-C1-menu"]').exists()).toBe(true);
-    expect(i18n.global.t("slackApp.channels.removeMessage", { name: "#sre-prod" })).toBe(
+    expect(w.findComponent({ name: "ConfirmDialog" }).props("messageValues")).toEqual({
+      command: "/o2",
+    });
+    expect(
+      i18n.global.t("slackApp.channels.removeMessage", { name: "#sre-prod", command: "/o2" }),
+    ).toBe(
       "Questions in #sre-prod then go to each person's default org (they can change it with /o2 org).",
     );
     await w.find('[data-test-stub="confirm-ok"]').trigger("click");
