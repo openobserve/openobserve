@@ -15,10 +15,14 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  applyColorDefault,
   applyConfigPanelDefaults,
   applyEditorMountDefaults,
   applyPanelConfigDefaults,
+  applyPivotConfigDefaults,
+  clearUnusableLegendSizes,
 } from "./panelConfigDefaults";
+import { HOSTMAP_DEFAULT_COLOR } from "./convertHostmapData";
 
 const store = (showSymbol?: boolean) => ({
   state: { zoConfig: { dashboard_show_symbol_enabled: showSymbol } },
@@ -95,7 +99,7 @@ describe("applyEditorMountDefaults", () => {
     });
   });
 
-  it("keeps a VRL function and lists the user set, and adds no colour config", () => {
+  it("keeps a VRL function and lists the user set", () => {
     const panel: any = {
       queries: [{ vrlFunctionQuery: ".x = 1" }],
       config: { drilldown: [{ name: "d" }] },
@@ -103,7 +107,21 @@ describe("applyEditorMountDefaults", () => {
     applyEditorMountDefaults(panel);
     expect(panel.queries[0].vrlFunctionQuery).toBe(".x = 1");
     expect(panel.config.drilldown).toEqual([{ name: "d" }]);
-    expect("color" in panel.config).toBe(false);
+  });
+
+  it("gives a panel without colours the picker default, and a table its override list", () => {
+    const line: any = { type: "line", config: {} };
+    const table: any = { type: "table", config: {} };
+    applyEditorMountDefaults(line);
+    applyEditorMountDefaults(table);
+    expect(line.config.color).toEqual({
+      mode: "palette-classic-by-series",
+      fixedColor: [],
+      seriesBy: "last",
+      colorBySeries: [],
+    });
+    expect("override_config" in line.config).toBe(false);
+    expect(table.config.override_config).toEqual([]);
   });
 });
 
@@ -121,5 +139,72 @@ describe("applyPanelConfigDefaults", () => {
     const panel: any = { id: "p1" };
     applyPanelConfigDefaults(panel, store());
     expect(panel).toEqual({ id: "p1" });
+  });
+});
+
+describe("clearUnusableLegendSizes", () => {
+  const sized = (legends_type: any, legends_position: any) => ({
+    legends_type,
+    legends_position,
+    legend_width: { value: 200, unit: "px" },
+    legend_height: { value: 80, unit: "px" },
+  });
+
+  it("keeps a width only for a plain legend on the right", () => {
+    const right = sized("plain", "right");
+    clearUnusableLegendSizes(right);
+    expect(right.legend_width.value).toBe(200);
+    expect(right.legend_height.value).toBeNull();
+
+    const scroll = sized("scroll", "right");
+    clearUnusableLegendSizes(scroll);
+    expect(scroll.legend_width.value).toBeNull();
+  });
+
+  it("keeps a height for a plain legend at the bottom or on Auto, missing or null", () => {
+    for (const position of ["bottom", null, undefined]) {
+      const config = sized("plain", position);
+      clearUnusableLegendSizes(config);
+      expect(config.legend_height.value).toBe(80);
+      expect(config.legend_width.value).toBeNull();
+    }
+  });
+});
+
+describe("applyPivotConfigDefaults", () => {
+  it("turns transpose and dynamic columns off and fills missing totals, keeping set ones", () => {
+    const config: Record<string, any> = {
+      table_transpose: true,
+      table_dynamic_columns: true,
+      table_pivot_show_row_totals: true,
+    };
+    applyPivotConfigDefaults(config);
+    expect(config).toEqual({
+      table_transpose: false,
+      table_dynamic_columns: false,
+      table_pivot_show_row_totals: true,
+      table_pivot_show_col_totals: false,
+      table_pivot_sticky_row_totals: false,
+      table_pivot_sticky_col_totals: false,
+    });
+  });
+});
+
+describe("applyColorDefault", () => {
+  it("gives a host map its own scale, other panels the classic palette, and keeps a set one", () => {
+    const hostmap: Record<string, any> = {};
+    const line: Record<string, any> = {};
+    const set: Record<string, any> = { color: { mode: "fixed" } };
+    applyColorDefault(hostmap, "hostmap");
+    applyColorDefault(line, "line");
+    applyColorDefault(set, "line");
+    expect(hostmap.color).toEqual(HOSTMAP_DEFAULT_COLOR);
+    expect(hostmap.color.fixedColor).not.toBe(HOSTMAP_DEFAULT_COLOR.fixedColor);
+    expect(line.color).toEqual({
+      mode: "palette-classic-by-series",
+      fixedColor: [],
+      seriesBy: "last",
+    });
+    expect(set.color).toEqual({ mode: "fixed" });
   });
 });

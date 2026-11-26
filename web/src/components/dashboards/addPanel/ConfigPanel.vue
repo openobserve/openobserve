@@ -3715,7 +3715,11 @@ import { BAR_WIDTH_MAX, isBarWidthValid } from "@/utils/dashboard/barTrack";
 import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
 import { resolveTooltipSort, TOOLTIP_SORT_VALUES } from "@/utils/dashboard/tooltipSort";
 import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
-import { applyPanelConfigDefaults } from "@/utils/dashboard/panelConfigDefaults";
+import {
+  applyPanelConfigDefaults,
+  applyPivotConfigDefaults,
+  clearUnusableLegendSizes,
+} from "@/utils/dashboard/panelConfigDefaults";
 
 const AlertListPanelConfig = defineAsyncComponent(() => import("./AlertListPanelConfig.vue"));
 const FlameGraphPanelConfig = defineAsyncComponent(() => import("./FlameGraphPanelConfig.vue"));
@@ -4825,29 +4829,11 @@ export default defineComponent({
       },
       { deep: true },
     );
-    // When pivot mode activates: disable conflicting features and
-    // initialize pivot config values (undefined ? false defaults).
-    // Without this, the toggle shows undefined as OFF but conversion
-    // may treat undefined differently — causing a mismatch.
+    // Shared with AddPanel's unsaved-changes check, so the comparison writes the same defaults.
     watch(
       () => isPivotMode.value,
       (active) => {
-        if (active) {
-          dashboardPanelData.data.config.table_transpose = false;
-          dashboardPanelData.data.config.table_dynamic_columns = false;
-          if (dashboardPanelData.data.config.table_pivot_show_row_totals === undefined) {
-            dashboardPanelData.data.config.table_pivot_show_row_totals = false;
-          }
-          if (dashboardPanelData.data.config.table_pivot_show_col_totals === undefined) {
-            dashboardPanelData.data.config.table_pivot_show_col_totals = false;
-          }
-          if (dashboardPanelData.data.config.table_pivot_sticky_row_totals === undefined) {
-            dashboardPanelData.data.config.table_pivot_sticky_row_totals = false;
-          }
-          if (dashboardPanelData.data.config.table_pivot_sticky_col_totals === undefined) {
-            dashboardPanelData.data.config.table_pivot_sticky_col_totals = false;
-          }
-        }
+        if (active) applyPivotConfigDefaults(dashboardPanelData.data.config);
       },
       { immediate: true },
     );
@@ -4932,32 +4918,8 @@ export default defineComponent({
       });
     });
 
-    // Clear legend width when switching away from plain type or when position is not right
-    watchEffect(() => {
-      if (
-        dashboardPanelData.data.config.legends_type !== "plain" ||
-        dashboardPanelData.data.config.legends_position !== "right"
-      ) {
-        // Clear the legend width value when conditions no longer allow width customization
-        if (dashboardPanelData.data.config.legend_width) {
-          dashboardPanelData.data.config.legend_width.value = null;
-        }
-      }
-    });
-
-    // Clear legend height when switching away from plain type or when position is not bottom/auto
-    watchEffect(() => {
-      if (
-        dashboardPanelData.data.config.legends_type !== "plain" ||
-        (dashboardPanelData.data.config.legends_position !== null &&
-          dashboardPanelData.data.config.legends_position !== "bottom")
-      ) {
-        // Clear the legend height value when conditions no longer allow height customization
-        if (dashboardPanelData.data.config.legend_height) {
-          dashboardPanelData.data.config.legend_height.value = null;
-        }
-      }
-    });
+    // Shared with AddPanel's unsaved-changes check, so the comparison clears the same sizes.
+    watchEffect(() => clearUnusableLegendSizes(dashboardPanelData.data.config));
 
     const decimalsTouched = ref(false);
 

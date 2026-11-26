@@ -513,6 +513,7 @@ export default defineComponent({
       resetAggregationFunction,
       validatePanel,
       makeAutoSQLQuery,
+      isPivotMode,
     } = useDashboardPanelData("dashboard", t);
     const editMode = ref(!!route.query.panelId);
     const selectedDate: any = ref(null);
@@ -805,7 +806,7 @@ export default defineComponent({
     // the same); with them on both sides that is not an edit. Comparison only: the panel itself is untouched.
     const snapshotPanel = () => {
       const copy = JSON.parse(JSON.stringify(dashboardPanelData.data));
-      applyPanelConfigDefaults(copy, store);
+      applyPanelConfigDefaults(copy, store, !!isPivotMode?.value);
       applyEditorMountDefaults(copy);
       return copy;
     };

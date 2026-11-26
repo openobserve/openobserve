@@ -22,14 +22,27 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   useDashboardPanelData: vi.fn(),
 }));
 
+// Every section open, so each section's own components (colour picker, drilldown, ...) mount too.
+vi.mock("@/utils/dashboard/searchLabelsConfig", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  const allExpanded = Object.fromEntries(
+    Object.keys(actual.DEFAULT_EXPANDED_SECTIONS as Record<string, boolean>).map((k) => [k, true]),
+  );
+  return { ...actual, DEFAULT_EXPANDED_SECTIONS: allExpanded };
+});
+
 import ConfigPanel from "@/components/dashboards/addPanel/ConfigPanel.vue";
+import OverrideConfig from "@/components/dashboards/addPanel/OverrideConfig.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getDefaultDashboardPanelData } from "@/composables/dashboard/useDashboardPanelDefaults";
-import { applyPanelConfigDefaults } from "@/utils/dashboard/panelConfigDefaults";
+import {
+  applyEditorMountDefaults,
+  applyPanelConfigDefaults,
+} from "@/utils/dashboard/panelConfigDefaults";
 
-vi.setConfig({ testTimeout: 20000 });
+vi.setConfig({ testTimeout: 30000 });
 
 // The server drops null fields, so a panel made in the UI comes back without them.
 const withoutNulls = (value: any): any => {
@@ -46,7 +59,43 @@ const withoutNulls = (value: any): any => {
 
 const clone = (value: any) => JSON.parse(JSON.stringify(value));
 
-describe("ConfigPanel mount-time defaults (#7454)", () => {
+const savedPanel = (type: string, change: (data: any) => void = () => {}) => {
+  const panel = getDefaultDashboardPanelData(store);
+  panel.data = withoutNulls({ ...panel.data, id: "p1", type, title: "Saved" });
+  change(panel.data);
+  const state = reactive(panel);
+  // Same rule as usePanelFields, so the pivot watcher sees pivot mode the way the app does.
+  const isPivotMode = computed(() => {
+    const fields = state.data.queries[state.layout.currentQueryIndex]?.fields;
+    return (
+      state.data.type === "table" &&
+      fields?.x?.length > 0 &&
+      fields?.y?.length > 0 &&
+      fields?.breakdown?.length > 0
+    );
+  });
+  vi.mocked(useDashboardPanelData).mockReturnValue({
+    dashboardPanelData: state,
+    promqlMode: computed(() => false),
+    isPivotMode,
+    selectedStreamFields: [],
+  } as any);
+  return { state, isPivotMode };
+};
+
+// What AddPanel's unsaved check compares: the panel with every mount-time default applied.
+const normalised = (data: any, isPivotMode: boolean) => {
+  const copy = clone(data);
+  applyPanelConfigDefaults(copy, store, isPivotMode);
+  applyEditorMountDefaults(copy);
+  return copy;
+};
+
+const mountOptions = {
+  global: { plugins: [i18n, store], provide: { dashboardPanelDataPageKey: "dashboard" } },
+};
+
+describe("Config sidebar mount-time writes match the unsaved check (#7454)", () => {
   let wrapper: any;
 
   afterEach(() => {
@@ -54,34 +103,72 @@ describe("ConfigPanel mount-time defaults (#7454)", () => {
     wrapper = null;
   });
 
-  it.each(["line", "bar", "table", "custom_chart"])(
-    "writes on open exactly what the editor's unsaved check fills in (%s)",
-    async (type) => {
-      const panel = getDefaultDashboardPanelData(store);
-      panel.data = withoutNulls({ ...panel.data, id: "p1", type, title: "Saved" });
-      const state = reactive(panel);
-      vi.mocked(useDashboardPanelData).mockReturnValue({
-        dashboardPanelData: state,
-        promqlMode: false,
-        isPivotMode: computed(() => false),
-        selectedStreamFields: [],
-      } as any);
-      const beforeOpen = clone(state.data);
+  const openConfig = async (state: any, isPivotMode: any) => {
+    const before = clone(state.data);
+    wrapper = mount(ConfigPanel, {
+      props: { variablesData: { values: [] }, panelData: {} },
+      ...mountOptions,
+    });
+    await flushPromises();
+    const after = clone(state.data);
+    expect(after).not.toEqual(before);
+    expect(normalised(after, isPivotMode.value)).toEqual(normalised(before, isPivotMode.value));
+    return after;
+  };
 
-      wrapper = mount(ConfigPanel, {
-        props: { variablesData: { values: [] }, panelData: {} },
-        global: { plugins: [i18n, store], provide: { dashboardPanelDataPageKey: "dashboard" } },
+  it.each(["line", "bar", "table", "custom_chart"])("%s panel", async (type) => {
+    const { state, isPivotMode } = savedPanel(type);
+    const after = await openConfig(state, isPivotMode);
+    expect(after.config.legends_position).toBeNull();
+  });
+
+  it.each(["line", "hostmap"])("%s panel saved without a colour config", async (type) => {
+    const { state, isPivotMode } = savedPanel(type, (data) => {
+      delete data.config.color;
+    });
+    const after = await openConfig(state, isPivotMode);
+    expect(after.config.color.mode).toBeTruthy();
+  });
+
+  it("pivot table saved without its pivot keys", async () => {
+    const { state, isPivotMode } = savedPanel("table", (data) => {
+      Object.assign(data.queries[0].fields, {
+        x: [{ alias: "x", column: "x" }],
+        y: [{ alias: "y", column: "y", aggregationFunction: "count" }],
+        breakdown: [{ alias: "b", column: "b" }],
       });
-      await flushPromises();
+      for (const key of Object.keys(data.config)) {
+        if (key.startsWith("table_pivot_")) delete data.config[key];
+      }
+      data.config.table_transpose = true;
+    });
+    expect(isPivotMode.value).toBe(true);
+    const after = await openConfig(state, isPivotMode);
+    expect(after.config).toMatchObject({
+      table_transpose: false,
+      table_pivot_show_row_totals: false,
+      table_pivot_sticky_col_totals: false,
+    });
+  });
 
-      const afterOpen = clone(state.data);
-      // Opening Config does write: this is what raised the leave dialog.
-      expect(afterOpen).not.toEqual(beforeOpen);
-      expect(afterOpen.config.legends_position).toBeNull();
-      // Normalising the pre-open snapshot the same way leaves nothing to call an edit.
-      const normalised = clone(beforeOpen);
-      applyPanelConfigDefaults(normalised, store);
-      expect(afterOpen).toEqual(normalised);
-    },
-  );
+  it("scroll legend saved with a width", async () => {
+    const { state, isPivotMode } = savedPanel("line", (data) => {
+      data.config.legends_type = "scroll";
+      data.config.legend_width = { value: 200, unit: "px" };
+    });
+    const after = await openConfig(state, isPivotMode);
+    expect(after.config.legend_width).toEqual({ value: null, unit: "px" });
+  });
+
+  it("table saved without overrides, once OverrideConfig mounts", async () => {
+    const { state, isPivotMode } = savedPanel("table", (data) => {
+      delete data.config.override_config;
+    });
+    const before = clone(state.data);
+    wrapper = mount(OverrideConfig, { props: { mode: "table", panelData: {} }, ...mountOptions });
+    await flushPromises();
+    const after = clone(state.data);
+    expect(after.config.override_config).toEqual([]);
+    expect(normalised(after, isPivotMode.value)).toEqual(normalised(before, isPivotMode.value));
+  });
 });

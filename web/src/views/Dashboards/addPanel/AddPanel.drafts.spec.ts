@@ -35,7 +35,6 @@ import {
   readPanelDraft,
   writePanelDraft,
 } from "@/composables/dashboard/usePanelDraft";
-import { applyPanelConfigDefaults } from "@/utils/dashboard/panelConfigDefaults";
 import AddPanel from "./AddPanel.vue";
 
 vi.mock("@/composables/dashboard/usePanelDraft", async (importOriginal) => {
@@ -64,7 +63,7 @@ vi.mock("@/utils/commons", () => ({
 }));
 
 vi.mock("@/composables/dashboard/useDashboardPanel", async () => {
-  const { reactive } = await import("vue");
+  const { computed, reactive } = await import("vue");
   const fresh = () => ({
     id: "",
     title: "",
@@ -100,6 +99,16 @@ vi.mock("@/composables/dashboard/useDashboardPanel", async () => {
     },
     meta: { dateTime: null, stream: {} },
   });
+  // Same rule as usePanelFields: a table whose current query has x, y and breakdown fields.
+  const isPivotMode = computed(() => {
+    const fields = state.data.queries[state.layout.currentQueryIndex]?.fields as any;
+    return (
+      state.data.type === "table" &&
+      fields?.x?.length > 0 &&
+      fields?.y?.length > 0 &&
+      fields?.breakdown?.length > 0
+    );
+  });
   return {
     default: vi.fn(() => ({
       dashboardPanelData: state,
@@ -112,6 +121,7 @@ vi.mock("@/composables/dashboard/useDashboardPanel", async () => {
       resetAggregationFunction: vi.fn(),
       validatePanel: vi.fn(),
       makeAutoSQLQuery: vi.fn(),
+      isPivotMode,
     })),
   };
 });
@@ -635,12 +645,114 @@ describe("AddPanel drafts and Save and keep editing", () => {
       expect(next).toHaveBeenCalledWith();
     });
 
-    // #7454: the click that opens Config takes the snapshot, then the sidebar fills the keys the server dropped.
-    const openConfigSidebar = async (wrapper: any) => {
+    // #7454: the click that opens Config takes the snapshot; the literals are what the real components write.
+    const openConfigSidebar = async (wrapper: any, write: (panel: any) => void = () => {}) => {
       window.dispatchEvent(new Event("pointerdown"));
-      applyPanelConfigDefaults(wrapper.vm.dashboardPanelData.data, store);
+      const panel = wrapper.vm.dashboardPanelData.data;
+      Object.assign(panel.config, {
+        legends_position: null,
+        legends_type: null,
+        chart_align: null,
+        unit: null,
+        unit_custom: null,
+        legend_width: { value: null, unit: "px" },
+        legend_height: { value: null, unit: "px" },
+        table_filtering: false,
+        show_symbol: false,
+      });
+      write(panel);
       await nextTick();
     };
+
+    const savedPanel = (changes: (panel: any) => void) => {
+      const panel: any = serverPanel();
+      changes(panel);
+      vi.mocked(getPanel).mockResolvedValue(panel);
+      nav.route = routeWith({ panelId: "p1" });
+    };
+
+    const leavesWithoutAsking = async () => {
+      const { next, done } = leave();
+      await done;
+      expect(leaveDialog()).toBeNull();
+      expect(next).toHaveBeenCalledWith();
+    };
+
+    it("opening Colors on a panel saved without a colour config leaves without asking", async () => {
+      savedPanel(() => {});
+      wrapper = await mountEditor();
+      await openConfigSidebar(wrapper, (panel) => {
+        panel.config.color = {
+          mode: "palette-classic-by-series",
+          fixedColor: [],
+          seriesBy: "last",
+        };
+        panel.config.color.colorBySeries = [];
+      });
+      await leavesWithoutAsking();
+    });
+
+    it("a table saved without overrides leaves without asking once OverrideConfig mounts", async () => {
+      savedPanel((panel) => {
+        panel.type = "table";
+      });
+      wrapper = await mountEditor();
+      await openConfigSidebar(wrapper, (panel) => {
+        panel.config.override_config = [];
+      });
+      await leavesWithoutAsking();
+    });
+
+    it("a pivot table saved without its pivot keys leaves without asking", async () => {
+      savedPanel((panel) => {
+        panel.type = "table";
+        Object.assign(panel.queries[0].fields, {
+          x: [{ alias: "x" }],
+          y: [{ alias: "y" }],
+          breakdown: [{ alias: "b" }],
+        });
+        panel.config = { table_transpose: true, table_dynamic_columns: true };
+      });
+      wrapper = await mountEditor();
+      await openConfigSidebar(wrapper, (panel) => {
+        Object.assign(panel.config, {
+          table_transpose: false,
+          table_dynamic_columns: false,
+          table_pivot_show_row_totals: false,
+          table_pivot_show_col_totals: false,
+          table_pivot_sticky_row_totals: false,
+          table_pivot_sticky_col_totals: false,
+        });
+      });
+      await leavesWithoutAsking();
+    });
+
+    it("a scroll legend saved with a width leaves without asking once the width is cleared", async () => {
+      savedPanel((panel) => {
+        panel.config = { legends_type: "scroll", legend_width: { value: 200, unit: "px" } };
+      });
+      wrapper = await mountEditor();
+      await openConfigSidebar(wrapper, (panel) => {
+        panel.config.legends_type = "scroll";
+        panel.config.legend_width = { value: null, unit: "px" };
+      });
+      await leavesWithoutAsking();
+    });
+
+    it("a colour edit on a panel saved without a colour config still asks", async () => {
+      savedPanel(() => {});
+      wrapper = await mountEditor();
+      await openConfigSidebar(wrapper, (panel) => {
+        panel.config.color = { mode: "fixed", fixedColor: ["#ff0000"], seriesBy: "last" };
+      });
+
+      const { next, done } = leave();
+      await leaveAsked();
+      await pressEscape();
+      await done;
+
+      expect(next).toHaveBeenCalledWith(false);
+    });
 
     it("opening Config on a saved panel without editing leaves without asking", async () => {
       nav.route = routeWith({ panelId: "p1" });
@@ -697,9 +809,9 @@ describe("AddPanel drafts and Save and keep editing", () => {
       nav.route = routeWith({ panelId: "p1" });
       wrapper = await mountEditor();
       expect(wrapper.vm.dashboardPanelData.data.queries[0].vrlFunctionQuery).toBeNull();
-      await openConfigSidebar(wrapper);
-      wrapper.vm.dashboardPanelData.data.queries[0].vrlFunctionQuery = "";
-      await nextTick();
+      await openConfigSidebar(wrapper, (panel) => {
+        panel.queries[0].vrlFunctionQuery = "";
+      });
 
       const { next, done } = leave();
       await done;
