@@ -306,6 +306,8 @@ describe("usePatternVolumeCache issues", () => {
 
   it.each([
     [503, "retryable"],
+    [408, "retryable"],
+    [429, "retryable"],
     [400, "lasting"],
   ])("classifies a %i failure as %s", async (status, failure) => {
     mockSearch.mockRejectedValueOnce({ response: { status } });

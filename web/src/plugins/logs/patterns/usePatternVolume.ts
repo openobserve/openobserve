@@ -309,10 +309,12 @@ export function volumeIssueKey(entry?: PatternVolumeEntry): I18nKey | undefined 
   return entry.failure ? VOLUME_FAILURE_MESSAGE[entry.failure] : undefined;
 }
 
-/** A 5xx or a request that never got a response can pass on retry; a 4xx will fail again. */
+const RETRYABLE_4XX = new Set([408, 429]);
+
+/** A 5xx, timeout, rate limit or lost response can pass on retry; other 4xx fail again. */
 function volumeFailure(error: any): PatternVolumeFailure {
   const status = Number(error?.response?.status ?? 0);
-  return !status || status >= 500 ? "retryable" : "lasting";
+  return !status || status >= 500 || RETRYABLE_4XX.has(status) ? "retryable" : "lasting";
 }
 
 /** Stable identity for a pattern across re-renders. */
