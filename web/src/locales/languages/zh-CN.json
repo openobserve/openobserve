@@ -37154,10 +37154,5 @@
       "assistant": "助手",
       "userNamed": "用户 {user}"
     }
-  },
-  "brand": {
-    "askAutobot": "询问 Autobot",
-    "autobot": "Autobot",
-    "autobotInvestigate": "Autobot 调查"
   }
 }

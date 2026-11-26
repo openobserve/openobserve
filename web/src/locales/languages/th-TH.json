@@ -37152,10 +37152,5 @@
       "assistant": "ผู้ช่วย",
       "userNamed": "ผู้ใช้ {user}"
     }
-  },
-  "brand": {
-    "askAutobot": "ถาม Autobot",
-    "autobot": "Autobot",
-    "autobotInvestigate": "Autobot Investigate"
   }
 }

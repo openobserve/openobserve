@@ -34790,7 +34790,7 @@
       "moreTime": "Mehr Zeit",
       "named": "{verb} {name}",
       "nameUnknown": "Name von {entity} {shortId} konnte nicht geladen werden",
-      "needsOk": "Braucht dich",
+      "needsOk": "Braucht Sie",
       "noDecision": "Für diese Anfrage wurde keine Antwort erfasst",
       "nothingSelected": "Nichts ausgewählt",
       "open": "Offen",
@@ -34815,7 +34815,7 @@
         "checkListName": "Liste prüfen (öffnet in einem neuen Tab)",
         "declined": "Abgelehnt · nichts wurde geändert",
         "declinedElsewhere": "In einem anderen Tab abgelehnt · {time}",
-        "declinedNewChat": "Abgelehnt, weil du einen neuen Chat gestartet hast",
+        "declinedNewChat": "Abgelehnt, weil Sie einen neuen Chat gestartet haben",
         "deciding": "Wird in einem anderen Tab entschieden…",
         "done": {
           "create": "{entity} erstellt",
@@ -35919,7 +35919,7 @@
       "filterEmpty": "Keine Chats entsprechen diesen Filtern",
       "group": {
         "browser": "In diesem Browser",
-        "needsYou": "Wartet auf dich",
+        "needsYou": "Wartet auf Sie",
         "older": "Älter",
         "pinned": "Angepinnt",
         "running": "Läuft",
@@ -36387,7 +36387,7 @@
       "stop": "Stoppen",
       "summary": {
         "answering": "{count} antworten",
-        "needs": "{count} braucht dich | {count} brauchen dich"
+        "needs": "{count} braucht Sie | {count} brauchen Sie"
       },
       "state": {
         "reconnecting": "Verbindung wird wiederhergestellt"
@@ -36980,14 +36980,14 @@
         "ingest": {
           "1": "Zeig mir, wie ich Logs aus meiner App sende",
           "2": "Datenerfassung für Kubernetes einrichten",
-          "3": "Was kannst du tun, sobald Daten ankommen?"
+          "3": "Was können Sie tun, sobald Daten ankommen?"
         },
         "jsonEditor": {
           "2": "Prüfe dieses JSON auf Fehler",
           "alert": "Erkläre die Bedingungen dieses Alarms",
           "pipeline": "Erkläre, was diese Pipeline macht"
         },
-        "learn": "Was kannst du tun?",
+        "learn": "Was können Sie tun?",
         "logs": {
           "1": "Warum sind die Fehler in `{stream}` in den letzten {range} stark angestiegen?",
           "2": "Fasse zusammen, was gerade in `{stream}` ist",
@@ -37016,7 +37016,7 @@
         }
       },
       "viewAll": "Alle anzeigen",
-      "whatCanYouDo": "Was kannst du tun?"
+      "whatCanYouDo": "Was können Sie tun?"
     },
     "rca": {
       "tag": "Vorfallanalyse",
@@ -37154,10 +37154,5 @@
       "assistant": "Assistent",
       "userNamed": "Benutzer {user}"
     }
-  },
-  "brand": {
-    "askAutobot": "Autobot fragen",
-    "autobot": "Autobot",
-    "autobotInvestigate": "Autobot untersuchen"
   }
 }

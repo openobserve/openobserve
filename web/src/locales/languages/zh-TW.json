@@ -37149,10 +37149,5 @@
       "assistant": "助理",
       "userNamed": "使用者 {user}"
     }
-  },
-  "brand": {
-    "askAutobot": "詢問 Autobot",
-    "autobot": "Autobot",
-    "autobotInvestigate": "Autobot 調查"
   }
 }

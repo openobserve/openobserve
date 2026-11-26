@@ -37154,10 +37154,5 @@
       "assistant": "어시스턴트",
       "userNamed": "사용자 {user}"
     }
-  },
-  "brand": {
-    "askAutobot": "Autobot에게 묻기",
-    "autobot": "Autobot",
-    "autobotInvestigate": "Autobot 조사"
   }
 }

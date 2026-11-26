@@ -36996,7 +36996,7 @@
         },
         "metrics": {
           "1": "Escribe PromQL para la latencia p95 de `{metric}`",
-          "2": "¿Qué métricas dejaron de reportar?",
+          "2": "¿Qué métricas dejaron de enviar datos?",
           "1Generic": "Escribe PromQL para la latencia p95"
         },
         "recent": "Continuar \"{title}\"",
@@ -37154,10 +37154,5 @@
       "assistant": "Asistente",
       "userNamed": "Usuario {user}"
     }
-  },
-  "brand": {
-    "askAutobot": "Ask Autobot",
-    "autobot": "Autobot",
-    "autobotInvestigate": "Autobot Investigate"
   }
 }

@@ -37154,10 +37154,5 @@
       "assistant": "Asistan",
       "userNamed": "Kullanıcı {user}"
     }
-  },
-  "brand": {
-    "askAutobot": "Autobot'a sor",
-    "autobot": "Autobot",
-    "autobotInvestigate": "Autobot ile araştır"
   }
 }

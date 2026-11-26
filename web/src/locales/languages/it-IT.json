@@ -37154,10 +37154,5 @@
       "assistant": "Assistente",
       "userNamed": "Utente {user}"
     }
-  },
-  "brand": {
-    "askAutobot": "Chiedi ad Autobot",
-    "autobot": "Autobot",
-    "autobotInvestigate": "Indaga con Autobot"
   }
 }

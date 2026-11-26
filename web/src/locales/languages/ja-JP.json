@@ -37154,10 +37154,5 @@
       "assistant": "アシスタント",
       "userNamed": "ユーザー {user}"
     }
-  },
-  "brand": {
-    "askAutobot": "Autobot に質問",
-    "autobot": "Autobot",
-    "autobotInvestigate": "Autobot 調査"
   }
 }
