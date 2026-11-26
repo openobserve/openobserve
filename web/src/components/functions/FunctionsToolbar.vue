@@ -11,6 +11,7 @@
   <OPageHeader
     :subtitle="embedded ? undefined : t('function.addFunction')"
     title-overflow="visible"
+    :tabs-below="narrow"
     :back="
       embedded
         ? undefined
@@ -36,13 +37,17 @@
       />
     </template>
     <template #tabs>
-      <div class="o2-input flex h-full items-center gap-4 max-md:h-auto max-md:basis-full">
+      <div
+        ref="toggleRef"
+        data-test="function-toolbar-tabs"
+        class="o2-input flex h-full items-center gap-4 max-md:h-auto max-md:basis-full"
+      >
         <!-- Divider between the function name (header #title) and the language
              toggle — they are separate controls sharing one header row. h-full +
              the separator's own self-stretch span the full h-15 header row; my-2
              insets it to ~2.75rem, so it runs past the subtitle line ("Add
              Function") rather than stopping at the name. -->
-        <OSeparator vertical class="my-2 max-md:hidden" />
+        <OSeparator v-if="!narrow" vertical class="my-2 max-md:hidden" />
         <!-- Transform-type (language) selector -->
         <div class="flex h-9 items-center gap-4">
           <!-- A segmented toggle rather than a radio group: the two languages are
@@ -173,83 +178,76 @@
       </div>
     </template>
     <template #actions>
-      <OButton
-        v-if="
-          config.isEnterprise == 'true' &&
-          !isAddFunctionComponent &&
-          store.state.zoConfig.ai_enabled &&
-          !hideChat
-        "
-        variant="ghost"
-        size="icon-sm"
-        @click="emit('open:chat', !store.state.isAiChatEnabled)"
-        data-test="menu-link-ai-item"
-        :aria-label="t('menu.aiAssistant')"
-        class="rounded-default hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-in-out ![background:var(--color-gradient-ai-subtle)] hover:shadow-md hover:![background:var(--color-gradient-ai)]"
-        :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-        :disabled="isSubmitting"
-        @mouseenter="isHovered = true"
-        @mouseleave="isHovered = false"
-      >
-        <img
-          alt=""
-          :src="getBtnLogo"
-          class="opacity-70 transition-transform duration-600 [.ai-btn-active_&]:!opacity-100"
+      <div ref="actionsRef" data-test="function-toolbar-actions" class="flex items-center gap-2">
+        <AiEntryButton
+          v-if="assistant && !hideChat"
+          :appearance="dockHost ? 'toggle' : 'button'"
+          verb="ask"
+          entry-kind="editor_toggle"
+          object-kind="function"
+          thread="current"
+          :dock-host="dockHost ? 'function' : undefined"
+          :label="t('assistant.entry.assistant')"
+          :tooltip="
+            dockHost
+              ? t('assistant.entry.tooltip.dockedAsk')
+              : t('assistant.entry.tooltip.sidebarAsk')
+          "
+          :pressed="assistant.dock.isOpen.value"
+          :build="assistant.dock.build"
+          data-test="ai-entry-function-ask"
+          @closed="assistant.dock.close"
         />
-      </OButton>
-      <OButton
-        v-if="!embedded"
-        data-test="add-function-fullscreen-btn"
-        v-close-popup="true"
-        variant="outline"
-        size="sm-action"
-        :disabled="isSubmitting"
-        @click="handleFullScreen"
-        icon-left="fullscreen"
-      >
-        {{ t("common.fullscreen") }}
-      </OButton>
-      <OButton
-        v-if="!hideTest"
-        data-test="add-function-test-btn"
-        variant="outline"
-        size="sm-action"
-        :disabled="isSubmitting"
-        @click="emit('test')"
-        icon-left="play-arrow"
-      >
-        {{ t("function.testFunction") }}
-      </OButton>
-      <OButton
-        v-if="!embedded"
-        data-test="add-function-cancel-btn"
-        variant="outline"
-        size="sm-action"
-        :disabled="isSubmitting"
-        @click="emit('cancel')"
-      >
-        {{ t("function.cancel") }}
-      </OButton>
-      <OButton
-        data-test="add-function-save-btn"
-        variant="primary"
-        size="sm-action"
-        type="submit"
-        :loading="isSubmitting"
-      >
-        {{ t("function.save") }}
-      </OButton>
+        <OButton
+          v-if="!embedded"
+          data-test="add-function-fullscreen-btn"
+          v-close-popup="true"
+          variant="outline"
+          size="sm-action"
+          :disabled="isSubmitting"
+          @click="handleFullScreen"
+          icon-left="fullscreen"
+        >
+          {{ t("common.fullscreen") }}
+        </OButton>
+        <OButton
+          v-if="!hideTest"
+          data-test="add-function-test-btn"
+          variant="outline"
+          size="sm-action"
+          :disabled="isSubmitting"
+          @click="emit('test')"
+          icon-left="play-arrow"
+        >
+          {{ t("function.testFunction") }}
+        </OButton>
+        <OButton
+          v-if="!embedded"
+          data-test="add-function-cancel-btn"
+          variant="outline"
+          size="sm-action"
+          :disabled="isSubmitting"
+          @click="emit('cancel')"
+        >
+          {{ t("function.cancel") }}
+        </OButton>
+        <OButton
+          data-test="add-function-save-btn"
+          variant="primary"
+          size="sm-action"
+          type="submit"
+          :loading="isSubmitting"
+        >
+          {{ t("function.save") }}
+        </OButton>
+      </div>
     </template>
   </OPageHeader>
 </template>
 <script setup lang="ts">
-import { ref, computed, type PropType, inject } from "vue";
+import { ref, computed, type PropType, inject, defineAsyncComponent } from "vue";
+import { useResizeObserver } from "@vueuse/core";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useRouter } from "vue-router";
-import { useStore } from "vuex";
-import { useTheme } from "@/composables/useTheme";
-import config from "../../aws-exports";
-import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
@@ -262,12 +260,12 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import { toggleFullscreen } from "@/utils/dom";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import type { DockedEditor } from "@/composables/assistant/pure";
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
 const { t } = useI18nTyped();
 
-const router = useRouter();
-
-const store = useStore();
-const { isDark } = useTheme();
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 function onLockedJsClick(event: MouseEvent) {
@@ -314,11 +312,46 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  /** The assistant's host; `null` hides the door. */
+  assistant: {
+    type: Object as PropType<DockedEditor | null>,
+    default: null,
+  },
+  /** Docks beside the editor (a pipeline node) instead of opening the sidebar. */
+  dockHost: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-const emit = defineEmits(["test", "back", "cancel", "open:chat"]);
+const emit = defineEmits(["test", "back", "cancel"]);
 
-const isHovered = ref(false);
+const toggleRef = ref<HTMLElement | null>(null);
+const actionsRef = ref<HTMLElement | null>(null);
+const GAP = 8;
+// OPageHeader has no single root element to ref, so find it from our own slot content.
+const headerEl = computed(() => actionsRef.value?.closest<HTMLElement>(".app-page-header") ?? null);
+const narrow = ref(false);
+// Remembered from the one-row layout so the toggle can return to it without flicker.
+let leftOffset = 0;
+let rightPad = 0;
+
+function measure() {
+  const header = headerEl.value?.getBoundingClientRect();
+  const toggle = toggleRef.value?.getBoundingClientRect();
+  // The tabs box stretches across the row in the two-row layout, so take its content's right edge.
+  const toggleEnd = toggleRef.value?.lastElementChild?.getBoundingClientRect().right;
+  const actions = actionsRef.value?.getBoundingClientRect();
+  if (!header || !toggle || !actions || toggleEnd === undefined || !header.width) return;
+  const toggleWidth = toggleEnd - toggle.left;
+  if (!narrow.value) {
+    leftOffset = toggle.left - header.left;
+    rightPad = header.right - actions.right;
+  }
+  narrow.value = header.width < leftOffset + toggleWidth + GAP + actions.width + rightPad;
+}
+
+useResizeObserver([headerEl, toggleRef, actionsRef], measure);
 
 // The name + transType fields are form-owned (OForm*). We only READ transType
 // here (for the forced-language info tooltip) via the injected OForm context.
@@ -327,7 +360,6 @@ const transTypeValue = form
   ? form.useStore((s: any) => String(s.values.transType ?? "0"))
   : ref("0");
 
-const isAddFunctionComponent = computed(() => router.currentRoute.value.path.includes("functions"));
 const handleFullScreen = () => {
   toggleFullscreen();
 };
@@ -335,14 +367,4 @@ const handleFullScreen = () => {
 const redirectToFunctions = () => {
   emit("back");
 };
-
-const getBtnLogo = computed(() => {
-  if (isHovered.value || store.state.isAiChatEnabled) {
-    return getImageURL("images/common/ai_icon_dark.svg");
-  }
-
-  return isDark.value
-    ? getImageURL("images/common/ai_icon_dark.svg")
-    : getImageURL("images/common/ai_icon_gradient.svg");
-});
 </script>

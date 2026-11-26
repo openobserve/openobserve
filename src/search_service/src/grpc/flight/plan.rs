@@ -333,7 +333,7 @@ mod tests {
         let placeholder = NewEmptyTable::new("logs", schema.clone());
         for projection in [None, Some(vec![2]), Some(vec![2, 0]), Some(vec![])] {
             let plan = placeholder
-                .scan(&ctx.state(), projection.as_ref(), &[], None)
+                .scan(&ctx.state(), projection.as_deref(), &[], None)
                 .await?;
             let empty_exec = plan.downcast_ref::<NewEmptyExec>().unwrap();
             for table_count in [0, 1, 2] {

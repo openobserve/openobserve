@@ -72,6 +72,10 @@ const props = withDefaults(
     removable?: boolean;
     /** Accessible name for the remove button. Defaults to `common.remove`. */
     removeLabel?: I18nText;
+    /** `data-test` for the remove button (OBadge passthrough). */
+    removeDataTest?: string;
+    /** Label as its own button beside the ✕ (OBadge passthrough). */
+    labelButton?: boolean;
     /** Text shown when a typed value is empty. Default "—". */
     emptyLabel?: I18nText;
   }>(),
@@ -144,6 +148,8 @@ const dot = computed(() => props.dot ?? (props.type ? resolved.value.dot : false
     :disabled="disabled"
     :removable="removable"
     :remove-label="removeLabel"
+    :remove-data-test="removeDataTest"
+    :label-button="labelButton"
     v-bind="$attrs"
     @click="emit('click', $event)"
     @remove="emit('remove', $event)"

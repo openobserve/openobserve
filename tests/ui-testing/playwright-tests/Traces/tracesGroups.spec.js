@@ -4,25 +4,15 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { ingestTraces } = require('../utils/trace-ingestion.js');
+const { seedSearchableTraces } = require('../utils/trace-ingestion.js');
 
 test.describe("Traces Groups view testcases", () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'parallel' });
   let pm;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120000);
-    const context = await browser.newContext({
-      storageState: 'playwright-tests/utils/auth/user.json',
-    });
-    const page = await context.newPage();
-    try {
-      await ingestTraces(page, 6, { forceScenario: 'success' });
-    } catch (e) {
-      testLogger.warn('Groups trace seeding failed (continuing)', { error: e.message });
-    } finally {
-      await context.close();
-    }
+    await seedSearchableTraces(browser, 6, { forceScenario: 'success' });
   });
 
   test.beforeEach(async ({ page }, testInfo) => {

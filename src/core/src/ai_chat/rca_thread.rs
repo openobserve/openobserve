@@ -43,8 +43,6 @@ use super::{
 
 pub(crate) const RECORD_STEP: &str = "record_step";
 pub(crate) const SUBMIT_REPORT: &str = "submit_report";
-/// The durable event type of a part change; stored types carry a `.N` version suffix.
-const PART_UPDATED: &str = "message.part.updated";
 const IMPLICIT_STEP_TITLE: &str = "Investigation";
 
 /// One of the seven stage names, else `None`.
@@ -176,19 +174,6 @@ impl<'a> ToolPart<'a> {
             .unwrap_or_default()
             .to_string()
     }
-}
-
-/// The part a `message.part.updated` event carries.
-pub(crate) fn updated_part(event: &DurableEvent) -> Option<&Map<String, Value>> {
-    let version = event.event_type.strip_prefix(PART_UPDATED)?;
-    let versioned = version.is_empty()
-        || version
-            .strip_prefix('.')
-            .is_some_and(|v| v.bytes().all(|b| b.is_ascii_digit()));
-    if !versioned {
-        return None;
-    }
-    event.data.get("part").and_then(Value::as_object)
 }
 
 pub(crate) fn step_title(title: Option<&Value>, index: usize) -> String {
@@ -1689,6 +1674,11 @@ pub(crate) mod tests {
             end_seq: None,
             started_at: started_ms * 1000,
             ended_at: None,
+            first_event_at: None,
+            version_of: None,
+            decisions: None,
+            agent_type: None,
+            handoff_from: None,
         }
     }
 
@@ -1744,5 +1734,28 @@ pub(crate) mod tests {
             let thread = project_rca_thread(&s.events, &turns, false, false);
             assert_eq!(thread.stats.duration_ms, last - T, "{turns:?}");
         }
+    }
+
+    /// o2-ai's 2.x records of a run thread like its 1.x events; 2.x text items carry no times.
+    #[test]
+    fn a_2x_run_threads_like_its_1x_source() {
+        let without_times = |mut thread: RcaThread| {
+            for step in &mut thread.steps {
+                step.ended_at = None;
+            }
+            thread.stats.duration_ms = 0;
+            thread
+        };
+        let v1 = rca_session();
+        let v2 = crate::ai_chat::record_v2::tests::to_v2(&v1);
+        assert!(v2.len() < v1.len());
+        for (active, show_tool_io) in [(false, false), (true, true)] {
+            let expected = project_rca_thread(&v1, &[], active, show_tool_io);
+            let actual = project_rca_thread(&v2, &[], active, show_tool_io);
+            assert_eq!(without_times(actual), without_times(expected));
+        }
+        let thread = project_rca_thread(&v2, &[], false, false);
+        assert_eq!(thread.stats.tool_calls, VISIBLE_TOOL_CALLS);
+        assert!(thread.report_submitted);
     }
 }

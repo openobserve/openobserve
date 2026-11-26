@@ -76,6 +76,7 @@ function resetToDefault(): void {
       <OButton
         variant="outline"
         size="icon-toolbar"
+        class="relative"
         :aria-label="
           hiddenCount > 0
             ? t('common.manageColumnsHidden', { count: hiddenCount })
