@@ -49,6 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :toolbar="bare"
       >
         <template #container-actions="{ narrow: tight }">
+          <AiMemoryPanel
+            v-if="memoryShown && !(placement === 'window' && tight)"
+            trigger-size="icon-xs-sq"
+          />
           <AssistantModeButtons
             v-if="!sheet && !(placement === 'window' && tight)"
             :placement="placement"
@@ -654,6 +658,7 @@ import AssistantChatSearch from "@/components/ai-assistant/history/AssistantChat
 import AssistantHistoryList from "@/components/ai-assistant/history/AssistantHistoryList.vue";
 import AssistantShareManager from "@/components/ai-assistant/share/AssistantShareManager.vue";
 import { chatStatusWord } from "@/components/ai-assistant/history/chatStatus";
+import AiMemoryPanel from "@/components/ai_memory/AiMemoryPanel.vue";
 import AssistantForkSource from "@/components/ai-assistant/thread/AssistantForkSource.vue";
 import AssistantTranscript from "@/components/ai-assistant/transcript/AssistantTranscript.vue";
 import AssistantTurnOutcome, {
@@ -815,6 +820,8 @@ const isTerminalBody = computed(
   () => state.value === "not_found" || state.value === "deleted_elsewhere",
 );
 const showTitle = computed(() => state.value !== "gate" && !isTerminalBody.value);
+// Memory is read and noted outside any one chat, so it is offered before a chat exists too.
+const memoryShown = computed(() => capability.value.canChat !== "no");
 const b06 = computed(() => capability.value.source === "capabilities");
 const signedOutElsewhere = useSignedOutElsewhere();
 const otherAccount = useOtherAccountSignedIn();

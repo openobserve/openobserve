@@ -160,7 +160,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex min-h-7 min-w-0 items-center max-md:min-h-11"
             :data-test="`assistant-queries-row-${row.step.callId}`"
           >
-            <AssistantStepRowHead :row="row" plain />
+            <AssistantStepRowHead :row="row" plain>
+              <OButton
+                v-if="row.step.memory && memoryPage"
+                variant="ghost-primary"
+                size="chip"
+                as="a"
+                :href="memoryPage.href"
+                icon-left="psychology"
+                :class="['shrink-0', TOUCH_TARGET_CLASS]"
+                :data-test="`assistant-queries-memory-link-${row.step.callId}`"
+                @click="openMemoryPage"
+              >
+                {{ t("aiMemory.openPage") }}
+              </OButton>
+            </AssistantStepRowHead>
           </div>
         </li>
       </ul>
@@ -229,6 +243,12 @@ const root = ref<HTMLElement | null>(null);
 const open = ref(false);
 const expanded = ref<string[]>([]);
 
+// The page is registered only where its feature is offered (`useManagementRoutes`).
+const memoryPage = computed(() => {
+  if (props.readonly || !router?.hasRoute?.("aiMemory")) return null;
+  const org = props.turn?.org || evidence?.currentOrg() || undefined;
+  return router.resolve({ name: "aiMemory", query: { org_identifier: org } });
+});
 const hidden = computed(() => props.turn?.hiddenByOwner === true);
 const steps = computed(() => stepsOf(props.message, props.turn?.org ?? ""));
 const queries = computed(() => queryCount(steps.value));
@@ -389,6 +409,14 @@ function onOpen(event: MouseEvent, step: StepFacts): void {
     query: step.query,
     explorer: explorerOf(step.query),
   });
+}
+
+// Ctrl/⌘, Shift and middle clicks keep the browser's own new-tab behaviour.
+function openMemoryPage(event: MouseEvent): void {
+  if (!memoryPage.value || event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1)
+    return;
+  event.preventDefault();
+  void router.push(memoryPage.value);
 }
 
 function rerunWider(): void {

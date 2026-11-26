@@ -331,6 +331,18 @@ describe("AssistantShell states", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("offers the memory panel in the container actions before a chat exists, and in a chat", async () => {
+    const { wrapper, store } = setup({ placement: "docked" });
+    expect(root(wrapper).attributes("data-state")).toBe("empty");
+    expect(wrapper.findAll('[data-test="ai-memory-panel-btn"]')).toHaveLength(1);
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "docked" },
+    });
+    store.state.sessions[sid].messages.push({ role: "user", content: raw("hi") });
+    await flushPromises();
+    expect(wrapper.findAll('[data-test="ai-memory-panel-btn"]')).toHaveLength(1);
+  });
+
   it("renders the transcript slot once messages exist", async () => {
     const { wrapper, store } = setup();
     const sid = store.createSession({

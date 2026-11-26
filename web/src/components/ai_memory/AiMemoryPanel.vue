@@ -59,7 +59,7 @@ import AiMemoryEditor from "./AiMemoryEditor.vue";
 withDefaults(
   defineProps<{
     triggerVariant?: "ghost" | "ghost-muted";
-    triggerSize?: "icon" | "icon-sm";
+    triggerSize?: "icon" | "icon-sm" | "icon-xs-sq";
   }>(),
   { triggerVariant: "ghost", triggerSize: "icon-sm" },
 );

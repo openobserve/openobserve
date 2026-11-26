@@ -111,7 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="flex shrink-0 items-center">
-          <AiMemoryPanel v-if="chatActions" />
           <ODropdown
             v-model:open="menuOpen"
             side="bottom"
@@ -322,7 +321,6 @@ const REM_PX = 16;
 </script>
 
 <script setup lang="ts">
-import AiMemoryPanel from "@/components/ai_memory/AiMemoryPanel.vue";
 import {
   computed,
   inject,
