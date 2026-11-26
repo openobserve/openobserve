@@ -723,7 +723,7 @@ describe("ChartRenderer", () => {
       vi.mocked(mockChart.convertFromPixel).mockReturnValue(12345 as any);
       const zr = mockChart.getZr();
       // The zr listener must be in place before the first setOption so it precedes the tooltip's.
-      const move = zr.on.mock.calls.map(([name]: any[]) => name).lastIndexOf("mousemove");
+      const move = zr.on.mock.calls.map(([name]: unknown[]) => name).lastIndexOf("mousemove");
       const registered = zr.on.mock.invocationCallOrder[move];
       expect(registered).toBeLessThan(mockChart.setOption.mock.invocationCallOrder.at(-1));
       const [, onMove] = zr.on.mock.calls[move];
@@ -2168,12 +2168,12 @@ describe("ChartRenderer node graph drag", () => {
     const onChart = (event: string) =>
       vi
         .mocked(chart.on)
-        .mock.calls.filter(([name]: any[]) => name === event)
+        .mock.calls.filter(([name]: unknown[]) => name === event)
         .at(-1)?.[1];
     const onZr = (event: string) =>
       vi
         .mocked(chart.getZr().on)
-        .mock.calls.filter(([name]: any[]) => name === event)
+        .mock.calls.filter(([name]: unknown[]) => name === event)
         .at(-1)?.[1];
     const press = { dataType: "node", seriesIndex: 0, dataIndex: 0, name: "web" };
 

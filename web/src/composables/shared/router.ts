@@ -764,8 +764,7 @@ const useRoutes = () => {
           next({ path: PLAYLIST_TV_PATH, query: buildPlaylistQuery(playlist), replace: true });
           return;
         }
-        // Saves are scoped to the URL's folder. The view checks it too, for links followed inside it,
-        // but on entry its own URL sync cancels that redirect, so entry is checked here.
+        // On entry the view's own URL sync cancels its folder redirect, so entry is checked here.
         const needsFolder = !query.folder && !isPlaylistPage(query);
         routeGuard(to, from, (target?: unknown) => {
           if (target !== undefined || !needsFolder) return next(target);

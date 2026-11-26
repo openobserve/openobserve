@@ -88,6 +88,7 @@ import { useTheme } from "@/composables/useTheme";
 import { currentDevicePixelRatio, useChartPixelRatio } from "@/composables/useDevicePixelRatio";
 import { chartColor } from "@/utils/chartTheme";
 import * as echarts from "echarts/core";
+import type { ECElementEvent } from "echarts";
 import {
   BarChart,
   LineChart,
@@ -286,8 +287,7 @@ export default defineComponent({
       chart = null;
     };
 
-    // A large node graph is slow to redraw and editors fire window resizes on every change,
-    // so a node graph skips a resize that keeps its box's size.
+    // Editors fire window resizes on every change and a large node graph is slow to redraw.
     const resizeToBox = () => {
       const box = chartRef.value;
       const graph = props.data?.extras?.nodeGraph;
@@ -478,7 +478,7 @@ export default defineComponent({
     };
     const nodesOf = (seriesIndex: number) =>
       chart?.getModel()?.getSeriesByIndex(seriesIndex)?.getData();
-    const pressNode = (params: any) => {
+    const pressNode = (params: ECElementEvent) => {
       const at =
         props.data?.extras?.nodeGraph && params?.dataType === "node"
           ? nodesOf(params.seriesIndex)?.getItemLayout(params.dataIndex)
@@ -492,8 +492,7 @@ export default defineComponent({
           }
         : null;
     };
-    // A drag lives only in the chart, and a restore or resize redraws from the options,
-    // so the drop is written into them.
+    // A restore or resize redraws from the options, so the drop must be written into them.
     const keepDroppedNode = () => {
       const pressed = pressedNode;
       pressedNode = null;

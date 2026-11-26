@@ -2450,9 +2450,7 @@ describe("useRoutes (router.ts)", () => {
 
     it("leaves a paywall or other route-guard redirect of a folderless link as it is", async () => {
       const { routeGuard } = await import("@/utils/zincutils");
-      vi.mocked(routeGuard).mockImplementationOnce((_to: any, _from: any, next: any) =>
-        next({ name: "plans" }),
-      );
+      vi.mocked(routeGuard).mockImplementationOnce((_to, _from, next) => next({ name: "plans" }));
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "viewDashboard");
       const next = vi.fn();

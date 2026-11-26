@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { DefaultLabelFormatterCallbackParams } from "echarts";
 import { color as echartsColor } from "echarts/core";
 import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
@@ -54,8 +55,7 @@ const FALLBACK_PANEL = { width: 800, height: 400 };
 const FORCE_LAYOUT_CACHE_SIZE = 16;
 const SELF_MARK = "↻";
 
-/** A graph node; `value` is the larger of its incoming and outgoing totals,
- * `self` the part it sends to itself. */
+/** `self` holds a node's traffic to itself, which has no edge to draw. */
 export interface GraphNode {
   name: string;
   value: number;
@@ -82,6 +82,8 @@ type Side = "bottom" | "top" | "right" | "left";
 /** Nodes the user dropped elsewhere, by name, as fractions of the panel width and height. */
 export type MovedNodes = Map<string, Point>;
 
+type GraphOptions = { series?: Record<string, unknown>[] } & Record<string, unknown>;
+
 const toNumber = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "" || typeof value === "boolean") {
     return null;
@@ -90,8 +92,7 @@ const toNumber = (value: unknown): number | null => {
   return Number.isFinite(numeric) ? numeric : null;
 };
 
-/** Sums rows into one edge per source → target pair and sizes each node by the traffic through it.
- * A node's traffic to itself has no edge to draw, so it is kept on the node as `self`. */
+/** Sums rows into one edge per source → target pair; self traffic stays on the node as `self`. */
 export const buildGraph = (
   panelSchema: any,
   data: any[],
@@ -303,8 +304,7 @@ const toPlot = (positions: Point[], panel: Panel, inset: Inset): Point[] => {
   ]);
 };
 
-/** An inset whose plot is exactly the nodes' bounding box, so the chart draws each node
- * at its own pixel position, unscaled. */
+/** Plot equals the nodes' bounding box, so each node draws at its own pixel position, unscaled. */
 const insetAround = (positions: Point[], panel: Panel): Inset => {
   const [minX, maxX, minY, maxY] = bounds(positions);
   // ECharts widens a zero span by 1 on each side before fitting it, so the plot widens with it.
@@ -388,8 +388,7 @@ const textWidth = (text: string) => calculateWidthText(text, LABEL_FONT_SIZE);
 
 const SIDES: Side[] = ["bottom", "top", "right", "left"];
 
-/** The chip ECharts draws for a node label on one side of its symbol: one row per line,
- * as wide as its widest line up to the label width. */
+/** Mirrors ECharts' label chip box, so collisions are checked against what is actually drawn. */
 const nodeLabelBox = (node: GraphNode, lines: string[], side: Side): Box => {
   const reach = (node.symbolSize ?? NODE_SIZE_MIN) / 2 + LABEL_DISTANCE;
   const halfHeight = (lines.length * LINE_HEIGHT) / 2 + LABEL_PADDING[0];
@@ -425,8 +424,7 @@ interface NodeLabel {
   side: Side;
 }
 
-/** Gives each name, larger nodes first, the first side where its chip stays in the panel and clear
- * of other nodes and placed names; a name with no such side shows on hover. */
+/** Larger nodes pick a clear side first; a name with no clear side shows on hover instead of overlapping. */
 const placeNodeLabels = (
   nodes: GraphNode[],
   linesOf: (node: GraphNode) => string[],
@@ -491,8 +489,7 @@ const edgeLabelBox = (from: GraphNode, to: GraphNode, curveness: number, text: s
   };
 };
 
-/** Keeps a static label only on edges whose chip stays inside the panel and clear of every node,
- * drawn node name and kept label, largest values first; the rest show on hover. */
+/** Largest edges keep a static label first; one that would overlap or leave the panel shows on hover. */
 export const fittingEdgeLabels = (
   edges: GraphEdge[],
   nodes: GraphNode[],
@@ -613,7 +610,7 @@ const nodeGraphOptions = (
     series: [
       {
         type: "graph",
-        // Positions are computed here so the chart fits them inside the plot at any panel size.
+        // Positions come from the converter's cached layouts, so ECharts' own layout stays off.
         layout: "none",
         data: drawn.nodes,
         links: drawn.edges,
@@ -628,8 +625,10 @@ const nodeGraphOptions = (
           fontSize: 12,
           distance: LABEL_DISTANCE,
           ...chip,
-          formatter: (params: any) =>
-            params?.data ? scene.labelLines(params.data).join("\n") : (params?.name ?? ""),
+          formatter: (params: DefaultLabelFormatterCallbackParams) =>
+            params?.data
+              ? scene.labelLines(params.data as GraphNode).join("\n")
+              : (params?.name ?? ""),
         },
         lineStyle: { opacity: 0.55, curveness: scene.curveness },
         edgeLabel: {
@@ -640,7 +639,7 @@ const nodeGraphOptions = (
           // Edge labels otherwise inherit the faded line opacity, which leaves the chip see-through.
           opacity: 1,
           ...chip,
-          formatter: (params: any) => scene.chipText(params?.value),
+          formatter: (params: DefaultLabelFormatterCallbackParams) => scene.chipText(params?.value),
         },
         emphasis: {
           focus: "adjacency",
@@ -715,7 +714,7 @@ export const convertNodeGraphData = (
     chipText,
   };
   // Only nodes, links and plot change, so whatever the renderer added to the options is kept.
-  const placeNodes = (options: any, moved: MovedNodes) => {
+  const placeNodes = (options: GraphOptions, moved: MovedNodes): GraphOptions => {
     const drawn = drawScene(
       scene,
       points.map((point, i) => {

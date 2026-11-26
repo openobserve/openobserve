@@ -54,6 +54,7 @@ import AddDashboard from "@/components/dashboards/AddDashboard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import dashboardService from "@/services/dashboards";
+import { getAllDashboards } from "@/utils/commons";
 
 describe("AddDashboard", () => {
   let wrapper: any;
@@ -274,6 +275,7 @@ describe("AddDashboard", () => {
         expect.objectContaining({ title: "From favorites" }),
         "default",
       );
+      expect(getAllDashboards).toHaveBeenCalledWith(store, "default", true);
       expect(wrapper.emitted("updated")![0]).toEqual(["new-dashboard-1", "default"]);
     });
 

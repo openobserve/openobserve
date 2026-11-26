@@ -92,12 +92,11 @@ export default defineComponent({
     const addDashboardSchema = makeAddDashboardSchema(t);
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
-    // A pseudo-folder such as Favorites holds no dashboards, so a dashboard created
-    // from one lands in default, as the folder picker shows.
-    const folders = store.state.organizationData.folders;
-    const activeFolder: any =
-      folders.find((item: any) => item.folderId === props.activeFolderId) ??
-      folders.find((item: any) => item.folderId === "default");
+    // A pseudo-folder such as Favorites holds no dashboards, so creating from one lands in default.
+    const folders: { folderId: string; name: string }[] = store.state.organizationData.folders;
+    const activeFolder =
+      folders.find((item) => item.folderId === props.activeFolderId) ??
+      folders.find((item) => item.folderId === "default");
     const selectedFolder = ref({
       label: activeFolder?.name,
       value: activeFolder?.folderId ?? "default",

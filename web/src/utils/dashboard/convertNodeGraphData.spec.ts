@@ -17,7 +17,13 @@ import { describe, expect, it, vi } from "vitest";
 import * as echarts from "echarts";
 import { convertPanelData } from "./convertPanelData";
 import { sankeyChartQuery } from "./dashboardAutoQueryBuilder";
-import { buildGraph, circularPositions, forcePositions } from "./convertNodeGraphData";
+import {
+  buildGraph,
+  circularPositions,
+  forcePositions,
+  type GraphEdge,
+  type GraphNode,
+} from "./convertNodeGraphData";
 
 vi.mock("./convertCustomChartData", () => ({
   prepareCustomChartRun: vi.fn(),
@@ -467,8 +473,10 @@ describe("node graph", () => {
 
     for (const layout of ["force", "circular"]) {
       const off = (await convert(panel({ node_graph_layout: layout }), [withSelf])).options;
-      const db = off.series[0].data.find((node: any) => node.name === "db");
-      expect(off.series[0].links.some((link: any) => link.source === link.target)).toBe(false);
+      const db = off.series[0].data.find((node: GraphNode) => node.name === "db");
+      expect(off.series[0].links.some((link: GraphEdge) => link.source === link.target)).toBe(
+        false,
+      );
       expect(off.tooltip.formatter({ dataType: "node", name: "db", value: 55, data: db })).toBe(
         "db: <strong>55</strong><br>db → db: <strong>30</strong>",
       );
@@ -479,7 +487,7 @@ describe("node graph", () => {
           withSelf,
         ])
       ).options;
-      const onDb = on.series[0].data.find((node: any) => node.name === "db");
+      const onDb = on.series[0].data.find((node: GraphNode) => node.name === "db");
       expect(on.series[0].label.formatter({ name: "db", data: onDb })).toBe("db\n↻ 30");
       const { chips } = renderedLayout(on, 800, 400);
       expect(chips.map((chip) => chip.text)).toContain("db\n↻ 30");
@@ -544,7 +552,7 @@ describe("node graph", () => {
       });
       const series = options.series[0];
       const { chips, symbols } = renderedLayout(options, 727, 263);
-      expect(chips.length).toBe(series.data.filter((node: any) => node.label.show).length);
+      expect(chips.length).toBe(series.data.filter((node: GraphNode) => node.label?.show).length);
       expect(chips.length).toBeGreaterThan(0);
       chips.forEach((chip, i) => {
         chips.slice(i + 1).forEach((other) => {
@@ -561,7 +569,7 @@ describe("node graph", () => {
     const ringAt = async (size: { width: number; height: number }) =>
       (
         await convert(panel({ node_graph_layout: "circular" }), [ring], size)
-      ).options.series[0].data.filter((node: any) => node.label.show).length;
+      ).options.series[0].data.filter((node: GraphNode) => node.label?.show).length;
     expect(await ringAt({ width: 727, height: 263 })).toBeLessThan(names.length);
     expect(await ringAt({ width: 1400, height: 700 })).toBe(names.length);
   });
