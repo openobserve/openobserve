@@ -1098,11 +1098,10 @@ export default defineComponent({
       focusEditor();
     };
 
-    const onRecentEditorEdit = (isBlank = false, wasBlank = false) => {
+    const onRecentEditorEdit = (isBlank = false, _wasBlank = false) => {
       recentFocusDismissed = false;
       recentFocusOpen.value = recentsOpenAfterEdit(
         recentFocusOpen.value,
-        wasBlank,
         recentSearchesEnabled.value && isBlank,
       );
     };

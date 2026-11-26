@@ -489,13 +489,13 @@ describe("editor keys routed to the open recent-searches dropdown", () => {
 
 describe("focus dropdown after an edit", () => {
   it("never opens because an edit emptied the editor", () => {
-    expect(recentsOpenAfterEdit(false, false, true)).toBe(false);
-    expect(recentsOpenAfterEdit(false, true, true)).toBe(false);
+    expect(recentsOpenAfterEdit(false, true)).toBe(false);
+    expect(recentsOpenAfterEdit(false, true)).toBe(false);
   });
 
   it("closes on the next character and stays open while the editor stays empty", () => {
-    expect(recentsOpenAfterEdit(true, true, false)).toBe(false);
-    expect(recentsOpenAfterEdit(true, true, true)).toBe(true);
-    expect(recentsOpenAfterEdit(false, false, false)).toBe(false);
+    expect(recentsOpenAfterEdit(true, false)).toBe(false);
+    expect(recentsOpenAfterEdit(true, true)).toBe(true);
+    expect(recentsOpenAfterEdit(false, false)).toBe(false);
   });
 });

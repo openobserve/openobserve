@@ -506,7 +506,7 @@ describe("ShortUrl", () => {
       mockShortURLGet.mockRejectedValue(new Error("Network error"));
       await wrapper.vm.fetchAndRedirect();
       expect(toastMock).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "Could not open this link, try again" }),
+        expect.objectContaining({ message: "Could not open this link" }),
       );
     });
 

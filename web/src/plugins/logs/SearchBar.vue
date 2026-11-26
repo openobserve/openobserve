@@ -4804,13 +4804,12 @@ export default defineComponent({
       t,
     );
 
-    const onEditorUserEdit = (isBlank = false, wasBlank = false) => {
+    const onEditorUserEdit = (isBlank = false, _wasBlank = false) => {
       recentFocusDismissed = false;
       autoRun.engine.markEditorDirty();
       updateFreeTextPreview();
       recentFocusOpen.value = recentsOpenAfterEdit(
         recentFocusOpen.value,
-        wasBlank,
         recentSearchesEnabled.value && isBlank,
       );
     };

@@ -2971,10 +2971,10 @@ describe("SearchBar", () => {
         .findAll('[data-test^="traces-saved-view-apply-"]')
         .map((item) => item.attributes("data-test"));
       expect(items).toEqual(["traces-saved-view-apply-t1", "traces-saved-view-apply-t2"]);
-      const pressed = (id: string) =>
-        wrapper.find(`[data-test="traces-saved-view-favorite-${id}"]`).attributes("aria-pressed");
-      expect(pressed("t1")).toBe("true");
-      expect(pressed("t2")).toBe("false");
+      const label = (id: string) =>
+        wrapper.find(`[data-test="traces-saved-view-favorite-${id}"]`).attributes("aria-label");
+      expect(label("t1")).toBe("search.unfavoriteViewNamed");
+      expect(label("t2")).toBe("search.favoriteViewNamed");
     });
 
     it("pinned dropdown shows a loading row while the list loads", async () => {

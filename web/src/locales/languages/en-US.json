@@ -1081,7 +1081,7 @@
     "shortUrl": {
       "redirecting": "Redirecting...",
       "invalid": "This link is invalid or has expired",
-      "failed": "Could not open this link, try again"
+      "failed": "Could not open this link"
     },
     "copied": "Copied",
     "couldntCopy": "Couldn't copy",
