@@ -124,6 +124,14 @@ async function tabTo(testId: string, back = true) {
   expect(activeTest()).toBe(`${DT}-${testId}`);
 }
 
+// The chip layout walks its parts with the arrow keys from one Tab stop; the row layout tabs to each part.
+async function goTo(layout: FilterLayout, testId: string, back = true) {
+  if (layout === "vertical") return tabTo(testId, back);
+  for (let i = 0; i < 40 && activeTest() !== `${DT}-${testId}`; i++)
+    await key(back ? "ArrowLeft" : "ArrowRight");
+  expect(activeTest()).toBe(`${DT}-${testId}`);
+}
+
 async function pickOperator(id: string) {
   const index = rowKeys().indexOf(id);
   expect(index).toBeGreaterThanOrEqual(0);
@@ -161,7 +169,7 @@ describe.each<FilterLayout>(["horizontal", "vertical"])("keyboard only (%s)", (l
     await key("Escape");
     expect(sql(state)).toBe("a = 1 AND (b IN ('x', 'y') OR str_match(c, 'z'))");
 
-    await tabTo("chip-c-value");
+    await goTo(layout, "chip-c-value");
     await key("Enter");
     expect(activeTest()).toBe(`${DT}-search`);
     await type("zz", true);
@@ -170,21 +178,22 @@ describe.each<FilterLayout>(["horizontal", "vertical"])("keyboard only (%s)", (l
     // Focus comes back to the part that was changed, not to the page.
     expect(activeTest()).toBe(`${DT}-chip-c-value`);
 
-    await tabTo("connector-1-1");
+    await goTo(layout, "connector-1-1");
     await key("Enter");
     expect(sql(state)).toBe("a = 1 AND (b IN ('x', 'y') AND str_match(c, 'zz'))");
 
-    await tabTo("chip-b-field");
+    await goTo(layout, "chip-b-field");
     await key("Backspace");
     // A one-item group needs no brackets in SQL, but stays a group until ungrouped.
     expect(sql(state)).toBe("a = 1 AND str_match(c, 'zz')");
 
-    await tabTo("ungroup-1", false);
+    await goTo(layout, "ungroup-1", false);
     await key("Enter");
     expect(state.tree.items.map((item) => item.kind)).toEqual(["condition", "condition"]);
 
     caret().focus();
     await settle();
+    await key("End");
     await key("Backspace");
     await key("Backspace");
     expect(sql(state)).toBe("a = 1");
@@ -197,6 +206,8 @@ describe.each<FilterLayout>(["horizontal", "vertical"])("keyboard only (%s)", (l
     await condition("a", "eq", ["1"]);
     await condition("c", "eq", ["3"]);
     await key("Escape");
+    // The chip layout's arrows walk c's parts and its AND to the gap before it; a row steps straight there.
+    if (layout === "horizontal") await goTo(layout, "connector-1");
     await key("ArrowLeft");
     await condition("b", "eq", ["2"]);
     expect(sql(state)).toBe("a = 1 AND b = '2' AND c = '3'");

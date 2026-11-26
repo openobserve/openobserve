@@ -40,14 +40,23 @@ const props = withDefaults(
     armed?: boolean;
     invalid?: boolean;
     disabled?: boolean;
+    /** One arrow-key stop per chip, as in the search bar, instead of a Tab stop per part. */
+    roving?: boolean;
     /** The bar's prefix; the chip is `-chip-<field>` (free text `-chip-text`, a locked part `-chip-locked`). */
     dataTest: string;
   }>(),
-  { dialect: "sql", activePart: null, armed: false, invalid: false, disabled: false },
+  {
+    dialect: "sql",
+    activePart: null,
+    armed: false,
+    invalid: false,
+    disabled: false,
+    roving: false,
+  },
 );
 
 const emit = defineEmits<{
-  (_e: "edit", _part: FilterTokenPart, _element: HTMLElement): void;
+  (_e: "edit", _part: FilterTokenPart, _element: HTMLElement, _event?: MouseEvent): void;
   (_e: "remove"): void;
 }>();
 
@@ -99,6 +108,7 @@ const invalidMessage = computed(() =>
       :field="fieldLabel"
       :editable="false"
       :armed="armed"
+      :roving="roving"
       :removable="!disabled"
       :remove-label="t('filterBar.removeFilter')"
       :data-test="`${dataTest}-chip-${testKey}`"
@@ -117,10 +127,11 @@ const invalidMessage = computed(() =>
     :invalid-message="invalidMessage"
     :value-hint="valueHint"
     :editable="!disabled"
+    :roving="roving"
     :removable="!disabled"
     :remove-label="t('filterBar.removeFilter')"
     :data-test="`${dataTest}-chip-${testKey}`"
-    @select="(part, element) => emit('edit', part, element)"
+    @select="(part, element, event) => emit('edit', part, element, event)"
     @remove="emit('remove')"
   />
 </template>

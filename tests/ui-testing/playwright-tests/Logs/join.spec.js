@@ -241,9 +241,6 @@ test.describe("Two streams whose fields differ", () => {
 
   test.describe("with the filter builder", () => {
     test.beforeEach(async ({ page }) => {
-      await page.addInitScript(() => {
-        try { localStorage.setItem('o2.logs.queryInput', 'builder'); } catch (_) {}
-      });
       await navigateToBase(page);
       pm = new PageManager(page);
     });

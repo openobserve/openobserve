@@ -89,7 +89,6 @@ test.describe("Logs Include and Visualize keep the filter's meaning (#16976)", (
       { tag: ["@bug-16976", "@P2", "@regression", "@logsRegression"] },
       async ({ page }) => {
         await pm.logsPage.openLogsWithQueryText(STREAM, filter);
-        await pm.logsPage.ensureQueryEditorMode();
         await pm.logsPage.runQueryAndWaitForResults();
         await pm.logsPage.expectNoQueryInFlight(60000);
 

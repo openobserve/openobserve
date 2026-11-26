@@ -17,6 +17,9 @@ import type { Component } from "vue";
 import type { I18nText } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 
+/** What opened the popover: a click or focus on the field, ArrowDown, or typing. */
+export type ChipInputActivation = "pointer" | "key" | "type";
+
 export interface ChipInputSuggestion {
   /** Stable identity; emitted by `select`. */
   key: string;
@@ -64,6 +67,10 @@ export interface ChipInputProps {
   inlineCaret?: boolean;
   /** Lines of chips shown before the field scrolls inside itself; it grows freely when unset. */
   maxRows?: number;
+  /** One Tab stop: Left, Right, Home and End are handed to the parent, which walks over the chips' parts and gaps. */
+  walkChips?: boolean;
+  /** Tab in the list's search box emits `tab` instead of leaving the field. */
+  tabSwitch?: boolean;
   /** Prefix for `data-test`: `-input` caret input, `-search` popover search box, `-suggest` popover, `-suggest-item-{key}` rows, `-suggest-section` section headings. */
   dataTest?: string;
 }
@@ -80,12 +87,20 @@ export interface ChipInputEmits {
   (_e: "escape"): void;
   /** A pointer or focus move outside the field and its popover. */
   (_e: "close"): void;
-  /** The caret was clicked or typed into while the popover was shut. */
-  (_e: "activate"): void;
+  /** The caret was clicked, typed into or arrowed down while the popover was shut, and which. */
+  (_e: "activate", _how: ChipInputActivation): void;
   /** A comma typed into a `multiple` input, which the parent treats as a separator. */
   (_e: "separator", _char: string): void;
   /** Left or Right on an empty caret: move it one place among the chips. */
   (_e: "caret-move", _step: -1 | 1): void;
+  /** Tab or Shift+Tab in the list's search box while `tabSwitch` is set. */
+  (_e: "tab", _step: -1 | 1): void;
+  /** Walk mode: Left, Right, Home or End from the caret or a chip's part; the parent moves focus. */
+  (_e: "walk", _move: -1 | 1 | "home" | "end", _from: HTMLElement): void;
+  /** Walk mode: a key typed while a chip's part has focus; the parent decides where it is typed. */
+  (_e: "type-at", _from: HTMLElement, _key: string): void;
+  /** Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z (or Ctrl+Y) and Ctrl/Cmd+Backspace while nothing is being typed. */
+  (_e: "history", _action: "undo" | "redo" | "clear"): void;
   /** Delete on an empty caret. */
   (_e: "delete-empty"): void;
   /** Ctrl or Cmd + Enter: confirm what is picked, e.g. a multi-select. */
@@ -94,8 +109,12 @@ export interface ChipInputEmits {
   (_e: "press", _event: PointerEvent): void;
   /** Focus moved from the caret to another control inside the field while its list was open. */
   (_e: "dismiss"): void;
+  /** Focus came into the field, on its caret or any of its chips. */
+  (_e: "engage"): void;
   /** Focus left the field and its popover. */
   (_e: "leave"): void;
+  /** The highlighted row changed; null while none is. */
+  (_e: "highlight", _key: string | null): void;
 }
 
 export interface ChipInputSlots {
@@ -107,6 +126,8 @@ export interface ChipInputSlots {
   suggestion?(_props: { suggestion: ChipInputSuggestion; active: boolean }): unknown;
   /** Content pinned under the rows (a hint line). */
   footer?(): unknown;
+  /** Above the list's search box, e.g. to switch what is being edited. */
+  header?(): unknown;
 }
 
 export interface ChipInputExpose {

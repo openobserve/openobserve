@@ -32,7 +32,6 @@ describe("SearchBar — the query pane grows with the filter builder", () => {
 
   beforeEach(() => {
     resetLogsAutoRunForTests(store);
-    localStorage.setItem("o2.logs.queryInput", "builder");
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
       this: HTMLElement,
     ) {
@@ -44,7 +43,6 @@ describe("SearchBar — the query pane grows with the filter builder", () => {
   afterEach(() => {
     wrapper?.unmount();
     wrapper = undefined;
-    localStorage.removeItem("o2.logs.queryInput");
     vi.restoreAllMocks();
   });
 
@@ -61,13 +59,27 @@ describe("SearchBar — the query pane grows with the filter builder", () => {
     expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([0]);
   });
 
-  it("reports the extra height of a wrapped builder, and null once the query editor is back", async () => {
+  it("reports the extra height of a wrapped builder, and null once SQL mode shows the editor", async () => {
     builderHeight = 84;
     wrapper = mountSearchBar();
     await flushPromises();
     expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([54]);
-    await wrapper.find('[data-test="logs-search-bar-filter-builder-toggle"]').trigger("click");
+    wrapper.vm.searchObj.meta.sqlMode = true;
     await flushPromises();
     expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([null]);
+  });
+
+  it("keeps the SQL editor while it has focus after an edit leaves SQL mode, then shows the chip bar", async () => {
+    wrapper = mountSearchBar();
+    await flushPromises();
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    await flushPromises();
+    wrapper.vm.onQueryEditorFocus();
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    await flushPromises();
+    expect(wrapper.vm.showFilterBuilder).toBe(false);
+    await wrapper.vm.handleQueryEditorBlur();
+    await flushPromises();
+    expect(wrapper.vm.showFilterBuilder).toBe(true);
   });
 });

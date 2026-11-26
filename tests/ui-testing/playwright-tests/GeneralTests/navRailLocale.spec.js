@@ -113,7 +113,7 @@ test.describe("Nav rail: locales and language reload", () => {
     const url = new URL(page.url());
     expect(url.searchParams.get("period")).toBe("1h");
     expect(url.searchParams.get("query")).toBeTruthy();
-    await expect(page.locator('[data-test="logs-search-bar-query-editor"]')).toContainText(
+    await expect(pm.logsPage.getQueryInput()).toContainText(
       "language-reload-probe",
       { timeout: 30000 },
     );

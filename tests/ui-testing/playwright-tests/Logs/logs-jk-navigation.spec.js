@@ -87,7 +87,7 @@ async function openResults(page) {
   });
   const searches = trackSearches(page);
   await page.goto(urlFor());
-  await page.locator(editor).first().waitFor({ timeout: 60000 });
+  await page.locator(editor).first().waitFor({ state: 'attached', timeout: 60000 });
   // The stream URL runs its own search on entry; clicking the shared run/cancel button mid-flight cancels it.
   await expect
     .poll(() => searches.hits().length, { timeout: 30000 })

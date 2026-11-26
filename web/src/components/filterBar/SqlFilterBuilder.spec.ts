@@ -16,7 +16,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import SqlFilterBuilder from "./SqlFilterBuilder.vue";
-import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 import OChipInput from "@/lib/forms/ChipInput/OChipInput.vue";
 import type { FilterField } from "@/utils/query/filterBar";
 
@@ -26,13 +25,10 @@ const fields: FilterField[] = [
 ];
 
 let wrapper: VueWrapper | null = null;
-let provider: VueWrapper | null = null;
 
 afterEach(() => {
   wrapper?.unmount();
   wrapper = null;
-  provider?.unmount();
-  provider = null;
   document.body.innerHTML = "";
 });
 
@@ -58,12 +54,18 @@ describe("SqlFilterBuilder", () => {
     expect(wrapper!.find('[data-test="b-bar-field"]').classes()).not.toContain("border");
   });
 
-  it("activates like a click on the bar: focuses the caret and opens the field list", async () => {
+  it("activates like a click on the bar: focuses the caret and leaves the list shut until typing", async () => {
     mountBuilder("level = 'error'");
     (wrapper!.vm as unknown as { activate: () => void }).activate();
     await flushPromises();
-    expect(document.activeElement).toBe(wrapper!.find('[data-test="b-bar-input"]').element);
+    const caret = wrapper!.find<HTMLInputElement>('[data-test="b-bar-input"]').element;
+    expect(document.activeElement).toBe(caret);
     expect(wrapper!.emitted("focus")).toHaveLength(1);
+    expect(document.body.querySelector('[data-test^="b-bar-suggest-item-"]')).toBeNull();
+    caret.value = "sta";
+    caret.dispatchEvent(new Event("input"));
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="b-bar-suggest-item-status"]')).not.toBeNull();
   });
 
   it("caps the bar at three lines unless the host lifts the cap", () => {
@@ -95,9 +97,9 @@ describe("SqlFilterBuilder", () => {
     await wrapper!.setProps({ query: "level = 'error'" });
     expect(chips().map((chip) => chip.text())).toEqual(["level"]);
     await wrapper!.setProps({ query: "upper(level) = 'x'" });
-    expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="b-bar-chip-locked"]').exists()).toBe(true);
     await wrapper!.setProps({ query: "level = 'error'" });
-    expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test="b-bar-chip-locked"]').exists()).toBe(false);
   });
 
   it("re-reads an earlier emitted query the page restores without echoing it first", async () => {
@@ -108,47 +110,19 @@ describe("SqlFilterBuilder", () => {
     expect(chips().map((chip) => chip.text())).toEqual(["level"]);
   });
 
-  it("offers to keep a query it cannot draw as text, or clear it and build", async () => {
-    provider = mount(ConfirmDialogProvider, { attachTo: document.body });
-    mountBuilder("upper(level) = 'ERROR'");
-    expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(true);
-    await wrapper!.find('[data-test="b-keep-query"]').trigger("click");
-    expect(wrapper!.emitted("exit")).toHaveLength(1);
-    await wrapper!.find('[data-test="b-clear-and-build"]').trigger("click");
-    await flushPromises();
-    const dialog = () =>
-      document.body.querySelector<HTMLElement>('[data-test="confirm-dialog-provider"]');
-    dialog()!.querySelector<HTMLElement>('[data-test="o-dialog-primary-btn"]')!.click();
-    await flushPromises();
-    expect(wrapper!.emitted("update:query")).toEqual([[""]]);
-    expect(wrapper!.find('[data-test="b-bar-input"]').exists()).toBe(true);
-  });
-
-  it("asks before Clear and build discards the query, and keeps it on Cancel", async () => {
-    provider = mount(ConfirmDialogProvider, { attachTo: document.body });
-    mountBuilder("upper(level) = 'ERROR'");
-    await wrapper!.find('[data-test="b-clear-and-build"]').trigger("click");
-    await flushPromises();
-    const dialog = document.body.querySelector<HTMLElement>(
-      '[data-test="confirm-dialog-provider"]',
+  it("locks only the part it cannot draw, showing its SQL, and keeps it when a chip changes", async () => {
+    mountBuilder("upper(level) = 'ERROR' AND status = 1");
+    expect(wrapper!.find('[data-test="b-bar-chip-locked"]').text()).toContain(
+      "upper(level) = 'ERROR'",
     );
-    expect(dialog?.textContent).toContain("Clear the query?");
-    expect(wrapper!.emitted("update:query")).toBeUndefined();
-    dialog!.querySelector<HTMLElement>('[data-test="o-dialog-secondary-btn"]')!.click();
-    await flushPromises();
-    expect(wrapper!.emitted("update:query")).toBeUndefined();
-    expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(true);
+    await wrapper!.find('[data-test="b-bar-chip-status-remove"]').trigger("click");
+    expect(wrapper!.emitted("update:query")).toEqual([["(upper(level) = 'ERROR')"]]);
   });
 
   it("draws a value with a backslash before a quote again after a reload", () => {
     mountBuilder("level != ('x\\' || '''y')");
-    expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test="b-bar-chip-locked"]').exists()).toBe(false);
     expect(wrapper!.find('[data-test="b-bar-chip-level-value"]').text()).toBe("x\\'y");
-  });
-
-  it("shows the query it cannot draw, so the running filter stays visible", () => {
-    mountBuilder("NOT (level = 'error')");
-    expect(wrapper!.find('[data-test="b-unparsable-query"]').text()).toBe("NOT (level = 'error')");
   });
 
   it("draws an OR query with its connector", () => {

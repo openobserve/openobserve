@@ -685,7 +685,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import {
-  TIER_RULE_OPERATORS,
+  TIER_USAGE_RULE_OPERATORS,
   TIER_USAGE_OPERATORS,
   TIER_USAGE_PAYLOAD,
   type ModelPricingFilter,
@@ -1075,7 +1075,7 @@ function tierFilterFields(tier: any): FilterField[] {
     ...keys.map((key): FilterField => ({
       name: `usage.${key}`,
       type: "number",
-      operators: TIER_RULE_OPERATORS,
+      operators: TIER_USAGE_RULE_OPERATORS,
     })),
     { name: "openai.response.service_tier, openai.request.service_tier", type: "string" },
   ];

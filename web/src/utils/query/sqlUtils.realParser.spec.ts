@@ -85,7 +85,7 @@ describe("chart SQL generated from the checked filter", () => {
     ["is_error IS NOT NULL", "(is_error IS NOT NULL)"],
     ["str_match(message, 'x')", "(str_match(message, 'x'))"],
     ["str_match_ignore_case(message, 'a')", "(str_match_ignore_case(message, 'a'))"],
-    ["re_match(message, 'a.*')", "(re_match(message, 'a.*'))"],
+    ["re_match(message, 'a.*')", "(regexp_like(message, 'a.*'))"],
     ["match_all('x')", "(match_all('x'))"],
     ["level IN ('a','b')", "(level IN ('a', 'b'))"],
     ["status IN (1,2)", "(status IN (1, 2))"],

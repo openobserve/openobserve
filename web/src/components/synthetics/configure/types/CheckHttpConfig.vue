@@ -27,7 +27,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
-import type { FilterField } from "@/utils/query/filterBar";
+import type { FilterField, FilterOperatorId } from "@/utils/query/filterBar";
 
 const props = defineProps<{ check: ProtocolCheck; validationErrors?: Record<string, string> }>();
 const emit = defineEmits<{ "update:check": [value: ProtocolCheck] }>();
@@ -44,18 +44,26 @@ function update(patch: Partial<HttpCheckConfig>) {
 const METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
 const methodOptions = METHODS.map((m) => ({ label: raw(m), value: m }));
 
-// The prober reads these three response fields only.
+// The prober reads these three response fields only; the server takes any of its six operators on each.
+const NUMBER_ASSERTIONS: FilterOperatorId[] = ["eq", "neq", "lt", "gt"];
 const assertionFields = computed<FilterField[]>(() => [
   {
     name: "status_code",
     type: "number",
     label: t("synthetics.protocolConfig.http.fields.status_code"),
+    operators: NUMBER_ASSERTIONS,
   },
-  { name: "body", type: "string", label: t("synthetics.protocolConfig.http.fields.body") },
+  {
+    name: "body",
+    type: "string",
+    label: t("synthetics.protocolConfig.http.fields.body"),
+    operators: ["eq", "neq", "contains", "not_contains"],
+  },
   {
     name: "response_time_ms",
     type: "number",
     label: t("synthetics.protocolConfig.http.fields.response_time_ms"),
+    operators: NUMBER_ASSERTIONS,
   },
 ]);
 

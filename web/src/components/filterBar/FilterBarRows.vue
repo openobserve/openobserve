@@ -247,7 +247,7 @@ const hasIssue = (group: FilterGroup) =>
           :next-connector="nextConnector"
           :folded-ids="foldedIds"
           :data-test="dataTest"
-          @edit="(id, part, element) => emit('edit', id, part, element)"
+          @edit="(id, part, element, event) => emit('edit', id, part, element, event)"
           @remove="emit('remove', $event)"
           @toggle-connector="emit('toggle-connector', $event)"
           @ungroup="emit('ungroup', $event)"
@@ -276,8 +276,9 @@ const hasIssue = (group: FilterGroup) =>
           :armed="item.id === armedId"
           :invalid="Boolean(invalidIds?.has(item.id))"
           :disabled="disabled"
+          :data-filter-chip="item.id"
           :data-test="dataTest"
-          @edit="(part, element) => emit('edit', item.id, part, element)"
+          @edit="(part, element, event) => emit('edit', item.id, part, element, event)"
           @remove="emit('remove', item.id)"
         />
         <OTruncatedText

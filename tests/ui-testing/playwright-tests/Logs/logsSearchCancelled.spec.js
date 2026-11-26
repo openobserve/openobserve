@@ -65,7 +65,7 @@ async function open(page) {
   });
   const searches = trackSearches(page);
   await page.goto(urlFor());
-  await page.locator(editor).first().waitFor({ timeout: 60000 });
+  await page.locator(editor).first().waitFor({ state: 'attached', timeout: 60000 });
   return searches;
 }
 

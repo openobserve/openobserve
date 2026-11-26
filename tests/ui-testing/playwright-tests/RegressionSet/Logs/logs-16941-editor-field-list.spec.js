@@ -10,7 +10,6 @@ const {
   waitForSearchable,
 } = require("../../utils/auto-run-helpers.js");
 const { deleteStream } = require("../../utils/traces-api.js");
-const { waitForMenuRow } = require("../../utils/suggest-menu-helpers.js");
 const { getOrgIdentifier } = require("../../utils/cloud-auth.js");
 
 const ORG = getOrgIdentifier() || "default";
@@ -85,7 +84,6 @@ test.describe("Logs editor and field list keep the user's query (#16941)", () =>
     { tag: ["@bug-16941", "@P2", "@regression", "@logsRegression"] },
     async ({ page }) => {
       await pm.logsPage.openLogsWithQueryText(STREAM, "order = 'o1'");
-      await pm.logsPage.ensureQueryEditorMode();
       await pm.logsPage.runQueryAndWaitForResults();
       expect(await pm.logsPage.getResultHitsCount()).toBe(
         SERVICES.length * ROWS_PER_PAIR,
@@ -107,47 +105,6 @@ test.describe("Logs editor and field list keep the user's query (#16941)", () =>
 
       await pm.logsPage.runQueryAndWaitForResults();
       expect(await pm.logsPage.getResultHitsCount()).toBe(2 * ROWS_PER_PAIR);
-    },
-  );
-
-  test(
-    "Tab on a word that also starts a recent search completes the field, not the recent query",
-    { tag: ["@bug-16941", "@P2", "@regression", "@logsRegression"] },
-    async ({ page }) => {
-      const recent = `${CODE_FIELD} = 200`;
-      await pm.logsPage.openLogsWithParams(STREAM, {
-        period: "1h",
-        sql_mode: "false",
-        quick_mode: "false",
-      });
-      await pm.logsPage.ensureQueryEditorMode();
-      await pm.logsPage.waitForSearchResultRows(60000);
-      await pm.logsPage.expectNoQueryInFlight(60000);
-      await pm.logsPage.fillQueryEditor(recent);
-      const recorded = pm.logsPage.waitForQueryHistoryRecorded();
-      await pm.logsPage.runPendingQuery();
-      await recorded;
-      await pm.logsPage.expectNoQueryInFlight(60000);
-
-      await pm.logsPage.openLogsWithParams(STREAM, {
-        period: "1h",
-        sql_mode: "false",
-        quick_mode: "false",
-      });
-      await pm.logsPage.expectNoQueryInFlight(60000);
-      await pm.logsPage.clearQueryEditor();
-      const typed = CODE_FIELD.slice(0, -1);
-      await page.keyboard.type(typed, { delay: 60 });
-      const menu = await waitForMenuRow(page, new RegExp(recent), 20000);
-      expect(
-        menu?.rows.filter((row) => row.includes(CODE_FIELD)).length ?? 0,
-        `Precondition: the menu must offer both the field and the recent search, got ${JSON.stringify(menu?.rows)}`,
-      ).toBeGreaterThanOrEqual(2);
-
-      await page.keyboard.press("Tab");
-      await expect
-        .poll(async () => pm.logsPage.getQueryEditorTextCollapsed())
-        .toBe(CODE_FIELD);
     },
   );
 });

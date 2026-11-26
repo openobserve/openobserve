@@ -189,6 +189,12 @@ class UnflattenedPage {
             ? `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`
             : `SELECT * FROM "${stream}"`;
 
+        // Filter mode shows the chip bar instead; SQL put into the mounted editor switches the page to SQL mode.
+        if (!(await this.logsSearchBarQueryEditor.isVisible())) {
+            await this.logsSearchBarQueryEditor.evaluate((node, value) => {
+                window.monaco.editor.getEditors().find((e) => node.contains(e.getDomNode())).setValue(value);
+            }, sql);
+        }
         await this.logsSearchBarQueryEditor.waitFor({ state: 'visible', timeout: 10000 });
         await this.logsSearchBarQueryEditor.click();
         await new MonacoEditorHelper(this.page).fillInputArea(this.logsSearchBarQueryEditor, sql);

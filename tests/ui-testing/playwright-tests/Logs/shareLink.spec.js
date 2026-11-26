@@ -516,7 +516,7 @@ function paramsOf(url) {
 
 async function runStream(page, stream, extra = {}) {
   await page.goto(hand(logsUrl(stream), extra));
-  await page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor').first().waitFor({ timeout: 60000 });
+  await page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor').first().waitFor({ state: 'attached', timeout: 60000 });
   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   await expect(page.locator(lineRow(0))).toBeAttached({ timeout: 60000 });
   await expect(page.locator('[data-test="logs-results-progress"] [role="progressbar"]')).toHaveCount(0, {
@@ -928,7 +928,7 @@ test.describe('Line links (4c Part C)', () => {
       await route.continue().catch(() => undefined);
     });
     await page.goto(lineLinkPath(LINE_STREAM, T_UNIQUE));
-    await page.locator('[data-test="logs-search-bar-query-editor"]').first().waitFor({ timeout: 60000 });
+    await page.locator('[data-test="logs-search-bar-query-editor"]').first().waitFor({ state: 'attached', timeout: 60000 });
     await switchStream(page, LINE_STREAM, OTHER_STREAM);
     await expect.poll(() => paramsOf(page.url()).log_ts, { timeout: 30000 }).toBeUndefined();
     releaseResolve();
@@ -994,7 +994,7 @@ test.describe('Line links (4c Part C)', () => {
     await expect.poll(() => paramsOf(page.url()).log_ts).toBeUndefined();
     await expect(page.locator(gridDrawer)).toHaveCount(0);
     await page.reload();
-    await page.locator('[data-test="logs-search-bar-query-editor"]').first().waitFor({ timeout: 60000 });
+    await page.locator('[data-test="logs-search-bar-query-editor"]').first().waitFor({ state: 'attached', timeout: 60000 });
     await expect(page.locator(lineBanner)).toHaveCount(0);
     await page.goto(lineLinkPath(LINE_STREAM, T_UNIQUE));
     await expect(page.locator(lineBanner)).toHaveAttribute('data-state', 'found', { timeout: 60000 });
@@ -1002,7 +1002,7 @@ test.describe('Line links (4c Part C)', () => {
     await page.getByRole('heading', { name: 'Dashboards', level: 1 }).waitFor({ timeout: 60000 });
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
     await page.waitForURL(/\/web\/logs/, { timeout: 60000 });
-    await page.locator('[data-test="logs-search-bar-query-editor"]').first().waitFor({ timeout: 60000 });
+    await page.locator('[data-test="logs-search-bar-query-editor"]').first().waitFor({ state: 'attached', timeout: 60000 });
     await expect(page.locator(lineBanner)).toHaveCount(0);
     expect(paramsOf(page.url()).log_ts).toBeUndefined();
   });
@@ -1047,7 +1047,7 @@ test.describe('Line links (4c Part C)', () => {
     expect(paramsOf(page.url()).stream).toBe(OTHER_STREAM);
     await page.unroute('**/_search_stream?*');
     await page.reload();
-    await page.locator('[data-test="logs-search-bar-query-editor"]').first().waitFor({ timeout: 60000 });
+    await page.locator('[data-test="logs-search-bar-query-editor"]').first().waitFor({ state: 'attached', timeout: 60000 });
     expect(paramsOf(page.url()).stream).toBe(OTHER_STREAM);
   });
 

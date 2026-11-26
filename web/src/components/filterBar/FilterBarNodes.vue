@@ -40,6 +40,7 @@ const props = withDefaults(defineProps<FilterBarNodesProps>(), {
   dialect: "sql",
   disabled: false,
   canUngroup: undefined,
+  canGroupAround: undefined,
 });
 const emit = defineEmits<FilterBarNodesEmits>();
 defineSlots<{ caret?(_props: FilterBarCaretSlotProps): unknown }>();
@@ -55,6 +56,21 @@ const caretAt = (index: number) =>
 const anyOfGroups = computed(() => props.connectorMode === "any-of-groups");
 const showConnector = computed(() => props.connectorMode !== "and-only" && !anyOfGroups.value);
 
+const groupAround = (id: string) => props.canGroupAround?.(id) ?? null;
+// The AND/OR is also where its two conditions are grouped, so its tooltip says how.
+const joinHint = (id: string) => {
+  const mode = groupAround(id);
+  if (mode === "join") return t("filterBar.joinAddHint");
+  return mode === "group" ? t("filterBar.joinGroupHint") : t("filterBar.toggleConnector");
+};
+
+// On a focused AND/OR, `(` brackets the two conditions it joins, as typing it in a query would.
+function onConnectorKey(event: KeyboardEvent, id: string) {
+  if (event.key !== "(" || !groupAround(id)) return;
+  event.preventDefault();
+  emit("group-around", id);
+}
+
 const groupJoin = (index: number) => {
   if (props.items.slice(0, index).some((item) => item.kind === "group"))
     return t("metrics.labelGroups.or");
@@ -66,19 +82,27 @@ const groupJoin = (index: number) => {
 
 <template>
   <template v-for="(item, index) in items" :key="item.id">
+    <!-- Every place a new condition can go is a stop for the arrow keys, where the caret then stands. -->
+    <span class="contents" data-gap :data-gap-group="groupId" :data-gap-before="item.id" />
     <slot v-if="caretAt(index)" name="caret" :group-id="groupId" :index="index" />
-    <OTag
-      v-if="showConnector && index > 0"
-      clickable
-      size="xs"
-      shape="rounded"
-      variant="default-soft"
-      :disabled="disabled"
-      :label="raw(item.connector)"
-      :aria-label="t('filterBar.toggleConnector')"
-      :data-test="`${dataTest}-connector-${pathOf(index)}`"
-      @click.stop="emit('toggle-connector', item.id)"
-    />
+    <span v-if="showConnector && index > 0" class="inline-flex">
+      <OTag
+        clickable
+        size="xs"
+        shape="rounded"
+        variant="default-soft"
+        tabindex="-1"
+        data-walk
+        :disabled="disabled"
+        :label="raw(item.connector)"
+        :aria-label="t('filterBar.toggleConnector')"
+        :data-join="item.id"
+        :data-test="`${dataTest}-connector-${pathOf(index)}`"
+        @click.stop="emit('toggle-connector', item.id)"
+        @keydown="onConnectorKey($event, item.id)"
+      />
+      <OTooltip :content="joinHint(item.id)" />
+    </span>
     <span
       v-if="anyOfGroups && item.kind === 'group'"
       class="text-3xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
@@ -99,6 +123,8 @@ const groupJoin = (index: number) => {
         :active="Boolean(item.negate)"
         :aria-pressed="Boolean(item.negate)"
         :disabled="disabled"
+        tabindex="-1"
+        data-walk
         :data-test="`${dataTest}-group-not-${pathOf(index)}`"
         @mousedown.prevent
         @click.stop="emit('toggle-negate', item.id)"
@@ -120,12 +146,14 @@ const groupJoin = (index: number) => {
         :invalid-ids="invalidIds"
         :disabled="disabled"
         :can-ungroup="canUngroup"
+        :can-group-around="canGroupAround"
         :data-test="dataTest"
-        @edit="(id, part, element) => emit('edit', id, part, element)"
+        @edit="(id, part, element, event) => emit('edit', id, part, element, event)"
         @remove="emit('remove', $event)"
         @toggle-connector="emit('toggle-connector', $event)"
         @toggle-negate="emit('toggle-negate', $event)"
         @ungroup="emit('ungroup', $event)"
+        @group-around="emit('group-around', $event)"
         @add-condition="emit('add-condition', $event)"
       >
         <template #caret="slotProps">
@@ -137,6 +165,8 @@ const groupJoin = (index: number) => {
           variant="ghost"
           size="icon-xs-sq"
           icon-left="add"
+          tabindex="-1"
+          data-walk
           :aria-label="t('metrics.labelGroups.addToGroup')"
           :data-test="`${dataTest}-group-add-${pathOf(index)}`"
           @mousedown.prevent
@@ -148,14 +178,16 @@ const groupJoin = (index: number) => {
         <OButton
           variant="ghost"
           size="icon-xs-sq"
-          icon-left="unfold-more"
+          icon-left="call-split"
           :disabled="disabled"
+          tabindex="-1"
+          data-walk
           :aria-label="t('filterBar.ungroup')"
           :data-test="`${dataTest}-ungroup-${pathOf(index)}`"
           @mousedown.prevent
           @click.stop="emit('ungroup', item.id)"
         />
-        <OTooltip :content="t('filterBar.ungroup')" />
+        <OTooltip :content="t('filterBar.ungroupTooltip')" />
       </span>
     </span>
     <FilterBarChip
@@ -164,13 +196,16 @@ const groupJoin = (index: number) => {
       :dialect="dialect"
       :active-part="item.id === editingId ? (editPart ?? 'value') : null"
       :armed="item.id === armedId"
+      roving
       :invalid="Boolean(invalidIds?.has(item.id))"
       :disabled="disabled"
       :data-filter-index="index"
+      :data-filter-chip="item.id"
       :data-test="dataTest"
-      @edit="(part, element) => emit('edit', item.id, part, element)"
+      @edit="(part, element, event) => emit('edit', item.id, part, element, event)"
       @remove="emit('remove', item.id)"
     />
   </template>
+  <span class="contents" data-gap :data-gap-group="groupId" data-gap-before="" />
   <slot v-if="caretAt(items.length)" name="caret" :group-id="groupId" :index="items.length" />
 </template>

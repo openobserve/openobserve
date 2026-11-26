@@ -3298,14 +3298,11 @@ const tracesShortcuts = [
   },
   {
     id: "tracesFocusQuery",
-    handler: () => {
-      // The traces query editor is Monaco — focus its inner textarea.
-      const el = document.querySelector<HTMLElement>(
-        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea',
-      );
-      el?.focus();
-    },
+    handler: () => searchBarRef.value?.focusQuery?.(),
   },
+  { id: "tracesFilterUndo", handler: () => searchBarRef.value?.filterHistory?.("undo") },
+  { id: "tracesFilterRedo", handler: () => searchBarRef.value?.filterHistory?.("redo") },
+  { id: "tracesFilterClear", handler: () => searchBarRef.value?.filterHistory?.("clear") },
   {
     id: "tracesCopyUrl",
     // The shortcut copies without the Share button, so it applies the button's gate itself.

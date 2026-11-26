@@ -790,7 +790,8 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
         : condition.column.field;
-      selectFilter += `re_match(${fieldRef}, ${formatValue(
+      // Not the re_match UDF: it strips escapes such as `\b`, so the pattern would not mean what was typed.
+      selectFilter += `regexp_like(${fieldRef}, ${formatValue(
         condition.value,
         condition.column,
         dashboardPanelData,
@@ -799,7 +800,7 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
         : condition.column.field;
-      selectFilter += `re_not_match(${fieldRef}, ${formatValue(
+      selectFilter += `NOT regexp_like(${fieldRef}, ${formatValue(
         condition.value,
         condition.column,
         dashboardPanelData,
@@ -835,6 +836,12 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
           break;
         case "Ends With":
           selectFilter += `LIKE '%${escapeSingleQuotes(condition.value)}'`;
+          break;
+        case "Not Starts With":
+          selectFilter += `NOT LIKE '${escapeSingleQuotes(condition.value)}%'`;
+          break;
+        case "Not Ends With":
+          selectFilter += `NOT LIKE '%${escapeSingleQuotes(condition.value)}'`;
           break;
         default:
           selectFilter += `${condition.operator} ${formatValue(

@@ -31,6 +31,7 @@ const props = withDefaults(defineProps<FilterTokenProps>(), {
   invalidMessage: undefined,
   valueHint: undefined,
   editable: true,
+  roving: false,
   removable: false,
   removeLabel: undefined,
   dataTest: undefined,
@@ -87,15 +88,20 @@ const segmentClass = (part: FilterTokenPart) => [
 ];
 
 function onSelect(part: FilterTokenPart, event: MouseEvent) {
-  if (props.editable) emit("select", part, event.currentTarget as HTMLElement);
+  if (props.editable) emit("select", part, event.currentTarget as HTMLElement, event);
 }
 
 // A focused token is removed from the keyboard the way a selected chip is in a text field.
 function onSegmentKeydown(event: KeyboardEvent) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
   if (!props.removable || (event.key !== "Backspace" && event.key !== "Delete")) return;
   event.preventDefault();
   emit("remove");
 }
+
+// Roving parts leave the Tab order to the field's caret and are reached with the arrow keys instead.
+const stopAttrs = () =>
+  props.roving ? { tabindex: -1, "data-walk": "" } : { tabindex: props.editable ? 0 : -1 };
 </script>
 
 <template>
@@ -120,8 +126,10 @@ function onSegmentKeydown(event: KeyboardEvent) {
       >
         <button
           type="button"
-          :tabindex="editable ? 0 : -1"
+          v-bind="stopAttrs()"
+          :data-part="part"
           :class="segmentClass(part)"
+          :aria-haspopup="editable ? 'listbox' : undefined"
           :aria-describedby="describedBy"
           :data-test="testId(part)"
           @click.stop="onSelect(part, $event)"
@@ -133,6 +141,7 @@ function onSegmentKeydown(event: KeyboardEvent) {
         <button
           type="button"
           :aria-label="removeLabel ?? t('common.remove')"
+          :tabindex="roving ? -1 : undefined"
           class="focus-visible:ring-focus-ring-accent inline-flex cursor-pointer items-center ps-0.5 pe-1.5 opacity-60 outline-none hover:opacity-100 focus-visible:ring-2 focus-visible:ring-inset"
           :data-test="testId('remove')"
           @click.stop="emit('remove')"
@@ -144,8 +153,10 @@ function onSegmentKeydown(event: KeyboardEvent) {
       <button
         v-else
         type="button"
-        :tabindex="editable ? 0 : -1"
+        v-bind="stopAttrs()"
+        :data-part="part"
         :class="segmentClass(part)"
+        :aria-haspopup="editable ? 'listbox' : undefined"
         :aria-describedby="describedBy"
         :data-test="testId(part)"
         @click.stop="onSelect(part, $event)"
