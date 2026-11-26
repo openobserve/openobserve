@@ -65,6 +65,15 @@
   color: var(--log-syntax-value);
 }
 
+/* Light log values a softer near-black (10.4:1) so navy keys and values read as two calm tones. */
+:root:not(.dark) .log-cell-html {
+  color: var(--color-text-body);
+}
+/* Dark log values one step brighter than body text (12.7:1), so dense lines stay readable. */
+:root.dark .log-cell-html {
+  color: #dcdde3;
+}
+
 /* Highlighting class */
 .log-highlighted {
   background-color: rgb(255, 213, 0);

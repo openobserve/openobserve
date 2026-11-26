@@ -69,7 +69,7 @@
   --color-sidebar-flyout-border: var(--color-border-subtle);
   --selected-tint: color-mix(in srgb, var(--color-accent) 12%, transparent);
   --toggle-pill: var(--color-surface-raised);
-  --color-log-key: #2f5fb8;
+  --color-log-key: #1e3a8a;
   --color-selected-border: var(--color-accent-text);
   /* Opaque twin of the selected fill, so sticky table cells stay solid. */
   --color-table-row-selected-bg: color-mix(
@@ -133,7 +133,8 @@
   --selected-tint: color-mix(in srgb, var(--color-accent) 20%, transparent);
   /* A raised pill one step above the dark track. */
   --toggle-pill: var(--color-surface-selected-neutral);
-  --color-log-key: #8ab4f8;
+  /* Soft slate key: saturated blue glared on dark; 7.8:1, a step below the log values. */
+  --color-log-key: #a8aec0;
   /* dark.css builds its surfaces and borders from these. */
   /* Neutral greys: a blue cast read as tinted next to the accent. */
   --d-chrome: #0e0e10;
@@ -469,6 +470,51 @@
   color: var(--color-selected-fg);
 }
 
+/* Light work area is white; the table header keeps a light band so it separates from the chart above, and rows split on a visible hairline. */
+:root:not(.dark) {
+  --color-button-outline-text: var(--color-text-body);
+  --color-field-list-label-text: var(--color-text-body);
+  --color-field-list-group-text: var(--color-grey-600);
+  --color-table-header-text: var(--color-grey-600);
+  --color-field-list-row-selected-bg: var(--selected-tint);
+  /* Quiet surfaces: a faint cool page behind white panels, one light hairline everywhere, no card lift. */
+  --color-surface-shell: #fafafd;
+  --color-surface-band: #f3f3f6;
+  --color-surface-hover: #ececf0;
+  --color-surface-subtle-hover: #f6f6f9;
+  --color-border-subtle: #ebebee;
+  --color-border-button: #e6e6e7;
+  --color-card-edge: #ebebee;
+  --shadow-card: none;
+  --color-table-header-bg: #fafafd;
+  --color-table-header-border: #ebebee;
+  --color-table-row-divider: #ebebee;
+}
+/* Light chrome text steps down from data text; table headers get a heavier weight to stay distinct. */
+:root:not(.dark) thead[data-test="o2-table-header"] th {
+  font-weight: var(--font-medium);
+}
+/* Light toolbar buttons and the date picker at regular weight: 500 Geist read as bold next to the 400 tabs and menu. */
+:root:not(.dark) :is(.toolbar-btn-rest, #date-time-button, #date-time-button .date-time-label) {
+  font-weight: var(--font-normal);
+}
+/* The query editor box shares the panel tone with the Monaco surface inside it, as dark does. */
+:root:not(.dark) .logs-query-editor {
+  background-color: var(--color-surface-panel);
+}
+/* Layered `text-*!` utilities beat unlayered !important, so scope the variables they read instead. */
+:root:not(.dark) .toolbar-btn-rest {
+  --color-button-ghost-text: var(--color-text-body);
+}
+/* Active sidebar row: a light tint of the theme accent with accent text and icon. */
+:root:not(.dark) [data-test="sidebar"] a[aria-current="page"] {
+  --color-text-body: var(--color-selected-fg);
+  background-color: var(--selected-tint);
+}
+:root:not(.dark) [data-test="sidebar"] a[aria-current="page"] :is(span, svg) {
+  color: var(--color-selected-fg);
+}
+
 /* ── Shell: content sits in an inset card with its own edge and, in light, a faint lift ── */
 :root main[data-test="main-content"] > div {
   border-radius: 0.625rem;
@@ -683,7 +729,7 @@
 
 /* ── Icons ── */
 /* Secondary at rest (6.8:1), body on hover, open or pressed; filled (incl. ghost painted primary) and disabled buttons keep currentColor. */
-:root
+/* Toolbar secondary buttons use the standard outline button: a 1px edge in both themes, white in light, a tonal fill in dark; hover and open keep the ghost fills. */
   [data-o2-btn]:is([data-o2-variant="outline"], [data-o2-variant="ghost"]):not(
     :disabled,
     [data-o2-active],
@@ -691,21 +737,45 @@
     [class*="text-button-primary-foreground"],
     [class*="gradient-ai"],
     [class*="ai-accent"]
-  )
-  span.inline-flex.shrink-0.align-middle:not([data-destructive-icon]) {
+  box-shadow:
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline ring width */
+    inset 0 0 0 1px var(--toolbar-btn-rest-edge),
+    var(--toolbar-btn-rest-shadow);
   color: var(--color-text-secondary);
 }
 :root
-  [data-o2-btn]:is([data-o2-variant="outline"], [data-o2-variant="ghost"]):not(
+  --toolbar-btn-rest-edge: var(--color-border-button);
+  --toolbar-btn-rest-shadow: 0 0 #0000;
+  --toolbar-btn-rest-fg: var(--color-text-body);
     :disabled,
-    [data-o2-active],
+/* Thin glyphs in secondary grey read as disabled, so enabled toolbar icons use body text; disabled ones keep their fade and the quieter results bar keeps its grey. */
+:root
+  [data-o2-btn].toolbar-btn-rest:not(:disabled)
+  span.inline-flex.shrink-0.align-middle:not([data-destructive-icon]) {
+  color: var(--toolbar-btn-rest-fg);
+}
+/* A grey fill on a light page reads as disabled, so light-mode buttons are white instead. */
+:root:not(.dark) {
+  --toolbar-btn-rest-bg: var(--color-surface-raised);
+  /* On white, near-black glyphs feel heavy; mid grey still reads as enabled. */
+  --toolbar-btn-rest-fg: var(--color-text-body);
+}
+/* Between the step arrows the borderless picker draws its top, bottom and left edge (its 1px overlap hides the left arrow's), so arrows + picker read as one outlined group. */
+:root .date-time-container > #date-time-button:not(:first-child):not(:focus-visible) {
+  box-shadow:
+    inset 0 0.0625rem 0 var(--toolbar-btn-rest-edge),
+    inset 0 -0.0625rem 0 var(--toolbar-btn-rest-edge),
+    inset 0.0625rem 0 0 var(--toolbar-btn-rest-edge),
+    var(--toolbar-btn-rest-shadow);
+}
+/* Toolbar time pickers (not the full-width form field) and outlined actions in page headers and table toolbars join the same set. */
     [class*="bg-cancel-query-bg"],
     [class*="text-button-primary-foreground"],
     [class*="gradient-ai"],
     [class*="ai-accent"]
   ):is(:hover, :active, [aria-expanded="true"], [aria-pressed="true"])
   span.inline-flex.shrink-0.align-middle:not([data-destructive-icon], [data-menu-chevron]) {
-  color: var(--color-text-body);
+  border-color: var(--toolbar-btn-rest-edge) !important;
 }
 /* An off toggle item's glyph is its label, so it takes the label colour; secondary thin glyphs fell under 3:1. */
 :root [data-otoggle-value][data-state="off"] span.inline-flex.shrink-0.align-middle {
@@ -722,10 +792,6 @@
 :root [data-o2-btn]:is(.h-7, .size-7) span.inline-flex.shrink-0.align-middle:is(.size-6, .size-5) {
   width: 1rem;
   height: 1rem;
-}
-:root [data-o2-btn]:is(.h-6, .size-6) span.inline-flex.shrink-0.align-middle.size-4 {
-  width: 0.875rem;
-  height: 0.875rem;
 }
 
 /* Toolbar secondary buttons use the standard outline button: a 1px edge in both themes, white in light, a tonal fill in dark; hover and open keep the ghost fills. */
@@ -755,6 +821,25 @@
 }
 /* A grey fill on a light page reads as disabled, so light-mode buttons are white instead. */
 :root:not(.dark) {
+/* Nested corners: an inner element's radius is the outer radius minus the gap between them. */
+/* Page cells sit 3px inside the pager (1px border + 2px padding). */
+:root .o-pagination {
+  padding: 0.125rem;
+}
+:root .o-pagination__btn {
+  height: 1.375rem;
+  border-radius: calc(var(--radius-default) - 0.1875rem);
+}
+/* Toggle-group segments and the sliding selected pill sit 3px inside a padded track (22px cells keep the 28px track); unpadded, transparent tracks keep the full radius. */
+:root [class*="bg-toggle-track-bg"]:not([class*="p-0!"]) {
+  padding: 0.1875rem;
+}
+:root
+  [class*="bg-toggle-track-bg"]:not([class*="p-0!"])
+  :is([data-otoggle-value], .bg-toggle-item-active-bg) {
+  height: 1.375rem;
+  border-radius: calc(var(--radius-default) - 0.1875rem) !important;
+}
   --toolbar-btn-rest-bg: var(--color-surface-raised);
   /* On white, near-black glyphs feel heavy; mid grey still reads as enabled. */
   --toolbar-btn-rest-fg: var(--color-text-body);
