@@ -55,10 +55,7 @@ describe("MainLayout — Product Analytics menu entry", () => {
         stubs: {
           AppHeader: StubDiv,
           ONavbar: NavbarStub,
-          AssistantSidebarHost: StubDiv,
-          AssistantWindowLayer: StubDiv,
-          AssistantSkipLink: StubDiv,
-          HomeReturnBar: StubDiv,
+          O2AIChat: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,
@@ -442,10 +439,7 @@ describe("MainLayout — rail while the config loads", () => {
         stubs: {
           AppHeader: StubDiv,
           ONavbar: NavbarStub,
-          AssistantSidebarHost: StubDiv,
-          AssistantWindowLayer: StubDiv,
-          AssistantSkipLink: StubDiv,
-          HomeReturnBar: StubDiv,
+          O2AIChat: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,
