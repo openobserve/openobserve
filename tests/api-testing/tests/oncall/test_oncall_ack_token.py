@@ -612,7 +612,7 @@ def test_a_replayed_token_shows_the_state_and_records_nothing(create_session, ba
     was spent before the first acknowledgement, so the second must add nothing:
     it says who already has the page, and no second Acknowledged event appears.
     """
-    token, response_id, subject = minted_ack_token
+    token, response_id, _subject = minted_ack_token
 
     first = post_ack(base_url, org_id, token)
     assert_acknowledged_page(first)
@@ -624,7 +624,8 @@ def test_a_replayed_token_shows_the_state_and_records_nothing(create_session, ba
     second = post_ack(base_url, org_id, token)
     assert second.status_code == 200, f"a replay must not be an error: {second.text[:300]}"
     assert ACKED_HEADING not in second.text, "a replay must not claim it acknowledged"
-    assert f"Already acknowledged by {subject}".lower() in second.text.lower(), (
+    # `make_user` names an admin "OnCall Admin"; the page names a person, not their email.
+    assert "Already acknowledged by OnCall Admin" in second.text, (
         f"a replay shows the page's current state: {second.text[:300]}"
     )
 
@@ -640,14 +641,14 @@ def test_a_used_link_opened_again_shows_the_state_not_the_button(create_session,
                                                                  org_id, minted_ack_token):
     """Once the page is acknowledged, opening the link again must not offer the
     Acknowledge button a second time; it says who has the page, as the POST does."""
-    token, _response_id, subject = minted_ack_token
+    token, _response_id, _subject = minted_ack_token
 
     assert_acknowledged_page(post_ack(base_url, org_id, token))
 
     again = get_ack(base_url, org_id, token)
     assert again.status_code == 200, again.text[:300]
     assert again.headers.get("Content-Type", "").startswith("text/html"), again.headers
-    assert f"Already acknowledged by {subject}".lower() in again.text.lower(), (
+    assert "Already acknowledged by OnCall Admin" in again.text, (
         f"a used link shows the page's current state: {again.text[:300]}"
     )
     assert "<form" not in again.text, "a used link must not offer the Acknowledge button again"
@@ -684,7 +685,12 @@ def test_a_token_whose_subject_left_the_team_does_not_acknowledge(
 
     leaver_post = post_ack(base_url, org_id, token)
     assert leaver_post.status_code == 403, f"{leaver_post.status_code}: {leaver_post.text[:300]}"
-    assert leaver_post.json().get("code") == "ack_refused", leaver_post.text[:300]
+    # The link has no session, so the refusal is the link page and names nobody who could act.
+    assert leaver_post.headers.get("Content-Type", "").startswith("text/html"), leaver_post.headers
+    assert "You can't acknowledge this page from this link" in leaver_post.text, leaver_post.text[:300]
+    assert "can_act" not in leaver_post.text and subject not in leaver_post.text, (
+        leaver_post.text[:300]
+    )
     assert_did_not_act(leaver_post)
 
     after = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")
