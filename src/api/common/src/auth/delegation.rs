@@ -110,6 +110,8 @@ static LINK_CACHE: LazyLock<Mutex<HashMap<String, LinkFacts>>> =
 #[rustfmt::skip]
 const ASSISTANT_SCOPE: &[ScopeRoute] = &[
     v1(&[Param, Lit("_search")], POST),
+    // The MCP SearchSQL tool runs on the streaming route, not on `_search`.
+    v1(&[Param, Lit("_search_stream")], POST),
     v1(&[Param, Stream, Lit("_values")], GET),
     v1(&[Param, Stream, Lit("_around")], GET_POST),
     v1(&[Param, Lit("prometheus"), Lit("api"), Lit("v1"), Lit("query")], GET_POST),
@@ -1200,6 +1202,20 @@ mod tests {
         ] {
             assert!(in_assistant_scope(&method, path), "{method} {path}");
         }
+    }
+
+    #[test]
+    fn delegated_search_sql_may_call_search_stream() {
+        assert!(in_assistant_scope(&Method::POST, "acme/_search_stream"));
+        assert!(!in_assistant_scope(&Method::GET, "acme/_search_stream"));
+        assert!(!in_assistant_scope(
+            &Method::POST,
+            "acme/_search_multi_stream"
+        ));
+        assert!(!in_assistant_scope(
+            &Method::POST,
+            "acme/logs/_search_stream"
+        ));
     }
 
     #[test]
