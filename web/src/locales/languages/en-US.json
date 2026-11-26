@@ -1079,7 +1079,9 @@
     "username": "Username",
     "password": "Password",
     "shortUrl": {
-      "redirecting": "Redirecting..."
+      "redirecting": "Redirecting...",
+      "invalid": "This link is invalid or has expired",
+      "failed": "Could not open this link, try again"
     },
     "copied": "Copied",
     "couldntCopy": "Couldn't copy",

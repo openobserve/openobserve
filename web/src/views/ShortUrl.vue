@@ -11,6 +11,7 @@
 import { defineComponent, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import shortURL from "@/services/short_url";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -35,6 +36,11 @@ export default defineComponent({
       });
     };
 
+    const routeToHomeWithError = (message: string) => {
+      toast({ variant: "error", message });
+      routeToHome();
+    };
+
     const handleOriginalUrl = (url: string) => {
       const { pathname, search, hash } = new URL(url, window.location.origin);
       // Everything up to the first /web/ is the deployment's base path (ZO_BASE_URI), as in getPath().
@@ -53,13 +59,16 @@ export default defineComponent({
         if (typeof response.data === "string") {
           handleOriginalUrl(response.data);
         } else {
-          // Handle case where redirect URL is not found
-          routeToHome();
+          routeToHomeWithError(t("common.shortUrl.invalid"));
         }
       } catch (error) {
         console.error("Error fetching short URL:", error);
-        // Redirect to home page on error
-        routeToHome();
+        const status = (error as { response?: { status?: number } })?.response?.status;
+        routeToHomeWithError(
+          status === 404 || status === 400
+            ? t("common.shortUrl.invalid")
+            : t("common.shortUrl.failed"),
+        );
       }
     };
 
