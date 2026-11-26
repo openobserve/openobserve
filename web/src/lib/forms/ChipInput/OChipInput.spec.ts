@@ -125,6 +125,50 @@ describe("OChipInput", () => {
     expect(input.emitted("select")).toBeUndefined();
   });
 
+  it("applies on Enter after rows were ticked with the mouse instead of unticking the hovered one", async () => {
+    const input = mountInput({
+      open: true,
+      multiple: true,
+      suggestions: [
+        { key: "a", label: raw("a"), selected: true },
+        { key: "b", label: raw("b"), selected: true },
+      ],
+    });
+    await flushPromises();
+    const row = document.querySelector<HTMLElement>('[data-test="ci-suggest-item-b"]')!;
+    row.dispatchEvent(new PointerEvent("pointermove", { bubbles: true }));
+    row.click();
+    await key("Enter");
+    expect(input.emitted("select")!.map(([k]) => k)).toEqual(["b"]);
+    expect(input.emitted("apply")).toHaveLength(1);
+  });
+
+  it("still ticks the hovered row on Enter when nothing is ticked yet", async () => {
+    const input = mountInput({ open: true, multiple: true });
+    await flushPromises();
+    document
+      .querySelector<HTMLElement>('[data-test="ci-suggest-item-b"]')!
+      .dispatchEvent(new PointerEvent("pointermove", { bubbles: true }));
+    await key("Enter");
+    expect(input.emitted("select")!.map(([k]) => k)).toEqual(["b"]);
+    expect(input.emitted("apply")).toBeUndefined();
+  });
+
+  it("keeps Enter on a row picked with the arrow keys as a tick, even with other rows ticked", async () => {
+    const input = mountInput({
+      open: true,
+      multiple: true,
+      suggestions: [
+        { key: "a", label: raw("a"), selected: true },
+        { key: "b", label: raw("b") },
+      ],
+    });
+    await key("ArrowDown");
+    await key("Enter");
+    expect(input.emitted("select")!.map(([k]) => k)).toEqual(["b"]);
+    expect(input.emitted("apply")).toBeUndefined();
+  });
+
   it("ticks the highlighted row with Space in a multi-select and keeps it highlighted", async () => {
     const input = mountInput({ open: true, multiple: true });
     await key("ArrowDown");
