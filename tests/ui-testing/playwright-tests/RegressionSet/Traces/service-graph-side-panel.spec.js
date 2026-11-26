@@ -81,14 +81,18 @@ test.describe('Service Graph Side Panel Regression', () => {
   }, async () => {
     await pm.serviceGraphPage.expectOperationsSectionVisible();
 
-    const rowCount = await pm.serviceGraphPage.getOperationsTableRowCount();
-    // A single row is trivially ordered, so it cannot demonstrate sorting.
-    test.skip(rowCount < 2, `needs at least 2 operations to order, got ${rowCount}`);
+    // Loading placeholders are rows too but carry no latency bar, so bars are what proves the data is in.
+    await expect.poll(async () => (await pm.serviceGraphPage.getOperationsDurationRatios('p95')).length, {
+      timeout: 30000,
+      message: 'the seeded operations must show their p95 bars',
+    }).toBeGreaterThan(1);
 
     await pm.serviceGraphPage.sortOperationsByColumn('p95');
     const ascOperations = await pm.serviceGraphPage.getOperationsColumnText('operation');
     const ascRatios = await pm.serviceGraphPage.getOperationsDurationRatios('p95');
     testLogger.info(`Ascending p95 ratios: ${ascRatios.join(', ')}`);
+    expect(ascRatios, 'every operation must show its p95 bar').toHaveLength(ascOperations.length);
+    expect(new Set(ascRatios).size, 'the latencies must differ, or any order would pass').toBeGreaterThan(1);
 
     // The defect was duration columns comparing as formatted strings, so assert
     // the latencies themselves rather than merely that the order changed.
@@ -102,8 +106,10 @@ test.describe('Service Graph Side Panel Regression', () => {
 
     expect(descRatios, 'second click must reverse the latency order')
       .toEqual([...descRatios].sort((a, b) => b - a));
-    expect(descOperations, 'descending rows must be the ascending rows reversed')
-      .toEqual([...ascOperations].reverse());
+    // Rows with the same latency keep their order in both directions, so the rows are compared as pairs, not reversed.
+    const pairs = (operations, ratios) => operations.map((operation, i) => `${ratios[i]} ${operation}`).sort();
+    expect(pairs(descOperations, descRatios), 'each operation must keep its own latency when the order flips')
+      .toEqual(pairs(ascOperations, ascRatios));
   });
 
   test('Operations table exposes request, error and latency columns', {

@@ -11,6 +11,22 @@ const ROWS = [
   { svc: 'beta', ns: 'ns-b', host: 'host-b', pod: 'pod-b', level: 'warn', message: 'ovn-b-include beta 2' },
 ];
 
+const INCLUDE_CASES = [
+  {
+    name: 'add no brackets to a simple filter',
+    filter: "level = 'info'",
+    rowsBefore: 3,
+    shape: /^level = 'info' AND ns = 'ns-a' AND host = 'host-a' AND pod = 'pod-a'$/,
+  },
+  {
+    // Beta comes first so that losing the bracket would let the beta rows past the includes.
+    name: 'keep one bracket around a filter with OR',
+    filter: "svc = 'beta' OR svc = 'alpha'",
+    rowsBefore: 4,
+    shape: /^\(\s*svc = 'beta' OR svc = 'alpha'\s*\) AND ns = 'ns-a' AND host = 'host-a' AND pod = 'pod-a'$/,
+  },
+];
+
 test.describe('Logs Include Search Term query shape (ENT#3086, OSS#11220)', () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
@@ -31,28 +47,28 @@ test.describe('Logs Include Search Term query shape (ENT#3086, OSS#11220)', () =
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  test('three includes in a row keep one bracket around the original filter (ENT#3086)', {
-    tag: ['@bug-ent3086', '@P2', '@regression', '@logsRegression'],
-  }, async ({ page }) => {
-    await pm.logsPage.openLogsWithFilter(stream, "svc = 'alpha'");
-    await pm.logsPage.getQueryEditorTextWhenReady("svc = 'alpha'");
-    await pm.logsPage.clickRefreshButton();
-    await expect.poll(async () => (await pm.logsPage.getResultRowTexts()).length, { timeout: 30000 }).toBe(2);
+  for (const { name, filter, rowsBefore, shape } of INCLUDE_CASES) {
+    test(`three includes in a row ${name} (ENT#3086, OSS#17234)`, {
+      tag: ['@bug-ent3086', '@bug-17234', '@P2', '@regression', '@logsRegression'],
+    }, async ({ page }) => {
+      await pm.logsPage.openLogsWithFilter(stream, filter);
+      await pm.logsPage.getQueryEditorTextWhenReady(filter);
+      await pm.logsPage.clickRefreshButton();
+      await expect.poll(async () => (await pm.logsPage.getResultRowTexts()).length, { timeout: 30000 }).toBe(rowsBefore);
 
-    for (const field of ['ns', 'host', 'pod']) {
-      await pm.logsPage.includeFieldFromRowContaining('ovn-b-include alpha', field);
-      await pm.logsPage.getQueryEditorTextWhenReady(`${field} = '${field}-a'`);
-    }
+      for (const field of ['ns', 'host', 'pod']) {
+        await pm.logsPage.includeFieldFromRowContaining('ovn-b-include alpha', field);
+        await pm.logsPage.getQueryEditorTextWhenReady(`${field} = '${field}-a'`);
+      }
 
-    const query = (await pm.logsPage.getQueryEditorText()).replace(/\s+/g, ' ').trim();
-    testLogger.info(`Query after three includes: ${query}`);
-    // Pre-fix every include re-wrapped the whole query: "( ( ( svc = 'alpha' ) AND ns ... ) AND host ... ) AND pod ...".
-    expect((query.match(/\(/g) || []).length, `one bracket level only: ${query}`).toBe(1);
-    expect(query).toMatch(/^\(\s*svc = 'alpha'\s*\) AND ns = 'ns-a' AND host = 'host-a' AND pod = 'pod-a'$/);
+      const query = (await pm.logsPage.getQueryEditorText()).replace(/\s+/g, ' ').trim();
+      testLogger.info(`Query after three includes: ${query}`);
+      expect(query).toMatch(shape);
 
-    await pm.logsPage.clickRefreshButton();
-    await expect.poll(async () => (await pm.logsPage.getResultRowTexts()).length, { timeout: 30000 }).toBe(2);
-  });
+      await pm.logsPage.clickRefreshButton();
+      await expect.poll(async () => (await pm.logsPage.getResultRowTexts()).length, { timeout: 30000 }).toBe(2);
+    });
+  }
 
   test('include on a GROUP BY query lands inside WHERE, before GROUP BY, and the query runs (OSS#11220)', {
     tag: ['@bug-11220', '@P2', '@regression', '@logsRegression'],
