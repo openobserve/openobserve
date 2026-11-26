@@ -624,7 +624,10 @@
       "tracesRedActions.spec.js",
       "traceSessionReplay.spec.js",
       "traces-jk-navigation.spec.js",
-      "service-graph-side-panel.spec.js"
+      "service-graph-side-panel.spec.js",
+      "tracesSqlMode.spec.js",
+      "tracesGroups.spec.js",
+      "tracesScope.spec.js"
     ],
     "disabled": []
   },
