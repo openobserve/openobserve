@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div
-            class="results-bar-quiet flex flex-none items-center justify-end gap-1.5 pe-2 max-md:ms-auto"
+            class="results-bar-quiet flex flex-none items-center justify-end gap-1.5 pe-1.5 max-md:ms-auto"
           >
             <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
             <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test-prefix="logs-search-result-pagination"
           page-size-data-test="logs-search-result-records-per-page"
           :bordered="false"
-          class="shrink-0"
+          class="shrink-0 ps-0! [&>div]:gap-x-1.5!"
           @update:page-size="onLogsPageSize"
           @go-to-page="onLogsGoToPage"
         />
