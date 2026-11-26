@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Ainda nenhum canal tem uma organização predefinida",
-      "description": "As perguntas num canal sem predefinição vão para a organização predefinida de cada pessoa (podem alterá-la com /o2 org)."
+      "description": "As perguntas num canal sem predefinição vão para a organização predefinida de cada pessoa (podem alterá-la com {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Ainda ninguém nesta organização associou o Slack"
@@ -28465,7 +28465,7 @@
     "mineJoinTeam": "Juntar-se a uma equipa",
     "mineTestTeam": "Enviar um acionamento de teste para {team}",
     "mineCoverSaved": "Cobertura guardada",
-    "mineSlackLinkHow": "Escreva /o2 link no Slack",
+    "mineSlackLinkHow": "Escreva {command} link no Slack",
     "mineSlackSetUpHint": "Abre Definições › Slack",
     "myDeliveriesWhen": "Quando",
     "phoneAddHint": "Adicione um número para SMS e chamadas",
@@ -29036,7 +29036,7 @@
     "channelUnavailable": "{channel} — sem fornecedor por trás",
     "channelUnverified": "{channel} — registado, mas ninguém o verificou",
     "channelAddPhone": "{reason}. Adicione o seu telefone na página O meu piquete",
-    "channelLinkSlack": "{reason}. Execute /o2 link no Slack",
+    "channelLinkSlack": "{reason}. Execute {command} link no Slack",
     "loadUneven": "{name} carregou {factor}× a mediana nos últimos {days} dias",
     "loadUnevenLabel": "Carga desigual:",
     "membersUnreachableMore": "{name} está nesta equipa, mas nenhum acionamento pode chegar a esta pessoa — {why}. {count} outro membro está no mesmo estado. | {name} está nesta equipa, mas nenhum acionamento pode chegar a esta pessoa — {why}. {count} outros membros estão no mesmo estado.",
@@ -30817,7 +30817,7 @@
         "settings": "Definições",
         "install": "Na instalação",
         "destination": "A partir de um destino de alerta",
-        "oncall": "A partir de /o2 oncall aqui"
+        "oncall": "A partir de {command} oncall aqui"
       },
       "channel": "Canal",
       "channelPlaceholder": "Pesquisar canais",
@@ -30831,7 +30831,7 @@
       "editDefault": "Editar predefinição do canal",
       "removeConfirm": "Remover predefinição",
       "removeTitle": "Remover a predefinição de #{channel}?",
-      "removeMessage": "As perguntas em {name} passam então a ir para a organização predefinida de cada pessoa (pode alterá-la com /o2 org).",
+      "removeMessage": "As perguntas em {name} passam então a ir para a organização predefinida de cada pessoa (pode alterá-la com {command} org).",
       "instanceAdminOnly": "Apenas administrador da instância",
       "ownOrgOnlyHint": "Num espaço de trabalho de instância, associa os canais à sua própria organização",
       "claimableHint": "Canais por atribuir e canais pertencentes a {org}",

@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Noch hat kein Kanal eine Standardorganisation",
-      "description": "Fragen in einem Kanal ohne Standard gehen an die Standardorganisation der jeweiligen Person (sie kann sie mit /o2 org ändern)."
+      "description": "Fragen in einem Kanal ohne Standard gehen an die Standardorganisation der jeweiligen Person (sie kann sie mit {command} org ändern)."
     },
     "noSlackLinkedPeople": {
       "title": "Noch niemand in dieser Organisation hat Slack verknüpft"
@@ -28465,7 +28465,7 @@
     "mineJoinTeam": "Einem Team beitreten",
     "mineTestTeam": "Eine Testalarmierung an {team} senden",
     "mineCoverSaved": "Vertretung gespeichert",
-    "mineSlackLinkHow": "/o2 link in Slack eingeben",
+    "mineSlackLinkHow": "{command} link in Slack eingeben",
     "mineSlackSetUpHint": "Öffnet Einstellungen › Slack",
     "myDeliveriesWhen": "Wann",
     "phoneAddHint": "Eine Nummer für SMS und Anrufe hinzufügen",
@@ -29036,7 +29036,7 @@
     "channelUnavailable": "{channel} — kein Anbieter dahinter",
     "channelUnverified": "{channel} — hinterlegt, aber von niemandem verifiziert",
     "channelAddPhone": "{reason}. Fügen Sie Ihr Telefon unter Mein On-Call hinzu",
-    "channelLinkSlack": "{reason}. Führen Sie /o2 link in Slack aus",
+    "channelLinkSlack": "{reason}. Führen Sie {command} link in Slack aus",
     "loadUneven": "{name} hatte in den letzten {days} Tagen das {factor}-fache des Medians",
     "loadUnevenLabel": "Ungleichmäßige Last:",
     "membersUnreachableMore": "{name} ist in diesem Team, aber keine Alarmierung kann diese Person erreichen — {why}. {count} weiteres Mitglied ist in derselben Lage. | {name} ist in diesem Team, aber keine Alarmierung kann diese Person erreichen — {why}. {count} weitere Mitglieder sind in derselben Lage.",
@@ -30817,7 +30817,7 @@
         "settings": "Einstellungen",
         "install": "Bei Installation",
         "destination": "Von einem Alarmziel",
-        "oncall": "Von /o2 oncall hier"
+        "oncall": "Von {command} oncall hier"
       },
       "channel": "Kanal",
       "channelPlaceholder": "Kanäle durchsuchen",
@@ -30831,7 +30831,7 @@
       "editDefault": "Kanalstandard bearbeiten",
       "removeConfirm": "Standard entfernen",
       "removeTitle": "Standard für #{channel} entfernen?",
-      "removeMessage": "Fragen in {name} gehen dann an die Standardorganisation jeder Person (sie kann sie mit /o2 org ändern).",
+      "removeMessage": "Fragen in {name} gehen dann an die Standardorganisation jeder Person (sie kann sie mit {command} org ändern).",
       "instanceAdminOnly": "Nur für Instanz-Administratoren",
       "ownOrgOnlyHint": "In einem Instanz-Workspace ordnen Sie Kanäle Ihrer eigenen Organisation zu",
       "claimableHint": "Nicht übernommene Kanäle und Kanäle im Besitz von {org}",

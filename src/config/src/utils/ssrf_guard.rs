@@ -509,6 +509,21 @@ pub fn build_destination_client_without_redirects(
         .build()
 }
 
+/// [`build_safe_client`] that never follows redirects, for requests whose body carries
+/// credentials: reqwest re-sends the body on a 307/308 to whatever host the server names.
+pub fn build_safe_client_no_redirects(
+    builder: reqwest::ClientBuilder,
+) -> reqwest::Result<reqwest::Client> {
+    let resolver = SsrfDnsResolver {
+        allowlist: Scope::Strict.allowlist(&ALLOWLIST),
+        proxy_hosts: &PROXY_HOSTS,
+    };
+    builder
+        .redirect(reqwest::redirect::Policy::none())
+        .dns_resolver(Arc::new(resolver))
+        .build()
+}
+
 /// Parses the allowlist now so invalid entries are reported at startup, not on first request.
 pub fn init_allowlist() {
     LazyLock::force(&ALLOWLIST);
@@ -1175,6 +1190,41 @@ mod tests {
             "{chain}"
         );
         assert!(find_ssrf_refusal(&err).is_some(), "{chain}");
+    }
+
+    #[tokio::test]
+    async fn test_no_redirect_client_does_not_resend_body_to_redirect_target() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let target = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target_port = target.local_addr().unwrap().port();
+        let origin = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin_port = origin.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (mut sock, _) = origin.accept().await.unwrap();
+            let mut buf = [0u8; 4096];
+            let _ = sock.read(&mut buf).await;
+            let reply = format!(
+                "HTTP/1.1 307 Temporary Redirect\r\nLocation: http://127.0.0.1:{target_port}/auth\r\n\
+                 Content-Length: 0\r\n\r\n"
+            );
+            let _ = sock.write_all(reply.as_bytes()).await;
+        });
+        let client = build_safe_client_no_redirects(
+            reqwest::Client::builder().timeout(std::time::Duration::from_secs(5)),
+        )
+        .unwrap();
+        let res = client
+            .post(format!("http://127.0.0.1:{origin_port}/auth"))
+            .body("access-key=secret")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), reqwest::StatusCode::TEMPORARY_REDIRECT);
+        let reached = tokio::time::timeout(std::time::Duration::from_millis(300), target.accept());
+        assert!(
+            reached.await.is_err(),
+            "the redirect target must not be contacted"
+        );
     }
 
     #[tokio::test]

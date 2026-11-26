@@ -107,6 +107,8 @@ export interface InstallationView {
   created_at: number;
   scope: SlackInstallScope;
   managed: boolean;
+  /** The app's slash command, such as `/o2`; older servers omit it. */
+  command?: string;
   org_access?: SlackOrgAccessMode;
   instance_help_contact?: string;
 }
@@ -629,6 +631,8 @@ export interface SlackMyLinksResponse {
   links: SlackMyLink[];
   /** An active workspace serves this org; `links` are only its links. */
   slack_serves_org: boolean;
+  /** The serving workspace's slash command; older servers omit it. */
+  command?: string;
 }
 
 /** One row of the admin link list (`links::AdminLinkView`): it never names another org. */

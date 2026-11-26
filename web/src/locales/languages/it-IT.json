@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Nessun canale ha ancora un'organizzazione predefinita",
-      "description": "Le domande poste in un canale senza predefinita vanno all'organizzazione predefinita di ciascuna persona (può essere cambiata con /o2 org)."
+      "description": "Le domande poste in un canale senza predefinita vanno all'organizzazione predefinita di ciascuna persona (può essere cambiata con {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nessuno in questa organizzazione ha ancora collegato Slack"
@@ -28465,7 +28465,7 @@
     "mineJoinTeam": "Unisciti a un team",
     "mineTestTeam": "Invia una notifica di test a {team}",
     "mineCoverSaved": "Copertura salvata",
-    "mineSlackLinkHow": "Digita /o2 link in Slack",
+    "mineSlackLinkHow": "Digita {command} link in Slack",
     "mineSlackSetUpHint": "Apre Impostazioni › Slack",
     "myDeliveriesWhen": "Quando",
     "phoneAddHint": "Aggiungi un numero per SMS e chiamate",
@@ -29036,7 +29036,7 @@
     "channelUnavailable": "{channel} — nessun provider configurato",
     "channelUnverified": "{channel} — registrato, ma nessuno lo ha verificato",
     "channelAddPhone": "{reason}. Aggiungi il tuo telefono in La mia reperibilità",
-    "channelLinkSlack": "{reason}. Esegui /o2 link in Slack",
+    "channelLinkSlack": "{reason}. Esegui {command} link in Slack",
     "loadUneven": "{name} ha gestito {factor}× la mediana negli ultimi {days} giorni",
     "loadUnevenLabel": "Il carico non è uniforme:",
     "membersUnreachableMore": "{name} è in questo team, ma nessuna notifica può essere recapitata — {why}. {count} altro membro è nella stessa situazione. | {name} è in questo team, ma nessuna notifica può essere recapitata — {why}. {count} altri membri sono nella stessa situazione.",
@@ -30817,7 +30817,7 @@
         "settings": "Impostazioni",
         "install": "All'installazione",
         "destination": "Da una destinazione di avviso",
-        "oncall": "Da /o2 oncall qui"
+        "oncall": "Da {command} oncall qui"
       },
       "channel": "Canale",
       "channelPlaceholder": "Cerca canali",
@@ -30831,7 +30831,7 @@
       "editDefault": "Modifica canale predefinito",
       "removeConfirm": "Rimuovi predefinito",
       "removeTitle": "Rimuovere il predefinito per #{channel}?",
-      "removeMessage": "Le domande in {name} vanno poi all'organizzazione predefinita di ciascuna persona (possono cambiarla con /o2 org).",
+      "removeMessage": "Le domande in {name} vanno poi all'organizzazione predefinita di ciascuna persona (possono cambiarla con {command} org).",
       "instanceAdminOnly": "Solo amministratore dell'istanza",
       "ownOrgOnlyHint": "Su un workspace dell'istanza, i canali vengono mappati alla tua organizzazione",
       "claimableHint": "Canali non assegnati e canali di proprietà di {org}",

@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "아직 기본 조직이 설정된 채널이 없습니다",
-      "description": "기본 조직이 없는 채널의 질문은 각 사용자의 기본 조직으로 전달됩니다(/o2 org로 변경할 수 있습니다)."
+      "description": "기본 조직이 없는 채널의 질문은 각 사용자의 기본 조직으로 전달됩니다({command} org로 변경할 수 있습니다)."
     },
     "noSlackLinkedPeople": {
       "title": "이 조직에서 아직 Slack을 연결한 사람이 없습니다"
@@ -28465,7 +28465,7 @@
     "mineJoinTeam": "팀에 참여",
     "mineTestTeam": "{team}에 테스트 호출 보내기",
     "mineCoverSaved": "대체 근무 저장됨",
-    "mineSlackLinkHow": "Slack에서 /o2 link 입력",
+    "mineSlackLinkHow": "Slack에서 {command} link 입력",
     "mineSlackSetUpHint": "설정 › Slack 열기",
     "myDeliveriesWhen": "시각",
     "phoneAddHint": "문자와 전화에 사용할 번호 추가",
@@ -29036,7 +29036,7 @@
     "channelUnavailable": "{channel} — 연결된 제공업체 없음",
     "channelUnverified": "{channel} — 등록됨, 아무도 확인하지 않음",
     "channelAddPhone": "{reason}. 내 온콜에서 전화번호를 추가하세요",
-    "channelLinkSlack": "{reason}. Slack에서 /o2 link를 실행하세요",
+    "channelLinkSlack": "{reason}. Slack에서 {command} link를 실행하세요",
     "loadUneven": "{name}님이 중앙값의 {factor}배를 담당했습니다 — 지난 {days}일 동안",
     "loadUnevenLabel": "부하가 불균등합니다:",
     "membersUnreachableMore": "{name}님은 이 팀에 있지만, 호출이 전달될 수 없습니다 — {why}. 다른 멤버 {count}명도 같은 상태입니다. | {name}님은 이 팀에 있지만, 호출이 전달될 수 없습니다 — {why}. 다른 멤버 {count}명도 같은 상태입니다.",
@@ -30817,7 +30817,7 @@
         "settings": "설정",
         "install": "설치 시",
         "destination": "알림 대상에서",
-        "oncall": "여기에서 /o2 oncall로 설정"
+        "oncall": "여기에서 {command} oncall로 설정"
       },
       "channel": "채널",
       "channelPlaceholder": "채널 검색",
@@ -30831,7 +30831,7 @@
       "editDefault": "채널 기본값 편집",
       "removeConfirm": "기본값 제거",
       "removeTitle": "#{channel}의 기본값을 제거할까요?",
-      "removeMessage": "{name}의 질문은 이후 각 사용자의 기본 조직으로 전달됩니다(/o2 org로 변경할 수 있습니다).",
+      "removeMessage": "{name}의 질문은 이후 각 사용자의 기본 조직으로 전달됩니다({command} org로 변경할 수 있습니다).",
       "instanceAdminOnly": "인스턴스 관리자 전용",
       "ownOrgOnlyHint": "인스턴스 워크스페이스에서는 채널을 자신의 조직에 매핑합니다",
       "claimableHint": "할당되지 않은 채널 및 {org} 소유 채널",
