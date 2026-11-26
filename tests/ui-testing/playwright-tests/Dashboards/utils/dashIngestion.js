@@ -149,6 +149,79 @@ export const ingestionHighCardinality = async (
   return await fetchResponse.json();
 };
 
+// Logs panel rows this worker has ingested, keyed by org:stream; reused while they are still inside a 15-minute window.
+const logsPanelRuns = new Map();
+const LOGS_PANEL_RUN_MAX_AGE_MS = 8 * 60 * 1000;
+export const LOGS_PANEL_LEVELS = ["info", "warn", "error", "debug"];
+export const LOGS_PANEL_ROW_COUNT = 30;
+
+/**
+ * Ingest known log lines for the Logs panel specs. Every row carries the same `run_id`, so a spec can scope its SQL to
+ * this ingestion and ignore rows other workers or earlier runs left in the stream.
+ *
+ * Plain rows (kind = "row"): seq 0..29, one second apart and newest first (seq 0 is the newest), with
+ * level cycling info/warn/error/debug, lvl = "err"/"warn", status 500 on every fifth row, and the same instant
+ * copied into ts_ms (epoch ms number) and ts_ns (epoch ns string).
+ * Special rows (kind = "special"), older than every plain row: three XSS payloads, a JSON message and a long line.
+ *
+ * @returns {Promise<{runId: string, baseMs: number}>} baseMs is the _timestamp (ms) of seq 0
+ */
+export const ingestionForLogsPanel = async (page, streamName = "e2e_logs_panel") => {
+  if (!process.env["INGESTION_URL"]) {
+    throw new Error("Required environment variables are not set");
+  }
+  const key = `${getOrgIdentifier()}:${streamName}`;
+  const cached = logsPanelRuns.get(key);
+  if (cached && Date.now() - cached.baseMs < LOGS_PANEL_RUN_MAX_AGE_MS) return cached;
+
+  const runId = `lp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const baseMs = Date.now() - 2000;
+  const records = [];
+  for (let seq = 0; seq < LOGS_PANEL_ROW_COUNT; seq++) {
+    const ms = baseMs - seq * 1000;
+    records.push({
+      _timestamp: ms * 1000,
+      run_id: runId,
+      kind: "row",
+      seq,
+      level: LOGS_PANEL_LEVELS[seq % LOGS_PANEL_LEVELS.length],
+      lvl: seq % 2 === 0 ? "err" : "warn",
+      message: `logs-panel row ${seq}`,
+      svc: `svc-${seq % 3}`,
+      status: seq % 5 === 0 ? 500 : 200,
+      ts_ms: ms,
+      ts_ns: `${ms}000000`,
+    });
+  }
+  const specials = [
+    '<img src=x onerror="window.__lpXss=1">XSS-IMG',
+    '"><svg onload="window.__lpXss=2">XSS-SVG',
+    "<script>window.__lpXss=3</script>XSS-SCRIPT",
+    '{"nested":{"a":1},"msg":"json in message"}',
+    `LONG ${"x".repeat(2000)} END`,
+  ];
+  specials.forEach((message, i) => {
+    records.push({
+      _timestamp: (baseMs - (LOGS_PANEL_ROW_COUNT + 10 + i) * 1000) * 1000,
+      run_id: runId,
+      kind: "special",
+      seq: 100 + i,
+      level: "info",
+      message,
+    });
+  });
+
+  const fetchResponse = await postWithRetry(page, streamName, records, "Logs panel ingestion");
+  if (!fetchResponse.ok) {
+    const body = await fetchResponse.text().catch(() => "");
+    throw new Error(`HTTP error! status: ${fetchResponse.status}, response: ${body.slice(0, 200)}`);
+  }
+  const run = { runId, baseMs };
+  logsPanelRuns.set(key, run);
+  testLogger.info("Logs panel stream ingested", { streamName, runId, rows: records.length });
+  return run;
+};
+
 // Dashboard maps ingestion
 
 // Ingestion function for Geomap and Maps chart

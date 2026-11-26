@@ -381,6 +381,31 @@ export async function setupBoxplotPanelWithConfig(page, pm, dashboardName, {
   testLogger.info("Box plot panel with config ready", { dashboardName, panelName, valueField, categoryField });
 }
 
+// Logs panel with the config sidebar open. The stream is chosen before the type, because the starter query is
+// seeded from the stream selected when Logs is picked. sql = null keeps that starter; any other SQL replaces it.
+export async function setupLogsPanelWithConfig(page, pm, dashboardName, {
+  panelName = "Test Panel",
+  streamName = "e2e_logs_panel",
+  sql = null,
+} = {}) {
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream(streamName);
+  await pm.chartTypeSelector.selectChartType("logs");
+  await pm.chartTypeSelector.expectQueryEditorText(
+    `SELECT * FROM "${streamName}" ORDER BY _timestamp DESC LIMIT 100`
+  );
+  if (sql) {
+    await pm.chartTypeSelector.enterCustomSQL(sql);
+    await pm.chartTypeSelector.expectQueryEditorText(sql);
+  }
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Logs panel with config ready", { dashboardName, panelName, streamName, sql });
+}
+
 // Sunburst panel with the config sidebar open; Size keeps the seeded count. The editor opens as a bar and
 // seeds histogram(_timestamp) on X, which the switch to sunburst keeps, so it is removed first.
 export async function setupSunburstPanelWithConfig(page, pm, dashboardName, {

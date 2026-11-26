@@ -939,6 +939,17 @@ export default class ChartTypeSelector {
     await this.page.locator(`[data-test="dashboard-y-item-${yAlias}"]`).first().waitFor({ state: "attached", timeout: 15000 });
   }
 
+  /** The panel query editor's text, with Monaco's non-breaking spaces turned back into spaces. */
+  async getQueryEditorText() {
+    await this.monaco.waitForReady(this.queryEditor);
+    return ((await this.monaco.getContent(this.queryEditor)) ?? "").replace(/ /g, " ").trim();
+  }
+
+  /** Wait until the panel query editor holds exactly `query`. */
+  async expectQueryEditorText(query, timeout = 15000) {
+    await expect.poll(async () => this.getQueryEditorText(), { timeout }).toBe(query);
+  }
+
   /**
    * End-to-end helper: switch to SQL → Custom query mode and enter the query.
    * @param {string} query - The SQL query to enter
