@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Nessun canale ha ancora un'organizzazione predefinita",
-      "description": "Le domande poste in un canale senza predefinita vanno all'organizzazione predefinita di ciascuna persona (può essere cambiata con {command} org)."
+      "description": "Le domande in un canale senza un valore predefinito vanno all'organizzazione predefinita di ciascuna persona (possono cambiarla con {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nessuno in questa organizzazione ha ancora collegato Slack"
@@ -1920,6 +1920,7 @@
     "patternCount": "Conteggio",
     "errorConstructingSearchQuery": "Si è verificato un errore durante la costruzione della query di ricerca.",
     "errorExtractingPatterns": "Errore nell'estrazione dei pattern. Riprova.",
+    "patternsNoReadPermission": "Non hai l’autorizzazione per leggere questo stream.",
     "errorWhileApplyingSavedView": "Errore durante l'applicazione della vista salvata.",
     "errorWhileExtractingStreamFields": "Errore durante l'estrazione dei campi dello stream.",
     "errorWhileGeneratingHistogramData": "Errore durante la generazione dei dati dell'istogramma.",
@@ -31085,7 +31086,7 @@
       "editDefault": "Modifica canale predefinito",
       "removeConfirm": "Rimuovi predefinito",
       "removeTitle": "Rimuovere il predefinito per #{channel}?",
-      "removeMessage": "Le domande in {name} vanno poi all'organizzazione predefinita di ciascuna persona (possono cambiarla con {command} org).",
+      "removeMessage": "Le domande in {name} vanno quindi all'organizzazione predefinita di ciascuna persona (possono cambiarla con {command} org).",
       "instanceAdminOnly": "Solo amministratore dell'istanza",
       "ownOrgOnlyHint": "Su un workspace dell'istanza, i canali vengono mappati alla tua organizzazione",
       "claimableHint": "Canali non assegnati e canali di proprietà di {org}",
