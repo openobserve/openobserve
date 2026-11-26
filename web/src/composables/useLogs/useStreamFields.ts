@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { inferResultFieldType } from "@/utils/logs/resultFieldType";
 import { CancelledError } from "@tanstack/vue-query";
 import { effectScope, getCurrentScope, nextTick, onScopeDispose, ref, type EffectScope } from "vue";
 import { byString } from "@/utils/json";
@@ -817,11 +818,13 @@ export const useStreamFields = () => {
                   !commonSchemaFields.includes(key) &&
                   key != "_stream_name"
                 ) {
+                  const resultType = inferResultFieldType(searchObj.data.queryResults.hits, key);
                   fieldObj = {
                     name: key,
-                    type: "Utf8",
+                    type: resultType,
+                    dataType: resultType,
                     ftsKey: false,
-                    group: resolveFieldGroup(key, "Utf8", semanticIndex, dynamicPrefixes),
+                    group: resolveFieldGroup(key, resultType, semanticIndex, dynamicPrefixes),
                     isSchemaField: false,
                     showValues: false,
                     // Never interesting: a persisted entry would be re-added on every extract.
