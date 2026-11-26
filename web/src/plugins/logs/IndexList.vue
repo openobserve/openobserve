@@ -2144,6 +2144,11 @@ export default defineComponent({
 .logs-index-menu :deep(.o-field-row__in-table) {
   margin-inline-end: 1rem;
 }
+/* The resting interesting-field "i" sits where the hover strip's last button lands (the strip ends 11px in), so it does not jump on hover. */
+.logs-index-menu
+  :deep([data-test^="log-search-index-list-interesting-"].absolute:not(.o-field-row__actions *)) {
+  inset-inline-end: 0.6875rem;
+}
 .logs-index-menu :deep(.o-field-row__actions [data-o2-btn]) {
   width: 1.5rem;
   height: 1.5rem;
