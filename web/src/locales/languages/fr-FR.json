@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "Aucun canal n'a encore d'organisation par défaut",
-      "description": "Les questions posées dans un canal sans organisation par défaut sont dirigées vers l'organisation par défaut de chaque personne (modifiable avec /o2 org)."
+      "description": "Les questions posées dans un canal sans organisation par défaut sont dirigées vers l'organisation par défaut de chaque personne (modifiable avec {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Personne dans cette organisation n'a encore lié Slack"
@@ -28789,7 +28789,7 @@
     "mineJoinTeam": "Rejoindre une équipe",
     "mineTestTeam": "Envoyer une notification de test à {team}",
     "mineCoverSaved": "Remplacement enregistré",
-    "mineSlackLinkHow": "Tapez /o2 link dans Slack",
+    "mineSlackLinkHow": "Tapez {command} link dans Slack",
     "mineSlackSetUpHint": "Ouvre Réglages › Slack",
     "myDeliveriesWhen": "Quand",
     "phoneAddHint": "Ajoutez un numéro pour les SMS et les appels",
@@ -29360,7 +29360,7 @@
     "channelUnavailable": "{channel} — aucun fournisseur associé",
     "channelUnverified": "{channel} — enregistré, mais personne ne l'a vérifié",
     "channelAddPhone": "{reason}. Ajoutez votre téléphone dans Mon astreinte",
-    "channelLinkSlack": "{reason}. Exécutez /o2 link dans Slack",
+    "channelLinkSlack": "{reason}. Exécutez {command} link dans Slack",
     "loadUneven": "{name} a géré {factor}× la charge médiane au cours des {days} derniers jours",
     "loadUnevenLabel": "La charge est inégale :",
     "membersUnreachableMore": "{name} est dans cette équipe, mais aucune notification ne peut lui parvenir — {why}. {count} autre membre est dans le même état. | {name} est dans cette équipe, mais aucune notification ne peut lui parvenir — {why}. {count} autres membres sont dans le même état.",
@@ -31146,7 +31146,7 @@
         "settings": "Réglages",
         "install": "À l'installation",
         "destination": "Depuis une destination d'alerte",
-        "oncall": "Depuis /o2 oncall ici"
+        "oncall": "Depuis {command} oncall ici"
       },
       "channel": "Canal",
       "channelPlaceholder": "Rechercher des canaux",
@@ -31160,7 +31160,7 @@
       "editDefault": "Modifier le canal par défaut",
       "removeConfirm": "Supprimer le canal par défaut",
       "removeTitle": "Supprimer la valeur par défaut pour #{channel} ?",
-      "removeMessage": "Les questions dans {name} vont alors vers l'organisation par défaut de chaque personne (elle peut la modifier avec /o2 org).",
+      "removeMessage": "Les questions dans {name} vont alors vers l'organisation par défaut de chaque personne (elle peut la modifier avec {command} org).",
       "instanceAdminOnly": "Administrateur d'instance uniquement",
       "ownOrgOnlyHint": "Sur un espace de travail d'instance, vous associez les canaux à votre propre organisation",
       "claimableHint": "Canaux non revendiqués et canaux détenus par {org}",

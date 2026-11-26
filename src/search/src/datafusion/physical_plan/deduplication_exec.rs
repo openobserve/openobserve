@@ -35,8 +35,8 @@ use datafusion::{
         LexRequirement, OrderingRequirements, Partitioning, PhysicalExpr, PhysicalSortRequirement,
     },
     physical_plan::{
-        ChildStats, DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
-        StatisticsArgs,
+        ChildStats, DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, LimitBehavior,
+        PlanProperties, StatisticsArgs,
         execution_plan::{Boundedness, EmissionType, apply_expression_roots},
         expressions::Column,
         metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet},
@@ -148,8 +148,8 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
-    fn supports_limit_pushdown(&self) -> bool {
-        true
+    fn limit_behavior(&self) -> LimitBehavior {
+        LimitBehavior::CopyToChildren
     }
 
     fn execute(
@@ -470,7 +470,7 @@ mod tests {
     #[test]
     fn test_deduplication_exec_supports_limit_pushdown() {
         let exec = make_exec();
-        assert!(exec.supports_limit_pushdown());
+        assert_eq!(exec.limit_behavior(), LimitBehavior::CopyToChildren);
     }
 
     #[test]

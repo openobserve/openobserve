@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "No channel has a default org yet",
-      "description": "Questions in a channel without a default go to each person's default org (they can change it with /o2 org)."
+      "description": "Questions in a channel without a default go to each person's default org (they can change it with {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "Nobody in this org has linked Slack yet"
@@ -28788,7 +28788,7 @@
     "mineJoinTeam": "Join a team",
     "mineTestTeam": "Send a test page to {team}",
     "mineCoverSaved": "Cover saved",
-    "mineSlackLinkHow": "Type /o2 link in Slack",
+    "mineSlackLinkHow": "Type {command} link in Slack",
     "mineSlackSetUpHint": "Opens Settings › Slack",
     "myDeliveriesWhen": "When",
     "phoneAddHint": "Add a number for texts and calls",
@@ -29359,7 +29359,7 @@
     "channelUnavailable": "{channel} — no provider behind it",
     "channelUnverified": "{channel} — on file, but nobody has verified it",
     "channelAddPhone": "{reason}. Add your phone on My on-call",
-    "channelLinkSlack": "{reason}. Run /o2 link in Slack",
+    "channelLinkSlack": "{reason}. Run {command} link in Slack",
     "loadUneven": "{name} carried {factor}× the median over the last {days} days",
     "loadUnevenLabel": "Load is uneven:",
     "membersUnreachableMore": "{name} is on this team, but no page to them can land — {why}. {count} other member is in the same state. | {name} is on this team, but no page to them can land — {why}. {count} other members are in the same state.",
@@ -31145,7 +31145,7 @@
         "settings": "Settings",
         "install": "At install",
         "destination": "From an alert destination",
-        "oncall": "From /o2 oncall here"
+        "oncall": "From {command} oncall here"
       },
       "channel": "Channel",
       "channelPlaceholder": "Search channels",
@@ -31159,7 +31159,7 @@
       "editDefault": "Edit channel default",
       "removeConfirm": "Remove default",
       "removeTitle": "Remove the default for #{channel}?",
-      "removeMessage": "Questions in {name} then go to each person's default org (they can change it with /o2 org).",
+      "removeMessage": "Questions in {name} then go to each person's default org (they can change it with {command} org).",
       "instanceAdminOnly": "Instance admin only",
       "ownOrgOnlyHint": "On an instance workspace you map channels to your own org",
       "claimableHint": "Unclaimed channels and channels {org} owns",
