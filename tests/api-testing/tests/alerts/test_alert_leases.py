@@ -62,13 +62,13 @@ def _alert(alerts, alert_id: str) -> dict:
     return alert
 
 
-def _settles(alerts, alert_id: str, field: str, value: bool, msg: str = "") -> None:
+def _settles(alerts, alert_id: str, field: str, value, msg: str = "") -> None:
     # GET reads the alert cache, which a watcher refreshes just after each write
-    wait_until(
-        lambda: _alert(alerts, alert_id)[field] is value,
-        timeout=5,
-        msg=msg or f"alert {alert_id} {field} to become {value}",
-    )
+    def settled() -> bool:
+        got = _alert(alerts, alert_id)[field]
+        return type(got) is type(value) and got == value
+
+    wait_until(settled, timeout=5, msg=msg or f"alert {alert_id} {field} to become {value!r}")
 
 
 def _item(alerts, name: str) -> dict:
@@ -330,14 +330,14 @@ def test_an_edit_after_a_timed_toggle_wins_over_its_end(alerts):
     """A14: PUT"""
     _, alert_id = _plain(alerts, "lease_a14_put")
     lease = _timed_lease(alerts, alert_id, True)
+    _settles(alerts, alert_id, "creates_incident", True)
     edited = _alert(alerts, alert_id)
     edited["description"] = "edited during the lease"
     assert alerts.update_alert(alert_id, edited).status_code == 200
 
     _superseded_by_edit(alerts, _end(alerts, alert_id, lease["id"]))
-    after = _alert(alerts, alert_id)
-    assert after["creates_incident"] is True, "the end must not undo a value a person saved"
-    assert after["description"] == "edited during the lease"
+    _settles(alerts, alert_id, "description", "edited during the lease")
+    _settles(alerts, alert_id, "creates_incident", True, "the end must not undo a value a person saved")
 
 
 def test_a_disable_after_a_timed_toggle_wins_over_its_end(alerts):
@@ -347,9 +347,8 @@ def test_a_disable_after_a_timed_toggle_wins_over_its_end(alerts):
     assert alerts.enable_alert(alert_id, False).status_code == 200
 
     _superseded_by_edit(alerts, _end(alerts, alert_id, lease["id"]))
-    after = _alert(alerts, alert_id)
-    assert after["enabled"] is False
-    assert after["creates_incident"] is True
+    _settles(alerts, alert_id, "enabled", False)
+    _settles(alerts, alert_id, "creates_incident", True)
 
 
 def test_an_edited_temporary_alert_stays_enabled_after_its_end(alerts):
@@ -360,9 +359,8 @@ def test_an_edited_temporary_alert_stays_enabled_after_its_end(alerts):
     assert alerts.update_alert(alert_id, edited).status_code == 200
 
     _superseded_by_edit(alerts, _end(alerts, alert_id, lease["id"]))
-    after = _alert(alerts, alert_id)
-    assert after["enabled"] is True
-    assert after["description"] == "kept on by a person"
+    _settles(alerts, alert_id, "description", "kept on by a person")
+    _settles(alerts, alert_id, "enabled", True)
 
 
 def test_ending_the_lease_of_a_deleted_temporary_alert_supersedes_it(alerts):
