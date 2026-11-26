@@ -85,6 +85,12 @@ describe("HomeChatHistory", () => {
     service.listForChat.mockResolvedValue({ data: { shares: [{ id: "a" }, { id: "b" }] } });
   });
 
+  it("renders the memory button in the header", async () => {
+    const { wrapper } = mountList();
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-memory-panel-btn"]').exists()).toBe(true);
+  });
+
   it("opens a chat from the keyboard", async () => {
     const { wrapper } = mountList();
     await flushPromises();

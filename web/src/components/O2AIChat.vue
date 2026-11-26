@@ -47,27 +47,6 @@
           <div class="chat-header-actions flex shrink-0 items-center gap-1">
             <AiMemoryPanel />
             <OButton
-              v-if="currentChatId"
-              variant="ghost"
-              size="icon-sm"
-              :aria-label="t('aiAssistant.editTitleTooltip')"
-              @click.stop="openEditTitleDialog"
-            >
-              <OIcon name="edit" size="sm" />
-              <OTooltip :content="t('aiAssistant.editTitleTooltip')" />
-            </OButton>
-            <OButton
-              v-if="canShareCurrentChat"
-              variant="ghost"
-              size="icon-sm"
-              data-test="o2-ai-chat-share-btn"
-              :aria-label="t('aiChatShare.share')"
-              @click.stop="shareCurrentChat"
-            >
-              <OIcon name="share" size="sm" />
-              <OTooltip :content="t('aiChatShare.share')" />
-            </OButton>
-            <OButton
               variant="ghost"
               size="icon-sm"
               :aria-label="t('common.newChat')"
@@ -98,6 +77,33 @@
                 "
               />
             </OButton>
+            <ODropdown v-if="currentChatId || canShareCurrentChat" align="end">
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="more-vert"
+                  data-test="o2-ai-chat-more-btn"
+                  :aria-label="t('common.moreActions')"
+                />
+              </template>
+              <ODropdownItem
+                v-if="currentChatId"
+                icon-left="edit"
+                data-test="o2-ai-chat-rename-btn"
+                @select="openEditTitleDialog"
+              >
+                {{ t("aiAssistant.editTitleTooltip") }}
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="canShareCurrentChat"
+                icon-left="share"
+                data-test="o2-ai-chat-share-btn"
+                @select="shareCurrentChat"
+              >
+                {{ t("aiChatShare.share") }}
+              </ODropdownItem>
+            </ODropdown>
             <OButton
               variant="ghost"
               size="icon-sm"
@@ -483,6 +489,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import AiMemoryPanel from "@/components/ai_memory/AiMemoryPanel.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -541,6 +548,7 @@ export default defineComponent({
     O2AIChatMessage,
     O2AIChatToolCallIndicator,
     ODropdown,
+    ODropdownItem,
     ODrawer,
     ODialog,
     OSpinner,

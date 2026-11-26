@@ -623,6 +623,37 @@ describe("O2AIChat", () => {
     });
   });
 
+  // ── Header overflow menu ─────────────────────────────────────────────────
+  describe("header overflow menu", () => {
+    beforeEach(() => {
+      wrapper = mountO2AIChat({ isOpen: true });
+    });
+
+    it("hides the more menu when there is no chat to rename or share", async () => {
+      (wrapper.vm as any).currentChatId = null;
+      await nextTick();
+      expect(wrapper.find('[data-test="o2-ai-chat-more-btn"]').exists()).toBe(false);
+    });
+
+    it("shows the more menu before the close button once a chat is open", async () => {
+      (wrapper.vm as any).currentChatId = 5;
+      await nextTick();
+      const buttons = wrapper.findAll(".chat-header-actions button");
+      const more = buttons.findIndex((b) => b.attributes("data-test") === "o2-ai-chat-more-btn");
+      expect(more).toBeGreaterThan(-1);
+      expect(more).toBe(buttons.length - 2);
+    });
+
+    it("opens the rename dialog from the menu item", async () => {
+      (wrapper.vm as any).currentChatId = 5;
+      await nextTick();
+      await wrapper.find('[data-test="o2-ai-chat-more-btn"]').trigger("click");
+      await nextTick();
+      const item = document.body.querySelector('[data-test="o2-ai-chat-rename-btn"]');
+      expect(item).not.toBeNull();
+    });
+  });
+
   // ── Migration: ODialog (Edit Title) ──────────────────────────────────────
   describe("edit title dialog (ODialog)", () => {
     beforeEach(() => {

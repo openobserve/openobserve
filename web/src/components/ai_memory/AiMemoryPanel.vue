@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #trigger>
       <OButton
-        variant="ghost"
-        size="icon-sm"
+        :variant="triggerVariant"
+        :size="triggerSize"
         data-test="ai-memory-panel-btn"
         :aria-label="t('aiMemory.header')"
       >
@@ -55,6 +55,14 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { useI18nTyped } from "@/types/i18n";
 import AiMemoryEditor from "./AiMemoryEditor.vue";
+
+withDefaults(
+  defineProps<{
+    triggerVariant?: "ghost" | "ghost-muted";
+    triggerSize?: "icon" | "icon-sm";
+  }>(),
+  { triggerVariant: "ghost", triggerSize: "icon-sm" },
+);
 
 const { t } = useI18nTyped();
 const store = useStore();

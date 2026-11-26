@@ -8,6 +8,7 @@ import { chatListRevision } from "@/utils/chatListRevision";
 import useAiChat from "@/composables/useAiChat";
 import type { ChatHistoryEntry } from "@/ts/interfaces/chat";
 import OButton from "@/lib/core/Button/OButton.vue";
+import AiMemoryPanel from "@/components/ai_memory/AiMemoryPanel.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -165,6 +166,7 @@ function formatTime(ts: string): string {
         t("chatHistory.title")
       }}</span>
       <span class="flex items-center gap-0.5">
+        <AiMemoryPanel trigger-variant="ghost-muted" trigger-size="icon" />
         <OButton
           v-if="persistenceEnabled"
           variant="ghost-muted"
