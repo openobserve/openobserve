@@ -34,7 +34,6 @@ import {
   useLocalLogFilterField,
   timestampToTimezoneDate,
   useLocalInterestingFields,
-  convertToCamelCase,
   deepCopy,
 } from "@/utils/zincutils";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
@@ -329,7 +328,7 @@ export const useStreamFields = () => {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
             if (searchObj.data.stream.selectedStream.length > 1) {
               schemaMaps.push({
-                name: convertToCamelCase(stream.name),
+                name: stream.name,
                 label: true,
                 ftsKey: false,
                 isSchemaField: false,
@@ -535,7 +534,9 @@ export const useStreamFields = () => {
                 name: field,
                 ftsKey: ftsKeySet.has(field),
                 isSchemaField: true,
-                group: semanticGroup,
+                // Under a stream header the field belongs to that stream, which is what the header counts.
+                group:
+                  searchObj.data.stream.selectedStream.length > 1 ? stream.name : semanticGroup,
                 streams: [stream.name],
                 showValues: field !== timestampField && field !== allField,
                 isInterestingField: interestingFieldSet.has(field),

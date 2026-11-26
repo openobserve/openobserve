@@ -323,6 +323,44 @@ describe("useStreamFields Composable", () => {
     });
   });
 
+  describe("extractFields for several streams", () => {
+    const { searchObj } = searchState();
+
+    const run = async () => {
+      searchObj.data.stream.selectedStream = ["qa_logs_a", "qa_logs_b"];
+      searchObj.data.streamResults = {
+        list: ["qa_logs_a", "qa_logs_b"].map((name) => ({
+          name,
+          settings: {},
+          schema: [
+            { name: "_timestamp", type: "Int64" },
+            { name: "level", type: "Utf8" },
+            { name: `only_${name.slice(-1)}`, type: "Utf8" },
+          ],
+        })),
+      } as any;
+      searchObj.data.queryResults = { hits: [] } as any;
+      await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+      return searchObj.data.stream.selectedStreamFields as any[];
+    };
+
+    it("names each stream header exactly as the stream is spelled", async () => {
+      const labels = (await run()).filter((row) => row.label).map((row) => row.name);
+      expect(labels).toContain("qa_logs_a");
+      expect(labels).toContain("qa_logs_b");
+      expect(labels).not.toContain("Qa_logs_b");
+    });
+
+    it("counts the fields listed under each stream header", async () => {
+      await run();
+      const fields = searchObj.data.stream.selectedStreamFields as any[];
+      const count = (name: string) => fields.filter((f) => !f.label && f.group === name).length;
+      expect(count("qa_logs_a")).toBe(1);
+      expect(count("qa_logs_b")).toBe(1);
+      expect(searchObj.data.stream.expandGroupRowsFieldCount.qa_logs_a).toBe(1);
+    });
+  });
+
   describe("updateGridColumns stream name column", () => {
     const { searchObj } = searchState();
 
