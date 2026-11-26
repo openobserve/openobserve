@@ -26,7 +26,7 @@ use utoipa::ToSchema;
 use crate::meta::stream::StreamType;
 
 /// Information about a stream where a service was discovered
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Eq)]
 pub struct StreamInfo {
     /// Stream name
     pub stream_name: String,
@@ -58,6 +58,23 @@ pub struct StreamInfo {
     /// Consumers should warn: queries on this stream are wider than the chips imply.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dropped_dimensions: Vec<String>,
+
+    /// Whether the stream holds a row matching its filters in the requested window.
+    /// Set only when the caller asked for it and the check finished; absent means unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub has_data: Option<bool>,
+}
+
+impl PartialEq for StreamInfo {
+    // `has_data` is a per-request annotation, so two copies of one stream stay equal across it.
+    fn eq(&self, other: &Self) -> bool {
+        self.stream_name == other.stream_name
+            && self.stream_type == other.stream_type
+            && self.filters == other.filters
+            && self.filter_spellings == other.filter_spellings
+            && self.filter_aliases == other.filter_aliases
+            && self.dropped_dimensions == other.dropped_dimensions
+    }
 }
 
 impl std::hash::Hash for StreamInfo {
@@ -84,6 +101,7 @@ impl StreamInfo {
             dropped_dimensions: Vec::new(),
             filter_spellings: HashMap::new(),
             filter_aliases: HashMap::new(),
+            has_data: None,
         }
     }
 
@@ -96,6 +114,7 @@ impl StreamInfo {
             dropped_dimensions: Vec::new(),
             filter_spellings: HashMap::new(),
             filter_aliases: HashMap::new(),
+            has_data: None,
         }
     }
 
@@ -108,6 +127,7 @@ impl StreamInfo {
             dropped_dimensions: Vec::new(),
             filter_spellings: HashMap::new(),
             filter_aliases: HashMap::new(),
+            has_data: None,
         }
     }
 
@@ -124,6 +144,7 @@ impl StreamInfo {
             dropped_dimensions: Vec::new(),
             filter_spellings: HashMap::new(),
             filter_aliases: HashMap::new(),
+            has_data: None,
         }
     }
 }
@@ -528,6 +549,41 @@ mod tests {
         s.dropped_dimensions = vec!["k8s-cluster".to_string()];
         let round: StreamInfo = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
         assert_eq!(round.dropped_dimensions, vec!["k8s-cluster".to_string()]);
+    }
+
+    #[test]
+    fn test_stream_info_has_data_absent_round_trips() {
+        let old: StreamInfo =
+            serde_json::from_str(r#"{"stream_name":"s1","stream_type":"logs"}"#).unwrap();
+        assert_eq!(old.has_data, None);
+        let ser = serde_json::to_string(&old).unwrap();
+        assert!(
+            !ser.contains("has_data"),
+            "an unknown answer stays off the wire"
+        );
+        let round: StreamInfo = serde_json::from_str(&ser).unwrap();
+        assert_eq!(round.has_data, None);
+
+        let mut s = StreamInfo::new("s2".to_string());
+        s.has_data = Some(false);
+        let ser = serde_json::to_string(&s).unwrap();
+        assert!(ser.contains(r#""has_data":false"#));
+        let round: StreamInfo = serde_json::from_str(&ser).unwrap();
+        assert_eq!(round.has_data, Some(false));
+    }
+
+    #[test]
+    fn test_stream_info_has_data_ignored_by_eq_and_hash() {
+        use std::{collections::HashSet, hash::BuildHasher};
+
+        let a = StreamInfo::with_type("s".to_string(), StreamType::Logs);
+        let mut b = a.clone();
+        b.has_data = Some(true);
+        assert_eq!(a, b);
+        let hasher = std::collections::hash_map::RandomState::new();
+        assert_eq!(hasher.hash_one(&a), hasher.hash_one(&b));
+        let set: HashSet<StreamInfo> = [a, b].into_iter().collect();
+        assert_eq!(set.len(), 1);
     }
 
     #[test]
