@@ -228,7 +228,10 @@ pub async fn get_by_name(org: &str, name: &str) -> Result<Option<OrgToolset>, er
 }
 
 /// `(id, name)` of the org's toolsets of `kind`, oldest first; their data is never read.
-pub async fn list_names(org: &str, kind: &str) -> Result<Vec<(String, String)>, errors::Error> {
+pub async fn list_kind_names(
+    org: &str,
+    kind: &str,
+) -> Result<Vec<(String, String)>, errors::Error> {
     Ok(Entity::find()
         .select_only()
         .column(Column::Id)

@@ -343,7 +343,13 @@ describe("groupNavLinks", () => {
     const response = reliability?.children
       .filter((c) => c.categoryKey === "menu.response")
       .map((c) => c.name);
-    expect(response).toEqual(["sloList", "autobotInvestigate", "incidentList", "autoresolve", "alertCalibration"]);
+    expect(response).toEqual([
+      "sloList",
+      "autobotInvestigate",
+      "incidentList",
+      "autoresolve",
+      "alertCalibration",
+    ]);
     expect(reliability?.children.filter((c) => !c.categoryKey)).toEqual([]);
   });
 

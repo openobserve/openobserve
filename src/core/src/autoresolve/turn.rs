@@ -1170,6 +1170,11 @@ mod tests {
             created_by: "rita@example.com".into(),
             created_at: 0,
             updated_at: 0,
+            enabled: true,
+            status_state: None,
+            status_since: None,
+            last_error: None,
+            last_used_at: None,
         };
         let org = [mcp("c1", "code-host"), mcp("c2", "k8s")];
         let names: Vec<String> = org.iter().map(|t| t.name.clone()).collect();

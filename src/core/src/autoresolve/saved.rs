@@ -640,7 +640,7 @@ async fn one_view(org: &str, row: AutoResolveRow) -> Result<SavedView, SavedErro
 }
 
 async fn views(org: &str, rows: Vec<AutoResolveRow>) -> Result<Vec<SavedView>, SavedError> {
-    let names: HashMap<String, String> = org_ai_toolsets::list_names(org, MCP_KIND)
+    let names: HashMap<String, String> = org_ai_toolsets::list_kind_names(org, MCP_KIND)
         .await?
         .into_iter()
         .collect();

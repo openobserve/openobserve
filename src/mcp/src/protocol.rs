@@ -352,6 +352,7 @@ fn refuse_change(
         return Err(RpcError {
             code: MCPErrorCode::InvalidRequest,
             message: READ_ONLY_REFUSAL.to_string(),
+            data: None,
         });
     }
     Ok(())

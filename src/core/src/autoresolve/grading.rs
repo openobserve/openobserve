@@ -280,6 +280,7 @@ mod tests {
             started_at_us: 1,
             duration_ms: 1,
             error_type: None,
+            change_rows: None,
             signal,
             target: EvidenceTarget {
                 signal,

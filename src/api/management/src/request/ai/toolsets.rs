@@ -1259,6 +1259,11 @@ mod tests {
             created_by: String::new(),
             created_at: 0,
             updated_at: 0,
+            enabled: true,
+            status_state: None,
+            status_since: None,
+            last_error: None,
+            last_used_at: None,
         };
         let granted = |objects: &[&str]| objects.iter().map(|o| o.to_string()).collect::<Vec<_>>();
         let one = granted(&["ai_toolsets:t2"]);

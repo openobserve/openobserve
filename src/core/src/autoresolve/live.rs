@@ -1196,7 +1196,7 @@ pub(crate) fn connection_ref(
 
 /// The org's MCP connections a run can use: a key two toolsets share reaches neither.
 async fn usable_connections(org: &str) -> Result<Vec<(String, String)>, AutoResolveError> {
-    let all = org_ai_toolsets::list_names(org, MCP_KIND).await?;
+    let all = org_ai_toolsets::list_kind_names(org, MCP_KIND).await?;
     let mut per_key: HashMap<String, usize> = HashMap::new();
     for (_, name) in &all {
         *per_key.entry(normalize_tool_name(name)).or_default() += 1;
@@ -1209,7 +1209,7 @@ async fn usable_connections(org: &str) -> Result<Vec<(String, String)>, AutoReso
 
 /// The org's MCP connection names by id.
 async fn connection_names(org: &str) -> Result<HashMap<String, String>, AutoResolveError> {
-    Ok(org_ai_toolsets::list_names(org, MCP_KIND)
+    Ok(org_ai_toolsets::list_kind_names(org, MCP_KIND)
         .await?
         .into_iter()
         .collect())

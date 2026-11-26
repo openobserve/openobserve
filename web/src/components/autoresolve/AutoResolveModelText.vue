@@ -20,15 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { processHtmlBlock, renderMarkdown } from "@/components/O2AIChat.content";
+import DOMPurify from "dompurify";
+import { renderMarkdown } from "@/plugins/traces/markdown";
 
 const props = defineProps<{
   /** Markdown the agent wrote. */
   text: string;
 }>();
 
-// Every viewer of the run sees the agent's text, so it takes the chat's read-only sanitizer.
-const html = computed(() => processHtmlBlock(renderMarkdown(props.text) as string, true));
+// Every viewer of the run sees the agent's text: it is sanitized, and an image (which would load
+// from any host the agent named) is dropped.
+const html = computed(() =>
+  DOMPurify.sanitize(renderMarkdown(props.text), { FORBID_TAGS: ["img"] }),
+);
 </script>
 
 <style scoped>
@@ -75,7 +79,7 @@ const html = computed(() => processHtmlBlock(renderMarkdown(props.text) as strin
   padding: 0.1rem 0.3rem;
   border-radius: 0.1875rem;
 }
-.autoresolve-model-text :deep(.generated-code-block) {
+.autoresolve-model-text :deep(pre) {
   display: block;
   white-space: pre-wrap;
   margin: 0 0 0.5rem;
@@ -83,7 +87,7 @@ const html = computed(() => processHtmlBlock(renderMarkdown(props.text) as strin
   border-radius: 0.25rem;
   background: color-mix(in srgb, var(--color-text-body) 5%, transparent);
 }
-.autoresolve-model-text :deep(.generated-code-block code) {
+.autoresolve-model-text :deep(pre code) {
   background: transparent;
   padding: 0;
 }

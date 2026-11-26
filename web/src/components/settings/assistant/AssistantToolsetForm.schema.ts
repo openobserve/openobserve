@@ -61,7 +61,7 @@ export const makeToolsetFormSchema = (t: Translate, options: ToolsetSchemaOption
         timeout_seconds: z.coerce.number().int(whole).positive(whole),
         headers: z.array(secretRow),
         /** AutoResolve's write credential; the server never returns its values. */
-        writeHeaders: z.array(secretRow),
+        writeHeaders: z.array(secretRow).default([]),
       }),
       skill: z.object({ content: z.string() }),
     })

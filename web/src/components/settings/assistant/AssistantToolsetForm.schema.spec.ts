@@ -143,4 +143,46 @@ describe("toolset form schema and payload", () => {
     removed.mcp.headers.pop();
     expect(reenterReason(removed, loaded, true)).toBeNull();
   });
+
+  it("loads AutoResolve's write headers by name only and keeps each unless it is replaced", () => {
+    const record = {
+      ...STORED,
+      data: { ...STORED.data, write_header_names: ["X-Write", "X-Org"] },
+    };
+    // Even a server that cannot keep the plain headers keeps a write header sent as the mask.
+    const values = toolsetFormOf(record, false);
+    expect(values.mcp.writeHeaders).toEqual([
+      { key: "X-Write", value: null, state: "unchanged", stored: "X-Write" },
+      { key: "X-Org", value: null, state: "unchanged", stored: "X-Org" },
+    ]);
+    values.mcp.headers = [];
+    values.mcp.writeHeaders[1] = {
+      key: "X-Org",
+      value: "o-2",
+      state: "replacing",
+      stored: "X-Org",
+    };
+    values.mcp.writeHeaders.push({ key: "X-New", value: "n-1", state: "new" });
+    expect(toolsetDataOf(values, false, true).write_headers).toEqual({
+      "X-Write": SECRET_MASK,
+      "X-Org": "o-2",
+      "X-New": "n-1",
+    });
+    // Without AutoResolve the body leaves them out, so the server keeps the stored ones.
+    expect(toolsetDataOf(values, false, false)).not.toHaveProperty("write_headers");
+  });
+
+  it("asks for a new write header's value and refuses a typed mask", () => {
+    const values = toolsetFormDefaults();
+    values.name = "pager";
+    values.mcp.url = "https://pd.example/mcp";
+    values.mcp.writeHeaders = [
+      { key: "X-Write", value: "", state: "new" },
+      { key: "X-Org", value: SECRET_MASK, state: "new" },
+    ];
+    expect(issuesOf(values)).toEqual([
+      "mcp.writeHeaders.0.value=assistant.toolsets.form.enterAgain",
+      "mcp.writeHeaders.1.value=assistant.toolsets.form.maskValue",
+    ]);
+  });
 });
