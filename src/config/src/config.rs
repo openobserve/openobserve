@@ -168,7 +168,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 165: add agent to ai_chat_turns.
 // 166: add branched_from to ai_chat_sessions.
 // 167: add approval_scope to ai_actions.
-pub const DB_SCHEMA_VERSION: u64 = 167;
+// 168: add oncall_policies.saved_by_person, set once a person saves the ladder.
+pub const DB_SCHEMA_VERSION: u64 = 168;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
