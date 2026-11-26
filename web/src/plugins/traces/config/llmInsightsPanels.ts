@@ -104,7 +104,7 @@ export const ERROR_MESSAGE_SQL = "COALESCE(status_message, '')";
 // fields. DataFusion validates column references at parse time, so referencing
 // a legacy column that doesn't exist on a given stream's schema would fail
 // the entire query — staying on the standard fields keeps panels portable.
-const baseFilter = `gen_ai_operation_name IS NOT NULL`;
+export const LLM_SPAN_FILTER = `gen_ai_operation_name IS NOT NULL`;
 
 // Centralised column names so a future rename only touches this file.
 const COST_FIELD = `gen_ai_usage_cost`;
@@ -114,14 +114,14 @@ const TOTAL_TOKENS_FIELD = `gen_ai_usage_total_tokens`;
 const MODEL_FIELD = `gen_ai_response_model`;
 const OBSERVATION_TYPE_FIELD = `gen_ai_operation_name`;
 
-// Scope for every panel that groups by model. `baseFilter` alone admits ALL
+// Scope for every panel that groups by model. `LLM_SPAN_FILTER` alone admits ALL
 // gen_ai spans — including `execute_tool` children and evaluator spans, which
 // legitimately carry no model (the OTEL gen_ai conventions only put a model on
 // generation/embedding operations). Bucketing those under a synthetic
 // "unknown" model made them dominate the per-model panels: an agent emits one
 // generation span per turn but a tool span per tool call, so "unknown" read as
 // ~9x the real model and its token bar was always a flat zero.
-const modelScopedFilter = `${baseFilter} AND ${MODEL_FIELD} IS NOT NULL`;
+const modelScopedFilter = `${LLM_SPAN_FILTER} AND ${MODEL_FIELD} IS NOT NULL`;
 
 // Operations that are LLM calls (mirrors GENERATION_GEN_AI_OPERATIONS in
 // src/config/src/meta/traces.rs). Agent/workflow spans repeat their children's
@@ -192,7 +192,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     drill: {},
     alert: "failure_rate",
     query: {
-      // No baseFilter: failures land on deep child spans without gen_ai_operation_name.
+      // No LLM_SPAN_FILTER: failures land on deep child spans without gen_ai_operation_name.
       sql: `
         SELECT
           histogram(_timestamp, '{{interval}}') as ts,
@@ -257,7 +257,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     layout: { colSpan: 1 },
     drill: { seriesSql: ERROR_MESSAGE_SQL, errored: true },
     query: {
-      // No baseFilter, for the same reason as traces-over-time.
+      // No LLM_SPAN_FILTER, for the same reason as traces-over-time.
       sql: `
         SELECT
           ${ERROR_MESSAGE_SQL} as message,
@@ -350,7 +350,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
             COALESCE(${llmCallUsageSum(INPUT_TOKENS_FIELD)}, 0) as input_tokens,
             COALESCE(${llmCallUsageSum(OUTPUT_TOKENS_FIELD)}, 0) as output_tokens
           FROM {{stream}}
-          WHERE ${baseFilter}{{scope}}
+          WHERE ${LLM_SPAN_FILTER}{{scope}}
           GROUP BY ts
           UNION ALL
           SELECT histogram(first_ts, '{{interval}}') as ts, input_tokens, output_tokens
