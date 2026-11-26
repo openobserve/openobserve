@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "ยังไม่มีช่องใดที่ตั้งองค์กรเริ่มต้นไว้",
-      "description": "คำถามในช่องที่ไม่มีค่าเริ่มต้นจะถูกส่งไปยังองค์กรเริ่มต้นของแต่ละคน (เปลี่ยนได้ด้วย /o2 org)."
+      "description": "คำถามในช่องที่ไม่มีค่าเริ่มต้นจะถูกส่งไปยังองค์กรเริ่มต้นของแต่ละคน (เปลี่ยนได้ด้วย {command} org)."
     },
     "noSlackLinkedPeople": {
       "title": "ยังไม่มีใครในองค์กรนี้เชื่อมโยง Slack"
@@ -28140,7 +28140,7 @@
     "teamChannelSilent": "This team's channel is empty on purpose — pages will not be announced anywhere.",
     "slackChannelTitle": "ช่อง Slack",
     "slackChannelSetWith": "ตั้งค่าช่อง Slack ด้วย {command}",
-    "slackChannelLinkHint": "พิมพ์ในช่อง Slack นั้น ต้องเชื่อมโยงบัญชี Slack ของคุณ: พิมพ์ /o2 link ใน Slack",
+    "slackChannelLinkHint": "พิมพ์ในแชนเนล Slack นั้น จำเป็นต้องเชื่อมโยงบัญชี Slack ของคุณ: พิมพ์ {command} link ใน Slack",
     "slackChannelSendTest": "ส่งข้อความทดสอบ",
     "slackChannelClear": "ล้าง",
     "slackChannelBackup": "ใช้ {webhook} เป็นตัวสำรองเท่านั้น",
@@ -28715,7 +28715,7 @@
     "mineJoinTeam": "เข้าร่วมทีม",
     "mineTestTeam": "ส่งการแจ้งเตือนทดสอบไปยัง {team}",
     "mineCoverSaved": "บันทึกการครอบเวรแล้ว",
-    "mineSlackLinkHow": "พิมพ์ /o2 link ใน Slack",
+    "mineSlackLinkHow": "พิมพ์ {command} link ใน Slack",
     "mineSlackSetUpHint": "เปิดการตั้งค่า › Slack",
     "myDeliveriesWhen": "เวลา",
     "phoneAddHint": "เพิ่มหมายเลขสำหรับข้อความและการโทร",
@@ -29286,7 +29286,7 @@
     "channelUnavailable": "{channel} — no provider behind it",
     "channelUnverified": "{channel} — on file, but nobody has verified it",
     "channelAddPhone": "{reason}. Add your phone on My on-call",
-    "channelLinkSlack": "{reason} เรียกใช้ /o2 link ใน Slack",
+    "channelLinkSlack": "{reason} เรียกใช้ {command} link ใน Slack",
     "loadUneven": "{name} carried {factor}× the median over the last {days} days",
     "loadUnevenLabel": "Load is uneven:",
     "membersUnreachableMore": "{name} is on this team, but no page to them can land — {why}. {count} other member is in the same state. | {name} is on this team, but no page to them can land — {why}. {count} other members are in the same state.",
@@ -30896,6 +30896,13 @@
         "http": "HTTP",
         "httpDescription": "Slack calls your public URL. Needs one Verify click in Slack",
         "channelHistory": "Let the bot read replies in threads it started",
+        "appName": "ชื่อแอป",
+        "appNameHelp": "ชื่อที่ผู้คนเห็นใน Slack ตั้งชื่อให้แต่ละเซิร์ฟเวอร์ OpenObserve แยกกัน เช่น OpenObserve Staging",
+        "appNameTooLong": "ชื่อแอปต้องมีความยาวไม่เกิน {max} อักขระ",
+        "appNameMarkup": "ชื่อแอปต้องไม่มี <, > หรือ &",
+        "command": "คำสั่งสแลช",
+        "commandInvalid": "เริ่มต้นด้วย / และใช้ไม่เกิน {max} อักขระ: ตัวอักษรพิมพ์เล็ก ตัวเลข - และ _",
+        "commandWarning": "Slack เรียกใช้คำสั่งสแลชได้เพียงแอปเดียวต่อเวิร์กสเปซ หากแอปอื่นในเวิร์กสเปซนี้ใช้ {command} อยู่แล้ว {command} จะหยุดทำงานสำหรับแอปนั้นหลังจากคุณติดตั้งแอปนี้",
         "tokenLabel": "App configuration refresh token (xoxe-…)",
         "tokenHelp": "On Slack's Your Apps page, Your App Configuration Tokens › Generate Token shows an access token and a refresh token: paste the refresh token. OpenObserve rotates it and keeps the newest one encrypted to update the app later.",
         "generateToken": "Generate a token",
@@ -31065,7 +31072,7 @@
         "settings": "การตั้งค่า",
         "install": "At install",
         "destination": "From an alert destination",
-        "oncall": "จาก /o2 oncall ที่นี่"
+        "oncall": "จาก {command} oncall ที่นี่"
       },
       "channel": "Channel",
       "channelPlaceholder": "Search channels",
@@ -31079,7 +31086,7 @@
       "editDefault": "แก้ไขค่าเริ่มต้นของช่อง",
       "removeConfirm": "ลบค่าเริ่มต้น",
       "removeTitle": "Remove the default for #{channel}?",
-      "removeMessage": "Questions in {name} then go to each person's default org (they can change it with /o2 org).",
+      "removeMessage": "Questions in {name} then go to each person's default org (they can change it with {command} org).",
       "instanceAdminOnly": "Instance admin only",
       "ownOrgOnlyHint": "On an instance workspace you map channels to your own org",
       "claimableHint": "Unclaimed channels and channels {org} owns",

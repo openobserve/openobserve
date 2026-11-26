@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "아직 기본 조직이 설정된 채널이 없습니다",
-      "description": "기본 조직이 없는 채널의 질문은 각 사용자의 기본 조직으로 전달됩니다(/o2 org로 변경할 수 있습니다)."
+      "description": "기본 조직이 없는 채널의 질문은 각 사용자의 기본 조직으로 전달됩니다({command} org로 변경할 수 있습니다)."
     },
     "noSlackLinkedPeople": {
       "title": "이 조직에서 아직 Slack을 연결한 사람이 없습니다"
@@ -28142,7 +28142,7 @@
     "teamChannelSilent": "이 팀의 채널은 의도적으로 비어 있습니다. 호출이 어디에도 공지되지 않습니다.",
     "slackChannelTitle": "Slack 채널",
     "slackChannelSetWith": "{command}(으)로 Slack 채널 설정",
-    "slackChannelLinkHint": "해당 Slack 채널에서 입력하세요. Slack 계정이 연결되어 있어야 합니다. Slack에서 /o2 link를 입력하세요.",
+    "slackChannelLinkHint": "해당 Slack 채널에 입력하세요. Slack 계정이 연결되어 있어야 합니다. Slack에서 {command} link를 입력하세요.",
     "slackChannelSendTest": "테스트 메시지 보내기",
     "slackChannelClear": "지우기",
     "slackChannelBackup": "{webhook}은(는) 백업으로만 사용",
@@ -28717,7 +28717,7 @@
     "mineJoinTeam": "팀에 참여",
     "mineTestTeam": "{team}에 테스트 호출 보내기",
     "mineCoverSaved": "대체 근무 저장됨",
-    "mineSlackLinkHow": "Slack에서 /o2 link 입력",
+    "mineSlackLinkHow": "Slack에서 {command} link 입력",
     "mineSlackSetUpHint": "설정 › Slack 열기",
     "myDeliveriesWhen": "시각",
     "phoneAddHint": "문자와 전화에 사용할 번호 추가",
@@ -29288,7 +29288,7 @@
     "channelUnavailable": "{channel} — 연결된 제공업체 없음",
     "channelUnverified": "{channel} — 등록됨, 아무도 확인하지 않음",
     "channelAddPhone": "{reason}. 내 온콜에서 전화번호를 추가하세요",
-    "channelLinkSlack": "{reason}. Slack에서 /o2 link를 실행하세요",
+    "channelLinkSlack": "{reason}. Slack에서 {command} link를 실행하세요",
     "loadUneven": "{name}님이 중앙값의 {factor}배를 담당했습니다 — 지난 {days}일 동안",
     "loadUnevenLabel": "부하가 불균등합니다:",
     "membersUnreachableMore": "{name}님은 이 팀에 있지만, 호출이 전달될 수 없습니다 — {why}. 다른 멤버 {count}명도 같은 상태입니다. | {name}님은 이 팀에 있지만, 호출이 전달될 수 없습니다 — {why}. 다른 멤버 {count}명도 같은 상태입니다.",
@@ -30898,6 +30898,13 @@
         "http": "HTTP",
         "httpDescription": "Slack이 사용자의 공개 URL을 호출합니다. Slack에서 Verify를 한 번 클릭해야 합니다.",
         "channelHistory": "봇이 시작한 스레드의 답글을 읽도록 허용",
+        "appName": "앱 이름",
+        "appNameHelp": "Slack에서 사람들이 보는 이름입니다. 각 OpenObserve 서버에 OpenObserve Staging처럼 고유한 이름을 지정하세요.",
+        "appNameTooLong": "앱 이름은 최대 {max}자여야 합니다",
+        "appNameMarkup": "앱 이름에는 <, > 또는 &를 포함할 수 없습니다",
+        "command": "슬래시 명령어",
+        "commandInvalid": "/로 시작하고 최대 {max}자까지 사용하세요: 소문자, 숫자, - 및 _",
+        "commandWarning": "Slack은 워크스페이스에서 하나의 앱에 대해서만 슬래시 명령어를 실행합니다. 이 워크스페이스의 다른 앱이 이미 {command}를 사용하고 있다면, 이 앱을 설치한 후 해당 앱에서는 {command}가 작동하지 않습니다.",
         "tokenLabel": "앱 구성 리프레시 토큰 (xoxe-…)",
         "tokenHelp": "Slack의 Your Apps 페이지에서 Your App Configuration Tokens › Generate Token을 선택하면 액세스 토큰과 리프레시 토큰이 표시됩니다. 리프레시 토큰을 붙여넣으세요. OpenObserve는 토큰을 순환시키고 나중에 앱을 업데이트할 수 있도록 최신 토큰을 암호화하여 보관합니다.",
         "generateToken": "토큰 생성",
@@ -31067,7 +31074,7 @@
         "settings": "설정",
         "install": "설치 시",
         "destination": "알림 대상에서",
-        "oncall": "여기에서 /o2 oncall로 설정"
+        "oncall": "여기에서 {command} oncall로 설정"
       },
       "channel": "채널",
       "channelPlaceholder": "채널 검색",
@@ -31081,7 +31088,7 @@
       "editDefault": "채널 기본값 편집",
       "removeConfirm": "기본값 제거",
       "removeTitle": "#{channel}의 기본값을 제거할까요?",
-      "removeMessage": "{name}의 질문은 이후 각 사용자의 기본 조직으로 전달됩니다(/o2 org로 변경할 수 있습니다).",
+      "removeMessage": "{name}의 질문은 이후 각 사용자의 기본 조직으로 전달됩니다({command} org로 변경할 수 있습니다).",
       "instanceAdminOnly": "인스턴스 관리자 전용",
       "ownOrgOnlyHint": "인스턴스 워크스페이스에서는 채널을 자신의 조직에 매핑합니다",
       "claimableHint": "할당되지 않은 채널 및 {org} 소유 채널",

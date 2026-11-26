@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ raw(links.data.value.links.map((link) => link.team_name).join(", ")) }}
         </OTruncatedText>
         <OText v-else variant="meta" data-test="oncall-slack-not-linked">
-          {{ t("oncall.mineSlackLinkHow") }}
+          {{ t("oncall.mineSlackLinkHow", { command: slackCommand }) }}
         </OText>
       </template>
     </template>
@@ -95,6 +95,7 @@ import { useRouter } from "vue-router";
 
 import OnCallHint from "@/components/oncall/OnCallHint.vue";
 import OnCallReachRow from "@/components/oncall/OnCallReachRow.vue";
+import { DEFAULT_SLACK_COMMAND } from "@/components/settings/SlackSettings.schema";
 import { useTheme } from "@/composables/useTheme";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -122,6 +123,7 @@ const { isDark } = useTheme();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 // My on-call shows this card only while Slack is on.
 const links = useQuery(() => Object.assign(slackMyLinksQuery(org.value), { enabled: !!org.value }));
+const slackCommand = computed(() => raw(links.data.value?.command || DEFAULT_SLACK_COMMAND));
 
 const slackLogo = computed(() =>
   getImageURL(isDark.value ? "images/common/slack_dark.svg" : "images/common/slack.svg"),

@@ -202,7 +202,7 @@
     },
     "noSlackChannelDefaults": {
       "title": "尚无频道设置默认组织",
-      "description": "在没有默认组织的频道中，问题会发送到每个人的默认组织（他们可以用 /o2 org 更改）。"
+      "description": "在没有默认组织的频道中，问题会发送到每个人的默认组织（他们可以用 {command} org 更改）。"
     },
     "noSlackLinkedPeople": {
       "title": "此组织中尚无人关联 Slack"
@@ -28142,7 +28142,7 @@
     "teamChannelSilent": "该团队的频道是特意留空的——呼叫不会在任何地方发布。",
     "slackChannelTitle": "Slack 频道",
     "slackChannelSetWith": "使用 {command} 设置 Slack 频道",
-    "slackChannelLinkHint": "在该 Slack 频道中输入。这需要先关联您的 Slack 账户：在 Slack 中输入 /o2 link。",
+    "slackChannelLinkHint": "在该 Slack 频道中输入。需要先关联你的 Slack 账户：在 Slack 中输入 {command} link。",
     "slackChannelSendTest": "发送测试消息",
     "slackChannelClear": "清除",
     "slackChannelBackup": "仅将 {webhook} 用作备用",
@@ -28717,7 +28717,7 @@
     "mineJoinTeam": "加入团队",
     "mineTestTeam": "向 {team} 发送测试呼叫",
     "mineCoverSaved": "代班已保存",
-    "mineSlackLinkHow": "在 Slack 中输入 /o2 link",
+    "mineSlackLinkHow": "在 Slack 中输入 {command} link",
     "mineSlackSetUpHint": "打开 设置 › Slack",
     "myDeliveriesWhen": "时间",
     "phoneAddHint": "添加用于短信和电话的号码",
@@ -29288,7 +29288,7 @@
     "channelUnavailable": "{channel} — 没有对应的提供方",
     "channelUnverified": "{channel} — 已登记，但还没有人验证",
     "channelAddPhone": "{reason}。请在“我的值班”中添加您的电话号码",
-    "channelLinkSlack": "{reason}。请在 Slack 中运行 /o2 link",
+    "channelLinkSlack": "{reason}。请在 Slack 中运行 {command} link",
     "loadUneven": "{name} 承担的工作量是中位数的 {factor} 倍（过去 {days} 天）",
     "loadUnevenLabel": "工作量不均衡：",
     "membersUnreachableMore": "{name} 在此团队中，但发给此人的通知无法送达 — {why}。另有 {count} 位成员也处于相同状态。 | {name} 在此团队中，但发给此人的通知无法送达 — {why}。另有 {count} 位成员也处于相同状态。",
@@ -30898,6 +30898,13 @@
         "http": "HTTP",
         "httpDescription": "Slack 会调用您的公共 URL。需要在 Slack 中点击一次“验证”",
         "channelHistory": "允许机器人读取其发起的消息串中的回复",
+        "appName": "应用名称",
+        "appNameHelp": "人们在 Slack 中看到的名称。为每个 OpenObserve 服务器指定各自的名称，例如 OpenObserve Staging。",
+        "appNameTooLong": "应用名称最多只能包含 {max} 个字符",
+        "appNameMarkup": "应用名称不能包含 <、> 或 &",
+        "command": "斜杠命令",
+        "commandInvalid": "以 / 开头，最多使用 {max} 个字符：小写字母、数字、- 和 _",
+        "commandWarning": "Slack 在一个工作区中只会为一个应用运行某个斜杠命令。如果此工作区中的另一个应用已使用 {command}，那么在你安装此应用后，{command} 将停止为该应用工作。",
         "tokenLabel": "应用配置刷新令牌（xoxe-…）",
         "tokenHelp": "在 Slack 的“Your Apps”页面中，“Your App Configuration Tokens › Generate Token”会显示访问令牌和刷新令牌：请粘贴刷新令牌。OpenObserve 会轮换该令牌，并加密保留最新令牌，以便之后更新应用。",
         "generateToken": "生成令牌",
@@ -31067,7 +31074,7 @@
         "settings": "设置",
         "install": "安装时",
         "destination": "来自告警目标",
-        "oncall": "来自此处的 /o2 值班"
+        "oncall": "来自此处的 {command} 值班"
       },
       "channel": "频道",
       "channelPlaceholder": "搜索频道",
@@ -31081,7 +31088,7 @@
       "editDefault": "编辑频道默认设置",
       "removeConfirm": "移除默认设置",
       "removeTitle": "移除 #{channel} 的默认设置？",
-      "removeMessage": "此后，{name} 中的问题将转到每个人的默认组织（可通过 /o2 org 更改）。",
+      "removeMessage": "此后，{name} 中的问题将转到每个人的默认组织（可通过 {command} org 更改）。",
       "instanceAdminOnly": "仅实例管理员",
       "ownOrgOnlyHint": "在实例工作区中，您可以将频道映射到自己的组织",
       "claimableHint": "未认领的频道以及 {org} 拥有的频道",

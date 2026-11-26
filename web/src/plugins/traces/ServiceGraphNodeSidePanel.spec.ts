@@ -143,7 +143,11 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import { streamTraceRows } from "@/plugins/correlation/correlationStream";
-import { correlate as correlateStreams, getDimensionAnalytics } from "@/services/service_streams";
+import {
+  correlate as correlateStreams,
+  getDimensionAnalytics,
+  getSemanticGroups,
+} from "@/services/service_streams";
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -992,6 +996,118 @@ describe("ServiceGraphNodeSidePanel", () => {
       const childIds = (g: { children?: { id: string }[] }) => (g.children ?? []).map((c) => c.id);
       expect(childIds(groups[0])).toEqual(["compute", "memory", "network", "storage", "others"]);
       expect(childIds(groups[1])).toEqual(["compute", "memory", "network", "storage", "others"]);
+    });
+  });
+
+  describe("viewRelatedLogs — correlation request", () => {
+    const defaults = {
+      correlate: vi.mocked(correlateStreams).getMockImplementation(),
+      semanticGroups: vi.mocked(getSemanticGroups).getMockImplementation(),
+      traceRows: vi.mocked(streamTraceRows).getMockImplementation(),
+    };
+    afterEach(() => {
+      vi.mocked(correlateStreams).mockImplementation(defaults.correlate!);
+      vi.mocked(getSemanticGroups).mockImplementation(defaults.semanticGroups!);
+      vi.mocked(streamTraceRows).mockImplementation(defaults.traceRows!);
+    });
+    const clickViewRelatedLogs = async (w: VueWrapper<any>) => {
+      await w.find('[data-test="service-graph-node-panel-view-related-logs-btn"]').trigger("click");
+      await flushPromises();
+    };
+
+    it("sends the latest span's dimensions so service_optional orgs still resolve the service", async () => {
+      vi.mocked(getSemanticGroups).mockResolvedValue({
+        data: [
+          { id: "service", fields: ["service_name"] },
+          { id: "k8s-namespace", fields: ["service_k8s_namespace_name"] },
+        ],
+      } as any);
+      vi.mocked(streamTraceRows).mockResolvedValue([
+        { service_name: "frontend", service_k8s_namespace_name: "default" },
+      ]);
+      wrapper = mountPanel({ streamFilter: "otel_demo" });
+      await flushPromises();
+      vi.mocked(correlateStreams).mockClear();
+
+      await clickViewRelatedLogs(wrapper);
+
+      expect(correlateStreams).toHaveBeenCalledWith("default", {
+        source_stream: "otel_demo",
+        source_type: "traces",
+        available_dimensions: { service: "frontend", "k8s-namespace": "default" },
+        source_dimensions: { service: "frontend", "k8s-namespace": "default" },
+        resolve_from_source: true,
+        start_time: baseTimeRange.startTime,
+        end_time: baseTimeRange.endTime,
+      });
+    });
+
+    it("keeps the bare service name for an inferred dependency, whose span is its caller's", async () => {
+      vi.mocked(getSemanticGroups).mockResolvedValue({
+        data: [{ id: "k8s-namespace", fields: ["service_k8s_namespace_name"] }],
+      } as any);
+      vi.mocked(streamTraceRows).mockResolvedValue([
+        { service_name: "frontend", service_k8s_namespace_name: "shop" },
+      ]);
+      wrapper = mountPanel({
+        streamFilter: "otel_demo",
+        selectedNode: { ...baseNode, id: "redis", name: "redis", service_type: "database" },
+      });
+      await flushPromises();
+      vi.mocked(correlateStreams).mockClear();
+
+      await clickViewRelatedLogs(wrapper);
+
+      expect(correlateStreams).toHaveBeenCalledWith("default", {
+        source_stream: "otel_demo",
+        source_type: "traces",
+        available_dimensions: { service: "redis" },
+      });
+    });
+
+    it("asks again for the Metrics tab when the time range changes", async () => {
+      wrapper = mountPanel({ streamFilter: "otel_demo" });
+      await flushPromises();
+      (wrapper.vm as any).activeTab = "metrics";
+      await flushPromises();
+      vi.mocked(correlateStreams).mockClear();
+
+      const later = { startTime: NOW, endTime: NOW + 3_600_000_000 };
+      await wrapper.setProps({ timeRange: later });
+      await flushPromises();
+
+      expect(correlateStreams).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({ start_time: later.startTime, end_time: later.endTime }),
+      );
+    });
+
+    it("opens the log stream named like the source stream before other matches", async () => {
+      vi.mocked(correlateStreams).mockResolvedValue({
+        data: {
+          service_name: "frontend",
+          matched_dimensions: {},
+          additional_dimensions: {},
+          related_streams: {
+            logs: [
+              { stream_name: "traces_stream_transformed", filters: { service_name: "frontend" } },
+              { stream_name: "otel_demo", filters: { service_name: "frontend" } },
+            ],
+            metrics: [],
+            traces: [],
+            profiles: [],
+          },
+        },
+      } as any);
+      wrapper = mountPanel({ streamFilter: "otel_demo" });
+
+      await clickViewRelatedLogs(wrapper);
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({ stream: "otel_demo" }),
+        }),
+      );
     });
   });
 
