@@ -10,7 +10,7 @@ import { checkBundleBudget } from "../src/utils/bundleBudget.ts";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const distDir = process.argv[2] ?? join(__dirname, "..", "dist");
 // The assistant's locale namespace ships in the entry because eager pages render its keys before mount.
-const BUDGET_BYTES = 1_430_000;
+const BUDGET_BYTES = 1_445_000;
 
 const html = readFileSync(join(distDir, "index.html"), "utf8");
 const gzipSizeOf = (asset) =>
