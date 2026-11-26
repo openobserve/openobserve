@@ -1,0 +1,9 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chat.rs:1617-1626 MetaHttpResponse::internal_error",
+  "shape": "G",
+  "status": 500,
+  "body": {
+    "code": 500,
+    "message": "Confirmation failed: {\"detail\":\"No pending confirmation for this session\"}"
+  }
+}

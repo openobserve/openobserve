@@ -160,7 +160,8 @@ export function rcaHypothesisGroupTitle(id: RcaHypothesisGroupId, live: boolean)
 }
 
 const STATUS_LABEL: Record<RcaHypothesisStatus, I18nKey> = {
-  root_cause: "alerts.incidents.rcaSummary.status.rootCause",
+  // "Root cause" is the callout's own words; a hypothesis tag says it was confirmed.
+  root_cause: "alerts.incidents.rcaSummary.marker.confirmed",
   contributing: "alerts.incidents.rcaSummary.status.contributing",
   symptom: "alerts.incidents.rcaSummary.status.symptom",
   ruled_out: "alerts.incidents.rcaSummary.status.ruledOut",
@@ -182,14 +183,15 @@ export function rcaHypothesisStatusLabel(
 ): I18nText {
   const confirmed = outcome === "root_cause_identified" || outcome === "multiple_root_causes";
   if (status === "root_cause" && !confirmed) {
-    return gt("alerts.incidents.rcaSummary.status.rootCauseNotConfirmed");
+    return gt("alerts.incidents.rcaSummary.status.likely");
   }
   return rcaHypothesisStatusWord(status);
 }
 
 /** Pill tone of a hypothesis status (redesign `HT`). */
 export const RCA_HYPOTHESIS_TONE: Record<RcaHypothesisStatus, RcaPillTone> = {
-  root_cause: "strong",
+  // A confirmed cause reads as a green tag; the accent fill stays for decisive evidence.
+  root_cause: "ok",
   contributing: "warn",
   likely: "warn",
   symptom: "neutral",

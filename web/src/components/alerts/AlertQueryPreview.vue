@@ -31,6 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import hljs from "highlight.js/lib/core";
 import sql from "highlight.js/lib/languages/sql";
+// The `.hljs` token colours; the chat that used to load them globally is gone.
+import "highlight.js/styles/github.css";
+import "highlight.js/styles/github-dark.css";
 import { computed } from "vue";
 
 hljs.registerLanguage("sql", sql);

@@ -120,3 +120,10 @@ export const forkSharedChatMutation = (org: string) =>
     mutationFn: async (token: string) => (await aiChatShare.fork(org, token)).data,
     meta: { silentError: true },
   });
+
+export const renameForkMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { sessionId: string; title: string }) =>
+      aiChatShare.renameChat(org, vars.sessionId, vars.title),
+    meta: { silentError: true },
+  });

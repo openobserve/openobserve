@@ -1,0 +1,9 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chat.rs:254-260 (cloud) MetaHttpResponse::error",
+  "shape": "A",
+  "status": 503,
+  "body": {
+    "code": 503,
+    "message": "redis connection timed out"
+  }
+}

@@ -461,7 +461,7 @@ fn split_params(
         (status = 504, description = "The provider timed out before streaming", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-mcp" = json!({"enabled": true, "readOnlyHint": true})),
         ("x-o2-ratelimit" = json!({"module": "Playground", "operation": "create"}))
     )
 )]
@@ -612,7 +612,7 @@ pub async fn run_playground_cell(
         (status = 500, description = "Scorer resolution failed", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-mcp" = json!({"enabled": true, "readOnlyHint": true})),
         ("x-o2-ratelimit" = json!({"module": "Playground", "operation": "create"}))
     )
 )]
