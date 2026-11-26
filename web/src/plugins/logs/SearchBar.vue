@@ -4499,8 +4499,11 @@ export default defineComponent({
             }
           })
           .catch((err) => {
+            const detail = err?.response?.data?.message;
             toast({
-              message: t("search.errorCreatingSavedView"),
+              message: detail
+                ? t("search.errorCreatingSavedViewDetail", { detail })
+                : t("search.errorCreatingSavedView"),
               variant: "error",
             });
             console.log("Error while creating saved view", err);
