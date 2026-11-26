@@ -13953,6 +13953,14 @@
       "servicenowAssignmentGroupHelp": "Group to assign incidents to (e.g., IT Operations)",
       "servicenowResolutionCode": "Resolution code (optional)",
       "servicenowResolutionCodeHelp": "Must match a valid resolution code on your ServiceNow instance. Used when OpenObserve resolves the incident. Defaults to Solved (Permanently).",
+      "servicenowSignIn": "How OpenObserve signs in",
+      "servicenowSignInBasic": "Username and password",
+      "servicenowSignInApiKey": "API key",
+      "servicenowPickSecret": "Pick a secret",
+      "servicenowSecretHelp": "Pick a secret from Secrets & variables. Its value is never shown here.",
+      "servicenowSecretRequired": "Pick a secret.",
+      "servicenowUsernameColon": "The username cannot contain a colon (:).",
+      "servicenowPlainPassword": "The password is stored in plain text. Pick a secret to protect it.",
       "usernameRequired": "Username is required",
       "passwordRequired": "Password is required",
       "emailRecipients": "Recipient Email Addresses",
@@ -38109,6 +38117,7 @@
       "emptyFgaOff": "Only org admins can use secrets while fine-grained access is off"
     },
     "consumer": {
+      "bindCheckFailed": "Could not check the picked secret, so nothing was saved. Try again.",
       "needsPin": "{name} needs a host pin",
       "required": "Required",
       "pinTo": "Pin to",

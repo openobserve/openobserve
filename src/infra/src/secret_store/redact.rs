@@ -29,30 +29,20 @@ pub struct Redactor {
 
 impl Redactor {
     pub fn for_attempt<'a>(values: impl IntoIterator<Item = &'a str>) -> Self {
-        let mut needles = Vec::new();
-        for value in values.into_iter().filter(|value| !value.is_empty()) {
-            let percent = urlencoding::encode(value).into_owned();
-            let lower_percent = lowercase_percent_escapes(&percent);
-            needles.extend(
-                [
-                    value.to_owned(),
-                    STANDARD.encode(value),
-                    STANDARD_NO_PAD.encode(value),
-                    URL_SAFE.encode(value),
-                    URL_SAFE_NO_PAD.encode(value),
-                    percent,
-                    lower_percent,
-                ]
-                .map(Zeroizing::new),
-            );
+        let mut redactor = Self {
+            needles: Vec::new(),
+        };
+        for value in values {
+            redactor.push_encodings(value);
         }
-        needles.sort_unstable_by(|a, b| {
-            b.len()
-                .cmp(&a.len())
-                .then_with(|| a.as_str().cmp(b.as_str()))
-        });
-        needles.dedup();
-        Self { needles }
+        redactor.sort();
+        redactor
+    }
+
+    /// Also hides a value built from this attempt's secrets, such as a Basic credential. [no-fail]
+    pub fn cover(&mut self, value: &str) {
+        self.push_encodings(value);
+        self.sort();
     }
 
     pub fn redact(&self, text: &str) -> String {
@@ -83,6 +73,35 @@ impl Redactor {
 
     pub fn is_empty(&self) -> bool {
         self.needles.is_empty()
+    }
+
+    fn push_encodings(&mut self, value: &str) {
+        if value.is_empty() {
+            return;
+        }
+        let percent = urlencoding::encode(value).into_owned();
+        let lower_percent = lowercase_percent_escapes(&percent);
+        self.needles.extend(
+            [
+                value.to_owned(),
+                STANDARD.encode(value),
+                STANDARD_NO_PAD.encode(value),
+                URL_SAFE.encode(value),
+                URL_SAFE_NO_PAD.encode(value),
+                percent,
+                lower_percent,
+            ]
+            .map(Zeroizing::new),
+        );
+    }
+
+    fn sort(&mut self) {
+        self.needles.sort_unstable_by(|a, b| {
+            b.len()
+                .cmp(&a.len())
+                .then_with(|| a.as_str().cmp(b.as_str()))
+        });
+        self.needles.dedup();
     }
 }
 

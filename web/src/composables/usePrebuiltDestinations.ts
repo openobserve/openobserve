@@ -35,6 +35,12 @@ import {
   getPrebuiltTypesByCategory,
 } from "@/utils/prebuilt-templates";
 import { jiraKeepsSavedToken, jiraSetupRequest } from "@/utils/prebuilt-templates/jira";
+import type { SecretBind } from "@/services/secrets";
+import { refusalFrom } from "@/views/Secrets/useSecretConsumer";
+import {
+  servicenowSignInPayload,
+  servicenowUsesField,
+} from "@/utils/prebuilt-templates/servicenow";
 
 /**
  * System Templates Architecture:
@@ -51,7 +57,6 @@ import type {
   PrebuiltTypeId,
 } from "@/utils/prebuilt-templates/types";
 import type { Destination, Template } from "@/ts/interfaces/alert";
-import type { SecretBind } from "@/services/secrets";
 
 // Store
 import { useStore } from "vuex";
@@ -117,6 +122,16 @@ const buildDestinationMetadata = (
   ...generatePrebuiltMetadata(type, credentials),
   ...slackSetupMetadata(type, setup),
 });
+
+/** Adds the ServiceNow sign-in headers and metadata to a destination payload. */
+const addServiceNowSignIn = (
+  destinationData: { headers: Record<string, string>; metadata: Record<string, string> },
+  credentials: Record<string, unknown>,
+): void => {
+  const signIn = servicenowSignInPayload(credentials);
+  destinationData.headers = { ...destinationData.headers, ...signIn.headers };
+  destinationData.metadata = { ...destinationData.metadata, ...signIn.metadata };
+};
 
 export const requestErrorMessage = (error: unknown, fallback: I18nText): I18nText => {
   if (!error || typeof error !== "object") return fallback;
@@ -254,6 +269,7 @@ export function usePrebuiltDestinations() {
       const value = credentials[field.key];
 
       if (type === "jira" && field.key === "token" && jiraKeepsSavedToken(credentials)) continue;
+      if (type === "servicenow" && !servicenowUsesField(credentials, field.key)) continue;
 
       // Check required fields
       if (field.required && (!value || value.toString().trim() === "")) {
@@ -690,14 +706,8 @@ export function usePrebuiltDestinations() {
           metadata: buildDestinationMetadata(type, credentials, setup),
         };
 
-        // Special handling for ServiceNow - encode Basic Auth in Authorization header
-        if (type === "servicenow" && credentials.username && credentials.password) {
-          const authString = btoa(`${credentials.username}:${credentials.password}`);
-          destinationData.headers = {
-            ...destinationData.headers,
-            Authorization: `Basic ${authString}`,
-          };
-        }
+        if (type === "servicenow") addServiceNowSignIn(destinationData, credentials);
+        if (secretBinds.length) destinationData.secret_binds = secretBinds;
       }
 
       if (secretBinds.length) destinationData.secret_binds = secretBinds;
@@ -710,7 +720,8 @@ export function usePrebuiltDestinations() {
         message: t("alert_destinations.saved"),
       });
     } catch (error: any) {
-      if (error?.response?.status == 403) throw error;
+      // A secret refusal is shown in the form; a 403 is not toasted here, as before.
+      if (error?.response?.status == 403 || refusalFrom(error)) throw error;
       toast({
         variant: "error",
         message: requestErrorMessage(error, t("alerts.prebuilt.testFailedUnknownError")),
@@ -787,17 +798,8 @@ export function usePrebuiltDestinations() {
           metadata: buildDestinationMetadata(type, credentials, setup),
         };
 
-        if (type === "servicenow") {
-          // Only overwrite Authorization when both username and password are provided.
-          // If either is missing, preserve the existing stored header.
-          if (credentials.username && credentials.password) {
-            const authString = btoa(`${credentials.username}:${credentials.password}`);
-            destinationData.headers = {
-              ...destinationData.headers,
-              Authorization: `Basic ${authString}`,
-            };
-          }
-        }
+        if (type === "servicenow") addServiceNowSignIn(destinationData, credentials);
+        if (secretBinds.length) destinationData.secret_binds = secretBinds;
         // For Opsgenie, drop the Authorization header when apiKey is blank so the
         // existing stored value is preserved. generateDestinationHeaders always
         // produces an Authorization header, but it will contain "GenieKey " when
@@ -821,7 +823,8 @@ export function usePrebuiltDestinations() {
         message: t("alert_destinations.saved"),
       });
     } catch (error: any) {
-      if (error?.response?.status == 403) throw error;
+      // A secret refusal is shown in the form; a 403 is not toasted here, as before.
+      if (error?.response?.status == 403 || refusalFrom(error)) throw error;
       toast({
         variant: "error",
         message: requestErrorMessage(error, t("alerts.prebuilt.testFailedUnknownError")),

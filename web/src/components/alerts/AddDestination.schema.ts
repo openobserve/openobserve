@@ -33,6 +33,11 @@ import {
   toJiraFieldValue,
   type JiraCreateMeta,
 } from "@/utils/prebuilt-templates/jira";
+import {
+  servicenowCredentials,
+  servicenowSignInIssues,
+  servicenowUsesField,
+} from "@/utils/prebuilt-templates/servicenow";
 
 // One row in the dynamic api-headers array-field. Both fields are free-form
 // text (a blank starter row is valid — only non-empty rows persist on save).
@@ -44,6 +49,7 @@ export const headerRowSchema = z.object({
 export const makeAddDestinationSchema = (
   t: (_key: string, _named?: Record<string, unknown>) => string,
   isAlerts: boolean,
+  servicenowStoreSignIn: () => boolean = () => false,
 ) =>
   z
     .object({
@@ -158,15 +164,27 @@ export const makeAddDestinationSchema = (
         // A saved Jira token never comes back to the browser; it is required again only after Change.
         const keepsSavedToken =
           val.destination_type === "jira" && jiraKeepsSavedToken(val.credentials);
+        const servicenow =
+          val.destination_type === "servicenow"
+            ? servicenowCredentials(val.credentials, servicenowStoreSignIn())
+            : null;
         if (!credResult.success) {
           for (const issue of credResult.error.issues) {
             if (keepsSavedToken && issue.path[0] === "token") continue;
+            if (servicenow && !servicenowUsesField(servicenow, String(issue.path[0]))) continue;
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               path: ["credentials", ...issue.path],
               message: issue.message,
             });
           }
+        }
+        for (const issue of servicenow ? servicenowSignInIssues(servicenow) : []) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["credentials", issue.field],
+            message: t(issue.messageKey),
+          });
         }
       }
 

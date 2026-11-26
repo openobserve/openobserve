@@ -3986,7 +3986,7 @@ pub(crate) async fn send_saved_http_notification(
     let episode = ctx.and_then(|ctx| ctx.episode_id.as_deref());
     let (attempt, response) =
         send_secret_webhook_attempt(destination, endpoint, platform, episode, &msg).await?;
-    let response = resend_after_auth_refetch(
+    let (attempt, response) = resend_after_auth_refetch(
         destination,
         endpoint,
         platform,
@@ -3997,6 +3997,7 @@ pub(crate) async fn send_saved_http_notification(
     )
     .await?;
     let status = response.status();
+    let headers = response.headers().clone();
     if is_slack_hook
         && status == reqwest::StatusCode::BAD_REQUEST
         && let Some(stripped) = slack_render::strip_image_blocks(&msg)
@@ -4017,7 +4018,7 @@ pub(crate) async fn send_saved_http_notification(
         }
         return secret_send_outcome(destination, retry.status());
     }
-    secret_send_outcome(destination, status)
+    secret_send_outcome(destination, status).map_err(|e| attempt.explain(e, status, &headers))
 }
 
 async fn send_secret_webhook_attempt(
@@ -4078,14 +4079,14 @@ async fn resend_after_auth_refetch(
     body: &str,
     first: send::SecretRequest,
     response: reqwest::Response,
-) -> Result<reqwest::Response, anyhow::Error> {
+) -> Result<(send::SecretRequest, reqwest::Response), anyhow::Error> {
     let status = response.status();
     if !matches!(
         status,
         reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN
     ) || !send::refetch_after_auth_failure(destination).await
     {
-        return Ok(response);
+        return Ok((first, response));
     }
     match secret_attempt(destination, endpoint).await? {
         Some(fresh) if !fresh.same_material(&first, endpoint) => {
@@ -4094,9 +4095,10 @@ async fn resend_after_auth_refetch(
                 destination.org_id,
                 destination.name
             );
-            send_with_attempt(&fresh, endpoint, platform, episode, body).await
+            let response = send_with_attempt(&fresh, endpoint, platform, episode, body).await?;
+            Ok((fresh, response))
         }
-        _ => Ok(response),
+        _ => Ok((first, response)),
     }
 }
 

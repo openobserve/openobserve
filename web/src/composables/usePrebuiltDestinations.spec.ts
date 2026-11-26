@@ -42,7 +42,8 @@ vi.mock("vue-i18n", async () => {
   };
 });
 
-vi.mock("vuex", () => ({
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
   useStore: vi.fn(() => ({
     state: {
       selectedOrganization: { identifier: "test-org" },

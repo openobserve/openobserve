@@ -1235,6 +1235,13 @@ async fn save_internal(
     {
         return Err(SecretRefusal::from(SecretErrorCode::PinHostsEmpty).into());
     }
+    if let Module::Alert {
+        destination_type, ..
+    } = &destination.module
+    {
+        super::notifications::servicenow::check(destination_type)
+            .map_err(DestinationError::ServiceNowSignIn)?;
+    }
     let slots = if store_refs_enabled {
         destination_slots(&destination, previous.as_ref())?
     } else {
@@ -1489,8 +1496,21 @@ fn pointer_component(key: &str) -> String {
 }
 
 fn is_pagerduty(destination: &Destination) -> bool {
+    metadata_platform(destination) == "pagerduty"
+}
+
+fn metadata_platform(destination: &Destination) -> &'static str {
     use super::notifications::platform::{Platform, platform_of};
-    matches!(&destination.module, Module::Alert { destination_type, .. } if platform_of(destination_type) == Some(Platform::PagerDuty))
+    match &destination.module {
+        Module::Alert {
+            destination_type, ..
+        } => match platform_of(destination_type) {
+            Some(Platform::PagerDuty) => "pagerduty",
+            Some(Platform::ServiceNow) => "servicenow",
+            Some(Platform::Opsgenie) | None => "",
+        },
+        Module::Pipeline { .. } => "",
+    }
 }
 
 fn destination_slots(
@@ -1517,11 +1537,7 @@ fn destination_slots(
                 &previous,
             )?;
         }
-        let platform = if is_pagerduty(destination) {
-            "pagerduty"
-        } else {
-            ""
-        };
+        let platform = metadata_platform(destination);
         for (key, value) in &ep.metadata {
             refuse_tokens(key)?;
             let slot = Slot::Metadata {
@@ -2797,22 +2813,51 @@ mod tests {
                     let f = Fixture::new();
                     let row = f.secret(PinMode::Hosts, ORG_ENV).await;
                     f.allow(&row).await;
-                    for (platform, key) in [
+                    for (index, (platform, key)) in [
                         ("servicenow", "routing_key"),
+                        ("servicenow", "servicenow_username"),
+                        ("servicenow", "servicenow_password"),
                         ("pagerduty", "note"),
+                        ("pagerduty", "servicenow_password"),
                         ("custom", "routing_key"),
                         ("pagerduty", "routing_key"),
-                    ] {
+                    ]
+                    .into_iter()
+                    .enumerate()
+                    {
                         let mut dest = f.destination("literal");
+                        dest.name = format!("webhook{index}");
                         let ep = endpoint(&mut dest);
                         ep.destination_type = Some(platform.into());
+                        // A valid Basic sign-in, so only the metadata slot rule can refuse.
+                        if platform == "servicenow" {
+                            ep.headers = None;
+                            ep.metadata.extend([
+                                ("servicenow_auth".into(), "basic".into()),
+                                ("servicenow_username".into(), "abcd".into()),
+                                ("servicenow_password".into(), TOKEN.into()),
+                            ]);
+                        }
                         ep.metadata.insert(key.into(), TOKEN.into());
                         let result = f.save(dest, true).await;
-                        if platform == "pagerduty" && key == "routing_key" {
-                            let (_, bind) = result.unwrap();
-                            assert_eq!(bind.unwrap().refs[0].secret_id, row.id);
-                        } else {
-                            refusal(result.unwrap_err(), SecretErrorCode::RefNotAllowedInField);
+                        match (platform, key) {
+                            ("pagerduty", "routing_key")
+                            | ("servicenow", "servicenow_password") => {
+                                let (_, bind) = result.unwrap();
+                                assert_eq!(bind.unwrap().refs[0].secret_id, row.id);
+                            }
+                            ("pagerduty", "servicenow_password") => assert!(
+                                matches!(
+                                    result,
+                                    Err(DestinationSaveError::Destination(
+                                        DestinationError::ServiceNowSignIn(_)
+                                    ))
+                                ),
+                                "{platform} {key}"
+                            ),
+                            _ => {
+                                refusal(result.unwrap_err(), SecretErrorCode::RefNotAllowedInField);
+                            }
                         }
                     }
                 },

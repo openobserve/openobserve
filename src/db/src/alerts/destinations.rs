@@ -83,6 +83,8 @@ pub enum DestinationError {
     JiraTokenChanged,
     #[error("{0}")]
     JiraAlertsUnsupported(String),
+    #[error("{0}")]
+    ServiceNowSignIn(String),
 }
 
 /// A refused Slack app save; `code` lets the form show its own copy (MK-7, MK-20).

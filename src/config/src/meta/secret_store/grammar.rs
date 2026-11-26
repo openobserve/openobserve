@@ -21,7 +21,10 @@ use url::{Host, Url};
 use super::{ConsumerType, SecretErrorCode};
 use crate::meta::synthetics_variables::RESERVED_VARIABLE_PREFIX;
 
-const CREDENTIAL_METADATA: &[(&str, &str)] = &[("pagerduty", "routing_key")];
+const CREDENTIAL_METADATA: &[(&str, &str)] = &[
+    ("pagerduty", "routing_key"),
+    ("servicenow", "servicenow_password"),
+];
 
 // A namespace typo must survive the scan so callers can refuse it before rendering.
 static STORE_REF: LazyLock<Regex> = LazyLock::new(|| {

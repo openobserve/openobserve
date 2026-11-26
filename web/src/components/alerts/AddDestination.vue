@@ -145,7 +145,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="dtVal && dtVal !== 'custom' && !isNewSlackDestination"
                 :destination-type="dtVal"
                 :hide-actions="true"
+                :servicenow-store-sign-in="servicenowStoreSignIn"
+                :consumer-id="destination?.name ?? ''"
                 data-test="prebuilt-form"
+                @pick-secret="pickServiceNowSecret"
               />
               <div v-else-if="isUpdatingDestination" class="p-3 text-center">
                 <OSpinner size="md" data-test="add-destination-loading-indicator" />
@@ -609,7 +612,11 @@ import SecretBindBox from "@/views/Secrets/SecretBindBox.vue";
 import SecretSaveRefusal from "@/views/Secrets/SecretSaveRefusal.vue";
 import { refusalFrom, useSecretConsumer } from "@/views/Secrets/useSecretConsumer";
 import { formatTestOutcome } from "@/views/Secrets/secretRefs";
-import secretsService, { type SecretPickerItem, type StatusOnlyOutcome } from "@/services/secrets";
+import secretsService, {
+  type SecretBind,
+  type SecretPickerItem,
+  type StatusOnlyOutcome,
+} from "@/services/secrets";
 import { secretStoreStatusQuery } from "@/services/secrets.queries";
 import { ref, computed, nextTick, onBeforeMount, onActivated, onMounted, watch } from "vue";
 import type { PropType } from "vue";
@@ -631,6 +638,7 @@ import usersService from "@/services/users";
 import AddUser from "@/components/iam/users/AddUser.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import {
+  requestErrorMessage,
   usePrebuiltDestinations,
   type SlackSetupMetadata,
 } from "@/composables/usePrebuiltDestinations";
@@ -638,6 +646,13 @@ import { detectPrebuiltType, getPrebuiltConfig } from "@/utils/prebuilt-template
 import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
 import { jiraCredentialsFromMetadata } from "@/utils/prebuilt-templates/jira";
 import { PAGERDUTY_EU_EVENTS_URL } from "@/utils/prebuilt-templates/pagerduty";
+import {
+  SERVICENOW_API_KEY_HEADER,
+  servicenowCredentials,
+  servicenowSavedCredentials,
+  servicenowSignIn,
+  servicenowSignInPayload,
+} from "@/utils/prebuilt-templates/servicenow";
 import { DEFAULT_SLACK_APP_NAME } from "@/utils/slackManifest";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
 import { prebuiltDestinationDefaults } from "./PrebuiltDestinationForm.schema";
@@ -774,7 +789,11 @@ const { track } = useReo();
 
 // Single form for custom, pipeline and prebuilt destinations (credentials are
 // `credentials.*` fields); saveDestination dispatches by type.
-const addDestinationSchema = makeAddDestinationSchema(t, props.isAlerts);
+const addDestinationSchema = makeAddDestinationSchema(
+  t,
+  props.isAlerts,
+  () => servicenowStoreSignIn.value,
+);
 const form = useOForm({
   defaultValues: addDestinationDefaults(),
   schema: addDestinationSchema,
@@ -833,17 +852,28 @@ const secretStatus = useQuery(() =>
   }),
 );
 const secretPickerShown = computed(() => secretStatus.data.value?.store_ready === true);
+// The store refuses binds in a super cluster, so ServiceNow keeps its typed form there (D1).
+const servicenowStoreSignIn = computed(
+  () => secretPickerShown.value && secretStatus.data.value?.mode !== "super_cluster",
+);
 const secretConsumerType = computed(() =>
   props.isAlerts ? ("alert_destination" as const) : ("pipeline_destination" as const),
 );
-const secretRefTexts = computed(() => [urlVal.value, ...apiHeaders.value.map((h) => h.value)]);
-const secretConsumer = useSecretConsumer(orgId, secretConsumerType, secretRefTexts, urlVal);
+const secretRefTexts = computed(() => [
+  urlVal.value,
+  ...apiHeaders.value.map((h) => h.value),
+  ...servicenowRefTexts.value,
+]);
+// A ServiceNow secret is pinned to the instance, which lives in its credentials, not in `url`.
+const secretRefUrl = computed(() =>
+  dtVal.value === "servicenow" ? String(prebuiltCredentials.value.instanceUrl ?? "") : urlVal.value,
+);
+const secretConsumer = useSecretConsumer(orgId, secretConsumerType, secretRefTexts, secretRefUrl);
 const formIsDirty = form.useStore((s: any) => !!s.isDirty);
 // A draft that carries a store ref is refused before any decryption (V37), so test only saved, unchanged ones.
 const testNeedsSave = computed(
   () =>
-    isCustomWebhook.value &&
-    secretConsumer.hasRef.value &&
+    ((isCustomWebhook.value && secretConsumer.hasRef.value) || servicenowFromStore.value) &&
     (!props.destination || formIsDirty.value),
 );
 const savedTestOutcome = ref<StatusOnlyOutcome | null>(null);
@@ -877,6 +907,31 @@ const {
 const prebuiltCredentials = form.useStore(
   (s: any) => (s.values.credentials ?? {}) as Record<string, any>,
 );
+// A ServiceNow store method has no draft test: the draft Test request carries no metadata (D13).
+// Test, Preview and Save all see the method choice only while the store gate is open (D1).
+const gatedCredentials = computed(() =>
+  dtVal.value === "servicenow"
+    ? servicenowCredentials(prebuiltCredentials.value, servicenowStoreSignIn.value)
+    : prebuiltCredentials.value,
+);
+const servicenowFromStore = computed(
+  () => dtVal.value === "servicenow" && servicenowSignIn(gatedCredentials.value) !== "typed",
+);
+// Only the active method's secret is saved, so only it is bound.
+const servicenowRefTexts = computed(() => {
+  if (!servicenowFromStore.value) return [];
+  const signIn = servicenowSignInPayload(gatedCredentials.value);
+  return [...Object.values(signIn.headers), ...Object.values(signIn.metadata)];
+});
+
+// A sign-in field holds exactly one reference, so a pick replaces it rather than appending.
+const pickServiceNowSecret = (field: string, item: SecretPickerItem) => {
+  form.setFieldValue(
+    `credentials.${field}` as FormFieldPath<AddDestinationForm>,
+    secretConsumer.insert("", item) as never,
+  );
+  secretConsumer.refusal.value = null;
+};
 const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
@@ -1229,6 +1284,10 @@ const setupDestinationData = () => {
         props.isAlerts && destType && destType !== "custom"
           ? ["Content-Type", "Authorization", "X-Routing-Key"]
           : [];
+      // The API key method owns this header; a hand-added one on an older destination stays a row.
+      if (destType === "servicenow" && parsedMetadata?.servicenow_auth === "api_key") {
+        systemHeaders.push(SERVICENOW_API_KEY_HEADER);
+      }
       const customHeadersOnly = Object.entries(destHeaders).filter(
         ([key]) => !systemHeaders.includes(key),
       );
@@ -1266,9 +1325,11 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
   // Step 1: Parse metadata and remove the credential_ prefix. `metadata` is not
   // on the DestinationPayload type but is present on saved records at runtime.
   const rawMetadata = props.destination.metadata;
+  let savedMetadata: Record<string, unknown> = {};
   if (rawMetadata) {
     try {
       const metadata = typeof rawMetadata === "string" ? JSON.parse(rawMetadata) : rawMetadata;
+      savedMetadata = metadata;
       Object.entries(metadata).forEach(([key, value]) => {
         if (key.startsWith("credential_")) {
           credentials[key.replace("credential_", "")] = value;
@@ -1338,6 +1399,12 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
         // Can't decode — leave credential fields blank.
       }
     }
+  }
+  if (typeId === "servicenow") {
+    Object.assign(
+      credentials,
+      servicenowSavedCredentials(savedMetadata, props.destination.headers ?? {}),
+    );
   }
   // Non-sensitive fields (severity, priority, assignmentGroup, username, …) are
   // restored from metadata via Step 1. Sensitive fields containing "password",
@@ -1431,7 +1498,10 @@ const selectDestinationType = (type: string) => {
   } else {
     // Seed a fresh, per-type credential sub-object (defaults for that type) so
     // switching types never carries stale credential keys into the save.
-    form.setFieldValue("credentials", prebuiltDestinationDefaults(type, {}));
+    form.setFieldValue(
+      "credentials",
+      prebuiltDestinationDefaults(type, type === "servicenow" ? { authMethod: "basic" } : {}),
+    );
     form.setFieldValue("type", type === "email" ? "email" : "http");
     form.setFieldValue("template", templateNameFor(type));
     if (type === "slack") {
@@ -1446,7 +1516,7 @@ const selectDestinationType = (type: string) => {
 
 // Handle prebuilt and custom Web Hook destination tests
 const handleTestDestination = async () => {
-  if (isCustomWebhook.value && secretConsumer.hasRef.value) {
+  if ((isCustomWebhook.value && secretConsumer.hasRef.value) || servicenowFromStore.value) {
     if (testNeedsSave.value || !props.destination) return;
     savedTestRunning.value = true;
     savedTestOutcome.value = null;
@@ -1481,7 +1551,7 @@ const handleTestDestination = async () => {
   if (!isPrebuiltDestination.value) return;
 
   try {
-    await testDestination(dtVal.value, prebuiltCredentials.value, pickedPrebuiltTemplate.value);
+    await testDestination(dtVal.value, gatedCredentials.value, pickedPrebuiltTemplate.value);
   } catch {
     // testDestination owns user-facing sanitized error state.
   }
@@ -1506,12 +1576,12 @@ const showPreview = async () => {
     if (pickedTemplate) {
       preview = await renderTemplateBody(pickedTemplate, {
         type: dtVal.value,
-        credentials: prebuiltCredentials.value,
+        credentials: gatedCredentials.value,
       });
     } else if (customTemplate) {
       preview = await renderTemplateBody(customTemplate);
     } else {
-      preview = await generatePreview(dtVal.value, prebuiltCredentials.value);
+      preview = await generatePreview(dtVal.value, gatedCredentials.value);
     }
     previewContent.value = preview;
     previewShowsBody.value = !!pickedTemplate;
@@ -1558,13 +1628,30 @@ const slackSetupMetadataFor = (value: AddDestinationForm): SlackSetupMetadata | 
 
 async function handlePrebuiltSave(value: AddDestinationForm) {
   secretConsumer.refusal.value = null;
+  let secretBinds: SecretBind[];
   try {
-    const secretBinds = await secretConsumer.binds();
+    secretBinds = await secretConsumer.binds();
+  } catch (err) {
+    const refusal = refusalFrom(err);
+    if (refusal) {
+      secretConsumer.refusal.value = refusal;
+      return;
+    }
+    toast({
+      variant: "error",
+      message: requestErrorMessage(err, t("secrets.consumer.bindCheckFailed")),
+    });
+    return;
+  }
+  try {
     // Scope credentials to the ACTIVE type's fields (dropping any keys left over
     // from a previous type selection) and coerce them exactly as the schema does.
     const credentials = prebuiltDestinationDefaults(
       value.destination_type,
-      (value.credentials ?? {}) as Record<string, unknown>,
+      servicenowCredentials(
+        (value.credentials ?? {}) as Record<string, unknown>,
+        servicenowStoreSignIn.value,
+      ),
     );
     // Build custom headers object from the api-headers array-field
     const customHeaders = headersFromRows(value.apiHeaders || []);
@@ -1606,8 +1693,9 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
     // `createDestination`/`updateDestination` above come from usePrebuiltDestinations,
     // which invalidates the scope itself.
     finishSave();
-  } catch (error: unknown) {
-    const refusal = refusalFrom(error);
+  } catch (err) {
+    // The composable toasts every other failure, sanitized, and rethrows so submission settles.
+    const refusal = refusalFrom(err);
     if (refusal) secretConsumer.refusal.value = refusal;
   }
 }

@@ -17,6 +17,8 @@ import {
   servicenowTemplate,
   servicenowConfig,
   servicenowDestinationType,
+  servicenowSignInPayload,
+  servicenowSavedCredentials,
 } from "@/utils/prebuilt-templates/servicenow";
 
 describe("servicenow template", () => {
@@ -123,5 +125,73 @@ describe("servicenow template", () => {
     it("has correct category", () => {
       expect(servicenowDestinationType.category).toBe("incident");
     });
+  });
+});
+
+describe("servicenowSignInPayload", () => {
+  const typed = { username: "admin", password: "pw" };
+  it.each([
+    [
+      "no method: today's browser-built Basic header",
+      { ...typed, authMethod: "" },
+      { headers: { Authorization: `Basic ${btoa("admin:pw")}` }, metadata: {} },
+    ],
+    [
+      "basic with a picked secret: metadata only, no Authorization",
+      {
+        username: " admin ",
+        password: "",
+        passwordSecret: "{{secrets.SN_PW}}",
+        authMethod: "basic",
+      },
+      {
+        headers: {},
+        metadata: {
+          servicenow_auth: "basic",
+          servicenow_username: "admin",
+          servicenow_password: "{{secrets.SN_PW}}",
+        },
+      },
+    ],
+    [
+      "basic on an old destination with no pick keeps the plain header",
+      { ...typed, passwordSecret: "", authMethod: "basic" },
+      { headers: { Authorization: `Basic ${btoa("admin:pw")}` }, metadata: {} },
+    ],
+    [
+      "api_key drops the other method's username and password",
+      {
+        ...typed,
+        passwordSecret: "{{secrets.SN_PW}}",
+        apiKeySecret: "{{secrets.SN_KEY}}",
+        authMethod: "api_key",
+      },
+      {
+        headers: { "x-sn-apikey": "{{secrets.SN_KEY}}" },
+        metadata: { servicenow_auth: "api_key" },
+      },
+    ],
+  ])("%s", (_name, credentials, expected) => {
+    expect(servicenowSignInPayload(credentials)).toEqual(expected);
+  });
+});
+
+describe("servicenowSavedCredentials", () => {
+  it.each([
+    ["an old destination opens as basic", {}, {}, { authMethod: "basic" }],
+    [
+      "a basic destination restores its username and secret",
+      { servicenow_auth: "basic", servicenow_username: "o2", servicenow_password: "{{secrets.P}}" },
+      {},
+      { authMethod: "basic", username: "o2", passwordSecret: "{{secrets.P}}" },
+    ],
+    [
+      "an api_key destination restores its key",
+      { servicenow_auth: "api_key" },
+      { "x-sn-apikey": "{{secrets.K}}" },
+      { authMethod: "api_key", apiKeySecret: "{{secrets.K}}" },
+    ],
+  ])("%s", (_name, metadata, headers, expected) => {
+    expect(servicenowSavedCredentials(metadata, headers)).toEqual(expected);
   });
 });

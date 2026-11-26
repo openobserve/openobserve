@@ -44,6 +44,7 @@ use super::{
     jira,
     platform::{self, platform_of},
     render, resolve_content,
+    servicenow::{self, SignIn},
 };
 use crate::alerts::{
     alert::{
@@ -96,6 +97,7 @@ pub(crate) struct SecretRequest {
     headers: HeaderMap,
     endpoint_pointer: String,
     resolved: Resolved,
+    sign_in: Option<SignIn>,
 }
 
 impl SecretRequest {
@@ -117,6 +119,12 @@ impl SecretRequest {
         {
             return Err(refuse(SecretErrorCode::DeliveryStale));
         }
+        let sign_in = match &destination.module {
+            Module::Alert {
+                destination_type, ..
+            } => servicenow::sign_in_of(destination_type).map_err(SendError::Blocked)?,
+            Module::Pipeline { .. } => None,
+        };
         let snapshot = destination_snapshot(destination)
             .await
             .map_err(refuse)?
@@ -133,7 +141,7 @@ impl SecretRequest {
         authorize_human_sender(&destination.org_id, &checked)
             .await
             .map_err(refuse)?;
-        let resolved = resolver::materialize(conn, &snapshot, plan)
+        let mut resolved = resolver::materialize(conn, &snapshot, plan)
             .await
             .map_err(refuse)?;
         validate_materialized_slots(&snapshot, &resolved).map_err(refuse)?;
@@ -151,7 +159,11 @@ impl SecretRequest {
         )
         .await
         .map_err(|_| SendError::Blocked("Destination URL blocked by SSRF guard".into()))?;
-        let headers = secret_headers(endpoint, base, &resolved)?;
+        let mut headers = secret_headers(endpoint, base, &resolved)?;
+        if sign_in == Some(SignIn::Basic) {
+            let value = basic_authorization(endpoint, base, &mut resolved)?;
+            headers.insert(reqwest::header::AUTHORIZATION, value);
+        }
         #[cfg(test)]
         let builder = match SECRET_TEST_ROOT.get() {
             Some(cert) => builder.tls_certs_only([cert.clone()]).no_proxy(),
@@ -166,6 +178,7 @@ impl SecretRequest {
             headers,
             endpoint_pointer: base.to_owned(),
             resolved,
+            sign_in,
         }))
     }
 
@@ -195,6 +208,23 @@ impl SecretRequest {
                 text,
             )
             .map_err(|code| secret_error(endpoint, code))
+    }
+
+    /// Puts the ServiceNow sign-in words on a refused answer; others keep their text. [pure]
+    pub(crate) fn explain(
+        &self,
+        error: anyhow::Error,
+        status: StatusCode,
+        headers: &HeaderMap,
+    ) -> anyhow::Error {
+        let rule = headers
+            .get(servicenow::RATE_LIMIT_RULE_HEADER)
+            .and_then(|value| value.to_str().ok())
+            .map(|rule| self.resolved.redactor.redact(rule));
+        match servicenow::rejection(self.sign_in, status, rule.as_deref()) {
+            Some(text) => error.context(text),
+            None => error,
+        }
     }
 
     pub(crate) fn transport_error(&self, error: reqwest::Error) -> anyhow::Error {
@@ -494,6 +524,38 @@ fn secret_headers(
     Ok(headers)
 }
 
+/// The resolved password goes into the attempt's redactor before it leaves as a header.
+fn basic_authorization(
+    endpoint: &Endpoint,
+    base: &str,
+    resolved: &mut Resolved,
+) -> anyhow::Result<HeaderValue> {
+    let text = endpoint
+        .metadata
+        .get(servicenow::PASSWORD_KEY)
+        .map_or("", String::as_str);
+    let password = resolved
+        .substitute_slot(
+            &format!("{base}/metadata/{}", servicenow::PASSWORD_KEY),
+            text,
+        )
+        .map_err(|code| secret_error(endpoint, code))?;
+    let username = endpoint
+        .metadata
+        .get(servicenow::USERNAME_KEY)
+        .map_or("", String::as_str);
+    let credential = SecretValue::new(format!("{username}:{}", password.as_str()));
+    resolved.redactor.cover(&credential);
+    let header = SecretValue::new(format!(
+        "Basic {}",
+        config::utils::base64::encode(&credential)
+    ));
+    let mut value = HeaderValue::from_str(&header)
+        .map_err(|_| SendError::Blocked("invalid destination header value".into()))?;
+    value.set_sensitive(true);
+    Ok(value)
+}
+
 /// Runs on the set this attempt will materialize, before any value is read or fetched for it.
 async fn authorize_human_sender(
     org_id: &str,
@@ -684,6 +746,7 @@ mod tests {
     use config::{
         ider::ksuid,
         meta::{
+            alerts::{content_spec::ContentSpec, notification_kind::NotificationKind},
             destinations::{AwsSns, Module, SlackAppTarget},
             secret_store::{ConsumerType, GateState, ORG_ENV_ID, SecretKind},
             user::UserRole,
@@ -708,7 +771,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        alerts::{destinations::SavePrincipal, notifications::notify},
+        alerts::{
+            destinations::SavePrincipal,
+            notifications::{notify, servicenow, test_send},
+        },
         ssrf_test_support::isolated,
     };
 
@@ -1752,6 +1818,161 @@ server.serve_forever()
                     "secret_error:secret_deleted:TOKEN"
                 );
                 receiver.assert_no_request().await;
+            },
+        );
+    }
+
+    #[test]
+    fn servicenow_basic_signs_in_on_every_send_path() {
+        run(
+            concat!(
+                module_path!(),
+                "::servicenow_basic_signs_in_on_every_send_path"
+            ),
+            |dir| async move {
+                let mut receiver = Receiver::start(&dir).await;
+                let fixture = Fixture::new(&receiver.base, "PW", CANARY).await;
+                let destination = fixture
+                    .save(Endpoint {
+                        url: format!("{}/incidents", receiver.base),
+                        destination_type: Some("servicenow".into()),
+                        metadata: [
+                            (servicenow::AUTH_KEY.into(), "basic".into()),
+                            (servicenow::USERNAME_KEY.into(), "abcd".into()),
+                            (servicenow::PASSWORD_KEY.into(), "{{secrets.PW}}".into()),
+                        ]
+                        .into(),
+                        ..Default::default()
+                    })
+                    .await;
+                let (_, endpoint) = http(&destination);
+                let basic = |password: &str| {
+                    format!(
+                        "Basic {}",
+                        config::utils::base64::encode(&format!("abcd:{password}"))
+                    )
+                };
+                let send =
+                    || send_saved_http_notification(&destination, endpoint, None, "{}".into());
+
+                let (outcome, ()) = tokio::join!(send(), async {
+                    let request = receiver.request().await;
+                    assert_eq!(request["headers"]["authorization"], basic(CANARY));
+                    fixture.rotate("rotated").await;
+                    receiver.reply(json!({"status": 401})).await;
+                    let request = receiver.request().await;
+                    assert_eq!(request["headers"]["authorization"], basic("rotated"));
+                    receiver.reply(json!({"status": 200})).await;
+                });
+                assert_eq!(outcome.unwrap(), "sent status: 200 OK");
+
+                let (outcome, ()) = tokio::join!(send(), async {
+                    receiver.request().await;
+                    receiver.reply(json!({"status": 401})).await;
+                });
+                let error = outcome.unwrap_err().to_string();
+                assert!(
+                    error.starts_with("ServiceNow refused the username and password (401)."),
+                    "{error}"
+                );
+
+                let (outcome, ()) = tokio::join!(
+                    platform::send_saved_resolve(
+                        &destination,
+                        platform::Platform::ServiceNow,
+                        endpoint,
+                        "episode",
+                    ),
+                    async {
+                        let lookup = receiver.request().await;
+                        assert_eq!(lookup["headers"]["authorization"], basic("rotated"));
+                        receiver
+                            .reply(json!({"status": 429, "headers": {"X-RateLimit-Rule": "incident-create"}}))
+                            .await;
+                    },
+                );
+                assert_eq!(
+                    outcome.unwrap_err().to_string(),
+                    "ServiceNow is rate limiting requests (incident-create). A ServiceNow admin \
+                     can raise the limit for this user."
+                );
+
+                let principal = SavePrincipal {
+                    user_id: "root@example.org".into(),
+                    role: UserRole::Root,
+                };
+                let spec = ContentSpec {
+                    title: "t".into(),
+                    body: "b".into(),
+                    ..Default::default()
+                };
+                let (outcome, ()) = tokio::join!(
+                    test_send::test_send_saved(
+                        &destination.org_id,
+                        &principal,
+                        &destination,
+                        &spec,
+                        NotificationKind::Alert,
+                    ),
+                    async {
+                        let request = receiver.request().await;
+                        assert_eq!(request["headers"]["authorization"], basic("rotated"));
+                        receiver.reply(json!({"status": 200})).await;
+                    },
+                );
+                assert_eq!(outcome.unwrap(), "sent status: 200 OK");
+
+                // With a 4-character username the password's own base64 is not inside the header's.
+                let attempt = SecretRequest::new(
+                    Some(&destination),
+                    endpoint,
+                    destination_client_builder(false),
+                )
+                .await
+                .unwrap()
+                .unwrap();
+                let header = basic("rotated");
+                assert!(!header.contains(&config::utils::base64::encode("rotated")));
+                assert_eq!(
+                    attempt.resolved.redactor.redact(&header),
+                    "Basic [REDACTED]"
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn servicenow_api_key_reaches_the_instance() {
+        run(
+            concat!(module_path!(), "::servicenow_api_key_reaches_the_instance"),
+            |dir| async move {
+                let mut receiver = Receiver::start(&dir).await;
+                let fixture = Fixture::new(&receiver.base, "KEY", CANARY).await;
+                let destination = fixture
+                    .save(Endpoint {
+                        url: format!("{}/incidents", receiver.base),
+                        destination_type: Some("servicenow".into()),
+                        metadata: [(servicenow::AUTH_KEY.into(), "api_key".into())].into(),
+                        headers: Some([("x-sn-apikey".into(), "{{secrets.KEY}}".into())].into()),
+                        ..Default::default()
+                    })
+                    .await;
+                let (_, endpoint) = http(&destination);
+                let send =
+                    || send_saved_http_notification(&destination, endpoint, None, "{}".into());
+                for (status, message) in [
+                    (403, "ServiceNow refused the request (403)."),
+                    (401, "ServiceNow refused the API key (401)."),
+                ] {
+                    let (outcome, ()) = tokio::join!(send(), async {
+                        let request = receiver.request().await;
+                        assert_eq!(request["headers"]["x-sn-apikey"], CANARY);
+                        assert!(request["headers"].get("authorization").is_none());
+                        receiver.reply(json!({"status": status})).await;
+                    });
+                    let error = outcome.unwrap_err().to_string();
+                    assert!(error.starts_with(message), "{error}");
+                }
             },
         );
     }
