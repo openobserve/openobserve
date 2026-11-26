@@ -177,10 +177,11 @@ export interface AiEntryButtonProps {
   /** Registry id whose keycaps the tooltip shows beside its text. */
   shortcutId?: string;
   narrowIconOnly?: boolean;
+  /** A prop, not an emit: a menu item can unmount before its build settles, and Vue drops an unmounted emit. */
+  onOpened?: (result: OpenAssistantResult) => void;
 }
 
 export interface AiEntryButtonEmits {
-  (e: "opened", result: OpenAssistantResult): void;
   /** A pressed toggle was activated again: the host closes its dock. */
   (e: "closed"): void;
 }
@@ -712,7 +713,7 @@ async function activate(): Promise<void> {
 async function runHandoff(handoff: () => void | Promise<void>): Promise<void> {
   const key = callerKey();
   if (key && key !== store.state.userOrgKey) {
-    emit("opened", await openAssistant(callFor(undefined, controlEl())));
+    props.onOpened?.(await openAssistant(callFor(undefined, controlEl())));
     return;
   }
   await handoff();
@@ -728,7 +729,7 @@ async function run(): Promise<void> {
   const invoker = toolbarOwner?.() ?? controlEl();
   const result = await openAssistant(callFor(payload, invoker));
   if (result.ok) rememberEmptyState(result.sid);
-  emit("opened", result);
+  props.onOpened?.(result);
   if (!result.ok || result.sent || result.staged === 0) return;
   if (!placement.isVisible.value) return toastAdded();
   const total = store.state.sessions[result.sid]?.composer.chips.length ?? result.staged;
