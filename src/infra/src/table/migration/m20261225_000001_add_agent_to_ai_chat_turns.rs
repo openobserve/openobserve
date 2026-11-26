@@ -15,11 +15,31 @@
 
 //! Adds the agent that answered each turn and the agent it took over from to `ai_chat_turns`.
 
+use sea_orm::{ConnectionTrait, DatabaseConnection};
 use sea_orm_migration::prelude::*;
 
 const TURNS: &str = "ai_chat_turns";
 const AGENT_TYPE: &str = "agent_type";
 const HANDOFF_FROM: &str = "handoff_from";
+/// The assistant migrations under their names before they were dated after main's newest.
+const RENAMED_AI_MIGRATIONS: [&str; 16] = [
+    "m20261030_000001_add_agent_to_ai_chat_turns",
+    "m20261016_000001_add_first_event_at_to_ai_chat_turns",
+    "m20261020_000001_add_health_to_org_ai_toolsets",
+    "m20261020_000002_create_ai_grants",
+    "m20261020_000003_create_ai_actions",
+    "m20261020_000004_create_ai_access_requests",
+    "m20261020_000005_create_ai_turn_marks",
+    "m20261021_000001_add_history_to_ai_chat_sessions",
+    "m20261021_000002_add_versions_to_ai_chat_turns",
+    "m20261021_000003_add_hide_attachments_to_ai_chat_shares",
+    "m20261021_000004_create_ai_chat_feedback",
+    "m20261021_000005_create_ai_chat_imports",
+    "m20261021_000006_create_paid_overage_attribution",
+    "m20261021_000007_create_ai_approvals",
+    "m20261218_000001_ai_chat_sessions_branched_from",
+    "m20261219_000001_add_approval_scope_to_ai_actions",
+];
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -86,12 +106,26 @@ fn add_statement(mut column: ColumnDef) -> TableAlterStatement {
         .to_owned()
 }
 
+/// Drops the pre-rename history rows, which `Migrator::up` refuses to run with; every body reruns.
+pub(crate) async fn forget_renamed_ai_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
+    if !SchemaManager::new(db).has_table("seaql_migrations").await? {
+        return Ok(());
+    }
+    let stmt = Query::delete()
+        .from_table(Alias::new("seaql_migrations"))
+        .and_where(Expr::col(Alias::new("version")).is_in(RENAMED_AI_MIGRATIONS))
+        .to_owned();
+    db.execute(db.get_database_backend().build(&stmt)).await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, FromQueryResult, Statement};
+    use sea_orm_migration::MigratorTrait;
 
     use super::*;
-    use crate::table::ai_chat_sessions::hand_off_with;
+    use crate::table::{ai_chat_sessions::hand_off_with, migration::Migrator};
 
     #[derive(Debug, FromQueryResult, PartialEq)]
     struct Row {
@@ -187,5 +221,31 @@ mod tests {
             "no second move"
         );
         assert!(!hand_off_with(&db, "o", "gone", "sre").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn forgetting_the_renamed_ai_migrations_lets_the_migrator_run() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        forget_renamed_ai_migrations(&db).await.unwrap();
+        Migrator::install(&db).await.unwrap();
+        for name in RENAMED_AI_MIGRATIONS {
+            db.execute_unprepared(&format!(
+                "INSERT INTO seaql_migrations (version, applied_at) VALUES ('{name}', 1)"
+            ))
+            .await
+            .unwrap();
+        }
+        let Err(err) = Migrator::get_pending_migrations(&db).await else {
+            panic!("the migrator ran with renamed migrations in its history");
+        };
+        assert!(err.to_string().contains("is missing"), "{err}");
+
+        forget_renamed_ai_migrations(&db).await.unwrap();
+        assert!(
+            Migrator::get_applied_migrations(&db)
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 }

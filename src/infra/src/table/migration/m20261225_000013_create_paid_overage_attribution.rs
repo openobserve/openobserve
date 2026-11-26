@@ -100,7 +100,7 @@ mod tests {
     fn test_migration_name() {
         assert_eq!(
             Migration.name(),
-            "m20261021_000006_create_paid_overage_attribution"
+            "m20261225_000013_create_paid_overage_attribution"
         );
     }
 
