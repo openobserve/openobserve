@@ -531,10 +531,20 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
 mod tests {
     use datafusion::{
         arrow::datatypes::{DataType, Field, Schema},
-        common::JoinType,
+        common::{JoinType, ScalarValue},
         execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
-        physical_optimizer::PhysicalOptimizerRule,
-        physical_plan::{empty::EmptyExec, expressions::col},
+        functions_aggregate::count::count_udaf,
+        physical_expr::{
+            aggregate::{AggregateExprBuilder, AggregateFunctionExpr},
+            expressions::Literal,
+        },
+        physical_optimizer::{PhysicalOptimizerRule, sanity_checker::check_plan_tree_sanity},
+        physical_plan::{
+            displayable,
+            empty::EmptyExec,
+            expressions::{col, lit},
+            windows::BoundedWindowAggExec,
+        },
         prelude::{SessionConfig, SessionContext},
     };
     use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
@@ -543,6 +553,15 @@ mod tests {
     use crate::datafusion::{
         datasource::empty_table::NewEmptyTable, distributed::codec::get_physical_extension_codec,
     };
+
+    // DataFusion rejects an AggregateExec with neither grouping nor aggregates.
+    fn count_one(schema: &Arc<Schema>) -> Result<Vec<Arc<AggregateFunctionExpr>>> {
+        let count = AggregateExprBuilder::new(count_udaf(), vec![lit(1i32)])
+            .schema(Arc::clone(schema))
+            .alias("COUNT(1)")
+            .build()?;
+        Ok(vec![Arc::new(count)])
+    }
 
     #[test]
     fn test_remote_scan_rule_name() {
@@ -592,8 +611,7 @@ mod tests {
     }
 
     #[test]
-    fn test_wrap_partial_reduce_single_mode_returns_input_unchanged()
-    -> datafusion::common::Result<()> {
+    fn test_wrap_partial_reduce_single_mode_returns_input_unchanged() -> Result<()> {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
         let group_by = PhysicalGroupBy::new(
             vec![(col("a", &schema)?, "a".to_string())],
@@ -617,15 +635,14 @@ mod tests {
     }
 
     #[test]
-    fn test_wrap_partial_reduce_partial_no_group_by_produces_partial_reduce()
-    -> datafusion::common::Result<()> {
+    fn test_wrap_partial_reduce_partial_no_group_by_produces_partial_reduce() -> Result<()> {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
         let group_by = PhysicalGroupBy::new(vec![], vec![], vec![vec![]], false);
         let agg = AggregateExec::try_new(
             AggregateMode::Partial,
             group_by,
-            vec![],
-            vec![],
+            count_one(&schema)?,
+            vec![None],
             Arc::new(EmptyExec::new(Arc::clone(&schema))),
             Arc::clone(&schema),
         )?;
@@ -639,7 +656,7 @@ mod tests {
 
     #[test]
     fn test_wrap_partial_reduce_partial_with_group_by_produces_partial_reduce_with_column_refs()
-    -> datafusion::common::Result<()> {
+    -> Result<()> {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
         let group_by = PhysicalGroupBy::new(
             vec![(col("a", &schema)?, "a".to_string())],
@@ -671,8 +688,7 @@ mod tests {
     }
 
     #[test]
-    fn test_wrap_partial_reduce_multi_partition_group_by_hash_repartitions()
-    -> datafusion::common::Result<()> {
+    fn test_wrap_partial_reduce_multi_partition_group_by_hash_repartitions() -> Result<()> {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
         let group_by = PhysicalGroupBy::new(
             vec![(col("a", &schema)?, "a".to_string())],
@@ -712,16 +728,15 @@ mod tests {
     }
 
     #[test]
-    fn test_wrap_partial_reduce_multi_partition_no_group_by_falls_back_to_coalesce()
-    -> datafusion::common::Result<()> {
+    fn test_wrap_partial_reduce_multi_partition_no_group_by_falls_back_to_coalesce() -> Result<()> {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
         let group_by = PhysicalGroupBy::new(vec![], vec![], vec![vec![]], false);
         // Partial agg over a 4-partition input but with no GROUP BY.
         let agg = AggregateExec::try_new(
             AggregateMode::Partial,
             group_by,
-            vec![],
-            vec![],
+            count_one(&schema)?,
+            vec![None],
             Arc::new(EmptyExec::new(Arc::clone(&schema)).with_partitions(4)),
             Arc::clone(&schema),
         )?;
@@ -734,8 +749,7 @@ mod tests {
     }
 
     #[test]
-    fn test_wrap_partial_reduce_for_partial_reduce_source_accepts_remote_output()
-    -> datafusion::common::Result<()> {
+    fn test_wrap_partial_reduce_for_partial_reduce_source_accepts_remote_output() -> Result<()> {
         let scan_schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
         let group_by = PhysicalGroupBy::new(
             vec![(col("a", &scan_schema)?, "a".to_string())],
@@ -786,7 +800,7 @@ mod tests {
     // (which is the group-by key `client_ip:Utf8`), causing MinMaxBytesAccumulator(Utf8) to
     // be created and then panic when fed Int64 state data.
     #[test]
-    fn test_wrap_partial_reduce_input_schema_is_scan_schema() -> datafusion::common::Result<()> {
+    fn test_wrap_partial_reduce_input_schema_is_scan_schema() -> Result<()> {
         // Scan schema: [_timestamp:Int64 @ 0, client_ip:Utf8 @ 1]
         // Group by client_ip (index 1), so partial output is [client_ip:Utf8, ...].
         // After wrapping, result_agg.input_schema() must still be the SCAN schema.
@@ -827,12 +841,7 @@ mod tests {
     // unchanged.  The original code remapped them to Column refs, which would replace
     // the NULL sentinel with the actual column value during ROLLUP/CUBE aggregation.
     #[test]
-    fn test_wrap_partial_reduce_null_exprs_preserved_for_grouping_sets()
-    -> datafusion::common::Result<()> {
-        use datafusion::{
-            arrow::datatypes::DataType, common::ScalarValue, physical_expr::expressions::Literal,
-        };
-
+    fn test_wrap_partial_reduce_null_exprs_preserved_for_grouping_sets() -> Result<()> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("a", DataType::Int64, false),
             Field::new("b", DataType::Utf8, false),
@@ -1033,7 +1042,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_cluster_window_partitioned_by_filtered_constants_executes() {
-        use datafusion::physical_plan::windows::BoundedWindowAggExec;
         let latest = "SELECT event_name, _timestamp FROM (SELECT event_name, _timestamp, \
             ROW_NUMBER() OVER (PARTITION BY k8s_cluster, k8s_resource_name, \
             COALESCE(k8s_namespace_name, ''), event_name ORDER BY _timestamp DESC) AS rn \
@@ -1091,12 +1099,8 @@ mod tests {
 
     async fn assert_cluster_plan_is_sane(sql: &str) {
         let (ctx, plan) = cluster_plan(sql).await;
-        let check = datafusion::physical_optimizer::sanity_checker::SanityCheckPlan::new();
-        if let Err(e) = check.optimize(Arc::clone(&plan), ctx.state().config_options()) {
-            panic!(
-                "{sql}: {e}\n{}",
-                datafusion::physical_plan::displayable(plan.as_ref()).indent(false)
-            );
+        if let Err(e) = check_plan_tree_sanity(&plan, &ctx.state().config_options().optimizer) {
+            panic!("{sql}: {e}\n{}", displayable(plan.as_ref()).indent(false));
         }
     }
 
@@ -1113,6 +1117,20 @@ mod tests {
         ] {
             assert_cluster_plan_is_sane(sql).await;
         }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_window_on_computed_key_keeps_equivalences() {
+        // DataFusion drops the outer sort through `scan_type ≡ COALESCE(..)`, which only
+        // holds above RemoteScanExec if it keeps the input's equivalence classes.
+        assert_cluster_plan_is_sane(
+            "SELECT _timestamp, COALESCE(k8s_cluster, 'unknown') AS scan_type, value, \
+                ROW_NUMBER() OVER (PARTITION BY COALESCE(k8s_cluster, 'unknown') ORDER BY value) \
+                AS rn_by_scan, \
+                AVG(value) OVER (PARTITION BY COALESCE(k8s_cluster, 'unknown')) AS avg_by_scan \
+                FROM t WHERE value IS NOT NULL ORDER BY scan_type, rn_by_scan LIMIT 10",
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -1138,7 +1156,7 @@ mod tests {
                 sorted_below_merge |= node.downcast_ref::<SortExec>().is_some_and(|sort| {
                     sort.expr().iter().any(|e| {
                         e.expr
-                            .downcast_ref::<datafusion::physical_expr::expressions::Column>()
+                            .downcast_ref::<PhysicalColumn>()
                             .is_some_and(|c| c.name() == "_timestamp")
                     })
                 });
@@ -1232,7 +1250,7 @@ mod tests {
         )
         .unwrap();
         let (ctx, plan) = cluster_plan_with(sql, session_config).await;
-        let display = datafusion::physical_plan::displayable(plan.as_ref()).indent(false);
+        let display = displayable(plan.as_ref()).indent(false);
         let context = format!("{sql} (target_partitions={target_partitions})\n{display}");
         let mut joins = vec![];
         plan.apply(|node| {
@@ -1252,8 +1270,7 @@ mod tests {
         }
         assert_eq!(count_bare_new_empty_execs(&plan), 0, "{context}");
         assert!(decode_every_remote_scan(&ctx, &plan) >= 2, "{context}");
-        let check = datafusion::physical_optimizer::sanity_checker::SanityCheckPlan::new();
-        if let Err(e) = check.optimize(Arc::clone(&plan), ctx.state().config_options()) {
+        if let Err(e) = check_plan_tree_sanity(&plan, &ctx.state().config_options().optimizer) {
             panic!("{e}: {context}");
         }
     }

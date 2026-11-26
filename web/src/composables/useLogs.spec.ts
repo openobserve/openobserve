@@ -417,6 +417,53 @@ describe("Use Logs Composable", () => {
       expect(wrapper.vm.searchObj.meta.freeTextScan).toEqual({});
     });
 
+    it("restores the picked Drill down dimensions and clears them when the link has none", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        drilldown_dims: "level,k8s_namespace_name",
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.drillDownDimensions).toEqual([
+        "level",
+        "k8s_namespace_name",
+      ]);
+
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.drillDownDimensions).toBeNull();
+    });
+
+    it("restores an emptied Drill down pick list as empty, not as the defaults", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        drilldown_dims: "",
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.drillDownDimensions).toEqual([]);
+    });
+
+    it("restores a Drill down dimension whose name holds a comma", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        drilldown_dims: `${encodeURIComponent("a,b")},level,%E0%A4`,
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.drillDownDimensions).toEqual(["a,b", "level", "%E0%A4"]);
+    });
+
     it("should restore stream and datetime parameters", async () => {
       wrapper.vm.router.currentRoute.value.query = {
         stream: "stream1,stream2",
@@ -435,6 +482,14 @@ describe("Use Logs Composable", () => {
         relativeTimePeriod: null,
         type: "absolute",
       });
+    });
+
+    it("keeps the range in force when the link names only a stream", async () => {
+      const kept = { startTime: 1, endTime: 2, relativeTimePeriod: "1h", type: "relative" };
+      wrapper.vm.searchObj.data.datetime = { ...kept };
+      wrapper.vm.router.currentRoute.value.query = { stream: "stream1", stream_type: "logs" };
+      await wrapper.vm.restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.data.datetime).toEqual(kept);
     });
 
     it("should handle relative time period", async () => {

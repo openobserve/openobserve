@@ -16,6 +16,7 @@
 import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, afterEach } from "vitest";
 import PrefixFilterPanel from "./PrefixFilterPanel.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -197,6 +198,62 @@ describe("PrefixFilterPanel", () => {
     it("keeps a SELECTED zero-count facet visible so it stays deselectable", () => {
       wrapper = createWrapper({ selected: new Set(["http_requests"]) });
       expect(renderedIds(wrapper)).toContain("http_requests");
+    });
+  });
+
+  describe("counts not yet checked (#17163)", () => {
+    const PARTIAL = [
+      { id: "http_requests", label: "http_requests", count: 4, unchecked: 0 },
+      { id: "kube", label: "kube", count: 2, unchecked: 6 },
+      { id: "system_cpu", label: "system_cpu", count: 0, unchecked: 3 },
+      { id: "traces_service", label: "traces_service", count: 0, unchecked: 0 },
+    ];
+    const chip = (id: string) => wrapper.find(`[data-test="metrics-explorer-prefix-count-${id}"]`);
+
+    it('shows "N+" while some metrics are unchecked, and a plain number once all are', () => {
+      wrapper = createWrapper({ facets: PARTIAL });
+      expect(chip("kube").text()).toBe("2+");
+      expect(chip("system_cpu").text()).toBe("0+");
+      expect(chip("http_requests").text()).toBe("4");
+    });
+
+    it('keeps a "0+" row visible, but hides a settled 0 unless it is selected', async () => {
+      wrapper = createWrapper({ facets: PARTIAL });
+      expect(renderedIds(wrapper)).toEqual(["http_requests", "kube", "system_cpu"]);
+      await wrapper.setProps({ selected: new Set(["traces_service"]) });
+      expect(renderedIds(wrapper)).toContain("traces_service");
+      expect(chip("traces_service").text()).toBe("0");
+    });
+
+    // OTruncatedText carries its own tooltip, so only the count tooltips are kept.
+    const countTips = () =>
+      wrapper
+        .findAllComponents(OTooltip)
+        .map((tip) => String(tip.props("content") ?? ""))
+        .filter((text) => text.includes("not checked"));
+
+    it("explains the split in a tooltip only on rows with unchecked metrics", () => {
+      wrapper = createWrapper({ facets: PARTIAL });
+      expect(countTips()).toEqual([
+        "2 with data · 6 not checked yet",
+        "0 with data · 3 not checked yet",
+      ]);
+    });
+
+    it("gives screen readers the same split the tooltip shows", () => {
+      wrapper = createWrapper({ facets: PARTIAL });
+      const aria = (id: string) =>
+        wrapper
+          .find(`[data-test="metrics-explorer-prefix-facet-${id}"] button[role="checkbox"]`)
+          .attributes("aria-label");
+      expect(aria("kube")).toBe("kube, 2 with data, 6 not checked yet");
+      expect(aria("http_requests")).toBe("http_requests, 4 metrics");
+    });
+
+    it("treats a facet without an unchecked field as settled", () => {
+      wrapper = createWrapper();
+      expect(chip("node_cpu").text()).toBe("12");
+      expect(countTips()).toEqual([]);
     });
   });
 

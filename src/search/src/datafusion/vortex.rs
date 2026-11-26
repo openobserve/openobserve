@@ -37,7 +37,7 @@ use vortex::{
     error::VortexResult,
     file::WriteStrategyBuilder,
     layout::{LayoutStrategy, layouts::compressed::CompressorPlugin},
-    scan::selection::Selection,
+    scan::{selection::Selection, strict_sorted_buffer::StrictSortedBuffer},
     session::VortexSession,
 };
 use vortex_btrblocks::{SchemeExt, schemes::integer::IntDictScheme};
@@ -212,8 +212,7 @@ pub fn generate_vortex_access_plan(row_ids: &BooleanBuffer) -> Option<VortexAcce
 
     let buffer = Buffer::from(indices);
     let selection = VortexAccessPlan::default().with_selection(Selection::IncludeByIndex(
-        vortex::scan::strict_sorted_buffer::StrictSortedBuffer::try_new(buffer)
-            .expect("bitmap set indices are strictly increasing"),
+        StrictSortedBuffer::try_new(buffer).expect("bitmap set indices are strictly increasing"),
     ));
     Some(selection)
 }
@@ -254,11 +253,12 @@ mod tests {
         VortexSessionDefault,
         array::{
             IntoArray,
-            arrays::{StructArray, VarBinViewArray},
-            expr::{root, select},
+            arrays::{PrimitiveArray, StructArray, VarBinViewArray},
             stream::ArrayStreamExt,
+            validity::Validity,
         },
         dtype::{DType, FieldNames, Nullability},
+        expr::{root, select},
         file::{OpenOptionsSessionExt, VortexWriteOptions},
         io::session::RuntimeSessionExt,
         session::VortexSession,
@@ -343,8 +343,6 @@ mod tests {
 
     #[test]
     fn test_non_utf8_uses_btrblocks() {
-        use vortex::array::arrays::PrimitiveArray;
-
         let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::from_session(
             &VortexSession::default(),
         ));
@@ -378,7 +376,7 @@ mod tests {
             VortexCompression::Compact,
         ] {
             // Monotonic integers exercise encodings that require opt-in editions.
-            let array = vortex::array::arrays::PrimitiveArray::from_iter(0..8192i64).into_array();
+            let array = PrimitiveArray::from_iter(0..8192i64).into_array();
             let dtype = array.dtype().clone();
             let session = VortexSession::default().with_tokio();
             let write_options = VortexWriteOptions::new(session.clone())
@@ -409,7 +407,7 @@ mod tests {
             FieldNames::from(["body", "tag"]),
             vec![body, tag],
             8192,
-            vortex::array::validity::Validity::NonNullable,
+            Validity::NonNullable,
         )
         .unwrap()
         .into_array();
@@ -445,7 +443,7 @@ mod tests {
     #[tokio::test]
     async fn test_custom_strategy_dict_encodes_low_cardinality_integers() {
         // 240 distinct scrape timestamps cycling over series, as in a hash-sorted metrics file
-        let ts = vortex::array::arrays::PrimitiveArray::from_iter(
+        let ts = PrimitiveArray::from_iter(
             (0..8192i64).map(|i| 1_789_452_000_000_000 + (i % 240) * 15_000_000),
         )
         .into_array();
@@ -453,7 +451,7 @@ mod tests {
             FieldNames::from(["ts"]),
             vec![ts],
             8192,
-            vortex::array::validity::Validity::NonNullable,
+            Validity::NonNullable,
         )
         .unwrap()
         .into_array();
@@ -492,7 +490,7 @@ mod tests {
     #[tokio::test]
     async fn test_compact_strategy_uses_pco() {
         // jittered 15s scrape steps defeat dict, sequence and plain bitpacking
-        let ts = vortex::array::arrays::PrimitiveArray::from_iter(
+        let ts = PrimitiveArray::from_iter(
             (0..8192i64).map(|i| 1_789_452_000_000_000 + i * 15_000_000 + (i % 7) * 1_000),
         )
         .into_array();
@@ -500,7 +498,7 @@ mod tests {
             FieldNames::from(["ts"]),
             vec![ts],
             8192,
-            vortex::array::validity::Validity::NonNullable,
+            Validity::NonNullable,
         )
         .unwrap()
         .into_array();

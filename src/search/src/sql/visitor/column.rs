@@ -20,8 +20,8 @@ use datafusion::common::TableReference;
 use hashbrown::{HashMap, HashSet};
 use infra::schema::SchemaCache;
 use sqlparser::ast::{
-    Expr, GroupByExpr, OrderByKind, Query, SelectItem, SetExpr, Value, ValueWithSpan, VisitMut,
-    VisitorMut,
+    Expr, GroupByExpr, LimitClause, OrderByKind, OrderBySort, Query, SelectItem, SetExpr, Value,
+    ValueWithSpan, VisitMut, VisitorMut,
 };
 
 use crate::{sql::visitor::utils::FieldNameVisitor, utils::trim_quotes};
@@ -113,7 +113,7 @@ impl VisitorMut for ColumnVisitor<'_> {
             for order in exprs {
                 self.order_by.push((
                     order_by_key_name(&order.expr, projection),
-                    if order.options.asc.unwrap_or(true) {
+                    if !matches!(order.options.sort, Some(OrderBySort::Desc)) {
                         OrderBy::Asc
                     } else {
                         OrderBy::Desc
@@ -121,7 +121,7 @@ impl VisitorMut for ColumnVisitor<'_> {
                 ));
             }
         }
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
+        if let SetExpr::Select(select) = query.body.as_mut() {
             for select_item in select.projection.iter_mut() {
                 match select_item {
                     SelectItem::ExprWithAlias { expr, alias } => {
@@ -147,8 +147,7 @@ impl VisitorMut for ColumnVisitor<'_> {
             if select.distinct.is_some() {
                 self.is_distinct = true;
             }
-        } else if let sqlparser::ast::SetExpr::SetOperation { left, right, .. } =
-            query.body.as_mut()
+        } else if let SetExpr::SetOperation { left, right, .. } = query.body.as_mut()
             && (has_wildcard(left) || has_wildcard(right))
         {
             self.is_wildcard = true;
@@ -159,7 +158,7 @@ impl VisitorMut for ColumnVisitor<'_> {
         let mut has_limit = false;
         if is_outermost
             && let Some(limit_clause) = query.limit_clause.as_ref()
-            && let sqlparser::ast::LimitClause::LimitOffset { limit, offset, .. } = limit_clause
+            && let LimitClause::LimitOffset { limit, offset, .. } = limit_clause
         {
             if let Some(limit) = limit.as_ref()
                 && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
@@ -239,14 +238,14 @@ fn has_wildcard(set: &SetExpr) -> bool {
 #[cfg(test)]
 mod tests {
     use arrow_schema::{DataType, Field, Schema};
-    use sqlparser::dialect::GenericDialect;
+    use sqlparser::{dialect::GenericDialect, parser::Parser};
 
     use super::*;
 
     #[test]
     fn test_column_visitor() {
         let sql = "SELECT name, age, COUNT(*) FROM users WHERE status = 'active' GROUP BY name, age ORDER BY name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -277,7 +276,7 @@ mod tests {
     #[test]
     fn test_column_visitor_with_limit() {
         let sql = "SELECT name, age, COUNT(*) FROM users WHERE status in (select distinct status from users order by status limit 10) GROUP BY name, age ORDER BY name limit 1000";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -303,7 +302,7 @@ mod tests {
     #[test]
     fn test_column_visitor_with_wildcard() {
         let sql = "SELECT * FROM users union select * from users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -343,7 +342,7 @@ mod tests {
     #[test]
     fn test_column_visitor_direct_wildcard() {
         let sql = "SELECT * FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -358,7 +357,7 @@ mod tests {
     #[test]
     fn test_column_visitor_is_distinct() {
         let sql = "SELECT DISTINCT name FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -373,7 +372,7 @@ mod tests {
     #[test]
     fn test_column_visitor_columns_alias() {
         let sql = "SELECT name AS n, age AS a FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -399,7 +398,7 @@ mod tests {
     #[test]
     fn test_column_visitor_limit_and_offset() {
         let sql = "SELECT * FROM users LIMIT 100 OFFSET 50";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -415,7 +414,7 @@ mod tests {
     #[test]
     fn test_column_visitor_order_by_desc() {
         let sql = "SELECT name FROM users ORDER BY age DESC";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -468,7 +467,7 @@ mod tests {
         ];
         for (select, order_by, expected) in cases {
             let sql = format!("SELECT {select} FROM users {order_by}");
-            let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            let mut statement = Parser::parse_sql(&GenericDialect {}, &sql)
                 .unwrap()
                 .pop()
                 .unwrap();
@@ -486,7 +485,7 @@ mod tests {
     #[test]
     fn test_column_visitor_no_tests_when_no_schema_match() {
         let sql = "SELECT unknown_col FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -504,7 +503,7 @@ mod tests {
     fn test_column_visitor_compound_identifier() {
         // table.field style → CompoundIdentifier branch in pre_visit_expr
         let sql = "SELECT users.name, users.age FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -522,7 +521,7 @@ mod tests {
     #[test]
     fn test_column_visitor_order_by_multiple_keys() {
         let sql = "SELECT name FROM users ORDER BY name, age";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -545,7 +544,7 @@ mod tests {
     fn test_column_visitor_limit_no_explicit_offset_defaults_to_zero() {
         // LIMIT with no OFFSET → offset defaults to 0
         let sql = "SELECT * FROM users LIMIT 5";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -559,7 +558,7 @@ mod tests {
     }
 
     fn visit_limit(sql: &str) -> (Option<i64>, Option<i64>) {
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();

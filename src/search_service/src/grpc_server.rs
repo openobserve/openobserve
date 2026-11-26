@@ -55,8 +55,10 @@ impl Search for Searcher {
         let start = std::time::Instant::now();
         let req = req.into_inner();
         set_parent_or_trace_id(&tracing::Span::current(), parent_cx, &req.trace_id);
-        let request = json::from_slice::<search::Request>(&req.request)
+        let mut request = json::from_slice::<search::Request>(&req.request)
             .map_err(|e| Status::internal(format!("failed to parse search request: {e}")))?;
+        // The sender resolved the permission; an old sender without the field gets redaction.
+        request.raw_streams = Some(search::RawStreams::from(req.raw_streams));
         let stream_type = StreamType::from(req.stream_type.as_str());
         let ret = SearchService::cache::search(
             &req.trace_id,
@@ -102,9 +104,16 @@ impl Search for Searcher {
                 Status::internal(format!("failed to parse multi-stream search request: {e}"))
             })?;
         let stream_type = StreamType::from(req.stream_type.as_str());
-        let ret =
-            SearchService::search_multi(&req.trace_id, &req.org_id, stream_type, None, &request)
-                .await;
+        let raw_streams = search::RawStreams::from(req.raw_streams);
+        let ret = SearchService::search_multi(
+            &req.trace_id,
+            &req.org_id,
+            stream_type,
+            None,
+            Some(raw_streams),
+            &request,
+        )
+        .await;
 
         match ret {
             Ok(ret) => {
@@ -125,10 +134,11 @@ impl Search for Searcher {
         req: Request<SearchPartitionRequest>,
     ) -> Result<Response<SearchPartitionResponse>, Status> {
         let req = req.into_inner();
-        let request =
-            json::from_slice::<search::SearchPartitionRequest>(&req.request).map_err(|e| {
+        let mut request = json::from_slice::<search::SearchPartitionRequest>(&req.request)
+            .map_err(|e| {
                 Status::internal(format!("failed to parse search partition request: {e}"))
             })?;
+        request.raw_streams = Some(search::RawStreams::from(req.raw_streams));
         let stream_type = StreamType::from(req.stream_type.as_str());
         let ret = SearchService::search_partition(
             &req.trace_id,

@@ -250,6 +250,7 @@ export class TracesPage {
 
     this.moreMenuButton = '[data-test="traces-search-bar-more-menu-btn"]';
     this.openDropdownMenu = page.getByRole('menu');
+    this.sqlModeSwitch = '[data-test="traces-search-bar-sql-mode-toggle-btn"]';
     this.menuPinSavedViewsButton = '[data-test="traces-search-bar-menu-pin-saved-views-btn"]';
     this.menuListSavedViewsButton = '[data-test="traces-search-bar-menu-list-saved-views-btn"]';
     this.menuCreateSavedViewButton = '[data-test="traces-search-bar-menu-create-saved-view-btn"]';
@@ -3242,6 +3243,37 @@ export class TracesPage {
     return { requests, stop: () => this.page.off('request', onRequest) };
   }
 
+  // Only a catalog load totals requests per service without filtering on one service; all its queries share one window.
+  servicesCatalogWindow(capture, service) {
+    const loads = capture.requests.filter((r) => /\bAS total_requests\b/.test(r.sql) && !r.sql.includes(`'${service}'`));
+    expect(loads.length, 'the catalog must have loaded its rows').toBeGreaterThan(0);
+    const { startTime, endTime } = loads[loads.length - 1];
+    return { startTime, endTime };
+  }
+
+  sidePanelRequests(capture, service) {
+    return capture.requests.filter((r) => r.sql.includes(`'${service}'`));
+  }
+
+  /** Distinct windows the side panel has queried, oldest first. */
+  serviceSidePanelWindows(capture, service) {
+    const windows = this.sidePanelRequests(capture, service)
+      .map(({ startTime, endTime }) => JSON.stringify({ startTime, endTime }));
+    return [...new Set(windows)].map((w) => JSON.parse(w));
+  }
+
+  /** Waits until the operations search and the RED charts of the side panel last queried `window`. */
+  async expectServiceSidePanelWindow(capture, service, window, message) {
+    // On its default Operations tab the table is the panel's only UI search; panel names stay URL-encoded in the request.
+    const names = ['results', 'Rate', 'Errors', 'Duration%20p95'];
+    const lastWindows = () => Object.fromEntries(names.map((name) => {
+      const last = this.sidePanelRequests(capture, service).filter((r) => r.panel === name).pop();
+      return [name, last ? { startTime: last.startTime, endTime: last.endTime } : null];
+    }));
+    await expect.poll(lastWindows, { timeout: 30000, message })
+      .toEqual(Object.fromEntries(names.map((name) => [name, window])));
+  }
+
   // Traces searches are a span-list SQL POST or a traces/latest GET whose `filter` param carries the editor text.
   /** Live list of the filter text (latest GET) or decoded SQL (UI span-list POST, no counts) of each `stream` search sent from now on. */
   trackTraceSearchFilters(stream) {
@@ -3291,6 +3323,28 @@ export class TracesPage {
       .toHaveAttribute('data-state', 'on', { timeout: 10000 });
   }
 
+  // The switch runs a search; its count query follows the list and the RED charts follow on their own timer.
+  async switchToTracesModeAndSettle() {
+    let lastSent = Date.now();
+    const onRequest = (request) => {
+      if (this.isTracesSearchRequest(request)) lastSent = Date.now();
+    };
+    this.page.on('request', onRequest);
+    try {
+      await this.switchToTracesMode();
+      await expect(this.page.locator(this.tracesCountBadge))
+        .toHaveText(/[1-9][\d.,]*\s*[KMB]?\s+traces?/i, { timeout: 60000 });
+      await expect.poll(() => Date.now() - lastSent, { timeout: 15000 }).toBeGreaterThan(1000);
+    } finally {
+      this.page.off('request', onRequest);
+    }
+  }
+
+  // The Traces view lists through latest_stream; the other list, count and chart searches use _search_stream.
+  isTracesSearchRequest(request) {
+    return /_search_stream|\/traces\/latest_stream/.test(request.url());
+  }
+
   async expectGenericQueryError() {
     const errorState = this.page.locator(this.errorMessage);
     await expect(errorState).toBeVisible({ timeout: 15000 });
@@ -3327,6 +3381,10 @@ export class TracesPage {
     await this.servicesCatalogServiceLink(serviceName).click();
   }
 
+  async refreshServicesCatalog() {
+    await this.page.locator(this.servicesCatalogRefreshButton).click();
+  }
+
   async expectServiceSidePanelVisible() {
     await expect(this.page.locator('[data-test="service-graph-side-panel"]')).toBeVisible({ timeout: 15000 });
   }
@@ -3340,6 +3398,15 @@ export class TracesPage {
     // A nested submenu consumes the first Escape, so repeat until no menu is left.
     await expect(async () => {
       if (await this.openDropdownMenu.count()) await this.page.keyboard.press('Escape');
+      await expect(this.openDropdownMenu).toHaveCount(0, { timeout: 1000 });
+    }).toPass({ timeout: 10000 });
+  }
+
+  // closeMoreMenu presses Escape, which closes every open toast too.
+  async closeMoreMenuKeepingToasts() {
+    const trigger = this.page.locator(this.moreMenuButton);
+    await expect(async () => {
+      if ((await trigger.getAttribute('aria-expanded')) === 'true') await trigger.click();
       await expect(this.openDropdownMenu).toHaveCount(0, { timeout: 1000 });
     }).toPass({ timeout: 10000 });
   }
@@ -3972,5 +4039,230 @@ export class TracesPage {
     const notice = this.page.locator('[data-test="traces-span-drawer-no-logs-notice"]');
     await expect(notice).toBeVisible({ timeout: 30000 });
     await expect(notice).toContainText(message);
+  }
+
+  // ===== SQL MODE =====
+
+  getSqlModePinnedSwitch() {
+    return this.page.locator('[data-test="traces-search-bar-sql-mode-pinned-btn"] [role="switch"]');
+  }
+
+  // SQL Mode is unpinned by default, so it is toggled from the More menu unless the user pinned it.
+  async toggleSqlModeFromToolbar() {
+    const pinned = this.page.locator('[data-test="traces-search-bar-sql-mode-pinned-btn"]');
+    if (await pinned.isVisible()) {
+      await pinned.click();
+      return;
+    }
+    await this.page.locator(this.moreMenuButton).click();
+    await this.page.locator(this.sqlModeSwitch).click();
+    await this.closeMoreMenuKeepingToasts();
+  }
+
+  async expectSqlMode(on) {
+    const pinned = this.page.locator('[data-test="traces-search-bar-sql-mode-pinned-btn"]');
+    if (await pinned.isVisible()) {
+      await expect(this.getSqlModePinnedSwitch()).toHaveAttribute('aria-checked', String(on), {
+        timeout: 10000,
+      });
+      return;
+    }
+    await this.page.locator(this.moreMenuButton).click();
+    await expect(this.page.locator(this.sqlModeSwitch))
+      .toHaveAttribute('aria-checked', String(on), { timeout: 10000 });
+    await this.closeMoreMenuKeepingToasts();
+  }
+
+  // Monaco auto-closes quotes and brackets on typed input, so SQL is set through its API.
+  async setQueryEditorValue(text) {
+    await expect(this.page.locator(this.queryEditor)).toBeVisible({ timeout: 10000 });
+    await expect
+      .poll(() => this.page.evaluate(() => !!(/** @type {any} */ (window)).monaco?.editor), {
+        timeout: 10000,
+      })
+      .toBe(true);
+    await this.page.evaluate((value) => {
+      const editors = /** @type {any} */ (window).monaco.editor.getEditors();
+      const target =
+        editors.find((e) => e.getDomNode?.()?.closest('#traces-query-editor')) || editors[0];
+      target.setValue(value);
+    }, text);
+    await this.expectQueryEditorValue(text);
+    // The app reads the editor after a 100 ms debounce that only a text blur flushes, and its state has no DOM signal in production builds.
+    await this.page.waitForTimeout(400);
+  }
+
+  async expectQueryEditorValue(text) {
+    await expect.poll(() => this.getQueryEditorContent(), { timeout: 10000 }).toBe(text);
+  }
+
+  getSqlModeConfirmDialog() {
+    return this.page.locator('[data-test="confirm-dialog-provider"]');
+  }
+
+  getSqlResultTable() {
+    return this.page.locator('[data-test="traces-sql-result-table"]');
+  }
+
+  // The caption lives in the tooltip of the info icon after the Rate chart title.
+  async openRedRateCaption() {
+    await this.page.locator('[data-test="traces-red-caption-info-rate"]').hover({ timeout: 20000 });
+    return this.page.locator('[data-test="traces-red-caption-rate"]');
+  }
+
+  getRedMetricsDashboard() {
+    return this.page.locator('[data-test="traces-metrics-dashboard"]');
+  }
+
+  getSqlResultCap() {
+    return this.page.locator('[data-test="traces-sql-result-cap"]');
+  }
+
+  async openFirstSqlResultRow() {
+    await this.getSqlResultTable().locator('[data-test^="o2-table-row-"]').first().click();
+  }
+
+  getSqlAwaitingRun() {
+    return this.page.locator('[data-test="traces-sql-awaiting-run"]');
+  }
+
+  /** The card a Run shows for a SELECT typed in the Traces view filter. */
+  getStatementInTracesCard() {
+    return this.page.locator('[data-test="traces-statement-in-traces"]');
+  }
+
+  getSidebarValueRows(field) {
+    return this.page.locator(`[data-test^="logs-search-subfield-add-${field}-"]`);
+  }
+
+  // Ticks or unticks a sidebar value of an expanded field, by row index or by value, and returns its value.
+  async toggleSidebarValue(field, indexOrValue) {
+    const row =
+      typeof indexOrValue === 'number'
+        ? this.getSidebarValueRows(field).nth(indexOrValue)
+        : this.page.locator(`[data-test="logs-search-subfield-add-${field}-${indexOrValue}"]`);
+    await expect(row).toBeVisible({ timeout: 15000 });
+    const dataTest = (await row.getAttribute('data-test')) ?? '';
+    await row.getByRole('checkbox').click();
+    return dataTest.replace(`logs-search-subfield-add-${field}-`, '');
+  }
+
+  // Counts search requests sent while `action` runs, until `settled` sees the page at rest and 1.5 s after.
+  async countSearchStreams(action, settled) {
+    let searches = 0;
+    const onRequest = (request) => {
+      if (this.isTracesSearchRequest(request)) searches++;
+    };
+    this.page.on('request', onRequest);
+    try {
+      await action();
+      await settled();
+      // A search the action set off can start after the prompt shows, so counting goes on a little longer.
+      await this.page.waitForTimeout(1500);
+    } finally {
+      this.page.off('request', onRequest);
+    }
+    return searches;
+  }
+
+  async openStatementInSpans() {
+    await this.getStatementInTracesCard().getByRole('button').click();
+  }
+
+  getToastMessage(text) {
+    return this.page.locator('[data-test="o-toast-message"]', { hasText: text });
+  }
+
+  async clickToastAction(label) {
+    await this.page.locator('[data-test="o-toast-action-btn"]', { hasText: label }).click();
+  }
+
+  getTraceResultRows() {
+    return this.page.locator(this.searchResultItem);
+  }
+
+  getSqlErrorState() {
+    return this.page.locator('[data-test="traces-sql-error-state"]');
+  }
+
+  getSqlSuggestionFixCard() {
+    return this.page.locator('[data-test="traces-sql-fix-suggestion-card"]');
+  }
+
+  // ===== SCOPE SWITCH (results bar; the e2e viewport is wide enough for the switch) =====
+
+  getScopeSelect() {
+    return this.page.locator('[data-test="traces-scope-switch"]');
+  }
+
+  getScopeValue() {
+    return this.page.locator('[data-test^="traces-scope-option-"][data-state="on"]');
+  }
+
+  // scope: all | root | entrypoint
+  async pickScope(scope) {
+    await this.page.locator(`[data-test="traces-scope-option-${scope}"]`).click();
+  }
+
+  getListHeaderCell(columnId) {
+    return this.page.locator(`${this.searchResultList} [data-test="o2-table-th-${columnId}"]`);
+  }
+
+  // ===== GROUP BY AND GROUPS TABLE =====
+
+  getGroupBySelect() {
+    return this.page.locator('[data-test="traces-group-by-chip-trigger"]');
+  }
+
+  // "Group by" when ungrouped, "Grouped by <field> · N groups" when grouped
+  getGroupByValue() {
+    return this.page.locator('[data-test="traces-group-by-chip-value"]');
+  }
+
+  // field: a stream field name, or null to clear Group by
+  async pickGroupBy(field) {
+    if (field === null) {
+      await this.page.locator('[data-test="traces-group-by-clear"]').click();
+      return;
+    }
+    await this.getGroupBySelect().click();
+    await this.page.locator('[data-test="traces-group-by-chip-search"]').fill(field);
+    await this.page
+      .locator(`[data-test="traces-group-by-chip-option"][data-test-value="${field}"]`)
+      .click();
+  }
+
+  getGroupsTable() {
+    return this.page.locator('[data-test="traces-groups"]');
+  }
+
+  getSearchResultList() {
+    return this.page.locator(this.searchResultList);
+  }
+
+  getResultPagination() {
+    return this.page.locator('[data-test="traces-search-result-pagination"]');
+  }
+
+  getGroupsValues() {
+    return this.page.locator('[data-test="traces-groups"] [data-test="traces-groups-value"]');
+  }
+
+  getGroupsRowByValue(value) {
+    return this.page
+      .locator('[data-test="traces-groups"] tr[data-test^="o2-table-row-"]')
+      .filter({ has: this.page.locator('[data-test="traces-groups-value"]', { hasText: value }) })
+      .first();
+  }
+
+  async openGroupsRowMenu(value) {
+    await this.getGroupsRowByValue(value)
+      .locator('td[data-test="o2-table-cell-spans"]')
+      .click({ button: 'right' });
+  }
+
+  getGroupsMenuItem(item) {
+    // item: include-term | exclude-term | open-traces
+    return this.page.locator(`[data-test="traces-groups-context-${item}"]`);
   }
 }

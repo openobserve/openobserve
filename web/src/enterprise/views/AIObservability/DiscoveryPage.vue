@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :searchable="false"
               width="sm"
               class="shrink-0 max-md:w-36"
+              :aria-label="t('common.status')"
               data-test="ai-discovery-in-queue-filter"
               @update:model-value="onQueueStatusChange"
             />

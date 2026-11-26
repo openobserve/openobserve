@@ -327,6 +327,13 @@ fn without_stale_markers(value: Value) -> Value {
 #[cfg(test)]
 mod tests {
     use config::meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL};
+    use datafusion::{
+        arrow::{
+            array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+            datatypes::{DataType, Field, Schema},
+        },
+        prelude::SessionContext,
+    };
     use promql_parser::parser;
 
     use super::*;
@@ -352,10 +359,6 @@ mod tests {
             _filters: &mut [(String, Vec<String>)],
             _streaming: bool,
         ) -> Result<Vec<crate::ScanContext>> {
-            use datafusion::arrow::{
-                array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
-                datatypes::{DataType, Field, Schema},
-            };
             let schema = Arc::new(Schema::new(vec![
                 Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
                 Field::new(VALUE_LABEL, DataType::Float64, false),
@@ -391,7 +394,7 @@ mod tests {
                 ],
             )
             .unwrap();
-            let ctx = datafusion::prelude::SessionContext::new();
+            let ctx = SessionContext::new();
             ctx.register_batch(stream_name, batch).unwrap();
             Ok(vec![crate::ScanContext::table(
                 ctx,

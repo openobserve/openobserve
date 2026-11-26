@@ -43,6 +43,15 @@
 //! | Computation-affecting edits rebuild; reverts rebuild too (D59) | [`generation`] |
 
 use serde::{Deserialize, Serialize};
+use sqlparser::{
+    ast::{
+        BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr,
+        SelectItem, SetExpr, Statement, UnaryOperator, Value,
+    },
+    dialect::GenericDialect,
+    parser::Parser,
+    tokenizer::Token,
+};
 use utoipa::ToSchema;
 
 use super::alerts::Operator;
@@ -617,8 +626,6 @@ pub fn parse_predicate(
     field: &'static str,
     fragment: &str,
 ) -> Result<ValidatedPredicate, QuerySafetyError> {
-    use sqlparser::{dialect::GenericDialect, parser::Parser};
-
     if fragment.trim().is_empty() {
         // An empty scope means "all rows" to the caller; it must not be
         // forced through here and become an empty predicate.
@@ -638,7 +645,7 @@ pub fn parse_predicate(
 
     // Exactly ONE expression: anything left over means the fragment was a
     // list, a statement, or trailing garbage.
-    if parser.peek_token().token != sqlparser::tokenizer::Token::EOF {
+    if parser.peek_token().token != Token::EOF {
         return Err(QuerySafetyError::NotASingleExpression { field });
     }
 
@@ -653,8 +660,7 @@ pub fn parse_predicate(
 }
 
 /// Reject subqueries and non-allowlisted functions anywhere in the tree.
-fn check_expr(field: &'static str, expr: &sqlparser::ast::Expr) -> Result<(), QuerySafetyError> {
-    use sqlparser::ast::Expr;
+fn check_expr(field: &'static str, expr: &Expr) -> Result<(), QuerySafetyError> {
     match expr {
         Expr::Subquery(_) | Expr::InSubquery { .. } | Expr::Exists { .. } => {
             Err(QuerySafetyError::ContainsSubquery { field })
@@ -696,20 +702,22 @@ fn check_expr(field: &'static str, expr: &sqlparser::ast::Expr) -> Result<(), Qu
 /// Whether the expression could plausibly evaluate to a boolean. A bare
 /// column is not a predicate — accepting one would silently filter on
 /// truthiness.
-fn is_boolean_shaped(expr: &sqlparser::ast::Expr) -> bool {
-    use sqlparser::ast::{BinaryOperator as Op, Expr};
+fn is_boolean_shaped(expr: &Expr) -> bool {
     match expr {
         Expr::BinaryOp { op, left, right } => {
             matches!(
                 op,
-                Op::Eq | Op::NotEq | Op::Gt | Op::GtEq | Op::Lt | Op::LtEq
-            ) || (matches!(op, Op::And | Op::Or)
+                BinaryOperator::Eq
+                    | BinaryOperator::NotEq
+                    | BinaryOperator::Gt
+                    | BinaryOperator::GtEq
+                    | BinaryOperator::Lt
+                    | BinaryOperator::LtEq
+            ) || (matches!(op, BinaryOperator::And | BinaryOperator::Or)
                 && is_boolean_shaped(left)
                 && is_boolean_shaped(right))
         }
-        Expr::UnaryOp { op, expr } => {
-            matches!(op, sqlparser::ast::UnaryOperator::Not) && is_boolean_shaped(expr)
-        }
+        Expr::UnaryOp { op, expr } => matches!(op, UnaryOperator::Not) && is_boolean_shaped(expr),
         Expr::Nested(inner) => is_boolean_shaped(inner),
         Expr::IsNull(_) | Expr::IsNotNull(_) | Expr::InList { .. } | Expr::Between { .. } => true,
         Expr::Like { .. } | Expr::ILike { .. } => true,
@@ -753,12 +761,6 @@ pub fn validate_count_query(
     group_by: &[String],
     slice_interval_secs: i64,
 ) -> Result<Vec<String>, QuerySafetyError> {
-    use sqlparser::{
-        ast::{Expr, GroupByExpr, SelectItem, SetExpr, Statement},
-        dialect::GenericDialect,
-        parser::Parser,
-    };
-
     let statements = Parser::parse_sql(&GenericDialect {}, &query.sql)
         .map_err(|_| QuerySafetyError::Unparseable { field })?;
     let [Statement::Query(q)] = statements.as_slice() else {
@@ -855,8 +857,7 @@ pub fn validate_count_query(
 }
 
 /// Whether an expression looks like a numeric aggregate rather than a column.
-fn expr_is_numeric(expr: &sqlparser::ast::Expr) -> bool {
-    use sqlparser::ast::Expr;
+fn expr_is_numeric(expr: &Expr) -> bool {
     match expr {
         Expr::Function(_) => true,
         Expr::Cast { .. } => true,
@@ -872,11 +873,9 @@ fn expr_is_numeric(expr: &sqlparser::ast::Expr) -> bool {
 /// from (§6b.4a-bis).
 fn check_histogram_interval(
     field: &'static str,
-    expr: &sqlparser::ast::Expr,
+    expr: &Expr,
     slice_interval_secs: i64,
 ) -> Result<(), QuerySafetyError> {
-    use sqlparser::ast::{Expr, FunctionArg, FunctionArgExpr, FunctionArguments, Value};
-
     let Expr::Function(f) = expr else {
         return Err(QuerySafetyError::ProjectionMismatch {
             field,

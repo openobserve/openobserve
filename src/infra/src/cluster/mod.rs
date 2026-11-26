@@ -301,44 +301,13 @@ pub async fn watch_node_list() -> Result<()> {
                 }
                 if item_value.status == NodeStatus::Offline {
                     log::info!("[CLUSTER] offline {item_value:?}");
-                    if item_value.is_interactive_querier() {
-                        remove_node_from_consistent_hash(
-                            &item_value,
-                            &Role::Querier,
-                            Some(RoleGroup::Interactive),
-                        )
-                        .await;
-                    }
-                    if item_value.is_background_querier() {
-                        remove_node_from_consistent_hash(
-                            &item_value,
-                            &Role::Querier,
-                            Some(RoleGroup::Background),
-                        )
-                        .await;
-                    }
-                    if item_value.is_compactor() {
-                        remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
-                    }
-                    if item_value.is_flatten_compactor() {
-                        remove_node_from_consistent_hash(
-                            &item_value,
-                            &Role::FlattenCompactor,
-                            None,
-                        )
-                        .await;
-                    }
+                    remove_node_from_consistent_hashes(&item_value).await;
                     NODES.write().await.remove(item_key);
                     continue;
                 }
                 log::info!("[CLUSTER] join {item_value:?}");
                 item_value.broadcasted = true;
-                // check if the same node is already in the cluster
-                if let Some(node) = get_cached_node_by_name(&item_value.name).await
-                    && node.uuid.ne(&item_value.uuid)
-                {
-                    NODES.write().await.remove(&node.uuid);
-                }
+                remove_previous_incarnations(&item_value).await;
                 if item_value.is_interactive_querier() {
                     add_node_to_consistent_hash(
                         &item_value,
@@ -372,29 +341,7 @@ pub async fn watch_node_list() -> Result<()> {
                     }
                 };
                 log::info!("[CLUSTER] leave {item_value:?}");
-                if item_value.is_interactive_querier() {
-                    remove_node_from_consistent_hash(
-                        &item_value,
-                        &Role::Querier,
-                        Some(RoleGroup::Interactive),
-                    )
-                    .await;
-                }
-                if item_value.is_background_querier() {
-                    remove_node_from_consistent_hash(
-                        &item_value,
-                        &Role::Querier,
-                        Some(RoleGroup::Background),
-                    )
-                    .await;
-                }
-                if item_value.is_compactor() {
-                    remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
-                }
-                if item_value.is_flatten_compactor() {
-                    remove_node_from_consistent_hash(&item_value, &Role::FlattenCompactor, None)
-                        .await;
-                }
+                remove_node_from_consistent_hashes(&item_value).await;
                 NODES.write().await.remove(item_key);
             }
             Event::Empty => {}
@@ -441,28 +388,7 @@ pub async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
                     node.http_addr,
                     times
                 );
-                if node.is_interactive_querier() {
-                    remove_node_from_consistent_hash(
-                        &node,
-                        &Role::Querier,
-                        Some(RoleGroup::Interactive),
-                    )
-                    .await;
-                }
-                if node.is_background_querier() {
-                    remove_node_from_consistent_hash(
-                        &node,
-                        &Role::Querier,
-                        Some(RoleGroup::Background),
-                    )
-                    .await;
-                }
-                if node.is_compactor() {
-                    remove_node_from_consistent_hash(&node, &Role::Compactor, None).await;
-                }
-                if node.is_flatten_compactor() {
-                    remove_node_from_consistent_hash(&node, &Role::FlattenCompactor, None).await;
-                }
+                remove_node_from_consistent_hashes(&node).await;
                 NODES.write().await.remove(&node.uuid);
                 NODES_HEALTH_CHECK.write().await.remove(&node.uuid);
             }
@@ -500,6 +426,10 @@ pub async fn get_node_by_addr(addr: &str) -> Option<Node> {
 #[inline(always)]
 pub async fn get_node_by_uuid(uuid: &str) -> Option<Node> {
     NODES.read().await.get(uuid).cloned()
+}
+
+pub async fn is_node_alive(uuid: &str) -> bool {
+    NODES.read().await.get(uuid).is_some_and(Node::is_alive)
 }
 
 #[inline(always)]
@@ -712,6 +642,35 @@ pub async fn cache_node_list() -> Result<Vec<i32>> {
     Ok(node_ids)
 }
 
+async fn remove_node_from_consistent_hashes(node: &Node) {
+    if node.is_interactive_querier() {
+        remove_node_from_consistent_hash(node, &Role::Querier, Some(RoleGroup::Interactive)).await;
+    }
+    if node.is_background_querier() {
+        remove_node_from_consistent_hash(node, &Role::Querier, Some(RoleGroup::Background)).await;
+    }
+    if node.is_compactor() {
+        remove_node_from_consistent_hash(node, &Role::Compactor, None).await;
+    }
+    if node.is_flatten_compactor() {
+        remove_node_from_consistent_hash(node, &Role::FlattenCompactor, None).await;
+    }
+}
+
+/// Hash entries are keyed by name, so this also drops `node`'s own; the caller re-adds them.
+async fn remove_previous_incarnations(node: &Node) {
+    let stale: Vec<Node> = NODES
+        .write()
+        .await
+        .extract_if(|uuid, cached| cached.name == node.name && *uuid != node.uuid)
+        .map(|(_, cached)| cached)
+        .collect();
+    for old in stale {
+        log::info!("[CLUSTER] remove previous incarnation {old:?}");
+        remove_node_from_consistent_hashes(&old).await;
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -846,6 +805,35 @@ mod tests {
         nodes.sort();
         assert_eq!(nodes.len(), 3);
         assert_eq!(nodes, vec!["node-q-2", "node-q-5", "node-q-8"]);
+    }
+
+    #[tokio::test]
+    async fn test_join_removes_every_previous_incarnation() {
+        let node = |uuid: &str, name: &str| Node {
+            uuid: uuid.into(),
+            name: name.into(),
+            role: vec![Role::Ingester],
+            // the health check test drops Online nodes it cannot reach from the shared cache
+            status: NodeStatus::Prepare,
+            ..Default::default()
+        };
+        let joined = node("incarnation-test-new", "incarnation-test-pod");
+        let other = node("incarnation-test-other", "incarnation-test-other-pod");
+        for n in [
+            node("incarnation-test-old-1", "incarnation-test-pod"),
+            joined.clone(),
+            node("incarnation-test-old-2", "incarnation-test-pod"),
+            other.clone(),
+        ] {
+            add_node_to_cache(n).await;
+        }
+
+        remove_previous_incarnations(&joined).await;
+
+        assert!(get_node_by_uuid("incarnation-test-old-1").await.is_none());
+        assert!(get_node_by_uuid("incarnation-test-old-2").await.is_none());
+        assert!(get_node_by_uuid(&joined.uuid).await.is_some());
+        assert!(get_node_by_uuid(&other.uuid).await.is_some());
     }
 
     #[tokio::test]

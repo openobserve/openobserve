@@ -180,13 +180,26 @@ mod tests {
 
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::{
+        error::DataFusionError,
         execution::SendableRecordBatchStream,
-        physical_plan::{aggregates::AggregateExec, memory::MemoryStream},
+        physical_expr::expressions::col,
+        physical_plan::{
+            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
+            empty::EmptyExec,
+            memory::MemoryStream,
+            stream::RecordBatchStreamAdapter,
+        },
     };
     use tokio::sync::mpsc;
 
     use super::*;
     use crate::datafusion::physical_plan::streaming_aggs_exec::merge::cache_buf::CacheStream;
+
+    // DataFusion rejects an AggregateExec with neither grouping nor aggregates.
+    fn group_by_col1(schema: &Schema) -> PhysicalGroupBy {
+        let col1 = col("col1", schema).unwrap();
+        PhysicalGroupBy::new_single(vec![(col1, "col1".to_string())])
+    }
 
     #[test]
     fn test_monitor_stream_new() {
@@ -215,13 +228,11 @@ mod tests {
                 1,
                 Arc::new(
                     AggregateExec::try_new(
-                        datafusion::physical_plan::aggregates::AggregateMode::Partial,
-                        datafusion::physical_plan::aggregates::PhysicalGroupBy::new_single(vec![]),
+                        AggregateMode::Partial,
+                        group_by_col1(&schema),
                         vec![],
                         vec![],
-                        Arc::new(datafusion::physical_plan::empty::EmptyExec::new(
-                            schema.clone(),
-                        )),
+                        Arc::new(EmptyExec::new(schema.clone())),
                         schema.clone(),
                     )
                     .unwrap(),
@@ -248,24 +259,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_failed_partition_does_not_complete_cache() {
-        use datafusion::{
-            error::DataFusionError,
-            physical_plan::{
-                aggregates::{AggregateMode, PhysicalGroupBy},
-                empty::EmptyExec,
-                stream::RecordBatchStreamAdapter,
-            },
-        };
-
         let schema = Arc::new(Schema::empty());
+        let agg_schema = Arc::new(Schema::new(vec![Field::new(
+            "col1",
+            DataType::Int64,
+            false,
+        )]));
         let aggregate = Arc::new(
             AggregateExec::try_new(
                 AggregateMode::Partial,
-                PhysicalGroupBy::new_single(vec![]),
+                group_by_col1(&agg_schema),
                 vec![],
                 vec![],
-                Arc::new(EmptyExec::new(schema.clone())),
-                schema.clone(),
+                Arc::new(EmptyExec::new(agg_schema.clone())),
+                agg_schema.clone(),
             )
             .unwrap(),
         );

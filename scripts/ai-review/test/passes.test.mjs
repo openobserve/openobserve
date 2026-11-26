@@ -6,6 +6,7 @@ import { mergeConfidence, unfinishedReviewers } from "../src/confidence.mjs";
 import { reviewerFacts } from "../src/auto-approve.mjs";
 import {
   DEFAULT_COLD_PASSES,
+  PRIMER_WAIT_MS,
   lostPassesNote,
   mergePassResults,
   parseColdPasses,
@@ -157,4 +158,115 @@ test("run-review writes the diff fingerprint only for a complete review", () => 
   assert.match(source, /const complete = reviewComplete\(passResults, coordinatorResult\);/);
   assert.match(source, /diffFingerprint: complete && fullyRead && diffPinned && hunksLocatable\(diff, readBaseFile\) \? fingerprint : ""/);
   assert.equal((source.match(/diffFingerprint:/g) || []).length, 1, "every finishReviewBody call goes through the completeness check");
+});
+
+// The stagger (arm A): the first item runs alone, and the pool is released by its first model response, its failure or skip, or the wait bound.
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function staggerRun({ limit = 16, count = 5, primer, waitMs = 80 }) {
+  const t0 = Date.now();
+  const events = [];
+  let active = 0;
+  let peak = 0;
+  const worker = async (item, index, hooks) => {
+    events.push({ index, at: Date.now() - t0, kind: "start", hooks });
+    active += 1;
+    peak = Math.max(peak, active);
+    try {
+      if (index === 0) return await primer({ hooks, mark: kind => events.push({ index, at: Date.now() - t0, kind }) });
+      await wait(5);
+      return `item-${item}`;
+    } finally {
+      active -= 1;
+    }
+  };
+  const promise = runPooled(Array.from({ length: count }, (_, i) => i), limit, worker, { primer: true, waitMs });
+  return { promise, events, peak: () => peak };
+}
+
+const startOf = (events, index) => events.find(e => e.index === index && e.kind === "start").at;
+
+test("the pool waits for the primer's first model response, not for its session to end", async () => {
+  const run = staggerRun({
+    primer: async ({ hooks, mark }) => {
+      await wait(30);
+      mark("first-response");
+      hooks.onFirstResponse();
+      await wait(250);
+      return "primer";
+    },
+  });
+  const results = await run.promise;
+  const first = run.events.find(e => e.kind === "first-response").at;
+  for (const index of [1, 2, 3, 4]) {
+    assert.ok(startOf(run.events, index) >= first, `item ${index} started before the first response`);
+    assert.ok(startOf(run.events, index) < first + 120, `item ${index} waited for the session to end (${startOf(run.events, index) - first} ms after the response)`);
+  }
+  assert.deepEqual(results.map(r => r.value), ["primer", "item-1", "item-2", "item-3", "item-4"]);
+});
+
+test("the primer's first response releases every waiting item together, with no further spacing between them", async () => {
+  const run = staggerRun({ count: 7, primer: async ({ hooks }) => { await wait(20); hooks.onFirstResponse(); await wait(150); } });
+  await run.promise;
+  const starts = [1, 2, 3, 4, 5, 6].map(i => startOf(run.events, i));
+  assert.ok(Math.max(...starts) - Math.min(...starts) < 40, `starts spread over ${Math.max(...starts) - Math.min(...starts)} ms`);
+});
+
+test("a primer that never responds holds the pool only for the bounded wait", async () => {
+  const run = staggerRun({ waitMs: 80, primer: async () => { await wait(400); return "slow"; } });
+  await run.promise;
+  for (const index of [1, 2, 3, 4]) {
+    const at = startOf(run.events, index);
+    assert.ok(at >= 70, `item ${index} started at ${at} ms, before the bound`);
+    assert.ok(at < 250, `item ${index} started at ${at} ms, long after the bound`);
+  }
+});
+
+test("a primer that fails releases the pool at once, and its failure stays its own", async () => {
+  const run = staggerRun({ waitMs: 5_000, primer: async () => { await wait(20); throw new Error("provider down"); } });
+  const results = await run.promise;
+  assert.equal(results[0].status, "rejected");
+  assert.equal(results[0].reason.message, "provider down");
+  assert.deepEqual(results.slice(1).map(r => r.status), ["fulfilled", "fulfilled", "fulfilled", "fulfilled"]);
+  assert.ok(startOf(run.events, 1) < 500, "the wait bound was never needed");
+});
+
+test("a primer that is skipped (returns without a model call) releases the pool at once", async () => {
+  const run = staggerRun({ waitMs: 5_000, primer: async () => ({ skipped: true }) });
+  const results = await run.promise;
+  assert.equal(results.every(r => r.status === "fulfilled"), true);
+  assert.ok(startOf(run.events, 4) < 500);
+});
+
+test("only the first item gets a hook, nothing runs beside the primer, and the pool limit still holds", async () => {
+  const run = staggerRun({
+    limit: 2,
+    count: 6,
+    primer: async ({ hooks }) => { await wait(20); hooks.onFirstResponse(); await wait(60); },
+  });
+  await run.promise;
+  assert.equal(typeof run.events.find(e => e.index === 0).hooks.onFirstResponse, "function");
+  for (const index of [1, 2, 3, 4, 5]) assert.equal(run.events.find(e => e.index === index).hooks.onFirstResponse, undefined);
+  assert.ok(run.peak() <= 2, `peak concurrency ${run.peak()}`);
+  assert.ok(startOf(run.events, 1) >= 20, "item 1 started while the primer was still waiting for its response");
+});
+
+test("a repeated or late first-response signal changes nothing", async () => {
+  const run = staggerRun({ primer: async ({ hooks }) => { hooks.onFirstResponse(); hooks.onFirstResponse(); await wait(30); hooks.onFirstResponse(); } });
+  const results = await run.promise;
+  assert.equal(results.every(r => r.status === "fulfilled"), true);
+});
+
+test("without the stagger the pool starts every lane at once and hands the worker no hooks", async () => {
+  const seen = [];
+  await runPooled([1, 2, 3], 3, async (item, index, hooks) => { seen.push([item, index, hooks]); });
+  assert.deepEqual(seen, [[1, 0, undefined], [2, 1, undefined], [3, 2, undefined]]);
+  assert.equal(PRIMER_WAIT_MS, 90_000);
+});
+
+test("the runner staggers only when the arm asks, and routes the hook to the model call of the first pass", () => {
+  const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
+  assert.match(source, /\{ primer: ARMS\.stagger \}/);
+  assert.match(source, /REVIEWER_HOOKS\.run\(hooks, \(\) => runReviewer\(/);
+  assert.match(source, /onFirstResponse: REVIEWER_HOOKS\.getStore\(\)\?\.onFirstResponse,/);
 });

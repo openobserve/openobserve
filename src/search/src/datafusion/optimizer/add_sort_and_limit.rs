@@ -51,10 +51,6 @@ impl OptimizerRule for AddSortAndLimitRule {
         Some(ApplyOrder::TopDown)
     }
 
-    fn supports_rewrite(&self) -> bool {
-        true
-    }
-
     fn rewrite(
         &self,
         plan: LogicalPlan,
@@ -85,6 +81,7 @@ mod tests {
         assert_batches_eq,
         common::tree_node::TreeNode,
         datasource::{MemTable, TableProvider},
+        optimizer::{OptimizerRule, optimizer::ApplyOrder},
         physical_plan::{collect, displayable},
         prelude::SessionContext,
     };
@@ -343,19 +340,14 @@ mod tests {
 
     #[test]
     fn test_add_sort_and_limit_rule_new_metadata() {
-        use datafusion::optimizer::OptimizerRule;
         let rule = AddSortAndLimitRule::new(10, 5, StreamType::Logs);
         assert_eq!(rule.name(), "add_sort_and_limit");
-        assert_eq!(
-            rule.apply_order(),
-            Some(datafusion::optimizer::optimizer::ApplyOrder::TopDown)
-        );
+        assert_eq!(rule.apply_order(), Some(ApplyOrder::TopDown));
     }
 
     #[test]
     fn test_add_sort_and_limit_rule_new_zero_limit() {
         let rule = AddSortAndLimitRule::new(0, 0, StreamType::Logs);
-        use datafusion::optimizer::OptimizerRule;
         assert_eq!(rule.name(), "add_sort_and_limit");
     }
 }

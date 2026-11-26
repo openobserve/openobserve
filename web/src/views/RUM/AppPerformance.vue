@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 :variant="isVariablesChanged ? 'warning' : 'primary'"
                 size="icon-toolbar"
-                class="w-5"
+                class="w-6"
                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                 data-test="rum-performance-refresh-options-btn"
                 icon-left="arrow-drop-down"

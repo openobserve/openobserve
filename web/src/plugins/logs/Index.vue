@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="logPage"
     data-test="logs-page-container"
   >
+    <h1 class="sr-only">{{ t("menu.search") }}</h1>
     <FirstDataPanel
       v-if="firstDataArrival"
       signal="logs"
@@ -333,6 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :stream-doc-time-range="streamDocTimeRange"
                         :query-window-us="queryWindowUs"
                         :timezone="store.state.timezone"
+                        :function-error="searchObj.data.functionError"
                         @jump-to-stream-data="onJumpToStreamData"
                         @open-history="openSearchHistory"
                         @ask-ai="onAskAiFixQuery"
@@ -477,6 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
               :histogramQuery="storedHistogramQuery"
+              @loadEndedWithoutFetch="onVisualizeLoadEndedWithoutFetch"
             >
             </VisualizeLogsQuery>
           </div>
@@ -586,7 +589,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : searchObj.data.stream.selectedStreamFields
                 "
                 :logSamples="searchObj.data.queryResults.hits"
+                :initialDimensions="searchObj.meta.drillDownDimensions"
                 analysisType="volume"
+                @update:dimensions="onDrillDownDimensionsChange"
               >
                 <template #header-start>
                   <LogsDrillDownStreamSelect
@@ -609,6 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :stream-doc-time-range="streamDocTimeRange"
                 :query-window-us="queryWindowUs"
                 :timezone="store.state.timezone"
+                :function-error="searchObj.data.functionError"
                 @jump-to-stream-data="onJumpToStreamData"
                 @open-history="openSearchHistory"
                 @ask-ai="onAskAiFixQuery"
@@ -1240,10 +1246,14 @@ export default defineComponent({
     let stopHistoryRestore: (() => void) | undefined;
     onMounted(() => {
       registerBeforeAppReload();
-      stopHistoryRestore = useLogsHistoryRestore(router, () => {
-        replaceNextLogsWrite();
-        requestLogsReapply(true, "url");
-      });
+      stopHistoryRestore = useLogsHistoryRestore(
+        router,
+        () => {
+          replaceNextLogsWrite();
+          requestLogsReapply(true, "url");
+        },
+        () => searchObj.data.stream.selectedStream.join(","),
+      );
     });
 
     onActivated(() => {
@@ -1303,7 +1313,7 @@ export default defineComponent({
               router.currentRoute.value.query.to,
             );
             searchObj.data.datetime.type = "absolute";
-          } else {
+          } else if (router.currentRoute.value.query.period) {
             // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
             searchBarRef.value.dateTimeRef.setRelativeTime(router.currentRoute.value.query.period);
             searchObj.data.datetime.type = "relative";
@@ -1486,6 +1496,7 @@ export default defineComponent({
         if (generationId !== null && generationId !== undefined && !engine.isCurrent(generationId))
           return;
         searchObj.loading = false;
+        searchObj.meta.searchApplied = true;
         if (generationId !== null && generationId !== undefined)
           engine.recordPatternsComplete(generationId);
 
@@ -1493,7 +1504,10 @@ export default defineComponent({
       } catch (error) {
         console.error("[Index] Error extracting patterns:", error);
         searchObj.loading = false;
-        showErrorNotification(t("logs.index.errorExtractingPatterns"));
+        // The Patterns list shows the stored error itself; a toast would repeat it generically.
+        if (!patternsState.value?.error) {
+          showErrorNotification(t("logs.index.errorExtractingPatterns"));
+        }
         if (generationId !== null && generationId !== undefined)
           engine.recordPatternsFailure(generationId);
         settle();
@@ -2181,6 +2195,11 @@ export default defineComponent({
       onStreamChange("", { origin: "selector" });
     };
 
+    const onDrillDownDimensionsChange = (dimensions: string[]) => {
+      searchObj.meta.drillDownDimensions = dimensions;
+      patchUrlViewState();
+    };
+
     const onSelectStream = () => {
       // The fields panel holding the IndexList selector is hidden in drill down.
       if (searchObj.meta.logsVisualizeToggle === "drilldown") {
@@ -2728,7 +2747,9 @@ export default defineComponent({
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
+        let togglePanelRun: number | null = null;
         try {
+          if (searchObj.meta.logsVisualizeToggle !== "visualize") autoRun.cancelUnstartedPanelRun();
           // Reset buildModeQueryEditorDisabled when not in build mode
           if (searchObj.meta.logsVisualizeToggle !== "build") {
             searchObj.meta.buildModeQueryEditorDisabled = false;
@@ -3021,9 +3042,13 @@ export default defineComponent({
               dashboardPanelData.data.config.table_dynamic_columns = true;
             }
 
+            // A chart load outside a panel run is never recorded, so the URL keeps the last shown query.
+            togglePanelRun = autoRun.openToggleChartRun(hasReusableData, () =>
+              searchBarRef.value?.cancelVisualizeQueries?.(),
+            );
             autoRun.notePanelScopeApplied();
             // run query
-            await copyDashboardDataToVisualize();
+            await copyDashboardDataToVisualize(togglePanelRun);
 
             // Clear the restoration flag after all operations are complete
             await nextTick();
@@ -3051,6 +3076,8 @@ export default defineComponent({
             resetDashboardPanelData();
           }
         } catch (err: any) {
+          if (togglePanelRun !== null && autoRun.hasPanelRun(togglePanelRun))
+            autoRun.endPanelRun(false);
           // this will clear dummy trace id
           cancelFieldExtraction();
 
@@ -3414,9 +3441,7 @@ export default defineComponent({
           end_time: new Date(dateTime.endTime),
         };
 
-        await copyDashboardDataToVisualize();
-        if (generationId !== null && generationId !== undefined)
-          autoRun.markPanelDispatched(generationId);
+        await copyDashboardDataToVisualize(generationId ?? null);
 
         // Sync visualization config to URL parameters
         patchUrlViewState(dashboardPanelData);
@@ -3647,7 +3672,7 @@ export default defineComponent({
     };
 
     // Helper function to copy dashboardPanelData while preserving stream info
-    const copyDashboardDataToVisualize = async () => {
+    const copyDashboardDataToVisualize = async (panelRunId: number | null = null) => {
       // Extract and assign stream info BEFORE copying
       const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
       const currentQuery = dashboardPanelData.data.queries[currentQueryIndex];
@@ -3673,6 +3698,8 @@ export default defineComponent({
 
       // Now copy dashboardPanelData with updated stream info
       visualizeChartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      // The chart reacts on the next flush, before an awaiting caller resumes, so the run must hold this config now.
+      if (panelRunId !== null) autoRun.markPanelDispatched(panelRunId);
     };
 
     const extractVisualizationFields = async (autoSelectChartType: boolean = true) => {
@@ -3880,6 +3907,12 @@ export default defineComponent({
 
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
+
+    // The Visualize chart stays mounted while hidden, so its loads must not end another surface's run.
+    const onVisualizeLoadEndedWithoutFetch = (shown: boolean) => {
+      if (searchObj.meta.logsVisualizeToggle === "visualize")
+        autoRun.panelLoadEndedWithoutFetch(shown);
+    };
 
     const panelsLoading = computed(() =>
       Object.values(variablesAndPanelsDataLoadingState.panels ?? {}).some(Boolean),
@@ -4384,6 +4417,7 @@ export default defineComponent({
       drillDownPickerStreams,
       drillDownShowsDashboard,
       onDrillDownStreamChange,
+      onDrillDownDimensionsChange,
       onWidenRange,
       onRemoveFilter,
       onAskAiFixQuery,
@@ -4402,6 +4436,7 @@ export default defineComponent({
       handleRunQueryFn,
       visualizeChartData,
       handleChartApiError,
+      onVisualizeLoadEndedWithoutFetch,
       visualizeErrorData,
       resetHistogramWithError,
       fnParsedSQL,

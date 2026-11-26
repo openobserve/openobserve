@@ -16,7 +16,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use config::{datafusion::request::Request, meta::sql::TableReferenceExt};
-use datafusion::prelude::SessionContext;
+use datafusion::{arrow::datatypes::Metadata, prelude::SessionContext};
 use infra::errors::Result;
 
 use super::{
@@ -101,7 +101,7 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
             .schema()
             .as_ref()
             .clone()
-            .with_metadata(Default::default());
+            .with_metadata(Metadata::default());
         let stream_name = stream.to_quoted_string();
         let table = Arc::new(
             NewEmptyTable::new(&stream_name, Arc::new(schema))

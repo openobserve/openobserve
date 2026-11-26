@@ -14,13 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::HashSet,
     sync::{Arc, LazyLock as Lazy},
 };
 
 use arrow::buffer::BooleanBuffer;
 use config::metrics;
 use dashmap::DashMap;
+use infra::cache::recency::{EvictedKeys, Recency, now_secs};
 
 use super::TantivyResult;
 
@@ -108,8 +109,9 @@ impl CacheEntry {
 
 /// Cache created for storing the tantivy result
 pub struct TantivyResultCache {
-    readers: DashMap<String, CacheEntry>,
-    cacher: parking_lot::Mutex<VecDeque<String>>,
+    readers: DashMap<String, ResultEntry>,
+    evicting: parking_lot::Mutex<()>,
+    evicted: EvictedKeys,
     max_entries: usize,
 }
 
@@ -117,46 +119,18 @@ impl TantivyResultCache {
     pub fn new(max_entries: usize) -> Self {
         Self {
             readers: DashMap::new(),
-            cacher: parking_lot::Mutex::new(VecDeque::new()),
+            evicting: parking_lot::Mutex::new(()),
+            evicted: EvictedKeys::new(),
             max_entries,
         }
     }
 
     pub fn get(&self, key: &str) -> Option<TantivyResult> {
-        let entry = { self.readers.get(key).map(|r| r.value().clone()) };
-
-        entry.map(TantivyResult::from)
+        self.lookup(key, now_secs()).map(TantivyResult::from)
     }
 
     pub fn put(&self, key: String, value: CacheEntry) -> Option<CacheEntry> {
-        let mut w = self.cacher.lock();
-        if w.len() >= self.max_entries {
-            metrics::TANTIVY_RESULT_CACHE_GC_TOTAL
-                .with_label_values::<&str>(&[])
-                .inc();
-            let mut memory_usage = 0;
-            // release 10% of the cache
-            for _ in 0..(std::cmp::max(1, self.max_entries / 10)) {
-                if let Some(k) = w.pop_front() {
-                    if let Some((key, entry)) = self.readers.remove(&k) {
-                        memory_usage += entry.get_memory_size() + 2 * key.capacity();
-                    }
-                } else {
-                    break;
-                }
-            }
-            metrics::TANTIVY_RESULT_CACHE_MEMORY_USAGE
-                .with_label_values::<&str>(&[])
-                .sub(memory_usage as i64);
-        }
-        w.push_back(key.clone());
-        drop(w);
-        // update metrics
-        let memory_usage = value.get_memory_size() + 2 * key.capacity();
-        metrics::TANTIVY_RESULT_CACHE_MEMORY_USAGE
-            .with_label_values::<&str>(&[])
-            .add(memory_usage as i64);
-        self.readers.insert(key, value)
+        self.insert(key, value, now_secs())
     }
 
     pub fn len(&self) -> usize {
@@ -170,8 +144,70 @@ impl TantivyResultCache {
     pub fn memory_size(&self) -> usize {
         self.readers
             .iter()
-            .map(|r| r.value().get_memory_size() + 2 * r.key().capacity())
+            .map(|r| r.value().value.get_memory_size() + 2 * r.key().capacity())
             .sum()
+    }
+
+    fn lookup(&self, key: &str, now: u32) -> Option<CacheEntry> {
+        if let Some(entry) = self.readers.get(key) {
+            entry.recency.touch(now);
+            return Some(entry.value.clone());
+        }
+        if self.evicted.take(key) {
+            metrics::TANTIVY_RESULT_CACHE_REREAD_MISS_TOTAL
+                .with_label_values::<&str>(&[])
+                .inc();
+        }
+        None
+    }
+
+    fn insert(&self, key: String, value: CacheEntry, now: u32) -> Option<CacheEntry> {
+        if self.readers.len() >= self.max_entries {
+            self.evict();
+        }
+        let memory_usage = value.get_memory_size() + 2 * key.capacity();
+        metrics::TANTIVY_RESULT_CACHE_MEMORY_USAGE
+            .with_label_values::<&str>(&[])
+            .add(memory_usage as i64);
+        let entry = ResultEntry {
+            value,
+            recency: Recency::new(now),
+        };
+        self.readers.insert(key, entry).map(|old| old.value)
+    }
+
+    /// Drops the least recently read 10% of `max_entries`.
+    fn evict(&self) {
+        // Another thread is evicting; the next insert still over the limit evicts again.
+        let Some(_evicting) = self.evicting.try_lock() else {
+            return;
+        };
+        if self.readers.len() < self.max_entries {
+            return;
+        }
+        metrics::TANTIVY_RESULT_CACHE_GC_TOTAL
+            .with_label_values::<&str>(&[])
+            .inc();
+        let mut coldest = self
+            .readers
+            .iter()
+            .map(|entry| (entry.recency.rank(), entry.key().clone()))
+            .collect::<Vec<_>>();
+        coldest.sort_unstable();
+        let mut memory_usage = 0;
+        for (rank, key) in coldest.into_iter().take((self.max_entries / 10).max(1)) {
+            // An entry read or replaced after the snapshot has a new rank and stays.
+            if let Some((key, entry)) = self
+                .readers
+                .remove_if(&key, |_, entry| entry.recency.rank() == rank)
+            {
+                memory_usage += entry.value.get_memory_size() + 2 * key.capacity();
+                self.evicted.record(&key);
+            }
+        }
+        metrics::TANTIVY_RESULT_CACHE_MEMORY_USAGE
+            .with_label_values::<&str>(&[])
+            .sub(memory_usage as i64);
     }
 }
 
@@ -183,6 +219,11 @@ impl Default for TantivyResultCache {
                 .inverted_index_result_cache_max_entries,
         )
     }
+}
+
+struct ResultEntry {
+    value: CacheEntry,
+    recency: Recency,
 }
 
 #[cfg(test)]
@@ -305,6 +346,46 @@ mod tests {
 
         assert!(cache.get("key_0").is_none());
         assert!(cache.get("key_9").is_some());
+    }
+
+    #[test]
+    fn test_eviction_keeps_recently_read_entry_over_newer_unread_ones() {
+        let cache = TantivyResultCache::new(10);
+        cache.insert("hot".to_string(), create_test_count_result(), 1);
+        for i in 0..9 {
+            cache.insert(format!("cold_{i}"), create_test_count_result(), 2 * i + 2);
+            assert!(cache.lookup("hot", 2 * i + 3).is_some());
+        }
+        cache.insert("new".to_string(), create_test_count_result(), 30);
+
+        assert!(cache.lookup("hot", 31).is_some(), "hot entry was evicted");
+        assert!(cache.lookup("cold_0", 31).is_none());
+        assert!(!cache.evicted.take("cold_0"), "re-read counted twice");
+        assert!(cache.lookup("cold_1", 31).is_some());
+        assert!(cache.lookup("new", 31).is_some());
+        assert!(!cache.evicted.take("never_cached"));
+    }
+
+    #[test]
+    fn test_put_does_not_wait_for_a_running_eviction() {
+        let cache = Arc::new(TantivyResultCache::new(1));
+        cache.put("key1".to_string(), create_test_count_result());
+        let held = cache.evicting.lock();
+        let (done, finished) = std::sync::mpsc::channel();
+        let writer = cache.clone();
+        std::thread::spawn(move || {
+            writer.put("key2".to_string(), create_test_count_result());
+            done.send(()).unwrap();
+        });
+        assert!(
+            finished.recv_timeout(Duration::from_secs(5)).is_ok(),
+            "put waited for the running eviction"
+        );
+        assert_eq!(cache.len(), 2);
+        drop(held);
+        cache.put("key3".to_string(), create_test_count_result());
+        assert!(cache.get("key1").is_none());
+        assert!(cache.get("key3").is_some());
     }
 
     #[test]

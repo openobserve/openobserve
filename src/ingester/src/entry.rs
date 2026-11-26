@@ -18,7 +18,12 @@ use std::{
     sync::Arc,
 };
 
-use arrow::{array::Int64Array, record_batch::RecordBatch};
+use arrow::{
+    array::Int64Array,
+    compute::concat_batches,
+    ipc::{reader::StreamReader, writer::StreamWriter},
+    record_batch::RecordBatch,
+};
 use arrow_schema::Schema;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use config::{
@@ -113,8 +118,8 @@ impl Entry {
         // arrow ipc stream (includes the schema), length-prefixed
         let ipc_offset = buf.len();
         buf.write_u32::<BigEndian>(0).context(WriteDataSnafu)?; // length placeholder
-        let mut writer = arrow::ipc::writer::StreamWriter::try_new(&mut buf, &batch.schema())
-            .context(ArrowIpcEncodeSnafu)?;
+        let mut writer =
+            StreamWriter::try_new(&mut buf, &batch.schema()).context(ArrowIpcEncodeSnafu)?;
         writer.write(batch).context(ArrowIpcEncodeSnafu)?;
         writer.finish().context(ArrowIpcEncodeSnafu)?;
         drop(writer);
@@ -142,8 +147,8 @@ impl Entry {
         let ipc_len = cursor.read_u32::<BigEndian>().context(ReadDataSnafu)?;
         let mut ipc_data = vec![0; ipc_len as usize];
         cursor.read_exact(&mut ipc_data).context(ReadDataSnafu)?;
-        let reader = arrow::ipc::reader::StreamReader::try_new(Cursor::new(ipc_data), None)
-            .context(ArrowIpcDecodeSnafu)?;
+        let reader =
+            StreamReader::try_new(Cursor::new(ipc_data), None).context(ArrowIpcDecodeSnafu)?;
         let schema = reader.schema();
         let mut batches = reader
             .collect::<std::result::Result<Vec<_>, _>>()
@@ -152,8 +157,7 @@ impl Entry {
         let batch = match batches.len() {
             0 => RecordBatch::new_empty(schema),
             1 => batches.pop().unwrap(),
-            _ => arrow::compute::concat_batches(&schema, batches.iter())
-                .context(ArrowIpcDecodeSnafu)?,
+            _ => concat_batches(&schema, batches.iter()).context(ArrowIpcDecodeSnafu)?,
         };
 
         Ok(Self {
@@ -374,6 +378,9 @@ impl std::ops::AddAssign for PersistStat {
 mod tests {
     use std::sync::Arc;
 
+    use arrow::array::StringArray;
+    use arrow_schema::{DataType, Field};
+
     use super::*;
 
     fn make_entry(org: &str, stream: &str, schema_key: &str, partition_key: &str) -> Entry {
@@ -422,7 +429,6 @@ mod tests {
 
     #[test]
     fn test_entry_arrow_roundtrip() {
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(Schema::new(vec![
             Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("msg", DataType::Utf8, true),
@@ -431,7 +437,7 @@ mod tests {
             schema,
             vec![
                 Arc::new(Int64Array::from(vec![100i64, 200i64])),
-                Arc::new(arrow::array::StringArray::from(vec!["a", "b"])),
+                Arc::new(StringArray::from(vec!["a", "b"])),
             ],
         )
         .unwrap();
@@ -459,7 +465,6 @@ mod tests {
 
     #[test]
     fn test_entry_arrow_roundtrip_empty_batch() {
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(Schema::new(vec![Field::new(
             config::TIMESTAMP_COL_NAME,
             DataType::Int64,
@@ -476,13 +481,10 @@ mod tests {
 
     #[test]
     fn test_entry_arrow_roundtrip_unicode_fields() {
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(Schema::new(vec![Field::new("消息", DataType::Utf8, true)]));
-        let batch = RecordBatch::try_new(
-            schema,
-            vec![Arc::new(arrow::array::StringArray::from(vec!["日志内容"]))],
-        )
-        .unwrap();
+        let batch =
+            RecordBatch::try_new(schema, vec![Arc::new(StringArray::from(vec!["日志内容"]))])
+                .unwrap();
         let entry = make_entry("组织", "日志流", "schema_v1", "2024/01/01/00/city=北京");
         let bytes = entry.into_bytes_arrow(&batch).expect("serialize");
         let decoded = Entry::from_bytes(&bytes).expect("deserialize");
@@ -585,8 +587,6 @@ mod tests {
     }
 
     fn make_ts_batch(values: Vec<i64>) -> RecordBatch {
-        use arrow::array::Int64Array;
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
             config::TIMESTAMP_COL_NAME,
             DataType::Int64,
@@ -614,8 +614,6 @@ mod tests {
 
     #[test]
     fn test_pop_time_range_column_not_found() {
-        use arrow::array::Int64Array;
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
             "other_col",
             DataType::Int64,
@@ -630,8 +628,6 @@ mod tests {
 
     #[test]
     fn test_pop_time_range_wrong_column_type() {
-        use arrow::array::StringArray;
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
             config::TIMESTAMP_COL_NAME,
             DataType::Utf8,
@@ -646,8 +642,6 @@ mod tests {
 
     #[test]
     fn test_pop_time_range_separate_min_max_columns() {
-        use arrow::array::Int64Array;
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(arrow_schema::Schema::new(vec![
             Field::new("ts_min", DataType::Int64, false),
             Field::new("ts_max", DataType::Int64, false),
@@ -662,8 +656,6 @@ mod tests {
 
     #[test]
     fn test_pop_time_range_separate_missing_min_col() {
-        use arrow::array::Int64Array;
-        use arrow_schema::{DataType, Field};
         let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
             "ts_max",
             DataType::Int64,

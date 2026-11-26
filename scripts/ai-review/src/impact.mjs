@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { gitEnvForRun } from "./pr-diff.mjs";
 
 // Where the code a PR changes is used outside the diff. Most missed bugs live in a caller, a consumer or a
 // parallel implementation the diff does not touch, so every reviewer gets this map up front.
@@ -63,7 +64,7 @@ export function changedSymbols(diff) {
 function gitGrep(prDir, name, run) {
   try {
     return run("git", ["-C", prDir, "grep", "-n", "-w", "-F", "-I", "-e", name, "--", "."], {
-      encoding: "utf-8", maxBuffer: 20 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"],
+      encoding: "utf-8", maxBuffer: 20 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"], env: gitEnvForRun(),
     });
   } catch {
     return ""; // exit 1 = no match

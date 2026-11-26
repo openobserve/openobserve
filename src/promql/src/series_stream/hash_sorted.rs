@@ -246,6 +246,13 @@ mod tests {
     use std::{sync::Arc, time::Duration};
 
     use config::meta::promql::value::Value;
+    use datafusion::{
+        arrow::{
+            array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
+            datatypes::{DataType, Field, Schema},
+        },
+        physical_plan::memory::MemoryStream,
+    };
     use hashbrown::HashSet;
 
     use super::super::{
@@ -323,13 +330,6 @@ mod tests {
         use config::{
             TIMESTAMP_COL_NAME,
             meta::promql::{HASH_LABEL, VALUE_LABEL, is_stale_marker},
-        };
-        use datafusion::{
-            arrow::{
-                array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
-                datatypes::{DataType, Field, Schema},
-            },
-            physical_plan::memory::MemoryStream,
         };
 
         use super::{super::SeriesStream, HashSortedSeriesStream};

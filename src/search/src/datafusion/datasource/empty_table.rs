@@ -75,7 +75,7 @@ impl TableProvider for NewEmptyTable {
     async fn scan(
         &self,
         _state: &dyn Session,
-        projection: Option<&Vec<usize>>,
+        projection: Option<&[usize]>,
         filters: &[Expr],
         _limit: Option<usize>, // limit is not supported for empty table
     ) -> Result<Arc<dyn ExecutionPlan>> {
@@ -110,6 +110,7 @@ mod tests {
         arrow::datatypes::{DataType, Field, Schema},
         datasource::{TableProvider, TableType},
         logical_expr::TableProviderFilterPushDown,
+        scalar::ScalarValue,
     };
 
     use super::*;
@@ -154,7 +155,7 @@ mod tests {
     #[test]
     fn test_supports_filters_pushdown_inexact() {
         let table = NewEmptyTable::new("test", test_schema());
-        let dummy_expr = Expr::Literal(datafusion::scalar::ScalarValue::Boolean(Some(true)), None);
+        let dummy_expr = Expr::Literal(ScalarValue::Boolean(Some(true)), None);
         let filters = vec![&dummy_expr];
         let result = table.supports_filters_pushdown(&filters).unwrap();
         assert_eq!(result.len(), 1);

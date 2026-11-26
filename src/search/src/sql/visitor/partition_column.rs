@@ -179,14 +179,18 @@ fn partition_value(expr: &Expr) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use arrow_schema::{DataType, Field, Schema};
-    use sqlparser::{ast::VisitMut, dialect::GenericDialect};
+    use sqlparser::{
+        ast::VisitMut,
+        dialect::{GenericDialect, PostgreSqlDialect},
+        parser::Parser,
+    };
 
     use super::*;
 
     #[test]
     fn test_partition_column_visitor() {
         let sql = "SELECT * FROM users WHERE name = 'john' AND age = 25 AND city IN ('NYC', 'LA')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -233,7 +237,7 @@ mod tests {
     fn test_partition_visitor_value_on_left_side() {
         // value = field (value on left) — should be swapped to field = value
         let sql = "SELECT * FROM users WHERE 'john' = name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -250,7 +254,7 @@ mod tests {
     #[test]
     fn test_partition_visitor_no_where_clause() {
         let sql = "SELECT * FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -265,7 +269,7 @@ mod tests {
     #[test]
     fn test_partition_visitor_column_not_in_schema_ignored() {
         let sql = "SELECT * FROM users WHERE unknown_col = 'x'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -284,7 +288,7 @@ mod tests {
     fn test_partition_visitor_negated_in_list_ignored() {
         // NOT IN should NOT be captured
         let sql = "SELECT * FROM users WHERE city NOT IN ('NYC', 'LA')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -301,7 +305,7 @@ mod tests {
     fn test_partition_visitor_compound_identifier_eq() {
         // table.field = 'value' → CompoundIdentifier branch on the left side
         let sql = "SELECT * FROM users WHERE users.name = 'alice'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -319,7 +323,7 @@ mod tests {
     fn test_partition_visitor_compound_identifier_eq_unknown_table_ignored() {
         // unknown.field = 'value' → CompoundIdentifier, table not in schemas → ignored
         let sql = "SELECT * FROM users WHERE other.name = 'alice'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -336,7 +340,7 @@ mod tests {
     fn test_partition_visitor_compound_identifier_in_list() {
         // table.field IN (...) → CompoundIdentifier branch in InList
         let sql = "SELECT * FROM users WHERE users.city IN ('NYC', 'LA')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -355,7 +359,7 @@ mod tests {
     fn test_partition_visitor_ambiguous_field_in_multiple_tables_ignored() {
         // field exists in 2 tables → count > 1 → ignored (no partition capture)
         let sql = "SELECT * FROM users WHERE name = 'alice'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -505,11 +509,10 @@ mod tests {
     }
 
     fn partition_items(sql: &str) -> Vec<(String, String)> {
-        let mut statement =
-            sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::PostgreSqlDialect {}, sql)
-                .unwrap()
-                .pop()
-                .unwrap();
+        let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
         let schemas = make_schemas();
         let mut visitor = PartitionColumnVisitor::new(&schemas);
         let _ = statement.visit(&mut visitor);

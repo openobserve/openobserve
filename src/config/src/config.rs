@@ -32,6 +32,7 @@ use lettre::{
         client::{Tls, TlsParameters},
     },
 };
+use parquet::basic::Compression;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 
@@ -157,7 +158,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
 // 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
 //      service_streams rows named by the metric-name label that list no trace stream.
-pub const DB_SCHEMA_VERSION: u64 = 158;
+// 159: delete org_ai_toolsets rows of the removed cli kind.
+pub const DB_SCHEMA_VERSION: u64 = 159;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -842,8 +844,11 @@ async fn init_sns_client() -> aws_sdk_sns::Client {
     let cfg = get_config();
     let shared_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
 
-    let sns_config = aws_sdk_sns::config::Builder::from(&shared_config)
-        .endpoint_url(cfg.sns.endpoint.clone())
+    let mut builder = aws_sdk_sns::config::Builder::from(&shared_config);
+    if !cfg.sns.endpoint.is_empty() {
+        builder = builder.endpoint_url(cfg.sns.endpoint.clone());
+    }
+    let sns_config = builder
         .timeout_config(
             aws_config::timeout::TimeoutConfig::builder()
                 .connect_timeout(std::time::Duration::from_secs(cfg.sns.connect_timeout))
@@ -1260,7 +1265,7 @@ pub struct DatabaseMonitoring {
 pub struct ServiceVersions {
     #[env_config(
         name = "ZO_SERVICE_VERSIONS_ENABLED",
-        default = true,
+        default = false,
         help = "Enable Service Versions: span stamping at ingest, the version registry flush and the service signals processor. false pauses all three and keeps every stored row and cursor; true resumes from the saved cursors."
     )]
     pub enabled: bool,
@@ -2208,7 +2213,7 @@ pub struct Common {
     /// server legitimately needs to send notifications to itself.
     #[env_config(name = "ZO_SSRF_ALLOW_LOOPBACK", default = false)]
     pub ssrf_allow_loopback: bool,
-    /// Skips SSRF checks and lets any org's VRL call `http_request`, `dns_lookup`, `reverse_dns`.
+    /// Skips SSRF checks on outbound requests; VRL network functions stay disabled regardless.
     #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
     pub skip_ssrf_checks: bool,
     /// Comma-separated CIDRs that only send-only destinations may reach; changes need a restart.
@@ -2762,6 +2767,13 @@ impl Common {
 
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Limit {
+    // MB, converted to bytes in check_common_config
+    #[env_config(
+        name = "ZO_RESOURCE_CATALOG_MAX_SIZE",
+        default = 100,
+        help = "Maximum size in MB of the Command K resource catalogs one process keeps in memory; 0 means 100"
+    )]
+    pub resource_catalog_max_size: usize,
     // no need set by environment
     pub cpu_num: usize,
     pub real_cpu_num: usize,
@@ -3777,7 +3789,7 @@ pub struct Nats {
     #[env_config(
         name = "ZO_NATS_KV_WATCH_MODULES",
         help = "Set the modules which need to use kv watcher",
-        default = ""
+        default = "/nodes/,/user_sessions/"
     )]
     pub kv_watch_modules: String,
 }
@@ -3975,7 +3987,7 @@ pub struct Pipeline {
     #[env_config(
         name = "ZO_PIPELINE_REMOTE_REQUEST_MAX_RETRY_TIME",
         default = 86400,
-        help = "pipeline exporter client request max retry times, default 1440 minutes(24 hours)， unit is seconds"
+        help = "seconds one export keeps retrying before the file goes back to the retry queue, default 86400 (24 hours)"
     )]
     pub remote_request_max_retry_time: u64,
     #[env_config(
@@ -4515,6 +4527,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.req_cols_per_record_limit = 1000;
     }
 
+    cfg.limit.resource_catalog_max_size = match cfg.limit.resource_catalog_max_size {
+        0 => 100,
+        v => v,
+    }
+    .saturating_mul(SIZE_IN_MB as usize);
     cfg.limit.sourcemap_file_max_size = match cfg.limit.sourcemap_file_max_size {
         0 => 50,
         v => v,
@@ -5455,15 +5472,15 @@ pub fn get_cluster_name() -> String {
 }
 
 #[inline]
-pub fn get_parquet_compression(compression: &str) -> parquet::basic::Compression {
+pub fn get_parquet_compression(compression: &str) -> Compression {
     match compression.to_lowercase().as_str() {
-        "none" | "uncompressed" => parquet::basic::Compression::UNCOMPRESSED,
-        "snappy" => parquet::basic::Compression::SNAPPY,
-        "gzip" => parquet::basic::Compression::GZIP(Default::default()),
-        "brotli" => parquet::basic::Compression::BROTLI(Default::default()),
-        "lz4" | "lz4_raw" => parquet::basic::Compression::LZ4_RAW,
-        "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
-        _ => parquet::basic::Compression::ZSTD(Default::default()),
+        "none" | "uncompressed" => Compression::UNCOMPRESSED,
+        "snappy" => Compression::SNAPPY,
+        "gzip" => Compression::GZIP(Default::default()),
+        "brotli" => Compression::BROTLI(Default::default()),
+        "lz4" | "lz4_raw" => Compression::LZ4_RAW,
+        "zstd" => Compression::ZSTD(Default::default()),
+        _ => Compression::ZSTD(Default::default()),
     }
 }
 
@@ -6157,6 +6174,58 @@ mod tests {
     }
 
     #[test]
+    fn test_sns_endpoint_builder_and_resolution() {
+        use aws_sdk_sns::config::endpoint::ResolveEndpoint;
+
+        let shared_config = aws_config::SdkConfig::builder()
+            .region(aws_config::Region::new("eu-central-1"))
+            .build();
+
+        let empty_endpoint = "";
+        let mut builder_default = aws_sdk_sns::config::Builder::from(&shared_config);
+        if !empty_endpoint.is_empty() {
+            builder_default = builder_default.endpoint_url(empty_endpoint);
+        }
+        let _client = aws_sdk_sns::Client::from_conf(builder_default.build());
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let resolver = aws_sdk_sns::config::endpoint::DefaultResolver::new();
+        let params_default = aws_sdk_sns::config::endpoint::Params::builder()
+            .region("eu-central-1".to_string())
+            .build()
+            .unwrap();
+        let endpoint = rt
+            .block_on(resolver.resolve_endpoint(&params_default))
+            .unwrap();
+        assert_eq!(endpoint.url(), "https://sns.eu-central-1.amazonaws.com");
+
+        let params_empty = aws_sdk_sns::config::endpoint::Params::builder()
+            .region("eu-central-1".to_string())
+            .endpoint("".to_string())
+            .build()
+            .unwrap();
+        assert!(
+            std::panic::catch_unwind(|| {
+                let _ = rt.block_on(resolver.resolve_endpoint(&params_empty));
+            })
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn test_init_sns_client_succeeds_with_default_config() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let _client = rt.block_on(init_sns_client());
+    }
+
+    #[test]
     fn test_file_format_display() {
         assert_eq!(FileFormat::Parquet.to_string(), "parquet");
         assert_eq!(FileFormat::Vortex.to_string(), "vortex");
@@ -6305,6 +6374,19 @@ mod tests {
     }
 
     #[test]
+    fn test_resource_catalog_max_size_is_mb_with_zero_as_default() {
+        let mut cfg = Config::init().unwrap();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.resource_catalog_max_size, 100 * 1024 * 1024);
+        for (mb, bytes) in [(0, 100 * 1024 * 1024), (7, 7 * 1024 * 1024)] {
+            let mut cfg = Config::init().unwrap();
+            cfg.limit.resource_catalog_max_size = mb;
+            check_common_config(&mut cfg).unwrap();
+            assert_eq!(cfg.limit.resource_catalog_max_size, bytes);
+        }
+    }
+
+    #[test]
     fn test_sourcemap_limits_default_to_bytes() {
         let mut cfg = Config::init().unwrap();
         check_common_config(&mut cfg).unwrap();
@@ -6406,7 +6488,6 @@ mod tests {
 
     #[test]
     fn test_get_parquet_compression() {
-        use parquet::basic::Compression;
         assert_eq!(get_parquet_compression("snappy"), Compression::SNAPPY);
         assert_eq!(
             get_parquet_compression("uncompressed"),

@@ -21,8 +21,13 @@ use config::{get_config, metrics};
 use futures::{StreamExt, stream::BoxStream};
 use object_store::{
     CopyOptions, Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta,
-    ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
+    ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
+    aws::{AmazonS3, AmazonS3Builder},
+    azure::{MicrosoftAzure, MicrosoftAzureBuilder},
+    gcp::{GoogleCloudStorage, GoogleCloudStorageBuilder},
+    limit::LimitStore,
     path::Path,
+    signer::Signer,
 };
 
 use crate::storage::CONCURRENT_REQUESTS;
@@ -130,6 +135,7 @@ impl ObjectStore for Remote {
                 Ok(PutResult {
                     e_tag: None,
                     version: None,
+                    extensions: Default::default(),
                 })
             }
             Err(err) => {
@@ -239,7 +245,7 @@ impl ObjectStore for Remote {
     }
 }
 
-fn init_aws_config(config: StorageConfig) -> object_store::Result<object_store::aws::AmazonS3> {
+fn init_aws_config(config: StorageConfig) -> object_store::Result<AmazonS3> {
     let cfg = get_config();
     let mut opts = object_store::ClientOptions::default()
         .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
@@ -264,7 +270,7 @@ fn init_aws_config(config: StorageConfig) -> object_store::Result<object_store::
         retry_timeout: Duration::from_secs(3 * 60),
         backoff: object_store::BackoffConfig::default(),
     };
-    let mut builder = object_store::aws::AmazonS3Builder::from_env()
+    let mut builder = AmazonS3Builder::from_env()
         .with_client_options(opts)
         .with_bucket_name(&config.bucket_name)
         .with_retry(retry_config)
@@ -285,11 +291,9 @@ fn init_aws_config(config: StorageConfig) -> object_store::Result<object_store::
     builder.build()
 }
 
-fn init_azure_config(
-    config: StorageConfig,
-) -> object_store::Result<object_store::azure::MicrosoftAzure> {
+fn init_azure_config(config: StorageConfig) -> object_store::Result<MicrosoftAzure> {
     let cfg = get_config();
-    let mut builder = object_store::azure::MicrosoftAzureBuilder::from_env()
+    let mut builder = MicrosoftAzureBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
@@ -309,11 +313,9 @@ fn init_azure_config(
     builder.build()
 }
 
-fn init_gcp_config(
-    config: StorageConfig,
-) -> object_store::Result<object_store::gcp::GoogleCloudStorage> {
+fn init_gcp_config(config: StorageConfig) -> object_store::Result<GoogleCloudStorage> {
     let cfg = get_config();
-    let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
+    let mut builder = GoogleCloudStorageBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
@@ -327,19 +329,17 @@ fn init_gcp_config(
     builder.build()
 }
 
-pub fn build_signer(
-    config: StorageConfig,
-) -> object_store::Result<Box<dyn object_store::signer::Signer + Send + Sync>> {
+pub fn build_signer(config: StorageConfig) -> object_store::Result<Box<dyn Signer + Send + Sync>> {
     let provider = config.provider.to_lowercase();
     match provider.as_str() {
-        "aws" | "s3" | "" => init_aws_config(config)
-            .map(|s| Box::new(s) as Box<dyn object_store::signer::Signer + Send + Sync>),
-        "gcs" | "gcp" => init_gcp_config(config)
-            .map(|s| Box::new(s) as Box<dyn object_store::signer::Signer + Send + Sync>),
-        "azure" => init_azure_config(config)
-            .map(|s| Box::new(s) as Box<dyn object_store::signer::Signer + Send + Sync>),
-        _ => init_aws_config(config)
-            .map(|s| Box::new(s) as Box<dyn object_store::signer::Signer + Send + Sync>),
+        "aws" | "s3" | "" => {
+            init_aws_config(config).map(|s| Box::new(s) as Box<dyn Signer + Send + Sync>)
+        }
+        "gcs" | "gcp" => {
+            init_gcp_config(config).map(|s| Box::new(s) as Box<dyn Signer + Send + Sync>)
+        }
+        "azure" => init_azure_config(config).map(|s| Box::new(s) as Box<dyn Signer + Send + Sync>),
+        _ => init_aws_config(config).map(|s| Box::new(s) as Box<dyn Signer + Send + Sync>),
     }
 }
 

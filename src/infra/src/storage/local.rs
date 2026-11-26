@@ -129,6 +129,7 @@ impl ObjectStore for Local {
                 Ok(PutResult {
                     e_tag: None,
                     version: None,
+                    extensions: Default::default(),
                 })
             }
             Err(err) => {
@@ -300,6 +301,8 @@ fn init_client(root_dir: &str) -> Box<dyn object_store::ObjectStore> {
 
 #[cfg(test)]
 mod tests {
+    use object_store::memory::InMemory;
+
     use super::*;
 
     fn make_local(root: &str, with_prefix: bool) -> Local {
@@ -346,7 +349,7 @@ mod tests {
         for prefix in [false, true] {
             let directory = tempfile::tempdir().unwrap();
             let store = Local::new(directory.path().to_str().unwrap(), prefix);
-            let reference = object_store::memory::InMemory::new();
+            let reference = InMemory::new();
             let location = Path::from("ranges");
             for backend in [&store as &dyn ObjectStore, &reference as &dyn ObjectStore] {
                 backend

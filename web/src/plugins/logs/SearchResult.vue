@@ -351,6 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-full w-full"
               @updated:dataZoom="onChartUpdate"
               @finished="onHistogramFinished"
+              @painted="onHistogramPainted"
             />
           </div>
 
@@ -784,10 +785,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'min-h-[calc(100%-6.25rem)]!',
           ]"
         >
+          <div
+            v-if="!patternsState?.loading && !patternsStale && patternsWarnings.length"
+            role="status"
+            data-test="logs-patterns-partial-warning"
+            class="px-page-edge bg-status-warning-bg text-status-warning-text py-2 text-xs"
+          >
+            <div v-for="w in patternsWarnings" :key="w">{{ w }}</div>
+          </div>
+          <div
+            v-if="patternsStale"
+            role="status"
+            data-test="logs-patterns-stale"
+            class="text-text-secondary flex flex-1 items-center justify-center py-10 text-sm"
+          >
+            {{ t("search.autoRunStaleTooltip") }}
+          </div>
           <!-- Patterns List -->
           <PatternList
+            v-else
             :patterns="patternsState?.patterns?.patterns || []"
             :loading="patternsState?.loading"
+            :error="patternsState?.error"
+            :error-status="patternsState?.errorStatus"
             :totalLogsAnalyzed="patternsState?.patterns?.statistics?.total_logs_analyzed"
             :wrap="searchObj.meta.toggleSourceWrap"
             :scroll-target="scrollContainerRef"
@@ -1815,8 +1835,6 @@ export default defineComponent({
     const columnSizes = ref({});
 
     const reDrawChart = () => {
-      // Partitions stream in while loading; the chart paints once when the histogram settles.
-      if (searchObj.loadingHistogram) return;
       if (
         Object.prototype.hasOwnProperty.call(searchObj.data.histogram, "xData") &&
         searchObj.data.histogram.xData.length > 0
@@ -2059,6 +2077,8 @@ export default defineComponent({
     // The histogram response lands frames before ECharts paints it, so the run settles on the paint.
     const CHART_PAINT_WAIT_MS = 1500;
     const chartPaintPending = ref(false);
+    const streamPainted = ref(false);
+    const hasPlotChart = () => Object.keys(plotChart.value ?? {}).length > 0;
     let chartPaintTimer: ReturnType<typeof setTimeout> | undefined;
     const settleChartPaint = () => {
       clearTimeout(chartPaintTimer);
@@ -2069,10 +2089,19 @@ export default defineComponent({
       () => !!searchObj.loadingHistogram,
       (loadingNow, loadingBefore) => {
         settleChartPaint();
+        if (loadingNow && !loadingBefore) streamPainted.value = !hasPlotChart();
         if (!loadingBefore || loadingNow || !searchObj.meta.showHistogram || autoRefreshOn())
           return;
         chartPaintPending.value = true;
         chartPaintTimer = setTimeout(settleChartPaint, CHART_PAINT_WAIT_MS);
+      },
+      { flush: "sync" },
+    );
+    // A replacing run can keep loadingHistogram true, so a run's cleared points also start a new stream.
+    watch(
+      () => (searchObj.data.histogram?.xData?.length ?? 0) === 0,
+      (cleared) => {
+        if (cleared) streamPainted.value = !hasPlotChart();
       },
       { flush: "sync" },
     );
@@ -2110,21 +2139,27 @@ export default defineComponent({
     const histogramView = computed(() =>
       resolveHistogramView({
         showHistogram: !!searchObj.meta.showHistogram,
-        hasChart: Object.keys(plotChart.value ?? {}).length > 0,
+        hasChart: hasPlotChart(),
         loading: !!searchObj.loading,
         loadingHistogram: !!searchObj.loadingHistogram,
         histogramPoints: searchObj.data.histogram?.xData?.length ?? 0,
         liveMode: autoRefreshOn(),
+        streamPainted: streamPainted.value,
       }),
     );
     const histogramDimmed = useDelayedFlag(
-      () => histogramView.value.stale || chartPaintPending.value,
+      () => histogramView.value.stale || (chartPaintPending.value && !streamPainted.value),
       STALE_DIM_DELAY_MS,
     );
     const histogramPainted = ref(false);
     const onHistogramFinished = () => {
       histogramPainted.value = true;
-      settleChartPaint();
+    };
+    // A paint with no points of the new run is the previous chart redrawn, so it must not undim it.
+    const onHistogramPainted = () => {
+      if (!searchObj.data.histogram?.xData?.length) return;
+      streamPainted.value = true;
+      if (chartPaintPending.value) settleChartPaint();
     };
     let histogramPaintFrame = 0;
     // Reveal on "finished" so the bars never grow from empty axes; the frame cap only guards a lost event.
@@ -2933,6 +2968,11 @@ export default defineComponent({
     const { processedResults, processHitsInChunks } = useLogsHighlighter(t);
 
     const isFunctionErrorOpen = ref(false);
+    const patternsStale = computed(() => autoRun.engine.isPatternsStale());
+    const patternsWarnings = computed<string[]>(() => {
+      const fe = patternsState.value?.patterns?.function_error;
+      return Array.isArray(fe) ? fe.filter((m): m is string => typeof m === "string") : [];
+    });
 
     const logsTimestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
 
@@ -3156,6 +3196,7 @@ export default defineComponent({
       histogramSettling,
       chartPaintPending,
       onHistogramFinished,
+      onHistogramPainted,
       histogramPainted,
       canChangePage,
       hasPrevPage,
@@ -3216,6 +3257,8 @@ export default defineComponent({
       turnOffQuickMode,
       openLogDetailsByRow,
       isFunctionErrorOpen,
+      patternsWarnings,
+      patternsStale,
       contextCell,
       contextCellIsStreamField,
       aiEnabled,

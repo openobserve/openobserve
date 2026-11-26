@@ -20,7 +20,7 @@ use sqlparser::{
         Expr, GroupByExpr, SelectItem, SetExpr, Statement, Value, ValueWithSpan, visit_expressions,
     },
     dialect::GenericDialect,
-    parser::Parser,
+    parser::{Parser, ParserError},
 };
 
 use super::helpers::{has_group_by, is_aggregate_expression};
@@ -28,7 +28,7 @@ use super::helpers::{has_group_by, is_aggregate_expression};
 const TIME_BUCKETS: [&str; 3] = ["histogram", "date_bin", "date_trunc"];
 
 /// Top-level GROUP BY only: a grouped subquery does not group the outer result set.
-pub fn is_group_by_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
+pub fn is_group_by_query(query: &str) -> Result<bool, ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     Ok(ast
         .iter()

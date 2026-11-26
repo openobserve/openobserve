@@ -28,6 +28,8 @@ export interface SqlFilterBuilderProps {
   extraSuggestions?: FilterBarExtraSection;
   /** Lines of chips shown before the bar scrolls; 0 lifts the cap. */
   maxRows?: number;
+  /** `plain` blends the bar into the editor surface it replaces; `field` draws its own border. */
+  appearance?: "field" | "plain";
   dataTest?: string;
 }
 

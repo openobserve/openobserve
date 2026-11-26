@@ -237,7 +237,9 @@ pub fn get_record_batches(
         let mut options = RecordBatchOptions::new();
         options = options.with_row_count(Some(batch.num_rows()));
         let batch = RecordBatch::try_new_with_options(schema.clone(), new_columns, &options)
-            .expect("Failed to re-create the record batch");
+            .map_err(|e| {
+                std::io::Error::other(format!("cached file does not match the schema: {e}"))
+            })?;
 
         batches.push(batch);
     }
@@ -510,8 +512,9 @@ pub fn get_aggregation_cache_key_from_request(
     histogram_interval: Option<i64>,
     redaction_digest: Option<&str>,
 ) -> u64 {
-    // Keep UTC entries separate from caches written before timezone eligibility was enforced.
-    let mut hash_body = vec!["aggregation-v2".to_string(), req.sql.clone()];
+    // Bump whenever cached partial states can change shape, e.g. on a DataFusion upgrade:
+    // files are read back by column position and an older layout no longer lines up.
+    let mut hash_body = vec!["aggregation-v3".to_string(), req.sql.clone()];
     // `histogram(_timestamp)` buckets by the time range, so equal SQL can hold different buckets.
     if let Some(interval) = histogram_interval {
         hash_body.push(format!("histogram_interval={interval}"));
@@ -533,7 +536,11 @@ pub fn get_aggregation_cache_key_from_request(
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::StringArray;
+    use arrow::{
+        array::{BinaryArray, Float64Array, Int32Array, ListArray, StringArray, StructArray},
+        buffer::OffsetBuffer,
+        datatypes::{Fields, Schema},
+    };
 
     use super::*;
 
@@ -599,11 +606,6 @@ mod tests {
 
     #[test]
     fn test_get_record_batches_rejects_invalid_ipc() {
-        use arrow::{
-            array::{Array, BinaryArray},
-            datatypes::Schema,
-        };
-
         let schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
         let binary = BinaryArray::from_iter_values([b"ok".as_slice(), &[0xff, 0xfe, 0xfd]]);
         // SAFETY: deliberately invalid UTF-8 to exercise the reader's validation
@@ -628,9 +630,31 @@ mod tests {
     }
 
     #[test]
-    fn test_cast_array_recursive_string_types() {
-        use arrow::array::StringArray;
+    fn test_get_record_batches_rejects_older_state_layout() {
+        let old = Arc::new(Schema::new(vec![Field::new("p", DataType::Float64, true)]));
+        let batch = RecordBatch::try_new(
+            old.clone(),
+            vec![Arc::new(Float64Array::from(vec![Some(1.0)]))],
+        )
+        .unwrap();
+        let data = serialize_record_batches(old, vec![Arc::new(batch)]).unwrap();
+        let key = "aggregations/org_a/logs/older_layout/0_1.arrow";
+        let path = disk::get_file_path(key).unwrap();
+        std::fs::create_dir_all(Path::new(&path).parent().unwrap()).unwrap();
+        std::fs::write(&path, data).unwrap();
+        let new = Arc::new(Schema::new(vec![
+            Field::new("p", DataType::Float64, true),
+            Field::new("percentile", DataType::Float64, true),
+        ]));
 
+        let ret = get_record_batches("older_layout", key, new);
+
+        let _ = std::fs::remove_file(&path);
+        assert!(ret.is_err(), "a file with fewer state columns was accepted");
+    }
+
+    #[test]
+    fn test_cast_array_recursive_string_types() {
         // Test Utf8 to Utf8View
         let array: ArrayRef = Arc::new(StringArray::from(vec!["hello", "world"]));
         let result = cast_array_recursive(&array, &DataType::Utf8, &DataType::Utf8View);
@@ -651,8 +675,6 @@ mod tests {
 
     #[test]
     fn test_cast_array_recursive_identical_types() {
-        use arrow::array::Int32Array;
-
         // Test that identical types return None (no cast needed)
         let array: ArrayRef = Arc::new(Int32Array::from(vec![1, 2, 3]));
         let result = cast_array_recursive(&array, &DataType::Int32, &DataType::Int32);
@@ -666,11 +688,9 @@ mod tests {
 
     #[test]
     fn test_cast_array_recursive_list_with_string() {
-        use arrow::array::{ListArray, StringArray};
-
         // Create a List<Utf8> array
         let values = StringArray::from(vec!["a", "b", "c", "d"]);
-        let offsets = arrow::buffer::OffsetBuffer::new(vec![0, 2, 4].into());
+        let offsets = OffsetBuffer::new(vec![0, 2, 4].into());
         let field = Arc::new(Field::new("item", DataType::Utf8, true));
         let list_array = ListArray::new(field.clone(), offsets, Arc::new(values), None);
         let array: ArrayRef = Arc::new(list_array);
@@ -692,11 +712,9 @@ mod tests {
 
     #[test]
     fn test_cast_array_recursive_nested_list() {
-        use arrow::array::{ListArray, StringArray};
-
         // Create a List<List<Utf8>> structure
         let inner_values = StringArray::from(vec!["x", "y"]);
-        let inner_offsets = arrow::buffer::OffsetBuffer::new(vec![0, 1, 2].into());
+        let inner_offsets = OffsetBuffer::new(vec![0, 1, 2].into());
         let inner_field = Arc::new(Field::new("item", DataType::Utf8, true));
         let inner_list = ListArray::new(
             inner_field.clone(),
@@ -705,7 +723,7 @@ mod tests {
             None,
         );
 
-        let outer_offsets = arrow::buffer::OffsetBuffer::new(vec![0, 2].into());
+        let outer_offsets = OffsetBuffer::new(vec![0, 2].into());
         let outer_field = Arc::new(Field::new(
             "item",
             DataType::List(inner_field.clone()),
@@ -732,11 +750,6 @@ mod tests {
 
     #[test]
     fn test_cast_array_recursive_struct_with_string() {
-        use arrow::{
-            array::{Int32Array, StringArray, StructArray},
-            datatypes::Fields,
-        };
-
         // Create a Struct with (name: Utf8, age: Int32)
         let name_array = Arc::new(StringArray::from(vec!["Alice", "Bob"]));
         let age_array = Arc::new(Int32Array::from(vec![30, 25]));
@@ -800,8 +813,6 @@ mod tests {
 
     #[test]
     fn test_needs_recursive_cast_struct_types() {
-        use arrow::datatypes::Fields;
-
         // Struct with different field types
         let from_fields = Fields::from(vec![Field::new("name", DataType::Utf8, false)]);
         let to_fields = Fields::from(vec![Field::new("name", DataType::Utf8View, false)]);
@@ -817,8 +828,6 @@ mod tests {
 
     #[test]
     fn test_cast_array_recursive_incompatible_types() {
-        use arrow::array::{Int32Array, StringArray};
-
         // Test that incompatible types return None
         let array: ArrayRef = Arc::new(Int32Array::from(vec![1, 2, 3]));
         let result = cast_array_recursive(&array, &DataType::Int32, &DataType::Float64);

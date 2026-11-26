@@ -70,7 +70,9 @@ async fn ensure_dashboard_in_org(org_id: &str, dashboard_id: &str) -> bool {
     ),
     responses(
         (status = StatusCode::CREATED, description = "Dashboard created", body = inline(DashboardResponseBody)),
+        (status = StatusCode::BAD_REQUEST, description = "Dashboard has no title", body = ()),
         (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
+        (status = StatusCode::UNPROCESSABLE_ENTITY, description = "Invalid dashboard body", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
@@ -122,7 +124,9 @@ pub async fn create_dashboard(
     request_body(content = inline(DashboardRequestBody), description = "Dashboard details"),
     responses(
         (status = StatusCode::OK, description = "Dashboard updated", body = inline(DashboardResponseBody)),
+        (status = StatusCode::BAD_REQUEST, description = "Missing or invalid hash, or dashboard has no title", body = ()),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
+        (status = StatusCode::UNPROCESSABLE_ENTITY, description = "Invalid dashboard body", body = ()),
         (status = StatusCode::CONFLICT, description = "Conflict: Failed to save due to concurrent changes", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = ()),
     ),
@@ -927,35 +931,27 @@ mod tests {
         );
     }
 
-    // 500 Internal Server Error
     #[test]
-    fn test_update_missing_hash_is_internal_error() {
+    fn test_update_missing_hash_is_bad_request() {
         assert_eq!(
             status(DashboardError::UpdateMissingHash),
-            StatusCode::INTERNAL_SERVER_ERROR
+            StatusCode::BAD_REQUEST
         );
     }
 
     #[test]
-    fn test_put_missing_title_is_internal_error() {
+    fn test_put_missing_title_is_bad_request() {
         assert_eq!(
             status(DashboardError::PutMissingTitle),
-            StatusCode::INTERNAL_SERVER_ERROR
+            StatusCode::BAD_REQUEST
         );
     }
 
+    // 500 Internal Server Error
     #[test]
     fn test_create_default_folder_is_internal_error() {
         assert_eq!(
             status(DashboardError::CreateDefaultFolder),
-            StatusCode::INTERNAL_SERVER_ERROR
-        );
-    }
-
-    #[test]
-    fn test_distinct_value_error_is_internal_error() {
-        assert_eq!(
-            status(DashboardError::DistinctValueError),
             StatusCode::INTERNAL_SERVER_ERROR
         );
     }

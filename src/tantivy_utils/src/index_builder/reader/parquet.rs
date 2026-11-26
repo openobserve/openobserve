@@ -20,7 +20,10 @@ use std::sync::Arc;
 use arrow_schema::Schema;
 use bytes::Bytes;
 use config::get_batch_size;
-use parquet::arrow::{ProjectionMask, arrow_reader::ParquetRecordBatchReaderBuilder};
+use parquet::{
+    arrow::{ProjectionMask, arrow_reader::ParquetRecordBatchReaderBuilder},
+    file::metadata::ParquetMetaData,
+};
 
 use super::RecordBatchIter;
 
@@ -43,7 +46,7 @@ pub(super) fn scan_parquet_row_group(
 /// Returns `None` when all columns should be read.
 pub(super) fn parquet_projection(
     full_schema: &Arc<Schema>,
-    metadata: &parquet::file::metadata::ParquetMetaData,
+    metadata: &ParquetMetaData,
     projection: Option<&[String]>,
 ) -> Result<Option<ProjectionMask>, anyhow::Error> {
     let Some(cols) = projection else {

@@ -793,18 +793,6 @@ export const BADGE_GROUPS = {
     },
   },
 
-  // CLI command presets (AddAiToolset) — every preset shares ONE colour via a
-  // fallback-only entry (the list is data-driven via CLI_PRESETS). The `value` is
-  // passed for semantics but always resolves to the fallback. Add per-preset
-  // colours under `values` if ever needed.
-  cliPreset: {
-    mode: "plain",
-    shape: "pill",
-    size: "md",
-    values: {},
-    fallback: { variant: "primary-soft" },
-  },
-
   // Count chip — numeric count/total badges, keyed by colour INTENT (the number
   // itself is the slot). pill + sm; the leading `dot` (where present) stays a
   // per-call decorative prop.
@@ -1815,9 +1803,8 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      // MCP / CLI are acronyms — identical in every locale.
+      // MCP is an acronym — identical in every locale.
       mcp: { variant: "primary-soft", label: raw("MCP") },
-      cli: { variant: "success-soft", label: raw("CLI") },
       skill: { variant: "warning-soft", labelKey: "components.badge.aiToolsetKind.skill" },
       generic: { variant: "default-soft", labelKey: "components.badge.aiToolsetKind.generic" },
     },

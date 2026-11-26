@@ -212,8 +212,10 @@ fn is_timestamp_filter(expr: &Arc<dyn PhysicalExpr>) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::{
-        physical_expr::expressions::Column, physical_plan::expressions::Literal,
+        physical_expr::expressions::Column,
+        physical_plan::{empty::EmptyExec, expressions::Literal},
         scalar::ScalarValue,
     };
 
@@ -307,9 +309,6 @@ mod tests {
 
     #[test]
     fn test_is_aggregate_exec_false_for_empty_exec() {
-        use arrow::datatypes::{DataType, Field, Schema};
-        use datafusion::physical_plan::empty::EmptyExec;
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let exec: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
         assert!(!is_aggregate_exec(&exec));
@@ -332,7 +331,7 @@ mod tests {
     fn test_disjunction_empty_returns_true_literal() {
         let result = disjunction(vec![]);
         // empty → lit(true)
-        let lit = result.downcast_ref::<datafusion::physical_plan::expressions::Literal>();
+        let lit = result.downcast_ref::<Literal>();
         assert!(lit.is_some());
     }
 

@@ -76,9 +76,10 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema, SchemaRef};
     use async_trait::async_trait;
     use datafusion::{
-        catalog::SchemaProvider,
+        catalog::{SchemaProvider, Session},
         datasource::{TableProvider, TableType},
         logical_expr::TableProviderFilterPushDown,
+        physical_plan::ExecutionPlan,
         prelude::Expr,
     };
 
@@ -107,17 +108,17 @@ mod tests {
         }
         async fn scan(
             &self,
-            _: &dyn datafusion::catalog::Session,
-            _: Option<&Vec<usize>>,
+            _: &dyn Session,
+            _: Option<&[usize]>,
             _: &[Expr],
             _: Option<usize>,
-        ) -> datafusion::common::Result<Arc<dyn datafusion::physical_plan::ExecutionPlan>> {
+        ) -> Result<Arc<dyn ExecutionPlan>> {
             unimplemented!()
         }
         fn supports_filters_pushdown(
             &self,
             filters: &[&Expr],
-        ) -> datafusion::common::Result<Vec<TableProviderFilterPushDown>> {
+        ) -> Result<Vec<TableProviderFilterPushDown>> {
             Ok(vec![TableProviderFilterPushDown::Inexact; filters.len()])
         }
     }

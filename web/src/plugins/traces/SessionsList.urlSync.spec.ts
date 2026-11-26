@@ -16,16 +16,21 @@
 // @vitest-environment jsdom
 
 import { ref } from "vue";
+import type * as Vuex from "vuex";
 
 const mockGetStreams = vi.fn();
-vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStreams: mockGetStreams }) }));
-vi.mock("vuex", () => ({
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStreams: mockGetStreams,
+    getStream: vi.fn(async () => ({ schema: [] })),
+  }),
+}));
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof Vuex>()),
   useStore: () => ({ state: { selectedOrganization: { identifier: "test-org" } } }),
 }));
 // Real refs: the component reads and mutates the composable's state directly.
 vi.mock("./composables/useSessions", () => ({
-  SESSION_SEARCH_MAX_LEN: 256,
-  normalizeSearchTerm: (raw: string) => String(raw ?? "").trim(),
   useSessions: () => ({
     sessions: ref([]),
     total: ref(0),
@@ -37,8 +42,7 @@ vi.mock("./composables/useSessions", () => ({
     loadedOrg: ref(null),
     currentPage: ref(1),
     rowsPerPage: ref(20),
-    searchKeyword: ref("foo"),
-    searchUser: ref(""),
+    searchFilter: ref(""),
     sortBy: ref("end_time"),
     sortOrder: ref("desc"),
     agents: ref([]),
@@ -63,8 +67,7 @@ const STREAM = "test-stream";
 const COMPONENT = SessionsList;
 const PROPS = { streamName: STREAM, startTime: 1000, endTime: 2000 };
 const STUBS = {};
-const WRITTEN_KEY = "keyword";
-const WRITTEN_VALUE = "foo";
+const FILTER = "user_id = 'foo'";
 
 enableAutoUnmount(afterEach);
 
@@ -82,7 +85,7 @@ async function setup() {
       { path: "/other", name: "other", component: { template: "<div />" } },
     ],
   });
-  await router.push(START);
+  await router.push({ path: START, query: { filter: ` ${FILTER} ` } });
   const streams = deferred<any>();
   mockGetStreams.mockReturnValue(streams.promise);
   const wrapper = mount(COMPONENT, { props: PROPS, global: { plugins: [router], stubs: STUBS } });
@@ -130,6 +133,6 @@ describe(`${ROUTE} filter URL sync during navigation`, () => {
     const { router, finishLoad } = await setup();
     await finishLoad();
     expect(router.currentRoute.value.name).toBe(ROUTE);
-    expect(router.currentRoute.value.query[WRITTEN_KEY]).toBe(WRITTEN_VALUE);
+    expect(router.currentRoute.value.query.filter).toBe(FILTER);
   });
 });

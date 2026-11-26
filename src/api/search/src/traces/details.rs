@@ -174,6 +174,7 @@ fn details_request(sql: String, size: usize, range: (i64, i64), timeout: i64) ->
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     }
 }
 

@@ -52,9 +52,7 @@
         >
           <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap max-md:hidden">
             {{ t("traces.serviceGraph.borderColor") }}
-            <span class="font-normal opacity-55"
-              >| {{ t("traces.serviceGraph.borderColorMetric") }}</span
-            >
+            <span class="font-normal">| {{ t("traces.serviceGraph.borderColorMetric") }}</span>
           </div>
           <div class="flex! flex-row flex-wrap gap-2 gap-y-1">
             <div
@@ -77,7 +75,9 @@
                 <div class="text-text-secondary! text-left text-xs font-semibold">
                   {{ level.label }}
                 </div>
-                <div class="text-3xs text-left opacity-55 max-md:hidden">{{ level.range }}</div>
+                <div class="text-text-secondary text-3xs text-left max-md:hidden">
+                  {{ level.range }}
+                </div>
               </div>
             </div>
           </div>
@@ -214,9 +214,7 @@
           <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
           <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap">
             {{ t("traces.serviceGraph.nodeSize") }}
-            <span class="font-normal opacity-55"
-              >| {{ t("traces.serviceGraph.nodeSizeMetric") }}</span
-            >
+            <span class="font-normal">| {{ t("traces.serviceGraph.nodeSizeMetric") }}</span>
           </div>
           <div class="flex items-center gap-1 py-0!">
             <div class="flex flex-row items-center gap-1.5">

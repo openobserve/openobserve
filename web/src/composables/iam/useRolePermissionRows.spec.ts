@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ref } from "vue";
 
 import { useRolePermissionRows } from "@/composables/iam/useRolePermissionRows";
+import { GET_ONLY_STREAM_RESOURCES } from "@/composables/iam/useRolePermissionTree";
 
 const ORG = "default";
 
@@ -31,6 +32,7 @@ function setup(selected: string[] = []) {
       resource("role"),
       resource("logs_pattern"),
       resource("logs_insights"),
+      resource("logs_unredacted"),
       resource("logs_cache"),
       resource("prompt"),
       resource("stream"),
@@ -135,13 +137,14 @@ describe("useRolePermissionRows - updateResourceEntities", () => {
     expect(pinnedRow.top_level).toBe(true);
   });
 
-  it("hides four actions on logs_pattern and logs_insights rows", () => {
+  it("hides four actions on logs_pattern, logs_insights and logs_unredacted rows", () => {
     const { updateResourceEntities, permissionsState } = setup();
 
-    updateResourceEntities("logs_pattern", ["name"], [{ name: "app" }]);
-    updateResourceEntities("logs_insights", ["name"], [{ name: "app" }]);
+    for (const name of GET_ONLY_STREAM_RESOURCES) {
+      updateResourceEntities(name, ["name"], [{ name: "app" }]);
+    }
 
-    for (const name of ["logs_pattern", "logs_insights"]) {
+    for (const name of GET_ONLY_STREAM_RESOURCES) {
       const row = entitiesOf(permissionsState, name)[0];
       expect(row.name).toBe("app");
       expect(row.permission.AllowList.show).toBe(false);

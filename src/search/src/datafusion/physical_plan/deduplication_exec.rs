@@ -18,9 +18,12 @@ use std::{
     task::{Context, Poll},
 };
 
-use arrow::array::{
-    BooleanArray, Float64Array, Int64Array, LargeStringArray, RecordBatch, StringArray,
-    StringViewArray, TimestampMicrosecondArray, UInt64Array,
+use arrow::{
+    array::{
+        BooleanArray, Float64Array, Int64Array, LargeStringArray, RecordBatch, StringArray,
+        StringViewArray, TimestampMicrosecondArray, UInt64Array,
+    },
+    compute::take,
 };
 use arrow_schema::{DataType, SortOptions, TimeUnit};
 use config::TIMESTAMP_COL_NAME;
@@ -32,8 +35,9 @@ use datafusion::{
         LexRequirement, OrderingRequirements, Partitioning, PhysicalExpr, PhysicalSortRequirement,
     },
     physical_plan::{
-        DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
-        execution_plan::{Boundedness, EmissionType},
+        ChildStats, DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, LimitBehavior,
+        PlanProperties, StatisticsArgs,
+        execution_plan::{Boundedness, EmissionType, apply_expression_roots},
         expressions::Column,
         metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet},
     },
@@ -117,7 +121,7 @@ impl ExecutionPlan for DeduplicationExec {
             .iter()
             .map(|column| Arc::new(column.clone()) as Arc<dyn PhysicalExpr>)
             .collect::<Vec<_>>();
-        datafusion::physical_plan::execution_plan::apply_expression_roots(columns.iter(), _f)
+        apply_expression_roots(columns.iter(), _f)
     }
 
     fn name(&self) -> &'static str {
@@ -144,8 +148,8 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
-    fn supports_limit_pushdown(&self) -> bool {
-        true
+    fn limit_behavior(&self) -> LimitBehavior {
+        LimitBehavior::CopyToChildren
     }
 
     fn execute(
@@ -170,17 +174,14 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
-    fn child_stats_requests(
-        &self,
-        partition: Option<usize>,
-    ) -> Vec<datafusion::physical_plan::ChildStats> {
-        vec![datafusion::physical_plan::ChildStats::At(partition)]
+    fn child_stats_requests(&self, partition: Option<usize>) -> Vec<ChildStats> {
+        vec![ChildStats::At(partition)]
     }
 
     fn statistics_from_inputs(
         &self,
         input_stats: &[Arc<Statistics>],
-        _args: &datafusion::physical_plan::StatisticsArgs,
+        _args: &StatisticsArgs,
     ) -> Result<Arc<Statistics>> {
         Ok(Arc::clone(&input_stats[0]))
     }
@@ -274,7 +275,7 @@ impl Stream for DeduplicationStream {
                 let indexes = UInt64Array::from(indexes);
                 for i in 0..batch.columns().len() {
                     let column = batch.column(i);
-                    let values = arrow::compute::take(column, &indexes, None)?;
+                    let values = take(column, &indexes, None)?;
                     new_columns.push(values);
                 }
 
@@ -469,7 +470,7 @@ mod tests {
     #[test]
     fn test_deduplication_exec_supports_limit_pushdown() {
         let exec = make_exec();
-        assert!(exec.supports_limit_pushdown());
+        assert_eq!(exec.limit_behavior(), LimitBehavior::CopyToChildren);
     }
 
     #[test]

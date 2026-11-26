@@ -259,13 +259,31 @@ jobs:
           echo "body<<EOF" >> $GITHUB_OUTPUT
           cat release_body.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-  
+
+      # GitHub's own guess can reach far back (v0.15.0 for v1.2.0) and overflow the release body limit.
+      # A GA compares against the previous GA; an rc against the previous rc or GA. Keys sort rcN below its GA.
+      - name: Find previous release tag
+        id: prev-tag
+        run: |
+          re='^v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?$'
+          prev=""
+          if [[ "${GITHUB_REF_NAME}" =~ $re ]]; then
+            prev=$(git tag -l 'v*' | grep -E "$re" | awk -v cur="${GITHUB_REF_NAME}" '
+              function key(t, a) { split(substr(t, 2), a, /[.]|-rc/); return sprintf("%09d%09d%09d%09d", a[1], a[2], a[3], t ~ /-rc/ ? a[4] : 999999999) }
+              BEGIN { ck = key(cur); ga = cur !~ /-rc/ }
+              { k = key($0); if (k < ck && !(ga && $0 ~ /-rc/) && k > best) { best = k; prev = $0 } }
+              END { print prev }')
+          fi
+          echo "Previous tag: ${prev:-none, GitHub picks one}"
+          echo "tag=${prev}" >> "$GITHUB_OUTPUT"
+
       - name: Publish release
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: "Release ${{ github.ref_name }}"
           generate_release_notes: true
+          previous_tag: ${{ steps.prev-tag.outputs.tag }}
           body: ${{ steps.generate-body.outputs.body }}
           files: openapi.json
           fail_on_unmatched_files: false

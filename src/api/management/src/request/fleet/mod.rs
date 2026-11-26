@@ -2307,6 +2307,7 @@ fn to_response(e: anyhow::Error) -> Response {
 mod tests {
     use std::cell::RefCell;
 
+    use arrow_schema::{DataType, Field, Schema};
     use o2_enterprise::enterprise::fleet::service::FleetError;
 
     use super::*;
@@ -3187,7 +3188,6 @@ mod tests {
 
     #[tokio::test]
     async fn the_audit_trail_is_not_licence_gated_while_search_is_blocked() {
-        use arrow_schema::{DataType, Field, Schema};
         use config::meta::{self_reporting::usage::AUDIT_STREAM, stream::StreamType};
         use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 

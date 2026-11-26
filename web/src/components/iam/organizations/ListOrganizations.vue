@@ -131,7 +131,8 @@ import { useListViewState } from "@/composables/useListViewState";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { confirmLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
 
 import organizationsService from "@/services/organizations";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -152,6 +153,7 @@ import {
   switchOrganization as selectOrganization,
   toOrganizationOption,
 } from "@/utils/organizationSwitch";
+import { orgCreatePending } from "@/utils/orgScopedRoutes";
 import useStreams from "@/composables/useStreams";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -291,6 +293,22 @@ export default defineComponent({
       },
     );
 
+    const resetToBeUpdated = () => {
+      toBeUpdatedOrganization.value = { id: "", name: "", identifier: "" };
+    };
+
+    // The header's "+" asks for the create dialog through this flag, so a reload of `action=add` still lands on the list.
+    watch(
+      orgCreatePending,
+      (pending) => {
+        if (!pending) return;
+        resetToBeUpdated();
+        showAddOrganizationDialog.value = true;
+        orgCreatePending.value = false;
+      },
+      { immediate: true },
+    );
+
     onMounted(() => {
       // Only `action=update` deep-links auto-open the dialog so a shared
       // edit URL still lands directly on the org's edit form. `action=add`
@@ -318,7 +336,7 @@ export default defineComponent({
       });
       loading.value = true;
       forbidden.value = false;
-      organizationsService
+      return organizationsService
         .list(0, 1000000, "name", false, "")
         .then((res) => {
           store.dispatch("setOrganizations", res.data.data);
@@ -460,12 +478,32 @@ export default defineComponent({
       const org = (store.state.organizations ?? []).find(
         (o: any) => o.identifier === row.identifier,
       );
-      if (!org) return;
+      if (!org) return false;
       const option = toOrganizationOption(org, store.state.userInfo.email);
       void selectOrganization({ store, router, resetStreams }, option, {
         name: "organizations",
         query: { org_identifier: org.identifier },
       });
+      return true;
+    };
+
+    // The new org reaches the store only with the list reload, so the toast's switch waits for it.
+    // Only the latest click may switch, so a slow earlier reload never overrides a newer choice.
+    let createdSwitchSeq = 0;
+    const switchToCreatedOrganization = async (identifier: string, reload: Promise<void>) => {
+      const ticket = ++createdSwitchSeq;
+      await reload;
+      if (ticket !== createdSwitchSeq) return;
+      // A user who has moved on from this page did not ask to be brought back to it.
+      if (router.currentRoute.value.name !== "organizations") return;
+      const known = (store.state.organizations ?? []).some((o: any) => o.identifier === identifier);
+      if (!known) {
+        toast({ variant: "error", message: t("organization.switchToNewFailed") });
+        return;
+      }
+      // Asked before the switch commits, as the header switch does: it resets state the open page uses.
+      if (!(await confirmLeave()) || ticket !== createdSwitchSeq) return;
+      switchOrganization({ identifier });
     };
 
     // Returns true if the current user can delete the given org row.
@@ -553,10 +591,12 @@ export default defineComponent({
       canDeleteOrg,
       deleteOrganization,
       toBeUpdatedOrganization,
+      switchOrganization,
+      switchToCreatedOrganization,
     };
   },
   methods: {
-    updateOrganizationList() {
+    updateOrganizationList(newIdentifier?: string, newName?: string) {
       this.router.push({
         name: "organizations",
         query: {
@@ -571,13 +611,27 @@ export default defineComponent({
         name: "",
         identifier: "",
       };
-      this.getOrganizations();
+      const reload = this.getOrganizations();
 
+      const switchAction =
+        !isUpdated && newIdentifier
+          ? {
+              label: this.t("organization.switchToIt"),
+              dataTest: "organization-created-toast-switch",
+              handler: () => this.switchToCreatedOrganization(newIdentifier, reload),
+            }
+          : undefined;
+      // The identifier keeps the title unique, so two quick creates (even with one name) never collapse
+      // into one toast that holds the first org's action.
+      const createdTitle =
+        newName && newName !== newIdentifier ? `${newName} (${newIdentifier})` : newIdentifier;
       toast({
         variant: "success",
+        title: switchAction ? raw(createdTitle) : undefined,
         message: isUpdated
           ? this.t("iam.listOrganizations.organizationUpdated")
           : this.t("iam.listOrganizations.organizationAdded"),
+        action: switchAction,
       });
     },
     joinOrganization() {

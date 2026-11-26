@@ -264,6 +264,7 @@ export interface AutoRunDeps {
   pickNarrowPreset?: (signature: LogsSignature, estimate: ScanEstimate) => NarrowCandidate | null;
   getRefreshInterval?: () => number;
   resetLoading?: () => void;
+  resetHistogramLoading?: () => void;
   clearResults?: () => void;
   rearmRefresh?: () => void;
   onResetScope?: () => void;
@@ -707,7 +708,11 @@ export function createAutoRun(deps: AutoRunDeps) {
     const keep = new Set(options.keep ?? []);
     const targets = gen ? [gen] : [current.grid, current.patterns];
     targets.forEach((target) => target && cancelOne(target, keep));
-    if (cause === "replace") return;
+    if (cause === "replace") {
+      // An aborted histogram never reports back, so its busy flag would keep the next run from requesting one.
+      if (keep.size === 0) deps.resetHistogramLoading?.();
+      return;
+    }
     if (cause !== "block") {
       clearAllPending();
       deferredRefresh = false;
@@ -1152,6 +1157,12 @@ export function createAutoRun(deps: AutoRunDeps) {
     return !!meta.editorDirty || !sameSignature(deps.readSignature(), executed.signature);
   }
 
+  function isPatternsStale(): boolean {
+    const executed = meta.executedPatterns;
+    if (!executed) return false;
+    return !sameSignature(deps.readSignature(), executed.signature);
+  }
+
   function staleReason(): string | null {
     return isResultsStale() ? translate(AUTO_RUN_I18N.staleTooltip) : null;
   }
@@ -1520,6 +1531,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     reconcileEditorDirty,
     syncBlockedScope,
     isResultsStale,
+    isPatternsStale,
     isRunDirty,
     staleReason,
     canPersistOrShare,

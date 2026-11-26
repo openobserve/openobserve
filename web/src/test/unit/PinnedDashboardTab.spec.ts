@@ -304,4 +304,332 @@ describe("PinnedDashboardTab", () => {
     expect(afterSpan).toBeGreaterThan(3_500_000_000);
     expect(afterSpan).toBeLessThan(3_700_000_000);
   });
+
+  const globalSpan = () => {
+    const g = wrapper
+      .findComponent({ name: "RenderDashboardCharts" })
+      .props("currentTimeObj").__global;
+    return g.end_time.getTime() - g.start_time.getTime();
+  };
+
+  it("opens on the dashboard's default relative time when nothing is saved", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(
+      processedDashboard({
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "1h" },
+      }),
+    );
+    wrapper = factory();
+    await flushPromises();
+    expect(wrapper.vm.selectedDate).toMatchObject({
+      valueType: "relative",
+      relativeTimePeriod: "1h",
+    });
+    expect(globalSpan()).toBeGreaterThan(3_500_000_000);
+    expect(globalSpan()).toBeLessThan(3_700_000_000);
+    expect(localStorage.getItem("o2_home_pin_time_v2_abc")).toBeNull();
+  });
+
+  it("opens on the dashboard's default absolute time when nothing is saved", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(
+      processedDashboard({
+        defaultDatetimeDuration: { type: "absolute", startTime: 1_000_000, endTime: 5_000_000 },
+      }),
+    );
+    wrapper = factory();
+    await flushPromises();
+    const g = wrapper
+      .findComponent({ name: "RenderDashboardCharts" })
+      .props("currentTimeObj").__global;
+    expect(g.start_time.getTime()).toBe(1_000_000);
+    expect(g.end_time.getTime()).toBe(5_000_000);
+  });
+
+  it("keeps the user's saved time over the dashboard default", async () => {
+    localStorage.setItem(
+      "o2_home_pin_time_v2_abc",
+      JSON.stringify({
+        valueType: "relative",
+        startTime: null,
+        endTime: null,
+        relativeTimePeriod: "15m",
+      }),
+    );
+    vi.mocked(getDashboard).mockResolvedValue(
+      processedDashboard({
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "1h" },
+      }),
+    );
+    wrapper = factory();
+    await flushPromises();
+    expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
+  });
+
+  it("falls back to 15m without saving it when the dashboard has no default", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(processedDashboard());
+    wrapper = factory();
+    await flushPromises();
+    expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
+    expect(localStorage.getItem("o2_home_pin_time_v2_abc")).toBeNull();
+  });
+
+  it("does not save the default when the picker replays it on mount", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(
+      processedDashboard({
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "1h" },
+      }),
+    );
+    wrapper = factory();
+    await flushPromises();
+    wrapper.findComponent({ name: "DateTimePickerDashboard" }).vm.$emit("update:modelValue", {
+      valueType: "relative",
+      startTime: 1,
+      endTime: 2,
+      relativeTimePeriod: "1h",
+    });
+    await flushPromises();
+    expect(localStorage.getItem("o2_home_pin_time_v2_abc")).toBeNull();
+  });
+
+  const pickerEmit = async (value: Record<string, unknown>) => {
+    wrapper.findComponent({ name: "DateTimePickerDashboard" }).vm.$emit("update:modelValue", value);
+    await flushPromises();
+  };
+
+  it("saves a time the user picks after the picker's mount replay", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(processedDashboard());
+    wrapper = factory();
+    await flushPromises();
+    await pickerEmit({ valueType: "relative", relativeTimePeriod: "15m" });
+    await pickerEmit({ valueType: "relative", relativeTimePeriod: "6h" });
+    expect(JSON.parse(localStorage.getItem("o2_home_pin_time_v2_abc")!).relativeTimePeriod).toBe(
+      "6h",
+    );
+  });
+
+  it("does not save a sub-second absolute default that the picker replays truncated", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(
+      processedDashboard({
+        defaultDatetimeDuration: {
+          type: "absolute",
+          startTime: 1_700_000_000_123_456,
+          endTime: 1_700_000_900_654_321,
+        },
+      }),
+    );
+    wrapper = factory();
+    await flushPromises();
+    await pickerEmit({
+      valueType: "absolute",
+      startTime: 1_700_000_000_000_000,
+      endTime: 1_700_000_900_000_000,
+    });
+    expect(localStorage.getItem("o2_home_pin_time_v2_abc")).toBeNull();
+
+    await pickerEmit({ valueType: "relative", relativeTimePeriod: "6h" });
+    expect(JSON.parse(localStorage.getItem("o2_home_pin_time_v2_abc")!).relativeTimePeriod).toBe(
+      "6h",
+    );
+  });
+
+  it("saves the first change when the picker never replayed its mount value", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(
+      processedDashboard({
+        defaultDatetimeDuration: {
+          type: "absolute",
+          startTime: 1_700_000_000_000_000,
+          endTime: 1_700_000_900_000_000,
+        },
+      }),
+    );
+    wrapper = factory();
+    await flushPromises();
+    await pickerEmit({
+      valueType: "absolute",
+      startTime: 1_700_000_900_000_000,
+      endTime: 1_700_001_800_000_000,
+    });
+    expect(JSON.parse(localStorage.getItem("o2_home_pin_time_v2_abc")!).startTime).toBe(
+      1_700_000_900_000_000,
+    );
+  });
+
+  it("does not save a default whose future end the picker clips to now", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(
+      processedDashboard({
+        defaultDatetimeDuration: {
+          type: "absolute",
+          startTime: 1_700_000_000_000_000,
+          endTime: Date.now() * 1000 + 3_600_000_000,
+        },
+      }),
+    );
+    wrapper = factory();
+    await flushPromises();
+    await pickerEmit({
+      valueType: "absolute",
+      startTime: 1_700_000_000_000_000,
+      endTime: Date.now() * 1000,
+    });
+    expect(localStorage.getItem("o2_home_pin_time_v2_abc")).toBeNull();
+  });
+
+  it("drops a saved absolute time that has no range", async () => {
+    localStorage.setItem(
+      "o2_home_pin_time_v2_abc",
+      JSON.stringify({ valueType: "absolute", startTime: null, endTime: null }),
+    );
+    vi.mocked(getDashboard).mockResolvedValue(
+      processedDashboard({
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "1h" },
+      }),
+    );
+    wrapper = factory();
+    await flushPromises();
+    expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
+    expect(localStorage.getItem("o2_home_pin_time_v2_abc")).toBeNull();
+  });
+
+  it("keeps the legacy saved time when writing the new key fails", async () => {
+    localStorage.setItem(
+      "o2_home_pin_time_abc",
+      JSON.stringify({ valueType: "relative", relativeTimePeriod: "6h" }),
+    );
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("quota");
+    });
+    vi.mocked(getDashboard).mockResolvedValue(processedDashboard());
+    try {
+      wrapper = factory();
+      await flushPromises();
+    } finally {
+      setItem.mockRestore();
+    }
+    expect(JSON.parse(localStorage.getItem("o2_home_pin_time_abc")!).relativeTimePeriod).toBe("6h");
+  });
+
+  it("re-reads the time when the pinned dashboard changes", async () => {
+    localStorage.setItem(
+      "o2_home_pin_time_v2_abc",
+      JSON.stringify({ valueType: "relative", relativeTimePeriod: "6h" }),
+    );
+    vi.mocked(getDashboard).mockResolvedValue(processedDashboard());
+    wrapper = factory();
+    await flushPromises();
+    expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("6h");
+
+    vi.mocked(getDashboard).mockResolvedValue(
+      processedDashboard({
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "1h" },
+      }),
+    );
+    await wrapper.setProps({ dashboardId: "xyz" });
+    await flushPromises();
+    expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
+    expect(localStorage.getItem("o2_home_pin_time_v2_xyz")).toBeNull();
+    expect(JSON.parse(localStorage.getItem("o2_home_pin_time_v2_abc")!).relativeTimePeriod).toBe(
+      "6h",
+    );
+  });
+
+  it("drops a legacy saved time so the dashboard default applies", async () => {
+    localStorage.setItem(
+      "o2_home_pin_time_abc",
+      JSON.stringify({ valueType: "relative", relativeTimePeriod: "15m" }),
+    );
+    vi.mocked(getDashboard).mockResolvedValue(
+      processedDashboard({
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "1h" },
+      }),
+    );
+    wrapper = factory();
+    await flushPromises();
+    expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
+    expect(localStorage.getItem("o2_home_pin_time_abc")).toBeNull();
+  });
+
+  it("keeps a legacy saved time that the user picked", async () => {
+    localStorage.setItem(
+      "o2_home_pin_time_abc",
+      JSON.stringify({ valueType: "relative", relativeTimePeriod: "6h" }),
+    );
+    vi.mocked(getDashboard).mockResolvedValue(
+      processedDashboard({
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "1h" },
+      }),
+    );
+    wrapper = factory();
+    await flushPromises();
+    expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("6h");
+    expect(localStorage.getItem("o2_home_pin_time_abc")).toBeNull();
+    expect(JSON.parse(localStorage.getItem("o2_home_pin_time_v2_abc")!).relativeTimePeriod).toBe(
+      "6h",
+    );
+  });
+
+  it.each([["o2_home_pin_time_abc"], ["o2_home_pin_time_v2_abc"]])(
+    "drops a saved time in %s that is not a picker value",
+    async (key) => {
+      localStorage.setItem(key, "5");
+      vi.mocked(getDashboard).mockResolvedValue(
+        processedDashboard({
+          defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "1h" },
+        }),
+      );
+      wrapper = factory();
+      await flushPromises();
+      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
+      expect(localStorage.getItem("o2_home_pin_time_abc")).toBeNull();
+      expect(localStorage.getItem("o2_home_pin_time_v2_abc")).toBeNull();
+    },
+  );
+
+  it.each([["first"], ["last"]])(
+    "keeps the newer pin when the older load resolves %s",
+    async (olderResolves) => {
+      let resolveOlder: (value: unknown) => void = () => {};
+      let resolveNewer: (value: unknown) => void = () => {};
+      vi.mocked(getDashboard)
+        .mockReturnValueOnce(new Promise((resolve) => (resolveOlder = resolve)))
+        .mockReturnValueOnce(new Promise((resolve) => (resolveNewer = resolve)));
+      wrapper = factory();
+      await flushPromises();
+      await wrapper.setProps({ dashboardId: "xyz" });
+
+      const older = processedDashboard({
+        title: "Older",
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "6h" },
+      });
+      const newer = processedDashboard({
+        title: "Newer",
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "1h" },
+      });
+      if (olderResolves === "first") {
+        resolveOlder(older);
+        await flushPromises();
+        resolveNewer(newer);
+      } else {
+        resolveNewer(newer);
+        await flushPromises();
+        resolveOlder(older);
+      }
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
+      expect(lastDashboardData.title).toBe("Newer");
+      expect(wrapper.emitted("update-label")).toEqual([["Newer"]]);
+      expect(localStorage.getItem("o2_home_pin_time_v2_xyz")).toBeNull();
+    },
+  );
+
+  it("falls back to 15m when the absolute default has no range", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(
+      processedDashboard({ defaultDatetimeDuration: { type: "absolute" } }),
+    );
+    wrapper = factory();
+    await flushPromises();
+    expect(wrapper.vm.selectedDate).toMatchObject({
+      valueType: "relative",
+      relativeTimePeriod: "15m",
+    });
+  });
 });

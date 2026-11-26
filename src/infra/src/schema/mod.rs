@@ -36,7 +36,7 @@ use config::{
         time::{BASE_TIME, now_micros},
     },
 };
-use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
+use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Metadata, Schema, SchemaRef};
 use serde::Serialize;
 
 use crate::{
@@ -758,8 +758,9 @@ pub async fn update_setting(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    metadata: std::collections::HashMap<String, String>,
+    metadata: impl Into<Metadata>,
 ) -> Result<()> {
+    let metadata = metadata.into();
     let stream_name = stream_name.trim();
     if stream_name.is_empty() {
         return Ok(());

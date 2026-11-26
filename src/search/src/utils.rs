@@ -20,7 +20,10 @@ use std::{
 };
 
 use config::meta::search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats};
-use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
+use datafusion::{
+    common::DataFusionError,
+    physical_plan::{ExecutionPlan, ExecutionPlanVisitor},
+};
 use infra::runtime::DATAFUSION_RUNTIME;
 use sqlparser::ast::{BinaryOperator, Expr};
 use tokio::sync::Mutex;
@@ -81,7 +84,7 @@ impl ScanStatsVisitor {
 }
 
 impl ExecutionPlanVisitor for ScanStatsVisitor {
-    type Error = datafusion::common::DataFusionError;
+    type Error = DataFusionError;
 
     fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> Result<bool, Self::Error> {
         let mayby_remote_scan_exec = plan.downcast_ref::<RemoteScanExec>();
@@ -226,6 +229,7 @@ pub fn is_permissable_function_error(function_error: &[String]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use datafusion::{arrow::datatypes::Schema, physical_plan::empty::EmptyExec};
     use sqlparser::ast::{BinaryOperator, Expr, Ident, Value};
 
     use super::*;
@@ -399,9 +403,7 @@ mod tests {
         let mut visitor = ScanStatsVisitor::new();
 
         // Create a mock execution plan that's not a RemoteScanExec
-        let mock_plan = datafusion::physical_plan::empty::EmptyExec::new(Arc::new(
-            datafusion::arrow::datatypes::Schema::empty(),
-        ));
+        let mock_plan = EmptyExec::new(Arc::new(Schema::empty()));
 
         let result = visitor.pre_visit(&mock_plan);
         assert!(result.is_ok_and(|v| v));

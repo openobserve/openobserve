@@ -16,7 +16,8 @@
 import type { FleetFlowWindow } from "@/services/fleet";
 import type { I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
-import { buildDbmPromqlPanelSchema, promqlEscape } from "@/utils/dbm/metricsPanels";
+import { buildDbmPromqlPanelSchema } from "@/utils/dbm/metricsPanels";
+import { promqlEscape } from "@/utils/query/promQLUtils";
 
 export type CollectorMetricTile = "cpu" | "memory" | "uptime" | "received" | "sent" | "failed";
 

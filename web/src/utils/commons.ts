@@ -19,6 +19,7 @@ import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
 import { foldersQuery } from "@/services/common.queries";
 import { dashboardKeys } from "@/services/dashboards.querykeys";
 import { folderKeys } from "@/services/common.querykeys";
+import { reportKeys } from "@/services/reports.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
 import { dropDashboardPanelCache, dropPanelCache } from "@/composables/dashboard/usePanelCache";
@@ -38,6 +39,11 @@ import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { toRaw, type Ref } from "vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import { pruneAnnotationSourcePanels } from "@/utils/dashboard/pruneAnnotationSourcePanels";
+import {
+  getReferencedVariableNames,
+  getVariablesReferencedInQueries,
+} from "@/utils/dashboard/variables/variablesUtils";
+import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 
 let moment: any;
 let momentInitialized = false;
@@ -271,13 +277,100 @@ const getMaxIAndMaxYFromTab = (tab: any) => {
   return { maxI, maxY, lastPanel };
 };
 
+interface ScopedVariable {
+  name: string;
+  type: string;
+  scope?: string;
+  tabs?: string[];
+  panels?: string[];
+  query_data: unknown;
+}
+
+interface MovedPanel {
+  id: string;
+  title?: string;
+  queries?: unknown[];
+  markdownContent?: string;
+  htmlContent?: string;
+  config?: { drilldown?: PanelDrilldown[]; no_data_text?: string };
+}
+
+interface PanelDrilldown {
+  data?: {
+    url?: string;
+    logsQuery?: string;
+    variables?: { name?: string; value?: string }[];
+  };
+}
+
+const drilldownTemplates = (panel: MovedPanel) =>
+  (panel.config?.drilldown ?? []).flatMap(({ data }) => [
+    data?.url,
+    data?.logsQuery,
+    ...(data?.variables ?? []).flatMap((variable) => [variable.name, variable.value]),
+  ]);
+
+const listsAnyPanel = (variable: ScopedVariable, panelIds: Set<string>) =>
+  variable.scope === "panels" && (variable.panels ?? []).some((id) => panelIds.has(id));
+
+const variableNamesUsedByPanels = (
+  variables: ScopedVariable[],
+  panels: MovedPanel[],
+  panelIds: Set<string>,
+) => {
+  // Ad hoc filters apply tab-wide by design, so they never follow a panel.
+  const textCandidates = variables.filter((v) => v.type !== "dynamic_filters").map((v) => v.name);
+  const graph = buildVariablesDependencyGraph(variables);
+  const pending: string[] = panels.flatMap((panel) => [
+    ...(getVariablesReferencedInQueries(variables, panel.queries) ?? []).map((v) => v.name),
+    ...getReferencedVariableNames(
+      [
+        panel.title,
+        panel.markdownContent,
+        panel.htmlContent,
+        panel.config?.no_data_text,
+        ...drilldownTemplates(panel),
+      ],
+      textCandidates,
+    ),
+  ]);
+  // A variable scoped to a moved panel follows it even when unreferenced, so its parents must follow too.
+  pending.push(...variables.filter((v) => listsAnyPanel(v, panelIds)).map((v) => v.name));
+  const used = new Set<string>();
+  while (pending.length > 0) {
+    const name = pending.pop()!;
+    if (used.has(name)) continue;
+    used.add(name);
+    pending.push(...(graph[name]?.parentVariables ?? []));
+  }
+  return used;
+};
+
+// A scoped variable resolves only in its listed tabs, so panels leaving a tab take the ones they use (and their parents) along.
+const extendScopedVariablesToTab = (
+  variables: ScopedVariable[],
+  panels: MovedPanel[],
+  fromTabId: string,
+  toTabId: string,
+) => {
+  const movedIds = new Set(panels.map((panel) => panel.id));
+  const used = variableNamesUsedByPanels(variables, panels, movedIds);
+  variables.forEach((variable) => {
+    if (!variable.tabs || variable.tabs.includes(toTabId)) return;
+    const followsTab =
+      variable.scope === "tabs" && used.has(variable.name) && variable.tabs.includes(fromTabId);
+    // The variable editor drops a listed panel whose tab is not among the variable's tabs.
+    if (followsTab || listsAnyPanel(variable, movedIds)) variable.tabs.push(toTabId);
+  });
+};
+
 export const addPanel = async (
   store: any,
   dashboardId: any,
   panelData: any,
   folderId: any,
   tabId: any,
-  variablesToUpdate?: { variableNames: string[]; newPanelId: string },
+  variablesToUpdate?: { variableNames: string[]; newPanelId: string; sourcePanelId?: string },
   newVariables?: any[],
 ) => {
   // get the object of panel data
@@ -310,16 +403,26 @@ export const addPanel = async (
   }
 
   // Update variables if needed (for variables created from Add Panel that use "current_panel")
-  if (variablesToUpdate && variablesToUpdate.variableNames.length > 0) {
+  if (variablesToUpdate) {
+    const { variableNames, newPanelId, sourcePanelId } = variablesToUpdate;
     currentDashboard.variables?.list?.forEach((variable: any) => {
-      if (variablesToUpdate.variableNames.includes(variable.name)) {
+      if (variableNames.includes(variable.name)) {
         // Check if variable has "current_panel" in panels array
         if (variable.panels?.includes("current_panel")) {
           // Replace "current_panel" with the actual panel ID
           variable.panels = variable.panels.map((id: string) =>
-            id === "current_panel" ? variablesToUpdate.newPanelId : id,
+            id === "current_panel" ? newPanelId : id,
           );
         }
+      }
+      // A copy keeps working only if it is listed alongside its source in panel-scoped variables.
+      if (
+        sourcePanelId &&
+        variable.scope === "panels" &&
+        variable.panels?.includes(sourcePanelId) &&
+        !variable.panels.includes(newPanelId)
+      ) {
+        variable.panels.push(newPanelId);
       }
     });
   }
@@ -867,6 +970,14 @@ const pruneDashboardQueryCache = (store: any, folderId: string, ids: string[]) =
   }
 };
 
+// A deleted dashboard deletes or changes the reports that include it.
+const invalidateReportsOfDeletedDashboards = (store: {
+  state: { selectedOrganization?: { identifier?: string } };
+}) => {
+  const org = store.state.selectedOrganization?.identifier;
+  if (org) void queryClient.invalidateQueries({ queryKey: reportKeys.all(org) });
+};
+
 // Fix duplicate panel layout ids (layout.i). layout.i is a numeric grid-slot
 // id scoped to a tab, so dedupe per-tab and continue from the tab's max i.
 const fixDuplicateLayoutIds = (dashboardJson: any): boolean => {
@@ -928,6 +1039,7 @@ export const deleteDashboardById = async (store: any, dashboardId: any, folderId
   }
 
   pruneDashboardQueryCache(store, folderId, [dashboardId]);
+  invalidateReportsOfDeletedDashboards(store);
 
   await dropDashboardPanelCache(store.state.selectedOrganization.identifier, folderId, dashboardId);
   deletePanelDraftsFor({
@@ -973,6 +1085,7 @@ export const evictDashboardsFromCache = (store: any, idsByFolder: Map<string, st
   const allDashboardList = store.state.organizationData?.allDashboardList ?? {};
   const next = { ...allDashboardList };
   let changed = false;
+  invalidateReportsOfDeletedDashboards(store);
 
   idsByFolder.forEach((ids, folderId) => {
     pruneDashboardQueryCache(store, folderId, ids);
@@ -1053,9 +1166,20 @@ export const deleteTab = async (
     });
 
     moveToTabData.panels.push(...(deleteTabData.panels ?? []));
+    extendScopedVariablesToTab(
+      currentDashboard.variables?.list ?? [],
+      deleteTabData.panels ?? [],
+      deleteTabId,
+      moveToTabId,
+    );
   }
   // delete the tab
   currentDashboard.tabs = currentDashboard.tabs.filter((tab: any) => tab.tabId != deleteTabId);
+  currentDashboard.variables?.list?.forEach((variable: ScopedVariable) => {
+    const remaining = variable.tabs?.filter((id) => id !== deleteTabId);
+    // An empty list reads as Global in the variable editor, so the last tab id stays.
+    if (remaining?.length) variable.tabs = remaining;
+  });
 
   const result = await updateDashboard(
     store,
@@ -1156,6 +1280,12 @@ export const movePanelToAnotherTab = async (
   panelData.layout.i = maxI + 1;
   panelData.layout.y = maxY + 20;
   moveToTabData.panels.push(panelData);
+  extendScopedVariablesToTab(
+    currentDashboard.variables?.list ?? [],
+    [panelData],
+    currentTabId,
+    moveToTabId,
+  );
 
   return await updateDashboard(
     store,

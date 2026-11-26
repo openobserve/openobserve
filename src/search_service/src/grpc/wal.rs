@@ -16,7 +16,7 @@
 use std::{path::Path, sync::Arc};
 
 use arrow::array::{ArrayRef, new_null_array};
-use arrow_schema::{DataType, Field};
+use arrow_schema::{DataType, Field, Metadata};
 use chrono::DateTime;
 use common::infra::wal;
 use config::{
@@ -515,7 +515,7 @@ async fn create_tables_from_batch_groups(
     source: &str,
 ) -> Result<Vec<Arc<dyn TableProvider>>, Error> {
     // construct latest schema map
-    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
+    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Metadata::default()));
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
@@ -808,7 +808,7 @@ fn adapt_batch(
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::{Array, Int64Array, StringArray};
+    use arrow::array::{Array, BooleanArray, Int32Array, Int64Array, StringArray};
     use arrow_schema::Field;
 
     use super::*;
@@ -904,7 +904,7 @@ mod tests {
         let active_col = result_batch
             .column(2)
             .as_any()
-            .downcast_ref::<arrow::array::BooleanArray>()
+            .downcast_ref::<BooleanArray>()
             .unwrap();
         assert_eq!(active_col.null_count(), 3);
     }
@@ -971,7 +971,7 @@ mod tests {
             vec![
                 Arc::new(Int64Array::from(vec![1, 2, 3])),
                 Arc::new(StringArray::from(vec!["a", "b", "c"])),
-                Arc::new(arrow::array::Int32Array::from(vec![10, 20, 30])),
+                Arc::new(Int32Array::from(vec![10, 20, 30])),
             ],
         )
         .unwrap();

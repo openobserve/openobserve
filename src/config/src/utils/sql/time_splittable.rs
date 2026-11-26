@@ -21,7 +21,7 @@ use sqlparser::{
         Visitor,
     },
     dialect::GenericDialect,
-    parser::Parser,
+    parser::{Parser, ParserError},
 };
 
 use crate::meta::stream::StreamType;
@@ -53,7 +53,7 @@ impl Visitor for CrossSliceVisitor {
 }
 
 /// True when every output row depends only on input rows of its own time slice.
-pub fn is_time_splittable(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
+pub fn is_time_splittable(query: &str) -> Result<bool, ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     Ok(match ast.as_slice() {
         [Statement::Query(query)] => {
@@ -64,6 +64,18 @@ pub fn is_time_splittable(query: &str) -> Result<bool, sqlparser::parser::Parser
         }
         _ => false,
     })
+}
+
+/// True when the top-level query carries its own LIMIT, whose row count only holds if run once.
+pub fn has_limit_clause(query: &str) -> bool {
+    match Parser::parse_sql(&GenericDialect {}, query).ok().as_deref() {
+        Some([Statement::Query(query)]) => matches!(
+            &query.limit_clause,
+            Some(LimitClause::LimitOffset { limit: Some(_), .. })
+                | Some(LimitClause::OffsetCommaLimit { .. })
+        ),
+        _ => false,
+    }
 }
 
 fn is_splittable_body(body: &SetExpr) -> bool {
@@ -114,6 +126,17 @@ fn has_offset(query: &Query) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn limit_clause_detection() {
+        assert!(has_limit_clause("SELECT * FROM t LIMIT 10"));
+        assert!(has_limit_clause(
+            "SELECT * FROM t ORDER BY a LIMIT 10 OFFSET 5"
+        ));
+        assert!(!has_limit_clause("SELECT * FROM t WHERE a = 1"));
+        assert!(!has_limit_clause("SELECT * FROM t ORDER BY a"));
+        assert!(!has_limit_clause("not sql"));
+    }
 
     #[test]
     fn splittable_queries() {

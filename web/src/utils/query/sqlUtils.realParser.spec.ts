@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 
-import { parseWhereClauseToFilterChecked } from "./sqlUtils";
+import { addLabelGroupToSQlQuery, parseWhereClauseToFilterChecked } from "./sqlUtils";
 
 describe("parseWhereClauseToFilterChecked with the real SQL parser", () => {
   it.each([
@@ -116,5 +116,58 @@ describe("chart SQL generated from the checked filter", () => {
     "level NOT LIKE 'a%'",
   ])("holds %s because the builder would change its meaning", async (where) => {
     expect((await chartSql(where)).complete).toBe(false);
+  });
+});
+
+describe("addLabelGroupToSQlQuery with the real SQL parser", () => {
+  const base = 'SELECT DISTINCT "svc" FROM "logs"';
+  const row = (name: string, operator: string, value: unknown, logicalOperator?: string) => ({
+    name,
+    operator,
+    value,
+    logicalOperator,
+  });
+
+  it("joins rows left to right as written, so AND binds tighter than OR as in panel filters", async () => {
+    expect(
+      await addLabelGroupToSQlQuery(base, {
+        conditions: [row("a", "=", "x"), row("b", "=", "y", "OR"), row("c", "=", "z", "AND")],
+      }),
+    ).toBe(`${base} WHERE "a" = 'x' OR "b" = 'y' AND "c" = 'z'`);
+  });
+
+  it("keeps a nested group together in parentheses", async () => {
+    expect(
+      await addLabelGroupToSQlQuery(base, {
+        conditions: [
+          row("a", "=", "x"),
+          { logicalOperator: "AND", conditions: [row("b", "=", "y"), row("c", "=", "z", "OR")] },
+        ],
+      }),
+    ).toBe(`${base} WHERE "a" = 'x' AND ("b" = 'y' OR "c" = 'z')`);
+  });
+
+  it("ANDs the group after a WHERE the query already has", async () => {
+    expect(
+      await addLabelGroupToSQlQuery(`${base} WHERE env = 'prod'`, {
+        conditions: [row("a", "=", "x"), row("b", "=", "y", "OR")],
+      }),
+    ).toBe(`${base} WHERE (env = 'prod') AND ("a" = 'x' OR "b" = 'y')`);
+  });
+
+  it("renders each row as the flat filter list does, list values included", async () => {
+    expect(
+      await addLabelGroupToSQlQuery(base, {
+        conditions: [
+          row("a", "IN", ["x", "y's"]),
+          row("b", "Is Null", "", "OR"),
+          row("c", "!=", "q"),
+        ],
+      }),
+    ).toBe(`${base} WHERE "a" IN ('x', 'y''s') OR "b" IS NULL AND "c" != 'q'`);
+  });
+
+  it("leaves the query alone for an empty group", async () => {
+    expect(await addLabelGroupToSQlQuery(base, { conditions: [] })).toBe(base);
   });
 });

@@ -53,10 +53,6 @@ impl OptimizerRule for LimitJoinRightSide {
         Some(ApplyOrder::TopDown)
     }
 
-    fn supports_rewrite(&self) -> bool {
-        true
-    }
-
     fn rewrite(
         &self,
         plan: LogicalPlan,
@@ -189,7 +185,7 @@ mod tests {
         common::Result,
         datasource::MemTable,
         execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
-        optimizer::OptimizerRule,
+        optimizer::{OptimizerRule, optimizer::ApplyOrder},
         physical_plan::get_plan_string,
         prelude::{SessionConfig, SessionContext},
     };
@@ -207,7 +203,6 @@ mod tests {
 
     #[test]
     fn test_limit_join_right_side_apply_order() {
-        use datafusion::optimizer::optimizer::ApplyOrder;
         let rule = LimitJoinRightSide::new(10, StreamType::Logs);
         assert_eq!(rule.apply_order(), Some(ApplyOrder::TopDown));
     }
@@ -256,8 +251,8 @@ mod tests {
             "          DataSourceExec: partitions=1, partition_sizes=[1]",
             "          RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
             "            DeduplicationExec: columns: [name@0]",
-            "              SortExec: TopK(fetch=50000), expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]",
-            "                CoalescePartitionsExec",
+            "              SortExec: expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]",
+            "                CoalescePartitionsExec: fetch=50000",
             "                  AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[], lim=[50000]",
             "                    RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=1",
             "                      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[], lim=[50000]",
@@ -451,12 +446,8 @@ mod tests {
 
     #[test]
     fn test_limit_join_right_side_rule_metadata() {
-        use datafusion::optimizer::OptimizerRule;
         let rule = LimitJoinRightSide::new(100, StreamType::Logs);
         assert_eq!(rule.name(), "limit_join_right_side");
-        assert_eq!(
-            rule.apply_order(),
-            Some(datafusion::optimizer::optimizer::ApplyOrder::TopDown)
-        );
+        assert_eq!(rule.apply_order(), Some(ApplyOrder::TopDown));
     }
 }
