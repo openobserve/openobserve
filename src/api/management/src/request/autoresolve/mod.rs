@@ -56,8 +56,10 @@ fn failed(context: &str, e: impl std::fmt::Display) -> Response {
 
 fn autoresolve_error(context: &str, e: AutoResolveError) -> Response {
     let status = match &e {
-        AutoResolveError::NotEnabled => StatusCode::NOT_FOUND,
-        AutoResolveError::StepNotRunning | AutoResolveError::RunInProgress => StatusCode::CONFLICT,
+        AutoResolveError::NotEnabled | AutoResolveError::IncidentNotFound => StatusCode::NOT_FOUND,
+        AutoResolveError::StepNotRunning
+        | AutoResolveError::RunInProgress
+        | AutoResolveError::IncidentHasRun(_) => StatusCode::CONFLICT,
         AutoResolveError::NoConnections | AutoResolveError::ConnectionsGone => {
             StatusCode::UNPROCESSABLE_ENTITY
         }

@@ -21,7 +21,7 @@ use o2_enterprise::enterprise::slack::{
     self as ent_slack,
     autoresolve::{
         self as card, Approver as CardApprover, ApproverKind as CardApproverKind, AutoResolveCard,
-        CardOption, CardOutcome, SlackRef,
+        CardOption, CardOutcome, ProposalCard, SlackRef,
     },
     links::LinkEnv,
 };
@@ -49,6 +49,42 @@ pub(crate) async fn run_changed(org: &str, run_id: &str, to: RunState) {
             lock.release().await;
         }
     });
+}
+
+/// Posts an incident trigger's proposal of `flow`; Slack never holds up the incident.
+pub(crate) async fn propose(
+    org: &str,
+    flow: &infra::table::entity::autoresolve::Model,
+    incident: &infra::table::entity::alert_incidents::Model,
+    alert_name: Option<String>,
+) {
+    if !ent_slack::enabled_for(org) {
+        return;
+    }
+    let mut mcps: Vec<String> =
+        serde_json::from_str::<std::collections::HashMap<String, String>>(&flow.connection_names)
+            .map(|names| names.into_values().collect())
+            .unwrap_or_default();
+    mcps.sort();
+    let env = LinkEnv::live();
+    let card = ProposalCard {
+        org: org.to_string(),
+        autoresolve_id: flow.id.clone(),
+        name: flow.name.clone(),
+        goal: flow.goal.clone(),
+        incident_id: incident.id.clone(),
+        incident_title: incident.title.clone(),
+        incident_url: card::incident_url(&env, org, &incident.id),
+        alert_name,
+        mcps,
+    };
+    if let Err(e) = card::post_proposal(&card).await {
+        log::warn!(
+            "[autoresolve] Slack proposal of {} on incident {}: {e}",
+            flow.id,
+            incident.id
+        );
+    }
 }
 
 /// A run's channel is fixed when it starts, so screen runs skip the lock and the card reads.

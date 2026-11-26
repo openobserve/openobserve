@@ -147,6 +147,19 @@ pub async fn list(org: &str) -> Result<Vec<Model>, Error> {
         .await?)
 }
 
+/// The AutoResolves whose trigger names one of these alerts, whatever their kind or state.
+pub async fn list_for_alerts(org: &str, alert_ids: &[String]) -> Result<Vec<Model>, Error> {
+    if alert_ids.is_empty() {
+        return Ok(vec![]);
+    }
+    Ok(Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::TriggerAlertId.is_in(alert_ids.iter().cloned()))
+        .order_by_asc(Column::Name)
+        .all(get_orm_client_rw().await)
+        .await?)
+}
+
 /// The enabled AutoResolves of this region that fire on this kind of trigger for this alert.
 pub async fn list_triggered(
     org: &str,

@@ -299,6 +299,7 @@ mod m20261225_000017_add_oncall_policy_saved_by_person;
 mod m20261226_000001_add_oncall_team_to_incident_integrations;
 mod m20261226_000001_create_autoresolve_corrections;
 mod m20261227_000001_add_autoresolve_plan_history;
+mod m20261228_000001_add_autoresolve_run_incident;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -649,6 +650,12 @@ pub(crate) fn autoresolve_plan_history_migration_for_test()
     m20261227_000001_add_autoresolve_plan_history::Migration
 }
 
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) fn autoresolve_run_incident_migration_for_test()
+-> m20261228_000001_add_autoresolve_run_incident::Migration {
+    m20261228_000001_add_autoresolve_run_incident::Migration
+}
+
 /// Run the v1 run-pointer backfill over the current rows, for tests in any crate.
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn backfill_v1_rca_pointer(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
@@ -985,6 +992,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261225_000001_create_autoresolve_tables::Migration),
             Box::new(m20261226_000001_create_autoresolve_corrections::Migration),
             Box::new(m20261227_000001_add_autoresolve_plan_history::Migration),
+            Box::new(m20261228_000001_add_autoresolve_run_incident::Migration),
         ]
     }
 }
@@ -1140,6 +1148,7 @@ mod tests {
         (170, "m20261225_000001_create_autoresolve_tables"),
         (171, "m20261226_000001_create_autoresolve_corrections"),
         (172, "m20261227_000001_add_autoresolve_plan_history"),
+        (173, "m20261228_000001_add_autoresolve_run_incident"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1269,6 +1278,10 @@ mod tests {
             (
                 "m20261225_000001_create_autoresolve_tables",
                 "m20261227_000001_add_autoresolve_plan_history",
+            ),
+            (
+                "m20261225_000001_create_autoresolve_tables",
+                "m20261228_000001_add_autoresolve_run_incident",
             ),
             (
                 "m20251204_000001_create_alert_incidents_table",

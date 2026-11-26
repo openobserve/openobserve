@@ -4421,8 +4421,9 @@ async fn handle_alert_triggers(
         // notification is skipped.
         && delivery.should_deliver()
     {
+        // AutoResolve waits for correlation: a firing that opens an incident links its run to it.
         #[cfg(feature = "enterprise")]
-        crate::autoresolve::triggers::on_alert_fired(&alert, triggered_at);
+        let mut fired_into = crate::autoresolve::triggers::FiredInto::NoIncident;
         #[cfg(feature = "enterprise")]
         let unmuted_rows = unmuted_group_rows(&alert, &folder_id, &data, now).await;
         #[cfg(feature = "enterprise")]
@@ -4456,6 +4457,15 @@ async fn handle_alert_triggers(
                     // (sent for new incidents/alert types, suppressed for repeats).
                     // The incident owns the resolve too, so the episode records it.
                     episode_incident_id = Some(correlated.outcome.incident_id().to_string());
+                    fired_into = match &correlated.outcome {
+                        config::meta::alerts::incidents::IncidentCorrelationOutcome::NewIncidentCreated {
+                            incident_id,
+                            ..
+                        } => {
+                            crate::autoresolve::triggers::FiredInto::Opened(incident_id.clone())
+                        }
+                        _ => crate::autoresolve::triggers::FiredInto::Joined,
+                    };
                     trigger_data_stream.delivery_attempted = Some(correlated.notify_attempted);
                     (true, correlated.notify_error)
                 }
@@ -4479,6 +4489,9 @@ async fn handle_alert_triggers(
         } else {
             (false, None)
         };
+
+        #[cfg(feature = "enterprise")]
+        crate::autoresolve::triggers::on_alert_fired(&alert, triggered_at, fired_into);
 
         #[cfg(not(feature = "enterprise"))]
         let incident_handled_notification = false;

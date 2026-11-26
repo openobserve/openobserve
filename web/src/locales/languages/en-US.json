@@ -35100,6 +35100,21 @@
       "runOf": "run of {time}",
       "sourceGone": "From a run that no longer exists, {time} by {name}",
       "removeFailed": "The correction was not removed. Try again."
+    },
+    "incident": {
+      "title": "AutoResolve",
+      "note": "One run per incident. It asks before it changes anything.",
+      "loading": "Loading AutoResolve…",
+      "loadFailed": "AutoResolve for this incident could not be loaded.",
+      "newRun": "New run for this incident",
+      "liveRun": "This is the incident's run. A new run can start when it ends.",
+      "openRun": "Open run",
+      "related": "Saved AutoResolves for this incident's alerts",
+      "suggestedFor": "Suggested for incidents from {alert}",
+      "startsOn": "Starts on {alert}",
+      "run": "Run",
+      "runLocked": "{run} is this incident's live run. A new run can start when it ends.",
+      "empty": "No AutoResolve has run on this incident, and none is saved for its alerts."
     }
   },
   "autobotInvestigate": {

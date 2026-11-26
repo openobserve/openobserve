@@ -21,6 +21,7 @@ pub mod consume;
 pub mod corrections;
 pub(crate) mod evidence;
 mod grading;
+pub mod incident;
 pub mod live;
 pub mod plan;
 pub mod saved;
@@ -90,6 +91,11 @@ pub enum AutoResolveError {
     StepNotRunning,
     #[error("Another run of this AutoResolve is in progress; finish it first.")]
     RunInProgress,
+    /// One live run per incident; the field is that run's id.
+    #[error("AutoResolve run {0} is already live on this incident; finish it first.")]
+    IncidentHasRun(String),
+    #[error("Incident not found.")]
+    IncidentNotFound,
     #[error(transparent)]
     Db(#[from] anyhow::Error),
 }
@@ -225,12 +231,17 @@ pub async fn start_person_run(
     user_email: &str,
     goal: &str,
     connection_ids: &[String],
+    incident_id: Option<String>,
 ) -> Result<String, AutoResolveError> {
     let source = Listable {
         source: &LiveConnections,
         permitted: approve::permitted_connections(org, user_email, "LIST").await?,
     };
     let connections = validate_connections(&source, org, connection_ids, &HashMap::new()).await?;
+    let context = match &incident_id {
+        Some(id) => Some(triggers::incident_context(org, id).await?),
+        None => None,
+    };
     let started = start_run_for(
         org,
         goal,
@@ -238,10 +249,11 @@ pub async fn start_person_run(
         user_email,
         user_email,
         TriggerKind::Person,
-        None,
+        context,
         ApprovalChannel::Screen,
         autoresolve_runs::new_run_id(),
         None,
+        incident_id,
     )
     .await?;
     started.ok_or_else(|| AutoResolveError::Db(anyhow::anyhow!("a new run id was already taken")))
@@ -261,6 +273,7 @@ pub async fn start_run_for(
     approval_channel: ApprovalChannel,
     idempotency_key: String,
     autoresolve_id: Option<String>,
+    incident_id: Option<String>,
 ) -> Result<Option<String>, AutoResolveError> {
     if !autoresolve_on() {
         return Err(AutoResolveError::NotEnabled);
@@ -283,9 +296,14 @@ pub async fn start_run_for(
         approval_channel,
         idempotency_key,
         autoresolve_id,
+        incident_id.clone(),
     )?;
-    let Some(run) = record_run_with(infra::db::get_orm_client_rw().await, new).await? else {
-        return Ok(None);
+    let db = infra::db::get_orm_client_rw().await;
+    let Some(run) = record_run_with(db, new).await? else {
+        return match incident_id {
+            Some(id) => incident_refusal(db, org, &id).await,
+            None => Ok(None),
+        };
     };
     if let Err(e) = spawn_planning_turn(&run, None, true).await {
         fail_unstarted(&run, &e).await;
@@ -307,6 +325,7 @@ pub(crate) fn launch_row(
     approval_channel: ApprovalChannel,
     idempotency_key: String,
     autoresolve_id: Option<String>,
+    incident_id: Option<String>,
 ) -> Result<NewRun, AutoResolveError> {
     let ids: Vec<&str> = connections.iter().map(|c| c.id.as_str()).collect();
     let now = now_micros();
@@ -326,8 +345,22 @@ pub(crate) fn launch_row(
         approval_channel: approval_channel.as_str().to_string(),
         turn_deadline_us: Some(turn_deadline_us(now)),
         idempotency_key,
+        incident_id,
         now_us: now,
     })
+}
+
+/// A refused insert of a run on an incident: the incident's live run names the refusal, else
+/// the other unique keys refused it.
+async fn incident_refusal(
+    db: &sea_orm::DatabaseConnection,
+    org: &str,
+    incident_id: &str,
+) -> Result<Option<String>, AutoResolveError> {
+    match autoresolve_runs::live_for_incident_with(db, org, incident_id).await? {
+        Some(live) => Err(AutoResolveError::IncidentHasRun(live.id)),
+        None => Ok(None),
+    }
 }
 
 /// [transition_with] on the global client, then [after_transition] when the run moved.

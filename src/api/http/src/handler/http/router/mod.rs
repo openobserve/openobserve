@@ -1459,6 +1459,7 @@ fn autoresolve_routes(router: Router) -> Router {
     router
         .route("/v2/{org_id}/autoresolve/summary", get(autoresolve::runs::get_summary))
         .route("/v2/{org_id}/autoresolve/runs", get(autoresolve::runs::list_runs).post(autoresolve::runs::start_run))
+        .route("/v2/{org_id}/autoresolve/incidents/{incident_id}", get(autoresolve::runs::get_incident))
         .route("/v2/{org_id}/autoresolve/runs/{run_id}", get(autoresolve::runs::get_run))
         .route("/v2/{org_id}/autoresolve/runs/{run_id}/live_stream", get(autoresolve::runs::get_run_live_stream))
         .route("/v2/{org_id}/autoresolve/runs/{run_id}/approve", post(autoresolve::runs::approve_run))

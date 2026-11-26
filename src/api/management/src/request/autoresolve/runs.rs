@@ -85,6 +85,9 @@ pub struct StartRunBody {
     /// loads only these.
     #[serde(default)]
     pub connection_ids: Vec<String>,
+    /// The incident the run works on; refused with 409 while the incident has a live run.
+    #[serde(default)]
+    pub incident_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -166,6 +169,40 @@ pub async fn get_summary(
     match live::summary(&org_id, &user.user_id).await {
         Ok(summary) => MetaHttpResponse::json(summary),
         Err(e) => autoresolve_error("summary", e),
+    }
+}
+
+/// AutoResolveGetIncident
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/autoresolve/incidents/{incident_id}",
+    context_path = "/api",
+    tag = "AutoResolve",
+    operation_id = "AutoResolveGetIncident",
+    summary = "Get an incident's AutoResolve",
+    description = "The incident's one run (its live run, else its newest), the saved AutoResolves whose trigger names an alert of the incident (incident-triggered first), and the RCA's probable cause as a goal for a new run.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident id"),
+    ),
+    responses(
+        (status = 200, description = "The incident's AutoResolve", content_type = "application/json", body = openobserve_core::autoresolve::incident::IncidentAutoResolve),
+        (status = 404, description = "The incident is not found, or AutoResolve is not enabled", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "AutoResolve", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn get_incident(Path((org_id, incident_id)): Path<(String, String)>) -> Response {
+    if let Some(off) = disabled() {
+        return off;
+    }
+    match openobserve_core::autoresolve::incident::view(&org_id, &incident_id).await {
+        Ok(view) => MetaHttpResponse::json(view),
+        Err(e) => autoresolve_error("incident", e),
     }
 }
 
@@ -261,7 +298,19 @@ pub async fn start_run(
             format!("The goal can be at most {MAX_GOAL_CHARS} characters."),
         );
     }
-    match start_person_run(&org_id, &user.user_id, goal, &body.connection_ids).await {
+    let incident_id = body
+        .incident_id
+        .map(|id| id.trim().to_string())
+        .filter(|id| !id.is_empty());
+    match start_person_run(
+        &org_id,
+        &user.user_id,
+        goal,
+        &body.connection_ids,
+        incident_id,
+    )
+    .await
+    {
         Ok(run_id) => (StatusCode::CREATED, Json(StartedRun { run_id })).into_response(),
         Err(AutoResolveError::NoConnections) => {
             refusal(StatusCode::UNPROCESSABLE_ENTITY, NO_CONNECTIONS_MESSAGE)

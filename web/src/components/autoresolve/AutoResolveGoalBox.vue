@@ -72,6 +72,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ limitText }}
             </p>
             <OButton
+              v-if="cancellable"
+              variant="outline"
+              size="sm-action"
+              :disabled="starting"
+              data-test="autoresolve-goal-box-cancel"
+              @click="emit('cancel')"
+            >
+              {{ t("common.cancel") }}
+            </OButton>
+            <OButton
               variant="primary"
               size="sm-action"
               :disabled="!canStart"
@@ -134,8 +144,10 @@ const props = withDefaults(
     error?: I18nText | null;
     /** With no MCPs, offer to add one only to someone who may. */
     canAddMcps?: boolean;
+    /** Show Cancel beside Start, for a box opened in place of other content. */
+    cancellable?: boolean;
   }>(),
-  { loading: false, error: null, canAddMcps: false },
+  { loading: false, error: null, canAddMcps: false, cancellable: false },
 );
 
 const emit = defineEmits<{
@@ -144,6 +156,7 @@ const emit = defineEmits<{
   (e: "start", run: { goal: string; connectionIds: string[] }): void;
   /** The person changed the goal or the connections; a dropped removed connection is not an edit. */
   (e: "edit"): void;
+  (e: "cancel"): void;
 }>();
 
 const { t } = useI18nTyped();

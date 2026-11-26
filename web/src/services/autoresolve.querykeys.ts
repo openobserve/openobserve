@@ -26,4 +26,5 @@ export const autoresolveKeys = {
   savedOne: (org: string, id: string) => orgKey(org, "autoresolve", "saved", id),
   corrections: (org: string, autoresolveId: string) =>
     orgKey(org, "autoresolve", "corrections", autoresolveId),
+  incident: (org: string, incidentId: string) => orgKey(org, "autoresolve", "incident", incidentId),
 };

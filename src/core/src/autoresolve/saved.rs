@@ -305,10 +305,25 @@ pub async fn delete(org: &str, id: &str) -> Result<(), SavedError> {
     txn.commit().await.map_err(|e| SavedError::Db(e.into()))
 }
 
-/// Starts a run of the AutoResolve as the caller, approved on screen.
-pub async fn run_saved(org: &str, email: &str, id: &str) -> Result<String, SavedError> {
+/// Starts a run of the AutoResolve as the caller; on an incident, it is the incident's one live
+/// run. `approval` is Slack when the caller clicked Run on a Slack proposal.
+pub async fn run_saved(
+    org: &str,
+    email: &str,
+    id: &str,
+    incident_id: Option<String>,
+    approval: ApprovalChannel,
+) -> Result<String, SavedError> {
     let row = table::get(org, id).await?.ok_or(SavedError::NotFound)?;
     let connections = saved_connections(&row).map_err(SavedError::Run)?;
+    let context = match &incident_id {
+        Some(incident) => Some(
+            super::triggers::incident_context(org, incident)
+                .await
+                .map_err(SavedError::Run)?,
+        ),
+        None => None,
+    };
     let started = start_run_for(
         org,
         &row.goal,
@@ -316,14 +331,16 @@ pub async fn run_saved(org: &str, email: &str, id: &str) -> Result<String, Saved
         email,
         email,
         TriggerKind::Person,
-        None,
-        ApprovalChannel::Screen,
+        context,
+        approval,
         autoresolve_runs::new_run_id(),
         Some(row.id),
+        incident_id,
     )
     .await
     .map_err(SavedError::Run)?;
-    // The key is new, so only the one-live-run-per-AutoResolve index can refuse the insert.
+    // The key is new and the incident's refusal is an error, so only the
+    // one-live-run-per-AutoResolve index can refuse the insert here.
     started.ok_or(SavedError::RunInProgress)
 }
 
@@ -639,7 +656,10 @@ async fn one_view(org: &str, row: AutoResolveRow) -> Result<SavedView, SavedErro
     views.pop().ok_or(SavedError::NotFound)
 }
 
-async fn views(org: &str, rows: Vec<AutoResolveRow>) -> Result<Vec<SavedView>, SavedError> {
+pub(crate) async fn views(
+    org: &str,
+    rows: Vec<AutoResolveRow>,
+) -> Result<Vec<SavedView>, SavedError> {
     let names: HashMap<String, String> = org_ai_toolsets::list_kind_names(org, MCP_KIND)
         .await?
         .into_iter()

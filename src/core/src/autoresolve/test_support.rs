@@ -93,6 +93,7 @@ pub(crate) fn new_run(id: &str) -> NewRun {
         approval_channel: "screen".into(),
         turn_deadline_us: None,
         idempotency_key: id.into(),
+        incident_id: None,
         now_us: 1,
     }
 }

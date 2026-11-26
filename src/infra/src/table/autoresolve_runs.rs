@@ -56,6 +56,9 @@ pub struct NewRun {
     pub approval_channel: String,
     pub turn_deadline_us: Option<i64>,
     pub idempotency_key: String,
+    /// The incident the run works on; a second live run on it fails with
+    /// `DbError::UniqueViolation`.
+    pub incident_id: Option<String>,
     pub now_us: i64,
 }
 
@@ -194,6 +197,7 @@ pub async fn insert_with<C: ConnectionTrait + TransactionTrait>(
         turn_started_at_us: Set(run.turn_deadline_us.map(|_| run.now_us)),
         check_retried_at_us: Set(None),
         plan_history: Set(None),
+        incident_id: Set(run.incident_id),
     }
     .insert(&txn)
     .await
@@ -280,6 +284,36 @@ pub async fn list_live_past_turn_deadline_with<C: ConnectionTrait>(
         .order_by_asc(Column::TurnDeadlineUs)
         .limit(limit)
         .all(conn)
+        .await?)
+}
+
+/// The incident's run that has not ended, one waiting for approval included, if any.
+pub async fn live_for_incident_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    incident_id: &str,
+) -> Result<Option<Model>, Error> {
+    let mut states = live_states();
+    states.push(RunState::WaitingApproval.as_str());
+    Ok(Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::IncidentId.eq(incident_id))
+        .filter(Column::State.is_in(states))
+        .one(conn)
+        .await?)
+}
+
+/// The incident's live run, else its newest run.
+pub async fn current_for_incident(org: &str, incident_id: &str) -> Result<Option<Model>, Error> {
+    let conn = get_orm_client_rw().await;
+    if let Some(live) = live_for_incident_with(conn, org, incident_id).await? {
+        return Ok(Some(live));
+    }
+    Ok(Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::IncidentId.eq(incident_id))
+        .order_by_desc(Column::CreatedAtUs)
+        .one(conn)
         .await?)
 }
 
@@ -454,6 +488,9 @@ pub async fn create_tables_for_tests(
         .await?;
     crate::table::migration::autoresolve_plan_history_migration_for_test()
         .up(&SchemaManager::new(db))
+        .await?;
+    crate::table::migration::autoresolve_run_incident_migration_for_test()
+        .up(&SchemaManager::new(db))
         .await
 }
 
@@ -570,6 +607,7 @@ mod tests {
             approval_channel: "screen".into(),
             turn_deadline_us: None,
             idempotency_key: format!("key-{id}"),
+            incident_id: None,
             now_us: 1,
         }
     }

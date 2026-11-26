@@ -16,13 +16,14 @@
 //! Saved AutoResolves: list, create, read, edit and delete them, switch their trigger, and run one.
 
 use axum::{
-    Json,
+    Extension, Json,
     body::Bytes,
     extract::Path,
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use openobserve_api_common::extractors::Headers;
+use config::meta::autoresolve::ApprovalChannel;
+use openobserve_api_common::{auth::delegation::DelegatedCaller, extractors::Headers};
 use openobserve_core::autoresolve::{
     corrections,
     saved::{self, SavedError, SavedInput},
@@ -36,6 +37,14 @@ use super::{
     runs::{StartedRun, approve_error},
 };
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::auth::UserEmail};
+
+/// The body of a saved run; empty for a run on no incident.
+#[derive(Debug, Default, Deserialize, ToSchema)]
+pub struct RunSavedBody {
+    /// The incident the run works on; refused with 409 while the incident has a live run.
+    #[serde(default)]
+    pub incident_id: Option<String>,
+}
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct TriggerBody {
@@ -289,16 +298,17 @@ pub async fn set_saved_trigger(
     tag = "AutoResolve",
     operation_id = "AutoResolveRunSaved",
     summary = "Run a saved AutoResolve",
-    description = "Starts a run of the AutoResolve's goal over its connections as saved now, as the caller; later edits to the AutoResolve do not change the run. The run proposes a plan; nothing changes until someone approves an option.",
+    description = "Starts a run of the AutoResolve's goal over its connections as saved now, as the caller; later edits to the AutoResolve do not change the run. With an `incident_id`, the run is the incident's one live run. The run proposes a plan; nothing changes until someone approves an option. A run started from a Slack proposal is approved in Slack.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("autoresolve_id" = String, Path, description = "Saved AutoResolve id"),
     ),
+    request_body(content = RunSavedBody, description = "Optional: the incident the run works on", content_type = "application/json"),
     responses(
         (status = 201, description = "Started", content_type = "application/json", body = StartedRun),
-        (status = 404, description = "Not found, or AutoResolve is not enabled", content_type = "application/json", body = Object),
-        (status = 409, description = "A run of this AutoResolve is still in progress", content_type = "application/json", body = Object),
+        (status = 404, description = "Not found, the incident is not found, or AutoResolve is not enabled", content_type = "application/json", body = Object),
+        (status = 409, description = "A run of this AutoResolve, or a run on the incident, is still in progress", content_type = "application/json", body = Object),
         (status = 422, description = "Its connections were all deleted", content_type = "application/json", body = Object),
         (status = 500, description = "Internal error", content_type = "application/json", body = Object),
         (status = 503, description = "The AI turn could not start", content_type = "application/json", body = Object),
@@ -311,11 +321,41 @@ pub async fn set_saved_trigger(
 pub async fn run_saved(
     Path((org_id, autoresolve_id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
+    delegated: Option<Extension<DelegatedCaller>>,
+    body: Bytes,
 ) -> Response {
     if let Some(off) = disabled() {
         return off;
     }
-    match saved::run_saved(&org_id, &user.user_id, &autoresolve_id).await {
+    let body: RunSavedBody = if body.is_empty() {
+        RunSavedBody::default()
+    } else {
+        match parse_body(&body) {
+            Ok(body) => body,
+            Err(bad) => return bad,
+        }
+    };
+    let incident_id = body
+        .incident_id
+        .map(|id| id.trim().to_string())
+        .filter(|id| !id.is_empty());
+    // Only the validator sets the extension, so a client cannot claim a Slack click.
+    let approval = match delegated
+        .as_deref()
+        .is_some_and(DelegatedCaller::is_slack_action)
+    {
+        true => ApprovalChannel::Slack,
+        false => ApprovalChannel::Screen,
+    };
+    match saved::run_saved(
+        &org_id,
+        &user.user_id,
+        &autoresolve_id,
+        incident_id,
+        approval,
+    )
+    .await
+    {
         Ok(run_id) => (StatusCode::CREATED, Json(StartedRun { run_id })).into_response(),
         Err(e) => saved_error("run saved", e),
     }

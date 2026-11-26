@@ -1379,7 +1379,7 @@ fn preview_text(stored: &str) -> String {
     }
 }
 
-fn trigger_of(run: &RunRow) -> AutoResolveTrigger {
+pub(crate) fn trigger_of(run: &RunRow) -> AutoResolveTrigger {
     AutoResolveTrigger {
         kind: run.trigger_kind.clone(),
         by: trigger_by(run),

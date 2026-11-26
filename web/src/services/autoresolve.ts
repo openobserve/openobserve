@@ -384,6 +384,41 @@ export interface AutoResolveSavedInput {
 export interface AutoResolveStartInput {
   goal: string;
   connection_ids: string[];
+  /** Makes it the incident's run; refused with 409 while the incident has a live run. */
+  incident_id?: string;
+}
+
+/** The run `GET /incidents/{id}` shows: the incident's live run, else its latest. */
+export interface AutoResolveIncidentRun {
+  run_id: string;
+  state: AutoResolveRunState;
+  live: boolean;
+  autoresolve_id: string | null;
+  name: string | null;
+  goal: string;
+  trigger: Pick<AutoResolveTrigger, "kind" | "label">;
+  created_at_us: number;
+  ended_at_us: number | null;
+}
+
+/** A saved AutoResolve whose trigger alert is in the incident; incident-triggered come first. */
+export interface AutoResolveIncidentRelated {
+  id: string;
+  name: string;
+  goal: string;
+  trigger_kind: AutoResolveTriggerKind;
+  alert_id: string | null;
+  alert_name: string | null;
+  connections: AutoResolveConnectionRef[];
+}
+
+/** `GET /incidents/{id}`. */
+export interface AutoResolveIncident {
+  incident_id: string;
+  run: AutoResolveIncidentRun | null;
+  related: AutoResolveIncidentRelated[];
+  /** The RCA's probable cause, once the RCA finished. */
+  suggested_goal: string | null;
 }
 
 /** The live turn's clock (the server's `TurnStatus`); times are microseconds. */
@@ -600,8 +635,20 @@ const autoresolve = {
   setTrigger: (org: string, id: string, enabled: boolean) =>
     http().post<AutoResolveSaved>(`${savedPath(org, id)}/trigger`, { enabled }, rendersForbidden),
 
-  runSaved: (org: string, id: string) =>
-    http().post<{ run_id: string }>(`${savedPath(org, id)}/run`, undefined, rendersForbidden),
+  /** With `incidentId` the run becomes the incident's run; 409 while that incident has a live one. */
+  runSaved: (org: string, id: string, incidentId?: string) =>
+    http().post<{ run_id: string }>(
+      `${savedPath(org, id)}/run`,
+      incidentId ? { incident_id: incidentId } : undefined,
+      rendersForbidden,
+    ),
+
+  // The incident page hides the section on a 403, so the access toast stays quiet.
+  getIncident: (org: string, incidentId: string) =>
+    http().get<AutoResolveIncident>(
+      `${base(org)}/incidents/${encodeURIComponent(incidentId)}`,
+      rendersForbidden,
+    ),
 
   /** Stream the run into `onEvent`; rejects with AutoResolveLiveStreamRefused if refused. */
   openAutoResolveLiveStream: async (

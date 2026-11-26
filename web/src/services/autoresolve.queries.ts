@@ -16,6 +16,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import autoresolve, {
   type AutoResolveCorrectionList,
+  type AutoResolveIncident,
   type AutoResolveReplanInput,
   type AutoResolveRun,
   type AutoResolveSaved,
@@ -92,6 +93,23 @@ export const autoresolveSavedQuery = (org: string, id: string) =>
     queryKey: autoresolveKeys.savedOne(org, id),
     queryFn: async (): Promise<AutoResolveSaved> => (await autoresolve.getSaved(org, id)).data,
     staleTime: NORMAL_STALE_TIME,
+  });
+
+// A live run's state moves on its own, so it is read again until the run ends.
+export const autoresolveIncidentQuery = (org: string, incidentId: string) =>
+  queryOptions({
+    queryKey: autoresolveKeys.incident(org, incidentId),
+    queryFn: async (): Promise<AutoResolveIncident> => {
+      const data = (await autoresolve.getIncident(org, incidentId)).data;
+      return {
+        incident_id: data?.incident_id ?? incidentId,
+        run: data?.run ?? null,
+        related: data?.related ?? [],
+        suggested_goal: data?.suggested_goal ?? null,
+      };
+    },
+    staleTime: LIVE_STALE_TIME,
+    refetchInterval: (query) => (query.state.data?.run?.live ? 15_000 : false),
   });
 
 export const startAutoResolveRunMutation = (org: string) =>
@@ -172,8 +190,9 @@ export const setAutoResolveTriggerMutation = (org: string) =>
     meta: { invalidates: [autoresolveKeys.all(org)], awaitInvalidation: true, silentError: true },
   });
 
-export const runAutoResolveSavedMutation = (org: string) =>
+/** With `incidentId` every run it starts is that incident's run. */
+export const runAutoResolveSavedMutation = (org: string, incidentId?: string) =>
   mutationOptions({
-    mutationFn: async (id: string) => (await autoresolve.runSaved(org, id)).data,
+    mutationFn: async (id: string) => (await autoresolve.runSaved(org, id, incidentId)).data,
     meta: { invalidates: [autoresolveKeys.all(org)], silentError: true },
   });

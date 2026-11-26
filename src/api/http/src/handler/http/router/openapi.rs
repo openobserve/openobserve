@@ -1551,6 +1551,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::autoobserve::paging::put_paging_settings,
     openobserve_api_management::request::autoresolve::runs::get_summary,
     openobserve_api_management::request::autoresolve::runs::list_runs,
+    openobserve_api_management::request::autoresolve::runs::get_incident,
     openobserve_api_management::request::autoresolve::runs::start_run,
     openobserve_api_management::request::autoresolve::runs::get_run,
     openobserve_api_management::request::autoresolve::runs::get_run_live_stream,

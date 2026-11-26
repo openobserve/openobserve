@@ -199,6 +199,9 @@ const SLACK_ACTION_SCOPE: &[ScopeRoute] = &[
     v2(&[Param, Lit("autoresolve"), Lit("runs"), Param, Lit("approve")], POST),
     #[cfg(feature = "enterprise")]
     v2(&[Param, Lit("autoresolve"), Lit("runs"), Param, Lit("decline")], POST),
+    // Run on an incident trigger's proposal.
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoresolve"), Lit("saved"), Param, Lit("run")], POST),
 ];
 
 /// An AutoResolve turn's reads and its run's internal routes; no approve, decline or settings route.

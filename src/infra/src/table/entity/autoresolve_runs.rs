@@ -78,6 +78,8 @@ pub struct Model {
     /// A JSON array of every plan the agent proposed, oldest first (`PlanRevision`).
     #[sea_orm(column_type = "Text", nullable)]
     pub plan_history: Option<String>,
+    /// The incident this run works on; the incident has at most one live run.
+    pub incident_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

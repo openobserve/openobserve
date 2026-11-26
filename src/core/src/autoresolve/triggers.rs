@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Alert and incident triggers: a firing starts the saved AutoResolves of this region that wait
-//! for it, each run as the org's SysRcaAgent and approved in Slack.
+//! Alert and incident triggers. An alert firing starts the saved AutoResolves of this region that
+//! wait for it, each run as the org's SysRcaAgent and approved in Slack; a firing that opens an
+//! incident links its run to the incident, and one that joins an open incident starts none. A new
+//! incident proposes its saved AutoResolves in Slack, and a person starts one.
 
 use config::meta::{
     alerts::{
@@ -44,6 +46,19 @@ pub(crate) struct Firing {
     pub subject_id: String,
     pub fired_at_us: i64,
     pub context: Value,
+    /// The incident the firing opened; its run is the incident's one live run.
+    pub incident_id: Option<String>,
+}
+
+/// Where an alert firing went once incidents correlated it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FiredInto {
+    /// No incident: the alert does not create them, incidents are off, or a downtime muted it.
+    NoIncident,
+    /// A new incident, which the firing's run works on.
+    Opened(String),
+    /// An incident that was open; it already has its run or a person chooses one.
+    Joined,
 }
 
 impl Firing {
@@ -105,6 +120,7 @@ impl RunStarter for LiveStarter {
             ApprovalChannel::Slack,
             key,
             Some(flow.id.clone()),
+            firing.incident_id.clone(),
         )
         .await
     }
@@ -112,26 +128,44 @@ impl RunStarter for LiveStarter {
 
 /// Starts, in the background, the runs a delivered alert firing asks for; never fails or
 /// waits on the alert path.
-pub fn on_alert_fired(alert: &Alert, fired_at_us: i64) {
+pub fn on_alert_fired(alert: &Alert, fired_at_us: i64, into: FiredInto) {
     let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
+        return;
+    };
+    let Some(incident_id) = run_incident(into) else {
+        log::debug!("[autoresolve] alert {alert_id} joined an open incident; it starts no run");
         return;
     };
     if !autoresolve_on() {
         return;
+    }
+    let mut context = alert_context(alert, fired_at_us);
+    if let Some(id) = &incident_id {
+        context["incident_id"] = id.clone().into();
     }
     let firing = Firing {
         kind: TriggerKind::Alert,
         alert_id: alert_id.clone(),
         subject_id: alert_id,
         fired_at_us,
-        context: alert_context(alert, fired_at_us),
+        context,
+        incident_id,
     };
     let org = alert.org_id.clone();
     tokio::spawn(async move { fire(&org, &firing).await });
 }
 
-/// Starts, in the background, the runs a new incident asks for; `alert_id` is the alert that
-/// created it.
+/// The incident an alert firing's run works on; `None` when the firing starts no run.
+fn run_incident(into: FiredInto) -> Option<Option<String>> {
+    match into {
+        FiredInto::NoIncident => Some(None),
+        FiredInto::Opened(id) => Some(Some(id)),
+        FiredInto::Joined => None,
+    }
+}
+
+/// Proposes, in the background, the AutoResolves a new incident asks for; `alert_id` is the
+/// alert that created it. Nothing runs until a person starts one.
 pub fn on_incident_created(org: &str, incident_id: &str, alert_id: &str) {
     if !autoresolve_on() {
         return;
@@ -141,17 +175,54 @@ pub fn on_incident_created(org: &str, incident_id: &str, alert_id: &str) {
         incident_id.to_string(),
         alert_id.to_string(),
     );
-    tokio::spawn(async move {
-        let context = incident_context(&org, &incident_id, &alert_id).await;
-        let firing = Firing {
-            kind: TriggerKind::Incident,
-            alert_id,
-            subject_id: incident_id,
-            fired_at_us: 0,
-            context,
-        };
-        fire(&org, &firing).await;
-    });
+    tokio::spawn(async move { propose(&org, &incident_id, &alert_id).await });
+}
+
+async fn propose(org: &str, incident_id: &str, alert_id: &str) {
+    let region = crate::downtimes::notify::this_region();
+    let listed = |kind| table::list_triggered(org, &region, kind, alert_id);
+    let (proposed, starts) = match (
+        listed(TriggerKind::Incident).await,
+        listed(TriggerKind::Alert).await,
+    ) {
+        (Ok(p), Ok(s)) => (p, s),
+        (Err(e), _) | (_, Err(e)) => {
+            log::warn!("[autoresolve] {org}: could not read the triggered AutoResolves: {e}");
+            return;
+        }
+    };
+    if !posts_proposals(&proposed, &starts) {
+        if !proposed.is_empty() {
+            log::info!(
+                "[autoresolve] {org}: incident {incident_id} gets its run from alert {alert_id}'s own AutoResolve; no proposal posted"
+            );
+        }
+        return;
+    }
+    let incident = match infra::table::alert_incidents::get_rw(org, incident_id).await {
+        Ok(Some(incident)) => incident,
+        Ok(None) => return,
+        Err(e) => {
+            log::warn!("[autoresolve] {org}: could not read incident {incident_id}: {e}");
+            return;
+        }
+    };
+    let alert_name = match alert_id.parse::<svix_ksuid::Ksuid>() {
+        Ok(id) => crate::alerts::alert::get_by_id_db(org, id)
+            .await
+            .ok()
+            .map(|a| a.name),
+        Err(_) => None,
+    };
+    for flow in &proposed {
+        super::slack::propose(org, flow, &incident, alert_name.clone()).await;
+    }
+}
+
+/// An enabled alert-triggered AutoResolve on the same alert already starts the incident's run,
+/// so a proposal would only offer a second one that the incident refuses.
+fn posts_proposals<T>(proposed: &[T], starts: &[T]) -> bool {
+    !proposed.is_empty() && starts.is_empty()
 }
 
 /// Starts a run of each enabled AutoResolve of `region` that waits for this firing, unless one of
@@ -211,6 +282,10 @@ async fn start_one(
         Ok(Some(run_id)) => log::info!("[autoresolve] {org}/{}: started run {run_id}", flow.id),
         Ok(None) => log::debug!(
             "[autoresolve] {org}/{}: already started, or a run is in progress",
+            flow.id
+        ),
+        Err(AutoResolveError::IncidentHasRun(run)) => log::info!(
+            "[autoresolve] {org}/{}: the incident already has run {run}",
             flow.id
         ),
         Err(e) => log::warn!(
@@ -317,22 +392,22 @@ fn push_field(out: &mut Vec<String>, column: &str) {
     }
 }
 
-async fn incident_context(org: &str, incident_id: &str, alert_id: &str) -> Value {
-    let incident = match infra::table::alert_incidents::get_rw(org, incident_id).await {
-        Ok(incident) => incident,
-        Err(e) => {
-            log::warn!("[autoresolve] {org}: could not read incident {incident_id}: {e}");
-            None
-        }
-    };
-    json!({
+/// What the planning turn of a run started on an incident is told about it; the incident must be
+/// the org's.
+pub(crate) async fn incident_context(
+    org: &str,
+    incident_id: &str,
+) -> Result<Value, AutoResolveError> {
+    let incident = infra::table::alert_incidents::get_rw(org, incident_id)
+        .await?
+        .ok_or(AutoResolveError::IncidentNotFound)?;
+    Ok(json!({
         "subject_type": "incident",
         "subject_id": incident_id,
         "incident_id": incident_id,
-        "title": incident.as_ref().and_then(|i| i.title.clone()),
-        "severity": incident.as_ref().map(|i| i.severity.clone()),
-        "alert_id": alert_id,
-    })
+        "title": incident.title,
+        "severity": incident.severity,
+    }))
 }
 
 #[cfg(test)]
@@ -379,6 +454,7 @@ mod tests {
                 ApprovalChannel::Slack,
                 key,
                 Some(flow.id.clone()),
+                firing.incident_id.clone(),
             )?;
             Ok(record_run_with(self.db, new).await?.map(|run| run.id))
         }
@@ -401,12 +477,13 @@ mod tests {
             subject_id: format!("{}-{alert_id}", kind.as_str()),
             fired_at_us: at,
             context: json!({}),
+            incident_id: None,
         }
     }
 
     #[tokio::test]
     async fn a_trigger_starts_one_run_per_firing() {
-        use TriggerKind::{Alert as A, Incident as I};
+        use TriggerKind::Alert as A;
         let rows = [
             Row {
                 name: "first fire",
@@ -464,22 +541,6 @@ mod tests {
                 raced: false,
                 runs: 0,
             },
-            Row {
-                name: "incident created by the saved alert",
-                saved: ("r1", I, true),
-                earlier: None,
-                fired: (I, ALERT, 0),
-                raced: false,
-                runs: 1,
-            },
-            Row {
-                name: "incident created by another alert",
-                saved: ("r1", I, true),
-                earlier: None,
-                fired: (I, "alert-2", 0),
-                raced: false,
-                runs: 0,
-            },
         ];
         for row in rows {
             let db = memory_db().await;
@@ -523,6 +584,75 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_firing_starts_a_run_unless_it_joined_an_open_incident() {
+        let cases = [
+            (FiredInto::NoIncident, Some(None)),
+            (
+                FiredInto::Opened("inc-1".into()),
+                Some(Some("inc-1".to_string())),
+            ),
+            (FiredInto::Joined, None),
+        ];
+        for (into, want) in cases {
+            assert_eq!(run_incident(into.clone()), want, "{into:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_incident_a_firing_opened_gets_one_run() {
+        let db = memory_db().await;
+        let starter = DbStarter { db: &db };
+        let first = table::insert_with(&db, saved("r1", TriggerKind::Alert, true))
+            .await
+            .unwrap();
+        let mut second = saved("r1", TriggerKind::Alert, true);
+        second.id = "flow-2".into();
+        second.name = "second flow".into();
+        let second = table::insert_with(&db, second).await.unwrap();
+        let mut fired = firing(TriggerKind::Alert, ALERT, FIRST);
+        fired.incident_id = Some("inc-1".into());
+        fire_with(&db, &starter, ORG, "r1", &fired).await;
+        let runs = Runs::find()
+            .filter(Column::IncidentId.eq("inc-1"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(
+            runs.len(),
+            1,
+            "two flows on the alert, one run on its incident"
+        );
+        let run_of = runs[0].autoresolve_id.as_deref();
+        assert!(run_of == Some(first.id.as_str()) || run_of == Some(second.id.as_str()));
+
+        let mut later = firing(TriggerKind::Alert, ALERT, FIRST + 1);
+        later.incident_id = Some("inc-2".into());
+        fire_with(&db, &starter, ORG, "r1", &later).await;
+        let other = Runs::find()
+            .filter(Column::IncidentId.eq("inc-2"))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(
+            other.len(),
+            1,
+            "another incident gets its own run from the free flow"
+        );
+    }
+
+    #[test]
+    fn an_incident_proposes_only_when_its_alert_starts_no_run() {
+        let (incident, alert, none): ([&str; 1], [&str; 1], [&str; 0]) =
+            (["incident flow"], ["alert flow"], []);
+        assert!(posts_proposals(&incident, &none));
+        assert!(
+            !posts_proposals(&incident, &alert),
+            "the alert's flow starts the run"
+        );
+        assert!(!posts_proposals(&none, &none));
     }
 
     #[test]
