@@ -73,7 +73,7 @@ test.describe('Logs Include Search Term query shape (ENT#3086, OSS#11220)', () =
     // Unbracketed, "alpha OR (beta AND ns-b ...)" would also return both alpha rows.
     await pm.logsPage.clickRefreshButton();
     await expect.poll(async () => (await pm.logsPage.getResultRowTexts()).length, { timeout: 30000 }).toBe(2);
-    for (const row of await pm.logsPage.getResultRowTexts()) expect(row).toContain('"svc":"beta"');
+    for (const row of await pm.logsPage.getResultRowTexts()) expect(row).toContain('ovn-b-include beta');
   });
 
   test('include on a GROUP BY query lands inside WHERE, before GROUP BY, and the query runs (OSS#11220)', {
