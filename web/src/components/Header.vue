@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
     <!-- LEFT SIDE: Logo -->
-    <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
+    <div
+      class="flex shrink-0 items-center justify-start gap-1 ps-3 max-xl:min-w-0 max-xl:shrink max-md:ps-1.5 xl:flex-1 xl:basis-0"
+    >
       <OButton
         v-if="!focusMode"
         variant="ghost"
@@ -143,21 +145,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </a>
       </div>
+      <div
+        v-if="securityAccess.canOpen.value"
+        class="ms-2 flex shrink-0 items-center max-xl:min-w-0 max-xl:shrink max-md:ms-0 max-md:min-w-12"
+      >
+        <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
+      </div>
     </div>
     <!-- end left side -->
 
-    <div
-      v-if="securityAccess.canOpen.value"
-      class="ms-3 flex shrink-0 items-center max-xl:min-w-0 max-xl:shrink max-md:ms-1 max-md:min-w-12"
-    >
-      <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
-    </div>
-
     <!-- A crowded header (wide custom logo, solution switcher) sheds the label, then the keycap, never the button. -->
     <div
-      class="@container/search flex min-w-14 flex-1 justify-center px-3 max-md:px-1"
+      class="@container/search flex min-w-14 flex-1 justify-center px-3 max-md:px-1 xl:w-66 xl:flex-none"
     >
-      <!-- Icon and keycap sit inset like an input's, each as close to its end as to the top and bottom. -->
       <OButton
         variant="field"
         size="xs"
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- RIGHT SIDE: Controls -->
     <div
-      class="flex shrink-0 items-center justify-end gap-1 pe-3 max-xl:min-w-0 max-xl:shrink max-md:pe-1.5"
+      class="flex shrink-0 items-center justify-end gap-1 pe-3 max-xl:min-w-0 max-xl:shrink max-md:pe-1.5 xl:flex-1 xl:basis-0"
     >
       <!-- SAMPLE DATA: stays visible while the org holds sample data -->
       <SampleDataHeaderChip class="me-2" />

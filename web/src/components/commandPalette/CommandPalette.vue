@@ -202,7 +202,7 @@ watch([org, subject], () => {
 });
 const results = computed<ResourceSearchResponse | undefined>(() => {
   if (search.data.value) return search.data.value;
-  if (!held.value || (!hasQuery.value && !filtering.value)) return undefined;
+  if (!held.value || search.error.value || (!hasQuery.value && !filtering.value)) return undefined;
   const text = fold(query.value.trim());
   const hits = held.value.hits.filter((hit) =>
     fold(`${hit.name} ${hit.id} ${hit.folder_name ?? ""}`).includes(text),
@@ -373,6 +373,7 @@ watch(
       activeKey.value = null;
       chosen.value = false;
       openVersion.value += 1;
+      held.value = null;
     }
   },
 );
@@ -427,6 +428,7 @@ onScopeDispose(() => {
         @keydown="onKeydown"
       />
       <div
+        v-if="peerKinds.length"
         ref="typesRef"
         class="flex min-w-0"
         data-test="command-palette-types"

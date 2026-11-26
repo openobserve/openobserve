@@ -312,7 +312,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
-  // field: an input's white fill with a light hairline that firms up on hover, for a button that opens a search or picker.
+  // field: a button that opens a search or picker.
   field: [
     "bg-input-bg text-text-secondary border border-border-default",
     "enabled:hover:border-input-border",

@@ -34587,7 +34587,7 @@
     "globalShortcut": "Open global search",
     "trigger": "Search or jump to…",
     "allTypes": "All",
-    "capped": "Showing the first match. Refine the search to see more. | Showing the first {count} matches. Refine the search to see more.",
+    "capped": "Showing the first match. | Showing the first {count} matches.",
     "hintNavigate": "Navigate",
     "hintOpen": "Open",
     "hintNewTab": "Open in new tab",

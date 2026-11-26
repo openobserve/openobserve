@@ -1,7 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// OListboxOption — one row of a listbox whose keyboard focus stays in a search
-// field (combobox with aria-activedescendant), e.g. a command palette.
+// OListboxOption — one row of a listbox whose focus stays in a combobox field.
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 

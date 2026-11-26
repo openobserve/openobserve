@@ -22,25 +22,30 @@ const result: ResourceSearchResponse = {
   sources: [{ type: "function", status: "complete", has_more: true }],
   took_ms: 1,
 };
-async function setup() {
+const resourceRouteNames = [
+  "logs",
+  "metrics",
+  "traces",
+  "dashboards",
+  "alertList",
+  "pipelines",
+  "synthetics",
+  "users",
+  "serviceAccounts",
+  "functionList",
+];
+async function setup(routeNames = resourceRouteNames) {
   const view = defineComponent({ setup: () => () => h("div") });
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      ...[
-        "logs",
-        "metrics",
-        "traces",
-        "dashboards",
-        "alertList",
-        "pipelines",
-        "synthetics",
-        "users",
-        "serviceAccounts",
-      ].map((name) => ({ path: `/${name}`, name, component: view })),
+      ...routeNames.map((name) => ({
+        path: name === "functionList" ? "/functions" : `/${name}`,
+        name,
+        component: view,
+      })),
       { path: "/", name: "home", component: view },
       { path: "/dashboards/view", name: "viewDashboard", component: view },
-      { path: "/functions", name: "functionList", component: view },
     ],
   });
   await router.push("/");
@@ -344,6 +349,32 @@ describe("Command K palette", () => {
       "command-entry-function:payment4",
     ]);
     expect(document.querySelector('[data-test="command-palette-searching"]')).toBeNull();
+  });
+  it("starts a reopened palette without the previous session's results", async () => {
+    const { wrapper } = await setup();
+    await search("payment");
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+    vi.mocked(resources.search).mockReturnValueOnce(new Promise(() => {}));
+    await search("payment 4");
+    expect(document.querySelector('[data-test^="command-entry-function:"]')).toBeNull();
+    expect(document.querySelector('[data-test="command-palette-searching"]')).not.toBeNull();
+  });
+  it("drops the held results once the next search fails", async () => {
+    await setup();
+    await search("payment");
+    vi.mocked(resources.search).mockRejectedValue(new Error("offline"));
+    await search("payment 4");
+    await vi.advanceTimersByTimeAsync(5000);
+    await flushPromises();
+    expect(document.querySelector('[data-test="command-palette-retry"]')).not.toBeNull();
+    expect(document.querySelector('[data-test^="command-entry-function:"]')).toBeNull();
+  });
+  it("shows no type chips when every resource type is hidden", async () => {
+    await setup([]);
+    expect(document.querySelector('[data-test="command-palette-types"]')).toBeNull();
+    expect(document.querySelector('[data-test="command-type-all"]')).toBeNull();
   });
   it("keeps the browser's saved-entry suggestions off the search field", async () => {
     await setup();

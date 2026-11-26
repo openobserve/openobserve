@@ -18,7 +18,6 @@ const emit = defineEmits<ListboxOptionEmits>();
 const slots = defineSlots<ListboxOptionSlots>();
 
 // Focus never lands on a row: the owning field moves the highlight and names it via aria-activedescendant.
-// The highlight switches without a colour fade, which would leave several rows half-lit while ↓ repeats.
 const link = computed(() => !!props.href && !props.disabled);
 
 function onClick(event: MouseEvent) {
