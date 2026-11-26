@@ -92,8 +92,9 @@
   --color-live-soft: color-mix(in srgb, var(--color-live) 12%, var(--color-surface-card));
   --color-live-border: var(--color-live);
 
+  /* Overlays draw their own border, so the shadow carries no ring (a ring doubled the edge). */
   /* eslint-disable-next-line local/no-hardcoded-px -- optical shadow geometry, not layout */
-  --shadow-overlay: 0 0 0 1px var(--color-border-subtle), 0 8px 24px rgb(16 18 27 / 0.12);
+  --shadow-overlay: 0 8px 24px rgb(16 18 27 / 0.12), 0 1px 3px rgb(16 18 27 / 0.06);
 
   /* The content card lifts off the shell by edge plus a faint shadow; flat fill alone read as one plane. */
   --color-card-edge: var(--color-border-subtle);
@@ -195,8 +196,8 @@
   --color-live-border: var(--color-live);
 
   /* Dark overlays lift by tone, not shadow. */
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline ring */
-  --shadow-overlay: 0 0 0 1px var(--color-border-subtle);
+  /* eslint-disable-next-line local/no-hardcoded-px -- optical shadow geometry, not layout */
+  --shadow-overlay: 0 8px 24px rgb(0 0 0 / 0.45);
 
   --color-card-edge: rgb(255 255 255 / 0.06);
   --shadow-card: none;
@@ -714,8 +715,19 @@
   ):not(:hover):not([aria-expanded="true"]):not([data-state="open"]):not([aria-pressed="true"]) {
   background-color: var(--toolbar-btn-rest-bg);
 }
-/* Their icons stay secondary grey (as in the reference apps) but get a thin currentColor stroke, lifting the 300-weight outlines to about the 400 weight (≈1.3px at 16px). */
-:root :is(.toolbar-btn-rest, .row-actions button, #date-time-button) svg path[fill="currentColor"] {
+/* Every control icon gets the same thin currentColor stroke, lifting the 300-weight outlines to about 400, so buttons and menus match. */
+:root
+  :is(
+    [data-o2-btn],
+    .toolbar-btn-rest,
+    .row-actions button,
+    #date-time-button,
+    [role="menuitem"],
+    [role="menuitemradio"],
+    [role="menuitemcheckbox"]
+  )
+  svg
+  path[fill="currentColor"] {
   stroke: currentColor;
   /* eslint-disable-next-line local/no-hardcoded-px -- icon stroke width */
   stroke-width: 0.75px;

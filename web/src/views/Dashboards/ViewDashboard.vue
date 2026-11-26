@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'hidden'
             : isFullscreen || store.state.printMode === true
               ? 'stickyHeader fullscreenHeader bg-surface-panel'
-              : 'shrink-0 [&_[data-test=dashboard-back-btn]]:size-7'
+              : 'shrink-0'
         "
         :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
         :back="

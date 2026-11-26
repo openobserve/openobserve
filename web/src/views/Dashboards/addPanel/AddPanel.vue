@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   )
                 "
                 variant="outline"
-                size="icon-sm"
+                size="icon-xs-sq"
                 @click="showViewPanel = true"
                 data-test="dashboard-panel-data-view-query-inspector-btn"
                 icon-left="manage-search"
@@ -115,8 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #trigger>
                   <OButton
                     variant="outline"
-                    size="icon-sm"
-                    class="h-7!"
+                    size="icon-xs-sq"
                     :disabled="isSavingPanel"
                     data-test="dashboard-panel-save-options-btn"
                     :aria-label="t('dashboard.moreActions')"
@@ -170,8 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #trigger>
                   <OButton
                     :variant="applyVariant"
-                    size="icon-sm"
-                    class="h-7!"
+                    size="icon-xs-sq"
                     :disabled="searchRequestTraceIds.length > 0"
                     data-test="dashboard-apply-options-btn"
                     :aria-label="t('dashboard.moreActions')"

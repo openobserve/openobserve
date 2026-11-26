@@ -2753,9 +2753,7 @@ describe("ViewDashboard", () => {
       expect(charts.props("viewOnly")).toBe(false);
       expect(charts.props("kiosk")).toBe(false);
       expect(charts.props("readOnlySelectors")).toBe(false);
-      expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe(
-        "shrink-0 [&_[data-test=dashboard-back-btn]]:size-7",
-      );
+      expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe("shrink-0");
     });
 
     it("opens TV mode with a link that keeps the relative range and adds the chosen options", async () => {

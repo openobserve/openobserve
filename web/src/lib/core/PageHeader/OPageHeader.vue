@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <FeatureLockExempt as="span" class="contents">
               <button
                 type="button"
-                class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent focus-visible:outline-focus-ring-accent inline-flex size-8 shrink-0 items-center justify-center transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+                class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent focus-visible:outline-focus-ring-accent inline-flex size-7 shrink-0 items-center justify-center transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
                 :title="backLabel"
                 :aria-label="backLabel"
                 :data-test="props.back?.dataTest ?? 'app-page-header-back'"

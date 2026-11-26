@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <PanelBar
-        class="@container/panelbar w-full flex-nowrap border-b-transparent!"
+        class="@container/panelbar w-full flex-nowrap gap-1 border-b-transparent!"
         :class="kioskFailed ? 'bg-status-error-bg!' : 'bg-transparent!'"
         data-test="dashboard-panel-bar"
       >
