@@ -123,7 +123,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -145,7 +144,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -182,7 +180,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -225,7 +222,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -260,7 +256,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -288,7 +283,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -333,7 +327,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -384,7 +377,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -413,7 +405,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -460,7 +451,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -518,7 +508,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": queryEditorStub,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -535,12 +524,6 @@ describe("TestFunction.vue Branch Coverage", () => {
       const testDateTime = { type: "relative", relativeTimePeriod: "2h" };
       vm.updateDateTime(testDateTime);
       expect(vm.dateTime).toEqual(testDateTime);
-
-      // Test sendToAiChat (line 750-752)
-      const testValue = "test AI chat value";
-      vm.sendToAiChat(testValue);
-      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
-      expect(wrapper.emitted("sendToAiChat")?.[0]).toEqual([testValue]);
 
       // Test processTestResults (line 609-628)
       vm.highlightSpecificEvent = vi.fn();
@@ -570,7 +553,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -625,7 +607,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -646,7 +627,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -667,7 +647,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -687,7 +666,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -707,7 +685,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -730,7 +707,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -750,7 +726,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -774,7 +749,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -794,7 +768,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -818,7 +791,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -847,7 +819,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });
@@ -869,7 +840,6 @@ describe("TestFunction.vue Branch Coverage", () => {
             "query-editor": true,
             DateTime: true,
             FullViewContainer: true,
-            O2AIContextAddBtn: true,
           },
         },
       });

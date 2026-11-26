@@ -110,11 +110,11 @@ describe("useRcaTrigger (RR-33)", () => {
   });
 
   it("non-Cloud 412 returns the server message and never prompts", async () => {
-    triggerRca.mockRejectedValue(httpError(412, { message: "AI SRE is not configured" }));
+    triggerRca.mockRejectedValue(httpError(412, { message: "Investigation is not configured" }));
 
     const result = await useRcaTrigger().requestRca("org", "inc-1", {});
 
-    expect(result).toEqual({ status: "unavailable", message: "AI SRE is not configured" });
+    expect(result).toEqual({ status: "unavailable", message: "Investigation is not configured" });
     expect(promptForConsent).not.toHaveBeenCalled();
     expect(triggerRca).toHaveBeenCalledTimes(1);
   });
@@ -271,11 +271,11 @@ describe("useRcaTrigger (RR-33)", () => {
     });
 
     it("non-Cloud 412 returns the server message, like a trigger", async () => {
-      resumeRca.mockRejectedValue(httpError(412, { message: "AI SRE is not configured" }));
+      resumeRca.mockRejectedValue(httpError(412, { message: "Investigation is not configured" }));
 
       const result = await useRcaTrigger().requestResume("org", "inc-1", "run-2");
 
-      expect(result).toEqual({ status: "unavailable", message: "AI SRE is not configured" });
+      expect(result).toEqual({ status: "unavailable", message: "Investigation is not configured" });
       expect(promptForConsent).not.toHaveBeenCalled();
     });
 

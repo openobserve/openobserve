@@ -1097,6 +1097,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :query="localTab === 'sql' ? localSqlQuery : editorPromqlQuery"
                         editor-height="100%"
                         :disable-ai="!streamName"
+                        :placeholder="inlineEditorPlaceholder"
                         :keywords="effectiveKeywords"
                         :suggestions="effectiveSuggestions"
                         :field-value-resolver="resolveFieldValues"
@@ -1104,17 +1105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @blur="onBlurInlineSqlEditor"
                         @update:query="handleInlineQueryUpdate"
                       />
-                    </div>
-                    <div
-                      v-if="
-                        (localTab === 'sql' ? !localSqlQuery : !editorPromqlQuery) &&
-                        queryEditorPlaceholderFlag
-                      "
-                      class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
-                    >
-                      <span class="query-editor-placeholder-typewriter">{{
-                        inlineEditorPlaceholder
-                      }}</span>
                     </div>
                   </div>
 
@@ -1843,7 +1833,6 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import { savedBrowserTimezone } from "@/utils/timezoneAliases";
-import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
@@ -2121,7 +2110,6 @@ export default defineComponent({
     });
 
     const onQueryEditorFocus = () => {
-      queryEditorPlaceholderFlag.value = false;
       _sqlOnFocus();
     };
 
@@ -2189,7 +2177,6 @@ export default defineComponent({
     );
 
     // Placeholder flags for inline editors (show image when empty + not focused)
-    const queryEditorPlaceholderFlag = ref(true);
     const vrlEditorPlaceholderFlag = ref(true);
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
 
@@ -2245,16 +2232,10 @@ export default defineComponent({
           })
         : [],
     );
-    const promqlPlaceholderEnabled = computed(
-      () => localTab.value === "promql" && promqlSamples.value.length > 0,
-    );
-    const { placeholder: promqlEditorPlaceholder } = useTypewriterPlaceholder(
-      computed(() => promqlSamples.value.map((s) => s.query)),
-      { enabled: promqlPlaceholderEnabled },
-    );
+    // One static line names the language instead of typing samples out.
     const inlineEditorPlaceholder = computed(() =>
-      localTab.value === "promql" && promqlSamples.value.length
-        ? promqlEditorPlaceholder.value
+      localTab.value === "promql"
+        ? t("assistant.helper.editorPlaceholder.promql")
         : sqlEditorPlaceholder.value,
     );
 
@@ -2264,12 +2245,9 @@ export default defineComponent({
     const insertPromqlSample = (sample: { query: string }) => {
       if (!canInsertPromqlSample.value) return;
       onEditorPromqlUpdate(sample.query);
-      queryEditorPlaceholderFlag.value = false;
     };
 
     const onBlurInlineSqlEditor = async () => {
-      queryEditorPlaceholderFlag.value =
-        localTab.value === "sql" ? localSqlQuery.value === "" : editorPromqlQuery.value === "";
       if (localTab.value === "sql") {
         await _sqlOnBlur();
         emit("validate-sql");
@@ -3996,7 +3974,6 @@ export default defineComponent({
       filterCount,
       emitTriggerUpdate,
       getImageURL,
-      queryEditorPlaceholderFlag,
       vrlEditorPlaceholderFlag,
       vrlPlaceholder,
       onQueryEditorFocus,

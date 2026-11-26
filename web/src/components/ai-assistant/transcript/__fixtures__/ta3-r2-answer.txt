@@ -1,0 +1,34 @@
+You have 46 streams: 20 log, 25 metric (mostly OpenObserve-internal service-graph/RUM rollups), and 1 trace. Descriptions come from each schema I read [^call_00_qlE3HoVGv7gl7f7qiLNl6528]–[^call_02_xYMD8pfnOQ9A4vJgAYg65108]; the 12 `e2e_jk_logs_*` are identical 3-field test streams.
+
+**Logs**
+- [app_logs](/web/logs?org_identifier=default&stream_type=logs&stream=app_logs) — 400 application records with service, level, message, latency_ms and status_code. A small but well-shaped stream for service-level error and latency analysis [^call_00_qlE3HoVGv7gl7f7qiLNl6528].
+- [e2e_automate](/web/logs?org_identifier=default&stream_type=logs&stream=e2e_automate) — 215k Kubernetes container records carrying pod, namespace, image, deploy, labels, level, method and took. It is your largest and most operationally rich stream [^call_01_cN4ic2FWqkz6NnR0xpNl3267].
+- [default](/web/logs?org_identifier=default&stream_type=traces&stream=default) — the only trace stream, 1,330 spans with service_name, operation_name, span_status, http_* and duration. Use it for distributed tracing and span-level latency [^call_02_CKVN83VO3WnnB6Ymf1Sz8671].
+- [e2e_secret_row](/web/logs?org_identifier=default&stream_type=logs&stream=e2e_secret_row) — 8 rows of message plus a `token` field, an obvious secrets-handling test [^call_00_iAQEmkwqZFNHbmA1WB7U8665].
+- [e2e_jk_logs_6leob](/web/logs?org_identifier=default&stream_type=logs&stream=e2e_jk_logs_6leob) and 11 siblings (`_9yihx`, `_c1tt9`, `_d5ayo`, `_d9y8q`, `_gvblz`, `_i3s1f`, `_jpis2`, `_rsc4m`, `_snbi6`, `_tp5to`, `_wgf12`, `_yxh7n`) — identical 130-row test streams of level + message [^call_02_xYMD8pfnOQ9A4vJgAYg65108].
+- [triggers](/web/logs?org_identifier=default&stream_type=logs&stream=triggers) — internal alert-firing records: threshold, actual_value, retries, delivery_attempted, error [^call_01_SyVXUNuMnPeOmwp1LvaZ4921].
+- [_o2_alert_calibration_digests](/web/logs?org_identifier=default&stream_type=logs&stream=_o2_alert_calibration_digests) — internal digests of alert calibration runs, findings and skip counts.
+- [_o2_service_verdicts](/web/logs?org_identifier=default&stream_type=logs&stream=_o2_service_verdicts) — internal per-service, per-version verdicts (regressed/healthy) after deploy evaluation.
+- [_rumdata](/web/logs?org_identifier=default&stream_type=logs&stream=_rumdata) — internal browser RUM events: view_url, browser/OS, error_message, session_id [^call_03_5So69TsxcpAc1I4N4G6L3190].
+
+**Metrics**
+- [traces_service_graph_request_total](/web/logs?org_identifier=default&stream_type=metrics&stream=traces_service_graph_request_total) / [_failed_total](/web/logs?org_identifier=default&stream_type=metrics&stream=traces_service_graph_request_failed_total) — service-graph counters keyed by client and server. They give per-edge traffic and failure rates [^call_04_r5AStoca4ngJoSDqGvbX0209].
+- `traces_service_graph_request_{client,server}_seconds_{bucket,sum,count}`, `..._server_failed_total`, `unresolved_total`, `processed_timestamp` — the latency, failure and unresolved-edge companions of that graph.
+- [_o2_service_requests_total](/web/logs?org_identifier=default&stream_type=metrics&stream=_o2_service_requests_total) — internal per-service, per-status, per-version request counter with env and where_key [^call_00_hVqodIjD7OXrGljz8qdA9644].
+- [_o2_service_endpoint_duration_seconds_bucket](/web/logs?org_identifier=default&stream_type=metrics&stream=_o2_service_endpoint_duration_seconds_bucket) (+`_sum`/`_count`) — internal per-endpoint latency histogram, ideal for p95/p99 by operation [^call_01_MaCzqVDj99U68pORshAU3975].
+- [_o2_service_rum_errors_total](/web/logs?org_identifier=default&stream_type=metrics&stream=_o2_service_rum_errors_total) with `rum_page_errors_total`, `rum_page_views_total`, `rum_sessions_total`, `rum_views_total`, `rum_error_types_total` — internal browser-side error, view and session counters [^call_02_g3eFsqVwNv6oc9E9pFpt0940].
+
+**Investigation ideas**
+- app_logs: (1) error rate by service and 5-minute bucket, (2) p95 latency_ms by service and status_code, (3) services whose errors spike while latency stays flat.
+- e2e_automate: (1) `k8s_container_restart_count` and crash loops by pod, (2) error-level logs by namespace and app label, (3) slowest `method`/`took` pairs per deploy revision.
+- default (traces): (1) top operations by p95 duration, (2) spans with span_status ERROR grouped by service and peer_service, (3) trace_id fan-out to find services inflating the critical path.
+- e2e_secret_row: (1) confirm no live credentials in `token` outside test rows, (2) retention and access review for the stream, (3) flag the field for redaction at ingest.
+- e2e_jk_logs_*: (1) drop or retire duplicates to cut clutter, (2) one representative stream kept for E2E smoke tests, (3) level distribution check to confirm fixtures behave.
+- triggers: (1) delivery_attempted=false or retries>0 grouped by module, (2) actual_value vs threshold_value drift per alert, (3) evaluation_took_in_secs outliers.
+- _o2_alert_calibration_digests: (1) skip_count trends per rule_id, (2) coverage_gap=true frequency, (3) alerts_in_scope vs finding_count ratio.
+- _o2_service_verdicts: (1) regressed verdicts by service and to_version, (2) consecutive_regressed >= 2 as a deploy-regression signal, (3) traces vs RUM vs ns_consecutive_drop correlation per deploy.
+- _rumdata: (1) top error_message by view_url, (2) crash rate per browser and version, (3) sessions with errors vs total sessions per day.
+- traces_service_graph_request_total / _failed_total: (1) failure rate by client→server edge, (2) edges with traffic but no server span (unresolved), (3) slowdown on one edge after a version change.
+- _o2_service_requests_total: (1) 5xx share by service and version, (2) traffic shift after deploy using where_key, (3) request drop per env.
+- _o2_service_endpoint_duration_seconds_bucket: (1) p99 by operation, (2) endpoints degrading across versions, (3) tail-latency outliers with low traffic.
+

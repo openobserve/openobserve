@@ -1,0 +1,18 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chats.rs turn_limit_response (WP-39)",
+  "shape": "B-01",
+  "status": 429,
+  "body": {
+    "code": "run_limit_org",
+    "message": "Too many AI responses are running at once; please wait for one to finish",
+    "retryable": true,
+    "action": "retry",
+    "error": "Too many AI responses are running at once; please wait for one to finish",
+    "error_code": "turn_limit",
+    "recoverable": true,
+    "scope": "org",
+    "limit": 50,
+    "active": 50,
+    "retry_after_ms": 15000
+  }
+}
