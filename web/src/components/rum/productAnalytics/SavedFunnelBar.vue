@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-sm"
-            icon-left="more-vert"
+            icon-left="more-horiz"
             :aria-label="t('rum.analytics.saved.more')"
             data-test="rum-analytics-funnel-saved-menu-btn"
             ><OTooltip :content="t('rum.analytics.saved.more')"

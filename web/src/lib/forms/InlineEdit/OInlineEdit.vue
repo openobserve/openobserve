@@ -302,8 +302,8 @@ defineExpose({ focus: startEdit });
           // keeps its normal muted colour (no separate message either; see the
           // visually-hidden alert below, kept only for screen readers).
           error
-            ? 'ring-input-border-error focus:ring-2'
-            : 'ring-input-border focus:ring-input-border-focus focus:ring-2',
+            ? 'ring-input-border-error focus:outline-input-border-error/20 focus:outline-3 focus:outline-solid'
+            : 'ring-input-border focus:ring-input-border-focus focus:outline-input-focus-glow focus:outline-3 focus:outline-solid',
         ]"
         @input="onInput"
         @focus="suggest.onFocus"

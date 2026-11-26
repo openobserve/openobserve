@@ -1921,7 +1921,7 @@ onMounted(() => {
             <OButton
               variant="outline"
               size="icon-sm"
-              icon-left="more-vert"
+              icon-left="more-horiz"
               :aria-label="t('siem.cases.moreActions')"
               data-test="security-cases-drawer-more"
             >

@@ -21,10 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         ref="formScrollRef"
-        class="[&::-webkit-scrollbar-thumb]:rounded-default [&::-webkit-scrollbar-thumb]:bg-border-default min-h-0 flex-1 [scrollbar-width:thin] [scrollbar-color:var(--color-border-default)_transparent] overflow-y-auto px-0.75 pb-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent"
+        class="[&::-webkit-scrollbar-thumb]:rounded-default [&::-webkit-scrollbar-thumb]:bg-border-default px-dialog-content-px py-dialog-content-py min-h-0 flex-1 [scrollbar-width:thin] [scrollbar-color:var(--color-border-default)_transparent] overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent"
       >
-        <OForm greedy id="add-setting-variable-form" :form="form" class="px-0.5">
-          <div class="mt-3">
+        <OForm greedy id="add-setting-variable-form" :form="form">
+          <div>
             <div class="mb-3">
               <OFormSelect
                 name="scope"
@@ -333,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-variable-date-format-select"
             />
           </div>
-          <div v-if="variableData.type == 'custom'">
+          <div v-if="variableData.type == 'custom'" class="mt-3">
             <div class="flex">
               <div class="w-6"></div>
               <div class="text-text-label flex-1 font-semibold">
@@ -417,8 +417,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- default value for multi select variables -->
           <!-- it can be first value or all values -->
           <div v-if="['query_values'].includes(variableData.type)">
-            <div class="mt-1.5 mb-1.5">
-              <div class="text-text-secondary mt-1.25 mb-1.25 text-sm font-semibold">
+            <div class="mt-4">
+              <div class="text-text-secondary mb-1.5 text-sm font-semibold">
                 {{ t("dashboard.byDefaultSelect") }}
               </div>
               <OFormToggleGroup name="selectAllValueForMultiSelect">
@@ -518,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="border-t-border-default shadow-sticky-footer sticky bottom-0 left-0 z-10 flex w-full justify-end gap-3 border-t px-4 py-3"
+        class="border-t-border-default shadow-sticky-footer px-dialog-footer-px py-dialog-footer-py sticky bottom-0 left-0 z-10 flex w-full justify-end gap-3 border-t"
       >
         <OButton
           variant="outline"

@@ -799,7 +799,7 @@ export const BADGE_GROUPS = {
   countChip: {
     mode: "plain",
     shape: "pill",
-    size: "sm",
+    size: "xs",
     values: {
       neutral: { variant: "default-soft" },
       primary: { variant: "primary-soft" },

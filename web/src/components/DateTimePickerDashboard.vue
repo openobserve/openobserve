@@ -87,7 +87,7 @@ export default defineComponent({
     },
     variant: {
       required: false,
-      default: "outline",
+      default: "ghost",
       type: String as PropType<ButtonVariant>,
     },
     calendarPresets: {

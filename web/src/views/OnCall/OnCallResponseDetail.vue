@@ -336,7 +336,7 @@
           <OButton
             variant="outline"
             size="icon-md"
-            icon-left="more-vert"
+            icon-left="more-horiz"
             :loading="snoozing || escalatingNow"
             :aria-label="t('oncall.moreActions')"
             data-test="oncall-response-more-btn"

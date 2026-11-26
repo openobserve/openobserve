@@ -536,7 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="toolbarActionsLabel"
                 variant="ghost"
                 size="icon-toolbar"
-                icon-left="more-vert"
+                icon-left="more-horiz"
               >
                 <OTooltip :content="toolbarActionsLabel" />
               </OButton>

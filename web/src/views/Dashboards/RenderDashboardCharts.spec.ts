@@ -1079,11 +1079,11 @@ describe("RenderDashboardCharts", () => {
       expect(controls().classes()).toEqual(["hidden"]);
     });
 
-    it("leaves the normal layout as it was: a contents wrapper, spaced tab bar", async () => {
+    it("leaves the normal layout as it was: a contents wrapper, a tab strip on a hairline", async () => {
       wrapper = createWrapper({ showTabs: true, dashboardData: twoTabs() });
       await flushPromises();
       expect(controls().classes()).toEqual(["contents"]);
-      expect(wrapper.findComponent({ name: "TabList" }).classes()).toContain("mt-2");
+      expect(wrapper.findComponent({ name: "TabList" }).classes()).toContain("border-b");
       expect(wrapper.find(".render-dashboard-charts-container").classes()).toContain("pt-2");
     });
 

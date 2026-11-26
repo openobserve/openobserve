@@ -27,7 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-markdown-editor-splitter"
       >
         <template #before>
-          <div data-test="dashboard-custom-markdown-editor-flex-col" class="flex h-full flex-col">
+          <div
+            data-test="dashboard-custom-markdown-editor-flex-col"
+            class="flex h-full flex-col pt-2"
+          >
             <CodeQueryEditor
               class="h-full flex-1"
               language="markdown"
@@ -41,16 +44,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #separator>
           <div
             data-test="dashboard-custom-markdown-editor-splitter-separator"
-            class="bg-border-default hover:bg-table-resize-handle h-full w-1 transition-colors"
+            class="bg-border-default hover:bg-table-resize-handle relative h-full w-px transition-colors before:absolute before:-inset-x-1 before:inset-y-0 before:content-['']"
           ></div>
         </template>
         <template #after>
-          <MarkdownRenderer
-            :markdown-content="markdownContent"
-            :variables-data="initialVariableValues"
-            :tabId="tabId"
-            :panelId="panelId"
-          />
+          <div class="h-full px-3 pt-2">
+            <MarkdownRenderer
+              :markdown-content="markdownContent"
+              :variables-data="initialVariableValues"
+              :tabId="tabId"
+              :panelId="panelId"
+            />
+          </div>
         </template>
       </OSplitter>
     </div>

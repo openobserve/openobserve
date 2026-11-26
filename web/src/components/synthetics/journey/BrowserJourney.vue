@@ -1675,7 +1675,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
             <OButton
               variant="ghost"
               size="xs"
-              icon-left="more-vert"
+              icon-left="more-horiz"
               class="md:hidden"
               :aria-label="t('synthetics.journey.moreActions')"
               data-test="synthetics-journey-toolbar-menu"

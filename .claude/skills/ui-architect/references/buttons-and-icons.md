@@ -20,6 +20,11 @@ button sizes it (16px in 28px controls, 14px in 24px controls). Never colour
 a button icon yourself: it inherits the button's text colour (see
 typography-and-icons.md).
 
+## Shortcut hints
+
+`OShortcut` shows one keycap per combo, written as the OS does: `⌘K` on macOS,
+`Ctrl+K` elsewhere. Separate keycaps mean a sequence pressed one after another.
+
 ## Sizes
 
 All toolbar and row-action buttons are 28px (`size="sm-toolbar"`, or
@@ -47,7 +52,7 @@ in a 38px row so the hover fill has room above and below.
 | History | `history` |
 | Save | `save` |
 | Close / dismiss | `close` |
-| More (overflow) | `more-vert` in rows, `more-horiz` in toolbars |
+| More (overflow) | `more-vert` (⋮) for one item: table/list rows, cards, panels; `more-horiz` (⋯) for a page or toolbar. Icon-only with a tooltip. Exception: the labelled "More ⌄" in the Logs and Traces query toolbars |
 | Menu trigger chevron | `expand-more`, `xs`, trailing |
 
 Add a row here before introducing a new verb's icon; never pick a second glyph

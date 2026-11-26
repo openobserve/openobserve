@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selectedTimeDate="currentTimeObj['__global']"
           :initialVariableValues="initialVariableValues"
           class="global-variables-selector"
-          :class="kiosk ? KIOSK_VARIABLES_CLASS : 'pb-1'"
+          :class="kiosk ? KIOSK_VARIABLES_CLASS : 'pb-2'"
           data-test="global-variables-selector"
         />
 
@@ -69,7 +69,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <TabList
           v-if="showTabs && selectedTabId !== null"
           :class="
-            kiosk ? (kioskHasTabs ? 'order-first min-w-0 flex-1' : 'hidden') : 'mt-2 mb-2 h-8'
+            kiosk
+              ? kioskHasTabs
+                ? 'order-first min-w-0 flex-1'
+                : 'hidden'
+              : 'border-border-default -mx-page-edge px-page-edge mb-3 h-9 items-stretch! border-b [&_[role=tab]]:h-full [&_[role=tablist]]:h-full [&_[role=tablist]]:ps-0 [&>:not(:first-child)]:self-center'
           "
           :dashboardData="dashboardData"
           :viewOnly="viewOnly"
@@ -87,14 +91,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variablesManager="variablesManager"
           :selectedTimeDate="currentTimeObj['__global']"
           :initialVariableValues="initialVariableValues"
-          :class="kiosk ? KIOSK_VARIABLES_CLASS : undefined"
+          :class="kiosk ? KIOSK_VARIABLES_CLASS : '-mt-1 pb-3'"
           data-test="tab-variables-selector"
         />
       </div>
 
       <slot name="before_panels" />
       <div
-        class="displayDiv clear-both h-auto min-h-0"
+        class="displayDiv clear-both -mx-1.5 h-auto min-h-0"
         :class="kiosk || !showTabs || selectedTabId === null ? 'mt-2' : ''"
       >
         <div
@@ -310,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           currentTimeObj?.[item.id] || currentTimeObj['__global'] || {}
                         "
                         :initialVariableValues="initialVariableValues"
-                        class="panel-variables-margin mb-2"
+                        class="px-1 pb-2"
                         :inert="readOnlySelectors || undefined"
                         data-test="panel-variables-selector"
                       />

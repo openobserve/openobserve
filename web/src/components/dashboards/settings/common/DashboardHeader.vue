@@ -16,7 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="dashboard-header-root">
-    <div data-test="dashboard-header-row" class="mx-2 my-2 flex flex-nowrap items-center">
+    <div
+      data-test="dashboard-header-row"
+      class="px-dialog-header-px py-dialog-header-py flex flex-nowrap items-center"
+    >
       <div v-if="backButton" data-test="dashboard-header-back-button-container" class="col-auto">
         <OButton
           :aria-label="t('common.goBack')"

@@ -194,7 +194,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="app-page-header-more-btn"
                 :aria-label="t('common.more')"
               >
-                <OIcon name="more-vert" size="sm" />
+                <OIcon name="more-horiz" size="sm" />
+                <OTooltip :content="t('common.more')" />
               </OButton>
             </template>
             <div class="flex max-w-56 flex-wrap gap-2 p-1.5">

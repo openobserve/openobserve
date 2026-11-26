@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTooltip v-if="!hideRangeShift" :content="t('common.previous')">
       <OButton
         data-test="date-time-prev-btn"
-        class="toolbar-btn-rest rounded-e-none!"
+        class="toolbar-btn-rest w-6! rounded-e-none! [&_svg]:size-3.5!"
         variant="ghost"
         size="icon-xs-sq"
         icon-left="chevron-left"
@@ -417,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTooltip v-if="!hideRangeShift" :content="t('common.next')">
       <OButton
         data-test="date-time-next-btn"
-        class="toolbar-btn-rest -ms-px rounded-s-none!"
+        class="toolbar-btn-rest -ms-px w-6! rounded-s-none! [&_svg]:size-3.5!"
         variant="ghost"
         size="icon-xs-sq"
         icon-left="chevron-right"
@@ -722,7 +722,7 @@ export default defineComponent({
     },
     variant: {
       type: String as PropType<ButtonVariant>,
-      default: "outline",
+      default: "ghost",
     },
     /** Offers Today … Last year; off where the backend only parses rolling `<n><unit>` periods. */
     calendarPresets: {

@@ -18,7 +18,7 @@
   <div class="flex h-full flex-col overflow-hidden" data-test="view-panel-screen">
     <div class="flex items-center justify-between p-3 max-md:flex-wrap max-md:gap-y-2">
       <div
-        class="me-3 flex min-w-0 items-center text-xl tracking-[0.005em] max-md:me-0 max-md:flex-1 max-md:basis-full"
+        class="text-text-heading me-3 flex min-w-0 items-center text-lg font-semibold max-md:me-0 max-md:flex-1 max-md:basis-full"
       >
         <OTruncatedText data-test="dashboard-viewpanel-title">
           {{ panelTitle }}
@@ -38,7 +38,7 @@
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          class="hover:bg-interactive-hover-bg h-7.5 w-37.5 transition-all duration-200"
+          class="w-37.5"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
         />
 
@@ -46,7 +46,6 @@
           :model-value="pickedDate ?? selectedDate"
           :auto-apply-dashboard="true"
           ref="dateTimePickerRef"
-          class="hover:bg-interactive-hover-bg h-7.5 min-h-7.5 transition-all duration-200"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
           calendar-presets
@@ -60,7 +59,7 @@
           trigger
           :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
           @trigger="refreshData"
-          class="hover:bg-interactive-hover-bg h-7.5 transition-all duration-200"
+          class="toolbar-btn-rest"
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <OButtonGroup class="shrink-0">
@@ -175,19 +174,20 @@
                 :initialVariableValues="getInitialVariablesData()"
                 @variablesData="variablesDataUpdated"
                 data-test="dashboard-viewpanel-variables-value-selector"
+                class="px-3"
                 :showAllVisible="true"
                 :tabId="currentTabId"
                 :panelId="currentPanelId"
               />
               <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div
-                  class="me-2 flex shrink-0 items-center justify-end"
+                  class="flex shrink-0 items-center justify-end px-3"
                   data-test="view-panel-last-refreshed-at"
                 >
                   <PanelViewToggle
                     v-if="showDataViewToggle"
                     v-model="previewView"
-                    class="my-2 ms-2 me-auto"
+                    class="my-2 me-auto"
                     data-test-prefix="dashboard-viewpanel"
                   />
                   <!-- Error/Warning tooltips -->
@@ -208,7 +208,7 @@
                     :viewOnly="false"
                   />
                 </div>
-                <div class="relative flex min-h-0 flex-1 flex-col">
+                <div class="relative flex min-h-0 flex-1 flex-col px-3 pb-3">
                   <PanelSchemaRenderer
                     class="min-h-0 flex-1"
                     v-if="chartData"

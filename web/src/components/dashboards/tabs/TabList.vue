@@ -40,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              that read as padding and only fade in on tab hover — at rest every
              tab is clean text. The name and the input carry the same box
              (px-0.5), the pencil is absolutely positioned (out of flow) in the
-             pe-2.5 reserve, and both gutters exist in display AND edit mode, so
+             pe-4 reserve, and both gutters exist in display AND edit mode, so
              entering/leaving edit never changes the tab's width. -->
-        <div class="flex w-full flex-nowrap items-center" :class="canManage ? 'pe-2.5' : ''">
+        <div class="flex w-full flex-nowrap items-center" :class="canManage ? 'pe-4' : ''">
           <!-- Auto-size the input to its text via an invisible sizer sharing the
                input's grid cell, so the field is exactly as wide as the name.
                `size="1"` neutralises the input's default ~20ch intrinsic width so
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="countChip"
             value="neutral"
-            class="ms-1.5 shrink-0"
+            class="ms-1 shrink-0"
             :aria-label="t('dashboard.tabPanelCount', { count: panelCount(tab) }, panelCount(tab))"
             :data-test="`dashboard-tab-${tab.tabId}-panel-count`"
             >{{ panelCount(tab) }}</OTag
@@ -99,9 +99,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             v-if="canRename && editingTabId !== tab.tabId"
             name="edit"
-            size="sm"
+            size="xs"
             :aria-label="t('common.edit')"
-            class="text-text-secondary absolute top-1/2 right-0.5 -translate-y-1/2 cursor-pointer opacity-0 transition-opacity duration-150 group-hover/otab:opacity-100 max-md:opacity-100"
+            class="text-text-secondary absolute top-1/2 right-0 -translate-y-1/2 cursor-pointer opacity-0 transition-opacity duration-150 group-hover/otab:opacity-100 max-md:opacity-100"
             :data-test="`dashboard-tab-${tab.tabId}-rename-btn`"
             @click.stop="startRename(tab)"
             @mousedown.stop
@@ -112,9 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             v-else-if="canRename"
             name="check"
-            size="sm"
+            size="xs"
             :aria-label="t('common.save')"
-            class="text-text-secondary absolute top-1/2 right-0.5 -translate-y-1/2 cursor-pointer"
+            class="text-text-secondary absolute top-1/2 right-0 -translate-y-1/2 cursor-pointer"
             :data-test="`dashboard-tab-${tab.tabId}-rename-confirm-btn`"
             @click.stop="commitRename(tab)"
             @mousedown.prevent.stop

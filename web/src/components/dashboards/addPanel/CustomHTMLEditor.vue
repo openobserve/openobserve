@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-html-editor-splitter"
       >
         <template #before>
-          <div data-test="dashboard-custom-html-editor-flex-col" class="flex h-full flex-col">
+          <div data-test="dashboard-custom-html-editor-flex-col" class="flex h-full flex-col pt-2">
             <CodeQueryEditor
               class="h-full flex-1"
               language="html"
@@ -40,16 +40,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #separator>
           <div
-            class="bg-border-default hover:bg-table-resize-handle h-full w-1 transition-colors"
+            class="bg-border-default hover:bg-table-resize-handle relative h-full w-px transition-colors before:absolute before:-inset-x-1 before:inset-y-0 before:content-['']"
           ></div>
         </template>
         <template #after>
-          <HTMLRenderer
-            :htmlContent="htmlContent"
-            :variables-data="initialVariableValues"
-            :tabId="tabId"
-            :panelId="panelId"
-          />
+          <div class="h-full px-3 pt-2">
+            <HTMLRenderer
+              :htmlContent="htmlContent"
+              :variables-data="initialVariableValues"
+              :tabId="tabId"
+              :panelId="panelId"
+            />
+          </div>
         </template>
       </OSplitter>
     </div>

@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="main-content"
             class="bg-surface-chrome-deeper flex min-h-0 flex-col"
             :class="
-              store.state.kioskMode
+              store.state.kioskMode || store.state.printMode === true
                 ? ''
                 : focusMode
                   ? 'px-2 pb-2 max-md:px-0'
@@ -175,7 +175,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="bg-surface-base flex min-h-0 flex-1 flex-col overflow-hidden"
               :class="[
-                store.state.kioskMode ? '' : 'rounded-surface border shadow-md',
+                store.state.kioskMode || store.state.printMode === true
+                  ? ''
+                  : 'rounded-surface border shadow-md',
                 isDark ? 'border-border-default' : 'border-transparent',
               ]"
             >

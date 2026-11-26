@@ -98,10 +98,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="icon-sm"
-        icon-left="more-vert"
+        icon-left="more-horiz"
         :aria-label="t('alerts.moreActions')"
         data-test="alerts-alertdetail-ack-menu"
-      />
+      >
+        <OTooltip :content="t('alerts.moreActions')" />
+      </OButton>
     </template>
     <ODropdownItem icon-left="person" data-test="alerts-alertdetail-unack" @select="onUnack">
       {{ t("alerts.ack.unacknowledge") }}

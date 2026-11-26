@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="secondary"
               size="icon-xs-sq"
-              icon-left="more-horiz"
+              icon-left="more-vert"
               class="pointer-events-auto absolute top-0.5 right-0.5"
               :aria-label="t('traces.latencyHeatmap.selection.reopen')"
               data-test="traces-latency-heatmap-selection-reopen"
