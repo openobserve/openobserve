@@ -117,16 +117,16 @@ describe("SavedViewsMenu", () => {
     expect(document.querySelectorAll("button button")).toHaveLength(0);
   });
 
-  it("marks the applied view and keeps the star label constant with aria-pressed", async () => {
+  it("marks the applied view and names the star for what a press does next", async () => {
     await mountMenu({ appliedViewId: "a" });
     expect(el("sv-applied-a")?.getAttribute("aria-label")).toBe(
       i18n.global.t("search.savedViewApplied"),
     );
     expect(el("sv-applied-b")).toBeNull();
-    expect(el("sv-favorite-b")?.getAttribute("aria-pressed")).toBe("true");
-    expect(el("sv-favorite-b")?.getAttribute("aria-label")).toBe("Favorite Beta");
+    expect(el("sv-favorite-b")?.getAttribute("aria-pressed")).toBeNull();
+    expect(el("sv-favorite-b")?.getAttribute("aria-label")).toBe("Unfavorite Beta");
     expect(el("sv-favorite-a")?.getAttribute("aria-label")).toBe("Favorite Alpha");
-    expect(el("sv-favorite-a")?.getAttribute("aria-pressed")).toBe("false");
+    expect(el("sv-favorite-a")?.getAttribute("aria-pressed")).toBeNull();
   });
 
   it("emits apply, favorite, update, delete and create", async () => {

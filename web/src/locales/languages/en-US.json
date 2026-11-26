@@ -1601,6 +1601,7 @@
     "savedViewsNoMatch": "No saved views match your search",
     "savedViewApplied": "Currently applied",
     "favoriteViewNamed": "Favorite {name}",
+    "unfavoriteViewNamed": "Unfavorite {name}",
     "deleteViewNamed": "Delete {name}",
     "overwriteSavedViewNamed": "Overwrite {name} with current query",
     "searchSavedFunction": "Search",
