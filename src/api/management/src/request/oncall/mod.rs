@@ -631,6 +631,7 @@ fn to_response(e: anyhow::Error) -> Response {
         Some(OncallError::NameTaken(_))
         | Some(OncallError::IsDefaultTeam(_))
         | Some(OncallError::TeamNamedByAlerts { .. })
+        | Some(OncallError::TeamNamedByIntegrations { .. })
         | Some(OncallError::TeamHasOpenPages { .. })
         | Some(OncallError::PathTaken(_)) => StatusCode::CONFLICT,
         Some(OncallError::Invalid(_)) => StatusCode::BAD_REQUEST,
@@ -1047,7 +1048,7 @@ pub async fn update_team(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
-        (status = 409, description = "Conflict: the org's default team, named by alerts, or still holding open pages", content_type = "application/json", body = Object),
+        (status = 409, description = "Conflict: the org's default team, named by alerts or by external alert sources, or still holding open pages", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
@@ -6272,6 +6273,22 @@ mod tests {
         for (e, want) in cases {
             assert_eq!(rule_write_response(e).status(), want);
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_team_named_by_integrations_is_a_conflict_naming_them() {
+        use o2_enterprise::enterprise::oncall::service::OncallError;
+        let e = OncallError::TeamNamedByIntegrations {
+            team: "SRE".to_string(),
+            integrations: vec!["grafana".to_string()],
+        };
+        let resp = to_response(e.into());
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(String::from_utf8_lossy(&body).contains("grafana"));
     }
 
     async fn ack_replies(org: &str) -> Vec<(axum::http::StatusCode, Vec<u8>)> {
