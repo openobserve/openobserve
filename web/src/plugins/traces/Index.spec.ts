@@ -4600,6 +4600,22 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("new-stream");
     });
 
+    it("switches at once from the sidebar picker, with no dialog even when the editor holds text", async () => {
+      mockSearchObj.data.editorValue = "service_name = 'test'";
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+      mockSearchObj.data.stream.streamLists = [
+        { label: "sidebar-stream", value: "sidebar-stream" },
+      ];
+
+      await wrapper.vm.onSidebarStreamChange("sidebar-stream");
+      await flushPromises();
+
+      expect(wrapper.vm.streamChangeDialog.show).toBe(false);
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("sidebar-stream");
+      expect(mockSearchObj.data.editorValue).toBe("");
+    });
+
     it("should show confirmation dialog when editorValue has content", async () => {
       mockSearchObj.data.editorValue = "service_name = 'test'";
 

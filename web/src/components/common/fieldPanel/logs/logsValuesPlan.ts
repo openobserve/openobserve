@@ -4,7 +4,7 @@ import { cloneDeep } from "lodash-es";
 import type { TranslateFn } from "@/types/i18n";
 import type { SearchObject } from "@/composables/useLogs/searchState";
 import {
-  removeFieldFromWhereAST,
+  relaxFieldInWhereAST,
   type ExtendedParsedSQLResult,
 } from "@/composables/useLogs/logsUtils";
 import {
@@ -73,7 +73,7 @@ export function createValuesPlanner(deps: ValuesPlanDeps) {
       const parsed = deps.fnParsedSQL(sql);
       if (!(parsed?.from?.length > 0)) return sql;
       const rendered = deps
-        .fnUnparsedSQL({ ...parsed, where: removeFieldFromWhereAST(parsed.where, fieldName) })
+        .fnUnparsedSQL({ ...parsed, where: relaxFieldInWhereAST(parsed.where, fieldName) })
         .replace(/`/g, '"');
       return rendered || sql;
     } catch {

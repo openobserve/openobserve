@@ -693,7 +693,7 @@ watch(
 );
 const { showErrorNotification } = useNotifications();
 const fieldSource = useTracesFieldSource({
-  onStreamChangeRequest: (name: string) => onChildStreamChangeRequest(name),
+  onStreamChangeRequest: (name: string) => onSidebarStreamChange(name),
   onColumnsChange: async () => {
     await nextTick();
     rebuildColumns();
@@ -2941,6 +2941,18 @@ watch(
       runQueryFn(false);
   },
 );
+
+// The sidebar's own picker switches at once, as the old index list did; only links from other tabs ask first.
+const onSidebarStreamChange = async (newStream: string) => {
+  searchObj.data.stream.selectedStream = searchObj.data.stream.streamLists.find(
+    (stream: { value: string }) => stream.value === newStream,
+  ) ?? { label: raw(""), value: "" };
+  searchObj.data.query = "";
+  searchObj.data.editorValue = "";
+  searchObj.data.resultGrid.currentPage = 0;
+  onAssistantSetCleared("stream");
+  await onChangeStream();
+};
 
 const onChildStreamChangeRequest = (newStream: string) => {
   if (searchObj.data.editorValue?.trim()) {

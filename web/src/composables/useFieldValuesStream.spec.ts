@@ -827,6 +827,13 @@ describe("stripFieldCondition", () => {
     expect(stripFieldCondition("a IS NULL AND b='2'", "a")).toBe("b='2'");
   });
 
+  it("drops an OR group holding the field whole, so the other branch does not narrow its counts", () => {
+    expect(stripFieldCondition("error_type='TypeError' OR service='checkout'", "error_type")).toBe(
+      "",
+    );
+    expect(stripFieldCondition("level='error' AND (a='1' OR b='2')", "a")).toBe("level='error'");
+  });
+
   it("returns an empty string when nothing is left", () => {
     expect(stripFieldCondition("a='1'", "a")).toBe("");
     expect(stripFieldCondition("", "a")).toBe("");

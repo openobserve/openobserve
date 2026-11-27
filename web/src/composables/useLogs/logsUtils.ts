@@ -106,6 +106,37 @@ export const removeFieldFromWhereAST = (whereNode: any, fieldName: string): any 
   return whereNode;
 };
 
+const whereNodeColumn = (node: any): string | null => {
+  if (node?.left?.type !== "column_ref") return null;
+  const col = node.left.column;
+  if (typeof col === "string") return col.replace(/^"|"$/g, "");
+  return col?.expr?.value != null ? String(col.expr.value) : null;
+};
+
+const whereMentionsField = (node: any, fieldName: string): boolean => {
+  if (!node) return false;
+  const operator = node.operator?.toUpperCase();
+  if (operator === "AND" || operator === "OR") {
+    return whereMentionsField(node.left, fieldName) || whereMentionsField(node.right, fieldName);
+  }
+  return whereNodeColumn(node) === fieldName;
+};
+
+/** The WHERE tree without `fieldName`'s conditions, an OR holding one dropped whole, so a values query is never narrowed by the rest of that OR. */
+export const relaxFieldInWhereAST = (whereNode: any, fieldName: string): any => {
+  if (!whereNode) return null;
+  const operator = whereNode.operator?.toUpperCase();
+  if (operator === "OR") return whereMentionsField(whereNode, fieldName) ? null : whereNode;
+  if (operator === "AND") {
+    const left = relaxFieldInWhereAST(whereNode.left, fieldName);
+    const right = relaxFieldInWhereAST(whereNode.right, fieldName);
+    if (left === null) return right;
+    if (right === null) return left;
+    return { ...whereNode, left, right };
+  }
+  return whereNodeColumn(whereNode) === fieldName ? null : whereNode;
+};
+
 const aggregateNamesByCatalog = new WeakMap<ServerQueryFunction[], Set<string>>();
 
 // The parser types only a few aggregates as aggr_func; the rest are plain function nodes.

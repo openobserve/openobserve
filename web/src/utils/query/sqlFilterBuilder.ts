@@ -104,6 +104,34 @@ export const removeConditions = (
   return changed ? operands.join(" OR ") : clause;
 };
 
+/** `clause` without the conditions `isTarget` picks, as a looser filter: an OR group holding one is dropped whole, since keeping its other branches would narrow the rows. */
+export const relaxConditions = (
+  clause: string,
+  isTarget: (condition: string) => boolean,
+): string => {
+  const operands = splitOnJunction(clause, "OR");
+  if (operands.length > 1) {
+    return operands.some((operand) => removeConditions(operand.trim(), isTarget) !== operand.trim())
+      ? ""
+      : clause;
+  }
+  let changed = false;
+  const kept = splitOnJunction(clause, "AND").flatMap((part) => {
+    const condition = part.trim();
+    if (isTarget(condition)) {
+      changed = true;
+      return [];
+    }
+    const inner = innerOfGroup(condition);
+    if (inner === null) return [condition];
+    const rest = relaxConditions(inner, isTarget);
+    if (rest === inner) return [condition];
+    changed = true;
+    return rest.trim() ? [`(${rest})`] : [];
+  });
+  return changed ? kept.join(" AND ") : clause;
+};
+
 export const sqlEquals = (fieldName: string, value: unknown, negate = false): string =>
   `${fieldName}${negate ? "!=" : "="}${sqlLiteral(value)}`;
 

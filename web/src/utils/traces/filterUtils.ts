@@ -1,4 +1,4 @@
-import { removeConditions } from "@/utils/query/sqlFilterBuilder";
+import { relaxConditions, removeConditions } from "@/utils/query/sqlFilterBuilder";
 
 /**
  * Shared filter utilities for the Traces feature.
@@ -90,6 +90,13 @@ export const removeFieldCondition = (queryStr: string, fieldName: string): strin
   // inside a term such as match_all('text | error') would hide the conditions
   // before the pipe from removal and corrupt the term on rejoin.
   return removeConditions(queryStr.trim(), (condition) => fieldPattern.test(condition));
+};
+
+/** `queryStr` with every condition on `fieldName` gone and any OR group holding one dropped whole, so the rest never narrows the rows. */
+export const relaxFieldCondition = (queryStr: string, fieldName: string): string => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const fieldPattern = new RegExp(`^"?${esc}"?\\s*(?:[=!<>]|is\\b)`, "i");
+  return relaxConditions(queryStr.trim(), (condition) => fieldPattern.test(condition));
 };
 
 /**

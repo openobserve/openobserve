@@ -136,7 +136,7 @@ vi.mock("@openobserve/node-sql-parser/build/datafusionsql", () => ({
 }));
 
 // Import the module under test (after mocks are set up)
-import { logsUtils } from "./logsUtils";
+import { logsUtils, relaxFieldInWhereAST } from "./logsUtils";
 import { queryClient } from "@/composables/query/queryClient";
 import { queryFunctionsQuery } from "@/services/query_functions.queries";
 
@@ -906,5 +906,33 @@ describe("logsUtils", () => {
 
       expect(queryReq.query).not.toHaveProperty("query_fn");
     });
+  });
+});
+
+describe("relaxFieldInWhereAST", () => {
+  const col = (name: string) => ({ type: "column_ref", column: name });
+  const eq = (name: string, value: string) => ({
+    type: "binary_expr",
+    operator: "=",
+    left: col(name),
+    right: { type: "single_quote_string", value },
+  });
+  const join = (operator: string, left: unknown, right: unknown) => ({
+    type: "binary_expr",
+    operator,
+    left,
+    right,
+  });
+
+  it("drops an OR holding the field whole", () => {
+    expect(relaxFieldInWhereAST(join("OR", eq("a", "1"), eq("b", "2")), "a")).toBeNull();
+  });
+
+  it("keeps the rest of an AND, and an OR without the field", () => {
+    const other = join("OR", eq("b", "2"), eq("c", "3"));
+    expect(relaxFieldInWhereAST(join("AND", eq("a", "1"), other), "a")).toBe(other);
+    expect(
+      relaxFieldInWhereAST(join("AND", join("OR", eq("a", "1"), eq("b", "2")), eq("c", "3")), "a"),
+    ).toEqual(eq("c", "3"));
   });
 });

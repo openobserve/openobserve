@@ -19,7 +19,7 @@ import store from "@/stores";
 import { generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { captureFromValuesApi } from "@/composables/fieldValueStore";
-import { removeFieldCondition } from "@/utils/traces/filterUtils";
+import { relaxFieldCondition } from "@/utils/traces/filterUtils";
 import {
   MISSING_VALUE_KEY,
   valueKeyLabel,
@@ -81,10 +81,10 @@ export const enrichmentValuesRange = (stats: EnrichmentStats) => ({
   endTime: toMsPrecision(stats.doc_time_max + ENRICHMENT_WINDOW_PAD_US),
 });
 
-/** Drops `fieldName`'s own conditions from a WHERE string so its value counts are not narrowed to the picked values. */
+/** Drops `fieldName`'s own conditions from a WHERE string, OR groups holding one whole, so its value counts are not narrowed to the picked values. */
 export const stripFieldCondition = (whereClause: string, fieldName: string): string => {
   if (!whereClause?.trim()) return "";
-  return removeFieldCondition(whereClause, fieldName).trim();
+  return relaxFieldCondition(whereClause, fieldName).trim();
 };
 
 /**
