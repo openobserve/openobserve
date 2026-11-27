@@ -211,6 +211,25 @@ describe("unusable configured time fields", () => {
     expect(toEpochMillis("2049-01-01T00:00:00Z")).toBeNull();
   });
 
+  it("reads the other date formats it read before, as UTC when they name no zone", () => {
+    const at = Date.UTC(2026, 9, 27, 3, 36, 37);
+    for (const text of [
+      "2026/10/27 03:36:37",
+      "2026.10.27 03:36:37",
+      "2026-10-27 3:36:37",
+      "10/27/2026 03:36:37",
+      "27 Oct 2026 03:36:37",
+      "Oct 27, 2026 03:36:37",
+      "Tue, 27 Oct 2026 03:36:37 GMT",
+    ]) {
+      expect(toEpochMillis(text), text).toBe(at);
+    }
+    expect(toEpochMillis("2026-10-27 09:06:37 +05:30")).toBe(at);
+    for (const text of ["login failed 2026-10-27 03:36:37", "Oct 27 2026 disk full", "2026"]) {
+      expect(toEpochMillis(text), text).toBeNull();
+    }
+  });
+
   it("flags only configured fields with no value in any row", () => {
     const result = convertLogsPanelData(
       panel({ logs_message_field: "nosuchfield", logs_level_field: "level" }),
@@ -219,6 +238,13 @@ describe("unusable configured time fields", () => {
     );
     expect(result.fieldIssues).toEqual([{ role: "message", field: "nosuchfield" }]);
     expect(convertLogsPanelData(panel(), [[{ code: 7 }]], store).fieldIssues).toEqual([]);
+    expect(
+      convertLogsPanelData(
+        panel({ logs_message_field: "log.msg" }),
+        [[{ log: { msg: "hi" } }]],
+        store,
+      ).fieldIssues,
+    ).toEqual([]);
     expect(
       convertLogsPanelData(panel({ logs_message_field: "nosuchfield" }), [[]], store).fieldIssues,
     ).toEqual([]);

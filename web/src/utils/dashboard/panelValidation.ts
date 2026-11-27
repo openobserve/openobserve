@@ -11,6 +11,7 @@ import {
 } from "@/utils/dashboard/heatmapYAxis";
 import { addCommasToNumber } from "@/utils/formatters";
 import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
+import { toRaw } from "vue";
 import {
   CARTESIAN_CHART_TYPES,
   CARTESIAN_TOOLTIP_MODES,
@@ -1331,14 +1332,27 @@ const PANEL_TYPE_RANGE_KEYS: ReadonlyArray<[string, I18nKey, string[], number, n
   ["alert_list_max", "dashboard.alertListMax", ["alert-list"], 1, ALERT_LIST_MAX_LIMIT, false],
 ];
 
+// Unknown choice values each editor panel was loaded with, keyed by the raw panel object.
+const loadedPanelChoices = new WeakMap<object, Record<string, unknown>>();
+
+const unsupportedPanelChoices = (panel: any): Record<string, unknown> => {
+  const config = panel?.config ?? {};
+  const found: Record<string, unknown> = {};
+  for (const [key, types, allowed] of PANEL_TYPE_CHOICE_KEYS) {
+    if (types.includes(panel?.type) && isSetValue(config[key]) && !allowed.includes(config[key])) {
+      found[key] = config[key];
+    }
+  }
+  return found;
+};
+
 const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) => {
   const config = panel.config;
   const unsupported = (setting: string, value: unknown) =>
     errors.push(t("dashboard.utils.unsupportedConfigValue", { setting, value: String(value) }));
-  for (const [key, types, allowed] of PANEL_TYPE_CHOICE_KEYS) {
-    if (types.includes(panel.type) && isSetValue(config[key]) && !allowed.includes(config[key])) {
-      unsupported(key, config[key]);
-    }
+  const loaded = loadedPanelChoices.get(toRaw(panel)) ?? {};
+  for (const [key, value] of Object.entries(unsupportedPanelChoices(panel))) {
+    if (!(key in loaded) || loaded[key] !== value) unsupported(key, value);
   }
   for (const [key, types, allowed] of PANEL_TYPE_LIST_KEYS) {
     if (!types.includes(panel.type) || !isSetValue(config[key])) continue;
@@ -1351,15 +1365,10 @@ const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) 
   }
 };
 
-/** Drops choice settings this panel type cannot use, so the editor's "Default" really is unset and Save passes. */
-export const dropUnsupportedPanelChoices = (panel: any) => {
-  const config = panel?.config;
-  if (!config) return;
-  for (const [key, types, allowed] of PANEL_TYPE_CHOICE_KEYS) {
-    if (types.includes(panel.type) && isSetValue(config[key]) && !allowed.includes(config[key])) {
-      delete config[key];
-    }
-  }
+/** Lets Save keep the unknown choice values a saved panel loaded with (a newer version's), until the user changes them. */
+export const keepLoadedPanelChoices = (panel: any) => {
+  if (!panel?.config) return;
+  loadedPanelChoices.set(toRaw(panel), unsupportedPanelChoices(panel));
 };
 
 /** The save-time range error for one ranged panel setting, or "" when it is unset or in range; config fields show it inline. */

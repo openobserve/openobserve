@@ -15,7 +15,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
-  dropUnsupportedPanelChoices,
+  keepLoadedPanelChoices,
   panelConfigRangeError,
   validateConditions,
   validateDashboardJson,
@@ -1818,21 +1818,43 @@ describe.each([
   });
 });
 
-describe("dropUnsupportedPanelChoices", () => {
-  it("drops an unknown choice for the panel's type so the panel then saves", () => {
-    const panel = { type: "logs", config: { logs_order: "sideways", logs_wrap: true } };
-    dropUnsupportedPanelChoices(panel);
-    expect(panel.config).toEqual({ logs_wrap: true });
+describe("keepLoadedPanelChoices", () => {
+  const errorsFor = (data: any) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      { data, layout: { currentQueryIndex: 0 } },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+  const logsPanel = (config: any) => ({
+    type: "logs",
+    queryType: "sql",
+    config,
+    queries: [{ query: 'SELECT * FROM "s"', customQuery: true, fields: {} }],
   });
 
-  it("keeps allowed choices and choices that belong to another panel type", () => {
-    const panel = {
-      type: "gauge",
-      config: { gauge_style: "arc", logs_order: "sideways", table_density: "bogus" },
-    };
-    const before = JSON.parse(JSON.stringify(panel.config));
-    dropUnsupportedPanelChoices(panel);
-    expect(panel.config).toEqual(before);
-    dropUnsupportedPanelChoices({ type: "logs" });
+  it("lets a loaded unknown choice save unchanged, without removing it", () => {
+    const panel = logsPanel({ logs_order: "sideways", logs_wrap: true });
+    keepLoadedPanelChoices(panel);
+    expect(errorsFor(panel)).toEqual([]);
+    expect(panel.config).toEqual({ logs_order: "sideways", logs_wrap: true });
+  });
+
+  it("still rejects an unknown value the panel did not load with", () => {
+    const panel = logsPanel({ logs_order: "sideways" });
+    keepLoadedPanelChoices(panel);
+    panel.config.logs_order = "random";
+    expect(errorsFor(panel)).toEqual([
+      gt("dashboard.utils.unsupportedConfigValue", { setting: "logs_order", value: "random" }),
+    ]);
+    expect(errorsFor(logsPanel({ logs_order: "sideways" }))).toHaveLength(1);
+    keepLoadedPanelChoices({ type: "logs" });
   });
 });

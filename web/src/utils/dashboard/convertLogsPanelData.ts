@@ -20,6 +20,7 @@ import {
   SEVERITY_TIER1_FIELDS,
   type LogSeverityLevel,
 } from "@/utils/logs/statusParser";
+import { byString } from "@/utils/json";
 
 export const LOGS_ORDERS = ["newest", "oldest"] as const;
 export type LogsOrder = (typeof LOGS_ORDERS)[number];
@@ -56,9 +57,15 @@ export interface LogsPanelData {
 // Real log times are far later; anything earlier is a misread column (a status code read as seconds).
 const EARLIEST_LOG_TIME = Date.UTC(2000, 0, 1);
 const YEAR_MS = 365 * 24 * 3600 * 1000;
-// Date.parse reads any text with a number as a date ("row 49" is 2049), so only date-shaped strings are parsed.
 const DATE_STRING =
-  /^(\d{4}-\d{2}-\d{2})(?:([ T])(\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?))?(Z|[+-]\d{2}:?\d{2})?$/i;
+  /^(\d{4}-\d{2}-\d{2})(?:([ T])(\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?))?\s?(Z|[+-]\d{2}:?\d{2})?$/i;
+const MONTH = "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*";
+const DATE_PART = `(?:\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}|\\d{1,2}[-/.]\\d{1,2}[-/.]\\d{4}|\\d{1,2}\\s+${MONTH},?\\s+\\d{4}|${MONTH}\\s+\\d{1,2},?\\s+\\d{4})`;
+// Date.parse reads any text with a number as a date ("row 49" is 2049), so only whole date-shaped strings reach it.
+const DATE_SHAPED = new RegExp(
+  `^(?:[a-z]{3,9},?\\s+)?${DATE_PART}(?:[ T]\\d{1,2}:\\d{2}(?::\\d{2}(?:[.,]\\d+)?)?)?(?:\\s*(?:z|utc|gmt))?(?:\\s*[+-]\\d{2}:?\\d{2})?(?:\\s*\\([^)]*\\))?$`,
+  "i",
+);
 
 const setField = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
@@ -71,6 +78,22 @@ const firstPresent = (rows: Record<string, unknown>[], names: readonly string[])
   return null;
 };
 
+const parseDateString = (text: string): number | null => {
+  const match = DATE_STRING.exec(text);
+  if (match) {
+    const [, date, separator, time, zone] = match;
+    // A space-separated time with no zone is the backend's UTC format.
+    const parsed = Date.parse(
+      time ? `${date}T${time}${zone ?? (separator === " " ? "Z" : "")}` : `${date}${zone ?? ""}`,
+    );
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  if (!DATE_SHAPED.test(text)) return null;
+  // Other formats keep the reading they had before: no "T" and no trailing "Z" means UTC.
+  const parsed = Date.parse(text.includes("T") || text.endsWith("Z") ? text : `${text}Z`);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 const parseEpochMillis = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value === "number" || (typeof value === "string" && /^\d+(\.\d+)?$/.test(value))) {
@@ -81,16 +104,7 @@ const parseEpochMillis = (value: unknown): number | null => {
     if (numeric > 1e11) return numeric;
     return numeric * 1e3;
   }
-  if (typeof value === "string") {
-    const match = DATE_STRING.exec(value.trim());
-    if (!match) return null;
-    const [, date, separator, time, zone] = match;
-    // A space-separated time with no zone is the backend's UTC format.
-    const parsed = Date.parse(
-      time ? `${date}T${time}${zone ?? (separator === " " ? "Z" : "")}` : `${date}${zone ?? ""}`,
-    );
-    return Number.isFinite(parsed) ? parsed : null;
-  }
+  if (typeof value === "string") return parseDateString(value.trim());
   return null;
 };
 
@@ -126,6 +140,10 @@ const levelOf = (row: Record<string, unknown>, field: string | null): LogSeverit
 
 const hasValue = (value: unknown) => value !== null && value !== undefined && value !== "";
 
+// Read each field the way its column does: the message column follows dotted paths into nested rows.
+const valueOf = (role: LogsPanelFieldRole, row: Record<string, unknown>, field: string) =>
+  role === "message" ? byString(row ?? {}, field) : row?.[field];
+
 // Only fields the user configured are checked; an auto-detected field was found in the rows already.
 const findFieldIssues = (config: any, rows: LogsPanelRow[]): LogsPanelFieldIssue[] => {
   if (!rows.length) return [];
@@ -140,7 +158,7 @@ const findFieldIssues = (config: any, rows: LogsPanelRow[]): LogsPanelFieldIssue
     const usable =
       role === "time"
         ? rows.some((row) => row.time !== null)
-        : rows.some((row) => hasValue(row.source?.[field]));
+        : rows.some((row) => hasValue(valueOf(role, row.source, field)));
     return usable ? [] : [{ role, field }];
   });
 };

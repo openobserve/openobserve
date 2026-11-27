@@ -18,6 +18,7 @@ import { addPanel, getDashboard, getPanel, updatePanel } from "@/utils/commons";
 import analytics from "@/services/product_analytics";
 import useDashboardPanel from "@/composables/dashboard/useDashboardPanel";
 import { DEFAULT_SQL_X_FIELD, DEFAULT_SQL_Y_FIELD_COUNT } from "@/utils/dashboard/defaultFields";
+import { validatePanel } from "@/utils/dashboard/panelValidation";
 import config from "@/aws-exports";
 import { createI18n } from "vue-i18n";
 
@@ -1238,7 +1239,7 @@ describe("AddPanel.vue", () => {
       vi.mocked(useRoute).mockReset();
     });
 
-    it("drops a choice value this panel type does not support, leaving the saved panel untouched", async () => {
+    it("keeps a choice value this panel type does not support and lets the panel validate", async () => {
       const saved = {
         id: "p1",
         title: "Logs",
@@ -1261,8 +1262,23 @@ describe("AddPanel.vue", () => {
       });
       await flushPromises();
 
-      expect(wrapper.vm.dashboardPanelData.data.config).toEqual({ logs_wrap: true });
-      expect(saved.config.logs_order).toBe("sideways");
+      expect(wrapper.vm.dashboardPanelData.data.config).toEqual({
+        logs_order: "sideways",
+        logs_wrap: true,
+      });
+      const errors: string[] = [];
+      const echo = ((key: string) => key) as any;
+      validatePanel(
+        echo,
+        wrapper.vm.dashboardPanelData,
+        errors,
+        false,
+        [],
+        "dashboard",
+        store,
+        () => true,
+      );
+      expect(errors).not.toContain("dashboard.utils.unsupportedConfigValue");
     });
   });
 
