@@ -485,9 +485,6 @@ class EnrichmentPage {
         await expect(this.dateTimeStartTimeInput.first()).toBeVisible({ timeout: 10000 });
         // Callers click the results table next; an open picker can sit over its first row.
         await this.page.keyboard.press('Escape');
-        // Escape only dismisses the topmost layer (a tooltip can sit above the picker); the trigger toggles it regardless.
-        const closed = await this.dateTimeStartTimeInput.first().waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
-        if (!closed) await this.dateTimeBtn.click();
         await expect(this.dateTimeStartTimeInput.first()).toBeHidden({ timeout: 10000 });
     }
 
