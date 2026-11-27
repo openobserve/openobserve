@@ -788,6 +788,11 @@ export default defineComponent({
       setFormField("url", "");
     };
     const importDashboard = () => {
+      // An empty editor (no file left, nothing typed) has nothing to parse; say so, not "Failed".
+      if (activeTab.value === "import_json_file" && !String(jsonStr.value ?? "").trim()) {
+        showErrorNotification(t("dashboard.importDashboardPage.pleaseEnterJsonObject"));
+        return;
+      }
       try {
         dashboardErrorsToDisplay.value = [];
         const jsonObj = JSON.parse(jsonStr.value);

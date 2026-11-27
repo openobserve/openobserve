@@ -435,6 +435,22 @@ describe("ImportDashboard.vue", () => {
     await vi.waitFor(() => expect(wrapper.vm.jsonStr).toBe(""));
   });
 
+  it("asks for a JSON object when Import is clicked after every file was removed", async () => {
+    const useNotifications = (await import("@/composables/useNotifications")).default as any;
+    const content = JSON.stringify({ title: "From A", tabs: [{ tabId: "t1", panels: [] }] });
+    wrapper = mountComponent();
+    await nextTick();
+    const { showErrorNotification } = useNotifications.mock.results.at(-1).value;
+    wrapper.vm.form.setFieldValue("jsonFiles", [
+      new File([content], "a.json", { type: "application/json" }),
+    ]);
+    await vi.waitFor(() => expect(wrapper.vm.jsonStr).toContain("From A"));
+    wrapper.vm.form.setFieldValue("jsonFiles", []);
+    await vi.waitFor(() => expect(wrapper.vm.jsonStr).toBe(""));
+    wrapper.vm.importDashboard();
+    expect(showErrorNotification).toHaveBeenCalledWith("Please Enter a JSON object for import");
+  });
+
   it("keeps a pick's valid file when another file in the same pick is refused", async () => {
     const dash = (title: string) =>
       new File([JSON.stringify({ title, tabs: [{ tabId: "t1", panels: [] }] })], `${title}.json`, {
