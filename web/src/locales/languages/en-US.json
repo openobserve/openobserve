@@ -24142,13 +24142,6 @@
       "ai": "AI",
       "collapse": "Collapse Sidebar",
       "collapseShort": "Collapse",
-      "expandShort": "Keep expanded",
-      "recents": "Recents",
-      "alerts": "Alerts",
-      "onCall": "On-call",
-      "infrastructure": "Infrastructure",
-      "experience": "Experience",
-      "morePages": "More {name} pages",
       "expand": "Expand Sidebar"
     },
     "tableLoading": {

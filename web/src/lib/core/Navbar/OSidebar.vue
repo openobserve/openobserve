@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 /** Grouped one-row sidebar for the modern skin; same entries and gates as the classic rail. */
-import { computed, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from "vue";
-import { useRouter, type RouteLocationRaw } from "vue-router";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -42,8 +42,17 @@ import {
   groupContainsActive,
   sidebarIcon,
   type SidebarEntry,
+  type SidebarSection,
 } from "./sidebarModel";
 import OSidebarItem from "./OSidebarItem.vue";
+import {
+  AIM_IDLE,
+  aim,
+  isAimingAtOpenFlyout,
+  releasePointerTracking,
+  retainPointerTracking,
+} from "./hoverIntent";
+import { flyoutColumns, flyoutTop } from "./flyoutLayout";
 
 const props = withDefaults(
   defineProps<{
@@ -163,7 +172,6 @@ const sections = computed(() =>
 const mainSections = computed(() => sections.value.filter((s) => s.key !== "bottom"));
 const bottomSection = computed(() => sections.value.find((s) => s.key === "bottom"));
 
-const RECENTS_GROUP = "__recents";
 const expanded = reactive(new Set<string>());
 watch(
   sections,
@@ -177,74 +185,177 @@ watch(
             resolveActiveChild(c, route.value, childPath),
           )
         ) {
-          openGroup(row.entry.item.name);
+          expanded.add(row.entry.item.name);
         }
       }
     }
   },
   { immediate: true },
 );
-// One menu group open at a time; Recents keeps its own state.
-function openGroup(name: string) {
-  for (const open of [...expanded]) {
-    if (open !== name && open !== RECENTS_GROUP) expanded.delete(open);
-  }
-  expanded.add(name);
-}
 function toggleGroup(name: string) {
+  closeFlyout();
   if (expanded.has(name)) expanded.delete(name);
-  else if (name === RECENTS_GROUP) expanded.add(name);
-  else openGroup(name);
+  else expanded.add(name);
 }
 
-// ── Collapsed rail peek: the full menu overlays the page once the pointer rests on the rail ──
-// The pointer must settle, so a fast pass toward the page's left edge never opens it.
-const PEEK_REST_DELAY = 280;
-const PEEK_CLOSE_DELAY = 250;
-const peek = ref(false);
-let peekTimer: ReturnType<typeof setTimeout> | null = null;
-// After a navigation the peek stays shut until the pointer leaves the rail.
-let peekSuppressed = false;
-const railCollapsed = computed(() => collapsed.value && !peek.value);
+// ── Group flyouts: hover intent, aim triangle and viewport fit shared with the classic rail ──
+const OPEN_DELAY = 120;
+const CLOSE_DELAY = 200;
+const FLYOUT_GAP = 6;
+const VIEWPORT_MARGIN = 8;
 const navRef = ref<HTMLElement | null>(null);
+const flyoutRef = ref<HTMLElement | null>(null);
+const flyoutName = ref<string | null>(null);
+const flyoutStyle = ref<Record<string, string>>({});
+let flyoutAnchor: HTMLElement | null = null;
+let openTimer: ReturnType<typeof setTimeout> | null = null;
+let closeTimer: ReturnType<typeof setTimeout> | null = null;
 
-function clearPeekTimer() {
-  if (peekTimer) clearTimeout(peekTimer);
-  peekTimer = null;
+const flyoutRow = computed(() => {
+  if (!flyoutName.value) return null;
+  for (const section of sections.value) {
+    for (const row of section.rows) {
+      if (row.group && row.entry.item.name === flyoutName.value) return row;
+    }
+  }
+  return null;
+});
+
+// The rail shows group children only in the hover flyout; the drawer never floats a menu.
+const canFlyout = (_name: string) => props.collapsible;
+const isRtl = () => document.documentElement.dir === "rtl";
+
+function clearFlyoutTimers() {
+  if (openTimer) clearTimeout(openTimer);
+  if (closeTimer) clearTimeout(closeTimer);
+  openTimer = closeTimer = null;
 }
-function onRailPointerMove() {
-  if (!collapsed.value || peek.value || peekSuppressed) return;
-  clearPeekTimer();
-  peekTimer = setTimeout(() => (peek.value = true), PEEK_REST_DELAY);
+
+function positionFlyout() {
+  const nav = navRef.value;
+  if (!flyoutAnchor || !nav) return;
+  const row = flyoutAnchor.getBoundingClientRect();
+  const edge = nav.getBoundingClientRect();
+  const top = flyoutTop({
+    tileTop: row.top,
+    height: flyoutRef.value?.offsetHeight ?? 0,
+    viewportHeight: window.innerHeight,
+    margin: VIEWPORT_MARGIN,
+  });
+  flyoutStyle.value = {
+    top: `${top}px`,
+    maxHeight: `${window.innerHeight - VIEWPORT_MARGIN * 2}px`,
+    zIndex: "6000",
+    ...(isRtl()
+      ? { right: `${document.documentElement.clientWidth - edge.left + FLYOUT_GAP}px` }
+      : { left: `${edge.right + FLYOUT_GAP}px` }),
+  };
 }
-function onRailLeave() {
-  peekSuppressed = false;
-  clearPeekTimer();
-  if (peek.value) peekTimer = setTimeout(() => (peek.value = false), PEEK_CLOSE_DELAY);
+
+function onOutsidePointerDown(e: PointerEvent) {
+  const target = e.target as Node;
+  if (flyoutRef.value?.contains(target) || flyoutAnchor?.contains(target)) return;
+  closeFlyout();
 }
-function onRailFocusIn(e: FocusEvent) {
-  if (collapsed.value && (e.target as Element | null)?.matches?.(":focus-visible")) {
-    clearPeekTimer();
-    peek.value = true;
+
+async function openFlyout(name: string, anchor: HTMLElement) {
+  if (!canFlyout(name)) return;
+  clearFlyoutTimers();
+  if (!flyoutName.value) {
+    retainPointerTracking();
+    document.addEventListener("pointerdown", onOutsidePointerDown, true);
+  }
+  flyoutName.value = name;
+  flyoutAnchor = anchor;
+  await nextTick();
+  positionFlyout();
+}
+
+function closeFlyout() {
+  clearFlyoutTimers();
+  if (!flyoutName.value) return;
+  flyoutName.value = null;
+  flyoutAnchor = null;
+  aim.exit = aim.flyout = null;
+  releasePointerTracking();
+  document.removeEventListener("pointerdown", onOutsidePointerDown, true);
+}
+
+function scheduleFlyoutOpen(name: string, e: MouseEvent) {
+  if (!canFlyout(name)) return;
+  const anchor = e.currentTarget as HTMLElement;
+  clearFlyoutTimers();
+  openTimer = setTimeout(() => openFlyout(name, anchor), OPEN_DELAY);
+}
+
+function scheduleFlyoutClose(e?: MouseEvent) {
+  clearFlyoutTimers();
+  if (!flyoutName.value) return;
+  aim.exit = e ? { x: e.clientX, y: e.clientY } : null;
+  aim.flyout = e ? flyoutRef.value : null;
+  const tryClose = () => {
+    if (aim.flyout && isAimingAtOpenFlyout()) {
+      closeTimer = setTimeout(tryClose, AIM_IDLE);
+      return;
+    }
+    closeFlyout();
+  };
+  closeTimer = setTimeout(tryClose, CLOSE_DELAY);
+}
+
+const flyoutColumnCount = computed(() =>
+  flyoutRow.value?.group
+    ? flyoutColumns(flyoutRow.value.group.sections.map((s) => s.children.length))
+    : 1,
+);
+// Static class strings so Tailwind sees them: one 200px column per group.
+const FLYOUT_GRID: Record<number, string> = {
+  2: "grid grid-cols-[repeat(2,13.5rem)] gap-x-2 gap-y-1.5",
+  3: "grid grid-cols-[repeat(3,13.5rem)] gap-x-2 gap-y-1.5",
+};
+
+const flyoutItems = () =>
+  Array.from(
+    flyoutRef.value?.querySelectorAll<HTMLElement>('[data-test^="sidebar-flyout-item-"]') ?? [],
+  );
+
+async function onGroupKeydown(name: string, e: KeyboardEvent) {
+  const openKey = isRtl() ? "ArrowLeft" : "ArrowRight";
+  const activates = props.collapsible && (e.key === "Enter" || e.key === " ");
+  if ((e.key === openKey || activates) && canFlyout(name)) {
+    e.preventDefault();
+    await openFlyout(name, e.currentTarget as HTMLElement);
+    flyoutItems()[0]?.focus();
+  } else if (e.key === "Escape" && flyoutName.value === name) {
+    closeFlyout();
   }
 }
-function onRailFocusOut(e: FocusEvent) {
-  if (peek.value && !navRef.value?.contains(e.relatedTarget as Node | null)) peek.value = false;
+
+function onFlyoutKeydown(e: KeyboardEvent) {
+  const items = flyoutItems();
+  const at = items.indexOf(document.activeElement as HTMLElement);
+  const backKey = isRtl() ? "ArrowRight" : "ArrowLeft";
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    const step = e.key === "ArrowDown" ? 1 : -1;
+    items[(at + step + items.length) % items.length]?.focus();
+  } else if (e.key === "Escape" || e.key === backKey) {
+    e.preventDefault();
+    const anchor = flyoutAnchor;
+    closeFlyout();
+    anchor?.focus();
+  } else if (e.key === " ") {
+    // Links ignore Space natively.
+    e.preventDefault();
+    (e.target as HTMLElement).click();
+  } else if (e.key === "Tab") {
+    closeFlyout();
+  }
 }
-watch(
-  () => route.value.fullPath,
-  () => {
-    if (!peek.value) return;
-    clearPeekTimer();
-    peek.value = false;
-    peekSuppressed = true;
-  },
-);
-watch(collapsed, () => {
-  clearPeekTimer();
-  peek.value = false;
-});
-onBeforeUnmount(clearPeekTimer);
+
+watch(() => route.value.fullPath, closeFlyout);
+watch(collapsed, closeFlyout);
+onBeforeUnmount(closeFlyout);
 
 function linkActive(item: NavItem): boolean {
   const r = route.value;
@@ -254,553 +365,245 @@ function linkActive(item: NavItem): boolean {
 const linkTo = (link: string) => ({ path: link, query: { org_identifier: orgIdentifier.value } });
 const childLabel = (c: SubnavChild): I18nText => (c.title ? raw(c.title) : t(c.titleKey));
 const iconFor = (item: NavItem) => sidebarIcon(SIDEBAR_ICONS[item.name] ?? item.icon);
-const sectionTitle = (s: { titleKey?: I18nKey }) => (s.titleKey ? t(s.titleKey) : undefined);
-
-// ── Promoted rows: a group's main pages sit in the menu directly; its secondary pages hide behind a chevron ──
-interface PromotedSpec {
-  main: string;
-  label?: I18nKey;
-  sub?: string[];
-}
-interface GroupPlan {
-  section?: { key: string; titleKey: I18nKey };
-  rows: PromotedSpec[];
-}
-const PROMOTED: Record<string, GroupPlan> = {
-  traces: {
-    rows: [
-      {
-        main: "traces-traces",
-        sub: ["traces-spans", "traces-service-graph", "traces-services-catalog"],
-      },
-    ],
-  },
-  dashboards: { rows: [{ main: "dashboards", sub: ["reports"] }] },
-  reliability: {
-    rows: [
-      {
-        main: "alertList",
-        label: "components.sidebar.alerts",
-        sub: [
-          "alertDestinations",
-          "alertTemplates",
-          "alertLibrary",
-          "downtimes",
-          "alertCalibration",
-        ],
-      },
-      { main: "sloList" },
-      {
-        main: "onCallResponses",
-        label: "components.sidebar.onCall",
-        sub: ["onCallTeams", "onCallRouting", "onCallMine"],
-      },
-      { main: "autobotInvestigate" },
-    ],
-  },
-  infra: {
-    section: { key: "infra", titleKey: "components.sidebar.infrastructure" },
-    rows: [{ main: "infraHosts" }, { main: "dbmDatabases" }, { main: "infraKubernetes" }],
-  },
-  experience: {
-    section: { key: "experience", titleKey: "components.sidebar.experience" },
-    rows: [{ main: "RUM" }, { main: "synthetics" }, { main: "productAnalytics" }],
-  },
-  data: {
-    rows: [
-      { main: "logstreams" },
-      { main: "pipelines", sub: ["workflows"] },
-      { main: "functionList" },
-      { main: "enrichmentTables" },
-      { main: "ingestion", sub: ["fleet"] },
-    ],
-  },
-};
-
-interface PromotedRow {
-  kind: "promoted";
-  key: string;
-  groupItem: NavItem;
-  group: GroupView;
-  main: SubnavChild;
-  label: I18nText;
-  beta: boolean;
-  subs: SubnavChild[];
-}
-type DisplayRow = { kind: "row"; row: SidebarRow } | PromotedRow;
-interface DisplaySection {
-  key: string;
-  titleKey?: I18nKey;
-  rows: DisplayRow[];
-}
-
-const childId = (c: SubnavChild) => `${c.name}${c.tab ? `-${c.tab}` : ""}`;
-
-function promoteGroup(row: SidebarRow, plan: GroupPlan): PromotedRow[] {
-  const group = row.group as GroupView;
-  const byId = new Map(group.children.map((c) => [childId(c), c]));
-  const betaSection = new Set(
-    group.sections.filter((s) => s.beta).flatMap((s) => s.children.map(childId)),
-  );
-  const used = new Set<string>();
-  const take = (id: string) => {
-    const child = byId.get(id);
-    if (!child || used.has(id)) return null;
-    used.add(id);
-    return child;
-  };
-  const rows: PromotedRow[] = [];
-  const build = (spec: PromotedSpec | null, main: SubnavChild, subs: SubnavChild[]) => {
-    const id = childId(main);
-    rows.push({
-      kind: "promoted",
-      key: `p:${id}`,
-      groupItem: row.entry.item,
-      group,
-      main,
-      label: spec?.label ? t(spec.label) : childLabel(main),
-      beta: !!main.beta || betaSection.has(id),
-      subs,
-    });
-  };
-  for (const spec of plan.rows) {
-    const subs = (spec.sub ?? []).map(take).filter((c): c is SubnavChild => !!c);
-    const main = take(spec.main) ?? subs.shift();
-    if (main) build(spec, main, subs);
-  }
-  // A page the plan does not name still gets its own row, so a new child is never lost.
-  for (const child of group.children) {
-    if (!used.has(childId(child))) build(null, child, []);
-  }
-  return rows;
-}
-
-const displaySections = computed<DisplaySection[]>(() => {
-  const out: DisplaySection[] = [];
-  for (const section of mainSections.value) {
-    const rows: DisplayRow[] = [];
-    const extra: DisplaySection[] = [];
-    for (const row of section.rows) {
-      const plan = row.group ? PROMOTED[row.entry.item.name] : undefined;
-      if (!plan) {
-        rows.push({ kind: "row", row });
-        continue;
-      }
-      const promoted = promoteGroup(row, plan);
-      if (plan.section) extra.push({ ...plan.section, rows: promoted });
-      else rows.push(...promoted);
-    }
-    if (rows.length) out.push({ key: section.key, titleKey: section.titleKey, rows });
-    out.push(...extra);
-  }
-  return out;
-});
-
-const isActiveChild = (r: PromotedRow, c: SubnavChild) => r.group.activeKey === childKey(c);
-const subActive = (r: PromotedRow) => r.subs.some((c) => isActiveChild(r, c));
-const promotedIcon = (r: PromotedRow) =>
-  r.main.icon ? sidebarIcon(r.main.icon) : iconFor(r.groupItem);
-
-watch(
-  displaySections,
-  (list) => {
-    for (const section of list) {
-      for (const r of section.rows) {
-        if (r.kind === "promoted" && subActive(r)) openGroup(r.key);
-      }
-    }
-  },
-  { immediate: true },
-);
+const sectionTitle = (s: SidebarSection) => (s.titleKey ? t(s.titleKey) : undefined);
 const headingIdBase = useId();
 const headingId = (scope: string, group: string, s: ChildSection) =>
   s.titleKey ? `${headingIdBase}-${scope}-${group}-${s.key}` : undefined;
-
-// ── Recents: the last pages visited from the menu, with the group they belong to ──
-const RECENTS_KEY = "o2-sidebar-recents";
-const RECENTS_MAX = 5;
-interface NavTarget {
-  key: string;
-  label: I18nText;
-  group?: I18nText;
-  to: RouteLocationRaw;
-}
-
-const navTargets = computed(() => {
-  const map = new Map<string, NavTarget>();
-  for (const section of sections.value) {
-    for (const row of section.rows) {
-      const name = row.entry.item.name;
-      if (!row.group) {
-        map.set(`link:${name}`, {
-          key: `link:${name}`,
-          label: row.entry.item.title,
-          to: linkTo(row.entry.item.link),
-        });
-        continue;
-      }
-      for (const child of row.group.children) {
-        const key = `child:${name}:${childKey(child)}`;
-        const label = childLabel(child);
-        map.set(key, {
-          key,
-          label,
-          group: String(label) === String(row.entry.item.title) ? undefined : row.entry.item.title,
-          to: childLocation(child, route.value, orgIdentifier.value),
-        });
-      }
-    }
-  }
-  return map;
-});
-
-function currentTargetKey(): string | null {
-  for (const section of sections.value) {
-    for (const row of section.rows) {
-      const name = row.entry.item.name;
-      if (row.group?.activeKey) return `child:${name}:${row.group.activeKey}`;
-      if (!row.group && linkActive(row.entry.item)) return `link:${name}`;
-    }
-  }
-  return null;
-}
-
-function readRecents(): string[] {
-  try {
-    const list = JSON.parse(localStorage.getItem(RECENTS_KEY) ?? "[]");
-    return Array.isArray(list) ? list.filter((k) => typeof k === "string") : [];
-  } catch {
-    return [];
-  }
-}
-const recentKeys = ref<string[]>(readRecents());
-
-watch(
-  [() => route.value.fullPath, sections],
-  () => {
-    const key = currentTargetKey();
-    if (!key || recentKeys.value[0] === key) return;
-    recentKeys.value = [key, ...recentKeys.value.filter((k) => k !== key)].slice(
-      0,
-      RECENTS_MAX + 1,
-    );
-    try {
-      localStorage.setItem(RECENTS_KEY, JSON.stringify(recentKeys.value));
-    } catch {
-      // storage blocked: recents still hold for this session
-    }
-  },
-  { immediate: true },
-);
-
-// The page already open is not a shortcut, so it is left out.
-const recents = computed(() => {
-  const current = currentTargetKey();
-  return recentKeys.value
-    .filter((k) => k !== current)
-    .map((k) => navTargets.value.get(k))
-    .filter((target): target is NavTarget => !!target)
-    .slice(0, RECENTS_MAX);
-});
 </script>
 
 <template>
-  <div
-    class="relative h-full min-h-0 shrink-0 transition-[width] duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
-    :class="collapsible ? (collapsed ? 'w-13' : 'w-54') : 'w-full'"
-    :data-rail="collapsible ? (collapsed ? 'collapsed' : 'expanded') : undefined"
+  <nav
+    ref="navRef"
+    :aria-label="t('components.navbar.mainNavigation')"
+    data-test="sidebar"
+    :data-collapsed="collapsed ? 'true' : undefined"
+    class="bg-surface-chrome-deeper flex h-full min-h-0 shrink-0 flex-col overflow-hidden transition-[width] duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
+    :class="collapsible ? (collapsed ? 'w-13' : 'w-42') : 'w-full'"
   >
-    <nav
-      ref="navRef"
-      :aria-label="t('components.navbar.mainNavigation')"
-      data-test="sidebar"
-      :data-collapsed="railCollapsed ? 'true' : undefined"
-      :data-peek="peek ? 'true' : undefined"
-      class="bg-surface-chrome-deeper absolute inset-y-0 start-0 flex min-h-0 flex-col overflow-hidden transition-[width,box-shadow] duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
-      :class="[
-        collapsible ? (railCollapsed ? 'w-13' : 'w-54') : 'w-full',
-        peek ? 'border-border-default z-50 border-e' : '',
-      ]"
-      @mouseenter="clearPeekTimer"
-      @mousemove="onRailPointerMove"
-      @mouseleave="onRailLeave"
-      @focusin="onRailFocusIn"
-      @focusout="onRailFocusOut"
-    >
+    <div class="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-2">
       <div
-        class="scrollbar-reveal flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-2"
+        v-if="loading"
+        class="flex flex-col gap-1 pt-1"
+        aria-hidden="true"
+        data-test="sidebar-skeleton"
       >
+        <OSkeleton v-for="n in 10" :key="n" class="h-8 w-full" />
+      </div>
+      <template v-else>
         <div
-          v-if="loading"
-          class="flex flex-col gap-1 pt-1"
-          aria-hidden="true"
-          data-test="sidebar-skeleton"
+          v-for="section in mainSections"
+          :key="section.key"
+          role="group"
+          :aria-label="sectionTitle(section)"
+          class="flex flex-col gap-0.5"
+          :data-test="`sidebar-group-${section.key}`"
         >
-          <OSkeleton v-for="n in 10" :key="n" class="h-8 w-full" />
-        </div>
-        <template v-else>
           <div
-            v-for="(section, sectionIdx) in displaySections"
-            :key="section.key"
-            role="group"
-            :aria-label="sectionTitle(section)"
-            class="flex flex-col gap-0.5"
-            :data-test="`sidebar-group-${section.key}`"
+            v-if="section.titleKey"
+            class="relative shrink-0 overflow-hidden transition-[height] duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
+            :class="collapsed ? 'h-3.5' : 'h-8'"
+            aria-hidden="true"
           >
             <div
-              v-if="section.titleKey"
-              class="relative shrink-0 overflow-hidden transition-[height] duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
-              :class="railCollapsed ? 'h-3.5' : 'h-8'"
-              aria-hidden="true"
+              class="overflow-hidden px-2 pt-4 pb-1 text-xs font-medium whitespace-nowrap text-[var(--color-sidebar-section-label)] transition-opacity duration-150 motion-reduce:transition-none"
+              :class="collapsed ? 'opacity-0' : 'opacity-100'"
             >
-              <div
-                class="overflow-hidden px-2 pt-4 pb-1 text-xs font-medium whitespace-nowrap text-[var(--color-sidebar-section-label)] transition-opacity duration-150 motion-reduce:transition-none"
-                :class="railCollapsed ? 'opacity-0' : 'opacity-100'"
-              >
-                {{ sectionTitle(section) }}
-              </div>
-              <div
-                class="border-border-default absolute inset-x-2 top-1/2 border-t transition-opacity duration-150 motion-reduce:transition-none"
-                :class="railCollapsed ? 'opacity-100' : 'opacity-0'"
-              />
+              {{ sectionTitle(section) }}
             </div>
-            <template
-              v-for="drow in section.rows"
-              :key="drow.kind === 'promoted' ? drow.key : drow.row.entry.item.name"
-            >
-              <template v-if="drow.kind === 'promoted'">
-                <div class="relative">
-                  <OSidebarItem
-                    :label="drow.label"
-                    :icon="promotedIcon(drow)"
-                    :to="childLocation(drow.main, route, orgIdentifier)"
-                    :active="isActiveChild(drow, drow.main)"
-                    :child-active="subActive(drow)"
-                    :collapsed="railCollapsed"
-                    :locked="drow.main.locked"
-                    :license-locked="drow.main.licenseLocked"
-                    :paywalled="isPaywalled(childLocation(drow.main, route, orgIdentifier))"
-                    :beta="drow.beta"
-                    :class="drow.subs.length && !railCollapsed ? 'pe-8!' : ''"
-                    :data-test="`sidebar-item-${childId(drow.main)}`"
-                  />
-                  <button
-                    v-if="drow.subs.length && !railCollapsed"
-                    type="button"
-                    class="rounded-default text-text-secondary hover:bg-surface-hover hover:text-text-body focus-visible:ring-accent absolute inset-y-0.5 end-0.5 flex w-6 cursor-pointer items-center justify-center border-0 bg-transparent transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
-                    :aria-label="t('components.sidebar.morePages', { name: String(drow.label) })"
-                    :aria-expanded="expanded.has(drow.key)"
-                    :aria-controls="`sidebar-children-${drow.key}`"
-                    :data-test="`sidebar-expand-${childId(drow.main)}`"
-                    @click="toggleGroup(drow.key)"
-                  >
-                    <OIcon
-                      name="sidebar-chevron-right"
-                      size="sm"
-                      class="size-4! transition-transform duration-150 motion-reduce:transition-none rtl:rotate-180"
-                      :class="expanded.has(drow.key) ? 'rotate-90 rtl:rotate-90' : ''"
-                    />
-                  </button>
-                </div>
-                <div
-                  v-if="drow.subs.length"
-                  :id="`sidebar-children-${drow.key}`"
-                  class="grid transition-[grid-template-rows,opacity] duration-[220ms,150ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
-                  :class="
-                    !railCollapsed && expanded.has(drow.key)
-                      ? 'grid-rows-[1fr] opacity-100'
-                      : 'grid-rows-[0fr] opacity-0'
-                  "
-                  :inert="railCollapsed || !expanded.has(drow.key)"
-                  :aria-hidden="railCollapsed || !expanded.has(drow.key) ? true : undefined"
-                >
+            <div
+              class="border-border-default absolute inset-x-2 top-1/2 border-t transition-opacity duration-150 motion-reduce:transition-none"
+              :class="collapsed ? 'opacity-100' : 'opacity-0'"
+            />
+          </div>
+          <template v-for="row in section.rows" :key="row.entry.item.name">
+            <OSidebarItem
+              v-if="!row.group"
+              :label="row.entry.item.title"
+              :icon="iconFor(row.entry.item)"
+              :to="linkTo(row.entry.item.link)"
+              :active="linkActive(row.entry.item)"
+              :collapsed="collapsed"
+              :locked="row.entry.item.locked"
+              :license-locked="row.entry.item.licenseLocked"
+              :paywalled="isPaywalled(row.entry.item.link)"
+              :data-test="`sidebar-item-${row.entry.item.name}`"
+            />
+            <template v-else>
+              <OSidebarItem
+                :label="row.entry.item.title"
+                :icon="iconFor(row.entry.item)"
+                :to="linkTo(row.group.tileLink)"
+                :active="row.group.activeKey !== null"
+                :collapsed="collapsed"
+                :expanded="collapsible ? undefined : expanded.has(row.entry.item.name)"
+                :aria-controls="collapsible ? undefined : `sidebar-children-${row.entry.item.name}`"
+                :flyout="collapsible"
+                :aria-haspopup="collapsible ? 'menu' : undefined"
+                :data-test="`sidebar-item-${row.entry.item.name}`"
+                @toggle="toggleGroup(row.entry.item.name)"
+                @mouseenter="scheduleFlyoutOpen(row.entry.item.name, $event)"
+                @mouseleave="scheduleFlyoutClose($event)"
+                @keydown="onGroupKeydown(row.entry.item.name, $event)"
+              />
+              <div
+                v-if="!collapsible"
+                :id="`sidebar-children-${row.entry.item.name}`"
+                class="grid transition-[grid-template-rows,opacity] duration-[220ms,150ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
+                :class="
+                  !collapsed && expanded.has(row.entry.item.name)
+                    ? 'grid-rows-[1fr] opacity-100'
+                    : 'grid-rows-[0fr] opacity-0'
+                "
+                :inert="collapsed || !expanded.has(row.entry.item.name)"
+                :aria-hidden="collapsed || !expanded.has(row.entry.item.name) ? true : undefined"
+                :data-test="`sidebar-children-${row.entry.item.name}`"
+              >
+                <div class="flex min-h-0 flex-col gap-0.5 overflow-hidden">
                   <div
-                    class="before:bg-text-secondary/25 relative flex min-h-0 flex-col gap-0.5 overflow-hidden before:absolute before:inset-y-0.5 before:start-4 before:w-px"
+                    v-for="(childSection, sectionIndex) in row.group.sections"
+                    :key="childSection.key"
+                    :role="childSection.titleKey ? 'group' : 'none'"
+                    :aria-labelledby="headingId('inline', row.entry.item.name, childSection)"
+                    class="flex flex-col gap-0.5"
+                    :class="sectionIndex > 0 ? 'mt-1.5' : ''"
+                    :data-test="
+                      childSection.titleKey ? `sidebar-section-${childSection.key}` : undefined
+                    "
                   >
+                    <div
+                      v-if="childSection.titleKey"
+                      :id="headingId('inline', row.entry.item.name, childSection)"
+                      role="presentation"
+                      class="text-text-secondary flex items-center gap-1.5 overflow-hidden ps-8.5 pe-2 pt-1 pb-0.5 text-xs font-medium whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none"
+                      :data-test="`sidebar-section-label-${childSection.key}`"
+                    >
+                      {{ t(childSection.titleKey) }}
+                      <OBetaBadge v-if="childSection.beta" />
+                    </div>
                     <OSidebarItem
-                      v-for="child in drow.subs"
+                      v-for="child in childSection.children"
                       :key="childKey(child)"
                       sub
                       :label="childLabel(child)"
                       :to="childLocation(child, route, orgIdentifier)"
-                      :active="isActiveChild(drow, child)"
+                      :active="row.group.activeKey === childKey(child)"
                       :locked="child.locked"
                       :license-locked="child.licenseLocked"
                       :paywalled="isPaywalled(childLocation(child, route, orgIdentifier))"
-                      :beta="child.beta"
-                      :data-test="`sidebar-item-${childId(child)}`"
+                      :beta="child.beta && !childSection.beta"
+                      :data-test="`sidebar-item-${child.name}${child.tab ? `-${child.tab}` : ''}`"
                     />
                   </div>
                 </div>
-              </template>
-              <template v-else>
-                <template v-for="row in [drow.row]" :key="row.entry.item.name">
-                  <OSidebarItem
-                    v-if="!row.group"
-                    :label="row.entry.item.title"
-                    :icon="iconFor(row.entry.item)"
-                    :to="linkTo(row.entry.item.link)"
-                    :active="linkActive(row.entry.item)"
-                    :collapsed="railCollapsed"
-                    :locked="row.entry.item.locked"
-                    :license-locked="row.entry.item.licenseLocked"
-                    :paywalled="isPaywalled(row.entry.item.link)"
-                    :data-test="`sidebar-item-${row.entry.item.name}`"
-                  />
-                  <template v-else>
-                    <OSidebarItem
-                      :label="row.entry.item.title"
-                      :icon="iconFor(row.entry.item)"
-                      :to="linkTo(row.group.tileLink)"
-                      :active="row.group.activeKey !== null"
-                      :collapsed="railCollapsed"
-                      :expanded="railCollapsed ? undefined : expanded.has(row.entry.item.name)"
-                      :aria-controls="`sidebar-children-${row.entry.item.name}`"
-                      :data-test="`sidebar-item-${row.entry.item.name}`"
-                      @toggle="toggleGroup(row.entry.item.name)"
-                    />
-                    <div
-                      :id="`sidebar-children-${row.entry.item.name}`"
-                      class="grid transition-[grid-template-rows,opacity] duration-[220ms,150ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
-                      :class="
-                        !railCollapsed && expanded.has(row.entry.item.name)
-                          ? 'grid-rows-[1fr] opacity-100'
-                          : 'grid-rows-[0fr] opacity-0'
-                      "
-                      :inert="railCollapsed || !expanded.has(row.entry.item.name)"
-                      :aria-hidden="
-                        railCollapsed || !expanded.has(row.entry.item.name) ? true : undefined
-                      "
-                      :data-test="`sidebar-children-${row.entry.item.name}`"
-                    >
-                      <div
-                        class="before:bg-text-secondary/25 relative flex min-h-0 flex-col gap-0.5 overflow-hidden before:absolute before:inset-y-0.5 before:start-4 before:w-px"
-                      >
-                        <div
-                          v-for="(childSection, sectionIndex) in row.group.sections"
-                          :key="childSection.key"
-                          :role="childSection.titleKey ? 'group' : 'none'"
-                          :aria-labelledby="headingId('inline', row.entry.item.name, childSection)"
-                          class="flex flex-col gap-0.5"
-                          :class="sectionIndex > 0 ? 'mt-1.5' : ''"
-                          :data-test="
-                            childSection.titleKey
-                              ? `sidebar-section-${childSection.key}`
-                              : undefined
-                          "
-                        >
-                          <div
-                            v-if="childSection.titleKey"
-                            :id="headingId('inline', row.entry.item.name, childSection)"
-                            role="presentation"
-                            class="text-text-secondary flex items-center gap-1.5 overflow-hidden ps-7 pe-2 pt-1 pb-0.5 text-xs font-medium whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none"
-                            :data-test="`sidebar-section-label-${childSection.key}`"
-                          >
-                            {{ t(childSection.titleKey) }}
-                            <OBetaBadge v-if="childSection.beta" />
-                          </div>
-                          <OSidebarItem
-                            v-for="child in childSection.children"
-                            :key="childKey(child)"
-                            sub
-                            :label="childLabel(child)"
-                            :to="childLocation(child, route, orgIdentifier)"
-                            :active="row.group.activeKey === childKey(child)"
-                            :locked="child.locked"
-                            :license-locked="child.licenseLocked"
-                            :paywalled="isPaywalled(childLocation(child, route, orgIdentifier))"
-                            :beta="child.beta && !childSection.beta"
-                            :data-test="`sidebar-item-${child.name}${child.tab ? `-${child.tab}` : ''}`"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </template>
-                </template>
-              </template>
-            </template>
-            <template v-if="sectionIdx === 0 && recents.length">
-              <OSidebarItem
-                :label="t('components.sidebar.recents')"
-                icon="history"
-                :collapsed="railCollapsed"
-                :expanded="railCollapsed ? undefined : expanded.has(RECENTS_GROUP)"
-                aria-controls="sidebar-children-recents"
-                data-test="sidebar-item-recents"
-                @toggle="toggleGroup(RECENTS_GROUP)"
-              />
-              <div
-                id="sidebar-children-recents"
-                class="grid transition-[grid-template-rows,opacity] duration-[220ms,150ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
-                :class="
-                  !railCollapsed && expanded.has(RECENTS_GROUP)
-                    ? 'grid-rows-[1fr] opacity-100'
-                    : 'grid-rows-[0fr] opacity-0'
-                "
-                :inert="railCollapsed || !expanded.has(RECENTS_GROUP)"
-                :aria-hidden="railCollapsed || !expanded.has(RECENTS_GROUP) ? true : undefined"
-                data-test="sidebar-children-recents"
-              >
-                <div
-                  class="before:bg-text-secondary/25 relative flex min-h-0 flex-col gap-0.5 overflow-hidden before:absolute before:inset-y-0.5 before:start-4 before:w-px"
-                >
-                  <OSidebarItem
-                    v-for="recent in recents"
-                    :key="recent.key"
-                    sub
-                    :label="recent.label"
-                    :hint="recent.group"
-                    :to="recent.to"
-                    :data-test="`sidebar-recent-${recent.key}`"
-                  />
-                </div>
               </div>
             </template>
-          </div>
-        </template>
-      </div>
+          </template>
+        </div>
+      </template>
+    </div>
 
-      <div class="border-border-default mx-2 flex shrink-0 flex-col gap-0.5 border-t pt-2 pb-2">
-        <OSidebarItem
-          v-for="row in bottomSection && !loading ? bottomSection.rows : []"
-          :key="row.entry.item.name"
-          :label="row.entry.item.title"
-          :icon="iconFor(row.entry.item)"
-          :to="linkTo(row.group ? row.group.tileLink : row.entry.item.link)"
-          :active="row.group ? row.group.activeKey !== null : linkActive(row.entry.item)"
-          :collapsed="railCollapsed"
-          :locked="row.entry.item.locked"
-          :license-locked="row.entry.item.licenseLocked"
-          :paywalled="isPaywalled(row.entry.item.link)"
-          :data-test="`sidebar-item-${row.entry.item.name}`"
+    <div class="flex shrink-0 flex-col gap-0.5 px-2 pb-2">
+      <OSidebarItem
+        v-for="row in bottomSection && !loading ? bottomSection.rows : []"
+        :key="row.entry.item.name"
+        :label="row.entry.item.title"
+        :icon="iconFor(row.entry.item)"
+        :to="linkTo(row.group ? row.group.tileLink : row.entry.item.link)"
+        :active="row.group ? row.group.activeKey !== null : linkActive(row.entry.item)"
+        :collapsed="collapsed"
+        :locked="row.entry.item.locked"
+        :license-locked="row.entry.item.licenseLocked"
+        :paywalled="isPaywalled(row.entry.item.link)"
+        :data-test="`sidebar-item-${row.entry.item.name}`"
+      />
+      <button
+        v-if="collapsible"
+        type="button"
+        class="group/nav rounded-default text-text-body hover:bg-dropdown-item-hover-bg focus-visible:ring-accent text-compact mt-0.5 flex h-7 w-full min-w-9 cursor-pointer items-center gap-2.5 overflow-hidden border-0 bg-transparent px-2 text-start [font-family:inherit] font-normal transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset motion-reduce:transition-none"
+        :aria-label="toggleLabel"
+        :aria-expanded="!collapsed"
+        data-test="sidebar-collapse-toggle"
+        @click="toggleCollapsed"
+      >
+        <OIcon
+          :name="collapsed ? 'left-panel-open' : 'left-panel-close'"
+          size="sm"
+          class="text-text-secondary size-4! shrink-0"
         />
-        <button
-          v-if="collapsible"
-          type="button"
-          class="group/nav rounded-default text-text-body hover:bg-dropdown-item-hover-bg focus-visible:ring-accent text-compact mt-0.5 flex h-7 w-full min-w-9 cursor-pointer items-center gap-2.5 overflow-hidden border-0 bg-transparent px-2 text-start [font-family:inherit] font-normal transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset motion-reduce:transition-none"
-          :aria-label="toggleLabel"
-          :aria-expanded="!collapsed"
-          data-test="sidebar-collapse-toggle"
-          @click="toggleCollapsed"
+        <span
+          class="min-w-0 flex-1 truncate transition-opacity duration-150 motion-reduce:transition-none"
+          :class="collapsed ? 'opacity-0' : 'opacity-100'"
+          :aria-hidden="collapsed ? true : undefined"
+          >{{ t("components.sidebar.collapseShort") }}</span
         >
-          <OIcon
-            :name="collapsed ? 'left-panel-open' : 'left-panel-close'"
-            size="sm"
-            class="text-text-secondary size-4! shrink-0"
-          />
-          <span
-            class="min-w-0 flex-1 truncate transition-opacity duration-150 motion-reduce:transition-none"
-            :class="railCollapsed ? 'opacity-0' : 'opacity-100'"
-            :aria-hidden="railCollapsed ? true : undefined"
-            >{{
-              collapsed
-                ? t("components.sidebar.expandShort")
-                : t("components.sidebar.collapseShort")
-            }}</span
+        <OTooltip :content="toggleLabel" shortcut="[" :side="collapsed ? 'right' : 'top'" />
+      </button>
+    </div>
+
+    <Teleport to="body">
+      <div
+        v-if="flyoutRow?.group"
+        ref="flyoutRef"
+        role="menu"
+        :aria-label="flyoutRow.entry.item.title"
+        class="shadow-overlay rounded-default fixed flex max-w-[min(46rem,calc(100vw-12rem))] min-w-52 flex-col gap-0.5 overflow-x-hidden overflow-y-auto overscroll-contain border border-[var(--color-sidebar-flyout-border)] bg-[var(--color-sidebar-flyout-bg)] p-1"
+        :style="flyoutStyle"
+        :data-test="`sidebar-flyout-${flyoutRow.entry.item.name}`"
+        @mouseenter="clearFlyoutTimers"
+        @mouseleave="scheduleFlyoutClose()"
+        @keydown="onFlyoutKeydown"
+      >
+        <div
+          class="text-text-heading text-compact overflow-hidden px-2 pt-1 pb-1 font-semibold whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none"
+          aria-hidden="true"
+        >
+          {{ flyoutRow.entry.item.title }}
+        </div>
+        <div
+          role="none"
+          :class="FLYOUT_GRID[flyoutColumnCount] ?? 'flex flex-col gap-0.5'"
+          :data-test="`sidebar-flyout-columns-${flyoutColumnCount}`"
+        >
+          <!-- A bare <div> is not a valid child of role="menu", so headless runs take role="none". -->
+          <div
+            v-for="(childSection, sectionIndex) in flyoutRow.group.sections"
+            :key="childSection.key"
+            :role="childSection.titleKey ? 'group' : 'none'"
+            :aria-labelledby="headingId('flyout', flyoutRow.entry.item.name, childSection)"
+            class="flex min-w-0 flex-col gap-0.5"
+            :class="sectionIndex > 0 && flyoutColumnCount === 1 ? 'mt-1.5' : ''"
+            :data-test="
+              childSection.titleKey ? `sidebar-flyout-section-${childSection.key}` : undefined
+            "
           >
-          <OTooltip :content="toggleLabel" shortcut="[" :side="railCollapsed ? 'right' : 'top'" />
-        </button>
+            <div
+              v-if="childSection.titleKey"
+              :id="headingId('flyout', flyoutRow.entry.item.name, childSection)"
+              role="presentation"
+              class="flex items-center gap-1.5 overflow-hidden px-2 pt-1 pb-0.5 text-xs font-medium whitespace-nowrap text-[var(--color-sidebar-section-label)] transition-opacity duration-150 motion-reduce:transition-none"
+              :data-test="`sidebar-flyout-section-label-${childSection.key}`"
+            >
+              {{ t(childSection.titleKey) }}
+              <OBetaBadge v-if="childSection.beta" />
+            </div>
+            <OSidebarItem
+              v-for="child in childSection.children"
+              :key="childKey(child)"
+              role="menuitem"
+              large
+              :label="childLabel(child)"
+              :icon="sidebarIcon(child.icon)"
+              :to="childLocation(child, route, orgIdentifier)"
+              :active="flyoutRow.group.activeKey === childKey(child)"
+              :locked="child.locked"
+              :license-locked="child.licenseLocked"
+              :paywalled="isPaywalled(childLocation(child, route, orgIdentifier))"
+              :beta="child.beta && !childSection.beta"
+              :data-test="`sidebar-flyout-item-${child.name}${child.tab ? `-${child.tab}` : ''}`"
+            />
+          </div>
+        </div>
       </div>
-    </nav>
-  </div>
+    </Teleport>
+  </nav>
 </template>

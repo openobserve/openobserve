@@ -39,9 +39,11 @@ const props = withDefaults(
     licenseLocked?: boolean;
     paywalled?: boolean;
     beta?: boolean;
-    /** Second line under the label, such as the group a recent page belongs to. */
-    hint?: I18nText;
     expanded?: boolean;
+    /** The row opens a flyout, which stands in for the collapsed-rail tooltip. */
+    flyout?: boolean;
+    /** Larger label for rows inside the flyout panel. */
+    large?: boolean;
   }>(),
   {
     icon: undefined,
@@ -54,8 +56,9 @@ const props = withDefaults(
     licenseLocked: false,
     paywalled: false,
     beta: false,
-    hint: undefined,
     expanded: undefined,
+    flyout: false,
+    large: false,
   },
 );
 
@@ -69,7 +72,11 @@ const isToggle = computed(
   () => !props.locked && (!props.to || (props.expanded !== undefined && !props.collapsed)),
 );
 const iconClass = computed(() =>
-  props.active || props.childActive ? "text-selected-fg" : "text-text-secondary",
+  props.active || props.childActive
+    ? "text-selected-fg"
+    : props.large
+      ? "text-[var(--color-sidebar-flyout-icon)]"
+      : "text-text-secondary",
 );
 
 const rootAttrs = computed<Record<string, unknown>>(() => {
@@ -89,7 +96,7 @@ const rowClass = computed(() => [
   "group/nav flex min-w-9 w-full items-center gap-2.5 overflow-hidden rounded-default [text-decoration:none]! transition-colors duration-150 motion-reduce:transition-none cursor-pointer border-0 text-start [font-family:inherit]",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent",
   "text-compact",
-  props.sub ? (props.hint ? "min-h-7 py-1 ps-7 pe-2" : "h-7 ps-7 pe-2") : "h-7 px-2",
+  props.sub ? "h-7 ps-8.5 pe-2" : "h-7 px-2",
   // Calm selection: a soft accent tint, no ring and no bold; the accent icon carries the state cue.
   props.active
     ? "bg-[var(--selected-tint)] text-text-body! font-normal"
@@ -132,13 +139,7 @@ function onKeydown(event: KeyboardEvent) {
       :class="collapsed ? 'opacity-0' : 'opacity-100'"
       :aria-hidden="collapsed ? true : undefined"
     >
-      <span v-if="hint" class="flex min-w-0 flex-col">
-        <span class="truncate leading-5">{{ label }}</span>
-        <span class="text-text-secondary text-2xs truncate leading-4">{{ hint }}</span>
-      </span>
-      <span v-else class="min-w-0 truncate" :title="sub ? String(label) : undefined">{{
-        label
-      }}</span>
+      <span class="min-w-0 truncate">{{ label }}</span>
       <OBetaBadge v-if="beta" class="-ms-1 shrink-0" />
       <span class="-ms-2.5 flex-1" aria-hidden="true" />
       <OIcon
@@ -149,7 +150,7 @@ function onKeydown(event: KeyboardEvent) {
         :class="iconClass"
       />
       <OIcon
-        v-if="expanded !== undefined"
+        v-if="expanded !== undefined || flyout"
         name="sidebar-chevron-right"
         size="sm"
         class="size-4.5! shrink-0 transition-transform duration-150 motion-reduce:transition-none rtl:rotate-180"
@@ -159,6 +160,6 @@ function onKeydown(event: KeyboardEvent) {
     <span v-if="paywalled" :id="paywallId" class="sr-only">{{
       t("menu.trialPageNeedsPlan", { page: label })
     }}</span>
-    <OTooltip v-if="collapsed" :content="label" side="right" />
+    <OTooltip v-if="collapsed && !flyout" :content="label" side="right" />
   </component>
 </template>

@@ -153,7 +153,7 @@
   --d-hover: #2f2f34;
 
   /* A slate night shell: neutral enough that the accent never tints the dark frame purple. */
-  --color-surface-shell: #0a0c10;
+  --color-surface-shell: #0d1016;
   --color-surface-card: var(--d-base);
   --color-surface-panel: var(--d-panel);
   --color-surface-band: var(--d-well);
@@ -886,22 +886,4 @@
 }
 :root .o-field-row--selected .o-field-row__in-table {
   color: var(--color-selected-fg);
-}
-
-/* The peeking rail casts only to the right, so its top and bottom stay flush with the header and window. */
-:root {
-  /* eslint-disable-next-line local/no-hardcoded-px -- optical shadow geometry, not layout */
-  --shadow-sidebar-peek: 12px 0 24px -12px rgb(15 23 42 / 0.18);
-}
-:root.dark {
-  /* eslint-disable-next-line local/no-hardcoded-px -- optical shadow geometry, not layout */
-  --shadow-sidebar-peek: 12px 0 28px -10px rgb(0 0 0 / 0.7);
-}
-:root [data-test="sidebar"][data-peek] {
-  box-shadow: var(--shadow-sidebar-peek);
-  /* Clip the blur above and below so only the trailing side casts. */
-  clip-path: inset(0 -3rem 0 0);
-}
-:root[dir="rtl"] [data-test="sidebar"][data-peek] {
-  clip-path: inset(0 0 0 -3rem);
 }

@@ -314,34 +314,3 @@
   pointer-events: none;
   background: linear-gradient(to right, transparent, var(--pin-bg));
 }
-
-/* Scrollbar that fades in while the pointer is over its container, for dense chrome like the sidebar. */
-@property --scrollbar-reveal {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0;
-}
-@utility scrollbar-reveal {
-  --scrollbar-reveal: 0;
-  transition: --scrollbar-reveal var(--duration-control, 150ms) ease-out;
-  &:hover,
-  &:focus-within {
-    --scrollbar-reveal: 1;
-  }
-  &::-webkit-scrollbar-thumb {
-    background-color: rgb(
-      from var(--color-scrollbar-thumb) r g b / calc(alpha* var(--scrollbar-reveal))
-    );
-  }
-  &::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-scrollbar-thumb-hover);
-  }
-  @supports not selector(::-webkit-scrollbar) {
-    scrollbar-color: transparent transparent;
-    transition: scrollbar-color var(--duration-control, 150ms) ease-out;
-    &:hover,
-    &:focus-within {
-      scrollbar-color: var(--color-scrollbar-thumb) transparent;
-    }
-  }
-}
