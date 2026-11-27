@@ -82,9 +82,9 @@ use {
     openobserve_api_common::auth::delegation::DelegatedCaller,
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, autoobserve,
-        datasets, discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys,
-        license, oncall, playground, prompts, providers, quality, remote_tasks, score_configs,
-        scorers, workflows,
+        autoresolve, datasets, discovery, domain_management, eval_jobs, experiments, fleet, gen_ai,
+        keys, license, oncall, playground, prompts, providers, quality, remote_tasks,
+        score_configs, scorers, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -145,6 +145,8 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-sampling-priority"),
             X_O2_ASSISTANT_SESSION_ID,
             X_O2_ASSISTANT_TURN_ID,
+            // The assistant's turn tail resumes from it after a stop or a reload.
+            header::HeaderName::from_static("last-event-id"),
             // The public dashboard viewer polls conditionally.
             header::IF_NONE_MATCH,
         ])
@@ -763,6 +765,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     if get_o2_config().common.audit_enabled
         && !(after_org.ends_with("_stream")
             || path.ends_with("ai/chat_stream")
+            // The handler writes its own record: the body is the prompt, its images and context.
+            || path.ends_with("ai/chat")
             || common::meta::ingestion_routes::is_ingestion_write(
                 &http_method,
                 &path,
@@ -893,6 +897,71 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     response.headers_mut().remove(ERROR_HEADER);
     response
+}
+
+/// The chat, confirm and cancel routes drive the assistant itself; `/{org}/mcp` checks each tool.
+fn assistant_approval_exempt(path: &str) -> bool {
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    matches!(
+        segments.as_slice(),
+        [_org, "mcp"]
+            | [_org, "ai", "chat" | "chat_stream"]
+            | [_org, "ai", "confirm", _]
+            | [_org, "ai", "chats", _, "cancel"]
+    )
+}
+
+/// The assistant's REST changes (its approved deletes) run only with o2-ai's signed approval.
+pub async fn assistant_approval_middleware(request: Request, next: Next) -> Response {
+    let method = request.method().clone();
+    let changes = matches!(
+        method,
+        Method::POST | Method::PUT | Method::PATCH | Method::DELETE
+    );
+    let path = request.uri().path();
+    let exempt = assistant_approval_exempt(path);
+    if !changes || exempt || !request.headers().contains_key(X_O2_ASSISTANT_SESSION_ID) {
+        return next.run(request).await;
+    }
+    let origin = match openobserve_mcp::ledger::Origin::checked(request.headers()) {
+        Ok(origin) => origin,
+        Err(problem) => return common::meta::http::HttpResponse::bad_request(problem),
+    };
+    let target = format!(
+        "/api{}",
+        request
+            .uri()
+            .path_and_query()
+            .map_or(path, |target| target.as_str())
+    );
+    let mut segments = path.split('/').filter(|segment| !segment.is_empty());
+    let org_id = match segments.next() {
+        Some("v2") => segments.next(),
+        first => first,
+    }
+    .unwrap_or_default()
+    .to_string();
+    let (parts, body) = request.into_parts();
+    let limit = get_config().limit.req_payload_limit;
+    let Ok(body) = axum::body::to_bytes(body, limit).await else {
+        return common::meta::http::HttpResponse::bad_request("Request body is too large");
+    };
+    let checked = openobserve_mcp::approval::check_rest(
+        &org_id,
+        method.as_str(),
+        &target,
+        &body,
+        origin.as_ref(),
+    )
+    .await;
+    let request = Request::from_parts(parts, axum::body::Body::from(body));
+    match checked {
+        Ok(()) => next.run(request).await,
+        Err(refused) => {
+            log::warn!("[ai] refused assistant {method} {target}: {refused}");
+            common::meta::http::HttpResponse::forbidden(refused.to_string())
+        }
+    }
 }
 
 /// Handler for /metrics endpoint
@@ -1280,6 +1349,14 @@ pub fn config_routes() -> Router {
 #[cfg(feature = "enterprise")]
 fn ai_chat_routes(router: Router) -> Router {
     router
+        .route(
+            "/{org_id}/ai/capabilities",
+            get(ai::capabilities::get_capabilities),
+        )
+        .route(
+            "/{org_id}/ai/capabilities/test",
+            post(ai::capabilities::test_capabilities),
+        )
         .route("/{org_id}/ai/chat", post(ai::chat::chat))
         .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
         .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
@@ -1291,6 +1368,8 @@ fn ai_chat_routes(router: Router) -> Router {
             "/{org_id}/ai/chats",
             get(ai::chats::list).delete(ai::chats::delete_all),
         )
+        .route("/{org_id}/ai/chats/import", post(ai::chats::import))
+        .route("/{org_id}/ai/chats/seeded", post(ai::seeded::create_seeded))
         .route(
             "/{org_id}/ai/chats/{session_id}",
             get(ai::chats::get)
@@ -1300,6 +1379,14 @@ fn ai_chat_routes(router: Router) -> Router {
         .route(
             "/{org_id}/ai/chats/{session_id}/cancel",
             post(ai::chat::cancel),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/branch",
+            post(ai::branch::branch),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/turns/{turn_id}/stream",
+            get(ai::chats::stream_turn),
         )
         .route(
             "/{org_id}/ai/chats/{session_id}/shares",
@@ -1312,6 +1399,21 @@ fn ai_chat_routes(router: Router) -> Router {
         )
         .route("/{org_id}/ai/shared/{token}", get(ai::shares::get_shared))
         .route("/{org_id}/ai/shared/{token}/fork", post(ai::shares::fork))
+        .route(
+            "/{org_id}/ai/settings",
+            get(ai::settings::get_settings).put(ai::settings::put_settings),
+        )
+        .route("/{org_id}/ai/grants", get(ai::grants::list_grants))
+        .route("/{org_id}/ai/grants/{id}", delete(ai::grants::delete_grant))
+        .route("/{org_id}/ai/activity", get(ai::activity::list_activity))
+        .route(
+            "/{org_id}/ai/activity/{id}/undo",
+            post(ai::activity::undo_action),
+        )
+        .route(
+            "/{org_id}/ai/access_requests",
+            post(ai::access_requests::create_access_request),
+        )
 }
 
 #[cfg(feature = "enterprise")]
@@ -1349,6 +1451,32 @@ fn autoobserve_routes(router: Router) -> Router {
         .route("/v2/{org_id}/autoobserve/review", get(autoobserve::review::get_review))
         .route("/v2/{org_id}/autoobserve/review/{decision_kind}/{cohort_id}", put(autoobserve::review::put_verdict))
         .route("/v2/{org_id}/autoobserve/settings/paging", get(autoobserve::paging::get_paging_settings).put(autoobserve::paging::put_paging_settings))
+}
+
+#[cfg(feature = "enterprise")]
+#[rustfmt::skip]
+fn autoresolve_routes(router: Router) -> Router {
+    router
+        .route("/v2/{org_id}/autoresolve/summary", get(autoresolve::runs::get_summary))
+        .route("/v2/{org_id}/autoresolve/runs", get(autoresolve::runs::list_runs).post(autoresolve::runs::start_run))
+        .route("/v2/{org_id}/autoresolve/incidents/{incident_id}", get(autoresolve::runs::get_incident))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}", get(autoresolve::runs::get_run))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/live_stream", get(autoresolve::runs::get_run_live_stream))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/approve", post(autoresolve::runs::approve_run))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/decline", post(autoresolve::runs::decline_run))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/replan", post(autoresolve::runs::replan_run))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/verdict", post(autoresolve::runs::post_verdict))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/add_connection", post(autoresolve::runs::add_connection))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/plan", post(autoresolve::internal::post_plan))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/outcome", post(autoresolve::internal::post_outcome))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/consume", post(autoresolve::internal::consume_step))
+        .route("/v2/{org_id}/autoresolve/runs/{run_id}/steps/{step_id}/result", post(autoresolve::internal::post_step_result))
+        .route("/v2/{org_id}/autoresolve/saved", get(autoresolve::saved::list_saved).post(autoresolve::saved::create_saved))
+        .route("/v2/{org_id}/autoresolve/saved/{autoresolve_id}", get(autoresolve::saved::get_saved).put(autoresolve::saved::update_saved).delete(autoresolve::saved::delete_saved))
+        .route("/v2/{org_id}/autoresolve/saved/{autoresolve_id}/trigger", post(autoresolve::saved::set_saved_trigger))
+        .route("/v2/{org_id}/autoresolve/saved/{autoresolve_id}/run", post(autoresolve::saved::run_saved))
+        .route("/v2/{org_id}/autoresolve/saved/{autoresolve_id}/corrections", get(autoresolve::saved::list_corrections))
+        .route("/v2/{org_id}/autoresolve/saved/{autoresolve_id}/corrections/{correction_id}", delete(autoresolve::saved::remove_correction))
 }
 
 #[rustfmt::skip]
@@ -1621,6 +1749,7 @@ fn service_route_table() -> Router {
         .route("/v2/{org_id}/alerts/tags", get(alerts::list_alert_tags))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
         .route("/v2/{org_id}/alerts/auto_investigate/decisions", get(alerts::auto_investigate::list_auto_investigate_decisions))
+        .route("/v2/{org_id}/alerts/rca_runs", get(alerts::rca_runs_org::list_org_rca_runs))
 
         // Alerts - incidents must be before alerts to avoid route conflicts
         .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents).post(alerts::incidents::create_incident))
@@ -2073,7 +2202,8 @@ fn service_route_table() -> Router {
 
             // AI
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
-            .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
+            .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).patch(ai::toolsets::patch).delete(ai::toolsets::delete))
+            .route("/{org_id}/ai/toolsets/{id}/test", post(ai::toolsets::test))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))
@@ -2095,6 +2225,10 @@ fn service_route_table() -> Router {
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
         router = ai_chat_routes(router);
+        // The licence can load after the router is built, so each handler checks the full gate.
+        if get_o2_config().autoresolve.enabled {
+            router = autoresolve_routes(router);
+        }
 
         if get_o2_config().common.workflows_enabled {
             // workflows
@@ -2464,6 +2598,7 @@ fn with_service_layers(router: Router) -> Router {
         .layer(middleware::from_fn(memory_breaker_middleware))
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
+        .layer(middleware::from_fn(assistant_approval_middleware))
         // Between auth and audit: it needs the email authentication resolves, and a request it
         // refuses never reached a handler, so there is nothing for the audit trail to record.
         .layer(middleware::from_fn(password_policy_middleware))
@@ -5607,7 +5742,7 @@ mod tests {
             .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
             .header(
                 header::ACCESS_CONTROL_REQUEST_HEADERS,
-                "content-type,traceparent,x-o2-assistant-session-id,x-o2-assistant-turn-id",
+                "content-type,traceparent,x-o2-assistant-session-id,x-o2-assistant-turn-id,last-event-id",
             )
             .body(Body::empty())
             .unwrap();
@@ -5624,10 +5759,54 @@ mod tests {
             "traceparent",
             X_O2_ASSISTANT_SESSION_ID.as_str(),
             X_O2_ASSISTANT_TURN_ID.as_str(),
+            "last-event-id",
         ] {
             assert!(
                 allowed.split(',').any(|h| h.trim() == name),
                 "{name} missing from access-control-allow-headers: {allowed}"
+            );
+        }
+    }
+
+    #[test]
+    fn assistant_approval_exempts_only_chat_confirm_cancel_and_mcp() {
+        for path in [
+            "/default/ai/chat",
+            "/default/ai/chat_stream",
+            "/default/ai/confirm/s1",
+            "/default/ai/chats/s1/cancel",
+            "/mcp/ai/chat",
+            "/default/mcp",
+            "/default/mcp/",
+            "/ai/mcp",
+            "/v2/ai/chat",
+        ] {
+            assert!(assistant_approval_exempt(path), "{path} should be exempt");
+        }
+        for path in [
+            "/default/streams/ai/data_by_time_range",
+            "/default/streams/ai/delete_fields",
+            "/default/streams/ai/settings",
+            "/default/streams/mcp",
+            "/default/functions/mcp",
+            "/ai/streams/logs/settings",
+            "/ai/alerts/a1",
+            "/mcp/streams/logs",
+            "/v2/default/ai/chat",
+            "/v2/streams/ai/settings",
+            "/v2/default/alerts/a1",
+            "/default/mcp/extra",
+            "/ai/ai/settings",
+            "/default/ai/settings",
+            "/default/ai/toolsets/t1",
+            "/default/ai/grants/g1",
+            "/default/ai/chats/s1/shares",
+            "/default/ai/activity/a1/undo",
+            "/",
+        ] {
+            assert!(
+                !assistant_approval_exempt(path),
+                "{path} must need approval"
             );
         }
     }
@@ -6305,6 +6484,7 @@ mod tests {
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/events",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}",
+            "GET /v2/{org_id}/alerts/rca_runs",
             "GET /v2/{org_id}/alerts/tags",
             "GET /v2/{org_id}/alerts/{alert_id}",
             "GET /v2/{org_id}/alerts/{alert_id}/groups",
@@ -6397,31 +6577,105 @@ mod tests {
             "GET /v2/{org_id}/autoobserve/decisions/preview",
             "POST /v2/{org_id}/autoobserve/decisions",
             "POST /v2/{org_id}/autoobserve/decisions/{decision_id}/undo",
+            "POST /v2/{org_id}/autoresolve/runs/{run_id}/approve",
+            "POST /v2/{org_id}/autoresolve/runs/{run_id}/decline",
+            "POST /v2/{org_id}/autoresolve/saved/{autoresolve_id}/run",
         ]);
         assert_eq!(scope_allows(in_slack_action_scope), sorted(&expected));
     }
 
-    /// A pattern parameter must not admit a path that axum hands to a more specific route.
     #[test]
-    fn assistant_scope_agrees_with_axum_dispatch() {
-        use openobserve_api_common::auth::delegation::in_assistant_scope;
+    fn autoresolve_scope_is_exactly_these_router_routes() {
+        use openobserve_api_common::auth::delegation::in_autoresolve_scope;
 
-        let wrong = dispatch_disagreements(in_assistant_scope);
-        assert!(
-            wrong.is_empty(),
-            "add the literal to RESERVED_STREAM_SLOTS in api/common auth/delegation.rs: {wrong:#?}"
-        );
+        #[allow(unused_mut)]
+        let mut expected = vec![
+            "GET /v2/{org_id}/alerts",
+            "GET /v2/{org_id}/alerts/incidents",
+            "GET /v2/{org_id}/alerts/incidents/stats",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}",
+            "GET /v2/{org_id}/alerts/{alert_id}",
+            "GET /{org_id}/mcp",
+            "GET /{org_id}/prometheus/api/v1/query",
+            "GET /{org_id}/prometheus/api/v1/query_range",
+            "GET /{org_id}/streams",
+            "GET /{org_id}/streams/{stream_name}/schema",
+            "GET /{org_id}/{stream_name}/_around",
+            "GET /{org_id}/{stream_name}/_values",
+            "GET /{org_id}/{stream_name}/traces/latest_stream",
+            "POST /{org_id}/_search_multi_stream",
+            "POST /{org_id}/_search_stream",
+            "POST /{org_id}/mcp",
+            "POST /{org_id}/prometheus/api/v1/query",
+            "POST /{org_id}/prometheus/api/v1/query_range",
+        ];
+        #[cfg(feature = "enterprise")]
+        expected.extend([
+            "POST /v2/{org_id}/autoresolve/runs/{run_id}/consume",
+            "POST /v2/{org_id}/autoresolve/runs/{run_id}/outcome",
+            "POST /v2/{org_id}/autoresolve/runs/{run_id}/plan",
+            "POST /v2/{org_id}/autoresolve/runs/{run_id}/steps/{step_id}/result",
+        ]);
+        assert_eq!(scope_allows(in_autoresolve_scope), sorted(&expected));
     }
 
+    /// A pattern parameter must not admit a path that axum hands to a more specific route.
     #[test]
-    fn slack_action_scope_agrees_with_axum_dispatch() {
-        use openobserve_api_common::auth::delegation::in_slack_action_scope;
+    fn scopes_agree_with_axum_dispatch() {
+        use openobserve_api_common::auth::delegation::{
+            in_assistant_scope, in_autoresolve_scope, in_slack_action_scope,
+        };
 
-        let wrong = dispatch_disagreements(in_slack_action_scope);
+        let assistant: fn(&Method, &str) -> bool = in_assistant_scope;
+        let cases = [
+            ("assistant", assistant, "RESERVED_STREAM_SLOTS"),
+            ("slack_action", in_slack_action_scope, "ALERT_ID_LITERALS"),
+            (
+                "autoresolve",
+                in_autoresolve_scope,
+                "RESERVED_STREAM_SLOTS or ALERT_ID_LITERALS",
+            ),
+        ];
+        for (scope, in_scope, fix) in cases {
+            let wrong = dispatch_disagreements(in_scope);
+            assert!(
+                wrong.is_empty(),
+                "{scope}: add the literal to {fix} in api/common auth/delegation.rs: {wrong:#?}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn autoresolve_routes_are_absent_with_the_flag_off() {
         assert!(
-            wrong.is_empty(),
-            "add the literal to ALERT_ID_LITERALS in api/common auth/delegation.rs: {wrong:#?}"
+            !get_o2_config().autoresolve.enabled,
+            "the routes mount only with O2_AUTORESOLVE_ENABLED on"
         );
+        let app = Router::new().nest("/api", service_route_table());
+        for (method, path) in [
+            (Method::GET, "/api/v2/default/autoresolve/summary"),
+            (Method::POST, "/api/v2/default/autoresolve/runs"),
+            (Method::POST, "/api/v2/default/autoresolve/runs/r1/consume"),
+        ] {
+            let req = Request::builder()
+                .method(method.clone())
+                .uri(path)
+                .header("user_id", "root@example.com")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from("{}"))
+                .unwrap();
+            let response = app.clone().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{method} {path}");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            // A handler's 404 carries a JSON message; only an unmatched route has no body.
+            assert!(
+                bytes.is_empty(),
+                "{method} {path} reached a handler: {bytes:?}"
+            );
+        }
     }
 
     // Router-role pods merge basic_routes the same way, so this covers both node shapes.
@@ -6612,11 +6866,15 @@ mod tests {
     #[tokio::test]
     async fn every_openapi_operation_reaches_the_route_it_documents() {
         // On-call is mounted only when enabled at runtime; the spec documents it regardless.
-        let routes = if get_o2_config().oncall.enabled {
+        let mut routes = if get_o2_config().oncall.enabled {
             local_routes()
         } else {
             local_routes().nest("/api", oncall_routes(Router::new()))
         };
+        // AutoResolve is mounted only when its flag is on; the spec documents it regardless.
+        if !get_o2_config().autoresolve.enabled {
+            routes = routes.nest("/api", autoresolve_routes(Router::new()));
+        }
         let app = routes.route_layer(middleware::from_fn(
             |req: Request<Body>, _next: Next| async move {
                 let matched = req

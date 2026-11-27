@@ -87,6 +87,7 @@ pub fn is_internal_stream(stream_name: &str) -> bool {
 /// Streams only a feature writer fills, so no ingestion credential may write them over OTLP.
 pub fn is_feature_writer_stream(stream_name: &str) -> bool {
     stream_name == crate::meta::alerts::alert_calibration::DIGEST_STREAM
+        || stream_name == crate::meta::autoresolve::AUTORESOLVE_RUNS_STREAM
         || stream_name.starts_with(crate::meta::autoobserve::AUTOOBSERVE_STREAM_PREFIX)
         || stream_name.starts_with(crate::meta::service_identity::SERVICE_SIGNALS_STREAM_PREFIX)
         || stream_name == SESSION_REPLAY_RESOURCES_STREAM
@@ -599,6 +600,7 @@ pub struct UsageData {
     pub size: f64,
     pub unit: String,
     pub user_email: String,
+    /// Milliseconds.
     pub response_time: f64,
     pub stream_type: StreamType,
     pub num_records: i64,
@@ -703,23 +705,25 @@ impl UsageData {
 /// The bucket key `ingest_usages` (openobserve-core `self_reporting::ingestion`)
 /// aggregates `UsageData` rows by, per org/hour/event.
 ///
-/// On a bucket collision only three fields are touched, and only two truly sum:
+/// On a bucket collision only these fields are touched:
 ///
 /// | field | behaviour |
 /// |---|---|
 /// | `size` | **sums** — the only reliable summation channel |
 /// | `num_records` | **sums** |
+/// | `dropped_records` | **sums** |
 /// | `response_time` | summed then divided by `count` ⇒ an AVERAGE, not a sum |
+/// | `took_wait_in_queue` | summed then divided by `wait_count` ⇒ an AVERAGE of the rows that have it |
 ///
 /// Every other field — `request_body` included — is taken from the FIRST row
-/// inserted into the bucket and the rest are discarded. `dropped_records` is
-/// likewise not summed: it keeps the first row's value and so under-counts
-/// (pre-existing behaviour, left alone deliberately).
+/// inserted into the bucket and the rest are discarded.
 #[derive(Hash, PartialEq, Eq)]
 pub struct GroupKey {
     pub stream_name: String,
     pub org_id: String,
     pub stream_type: StreamType,
+    pub year: i32,
+    pub month: u32,
     pub day: u32,
     pub hour: u32,
     pub event: UsageEvent,
@@ -730,6 +734,7 @@ pub struct GroupKey {
 pub struct AggregatedData {
     pub usage_data: UsageData,
     pub count: u64,
+    pub wait_count: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -976,6 +981,7 @@ pub struct RequestStats {
     pub records: i64,
     #[serde(default)]
     pub dropped_records: i64,
+    /// Milliseconds.
     pub response_time: f64,
     #[serde(default)]
     pub request_body: Option<String>,
@@ -2452,6 +2458,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -2463,6 +2471,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -2474,6 +2484,8 @@ mod tests {
             stream_name: "stream2".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -2495,6 +2507,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -2509,6 +2523,8 @@ mod tests {
             stream_name: "stream1".to_string(),
             org_id: "org1".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 1,
             hour: 12,
             event: UsageEvent::Search,
@@ -2561,6 +2577,7 @@ mod tests {
         let aggregated = AggregatedData {
             usage_data,
             count: 5,
+            wait_count: 0,
         };
 
         assert_eq!(aggregated.count, 5);
@@ -2994,6 +3011,8 @@ mod tests {
             stream_name: "synthetics".to_string(),
             org_id: "org_a".to_string(),
             stream_type: StreamType::Logs,
+            year: 2024,
+            month: 1,
             day: 25,
             hour: 13,
             event,

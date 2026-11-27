@@ -22,6 +22,9 @@ import {
   buildFeatureGateContext,
 } from "@/utils/enterpriseFeatures";
 import { oncallRouteGuard } from "./oncallRouteGuard";
+import { autoObserveAllowed, type ConfigSource } from "@/components/autoobserve/autoObserveGate";
+import { queryClient } from "@/composables/query/queryClient";
+import { configFullQuery } from "@/services/config.queries";
 
 // "rbac" needs the backend `rbac_enabled` flag, which only `store.state.zoConfig`
 // carries — every other key here is edition-only and could use the default.
@@ -78,6 +81,22 @@ const privateLocationRouteGuard = withFeatureGate(
 // syntheticsRouteGuard above.
 const workflowsRouteGuard = (to: any, from: any, next: any) => {
   if (!isLicenseLocked("workflows") && store.state.zoConfig?.workflows_enabled === false) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
+// Same query entry as MainLayout's full-config load, so the guard's fetch is not repeated.
+const zoConfigSource = (org: string | undefined): ConfigSource => ({
+  read: () => store.state.zoConfig,
+  watch: (callback) => store.watch((state: any) => state.zoConfig, callback),
+  fetchFull: () => (org ? queryClient.fetchQuery(configFullQuery(org)) : Promise.resolve(null)),
+});
+
+// Same `=== false` stance as workflowsRouteGuard: /config is fetched without await.
+const autoresolveRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.autoresolve_enabled === false) {
     next("/");
     return;
   }
@@ -393,6 +412,13 @@ const useEnterpriseRoutes = () => {
       },
       beforeEnter: withFeatureGate("incidents", routeGuard),
     }),
+    withLicenseFeature("ai_assistant", {
+      path: "investigate",
+      name: "autobotInvestigate",
+      component: () => import("@/views/AutobotInvestigate.vue"),
+      meta: { titleKey: "menu.autobotInvestigate" },
+      beforeEnter: routeGuard,
+    }),
   );
 
   if (config.isEnterprise == "true") {
@@ -403,7 +429,17 @@ const useEnterpriseRoutes = () => {
       // Home, coverage, issues and What I've changed share this route but read different things.
       meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true, accessScopeQuery: ["page"] },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
+        const org = to.query?.org_identifier ?? store.state.selectedOrganization?.identifier;
+        // routeGuard reads the store through inject, which is gone after the first await.
+        routeGuard(to, from, (target?: unknown) => {
+          if (target !== undefined) {
+            next(target);
+            return;
+          }
+          autoObserveAllowed(config.isEnterprise, zoConfigSource(org)).then((allowed) =>
+            allowed ? next() : next({ path: "/", query: { org_identifier: org } }),
+          );
+        });
       },
     });
     routes.push({
@@ -442,6 +478,38 @@ const useEnterpriseRoutes = () => {
           routeGuard(to, from, next);
         },
       },
+    );
+    routes.push(
+      withLicenseFeature("autoresolve", {
+        // `?tab=runs` opens the Runs tab; Home is the default.
+        path: "autoresolve",
+        name: "autoresolve",
+        component: () => import("@/views/AutoResolve/AutoResolveHome.vue"),
+        meta: { titleKey: "autoresolve.title", allowOnEmptyData: true },
+        beforeEnter: autoresolveRouteGuard,
+      }),
+      withLicenseFeature("autoresolve", {
+        path: "autoresolve/runs/:id",
+        name: "autoresolveRun",
+        component: () => import("@/views/AutoResolve/AutoResolveRunView.vue"),
+        meta: { titleKey: "autoresolve.runTitle", allowOnEmptyData: true },
+        beforeEnter: autoresolveRouteGuard,
+      }),
+      withLicenseFeature("autoresolve", {
+        // `?from_run=<run id>` prefills the form from that finished run.
+        path: "autoresolve/saved/new",
+        name: "autoresolveSavedNew",
+        component: () => import("@/views/AutoResolve/AutoResolveSavedView.vue"),
+        meta: { titleKey: "autoresolve.saved.newTitle", allowOnEmptyData: true },
+        beforeEnter: autoresolveRouteGuard,
+      }),
+      withLicenseFeature("autoresolve", {
+        path: "autoresolve/saved/:id",
+        name: "autoresolveSaved",
+        component: () => import("@/views/AutoResolve/AutoResolveSavedView.vue"),
+        meta: { titleKey: "autoresolve.savedTitle", allowOnEmptyData: true },
+        beforeEnter: autoresolveRouteGuard,
+      }),
     );
   }
 

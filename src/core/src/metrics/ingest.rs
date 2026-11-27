@@ -506,7 +506,7 @@ pub(super) async fn write_streams(
         let fns_length: usize = stream_pipelines.get(&stream_name).map_or(0, |pipelines| {
             pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
         });
-        req_stats.response_time = start.elapsed().as_secs_f64();
+        req_stats.response_time = start.elapsed().as_secs_f64() * 1000.0;
         let email_str = user.to_email();
         req_stats.user_email = if email_str.is_empty() {
             None
@@ -621,7 +621,7 @@ fn check_columns_per_record(
 ) -> Result<()> {
     let limit = get_config().limit.req_cols_per_record_limit;
     for record in records {
-        check_record_columns_limit(org_id, StreamType::Metrics, stream_name, record, limit)?;
+        check_record_columns_limit(org_id, StreamType::Metrics, stream_name, record, limit, &[])?;
     }
     Ok(())
 }

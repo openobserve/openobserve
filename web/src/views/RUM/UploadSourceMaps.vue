@@ -68,8 +68,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- File Upload Area (form-owned `file` field, schema-validated) -->
           <div class="mb-6">
-            <div class="mb-2 text-sm font-medium">{{ t("rum.sourceMapZipFileLabel") }}</div>
-            <SourceMapDropzone name="file" />
+            <!-- The label text already ends in "*", so `required` would add a second one. -->
+            <OFormFile
+              name="file"
+              data-test="rum-upload-source-maps-file"
+              :label="t('rum.sourceMapZipFileLabel')"
+              accept=".zip"
+            />
           </div>
         </div>
       </div>
@@ -109,7 +114,7 @@ import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import SourceMapDropzone from "./SourceMapDropzone.vue";
+import OFormFile from "@/lib/forms/File/OFormFile.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeUploadSourceMapsSchema, type UploadSourceMapsForm } from "./UploadSourceMaps.schema";

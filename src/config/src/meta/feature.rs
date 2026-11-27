@@ -65,6 +65,7 @@ pub enum Feature {
     SuperCluster,
     Byob,
     Security,
+    Autoresolve,
 }
 
 impl Feature {
@@ -112,6 +113,7 @@ impl Feature {
             Feature::SuperCluster => "Super Cluster",
             Feature::Byob => "Bring Your Own Bucket",
             Feature::Security => "Security (SIEM)",
+            Feature::Autoresolve => "AutoResolve",
         }
     }
 }
@@ -154,6 +156,6 @@ mod tests {
     fn indices_are_unique() {
         let indices: HashSet<u64> = Feature::all().map(Feature::index).collect();
         assert_eq!(indices.len(), Feature::all().count());
-        assert_eq!(Feature::all().count(), 31);
+        assert_eq!(Feature::all().count(), 32);
     }
 }

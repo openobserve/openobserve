@@ -19,6 +19,8 @@
 
 #[cfg(feature = "enterprise")]
 pub mod ai_chat;
+#[cfg(feature = "enterprise")]
+pub mod ai_policy;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
@@ -26,6 +28,8 @@ pub mod auth;
 pub mod authz;
 #[cfg(feature = "enterprise")]
 pub mod autoobserve;
+#[cfg(feature = "enterprise")]
+pub mod autoresolve;
 #[cfg(any(feature = "enterprise", test))]
 pub mod background_access;
 pub mod bootstrap;

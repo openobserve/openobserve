@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { DIALOG_DEPTH_KEY } from "./dialogStacking";
+import { overlayLayerZIndex, useOverlayLayer } from "./dialogStacking";
+import { useOverlayScope } from "@/lib/overlay/overlayScope";
 // Copyright 2026 OpenObserve Inc.
 
 import type { DialogProps, DialogEmits, DialogSlots } from "./ODialog.types";
@@ -21,7 +22,6 @@ import {
   computed,
   nextTick,
   useAttrs,
-  inject,
   provide,
   onActivated,
   onDeactivated,
@@ -43,9 +43,8 @@ const $attrs = useAttrs();
 // (DialogRoot is renderless, so default attribute inheritance would lose it.)
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
-// Stacking support: each nested ODialog gets a higher z-index layer
-const dialogDepth = inject<number>(DIALOG_DEPTH_KEY, 0);
-provide(DIALOG_DEPTH_KEY, dialogDepth + 1);
+const { overlayZIndex: dialogScrimZ, contentZIndex: dialogContentZ } =
+  overlayLayerZIndex(useOverlayLayer());
 
 // Auto loading: an OForm nested in the body (linked via `form-id`) mirrors its
 // `isSubmitting` into this ref, so the footer Save button shows its spinner
@@ -53,8 +52,8 @@ provide(DIALOG_DEPTH_KEY, dialogDepth + 1);
 const formSubmitting = ref(false);
 provide(FORM_SUBMIT_STATE_KEY, formSubmitting);
 
-const overlayZIndex = computed(() => 5999 + dialogDepth * 1000);
-const contentZIndex = computed(() => 6000 + dialogDepth * 1000);
+const overlayZIndex = computed(() => dialogScrimZ);
+const contentZIndex = computed(() => dialogContentZ);
 
 const props = withDefaults(defineProps<DialogProps>(), {
   persistent: false,
@@ -442,6 +441,9 @@ watch(shown, (open) => {
     detachShadow();
   }
 });
+
+// A scope that provides attributes (the assistant surface) keeps them on content teleported out of it.
+const overlayScope = useOverlayScope();
 </script>
 
 <template>
@@ -462,12 +464,15 @@ watch(shown, (open) => {
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
           'data-[state=closed]:duration-(--duration-dialog-out) data-[state=open]:duration-(--duration-dialog-in)',
+          // duration-* also sets transition-duration, so without this every inline style change would animate.
+          'transition-none',
         ]"
       />
 
       <!-- Dialog panel -->
       <DialogContent
         data-o2-dialog
+        v-bind="overlayScope"
         :data-test="parentDataTest || 'o-dialog-panel'"
         :style="[contentStyle, { zIndex: contentZIndex }]"
         :class="[
@@ -495,6 +500,7 @@ watch(shown, (open) => {
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-2',
           'data-[state=open]:duration-(--duration-dialog-in) data-[state=open]:ease-(--ease-out-expo)',
           'data-[state=closed]:duration-(--duration-dialog-out) data-[state=closed]:ease-(--ease-overlay-out)',
+          'transition-none',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"

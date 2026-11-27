@@ -278,11 +278,34 @@ mod m20261221_000001_add_last_detection_at_to_alert_incidents;
 mod m20261222_000001_incident_membership_and_catalog_cleanup;
 mod m20261223_000001_create_alert_leases;
 mod m20261224_000001_delete_cli_ai_toolsets;
+mod m20261225_000001_add_agent_to_ai_chat_turns;
+mod m20261225_000001_create_autoresolve_tables;
+mod m20261225_000002_add_first_event_at_to_ai_chat_turns;
+mod m20261225_000003_add_health_to_org_ai_toolsets;
+mod m20261225_000004_create_ai_grants;
+mod m20261225_000005_create_ai_actions;
+mod m20261225_000006_create_ai_access_requests;
+mod m20261225_000007_create_ai_turn_marks;
+mod m20261225_000008_add_history_to_ai_chat_sessions;
+mod m20261225_000009_add_versions_to_ai_chat_turns;
+mod m20261225_000010_add_hide_attachments_to_ai_chat_shares;
+mod m20261225_000011_create_ai_chat_feedback;
+mod m20261225_000012_create_ai_chat_imports;
+mod m20261225_000013_create_paid_overage_attribution;
+mod m20261225_000014_create_ai_approvals;
+mod m20261225_000015_ai_chat_sessions_branched_from;
+mod m20261225_000016_add_approval_scope_to_ai_actions;
+mod m20261225_000017_add_oncall_policy_saved_by_person;
+mod m20261226_000001_add_oncall_team_to_incident_integrations;
+mod m20261226_000001_create_autoresolve_corrections;
+mod m20261227_000001_add_autoresolve_plan_history;
+mod m20261228_000001_add_autoresolve_run_incident;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
 pub(crate) use m20261021_000001_create_public_dashboards::forget_draft_migrations;
 pub(crate) use m20261218_000001_add_security_case_to_alert_incidents::forget_renamed_migrations;
+pub(crate) use m20261225_000001_add_agent_to_ai_chat_turns::forget_renamed_ai_migrations;
 
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_public_dashboards_schema_for_test(
@@ -609,6 +632,30 @@ pub(crate) fn alert_leases_migration_for_test() -> m20261223_000001_create_alert
     m20261223_000001_create_alert_leases::Migration
 }
 
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) fn autoresolve_migration_for_test()
+-> m20261225_000001_create_autoresolve_tables::Migration {
+    m20261225_000001_create_autoresolve_tables::Migration
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) fn autoresolve_corrections_migration_for_test()
+-> m20261226_000001_create_autoresolve_corrections::Migration {
+    m20261226_000001_create_autoresolve_corrections::Migration
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) fn autoresolve_plan_history_migration_for_test()
+-> m20261227_000001_add_autoresolve_plan_history::Migration {
+    m20261227_000001_add_autoresolve_plan_history::Migration
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) fn autoresolve_run_incident_migration_for_test()
+-> m20261228_000001_add_autoresolve_run_incident::Migration {
+    m20261228_000001_add_autoresolve_run_incident::Migration
+}
+
 /// Run the v1 run-pointer backfill over the current rows, for tests in any crate.
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn backfill_v1_rca_pointer(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
@@ -924,6 +971,28 @@ impl MigratorTrait for Migrator {
             Box::new(m20261222_000001_incident_membership_and_catalog_cleanup::Migration),
             Box::new(m20261223_000001_create_alert_leases::Migration),
             Box::new(m20261224_000001_delete_cli_ai_toolsets::Migration),
+            Box::new(m20261225_000001_add_agent_to_ai_chat_turns::Migration),
+            Box::new(m20261225_000002_add_first_event_at_to_ai_chat_turns::Migration),
+            Box::new(m20261225_000003_add_health_to_org_ai_toolsets::Migration),
+            Box::new(m20261225_000004_create_ai_grants::Migration),
+            Box::new(m20261225_000005_create_ai_actions::Migration),
+            Box::new(m20261225_000006_create_ai_access_requests::Migration),
+            Box::new(m20261225_000007_create_ai_turn_marks::Migration),
+            Box::new(m20261225_000008_add_history_to_ai_chat_sessions::Migration),
+            Box::new(m20261225_000009_add_versions_to_ai_chat_turns::Migration),
+            Box::new(m20261225_000010_add_hide_attachments_to_ai_chat_shares::Migration),
+            Box::new(m20261225_000011_create_ai_chat_feedback::Migration),
+            Box::new(m20261225_000012_create_ai_chat_imports::Migration),
+            Box::new(m20261225_000013_create_paid_overage_attribution::Migration),
+            Box::new(m20261225_000014_create_ai_approvals::Migration),
+            Box::new(m20261225_000015_ai_chat_sessions_branched_from::Migration),
+            Box::new(m20261225_000016_add_approval_scope_to_ai_actions::Migration),
+            Box::new(m20261225_000017_add_oncall_policy_saved_by_person::Migration),
+            Box::new(m20261226_000001_add_oncall_team_to_incident_integrations::Migration),
+            Box::new(m20261225_000001_create_autoresolve_tables::Migration),
+            Box::new(m20261226_000001_create_autoresolve_corrections::Migration),
+            Box::new(m20261227_000001_add_autoresolve_plan_history::Migration),
+            Box::new(m20261228_000001_add_autoresolve_run_incident::Migration),
         ]
     }
 }
@@ -1063,6 +1132,23 @@ mod tests {
         ),
         (158, "m20261223_000001_create_alert_leases"),
         (159, "m20261224_000001_delete_cli_ai_toolsets"),
+        (160, "m20261225_000002_add_first_event_at_to_ai_chat_turns"),
+        (161, "m20261225_000007_create_ai_turn_marks"),
+        (162, "m20261225_000012_create_ai_chat_imports"),
+        (163, "m20261225_000013_create_paid_overage_attribution"),
+        (164, "m20261225_000014_create_ai_approvals"),
+        (165, "m20261225_000001_add_agent_to_ai_chat_turns"),
+        (166, "m20261225_000015_ai_chat_sessions_branched_from"),
+        (167, "m20261225_000016_add_approval_scope_to_ai_actions"),
+        (168, "m20261225_000017_add_oncall_policy_saved_by_person"),
+        (
+            169,
+            "m20261226_000001_add_oncall_team_to_incident_integrations",
+        ),
+        (170, "m20261225_000001_create_autoresolve_tables"),
+        (171, "m20261226_000001_create_autoresolve_corrections"),
+        (172, "m20261227_000001_add_autoresolve_plan_history"),
+        (173, "m20261228_000001_add_autoresolve_run_incident"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1186,6 +1272,18 @@ mod tests {
                 "m20261221_000001_add_last_detection_at_to_alert_incidents",
             ),
             (
+                "m20261225_000001_create_autoresolve_tables",
+                "m20261226_000001_create_autoresolve_corrections",
+            ),
+            (
+                "m20261225_000001_create_autoresolve_tables",
+                "m20261227_000001_add_autoresolve_plan_history",
+            ),
+            (
+                "m20261225_000001_create_autoresolve_tables",
+                "m20261228_000001_add_autoresolve_run_incident",
+            ),
+            (
                 "m20251204_000001_create_alert_incidents_table",
                 "m20261222_000001_incident_membership_and_catalog_cleanup",
             ),
@@ -1234,6 +1332,10 @@ mod tests {
                 "m20261006_000001_create_ai_chat_shares",
             ),
             (
+                "m20261007_000001_create_ai_chat_turns",
+                "m20261225_000001_add_agent_to_ai_chat_turns",
+            ),
+            (
                 "m20261006_000001_create_ai_chat_shares",
                 "m20261007_000002_add_redact_tools_to_ai_chat_shares",
             ),
@@ -1278,8 +1380,40 @@ mod tests {
                 "m20261102_000001_add_workflow_run_data_run_id_index",
             ),
             (
+                "m20261007_000001_create_ai_chat_turns",
+                "m20261225_000002_add_first_event_at_to_ai_chat_turns",
+            ),
+            (
+                "m20260414_000002_create_org_ai_toolsets",
+                "m20261225_000003_add_health_to_org_ai_toolsets",
+            ),
+            (
+                "m20261007_000001_create_ai_chat_turns",
+                "m20261225_000009_add_versions_to_ai_chat_turns",
+            ),
+            (
+                "m20261007_000002_add_redact_tools_to_ai_chat_shares",
+                "m20261225_000010_add_hide_attachments_to_ai_chat_shares",
+            ),
+            (
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261225_000008_add_history_to_ai_chat_sessions",
+            ),
+            (
+                "m20261225_000008_add_history_to_ai_chat_sessions",
+                "m20261225_000015_ai_chat_sessions_branched_from",
+            ),
+            (
+                "m20261225_000005_create_ai_actions",
+                "m20261225_000016_add_approval_scope_to_ai_actions",
+            ),
+            (
                 "m20260414_000002_create_org_ai_toolsets",
                 "m20261224_000001_delete_cli_ai_toolsets",
+            ),
+            (
+                "m20260730_000002_create_incident_integrations",
+                "m20261226_000001_add_oncall_team_to_incident_integrations",
             ),
         ] {
             assert!(

@@ -602,7 +602,8 @@ export default defineComponent({
         header: t("alerts.incidents.aiAnalysis.column"),
         resizable: true,
         hideable: true,
-        size: 220,
+        // The cell holds state, detail and the follow door on one line.
+        size: 320,
         meta: { align: "left" },
       },
       {

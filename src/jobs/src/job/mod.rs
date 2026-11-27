@@ -31,6 +31,7 @@ use crate::common::meta::user::{UserOrgRole, UserRequest};
 
 #[cfg(feature = "enterprise")]
 mod agent_signals;
+mod ai_actions_reaper;
 #[cfg(feature = "enterprise")]
 mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
@@ -38,6 +39,8 @@ mod alert_group_reaper;
 mod alert_lease_sweep;
 #[cfg(feature = "enterprise")]
 mod alert_transitions_reaper;
+#[cfg(feature = "enterprise")]
+mod autoresolve_sweep;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -1608,6 +1611,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     alert_transitions_reaper::run();
     query_history_reaper::run();
     public_dashboards_outbox::run();
+    ai_actions_reaper::run();
     // Reconciliation is what makes the rolling window actually roll: the
     // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
     // climbs past what its window can hold. Also releases expired budget
@@ -1630,6 +1634,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // RCA runs that stopped writing end as stale.
     #[cfg(feature = "enterprise")]
     rca_run_sweeper::run();
+    // Nothing else ends an AutoResolve run whose turn or step went silent.
+    #[cfg(feature = "enterprise")]
+    autoresolve_sweep::run();
     // Early Experiment deletion marks the head and leaves the removal to this
     // sweep, which retries until the Experiment's own storage is gone.
     #[cfg(feature = "enterprise")]

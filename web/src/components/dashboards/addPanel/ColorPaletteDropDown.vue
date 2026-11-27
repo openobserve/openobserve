@@ -154,7 +154,7 @@ import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import OSelectGroup from "@/lib/forms/Select/OSelectGroup.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
-import { HOSTMAP_DEFAULT_COLOR } from "@/utils/dashboard/convertHostmapData";
+import { applyColorDefault } from "@/utils/dashboard/panelConfigDefaults";
 
 interface ColorOption {
   label: I18nText;
@@ -181,21 +181,10 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData, promqlMode } = useDashboardPanelData(dashboardPanelDataPageKey, t);
-    onBeforeMount(() => {
-      // on before mount need to check whether color object is there or not else use palette-classic-by-series as a default
-      if (!dashboardPanelData?.data?.config?.color && dashboardPanelData.data.type === "hostmap") {
-        dashboardPanelData.data.config.color = {
-          ...HOSTMAP_DEFAULT_COLOR,
-          fixedColor: [...HOSTMAP_DEFAULT_COLOR.fixedColor],
-        };
-      } else if (!dashboardPanelData?.data?.config?.color) {
-        dashboardPanelData.data.config.color = {
-          mode: "palette-classic-by-series",
-          fixedColor: [],
-          seriesBy: "last",
-        };
-      }
-    });
+    // Shared with AddPanel's unsaved-changes check, so the comparison gives the same default.
+    onBeforeMount(() =>
+      applyColorDefault(dashboardPanelData.data.config, dashboardPanelData.data.type),
+    );
 
     const store = useStore();
 

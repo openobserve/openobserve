@@ -184,7 +184,6 @@ vi.mock("vue-router", async () => {
 const createMockStore = () => {
   return createStore({
     state: {
-      isAiChatEnabled: false,
       selectedOrganization: {
         identifier: "test-org",
       },
@@ -1396,6 +1395,39 @@ describe("AddPanel.vue", () => {
       );
       expect(editor.runQuery).not.toHaveBeenCalled();
       expect(editor.initChartData).not.toHaveBeenCalled();
+    });
+
+    it("says a box plot value must be numeric, not that the query it skipped is empty", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementation(() => {});
+      const editor = { reportValidationErrors: vi.fn(), runQuery: vi.fn(), initChartData: vi.fn() };
+      wrapper.vm.panelEditorRef = editor;
+      const panel = wrapper.vm.dashboardPanelData;
+      panel.data.type = "boxplot";
+      panel.data.queryType = "sql";
+      panel.meta.streamFields = {
+        groupedFields: [{ stream_alias: null, schema: [{ name: "status_text", type: "Utf8" }] }],
+      };
+      const query = panel.data.queries[0];
+      query.customQuery = false;
+      query.fields.y = [
+        {
+          alias: "y_axis_1",
+          column: "status_text",
+          functionName: null,
+          isDerived: false,
+          args: [{ type: "field", value: { field: "status_text" } }],
+        },
+      ];
+      query.query = "";
+
+      wrapper.vm.runQuery();
+
+      expect(editor.reportValidationErrors).toHaveBeenCalledTimes(1);
+      const errors = editor.reportValidationErrors.mock.calls[0][0];
+      expect(errors).toContain("dashboard.utils.boxplotValueNotNumeric");
+      expect(errors).not.toContain("dashboard.utils.queryIsEmpty");
+      expect(editor.runQuery).not.toHaveBeenCalled();
     });
 
     it("runs Apply on an alert list, which reads the alerts API and has no query", async () => {

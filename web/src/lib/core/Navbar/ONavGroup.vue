@@ -842,7 +842,11 @@ function onChildMouseenter(event: MouseEvent) {
                 :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
               />
               <span class="leading-tight">{{ childLabel(child) }}</span>
-              <BetaBadge v-if="child.beta" size="xs" />
+              <BetaBadge
+                v-if="child.beta || child.alpha"
+                :stage="child.alpha ? 'alpha' : 'beta'"
+                size="xs"
+              />
               <OIcon
                 v-if="isChildPaywalled(child) || child.locked || child.licenseLocked"
                 name="lock"
@@ -891,7 +895,11 @@ function onChildMouseenter(event: MouseEvent) {
               :class="isChildPaywalled(block.child) ? 'text-text-secondary!' : flyoutIconClass"
             />
             <span class="leading-tight">{{ childLabel(block.child) }}</span>
-            <BetaBadge v-if="block.child.beta" size="xs" />
+            <BetaBadge
+              v-if="block.child.beta || block.child.alpha"
+              :stage="block.child.alpha ? 'alpha' : 'beta'"
+              size="xs"
+            />
             <OIcon
               v-if="
                 isChildPaywalled(block.child) || block.child.locked || block.child.licenseLocked
@@ -1026,7 +1034,11 @@ function onChildMouseenter(event: MouseEvent) {
                       :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
                     />
                     <span class="leading-none">{{ childLabel(child) }}</span>
-                    <BetaBadge v-if="child.beta" size="xs" />
+                    <BetaBadge
+                      v-if="child.beta || child.alpha"
+                      :stage="child.alpha ? 'alpha' : 'beta'"
+                      size="xs"
+                    />
                     <OIcon
                       v-if="isChildPaywalled(child) || child.locked || child.licenseLocked"
                       name="lock"
@@ -1090,7 +1102,11 @@ function onChildMouseenter(event: MouseEvent) {
                     "
                   />
                   <span class="leading-none">{{ childLabel(block.child) }}</span>
-                  <BetaBadge v-if="block.child.beta" size="xs" />
+                  <BetaBadge
+                    v-if="block.child.beta || block.child.alpha"
+                    :stage="block.child.alpha ? 'alpha' : 'beta'"
+                    size="xs"
+                  />
                   <OIcon
                     v-if="
                       isChildPaywalled(block.child) ||

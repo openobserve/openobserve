@@ -13,14 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { h } from "vue";
-import { mount, type VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createMemoryHistory, createRouter } from "vue-router";
 import i18n from "@/locales";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import TracesNoDataState from "./TracesNoDataState.vue";
+
+vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", async () => {
+  const { defineComponent, h } = await import("vue");
+  return {
+    __esModule: true,
+    default: defineComponent({
+      props: { dataTest: String },
+      setup: (props) => () => h("button", { "data-test": props.dataTest }),
+    }),
+  };
+});
 
 let wrapper: VueWrapper;
 
@@ -33,7 +44,7 @@ const mountState = (props: Record<string, unknown> = {}, withStatus = false) => 
     state: { selectedOrganization: { identifier: "acme-prod" }, theme: "light" },
   });
   wrapper = mount(TracesNoDataState, {
-    props: { aiEnabled: true, ...props },
+    props,
     slots: withStatus
       ? { status: () => h("span", { "data-test": "status-line" }, "Waiting for your first traces") }
       : {},
@@ -43,6 +54,14 @@ const mountState = (props: Record<string, unknown> = {}, withStatus = false) => 
 };
 const html = () => wrapper.html();
 const shellProps = () => wrapper.findComponent(OEmptyState).vm.$.vnode.props ?? {};
+
+// The door is an async component, so its module must settle before it renders.
+const settleDoor = async () => {
+  for (let i = 0; i < 3; i++) {
+    await vi.dynamicImportSettled();
+    await flushPromises();
+  }
+};
 
 afterEach(() => {
   wrapper?.unmount();
@@ -71,7 +90,7 @@ describe("TracesNoDataState", () => {
     expect(wrapper.find("h2").text()).toBe("Start sending traces to OpenObserve");
   });
 
-  it("keeps only the cards and chips under an Or start another way caption below the panel (e1)", () => {
+  it("keeps only the cards and chips under an Or start another way caption below the panel (e1)", async () => {
     mountState({ alternativesOnly: true });
     expect(shellProps()).toMatchObject({ size: "block", backdrop: false });
     expect(shellProps().illustration).toBeUndefined();
@@ -82,6 +101,7 @@ describe("TracesNoDataState", () => {
     expect(wrapper.text()).not.toContain("No trace streams found in this organization yet");
     expect(wrapper.find('[data-test="traces-no-data-otlp-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="traces-no-data-kubernetes-btn"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="traces-no-data-ask-ai-btn"]').exists()).toBe(true);
+    await settleDoor();
+    expect(wrapper.find('[data-test="ai-entry-trace-no-stream-troubleshoot"]').exists()).toBe(true);
   });
 });

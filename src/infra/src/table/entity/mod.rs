@@ -2,9 +2,16 @@
 
 pub mod prelude;
 
+pub mod ai_access_requests;
+pub mod ai_actions;
+pub mod ai_approvals;
+pub mod ai_chat_feedback;
+pub mod ai_chat_imports;
 pub mod ai_chat_sessions;
 pub mod ai_chat_shares;
 pub mod ai_chat_turns;
+pub mod ai_grants;
+pub mod ai_turn_marks;
 pub mod alert_acks;
 pub mod alert_calibration_configs;
 pub mod alert_composite_children;
@@ -20,6 +27,11 @@ pub mod alert_states;
 pub mod alerts;
 pub mod anomaly_detection_config;
 pub mod anomaly_detection_models;
+pub mod autoresolve;
+pub mod autoresolve_corrections;
+pub mod autoresolve_run_connections;
+pub mod autoresolve_runs;
+pub mod autoresolve_steps;
 pub mod backfill_jobs;
 pub mod cipher_keys;
 pub mod compactor_manual_jobs;
@@ -90,6 +102,8 @@ pub mod org_storage_providers;
 pub mod org_telephony;
 pub mod org_users;
 pub mod organizations;
+#[cfg(feature = "cloud")]
+pub mod paid_overage_attribution;
 pub mod pipeline_last_errors;
 pub mod providers;
 pub mod public_dashboard_org_settings;

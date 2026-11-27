@@ -7,6 +7,8 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent 
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import type { LogsDoorBase } from "@/plugins/logs/logsDoors";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -26,6 +28,11 @@ const ChartRenderer = defineAsyncComponent(
 );
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/formatters";
+import {
+  buildPatternLogsSql,
+  FILTER_BLOCKED_MESSAGE,
+  patternFilterBlockedReason,
+} from "@/plugins/logs/patterns/patternUtils";
 import searchService from "@/services/search";
 import patternsService from "@/services/patterns";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -38,6 +45,9 @@ import { extractSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 const DetailTable = defineAsyncComponent(() => import("@/plugins/logs/DetailTable.vue"));
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
 
 const props = defineProps<{
   stream: string;
@@ -47,15 +57,53 @@ const props = defineProps<{
   startTime: number; // microseconds
   endTime: number; // microseconds
   baseWhere?: string; // panel's own WHERE, AND-combined with the clicked cell
+  /** The panel the cell came from, named in the cell door's prompt. */
+  panelTitle?: string;
 }>();
-
-const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+
+// Doors open the assistant directly in every host, with no relay through ViewDashboard.
+const loadedOrg = useLoadedOrg(
+  () => props.value,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
+const cellDoorBase = (): LogsDoorBase => ({
+  org: orgId.value,
+  stream: props.stream,
+  streamType: props.streamType || "logs",
+  range: { from: Math.round(rangeStart.value / 1000), to: Math.round(rangeEnd.value / 1000) },
+  timeZone: store.state.timezone || "UTC",
+  query: props.baseWhere ?? "",
+  mode: "filter",
+  timestampField: store.state.zoConfig?.timestamp_column || "_timestamp",
+});
+const cellDoor = (verb: "explain" | "add_to_chat") => ({
+  verb,
+  entryKind: "object_verb" as const,
+  boundOrg: loadedOrg.value,
+  objectKind: "log_field" as const,
+  label: t(verb === "explain" ? "assistant.entry.explainField" : "assistant.entry.addField"),
+  tooltip: t(
+    verb === "explain" ? "assistant.entry.tooltip.explainField" : "assistant.entry.tooltip.add",
+  ),
+  dataTest:
+    verb === "explain"
+      ? ("ai-entry-panel-cell-explain" as const)
+      : ("ai-entry-panel-cell-add" as const),
+  objectKey: `${props.stream}:${props.field}:${String(props.value)}`,
+  build: async () =>
+    (await import("@/utils/assistant/prompts")).buildLogFieldPrompt({
+      ...cellDoorBase(),
+      field: props.field,
+      value: props.value,
+      ...(props.panelTitle && { panelTitle: props.panelTitle }),
+    }),
+});
 
 const SQL_IDENT = /^[A-Za-z_][A-Za-z0-9_.]*$/;
 const paramsValid = computed(() => SQL_IDENT.test(props.field) && SQL_IDENT.test(props.stream));
@@ -162,6 +210,7 @@ const anomalyColumns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 const insightPatterns = ref<any[]>([]);
+const allPatternTemplates = ref<string[]>([]);
 const surroundEvents = ref<any[]>([]);
 const surroundMinutes = ref(3);
 const surroundLoading = ref(false);
@@ -346,6 +395,7 @@ async function loadInsights(ev: Record<string, any>) {
   insightsLoading.value = true;
   timeline.value = [];
   insightPatterns.value = [];
+  allPatternTemplates.value = [];
   surroundEvents.value = [];
 
   const intv = getTimeBucket();
@@ -398,7 +448,9 @@ async function loadInsights(ev: Record<string, any>) {
       .sort((a: any, b: any) => a.keyMs - b.keyMs);
   }
   if (patR.status === "fulfilled") {
-    insightPatterns.value = (patR.value.data?.patterns ?? []).slice(0, 8).map((p: any) => ({
+    const allPatterns: any[] = patR.value.data?.patterns ?? [];
+    allPatternTemplates.value = allPatterns.map((p: any) => p.template || p.description || "—");
+    insightPatterns.value = allPatterns.slice(0, 8).map((p: any) => ({
       template: p.template || p.description || "—",
       count: p.frequency ?? p.count ?? 0,
       pct: Math.round(p.percentage ?? 0),
@@ -740,13 +792,17 @@ function isSurroundExpanded(pageIdx: number) {
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
-function patternToSql(template: string): string {
-  // Replace SDR wildcards like <:IP>, <:NUM>, <:URI> with SQL LIKE wildcards (%)
-  const likePattern = template.replace(/<:[^>]+>/g, "%").replace(/'/g, "''");
-  return `SELECT * FROM "${props.stream}" WHERE _all LIKE '${likePattern}' ORDER BY _timestamp DESC`;
+function patternToSql(template: string): string | null {
+  return buildPatternLogsSql(template, props.stream, allPatternTemplates.value, effectiveWhere());
 }
 
 function openPatternInLogs(template: string) {
+  const sql = patternToSql(template);
+  if (!sql) {
+    const reason = patternFilterBlockedReason(template, allPatternTemplates.value) ?? "shared";
+    toast({ variant: "warning", message: t(FILTER_BLOCKED_MESSAGE[reason]) });
+    return;
+  }
   const pos = window.location.pathname.indexOf("/web/");
   const base =
     pos > -1
@@ -758,7 +814,7 @@ function openPatternInLogs(template: string) {
   url.searchParams.set("stream", props.stream);
   url.searchParams.set("from", String(rangeStart.value));
   url.searchParams.set("to", String(rangeEnd.value));
-  url.searchParams.set("query", b64EncodeUnicode(patternToSql(template)) ?? "");
+  url.searchParams.set("query", b64EncodeUnicode(sql) ?? "");
   url.searchParams.set("sql_mode", "true");
   url.searchParams.set("quick_mode", "false");
   url.searchParams.set("show_histogram", "true");
@@ -791,6 +847,8 @@ function openInLogs() {
       <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
       <div class="border-border-default flex min-w-0 shrink-0 flex-col border-b">
         <div class="flex min-w-0 items-center gap-2 px-2 pt-3 pb-2">
+          <AiEntryButton v-bind="cellDoor('explain')" />
+          <AiEntryButton v-bind="cellDoor('add_to_chat')" />
           <div class="flex-1" />
           <DateTime
             default-type="absolute"
@@ -1027,7 +1085,7 @@ function openInLogs() {
           @load-correlation="openCorrelationFromLog"
           @showPrevDetail="goPrev"
           @showNextDetail="goNext"
-          @sendToAiChat="(v: unknown, a?: boolean) => emit('sendToAiChat', v, a)"
+          :door-context="cellDoorBase"
         >
           <template #panel-insights>
             <!-- Global loading bar -->

@@ -16,7 +16,10 @@
 use std::{fmt::Debug, sync::Arc};
 
 use datafusion::{
-    common::{Result, tree_node::TreeNodeRecursion},
+    common::{
+        Result,
+        tree_node::{TreeNode, TreeNodeRecursion},
+    },
     error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::PhysicalExpr,
@@ -33,6 +36,7 @@ use super::{
     merge::cache_buf::{CacheBuf, CacheStream},
     stream::{cached_file_stream::CachedFileStream, monitor_stream::MonitorStream},
 };
+use crate::datafusion::distributed::remote_scan::remote_scan_exec::RemoteScanExec;
 
 #[derive(Debug)]
 pub struct StreamingAggsExec {
@@ -301,15 +305,28 @@ impl ExecutionPlan for StreamingAggsExec {
             self.id.clone(),
             self.start_time,
             self.end_time,
-            self.input.schema(),
             self.cache_buf.clone(),
             self.input
                 .execute(partition - self.cached_partition_num, context)?,
             self.overwrite_cache,
+            collect_remote_partial_errs(&self.input)?,
         )))
     }
 
     fn benefits_from_input_partitioning(&self) -> Vec<bool> {
         vec![false; self.children().len()]
     }
+}
+
+fn collect_remote_partial_errs(plan: &Arc<dyn ExecutionPlan>) -> Result<Vec<Arc<Mutex<String>>>> {
+    let mut errs = Vec::new();
+    plan.apply(|node| {
+        let Some(remote) = node.downcast_ref::<RemoteScanExec>() else {
+            return Ok(TreeNodeRecursion::Continue);
+        };
+        errs.push(remote.state.partial_err.clone());
+        // The subtree below runs on the remote nodes; its errors surface through this handle.
+        Ok(TreeNodeRecursion::Jump)
+    })?;
+    Ok(errs)
 }

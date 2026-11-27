@@ -314,6 +314,59 @@ describe("PatternDetailsDialog", () => {
     });
   });
 
+  describe("Variables", () => {
+    const withWildcards = {
+      pattern: {
+        pattern_id: "p-wild",
+        template: "User <*> logged in from <:IP>",
+        frequency: 10,
+        percentage: 5,
+        examples: [{ log_message: "User john logged in from 10.0.0.1" }],
+        wildcard_values: [
+          { position: 0, token: "<*>", sample_values: ["john", "jane"], is_variable: true },
+          { position: 1, token: "<:IP>", sample_values: ["10.0.0.1"], is_variable: true },
+        ],
+      },
+      index: 0,
+    };
+
+    it("counts the template's variable slots instead of reporting none", () => {
+      const w = mount(PatternDetailsDialog, {
+        props: { modelValue: true, selectedPattern: withWildcards, totalPatterns: 3 },
+        global: globalConfig,
+      });
+      expect(w.text()).not.toContain("No variables detected");
+      expect(w.text()).toContain("2 variables detected");
+    });
+
+    it("lists the values the card chips show for each slot", () => {
+      const w = mount(PatternDetailsDialog, {
+        props: { modelValue: true, selectedPattern: withWildcards, totalPatterns: 3 },
+        global: globalConfig,
+      });
+      const list = w.find('[data-test="pattern-details-variables"]');
+      expect(list.exists()).toBe(true);
+      expect(list.text()).toContain("john");
+      expect(list.text()).toContain("jane");
+      expect(list.text()).toContain("10.0.0.1");
+    });
+
+    it("still reports none when the template has no variable slots", () => {
+      const w = mount(PatternDetailsDialog, {
+        props: {
+          modelValue: true,
+          selectedPattern: {
+            pattern: { ...withWildcards.pattern, template: "plain text" },
+            index: 0,
+          },
+          totalPatterns: 3,
+        },
+        global: globalConfig,
+      });
+      expect(w.text()).toContain("No variables detected");
+    });
+  });
+
   describe("ODrawer wrapper", () => {
     it("should render the ODrawer wrapper", () => {
       expect(wrapper.find('[data-test-stub="o-drawer"]').exists()).toBe(true);
@@ -440,7 +493,7 @@ describe("PatternDetailsDialog", () => {
       });
 
       const text = wrapper.text();
-      expect(text).toContain("0 variables detected");
+      expect(text).toContain("No variables detected");
     });
   });
 

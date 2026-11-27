@@ -15,8 +15,12 @@
 
 use std::time::Instant;
 
-use ::search::{QueryDelta, SearchResultType, datafusion::physical_plan::streaming_aggs_exec};
+use ::search::{
+    QueryDelta, SearchResultType, datafusion::physical_plan::streaming_aggs_exec,
+    sql::rewriter::add_ordering_term::check_or_add_order_by_timestamp,
+};
 use config::{
+    TIMESTAMP_COL_NAME,
     meta::{
         search::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
@@ -25,8 +29,9 @@ use config::{
         sql::OrderBy,
         stream::StreamType,
     },
-    utils::sql::is_explain_query,
+    utils::{json, sql::is_explain_query},
 };
+use futures::StreamExt;
 use log;
 use tokio::sync::mpsc;
 use tracing::Instrument;
@@ -55,6 +60,69 @@ const EXTRACTION_FETCH_CONCURRENCY: usize = 4;
 /// meaningful while bounding memory; it also absorbs slices that hold less data
 /// than their share and rows the accumulator discards (too-short text fields).
 const EXTRACTION_OVERSAMPLE: i64 = 3;
+
+/// Caps the extra count queries one dense slice costs.
+const EXTRACTION_MAX_SUB_SLICES: usize = 8;
+
+/// Caps the ranges one run counts and fetches, so a busy window costs a bounded number of queries.
+const EXTRACTION_MAX_RANGES: usize = 24;
+
+/// How one time slice is read for the extraction sample.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SliceFetch {
+    Skip,
+    Newest(i64),
+    BothEnds { newest: i64, oldest: i64 },
+}
+
+/// The caller's identity shared by every slice search of one extraction run.
+struct SliceSearch<'a> {
+    trace_id: &'a str,
+    org_id: &'a str,
+    stream_type: StreamType,
+    user_id: &'a str,
+    is_multi_stream_search: bool,
+}
+
+impl SliceSearch<'_> {
+    /// Runs `reqs` with a few in flight at once and returns their results in input order.
+    async fn run(
+        &self,
+        label: &str,
+        reqs: Vec<config::meta::search::Request>,
+    ) -> Vec<Result<Response, infra::errors::Error>> {
+        // Each task owns its inputs: borrowing across the spawn breaks the caller's Send bound.
+        let tasks = reqs.into_iter().enumerate().map(|(i, req)| {
+            let trace_id = format!("{}-{label}{i}", self.trace_id);
+            let org_id = self.org_id.to_string();
+            let user_id = self.user_id.to_string();
+            let (stream_type, multi) = (self.stream_type, self.is_multi_stream_search);
+            tokio::spawn(async move {
+                do_search(
+                    &trace_id,
+                    &org_id,
+                    stream_type,
+                    &req,
+                    &user_id,
+                    false,
+                    multi,
+                )
+                .await
+            })
+        });
+        futures::stream::iter(tasks)
+            .buffered(EXTRACTION_FETCH_CONCURRENCY)
+            .map(|joined| {
+                joined.unwrap_or_else(|e| {
+                    Err(infra::errors::Error::Message(format!(
+                        "pattern extraction slice task failed: {e}"
+                    )))
+                })
+            })
+            .collect()
+            .await
+    }
+}
 
 /// Do partitioned search without cache
 #[tracing::instrument(
@@ -176,6 +244,7 @@ pub async fn do_partitioned_search(
             user_id,
             req_size,
             (modified_start_time, modified_end_time),
+            &range_error,
             accumulated_results,
             is_multi_stream_search,
         )
@@ -245,17 +314,12 @@ pub async fn do_partitioned_search(
         search_res.set_took(start_timer.elapsed().as_millis() as usize);
 
         // check range error
-        if !range_error.is_empty() {
-            search_res.is_partial = true;
-            search_res.function_error = if search_res.function_error.is_empty() {
-                vec![range_error.clone()]
-            } else {
-                search_res.function_error.push(range_error.clone());
-                search_res.function_error
-            };
-            search_res.new_start_time = Some(modified_start_time);
-            search_res.new_end_time = Some(modified_end_time);
-        }
+        apply_range_warning(
+            &mut search_res,
+            &range_error,
+            modified_start_time,
+            modified_end_time,
+        );
 
         // Accumulate the result
         if is_streaming_aggs {
@@ -360,22 +424,7 @@ pub async fn do_partitioned_search(
     Ok(())
 }
 
-/// Fetch the log sample that log-pattern extraction clusters over.
-///
-/// Splits the window into equal time slices and fetches each concurrently with
-/// its own share of the budget, appending every slice's hits to
-/// `accumulated_results` for the caller's accumulator to down-sample.
-///
-/// Why slices rather than one query: each fetch is `ORDER BY _timestamp DESC
-/// LIMIT n`, so a single query over the whole window returns only its NEWEST n
-/// rows — the sample collapses into the last few minutes and patterns that
-/// appear earlier are never discovered. Giving each slice its own quota spreads
-/// the sample without widening the read, because that same limit bounds each
-/// slice's scan.
-///
-/// Skips the streaming/ordering/progress machinery of `do_partitioned_search`
-/// because the patterns handler discards every response except
-/// `PatternExtractionResult` — it only needs the accumulated hits.
+/// Fetch the log-pattern sample: one response per time slice, `total` holding its row count.
 #[allow(clippy::too_many_arguments)]
 async fn fetch_extraction_sample(
     req: &config::meta::search::Request,
@@ -385,127 +434,428 @@ async fn fetch_extraction_sample(
     user_id: &str,
     req_size: i64,
     window: (i64, i64),
+    range_error: &str,
     accumulated_results: &mut Vec<SearchResultType>,
     is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
-    let (w_start, w_end) = window;
-    let span = w_end - w_start;
-    // A window too narrow to slice (or inverted) stays a single fetch.
-    let slices = if span > EXTRACTION_TIME_SLICES as i64 {
-        EXTRACTION_TIME_SLICES
-    } else {
-        1
+    let slices = extraction_slice_ranges(window);
+    let ctx = SliceSearch {
+        trace_id,
+        org_id,
+        stream_type,
+        user_id,
+        is_multi_stream_search,
     };
-    let step = span / slices as i64;
-    let slice_size = ((req_size * EXTRACTION_OVERSAMPLE) / slices as i64).max(100);
 
-    let ranges: Vec<[i64; 2]> = (0..slices)
-        .map(|i| {
-            let s = w_start + (i as i64 * step);
-            // Last slice takes the remainder so integer division can't drop rows.
-            let e = if i == slices - 1 { w_end } else { s + step };
-            [s, e]
-        })
-        .collect();
+    let (ranges, rows) = if can_slice_extraction(&req.query.sql) {
+        count_and_split(&ctx, req, slices, req_size).await
+    } else {
+        (vec![[window.0, window.1]], None)
+    };
+    let slice_size = fetch_share(req_size, rows.as_deref(), ranges.len());
+    let oldest_sql = oldest_first_sql(&req.query.sql);
 
-    // Each task owns its inputs: borrowing across the spawn leaves the enclosing
-    // future's Send bound "not general enough" to compile.
-    let org_id_owned = org_id.to_string();
-    let user_id_owned = user_id.to_string();
-    let mut responses: Vec<Response> = Vec::with_capacity(slices);
-    let mut last_error: Option<infra::errors::Error> = None;
-    let mut failed_slices = 0usize;
-
-    for (chunk_idx, chunk) in ranges.chunks(EXTRACTION_FETCH_CONCURRENCY).enumerate() {
-        let mut handles = Vec::with_capacity(chunk.len());
-        for (i, &[s_start, s_end]) in chunk.iter().enumerate() {
-            let mut s_req = req.clone();
-            s_req.query.start_time = s_start;
-            s_req.query.end_time = s_end;
-            s_req.query.size = slice_size;
-            s_req.query.from = 0;
-            let s_trace_id = format!(
-                "{trace_id}-{}",
-                chunk_idx * EXTRACTION_FETCH_CONCURRENCY + i
-            );
-            let s_org_id = org_id_owned.clone();
-            let s_user_id = user_id_owned.clone();
-            handles.push(tokio::spawn(async move {
-                do_search(
-                    &s_trace_id,
-                    &s_org_id,
-                    stream_type,
-                    &s_req,
-                    &s_user_id,
-                    false, // extraction never reads from cache
-                    is_multi_stream_search,
-                )
-                .await
-            }));
+    let mut slots = Vec::new();
+    let mut reqs = Vec::new();
+    for (i, &range) in ranges.iter().enumerate() {
+        let rows_i = rows.as_ref().map(|r| r[i]);
+        let (newest, oldest) = match plan_slice_fetch(rows_i, slice_size, oldest_sql.is_some()) {
+            SliceFetch::Skip => continue,
+            SliceFetch::Newest(n) => (n, 0),
+            SliceFetch::BothEnds { newest, oldest } => (newest, oldest),
+        };
+        slots.push(i);
+        reqs.push(slice_request(req, range, newest, None));
+        if let Some(sql) = oldest_sql.as_deref().filter(|_| oldest > 0) {
+            slots.push(i);
+            reqs.push(slice_request(req, range, oldest, Some(sql)));
         }
-        for handle in handles {
-            match handle.await {
-                Ok(Ok(res)) => responses.push(res),
-                // One slice failing shouldn't sink the whole extraction — the
-                // rest still yield a usable (if smaller) sample.
-                Ok(Err(e)) => {
-                    log::warn!(
-                        "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: slice failed, continuing: {e}"
-                    );
-                    failed_slices += 1;
-                    last_error = Some(e);
-                }
-                // A panicked task is still a failed slice: record it, or a run
-                // where every task panics would look like a successful search
-                // over an empty window.
-                Err(e) => {
-                    log::warn!(
-                        "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: slice task panicked: {e}"
-                    );
-                    failed_slices += 1;
-                    last_error = Some(infra::errors::Error::Message(format!(
-                        "pattern extraction slice task failed: {e}"
-                    )));
-                }
+    }
+
+    let mut slices: Vec<Option<Response>> = vec![None; ranges.len()];
+    let mut failed = vec![false; ranges.len()];
+    let mut last_error = None;
+    // A slice's newest-first result always precedes its oldest-first one.
+    for (i, result) in slots.into_iter().zip(ctx.run("f", reqs).await) {
+        match result {
+            Ok(res) => {
+                slices[i] = Some(match slices[i].take() {
+                    None => res,
+                    Some(newest) => merge_both_ends(newest, res),
+                });
+            }
+            // One slice failing shouldn't sink the whole extraction.
+            Err(e) => {
+                log::warn!(
+                    "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: slice failed, continuing: {e}"
+                );
+                failed[i] = true;
+                last_error = Some(e);
             }
         }
     }
 
-    // Every slice failed: surface the error instead of reporting an empty
-    // sample, which the handler would render as "this window has no logs".
+    // A slice that ran but carries `function_error` (e.g. a failed CAST) is a
+    // failure, not an empty window.
+    let slice_errors = drop_failed_slices(&mut slices, &mut failed);
+    let mut responses = build_sample(&ranges, slices, &failed, rows.as_deref(), req_size as usize);
+    if responses.is_empty() && last_error.is_none() && !slice_errors.is_empty() {
+        last_error = Some(infra::errors::Error::Message(slice_errors.join("; ")));
+    }
+    // Every fetched slice failed: surface the error rather than report an empty window.
     if responses.is_empty()
         && let Some(e) = last_error
     {
         return Err(e);
     }
 
-    // Trim to the caller's budget HERE, fairly across slices, rather than
-    // handing the accumulator more rows than its cap.
-    //
-    // The accumulator's overflow path is a rolling overwrite, not reservoir
-    // sampling: once full it replaces index (seen/interval - 1) % cap, so an
-    // over-budget feed silently overwrites the earliest rows it accepted — the
-    // earliest time slices — and they never reach the clustering. Staying
-    // within the cap keeps every slice represented.
-    trim_slices_to_budget(&mut responses, req_size as usize);
-    mark_partial_slices(&mut responses, failed_slices, slices);
+    if let Some(first) = responses.first_mut() {
+        first.function_error.extend(slice_errors);
+    }
 
     let fetched: usize = responses.iter().map(|r| r.hits.len()).sum();
-    for res in responses {
+    for mut res in responses {
+        apply_range_warning(&mut res, range_error, window.0, window.1);
         accumulated_results.push(SearchResultType::Search(res));
     }
 
     log::info!(
-        "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: fetched {fetched} rows from {slices} time slices"
+        "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: fetched {fetched} rows from {} time slices",
+        ranges.len()
     );
     Ok(())
 }
 
-/// Trim per-slice hits so the total fits `budget`, giving every slice as equal a
-/// share as its data allows (max-min fair): slices with less than an even share
-/// keep everything, and what they don't use is redistributed to fuller slices.
-/// Keeps the sample spread across the window instead of letting the busiest
-/// slices crowd out the quieter ones.
+/// A LIMIT or a subquery/join/window changes meaning per slice, so such SQL runs once over the
+/// window.
+fn can_slice_extraction(sql: &str) -> bool {
+    config::utils::sql::is_time_splittable(sql).unwrap_or(false)
+        && !config::utils::sql::has_limit_clause(sql)
+}
+
+/// Empties slices that returned no rows and carry `function_error`, marks them failed and
+/// returns the distinct messages. A partial slice that still has rows is kept.
+fn drop_failed_slices(slices: &mut [Option<Response>], failed: &mut [bool]) -> Vec<String> {
+    let mut errors: Vec<String> = Vec::new();
+    for (slot, failed) in slices.iter_mut().zip(failed.iter_mut()) {
+        if !slot
+            .as_ref()
+            .is_some_and(|r| !r.function_error.is_empty() && r.hits.is_empty())
+        {
+            continue;
+        }
+        *failed = true;
+        for e in slot.take().into_iter().flat_map(|r| r.function_error) {
+            if !errors.contains(&e) {
+                errors.push(e);
+            }
+        }
+    }
+    errors
+}
+
+/// Marks `res` partial when the stream's max query range shortened the window.
+fn apply_range_warning(res: &mut Response, range_error: &str, new_start: i64, new_end: i64) {
+    if range_error.is_empty() {
+        return;
+    }
+    res.is_partial = true;
+    res.function_error.push(range_error.to_string());
+    res.new_start_time = Some(new_start);
+    res.new_end_time = Some(new_end);
+}
+
+/// Equal time slices covering `window`; a window too narrow to slice stays whole.
+fn extraction_slice_ranges((w_start, w_end): (i64, i64)) -> Vec<[i64; 2]> {
+    let slices = if w_end - w_start > EXTRACTION_TIME_SLICES as i64 {
+        EXTRACTION_TIME_SLICES
+    } else {
+        1
+    };
+    even_ranges([w_start, w_end], slices)
+}
+
+fn even_ranges([start, end]: [i64; 2], n: usize) -> Vec<[i64; 2]> {
+    let step = (end - start) / n as i64;
+    (0..n)
+        .map(|i| {
+            let s = start + (i as i64 * step);
+            // Last range takes the remainder so integer division can't drop rows.
+            let e = if i == n - 1 { end } else { s + step };
+            [s, e]
+        })
+        .collect()
+}
+
+/// The ranges to fetch with their row counts, dense slices split, or the slices uncounted.
+async fn count_and_split(
+    ctx: &SliceSearch<'_>,
+    req: &config::meta::search::Request,
+    slices: Vec<[i64; 2]>,
+    req_size: i64,
+) -> (Vec<[i64; 2]>, Option<Vec<usize>>) {
+    if !rows_countable(req) {
+        return (slices, None);
+    }
+    let Some(rows) = count_slices(ctx, req, "c", &slices).await else {
+        return (slices, None);
+    };
+    let split = split_dense_slices(&slices, &rows, fetch_share(req_size, None, slices.len()));
+    let to_count: Vec<[i64; 2]> = split
+        .iter()
+        .filter(|(_, n)| n.is_none())
+        .map(|(r, _)| *r)
+        .collect();
+    if to_count.is_empty() {
+        return (slices, Some(rows));
+    }
+    let Some(sub_rows) = count_slices(ctx, req, "s", &to_count).await else {
+        return (slices, None);
+    };
+    let rows = fill_counts(&split, sub_rows);
+    (split.into_iter().map(|(r, _)| r).collect(), Some(rows))
+}
+
+/// Whether a slice count matches what its fetch returns: a query function may drop rows [pure].
+fn rows_countable(req: &config::meta::search::Request) -> bool {
+    req.query.query_fn.is_none()
+}
+
+/// Slices holding more than `limit` rows cut into equal sub-slices still to count [pure].
+fn split_dense_slices(
+    ranges: &[[i64; 2]],
+    rows: &[usize],
+    limit: i64,
+) -> Vec<([i64; 2], Option<usize>)> {
+    let pieces = allocate_pieces(rows, limit.max(1) as usize, EXTRACTION_MAX_RANGES);
+    let mut out = Vec::with_capacity(ranges.len());
+    for ((&range, &n), &pieces) in ranges.iter().zip(rows).zip(&pieces) {
+        if pieces < 2 || range[1] - range[0] < pieces as i64 {
+            out.push((range, Some(n)));
+            continue;
+        }
+        out.extend(even_ranges(range, pieces).into_iter().map(|r| (r, None)));
+    }
+    out
+}
+
+/// Pieces per slice, densest slices first, `max_ranges` ranges in all [pure].
+fn allocate_pieces(rows: &[usize], limit: usize, max_ranges: usize) -> Vec<usize> {
+    let wanted: Vec<usize> = rows
+        .iter()
+        .map(|&n| n.div_ceil(limit).clamp(1, EXTRACTION_MAX_SUB_SLICES))
+        .collect();
+    let mut pieces = vec![1usize; rows.len()];
+    for _ in rows.len()..max_ranges {
+        let densest = (0..rows.len())
+            .filter(|&i| pieces[i] < wanted[i])
+            .max_by(|&a, &b| {
+                (rows[a] * pieces[b])
+                    .cmp(&(rows[b] * pieces[a]))
+                    .then(b.cmp(&a))
+            });
+        let Some(i) = densest else {
+            break;
+        };
+        pieces[i] += 1;
+    }
+    pieces
+}
+
+/// Counts in range order: known ones kept, the rest taken in turn from `sub_rows` [pure].
+fn fill_counts(split: &[([i64; 2], Option<usize>)], sub_rows: Vec<usize>) -> Vec<usize> {
+    let mut sub_rows = sub_rows.into_iter();
+    split
+        .iter()
+        .map(|&(_, n)| n.or_else(|| sub_rows.next()).unwrap_or(0))
+        .collect()
+}
+
+/// Rows to fetch per range: the oversampled budget over the ranges holding rows [pure].
+fn fetch_share(req_size: i64, rows: Option<&[usize]>, ranges: usize) -> i64 {
+    let non_empty = rows
+        .map_or(ranges, |r| r.iter().filter(|&&n| n > 0).count())
+        .max(1) as i64;
+    // The 100-row floor is per slice; split ranges share it so small sizes don't read 8x more.
+    let floor =
+        (100 * EXTRACTION_TIME_SLICES as i64 / non_empty.max(EXTRACTION_TIME_SLICES as i64)).max(1);
+    ((req_size * EXTRACTION_OVERSAMPLE) / non_empty).max(floor)
+}
+
+/// Row count of every slice, or `None` when any count fails.
+async fn count_slices(
+    ctx: &SliceSearch<'_>,
+    req: &config::meta::search::Request,
+    label: &str,
+    ranges: &[[i64; 2]],
+) -> Option<Vec<usize>> {
+    let reqs = ranges
+        .iter()
+        .map(|&range| {
+            let mut count_req = slice_request(req, range, 1, None);
+            count_req.query.track_total_hits = true;
+            // A VRL function runs over the count row and could drop it, reading as zero rows.
+            count_req.query.query_fn = None;
+            count_req.query.uses_zo_fn = false;
+            count_req
+        })
+        .collect();
+    let mut rows = Vec::with_capacity(ranges.len());
+    for result in ctx.run(label, reqs).await {
+        match result {
+            Ok(res) if !res.is_partial => rows.push(res.total),
+            Ok(res) => {
+                log::warn!(
+                    "[HTTP2_STREAM trace_id {}] Pattern extraction: slice count partial, using sample shares: {:?}",
+                    ctx.trace_id,
+                    res.function_error
+                );
+                return None;
+            }
+            Err(e) => {
+                log::warn!(
+                    "[HTTP2_STREAM trace_id {}] Pattern extraction: slice count failed, using sample shares: {e}",
+                    ctx.trace_id
+                );
+                return None;
+            }
+        }
+    }
+    Some(rows)
+}
+
+/// How to read a slice of `rows` rows within `limit` [pure].
+fn plan_slice_fetch(rows: Option<usize>, limit: i64, can_read_oldest: bool) -> SliceFetch {
+    match rows {
+        Some(0) => SliceFetch::Skip,
+        Some(n) if can_read_oldest && n as i64 > limit => SliceFetch::BothEnds {
+            newest: limit / 2,
+            oldest: limit - limit / 2,
+        },
+        _ => SliceFetch::Newest(limit),
+    }
+}
+
+/// `sql` reading its oldest rows first, or `None` when the SQL already picks its own order [pure].
+fn oldest_first_sql(sql: &str) -> Option<String> {
+    let asc = check_or_add_order_by_timestamp(sql, true).ok()?;
+    let desc = check_or_add_order_by_timestamp(sql, false).ok()?;
+    (asc != desc).then_some(asc)
+}
+
+/// `req` narrowed to one slice and `size` rows, optionally with replacement SQL [pure].
+fn slice_request(
+    req: &config::meta::search::Request,
+    [start, end]: [i64; 2],
+    size: i64,
+    sql: Option<&str>,
+) -> config::meta::search::Request {
+    let mut slice_req = req.clone();
+    slice_req.query.start_time = start;
+    slice_req.query.end_time = end;
+    slice_req.query.size = size;
+    slice_req.query.from = 0;
+    if let Some(sql) = sql {
+        slice_req.query.sql = sql.to_string();
+    }
+    slice_req
+}
+
+/// Slice responses trimmed to `budget`, tagged with why the sample is partial [pure].
+fn build_sample(
+    ranges: &[[i64; 2]],
+    slices: Vec<Option<Response>>,
+    failed: &[bool],
+    rows: Option<&[usize]>,
+    budget: usize,
+) -> Vec<Response> {
+    let mut kept_ranges = Vec::new();
+    let mut fetched = Vec::new();
+    let mut responses = Vec::new();
+    for (i, slice) in slices.into_iter().enumerate() {
+        let Some(mut res) = slice.filter(|_| !failed[i]) else {
+            continue;
+        };
+        if let Some(rows) = rows {
+            res.total = rows[i];
+        }
+        kept_ranges.push(ranges[i]);
+        fetched.push(res.hits.len());
+        responses.push(res);
+    }
+
+    // The accumulator overwrites its earliest rows once over its cap, so trim to it here.
+    trim_slices_to_budget(&mut responses, budget);
+
+    let mut reasons = Vec::new();
+    if rows.is_none() {
+        // Without counts every kept row stands for itself, so shares stay the sample's own.
+        for res in &mut responses {
+            res.total = res.hits.len();
+        }
+        if ranges.len() > 1 {
+            let reason = "Pattern percentages reflect the sample only: rows per time slice could not be counted";
+            reasons.push(reason.to_string());
+        }
+    }
+    let failed_slices = failed.iter().filter(|f| **f).count();
+    if failed_slices > 0 {
+        reasons.push(format!(
+            "Patterns built from {} of {} time ranges",
+            ranges.len() - failed_slices,
+            ranges.len()
+        ));
+    }
+    let bursts = (0..responses.len())
+        .filter(|&i| is_thin_burst(fetched[i], &responses[i], kept_ranges[i]))
+        .count();
+    if bursts > 0 {
+        reasons.push(format!(
+            "Patterns sampled only part of a dense burst in {bursts} time slices; patterns from the rest of a burst may be missing"
+        ));
+    }
+    mark_partial(&mut responses, reasons);
+    responses
+}
+
+/// One slice response from its newest-first then oldest-first reads, no row twice [pure].
+fn merge_both_ends(mut newest: Response, oldest: Response) -> Response {
+    // Rows tied on the boundary timestamp can come back from both reads.
+    let newest_from = newest.hits.iter().filter_map(hit_ts).min();
+    let oldest_hits: Vec<json::Value> = oldest
+        .hits
+        .into_iter()
+        .filter(|h| match (newest_from, hit_ts(h)) {
+            (Some(from), Some(t)) => t < from,
+            _ => true,
+        })
+        .collect();
+    newest.hits.extend(oldest_hits);
+    newest.scan_records += oldest.scan_records;
+    newest.scan_size += oldest.scan_size;
+    newest.is_partial |= oldest.is_partial;
+    newest.function_error.extend(oldest.function_error);
+    newest
+}
+
+/// Whether a slice whose fetch fell short of its rows kept rows spanning under half of it [pure].
+fn is_thin_burst(fetched: usize, res: &Response, [start, end]: [i64; 2]) -> bool {
+    if res.total <= fetched {
+        return false;
+    }
+    let (lo, hi) = res
+        .hits
+        .iter()
+        .filter_map(hit_ts)
+        .fold((i64::MAX, i64::MIN), |(lo, hi), t| (lo.min(t), hi.max(t)));
+    lo <= hi && (hi - lo) * 2 < end - start
+}
+
+fn hit_ts(hit: &json::Value) -> Option<i64> {
+    hit.get(TIMESTAMP_COL_NAME).and_then(|v| v.as_i64())
+}
+
+/// Trim slices to `budget` max-min fairly, keeping evenly spaced rows and each slice's `total`.
 fn trim_slices_to_budget(responses: &mut [Response], budget: usize) {
     let total: usize = responses.iter().map(|r| r.hits.len()).sum();
     if total <= budget || responses.is_empty() {
@@ -529,24 +879,35 @@ fn trim_slices_to_budget(responses: &mut [Response], budget: usize) {
     }
 
     for (i, res) in responses.iter_mut().enumerate() {
-        res.hits.truncate(allowance[i]);
-        res.total = res.hits.len();
-        res.size = res.total as i64;
+        res.hits = spread(std::mem::take(&mut res.hits), allowance[i]);
+        res.size = res.hits.len() as i64;
     }
 }
 
-fn mark_partial_slices(responses: &mut [Response], failed: usize, total: usize) {
-    if failed == 0 {
-        return;
+/// `keep` rows evenly spaced across `hits`, so a slice stays covered end to end [pure].
+fn spread(hits: Vec<json::Value>, keep: usize) -> Vec<json::Value> {
+    let len = hits.len();
+    if keep >= len {
+        return hits;
     }
-    if let Some(first) = responses.first_mut() {
-        first.set_partial(
-            true,
-            format!(
-                "Patterns built from {} of {total} time slices",
-                total - failed
-            ),
-        );
+    let mut k = 0;
+    hits.into_iter()
+        .enumerate()
+        .filter(|&(i, _)| {
+            let take = k < keep && i == k * len / keep;
+            k += usize::from(take);
+            take
+        })
+        .map(|(_, h)| h)
+        .collect()
+}
+
+fn mark_partial(responses: &mut [Response], reasons: Vec<String>) {
+    let Some(first) = responses.first_mut() else {
+        return;
+    };
+    for reason in reasons {
+        first.set_partial(true, reason);
     }
 }
 
@@ -573,6 +934,25 @@ pub(super) fn tag_partial_extraction(
         obj.insert("is_partial".to_string(), true.into());
         obj.insert("function_error".to_string(), reasons.into());
     }
+}
+
+#[cfg(feature = "enterprise")]
+/// An empty Patterns body carrying the partial reasons, so a window cut or failed slice is
+/// not lost when the surviving slices returned no rows. None when nothing was partial.
+pub(super) fn empty_partial_patterns(
+    results: &[SearchResultType],
+) -> Option<config::utils::json::Value> {
+    let mut body = serde_json::json!({
+        "patterns": [],
+        "statistics": {
+            "total_logs_analyzed": 0,
+            "total_patterns_found": 0,
+            "coverage_percentage": 0.0,
+            "extraction_time_ms": 0
+        }
+    });
+    tag_partial_extraction(&mut body, results);
+    body.get("is_partial").is_some().then_some(body)
 }
 
 /// Get partitions for search
@@ -1014,6 +1394,76 @@ mod tests {
     }
 
     #[test]
+    fn test_can_slice_extraction() {
+        assert!(can_slice_extraction("SELECT * FROM t WHERE a = 1"));
+        assert!(!can_slice_extraction("SELECT * FROM t LIMIT 10"));
+        assert!(!can_slice_extraction(
+            "SELECT * FROM t WHERE k IN (SELECT k FROM t WHERE b = 1)"
+        ));
+    }
+
+    #[test]
+    fn test_drop_failed_slices_removes_errored_and_dedupes() {
+        let mut bad = slice_with(0);
+        bad.function_error = vec!["cast error".into()];
+        let mut bad2 = slice_with(0);
+        bad2.function_error = vec!["cast error".into()];
+        let mut slices = vec![Some(slice_with(3)), Some(bad), Some(bad2), None];
+        let mut failed = vec![false; 4];
+        let errors = drop_failed_slices(&mut slices, &mut failed);
+        assert_eq!(slices.iter().filter(|s| s.is_some()).count(), 1);
+        assert_eq!(failed, vec![false, true, true, false]);
+        assert_eq!(errors, vec!["cast error".to_string()]);
+    }
+
+    #[test]
+    fn test_drop_failed_slices_keeps_partial_slice_with_rows() {
+        let mut partial = slice_with(3);
+        partial.function_error = vec!["partial".into()];
+        let mut slices = vec![Some(partial)];
+        let mut failed = vec![false];
+        assert!(drop_failed_slices(&mut slices, &mut failed).is_empty());
+        assert!(slices[0].is_some() && !failed[0]);
+    }
+
+    #[test]
+    fn test_drop_failed_slices_keeps_clean_slices() {
+        let mut slices = vec![Some(slice_with(0)), Some(slice_with(2))];
+        let mut failed = vec![false; 2];
+        assert!(drop_failed_slices(&mut slices, &mut failed).is_empty());
+        assert_eq!(failed, vec![false; 2]);
+        assert!(slices.iter().all(Option::is_some));
+    }
+
+    #[test]
+    fn test_apply_range_warning_marks_partial() {
+        let mut r = slice_with(1);
+        apply_range_warning(&mut r, "clamped", 5, 9);
+        assert!(r.is_partial);
+        assert_eq!(r.function_error, vec!["clamped".to_string()]);
+        assert_eq!((r.new_start_time, r.new_end_time), (Some(5), Some(9)));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_empty_partial_patterns_keeps_warning_without_rows() {
+        let mut r = slice_with(0);
+        apply_range_warning(&mut r, "clamped", 5, 9);
+        let body = empty_partial_patterns(&[SearchResultType::Search(r)]).unwrap();
+        assert_eq!(body["is_partial"], true);
+        assert_eq!(body["function_error"][0], "clamped");
+        assert_eq!(body["patterns"].as_array().unwrap().len(), 0);
+        assert!(empty_partial_patterns(&[SearchResultType::Search(slice_with(0))]).is_none());
+    }
+
+    #[test]
+    fn test_apply_range_warning_noop_without_range_error() {
+        let mut r = slice_with(1);
+        apply_range_warning(&mut r, "", 5, 9);
+        assert!(!r.is_partial && r.function_error.is_empty() && r.new_start_time.is_none());
+    }
+
+    #[test]
     fn test_trim_slices_under_budget_is_untouched() {
         let mut slices = vec![slice_with(10), slice_with(20)];
         trim_slices_to_budget(&mut slices, 100);
@@ -1057,12 +1507,261 @@ mod tests {
     }
 
     #[test]
-    fn test_trim_slices_totals_stay_consistent_with_hits() {
+    fn test_trim_slices_keeps_each_slice_row_count() {
         let mut slices = vec![slice_with(5000), slice_with(5000)];
+        slices[0].total = 80_000;
         trim_slices_to_budget(&mut slices, 1000);
+        assert_eq!((slices[0].total, slices[1].total), (80_000, 5000));
         for s in &slices {
-            assert_eq!(s.total, s.hits.len());
             assert_eq!(s.size, s.hits.len() as i64);
+        }
+    }
+
+    #[test]
+    fn test_trim_keeps_rows_spread_across_each_slice() {
+        // A slice read newest-first in full must not keep only its newest rows.
+        let mut slices = vec![slice_with(10)];
+        trim_slices_to_budget(&mut slices, 5);
+        let kept: Vec<u64> = slices[0]
+            .hits
+            .iter()
+            .filter_map(|h| h["i"].as_u64())
+            .collect();
+        assert_eq!(kept, vec![0, 2, 4, 6, 8]);
+    }
+
+    #[test]
+    fn test_rows_countable_only_without_a_query_function() {
+        let mut req = config::meta::search::Request::default();
+        assert!(rows_countable(&req));
+        req.query.query_fn = Some("LmEgPSAx".to_string());
+        assert!(!rows_countable(&req));
+    }
+
+    #[test]
+    fn test_split_dense_slices() {
+        // (slice, rows) -> pieces, for a limit of 10 rows; None marks a piece still to count
+        type Piece = ([i64; 2], Option<usize>);
+        let cases: Vec<([i64; 2], usize, Vec<Piece>)> = vec![
+            ([0, 120], 10, vec![([0, 120], Some(10))]),
+            (
+                [0, 120],
+                25,
+                vec![([0, 40], None), ([40, 80], None), ([80, 120], None)],
+            ),
+            (
+                [0, 800],
+                1000,
+                (0..8).map(|i| ([i * 100, i * 100 + 100], None)).collect(),
+            ),
+            ([0, 2], 30, vec![([0, 2], Some(30))]),
+        ];
+        for (range, rows, expected) in cases {
+            assert_eq!(
+                split_dense_slices(&[range], &[rows], 10),
+                expected,
+                "{range:?} {rows}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_allocate_pieces_caps_total_ranges() {
+        // (rows per slice, limit, max ranges) -> pieces per slice, densest slices first
+        let cases: Vec<(Vec<usize>, usize, usize, Vec<usize>)> = vec![
+            (vec![1000; 12], 10, 24, vec![2; 12]),
+            (
+                [vec![1000], vec![5; 11]].concat(),
+                10,
+                24,
+                [vec![8], vec![1; 11]].concat(),
+            ),
+            (vec![1000, 500], 10, 4, vec![3, 1]),
+            (vec![15, 0], 10, 24, vec![2, 1]),
+        ];
+        for (rows, limit, max, expected) in cases {
+            assert_eq!(allocate_pieces(&rows, limit, max), expected, "{rows:?}");
+        }
+    }
+
+    #[test]
+    fn test_fill_counts_takes_sub_counts_in_order() {
+        let split = [
+            ([0, 1], Some(5)),
+            ([1, 2], None),
+            ([2, 3], Some(0)),
+            ([3, 4], None),
+        ];
+        assert_eq!(fill_counts(&split, vec![7, 9]), vec![5, 7, 0, 9]);
+    }
+
+    #[test]
+    fn test_fetch_share_spreads_over_non_empty_ranges() {
+        // (rows per range) -> share of 3 * 1200 rows
+        let cases: [(Option<&[usize]>, usize, i64); 5] = [
+            (None, 12, 300),
+            (Some(&[5, 0, 0, 7]), 4, 1800),
+            (Some(&[0, 0]), 2, 3600),
+            (Some(&[1; 400]), 400, 9),
+            (Some(&[1; 96]), 96, 37),
+        ];
+        for (rows, ranges, expected) in cases {
+            assert_eq!(fetch_share(1200, rows, ranges), expected, "{rows:?}");
+        }
+    }
+
+    #[test]
+    fn test_plan_slice_fetch() {
+        // (rows, can read oldest first) -> plan, for a limit of 100
+        let both = SliceFetch::BothEnds {
+            newest: 50,
+            oldest: 50,
+        };
+        let cases = [
+            (Some(0), true, SliceFetch::Skip),
+            (Some(100), true, SliceFetch::Newest(100)),
+            (Some(101), true, both),
+            (Some(101), false, SliceFetch::Newest(100)),
+            (None, true, SliceFetch::Newest(100)),
+        ];
+        for (rows, can_read_oldest, expected) in cases {
+            assert_eq!(
+                plan_slice_fetch(rows, 100, can_read_oldest),
+                expected,
+                "{rows:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_oldest_first_sql_only_when_sql_has_no_order() {
+        let cases = [
+            (
+                "SELECT * FROM \"s\" WHERE a = 1",
+                Some("SELECT * FROM \"s\" WHERE a = 1 ORDER BY _timestamp ASC"),
+            ),
+            ("SELECT * FROM \"s\" ORDER BY code DESC", None),
+            ("not sql", None),
+        ];
+        for (sql, expected) in cases {
+            assert_eq!(oldest_first_sql(sql).as_deref(), expected, "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_merge_both_ends_appends_the_oldest_read() {
+        let newest = Response {
+            hits: vec![json::json!("n0"), json::json!("n1"), json::json!("n2")],
+            scan_records: 3,
+            ..Default::default()
+        };
+        let oldest = Response {
+            hits: vec![json::json!("o0")],
+            scan_records: 1,
+            ..Default::default()
+        };
+        let merged = merge_both_ends(newest, oldest);
+        assert_eq!(
+            merged.hits,
+            vec![
+                json::json!("n0"),
+                json::json!("n1"),
+                json::json!("n2"),
+                json::json!("o0")
+            ]
+        );
+        assert_eq!(merged.scan_records, 4);
+    }
+
+    #[test]
+    fn test_merge_both_ends_drops_rows_both_reads_returned() {
+        let at = |ts: &[i64]| Response {
+            hits: ts
+                .iter()
+                .map(|t| json::json!({ "_timestamp": t }))
+                .collect(),
+            ..Default::default()
+        };
+        let merged = merge_both_ends(at(&[9, 7, 7]), at(&[1, 7, 7]));
+        let ts: Vec<i64> = merged.hits.iter().filter_map(hit_ts).collect();
+        assert_eq!(ts, vec![9, 7, 7, 1]);
+    }
+
+    #[test]
+    fn test_build_sample() {
+        let at = |ts: &[i64]| Response {
+            hits: ts
+                .iter()
+                .map(|t| json::json!({ "_timestamp": t }))
+                .collect(),
+            ..Default::default()
+        };
+        let ranges = [[0, 100], [100, 200], [200, 300]];
+        let slices = || vec![Some(at(&[40, 60])), Some(at(&[100, 199])), Some(at(&[250]))];
+        let reasons = |r: &[Response]| r[0].function_error.join(" | ");
+
+        // Counted: slice rows as totals, a narrow truncated slice is a burst, failed drops.
+        let counted = build_sample(
+            &ranges,
+            slices(),
+            &[false, false, true],
+            Some(&[50, 90, 7]),
+            100,
+        );
+        assert_eq!(
+            counted.iter().map(|r| r.total).collect::<Vec<_>>(),
+            vec![50, 90]
+        );
+        assert!(counted[0].is_partial);
+        assert!(reasons(&counted).contains("Patterns built from 2 of 3 time ranges"));
+        assert!(reasons(&counted).contains("dense burst in 1 time slices"));
+
+        // Not counted: totals are the rows the trim kept.
+        let uncounted = build_sample(&ranges, slices(), &[false; 3], None, 3);
+        assert_eq!(
+            uncounted
+                .iter()
+                .map(|r| (r.total, r.hits.len()))
+                .collect::<Vec<_>>(),
+            vec![(1, 1), (1, 1), (1, 1)]
+        );
+        assert!(reasons(&uncounted).contains("rows per time slice could not be counted"));
+        assert!(!reasons(&uncounted).contains("dense burst"));
+
+        let clean = build_sample(&ranges, slices(), &[false; 3], Some(&[2, 2, 1]), 100);
+        assert!(!clean[0].is_partial);
+
+        // One uncounted range: its sample shares are already the window's.
+        let whole = build_sample(&[[0, 300]], vec![Some(at(&[40]))], &[false], None, 100);
+        assert!(!whole[0].is_partial);
+    }
+
+    #[test]
+    fn test_is_thin_burst() {
+        let at = |ts: &[i64], total: usize| Response {
+            hits: ts
+                .iter()
+                .map(|t| json::json!({ "_timestamp": t }))
+                .collect(),
+            total,
+            ..Default::default()
+        };
+        // (kept timestamps, slice rows, rows fetched) -> thin burst, for a slice [0, 100)
+        let cases: [(&[i64], usize, usize, bool); 6] = [
+            (&[40, 60], 10, 2, true),
+            (&[0, 99], 10, 2, false),
+            (&[40, 60], 2, 2, false),
+            (&[], 10, 2, false),
+            (&[0, 50], 10, 2, false),
+            // Read in full, only the budget trim cut it: the whole burst was sampled.
+            (&[40, 60], 10, 10, false),
+        ];
+        for (ts, rows, fetched, expected) in cases {
+            assert_eq!(
+                is_thin_burst(fetched, &at(ts, rows), [0, 100]),
+                expected,
+                "{ts:?} {rows}"
+            );
         }
     }
 

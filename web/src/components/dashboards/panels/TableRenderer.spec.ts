@@ -77,10 +77,6 @@ vi.mock("@/plugins/logs/data-table/CellActions.vue", () => ({
   default: { template: "<div />" },
 }));
 
-vi.mock("@/components/common/O2AIContextAddBtn.vue", () => ({
-  default: { template: "<div />" },
-}));
-
 vi.mock("@/utils/logs/statusParser", () => ({
   extractStatusFromLog: () => ({ color: "" }),
 }));
@@ -850,6 +846,44 @@ describe("TableRenderer", () => {
 
       expect(capturedCsv).toContain("Count");
       expect(capturedCsv).toContain('"42"');
+    });
+
+    it("exports missing cells with the column's text so NULL and empty string differ", () => {
+      const format = (v: unknown) => (v === null ? "(null)" : v === "" ? "(empty)" : v);
+      const data = {
+        columns: [
+          { name: "k", label: "K", field: "k", format },
+          { name: "v", label: "V", field: "v", format: (v: unknown) => `${v} ms` },
+        ],
+        rows: [
+          { k: null, v: 429 },
+          { k: "", v: 234 },
+        ],
+      };
+      wrapper = createWrapper({ data });
+
+      wrapper.vm.downloadTableAsCSV("test");
+
+      const lines = capturedCsv.split("\n");
+      expect(lines[1]).toBe('"(null)","429"');
+      expect(lines[2]).toBe('"(empty)","234"');
+    });
+
+    it("exports missing cells of a re-fetched table with the displayed column's text", () => {
+      const format = (v: unknown) => (v === null ? "(null)" : v === "" ? "(empty)" : v);
+      const data = { columns: [{ name: "k", label: "K", field: "k", format }], rows: [] };
+      wrapper = createWrapper({ data });
+      const full = {
+        columns: [{ name: "k", label: "K", field: "k" }],
+        rows: [{ k: null }, { k: "" }, { k: "alpha" }],
+        capped: false,
+        partial: false,
+        rowLimit: 100000,
+      };
+
+      wrapper.vm.downloadTableAsCSV("test", full);
+
+      expect(capturedCsv.split("\n").slice(1)).toEqual(['"(null)"', '"(empty)"', '"alpha"']);
     });
 
     it("should fall back to name when field is not defined", () => {

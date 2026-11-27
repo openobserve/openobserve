@@ -1429,7 +1429,6 @@ mod tests {
                 account: "test_account".to_string(),
                 id: 1,
                 selection: None,
-                row_group_size: None,
             }];
 
             let ctx = metrics_session_context(&session, FileSortOrder::None).await?;
@@ -1474,7 +1473,6 @@ mod tests {
                 account: "test_account".to_string(),
                 id: 1,
                 selection: None,
-                row_group_size: None,
             }];
 
             let builder = TableBuilder::new().sort_order(FileSortOrder::TimestampDesc);

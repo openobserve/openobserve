@@ -43,7 +43,7 @@ import i18n, {
 } from "@/locales";
 import enMessages from "@/locales/languages/en-US.json";
 import enSecurityMessages from "@/locales/languages/security/en-US.json";
-import entryMessages from "@/locales/languages/en-US.json?without=serviceVersions";
+import entryMessages from "@/locales/languages/en-US.json?without=serviceVersions,autoresolve";
 
 const withNavigatorLanguage = (language: string, assertion: () => void) => {
   const descriptor = Object.getOwnPropertyDescriptor(navigator, "language");
@@ -97,9 +97,13 @@ describe("locale registry stays in sync", () => {
 
   it("restores every en-US message once the blocks left out of the entry load", async () => {
     expect(entryMessages).not.toHaveProperty("serviceVersions");
+    expect(entryMessages).not.toHaveProperty("autoresolve");
     await loadLazyLocaleBlocks();
     // setupTests merges the Security namespace into en-us as well.
-    expect(i18n.global.getLocaleMessage("en-us")).toEqual({ ...enMessages, ...enSecurityMessages });
+    expect(i18n.global.getLocaleMessage("en-us")).toEqual({
+      ...enMessages,
+      ...enSecurityMessages,
+    });
   });
 });
 
@@ -272,5 +276,20 @@ describe("untranslated keys fall back to en-US", () => {
     } finally {
       i18n.global.setLocaleMessage("de", loaded);
     }
+  });
+});
+
+describe("brand names", () => {
+  it("resolve as links in a lazily loaded locale, inside params and plurals", async () => {
+    await loadLocaleMessages("de");
+    const global = i18n.global as any;
+    expect(global.getLocaleMessage("de")).not.toHaveProperty("brand");
+    global.mergeLocaleMessage("de", {
+      brandProbe:
+        "@:{'brand.autobot'} hat {count} Zeile. | @:{'brand.autobot'} hat {count} Zeilen.",
+    });
+    expect(global.t("brandProbe", { count: 3 }, { locale: "de", plural: 3 })).toBe(
+      `${enMessages.brand.autobot} hat 3 Zeilen.`,
+    );
   });
 });

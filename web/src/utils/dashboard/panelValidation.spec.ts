@@ -1605,6 +1605,60 @@ describe("validatePanel on box plot", () => {
     expect(run({ y: [field("v")] }, { boxplot_whisker: "p99" })).toHaveLength(1);
   });
 
+  describe("value type", () => {
+    const column = (name: string) => ({
+      alias: "y_axis_1",
+      column: name,
+      functionName: null,
+      isDerived: false,
+      args: [{ type: "field", value: { field: name } }],
+    });
+    const schema = [
+      { name: "status_text", type: "Utf8" },
+      { name: "latency_ms", type: "Float64" },
+      { name: "bytes", type: "Int64" },
+      { name: "untyped" },
+    ];
+    const check = (y: any, customQuery = false) => {
+      const errors: string[] = [];
+      validatePanel(
+        gt,
+        {
+          data: {
+            type: "boxplot",
+            queryType: "sql",
+            config: {},
+            queries: [{ customQuery, query: "", fields: { x: [], y: [y], z: [], breakdown: [] } }],
+          },
+          layout: { currentQueryIndex: 0 },
+          meta: { streamFields: { groupedFields: [{ stream_alias: null, schema }] } },
+        },
+        errors,
+        false,
+        [],
+        "dashboard",
+        { state: { zoConfig: {} } },
+        () => true,
+      );
+      return errors;
+    };
+
+    it("blocks a builder value the stream types as text", () => {
+      expect(check(column("status_text"))).toEqual([gt("dashboard.utils.boxplotValueNotNumeric")]);
+    });
+
+    it("accepts numeric, untyped and custom SQL values", () => {
+      expect(check(column("latency_ms"))).toEqual([]);
+      expect(check(column("bytes"))).toEqual([]);
+      expect(check(column("untyped"))).toEqual([]);
+      expect(check(column("status_text"), true)).toEqual([]);
+    });
+
+    it("accepts a text column wrapped in a function, whose result type is unknown here", () => {
+      expect(check({ ...column("status_text"), functionName: "length" })).toEqual([]);
+    });
+  });
+
   it("lists box plot as an importable panel type", () => {
     const errors = validateDashboardJson(gt, {
       dashboardId: "d",

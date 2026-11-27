@@ -70,6 +70,8 @@ export interface BadgeValueConfig {
   /** Per-value size override (wins over the group `size`). For groups whose
    *  values legitimately render at different sizes (e.g. a sm chip vs an md one). */
   size?: BadgeSize;
+  /** Extra utility classes for this value only, merged after the group `class`. */
+  class?: string;
 }
 
 export interface BadgeGroupConfig {
@@ -611,6 +613,79 @@ export const BADGE_GROUPS = {
       success: { variant: "success-soft", labelKey: "common.success" },
       ok: { variant: "success-soft", labelKey: "components.badge.pipelineRunOutcome.ok" },
       warning: { variant: "warning-soft", labelKey: "components.badge.pipelineRunOutcome.warning" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // AutoResolve run and step states; both groups share the `autoresolve.state` wording.
+  autoresolveRunState: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      investigating: { variant: "blue-soft", labelKey: "autoresolve.state.investigating" },
+      waitingapproval: { variant: "warning-soft", labelKey: "autoresolve.state.waitingApproval" },
+      proceeding: { variant: "blue-soft", labelKey: "autoresolve.state.proceeding" },
+      checking: { variant: "blue-soft", labelKey: "autoresolve.state.checking" },
+      worked: { variant: "success-soft", labelKey: "autoresolve.state.worked" },
+      nochange: { variant: "default-soft", labelKey: "autoresolve.state.noChange" },
+      cantfix: { variant: "warning-soft", labelKey: "autoresolve.state.cantFix" },
+      notneeded: { variant: "default-soft", labelKey: "autoresolve.state.notNeeded" },
+      worse: { variant: "error-soft", labelKey: "autoresolve.state.worse" },
+      declined: { variant: "default-soft", labelKey: "autoresolve.state.declined" },
+      lapsed: { variant: "warning-soft", labelKey: "autoresolve.state.lapsed" },
+      stepfailed: { variant: "error-soft", labelKey: "autoresolve.state.stepFailed" },
+      outcomeunknown: { variant: "warning-soft", labelKey: "autoresolve.state.outcomeUnknown" },
+      failed: { variant: "error-soft", labelKey: "autoresolve.state.failed" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  autoresolvePersonVerdict: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      fixed: { variant: "success-soft", labelKey: "autoresolve.verdict.fixed" },
+      notfixed: { variant: "warning-soft", labelKey: "autoresolve.verdict.notFixed" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  autoresolveCorrectionKind: {
+    mode: "plain",
+    shape: "pill",
+    values: {
+      wrongcause: { variant: "default-soft", labelKey: "autoresolve.correction.kind.wrongCause" },
+      wrongfix: { variant: "default-soft", labelKey: "autoresolve.correction.kind.wrongFix" },
+      outofscope: { variant: "default-soft", labelKey: "autoresolve.correction.kind.outOfScope" },
+      notfixed: { variant: "default-soft", labelKey: "autoresolve.correction.kind.notFixed" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  autoresolveTriggerState: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      on: { variant: "success-soft", labelKey: "autoresolve.saved.triggerState.on" },
+      off: { variant: "default-soft", labelKey: "autoresolve.saved.triggerState.off" },
+      paused: { variant: "warning-soft", labelKey: "autoresolve.saved.triggerState.paused" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  autoresolveStepState: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      proposed: { variant: "default-soft", labelKey: "autoresolve.state.proposed" },
+      approved: { variant: "blue-soft", labelKey: "autoresolve.state.approved" },
+      running: { variant: "blue-soft", labelKey: "autoresolve.state.running" },
+      done: { variant: "success-soft", labelKey: "autoresolve.state.done" },
+      failed: { variant: "error-soft", labelKey: "autoresolve.state.failed" },
+      held: { variant: "warning-soft", labelKey: "autoresolve.state.held" },
+      notrun: { variant: "default-soft", labelKey: "autoresolve.state.notRun" },
+      superseded: { variant: "default-soft", labelKey: "autoresolve.state.superseded" },
+      outcomeunknown: { variant: "warning-soft", labelKey: "autoresolve.state.outcomeUnknown" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -2179,6 +2254,119 @@ export const BADGE_GROUPS = {
     },
     fallback: { variant: "default-soft" },
   },
+
+  // O2 Assistant context chips, keyed by chip state; the kind passes `label` and `icon` (`40` §2.2).
+  assistantContext: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      sent: { variant: "default-soft" },
+      notread: {
+        variant: "default-outline",
+        class: "ring-0 border border-dotted border-badge-default-ol-border",
+      },
+      custom: { variant: "default-soft" },
+      truncated: { variant: "default-soft" },
+      ghost: {
+        variant: "default-outline",
+        class: "ring-0 border border-dashed border-badge-default-ol-border",
+      },
+      inchat: { variant: "default-soft" },
+      used: { variant: "default-outline" },
+      hidden: { variant: "default-outline" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // O2 Assistant query blocks: the language as written everywhere (spec tokens, no labelKey).
+  assistantQueryLanguage: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      sql: { variant: "default-soft", label: raw("SQL") },
+      promql: { variant: "default-soft", label: raw("PromQL") },
+      vrl: { variant: "default-soft", label: raw("VRL") },
+      regex: { variant: "default-soft", label: raw("Regex") },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // O2 Assistant share chip and link tags.
+  assistantShare: {
+    mode: "plain",
+    shape: "rounded",
+    size: "xs",
+    values: {
+      org: { variant: "default-soft" },
+      public: { variant: "default-soft" },
+      expiring: { variant: "warning-quiet" },
+      mode: { variant: "default-soft" },
+      tools: { variant: "default-outline" },
+      attachments: { variant: "default-outline" },
+      outofdate: { variant: "default-outline" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // O2 Assistant claim chips: the number is the caller's `label`; muted when the step is not in view.
+  assistantClaim: {
+    mode: "plain",
+    shape: "rounded",
+    size: "xs",
+    values: {
+      available: { variant: "primary-soft", class: "text-assistant-link! font-medium" },
+      muted: { variant: "default-soft", class: "text-text-muted! ring-0!" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // O2 Assistant findings confidence; inconclusive is stated, never coloured as a failure (Calm Signal).
+  assistantConfidence: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      high: { variant: "default-soft", labelKey: "assistant.findings.level.high" },
+      medium: { variant: "default-soft", labelKey: "assistant.findings.level.medium" },
+      low: { variant: "default-soft", labelKey: "assistant.findings.level.low" },
+      inconclusive: {
+        variant: "default-outline",
+        labelKey: "assistant.findings.level.inconclusive",
+      },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Where an O2 Assistant chat started; quiet, never a status colour.
+  assistantOrigin: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      editor: { variant: "default-soft", labelKey: "assistant.history.origin.editor" },
+      alert: { variant: "default-soft", labelKey: "assistant.history.origin.alert" },
+      incident: { variant: "default-soft", labelKey: "assistant.history.origin.incident" },
+      browser: { variant: "default-outline", labelKey: "assistant.history.origin.browser" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // An O2 Assistant chat this browser could not save, or whose history could not load.
+  assistantSave: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      notsaved: { variant: "default-outline", labelKey: "assistant.thread.notSaved" },
+      historyunavailable: {
+        variant: "default-outline",
+        labelKey: "assistant.thread.historyUnavailable",
+      },
+    },
+    fallback: { variant: "default-outline" },
+  },
 } satisfies Record<string, BadgeGroupConfig>;
 
 export type BadgeGroupName = keyof typeof BADGE_GROUPS;
@@ -2243,7 +2431,7 @@ export function resolveBadge(
     // Per-value size wins over group size; both may be undefined → caller default.
     size: entry.size ?? cfg.size,
     shape: cfg.shape,
-    class: cfg.class,
+    class: [cfg.class, entry.class].filter(Boolean).join(" ") || undefined,
   };
 }
 

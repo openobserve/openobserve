@@ -1750,6 +1750,24 @@ describe("canPersistOrShare (G1 matrix)", () => {
     expect(h.engine.canPersistOrShare("patterns").ok).toBe(false);
   });
 
+  it("Patterns: results go stale when the stream changes after the run", () => {
+    const h = makeHarness({ mode: "patterns" });
+    expect(h.engine.isPatternsStale()).toBe(false);
+    h.engine.requestRun("run");
+    h.engine.recordPatternsComplete(h.engine.currentGeneration("patterns")?.id as number);
+    expect(h.engine.isPatternsStale()).toBe(false);
+    h.live.streams = ["other_stream"];
+    expect(h.engine.isPatternsStale()).toBe(true);
+  });
+
+  it("Patterns: typing in the editor alone does not hide the results", () => {
+    const h = makeHarness({ mode: "patterns" });
+    h.engine.requestRun("run");
+    h.engine.recordPatternsComplete(h.engine.currentGeneration("patterns")?.id as number);
+    h.engine.markEditorDirty();
+    expect(h.engine.isPatternsStale()).toBe(false);
+  });
+
   it("Patterns: a failed extraction leaves it disabled", () => {
     const h = makeHarness({ mode: "patterns" });
     h.engine.requestRun("run");

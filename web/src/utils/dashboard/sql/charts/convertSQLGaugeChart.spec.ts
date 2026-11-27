@@ -64,6 +64,7 @@ function makeMockContext(overrides: Partial<any> = {}): any {
       if (key === "x1") return ["Gauge1", "Gauge2"];
       return [];
     }),
+    getRawAxisDataFromKey: vi.fn((key: string) => (key === "x1" ? ["Gauge1", "Gauge2"] : [])),
     ...overrides,
   };
 }

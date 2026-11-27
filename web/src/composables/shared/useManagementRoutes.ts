@@ -1,6 +1,11 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
-import { withFeatureGate } from "@/utils/enterpriseFeatures";
+import {
+  buildFeatureGateContext,
+  checkFeatureAccess,
+  featureLockedLocation,
+  withFeatureGate,
+} from "@/utils/enterpriseFeatures";
 import { withLicenseFeature } from "@/utils/featureGate";
 import { oncallRouteGuard } from "./oncallRouteGuard";
 import { slackRouteGuard } from "./slackRouteGuard";
@@ -94,6 +99,16 @@ const useManagementRoutes = () => {
     },
   ];
 
+  // Every edition registers it so OSS reaches the locked page; writes are gated inside the view.
+  routes[0].children.push({
+    path: "assistant/:tab?",
+    name: "assistantSettings",
+    component: () => import("@/components/settings/assistant/AssistantSettingsView.vue"),
+    props: true,
+    meta: { titleKey: "assistant.settings.title" },
+    beforeEnter: withFeatureGate("aiAssistant", routeGuard),
+  });
+
   // Shared stand-in page for any enterprise/cloud-only route this build
   // doesn't unlock — every `withFeatureGate` redirect lands here.
   routes.push({
@@ -184,16 +199,16 @@ const useManagementRoutes = () => {
           },
           beforeEnter: withFeatureGate("cipherKeys", routeGuard),
         },
-        withLicenseFeature("ai_toolsets", {
+        {
+          // Old links and bookmarks keep working; `?action=` and `?id=` open the same form in the tab.
           path: "ai_toolsets",
           name: "aiToolsets",
-          component: () => import("@/components/settings/AiToolsets.vue"),
-          meta: {
-            keepAlive: true,
-            titleKey: "aiToolset.header",
-          },
-          beforeEnter: withFeatureGate("aiToolsets", routeGuard),
-        }),
+          // A redirect record skips `beforeEnter`, so the redirect applies the gate itself.
+          redirect: (to: any) =>
+            checkFeatureAccess("aiToolsets", buildFeatureGateContext()).allowed
+              ? { name: "assistantSettings", params: { tab: "toolsets" }, query: to.query }
+              : featureLockedLocation("aiToolsets", to),
+        },
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",

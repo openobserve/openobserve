@@ -29,6 +29,8 @@ export interface TextareaProps {
    * the screen. Ignored without `autogrow`.
    */
   maxRows?: number;
+  /** Resting height for `autogrow`, in lines; the field never shrinks below it. Ignored without `autogrow`. */
+  minRows?: number;
   /** Prevents value editing */
   readonly?: boolean;
   /** Prevents interaction */
@@ -59,6 +61,16 @@ export interface TextareaProps {
    * inside a flex container that has a bounded height.
    */
   fill?: boolean;
+  /** `strong` gives the placeholder body-secondary contrast, for a placeholder that carries information. */
+  placeholderTone?: "default" | "strong";
+  /** Attributes for the `<textarea>` itself (ARIA, `data-*`); the rest of `$attrs` stays on the wrapper. */
+  inputAttrs?: Record<string, string | number | boolean | undefined>;
+}
+
+export interface TextareaExposed {
+  focus(options?: FocusOptions): void;
+  /** The native element, for caret and selection work. */
+  readonly textarea: HTMLTextAreaElement | null;
 }
 
 export interface TextareaEmits {
@@ -71,6 +83,10 @@ export interface TextareaEmits {
 export interface TextareaSlots {
   /** Appended block outside the border */
   append?: () => unknown;
+  /** A row inside the border above the text, such as chips that belong to the message. */
+  header?: () => unknown;
+  /** A row inside the border below the text, such as the message's own actions. */
+  footer?: () => unknown;
   /**
    * Tooltip content rendered inside an info icon in the label area.
    * Provide a tooltip element as the slot content.
