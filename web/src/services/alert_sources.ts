@@ -49,7 +49,7 @@ const alertSources = {
   update: (
     org_identifier: string,
     integration_id: string,
-    data: { name?: string; destinations?: string[] },
+    data: { name?: string; destinations?: string[]; oncall_team?: string | null },
   ) => {
     return http()
       .patch(`/api/v2/${org_identifier}/incidents/integrations/${integration_id}`, data)
