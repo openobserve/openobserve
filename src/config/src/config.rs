@@ -194,17 +194,6 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 const MAX_FILE_SIZE_DEFAULT_CAP: usize = 512 * 1024 * 1024;
 const MAX_FILE_SIZE_DEFAULT_FLOOR: usize = 32 * 1024 * 1024;
 const JOB_RUNTIME_BLOCKING_PER_CPU: usize = 8;
-/// Entry-count cache limits replaced by byte limits: (removed env, replacement env).
-const REMOVED_CACHE_ENTRY_LIMIT_ENVS: [(&str, &str); 2] = [
-    (
-        "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
-        "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_SIZE",
-    ),
-    (
-        "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES",
-        "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_SIZE",
-    ),
-];
 const JOB_RUNTIME_BLOCKING_FLOOR: usize = 32;
 const JOB_RUNTIME_BLOCKING_CAP: usize = 256;
 // The current value is recorded in each tantivy index file (puffin `row_group_size`
@@ -5071,13 +5060,6 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         0.01,
         (8, 128),
     );
-    for (removed, replacement) in REMOVED_CACHE_ENTRY_LIMIT_ENVS {
-        if std::env::var(removed).is_ok() {
-            log::warn!(
-                "{removed} is no longer supported and has no effect, use {replacement} (MB)"
-            );
-        }
-    }
     cfg.search.metrics_blocks_cache_max_size = metrics_blocks_cache_size_mb(
         cfg.search.metrics_blocks_cache_max_size,
         cfg.limit.mem_total,
