@@ -1,0 +1,90 @@
+name: Sister OSS Gate Auto Re-run
+
+# When a required check or a review lands on an openobserve PR, re-run the failed `Sister OSS PR` gate
+# on its same-named o2-enterprise PR, so a "Merge when ready" enterprise PR proceeds unattended.
+# When the openobserve PR opens, re-run a passed gate so the enterprise PR is blocked again.
+# The gate re-reads the PR, so a re-run that finds it still unready just fails again.
+#
+# REQUIRED — secrets.ORG_ADMIN_TOKEN: o2-enterprise Actions: write, Pull requests: read.
+
+on:
+  # Workflows behind the required checks; keep in sync when a required check moves workflow.
+  workflow_run:
+    workflows:
+      - CI gate
+      - JS Licenses checker
+      - Unit tests
+      - API Integration Test
+      - Playwright UI Tests
+      - Playwright E2E Crosscheck
+    types: [completed]
+  # ent-build-status-check is a commit status posted from o2-enterprise with a PAT.
+  status:
+  # pull_request_target: the base copy of this file runs, so a PR cannot edit it to reach the token.
+  pull_request_target:
+    types: [opened, reopened]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+concurrency:
+  group: sister-oss-gate-auto-rerun-${{ github.event.workflow_run.head_sha || github.event.sha || github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  rerun:
+    name: Re-run enterprise sister gate
+    if: >-
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.head_repository.full_name == github.repository) ||
+      (github.event_name == 'status' && github.event.context == 'ent-build-status-check' &&
+        github.event.state != 'pending') ||
+      (startsWith(github.event_name, 'pull_request') &&
+        github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.event.sha || github.event.pull_request.head.sha }}
+          OSS: ${{ github.repository }}
+          ENT: openobserve/o2-enterprise
+          GATE: sister-oss-merge-gate.yml
+          ACTION: ${{ github.event_name }}/${{ github.event.action }}
+        run: |
+          set -euo pipefail
+          # A status or workflow_run event names only a commit; an open same-repo PR on it supplies the branch.
+          BRANCH=$(gh api "repos/$OSS/commits/$SHA/pulls" |
+            jq -r --arg sha "$SHA" --arg r "$OSS" \
+              '[.[] | select(.state == "open" and .head.sha == $sha and .head.repo.full_name == $r)]
+               | first | .head.ref // "-"')
+          if [ "$BRANCH" = "-" ]; then
+            echo "No open openobserve PR has $SHA as its head; nothing to re-run."
+            exit 0
+          fi
+
+          read -r PR ENT_SHA < <(gh pr list --repo "$ENT" --head "$BRANCH" --base main --state open -L 100 \
+            --json number,headRefOid,isCrossRepository |
+            jq -r '[.[] | select(.isCrossRepository == false)] | first
+                   | if . == null then "- -" else "\(.number) \(.headRefOid)" end')
+          if [ "$PR" = "-" ]; then
+            echo "No open o2-enterprise PR for '$BRANCH'; nothing to re-run."
+            exit 0
+          fi
+
+          read -r RUN CONCLUSION < <(gh api "repos/$ENT/actions/workflows/$GATE/runs?head_sha=$ENT_SHA&event=pull_request_target&per_page=20" \
+            --jq '[.workflow_runs[] | select(.conclusion != "skipped")] | sort_by(.created_at) | last
+                  | if . == null then "- -" else "\(.id) \(.conclusion // .status)" end')
+          # A passed run must re-run whole: --failed has no failed jobs to pick up.
+          if [ "$ACTION" = "pull_request_target/opened" ] || [ "$ACTION" = "pull_request_target/reopened" ]; then
+            WANT=success FLAG=""
+          else
+            WANT=failure FLAG="--failed"
+          fi
+          if [ "$CONCLUSION" != "$WANT" ]; then
+            echo "o2-enterprise#$PR gate on $ENT_SHA is '$CONCLUSION'; nothing to re-run."
+            exit 0
+          fi
+          gh run rerun "$RUN" --repo "$ENT" ${FLAG:+"$FLAG"}
+          echo "Re-ran https://github.com/$ENT/actions/runs/$RUN for o2-enterprise#$PR."
