@@ -262,6 +262,10 @@ mod m20261111_000001_add_false_alarm_recovery_stamp;
 mod m20261120_000001_add_template_applies_to;
 mod m20261120_000002_rename_reserved_template_collisions;
 mod m20261120_000003_add_anomaly_template;
+mod m20261127_000001_ai_toolsets_replication;
+mod m20261127_000002_create_ai_memory;
+mod m20261127_000003_add_flags_to_ai_memory_revisions;
+mod m20261127_000004_ai_memory_replication;
 mod m20261201_000001_add_synthetics_template;
 mod m20261210_000001_add_oncall_policy_template;
 mod m20261211_000001_add_templates_to_downtime_notifications;
@@ -300,10 +304,6 @@ mod m20261226_000001_add_oncall_team_to_incident_integrations;
 mod m20261226_000001_create_autoresolve_corrections;
 mod m20261227_000001_add_autoresolve_plan_history;
 mod m20261228_000001_add_autoresolve_run_incident;
-mod m20261229_000001_ai_toolsets_replication;
-mod m20261229_000002_create_ai_memory;
-mod m20261229_000003_add_flags_to_ai_memory_revisions;
-mod m20261229_000004_ai_memory_replication;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -516,13 +516,13 @@ pub(crate) async fn create_service_identity_tables_for_test(
 /// Created in migration order, as on a migrated database.
 pub(crate) async fn create_ai_memory_tables(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
     let manager = SchemaManager::new(db);
-    m20261229_000002_create_ai_memory::Migration
+    m20261127_000002_create_ai_memory::Migration
         .up(&manager)
         .await?;
-    m20261229_000003_add_flags_to_ai_memory_revisions::Migration
+    m20261127_000003_add_flags_to_ai_memory_revisions::Migration
         .up(&manager)
         .await?;
-    m20261229_000004_ai_memory_replication::Migration
+    m20261127_000004_ai_memory_replication::Migration
         .up(&manager)
         .await
 }
@@ -1012,10 +1012,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20261226_000001_create_autoresolve_corrections::Migration),
             Box::new(m20261227_000001_add_autoresolve_plan_history::Migration),
             Box::new(m20261228_000001_add_autoresolve_run_incident::Migration),
-            Box::new(m20261229_000001_ai_toolsets_replication::Migration),
-            Box::new(m20261229_000002_create_ai_memory::Migration),
-            Box::new(m20261229_000003_add_flags_to_ai_memory_revisions::Migration),
-            Box::new(m20261229_000004_ai_memory_replication::Migration),
+            Box::new(m20261127_000001_ai_toolsets_replication::Migration),
+            Box::new(m20261127_000002_create_ai_memory::Migration),
+            Box::new(m20261127_000003_add_flags_to_ai_memory_revisions::Migration),
+            Box::new(m20261127_000004_ai_memory_replication::Migration),
         ]
     }
 }
@@ -1172,10 +1172,10 @@ mod tests {
         (171, "m20261226_000001_create_autoresolve_corrections"),
         (172, "m20261227_000001_add_autoresolve_plan_history"),
         (173, "m20261228_000001_add_autoresolve_run_incident"),
-        (174, "m20261229_000001_ai_toolsets_replication"),
-        (175, "m20261229_000002_create_ai_memory"),
-        (176, "m20261229_000003_add_flags_to_ai_memory_revisions"),
-        (177, "m20261229_000004_ai_memory_replication"),
+        (174, "m20261127_000001_ai_toolsets_replication"),
+        (175, "m20261127_000002_create_ai_memory"),
+        (176, "m20261127_000003_add_flags_to_ai_memory_revisions"),
+        (177, "m20261127_000004_ai_memory_replication"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

@@ -69,7 +69,7 @@ const NOT_TOOLSET_SERVERS: [&str; 3] = ["o2", "cli", "custom"];
 
 /// First-party and built-in tools whose name a toolset's `<toolset>_<tool>` could spell; o2-ai's
 /// `_own_tool_names` refuses a server sharing any of these prefixes.
-const FIRST_PARTY_TOOLS: [&str; 23] = [
+const FIRST_PARTY_TOOLS: [&str; 25] = [
     "acknowledge_steering",
     "apply_patch",
     "ask_responders",
@@ -88,6 +88,8 @@ const FIRST_PARTY_TOOLS: [&str; 23] = [
     "record_blind_spot",
     "record_hypothesis",
     "record_step",
+    "report_outcome",
+    "submit_plan",
     "submit_report",
     "tool_search",
     "toolset_read_output",
