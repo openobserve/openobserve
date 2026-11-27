@@ -16504,6 +16504,13 @@
       "logoLightLabel": "شعار مخصص (الوضع الفاتح)",
       "logoLightHelp": "يُعرض في الوضع الفاتح. PNG أو JPG أو GIF أو BMP، حتى 150 × 30 بكسل.",
       "logoDarkLabel": "شعار مخصص (الوضع الداكن)",
+      "logoTitle": "شعار مخصص",
+      "logoHelp": "يظهر في رأس التطبيق. PNG، JPG، GIF، BMP، WEBP أو SVG، حتى 150 × 30 بكسل.",
+      "logoLightTitle": "الوضع الفاتح",
+      "logoDarkTitle": "الوضع الداكن",
+      "logoSaved": "محفوظ",
+      "logoNotSaved": "غير محفوظ",
+      "logoDimensions": "{width} × {height} بكسل",
       "logoDarkHelp": "يُعرض في الوضع الداكن. PNG أو JPG أو GIF أو BMP، حتى 150 × 30 بكسل."
     },
     "modelPricingEditor": {
@@ -24186,8 +24193,19 @@
       "clear": "مسح"
     },
     "file": {
-      "removeFile": "إزالة الملف",
-      "clearAll": "مسح الكل"
+      "removeNamed": "إزالة {name}",
+      "attachPrompt": "أفلت ملفًا لإرفاقه، أو {browse}",
+      "attachPromptMultiple": "أفلت ملفات لإرفاقها، أو {browse}",
+      "browseLink": "استعرض",
+      "supports": "الملفات المدعومة {types}",
+      "dropFileToAttach": "أفلت الملف لإرفاقه",
+      "dropFilesToAttach": "أفلت الملفات لإرفاقها",
+      "typeRejected": "يُقبل فقط الملفات من نوع {allowed}",
+      "sizeRejected": "{size} يتجاوز الحد {max}",
+      "countRejected": "{count} ملف فقط في كل مرة | {count} ملفات فقط في كل مرة",
+      "invalidJson": "JSON غير صالح: {detail}",
+      "invalidImage": "ليس ملف صورة صالحًا",
+      "unavailable": "رفع الملفات غير متاح"
     },
     "date": {
       "openCalendar": "فتح التقويم",

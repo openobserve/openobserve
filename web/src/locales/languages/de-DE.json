@@ -16504,6 +16504,13 @@
       "logoLightLabel": "Benutzerdefiniertes Logo (heller Modus)",
       "logoLightHelp": "Wird im hellen Modus angezeigt. PNG, JPG, GIF oder BMP, bis zu 150 × 30 px.",
       "logoDarkLabel": "Benutzerdefiniertes Logo (dunkler Modus)",
+      "logoTitle": "Eigenes Logo",
+      "logoHelp": "Wird in der Kopfzeile der App angezeigt. PNG, JPG, GIF, BMP, WEBP oder SVG, bis zu 150 × 30 px.",
+      "logoLightTitle": "Heller Modus",
+      "logoDarkTitle": "Dunkler Modus",
+      "logoSaved": "Gespeichert",
+      "logoNotSaved": "Nicht gespeichert",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Wird im dunklen Modus angezeigt. PNG, JPG, GIF oder BMP, bis zu 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24186,8 +24193,19 @@
       "clear": "Löschen"
     },
     "file": {
-      "removeFile": "Datei entfernen",
-      "clearAll": "Alle löschen"
+      "removeNamed": "{name} entfernen",
+      "attachPrompt": "Datei zum Anhängen ablegen oder {browse}",
+      "attachPromptMultiple": "Dateien zum Anhängen ablegen oder {browse}",
+      "browseLink": "durchsuchen",
+      "supports": "Unterstützte Dateien {types}",
+      "dropFileToAttach": "Datei zum Anhängen ablegen",
+      "dropFilesToAttach": "Dateien zum Anhängen ablegen",
+      "typeRejected": "Nur {allowed}-Dateien werden akzeptiert",
+      "sizeRejected": "{size} überschreitet das Limit von {max}",
+      "countRejected": "Nur {count} Datei auf einmal | Nur {count} Dateien auf einmal",
+      "invalidJson": "Kein gültiges JSON: {detail}",
+      "invalidImage": "Keine gültige Bilddatei",
+      "unavailable": "Datei-Upload ist nicht verfügbar"
     },
     "date": {
       "openCalendar": "Kalender öffnen",

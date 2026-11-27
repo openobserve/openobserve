@@ -16504,6 +16504,13 @@
       "logoLightLabel": "Aangepast logo (lichte modus)",
       "logoLightHelp": "Getoond in de lichte modus. PNG, JPG, GIF of BMP, tot 150 × 30 px.",
       "logoDarkLabel": "Aangepast logo (donkere modus)",
+      "logoTitle": "Aangepast logo",
+      "logoHelp": "Wordt getoond in de app-header. PNG, JPG, GIF, BMP, WEBP of SVG, tot 150 × 30 px.",
+      "logoLightTitle": "Lichte modus",
+      "logoDarkTitle": "Donkere modus",
+      "logoSaved": "Opgeslagen",
+      "logoNotSaved": "Niet opgeslagen",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Getoond in de donkere modus. PNG, JPG, GIF of BMP, tot 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24186,8 +24193,19 @@
       "clear": "Wissen"
     },
     "file": {
-      "removeFile": "Bestand verwijderen",
-      "clearAll": "Alles wissen"
+      "removeNamed": "{name} verwijderen",
+      "attachPrompt": "Sleep een bestand om toe te voegen, of {browse}",
+      "attachPromptMultiple": "Sleep bestanden om toe te voegen, of {browse}",
+      "browseLink": "blader",
+      "supports": "Ondersteunde bestanden {types}",
+      "dropFileToAttach": "Laat het bestand los om bij te voegen",
+      "dropFilesToAttach": "Laat de bestanden los om bij te voegen",
+      "typeRejected": "Alleen {allowed}-bestanden worden geaccepteerd",
+      "sizeRejected": "{size} overschrijdt de limiet van {max}",
+      "countRejected": "Slechts {count} bestand tegelijk | Slechts {count} bestanden tegelijk",
+      "invalidJson": "Geen geldige JSON: {detail}",
+      "invalidImage": "Geen geldig afbeeldingsbestand",
+      "unavailable": "Bestanden uploaden is niet beschikbaar"
     },
     "date": {
       "openCalendar": "Kalender openen",

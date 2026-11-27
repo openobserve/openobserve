@@ -38,27 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="jsonFile"
                 :label="t('correlation.importSemanticGroups.selectJsonFile')"
                 accept=".json"
+                :validate="validateSemanticGroupsFile"
                 @update:model-value="loadFile"
+                @clear="clearFile"
                 data-test="semantic-groups-import-file"
-                class="compact-file-input"
-              >
-                <template v-slot:prepend>
-                  <OIcon name="cloud-upload" size="sm" />
-                </template>
-                <template v-slot:append>
-                  <OIcon
-                    v-if="jsonFile"
-                    name="close"
-                    size="sm"
-                    @click.stop="clearFile"
-                    class="cursor-pointer"
-                  />
-                </template>
-              </OFile>
+              />
             </div>
-            <div class="col-md-4 w-full ps-2 text-right">
+            <div v-if="diffData" class="col-md-4 w-full ps-2 text-right">
               <OButton
-                v-if="diffData"
                 variant="primary"
                 size="sm"
                 @click="applyChanges"
@@ -240,7 +227,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- No Diff State -->
         <div v-else-if="!isImporting && !diffData" class="bg-card-glass-bg p-4 text-center">
-          <OIcon name="cloud-upload" class="mb-3 size-16!" />
           <div class="text-text-muted mb-2 text-xl font-semibold">
             {{ t("correlation.importSemanticGroups.uploadPrompt") }}
           </div>
@@ -359,6 +345,7 @@ import type { FileValue } from "@/lib/forms/File/OFile.types";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import BaseImport from "@/components/common/BaseImport.vue";
+import { createSemanticGroupsFileValidator } from "@/components/alerts/semanticGroupsFile";
 import alertsService from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
@@ -386,6 +373,7 @@ interface SemanticGroupDiff {
 }
 
 const { t } = useI18nTyped();
+const validateSemanticGroupsFile = createSemanticGroupsFileValidator(t);
 const router = useRouter();
 const store = useStore();
 
@@ -409,7 +397,11 @@ const hasSelectedChanges = computed(() => {
 const loadFile = async (value: FileValue) => {
   // Single-file input; take the first file when the model yields an array.
   const file = Array.isArray(value) ? value[0] : value;
-  if (!file) return;
+  // A refused or removed file leaves no value; the previous file's diff must not stay applicable.
+  if (!file) {
+    clearFile();
+    return;
+  }
 
   isImporting.value = true;
   try {
