@@ -18,6 +18,7 @@ import { calculateGridPositions } from "../../calculateGridForSubPlot";
 import { getSeriesColor } from "../../colorPalette";
 import { chartColor } from "@/utils/chartTheme";
 import { type SQLContext } from "../shared/types";
+import { NULL_BREAKDOWN_VALUE, breakdownValueLabel } from "../../sqlProcessData";
 import { gaugeDialRange } from "../../thresholds";
 import { createSeriesOverrideLookup, gaugeOverrideTooltip } from "../../seriesOverrides";
 import { buildValueMappingCache, lookupDisplayedValueMapping } from "../../tableConfigUtils";
@@ -48,13 +49,14 @@ export function applyGaugeChart(ctx: SQLContext): void {
     chartPanelRef,
     defaultSeriesProps,
     getAxisDataFromKey,
+    getRawAxisDataFromKey,
   } = ctx;
 
   const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
   const key1 = yAxisKeys[0];
   const yAxisValue = getAxisDataFromKey(key1);
-  // used for gauge name
-  const xAxisValue = getAxisDataFromKey(xAxisKeys[0]);
+  // Gauge names its own blank groups, so it reads the values before they get display names.
+  const xAxisValue = getRawAxisDataFromKey(xAxisKeys[0]);
 
   // create grid array based on chart panel width, height and total no. of gauge
   const gridDataForGauge = calculateGridPositions(
@@ -113,10 +115,17 @@ export function applyGaugeChart(ctx: SQLContext): void {
   const minDim = Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight);
 
   options.series = gaugeData.map((it: any, index: any) => {
-    const rawName = gaugeNames[index] ?? "";
+    const rawValue = gaugeNames[index];
+    const rawName = rawValue === null || rawValue === undefined ? "" : (rawValue as string);
     // Overrides, colours and the series list need a key for an empty group; drilldowns keep the blank value.
     const name =
-      String(rawName).trim() === "" && xAxisValue.length > 0 ? GAUGE_EMPTY_GROUP_NAME : rawName;
+      xAxisValue.length === 0
+        ? rawName
+        : rawValue === null || rawValue === undefined
+          ? breakdownValueLabel(NULL_BREAKDOWN_VALUE)
+          : String(rawName).trim() === ""
+            ? GAUGE_EMPTY_GROUP_NAME
+            : rawName;
     const unit = seriesOverrides.unitArgs(name);
     const mapping = lookupDisplayedValueMapping(it, mappingCache, unit.decimals);
     const gauge: any = {

@@ -180,6 +180,15 @@ describe("ImportSemanticGroupsDrawer - close & cancel", () => {
     expect((w.vm as any).diffData).toBeNull();
   });
 
+  it("drops the previous diff when a pick leaves no file, e.g. every file was refused", async () => {
+    const w = await mountComp();
+    (w.vm as any).diffData = mockDiffData;
+    (w.vm as any).selectedAdditions = ["add-1"];
+    await (w.vm as any).loadFile(null);
+    expect((w.vm as any).diffData).toBeNull();
+    expect((w.vm as any).selectedAdditions).toHaveLength(0);
+  });
+
   it("handleClose clears selectedAdditions", async () => {
     const w = await mountComp();
     (w.vm as any).selectedAdditions = ["add-1"];

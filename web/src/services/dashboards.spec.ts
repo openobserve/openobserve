@@ -282,6 +282,7 @@ describe("Dashboards Service", () => {
 
       expect(mockHttp.get).toHaveBeenCalledWith(
         "/api/test-org/dashboards/dashboard-123?folder=default",
+        undefined,
       );
     });
 
@@ -290,7 +291,16 @@ describe("Dashboards Service", () => {
 
       expect(mockHttp.get).toHaveBeenCalledWith(
         "/api/test-org/dashboards/dashboard-456?folder=custom-folder",
+        undefined,
       );
+    });
+
+    it("passes the request config through, so a caller can silence a 403", async () => {
+      await dashboards.get_Dashboard("test-org", "d1", undefined, { silentForbidden: true });
+
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/dashboards/d1?folder=default", {
+        silentForbidden: true,
+      });
     });
 
     it("should handle various organizations and dashboard IDs", async () => {
@@ -302,7 +312,10 @@ describe("Dashboards Service", () => {
 
       for (const { org, id, folder } of testCases) {
         await dashboards.get_Dashboard(org, id, folder);
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/dashboards/${id}?folder=${folder}`);
+        expect(mockHttp.get).toHaveBeenCalledWith(
+          `/api/${org}/dashboards/${id}?folder=${folder}`,
+          undefined,
+        );
       }
     });
   });

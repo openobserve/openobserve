@@ -276,7 +276,7 @@ fn timeline_entry_verified(
 }
 
 /// Ranked by status rank and `first_seen_seq`, then `symptom`, then `ruled_out`.
-fn hypotheses_view(
+pub fn hypotheses_view(
     ledger: &EvidenceLedger,
     evidence: &[EvidenceEntry],
     unverified: &[UnverifiedCitation],

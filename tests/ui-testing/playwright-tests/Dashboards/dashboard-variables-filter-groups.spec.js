@@ -70,7 +70,7 @@ test.describe("Query Values variables - Auto SQL filter groups", { tag: ["@dashb
     await qv.expectOptionValues("svc", ["cart", "checkout"]);
   });
 
-  test("B2: flipping a connector to OR widens the values and saves only filter_group", async ({ page }) => {
+  test("B2: flipping a connector to OR widens the values and leaves older readers no AND-only filter", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     const id = await startAutoVariable(qv);
     const queries = fx.trackQueries(page);
@@ -82,7 +82,8 @@ test.describe("Query Values variables - Auto SQL filter groups", { tag: ["@dashb
     await qv.save();
 
     const svc = await fx.getVariable(id, "svc");
-    expect(svc.query_data).not.toHaveProperty("filter");
+    // A top-level OR has no row every branch requires, so older readers get no filter.
+    expect(svc.query_data.filter).toEqual([]);
     expect(svc.query_data).not.toHaveProperty("query");
     expect(svc.query_data).not.toHaveProperty("query_type");
     const conditions = svc.query_data.filter_group.conditions;
@@ -112,7 +113,8 @@ test.describe("Query Values variables - Auto SQL filter groups", { tag: ["@dashb
     await qv.save();
 
     const svc = await fx.getVariable(id, "svc");
-    expect(svc.query_data).not.toHaveProperty("filter");
+    // Older readers apply the row every branch requires, a looser filter than the tree.
+    expect(svc.query_data.filter).toEqual([{ name: "level", operator: "=", value: "error" }]);
     const [first, group] = svc.query_data.filter_group.conditions;
     expect([first.column.field, first.value]).toEqual(["level", "error"]);
     expect(group.filterType).toBe("group");

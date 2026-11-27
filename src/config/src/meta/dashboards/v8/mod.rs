@@ -1292,7 +1292,7 @@ pub struct QueryData {
     pub max_record_size: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filter: Option<Vec<Filters>>,
-    /// AND/OR filter tree; saved instead of `filter` only when OR or nesting is used.
+    /// AND/OR tree used for OR or nesting; `filter` keeps only rows every branch requires.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filter_group: Option<GroupType>,
     /// Query language of the variable: "promql", or absent for SQL.

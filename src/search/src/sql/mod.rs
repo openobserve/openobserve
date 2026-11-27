@@ -417,7 +417,9 @@ pub fn protected_stream_refusal<'a>(
         // To anyone but the Chat API, chat history does not exist.
         ProtectedReader::ChatHistory => ErrorCodes::SearchStreamNotFound(name.to_string()),
         // Listed in Streams for its retention, so "not found" would contradict the picker (P3b-D3).
-        ProtectedReader::AlertCalibration => ErrorCodes::SearchStreamProtected(name.to_string()),
+        ProtectedReader::AlertCalibration | ProtectedReader::AutoResolve => {
+            ErrorCodes::SearchStreamProtected(name.to_string())
+        }
     })
 }
 

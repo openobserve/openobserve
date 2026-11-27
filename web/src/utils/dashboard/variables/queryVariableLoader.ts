@@ -110,6 +110,8 @@ export interface QueryVariableLoadParams {
 export interface QueryVariableLoadResult {
   options: QueryVariableOption[];
   capped: boolean;
+  /** Set when an unscoped metrics label scan skipped metric names past the scan limit. */
+  metricsTruncated?: boolean;
   columns: string[];
   rows: Record<string, unknown>[];
 }
@@ -247,37 +249,123 @@ const loadMetricNames = (range: PromRange): Promise<unknown[]> =>
     promValues(await metricsService.labelValues({ ...window, label: "__name__" })),
   );
 
+interface MetricScan {
+  names: string[];
+  /** More metric names exist than the scan reads, so values on the rest are missing. */
+  truncated: boolean;
+  next: number;
+  values: Set<string>;
+}
+
+interface MetricScanEntry {
+  scan: Promise<MetricScan>;
+  loadedAt: number;
+  signal?: AbortSignal;
+}
+
+interface PromValuesResult {
+  values: unknown[];
+  truncated?: boolean;
+}
+
+const METRIC_SCAN_CACHE_SIZE = 20;
+// Short enough that a refresh over a fixed range soon sees new label values or recovers from a failed lookup.
+const METRIC_SCAN_CACHE_TTL_MS = 60_000;
+
+// Search keystrokes reuse one scan per label and range instead of re-reading up to 200 metrics each time.
+const metricScanCache = new Map<string, MetricScanEntry>();
+
+const metricScanKey = (range: PromRange, label: string): string =>
+  JSON.stringify([range.org_identifier, label, range.start_time, range.end_time]);
+
+export const clearMetricScanCache = (): void => metricScanCache.clear();
+
+const getLiveMetricScan = (key: string): MetricScanEntry | undefined => {
+  const entry = metricScanCache.get(key);
+  if (!entry) return undefined;
+  metricScanCache.delete(key);
+  if (Date.now() - entry.loadedAt > METRIC_SCAN_CACHE_TTL_MS) return undefined;
+  metricScanCache.set(key, entry);
+  return entry;
+};
+
+const startMetricScan = (range: PromRange, key: string): Promise<MetricScan> => {
+  const scan = loadMetricNames(range).then((loaded): MetricScan => {
+    throwIfAborted(range.signal);
+    const names = loaded.map(String);
+    return {
+      names: names.slice(0, METRIC_SCAN_LIMIT),
+      truncated: names.length > METRIC_SCAN_LIMIT,
+      next: 0,
+      values: new Set<string>(),
+    };
+  });
+  // Concurrent callers share the in-flight scan, but a failed or aborted one must not stay cached.
+  const entry: MetricScanEntry = { scan, loadedAt: Date.now(), signal: range.signal };
+  metricScanCache.set(key, entry);
+  if (metricScanCache.size > METRIC_SCAN_CACHE_SIZE) {
+    metricScanCache.delete(metricScanCache.keys().next().value as string);
+  }
+  scan.catch(() => {
+    if (metricScanCache.get(key) === entry) metricScanCache.delete(key);
+  });
+  return scan;
+};
+
+const getMetricScan = async (range: PromRange, label: string): Promise<MetricScan> => {
+  const key = metricScanKey(range, label);
+  const live = getLiveMetricScan(key);
+  if (!live) return startMetricScan(range, key);
+  try {
+    return await live.scan;
+  } catch (error) {
+    throwIfAborted(range.signal);
+    // Another caller's cancellation rejected the shared scan, so join a newer scan or start one.
+    if (live.signal?.aborted) return getMetricScan(range, label);
+    throw error;
+  }
+};
+
+const matching = (values: Set<string>, search: string): string[] =>
+  [...values].filter((value) => value.includes(search));
+
 // The backend answers label values only for one metric, so an unscoped lookup unions them across metrics.
 const labelValuesAcrossMetrics = async (
   range: PromRange,
   label: string,
   maxRecords: number,
   search = "",
-): Promise<unknown[]> => {
-  const names = await loadMetricNames(range);
-  const values = new Set<string>();
-  const scanned = names.slice(0, METRIC_SCAN_LIMIT);
-  for (let i = 0; i < scanned.length && values.size <= maxRecords; i += METRIC_SCAN_BATCH) {
+): Promise<PromValuesResult> => {
+  const scan = await getMetricScan(range, label);
+  // Resumes where the last call stopped, and stops once one value past the cap matches.
+  while (scan.next < scan.names.length && matching(scan.values, search).length <= maxRecords) {
     throwIfAborted(range.signal);
+    const start = scan.next;
     const batch = await Promise.allSettled(
-      scanned
-        .slice(i, i + METRIC_SCAN_BATCH)
-        .map((name) => metricsService.labelValues({ ...range, label, match: String(name) })),
+      scan.names
+        .slice(start, start + METRIC_SCAN_BATCH)
+        .map((name) => metricsService.labelValues({ ...range, label, match: name })),
     );
+    // An aborted request settles as a failure, which must not be cached as "label missing".
+    throwIfAborted(range.signal);
+    // A concurrent call already stored this batch.
+    if (scan.next !== start) continue;
+    scan.next = Math.min(start + METRIC_SCAN_BATCH, scan.names.length);
     batch.forEach((result) => {
       if (result.status !== "fulfilled") return;
       try {
         promValues(result.value)
           .map(String)
-          .filter((value) => value.includes(search))
-          .forEach((value) => values.add(value));
+          .forEach((value) => scan.values.add(value));
       } catch {
         // A metric without the label answers with an error; the others still count.
       }
     });
   }
-  throwIfAborted(range.signal);
-  return [...values].sort((a, b) => a.localeCompare(b));
+  return {
+    values: matching(scan.values, search).sort((a, b) => a.localeCompare(b)),
+    truncated: scan.truncated,
+  };
 };
 
 const loadLabelValues = async (
@@ -286,18 +374,24 @@ const loadLabelValues = async (
   match: string | undefined,
   maxRecords: number,
   search?: string,
-): Promise<unknown[]> => {
-  if (match) return promValues(await metricsService.labelValues({ ...range, label, match }));
-  if (label === "__name__") return loadMetricNames(range);
+): Promise<PromValuesResult> => {
+  if (match) {
+    return { values: promValues(await metricsService.labelValues({ ...range, label, match })) };
+  }
+  if (label === "__name__") return { values: await loadMetricNames(range) };
+  // A live scan means the unscoped lookup already failed for this label and range.
+  if (getLiveMetricScan(metricScanKey(range, label))) {
+    return labelValuesAcrossMetrics(range, label, maxRecords, search);
+  }
   try {
-    return promValues(await metricsService.labelValues({ ...range, label }));
+    return { values: promValues(await metricsService.labelValues({ ...range, label })) };
   } catch {
     throwIfAborted(range.signal);
     return labelValuesAcrossMetrics(range, label, maxRecords, search);
   }
 };
 
-const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[]> => {
+const loadPromValues = async (params: QueryVariableLoadParams): Promise<PromValuesResult> => {
   const parsed = parsePromVariableQuery(params.query);
   if (!parsed) throw new Error(gt("dashboard.queryVariable.unsupportedPromql"));
   const range: PromRange = {
@@ -311,9 +405,11 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
     case "label_values":
       return loadLabelValues(range, parsed.label, parsed.match, params.maxRecords, params.search);
     case "label_names":
-      return withIndexLagWindows(range, async (window) =>
-        promValues(await metricsService.labels({ ...window, match: parsed.match })),
-      );
+      return {
+        values: await withIndexLagWindows(range, async (window) =>
+          promValues(await metricsService.labels({ ...window, match: parsed.match })),
+        ),
+      };
     case "metrics": {
       let matcher: RegExp;
       try {
@@ -322,7 +418,7 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
         throw new Error(gt("dashboard.queryVariable.invalidRegex", { regex: parsed.regex }));
       }
       const names = await loadMetricNames(range);
-      return names.filter((name) => matcher.test(String(name)));
+      return { values: names.filter((name) => matcher.test(String(name))) };
     }
     case "query_result": {
       const response = await searchService.metrics_query({
@@ -336,12 +432,12 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
         throw new Error(getQueryVariableErrorMessage(body));
       }
       const result = body?.data?.result;
-      if (!Array.isArray(result)) return [];
+      if (!Array.isArray(result)) return { values: [] };
       // A scalar or string result is a single [timestamp, value] pair, not a series list.
       if (body?.data?.resultType === "scalar" || body?.data?.resultType === "string") {
-        return [formatPromSeries({ value: result as [number, string] })];
+        return { values: [formatPromSeries({ value: result as [number, string] })] };
       }
-      return result.map((series: PromSeriesResult) => formatPromSeries(series));
+      return { values: result.map((series: PromSeriesResult) => formatPromSeries(series)) };
     }
   }
 };
@@ -404,14 +500,19 @@ export const loadQueryVariableValues = async (
   params: QueryVariableLoadParams,
 ): Promise<QueryVariableLoadResult> => {
   if (params.language === "promql") {
-    const values = (
-      await loadPromValues(params).catch((error) => {
-        throwIfAborted(params.signal);
-        throw error;
-      })
-    ).filter((value) => String(value).includes(params.search ?? ""));
+    const loaded = await loadPromValues(params).catch((error) => {
+      throwIfAborted(params.signal);
+      throw error;
+    });
+    const values = loaded.values.filter((value) => String(value).includes(params.search ?? ""));
     const { options, capped } = mapValuesToOptions(values, params.maxRecords);
-    return { options, capped, columns: [], rows: [] };
+    return {
+      options,
+      capped: capped || !!loaded.truncated,
+      metricsTruncated: !!loaded.truncated,
+      columns: [],
+      rows: [],
+    };
   }
   return loadSqlValues(params);
 };

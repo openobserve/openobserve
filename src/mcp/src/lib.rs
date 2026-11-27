@@ -35,5 +35,5 @@ pub use handler::{
 };
 pub use types::{
     MCP_PROTOCOL_VERSION, MCP_PROTOCOL_VERSION_MODERN, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCPRequest,
-    MCPResponse, decode_mcp_header_value, is_supported_protocol_version,
+    MCPResponse, ToolAccess, decode_mcp_header_value, is_supported_protocol_version,
 };

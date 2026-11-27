@@ -50,6 +50,7 @@ import {
   buildPatternLogsSql,
   FILTER_BLOCKED_MESSAGE,
   patternFilterBlockedReason,
+  type PatternTerms,
 } from "@/plugins/logs/patterns/patternUtils";
 import patternsService from "@/services/patterns";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
@@ -286,7 +287,7 @@ const anomalyColumns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 const insightPatterns = ref<any[]>([]);
-const allPatternTemplates = ref<string[]>([]);
+const allPatternTerms = ref<PatternTerms[]>([]);
 const surroundEvents = ref<any[]>([]);
 const surroundMinutes = ref(3);
 const surroundLoading = ref(false);
@@ -466,7 +467,7 @@ async function loadInsights(ev: Record<string, any>) {
   insightsLoading.value = true;
   timeline.value = [];
   insightPatterns.value = [];
-  allPatternTemplates.value = [];
+  allPatternTerms.value = [];
   surroundEvents.value = [];
 
   const intv = getTimeBucket();
@@ -511,7 +512,12 @@ async function loadInsights(ev: Record<string, any>) {
   }
   if (patR.status === "fulfilled") {
     const allPatterns: any[] = patR.value.data?.patterns ?? [];
-    allPatternTemplates.value = allPatterns.map((p: any) => p.template || p.description || "—");
+    allPatternTerms.value = allPatterns.map((p: any) => ({
+      template: p.template || p.description || "—",
+      match_terms: p.match_terms,
+      exclude_terms: p.exclude_terms,
+      match_block: p.match_block,
+    }));
     insightPatterns.value = allPatterns.slice(0, 8).map((p: any) => ({
       template: p.template || p.description || "—",
       count: p.frequency ?? p.count ?? 0,
@@ -771,7 +777,7 @@ function patternToSql(template: string): string | null {
   return buildPatternLogsSql(
     template,
     props.stream,
-    allPatternTemplates.value,
+    allPatternTerms.value,
     defaultWhere() || undefined,
   );
 }
@@ -779,7 +785,7 @@ function patternToSql(template: string): string | null {
 function openPatternInLogs(template: string) {
   const sql = patternToSql(template);
   if (!sql) {
-    const reason = patternFilterBlockedReason(template, allPatternTemplates.value) ?? "shared";
+    const reason = patternFilterBlockedReason(template, allPatternTerms.value) ?? "shared";
     toast({ variant: "warning", message: t(FILTER_BLOCKED_MESSAGE[reason]) });
     return;
   }

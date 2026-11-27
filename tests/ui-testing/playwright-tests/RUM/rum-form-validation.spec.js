@@ -3,10 +3,10 @@
 // RUM Source Maps — upload form validation E2E tests
 //
 // Covers (after the OForm+zod migration, all field validation is INLINE via the
-// schema — the file "required" / "only .zip" rules moved from manual toasts to
-// the inline dropzone error; only the success/server-error paths use toasts):
+// schema; a wrong file type is refused by the upload box itself, on its own row;
+// only the success/server-error paths use toasts):
 //   1. No file selected   → inline file error "Please select a ZIP file to upload"
-//   2. Wrong file type    → inline file error "Only ZIP files are allowed"
+//   2. Wrong file type    → error row "Only .zip files are accepted" as soon as it is picked
 //   3. No version filled  → versionError shown after clicking Upload
 //   4. No service filled  → serviceError shown after clicking Upload
 //   5. Valid inputs       → upload succeeds (toast success + navigation away)
@@ -17,8 +17,8 @@
 //   OInput service     → data-test="rum-upload-source-maps-service-input"
 //   OInput version     → data-test="rum-upload-source-maps-version-input"
 //   OInput environment → data-test="rum-upload-source-maps-environment-input"
-//   upload area div    → data-test="rum-upload-source-maps-file-dropzone"
-//   <input type="file">→ data-test="rum-upload-source-maps-file-input"
+//   OFormFile          → data-test="rum-upload-source-maps-file"
+//                        (drop zone -zone, <input type="file"> -field, error -error)
 //   Upload OButton     → data-test="rum-upload-source-maps-upload-btn"
 //   Cancel OButton     → data-test="rum-upload-source-maps-cancel-btn"
 
@@ -121,15 +121,18 @@ test.describe('RUM Source Maps upload form validation', () => {
     // Fill service + version so the file field is the only invalid one.
     await pm.rumFormValidation.fillService('test-service-fv');
     await pm.rumFormValidation.fillVersion('1.0.0');
+    // The upload box refuses a non-.zip file on its own row, before any submit.
     await pm.rumFormValidation.attachFile(tempTxtPath);
-    // OForm+zod uses submit-then-change timing, so the `.zip` rule fires on
-    // submit — attaching alone does not surface the error.
+
+    await expect(pm.rumFormValidation.getFileRowLocator()).toBeVisible({ timeout: 5000 });
+    await expect(pm.rumFormValidation.getFileRowLocator()).toHaveAttribute('data-state', 'error');
+    await expect(pm.rumFormValidation.getFileRowLocator()).toContainText('Only .zip files are accepted');
+
+    // The refused file never reaches the form, so Upload reports a missing file.
     await pm.rumFormValidation.clickUpload();
+    await expect(pm.rumFormValidation.getFileErrorLocator()).toContainText('Please select a ZIP file to upload');
 
-    await expect(pm.rumFormValidation.getFileErrorLocator()).toBeVisible({ timeout: 5000 });
-    await expect(pm.rumFormValidation.getFileErrorLocator()).toContainText('Only ZIP files are allowed');
-
-    testLogger.info('Wrong file type inline error correctly shown');
+    testLogger.info('Wrong file type error row correctly shown');
   });
 
   // ── Test 3: No version → version required field error ──────────────────────
