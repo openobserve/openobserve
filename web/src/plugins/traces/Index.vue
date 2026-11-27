@@ -181,13 +181,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </TracesNoDataState>
                     </FirstDataPanel>
                     <div
-                      v-else-if="searchObj.data.errorMsg !== '' && !searchObj.loading"
+                      v-else-if="
+                        searchObj.data.errorMsg !== '' && !searchObj.loading && !sqlAwaitingRun
+                      "
                       data-test="traces-search-error-message"
                       class="bg-card-glass-bg flex h-full flex-col"
                     >
                       <!-- The RED strip keeps its place above a failed query, each panel with its own state. -->
                       <TracesMetricsDashboard
-                        v-if="searchObj.meta.sqlMode && searchObj.meta.searchMode === 'spans'"
+                        v-if="
+                          searchObj.meta.sqlMode &&
+                          searchObj.meta.searchMode === 'spans' &&
+                          !statementsBlocked
+                        "
                         v-show="searchObj.meta.showHistogram"
                         class="shrink-0"
                         :stream-name="searchObj.data.stream.selectedStream.value"
@@ -407,6 +413,7 @@ import {
 import { HOME_RETURN_QUERY_KEY } from "@/composables/goto/homeReturn";
 
 import useTraces from "@/composables/useTraces";
+import { useTracesHistoryRestore } from "@/composables/useTracesHistoryRestore";
 import { contextRegistry, createTracesContextProvider } from "@/composables/contextProviders";
 
 import TransformService from "@/services/jstransform";
@@ -416,6 +423,7 @@ import {
   getUUID,
   generateTraceContext,
 } from "@/utils/zincutils";
+import { b64DecodeUnicodeSafe } from "@/utils/formatters";
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
 import {
   tracesEditorIsStaged,
@@ -451,6 +459,7 @@ import {
   analyzeTracesSql,
   buildTracesSql,
   filterHasSubquery,
+  hasMultipleStatements,
   hasOwnCondition,
   insertTraceIdColumn,
   isRowQuery,
@@ -944,7 +953,10 @@ function buildSearch(reuseLastWindow = false) {
 
     const queryParams = { ...getUrlQueryParams(), ...carriedQuery() };
 
-    if (canWriteTracesUrl()) router.push({ query: queryParams });
+    if (canWriteTracesUrl()) {
+      if (replaceNextUrlWrite) router.replace({ query: queryParams });
+      else router.push({ query: queryParams });
+    }
     return req;
   } catch (e) {
     console.error("Error while constructing the search query", e);
@@ -996,8 +1008,12 @@ function keepLastCount(results: any): boolean {
   return true;
 }
 
+// Set by the run that was blocked, not read from the editor, so a typed `;` keeps the strip.
+const statementsBlocked = ref(false);
+
 // Empty SQL waits for typing; a statement in the Traces view filter gets its card instead.
 function runBlocked(): boolean {
+  statementsBlocked.value = false;
   const text = String(searchObj.data.editorValue ?? "");
   const inTraces = searchObj.meta.searchMode === "traces";
   const statement = inTraces && isAuthoredStatement(text);
@@ -1007,7 +1023,21 @@ function runBlocked(): boolean {
     searchObj.data.errorMsg = "";
     return true;
   }
+  if (sqlHasSecondStatement()) {
+    statementsBlocked.value = true;
+    searchObj.data.errorMsg = t("traces.sqlMode.oneStatement");
+    searchObj.data.errorDetail = "";
+    searchObj.data.errorCode = 0;
+    return true;
+  }
   return !!searchObj.meta.sqlMode && !String(searchObj.data.editorValue ?? "").trim();
+}
+
+// The server runs only the last statement while the page reads the first, so neither result is right.
+function sqlHasSecondStatement(): boolean {
+  return (
+    !!searchObj.meta.sqlMode && hasMultipleStatements(String(searchObj.data.editorValue ?? ""))
+  );
 }
 
 // A query that groups or limits rows has no WHERE count; its rows are the count.
@@ -1140,6 +1170,8 @@ function resultsViewKey() {
     searchObj.data.stream.selectedStream.value,
     searchObj.meta.searchMode,
     String(searchObj.data.editorValue ?? "").trim(),
+    searchObj.meta.scope,
+    searchObj.meta.groupBy,
     // Rows read in another order are another view, so a failed re-sort never shows them under the new order.
     searchObj.meta.resultGrid.sortBy,
     searchObj.meta.resultGrid.sortOrder,
@@ -1189,7 +1221,7 @@ async function getQueryData(
       cancelMainSearch();
       searchObj.data.appliedEditorValue = String(searchObj.data.editorValue ?? "");
       searchObj.meta.lastRunSignature = tracesSearchRunSignature(searchObj);
-      sqlRanView.value = null;
+      sqlRanView.value = sqlHasSecondStatement() ? searchObj.meta.searchMode : null;
       return false;
     }
     if (!isPagination) resetTraceRowSelection();
@@ -2000,7 +2032,7 @@ watch(
 );
 
 /** `leftOrg`: the org an org switch left; a URL still on that org is the page's own sync, not a shared link. */
-async function loadPageData({ leftOrg = "" } = {}) {
+async function loadPageData({ leftOrg = "", forceRun = false } = {}) {
   const generation = pageGeneration;
   pageLoaded = false;
   const query = router.currentRoute.value.query;
@@ -2035,7 +2067,10 @@ async function loadPageData({ leftOrg = "" } = {}) {
     // Only a restore from recent searches is a user run; any other landing runs without recording.
     if (landing) {
       if (landing.run) searchData();
-    } else if ((streamFromUrl || !isAutoRunOff()) && (forcedRun || !reopensStagedEdit())) {
+    } else if (
+      (streamFromUrl || !isAutoRunOff()) &&
+      (forcedRun || forceRun || !reopensStagedEdit())
+    ) {
       searchData(false);
     }
   }
@@ -2071,6 +2106,8 @@ let countInterrupted = false;
 let fieldsInterrupted = false;
 
 let shownQuery: Record<string, any> | null = null;
+// A history step re-runs the search its entry holds; pushing that run would wipe Forward.
+let replaceNextUrlWrite = false;
 
 const routeQueryKey = () => tracesQueryKey(router.currentRoute.value.query);
 
@@ -2143,10 +2180,26 @@ onDeactivated(() => {
   cleanupContextProvider();
 });
 
+// Each run adds a history entry, so Back and Forward must show the search the entry holds.
+const restoreFromHistory = async () => {
+  if (!pageActive.value) return;
+  restoreUrlQueryParams({ keepDraft: false });
+  // A handoff entry holds its filter in `filter`, not `query`, as on landing.
+  applyHandoffFilter();
+  replaceNextUrlWrite = true;
+  try {
+    await loadPageData({ forceRun: true });
+  } finally {
+    replaceNextUrlWrite = false;
+  }
+};
+const stopHistoryRestore = useTracesHistoryRestore(router, () => void restoreFromHistory());
+
 onUnmounted(() => {
   stopUrlSync();
   stopInFlightRequests();
   cleanupContextProvider();
+  stopHistoryRestore();
 });
 
 onActivated(async () => {
@@ -2264,7 +2317,8 @@ const runQueryOnSort = () => {
   getQueryData(false, true);
 };
 
-function restoreUrlQueryParams() {
+/** `keepDraft`: false for a history step, whose entry is new intent even when it holds the SQL that ran. */
+function restoreUrlQueryParams({ keepDraft = true } = {}) {
   const queryParams = router.currentRoute.value.query;
 
   const date = {
@@ -2280,13 +2334,18 @@ function restoreUrlQueryParams() {
 
   const view = supportedTraceSearchMode(queryParams.tab);
   if (queryParams.query) {
-    const text = b64DecodeUnicode(queryParams.query);
+    const text = b64DecodeUnicodeSafe(String(queryParams.query), "");
+    if (!text) toast({ variant: "warning", message: t("traces.index.linkQueryUnreadable") });
     const sql = queryParams.sql_mode === "true" && !!text.trim();
+    // The URL holds the SQL that ran, so SQL typed over it since is still the page's own, waiting for Run.
+    const draftOverRun = keepDraft && sql && text === searchObj.data.appliedEditorValue;
+    const shown = draftOverRun ? String(searchObj.data.editorValue ?? "") : text;
     // The page's own URL keeps the SQL text it set aside; any other text is new intent.
-    const own = text === searchObj.data.editorValue && sql === !!searchObj.meta.sqlMode;
+    const own =
+      (text === searchObj.data.editorValue || draftOverRun) && sql === !!searchObj.meta.sqlMode;
     normalizeTracesView(
       view,
-      own ? { kind: "move", sql: sql ? text : undefined } : { kind: "open", text, sqlMode: sql },
+      own ? { kind: "move", sql: sql ? shown : undefined } : { kind: "open", text, sqlMode: sql },
     );
   } else if (fromAssistant() || queryParams.stream) {
     // A link with no filter means none, so the last visit's text must not run under its name.
@@ -2493,7 +2552,7 @@ const onGroupByChange = (field: string) => {
 
 // Opening a group is navigation, so it runs at once even with auto-run off; Include and Exclude stay staged.
 const onOpenGroup = (term: string) => {
-  const text = applyFilterTerm(term, String(searchObj.data.editorValue ?? ""));
+  const text = applyFilterTerm(term, String(searchObj.data.editorValue ?? ""), "append");
   searchObj.data.editorValue = text;
   searchBarRef.value?.setEditorValue?.(text);
   onGroupByChange("");

@@ -219,6 +219,8 @@ const defaultObject = {
       fieldsInAll: {} as Record<string, string>,
       filterField: "",
       addToFilter: "",
+      /** Row and Group by actions append; field-list ticks replace the field's whole condition. */
+      addToFilterMode: "replace" as "replace" | "append",
       /** A sidebar value tick in SQL mode: the field's ticked values, for the search bar to write. */
       sqlFieldFilter: null as { field: string; values: string[]; exclude: boolean } | null,
       /** The condition each field's sidebar ticks wrote into the SQL, recognised again only by its exact text. */
@@ -498,10 +500,18 @@ const useTraces = () => {
     // run-query is one-shot; kept in the entry, Back to it would run whatever edit was staged there.
     delete query["run-query"];
     for (const key of TRACES_LIST_URL_KEYS) delete query[key];
-    delete query.sql_mode;
-    Object.assign(query, listUrlState(), sqlModeUrlState(), {
-      query: b64EncodeUnicode(searchObj.data.editorValue),
-    });
+    Object.assign(query, listUrlState());
+    // As in Logs, the URL holds the SQL that ran, so a reload never runs SQL that waits for Run.
+    const unrunSql =
+      searchObj.meta.sqlMode &&
+      String(searchObj.data.editorValue ?? "").trim() !==
+        String(searchObj.data.appliedEditorValue ?? "").trim();
+    if (!unrunSql) {
+      delete query.sql_mode;
+      Object.assign(query, sqlModeUrlState(), {
+        query: b64EncodeUnicode(searchObj.data.editorValue),
+      });
+    }
     // Columns belong to the URL's stream, which only a run moves to the selected one.
     if (route.query.stream !== searchObj.data.stream.selectedStream.value) {
       if (route.query.columns === undefined) delete query.columns;

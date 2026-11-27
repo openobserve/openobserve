@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import { stripSqlComments } from "@/utils/query/sqlComments";
 import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 
 /** Turns Traces editor text into a runnable WHERE fragment: durations in µs, span kinds as numeric keys. */
@@ -22,7 +23,8 @@ export const resolveTracesFilter = (
   parser: unknown,
   streamName: string,
 ): string => {
-  const trimmed = text?.trim() ?? "";
+  // Callers append the scope, ORDER BY or GROUP BY on the same line, which a trailing -- comment would swallow.
+  const trimmed = stripSqlComments(text ?? "").trim();
   const durationResolved = parseDurationWhereClause(trimmed, parser, streamName);
   return parseSpanKindWhereClause(
     typeof durationResolved === "string" ? durationResolved : trimmed,

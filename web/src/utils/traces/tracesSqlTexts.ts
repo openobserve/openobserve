@@ -24,7 +24,7 @@ import { isAuthoredStatement } from "@/utils/query/freeTextFilter";
 export type TracesViewEntry =
   /** A view toggle, the nav, Back or Forward, or a return to the page; `sql` is a history entry's own SQL. */
   | { kind: "move"; sql?: string }
-  /** The SQL switch in the Traces view, Back to SQL (`stored`), or Open in Spans view with the typed `text`. */
+  /** The SQL switch in the Traces view (`stored` brings back the SQL kept from Spans), or Open in Spans view with the typed `text`. */
   | { kind: "sql"; text?: string; stored?: boolean }
   /** A link, saved view or recent search that brings its own text. */
   | { kind: "open"; text: string; sqlMode?: boolean }

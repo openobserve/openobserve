@@ -145,6 +145,8 @@ const AGGREGATE_FUNCTIONS = new Set([
   "approx_median",
   "approx_percentile_cont",
   "approx_percentile_cont_with_weight",
+  "approx_topk",
+  "approx_topk_distinct",
   "array_agg",
   "string_agg",
   "stddev",
@@ -184,6 +186,18 @@ const DROPPED_ORDER: RedDroppedClause[] = [
 ];
 
 const JOIN_WORDS = new Set(["inner", "left", "right", "full", "outer", "cross", "natural", "join"]);
+
+// Words that can follow a FROM target without being its alias.
+const NOT_ALIAS_WORDS = new Set([
+  ...JOIN_WORDS,
+  ...WHERE_END_WORDS,
+  "where",
+  "on",
+  "using",
+  "as",
+  "lateral",
+  "tablesample",
+]);
 
 const SET_OPERATORS = new Set(["union", "intersect", "except"]);
 
@@ -262,7 +276,7 @@ export function analyzeTracesSql(sql: string, parser: any): TracesSqlInfo {
 
   const selectNames = selectNamesOf(columns);
 
-  const join = hasTop("join");
+  const join = fromIdx >= 0 && fromRegion(top, fromIdx).some(isJoinToken);
   const withClause =
     firstWord === "with" && selectIdx > 0 ? text.slice(0, top[selectIdx].start).trim() : "";
   return {
@@ -449,6 +463,27 @@ export function insertWhereCondition(sql: string, condition: string): string | n
   return `${text.slice(0, first.start)}${kept} AND ${condition}${text.slice(last.end)}`;
 }
 
+/** FROM and WHERE for a field-values request: the server rebuilds FROM as the bare stream, so the alias qualifier goes. */
+export function fieldValuesSource(info: TracesSqlInfo): { from: string; where: string } {
+  if (info.stream === null) return { from: info.fromClause, where: info.where };
+  const from = `"${info.stream.replaceAll('"', '""')}"`;
+  const alias = fromAlias(info.fromClause);
+  if (!alias) return { from, where: info.where };
+  const tokens = tokenize(info.where);
+  const qualifiers = tokens.filter(
+    (tok, i) =>
+      nameOf(tok)?.toLowerCase() === alias &&
+      isPunct(tokens[i + 1], ".") &&
+      tokens[i + 1].start === tok.end &&
+      !isPunct(tokens[i - 1], "."),
+  );
+  const where = qualifiers.reduceRight(
+    (out, tok) => out.slice(0, tok.start) + out.slice(tok.end + 1),
+    info.where,
+  );
+  return { from, where };
+}
+
 /** The condition a sidebar tick writes for one field: = or IN for values, IS NULL for the null value. */
 export function fieldValuesCondition(ref: string, values: string[], exclude: boolean): string {
   const listed = values.filter((v) => v !== "null").map((v) => `'${v.replaceAll("'", "''")}'`);
@@ -594,9 +629,83 @@ export function missingStreamAfterFrom(sql: string): boolean {
   return tokens.some((tok, i) => isKeyword(tok, "from") && isKeyword(tokens[i + 1], "where"));
 }
 
+/** More than one statement; a trailing semicolon alone still leaves one. */
+export function hasMultipleStatements(sql: string): boolean {
+  const tokens = tokenize(sql ?? "");
+  const end = tokens.findIndex((tok) => tok.depth === 0 && isPunct(tok, ";"));
+  return end >= 0 && tokens.slice(end + 1).some((tok) => !isPunct(tok, ";"));
+}
+
 export function sqlJoinKeyword(sql: string): { start: number; end: number } | null {
   const tok = tokenize(sql).find((t) => t.kind === "word" && t.text.toLowerCase() === "join");
   return tok ? { start: tok.start, end: tok.end } : null;
+}
+
+// The alias of a single FROM target, lower-cased: `t a`, `t AS a` or `t "a"`.
+function fromAlias(fromClause: string): string | null {
+  const tokens = tokenize(fromClause);
+  const rest = isKeyword(tokens[1], "as") ? tokens.slice(2) : tokens.slice(1);
+  if (rest.length !== 1 || nameOf(tokens[0]) === null) return null;
+  const [alias] = rest;
+  if (alias.kind === "word" && NOT_ALIAS_WORDS.has(alias.text.toLowerCase())) return null;
+  return nameOf(alias)?.toLowerCase() ?? null;
+}
+
+// Top-level tokens of the FROM clause, up to WHERE or the next clause.
+function fromRegion(top: Token[], fromIdx: number): Token[] {
+  const end = top.findIndex(
+    (tok, i) =>
+      i > fromIdx &&
+      (isKeyword(tok, "where") ||
+        isPunct(tok, ";") ||
+        (tok.kind === "word" && WHERE_END_WORDS.has(tok.text.toLowerCase()))),
+  );
+  return top.slice(fromIdx + 1, end < 0 ? top.length : end);
+}
+
+function isJoinToken(tok: Token): boolean {
+  return isKeyword(tok, "join") || isPunct(tok, ",");
+}
+
+// An outer condition on a join, a CTE read or a subquery that narrows its columns may name a column that FROM lacks.
+function fromHidesColumns(
+  tokens: Token[],
+  top: Token[],
+  selectIdx: number,
+  fromIdx: number,
+): boolean {
+  if (fromRegion(top, fromIdx).some(isJoinToken)) return true;
+  const target = tokens.find((tok) => tok.start >= top[fromIdx].end);
+  if (isPunct(target, "(")) {
+    const close = matchingClose(tokens, target!);
+    const inner = tokens.filter(
+      (tok) =>
+        tok.depth === target!.depth + 1 &&
+        tok.start > target!.start &&
+        (!close || tok.end <= close.start),
+    );
+    return !(
+      isKeyword(inner[0], "select") &&
+      isPunct(inner[1], "*") &&
+      isKeyword(inner[2], "from")
+    );
+  }
+  const name = nameOf(target)?.toLowerCase();
+  return !!name && cteHeads(top, selectIdx).some((head) => head.name.toLowerCase() === name);
+}
+
+// Each CTE's name and the paren that opens its body, in order.
+function cteHeads(top: Token[], mainIdx: number): { name: string; open: Token }[] {
+  if (!isKeyword(top[0], "with")) return [];
+  const heads: { name: string; open: Token }[] = [];
+  top.slice(0, mainIdx).forEach((tok, i) => {
+    const open = top[i + 1];
+    if (!isKeyword(tok, "as") || !isPunct(open, "(")) return;
+    // A column list sits between the name and AS: name (a, b) AS (...).
+    const name = nameOf(isPunct(top[i - 1], ")") ? top[i - 3] : top[i - 1]);
+    if (name) heads.push({ name, open });
+  });
+  return heads;
 }
 
 function sliceFrom(text: string, top: Token[], fromIdx: number): string {
@@ -677,7 +786,7 @@ function topLevelWhere(text: string): { whereTok: Token | null; body: Token[] } 
   const selectIdx = top.findIndex((tok) => isKeyword(tok, "select"));
   const fromIdx =
     selectIdx < 0 ? -1 : top.findIndex((tok, i) => i > selectIdx && isKeyword(tok, "from"));
-  if (fromIdx < 0) return null;
+  if (fromIdx < 0 || fromHidesColumns(tokens, top, selectIdx, fromIdx)) return null;
   const whereIdx = top.findIndex((tok, i) => i > fromIdx && isKeyword(tok, "where"));
   const start = whereIdx >= 0 ? whereIdx : fromIdx;
   const endTok = top.find(
@@ -881,15 +990,8 @@ function selectSpanSet(
   const dropped = droppedClauses(top, selectIdx, fromIdx);
   const where = sliceWhere(text, top, fromIdx);
   const target = tokens.find((tok) => tok.start >= top[fromIdx].end);
-  const fromEnd = top.findIndex(
-    (tok, i) =>
-      i > fromIdx &&
-      (isKeyword(tok, "where") ||
-        isPunct(tok, ";") ||
-        (tok.kind === "word" && WHERE_END_WORDS.has(tok.text.toLowerCase()))),
-  );
-  const region = top.slice(fromIdx + 1, fromEnd < 0 ? top.length : fromEnd);
-  const joined = region.some((tok) => isKeyword(tok, "join") || isPunct(tok, ","));
+  const region = fromRegion(top, fromIdx);
+  const joined = region.some(isJoinToken);
   if (isPunct(target, "(")) {
     const outer = joined ? mergeDropped(dropped, ["join"]) : dropped;
     return fromSubquerySpanSet(text, tokens, target!, where, outer, ctx);
@@ -942,16 +1044,11 @@ function cteSpanSet(
   const mainIdx = top.findIndex((tok) => isKeyword(tok, "select"));
   if (mainIdx < 0 || isKeyword(top[1], "recursive")) return noSpanSet("shape");
   const ctes = new Map(ctx.ctes);
-  top.slice(0, mainIdx).forEach((tok, i) => {
-    const open = top[i + 1];
-    if (!isKeyword(tok, "as") || !isPunct(open, "(")) return;
+  for (const { name, open } of cteHeads(top, mainIdx)) {
     const close = matchingClose(tokens, open);
-    // A column list sits between the name and AS: name (a, b) AS (...).
-    const nameTok = isPunct(top[i - 1], ")") ? top[i - 3] : top[i - 1];
-    const name = nameOf(nameTok);
-    if (!name || !close) return;
+    if (!close) continue;
     ctes.set(name.toLowerCase(), { body: text.slice(open.end, close.start), scope: new Map(ctes) });
-  });
+  }
   const result = spanSetOf(text.slice(top[mainIdx].start), { ...ctx, ctes });
   if (result.kind === "none") return result;
   const readsCte = tokenize(`${result.from} ${result.where}`).some((tok) =>
@@ -1129,7 +1226,8 @@ function joinSpanSet(
   );
   const left = joinItem(text, region.slice(0, leftEnd));
   if (!left?.name) return noSpanSet("shape");
-  if (!ctx.isTracesStream(left.name)) return noSpanSet("notTraces", left.name);
+  const cte = ctx.ctes.get(left.name.toLowerCase());
+  if (!cte && !ctx.isTracesStream(left.name)) return noSpanSet("notTraces", left.name);
   const joinAt = region.findIndex((tok) => isKeyword(tok, "join"));
   const onAt = region.findIndex((tok) => isKeyword(tok, "on") || isKeyword(tok, "using"));
   const right = joinItem(text, region.slice(joinAt + 1, onAt < 0 ? region.length : onAt));
@@ -1147,6 +1245,11 @@ function joinSpanSet(
       : joinsOnTraceId(onText));
   const sides = splitAnd(where).map((cond) => ({ cond, side: conditionSide(cond, left, right) }));
   const leftConds = sides.filter((s) => s.side === "left").map((s) => s.cond);
+  // A CTE read keeps only the left CTE's span set, so the right side counts as a dropped join.
+  if (cte) {
+    const joinDropped = mergeDropped(dropped, ["join"]);
+    return cteReadSpanSet(left.name, cte, left.text, leftConds.join(" AND "), joinDropped, ctx);
+  }
   if (!(single && inner && keyed && right)) {
     return {
       kind: "set",

@@ -317,8 +317,13 @@ onBeforeUnmount(() => {
 
 const apply = (value: GroupValue, action: "include" | "exclude", toList: boolean) => {
   const term = groupTerm(props.request.key, value, action, !!props.request.textKey);
-  if (toList) emit("open-group", term);
-  else searchObj.data.stream.addToFilter = term;
+  if (toList) {
+    emit("open-group", term);
+    return;
+  }
+  // Group actions add a condition; only field-list ticks replace the field's whole condition.
+  searchObj.data.stream.addToFilterMode = "append";
+  searchObj.data.stream.addToFilter = term;
 };
 
 // The group key is filterable by construction, so Include/Exclude show as the context menu does, whatever the schema list holds.

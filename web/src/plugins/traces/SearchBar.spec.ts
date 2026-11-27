@@ -2670,6 +2670,24 @@ describe("SearchBar", () => {
 
       expect(searchObjInstance.data.editorValue).toBe("service_name='svc-a' and some bare keyword");
     });
+
+    it("appends a term written in append mode, then goes back to replace", async () => {
+      searchObjInstance.data.editorValue = "service_name != 'batch'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      searchObjInstance.data.stream.addToFilterMode = "append";
+      searchObjInstance.data.stream.addToFilter = "service_name != 'mail'";
+      await flushPromises();
+      expect(searchObjInstance.data.editorValue).toBe(
+        "service_name != 'batch' and service_name != 'mail'",
+      );
+      expect(searchObjInstance.data.stream.addToFilterMode).toBe("replace");
+
+      searchObjInstance.data.stream.addToFilter = "(service_name='a' or service_name='b')";
+      await flushPromises();
+      expect(searchObjInstance.data.editorValue).toBe("(service_name='a' or service_name='b')");
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -3873,6 +3891,33 @@ describe("SearchBar", () => {
       expect(searchObjInstance.data.groupsRequest).toBeNull();
     });
 
+    it("Reset Filters drops the Groups run's count with Group by, and runs nothing with auto-run off", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      searchObjInstance.meta.groupBy = "service_name";
+      searchObjInstance.data.groupsRequest = { key: "service_name" } as any;
+      searchObjInstance.data.queryResults = { hits: [], total: 17200 } as any;
+      searchObjInstance.searchApplied = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      (wrapper.vm as any).resetFilters();
+      expect(searchObjInstance.data.queryResults.total).toBeUndefined();
+      // Index shows the not-run prompt only for an unapplied search with no rows.
+      expect(searchObjInstance.searchApplied).toBe(false);
+      expect(searchObjInstance.data.queryResults.hits?.length ?? 0).toBe(0);
+      expect(wrapper.emitted("searchdata")).toBeUndefined();
+    });
+
+    it("Reset Filters keeps a shown span search applied when no Group by ran", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      searchObjInstance.data.groupsRequest = null;
+      searchObjInstance.data.queryResults = { hits: [{ span_id: "s1" }], total: 1 } as any;
+      searchObjInstance.searchApplied = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      (wrapper.vm as any).resetFilters();
+      expect(searchObjInstance.searchApplied).toBe(true);
+    });
+
     describe("with a scope", () => {
       const ROOT = "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
       const ENTRY = `(CAST(span_kind AS VARCHAR) IN ('2','5') OR ${ROOT})`;
@@ -4299,6 +4344,37 @@ describe("SearchBar", () => {
         expect(searchObjInstance.data.editorValue).toBe(
           `SELECT * FROM "default" WHERE a = 1 AND service_name = 'web' AND service_name = 'db'`,
         );
+      });
+
+      it("Undo does nothing once SQL mode is off or the SQL was edited again", async () => {
+        await mountTyped(`SELECT * FROM "default" WHERE a = 1`);
+        await tick("service_name", ["api"]);
+        const undo = lastToast().action.handler;
+        searchObjInstance.meta.sqlMode = false;
+        searchObjInstance.data.editorValue = "a = 1";
+        await flushPromises();
+        undo();
+        await flushPromises();
+        expect(searchObjInstance.data.editorValue).toBe("a = 1");
+        searchObjInstance.meta.sqlMode = true;
+        searchObjInstance.data.editorValue = `SELECT * FROM "default" WHERE b = 2`;
+        undo();
+        await flushPromises();
+        expect(searchObjInstance.data.editorValue).toBe(`SELECT * FROM "default" WHERE b = 2`);
+        expect(wrapper.emitted("searchdata")).toHaveLength(1);
+      });
+
+      it("writes stored span_kind values and keeps the labels for the ticks", async () => {
+        await mountTyped(`SELECT * FROM "default"`);
+        await tick("span_kind", ["Server", "Client"]);
+        expect(searchObjInstance.data.editorValue).toBe(
+          `SELECT * FROM "default" WHERE span_kind IN ('2','3')`,
+        );
+        expect(searchObjInstance.data.stream.sqlFieldConditions.span_kind).toEqual({
+          text: "span_kind IN ('2','3')",
+          values: ["Server", "Client"],
+          exclude: false,
+        });
       });
 
       it("keeps the Errors bar and Duration brush out of typed SQL", async () => {

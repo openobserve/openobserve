@@ -28,7 +28,9 @@ import {
   missingStreamAfterFrom,
   fieldHasOtherCondition,
   fieldValuesCondition,
+  fieldValuesSource,
   filterHasSubquery,
+  hasMultipleStatements,
   hasOwnCondition,
   replaceOwnCondition,
   replaceSqlIdentifier,
@@ -162,6 +164,21 @@ describe("analyzeTracesSql: query features", () => {
     expect(info(`SELECT x FROM "a" UNION SELECT x FROM "b"`).union).toBe(true);
     expect(info(`SELECT * FROM "a" LIMIT 7`).limit).toBe(7);
     expect(info(`SELECT DISTINCT service_name FROM "a"`).distinct).toBe(true);
+  });
+
+  it("flags a top-level comma in FROM as a join, but not a comma elsewhere", () => {
+    expect(info(`SELECT * FROM "a", "b" WHERE a.x = b.x`).join).toBe(true);
+    expect(isRowQuery(info(`SELECT * FROM "a" x, "b" y WHERE x.k = y.k`))).toBe(false);
+    expect(info(`SELECT a, b FROM "a" WHERE x IN (1, 2) ORDER BY a, b`).join).toBe(false);
+    expect(info(`SELECT * FROM (SELECT a, b FROM "a")`).join).toBe(false);
+  });
+
+  it("counts approx_topk and approx_topk_distinct as aggregates", () => {
+    expect(info(`SELECT approx_topk(service_name, 10) AS t FROM "a"`).aggregate).toBe(true);
+    expect(
+      info(`SELECT approx_topk_distinct(service_name, trace_id, 10) AS t FROM "a"`).aggregate,
+    ).toBe(true);
+    expect(isRowQuery(info(`SELECT approx_topk(service_name, 10) AS t FROM "a"`))).toBe(false);
   });
 
   it("does not take a function's DISTINCT or a nested LIMIT for the query's", () => {
@@ -465,6 +482,29 @@ describe("deriveSpanSet: the RED span-set ladder", () => {
     );
     expect(s.where).toBe("(span_status = 'ERROR') AND (service_name = 'a')");
     expect(s.dropped).toEqual([]);
+  });
+
+  it("rule 9: a join of two CTEs reads the left CTE and reports the join as dropped", () => {
+    const s = set(
+      `WITH a AS (SELECT * FROM "default" WHERE span_status = 'ERROR'), b AS (SELECT * FROM "default") SELECT * FROM a JOIN b ON a.trace_id = b.trace_id WHERE a.duration > 5 AND b.duration > 9`,
+    );
+    expect(s).toMatchObject({
+      subject: "cte",
+      cte: "a",
+      with: `WITH a AS (SELECT * FROM "default" WHERE span_status = 'ERROR'), b AS (SELECT * FROM "default")`,
+      from: "a",
+      where: "a.duration > 5",
+      keepsSubquery: true,
+    });
+    expect(s.dropped).toEqual(["join"]);
+  });
+
+  it("rule 9: a join whose left CTE reads no traces stream gives that reason", () => {
+    expect(
+      derive(
+        `WITH a AS (SELECT * FROM "k8s_events") SELECT * FROM a JOIN "default" b ON a.trace_id = b.trace_id`,
+      ),
+    ).toEqual({ kind: "none", reason: "notTraces", stream: "k8s_events" });
   });
 
   it("rule 14: a FROM that is not a traces stream names the stream", () => {
@@ -819,11 +859,43 @@ describe("insertWhereCondition", () => {
     );
   });
 
-  it("adds to the main statement of a CTE, not to the CTE body", () => {
-    const sql = `WITH slow AS (SELECT * FROM "default" WHERE duration > 5) SELECT * FROM slow LIMIT 10`;
+  it("adds to the main statement of a CTE query that reads the stream, not to the CTE body", () => {
+    const sql = `WITH bad AS (SELECT trace_id FROM "default" WHERE span_status = 'ERROR') SELECT * FROM "default" WHERE trace_id IN (SELECT trace_id FROM bad) LIMIT 10`;
     expect(insertWhereCondition(sql, cond)).toBe(
-      `WITH slow AS (SELECT * FROM "default" WHERE duration > 5) SELECT * FROM slow WHERE service_name = 'api' LIMIT 10`,
+      `WITH bad AS (SELECT trace_id FROM "default" WHERE span_status = 'ERROR') SELECT * FROM "default" WHERE trace_id IN (SELECT trace_id FROM bad) AND service_name = 'api' LIMIT 10`,
     );
+  });
+
+  it("adds to the outer WHERE of a FROM subquery that selects every column", () => {
+    const sql = `SELECT * FROM (SELECT * FROM "default" WHERE duration > 5) t ORDER BY start_time`;
+    expect(insertWhereCondition(sql, cond)).toBe(
+      `SELECT * FROM (SELECT * FROM "default" WHERE duration > 5) t WHERE service_name = 'api' ORDER BY start_time`,
+    );
+  });
+
+  it("refuses a FROM that may not have the column: a CTE, a join or a narrowed subquery", () => {
+    expect(
+      insertWhereCondition(
+        `WITH slow AS (SELECT * FROM "default" WHERE duration > 5) SELECT * FROM slow LIMIT 10`,
+        cond,
+      ),
+    ).toBeNull();
+    expect(
+      insertWhereCondition(
+        `WITH s (a, b) AS (SELECT a, b FROM "default") SELECT * FROM s WHERE a = 1`,
+        cond,
+      ),
+    ).toBeNull();
+    expect(
+      insertWhereCondition(
+        `SELECT * FROM "default" a JOIN "default" b ON a.trace_id = b.trace_id WHERE a.duration > 5`,
+        cond,
+      ),
+    ).toBeNull();
+    expect(insertWhereCondition(`SELECT * FROM "default" a, "default" b`, cond)).toBeNull();
+    expect(
+      insertWhereCondition(`SELECT * FROM (SELECT trace_id, duration FROM "default") t`, cond),
+    ).toBeNull();
   });
 
   it("never touches a CASE WHEN on the same field", () => {
@@ -1001,5 +1073,67 @@ describe("withAllFieldRefs", () => {
     expect(withAllFieldRefs("http_status_code is null", new Map())).toBe(
       "http_status_code is null",
     );
+  });
+});
+
+describe("hasMultipleStatements", () => {
+  it("is false for one statement, with or without a trailing semicolon", () => {
+    expect(hasMultipleStatements(`SELECT * FROM "default"`)).toBe(false);
+    expect(hasMultipleStatements(`SELECT * FROM "default";`)).toBe(false);
+    expect(hasMultipleStatements(`SELECT * FROM "default" ;  -- done\n`)).toBe(false);
+    expect(hasMultipleStatements("")).toBe(false);
+  });
+
+  it("is true when a second statement follows a semicolon", () => {
+    expect(hasMultipleStatements(`SELECT a FROM "x"; SELECT b FROM "y"`)).toBe(true);
+    expect(hasMultipleStatements(`SELECT a FROM "x";\nSELECT b FROM "y";`)).toBe(true);
+  });
+
+  it("ignores semicolons inside strings, quoted names and comments", () => {
+    expect(hasMultipleStatements(`SELECT * FROM "a;b" WHERE x = ';y' -- z; w`)).toBe(false);
+    expect(hasMultipleStatements(`SELECT * FROM "default" /* a; b */ WHERE x = 1`)).toBe(false);
+  });
+});
+
+describe("fieldValuesSource", () => {
+  const source = (sql: string) => fieldValuesSource(info(sql));
+
+  it("drops the alias from the WHERE and reads the bare stream", () => {
+    expect(source(`SELECT * FROM "shop_traces" a WHERE a.duration > 200000`)).toEqual({
+      from: `"shop_traces"`,
+      where: "duration > 200000",
+    });
+    expect(
+      source(`SELECT * FROM "shop_traces" AS a WHERE a.duration > 5 AND "a".service_name = 'x'`),
+    ).toEqual({ from: `"shop_traces"`, where: "duration > 5 AND service_name = 'x'" });
+    expect(source(`SELECT * FROM shop_traces "T" WHERE "T".duration > 5`)).toEqual({
+      from: `"shop_traces"`,
+      where: "duration > 5",
+    });
+  });
+
+  it("keeps strings and other qualifiers as typed", () => {
+    expect(source(`SELECT * FROM "t" a WHERE a.x = 'a.y' AND b.c = 1`)).toEqual({
+      from: `"t"`,
+      where: "x = 'a.y' AND b.c = 1",
+    });
+  });
+
+  it("does not take a keyword for an alias", () => {
+    expect(source(`SELECT * FROM "t" WHERE duration > 5`)).toEqual({
+      from: `"t"`,
+      where: "duration > 5",
+    });
+    expect(fieldValuesSource({ ...info(`SELECT * FROM "t"`), fromClause: `"t" join` })).toEqual({
+      from: `"t"`,
+      where: "",
+    });
+  });
+
+  it("keeps a FROM subquery as typed", () => {
+    expect(source(`SELECT * FROM (SELECT * FROM "t") s WHERE s.x = 1`)).toEqual({
+      from: `(SELECT * FROM "t") s`,
+      where: "s.x = 1",
+    });
   });
 });

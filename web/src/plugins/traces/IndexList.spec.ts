@@ -952,6 +952,17 @@ describe("IndexList Component", () => {
       wrapper.vm.handleAddSearchTerm("duration", "100", "include");
       expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("duration>=100");
     });
+
+    it("writes the stored span_kind value, not its label, in SQL mode", () => {
+      mockSearchObj.meta.sqlMode = true;
+      wrapper.vm.handleAddSearchTerm("span_kind", "Server", "include");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("span_kind='2'");
+      wrapper.vm.handleAddSearchTerm("span_kind", "Client", "exclude");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("span_kind!='3'");
+      mockSearchObj.meta.sqlMode = false;
+      wrapper.vm.handleAddSearchTerm("span_kind", "Server", "include");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("span_kind='Server'");
+    });
   });
 
   describe("handleAddMultipleSearchTerms value escaping", () => {
@@ -1104,14 +1115,25 @@ describe("IndexList Component", () => {
       mockSearchObj.data.editorValue = "";
     });
 
-    it("keeps the typed FROM alias so the typed WHERE resolves", async () => {
+    it("reads the stream without its alias, as the values API reads the stream itself", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "s" a WHERE a.duration > 1`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "s" WHERE duration > 1`,
+      );
+    });
+
+    it("drops the typed FROM alias from the WHERE it reads", async () => {
       mockSearchObj.meta.sqlMode = true;
       mockSearchObj.data.editorValue = `SELECT * FROM "test_stream" d WHERE d.status = '1' ORDER BY d.start_time`;
       fieldValuesApi.fetchFieldValues.mockClear();
       wrapper.vm.openFilterCreator({}, { name: "service_name" });
       await flushPromises();
       expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
-        `SELECT * FROM "test_stream" d WHERE d.status = '1'`,
+        `SELECT * FROM "test_stream" WHERE status = '1'`,
       );
     });
 
@@ -1122,13 +1144,13 @@ describe("IndexList Component", () => {
       wrapper.vm.openFilterCreator({}, { name: "status" });
       await flushPromises();
       expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
-        `SELECT * FROM "test_stream" d WHERE "d"."service_name" = 'a'`,
+        `SELECT * FROM "test_stream" WHERE "service_name" = 'a'`,
       );
       fieldValuesApi.fetchFieldValues.mockClear();
       wrapper.vm.openFilterCreator({}, { name: "service_name" });
       await flushPromises();
       expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
-        `SELECT * FROM "test_stream" d WHERE d.status = '1' AND (d.status = '2' OR d.status = '3')`,
+        `SELECT * FROM "test_stream" WHERE status = '1' AND (status = '2' OR status = '3')`,
       );
     });
 
