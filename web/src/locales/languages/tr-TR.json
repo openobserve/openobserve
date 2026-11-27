@@ -15419,7 +15419,9 @@
     "incidentDestination": "Vaka hedefi",
     "incidentDestinationPlaceholder": "Kuruluş varsayılanını kullan",
     "incidentDestinationHint": "Bu kaynağın uyarıları bir vaka oluşturduğunda veya bir vakaya katıldığında bildirimlerin gideceği yer. Kuruluş varsayılanını kullanmak için boş bırakın — hiçbiri ayarlanmazsa, eşleşen vakalar sessizce tetiklenir.",
+    "incidentDestinationHintOncall": "Bu kaynağın uyarıları bir vaka oluşturduğunda veya bir vakaya katıldığında, On-Call çağrısına ek olarak bildirimlerin gideceği yer. Kuruluş varsayılanını kullanmak için boş bırakın.",
     "noDestinationSet": "Vaka hedefi ayarlanmadı",
+    "oncallOnly": "Yalnızca On-Call",
     "setupStep1Title": "1. Bir webhook oluşturun",
     "setupStep1Body": "Grafana, Alertmanager veya JSON POST edebilen herhangi bir araçta bir webhook iletişim noktası / alıcı oluşturun.",
     "setupRemainingStepsHint": "Bu kaynağı kaydederek URL'sini ve token'ını alın, ardından bunları ilgili webhook yapılandırmasına yapıştırın.",
@@ -16502,6 +16504,13 @@
       "logoLightLabel": "Özel logo (açık mod)",
       "logoLightHelp": "Açık modda gösterilir. PNG, JPG, GIF veya BMP, en fazla 150 × 30 px.",
       "logoDarkLabel": "Özel logo (koyu mod)",
+      "logoTitle": "Özel logo",
+      "logoHelp": "Uygulama başlığında gösterilir. PNG, JPG, GIF, BMP, WEBP veya SVG, en fazla 150 × 30 px.",
+      "logoLightTitle": "Açık mod",
+      "logoDarkTitle": "Koyu mod",
+      "logoSaved": "Kaydedildi",
+      "logoNotSaved": "Kaydedilmedi",
+      "logoDimensions": "{width} × {height} piksel",
       "logoDarkHelp": "Koyu modda gösterilir. PNG, JPG, GIF veya BMP, en fazla 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24184,8 +24193,19 @@
       "clear": "Temizle"
     },
     "file": {
-      "removeFile": "Dosyayı kaldır",
-      "clearAll": "Tümünü temizle"
+      "removeNamed": "{name} öğesini kaldır",
+      "attachPrompt": "Eklemek için bir dosya bırakın veya {browse}",
+      "attachPromptMultiple": "Eklemek için dosyaları bırakın veya {browse}",
+      "browseLink": "göz atın",
+      "supports": "Desteklenen dosyalar {types}",
+      "dropFileToAttach": "Eklemek için dosyayı bırakın",
+      "dropFilesToAttach": "Eklemek için dosyaları bırakın",
+      "typeRejected": "Yalnızca {allowed} dosyaları kabul edilir",
+      "sizeRejected": "{size}, {max} sınırını aşıyor",
+      "countRejected": "Bir seferde yalnızca {count} dosya | Bir seferde yalnızca {count} dosya",
+      "invalidJson": "Geçerli JSON değil: {detail}",
+      "invalidImage": "Geçerli bir görüntü dosyası değil",
+      "unavailable": "Dosya yükleme kullanılamıyor"
     },
     "date": {
       "openCalendar": "Takvimi aç",
@@ -28011,8 +28031,8 @@
     "awayMark": "İzinli olarak işaretle",
     "awayClear": "Uzakta durumunu temizle",
     "awayClearConfirm": "Temizle",
-    "awayClearMessage": "{name} kişisinin uzakta durumu, {range} aralığında temizlensin mi? Tüm ekiplerde geçerli olur.",
-    "awayConsequence": "{name} kişisinin bulunduğu her ekipte geçerli olur. Vardiyaları, varsa her rotasyondaki bir sonraki kişiye geçer.",
+    "awayClearMessage": "{name} kişisinin izin durumu {range} için kaldırılsın mı? Bu, bu kuruluştaki her ekipte geçerli olur.",
+    "awayConsequence": "Bu kuruluştaki, {name} kişisinin üye olduğu her ekipte geçerli olur. Vardiyaları, varsa her rotasyonda sıradaki kişiye geçer.",
     "awayNextWeek": "Gelecek hafta, Pzt–Paz",
     "awayTitle": "İzinli olarak işaretle",
     "membersAddOpen": "Üye ekle",

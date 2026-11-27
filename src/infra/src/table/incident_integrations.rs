@@ -21,8 +21,8 @@
 //! tracks distinct upstream senders observed per integration for visibility.
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, Set, SqlErr,
-    TransactionTrait,
+    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set, SqlErr, TransactionTrait,
     sea_query::{Expr, Query},
 };
 
@@ -60,6 +60,8 @@ pub struct IncidentIntegrationRecord {
     /// `collect_incident_destinations` in `src/core/src/alerts/incidents.rs`,
     /// which has no fallback beyond what's passed in as `base_destinations`.
     pub destinations: Vec<String>,
+    /// The on-call team this source's new incidents page, overriding routing.
+    pub oncall_team: Option<String>,
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
@@ -95,6 +97,7 @@ impl From<Model> for IncidentIntegrationRecord {
             enabled: m.enabled,
             config,
             destinations,
+            oncall_team: m.oncall_team,
             created_by: m.created_by,
             created_at: m.created_at,
             updated_at: m.updated_at,
@@ -197,6 +200,7 @@ pub async fn ensure_default_for_org(
         enabled: true,
         config: serde_json::json!({}),
         destinations: Vec::new(),
+        oncall_team: None,
         created_by: created_by.to_owned(),
         created_at: now,
         updated_at: now,
@@ -237,18 +241,17 @@ pub async fn set_enabled(org_id: &str, id: &str, enabled: bool) -> Result<(), er
     Ok(())
 }
 
-/// Update an integration's name and/or incident-notification destinations
-/// in a single write. `None` leaves that field untouched; `destinations:
-/// Some(&[])` clears destinations back to "use the org default". `name` is
-/// just a label — it doesn't affect routing/matching, so it's safe to
-/// change at any time, including for the org's "default" source.
+/// Updates the given fields in one write; `None` keeps a field, `Some(&[])` and `Some(None)` clear
+/// destinations and team.
 pub async fn update(
     org_id: &str,
     id: &str,
     name: Option<&str>,
     destinations: Option<&[String]>,
+    oncall_team: Option<Option<&str>>,
 ) -> Result<(), errors::Error> {
-    update_with(get_orm_client_rw().await, org_id, id, name, destinations).await
+    let conn = get_orm_client_rw().await;
+    update_with(conn, org_id, id, name, destinations, oncall_team).await
 }
 
 /// Rotate an integration's token to a new random value, returning it.
@@ -425,6 +428,23 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
     delete_by_org_with(get_orm_client_rw().await, org_id).await
 }
 
+/// Names of every integration in the org that pages `team_id`, enabled or not, sorted.
+pub async fn list_names_by_oncall_team<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    team_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    Ok(Entity::find()
+        .select_only()
+        .column(Column::Name)
+        .filter(Column::OrgId.eq(org))
+        .filter(Column::OncallTeam.eq(team_id))
+        .order_by_asc(Column::Name)
+        .into_tuple::<String>()
+        .all(conn)
+        .await?)
+}
+
 /// List all observed senders for an integration.
 pub async fn list_senders(integration_id: &str) -> Result<Vec<SenderRecord>, errors::Error> {
     let client = get_orm_client_ro().await;
@@ -454,6 +474,7 @@ async fn add_with<C: ConnectionTrait>(
         } else {
             serde_json::to_string(&record.destinations).ok()
         }),
+        oncall_team: Set(record.oncall_team.clone()),
         created_by: Set(record.created_by.clone()),
         created_at: Set(now),
         updated_at: Set(now),
@@ -468,6 +489,7 @@ async fn update_with<C: ConnectionTrait>(
     id: &str,
     name: Option<&str>,
     destinations: Option<&[String]>,
+    oncall_team: Option<Option<&str>>,
 ) -> Result<(), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
     let mut q = Entity::update_many().col_expr(Column::UpdatedAt, Expr::value(now));
@@ -485,6 +507,9 @@ async fn update_with<C: ConnectionTrait>(
             })?)
         };
         q = q.col_expr(Column::Destinations, Expr::value(encoded));
+    }
+    if let Some(oncall_team) = oncall_team {
+        q = q.col_expr(Column::OncallTeam, Expr::value(oncall_team));
     }
     q.filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
@@ -544,6 +569,7 @@ mod tests {
                 enabled: Set(true),
                 config: Set("{}".to_string()),
                 destinations: Set(None),
+                oncall_team: Set(None),
                 created_by: Set("owner".to_string()),
                 created_at: Set(1),
                 updated_at: Set(1),
@@ -628,6 +654,7 @@ mod tests {
             enabled: true,
             config: serde_json::json!({}),
             destinations: Vec::new(),
+            oncall_team: None,
             created_by: "owner".to_string(),
             created_at: 1,
             updated_at: 1,
@@ -640,16 +667,87 @@ mod tests {
         );
         add_with(&db, &record("other", "other")).await.unwrap();
 
-        let err = update_with(&db, "live", "other", Some("default"), None)
+        let err = update_with(&db, "live", "other", Some("default"), None, None)
             .await
             .unwrap_err();
         assert!(
             matches!(err, Error::DbError(DbError::UniqueViolation)),
             "{err}"
         );
-        update_with(&db, "deleted", "deleted", Some("other"), None)
+        update_with(&db, "deleted", "deleted", Some("other"), None, None)
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_integrations_team_is_stored_kept_cleared_and_listed_by_team() {
+        let db = integration_db().await;
+        let record =
+            |id: &str, org: &str, name: &str, team: Option<&str>| IncidentIntegrationRecord {
+                id: id.to_string(),
+                org_id: org.to_string(),
+                name: name.to_string(),
+                source_type: "grafana".to_string(),
+                token: generate_token(),
+                enabled: false,
+                config: serde_json::json!({}),
+                destinations: Vec::new(),
+                oncall_team: team.map(str::to_string),
+                created_by: "owner".to_string(),
+                created_at: 1,
+                updated_at: 1,
+            };
+        add_with(&db, &record("b", "live", "zeta", Some("sre")))
+            .await
+            .unwrap();
+        add_with(&db, &record("a", "live", "alpha", Some("sre")))
+            .await
+            .unwrap();
+        add_with(&db, &record("c", "live", "other", Some("web")))
+            .await
+            .unwrap();
+        add_with(&db, &record("d", "deleted", "elsewhere", Some("sre")))
+            .await
+            .unwrap();
+        let team_of = |id: &'static str| {
+            let db = &db;
+            async move {
+                let m = Entity::find_by_id(id).one(db).await.unwrap().unwrap();
+                IncidentIntegrationRecord::from(m).oncall_team
+            }
+        };
+        assert_eq!(team_of("b").await.as_deref(), Some("sre"));
+        assert_eq!(
+            list_names_by_oncall_team(&db, "live", "sre").await.unwrap(),
+            vec!["alpha", "zeta"]
+        );
+
+        update_with(&db, "live", "b", Some("renamed"), None, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            team_of("b").await.as_deref(),
+            Some("sre"),
+            "absent keeps it"
+        );
+        update_with(&db, "live", "b", None, None, Some(Some("web")))
+            .await
+            .unwrap();
+        assert_eq!(team_of("b").await.as_deref(), Some("web"));
+        update_with(&db, "live", "b", None, None, Some(None))
+            .await
+            .unwrap();
+        assert_eq!(team_of("b").await, None);
+        assert_eq!(
+            list_names_by_oncall_team(&db, "live", "sre").await.unwrap(),
+            vec!["alpha"]
+        );
+        assert!(
+            list_names_by_oncall_team(&db, "live", "nobody")
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -671,6 +769,7 @@ mod tests {
             enabled: true,
             config: r#"{"destinations":["slack"]}"#.into(),
             destinations: None,
+            oncall_team: None,
             created_by: "a@b.c".into(),
             created_at: 1,
             updated_at: 1,
@@ -690,6 +789,7 @@ mod tests {
             enabled: true,
             config: "not-json".into(),
             destinations: None,
+            oncall_team: None,
             created_by: "a@b.c".into(),
             created_at: 1,
             updated_at: 1,
@@ -709,6 +809,7 @@ mod tests {
             enabled: true,
             config: "{}".into(),
             destinations: Some(r#"["sre-pages","email-oncall"]"#.into()),
+            oncall_team: None,
             created_by: "a@b.c".into(),
             created_at: 1,
             updated_at: 1,
@@ -728,6 +829,7 @@ mod tests {
             enabled: true,
             config: "{}".into(),
             destinations: None,
+            oncall_team: None,
             created_by: "a@b.c".into(),
             created_at: 1,
             updated_at: 1,
@@ -750,6 +852,7 @@ mod tests {
             enabled: true,
             config: r#"{"destinations":["sre-pages"]}"#.into(),
             destinations: None,
+            oncall_team: None,
             created_by: "a@b.c".into(),
             created_at: 1,
             updated_at: 1,
@@ -769,6 +872,7 @@ mod tests {
             enabled: true,
             config: r#"{"destinations":["stale-config-value"]}"#.into(),
             destinations: Some(r#"["sre-pages"]"#.into()),
+            oncall_team: None,
             created_by: "a@b.c".into(),
             created_at: 1,
             updated_at: 1,

@@ -621,7 +621,7 @@ fn check_columns_per_record(
 ) -> Result<()> {
     let limit = get_config().limit.req_cols_per_record_limit;
     for record in records {
-        check_record_columns_limit(org_id, StreamType::Metrics, stream_name, record, limit)?;
+        check_record_columns_limit(org_id, StreamType::Metrics, stream_name, record, limit, &[])?;
     }
     Ok(())
 }

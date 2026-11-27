@@ -15414,7 +15414,9 @@
     "incidentDestination": "事件目標",
     "incidentDestinationPlaceholder": "使用組織預設值",
     "incidentDestinationHint": "當此來源的警示建立或加入事件時，通知會傳送到哪裡。留空以使用組織預設 — 若兩者皆未設定，符合的事件會靜默觸發。",
+    "incidentDestinationHintOncall": "當此來源的警示建立或加入事件時，除 On-Call 呼叫外，通知還會傳送到哪裡。留空以使用組織預設。",
     "noDestinationSet": "未設定事件目標",
+    "oncallOnly": "僅 On-Call",
     "setupStep1Title": "1. 建立 Webhook",
     "setupStep1Body": "在 Grafana、Alertmanager 或任何可以 POST JSON 的工具中，建立 Webhook 聯絡點 / 接收器。",
     "setupRemainingStepsHint": "儲存此來源以取得其 URL 和 Token，然後將它們貼到該 Webhook 設定中。",
@@ -16497,6 +16499,13 @@
       "logoLightLabel": "自訂標誌（淺色模式）",
       "logoLightHelp": "於淺色模式顯示。支援 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。",
       "logoDarkLabel": "自訂標誌（深色模式）",
+      "logoTitle": "自訂標誌",
+      "logoHelp": "顯示於應用程式標頭。支援 PNG、JPG、GIF、BMP、WEBP 或 SVG，最大 150 × 30 px。",
+      "logoLightTitle": "淺色模式",
+      "logoDarkTitle": "深色模式",
+      "logoSaved": "已儲存",
+      "logoNotSaved": "未儲存",
+      "logoDimensions": "{width} × {height} 像素",
       "logoDarkHelp": "於深色模式顯示。支援 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。"
     },
     "modelPricingEditor": {
@@ -24179,8 +24188,19 @@
       "clear": "清除"
     },
     "file": {
-      "removeFile": "移除檔案",
-      "clearAll": "全部清除"
+      "removeNamed": "移除 {name}",
+      "attachPrompt": "拖放檔案以附加，或 {browse}",
+      "attachPromptMultiple": "拖放檔案以附加，或 {browse}",
+      "browseLink": "瀏覽",
+      "supports": "支援的檔案 {types}",
+      "dropFileToAttach": "放開以附加檔案",
+      "dropFilesToAttach": "放開以附加檔案",
+      "typeRejected": "僅接受 {allowed} 檔案",
+      "sizeRejected": "{size} 超過 {max} 的限制",
+      "countRejected": "一次只能 {count} 個檔案 | 一次只能 {count} 個檔案",
+      "invalidJson": "不是有效的 JSON:{detail}",
+      "invalidImage": "不是有效的圖片檔案",
+      "unavailable": "無法使用檔案上傳"
     },
     "date": {
       "openCalendar": "開啟行事曆",
@@ -28006,8 +28026,8 @@
     "awayMark": "標記為不在",
     "awayClear": "清除暫離",
     "awayClearConfirm": "清除",
-    "awayClearMessage": "要清除 {name} 的暫離狀態嗎（{range}）？此設定會套用至所有團隊。",
-    "awayConsequence": "會套用至 {name} 所屬的每個團隊。其班次會交給各輪值的下一位人員（若有）。",
+    "awayClearMessage": "要清除 {name} 在 {range} 的暫離狀態嗎？此設定會套用至此組織中的每一個團隊。",
+    "awayConsequence": "會套用至此組織中 {name} 所屬的每一個團隊。其班次會交給各輪值的下一位人員（若有）。",
     "awayNextWeek": "下週，週一至週日",
     "awayTitle": "標記為不在",
     "membersAddOpen": "新增成員",

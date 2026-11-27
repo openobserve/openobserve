@@ -15417,7 +15417,9 @@
     "incidentDestination": "Incident destination",
     "incidentDestinationPlaceholder": "Use org default",
     "incidentDestinationHint": "Where notifications go when this source's alerts create or join an incident. Leave empty to use the org default — without either set, matching incidents fire silently.",
+    "incidentDestinationHintOncall": "Where notifications go when this source's alerts create or join an incident, in addition to On-Call paging. Leave empty to use the org default.",
     "noDestinationSet": "No incident destination set",
+    "oncallOnly": "On-Call only",
     "setupStep1Title": "1. Create a webhook",
     "setupStep1Body": "In Grafana, Alertmanager, or any tool that can POST JSON, create a webhook contact point / receiver.",
     "setupRemainingStepsHint": "Save this source to get its URL and token, then paste them into that webhook config.",
@@ -16500,6 +16502,13 @@
       "logoLightLabel": "Custom logo (light mode)",
       "logoLightHelp": "Shown in light mode. PNG, JPG, GIF or BMP, up to 150 × 30 px.",
       "logoDarkLabel": "Custom logo (dark mode)",
+      "logoTitle": "Custom logo",
+      "logoHelp": "Shown in the app header. PNG, JPG, GIF, BMP, WEBP or SVG, up to 150 × 30 px.",
+      "logoLightTitle": "Light mode",
+      "logoDarkTitle": "Dark mode",
+      "logoSaved": "Saved",
+      "logoNotSaved": "Not saved",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Shown in dark mode. PNG, JPG, GIF or BMP, up to 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24182,8 +24191,19 @@
       "clear": "Clear"
     },
     "file": {
-      "removeFile": "Remove file",
-      "clearAll": "Clear all"
+      "removeNamed": "Remove {name}",
+      "attachPrompt": "Drop a file to attach, or {browse}",
+      "attachPromptMultiple": "Drop files to attach, or {browse}",
+      "browseLink": "browse",
+      "supports": "File supported {types}",
+      "dropFileToAttach": "Drop the file to attach",
+      "dropFilesToAttach": "Drop the files to attach",
+      "typeRejected": "Only {allowed} files are accepted",
+      "sizeRejected": "{size} is over the {max} limit",
+      "countRejected": "Only {count} file at a time | Only {count} files at a time",
+      "invalidJson": "Not valid JSON: {detail}",
+      "invalidImage": "Not a valid image file",
+      "unavailable": "File upload is unavailable"
     },
     "date": {
       "openCalendar": "Open calendar",

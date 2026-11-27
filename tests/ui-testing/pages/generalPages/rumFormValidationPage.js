@@ -30,14 +30,15 @@ export class RumFormValidationPage {
     this.environmentInput = page.locator('[data-test="rum-upload-source-maps-environment-input-field"]');
 
     // ── Upload form — File upload area ─────────────────────────────────────────
+    // OFormFile data-test="rum-upload-source-maps-file" → -zone / -field / -error
     // The clickable drop zone
-    this.fileUploadArea = page.locator('[data-test="rum-upload-source-maps-file-dropzone"]');
-    // The hidden <input type="file"> inside the dropzone
-    this.fileInput = page.locator('[data-test="rum-upload-source-maps-file-input"]');
-    // Inline file validation error (SourceMapDropzone) — after the OForm+zod
-    // migration the "required" / "only .zip" file errors surface INLINE via the
-    // schema (firstFieldError), not as a toast. Shown on submit.
+    this.fileUploadArea = page.locator('[data-test="rum-upload-source-maps-file-zone"]');
+    // The hidden <input type="file">
+    this.fileInput = page.locator('[data-test="rum-upload-source-maps-file-field"]');
+    // Inline "required" error from the schema, shown on submit.
     this.fileError = page.locator('[data-test="rum-upload-source-maps-file-error"]');
+    // A file the upload box refuses (wrong type) gets an error row as soon as it is picked.
+    this.fileRow = page.locator('[data-test="o-file-chip-0"]');
     // Toast locators — still used for the success path (and any server-side error).
     this.toastError = page.locator('[data-test-variant="error"]');
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
@@ -119,6 +120,7 @@ export class RumFormValidationPage {
   getEnvironmentInputLocator(){ return this.environmentInput; }
   getFileUploadAreaLocator()  { return this.fileUploadArea; }
   getFileErrorLocator()       { return this.fileError; }
+  getFileRowLocator()         { return this.fileRow; }
   getUploadBtnLocator()       { return this.uploadBtn; }
   getCancelBtnLocator()       { return this.cancelBtn; }
   getToastErrorLocator()      { return this.toastError; }

@@ -1151,20 +1151,6 @@ describe("General", () => {
     });
   });
 
-  describe("File upload validation", () => {
-    it("should handle file rejection", async () => {
-      const wrapper = createWrapper();
-      const rejectedFiles = [{ name: "large-file.png", size: 30000 }];
-
-      await wrapper.vm.onRejected(rejectedFiles);
-
-      expect(mockToast).toHaveBeenCalledWith({
-        variant: "error",
-        message: "1 file did not pass validation constraints",
-      });
-    });
-  });
-
   describe("Accessibility", () => {
     it("should render the scrape interval as a number input", () => {
       const wrapper = createWrapper();

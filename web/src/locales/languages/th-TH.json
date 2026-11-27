@@ -15417,7 +15417,9 @@
     "incidentDestination": "Incident destination",
     "incidentDestinationPlaceholder": "Use org default",
     "incidentDestinationHint": "Where notifications go when this source's alerts create or join an incident. Leave empty to use the org default — without either set, matching incidents fire silently.",
+    "incidentDestinationHintOncall": "Where notifications go when this source's alerts create or join an incident, in addition to On-Call paging. Leave empty to use the org default.",
     "noDestinationSet": "No incident destination set",
+    "oncallOnly": "On-Call only",
     "setupStep1Title": "1. Create a webhook",
     "setupStep1Body": "In Grafana, Alertmanager, or any tool that can POST JSON, create a webhook contact point / receiver.",
     "setupRemainingStepsHint": "Save this source to get its URL and token, then paste them into that webhook config.",
@@ -16500,6 +16502,13 @@
       "logoLightLabel": "โลโก้ที่กำหนดเอง (โหมดสว่าง)",
       "logoLightHelp": "แสดงในโหมดสว่าง รองรับ PNG, JPG, GIF หรือ BMP ขนาดสูงสุด 150 × 30 px",
       "logoDarkLabel": "โลโก้ที่กำหนดเอง (โหมดมืด)",
+      "logoTitle": "โลโก้ที่กำหนดเอง",
+      "logoHelp": "แสดงในส่วนหัวของแอป รองรับ PNG, JPG, GIF, BMP, WEBP หรือ SVG ขนาดไม่เกิน 150 × 30 px",
+      "logoLightTitle": "โหมดสว่าง",
+      "logoDarkTitle": "โหมดมืด",
+      "logoSaved": "บันทึกแล้ว",
+      "logoNotSaved": "ยังไม่บันทึก",
+      "logoDimensions": "{width} × {height} พิกเซล",
       "logoDarkHelp": "แสดงในโหมดมืด รองรับ PNG, JPG, GIF หรือ BMP ขนาดสูงสุด 150 × 30 px"
     },
     "modelPricingEditor": {
@@ -24182,8 +24191,19 @@
       "clear": "ล้าง"
     },
     "file": {
-      "removeFile": "Remove file",
-      "clearAll": "ล้างทั้งหมด"
+      "removeNamed": "ลบ {name}",
+      "attachPrompt": "วางไฟล์เพื่อแนบ หรือ {browse}",
+      "attachPromptMultiple": "วางไฟล์หลายไฟล์เพื่อแนบ หรือ {browse}",
+      "browseLink": "เลือกไฟล์",
+      "supports": "ไฟล์ที่รองรับ {types}",
+      "dropFileToAttach": "วางเพื่อแนบไฟล์",
+      "dropFilesToAttach": "วางเพื่อแนบไฟล์",
+      "typeRejected": "รับเฉพาะไฟล์ {allowed} เท่านั้น",
+      "sizeRejected": "{size} เกินขีดจำกัด {max}",
+      "countRejected": "ครั้งละ {count} ไฟล์เท่านั้น | ครั้งละ {count} ไฟล์เท่านั้น",
+      "invalidJson": "JSON ไม่ถูกต้อง: {detail}",
+      "invalidImage": "ไม่ใช่ไฟล์รูปภาพที่ถูกต้อง",
+      "unavailable": "ไม่สามารถอัปโหลดไฟล์ได้"
     },
     "date": {
       "openCalendar": "Open calendar",
@@ -28009,8 +28029,8 @@
     "awayMark": "Mark away",
     "awayClear": "ล้างสถานะไม่อยู่",
     "awayClearConfirm": "ล้าง",
-    "awayClearMessage": "ล้างสถานะไม่อยู่ของ {name} ช่วง {range} หรือไม่? มีผลกับทุกทีม",
-    "awayConsequence": "มีผลกับทุกทีมที่ {name} อยู่ กะของ他们将ถูกส่งต่อไปยังคนถัดไปในแต่ละรอบเวร หากมี",
+    "awayClearMessage": "ล้างสถานะไม่อยู่ของ {name} ช่วง {range} ใช่ไหม? การดำเนินการนี้มีผลกับทุกทีมในองค์กรนี้",
+    "awayConsequence": "มีผลกับทุกทีมที่ {name} สังกัดอยู่ในองค์กรนี้ กะของพวกเขาจะถูกโอนไปยังคนถัดไปในแต่ละรอบเวร หากมี",
     "awayNextWeek": "สัปดาห์หน้า จันทร์–อาทิตย์",
     "awayTitle": "Mark away",
     "membersAddOpen": "เพิ่มสมาชิก",
