@@ -16,10 +16,11 @@
 import { ref, watch, type Ref } from "vue";
 import searchService from "@/services/search";
 import { extractWhereClause } from "@/utils/query/sqlUtils";
+import type { I18nKey } from "@/types/i18n";
 import {
-  resolvePatternMatchTerms,
+  FILTER_BLOCKED_MESSAGE,
+  patternWhere,
   patternFilterBlockedReason,
-  escapeForMatchAll,
   type PatternFilterBlock,
 } from "./patternUtils";
 
@@ -44,8 +45,6 @@ export interface PatternVolumeContext {
   queryFn?: string | null;
   regions?: string[];
   clusters?: string[];
-  /** Every extracted template, so a volume query matches only the pattern it labels. */
-  allTemplates?: string[];
 }
 
 /**
@@ -64,9 +63,8 @@ export function buildPatternVolumeContext(args: {
   streamName?: string | null;
   window?: { start: number; end: number } | null;
   lastQuery?: any;
-  allTemplates?: string[];
 }): PatternVolumeContext | null {
-  const { orgId, streamName, window, lastQuery, allTemplates } = args;
+  const { orgId, streamName, window, lastQuery } = args;
   const startUs = lastQuery?.query?.start_time ?? window?.start;
   const endUs = lastQuery?.query?.end_time ?? window?.end;
   if (!streamName || !startUs || !endUs) return null;
@@ -79,7 +77,6 @@ export function buildPatternVolumeContext(args: {
     queryFn: lastQuery?.query?.query_fn ?? null,
     regions: lastQuery?.regions ?? undefined,
     clusters: lastQuery?.clusters ?? undefined,
-    allTemplates,
   };
 }
 
@@ -165,22 +162,21 @@ export async function fetchPatternVolume(
   pattern: any,
   ctx: PatternVolumeContext,
 ): Promise<PatternVolumeResult | null> {
-  const constants = resolvePatternMatchTerms(pattern?.template ?? "", ctx.allTemplates);
-  if (!constants) {
+  const patternFilter = patternWhere(pattern);
+  if (!patternFilter) {
     return null;
   }
 
   const windowSecs = Math.max(1, (ctx.endUs - ctx.startUs) / 1_000_000);
   const { label: interval, seconds: intervalSecs } = histogramInterval(windowSecs / TARGET_BARS);
 
-  const patternWhere = constants.map((c) => `match_all('${escapeForMatchAll(c)}')`).join(" AND ");
   // AND the extraction query's own filter (if any) so a filtered extraction's
   // volume reflects the same subset the patterns were extracted from. A null
   // means that filter can't be reproduced — report no volume rather than a
   // number for a different population.
   const baseWhere = await resolveBaseFilter(ctx.baseSql);
   if (baseWhere === null) return null;
-  const where = baseWhere ? `(${baseWhere}) AND ${patternWhere}` : patternWhere;
+  const where = baseWhere ? `(${baseWhere}) AND ${patternFilter}` : patternFilter;
   const sql =
     `SELECT histogram(_timestamp, '${interval}') AS zo_key, count(*) AS zo_cnt ` +
     `FROM "${ctx.streamName}" WHERE ${where} ` +
@@ -294,6 +290,31 @@ export interface PatternVolumeEntry {
   loading: boolean;
   /** Why no volume can exist for this pattern: no filter selects only its logs. */
   unavailableReason?: PatternFilterBlock;
+  /** Why the volume query did not run or failed; only "retryable" is worth another try. */
+  failure?: PatternVolumeFailure;
+}
+
+export type PatternVolumeFailure = "unsupported" | "retryable" | "lasting";
+
+const VOLUME_FAILURE_MESSAGE = {
+  unsupported: "logs.patternList.volumeUnsupported",
+  retryable: "logs.patternList.volumeFailedRetry",
+  lasting: "logs.patternList.volumeFailed",
+} as const satisfies Record<PatternVolumeFailure, I18nKey>;
+
+/** Why a settled entry has no volume, or undefined while it is loading or has one. */
+export function volumeIssueKey(entry?: PatternVolumeEntry): I18nKey | undefined {
+  if (!entry || entry.loading || entry.total !== null) return undefined;
+  if (entry.unavailableReason) return FILTER_BLOCKED_MESSAGE[entry.unavailableReason];
+  return entry.failure ? VOLUME_FAILURE_MESSAGE[entry.failure] : undefined;
+}
+
+const RETRYABLE_4XX = new Set([408, 429]);
+
+/** A 5xx, timeout, rate limit or lost response can pass on retry; other 4xx fail again. */
+function volumeFailure(error: any): PatternVolumeFailure {
+  const status = Number(error?.response?.status ?? 0);
+  return !status || status >= 500 || RETRYABLE_4XX.has(status) ? "retryable" : "lasting";
 }
 
 /** Stable identity for a pattern across re-renders. */
@@ -331,9 +352,11 @@ export function usePatternVolumeCache(ctx: Ref<PatternVolumeContext | null>) {
       ...entries.value,
       [key]: { buckets: null, total: null, intervalSecs: null, loading: true },
     };
+    const unavailableReason =
+      patternFilterBlockedReason(pattern?.template ?? "", [pattern]) ?? undefined;
     let entry: PatternVolumeEntry;
     try {
-      const result = await fetchPatternVolume(pattern, c);
+      const result = unavailableReason ? null : await fetchPatternVolume(pattern, c);
       const buckets = result?.buckets ?? null;
       const total = buckets && buckets.length ? buckets.reduce((sum, v) => sum + v, 0) : null;
       entry = {
@@ -341,26 +364,41 @@ export function usePatternVolumeCache(ctx: Ref<PatternVolumeContext | null>) {
         total,
         intervalSecs: result?.intervalSecs ?? null,
         loading: false,
-        unavailableReason:
-          patternFilterBlockedReason(pattern?.template ?? "", c.allTemplates) ?? undefined,
+        unavailableReason,
+        // With terms in hand, no result means the search's own filter could not be reproduced.
+        failure: !unavailableReason && !result ? "unsupported" : undefined,
       };
-    } catch {
-      entry = { buckets: [], total: null, intervalSecs: null, loading: false };
+    } catch (error) {
+      entry = {
+        buckets: [],
+        total: null,
+        intervalSecs: null,
+        loading: false,
+        failure: volumeFailure(error),
+      };
     }
     if (token !== generation) return;
     entries.value = { ...entries.value, [key]: entry };
   };
 
+  /** Drops a failed entry and queries again. */
+  const retry = (pattern: any): Promise<void> => {
+    const { [patternVolumeKey(pattern)]: _dropped, ...rest } = entries.value;
+    entries.value = rest;
+    return request(pattern);
+  };
+
   const get = (pattern: any): PatternVolumeEntry | undefined =>
     entries.value[patternVolumeKey(pattern)];
 
-  return { entries, request, get };
+  return { entries, request, retry, get };
 }
 
 export const PATTERN_VOLUME_CACHE = Symbol("pattern-volume-cache");
 
 export interface PatternVolumeCache {
   request: (pattern: any) => Promise<void>;
+  retry: (pattern: any) => Promise<void>;
   get: (pattern: any) => PatternVolumeEntry | undefined;
 }
 

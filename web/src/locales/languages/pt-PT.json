@@ -21894,7 +21894,10 @@
       "excludeFromQuery": "Excluir",
       "createAlertAction": "Criar alerta",
       "noMatchTerms": "Este padrão não possui texto distinto para filtrar.",
-      "noDistinctTextTooltip": "Cada parte de texto fixo deste padrão também aparece noutro padrão, por isso um filtro corresponderia também aos respetivos registos.",
+      "noDistinctTextTooltip": "O texto deste padrão também aparece nos registos de outro padrão, muitas vezes a mesma mensagem com outro nível de registo, por isso um filtro não consegue contá-lo isoladamente.",
+      "volumeUnsupported": "O volume não está disponível para pesquisas que usam WITH, JOIN, UNION, um alias de tabela ou uma subconsulta.",
+      "volumeFailedRetry": "Não foi possível carregar o volume. O servidor pode estar ocupado; tente novamente.",
+      "volumeFailed": "Não foi possível carregar o volume deste padrão.",
       "noStreamSelected": "Nenhum stream selecionado. Selecione um stream antes de criar um alerta.",
       "alertBroadMatch": "Este padrão não possui texto constante distinto — a consulta do alerta corresponderá amplamente. Considere adicionar filtros manuais."
     },

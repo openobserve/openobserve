@@ -105,6 +105,7 @@ vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }))
 
 // -- Import after mocks --
 import { usePatternActions } from "./usePatternActions";
+import { extractConstantsFromPattern } from "./patternUtils";
 import analytics from "@/services/product_analytics";
 
 describe("usePatternActions", () => {
@@ -205,9 +206,14 @@ describe("usePatternActions", () => {
   });
 
   describe("addPatternToSearch", () => {
+    // As the extractor returns them: long constants as terms, none for a template with no text.
+    const extracted = (template: string) => {
+      const terms = extractConstantsFromPattern(template);
+      return terms.length ? { template, match_terms: terms } : { template, match_block: "no_text" };
+    };
     const setPatterns = (templates: string[]) => {
       mockPatternsState.value = {
-        patterns: { patterns: templates.map((template) => ({ template })), statistics: {} },
+        patterns: { patterns: templates.map(extracted), statistics: {} },
       };
     };
 
@@ -215,7 +221,7 @@ describe("usePatternActions", () => {
       setPatterns(["User logged in <*> from address <:IP>", "Disk is full on <*>"]);
       const { addPatternToSearch } = usePatternActions();
 
-      addPatternToSearch({ template: "User logged in <*> from address <:IP>" }, "include");
+      addPatternToSearch(extracted("User logged in <*> from address <:IP>"), "include");
 
       expect(mockSearchObj.data.stream.addToFilter).toBe(
         "match_all('User logged in') AND match_all('from address')",
@@ -227,7 +233,7 @@ describe("usePatternActions", () => {
       setPatterns(["User logged in <*> ok", "Disk is full on <*>"]);
       const { addPatternToSearch } = usePatternActions();
 
-      addPatternToSearch({ template: "User logged in <*> ok" }, "exclude");
+      addPatternToSearch(extracted("User logged in <*> ok"), "exclude");
 
       expect(mockSearchObj.data.stream.addToFilter).toBe("NOT match_all('User logged in')");
       expect(analytics.track).toHaveBeenCalledWith("log_patterns_filter_applied", {
@@ -240,7 +246,7 @@ describe("usePatternActions", () => {
       setPatterns(["User logged in <*> from address <:IP>", "Disk is full on <*>"]);
       const { addPatternToSearch } = usePatternActions();
 
-      addPatternToSearch({ template: "User logged in <*> from address <:IP>" }, "exclude");
+      addPatternToSearch(extracted("User logged in <*> from address <:IP>"), "exclude");
 
       expect(mockSearchObj.data.stream.addToFilter).toBe(
         "NOT (match_all('User logged in') AND match_all('from address'))",
@@ -251,7 +257,7 @@ describe("usePatternActions", () => {
       setPatterns(["<*>"]);
       const { addPatternToSearch } = usePatternActions();
 
-      addPatternToSearch({ template: "<*>" }, "include");
+      addPatternToSearch(extracted("<*>"), "include");
 
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
       expect(mockSearchObj.data.stream.addToFilter).toBe("");
@@ -261,12 +267,13 @@ describe("usePatternActions", () => {
     describe("patterns that share a long prefix", () => {
       const A = "core event seq=<:NUM> info from <*> status 500";
       const B = "core event seq=<:NUM> warn from <*> status 404";
+      const PA = { template: A, match_terms: ["core event seq=", "info from", "status 500"] };
 
       it("includes the short words that tell the pattern apart", () => {
         setPatterns([A, B]);
         const { addPatternToSearch } = usePatternActions();
 
-        addPatternToSearch({ template: A }, "include");
+        addPatternToSearch(PA, "include");
 
         expect(mockSearchObj.data.stream.addToFilter).toBe(
           "match_all('core event seq=') AND match_all('info from') AND match_all('status 500')",
@@ -277,7 +284,7 @@ describe("usePatternActions", () => {
         setPatterns([A, B]);
         const { addPatternToSearch } = usePatternActions();
 
-        addPatternToSearch({ template: A }, "exclude");
+        addPatternToSearch(PA, "exclude");
 
         expect(mockSearchObj.data.stream.addToFilter).toBe(
           "NOT (match_all('core event seq=') AND match_all('info from') AND match_all('status 500'))",
@@ -285,13 +292,12 @@ describe("usePatternActions", () => {
       });
 
       it("warns and applies nothing when no term separates the pattern", () => {
-        const X = "core event seq=<:NUM> info from <*>";
-        setPatterns([X, A]);
+        const X = { template: "core event seq=<:NUM> info from <*>", match_block: "shared" };
         const { addPatternToSearch, filterBlockedReason } = usePatternActions();
 
-        expect(filterBlockedReason({ template: X })).toBe("shared");
-        expect(filterBlockedReason({ template: A })).toBeNull();
-        addPatternToSearch({ template: X }, "include");
+        expect(filterBlockedReason(X)).toBe("shared");
+        expect(filterBlockedReason(PA)).toBeNull();
+        addPatternToSearch(X, "include");
 
         expect(mockToast).toHaveBeenCalledWith({
           variant: "warning",
@@ -301,11 +307,10 @@ describe("usePatternActions", () => {
       });
 
       it("reports no constant text, with its own message, for an all-wildcard template", () => {
-        setPatterns(["<*> <*>", A]);
         const { addPatternToSearch, filterBlockedReason } = usePatternActions();
 
-        expect(filterBlockedReason({ template: "<*> <*>" })).toBe("none");
-        addPatternToSearch({ template: "<*> <*>" }, "exclude");
+        expect(filterBlockedReason(extracted("<*> <*>"))).toBe("none");
+        addPatternToSearch(extracted("<*> <*>"), "exclude");
 
         expect(mockToast).toHaveBeenCalledWith({
           variant: "warning",
@@ -359,8 +364,8 @@ describe("usePatternActions", () => {
       mockSearchObj.meta.sqlMode = false;
       mockSearchObj.data.query = "";
       mockPatternsState.value.patterns.patterns = [
-        { pattern_id: "p1", template: ERR, level: "error" },
-        { pattern_id: "p2", template: PROBE, level: "info" },
+        { pattern_id: "p1", template: ERR, level: "error", match_terms: [ERR.slice(0, -4)] },
+        { pattern_id: "p2", template: PROBE, level: "info", match_terms: [PROBE.slice(0, -4)] },
       ];
       usePatternActions().setActiveSeverities([]);
     });

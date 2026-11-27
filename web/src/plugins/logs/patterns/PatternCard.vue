@@ -32,10 +32,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="
           volumeCount !== null
             ? t('logs.patternList.exactCountTooltip', { count: volumeCount.toLocaleString() })
-            : volumeUnavailableTitle
+            : undefined
         "
       >
-        {{ countLabel }}
+        <span
+          v-if="volumeUnavailableTitle"
+          class="cursor-help underline decoration-dotted underline-offset-4"
+        >
+          {{ countLabel }}
+          <OTooltip :content="volumeUnavailableTitle" max-width="22rem" />
+        </span>
+        <template v-else>{{ countLabel }}</template>
       </div>
       <div
         class="text-2xs text-text-secondary tabular-nums"
@@ -164,12 +171,11 @@ import {
   patternTrendBadge,
   levelColorClass,
   compactCount,
-  FILTER_BLOCKED_MESSAGE,
   LEVEL_KEYWORD_PATTERN,
   PATTERN_BADGES,
   type PatternSeverityKey,
 } from "./patternUtils";
-import { PATTERN_VOLUME_CACHE, type PatternVolumeCache } from "./usePatternVolume";
+import { PATTERN_VOLUME_CACHE, volumeIssueKey, type PatternVolumeCache } from "./usePatternVolume";
 import useWildcardHover from "./useWildcardHover";
 
 const props = defineProps<{
@@ -210,21 +216,17 @@ const onVolume = (volume: { total: number; buckets: number[] } | null) => {
   volumeBuckets.value = volume?.buckets ?? null;
 };
 
-// No filter selects only this pattern, so its sample count would be shown as if it were its volume.
-const volumeUnavailableReason = computed(() =>
-  volumeCount.value === null ? volumeCache?.get(props.pattern)?.unavailableReason : undefined,
+// With no volume, the sample count would read as the pattern's size, so the row shows "—" and why.
+const volumeIssue = computed(() =>
+  volumeCount.value === null ? volumeIssueKey(volumeCache?.get(props.pattern)) : undefined,
 );
 const volumeUnavailableTitle = computed(() =>
-  volumeUnavailableReason.value
-    ? t(FILTER_BLOCKED_MESSAGE[volumeUnavailableReason.value])
-    : undefined,
+  volumeIssue.value ? t(volumeIssue.value) : undefined,
 );
 
 const countLabel = computed(() => {
   if (volumeCount.value !== null) return `~${compactCount(volumeCount.value)}`;
-  return volumeUnavailableReason.value
-    ? "—"
-    : `~${compactCount(props.pattern.estimated_count ?? 0)}`;
+  return volumeIssue.value ? "—" : `~${compactCount(props.pattern.estimated_count ?? 0)}`;
 });
 
 const percentageLabel = computed(() => `${(props.pattern.percentage ?? 0).toFixed(2)}%`);
