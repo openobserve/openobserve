@@ -487,7 +487,7 @@ export const metricsAvailability = (input: {
 
 /** Whether service correlation is set up: an enterprise build with service streams on. */
 export const correlationConfigured = (isEnterprise: unknown, zoConfig: any): boolean =>
-  isEnterprise == "true" && zoConfig?.service_streams_enabled !== false;
+  isEnterprise === "true" && zoConfig?.service_streams_enabled !== false;
 
 export const isPathChart = (type: unknown): boolean =>
   typeof type === "string" && PATH_TYPES.includes(type);
