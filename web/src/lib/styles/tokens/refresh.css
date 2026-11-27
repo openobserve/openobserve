@@ -204,12 +204,10 @@
   /* eslint-disable-next-line local/no-hardcoded-px -- optical shadow geometry, not layout */
   --shadow-overlay: 0 8px 24px rgb(0 0 0 / 0.45);
 
-  /* A drop shadow vanishes on near-black, so the card lifts with a lighter edge and a top highlight. */
-  --color-card-edge: #323845;
+  /* A drop shadow vanishes on near-black, so the card lifts with a lighter edge; no inset highlight, which doubled the top edge. */
+  --color-card-edge: #252a33;
   /* eslint-disable local/no-hardcoded-px -- optical shadow geometry, not layout */
-  --shadow-card:
-    inset 0 1px 0 rgb(255 255 255 / 0.07), 0 2px 4px rgb(0 0 0 / 0.5),
-    0 12px 32px -12px rgb(0 0 0 / 0.8);
+  --shadow-card: 0 2px 4px rgb(0 0 0 / 0.5), 0 12px 32px -12px rgb(0 0 0 / 0.8);
   /* eslint-enable local/no-hardcoded-px */
 
   /* grey-900 on error-400 is 6.40:1. */
