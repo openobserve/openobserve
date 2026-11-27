@@ -59,36 +59,10 @@ pub struct StreamInfo {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dropped_dimensions: Vec<String>,
 
-    /// Whether the stream holds a row matching its filters in the requested window.
+    /// Metric streams only: whether a row matches the Metrics tab's filters in the window.
     /// Set only when the caller asked for it and the check finished; absent means unknown.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub has_data: Option<bool>,
-}
-
-impl PartialEq for StreamInfo {
-    // `has_data` is a per-request annotation, so two copies of one stream stay equal across it.
-    fn eq(&self, other: &Self) -> bool {
-        self.stream_name == other.stream_name
-            && self.stream_type == other.stream_type
-            && self.filters == other.filters
-            && self.filter_spellings == other.filter_spellings
-            && self.filter_aliases == other.filter_aliases
-            && self.dropped_dimensions == other.dropped_dimensions
-    }
-}
-
-impl std::hash::Hash for StreamInfo {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.stream_name.hash(state);
-        self.stream_type.hash(state);
-        // Sort filters by key for consistent hashing
-        let mut filter_items: Vec<_> = self.filters.iter().collect();
-        filter_items.sort_by_key(|(k, _)| *k);
-        for (k, v) in filter_items {
-            k.hash(state);
-            v.hash(state);
-        }
-    }
 }
 
 impl StreamInfo {
@@ -145,6 +119,32 @@ impl StreamInfo {
             filter_spellings: HashMap::new(),
             filter_aliases: HashMap::new(),
             has_data: None,
+        }
+    }
+}
+
+impl PartialEq for StreamInfo {
+    // `has_data` is a per-request annotation, so two copies of one stream stay equal across it.
+    fn eq(&self, other: &Self) -> bool {
+        self.stream_name == other.stream_name
+            && self.stream_type == other.stream_type
+            && self.filters == other.filters
+            && self.filter_spellings == other.filter_spellings
+            && self.filter_aliases == other.filter_aliases
+            && self.dropped_dimensions == other.dropped_dimensions
+    }
+}
+
+impl std::hash::Hash for StreamInfo {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.stream_name.hash(state);
+        self.stream_type.hash(state);
+        // Sort filters by key for consistent hashing
+        let mut filter_items: Vec<_> = self.filters.iter().collect();
+        filter_items.sort_by_key(|(k, _)| *k);
+        for (k, v) in filter_items {
+            k.hash(state);
+            v.hash(state);
         }
     }
 }

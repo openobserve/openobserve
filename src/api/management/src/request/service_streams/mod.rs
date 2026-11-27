@@ -358,20 +358,25 @@ pub async fn correlate_streams(
                 response.source_stream = Some(req.source_stream.clone());
                 response.source_type = Some(req.source_type.clone());
                 let checker = openobserve_core::authz::active_checker();
-                response.related_streams = openobserve_core::authz::readable_related_streams(
-                    checker.as_ref(),
-                    &user_email.user_id,
-                    &org_id,
-                    response.related_streams,
-                )
-                .await;
-                let probe = has_data::LiveProbe {
-                    org_id: &org_id,
-                    user_id: &user_email.user_id,
+                let (org, user) = (org_id.as_str(), user_email.user_id.as_str());
+                let readable = move |streams: config::meta::service_streams::RelatedStreams| async move {
+                    openobserve_core::authz::readable_related_streams(
+                        checker.as_ref(),
+                        user,
+                        org,
+                        streams,
+                    )
+                    .await
                 };
-                has_data::annotate_requested(
+                let probe = has_data::LiveProbe {
+                    org_id: org,
+                    user_id: user,
+                };
+                has_data::filter_then_annotate(
                     &req,
-                    &mut response.related_streams,
+                    &mut response,
+                    &semantic_groups,
+                    readable,
                     &probe,
                     config::utils::time::now_micros(),
                     has_data::BUDGET,
@@ -438,7 +443,7 @@ pub struct CorrelationRequest {
     /// Correlation window end in microseconds
     #[serde(default)]
     pub end_time: Option<i64>,
-    /// Answer `has_data` per returned stream over the window, or the last hour without one
+    /// Answer `has_data` per returned metric stream over the window, or the last hour without one
     #[serde(default)]
     pub check_data: bool,
 }
