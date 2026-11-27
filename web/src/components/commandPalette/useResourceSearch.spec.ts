@@ -13,21 +13,21 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 function setup(
-  initialType: ResourceKind | "all" = "all",
+  initialPicked: ResourceKind[] = [],
   visible: ResourceKind[] = ["function", "dashboard"],
 ) {
   const open = ref(true),
     org = ref("acme"),
     subject = ref("alice"),
     query = ref(""),
-    type = ref<ResourceKind | "all">(initialType),
+    picked = ref<ResourceKind[]>(initialPicked),
     kinds = ref<ResourceKind[]>(visible);
   let search!: ReturnType<typeof useResourceSearch>;
   wrappers.push(
     mount(
       defineComponent({
         setup() {
-          search = useResourceSearch({ open, org, subject, query, type, kinds });
+          search = useResourceSearch({ open, org, subject, query, picked, kinds });
           return () => h("div");
         },
       }),
@@ -62,7 +62,7 @@ describe("Command K search lifecycle", () => {
     await typeQuery(setup(), "pay");
     expect(vi.mocked(resources.search).mock.calls[0][1].types).toEqual(["function", "dashboard"]);
     vi.clearAllMocks();
-    await typeQuery(setup("all", []), "pay");
+    await typeQuery(setup([], []), "pay");
     expect(resources.search).not.toHaveBeenCalled();
   });
   it("makes no resource request for empty All and debounces typing", async () => {
@@ -167,7 +167,7 @@ describe("Command K search lifecycle", () => {
       })
       .mockReturnValueOnce(new Promise((resolve) => (finishPoll = resolve)) as never)
       .mockResolvedValue(fresh);
-    const s = setup("function");
+    const s = setup(["function"]);
     await typeQuery(s, "pay");
     await vi.advanceTimersByTimeAsync(1000);
     await s.search.refetch();
@@ -188,7 +188,7 @@ describe("Command K search lifecycle", () => {
       took_ms: 0,
     };
     vi.mocked(resources.search).mockResolvedValue(loading);
-    const s = setup("function");
+    const s = setup(["function"]);
     await typeQuery(s, "pay");
     await s.search.refetch();
     await flushPromises();

@@ -34587,7 +34587,15 @@
     "offline": "Sin conexión. Las visitas recientes siguen disponibles.",
     "sourceUnavailable": "Este tipo de recurso no está disponible",
     "emptyHelp": "Introduce un nombre o ID para buscar",
-    "globalShortcut": "Abrir búsqueda global"
+    "globalShortcut": "Abrir búsqueda global",
+    "trigger": "Buscar o ir a…",
+    "allTypes": "Todos",
+    "capped": "Mostrando la primera coincidencia. | Mostrando las primeras {count} coincidencias.",
+    "hintNavigate": "Navegar",
+    "hintOpen": "Abrir",
+    "hintNewTab": "Abrir en una pestaña nueva",
+    "hintTypes": "Filtrar por tipo",
+    "hintClose": "Cerrar"
   },
   "timeRangeInput": {
     "label": "Escribe un rango de tiempo",

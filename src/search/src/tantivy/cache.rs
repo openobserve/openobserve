@@ -33,10 +33,8 @@ pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
 
 #[derive(Debug, Clone)]
 pub enum CacheEntry {
-    /// (matched_row_ids bitmap, row_group_size_from_index_file)
-    RowIds(Arc<BooleanBuffer>, Option<u32>),
-    /// ((_timestamp, doc_id), row_group_size_from_index_file)
-    SelectCandidates(Arc<Vec<(i64, u32)>>, Option<u32>),
+    RowIds(Arc<BooleanBuffer>),              // matched row ids bitmap
+    SelectCandidates(Arc<Vec<(i64, u32)>>),  // (_timestamp, doc_id) pairs
     Count(usize),                            // simple count optimization
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization
@@ -47,16 +45,8 @@ pub enum CacheEntry {
 impl From<CacheEntry> for TantivyResult {
     fn from(entry: CacheEntry) -> Self {
         match entry {
-            CacheEntry::RowIds(row_ids, row_group_size) => TantivyResult::RowIdsSelection {
-                row_ids,
-                row_group_size,
-            },
-            CacheEntry::SelectCandidates(candidates, row_group_size) => {
-                TantivyResult::SelectCandidates {
-                    candidates,
-                    row_group_size,
-                }
-            }
+            CacheEntry::RowIds(row_ids) => TantivyResult::RowIdsSelection(row_ids),
+            CacheEntry::SelectCandidates(candidates) => TantivyResult::SelectCandidates(candidates),
             CacheEntry::Count(count) => TantivyResult::Count(count),
             CacheEntry::Histogram(histogram) => TantivyResult::Histogram(histogram),
             CacheEntry::MultiHistogram(multi_histogram) => {
@@ -71,10 +61,10 @@ impl From<CacheEntry> for TantivyResult {
 impl CacheEntry {
     pub fn get_memory_size(&self) -> usize {
         match self {
-            CacheEntry::RowIds(packed, ..) => {
+            CacheEntry::RowIds(packed) => {
                 packed.inner().len() + std::mem::size_of::<BooleanBuffer>()
             }
-            CacheEntry::SelectCandidates(candidates, ..) => {
+            CacheEntry::SelectCandidates(candidates) => {
                 candidates.capacity() * std::mem::size_of::<(i64, u32)>()
                     + std::mem::size_of::<Vec<(i64, u32)>>()
             }
@@ -281,12 +271,9 @@ mod tests {
     }
 
     fn create_test_tantivy_result() -> CacheEntry {
-        CacheEntry::RowIds(
-            Arc::new(BooleanBuffer::from_iter(
-                (0..64u32).map(|i| [10u32, 20, 30].contains(&i)),
-            )),
-            None,
-        )
+        CacheEntry::RowIds(Arc::new(BooleanBuffer::from_iter(
+            (0..64u32).map(|i| [10u32, 20, 30].contains(&i)),
+        )))
     }
 
     fn create_test_count_result() -> CacheEntry {
@@ -314,12 +301,9 @@ mod tests {
     }
 
     fn create_test_row_ids_result() -> CacheEntry {
-        CacheEntry::RowIds(
-            Arc::new(BooleanBuffer::from_iter(
-                (0..64u32).map(|i| [10u32, 20, 30].contains(&i)),
-            )),
-            None,
-        )
+        CacheEntry::RowIds(Arc::new(BooleanBuffer::from_iter(
+            (0..64u32).map(|i| [10u32, 20, 30].contains(&i)),
+        )))
     }
 
     #[test]
@@ -340,7 +324,7 @@ mod tests {
         let retrieved = cache.get(&key);
         assert!(retrieved.is_some());
         match retrieved.unwrap() {
-            TantivyResult::RowIdsSelection { row_ids, .. } => {
+            TantivyResult::RowIdsSelection(row_ids) => {
                 assert_eq!(row_ids.set_indices().collect::<Vec<_>>(), vec![10, 20, 30]);
             }
             _ => panic!("Expected RowIdsSelection result"),
@@ -601,16 +585,11 @@ mod tests {
         let cache = TantivyResultCache::new(TEST_MAX_SIZE);
 
         let candidates = Arc::new(vec![(100i64, 7u32), (99, 3)]);
-        let entry = CacheEntry::SelectCandidates(candidates.clone(), Some(1024));
+        let entry = CacheEntry::SelectCandidates(candidates.clone());
         cache.put("select_candidates_key".to_string(), entry);
 
-        if let Some(TantivyResult::SelectCandidates {
-            candidates: cached,
-            row_group_size,
-        }) = cache.get("select_candidates_key")
-        {
+        if let Some(TantivyResult::SelectCandidates(cached)) = cache.get("select_candidates_key") {
             assert_eq!(*cached, *candidates);
-            assert_eq!(row_group_size, Some(1024));
         } else {
             panic!("Expected SelectCandidates result");
         }
@@ -620,21 +599,13 @@ mod tests {
     fn test_tantivy_result_cache_row_ids_roundtrip() {
         let cache = TantivyResultCache::new(TEST_MAX_SIZE);
 
-        let entry = CacheEntry::RowIds(
-            Arc::new(BooleanBuffer::from_iter(
-                (0..64u32).map(|i| [10u32, 20].contains(&i)),
-            )),
-            Some(1024),
-        );
+        let entry = CacheEntry::RowIds(Arc::new(BooleanBuffer::from_iter(
+            (0..64u32).map(|i| [10u32, 20].contains(&i)),
+        )));
         cache.put("row_ids_key".to_string(), entry);
 
-        if let Some(TantivyResult::RowIdsSelection {
-            row_ids,
-            row_group_size,
-        }) = cache.get("row_ids_key")
-        {
+        if let Some(TantivyResult::RowIdsSelection(row_ids)) = cache.get("row_ids_key") {
             assert_eq!(row_ids.set_indices().collect::<Vec<_>>(), vec![10, 20]);
-            assert_eq!(row_group_size, Some(1024));
         } else {
             panic!("Expected RowIdsSelection result");
         }

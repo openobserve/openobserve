@@ -22,8 +22,9 @@ export function useResourceSearch(input: {
   org: Ref<string>;
   subject: Ref<string>;
   query: Ref<string>;
-  type: Ref<ResourceKind | "all">;
-  /** The kinds this user's navigation shows; "all" searches only these. */
+  /** The type filters picked; none means every kind. */
+  picked: Ref<ResourceKind[]>;
+  /** The kinds this user's navigation shows; no pick searches only these. */
   kinds: Ref<ResourceKind[]>;
 }) {
   const scope = ++scopeSequence;
@@ -42,8 +43,16 @@ export function useResourceSearch(input: {
       input.open.value &&
       !!input.org.value &&
       !!input.subject.value &&
-      (input.type.value !== "all" || (!!input.query.value.trim() && input.kinds.value.length > 0)),
+      (input.picked.value.length > 0 ||
+        (!!input.query.value.trim() && input.kinds.value.length > 0)),
   );
+  // A query searches every kind at once, so picking types filters those hits instead of asking again.
+  const types = computed<ResourceKind[] | null>(() => {
+    if (!eligible.value) return null;
+    return input.query.value.trim() && input.kinds.value.length
+      ? input.kinds.value
+      : input.picked.value;
+  });
   const query = useQuery(() => ({
     ...resourcesQuery(input.org.value, input.subject.value, params.value, scope),
     enabled: eligible.value && !debouncing.value,
@@ -55,7 +64,7 @@ export function useResourceSearch(input: {
     client.removeQueries({ queryKey: previousScope });
   };
   watch(
-    [input.open, input.org, input.subject, input.query, input.type, input.kinds],
+    [input.open, input.org, input.subject, input.query, () => types.value?.join(",")],
     () => {
       sequence += 1;
       debouncing.value = eligible.value;
@@ -66,11 +75,7 @@ export function useResourceSearch(input: {
       retrying.value = false;
       if (!eligible.value) return;
       timer = setTimeout(() => {
-        params.value = {
-          q: input.query.value.trim(),
-          types: input.type.value === "all" ? input.kinds.value : [input.type.value],
-          limit: 20,
-        };
+        params.value = { q: input.query.value.trim(), types: types.value ?? [], limit: 20 };
         debouncing.value = false;
       }, 200);
     },
