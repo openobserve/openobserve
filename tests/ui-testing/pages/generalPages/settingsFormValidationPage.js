@@ -342,10 +342,12 @@ export class SettingsFormValidationPage {
             await tab.click();
             await this.page.waitForURL('**/domain_management**', { timeout: 10000 });
             await this.page.locator(this.domainRestrictionsTitle2).waitFor({ state: 'visible', timeout: 10000 });
-            return true;
         } catch {
             return false;
         }
+        // The initial load replaces the domain list, so a domain added before it returns is dropped.
+        await this.page.locator(`${this.noDomainMessage}, [data-test^="domain-management-domain-card-"]`).first().waitFor({ state: 'visible', timeout: 15000 });
+        return true;
     }
 
     getDomainRestrictionsTitleLocator() {
