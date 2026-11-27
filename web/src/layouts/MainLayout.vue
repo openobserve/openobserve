@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex shrink-0">
       <div
         v-if="store.state.printMode !== true && !focusMode && !store.state.kioskMode"
-        class="bg-surface-chrome-deeper flex h-10 w-42 shrink-0 items-center px-4 max-md:hidden"
+        class="bg-surface-chrome-deeper flex h-10 w-54 shrink-0 items-center px-4 max-md:hidden [.o2-app-root:has([data-rail=collapsed])_&]:w-auto [.o2-app-root:has([data-rail=collapsed])_&]:pe-2"
         data-test="main-layout-logo"
       >
         <OSidebarLogo class="-ms-[0.2875rem] [&>img:only-child]:h-8" />

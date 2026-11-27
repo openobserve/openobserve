@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="field"
         size="xs"
-        class="w-full max-w-60 justify-start ps-1.5! pe-0.75! max-md:w-auto max-md:px-3! @max-[10rem]/search:w-auto @max-[6rem]/search:px-3!"
+        class="w-full max-w-60 justify-start ps-1.5! pe-1! max-md:w-auto max-md:px-3! @max-[10rem]/search:w-auto @max-[6rem]/search:px-3!"
         data-test="header-command-palette"
         :aria-label="t('commandPalette.title')"
         icon-left="search"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OShortcut
           id="commandPalette"
-          class="-me-[0.3125rem] max-md:hidden @max-[6rem]/search:hidden [&_kbd]:h-4 [&_kbd]:min-w-4 [&_kbd]:rounded-[0.125rem] [&_kbd]:px-1 [&_kbd]:shadow-none"
+          class="shrink-0 self-center max-md:hidden @max-[6rem]/search:hidden [&_kbd]:flex [&_kbd]:h-4 [&_kbd]:min-w-4 [&_kbd]:items-center [&_kbd]:rounded-[0.125rem] [&_kbd]:px-1 [&_kbd]:leading-none [&_kbd]:shadow-none"
         />
       </OButton>
     </div>

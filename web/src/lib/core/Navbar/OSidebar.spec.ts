@@ -20,7 +20,6 @@ import { createStore } from "vuex";
 import { raw } from "@/types/i18n";
 import type { NavItem } from "./ONavbar.types";
 import OSidebar from "./OSidebar.vue";
-import config from "@/aws-exports";
 
 vi.mock("@/composables/useTrialPaywall", () => ({
   useTrialPaywall: () => ({ isPaywalled: () => false }),
@@ -101,21 +100,25 @@ describe("OSidebar", () => {
     ).toBeUndefined();
   });
 
-  it("auto-expands the group holding the current route", async () => {
+  it("lists a group's main pages as direct rows that navigate", async () => {
     await mountAt("/slos");
-    const group = wrapper.find("[data-test='sidebar-item-reliability']");
-    expect(group.attributes("aria-expanded")).toBe("true");
-    expect(wrapper.find("[data-test='sidebar-item-sloList']").attributes("aria-current")).toBe(
-      "page",
-    );
+    expect(wrapper.find("[data-test='sidebar-item-reliability']").exists()).toBe(false);
+    const slos = wrapper.find("[data-test='sidebar-item-sloList']");
+    expect(slos.attributes("aria-current")).toBe("page");
+    expect(slos.attributes("href")).toContain("/slos");
+    const alerts = wrapper.find("[data-test='sidebar-item-alertList']");
+    expect(alerts.text()).toContain("Alerts");
+    expect(alerts.attributes("role")).toBeUndefined();
   });
 
-  it("keeps other groups closed and toggles them on click", async () => {
-    await mountAt("/logs");
-    const group = wrapper.find("[data-test='sidebar-item-reliability']");
-    expect(group.attributes("aria-expanded")).toBe("false");
-    await group.trigger("click");
-    expect(wrapper.find("[data-test='sidebar-children-reliability']").exists()).toBe(true);
+  it("opens the row holding the current sub-page", async () => {
+    await mountAt("/alerts/destinations");
+    expect(wrapper.find("[data-test='sidebar-expand-alertList']").attributes("aria-expanded")).toBe(
+      "true",
+    );
+    expect(
+      wrapper.find("[data-test='sidebar-item-alertDestinations']").attributes("aria-current"),
+    ).toBe("page");
   });
 
   it("collapses to icons and remembers it", async () => {
@@ -193,193 +196,119 @@ describe("OSidebar", () => {
   });
 });
 
-describe("OSidebar group flyouts", () => {
-  const flyout = () =>
-    document.querySelector<HTMLElement>("[data-test='sidebar-flyout-reliability']");
-  const group = () => wrapper.find("[data-test='sidebar-item-reliability']");
-  const fakeTimers = () => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+describe("OSidebar sub-pages", () => {
+  const withDashboards: NavItem[] = [
+    ...links,
+    { title: raw("Dashboards"), icon: "home", link: "/dashboards", name: "dashboards" },
+    { title: raw("Reports"), icon: "home", link: "/reports", name: "reports" },
+  ];
+  const chevron = (name: string) => wrapper.find(`[data-test='sidebar-expand-${name}']`);
 
-  it("opens on hover after the delay, titled with the group, and lists only reachable children", async () => {
+  it("toggles sub-pages from the chevron without navigating", async () => {
     await mountAt("/logs");
-    fakeTimers();
-    await group().trigger("mouseenter");
-    vi.advanceTimersByTime(119);
+    expect(chevron("alertList").attributes("aria-expanded")).toBe("false");
+    await chevron("alertList").trigger("click");
     await flushPromises();
-    expect(flyout()).toBeNull();
-    vi.advanceTimersByTime(1);
-    await flushPromises();
-    expect(flyout()).not.toBeNull();
-    expect(flyout()!.textContent).toContain(group().text());
-    expect(flyout()!.querySelector("[data-test='sidebar-flyout-item-sloList']")).not.toBeNull();
+    expect(chevron("alertList").attributes("aria-expanded")).toBe("true");
+    expect(wrapper.vm.$router.currentRoute.value.path).toBe("/logs");
   });
 
-  it("closes after the pointer leaves both the row and the flyout", async () => {
+  it("keeps one row open at a time", async () => {
+    await mountAt("/logs", {}, true, withDashboards);
+    await chevron("dashboards").trigger("click");
+    await chevron("alertList").trigger("click");
+    expect(chevron("dashboards").attributes("aria-expanded")).toBe("false");
+    expect(chevron("alertList").attributes("aria-expanded")).toBe("true");
+  });
+
+  it("gives a row without secondary pages no chevron", async () => {
     await mountAt("/logs");
-    fakeTimers();
-    await group().trigger("mouseenter");
-    vi.advanceTimersByTime(120);
-    await flushPromises();
-    await group().trigger("mouseleave");
-    flyout()!.dispatchEvent(new MouseEvent("mouseenter"));
-    vi.advanceTimersByTime(400);
-    await flushPromises();
-    expect(flyout()).not.toBeNull();
-    flyout()!.dispatchEvent(new MouseEvent("mouseleave"));
-    vi.advanceTimersByTime(200);
-    await flushPromises();
-    expect(flyout()).toBeNull();
-  });
-
-  it("does not float a group that is already expanded inline", async () => {
-    await mountAt("/slos");
-    fakeTimers();
-    await group().trigger("mouseenter");
-    vi.advanceTimersByTime(500);
-    await flushPromises();
-    expect(flyout()).toBeNull();
-  });
-
-  it("opens from the collapsed rail in place of the tooltip", async () => {
-    await mountAt("/slos");
-    await wrapper.find("[data-test='sidebar-collapse-toggle']").trigger("click");
-    fakeTimers();
-    await group().trigger("mouseenter");
-    vi.advanceTimersByTime(120);
-    await flushPromises();
-    expect(flyout()).not.toBeNull();
-    const item = flyout()!.querySelector("[data-test='sidebar-flyout-item-sloList']");
-    expect(item?.getAttribute("aria-current")).toBe("page");
-  });
-
-  it("opens with ArrowRight, focuses the first item, and Escape returns focus to the row", async () => {
-    await mountAt("/logs");
-    (group().element as HTMLElement).focus();
-    await group().trigger("keydown", { key: "ArrowRight" });
-    await flushPromises();
-    const first = flyout()!.querySelector<HTMLElement>("[data-test^='sidebar-flyout-item-']");
-    expect(document.activeElement).toBe(first);
-    first!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    await flushPromises();
-    expect(flyout()).toBeNull();
-    expect(document.activeElement).toBe(group().element);
-  });
-
-  it("closes when the route changes", async () => {
-    await mountAt("/logs");
-    await group().trigger("keydown", { key: "ArrowRight" });
-    await flushPromises();
-    expect(flyout()).not.toBeNull();
-    await wrapper.vm.$router.push("/alerts");
-    await flushPromises();
-    expect(flyout()).toBeNull();
-  });
-
-  it("never floats a menu in the mobile drawer", async () => {
-    await mountAt("/logs", {}, false);
-    fakeTimers();
-    await group().trigger("mouseenter");
-    vi.advanceTimersByTime(500);
-    await group().trigger("keydown", { key: "ArrowRight" });
-    await flushPromises();
-    expect(flyout()).toBeNull();
+    expect(chevron("sloList").exists()).toBe(false);
   });
 });
 
-describe("OSidebar child sections", () => {
-  const flyout = () =>
-    document.querySelector<HTMLElement>("[data-test='sidebar-flyout-reliability']");
-  const openFlyout = async (name = "reliability") => {
-    await wrapper.find(`[data-test='sidebar-item-${name}']`).trigger("keydown", {
-      key: "ArrowRight",
-    });
+describe("OSidebar collapsed peek", () => {
+  const nav = () => wrapper.find("nav[data-test='sidebar']");
+  const fakeTimers = () => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  const collapse = () => wrapper.find("[data-test='sidebar-collapse-toggle']").trigger("click");
+
+  it("opens only once the pointer rests on the rail", async () => {
+    await mountAt("/logs");
+    await collapse();
+    fakeTimers();
+    await nav().trigger("mousemove");
+    vi.advanceTimersByTime(200);
+    await nav().trigger("mousemove");
+    vi.advanceTimersByTime(200);
     await flushPromises();
-  };
-  const sectionLabels = (root: ParentNode, prefix: string) =>
-    Array.from(root.querySelectorAll(`[data-test^='${prefix}-label-']`)).map((el) =>
-      el.textContent?.replace("Beta", "").trim(),
-    );
+    expect(nav().attributes("data-peek")).toBeUndefined();
+    vi.advanceTimersByTime(80);
+    await flushPromises();
+    expect(nav().attributes("data-peek")).toBe("true");
+    expect(nav().attributes("data-collapsed")).toBeUndefined();
+  });
 
-  it("heads each Reliability section in the flyout and in the inline expand", async () => {
+  it("closes when the pointer leaves", async () => {
     await mountAt("/logs");
-    await openFlyout();
-    expect(sectionLabels(flyout()!, "sidebar-flyout-section")).toEqual([
-      "Alerts",
-      "Response",
-      "On-Call",
-    ]);
-    const alerts = flyout()!.querySelector("[data-test='sidebar-flyout-section-alerts']")!;
-    expect(alerts.getAttribute("role")).toBe("group");
-    const heading = alerts.querySelector("[role='presentation']")!;
-    expect(alerts.getAttribute("aria-labelledby")).toBe(heading.id);
+    await collapse();
+    fakeTimers();
+    await nav().trigger("mousemove");
+    vi.advanceTimersByTime(280);
+    await nav().trigger("mouseleave");
+    vi.advanceTimersByTime(250);
+    await flushPromises();
+    expect(nav().attributes("data-peek")).toBeUndefined();
+  });
+
+  it("closes after navigating and stays shut until the pointer leaves", async () => {
+    await mountAt("/logs");
+    await collapse();
+    fakeTimers();
+    await nav().trigger("mousemove");
+    vi.advanceTimersByTime(280);
+    await flushPromises();
+    await wrapper.vm.$router.push("/slos");
+    await flushPromises();
+    expect(nav().attributes("data-peek")).toBeUndefined();
+    await nav().trigger("mousemove");
+    vi.advanceTimersByTime(500);
+    await flushPromises();
+    expect(nav().attributes("data-peek")).toBeUndefined();
+  });
+
+  it("never peeks in the mobile drawer", async () => {
+    await mountAt("/logs", {}, false);
+    fakeTimers();
+    await nav().trigger("mousemove");
+    vi.advanceTimersByTime(500);
+    await flushPromises();
+    expect(nav().attributes("data-peek")).toBeUndefined();
+  });
+});
+
+describe("OSidebar recents", () => {
+  it("lists visited pages, newest first, without the current one", async () => {
+    await mountAt("/logs");
+    await wrapper.vm.$router.push("/slos");
+    await flushPromises();
+    await wrapper.vm.$router.push("/settings");
+    await flushPromises();
+    const items = wrapper.findAll("[data-test^='sidebar-recent-']").map((w) => w.text());
+    expect(items[0]).toContain("SLOs");
+    expect(items[1]).toContain("Logs");
+    expect(items.join(" ")).not.toContain("Settings");
+  });
+
+  it("names the group under a recent sub-page", async () => {
+    await mountAt("/slos");
+    await wrapper.vm.$router.push("/logs");
+    await flushPromises();
     expect(
-      alerts.querySelector("[data-test='sidebar-flyout-item-alertDestinations']"),
-    ).not.toBeNull();
-
-    await wrapper.find("[data-test='sidebar-item-reliability']").trigger("click");
-    const inline = wrapper.find("[data-test='sidebar-children-reliability']").element;
-    expect(sectionLabels(inline, "sidebar-section")).toEqual(["Alerts", "Response", "On-Call"]);
-  });
-
-  it("leaves a group without sections as a flat list", async () => {
-    const withDashboards: NavItem[] = [
-      ...links,
-      { title: raw("Dashboards"), icon: "home", link: "/dashboards", name: "dashboards" },
-      { title: raw("Reports"), icon: "home", link: "/reports", name: "reports" },
-    ];
-    await mountAt("/logs", {}, true, withDashboards);
-    await openFlyout("dashboards");
-    const panel = document.querySelector("[data-test='sidebar-flyout-dashboards']")!;
-    expect(panel.querySelectorAll("[data-test^='sidebar-flyout-section']")).toHaveLength(0);
-    expect(panel.querySelectorAll("[role='group']")).toHaveLength(0);
-    expect(panel.querySelectorAll("[data-test^='sidebar-flyout-item-']")).toHaveLength(2);
-  });
-
-  it("moves the Beta badge to the heading when the whole section is beta", async () => {
-    await mountAt("/logs");
-    await openFlyout();
-    const onCall = flyout()!.querySelector("[data-test='sidebar-flyout-section-onCall']")!;
-    expect(
-      onCall.querySelector(
-        "[data-test='sidebar-flyout-section-label-onCall'] [data-test='beta-badge']",
-      ),
-    ).not.toBeNull();
-    expect(onCall.querySelectorAll("[data-test='beta-badge']")).toHaveLength(1);
-  });
-
-  it("keeps per-row Beta badges in a mixed section", async () => {
-    const was = config.isEnterprise;
-    (config as { isEnterprise: string }).isEnterprise = "true";
-    try {
-      const withDowntimes: NavItem[] = [
-        ...links,
-        { title: raw("Downtimes"), icon: "home", link: "/downtimes", name: "downtimes" },
-      ];
-      await mountAt("/logs", { downtimes_enabled: true }, true, withDowntimes);
-      await openFlyout();
-      const response = flyout()!.querySelector("[data-test='sidebar-flyout-section-response']")!;
-      const badgeIn = (sel: string) => response.querySelector(`${sel} [data-test='beta-badge']`);
-      expect(badgeIn("[data-test='sidebar-flyout-section-label-response']")).toBeNull();
-      expect(badgeIn("[data-test='sidebar-flyout-item-downtimes']")).not.toBeNull();
-      expect(badgeIn("[data-test='sidebar-flyout-item-sloList']")).toBeNull();
-    } finally {
-      (config as { isEnterprise: string }).isEnterprise = was;
-    }
-  });
-
-  it("moves arrow-key focus across sections without stopping on a heading", async () => {
-    await mountAt("/logs");
-    await openFlyout();
-    const item = (name: string) =>
-      flyout()!.querySelector<HTMLElement>(`[data-test='sidebar-flyout-item-${name}']`)!;
-    item("alertDestinations").focus();
-    item("alertDestinations").dispatchEvent(
-      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
-    );
-    expect(document.activeElement).toBe(item("sloList"));
-    item("sloList").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
-    expect(document.activeElement).toBe(item("alertDestinations"));
-    for (const heading of flyout()!.querySelectorAll<HTMLElement>("[role='presentation']")) {
-      expect(heading.tabIndex).toBe(-1);
-    }
+      wrapper
+        .find(
+          "[data-test='sidebar-recent-child:reliability:sloList'], [data-test^='sidebar-recent-child:reliability']",
+        )
+        .text(),
+    ).toContain("Reliability");
   });
 });
