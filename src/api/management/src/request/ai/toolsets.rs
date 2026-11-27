@@ -201,8 +201,9 @@ impl ToolsetUse {
         self.names
             .iter()
             .find(|(_, name)| {
+                // o2-ai labels a vendor tool `<toolset> · <tool>` in the chat's frames.
                 tool.strip_prefix(name.as_str())
-                    .is_some_and(|rest| rest.starts_with(['_', '-']))
+                    .is_some_and(|rest| rest.starts_with(['_', '-']) || rest.starts_with(" · "))
             })
             .map(|(id, _)| id.clone())
     }
@@ -2885,13 +2886,16 @@ mod tests {
             "data: {\"type\":\"tool_result\",\"tool\":\"kubectl_get\",\"success\":true}\n",
             "data: {\"type\":\"tool_result\",\"tool\":\"old_x\",\"success\":true}\n",
             "data: {\"type\":\"tool_result\",\"tool\":\"SearchSQL\",\"success\":true}\n",
+            "data: {\"type\":\"tool_result\",\"tool\":\"kubectl · get\",\"success\":false}\n",
+            "data: {\"type\":\"tool_result\",\"tool\":\"kubectlx · get\",\"success\":true}\n",
         );
         assert_eq!(
             usage.results(frames.as_bytes()),
             vec![
                 ("t2".to_string(), true),
                 ("t1".to_string(), false),
-                ("t3".to_string(), true)
+                ("t3".to_string(), true),
+                ("t3".to_string(), false)
             ]
         );
     }
