@@ -28,7 +28,7 @@ jobs:
     # Manual backfill needs repo write access to dispatch, so only the automatic door waits for the variable.
     if: >
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issues' && vars.E2E_AUTO_REGRESSION == 'true')
+      (github.event_name == 'issues' && github.event.issue.state_reason == 'completed' && vars.E2E_AUTO_REGRESSION == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -75,20 +75,20 @@ jobs:
           [ "$REASON" = "completed" ] || stop "#${ISSUE} closed as ${REASON}, not completed"
           [ "$IS_BUG" = "yes" ] || stop "#${ISSUE} has neither the bug label nor the Bug type"
 
-          CLOSER_OK=no; TRUSTED=no
+          CLOSER_OK=no; BY_WRITER=no
           if [ -z "$FIX_PR" ]; then
             # The close and the merge land together, so give the timeline one retry to show the closing PR.
             for attempt in 1 2; do
               OUT=$(python3 .github/scripts/regression-fix-pr.py "$ISSUE" "$EVENT")
-              read -r CLOSER_OK PICK SOURCE TRUSTED _ <<<"$OUT"
-              if [ "$CLOSER_OK" = "no" ] && [ "$attempt" = 1 ] && { [ "$SOURCE" = "none" ] || [ "$TRUSTED$EVENT" = "noissues" ]; }; then
+              read -r CLOSER_OK PICK SOURCE BY_WRITER _ <<<"$OUT"
+              if [ "$CLOSER_OK" = "no" ] && [ "$attempt" = 1 ] && { [ "$SOURCE" = "none" ] || [ "$BY_WRITER$EVENT" = "noissues" ]; }; then
                 sleep 30; continue
               fi
               break
             done
-            [ "$TRUSTED" = "yes" ] || [ "$EVENT" != "issues" ] || [ "$CLOSER_OK" = "yes" ] \
+            [ "$BY_WRITER" = "yes" ] || [ "$EVENT" != "issues" ] || [ "$CLOSER_OK" = "yes" ] \
               || stop "#${ISSUE} was closed by @${SENDER} without write access and not by a merged PR into main"
-            [ "$SOURCE" != "none" ] || stop "no merged fix PR into main is linked from #${ISSUE}"
+            [ "$SOURCE" != "none" ] || stop "no merged fix PR into main is linked from #${ISSUE} (on a close event, one merged by the time it closed)"
             FIX_PR="$PICK"
             [ "$SOURCE" != "mention" ] || echo "::warning::fix PR #${FIX_PR} was matched from a mention of #${ISSUE}, not a closing or linked PR; check it is the fix"
             echo "fix PR #${FIX_PR} chosen from the issue timeline (${SOURCE})"

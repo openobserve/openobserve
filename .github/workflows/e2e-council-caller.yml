@@ -128,7 +128,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ steps.ctx.outputs.pr }}
-          MERGED_AT: ${{ github.event.pull_request.merged_at }}
         run: |
           set -uo pipefail
           # An inconclusive read fails the run instead of dispatching, since the regression door may still fire for this PR.
@@ -144,22 +143,22 @@ jobs:
           [ -n "$CANDS" ] || { echo "::notice::dispatching as usual: #${PR} closes no openobserve/openobserve bug"; exit 0; }
           FILES=$(gh api --paginate "repos/${REPO}/pulls/${PR}/files" --jq '.[].filename') || stuck "could not list the files of #${PR}"
           grep -q '^web/' <<<"$FILES" || { echo "::notice::dispatching as usual: #${PR} does not touch web/, so the regression door declines it"; exit 0; }
-          MERGED_TS=$(date -d "$MERGED_AT" +%s) || stuck "unreadable merged_at '${MERGED_AT}'"
           # Same rule as regression-council-caller.yml (regression-fix-pr.py): a bug counts only if that door will pick this PR for it.
+          # That rule declines a PR merged after a hand close, so the answer does not depend on when either door runs.
           for attempt in 1 2; do
-            BUGS=""; OPEN=0
+            BUGS=""; PENDING=0
             for N in $CANDS; do
               OUT=$(python3 .github/scripts/regression-fix-pr.py "$N" issues) || stuck "could not read the timeline of #${N}"
-              read -r CLOSER_OK PICK SOURCE TRUSTED STATE REASON CLOSED_AT <<<"$OUT"
+              read -r CLOSER_OK PICK SOURCE BY_WRITER STATE REASON _ <<<"$OUT"
               # Still open: this merge closes it next, with this PR as the closer.
-              if [ "$STATE" = "OPEN" ]; then OPEN=1; BUGS="$BUGS #$N"; continue; fi
+              if [ "$STATE" = "OPEN" ]; then PENDING=1; BUGS="$BUGS #$N"; continue; fi
+              # The regression door retries a closed bug whose closer is not in the timeline yet, so wait for it too.
+              [ "$CLOSER_OK" = "yes" ] || PENDING=1
               [ "$REASON" = "COMPLETED" ] && [ "$PICK" = "$PR" ] || continue
-              [ "$CLOSER_OK" = "yes" ] || [ "$TRUSTED" = "yes" ] || continue
-              # A close more than the door's 30s retry before this merge was judged while this PR was unmerged.
-              [ $((MERGED_TS - $(date -d "$CLOSED_AT" +%s))) -le 30 ] || continue
+              [ "$CLOSER_OK" = "yes" ] || [ "$BY_WRITER" = "yes" ] || continue
               BUGS="$BUGS #$N"
             done
-            [ "$OPEN" = 0 ] || [ "$attempt" = 2 ] || { sleep 30; continue; }
+            [ "$PENDING" = 0 ] || [ "$attempt" = 2 ] || { sleep 30; continue; }
             break
           done
           [ -n "$BUGS" ] || { echo "::notice::dispatching as usual: the regression door picks no bug for #${PR}"; exit 0; }
