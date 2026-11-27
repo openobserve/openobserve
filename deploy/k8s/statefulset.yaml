@@ -50,7 +50,7 @@ spec:
             - name: ZO_ROOT_USER_EMAIL
               value: root@example.com
             - name: ZO_ROOT_USER_PASSWORD
-              value: Complexpass#123
+              value: "<YOUR_PASSWORD>"
             - name: ZO_DATA_DIR
               value: /data
           # command: ["/bin/bash", "-c", "while true; do sleep 1; done"]

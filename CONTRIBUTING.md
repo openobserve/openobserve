@@ -94,7 +94,7 @@ ZO_CORS_ALLOWED_ORIGINS="http://localhost:3000, http://localhost:5173, http://lo
 Start the backend server:
 
 ```shell
-ZO_ROOT_USER_EMAIL="root@example.com" ZO_ROOT_USER_PASSWORD="Complexpass#123" cargo run
+ZO_ROOT_USER_EMAIL="root@example.com" ZO_ROOT_USER_PASSWORD="<YOUR_PASSWORD>" cargo run
 ```
 
 This will start the openobserve API server on port 5080

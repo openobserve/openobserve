@@ -86,7 +86,7 @@ docker run -d \
       -v $PWD/data:/data \
       -p 5080:5080 \
       -e ZO_ROOT_USER_EMAIL="root@example.com" \
-      -e ZO_ROOT_USER_PASSWORD="Complexpass#123" \
+      -e ZO_ROOT_USER_PASSWORD="<YOUR_PASSWORD>" \
       public.ecr.aws/zinclabs/openobserve:latest
 ```
 
