@@ -37465,7 +37465,8 @@
         "ask": "Demander",
         "inputName": "Demander à {product}",
         "recentThreads": "Conversations récentes",
-        "askEmpty": "Saisissez une question ou joignez une image pour demander"
+        "askEmpty": "Saisissez une question ou joignez une image pour demander",
+        "askEmptyText": "Saisissez une question"
       },
       "prefill": {
         "append": "Ajouter",

@@ -52,5 +52,6 @@
   "answer_locale": true,
   "context_used": true,
   "attachments": true,
+  "image_input": true,
   "data_sharing_level": "raw"
 }

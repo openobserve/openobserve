@@ -37463,7 +37463,8 @@
         "ask": "Ask",
         "inputName": "Ask {product}",
         "recentThreads": "Recent chats",
-        "askEmpty": "Type a question or attach an image to ask"
+        "askEmpty": "Type a question or attach an image to ask",
+        "askEmptyText": "Type a question to ask"
       },
       "prefill": {
         "append": "Append",

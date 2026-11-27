@@ -37460,7 +37460,8 @@
         "ask": "提問",
         "inputName": "向 {product} 提問",
         "recentThreads": "最近的對話",
-        "askEmpty": "輸入問題或附加圖片以提問"
+        "askEmpty": "輸入問題或附加圖片以提問",
+        "askEmptyText": "輸入問題以提問"
       },
       "prefill": {
         "append": "附加",

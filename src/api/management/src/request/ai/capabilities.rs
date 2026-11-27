@@ -66,6 +66,7 @@ const ROUND_TRIP_FAILED: &str = "O2 Assistant answered its health check but not 
 const ROUND_TRIP_REFUSED: &str = "O2 Assistant refused the credentials of this request";
 const ROUND_TRIP_REJECTED: &str = "O2 Assistant rejected this request";
 const TURN_VERSIONS_CAPABILITY: &str = "turn_versions";
+const IMAGE_INPUT_CAPABILITY: &str = "image_input";
 const SERVER_REFUSED: &str = "O2 Assistant refused this server's internal secret";
 const NOT_CONFIGURED: &str = "O2 Assistant is not configured on this server";
 // An older o2-ai lists the judge; it only scores answers and nobody talks to it.
@@ -114,6 +115,8 @@ pub struct Capabilities {
     pub feedback_stored: bool,
     /// o2-ai reads typed `attachments[]`; the client's `attachmentsEnabled` reads this.
     pub attachments: bool,
+    /// o2-ai's model reads images; the client offers Photo only then.
+    pub image_input: bool,
     /// `complete` carries `context_used[]`.
     pub context_used: bool,
     /// Answers follow `context.locale`, so doors need no English-only note.
@@ -163,6 +166,7 @@ impl Capabilities {
             turn_versions: settings.persistence && facts.turn_versions,
             feedback_stored: settings.persistence,
             attachments: facts.attachments,
+            image_input: facts.image_input,
             context_used: facts.context_used,
             answer_locale: facts.answer_locale,
             rca_chat_mode: settings.rca && facts.rca_chat_mode,
@@ -285,6 +289,8 @@ struct AgentFacts {
     policy_enforced: bool,
     /// o2-ai's health lists `turn_versions` in `capabilities`: it answers from the given history.
     turn_versions: bool,
+    /// o2-ai's health lists `image_input` in `capabilities` when its model reads images.
+    image_input: bool,
     attachments: bool,
     context_used: bool,
     answer_locale: bool,
@@ -313,6 +319,7 @@ impl AgentFacts {
                 .collect(),
             policy_enforced: discover.policy_enforced,
             turn_versions: agent_capability(health, TURN_VERSIONS_CAPABILITY),
+            image_input: agent_capability(health, IMAGE_INPUT_CAPABILITY),
             attachments: discover.attachments,
             context_used: discover.context_used,
             answer_locale: discover.answer_locale,
@@ -1154,6 +1161,7 @@ mod tests {
             agents: vec![fact("o2-ai", true), fact("sre", true)],
             policy_enforced: false,
             turn_versions: true,
+            image_input: true,
             attachments: true,
             context_used: true,
             answer_locale: true,
@@ -1394,6 +1402,36 @@ mod tests {
         let odd: HealthResponse =
             serde_json::from_value(json!({"capabilities": "turn_versions"})).unwrap();
         assert!(!AgentFacts::new(&odd, &discover).turn_versions);
+    }
+
+    #[test]
+    fn image_input_follows_health_even_without_persistence() {
+        let (health, _) = sample_health();
+        let settings = Settings {
+            persistence: false,
+            ..sample_settings()
+        };
+        for (response, attachments, expected) in [
+            (r#"{"capabilities":["image_input"]}"#, false, true),
+            ("{}", true, false),
+            (r#"{"capabilities":"image_input"}"#, true, false),
+        ] {
+            let agent_health = serde_json::from_str(response).unwrap();
+            let discover =
+                serde_json::from_value(json!({"agents": [], "attachments": attachments})).unwrap();
+            let facts = AgentFacts::new(&agent_health, &discover);
+            let caps = Capabilities::new(
+                (health.clone(), facts),
+                Permissions::default(),
+                settings,
+                Vec::new(),
+            );
+            assert_eq!(
+                serde_json::to_value(caps).unwrap()["image_input"],
+                expected,
+                "{response}"
+            );
+        }
     }
 
     #[test]

@@ -47,6 +47,8 @@ export interface AssistantCapabilitiesResponse {
   policy_enforced?: boolean;
   retention_days?: number;
   attachments?: boolean;
+  /** True when o2-ai's model supports image input. */
+  image_input?: boolean;
   /** `/confirm {id, extend:true}` resets a card's expiry. */
   approval_extend?: boolean;
   /** Split user and background extension budgets (W-10); the `{user, background}` sizes when given. */

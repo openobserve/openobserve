@@ -37465,7 +37465,8 @@
         "ask": "질문하기",
         "inputName": "{product}에 질문하기",
         "recentThreads": "최근 채팅",
-        "askEmpty": "질문을 입력하거나 이미지를 첨부하여 질문하세요"
+        "askEmpty": "질문을 입력하거나 이미지를 첨부하여 질문하세요",
+        "askEmptyText": "질문을 입력하세요"
       },
       "prefill": {
         "append": "추가",

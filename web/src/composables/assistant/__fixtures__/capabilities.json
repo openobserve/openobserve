@@ -57,6 +57,7 @@
     "turn_versions": true,
     "feedback_stored": true,
     "attachments": true,
+    "image_input": true,
     "context_used": true,
     "answer_locale": true,
     "rca_chat_mode": true,

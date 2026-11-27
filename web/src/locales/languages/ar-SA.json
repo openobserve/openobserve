@@ -37465,7 +37465,8 @@
         "ask": "اسأل",
         "inputName": "اسأل {product}",
         "recentThreads": "المحادثات الأخيرة",
-        "askEmpty": "اكتب سؤالًا أو أرفق صورة للسؤال"
+        "askEmpty": "اكتب سؤالًا أو أرفق صورة للسؤال",
+        "askEmptyText": "اكتب سؤالًا"
       },
       "prefill": {
         "append": "إلحاق",

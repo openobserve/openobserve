@@ -42,6 +42,11 @@ const ROSTER: CapabilityAgent[] = [
   { id: "sre", pickable: true, available: true },
 ];
 
+const IMAGE_INPUT_CASES = [
+  { imageInput: false, emptyAsk: "Type a question to ask" },
+  { imageInput: true, emptyAsk: "Type a question or attach an image to ask" },
+];
+
 const { fake, open, loading, mentionPick, startersRead, toastCall } = vi.hoisted(() => ({
   fake: { current: null as any },
   open: vi.fn(),
@@ -163,6 +168,16 @@ function setupOn(
   });
   mounted.push(wrapper);
   return { wrapper, router, store: fake.current.store };
+}
+
+function setupWithImageInput(imageInput: boolean): ReturnType<typeof setup> {
+  const launcher = setupOn({});
+  fake.current.capability.value = {
+    ...fake.current.capability.value,
+    attachments: !imageInput,
+    imageInput,
+  };
+  return launcher;
 }
 
 describe("AssistantLauncher", () => {
@@ -387,7 +402,7 @@ describe("AssistantLauncher", () => {
   });
 
   it("is the composer everywhere else is: + left, agent mic Send right, 28 px square controls, no (i)", async () => {
-    const { wrapper } = setup();
+    const { wrapper } = setupWithImageInput(true);
     fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
     await flushPromises();
     const field = wrapper.get('[data-test="assistant-composer-frame"]');
@@ -449,30 +464,35 @@ describe("AssistantLauncher", () => {
     }
   });
 
-  it("turns Ask on only with text or an image, and says why it is off while it stays reachable", async () => {
-    const { wrapper } = setup();
-    const ask = () => wrapper.get('[data-test="assistant-launcher-ask"]');
-    expect(ask().attributes("disabled")).toBeUndefined();
-    expect(ask().attributes("aria-disabled")).toBe("true");
-    const reason = wrapper.get(`[id="${ask().attributes("aria-describedby")}"]`);
-    expect(reason.text()).toBe("Type a question or attach an image to ask");
-    await input(wrapper).setValue("why?");
-    expect(ask().attributes("aria-disabled")).toBeUndefined();
-  });
+  it.each(IMAGE_INPUT_CASES)(
+    "keeps Send reachable and describes why it is disabled (image input $imageInput)",
+    async ({ imageInput, emptyAsk }) => {
+      const { wrapper } = setupWithImageInput(imageInput);
+      await flushPromises();
+      const ask = () => wrapper.get('[data-test="assistant-launcher-ask"]');
+      expect(ask().attributes("disabled")).toBeUndefined();
+      expect(ask().attributes("aria-disabled")).toBe("true");
+      const reason = wrapper.get(`[id="${ask().attributes("aria-describedby")}"]`);
+      expect(reason.text()).toBe(emptyAsk);
+      await input(wrapper).setValue("why?");
+      expect(ask().attributes("aria-disabled")).toBeUndefined();
+    },
+  );
 
-  it("does nothing on an empty Enter on Home but say why, and keeps Home's URL", async () => {
-    const { wrapper, router } = setupOn({});
-    await router.replace({ name: "home", query: { period: "7d" } });
-    await flushPromises();
-    await input(wrapper).trigger("keydown", { key: "Enter" });
-    await input(wrapper).trigger("keydown", { key: "Enter", shiftKey: true });
-    await flushPromises();
-    expect(open).not.toHaveBeenCalled();
-    expect(router.currentRoute.value).toMatchObject({ name: "home", query: { period: "7d" } });
-    expect(wrapper.get('[data-test="assistant-launcher-status"]').text()).toBe(
-      "Type a question or attach an image to ask",
-    );
-  });
+  it.each(IMAGE_INPUT_CASES)(
+    "announces what an empty Enter needs and keeps Home's URL (image input $imageInput)",
+    async ({ imageInput, emptyAsk }) => {
+      const { wrapper, router } = setupWithImageInput(imageInput);
+      await router.replace({ name: "home", query: { period: "7d" } });
+      await flushPromises();
+      await input(wrapper).trigger("keydown", { key: "Enter" });
+      await input(wrapper).trigger("keydown", { key: "Enter", shiftKey: true });
+      await flushPromises();
+      expect(open).not.toHaveBeenCalled();
+      expect(router.currentRoute.value).toMatchObject({ name: "home", query: { period: "7d" } });
+      expect(wrapper.get('[data-test="assistant-launcher-status"]').text()).toBe(emptyAsk);
+    },
+  );
 
   describe("Attach Image", () => {
     const png = (name: string, size = 10) =>
@@ -484,11 +504,33 @@ describe("AssistantLauncher", () => {
 
     beforeEach(() => toastCall.mockReset());
 
+    it.each([false, true])(
+      "offers Photo only when image input is enabled (%s)",
+      async (imageInput) => {
+        const { wrapper } = setupWithImageInput(imageInput);
+        await flushPromises();
+        const trigger = wrapper.find('[data-test="assistant-composer-plus"]');
+        if (trigger.exists()) await trigger.trigger("keydown", { key: "Enter" });
+        await flushPromises();
+        const photo = document.body.querySelector('[data-test="assistant-attach-image"]');
+        expect(photo?.textContent?.trim()).toBe(imageInput ? "Photo" : undefined);
+        expect(wrapper.getComponent(AssistantComposerPlusMenu).props("actions")).toEqual(
+          imageInput ? ["attach", "connectors"] : ["connectors"],
+        );
+      },
+    );
+
+    it("removes the image file picker when image input is disabled", async () => {
+      const { wrapper } = setupWithImageInput(false);
+      await flushPromises();
+      expect(wrapper.findComponent(OFile).exists()).toBe(false);
+    });
+
     it("opens the picker from + and shows the pick as a removable thumbnail chip in a row above the field", async () => {
       const click = vi
         .spyOn(HTMLInputElement.prototype, "click")
         .mockImplementation(() => undefined);
-      const { wrapper } = setupOn({});
+      const { wrapper } = setupWithImageInput(true);
       await flushPromises();
       plus(wrapper, "attach");
       expect(click).toHaveBeenCalled();
@@ -516,7 +558,7 @@ describe("AssistantLauncher", () => {
     });
 
     it("moves focus to the next chip, then to the box, as chips are removed, and says each removal", async () => {
-      const { wrapper } = setupOn({});
+      const { wrapper } = setupWithImageInput(true);
       await flushPromises();
       pick(wrapper, [png("a.png"), png("b.png")]);
       await vi.waitFor(() => expect(thumbs(wrapper)).toHaveLength(2));
@@ -536,7 +578,7 @@ describe("AssistantLauncher", () => {
     });
 
     it("hands the images to the new chat with the line on Enter, and sends images alone", async () => {
-      const { wrapper } = setupOn({});
+      const { wrapper } = setupWithImageInput(true);
       await flushPromises();
       pick(wrapper, [png("a.png"), png("b.png", 20)]);
       await vi.waitFor(() =>
@@ -571,7 +613,7 @@ describe("AssistantLauncher", () => {
     });
 
     it("refuses with the composer's lines: a fifth image, a wrong type and an image over the size cap", async () => {
-      const { wrapper } = setupOn({});
+      const { wrapper } = setupWithImageInput(true);
       await flushPromises();
       pick(
         wrapper,

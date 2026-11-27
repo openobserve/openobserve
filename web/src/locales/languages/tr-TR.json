@@ -37465,7 +37465,8 @@
         "ask": "Sor",
         "inputName": "{product} ürününe sor",
         "recentThreads": "Son sohbetler",
-        "askEmpty": "Soru yazın veya sormak için bir görsel ekleyin."
+        "askEmpty": "Soru yazın veya sormak için bir görsel ekleyin.",
+        "askEmptyText": "Soru yazın."
       },
       "prefill": {
         "append": "Sona ekle",

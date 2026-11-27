@@ -37465,7 +37465,8 @@
         "ask": "提问",
         "inputName": "向 {product} 提问",
         "recentThreads": "最近对话",
-        "askEmpty": "输入问题或附上图片进行提问"
+        "askEmpty": "输入问题或附上图片进行提问",
+        "askEmptyText": "输入问题进行提问"
       },
       "prefill": {
         "append": "追加",

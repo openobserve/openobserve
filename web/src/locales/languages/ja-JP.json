@@ -37465,7 +37465,8 @@
         "ask": "質問",
         "inputName": "{product} に質問",
         "recentThreads": "最近のチャット",
-        "askEmpty": "質問を入力するか、画像を添付して質問してください"
+        "askEmpty": "質問を入力するか、画像を添付して質問してください",
+        "askEmptyText": "質問を入力してください"
       },
       "prefill": {
         "append": "追加",
