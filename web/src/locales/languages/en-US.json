@@ -10525,7 +10525,6 @@
     "traceExplorer": {
       "title": "Traces Explorer",
       "filter": "Filter",
-      "filterPlaceholder": "e.g. service_name = 'checkout'",
       "openInTraces": "Open in Traces",
       "noTraces": "No traces in this slice",
       "pageRange": "{from}–{to}",

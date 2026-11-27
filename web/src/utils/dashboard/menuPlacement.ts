@@ -37,11 +37,8 @@ export const placeMenu = (
   };
 };
 
-/**
- * A placed menu whose height changed: it keeps its top edge, so its first items stay where they
- * were and it never flips between above and below the click; pulled up only as far as needed to
- * stay inside the viewport. Its side of the click is placed afresh, as a wider item may need.
- */
+/** A resized menu keeps its top edge, so its first items stay put and it never flips, rising only to
+ * stay in the viewport; its side of the click is placed afresh for a wider item. */
 export const keepPlacement = (
   placedTop: number,
   click: { x: number; y: number },

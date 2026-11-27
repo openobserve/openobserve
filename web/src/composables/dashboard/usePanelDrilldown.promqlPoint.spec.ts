@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import { gt } from "@/types/i18n";
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 import { usePanelDrilldown } from "./usePanelDrilldown";
+import { PROMETHEUS_HISTOGRAM_MODE } from "@/utils/dashboard/promql/shared/histogramBuckets";
 
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "false" } }));
 vi.mock("@/utils/dashboard/chartDimensionUtils", () => ({
@@ -209,4 +210,121 @@ describe("point menu on PromQL charts", () => {
       expect(api.pointExplore.value?.target.filters).toEqual([{ field: "pod", value: "a" }]);
     },
   );
+
+  // A heatmap cell is [column, row, value]; the click carries it as both data and value.
+  const clickCell = async (
+    api: any,
+    series: any[],
+    match: (row: any) => boolean,
+    seriesIndex = 0,
+    column = 1,
+  ) => {
+    const heatmap = series[seriesIndex];
+    const row = heatmap._rows.findIndex((tags: any) => tags && match(tags._labels));
+    expect(row).toBeGreaterThanOrEqual(0);
+    const dataIndex = heatmap.data.findIndex((cell: any) => cell[0] === column && cell[1] === row);
+    const cell = heatmap.data[dataIndex];
+    await api.explorePoint({
+      componentType: "series",
+      seriesIndex,
+      dataIndex,
+      data: cell,
+      value: cell,
+      event: { offsetX: 1, offsetY: 1 },
+    });
+    return heatmap._timestamps[column] * 1_000_000;
+  };
+
+  it("heatmap: a cell opens its own row's series over the look-back behind its column", async () => {
+    const schema = panel("heatmap", ["max by (pod) (rate(alpha[5m]))"]);
+    const metadata = meta([{ panelQueryIndex: 0, query: "max by (pod) (rate(alpha[5m]))" }]);
+    const { api, series } = await drilldown(
+      schema,
+      [matrix([{ pod: "a" }, { pod: "b" }])],
+      metadata,
+    );
+    const columnUs = await clickCell(api, series, (labels) => labels.pod === "b");
+
+    expect(api.pointExplore.value?.target).toMatchObject({
+      stream: "alpha",
+      startTime: columnUs - 5 * MIN_US,
+      endTime: columnUs,
+      timeSlice: "lookBack",
+    });
+    expect(api.pointExplore.value?.target.filters).toEqual([{ field: "pod", value: "b" }]);
+  });
+
+  it("heatmap: a cell from the second query opens the second query", async () => {
+    const schema = panel("heatmap", ["max by (pod) (alpha)", "max by (pod) (beta)"]);
+    const metadata = meta([
+      { panelQueryIndex: 0, query: "max by (pod) (alpha)" },
+      { panelQueryIndex: 1, query: "max by (pod) (beta)" },
+    ]);
+    const { api, series } = await drilldown(
+      schema,
+      [matrix([{ pod: "a1" }]), matrix([{ pod: "b1" }])],
+      metadata,
+    );
+    await clickCell(api, series, (labels) => labels.pod === "b1");
+
+    expect(api.pointExplore.value?.target.stream).toBe("beta");
+    expect(api.pointExplore.value?.target.filters).toEqual([{ field: "pod", value: "b1" }]);
+  });
+
+  it("heatmap: a cell that names no series offers no point section", async () => {
+    const schema = panel("heatmap", ["max by (pod) (alpha)"]);
+    const { api, series } = await drilldown(
+      schema,
+      [matrix([{ pod: "a" }])],
+      meta([{ panelQueryIndex: 0, query: "max by (pod) (alpha)" }]),
+    );
+    series[0]._rows = [null];
+    const cell = series[0].data[1];
+    await api.explorePoint({
+      componentType: "series",
+      seriesIndex: 0,
+      dataIndex: 1,
+      data: cell,
+      value: cell,
+      event: { offsetX: 1, offsetY: 1 },
+    });
+    expect(api.pointExplore.value).toBeNull();
+  });
+
+  it("histogram heatmap: a cell opens its own bucket series of its own query", async () => {
+    const expr = "sum by (le, job) (rate(lat_bucket[5m]))";
+    const schema = {
+      ...panel("heatmap", ["sum by (le) (rate(other_bucket[5m]))", expr]),
+      config: { drilldown: [], heatmap_mode: PROMETHEUS_HISTOGRAM_MODE },
+    };
+    const metadata = meta([
+      { panelQueryIndex: 0, query: "sum by (le) (rate(other_bucket[5m]))" },
+      { panelQueryIndex: 1, query: expr },
+    ]);
+    const { api, series } = await drilldown(
+      schema,
+      [
+        matrix([{ le: "1" }, { le: "+Inf" }]),
+        matrix([
+          { job: "api", le: "0.5" },
+          { job: "api", le: "+Inf" },
+        ]),
+      ],
+      metadata,
+    );
+    // Two histograms draw two heatmaps; the second is the second query's.
+    const histogram = series.findIndex((s) => s._rows?.some((r: any) => r?._labels?.job === "api"));
+    expect(histogram).toBeGreaterThanOrEqual(0);
+    const columnUs = await clickCell(api, series, (labels) => labels.le === "0.5", histogram);
+
+    expect(api.pointExplore.value?.target.stream).toBe("lat_bucket");
+    expect(api.pointExplore.value?.target.filters).toEqual([
+      { field: "job", value: "api" },
+      { field: "le", value: "0.5" },
+    ]);
+    expect(api.pointExplore.value?.target).toMatchObject({
+      endTime: columnUs,
+      timeSlice: "lookBack",
+    });
+  });
 });

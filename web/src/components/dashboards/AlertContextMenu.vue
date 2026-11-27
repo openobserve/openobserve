@@ -159,9 +159,8 @@ export default defineComponent({
     });
 
     const menuSize = ref({ width: 0, height: 0 });
-    // The top edge the first full-size measure gave the menu. Later size changes (a point row
-    // resolving or leaving) keep it, so the menu never flips up or down and the alert items at its
-    // top stay put.
+    // Kept from the first full-size measure: a point row resolving or leaving later must not flip
+    // the menu, or the alert items at its top would jump.
     const placedTop = ref<number | null>(null);
     const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
     const menuStyle = computed(() => {

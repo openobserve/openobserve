@@ -30,10 +30,8 @@ export const traceDetailWindow = (trace: {
 
 const ONE_SECOND_US = 1_000_000;
 
-/**
- * The whole second holding an event, in µs: the Logs page's time picker keeps whole seconds,
- * so this is the narrowest range that survives its round trip and still contains the event.
- */
+/** The whole second holding an event (µs): the Logs page's picker keeps whole seconds, so this is
+ * the narrowest range that survives its round trip. */
 export const eventSecondWindow = (ts: number): { startTime: number; endTime: number } => {
   const startTime = Math.floor(ts / ONE_SECOND_US) * ONE_SECOND_US;
   return { startTime, endTime: startTime + ONE_SECOND_US };
@@ -49,11 +47,8 @@ export const labelsOnMetric = (filters: FieldFilter[], labels: string[]): FieldF
   return filters.filter((f) => known.has(f.field));
 };
 
-/**
- * Where the explorers' filter area remembers chips or "write your own": one key shared by the Logs,
- * Traces and Metrics explorers (so a choice in one is how the others open), apart from the Logs and
- * Traces pages' own keys.
- */
+/** Chips or "write your own", shared by the three explorers so a choice in one is how the others
+ * open; separate from the Logs and Traces pages' own keys. */
 export const EXPLORER_FILTER_MODE_KEY = "o2.dashboard.explorer.queryInput";
 
 /** The explorers' list query: every column of the stream under a WHERE condition, newest first. */
@@ -91,12 +86,8 @@ export const sampleLabels = (row: Record<string, unknown>): FieldFilter[] =>
       value: value === null || value === undefined || value === "" ? null : String(value),
     }));
 
-/**
- * A search failure as a reader can take it: the backend's own message without its "Error#" prefix
- * or the parser's `ParserError("…")` wrapper (its escaped quotes undone) or the traces endpoint's
- * "invalid filter: invalid filter expression:" lead, falling back to the HTTP message only when the
- * backend sent none.
- */
+/** The backend's message without its Error# prefix, ParserError("…") wrapper or traces "invalid
+ * filter" lead; the HTTP message only when the backend sent none. */
 export const explorerErrorText = (e: unknown): string => {
   const err = e as { message?: unknown; response?: { data?: Record<string, unknown> } } | null;
   const body = err?.response?.data ?? {};

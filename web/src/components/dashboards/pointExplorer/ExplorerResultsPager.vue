@@ -1,9 +1,8 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- The Logs and Metrics explorers' server pager: records per page, "x–y of N", first/prev/next/last.
-     The list shows one loaded page; the host fetches the page it is asked for. While the total is
-     not known it shows "x–y of …" (count pending) or just "x–y" (no count), never a guessed total. -->
+<!-- The Logs and Metrics explorers' server pager. An unknown total reads "x–y of …" (counting)
+     or "x–y" (no count), never a guessed total such as the page size. -->
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";

@@ -796,6 +796,9 @@ export function usePanelDrilldown({
   // A PromQL pie slice or plain h-bar is one series of its own, so its tags sit on the data item.
   const pointTag = (params: any, key: "_labels" | "_panelQueryIndex" | "_resultIndex") => {
     const item = params?.data;
+    // A PromQL heatmap cell is [column, row, value]; its row names the series it came from.
+    const rows = pointSeries(params)?._rows;
+    if (Array.isArray(rows) && Array.isArray(item)) return rows[item[1]]?.[key];
     const own = item && typeof item === "object" && !Array.isArray(item) ? item[key] : undefined;
     return own ?? pointSeries(params)?.[key];
   };
@@ -921,9 +924,12 @@ export function usePanelDrilldown({
 
   // A stacked bar's value is a bare number, so its bucket's time comes from the series (seconds).
   const promqlPointUs = (params: any): number | null => {
-    const times = pointSeries(params)?._timestamps;
+    const series = pointSeries(params);
+    const times = series?._timestamps;
     if (Array.isArray(times)) {
-      const seconds = Number(times[params?.dataIndex ?? -1]);
+      // A heatmap's data index runs over every cell; its column is the cell's first value.
+      const column = Array.isArray(series?._rows) ? params?.data?.[0] : params?.dataIndex;
+      const seconds = Number(times[column ?? -1]);
       return Number.isFinite(seconds) ? seconds * 1_000_000 : null;
     }
     return getUTCTimestampFromZonedTimestamp(params?.value?.[0], store.state.timezone);
@@ -950,7 +956,9 @@ export function usePanelDrilldown({
     }
     // A PromQL point is computed from the samples in the look-back before it, not a bucket after it.
     const pointUs =
-      family === "time" && panelSchema.value?.queryType === "promql" ? promqlPointUs(params) : null;
+      (family === "time" || family === "heatmap") && panelSchema.value?.queryType === "promql"
+        ? promqlPointUs(params)
+        : null;
     if (pointUs !== null) {
       const expression = executedQuery(queryIndex, resultIndex);
       // Each selector's own offset moves the samples it reads back (or forward, when negative).
@@ -1142,6 +1150,11 @@ export function usePanelDrilldown({
         : (pointTag(params, "_resultIndex") ?? pointSeries(params)?._queryIndex ?? 0);
     const query = schema.queries?.[queryIndex];
     const isPromql = schema.queryType === "promql";
+    // A PromQL heatmap cell that names no series would open another query's metric unfiltered.
+    if (isPromql && family === "heatmap" && pointTag(params, "_resultIndex") === undefined) {
+      pointExplore.value = null;
+      return false;
+    }
     const customColumns =
       !isPromql && query?.customQuery ? await customQueryColumns(queryIndex) : undefined;
     const rows = data.value?.[resultIndex];
@@ -1992,10 +2005,8 @@ export function usePanelDrilldown({
     { deep: true },
   );
 
-  /**
-   * Fills the point section of the right-click menu (View logs / traces / metrics) for a chart point.
-   * True when at least one row shows; a fast correlation miss can still clear it afterwards.
-   */
+  /** Fills the right-click menu's point rows; true when one shows, though a fast correlation miss
+   * can still clear it afterwards. */
   const explorePoint = async (params: any): Promise<boolean> => {
     // Only a series item is a data point; an annotation marker or empty space has none.
     if (!params || (params.componentType ?? "series") !== "series") {

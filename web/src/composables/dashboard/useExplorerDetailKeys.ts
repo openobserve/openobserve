@@ -60,11 +60,8 @@ export function createExplorerBack(): ExplorerBack {
   };
 }
 
-/**
- * The explorer drawer's detail keys: arrows step the open item, Escape returns to the list. Returns
- * the explorer root's `keydown`: Escape in a field goes back while an item is open, and otherwise
- * only leaves the field (leaveFieldOnEscape).
- */
+/** Arrows step the open item and Escape returns to the list; returns the explorer root's `keydown`,
+ * which also takes Escape from a field in the open item. */
 export function useExplorerDetailKeys(handlers: {
   isOpen: () => boolean;
   prev: () => void;
@@ -121,13 +118,8 @@ export function useExplorerDetailKeys(handlers: {
   };
 }
 
-/**
- * Bound as the explorer root's `keydown`: Escape in one of its fields leaves the field instead of
- * closing the drawer (whose Escape listener sits on window, past this root). The next Escape then
- * goes back from the detail or closes the drawer as before. A field that used the key fully (an
- * open suggest or chip list) stops it itself and never reaches here; one that only marked it
- * (the chip bar with its list closed) is still left, or the drawer could never take Escape back.
- */
+/** Escape in a field leaves the field, so the drawer closes only on the next one. Leaves it even when
+ * the field only marked the key (the chip bar), or the drawer could never take Escape back. */
 export function leaveFieldOnEscape(e: KeyboardEvent): void {
   if (e.key !== "Escape" || !isTypingTarget(e.target)) return;
   e.stopPropagation();

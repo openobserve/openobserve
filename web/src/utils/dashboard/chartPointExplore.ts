@@ -138,11 +138,8 @@ const skipGroup = (src: string, start: number, open: string, close: string): num
   return src.length;
 };
 
-/**
- * The offset each vector selector of a PromQL expression reads at, in µs: its own `offset` plus
- * that of every subquery around it. Negative offsets read later, as the engine does
- * (`selector.rs` `selector_time_range`). The `@` modifier is skipped: the engine rejects it.
- */
+/** Each vector selector's offset in µs, its own plus every enclosing subquery's; negative reads later
+ * as the engine does (selector.rs selector_time_range), and `@` is skipped since the engine rejects it. */
 export const promqlSelectorOffsetsUs = (expression: string | undefined): number[] => {
   const src = String(expression ?? "");
   const selectors: { end: number; offset: number }[] = [];
@@ -224,10 +221,8 @@ export const promqlSelectorOffsetsUs = (expression: string | undefined): number[
   return selectors.map((sel) => sel.offset);
 };
 
-/**
- * The samples behind a PromQL point, in µs: each selector reads its look-back before the point,
- * moved back by its offset; several offsets give the span that covers them all.
- */
+/** The samples behind a PromQL point (µs): each selector's look-back before it, moved back by its
+ * offset; several offsets give the span covering them all. */
 export const promqlPointWindow = (
   pointUs: number,
   expression: string | undefined,

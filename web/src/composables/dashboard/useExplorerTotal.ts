@@ -15,12 +15,8 @@
 
 import { ref } from "vue";
 
-/**
- * The Logs and Metrics explorers' match total, owned by one query run. `total` is null until it is
- * known: a page shorter than the page size makes it exact, otherwise the count request does. A new
- * query (filter, SQL or time range) starts a run and drops the old total, so a late, cancelled or
- * failed count never leaves one behind, and the page size is never shown as a total.
- */
+/** The explorers' match total, owned by one query run: null until a short page or the count makes
+ * it known, so a late, cancelled or failed count never leaves an old total or the page size. */
 export function useExplorerTotal() {
   const total = ref<number | null>(0);
   /** True while the count of the current run may still answer. */

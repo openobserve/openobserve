@@ -1,8 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-<!-- The explorers' filter area: one field box holding the <> toggle and either the chip builder or
-     "write your own" in the code editor (the WHERE condition for traces, the full SQL for logs and metrics).
+<!-- The explorers' filter area: chips or "write your own" (WHERE for traces, full SQL otherwise).
      The host keeps the two in step; this bar only shows them and reports edits. -->
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
@@ -49,12 +48,8 @@ const { t } = useI18nTyped();
 // browser stored "builder", and every toggle is saved. One key for all three explorers.
 const { builderOn, toggle } = useFilterBuilderPreference(EXPLORER_FILTER_MODE_KEY);
 
-// Auto run as on the Logs and Traces pages (isAutoRunActive): the server allows it
-// (zoConfig.auto_query_enabled) AND the user's Auto Run toggle from those pages' "Run query" menu is
-// on (stored as "true" under AUTO_RUN_STORAGE_KEY; missing or anything else is off, as they read it).
-// Then a chip edit reruns the search once edits settle, so rapid edits make one search. Otherwise it
-// only writes the filter, and the header's Run query or Enter on an empty bar runs it. The drawers
-// never write the key. "Write your own" always waits for Ctrl+Enter or Run query.
+// Chip edits rerun only when the Logs/Traces pages would (server setting AND the user's Auto Run
+// toggle, read but never written here), once edits settle; written queries wait for Ctrl+Enter.
 const store = useStore();
 const autoRunOn = (): boolean => {
   let liveMode = false;
@@ -115,11 +110,8 @@ defineExpose({ cancelPendingRun });
 </script>
 
 <template>
-  <!-- The Traces page's filter row (plugins/traces/SearchBar.vue, the query row around its
-       SqlFilterBuilder): a plain full-width row under the header (the header block draws the rule
-       below it), chips from the left edge, the
-       builder's own clear-all at its right end, then the <> toggle pinned top-right. The header's
-       refresh button runs it. -->
+  <!-- Mirrors the Traces page's filter row (plugins/traces/SearchBar.vue); it has no Run of its
+       own, the header's refresh runs it. -->
   <div class="border-border-default flex border-t" :data-test="`${dataTestPrefix}-filter-box`">
     <div class="relative flex h-full w-full flex-col overflow-hidden">
       <OButton
@@ -153,9 +145,8 @@ defineExpose({ cancelPendingRun });
           @exit="toggle"
         />
       </div>
-      <!-- Write your own, in the code editor the Logs and Traces pages use: the full SQL here for logs
-           and metrics, and for traces the bare WHERE condition in filter mode (as the Traces page's
-           filter), with the stream's fields and values offered. Ctrl+Enter runs it. -->
+      <!-- Traces edit the bare WHERE in filter mode, as the Traces page does; logs and metrics
+           edit the full SQL. -->
       <QueryEditor
         v-else
         :query="ownValue"
