@@ -47,11 +47,11 @@ const DEFAULT_SOURCE = {
   url: "/api/v2/myorg/incidents/events/o2iat_abcd1234efgh5678",
 };
 
-function buildWrapper() {
+function buildWrapper(zoConfig: Record<string, unknown> = { incidents_enabled: true }) {
   const store = createStore({
     state: {
       selectedOrganization: { identifier: "myorg" },
-      zoConfig: { incidents_enabled: true },
+      zoConfig,
       userInfo: { email: "admin@example.com" },
       organizationData: { organizationPasscode: "passcode" },
       API_ENDPOINT: "http://localhost:5080",
@@ -65,8 +65,8 @@ function buildWrapper() {
 
 // OTable holds its skeleton briefly after `loading` flips false, so
 // flushPromises() alone still sees skeleton rows instead of real cells.
-async function mountAndSettle() {
-  const wrapper = buildWrapper();
+async function mountAndSettle(zoConfig?: Record<string, unknown>) {
+  const wrapper = buildWrapper(zoConfig);
   await flushPromises();
   await vi.waitFor(() =>
     expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(false),
@@ -444,6 +444,26 @@ describe("ExternalAlertSourcesList", () => {
     const wrapper = await mountAndSettle();
     expect(wrapper.find('[data-test="alert-sources-no-destination-tag"]').exists()).toBe(true);
   });
+
+  it("shows a neutral On-Call only tag, not the error tag, when On-Call pages a source with no destination", async () => {
+    const wrapper = await mountAndSettle({ incidents_enabled: true, oncall_enabled: true });
+    expect(wrapper.find('[data-test="alert-sources-no-destination-tag"]').exists()).toBe(false);
+    const tag = wrapper.find('[data-test="alert-sources-oncall-only-tag"]');
+    expect(tag.text()).toBe("alert_sources.oncallOnly");
+  });
+
+  it.each([
+    ["on", true, false],
+    ["off", false, true],
+  ])(
+    "with On-Call %s, tints a no-destination row only when On-Call is off",
+    async (_label, enabled, tinted) => {
+      const wrapper = await mountAndSettle({ incidents_enabled: true, oncall_enabled: enabled });
+      const row = wrapper.find('[data-test="alert-sources-advanced-table"] tbody tr');
+      expect(row.exists()).toBe(true);
+      expect(row.classes().includes("bg-banner-error-soft-bg")).toBe(tinted);
+    },
+  );
 
   it("does not flag a source once destinations are set", async () => {
     (alertSources.list as any).mockResolvedValue({

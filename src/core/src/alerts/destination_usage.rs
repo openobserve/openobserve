@@ -950,6 +950,7 @@ mod tests {
             enabled: true,
             config: serde_json::json!({}),
             destinations: vec![name.to_string()],
+            oncall_team: None,
             created_by: "test@example.com".to_string(),
             created_at: now,
             updated_at: now,

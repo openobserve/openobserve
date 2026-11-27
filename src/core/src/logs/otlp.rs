@@ -228,9 +228,6 @@ pub async fn handle_request(
     } else {
         streams_need_original_map.values().any(|val| *val)
     };
-    let need_all_values = streams_need_all_values_map
-        .get(&stream_name)
-        .is_some_and(|v| *v);
     let uds_fields = user_defined_schema_map
         .get(&stream_name)
         .and_then(|fields| fields.as_ref());
@@ -387,8 +384,6 @@ pub async fn handle_request(
                         dbm: dbm_gate,
                         uds_fields,
                         need_original,
-                        need_all_values,
-                        all_values_max_len: index_all_max_value_length,
                     };
                     // from `log_record`, not the record, where a forged attribute looks the same
                     let trusted_event_name = (!log_record.event_name.is_empty() && event_name_gate)
@@ -477,10 +472,6 @@ pub async fn handle_request(
                             need_original: streams_need_original_map
                                 .get(&destination_stream)
                                 .is_some_and(|v| *v),
-                            need_all_values: streams_need_all_values_map
-                                .get(&destination_stream)
-                                .is_some_and(|v| *v),
-                            all_values_max_len: index_all_max_value_length,
                         };
 
                         for (idx, mut res) in stream_pl_results {
@@ -556,10 +547,6 @@ pub async fn handle_request(
                 need_original: streams_need_original_map
                     .get(&stream_name)
                     .is_some_and(|v| *v),
-                need_all_values: streams_need_all_values_map
-                    .get(&stream_name)
-                    .is_some_and(|v| *v),
-                all_values_max_len: index_all_max_value_length,
             };
             for (idx, mut res) in pipeline_inputs.iter().cloned().enumerate() {
                 let timestamp = match super::handle_timestamp_for_value(&mut res, min_ts, max_ts) {
@@ -653,7 +640,6 @@ pub async fn handle_request(
                     ) {
                         continue;
                     }
-                    let before = super::snapshot_derived_sources(&data.0);
                     if let Err(e) = pattern_manager.process_at_ingestion(
                         org_id,
                         StreamType::Logs,
@@ -664,7 +650,6 @@ pub async fn handle_request(
                             "[LOGS:OTLP] error applying SDR patterns for stream {org_id}/{stream}: {e}"
                         );
                     }
-                    super::refresh_derived_columns(&before, &mut data.0);
                 }
             }
             Err(e) => {
@@ -683,6 +668,13 @@ pub async fn handle_request(
             }
         }
     }
+
+    super::insert_all_values(
+        &mut json_data_by_stream,
+        &streams_need_all_values_map,
+        index_all_max_value_length,
+    );
+    drop(streams_need_all_values_map);
 
     // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
     let mut ingestion_status = IngestionStatus::Record(stream_status.status);
