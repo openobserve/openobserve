@@ -2037,12 +2037,6 @@ pub struct Search {
     )]
     pub bloom_footer_cache_max_size: usize,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
-        default = 35,
-        help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
-    )]
-    pub inverted_index_skip_threshold: usize,
-    #[env_config(
         name = "ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM",
         default = 1000,
         help = "For top-n group by queries, a file with up to N distinct groups returns all of them, making its contribution to the merged result exact. Files with more groups keep only the limit-derived top-k and the merged top-n becomes approximate; raise to trade speed for accuracy."
@@ -5536,9 +5530,6 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.search.inverted_index_result_cache_max_entry_size == 0 {
         cfg.search.inverted_index_result_cache_max_entry_size = 20480;
     }
-    if cfg.search.inverted_index_skip_threshold == 0 {
-        cfg.search.inverted_index_skip_threshold = 35;
-    }
     if cfg.limit.inverted_index_min_token_length == 0 {
         cfg.limit.inverted_index_min_token_length = 2;
     }
@@ -6674,12 +6665,10 @@ mod tests {
     fn test_check_inverted_index_config_defaults() {
         let mut cfg = Config::default();
         cfg.search.inverted_index_result_cache_max_entry_size = 0;
-        cfg.search.inverted_index_skip_threshold = 0;
         cfg.limit.inverted_index_min_token_length = 0;
         cfg.limit.inverted_index_max_token_length = 0;
         check_inverted_index_config(&mut cfg).unwrap();
         assert_eq!(cfg.search.inverted_index_result_cache_max_entry_size, 20480);
-        assert_eq!(cfg.search.inverted_index_skip_threshold, 35);
         assert_eq!(cfg.limit.inverted_index_min_token_length, 2);
         assert_eq!(cfg.limit.inverted_index_max_token_length, 64);
     }
