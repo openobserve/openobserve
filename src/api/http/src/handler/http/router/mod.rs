@@ -112,6 +112,8 @@ use crate::{
 /// How long a refused agent waits before reconnecting while fleet management is off.
 #[cfg(feature = "enterprise")]
 const FLEET_RETRY_AFTER_SECS: &str = "60";
+#[cfg(feature = "enterprise")]
+const LICENSE_DENIAL_AUDIT_MSG: &str = "The license does not entitle this feature";
 
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
@@ -337,7 +339,7 @@ fn license_denial(_required: &[Feature]) -> Option<Response> {
 /// Only a refused role learns what is locked; a failed credential must not read the license state.
 fn refusal_response(error: AuthError, denial: Option<Response>) -> Response {
     match (error, denial) {
-        (AuthError::RoleRefused(_), Some(denied)) => denied,
+        (AuthError::RoleRefused { .. }, Some(denied)) => denied,
         (error, _) => error.into_response(),
     }
 }
@@ -380,6 +382,14 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     let result = match oo_validator(&req_data, &auth_info).await {
         Ok(result) => result,
         Err(e) => {
+            #[cfg(feature = "enterprise")]
+            if let AuthError::RoleRefused {
+                user_email,
+                message,
+            } = &e
+            {
+                audit_refusal(&parts, user_email, message).await;
+            }
             let denial = auth_info.feature.and_then(license_denial);
             return maybe_add_mcp_www_authenticate(&uri, refusal_response(e, denial));
         }
@@ -387,6 +397,8 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
 
     // Outside oo_validator so the license gate holds with OpenFGA off and on bypass routes.
     if let Some(denied) = auth_info.feature.and_then(license_denial) {
+        #[cfg(feature = "enterprise")]
+        audit_refusal(&parts, &result.user_email, LICENSE_DENIAL_AUDIT_MSG).await;
         return denied;
     }
 
@@ -735,10 +747,14 @@ fn is_secret_field(name: &str) -> bool {
             .any(|word| name.contains(word))
 }
 
-/// A failed call is audited only when it is an outbound test, whose target must be on record.
+/// A failed call is audited only when it is a 403 or an outbound test, whose target must be on
+/// record. A 401 has no verified caller to attribute it to.
 #[cfg(any(feature = "enterprise", test))]
 fn audits_response(status: StatusCode, outbound: Option<&OutboundAudit>) -> bool {
-    status.is_success() || status.is_redirection() || outbound.is_some()
+    status.is_success()
+        || status.is_redirection()
+        || status == StatusCode::FORBIDDEN
+        || outbound.is_some()
 }
 
 /// A fleet change is published at once, so the Audit tab shows it before the periodic publish.
@@ -754,31 +770,93 @@ fn fleet_mutation(method: &Method, path: &str) -> bool {
 }
 
 #[cfg(feature = "enterprise")]
+fn skips_audit(method: &Method, path: &str, route: Option<&str>) -> bool {
+    let path_columns = path.split('/').collect::<Vec<&str>>();
+    let (_, after_org) = audit_org_and_next(&path_columns);
+    after_org.ends_with("_stream")
+        || path.ends_with("ai/chat_stream")
+        // The handler writes its own record: the body is the prompt, its images and context.
+        || path.ends_with("ai/chat")
+        || common::meta::ingestion_routes::is_ingestion_write(method, path, route)
+}
+
+#[cfg(feature = "enterprise")]
+fn audit_org_id(audit_org: &str) -> String {
+    if audit_org == "organizations" {
+        String::new()
+    } else {
+        audit_org.to_string()
+    }
+}
+
+/// Records a 403 the auth layer answers; `audit_middleware` sits inside it and never sees one.
+#[cfg(feature = "enterprise")]
+async fn audit_refusal(parts: &Parts, user_email: &str, error_msg: &str) {
+    if !get_o2_config().common.audit_enabled {
+        return;
+    }
+    if let Some(message) = refusal_audit(parts, user_email, error_msg, now_micros()) {
+        audit(message).await;
+    }
+}
+
+/// The audit row of an auth-layer 403, or `None` on a route the audit trail skips.
+#[cfg(feature = "enterprise")]
+fn refusal_audit(
+    parts: &Parts,
+    user_email: &str,
+    error_msg: &str,
+    now: i64,
+) -> Option<AuditMessage> {
+    let path = audited_path(&parts.uri);
+    let route = parts
+        .extensions
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str);
+    if skips_audit(&parts.method, &path, route) {
+        return None;
+    }
+    let path_columns = path.split('/').collect::<Vec<&str>>();
+    let (audit_org, _) = audit_org_and_next(&path_columns);
+    Some(AuditMessage {
+        login_ip: parts
+            .extensions
+            .get::<config::axum::middlewares::RealIp>()
+            .map(|ip| ip.0.to_string()),
+        user_agent: openobserve_api_management::request::audit_user_agent(&parts.headers),
+        user_email: user_email.to_string(),
+        org_id: audit_org_id(audit_org),
+        _timestamp: now,
+        protocol: Protocol::Http,
+        response_meta: ResponseMeta {
+            http_method: parts.method.to_string(),
+            http_path: config::axum::middlewares::mask_share_tokens(&path),
+            http_body: String::new(),
+            http_query_params: resource_search_audit_query(&parts.uri),
+            http_response_code: StatusCode::FORBIDDEN.as_u16(),
+            error_msg: Some(error_msg.to_string()),
+            trace_id: None,
+        },
+        delegated: None,
+        fleet_id: None,
+        target: None,
+    })
+}
+
+#[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
     let method = http_method.to_string();
     let path = audited_path(request.uri());
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
-    let (audit_org, after_org) = audit_org_and_next(&path_columns);
+    let (audit_org, _) = audit_org_and_next(&path_columns);
 
     if get_o2_config().common.audit_enabled
-        && !(after_org.ends_with("_stream")
-            || path.ends_with("ai/chat_stream")
-            // The handler writes its own record: the body is the prompt, its images and context.
-            || path.ends_with("ai/chat")
-            || common::meta::ingestion_routes::is_ingestion_write(
-                &http_method,
-                &path,
-                matched_route(&request).as_deref(),
-            ))
+        && !skips_audit(&http_method, &path, matched_route(&request).as_deref())
     {
         let query_params = resource_search_audit_query(request.uri());
-        let org_id = if audit_org == "organizations" {
-            String::new()
-        } else {
-            audit_org.to_string()
-        };
+        let org_id = audit_org_id(audit_org);
 
         let user_email = request
             .headers()
@@ -2572,11 +2650,10 @@ fn with_service_layers(router: Router) -> Router {
         // has been read yet when a tripped breaker refuses the write.
         .layer(middleware::from_fn(memory_breaker_middleware))
         .layer(middleware::from_fn(blocked_orgs_middleware))
-        .layer(middleware::from_fn(audit_middleware))
         .layer(middleware::from_fn(assistant_approval_middleware))
-        // Between auth and audit: it needs the email authentication resolves, and a request it
-        // refuses never reached a handler, so there is nothing for the audit trail to record.
+        // Inside auth for the email it resolves, and inside audit so its 403s are on record.
         .layer(middleware::from_fn(password_policy_middleware))
+        .layer(middleware::from_fn(audit_middleware))
         .layer(middleware::from_fn(auth_middleware))
         .layer(RequestDecompressionLayer::new())
         .layer(middleware::from_fn(ingest_rejections_middleware))
@@ -4159,17 +4236,57 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_call_is_audited_only_when_it_is_an_outbound_test() {
+    fn a_failed_call_is_audited_only_when_it_is_a_403_or_an_outbound_test() {
         let outbound = OutboundAudit("http://svc.ns:8080 timeout".to_string());
         for (status, outbound, audited) in [
             (StatusCode::OK, None, true),
             (StatusCode::FOUND, None, true),
+            (StatusCode::FORBIDDEN, None, true),
+            (StatusCode::UNAUTHORIZED, None, false),
             (StatusCode::BAD_REQUEST, None, false),
             (StatusCode::BAD_REQUEST, Some(&outbound), true),
             (StatusCode::INTERNAL_SERVER_ERROR, Some(&outbound), true),
         ] {
             assert_eq!(audits_response(status, outbound), audited, "{status}");
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_auth_layer_refusal_is_audited_as_a_403_with_the_verified_caller() {
+        let parts = |method: Method, uri: &str| {
+            let (mut parts, ()) = axum::http::Request::builder()
+                .method(method)
+                .uri(uri)
+                .header("user-agent", "AuditTest/1.0")
+                .body(())
+                .unwrap()
+                .into_parts();
+            parts.extensions.insert(config::axum::middlewares::RealIp(
+                "198.51.100.7".parse().unwrap(),
+            ));
+            parts
+        };
+        let refused = parts(Method::DELETE, "/default/alerts/a1");
+        let row = refusal_audit(&refused, "viewer@example.com", "Unauthorized Access", 7).unwrap();
+        assert_eq!(row.user_email, "viewer@example.com");
+        assert_eq!(row.org_id, "default");
+        assert_eq!(row._timestamp, 7);
+        assert_eq!(row.login_ip.as_deref(), Some("198.51.100.7"));
+        assert_eq!(row.user_agent.as_deref(), Some("AuditTest/1.0"));
+        assert_eq!(row.response_meta.http_method, "DELETE");
+        assert_eq!(row.response_meta.http_path, "default/alerts/a1");
+        assert_eq!(row.response_meta.http_response_code, 403);
+        assert_eq!(row.response_meta.http_body, "");
+        assert_eq!(
+            row.response_meta.error_msg.as_deref(),
+            Some("Unauthorized Access")
+        );
+
+        let chat = parts(Method::POST, "/default/ai/chat");
+        assert!(refusal_audit(&chat, "viewer@example.com", "Forbidden", 7).is_none());
+        let stream = parts(Method::POST, "/default/_search_stream");
+        assert!(refusal_audit(&stream, "viewer@example.com", "Forbidden", 7).is_none());
     }
 
     #[test]
@@ -6162,7 +6279,10 @@ mod tests {
 
     #[tokio::test]
     async fn only_a_refused_role_on_a_locked_route_answers_with_the_license_denial() {
-        let role = || AuthError::RoleRefused("Unauthorized Access".to_string());
+        let role = || AuthError::RoleRefused {
+            user_email: "viewer@example.com".to_string(),
+            message: "Unauthorized Access".to_string(),
+        };
         let (status, body) = refusal_parts(role(), true).await;
         assert_eq!(status, StatusCode::FORBIDDEN);
         assert!(body.contains("40001"), "{body}");

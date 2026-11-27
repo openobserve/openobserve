@@ -48,6 +48,14 @@ fn boot() {
 fn app() -> Router {
     Router::new()
         .route("/default/things", get(|| async { "ok" }))
+        .route(
+            "/default/forbidden",
+            get(|| async { StatusCode::FORBIDDEN }),
+        )
+        .route(
+            "/default/unauthorized",
+            get(|| async { StatusCode::UNAUTHORIZED }),
+        )
         .layer(middleware::from_fn(audit_middleware))
         .layer(middleware::from_fn(extract_real_ip))
         .layer(axum::Extension(resolve_client_ip_sources("XRealIp")))
@@ -74,7 +82,7 @@ async fn audited(request: Request<Body>) -> Value {
 }
 
 #[tokio::test]
-async fn the_audit_middleware_records_the_client_ip_and_user_agent() {
+async fn the_audit_middleware_records_client_metadata_and_403s_but_not_401s() {
     boot();
     drain().await;
 
@@ -96,4 +104,24 @@ async fn the_audit_middleware_records_the_client_ip_and_user_agent() {
     let row = audited(Request::get("/default/things").body(Body::empty()).unwrap()).await;
     assert!(row.get("login_ip").is_none(), "{row}");
     assert!(row.get("user_agent").is_none(), "{row}");
+
+    let forbidden = Request::get("/default/forbidden")
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(
+        app().oneshot(forbidden).await.unwrap().status(),
+        StatusCode::FORBIDDEN
+    );
+    let rows = drain().await;
+    assert_eq!(rows.len(), 1, "a 403 is audited: {rows:?}");
+    assert_eq!(rows[0]["http_response_code"], 403);
+
+    let unauthorized = Request::get("/default/unauthorized")
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(
+        app().oneshot(unauthorized).await.unwrap().status(),
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(drain().await, Vec::<Value>::new(), "a 401 is not audited");
 }
