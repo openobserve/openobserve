@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { reactive } from "vue";
+import { nextTick, reactive } from "vue";
 import {
   defaultFlameGraphPanelQuery,
   defaultLogsPanelQuery,
@@ -8,6 +8,7 @@ import {
   orderLogsStarter,
   usePanelAggregation,
 } from "./usePanelAggregation";
+import { hasTypedChanges, panelPayloadSignature } from "./usePanelLivePreview";
 
 const DEFAULT_CUSTOM_CHART_TEXT = "option = {};";
 const getDefaultCustomChartText = vi.fn(() => DEFAULT_CUSTOM_CHART_TEXT);
@@ -1057,6 +1058,62 @@ describe("usePanelAggregation", () => {
         orderLogsStarter(typed, "oldest");
         expect(typed.query).toBe(defaultLogsPanelQuery("s", "_timestamp"));
       });
+    });
+  });
+  describe("stream change on an untouched starter", () => {
+    const seeded = (type: string) => {
+      const panelData = makePanelData(type);
+      makeAggregation(panelData).resetAggregationFunction();
+      return panelData;
+    };
+
+    it("rebuilds the logs starter for the new stream and runs it as a builder edit", async () => {
+      const panelData = seeded("logs");
+      const applied = JSON.parse(JSON.stringify(panelData.data));
+      panelData.data.queries[0].fields.stream = "other_stream";
+      await nextTick();
+
+      const [query] = panelData.data.queries;
+      expect(query.query).toBe(defaultLogsPanelQuery("other_stream", "_timestamp"));
+      expect(isPanelStarterQuery(query)).toBe(true);
+      expect(hasTypedChanges(panelData.data, applied)).toBe(false);
+      expect(panelPayloadSignature(panelData.data)).not.toBe(panelPayloadSignature(applied));
+    });
+
+    it("keeps the stored oldest-first order", async () => {
+      const panelData = seeded("logs");
+      (panelData.data as any).config = { logs_order: "oldest" };
+      panelData.data.queries[0].fields.stream = "other_stream";
+      await nextTick();
+      expect(panelData.data.queries[0].query).toBe(
+        defaultLogsPanelQuery("other_stream", "_timestamp", "oldest"),
+      );
+    });
+
+    it("rebuilds the flame graph starter for the new stream", async () => {
+      const panelData = seeded("flame-graph");
+      panelData.data.queries[0].fields.stream = "profiles";
+      await nextTick();
+      expect(panelData.data.queries[0].query).toBe(defaultFlameGraphPanelQuery("profiles"));
+    });
+
+    it("never touches SQL the user edited", async () => {
+      const panelData = seeded("logs");
+      const typed = 'SELECT message FROM "test_stream" LIMIT 10';
+      panelData.data.queries[0].query = typed;
+      panelData.data.queries[0].fields.stream = "other_stream";
+      await nextTick();
+      expect(panelData.data.queries[0].query).toBe(typed);
+    });
+
+    it("leaves builder queries alone", async () => {
+      const panelData = makePanelData("bar");
+      makeAggregation(panelData);
+      panelData.data.queries[0].query = 'SELECT * FROM "test_stream"';
+      markPanelStarterQuery(panelData.data.queries[0]);
+      panelData.data.queries[0].fields.stream = "other_stream";
+      await nextTick();
+      expect(panelData.data.queries[0].query).toBe('SELECT * FROM "test_stream"');
     });
   });
 });

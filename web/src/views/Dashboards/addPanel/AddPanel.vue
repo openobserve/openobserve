@@ -389,6 +389,7 @@ import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/check
 import { usePanelLivePreview } from "@/composables/dashboard/usePanelLivePreview";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import {
+  keepLoadedPanelChoices,
   validateConditions,
   builderQueryRejection,
   validateJoinFields,
@@ -1088,6 +1089,8 @@ export default defineComponent({
             }
           });
         }
+        // A newer version's choice shows as "Default" here; Save keeps it rather than failing or dropping it.
+        keepLoadedPanelChoices(dashboardPanelData.data);
       } catch (e) {
         console.error("Error while parsing panel data", e);
       }
