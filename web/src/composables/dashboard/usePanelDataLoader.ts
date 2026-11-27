@@ -31,7 +31,11 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 
 import { usePanelCache } from "./usePanelCache";
-import { cachedWindowDiffers, usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
+import {
+  cachedWindowDiffers,
+  hasResultRows,
+  usePanelRefreshAfterRestore,
+} from "./usePanelRefreshAfterRestore";
 import { useFailedRefreshHold } from "./panelFailedRefreshHold";
 import { isEqual, omit } from "lodash-es";
 
@@ -227,6 +231,14 @@ export const usePanelDataLoader = (
     () => state.loading,
     (loading) => {
       if (!loading) settleLoad();
+    },
+    { flush: "sync" },
+  );
+  // A streamed chunk is already an answer, so the panel renders it instead of waiting for the stream to end.
+  watch(
+    () => hasResultRows(state.data),
+    (hasRows) => {
+      if (hasRows) isFirstLoadSettled.value = true;
     },
     { flush: "sync" },
   );
