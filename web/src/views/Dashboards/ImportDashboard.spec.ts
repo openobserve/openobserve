@@ -435,6 +435,23 @@ describe("ImportDashboard.vue", () => {
     await vi.waitFor(() => expect(wrapper.vm.jsonStr).toBe(""));
   });
 
+  it("keeps a pick's valid file when another file in the same pick is refused", async () => {
+    const dash = (title: string) =>
+      new File([JSON.stringify({ title, tabs: [{ tabId: "t1", panels: [] }] })], `${title}.json`, {
+        type: "application/json",
+      });
+    wrapper = mountComponent();
+    await nextTick();
+    wrapper.vm.form.setFieldValue("jsonFiles", [dash("From A")]);
+    await vi.waitFor(() => expect(wrapper.vm.jsonStr).toContain("From A"));
+    const refused = new File(["x"], "c.txt", { type: "text/plain" });
+    wrapper.findComponent({ name: "OFile" }).vm.$emit("rejected", [{ file: refused, reason: "x" }]);
+    wrapper.vm.form.setFieldValue("jsonFiles", [dash("From B")]);
+    await vi.waitFor(() => expect(wrapper.vm.jsonStr).toContain("From B"));
+    await flushPromises();
+    expect(wrapper.vm.jsonFiles).toHaveLength(1);
+  });
+
   it("keeps the folder picker locked while uploaded files are importing", async () => {
     const dashboardService = (await import("@/services/dashboards")).default;
     let settle: (v: unknown) => void = () => {};

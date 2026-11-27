@@ -129,7 +129,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         multiple
                         :validate="validateJsonFile"
                         :disabled="!!isLoading"
-                        @rejected="clearRejectedJson"
                       />
                     </div>
                     <QueryEditor
@@ -387,15 +386,11 @@ export default defineComponent({
       };
     });
 
-    // A rejected pick must not leave the previous file's JSON in the editor to be imported.
-    const clearRejectedJson = () => {
-      jsonStr.value = "";
-    };
-
     watch(jsonFiles, (newVal) => {
-      // Every file removed or refused: nothing is left to import.
+      // Every file removed or refused: nothing is left to import. Only this path clears the
+      // editor, since clearing it also resets the files and would drop a pick's valid ones.
       if (!newVal || newVal.length === 0) {
-        clearRejectedJson();
+        jsonStr.value = "";
         return;
       }
       if (newVal && newVal.length > 0) {
@@ -886,7 +881,6 @@ export default defineComponent({
     };
 
     return {
-      clearRejectedJson,
       validateJsonFile,
       t,
       goBack,

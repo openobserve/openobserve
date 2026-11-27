@@ -193,7 +193,6 @@ function openPicker() {
 /** Opens the OS file picker; for a control that hides the field behind its own button. */
 defineExpose({ open: openPicker });
 
-// ── Drag and drop ──────────────────────────────────────────────────────────
 // The zone swaps its content while dragging, and a removed child never fires its dragleave,
 // so a depth counter can stick; a leave counts only when the pointer really exits the zone.
 function onDragEnter(event: DragEvent) {
@@ -260,9 +259,6 @@ const browseLabelledBy = computed(() => {
 });
 const slotsHaveLabel = computed(() => !!slots.label);
 
-// The zone's dashed outline is drawn by an SVG (see the template) so the gap
-// between dashes can be wider than a CSS `border-dashed` allows. Its colour
-// comes from the zone's `--zone-dash` variable set here.
 const zoneClasses = computed(() => [
   "group relative flex min-h-16 flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-surface px-5 py-4 text-center text-compact transition-colors duration-(--duration-control) ease-(--ease-control)",
   isDragging.value

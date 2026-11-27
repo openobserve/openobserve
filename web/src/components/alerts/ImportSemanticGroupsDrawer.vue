@@ -385,7 +385,11 @@ const hasSelectedChanges = computed(() => {
 const loadFile = async (value: FileValue) => {
   // OFile single-mode emits File | null
   const file = value as File | null;
-  if (!file) return;
+  // A refused or removed file leaves no value; the previous file's diff must not stay applicable.
+  if (!file) {
+    clearFile();
+    return;
+  }
 
   isLoading.value = true;
   try {

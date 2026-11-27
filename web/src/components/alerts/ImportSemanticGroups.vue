@@ -397,7 +397,11 @@ const hasSelectedChanges = computed(() => {
 const loadFile = async (value: FileValue) => {
   // Single-file input; take the first file when the model yields an array.
   const file = Array.isArray(value) ? value[0] : value;
-  if (!file) return;
+  // A refused or removed file leaves no value; the previous file's diff must not stay applicable.
+  if (!file) {
+    clearFile();
+    return;
+  }
 
   isImporting.value = true;
   try {
