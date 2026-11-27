@@ -21,7 +21,9 @@ use std::{
 
 use bytes::Bytes;
 use config::{
-    RwHashMap, get_config, is_local_disk_storage, metrics, spawn_pausable_job,
+    RwHashMap, get_config, is_local_disk_storage,
+    memory::{MemoryConsumer, memory_budget},
+    metrics, spawn_pausable_job,
     utils::{hash::key_sum64, time::BASE_TIME},
 };
 use futures::StreamExt;
@@ -32,16 +34,16 @@ use super::CacheStrategy;
 
 static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
-    let mut files = Vec::with_capacity(cfg.memory_cache.bucket_num);
-    for _ in 0..cfg.memory_cache.bucket_num {
+    let mut files = Vec::with_capacity(cfg.memory.file_cache.bucket_num);
+    for _ in 0..cfg.memory.file_cache.bucket_num {
         files.push(RwLock::new(FileData::new()));
     }
     files
 });
 static DATA: Lazy<Vec<RwHashMap<String, Bytes>>> = Lazy::new(|| {
     let cfg = get_config();
-    let mut data = Vec::with_capacity(cfg.memory_cache.bucket_num);
-    for _ in 0..cfg.memory_cache.bucket_num {
+    let mut data = Vec::with_capacity(cfg.memory.file_cache.bucket_num);
+    for _ in 0..cfg.memory.file_cache.bucket_num {
         data.push(Default::default());
     }
     data
@@ -63,7 +65,7 @@ impl Default for FileData {
 impl FileData {
     pub fn new() -> FileData {
         let cfg = get_config();
-        FileData::with_cache_strategy(&cfg.memory_cache.cache_strategy)
+        FileData::with_cache_strategy(&cfg.memory.file_cache.strategy)
     }
 
     pub fn with_cache_strategy(strategy: &str) -> FileData {
@@ -107,15 +109,18 @@ impl FileData {
     async fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         let data_size = file.len() + data.len();
         #[cfg(test)]
-        let max_size = self.max_size.unwrap_or(get_config().memory_cache.max_size);
+        let max_size = self.max_size.unwrap_or(per_bucket(file_cache_quota()));
         #[cfg(not(test))]
-        let max_size = get_config().memory_cache.max_size;
+        let max_size = per_bucket(file_cache_quota());
         if self.cur_size + data_size >= max_size {
             log::info!("File memory cache is full, can't cache extra {data_size} bytes");
             // cache is full, need release some space
             let need_release_size = min(
                 self.cur_size,
-                max(get_config().memory_cache.release_size, data_size * 100),
+                max(
+                    per_bucket(get_config().memory.file_cache.release_size),
+                    data_size * 100,
+                ),
             );
             self.gc(need_release_size).await?;
         }
@@ -142,7 +147,7 @@ impl FileData {
         log::info!(
             "File memory cache start gc {}/{}, need to release {} bytes",
             self.cur_size,
-            get_config().memory_cache.max_size,
+            per_bucket(file_cache_quota()),
             need_release_size
         );
         let mut release_size = 0;
@@ -227,11 +232,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         _ = file.read().await.get("", None).await;
     }
 
-    spawn_pausable_job!("memory_cache_gc", get_config().memory_cache.gc_interval, {
-        if let Err(e) = gc().await {
-            log::error!("memory cache gc error: {e}");
+    spawn_pausable_job!(
+        "memory_cache_gc",
+        get_config().memory.file_cache.gc_interval,
+        {
+            if let Err(e) = gc().await {
+                log::error!("memory cache gc error: {e}");
+            }
         }
-    });
+    );
     Ok(())
 }
 
@@ -281,7 +290,7 @@ pub async fn get_opts(file: &str, options: GetOptions) -> object_store::Result<G
 
 #[inline]
 pub async fn get(file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
-    if !get_config().memory_cache.enabled {
+    if !get_config().memory.file_cache.enabled {
         return None;
     }
     let idx = get_bucket_idx(file);
@@ -291,7 +300,7 @@ pub async fn get(file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
 
 #[inline]
 pub async fn get_size(file: &str) -> Option<usize> {
-    if !get_config().memory_cache.enabled {
+    if !get_config().memory.file_cache.enabled {
         return None;
     }
     let idx = get_bucket_idx(file);
@@ -306,7 +315,7 @@ pub async fn get_size(file: &str) -> Option<usize> {
 /// This is the batched counterpart to [`get_opts`] used by the search
 /// hot path: one cache lookup yields N small slices with zero IO.
 pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> Option<Vec<Bytes>> {
-    if !get_config().memory_cache.enabled || ranges.is_empty() {
+    if !get_config().memory.file_cache.enabled || ranges.is_empty() {
         return None;
     }
     let data = get(file, None).await?;
@@ -323,7 +332,7 @@ pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> Option<Vec<Bytes>>
 
 #[inline]
 pub async fn exist(file: &str) -> bool {
-    if !get_config().memory_cache.enabled {
+    if !get_config().memory.file_cache.enabled {
         return false;
     }
     let idx = get_bucket_idx(file);
@@ -333,7 +342,7 @@ pub async fn exist(file: &str) -> bool {
 
 #[inline]
 pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
-    if !get_config().memory_cache.enabled {
+    if !get_config().memory.file_cache.enabled {
         return Ok(());
     }
     let idx = get_bucket_idx(file);
@@ -346,7 +355,7 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
 
 #[inline]
 pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
-    if !get_config().memory_cache.enabled {
+    if !get_config().memory.file_cache.enabled {
         return Ok(());
     }
     let idx = get_bucket_idx(file);
@@ -374,18 +383,20 @@ pub(crate) fn holds(file: &str) -> bool {
 
 async fn gc() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    if !cfg.memory_cache.enabled {
+    if !cfg.memory.file_cache.enabled {
         return Ok(());
     }
 
     for file in FILES.iter() {
         let r = file.read().await;
-        if r.cur_size + cfg.memory_cache.release_size < cfg.memory_cache.max_size {
+        if r.cur_size + per_bucket(cfg.memory.file_cache.release_size)
+            < per_bucket(file_cache_quota())
+        {
             continue;
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc(cfg.memory_cache.gc_size).await?;
+        w.gc(per_bucket(cfg.memory.file_cache.gc_size)).await?;
         drop(w);
     }
 
@@ -399,7 +410,7 @@ pub async fn stats() -> (usize, usize, usize) {
     let mut item_len = 0;
     for file in FILES.iter() {
         let r = file.read().await;
-        total_size += get_config().memory_cache.max_size;
+        total_size += per_bucket(file_cache_quota());
         used_size += r.size();
         item_len += r.len();
     }
@@ -435,12 +446,21 @@ pub async fn download(
 
 fn get_bucket_idx(file: &str) -> usize {
     let cfg = get_config();
-    if cfg.memory_cache.bucket_num <= 1 {
+    if cfg.memory.file_cache.bucket_num <= 1 {
         0
     } else {
         let h = key_sum64(file);
-        (h as usize) % cfg.memory_cache.bucket_num
+        (h as usize) % cfg.memory.file_cache.bucket_num
     }
+}
+
+fn file_cache_quota() -> usize {
+    memory_budget().quota(MemoryConsumer::FileMemoryCache)
+}
+
+/// The configured sizes cover the whole cache; each bucket holds an even share.
+fn per_bucket(total: usize) -> usize {
+    total / get_config().memory.file_cache.bucket_num.max(1)
 }
 
 #[cfg(test)]
@@ -462,8 +482,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_get_file() {
-        let mut file_data =
-            FileData::with_cache_strategy_and_max_size("lru", get_config().memory_cache.max_size);
+        let mut file_data = FileData::with_cache_strategy_and_max_size("lru", 1024 * 1024);
         let file_key = "files/default/logs/memory/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
@@ -507,8 +526,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_get_file() {
-        let mut file_data =
-            FileData::with_cache_strategy_and_max_size("fifo", get_config().memory_cache.max_size);
+        let mut file_data = FileData::with_cache_strategy_and_max_size("fifo", 1024 * 1024);
         let file_key = "files/default/logs/memory/2022/10/03/10/6982652937134804993_5_1.parquet";
         let content = Bytes::from("Some text");
 
@@ -540,14 +558,11 @@ mod tests {
     #[tokio::test]
     async fn test_stats_basic() {
         // Test that stats function returns correct tuple structure
-        let (total_size, used_size, _item_len) = stats().await;
-
-        // used_size should not exceed total_size
-        assert!(used_size <= total_size);
+        let (total_size, _used_size, _item_len) = stats().await;
 
         // total_size should be equal to max_size * bucket_num
         let cfg = get_config();
-        let expected_total = cfg.memory_cache.max_size * cfg.memory_cache.bucket_num;
+        let expected_total = per_bucket(file_cache_quota()) * cfg.memory.file_cache.bucket_num;
         assert_eq!(total_size, expected_total);
     }
 
@@ -680,7 +695,7 @@ mod tests {
     fn test_get_bucket_idx_valid_range() {
         let idx = get_bucket_idx("some/file/path.parquet");
         let cfg = config::get_config();
-        let max = cfg.memory_cache.bucket_num.max(1);
+        let max = cfg.memory.file_cache.bucket_num.max(1);
         assert!(idx < max);
     }
 

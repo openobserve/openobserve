@@ -50,6 +50,7 @@ schema.workspace = true
 compaction.workspace = true
 stream.workspace = true
 enrichment-data.workspace = true
+promql.workspace = true
 promql-service.workspace = true
 search.workspace = true
 search_service.workspace = true

@@ -16,7 +16,10 @@
 use std::sync::{Arc, LazyLock, Mutex};
 
 use anyhow::Result;
-use config::metrics::promql::{INDEX_BLOCKS_CACHE_METRICS, IndexBlocksCacheMetrics};
+use config::{
+    memory::{MemoryConsumer, memory_budget},
+    metrics::promql::{INDEX_BLOCKS_CACHE_METRICS, IndexBlocksCacheMetrics},
+};
 use hashlink::LruCache;
 
 use crate::block::{self, Index, ParentMetadata};
@@ -228,8 +231,5 @@ impl CacheWeight {
 }
 
 pub fn cache_limit() -> usize {
-    config::get_config()
-        .search
-        .metrics_blocks_cache_max_size
-        .saturating_mul(1024 * 1024)
+    memory_budget().quota(MemoryConsumer::MetricsBlocksCache)
 }

@@ -17,6 +17,7 @@ use std::path::Path;
 
 use config::{
     get_config,
+    memory::{MemoryConsumer, memory_budget},
     meta::{cluster::Role, stream::StreamType},
     metrics::{self},
     utils::async_file::scan_files,
@@ -31,6 +32,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // load metrics
     load_query_cache_limit_bytes().await?;
     load_ingest_wal_used_bytes().await?;
+    update_memory_budget_metrics().await;
 
     // update metrics every 60 seconds
     loop {
@@ -49,6 +51,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if let Err(e) = update_parquet_metadata_cache_metrics().await {
             log::error!("Error update parquet metadata cache metrics: {e}");
         }
+        update_memory_budget_metrics().await;
     }
 }
 
@@ -56,7 +59,7 @@ async fn load_query_cache_limit_bytes() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     metrics::QUERY_MEMORY_CACHE_LIMIT_BYTES
         .with_label_values::<&str>(&[])
-        .set(cfg.memory_cache.max_size as i64);
+        .set(memory_budget().quota(MemoryConsumer::FileMemoryCache) as i64);
     metrics::QUERY_DISK_CACHE_LIMIT_BYTES
         .with_label_values::<&str>(&[])
         .set((cfg.disk_cache.max_size * cfg.disk_cache.bucket_num) as i64);
@@ -292,6 +295,55 @@ async fn update_parquet_metadata_cache_metrics() -> Result<(), anyhow::Error> {
         .with_label_values::<&str>(&[])
         .set(mem_size as i64);
     Ok(())
+}
+
+async fn update_memory_budget_metrics() {
+    let budget = memory_budget();
+    for consumer in MemoryConsumer::ALL {
+        metrics::MEMORY_BUDGET_LIMIT_BYTES
+            .with_label_values(&[consumer.name()])
+            .set(budget.limit(consumer) as i64);
+        // Taking the child creates DataFusion's series at 0 on nodes that never ran a query.
+        let used_gauge = metrics::MEMORY_BUDGET_USED_BYTES.with_label_values(&[consumer.name()]);
+        if let Some(used) = memory_consumer_used_bytes(consumer).await {
+            used_gauge.set(used as i64);
+        }
+    }
+}
+
+/// `None` for the DataFusion pools, which update their gauge as they reserve.
+async fn memory_consumer_used_bytes(consumer: MemoryConsumer) -> Option<usize> {
+    let used = match consumer {
+        MemoryConsumer::MemTable => metrics::INGEST_MEMTABLE_ARROW_BYTES
+            .with_label_values::<&str>(&[])
+            .get() as usize,
+        MemoryConsumer::DataFusionPool => return None,
+        MemoryConsumer::FileMemoryCache => cache::file_data::memory::stats().await.1,
+        MemoryConsumer::DataFusionFileStat => {
+            search::datafusion::storage::file_statistics_cache::GLOBAL_CACHE.memory_size()
+        }
+        MemoryConsumer::MetricsBlocksCache => {
+            metrics::promql::INDEX_BLOCKS_CACHE_METRICS.used.get() as usize
+        }
+        MemoryConsumer::IndexFooterCache => {
+            tantivy_utils::puffin_directory::footer_cache::footer_data_cache_used_bytes()
+        }
+        MemoryConsumer::LabelCache => promql::label_cache_used_bytes(),
+        MemoryConsumer::BloomFooterCache => {
+            infra::bloom::footer_cache::BLOOM_FOOTER_CACHE.memory_size()
+        }
+        MemoryConsumer::MetricsResultCache => promql_service::search::get_cache_stats().await.2,
+        MemoryConsumer::IndexResultCache => search::tantivy::cache::GLOBAL_CACHE.memory_size(),
+        MemoryConsumer::StreamingAggsCache => {
+            search::datafusion::physical_plan::streaming_aggs_exec::registry::GLOBAL_CACHE
+                .id_cache
+                .memory_size()
+        }
+        MemoryConsumer::MemoryQueue => metrics::QUEUE_MEMORY_USED_BYTES
+            .with_label_values(&[infra::queue::memory::BACKEND_LABEL])
+            .get() as usize,
+    };
+    Some(used)
 }
 
 #[cfg(test)]

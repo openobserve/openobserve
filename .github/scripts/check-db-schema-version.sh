@@ -3,7 +3,7 @@
 set -euo pipefail
 
 MIGRATION_DIR="src/infra/src/table/migration"
-SCHEMA_VERSION_FILE="src/config/src/config.rs"
+SCHEMA_VERSION_FILE="src/config/src/config/mod.rs"
 
 usage() {
   echo "Usage: $0 <base-sha> <head-sha>" >&2

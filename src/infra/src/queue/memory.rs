@@ -35,7 +35,10 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::metrics;
+use config::{
+    memory::{MemoryConsumer, memory_budget},
+    metrics,
+};
 use parking_lot::{Mutex, MutexGuard};
 use tokio::{
     sync::{Notify, mpsc},
@@ -69,7 +72,7 @@ const PULL_WAIT: Duration = Duration::from_secs(30);
 /// Delivery channel capacity, same as the NATS backend.
 const CHANNEL_CAPACITY: usize = 1024;
 /// Metric label for this backend.
-const BACKEND_LABEL: &str = "memory";
+pub const BACKEND_LABEL: &str = "memory";
 
 pub struct MemoryQueue {
     shared: Arc<Shared>,
@@ -104,9 +107,7 @@ impl MemoryQueue {
 
 impl Default for MemoryQueue {
     fn default() -> Self {
-        let cfg = config::get_config();
-        // already converted from MB to bytes during config validation
-        Self::new(cfg.common.memory_queue_max_size as u64)
+        Self::new(memory_budget().quota(MemoryConsumer::MemoryQueue) as u64)
     }
 }
 

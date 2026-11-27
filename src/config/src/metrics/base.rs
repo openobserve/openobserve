@@ -2345,6 +2345,33 @@ pub static LICENSE_USAGE_LAST_REPORTING_SUCCESS: Lazy<IntGauge> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// Memory budget metrics, one series per memory consumer
+pub static MEMORY_BUDGET_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "memory_budget_limit_bytes",
+            "Bytes a memory consumer counts toward the node memory budget: one pool per query, or every merge pool on a compactor-only node; 0 when it is off on this node",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["consumer"],
+    )
+    .expect("Metric created")
+});
+
+pub static MEMORY_BUDGET_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "memory_budget_used_bytes",
+            "Bytes a memory consumer holds now, all of its live pools together",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["consumer"],
+    )
+    .expect("Metric created")
+});
+
 // Queue backend metrics (in-memory queue)
 pub static QUEUE_MEMORY_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -3820,6 +3847,12 @@ pub(crate) fn register(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(LICENSE_USAGE_LAST_REPORTING_SUCCESS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(MEMORY_BUDGET_LIMIT_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(MEMORY_BUDGET_USED_BYTES.clone()))
         .expect("Metric registered");
     // queue backend metrics
     registry
