@@ -357,6 +357,7 @@ export function anomalyExplanation(
   pattern: {
     percentage?: number;
     frequency?: number;
+    estimated_count?: number;
     z_score?: number;
     avg_frequency?: number;
     anomaly_score?: number;
@@ -372,10 +373,11 @@ export function anomalyExplanation(
     // `count` alongside the display args: it never appears in the message, it is
     // what vue-i18n reads to pick the plural form. `freq` itself is pre-formatted
     // for display (thousands separators) and so cannot serve as the choice.
+    const estimate = pattern.estimated_count ?? 0;
     return t("search.patternAnomalyRare", {
       pct: pct.toFixed(2),
-      freq: freq.toLocaleString(),
-      count: freq,
+      freq: estimate.toLocaleString(),
+      count: estimate,
     });
   }
   if (z < -1.5 && avg > 0) {

@@ -159,6 +159,8 @@ Applies to every NEW table and column (SQLite and PostgreSQL alike):
 - PR titles starting with `feat:` require `Design at: #xxx` as the FIRST line
   of the description (enforced by `.github/workflows/feat-design-checker.yml`);
   `fix:`/`chore:`/`test:` PRs skip the check.
+- `.github/workflows/sister-oss-gate-auto-rerun.yml` lists by name the workflows behind
+  main's required checks. When you rename, add or split such a workflow, update that list.
 
 ## Enterprise-gated code
 
