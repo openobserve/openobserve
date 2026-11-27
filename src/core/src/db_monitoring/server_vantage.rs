@@ -909,26 +909,6 @@ pub(crate) fn may_canonicalize_key(key: &str) -> bool {
 // existing settings first and writing only when something is actually missing.
 // This is the same shape for the same reason — the settings must be in place on
 // the node about to write parquet, and only ingest knows the stream exists.
-//
-// ── Known risk: selectivity ─────────────────────────────────────────────────
-//
-// A tantivy index only pays off when the predicate is SELECTIVE. `guard_matched_rows`
-// returns `Skipped` — falling back to DataFusion for that file — when matched
-// rows exceed `inverted_index_skip_threshold` PERCENT of the file's rows; and if
-// `cpu_num` files each blow that threshold, the whole tantivy step is abandoned
-// for the entire file list and every filter is added back.
-//
-// The effective default threshold is **35%** (declared `default = 35`, and a
-// configured 0 is rewritten to 35 at config load). On the measured stream
-// `o2_dbm_kind='activity'` was ~21.6% of rows — under 35, but the same order of
-// magnitude as the cutoff, not a comfortable margin. A deployment whose activity
-// share runs higher (a stream carrying little else, or a tightened threshold)
-// trips the guard, skips tantivy, and sees no improvement at all.
-//
-// So the index is conditional: it helps when the kind being queried is a small
-// minority of the file and degrades to an unindexed scan when it is not. The
-// rarer kinds (deadlock, blocking, explain) are the strongest case; `activity`
-// is the weakest. Measure before claiming a win.
 
 /// The canonical secondary-index field: the column every DBM read filters on.
 ///
@@ -969,11 +949,7 @@ pub const SERVER_STREAM_INDEX_FIELD: &str = O2_DBM_KIND;
 /// as much as seeding none of them.
 ///
 /// That failure lands in the worst possible place: deadlock and blocking are the
-/// RARE kinds, whose row share sits far below `inverted_index_skip_threshold`
-/// (35%) where a tantivy index actually pays off. The common kinds are already
-/// past that cutoff (`statement` measured at 50.4% of rows) and gain nothing
-/// from the index either way — so a kind-only seed helps only the kinds that
-/// need no help.
+/// RARE kinds, where the index prunes the most.
 ///
 /// # Why exactly these fields, and no others
 ///

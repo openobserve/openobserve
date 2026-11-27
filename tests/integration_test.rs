@@ -1840,6 +1840,7 @@ mod tests {
             enabled: true,
             config: json!({}),
             destinations: vec![],
+            oncall_team: None,
             created_by: "root@example.com".to_string(),
             created_at: now,
             updated_at: now,
