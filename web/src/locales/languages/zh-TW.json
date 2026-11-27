@@ -17551,6 +17551,7 @@
     "backToLogs": "返回日誌",
     "openInTraces": "在追蹤中開啟",
     "loadingStream": "載入串流中...",
+    "noLogsAvailableForService": "此服務無可用的日誌",
     "noCorrelatedLogsFound": "找不到此 span 的相關日誌",
     "spanHasNoLogsShowingTrace": "此 Span 沒有日誌。顯示整個追蹤的日誌。",
     "noLogStreamForTrace": "沒有日誌串流含有此追蹤的日誌。",
@@ -17974,11 +17975,7 @@
       "metricsLoadFailed": "無法載入此服務的關聯指標。{reason}",
       "noResourceRecorded": "此服務在此時間範圍內的 Span 未記錄 {resource}。",
       "resourceLoadFailed": "無法為此服務載入 {resource}。{reason}",
-      "noVersionTraffic": "此服務在此串流中的 Span 未記錄版本，因此沒有可依版本拆分的流量。",
-      "logsMatchedByName": "僅依服務名稱比對 {service}。關聯未找到其位置。",
-      "logsEmptyTitle": "找不到 {service} 的日誌",
-      "logsEmptyReason": "沒有日誌串流包含 {field} 欄位。",
-      "logsEmptyAction": "開啟日誌"
+      "noVersionTraffic": "此服務在此串流中的 Span 未記錄版本，因此沒有可依版本拆分的流量。"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP 狀態碼",

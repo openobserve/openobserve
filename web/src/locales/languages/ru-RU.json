@@ -17556,6 +17556,7 @@
     "backToLogs": "Назад к логам",
     "openInTraces": "Открыть в трейсах",
     "loadingStream": "Загрузка потока...",
+    "noLogsAvailableForService": "Нет доступных логов для этого сервиса",
     "noCorrelatedLogsFound": "Не найдено связанных логов для этого спана",
     "spanHasNoLogsShowingTrace": "У этого спана нет логов. Отображаются логи для всего трейса.",
     "noLogStreamForTrace": "Ни в одном потоке логов нет логов для этого трейса.",
@@ -17979,11 +17980,7 @@
       "metricsLoadFailed": "Не удалось загрузить коррелированные метрики этого сервиса. {reason}",
       "noResourceRecorded": "Спаны этого сервиса в этом диапазоне времени не содержат {resource}.",
       "resourceLoadFailed": "Не удалось загрузить {resource} для этого сервиса. {reason}",
-      "noVersionTraffic": "Спаны этого сервиса в этом потоке не содержат версии, поэтому нет трафика для разбивки по версии.",
-      "logsMatchedByName": "{service} сопоставлен только по имени сервиса. Корреляция не нашла для него расположение.",
-      "logsEmptyTitle": "Логи для {service} не найдены",
-      "logsEmptyReason": "Ни в одном потоке логов нет поля {field}.",
-      "logsEmptyAction": "Открыть логи"
+      "noVersionTraffic": "Спаны этого сервиса в этом потоке не содержат версии, поэтому нет трафика для разбивки по версии."
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP-статус код",

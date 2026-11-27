@@ -17556,6 +17556,7 @@
     "backToLogs": "로그로 돌아가기",
     "openInTraces": "트레이스에서 열기",
     "loadingStream": "스트림 로드 중...",
+    "noLogsAvailableForService": "이 서비스에 사용할 수 있는 로그가 없습니다.",
     "noCorrelatedLogsFound": "이 스팬에 대한 연관 로그를 찾을 수 없습니다.",
     "spanHasNoLogsShowingTrace": "이 스팬에는 로그가 없습니다. 전체 트레이스의 로그를 표시합니다.",
     "noLogStreamForTrace": "이 트레이스에 대한 로그가 있는 로그 스트림이 없습니다.",
@@ -17979,11 +17980,7 @@
       "metricsLoadFailed": "이 서비스의 상관 메트릭을 불러오지 못했습니다. {reason}",
       "noResourceRecorded": "이 시간 범위에서 이 서비스의 스팬에는 {resource}이(가) 기록되지 않습니다.",
       "resourceLoadFailed": "이 서비스의 {resource}을(를) 불러오지 못했습니다. {reason}",
-      "noVersionTraffic": "이 스트림에서 이 서비스의 스팬에는 버전이 기록되지 않으므로 버전별로 분할할 트래픽이 없습니다.",
-      "logsMatchedByName": "{service}을(를) 서비스 이름으로만 일치시켰습니다. 상관 분석에서 위치를 찾지 못했습니다.",
-      "logsEmptyTitle": "{service}의 로그를 찾을 수 없습니다",
-      "logsEmptyReason": "{field} 필드가 있는 로그 스트림이 없습니다.",
-      "logsEmptyAction": "로그 열기"
+      "noVersionTraffic": "이 스트림에서 이 서비스의 스팬에는 버전이 기록되지 않으므로 버전별로 분할할 트래픽이 없습니다."
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP 상태 코드",

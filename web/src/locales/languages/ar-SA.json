@@ -17556,6 +17556,7 @@
     "backToLogs": "العودة إلى السجلات",
     "openInTraces": "فتح في التتبعات",
     "loadingStream": "جار تحميل التدفق...",
+    "noLogsAvailableForService": "لا توجد سجلات متاحة لهذه الخدمة",
     "noCorrelatedLogsFound": "لم يتم العثور على سجلات مرتبطة لهذا الامتداد",
     "spanHasNoLogsShowingTrace": "لا يحتوي هذا الامتداد على سجلات. يتم عرض السجلات للتتبع بأكمله.",
     "noLogStreamForTrace": "لا يوجد تدفق سجلات يحتوي على سجلات لهذا التتبع.",
@@ -17979,11 +17980,7 @@
       "metricsLoadFailed": "تعذّر تحميل المقاييس المرتبطة لهذه الخدمة. {reason}",
       "noResourceRecorded": "لا تسجّل امتدادات هذه الخدمة في هذا النطاق الزمني {resource}.",
       "resourceLoadFailed": "تعذّر تحميل {resource} لهذه الخدمة. {reason}",
-      "noVersionTraffic": "لا تسجّل امتدادات هذه الخدمة في هذا التدفق إصدارًا، لذا لا توجد حركة بيانات يمكن تقسيمها حسب الإصدار.",
-      "logsMatchedByName": "تمت مطابقة {service} باسم الخدمة فقط. لم يعثر الربط على موقع لها.",
-      "logsEmptyTitle": "لم يتم العثور على سجلات لـ {service}",
-      "logsEmptyReason": "لا يحتوي أي تدفق سجلات على الحقل {field}.",
-      "logsEmptyAction": "فتح السجلات"
+      "noVersionTraffic": "لا تسجّل امتدادات هذه الخدمة في هذا التدفق إصدارًا، لذا لا توجد حركة بيانات يمكن تقسيمها حسب الإصدار."
     },
     "traceErrorTab": {
       "httpStatusCode": "رمز الحالة HTTP",

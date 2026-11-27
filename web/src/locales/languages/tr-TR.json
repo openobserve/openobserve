@@ -17556,6 +17556,7 @@
     "backToLogs": "Günlüklere Dön",
     "openInTraces": "İzlerde Aç",
     "loadingStream": "Akış Yükleniyor...",
+    "noLogsAvailableForService": "Bu hizmet için günlük yok",
     "noCorrelatedLogsFound": "Bu Span için ilişkili günlük bulunamadı",
     "spanHasNoLogsShowingTrace": "Bu Span'ın günlüğü yok. Günlükler tüm iz için gösteriliyor.",
     "noLogStreamForTrace": "Bu iz için günlük içeren bir günlük akışı yok.",
@@ -17979,11 +17980,7 @@
       "metricsLoadFailed": "Bu hizmetin ilişkili metrikleri yüklenemedi. {reason}",
       "noResourceRecorded": "Bu hizmetin bu zaman aralığındaki span'ları {resource} kaydetmiyor.",
       "resourceLoadFailed": "Bu hizmet için {resource} yüklenemedi. {reason}",
-      "noVersionTraffic": "Bu hizmetin bu akıştaki span'leri bir sürüm kaydetmiyor, bu nedenle sürüme göre bölünecek trafik yok.",
-      "logsMatchedByName": "{service} yalnızca servis adıyla eşleştirildi. Korelasyon bunun için bir konum bulamadı.",
-      "logsEmptyTitle": "{service} için log bulunamadı",
-      "logsEmptyReason": "Hiçbir log akışında {field} alanı yok.",
-      "logsEmptyAction": "Logları aç"
+      "noVersionTraffic": "Bu hizmetin bu akıştaki span'leri bir sürüm kaydetmiyor, bu nedenle sürüme göre bölünecek trafik yok."
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP Durum Kodu",

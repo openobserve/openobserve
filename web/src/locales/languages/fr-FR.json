@@ -17556,6 +17556,7 @@
     "backToLogs": "Retour aux Logs",
     "openInTraces": "Ouvrir dans Traces",
     "loadingStream": "Chargement du flux...",
+    "noLogsAvailableForService": "Aucun journal disponible pour ce service",
     "noCorrelatedLogsFound": "Aucun log corrélé trouvé pour ce span",
     "spanHasNoLogsShowingTrace": "Ce span n'a aucun log. Affichage des logs pour toute la trace.",
     "noLogStreamForTrace": "Aucun flux de logs ne contient de logs pour cette trace.",
@@ -17979,11 +17980,7 @@
       "metricsLoadFailed": "Impossible de charger les métriques corrélées de ce service. {reason}",
       "noResourceRecorded": "Les spans de ce service sur cette plage de temps n'enregistrent pas {resource}.",
       "resourceLoadFailed": "Impossible de charger {resource} pour ce service. {reason}",
-      "noVersionTraffic": "Les spans de ce service dans ce flux n'enregistrent pas de version, il n'y a donc pas de trafic à répartir par version.",
-      "logsMatchedByName": "{service} associé uniquement par nom de service. La corrélation n'a trouvé aucun emplacement.",
-      "logsEmptyTitle": "Aucun journal trouvé pour {service}",
-      "logsEmptyReason": "Aucun flux de journaux n'a de champ {field}.",
-      "logsEmptyAction": "Ouvrir les journaux"
+      "noVersionTraffic": "Les spans de ce service dans ce flux n'enregistrent pas de version, il n'y a donc pas de trafic à répartir par version."
     },
     "traceErrorTab": {
       "httpStatusCode": "Code de statut HTTP",

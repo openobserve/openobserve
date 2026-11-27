@@ -17556,6 +17556,7 @@
     "backToLogs": "ログに戻る",
     "openInTraces": "トレースで開く",
     "loadingStream": "ストリームをロード中...",
+    "noLogsAvailableForService": "このサービスで利用できるログはありません",
     "noCorrelatedLogsFound": "このスパンに関連するログは見つかりませんでした",
     "spanHasNoLogsShowingTrace": "このスパンにはログがありません。トレース全体のログを表示しています。",
     "noLogStreamForTrace": "このトレースのログを含むログストリームはありません。",
@@ -17979,11 +17980,7 @@
       "metricsLoadFailed": "このサービスの相関メトリクスを読み込めませんでした。{reason}",
       "noResourceRecorded": "この時間範囲におけるこのサービスのスパンには {resource} が記録されていません。",
       "resourceLoadFailed": "このサービスの {resource} を読み込めませんでした。{reason}",
-      "noVersionTraffic": "このストリームにおけるこのサービスのスパンにはバージョンが記録されていないため、バージョン別に分割するトラフィックがありません。",
-      "logsMatchedByName": "{service} はサービス名のみで一致しました。相関では場所が見つかりませんでした。",
-      "logsEmptyTitle": "{service} のログが見つかりません",
-      "logsEmptyReason": "{field} フィールドを持つログストリームがありません。",
-      "logsEmptyAction": "ログを開く"
+      "noVersionTraffic": "このストリームにおけるこのサービスのスパンにはバージョンが記録されていないため、バージョン別に分割するトラフィックがありません。"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTPステータスコード",

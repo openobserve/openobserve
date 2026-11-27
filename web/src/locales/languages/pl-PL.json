@@ -17556,6 +17556,7 @@
     "backToLogs": "Powrót do logów",
     "openInTraces": "Otwórz w Trace",
     "loadingStream": "Ładowanie strumienia...",
+    "noLogsAvailableForService": "Brak logów dla tej usługi",
     "noCorrelatedLogsFound": "Nie znaleziono powiązanych logów dla tego spanu.",
     "spanHasNoLogsShowingTrace": "Ten span nie ma logów. Wyświetlane są logi dla całego trace'a.",
     "noLogStreamForTrace": "Żaden strumień logów nie zawiera logów dla tego trace.",
@@ -17979,11 +17980,7 @@
       "metricsLoadFailed": "Nie udało się wczytać skorelowanych metryk tej usługi. {reason}",
       "noResourceRecorded": "Spany tej usługi w tym zakresie czasu nie zapisują {resource}.",
       "resourceLoadFailed": "Nie udało się wczytać {resource} dla tej usługi. {reason}",
-      "noVersionTraffic": "Spany tej usługi w tym strumieniu nie zawierają informacji o wersji, więc nie ma ruchu, który można podzielić według wersji.",
-      "logsMatchedByName": "Dopasowano {service} tylko po nazwie usługi. Korelacja nie znalazła dla niej lokalizacji.",
-      "logsEmptyTitle": "Nie znaleziono logów dla {service}",
-      "logsEmptyReason": "Żaden strumień logów nie ma pola {field}.",
-      "logsEmptyAction": "Otwórz logi"
+      "noVersionTraffic": "Spany tej usługi w tym strumieniu nie zawierają informacji o wersji, więc nie ma ruchu, który można podzielić według wersji."
     },
     "traceErrorTab": {
       "httpStatusCode": "Kod statusu HTTP",

@@ -17554,6 +17554,7 @@
     "backToLogs": "Back to Logs",
     "openInTraces": "Open in Traces",
     "loadingStream": "Loading Stream...",
+    "noLogsAvailableForService": "No Logs available for this service",
     "noCorrelatedLogsFound": "No correlated logs found for this span",
     "spanHasNoLogsShowingTrace": "This span has no logs. Showing logs for the whole trace.",
     "noLogStreamForTrace": "No log stream has logs for this trace.",
@@ -17977,11 +17978,7 @@
       "metricsLoadFailed": "Couldn't load this service's correlated metrics. {reason}",
       "noResourceRecorded": "This service's spans in this time range don't record {resource}.",
       "resourceLoadFailed": "Couldn't load {resource} for this service. {reason}",
-      "noVersionTraffic": "This service's spans in this stream don't record a version, so there is no traffic to split by version.",
-      "logsMatchedByName": "Matched {service} by service name only. Correlation found no location for it.",
-      "logsEmptyTitle": "No logs found for {service}",
-      "logsEmptyReason": "No logs stream has a {field} field.",
-      "logsEmptyAction": "Open Logs"
+      "noVersionTraffic": "This service's spans in this stream don't record a version, so there is no traffic to split by version."
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP Status Code",

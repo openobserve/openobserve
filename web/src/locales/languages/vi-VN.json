@@ -17556,6 +17556,7 @@
     "backToLogs": "Quay lại Nhật ký",
     "openInTraces": "Mở trong Trace",
     "loadingStream": "Đang tải Stream...",
+    "noLogsAvailableForService": "Không có Nhật ký nào cho dịch vụ này",
     "noCorrelatedLogsFound": "Không tìm thấy nhật ký tương quan nào cho span này",
     "spanHasNoLogsShowingTrace": "Span này không có nhật ký. Đang hiển thị nhật ký cho toàn bộ trace.",
     "noLogStreamForTrace": "Không có stream nhật ký nào chứa nhật ký cho trace này.",
@@ -17979,11 +17980,7 @@
       "metricsLoadFailed": "Không thể tải các chỉ số tương quan của dịch vụ này. {reason}",
       "noResourceRecorded": "Các span của dịch vụ này trong khoảng thời gian này không ghi nhận {resource}.",
       "resourceLoadFailed": "Không thể tải {resource} cho dịch vụ này. {reason}",
-      "noVersionTraffic": "Các span của dịch vụ này trong stream này không ghi lại phiên bản, vì vậy không có lưu lượng để tách theo phiên bản.",
-      "logsMatchedByName": "Đã khớp {service} chỉ theo tên dịch vụ. Tương quan không tìm thấy vị trí nào cho dịch vụ này.",
-      "logsEmptyTitle": "Không tìm thấy log cho {service}",
-      "logsEmptyReason": "Không có luồng log nào có trường {field}.",
-      "logsEmptyAction": "Mở log"
+      "noVersionTraffic": "Các span của dịch vụ này trong stream này không ghi lại phiên bản, vì vậy không có lưu lượng để tách theo phiên bản."
     },
     "traceErrorTab": {
       "httpStatusCode": "Mã trạng thái HTTP",

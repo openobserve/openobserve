@@ -17556,6 +17556,7 @@
     "backToLogs": "返回日志",
     "openInTraces": "在追踪中打开",
     "loadingStream": "正在加载数据流...",
+    "noLogsAvailableForService": "此服务没有可用的日志",
     "noCorrelatedLogsFound": "未找到此 span 的相关日志",
     "spanHasNoLogsShowingTrace": "此 Span 没有日志。正在显示整个追踪的日志。",
     "noLogStreamForTrace": "没有日志数据流包含此追踪的日志。",
@@ -17979,11 +17980,7 @@
       "metricsLoadFailed": "无法加载此服务的关联指标。{reason}",
       "noResourceRecorded": "此时间范围内该服务的 Span 未记录 {resource}。",
       "resourceLoadFailed": "无法加载此服务的 {resource}。{reason}",
-      "noVersionTraffic": "该服务在此数据流中的 Span 未记录版本，因此没有可按版本拆分的流量。",
-      "logsMatchedByName": "仅按服务名称匹配了 {service}。关联未找到其位置。",
-      "logsEmptyTitle": "未找到 {service} 的日志",
-      "logsEmptyReason": "没有日志流包含 {field} 字段。",
-      "logsEmptyAction": "打开日志"
+      "noVersionTraffic": "该服务在此数据流中的 Span 未记录版本，因此没有可按版本拆分的流量。"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP状态码",
