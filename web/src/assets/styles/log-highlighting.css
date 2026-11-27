@@ -34,35 +34,54 @@
   color: var(--log-syntax-muted);
   font-weight: normal;
 }
-:root
-  :is(
-    .log-string,
-    .log-ip,
-    .log-url,
-    .log-email,
-    .log-timestamp,
-    .log-http-method,
-    .log-status-code,
-    .log-path,
-    .log-uuid,
-    .log-object-value,
-    .log-array-value
-  ),
-:root.dark
-  :is(
-    .log-string,
-    .log-ip,
-    .log-url,
-    .log-email,
-    .log-timestamp,
-    .log-http-method,
-    .log-status-code,
-    .log-path,
-    .log-uuid,
-    .log-object-value,
-    .log-array-value
-  ) {
+/* Plain words and strings keep the value tone; only recognised types get a hue, so the important parts of a line stand out. */
+:root :is(.log-string, .log-object-value, .log-array-value),
+:root.dark :is(.log-string, .log-object-value, .log-array-value) {
   color: var(--log-syntax-value);
+}
+:root {
+  --log-syntax-method: color-mix(in srgb, #7e3fc4 55%, var(--log-syntax-value));
+  --log-syntax-path: color-mix(in srgb, #4338ca 55%, var(--log-syntax-value));
+  --log-syntax-ip: color-mix(in srgb, #a3620a 55%, var(--log-syntax-value));
+  --log-syntax-email: color-mix(in srgb, #b0337a 55%, var(--log-syntax-value));
+  --log-syntax-uuid: color-mix(in srgb, #0e7490 55%, var(--log-syntax-value));
+  --log-syntax-time: color-mix(in srgb, #5b6478 55%, var(--log-syntax-value));
+}
+:root.dark {
+  --log-syntax-method: color-mix(in srgb, #c9a7f5 55%, var(--log-syntax-value));
+  --log-syntax-path: color-mix(in srgb, #a9b6f7 55%, var(--log-syntax-value));
+  --log-syntax-ip: color-mix(in srgb, #e8c372 55%, var(--log-syntax-value));
+  --log-syntax-email: color-mix(in srgb, #f0a6cf 55%, var(--log-syntax-value));
+  --log-syntax-uuid: color-mix(in srgb, #86cfe0 55%, var(--log-syntax-value));
+  --log-syntax-time: color-mix(in srgb, #a8aec0 55%, var(--log-syntax-value));
+}
+:root .log-http-method,
+:root.dark .log-http-method {
+  color: var(--log-syntax-method);
+}
+:root .log-status-code,
+:root.dark .log-status-code {
+  color: var(--log-syntax-accent);
+}
+:root :is(.log-path, .log-url),
+:root.dark :is(.log-path, .log-url) {
+  color: var(--log-syntax-path);
+}
+:root .log-ip,
+:root.dark .log-ip {
+  color: var(--log-syntax-ip);
+}
+:root .log-email,
+:root.dark .log-email {
+  color: var(--log-syntax-email);
+}
+:root .log-uuid,
+:root.dark .log-uuid {
+  color: var(--log-syntax-uuid);
+}
+:root .log-timestamp,
+:root.dark .log-timestamp {
+  color: var(--log-syntax-time);
 }
 
 /* Light log values a softer near-black (10.4:1) so navy keys and values read as two calm tones. */
@@ -118,9 +137,6 @@
     .log-null,
     .log-separator,
     .log-object-brace,
-    .log-email,
-    .log-http-method,
-    .log-path,
     .log-file-size,
     .log-object-value,
     .log-array-value
@@ -128,8 +144,8 @@
   color: inherit;
 }
 
-/* Only the tokens people scan for get color: one calm accent, plus warning and error for 4xx and 5xx. */
-:root .log-cell-html :is(.log-ip, .log-url, .log-uuid, .log-timestamp, .log-status-code) {
+/* 2xx and 3xx status codes take the calm accent; 4xx and 5xx take warning and error. */
+:root .log-cell-html .log-status-code {
   color: var(--log-syntax-accent);
 }
 :root .log-cell-html .log-status-4xx {
