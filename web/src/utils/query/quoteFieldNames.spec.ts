@@ -53,4 +53,36 @@ describe("quoteFieldNames", () => {
     expect(quoteFieldNames("x = 1", fields)).toBe("x = 1");
     expect(quoteFieldNames("", fields)).toBe("");
   });
+
+  it("quotes field names adjacent to parentheses, commas, and unspaced operators", () => {
+    expect(quoteFieldNames("(status = 500 AND api = 'x')", fields)).toBe(
+      '("status" = 500 AND "api" = \'x\')',
+    );
+    expect(quoteFieldNames("(status=500 AND api!='x')", fields)).toBe(
+      '("status"=500 AND "api"!=\'x\')',
+    );
+    expect(quoteFieldNames("str_match(message, 'err')", fields)).toBe(
+      "str_match(\"message\", 'err')",
+    );
+  });
+
+  it("quotes field names separated by tabs or newlines", () => {
+    expect(quoteFieldNames("status\n= 500\tAND\napi = 'x'", fields)).toBe(
+      '"status"\n= 500\tAND\n"api" = \'x\'',
+    );
+  });
+
+  it("leaves double-quoted identifiers untouched", () => {
+    expect(quoteFieldNames('"my status" = 500 AND "api""name" = \'x\'', fields)).toBe(
+      '"my status" = 500 AND "api""name" = \'x\'',
+    );
+  });
+
+  it("quotes dotted, hyphenated, and slash-containing field names without partial matches", () => {
+    const extended = [...fields, "http.status", "k8s-pod", "k8s.io/app"];
+    expect(quoteFieldNames("(http.status=500 AND k8s-pod='a' AND k8s.io/app='b')", extended)).toBe(
+      '("http.status"=500 AND "k8s-pod"=\'a\' AND "k8s.io/app"=\'b\')',
+    );
+    expect(quoteFieldNames("status_code = 500", fields)).toBe("status_code = 500");
+  });
 });

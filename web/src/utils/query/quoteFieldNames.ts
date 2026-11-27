@@ -13,29 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/** Double-quotes bare field names in a where clause, leaving '...' string literals untouched. */
+/** Double-quotes bare field names in a where clause, leaving '...' literals and "..." identifiers untouched. */
 export function quoteFieldNames(where: string, fieldNames: string[]): string {
-  const fields = new Set(fieldNames);
+  const fields = new Set(fieldNames.filter(Boolean));
+  if (fields.size === 0 || !where) return where;
   let out = "";
   let chunk = "";
   const flush = () => {
-    out += chunk
-      .split(" ")
-      .map((token) => (fields.has(token) ? `"${token}"` : token))
-      .join(" ");
+    out += chunk.replace(/[^\s(),;=!<>[\]{}]+/g, (token) =>
+      fields.has(token) ? `"${token}"` : token,
+    );
     chunk = "";
   };
   let i = 0;
   while (i < where.length) {
-    if (where[i] !== "'") {
+    const ch = where[i];
+    if (ch !== "'" && ch !== '"') {
       chunk += where[i++];
       continue;
     }
     flush();
     let end = i + 1;
     while (end < where.length) {
-      if (where[end] !== "'") end += 1;
-      else if (where[end + 1] === "'") end += 2;
+      if (where[end] !== ch) end += 1;
+      else if (where[end + 1] === ch) end += 2;
       else break;
     }
     out += where.slice(i, end + 1);
