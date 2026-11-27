@@ -58,6 +58,10 @@ impl audit::AuditPublisher for CoreAuditPublisher {
     ) -> Result<proto::cluster_rpc::IngestionResponse, anyhow::Error> {
         audit_reporting::publish(request).await
     }
+
+    async fn wait_for_pending(&self) {
+        audit_reporting::wait_for_remote_posts().await;
+    }
 }
 
 #[cfg(feature = "enterprise")]

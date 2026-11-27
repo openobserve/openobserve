@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, future::Future, net::IpAddr, time::Duration};
+use std::{
+    collections::HashMap,
+    future::Future,
+    net::IpAddr,
+    sync::{LazyLock, Mutex},
+    time::Duration,
+};
 
 use anyhow::{Result, anyhow};
 use common::infra::config::MAXMIND_DB_CLIENT;
@@ -24,9 +30,12 @@ use o2_enterprise::enterprise::common::{
 };
 use proto::cluster_rpc::{IngestionRequest, IngestionResponse};
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
+use tokio::task::JoinSet;
 
 const AUDIT_REPORTING_TIMEOUT: Duration = Duration::from_secs(30);
 const AUDIT_REQUEUE_CAP_BATCHES: usize = 20;
+
+static REMOTE_POSTS: LazyLock<Mutex<JoinSet<()>>> = LazyLock::new(|| Mutex::new(JoinSet::new()));
 
 #[derive(Clone)]
 struct ReportingSettings {
@@ -57,6 +66,12 @@ impl ReportingSettings {
 /// Publishes one audit batch per `O2_AUDIT_REPORTING_MODE`, following usage reporting.
 pub(crate) async fn publish(request: IngestionRequest) -> Result<IngestionResponse> {
     publish_with(&ReportingSettings::from_config(), request, ingest_locally).await
+}
+
+/// Waits for the remote POSTs still running, so the shutdown flush does not lose its batch.
+pub(crate) async fn wait_for_remote_posts() {
+    let mut posts = std::mem::take(&mut *lock_remote_posts());
+    while posts.join_next().await.is_some() {}
 }
 
 /// Adds RUM's `geo_info` to each batch row from its `login_ip`, once the City DB is loaded.
@@ -92,12 +107,8 @@ where
     if let Some(body) = body.as_deref()
         && !settings.url.is_empty()
         && !settings.creds.is_empty()
-        && let Err(e) = post_remote(settings, body.to_vec()).await
     {
-        log::error!("[AUDIT-REPORTING] Error in ingesting audit data to external URL: {e}");
-        if mode != "both" {
-            requeue(settings.requeue_cap(), body).await;
-        }
+        spawn_remote_post(settings.clone(), body.to_vec());
     }
 
     if mode != "remote" {
@@ -119,6 +130,27 @@ where
         status_code: 200,
         message: mode.to_string(),
     })
+}
+
+/// Runs the POST off the request path: the auditor publishes from the call that fills the batch.
+fn spawn_remote_post(settings: ReportingSettings, body: Vec<u8>) {
+    let mut posts = lock_remote_posts();
+    while posts.try_join_next().is_some() {}
+    posts.spawn(async move {
+        if let Err(e) = post_remote(&settings, body.clone()).await {
+            log::error!("[AUDIT-REPORTING] Error in ingesting audit data to external URL: {e}");
+            if settings.mode != "both" {
+                requeue(settings.requeue_cap(), &body).await;
+            }
+        }
+    });
+}
+
+fn lock_remote_posts() -> std::sync::MutexGuard<'static, JoinSet<()>> {
+    // Nothing panics while the lock is held, so a poisoned lock still holds a valid set.
+    REMOTE_POSTS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 async fn post_remote(settings: &ReportingSettings, body: Vec<u8>) -> Result<()> {
@@ -390,6 +422,7 @@ mod tests {
         let resp = publish_with(&s, request(&rows(2)), local_writer(&calls, true))
             .await
             .unwrap();
+        wait_for_remote_posts().await;
 
         assert_eq!(resp.message, "local-write");
         assert_eq!(calls.load(Ordering::SeqCst), 1);
@@ -403,6 +436,7 @@ mod tests {
         let s = settings("local", "", "");
 
         let result = publish_with(&s, request(&rows(1)), local_writer(&calls, false)).await;
+        wait_for_remote_posts().await;
 
         assert!(result.is_err());
     }
@@ -423,6 +457,7 @@ mod tests {
         )
         .await
         .unwrap();
+        wait_for_remote_posts().await;
 
         assert_eq!(resp.status_code, 200);
         assert_eq!(calls.load(Ordering::SeqCst), 0);
@@ -447,6 +482,7 @@ mod tests {
         )
         .await
         .unwrap();
+        wait_for_remote_posts().await;
 
         let hits = stub.hits.lock().unwrap();
         assert!(hits[0].headers.contains("authorization: basic xyz"));
@@ -467,6 +503,7 @@ mod tests {
             local_writer(&calls, true),
         )
         .await;
+        wait_for_remote_posts().await;
 
         assert!(resp.is_ok());
         assert_eq!(calls.load(Ordering::SeqCst), 0);
@@ -485,6 +522,7 @@ mod tests {
             local_writer(&Arc::new(AtomicUsize::new(0)), true),
         )
         .await;
+        wait_for_remote_posts().await;
 
         assert!(resp.is_ok());
         assert_eq!(drain_buffer().await, batch);
@@ -506,6 +544,7 @@ mod tests {
             publish_with(&s, req, writer).await
         })
         .await;
+        wait_for_remote_posts().await;
 
         assert_eq!(stub.hit_count(), 1);
         assert_eq!(drain_buffer().await.len(), batch_size);
@@ -530,6 +569,7 @@ mod tests {
         )
         .await
         .unwrap();
+        wait_for_remote_posts().await;
 
         assert_eq!(
             config::metrics::AUDIT_REQUEUE_DROPPED_TOTAL.get() - before,
@@ -551,6 +591,7 @@ mod tests {
             local_writer(&calls, true),
         )
         .await;
+        wait_for_remote_posts().await;
 
         assert!(resp.is_ok());
         assert_eq!(stub.hit_count(), 1);
@@ -574,6 +615,7 @@ mod tests {
             publish_with(&s, req, writer).await
         })
         .await;
+        wait_for_remote_posts().await;
 
         assert_eq!(stub.hit_count(), 1);
         assert!(drain_buffer().await.is_empty());
@@ -593,6 +635,7 @@ mod tests {
             local_writer(&calls, false),
         )
         .await;
+        wait_for_remote_posts().await;
 
         assert!(resp.is_ok());
         assert_eq!(stub.hit_count(), 1);
@@ -613,6 +656,7 @@ mod tests {
             let calls = Arc::new(AtomicUsize::new(0));
 
             let resp = publish_with(&s, request(&rows(1)), local_writer(&calls, true)).await;
+            wait_for_remote_posts().await;
 
             assert!(resp.is_ok());
             assert_eq!(calls.load(Ordering::SeqCst), 0);
@@ -646,20 +690,27 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_remote_that_never_answers_times_out_and_requeues() {
+    async fn a_hanging_remote_does_not_hold_up_the_caller_and_its_batch_is_requeued() {
         let _guard = BUFFER_LOCK.lock().await;
         drain_buffer().await;
         let batch = rows(1);
         let started = std::time::Instant::now();
 
+        let s = settings("remote", &hanging_url().await, "abc");
+
         let resp = publish_with(
-            &settings("remote", &hanging_url().await, "abc"),
+            &s,
             request(&batch),
             local_writer(&Arc::new(AtomicUsize::new(0)), true),
         )
         .await;
-
         assert!(resp.is_ok());
+        assert!(
+            started.elapsed() < s.timeout,
+            "the caller waited for the POST"
+        );
+        wait_for_remote_posts().await;
+
         assert!(started.elapsed() < Duration::from_secs(5));
         assert_eq!(drain_buffer().await, batch);
     }
