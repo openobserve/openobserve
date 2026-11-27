@@ -123,7 +123,8 @@ const range = computed<{ text: I18nText; utc: I18nText }>(() => {
 const expectedText = computed(() => {
   const row = props.row;
   if (!row || row.lower === null || row.upper === null) return "";
-  const range = `${formatAnomalyNumber(row.lower)}-${formatAnomalyNumber(row.upper)}`;
+  // A spaced dash: "-5.00-3.00" reads as one number (o2-enterprise#3763).
+  const range = `${formatAnomalyNumber(row.lower)} – ${formatAnomalyNumber(row.upper)}`;
   const value = actual.value;
   if (value === null || row.expected === null || row.expected === 0) return range;
   const change = ((value - row.expected) / Math.abs(row.expected)) * 100;

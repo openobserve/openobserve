@@ -35,9 +35,16 @@ const row: AnomalyBandRow = {
 
 let wrapper: ReturnType<typeof mount> | null = null;
 
-const mountPopover = () => {
+const mountPopover = (bandRow: AnomalyBandRow = row) => {
   wrapper = mount(AnomalyPointPopover, {
-    props: { open: true, anchor: null, row, bucketMs: 15 * 60_000, current: true, loading: false },
+    props: {
+      open: true,
+      anchor: null,
+      row: bandRow,
+      bucketMs: 15 * 60_000,
+      current: true,
+      loading: false,
+    },
     global: {
       plugins: [i18n],
       stubs: {
@@ -71,5 +78,15 @@ describe("AnomalyPointPopover", () => {
     vi.setSystemTime(new Date(TS + 26 * 3_600_000));
     const range = mountPopover().find('[data-test="alerts-anomalypointpopover-range"]');
     expect(range.text()).toMatch(/16,? 18:45 – 19:00$/);
+  });
+
+  it("writes the expected range with a spaced dash, so a negative lower edge reads (#3763)", () => {
+    const expected = (r: AnomalyBandRow) =>
+      mountPopover(r).find('[data-test="alerts-anomalypointpopover-expected"]').text();
+    expect(expected(row)).toMatch(/^120\.40 – 157\.20( |$)/);
+    wrapper?.unmount();
+    expect(
+      expected({ ...row, value: 2, flagged: null, expected: -1, lower: -5, upper: 3 }),
+    ).toMatch(/^-5\.00 – 3\.00( |$)/);
   });
 });
