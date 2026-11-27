@@ -83,9 +83,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.alertSettings.addNewDestination") }}
             </OButton>
           </div>
-          <p class="text-text-secondary text-xs">
-            {{ t("alert_sources.incidentDestinationHint") }}
+          <p class="text-text-secondary text-xs" data-test="add-alert-source-destination-hint">
+            {{
+              oncallEnabled
+                ? t("alert_sources.incidentDestinationHintOncall")
+                : t("alert_sources.incidentDestinationHint")
+            }}
           </p>
+        </div>
+        <div v-if="oncallEnabled || oncallTeamLocked">
+          <div class="text-text-secondary mb-2 flex items-center text-xs font-semibold">
+            <span>{{ t("alerts.oncallTeam") }}</span>
+            <OTooltip v-if="oncallTeamLocked" :content="oncallLockReason" side="right">
+              <span class="ms-1 inline-flex" data-test="add-alert-source-oncall-team-locked">
+                <OIcon name="lock" size="sm" />
+              </span>
+            </OTooltip>
+            <template v-else>
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+              <OTooltip :content="t('alerts.oncallTeamTooltip')" side="right" />
+            </template>
+          </div>
+          <OFormSelect
+            name="oncall_team"
+            :aria-label="t('alerts.oncallTeam')"
+            :options="oncallTeamOptions"
+            clearable
+            width="md"
+            :disabled="created"
+            :placeholder="t('alerts.oncallTeamPlaceholder')"
+            data-test="add-alert-source-oncall-team-select"
+          >
+            <template #empty>{{ t("alerts.oncallTeamNoTeams") }}</template>
+          </OFormSelect>
         </div>
       </OForm>
 
@@ -156,6 +186,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import CopyContent from "@/components/CopyContent.vue";
@@ -163,6 +194,10 @@ import alertSources from "@/services/alert_sources";
 import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
+import { queryClient } from "@/composables/query/queryClient";
+import { oncallTeamsQuery } from "@/services/oncall.queries";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import type { OnCallTeam } from "@/ts/interfaces/oncall";
 import {
   makeAlertSourceSchema,
   alertSourceDefaults,
@@ -187,6 +222,7 @@ export default defineComponent({
     OFormSelect,
     OButton,
     OTag,
+    OTooltip,
     OStepper,
     OStep,
     CopyContent,
@@ -209,11 +245,14 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const router = useRouter();
     const schema = makeAlertSourceSchema(t);
-    return { store, t, router, schema, FORM_ID };
+    const { locked: oncallLicenseLocked, lockedReason: oncallLockReason } =
+      useLicenseLock("oncall");
+    return { store, t, router, schema, FORM_ID, oncallLicenseLocked, oncallLockReason };
   },
   data() {
     return {
       destinationOptions: [] as Array<{ label: I18nText; value: string }>,
+      oncallTeams: [] as OnCallTeam[],
       defaultValues: alertSourceDefaults(),
       formKey: 0,
       created: false,
@@ -230,6 +269,21 @@ export default defineComponent({
     },
     isEditMode(): boolean {
       return !!this.editingIntegration;
+    },
+    // Hidden when on-call is off, so an OSS build never shows a control that pages nobody.
+    oncallEnabled(): boolean {
+      return this.store.state.zoConfig?.oncall_enabled === true;
+    },
+    // Shown only with a team to see or clear: with none, a locked picker has nothing to offer.
+    oncallTeamLocked(): boolean {
+      return this.oncallLicenseLocked && !!this.editingIntegration?.oncall_team;
+    },
+    oncallTeamOptions(): Array<{ label: I18nText; value: string }> {
+      const lockedTeam = this.editingIntegration?.oncall_team;
+      if (this.oncallTeamLocked && lockedTeam) {
+        return [{ label: this.t("alerts.lockedTeamFallback"), value: lockedTeam }];
+      }
+      return this.oncallTeams.map((team) => ({ label: raw(team.name), value: team.id }));
     },
     // OStepper's modelValue — which step reads as active (all stay visible).
     activeStep(): number {
@@ -277,6 +331,7 @@ export default defineComponent({
       if (isOpen) {
         this.resetForm();
         this.fetchDestinationOptions();
+        this.fetchOncallTeams();
       } else {
         this.stopPolling();
       }
@@ -310,6 +365,15 @@ export default defineComponent({
         toast({ variant: "error", message: this.t("alert_sources.destinationsLoadError") });
       }
     },
+    // A failed lookup leaves the picker empty rather than blocking the save: routing still decides.
+    async fetchOncallTeams() {
+      if (!this.oncallEnabled) return;
+      try {
+        this.oncallTeams = await queryClient.fetchQuery(oncallTeamsQuery(this.orgIdentifier));
+      } catch {
+        this.oncallTeams = [];
+      }
+    },
     // Destinations are a full resource, so they're created on their own page
     // (new tab) — matches AlertSettings.vue.
     routeToCreateDestination() {
@@ -338,6 +402,7 @@ export default defineComponent({
           name,
           source_type: "auto",
           destinations: values.destinations,
+          ...(values.oncall_team ? { oncall_team: values.oncall_team } : {}),
         });
         this.createdIntegration = res.data;
         this.created = true;
@@ -356,10 +421,14 @@ export default defineComponent({
         const destinationsChanged =
           JSON.stringify([...values.destinations].sort()) !==
           JSON.stringify([...this.editingIntegration.destinations].sort());
-        if (nameChanged || destinationsChanged) {
+        // A cleared picker is undefined, and null is what tells the server to clear the team.
+        const team = values.oncall_team || null;
+        const teamChanged = team !== (this.editingIntegration.oncall_team ?? null);
+        if (nameChanged || destinationsChanged || teamChanged) {
           await alertSources.update(this.orgIdentifier, this.editingIntegration.id, {
             ...(nameChanged ? { name } : {}),
             ...(destinationsChanged ? { destinations: values.destinations } : {}),
+            ...(teamChanged ? { oncall_team: team } : {}),
           });
         }
         toast({ variant: "success", message: this.t("alert_sources.updatedSuccess") });

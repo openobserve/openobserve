@@ -177,6 +177,19 @@ impl From<AlertPriority> for u8 {
     }
 }
 
+/// An incident severity pages at the priority of the same rank. [pure]
+impl From<super::incidents::IncidentSeverity> for AlertPriority {
+    fn from(severity: super::incidents::IncidentSeverity) -> Self {
+        use super::incidents::IncidentSeverity;
+        match severity {
+            IncidentSeverity::P1 => Self::P1,
+            IncidentSeverity::P2 => Self::P2,
+            IncidentSeverity::P3 => Self::P3,
+            IncidentSeverity::P4 => Self::P4,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -190,6 +203,19 @@ mod tests {
         AlertPriority::P4,
         AlertPriority::P5,
     ];
+
+    #[test]
+    fn an_incident_severity_pages_at_the_priority_of_the_same_rank() {
+        use super::super::incidents::IncidentSeverity;
+        for (severity, want) in [
+            (IncidentSeverity::P1, AlertPriority::P1),
+            (IncidentSeverity::P2, AlertPriority::P2),
+            (IncidentSeverity::P3, AlertPriority::P3),
+            (IncidentSeverity::P4, AlertPriority::P4),
+        ] {
+            assert_eq!(AlertPriority::from(severity), want, "{severity}");
+        }
+    }
 
     /// PT-2: storage ids are durable. This test exists to FAIL loudly if
     /// anyone renumbers the enum — every persisted row would silently change
