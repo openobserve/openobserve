@@ -4248,11 +4248,13 @@ mod tests {
         ingest_one(&app, &headers, &org).await;
 
         unsafe { env::set_var("O2_SUPER_CLUSTER_ENABLED", "true") };
+        unsafe { env::set_var("O2_SUPER_CLUSTER_GRPC_TOKEN", "test-super-cluster-token") };
         o2_enterprise::enterprise::common::config::refresh_config().unwrap();
         let enabled = openobserve_core::org_cleanup::super_cluster_enabled();
         let refused =
             openobserve_core::org_cleanup::initiate_deletion(&org, "root@example.com").await;
         unsafe { env::remove_var("O2_SUPER_CLUSTER_ENABLED") };
+        unsafe { env::remove_var("O2_SUPER_CLUSTER_GRPC_TOKEN") };
         o2_enterprise::enterprise::common::config::refresh_config().unwrap();
 
         assert!(enabled);
