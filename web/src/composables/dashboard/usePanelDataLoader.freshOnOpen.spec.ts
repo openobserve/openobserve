@@ -378,26 +378,27 @@ describe("usePanelDataLoader: fresh on open", () => {
   });
 
   describe("hold and swap", () => {
-    it("keeps the restored chart and its age, with loading on, until the refresh completes", async () => {
+    it("keeps the restored chart and its age until the refresh streams rows, then shows them", async () => {
       await seedCache(10);
       const restoredAt = fakes.cache.get("panel-1").value.lastTriggeredAt;
       const { loader } = mountPanel({ visit: createVisit() });
       await settle();
 
       expect(loader.loading.value).toBe(true);
+      expect(loader.data.value).toEqual([hits(10)]);
       expect(loader.lastTriggeredAt.value).toBe(restoredAt);
 
       sendHits(0, 42);
       await settle();
-      expect(loader.data.value).toEqual([hits(10)]);
-      expect(loader.lastTriggeredAt.value).toBe(restoredAt);
+      expect(loader.loading.value).toBe(true);
+      expect(loader.data.value).toEqual([hits(42)]);
+      expect(loader.lastTriggeredAt.value).toBeGreaterThan(restoredAt);
       expect(loader.isPartialData.value).toBe(false);
       expect(fakes.saves).toHaveLength(0);
 
       endStream(0);
       expect(loader.loading.value).toBe(false);
       expect(loader.data.value).toEqual([hits(42)]);
-      expect(loader.lastTriggeredAt.value).toBeGreaterThan(restoredAt);
       await settle();
       expect(fakes.cache.get("panel-1").value.data).toEqual([hits(42)]);
     });
@@ -451,7 +452,7 @@ describe("usePanelDataLoader: fresh on open", () => {
       expect(fakes.deleteRunningQueries).toHaveBeenCalled();
     });
 
-    it("keeps holding when a newer run supersedes the refresh", async () => {
+    it("keeps holding when a newer run supersedes the refresh, until that run streams rows", async () => {
       await seedCache(10);
       const { loader, selectedTimeObj } = mountPanel({ visit: createVisit() });
       await settle();
@@ -459,9 +460,11 @@ describe("usePanelDataLoader: fresh on open", () => {
       selectedTimeObj.value = windowEndingAt(NOW + 60_000);
       await settle();
       expect(fakes.streams).toHaveLength(2);
+      expect(loader.data.value).toEqual([hits(10)]);
       sendHits(1, 99);
       await settle();
-      expect(loader.data.value).toEqual([hits(10)]);
+      expect(loader.loading.value).toBe(true);
+      expect(loader.data.value).toEqual([hits(99)]);
 
       endStream(1);
       expect(loader.data.value).toEqual([hits(99)]);
@@ -702,6 +705,85 @@ describe("usePanelDataLoader: fresh on open", () => {
       endStream(0);
 
       expect(loader.isFirstLoadSettled.value).toBe(true);
+    });
+
+    it("when the first streamed rows arrive, before the stream ends", async () => {
+      const { loader } = mountPanel({ visit: createVisit() });
+      await settle();
+      expect(loader.isFirstLoadSettled.value).toBe(false);
+
+      sendHits(0, 7);
+
+      expect(loader.loading.value).toBe(true);
+      expect(loader.isFirstLoadSettled.value).toBe(true);
+    });
+
+    it("when rows arrive as streamed hits, once the batch flushes", async () => {
+      const { loader } = mountPanel({ visit: createVisit() });
+      await settle();
+      const { payload, handlers } = fakes.streams[0];
+
+      handlers.data(payload, { type: "search_response_metadata", content: { results: {} } });
+      handlers.data(payload, {
+        type: "search_response_hits",
+        content: { results: { hits: hits(4) } },
+      });
+      expect(loader.isFirstLoadSettled.value).toBe(false);
+      await Promise.resolve();
+
+      expect(loader.data.value).toEqual([hits(4)]);
+      expect(loader.loading.value).toBe(true);
+      expect(loader.isFirstLoadSettled.value).toBe(true);
+    });
+
+    it("not on an empty chunk, so No Data cannot flash mid-stream", async () => {
+      const { loader } = mountPanel({ visit: createVisit() });
+      await settle();
+      const { payload, handlers } = fakes.streams[0];
+
+      handlers.data(payload, { type: "search_response", content: { results: { hits: [] } } });
+
+      expect(loader.loading.value).toBe(true);
+      expect(loader.isFirstLoadSettled.value).toBe(false);
+      endStream(0);
+      expect(loader.isFirstLoadSettled.value).toBe(true);
+    });
+
+    it("on rows from the second query of a multi-query panel", async () => {
+      const panel = sqlPanel();
+      panel.queries.push({ ...panel.queries[0] });
+      const { loader } = mountPanel({ visit: createVisit(), panel });
+      await settle();
+      expect(fakes.streams).toHaveLength(1);
+      const { payload, handlers } = fakes.streams[0];
+
+      handlers.data(payload, {
+        type: "search_response_metadata",
+        content: { results: { query_index: 1 } },
+      });
+      handlers.data(payload, {
+        type: "search_response_hits",
+        content: { results: { query_index: 1, hits: hits(3) } },
+      });
+      await Promise.resolve();
+
+      expect(loader.loading.value).toBe(true);
+      expect(loader.data.value[1]).toEqual(hits(3));
+      expect(loader.data.value[0]).toEqual([]);
+      expect(loader.isFirstLoadSettled.value).toBe(true);
+    });
+
+    it("and stays settled when the stream fails after rows arrived", async () => {
+      const { loader } = mountPanel({ visit: createVisit() });
+      await settle();
+      sendHits(0, 7);
+      const { payload, handlers } = fakes.streams[0];
+
+      handlers.error(payload, { content: { message: "querier timed out", code: 504 } });
+
+      expect(loader.loading.value).toBe(false);
+      expect(loader.isFirstLoadSettled.value).toBe(true);
+      expect(loader.errorDetail.value.message).not.toBe("");
     });
 
     it("when the first load fails", async () => {
