@@ -64,8 +64,7 @@ export async function assertPanelTimeInURL(page, panelId, expectedValue) {
   // Poll until the URL reflects the reactive write from onPanelTimeApply.
   // Use 30 s — the panelsInitializing guard (500 ms timer) can re-arm on every
   // panel data refresh under CI load, blocking onPanelTimeApply until the guard
-  // expires. changePanelTimeInView retries once after 8 s, so the URL can take
-  // up to ~20 s to settle in worst-case CI conditions.
+  // expires.
   await expect.poll(
     async () => page.url(),
     { intervals: [100, 200, 500, 1000, 2000], timeout: 30000 }

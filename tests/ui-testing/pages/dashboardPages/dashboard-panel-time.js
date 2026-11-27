@@ -342,9 +342,8 @@ export default class DashboardPanelTime {
    * @param {string} panelId - Panel ID
    * @param {string} timeRange - e.g., "15-m", "1-h", "7-d"
    * @param {boolean} clickApply - Whether to apply the pick (default: true); see applyPickedDateTime
-   * @param {number} [_attempt=1] - Internal recursion counter. Do NOT pass from call sites.
    */
-  async changePanelTimeInView(panelId, timeRange, clickApply = true, _attempt = 1) {
+  async changePanelTimeInView(panelId, timeRange, clickApply = true) {
     // Click the panel time picker button
     await this.clickPanelTimePicker(panelId);
 
@@ -355,63 +354,48 @@ export default class DashboardPanelTime {
     // option, which reduces re-render churn around the Reka UI portal.
     await this._waitForAllPanelsIdle();
 
-    // Captured before the pick: with Auto Run on the pick applies, and moves the URL, at once.
-    const urlBefore = this.page.url();
-
     // Page-level locators survive portal re-mounts; only one datetime menu can be
     // open at a time (Reka UI unmounts when closed), so these are unambiguous.
     const timeOptionLocator = this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`).first();
-    // force: true is required here. Reka UI's data-reka-popper-content-wrapper can
-    // transiently intercept pointer events mid-re-render even after the idle wait,
-    // and the element can briefly detach while Vue re-mounts the portal. force
-    // fires the pointer event as soon as the locator resolves without waiting for
-    // the wrapper to clear — the button itself IS the intended target.
-    await timeOptionLocator.click({ force: true, timeout: 15000 });
 
-    if (!clickApply) {
-      // A deferred pick leaves no URL change to detect a swallowed force click; the preset's selected class is the only proof it landed.
+    if (clickApply) {
+      const expectedParam = `pt-period.${panelId}=${timeRange.replace("-", "")}`;
+      let picked = false;
       await expect(async () => {
-        // A force click on the popper wrapper dismisses the popover, so reopen it before re-picking.
+        if (picked && this.page.url().includes(expectedParam)) return;
         if (!(await this.dateTimeMenu.isVisible())) {
           await this.clickPanelTimePicker(panelId);
           await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
         }
-        if (!/bg-button-primary!/.test((await timeOptionLocator.getAttribute("class")) ?? "")) {
-          await timeOptionLocator.click({ force: true, timeout: 5000 });
-        }
-        await expect(timeOptionLocator).toHaveClass(/bg-button-primary!/, { timeout: 2000 });
-      }).toPass({ timeout: 20000, intervals: [500, 1000, 2000] });
-    }
-
-    if (clickApply) {
-      // With Auto Run on the pick already started a panel reload; let it settle first.
-      await this._waitForAllPanelsIdle();
-
-      try {
+        // No force: a forced click that lands on the Reka popper wrapper dismisses the popover instead of picking.
+        await timeOptionLocator.click({ timeout: 5000 });
+        picked = true;
+        await this._waitForAllPanelsIdle();
         // Panel pickers have no Apply: with Auto Run on the preset already applied; with it
         // off the pick waits and the panel's own yellow refresh icon applies it.
         await applyPickedDateTime(this.page);
-
-        // Wait for the dialog to close, then for the resulting panel data request
-        // (triggered by the new time range) to complete.
         await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
-        await this._waitForAllPanelsIdle();
-
-        // An unchanged URL means the pick never reached the panel (a swallowed click) — retry.
-        const urlAfter = this.page.url();
-        if (urlAfter === urlBefore && _attempt < 4) {
-          await this._waitForAllPanelsIdle();
-          return this.changePanelTimeInView(panelId, timeRange, clickApply, _attempt + 1);
-        }
-      } catch (_err) {
-        // Apply click or menu-close timed out. Retry if attempts remain.
-        if (_attempt < 4) {
-          await this._waitForAllPanelsIdle();
-          return this.changePanelTimeInView(panelId, timeRange, clickApply, _attempt + 1);
-        }
-        throw _err;
-      }
+        await expect.poll(async () => this.page.url(), { timeout: 5000 }).toContain(expectedParam);
+      }).toPass({ timeout: 45000, intervals: [500, 1000, 2000] });
+      await this._waitForAllPanelsIdle();
+      return;
     }
+
+    // force: Reka's popper wrapper can intercept pointer events mid-re-render; the loop below re-picks if it was swallowed.
+    await timeOptionLocator.click({ force: true, timeout: 15000 });
+
+    // A deferred pick leaves no URL change to detect a swallowed force click; the preset's selected class is the only proof it landed.
+    await expect(async () => {
+      // A force click on the popper wrapper dismisses the popover, so reopen it before re-picking.
+      if (!(await this.dateTimeMenu.isVisible())) {
+        await this.clickPanelTimePicker(panelId);
+        await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
+      }
+      if (!/bg-button-primary!/.test((await timeOptionLocator.getAttribute("class")) ?? "")) {
+        await timeOptionLocator.click({ force: true, timeout: 5000 });
+      }
+      await expect(timeOptionLocator).toHaveClass(/bg-button-primary!/, { timeout: 2000 });
+    }).toPass({ timeout: 20000, intervals: [500, 1000, 2000] });
   }
 
   /**
