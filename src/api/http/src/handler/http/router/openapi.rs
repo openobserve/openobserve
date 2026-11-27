@@ -1349,6 +1349,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::ai::memory::resync_memory,
     openobserve_api_management::request::ai::memory::accept_pending_memory_edits,
     openobserve_api_management::request::ai::memory::accept_toolset_memory_revision,
+    openobserve_api_management::request::ai::memory::agent_edits,
     openobserve_api_management::request::ai::memory::delete_my_memory,
     openobserve_api_management::request::ai::memory::discard_org_memory_revision,
     openobserve_api_management::request::ai::memory::discard_pending_memory_edits,

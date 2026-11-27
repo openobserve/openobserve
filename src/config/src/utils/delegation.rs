@@ -31,6 +31,8 @@ pub const SCOPE_ASSISTANT: &str = "assistant";
 pub const SCOPE_SLACK_ACTION: &str = "slack_action";
 /// Minted per AutoResolve run; `lid` carries the run id.
 pub const SCOPE_AUTORESOLVE: &str = "autoresolve";
+/// Minted per agent turn that may edit AI memory; `lid` carries the turn id.
+pub const SCOPE_AI_MEMORY: &str = "ai_memory";
 pub const KEY_INFO: &[u8] = b"o2-slack-delegation-v1";
 pub const MAC_DOMAIN: &[u8] = b"o2dt.v1\0";
 /// `ZO_DELEGATION_SIGNING_KEY_PREVIOUS` value that keeps the master-key-derived key verifying.

@@ -336,6 +336,17 @@ pub async fn get_with<C: ConnectionTrait>(
         .map_err(db_err)
 }
 
+/// A turn marked running by its id alone, through the `(org_id, status)` index; from the primary.
+pub async fn get_running(org_id: &str, turn_id: &str) -> Result<Option<Model>, errors::Error> {
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Status.eq(TURN_RUNNING))
+        .filter(Column::TurnId.eq(turn_id))
+        .one(get_orm_client_rw().await)
+        .await
+        .map_err(db_err)
+}
+
 /// Stamps the turn's first forwarded o2-ai event once; `false` if it already had one.
 pub async fn set_first_event_at(
     org_id: &str,

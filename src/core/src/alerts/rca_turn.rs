@@ -68,6 +68,7 @@ use o2_enterprise::enterprise::{
             HealthResponse, POLICY_CONTEXT_KEY, QueryRequest, RCA_AGENT_TYPE, SESSION_ID_HEADER,
             get_agent_client,
         },
+        memory_token,
         toolsets::{
             McpEntry, SkillEntry,
             push::{AgentTools, TurnMemory, load_agent_tools, load_turn_memory},
@@ -496,6 +497,9 @@ async fn start_turn(
     request.unavailable_toolsets = (!unavailable.is_empty()).then_some(unavailable);
     request.skills = (!skills.is_empty()).then_some(skills);
     admission::apply_admission(&mut request, &admitted);
+    let settings = PersistSettings::for_rca();
+    // An RCA turn runs as the org's SysRcaAgent account, so its memory token names that one.
+    memory_token::attach(&mut request, &email, &run.org_id, settings.max_turn);
     let AdmittedTurn {
         row,
         owner,
@@ -508,7 +512,6 @@ async fn start_turn(
         session_id: row.session_id.clone(),
         turn_id: turn_id.clone(),
     };
-    let settings = PersistSettings::for_rca();
     let store = Arc::new(StreamChatStore::new(settings.retention_days));
     // o2-ai binds one opencode session to the run and HA routes to its replica.
     let forward_headers = HashMap::from([(SESSION_ID_HEADER.to_string(), row.session_id.clone())]);

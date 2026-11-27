@@ -13,25 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The `/{org_id}/ai/memory` API, each MCP toolset's `/memory`, and o2-ai's `/internal/ai/memory`.
+//! The `/{org_id}/ai/memory` API, each MCP toolset's `/memory`, and the agent's `agent_edits`.
 
 use ::db::ai_memory::{self as memory_db, Submission, Submitted};
 use axum::{
-    Json,
+    Extension, Json,
+    body::Bytes,
     extract::Path,
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
-use config::meta::ai::memory::{
-    AgentMemoryWrites, Author, ContentError, EditFlag, Evidence, MemoryEdit, MemoryScope,
-    MemorySettings, RevisionState,
+use config::{
+    meta::ai::memory::{
+        AgentMemoryWrites, Author, ContentError, EditFlag, Evidence, MemoryEdit, MemoryScope,
+        MemorySettings, RevisionState,
+    },
+    utils::{delegation::SCOPE_AI_MEMORY, str::constant_time_eq},
 };
 use infra::table::ai_memory::{AgentOutcome, AgentWrite, Change, MemoryKey, Outcome, Revision};
-use o2_enterprise::enterprise::ai::toolsets::{
-    ToolsetKind,
-    push::{colliding_names, normalize_tool_name},
+use o2_enterprise::enterprise::{
+    ai::{
+        client::INTERNAL_SECRET_HEADER,
+        toolsets::{
+            ToolsetKind,
+            push::{colliding_names, normalize_tool_name},
+        },
+    },
+    common::config::get_config as get_o2_config,
 };
-use openobserve_api_common::extractors::Headers;
+use openobserve_api_common::{auth::delegation::DelegatedCaller, extractors::Headers};
 use openobserve_core::{
     ai_chat::admission::{AdmitError, resolve_owner},
     auth::{UserEmail, check_permissions},
@@ -174,10 +184,9 @@ pub struct PendingListResponse {
     pub pending: Vec<PendingEdit>,
 }
 
-/// An agent's edit from o2-ai; the turn's row decides the org and the user, never this body.
-#[derive(Debug, Deserialize)]
-pub struct InternalWriteRequest {
-    pub org_id: String,
+/// An agent's edit from o2-ai; the turn's row decides the user, never this body.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct AgentEditsRequest {
     pub session_id: String,
     pub turn_id: String,
     pub scope: MemoryScope,
@@ -189,6 +198,24 @@ pub struct InternalWriteRequest {
     pub evidence: Vec<Evidence>,
     #[serde(default)]
     pub reason: Option<String>,
+}
+
+/// What `agent_edits` answers with 200: `applied`, `pending` or `refused`, with the details.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AgentEditsReply {
+    pub status: String,
+    pub rev: Option<i64>,
+    pub no_change: Option<bool>,
+    pub revision_id: Option<String>,
+    pub code: Option<String>,
+    pub reason: Option<String>,
+    pub content: Option<String>,
+}
+
+/// One agent edit with the org its route named.
+struct TurnWrite {
+    org_id: String,
+    request: AgentEditsRequest,
 }
 
 /// The caller as a memory author, and whether their shared-memory writes apply directly.
@@ -916,26 +943,84 @@ pub async fn revert_my_memory(
     }
 }
 
-/// o2-ai's write for a running turn: checks the secret, then the turn, then writes as the agent.
-/// Not under `/api`, so no user auth runs before it and it writes its own audit entry.
-pub async fn internal_write(headers: axum::http::HeaderMap, body: axum::body::Bytes) -> Response {
-    use o2_enterprise::enterprise::ai::client::{INTERNAL_SECRET_HEADER, internal_secret_matches};
-    let supplied = headers
-        .get(INTERNAL_SECRET_HEADER)
-        .and_then(|v| v.to_str().ok());
-    if let Some(refusal) = secret_refusal(internal_secret_matches(supplied)) {
-        return refusal;
+/// The agent's own way to edit memory; people use the PUT routes. It is a separate route because
+/// its rules differ: the agent is the author, it sends edits rather than whole text, a shared edit
+/// may wait for a memory admin, the turn must still be running, and it never uses a user's rights.
+/// It sits under `/api` and needs a token bound to that one turn plus the internal secret, the
+/// same pattern AutoResolve's run callbacks use, so only o2-ai can call it and only mid-turn.
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/ai/memory/agent_edits",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "AgentEditAiMemory",
+    summary = "Send a running turn's memory edits",
+    description = "Internal: o2-ai posts the edits the agent made with `update_memory`. Needs the turn's token and `x-o2-internal-secret`. Only available in enterprise deployments.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = AgentEditsRequest, description = "The edits, the revision they were made against and their evidence", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Applied, pending a memory admin's approval, or refused with a reason", content_type = "application/json", body = AgentEditsReply),
+        (status = 400, description = "The body is not an edit request", content_type = "application/json", body = Object),
+        (status = 403, description = "Not the turn's token, no internal secret, or the turn is no longer running", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn agent_edits(
+    Path(org_id): Path<String>,
+    headers: HeaderMap,
+    caller: Option<Extension<DelegatedCaller>>,
+    body: Bytes,
+) -> Response {
+    let parsed = serde_json::from_slice::<AgentEditsRequest>(&body);
+    let turn_id = parsed.as_ref().map_or("", |r| r.turn_id.as_str());
+    let secret = &get_o2_config().ai.internal_secret;
+    if !caller_ok_with(&headers, caller.as_deref(), &org_id, turn_id, secret) {
+        let reply = json!({"code": "caller_refused", "message": CALLER_REFUSED});
+        return (StatusCode::FORBIDDEN, Json(reply)).into_response();
     }
-    let request: InternalWriteRequest = match serde_json::from_slice(&body) {
+    let request = match parsed {
         Ok(request) => request,
         Err(e) => return MetaHttpResponse::bad_request(format!("invalid request: {e}")),
     };
     if request.edits.is_empty() {
         return MetaHttpResponse::bad_request("edits must not be empty");
     }
-    let (status, reply) = write_for_turn(request).await;
-    audit_internal_write(&body, status, &reply).await;
+    let (status, reply) = write_for_turn(TurnWrite {
+        org_id: org_id.clone(),
+        request,
+    })
+    .await;
+    audit_agent_edits(&org_id, &body, status, &reply).await;
     (status, Json(reply)).into_response()
+}
+
+/// True only for the turn's own token, in its org, together with the configured internal secret.
+fn caller_ok_with(
+    headers: &HeaderMap,
+    caller: Option<&DelegatedCaller>,
+    org: &str,
+    turn: &str,
+    secret: &str,
+) -> bool {
+    let Some(caller) = caller else {
+        return false;
+    };
+    if caller.scope != SCOPE_AI_MEMORY || caller.org != org || caller.link_id != turn {
+        return false;
+    }
+    if turn.is_empty() || secret.is_empty() {
+        return false;
+    }
+    let mut sent = headers.get_all(INTERNAL_SECRET_HEADER).iter();
+    match (sent.next(), sent.next()) {
+        (Some(value), None) => constant_time_eq(value.as_bytes(), secret.as_bytes()),
+        _ => false,
+    }
 }
 
 /// Holding `ai_memory` PUT is what makes someone a memory admin.
@@ -1245,26 +1330,11 @@ async fn apply_decision(
     }
 }
 
-fn secret_refusal(matches: Option<bool>) -> Option<Response> {
-    match matches {
-        None => Some(MetaHttpResponse::service_unavailable(
-            "the internal secret is not set on OpenObserve",
-        )),
-        Some(false) => Some(
-            (
-                StatusCode::UNAUTHORIZED,
-                Json(json!({"code": 401, "message": "missing or wrong internal secret"})),
-            )
-                .into_response(),
-        ),
-        Some(true) => None,
-    }
-}
-
 /// The reply for an agent's write; the turn, chat, setting and cap are checked in its transaction.
-async fn write_for_turn(request: InternalWriteRequest) -> (StatusCode, Value) {
-    // The org is in the body, so the routes' blocked-org gate never sees it.
-    if ::db::org_status::is_blocked(&request.org_id) {
+async fn write_for_turn(write: TurnWrite) -> (StatusCode, Value) {
+    let TurnWrite { org_id, request } = write;
+    // The `/api` gate refuses a blocked org too; kept so this write never depends on it.
+    if ::db::org_status::is_blocked(&org_id) {
         return (
             StatusCode::FORBIDDEN,
             json!({"code": "org_blocked", "message": "the organization is blocked"}),
@@ -1273,7 +1343,7 @@ async fn write_for_turn(request: InternalWriteRequest) -> (StatusCode, Value) {
     let toolset = match (request.scope, request.toolset.as_deref()) {
         (MemoryScope::Toolset, name) => {
             let name = name.unwrap_or_default();
-            match mcp_toolset_id(&request.org_id, name).await {
+            match mcp_toolset_id(&org_id, name).await {
                 Some(id) => Some((name.to_string(), id)),
                 None => return (StatusCode::OK, unknown_toolset()),
             }
@@ -1290,7 +1360,7 @@ async fn write_for_turn(request: InternalWriteRequest) -> (StatusCode, Value) {
         })
         .collect();
     let write = AgentWrite {
-        org: request.org_id,
+        org: org_id,
         session_id: request.session_id,
         turn_id: request.turn_id,
         running_since: super::chats::running_since(now),
@@ -1402,35 +1472,34 @@ fn agent_reply(scope: MemoryScope, outcome: Outcome) -> Value {
     }
 }
 
-/// The route has no audit middleware, so it records each call itself.
-async fn audit_internal_write(body: &[u8], status: StatusCode, reply: &Value) {
-    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+/// The generic audit skips this route, so the notes in its body are never recorded.
+async fn audit_agent_edits(org_id: &str, body: &[u8], status: StatusCode, reply: &Value) {
     if !get_o2_config().common.audit_enabled {
         return;
     }
-    audit::audit(internal_audit_message(body, status, reply)).await;
+    audit::audit(agent_edits_audit_message(org_id, body, status, reply)).await;
 }
 
 /// Attributed to o2-ai; the body names the session and turn the edit came from.
-fn internal_audit_message(
+fn agent_edits_audit_message(
+    org_id: &str,
     body: &[u8],
     status: StatusCode,
     reply: &Value,
 ) -> o2_enterprise::enterprise::common::auditor::AuditMessage {
     use o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta};
-    let request: Value = serde_json::from_slice(body).unwrap_or_default();
     let error_msg = (reply["status"] != "applied" && reply["status"] != "pending")
         .then(|| reply["code"].as_str().unwrap_or("refused").to_string());
     AuditMessage {
         login_ip: None,
         user_agent: None,
         user_email: "o2-ai".to_string(),
-        org_id: request["org_id"].as_str().unwrap_or_default().to_string(),
+        org_id: org_id.to_string(),
         _timestamp: config::utils::time::now_micros(),
         protocol: Protocol::Http,
         response_meta: ResponseMeta {
             http_method: "POST".to_string(),
-            http_path: "/internal/ai/memory".to_string(),
+            http_path: format!("api/v2/{org_id}/ai/memory/agent_edits"),
             http_query_params: String::new(),
             http_body: audited_body(body),
             http_response_code: status.as_u16(),
@@ -1442,6 +1511,8 @@ fn internal_audit_message(
         target: None,
     }
 }
+
+const CALLER_REFUSED: &str = "This route needs the turn's token and the internal secret.";
 
 /// Whether `path` is a memory PUT the generic audit must skip: its handler records it without the
 /// notes.
@@ -2110,9 +2181,8 @@ pub(crate) mod tests {
         toolset: Option<&str>,
         base_rev: i64,
         edits: Vec<MemoryEdit>,
-    ) -> InternalWriteRequest {
-        InternalWriteRequest {
-            org_id: org.to_string(),
+    ) -> TurnWrite {
+        let request = AgentEditsRequest {
             session_id: session.to_string(),
             turn_id: turn.to_string(),
             scope,
@@ -2125,6 +2195,10 @@ pub(crate) mod tests {
                 tool: None,
             }],
             reason: Some("seen in a result".to_string()),
+        };
+        TurnWrite {
+            org_id: org.to_string(),
+            request,
         }
     }
 
@@ -2143,19 +2217,68 @@ pub(crate) mod tests {
         memory_db::set_settings(key, None, &settings).await.unwrap();
     }
 
+    fn turn_caller(scope: &str, org: &str, turn: &str) -> DelegatedCaller {
+        DelegatedCaller {
+            link_id: turn.to_string(),
+            installation_id: String::new(),
+            org: org.to_string(),
+            jti: "j1".to_string(),
+            scope: scope.to_string(),
+        }
+    }
+
     #[test]
-    fn the_internal_route_wants_the_configured_secret() {
-        let unset = secret_refusal(None).unwrap();
-        assert_eq!(unset.status(), StatusCode::SERVICE_UNAVAILABLE);
-        let wrong = secret_refusal(Some(false)).unwrap();
-        assert_eq!(wrong.status(), StatusCode::UNAUTHORIZED);
-        assert!(secret_refusal(Some(true)).is_none());
+    fn agent_edits_need_the_turn_token_in_its_org_and_the_secret() {
+        let turn_token = turn_caller(SCOPE_AI_MEMORY, "acme", "t1");
+        let other_turn = turn_caller(SCOPE_AI_MEMORY, "acme", "t2");
+        let other_org = turn_caller(SCOPE_AI_MEMORY, "other", "t1");
+        let no_turn = turn_caller(SCOPE_AI_MEMORY, "acme", "");
+        let scopes =
+            ["assistant", "slack_action", "autoresolve"].map(|s| turn_caller(s, "acme", "t1"));
+        type Case<'a> = (
+            &'a str,
+            Option<&'a DelegatedCaller>,
+            &'a [&'a str],
+            &'a str,
+            &'a str,
+            bool,
+        );
+        #[rustfmt::skip]
+        let cases: [Case; 13] = [
+            ("token and secret", Some(&turn_token), &["s3cret"], "s3cret", "t1", true),
+            ("body names another turn", Some(&turn_token), &["s3cret"], "s3cret", "t2", false),
+            ("another turn's token", Some(&other_turn), &["s3cret"], "s3cret", "t1", false),
+            ("another org's token", Some(&other_org), &["s3cret"], "s3cret", "t1", false),
+            ("assistant token", Some(&scopes[0]), &["s3cret"], "s3cret", "t1", false),
+            ("slack_action token", Some(&scopes[1]), &["s3cret"], "s3cret", "t1", false),
+            ("autoresolve token", Some(&scopes[2]), &["s3cret"], "s3cret", "t1", false),
+            ("no token", None, &["s3cret"], "s3cret", "t1", false),
+            ("no secret", Some(&turn_token), &[], "s3cret", "t1", false),
+            ("wrong secret", Some(&turn_token), &["s3crex"], "s3cret", "t1", false),
+            ("secret sent twice", Some(&turn_token), &["s3cret", "s3cret"], "s3cret", "t1", false),
+            ("empty configured secret", Some(&turn_token), &[""], "", "t1", false),
+            ("no turn id", Some(&no_turn), &["s3cret"], "s3cret", "", false),
+        ];
+        for (label, caller, sent, configured, turn, want) in cases {
+            let mut headers = HeaderMap::new();
+            for value in sent {
+                headers.append(INTERNAL_SECRET_HEADER, value.parse().unwrap());
+            }
+            assert_eq!(
+                caller_ok_with(&headers, caller, "acme", turn, configured),
+                want,
+                "{label}"
+            );
+        }
     }
 
     #[tokio::test]
-    async fn without_a_secret_on_openobserve_the_internal_route_is_closed() {
-        let resp = internal_write(axum::http::HeaderMap::new(), axum::body::Bytes::new()).await;
-        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+    async fn agent_edits_without_the_turn_token_are_refused_before_the_body_is_read() {
+        let body = json!({"session_id": "s1", "turn_id": "t1", "scope": "org", "base_rev": 0, "edits": []});
+        for body in [Bytes::new(), Bytes::from(body.to_string())] {
+            let resp = agent_edits(Path("acme".to_string()), HeaderMap::new(), None, body).await;
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        }
     }
 
     #[tokio::test]
@@ -2390,19 +2513,24 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn each_internal_write_is_audited_with_its_outcome() {
-        let body = br#"{"org_id":"o1","turn_id":"t1"}"#;
-        let ok = internal_audit_message(
+    fn each_agent_edit_is_audited_with_its_outcome() {
+        let body = br#"{"turn_id":"t1"}"#;
+        let ok = agent_edits_audit_message(
+            "o1",
             body,
             StatusCode::OK,
             &json!({"status": "applied", "rev": 2}),
         );
         assert_eq!(ok.org_id, "o1");
         assert_eq!(ok.user_email, "o2-ai");
-        assert_eq!(ok.response_meta.http_path, "/internal/ai/memory");
+        assert_eq!(
+            ok.response_meta.http_path,
+            "api/v2/o1/ai/memory/agent_edits"
+        );
         assert_eq!(ok.response_meta.http_response_code, 200);
         assert!(ok.response_meta.error_msg.is_none());
-        let refused = internal_audit_message(
+        let refused = agent_edits_audit_message(
+            "o1",
             body,
             StatusCode::FORBIDDEN,
             &json!({"code": "turn_not_running"}),
@@ -2455,9 +2583,8 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn an_internal_write_s_audit_keeps_its_ids_but_not_its_notes() {
+    fn an_agent_edit_s_audit_keeps_its_ids_but_not_its_notes() {
         let body = json!({
-            "org_id": "o1",
             "session_id": "s1",
             "turn_id": "t1",
             "scope": "org",
@@ -2469,7 +2596,8 @@ pub(crate) mod tests {
             "evidence": [{"call_ref": "user"}],
             "reason": "why-note",
         });
-        let audited = internal_audit_message(
+        let audited = agent_edits_audit_message(
+            "o1",
             body.to_string().as_bytes(),
             StatusCode::OK,
             &json!({"status": "applied"}),
@@ -2480,7 +2608,6 @@ pub(crate) mod tests {
         assert_eq!(
             audited,
             json!({
-                "org_id": "o1",
                 "session_id": "s1",
                 "turn_id": "t1",
                 "scope": "org",

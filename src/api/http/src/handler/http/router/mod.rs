@@ -756,7 +756,9 @@ fn fleet_mutation(method: &Method, path: &str) -> bool {
 /// Routes whose handler writes its own audit entry, so their bodies never reach the generic one.
 #[cfg(feature = "enterprise")]
 fn audits_itself(path: &str) -> bool {
-    path.ends_with("ai/chat_stream") || path.ends_with("ai/toolsets/_discover")
+    path.ends_with("ai/chat_stream")
+        || path.ends_with("ai/toolsets/_discover")
+        || path.ends_with("ai/memory/agent_edits")
 }
 
 #[cfg(feature = "enterprise")]
@@ -1290,19 +1292,6 @@ pub fn basic_routes() -> Router {
                 require_features(&[Feature::Dashboards], req, next)
             }));
         router = router.merge(public);
-    }
-
-    // o2-ai's agent memory writes: the internal secret and the running turn are checked inside.
-    #[cfg(feature = "enterprise")]
-    {
-        router = router.route(
-            "/internal/ai/memory",
-            post(openobserve_api_management::request::ai::memory::internal_write).route_layer(
-                middleware::from_fn(|req, next| {
-                    require_features(&[Feature::AiAssistant], req, next)
-                }),
-            ),
-        );
     }
 
     // Unauthenticated like status pages: the share token is checked in the handler.
@@ -2249,6 +2238,7 @@ fn service_route_table() -> Router {
             .route("/{org_id}/ai/memory/me/revisions", get(ai::memory::list_my_memory_revisions))
             .route("/{org_id}/ai/memory/me/revisions/{id}", get(ai::memory::get_my_memory_revision))
             .route("/{org_id}/ai/memory/me/revert", post(ai::memory::revert_my_memory))
+            .route("/v2/{org_id}/ai/memory/agent_edits", post(ai::memory::agent_edits))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))
@@ -4127,6 +4117,7 @@ mod tests {
     fn toolset_discovery_bodies_never_reach_the_generic_audit() {
         assert!(audits_itself("api/acme/ai/toolsets/_discover"));
         assert!(audits_itself("api/acme/ai/chat_stream"));
+        assert!(audits_itself("api/v2/acme/ai/memory/agent_edits"));
         assert!(!audits_itself("api/acme/ai/toolsets"));
         assert!(!audits_itself("api/acme/ai/toolsets/t1"));
     }
@@ -6693,11 +6684,30 @@ mod tests {
         assert_eq!(scope_allows(in_autoresolve_scope), sorted(&expected));
     }
 
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn ai_memory_scope_is_exactly_the_agent_edits_route() {
+        use openobserve_api_common::auth::delegation::{
+            in_ai_memory_scope, in_assistant_scope, in_autoresolve_scope, in_slack_action_scope,
+        };
+
+        let route = "POST /v2/{org_id}/ai/memory/agent_edits";
+        assert_eq!(scope_allows(in_ai_memory_scope), vec![route.to_string()]);
+        let others: [fn(&Method, &str) -> bool; 3] = [
+            in_assistant_scope,
+            in_slack_action_scope,
+            in_autoresolve_scope,
+        ];
+        for other in others {
+            assert!(!scope_allows(other).contains(&route.to_string()));
+        }
+    }
+
     /// A pattern parameter must not admit a path that axum hands to a more specific route.
     #[test]
     fn scopes_agree_with_axum_dispatch() {
         use openobserve_api_common::auth::delegation::{
-            in_assistant_scope, in_autoresolve_scope, in_slack_action_scope,
+            in_ai_memory_scope, in_assistant_scope, in_autoresolve_scope, in_slack_action_scope,
         };
 
         let assistant: fn(&Method, &str) -> bool = in_assistant_scope;
@@ -6709,6 +6719,7 @@ mod tests {
                 in_autoresolve_scope,
                 "RESERVED_STREAM_SLOTS or ALERT_ID_LITERALS",
             ),
+            ("ai_memory", in_ai_memory_scope, "AI_MEMORY_SCOPE"),
         ];
         for (scope, in_scope, fix) in cases {
             let wrong = dispatch_disagreements(in_scope);

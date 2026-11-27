@@ -25,7 +25,7 @@ use std::{
 };
 
 use axum::http::Method;
-use config::utils::delegation::{SCOPE_AUTORESOLVE, SCOPE_SLACK_ACTION};
+use config::utils::delegation::{SCOPE_AI_MEMORY, SCOPE_AUTORESOLVE, SCOPE_SLACK_ACTION};
 #[cfg(any(feature = "enterprise", test))]
 use config::{
     meta::{
@@ -231,6 +231,13 @@ const AUTORESOLVE_SCOPE: &[ScopeRoute] = &[
     v2(&[Param, Lit("autoresolve"), Lit("runs"), Param, Lit("steps"), Param, Lit("result")], POST),
 ];
 
+/// The one route an agent turn's memory token may call; the handler also wants the internal secret.
+#[rustfmt::skip]
+const AI_MEMORY_SCOPE: &[ScopeRoute] = &[
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("ai"), Lit("memory"), Lit("agent_edits")], POST),
+];
+
 /// Set only by the validator; a request extension, so a client can never supply it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DelegatedCaller {
@@ -248,6 +255,10 @@ impl DelegatedCaller {
 
     pub fn is_autoresolve_run(&self) -> bool {
         self.scope == SCOPE_AUTORESOLVE
+    }
+
+    pub fn is_ai_memory_turn(&self) -> bool {
+        self.scope == SCOPE_AI_MEMORY
     }
 }
 
@@ -362,6 +373,32 @@ impl RunFacts {
     }
 }
 
+/// What the `ai_chat_turns` row named by an `ai_memory` token's `lid` says.
+#[cfg(any(feature = "enterprise", test))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct TurnFacts {
+    org: String,
+    running: bool,
+    /// The chat's owner is the token's `sub`: the user, or the org's RCA agent account.
+    owned_by_subject: bool,
+}
+
+#[cfg(any(feature = "enterprise", test))]
+impl TurnFacts {
+    /// 403, which o2-ai tells the model as "this turn is no longer running".
+    fn admit(&self, claims: &Claims) -> Result<(), AuthError> {
+        if self.org != claims.org {
+            Err(forbidden("turn is in another org"))
+        } else if !self.running {
+            Err(forbidden("turn is not running"))
+        } else if !self.owned_by_subject {
+            Err(forbidden("token subject is not the turn identity"))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// Validation steps 0-5 of the delegated-token contract; `authorize` runs steps 6 and 7.
 #[cfg(feature = "enterprise")]
 pub async fn validate_delegated(
@@ -378,6 +415,7 @@ pub async fn validate_delegated(
         token,
         slack_on,
         openobserve_core::autoresolve::autoresolve_on,
+        ai_memory_on,
         signing_keys,
         now_secs,
         slack::disabled_reason,
@@ -385,6 +423,9 @@ pub async fn validate_delegated(
     check_route(path, path_prefix, method, &claims)?;
     let installation_id = if claims.scope == SCOPE_AUTORESOLVE {
         admit_run(&claims, autoresolve_run_facts).await?;
+        String::new()
+    } else if claims.scope == SCOPE_AI_MEMORY {
+        admit_turn(&claims, ai_memory_turn_facts).await?;
         String::new()
     } else {
         let facts = link_facts(&claims.lid, Instant::now()).await?;
@@ -437,6 +478,11 @@ pub fn in_autoresolve_scope(method: &Method, path: &str) -> bool {
     in_scope(AUTORESOLVE_SCOPE, method, path)
 }
 
+/// Whether an `ai_memory` token may call `method` on `path` (relative to `/api`).
+pub fn in_ai_memory_scope(method: &Method, path: &str) -> bool {
+    in_scope(AI_MEMORY_SCOPE, method, path)
+}
+
 /// Validation step 6 (as the validator's own permission check), then step 7's usage touch.
 pub(crate) async fn authorize(
     result: AuthValidationResult,
@@ -455,12 +501,12 @@ pub(crate) async fn authorize(
         log::debug!("delegated token refused: permission denied");
         return Err(AuthError::RoleRefused("Unauthorized Access".to_string()));
     }
-    // A run token's link id is a run id, never a Slack link to keep fresh.
+    // A run or turn token's link id is a run or turn id, never a Slack link to keep fresh.
     #[cfg(feature = "enterprise")]
     if let Some(caller) = result
         .delegation
         .as_ref()
-        .filter(|c| c.scope != SCOPE_AUTORESOLVE)
+        .filter(|c| c.scope != SCOPE_AUTORESOLVE && c.scope != SCOPE_AI_MEMORY)
     {
         touch_if_due(&caller.link_id, config::utils::time::now_micros()).await;
     }
@@ -483,13 +529,14 @@ const fn v2(segments: &'static [Seg], methods: &'static [&'static str]) -> Scope
     }
 }
 
-/// Slack and AutoResolve both off answer before the keys are derived, so stray `o2dt.` bearers
-/// cost nothing.
+/// Slack, AutoResolve and the AI assistant all off answer before the keys are derived, so stray
+/// `o2dt.` bearers cost nothing.
 #[cfg(any(feature = "enterprise", test))]
 fn verified_claims(
     token: &str,
     slack_on: bool,
     autoresolve_on: impl Fn() -> bool,
+    ai_memory_on: impl Fn() -> bool,
     keys: impl FnOnce() -> anyhow::Result<Keys>,
     now_secs: i64,
     disabled_reason: impl Fn(&str) -> Option<DisabledReason>,
@@ -499,7 +546,7 @@ fn verified_claims(
         let open = std::cell::OnceCell::new();
         move || *open.get_or_init(&autoresolve_on)
     };
-    if !slack_on && !autoresolve_on() {
+    if !slack_on && !autoresolve_on() && !ai_memory_on() {
         return Err(unauthorized());
     }
     let keys = keys().map_err(|e| {
@@ -514,6 +561,12 @@ fn verified_claims(
     if claims.scope == SCOPE_AUTORESOLVE {
         if !autoresolve_on() {
             log::debug!("delegated token refused: AutoResolve is off");
+            return Err(unauthorized());
+        }
+    } else if claims.scope == SCOPE_AI_MEMORY {
+        // A turn token involves no Slack link either: it follows the AI assistant's gate.
+        if !ai_memory_on() {
+            log::debug!("delegated token refused: the AI assistant is off");
             return Err(unauthorized());
         }
     } else if !slack_on {
@@ -556,6 +609,7 @@ fn scope_routes(scope: &str) -> Option<&'static [ScopeRoute]> {
         SCOPE_ASSISTANT => Some(ASSISTANT_SCOPE),
         SCOPE_SLACK_ACTION => Some(SLACK_ACTION_SCOPE),
         SCOPE_AUTORESOLVE => Some(AUTORESOLVE_SCOPE),
+        SCOPE_AI_MEMORY => Some(AI_MEMORY_SCOPE),
         _ => None,
     }
 }
@@ -680,6 +734,54 @@ async fn autoresolve_run_facts(org: String, run_id: String) -> anyhow::Result<Op
         state: r.state,
         turn_identity: r.turn_identity,
     }))
+}
+
+/// A failed lookup is 503; an unknown turn is refused like one that ended.
+#[cfg(any(feature = "enterprise", test))]
+async fn admit_turn<F, Fut>(claims: &Claims, lookup: F) -> Result<(), AuthError>
+where
+    F: FnOnce(String, String, String) -> Fut,
+    Fut: Future<Output = anyhow::Result<Option<TurnFacts>>>,
+{
+    let turn = lookup(claims.org.clone(), claims.lid.clone(), claims.sub.clone())
+        .await
+        .map_err(|e| {
+            log::error!("delegated token: loading turn {} failed: {e}", claims.lid);
+            AuthError::Unavailable("Service Unavailable".to_string())
+        })?;
+    match turn {
+        Some(turn) => turn.admit(claims),
+        None => Err(forbidden("unknown turn")),
+    }
+}
+
+/// The write's own transaction re-checks the turn, with the stale-turn bound, before it saves.
+#[cfg(feature = "enterprise")]
+async fn ai_memory_turn_facts(
+    org: String,
+    turn_id: String,
+    subject: String,
+) -> anyhow::Result<Option<TurnFacts>> {
+    use infra::table::{ai_chat_sessions, ai_chat_turns, users};
+
+    let Some(turn) = ai_chat_turns::get_running(&org, &turn_id).await? else {
+        return Ok(None);
+    };
+    let primary = infra::db::get_orm_client_rw().await;
+    let chat = ai_chat_sessions::get_with(primary, &org, &turn.session_id).await?;
+    let subject_id = users::get_id_by_email(&subject).await?;
+    Ok(Some(TurnFacts {
+        org: turn.org_id,
+        running: true,
+        owned_by_subject: chat.is_some_and(|c| Some(c.user_id) == subject_id),
+    }))
+}
+
+#[cfg(feature = "enterprise")]
+fn ai_memory_on() -> bool {
+    use o2_enterprise::enterprise::{common::config::get_config, license::check_features};
+
+    get_config().ai.enabled && check_features(&[config::meta::feature::Feature::AiAssistant])
 }
 
 #[cfg(feature = "enterprise")]
@@ -843,6 +945,7 @@ mod tests {
             &token,
             slack_on,
             || autoresolve_on,
+            || false,
             || Ok(keys()),
             NOW_SECS,
             slack_disabled,
@@ -860,6 +963,7 @@ mod tests {
                 &token,
                 true,
                 || false,
+                || false,
                 || Ok(keys()),
                 NOW_SECS,
                 |_| Some(DisabledReason::Flag)
@@ -871,6 +975,7 @@ mod tests {
                 &token,
                 true,
                 || panic!("the AutoResolve gate was read for a Slack token"),
+                || false,
                 || Ok(keys()),
                 NOW_SECS,
                 |_| None
@@ -897,6 +1002,7 @@ mod tests {
                     &token,
                     true,
                     || false,
+                    || false,
                     || Ok(keys()),
                     NOW_SECS,
                     |_| Some(reason)
@@ -908,6 +1014,7 @@ mod tests {
         let no_key = verified_claims(
             &token,
             true,
+            || false,
             || false,
             || Err(anyhow::anyhow!("no master key")),
             NOW_SECS,
@@ -922,6 +1029,7 @@ mod tests {
         let refused = verified_claims(
             &token,
             false,
+            || false,
             || false,
             || panic!("signing keys were read with Slack off"),
             NOW_SECS,
@@ -951,6 +1059,7 @@ mod tests {
             status(verified_claims(
                 &token,
                 true,
+                || false,
                 || false,
                 || Ok(keys()),
                 NOW_SECS,
@@ -986,6 +1095,7 @@ mod tests {
                     &bad,
                     true,
                     || false,
+                    || false,
                     || Ok(keys()),
                     NOW_SECS,
                     |_| None
@@ -1007,6 +1117,7 @@ mod tests {
                 &token,
                 true,
                 || false,
+                || false,
                 || Ok(keys()),
                 NOW_SECS,
                 |_| None
@@ -1022,6 +1133,7 @@ mod tests {
             status(verified_claims(
                 &token,
                 true,
+                || false,
                 || false,
                 || Ok(keys()),
                 NOW_SECS,
@@ -1371,6 +1483,115 @@ mod tests {
             Err(anyhow::anyhow!("database is down"))
         });
         assert_eq!(status(failed.await), 503);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn each_scope_reaches_the_memory_edit_route_only_with_an_ai_memory_token() {
+        let edits = "/v2/acme/ai/memory/agent_edits";
+        let as_scope = |scope: &str, method: Method, path: &str| {
+            let claims = Claims {
+                scope: scope.to_string(),
+                ..claims("acme")
+            };
+            status(check_route(path, "/api/", &method, &claims))
+        };
+        assert_eq!(as_scope(SCOPE_AI_MEMORY, Method::POST, edits), 200);
+        for scope in [SCOPE_ASSISTANT, SCOPE_SLACK_ACTION, SCOPE_AUTORESOLVE] {
+            assert_eq!(as_scope(scope, Method::POST, edits), 403, "{scope}");
+        }
+        for (method, path) in [
+            (Method::GET, edits),
+            (Method::PUT, edits),
+            (Method::DELETE, edits),
+            (Method::POST, "/v2/other/ai/memory/agent_edits"),
+            (Method::POST, "/acme/ai/memory/agent_edits"),
+            (Method::POST, "/v2/acme/ai/memory/agent_edits/x"),
+            (Method::PUT, "/acme/ai/memory/org"),
+            (Method::GET, "/acme/ai/memory/org"),
+            (Method::POST, "/acme/ai/memory/pending/accept"),
+            (Method::POST, "/acme/ai/chat_stream"),
+            (Method::POST, "/acme/mcp"),
+            (Method::POST, "/acme/_search"),
+            (Method::GET, "/acme/streams"),
+            (Method::POST, "/v2/acme/autoresolve/runs/r1/plan"),
+            (Method::POST, "/v2/acme/alerts/a1/ack"),
+        ] {
+            assert_eq!(
+                as_scope(SCOPE_AI_MEMORY, method.clone(), path),
+                403,
+                "{method} {path}"
+            );
+        }
+        assert_eq!(
+            status(check_route(
+                "/proxy/acme/v2/acme/ai/memory/agent_edits",
+                "/proxy/",
+                &Method::POST,
+                &Claims {
+                    scope: SCOPE_AI_MEMORY.to_string(),
+                    ..claims("acme")
+                }
+            )),
+            403
+        );
+    }
+
+    #[tokio::test]
+    async fn ai_memory_token_is_admitted_only_for_its_running_turn() {
+        let turn = |org: &str, running: bool, owned_by_subject: bool| {
+            Some(TurnFacts {
+                org: org.to_string(),
+                running,
+                owned_by_subject,
+            })
+        };
+        let memory = Claims {
+            scope: SCOPE_AI_MEMORY.to_string(),
+            lid: "turn_01".to_string(),
+            ..claims("acme")
+        };
+        let admission = |ai_on: bool, turn: Option<TurnFacts>| {
+            let token = token(&memory);
+            async move {
+                let verified = verified_claims(
+                    &token,
+                    false,
+                    || false,
+                    || ai_on,
+                    || Ok(keys()),
+                    NOW_SECS,
+                    |_| Some(DisabledReason::Flag),
+                );
+                match verified {
+                    Ok(claims) => status(admit_turn(&claims, |_, _, _| async { Ok(turn) }).await),
+                    Err(e) => status(Err::<(), _>(e)),
+                }
+            }
+        };
+        #[rustfmt::skip]
+        let rows = [
+            ("running turn, Slack and AutoResolve off", true, turn("acme", true, true), 200),
+            ("turn ended", true, turn("acme", false, true), 403),
+            ("turn of another org", true, turn("other", true, true), 403),
+            ("sub is not the turn identity", true, turn("acme", true, false), 403),
+            ("unknown turn", true, None, 403),
+            ("AI assistant off", false, turn("acme", true, true), 401),
+        ];
+        for (name, ai_on, turn, want) in rows {
+            assert_eq!(admission(ai_on, turn).await, want, "{name}");
+        }
+        let failed = admit_turn(&memory, |_, _, _| async {
+            Err(anyhow::anyhow!("database is down"))
+        });
+        assert_eq!(status(failed.await), 503);
+        // The lookup is asked about the token's own org, turn and subject.
+        let asked = admit_turn(&memory, |org, turn, sub| async move {
+            assert_eq!((org.as_str(), turn.as_str()), ("acme", "turn_01"));
+            assert_eq!(sub, "alice@acme.io");
+            Ok(None)
+        });
+        assert_eq!(status(asked.await), 403);
     }
 
     #[cfg(not(feature = "enterprise"))]
