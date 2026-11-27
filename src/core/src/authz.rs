@@ -42,16 +42,18 @@ use datafusion::common::TableReference;
 use db::user::is_root_user;
 #[cfg(any(feature = "enterprise", test))]
 use infra::table::service_streams::ServiceRecord;
+#[cfg(feature = "enterprise")]
+use o2_openfga::authorizer::decision::{CheckArgs, check_decision, offline_check_allows};
 
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+use self::list::ListPolicy;
 #[cfg(any(feature = "enterprise", test))]
 pub use self::list::readable_streams;
 #[cfg(any(feature = "enterprise", test))]
 use self::list::{
     AuthzUnavailable, ListSettings, ObjectRef, ObjectsQuery, OrgWideCheck, StreamShape,
-    TypeAccessKind, UnlistedKind,
+    TypeAccessKind, UnavailableReason, UnlistedKind,
 };
-#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
-use self::list::{ListPolicy, UnavailableReason};
 use crate::auth::AuthExtractor;
 
 /// Longest object id the fake lets through, as OpenFGA's Check pattern does.
@@ -375,6 +377,12 @@ impl FakeStreamChecker {
         });
     }
 
+    pub fn set_small_request_objects(&self, user_id: &str, objects: usize) {
+        self.user(user_id, |user| {
+            user.settings.small_request_objects = objects
+        });
+    }
+
     /// Lists are enabled by default for a fake user, as a declared deadline enables them.
     pub fn set_list_policy(&self, user_id: &str, policy: ListPolicy) {
         self.user(user_id, |user| user.policy = policy);
@@ -410,12 +418,18 @@ impl FakeStreamChecker {
         self.user(user_id, |user| user.failures.object_check = Some(reason));
     }
 
+    pub fn fail_object_check_of(&self, user_id: &str, name: &str, reason: UnavailableReason) {
+        self.user(user_id, |user| {
+            user.failures.object_check_of = Some((name.to_string(), reason));
+        });
+    }
+
     /// Fails every later call of this user, the per-stream Checks of the legacy path included.
     pub fn fail_every_call(&self, user_id: &str, reason: UnavailableReason) {
         self.user(user_id, |user| user.failures.every_call = Some(reason));
     }
 
-    /// Makes the next legacy Check of `name` fail, which the legacy path reads as a deny.
+    /// Makes the next legacy Check of `name` fail as a timed-out Check.
     pub fn fail_stream_read_once(&self, user_id: &str, name: &str) {
         self.user(user_id, |user| {
             user.failures.stream_read = Some(name.to_string())
@@ -495,11 +509,14 @@ impl FakeStreamChecker {
         })
     }
 
-    /// A failure answered as `is_allowed` answers it: `true` for an offline-access role.
     fn offline(&self, org_id: &str, user_id: &str, reason: UnavailableReason) -> bool {
         let role = self.role(org_id, user_id);
         reason == UnavailableReason::Transport
             && self.user(user_id, |user| user.offline_roles.contains(&role))
+    }
+
+    fn offline_check(&self, org_id: &str, user_id: &str, reason: UnavailableReason) -> bool {
+        self.role_branch(org_id, user_id).is_some() && self.offline(org_id, user_id, reason)
     }
 
     fn listed(&self, user_id: &str, org_id: &str, stream_type: StreamType) -> HashSet<String> {
@@ -600,11 +617,16 @@ impl StreamAccessChecker for FakeStreamChecker {
         });
         if failed_once {
             fake_record(true);
+            list::record_error_denial(UnavailableReason::Timeout);
             return false;
         }
         if let Some(reason) = self.failure(user_id, |_| None) {
             fake_record(true);
-            return self.offline(&stream.org_id, user_id, reason);
+            let allowed = self.offline_check(&stream.org_id, user_id, reason);
+            if !allowed {
+                list::record_error_denial(reason);
+            }
+            return allowed;
         }
         fake_record(false);
         if let Some(allowed) = self.role_branch(&stream.org_id, user_id) {
@@ -739,9 +761,18 @@ impl StreamAccessChecker for FakeStreamChecker {
             });
         });
         self.enter_check(user_id).await;
-        if let Some(reason) = self.failure(user_id, |f| f.object_check.take()) {
+        if let Some(reason) = self.failure(user_id, |f| {
+            if f.object_check_of
+                .as_ref()
+                .is_some_and(|(name, _)| name == object.id)
+            {
+                f.object_check_of.take().map(|(_, reason)| reason)
+            } else {
+                f.object_check.take()
+            }
+        }) {
             fake_record(true);
-            if self.offline(org_id, user_id, reason) {
+            if self.offline_check(org_id, user_id, reason) {
                 return Ok(true);
             }
             return Err(reason.into());
@@ -773,7 +804,7 @@ impl StreamAccessChecker for FakeStreamChecker {
         self.count(user_id, |calls| calls.org_wide_checks += 1);
         if let Some(reason) = self.failure(user_id, |f| f.org_wide_check.take()) {
             fake_record(true);
-            if self.offline(org_id, user_id, reason) {
+            if self.offline_check(org_id, user_id, reason) {
                 return Ok(true);
             }
             return Err(reason.into());
@@ -863,6 +894,7 @@ struct FakeFailures {
     incomplete: Option<StreamType>,
     org_wide_check: Option<UnavailableReason>,
     object_check: Option<UnavailableReason>,
+    object_check_of: Option<(String, UnavailableReason)>,
     every_call: Option<UnavailableReason>,
     stream_read: Option<String>,
     list_extra: Option<(StreamType, String)>,
@@ -1004,6 +1036,7 @@ impl StreamAccessChecker for OpenFgaStreamChecker {
             mode,
             shadow_sample: cfg.list_authz_shadow_sample,
             fallback_concurrency: cfg.list_fallback_concurrency,
+            small_request_objects: list::SMALL_REQUEST_OBJECTS,
         }
     }
 
@@ -1127,8 +1160,6 @@ struct SentCheck<'a> {
 #[cfg(feature = "enterprise")]
 impl SentCheck<'_> {
     async fn send(&self, user: &config::meta::user::User) -> Result<bool, AuthzUnavailable> {
-        use o2_openfga::authorizer::decision::{CheckArgs, check_decision, offline_check_allows};
-
         let cfg = o2_openfga::config::get_config();
         if !cfg.enabled || user.role == UserRole::Root {
             return Ok(true);
@@ -1197,7 +1228,7 @@ impl StreamReadMemo {
         if unrestricted {
             return StreamReadAnswer {
                 allowed: true,
-                had_error: false,
+                ..Default::default()
             };
         }
         let shortcut = org_wide_shortcut_covers(stream_type, name);
@@ -1220,19 +1251,46 @@ impl StreamReadMemo {
                 if wide.allowed {
                     return wide;
                 }
-                let mut answer = StreamReadAnswer::counted(checker.can_read_stream(
-                    user_id,
-                    &TypedStream {
-                        org_id: org_id.to_string(),
-                        stream_type,
-                        name: name.to_string(),
-                    },
-                ))
+                let mut had_error = false;
+                let outcome = list::object_outcome(stream_type, name, async {
+                    let answer = StreamReadAnswer::counted(checker.can_read_stream(
+                        user_id,
+                        &TypedStream {
+                            org_id: org_id.to_string(),
+                            stream_type,
+                            name: name.to_string(),
+                        },
+                    ))
+                    .await;
+                    had_error = answer.had_error;
+                    answer.allowed
+                })
                 .await;
-                answer.had_error |= wide.had_error;
-                answer
+                StreamReadAnswer {
+                    allowed: outcome.allowed(),
+                    had_error: had_error || wide.had_error,
+                    error_denial: match outcome {
+                        list::Outcome::Error(reason) => Some(reason),
+                        _ => None,
+                    },
+                }
             })
             .await
+    }
+
+    /// The answer [`Self::read`] already holds for the stream, without sending a call.
+    pub(crate) fn held(&self, stream_type: StreamType, name: &str) -> Option<StreamReadAnswer> {
+        if *self.unrestricted.get()? {
+            return Some(StreamReadAnswer {
+                allowed: true,
+                ..Default::default()
+            });
+        }
+        if let Some(answer) = held_cell(&self.streams, &(stream_type, name.to_string())) {
+            return Some(answer);
+        }
+        held_cell(&self.org_wide, &stream_type)
+            .filter(|wide| wide.allowed && org_wide_shortcut_covers(stream_type, name))
     }
 
     async fn org_wide(
@@ -1261,6 +1319,8 @@ impl StreamReadMemo {
 pub(crate) struct StreamReadAnswer {
     pub(crate) allowed: bool,
     pub(crate) had_error: bool,
+    /// Why the stream's own Check returned false, when OpenFGA failed.
+    pub(crate) error_denial: Option<UnavailableReason>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -1274,6 +1334,7 @@ impl StreamReadAnswer {
         Self {
             allowed,
             had_error: errors > 0,
+            ..Default::default()
         }
     }
 }
@@ -1437,18 +1498,27 @@ pub async fn check_permissions(
     let org_id = &auth_info.org_id;
     let effective_role = effective_role(org_id, user_id, role);
 
-    o2_openfga::authorizer::authz::is_allowed(
-        org_id,
+    let args = CheckArgs {
+        org: org_id,
         user_id,
-        &auth_info.method,
-        &object_str,
-        &auth_info.parent_id,
-        &effective_role,
-        auth_info.use_all_org,
-        auth_info.use_self_context,
-        auth_info.use_self_parent,
-    )
-    .await
+        permission: &auth_info.method,
+        object: &object_str,
+        parent_id: &auth_info.parent_id,
+        role: &effective_role,
+        use_all_org: auth_info.use_all_org,
+        use_self_context: auth_info.use_self_context,
+        use_self_parent: auth_info.use_self_parent,
+    };
+    match check_decision(&args, None).await {
+        Ok(allowed) => allowed,
+        Err(err) => {
+            let allowed = offline_check_allows(&args, err);
+            if !allowed {
+                list::record_error_denial(err.into());
+            }
+            allowed
+        }
+    }
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -1665,7 +1735,15 @@ pub async fn readable_related_streams(
     streams: RelatedStreams,
 ) -> Result<RelatedStreams, AuthzUnavailable> {
     let wanted = related_stream_set(&streams);
-    let readable = readable_streams(checker, site, user_id, org_id, wanted).await?;
+    let readable = readable_streams(
+        checker,
+        site,
+        user_id,
+        org_id,
+        wanted,
+        &list::Scope::every(),
+    )
+    .await?;
     Ok(keep_related_streams(streams, readable))
 }
 
@@ -1692,7 +1770,15 @@ pub async fn readable_service_records(
     mut records: Vec<ServiceRecord>,
 ) -> Result<Vec<ServiceRecord>, AuthzUnavailable> {
     let wanted = service_record_set(&mut records);
-    let readable = readable_streams(checker, site, user_id, org_id, wanted).await?;
+    let readable = readable_streams(
+        checker,
+        site,
+        user_id,
+        org_id,
+        wanted,
+        &list::Scope::every(),
+    )
+    .await?;
     Ok(keep_service_records(records, readable))
 }
 
@@ -1833,8 +1919,15 @@ pub(crate) async fn check_each(
                 stream_type,
                 name,
             };
-            let allowed = checker.can_read_stream(user_id, &stream).await;
-            allowed.then_some((stream.stream_type, stream.name))
+            let outcome = list::object_outcome(
+                stream.stream_type,
+                &stream.name,
+                checker.can_read_stream(user_id, &stream),
+            )
+            .await;
+            outcome
+                .allowed()
+                .then_some((stream.stream_type, stream.name))
         })
         .buffer_unordered(16)
         .filter_map(std::future::ready)
@@ -1890,6 +1983,13 @@ fn stream_model(stream_type: StreamType) -> &'static str {
     OFGA_MODELS
         .get(type_str)
         .map_or(type_str, |model| model.key)
+}
+
+/// The answer `key`'s cell already holds; `None` when none is held or one is still in flight.
+#[cfg(feature = "enterprise")]
+fn held_cell<K: Eq + std::hash::Hash, V: Copy>(cells: &SharedAnswers<K, V>, key: &K) -> Option<V> {
+    let cells = cells.lock().unwrap_or_else(|e| e.into_inner());
+    cells.get(key).and_then(|cell| cell.get().copied())
 }
 
 /// The one cell of `key`, so concurrent readers of a key wait on a single Check.
@@ -3438,5 +3538,56 @@ mod tests {
             dropped.is_empty(),
             "off keeps today's deny on a failed Check"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_check_failing_before_it_is_sent_still_records_its_error_denial() {
+        const CHILD: &str = "O2_AUTHZ_NOT_INITIALIZED_CHILD";
+        // The OpenFGA switch is read once per process, so only a child can turn it on.
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "authz::tests::a_check_failing_before_it_is_sent_still_records_its_error_denial",
+                    "--test-threads=1",
+                ])
+                .env(CHILD, "1")
+                .env("O2_OPENFGA_ENABLED", "true")
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(
+                output.status.success() && stdout.contains("1 passed"),
+                "{stdout}\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+        assert!(o2_openfga::config::get_config().enabled);
+        let auth = AuthExtractor {
+            auth: String::new(),
+            method: "GET".to_string(),
+            o2_type: "logs:app".to_string(),
+            org_id: "o1".to_string(),
+            bypass_check: false,
+            parent_id: String::new(),
+            use_all_org: false,
+            use_self_context: false,
+            use_self_parent: true,
+            feature: None,
+        };
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let (allowed, denials) = runtime.block_on(list::error_denials_of(check_permissions(
+            "u1",
+            auth,
+            UserRole::User,
+            false,
+        )));
+        assert!(!allowed);
+        assert_eq!(denials.first(), Some(UnavailableReason::NotInitialized));
     }
 }

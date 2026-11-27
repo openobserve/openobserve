@@ -26,6 +26,7 @@ use axum::{http::StatusCode, response::IntoResponse};
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::service_identity::{
+    access::RumReads,
     aliases,
     api::{self, Context},
 };
@@ -73,7 +74,7 @@ pub async fn envs(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let ctx = match Context::load(&org, &user.user_id, "GET").await {
+        let ctx = match Context::load(&org, &user.user_id, "GET", RumReads::Summaries).await {
             Ok(ctx) => ctx,
             Err(response) => return response,
         };
@@ -120,7 +121,7 @@ pub async fn unresolved(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let ctx = match Context::load(&org, &user.user_id, "GET").await {
+        let ctx = match Context::load(&org, &user.user_id, "GET", RumReads::Summaries).await {
             Ok(ctx) => ctx,
             Err(response) => return response,
         };
@@ -170,7 +171,7 @@ pub async fn overrides(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let ctx = match Context::load(&org, &user.user_id, "GET").await {
+        let ctx = match Context::load(&org, &user.user_id, "GET", RumReads::Summaries).await {
             Ok(ctx) => ctx,
             Err(response) => return response,
         };
@@ -219,7 +220,7 @@ pub async fn put_override(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let ctx = match Context::load(&org, &user.user_id, "PUT").await {
+        let ctx = match Context::load(&org, &user.user_id, "PUT", RumReads::Summaries).await {
             Ok(ctx) => ctx,
             Err(response) => return response,
         };
@@ -265,7 +266,7 @@ pub async fn delete_override(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let ctx = match Context::load(&org, &user.user_id, "PUT").await {
+        let ctx = match Context::load(&org, &user.user_id, "PUT", RumReads::Summaries).await {
             Ok(ctx) => ctx,
             Err(response) => return response,
         };

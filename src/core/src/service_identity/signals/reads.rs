@@ -30,10 +30,14 @@ use infra::{
 };
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_json::{Value, json};
+use tracing::Instrument;
 
 use crate::{
-    authz::list::authz_unavailable_response,
-    service_identity::api::{Context, env_filter_matches, scope_identity, set_scope_identity},
+    authz::list::{AuthzUnavailable, Calls, Outcome, all_of, authz_unavailable_response},
+    service_identity::{
+        access::{evidence_unavailable, org_wide_read},
+        api::{Context, env_filter_matches, scope_identity, set_scope_identity},
+    },
 };
 
 pub async fn verdicts(ctx: &Context, params: &BTreeMap<String, String>) -> Result<Value, Response> {
@@ -102,7 +106,7 @@ pub async fn deploys(ctx: &Context, params: &BTreeMap<String, String>) -> Result
         .all(get_orm_client_rw().await)
         .await
         .map_err(unavailable)?;
-    let mut markers: Vec<Value> = Vec::new();
+    let mut markers = Vec::new();
     for row in rows {
         if !ctx.visible(&row.service_name, &row.where_key) {
             continue;
@@ -113,26 +117,9 @@ pub async fn deploys(ctx: &Context, params: &BTreeMap<String, String>) -> Result
         if !env_filter_matches(&label, params) {
             continue;
         }
-        let authorized = deploy_readable(ctx, &row).await?;
-        let verdict = if !authorized {
-            json!({"restricted":true})
-        } else {
-            match row.verdict_key.as_deref() {
-                Some(key) => {
-                    match table::service_version_verdicts::get(
-                        get_orm_client_rw().await,
-                        &ctx.org,
-                        key,
-                    )
-                    .await
-                    .map_err(unavailable)?
-                    {
-                        Some(verdict) => summary(ctx, &[verdict]).await?,
-                        None => Value::Null,
-                    }
-                }
-                None => Value::Null,
-            }
+        let (verdict, authz_error) = match deploy_verdict(ctx, &row).await? {
+            Ok(verdict) => (verdict, None),
+            Err(error) => (Value::Null, Some(error)),
         };
         let badge = if verdict["restricted"] == true {
             json!("restricted")
@@ -174,43 +161,9 @@ pub async fn deploys(ctx: &Context, params: &BTreeMap<String, String>) -> Result
             marker["previous_last_seen"] = Value::Null;
             marker["overlaps_previous"] = json!(false);
         }
-        markers.push(marker);
+        markers.push((marker, authz_error));
     }
-    let mut merged: Vec<Value> = Vec::new();
-    for marker in markers {
-        if let Some(existing) = merged.iter_mut().find(|other| {
-            other["version"] == marker["version"]
-                && other["image"] == marker["image"]
-                && other["where_key"] == marker["where_key"]
-                && other["kind"] == marker["kind"]
-                && other["from_version"] == marker["from_version"]
-                && other["from_image"] == marker["from_image"]
-                && marker["at"]
-                    .as_i64()
-                    .unwrap_or_default()
-                    .abs_diff(other["at"].as_i64().unwrap_or_default())
-                    <= 600_000_000
-                && !other["regions"]
-                    .as_array()
-                    .expect("regions")
-                    .contains(&marker["regions"][0])
-        }) {
-            existing["regions"]
-                .as_array_mut()
-                .expect("regions")
-                .push(marker["regions"][0].clone());
-            if marker["verdict"]["restricted"] == true
-                || (existing["verdict"]["restricted"] != true
-                    && rank(marker["verdict"]["verdict"].as_str().unwrap_or_default())
-                        > rank(existing["verdict"]["verdict"].as_str().unwrap_or_default()))
-            {
-                existing["verdict"] = marker["verdict"].clone();
-                existing["badge"] = marker["badge"].clone();
-            }
-        } else {
-            merged.push(marker);
-        }
-    }
+    let mut merged = merge_deploy_markers(markers).map_err(evidence_authz_response)?;
     provisional(ctx, params, start, end, &mut merged).await?;
     merged.sort_by(|a, b| {
         a["at"]
@@ -254,12 +207,17 @@ pub async fn enrich_versions(ctx: &Context, versions: &mut [Value]) -> Result<()
             .all(get_orm_client_rw().await)
             .await
             .map_err(unavailable)?;
-        let mut restricted = false;
-        let mut items = Vec::new();
-        for row in rows {
-            restricted |= !deploy_readable(ctx, &row).await?;
-            items.push(json!({"at":row.at,"kind":row.kind,"from_version":row.from_version,"from_image":row.from_image,"cluster":row.cluster,"deploy_key":row.deploy_key}));
-        }
+        let folded = all_of(Calls::Send, &rows, |row, calls| {
+            deploy_outcome(ctx, row, calls)
+        })
+        .await;
+        let restricted = match folded.outcome {
+            Some(Outcome::Error(reason)) => return Err(evidence_authz_response(reason.into())),
+            outcome => outcome != Some(Outcome::Allow),
+        };
+        let items: Vec<_> = rows.iter().map(|row| {
+            json!({"at":row.at,"kind":row.kind,"from_version":row.from_version,"from_image":row.from_image,"cluster":row.cluster,"deploy_key":row.deploy_key})
+        }).collect();
         value["deploys"] = json!(items);
         value["restricted"] = json!(restricted);
     }
@@ -271,7 +229,64 @@ pub async fn enrich_catalog(
     scopes: &mut Vec<Value>,
     params: &BTreeMap<String, String>,
 ) -> Result<(), Response> {
-    filter_catalog(ctx, scopes, params).await?;
+    filter_catalog(ctx, scopes, params)
+        .instrument(tracing::info_span!("authz.filter"))
+        .await?;
+    enrich_catalog_page(ctx, scopes, params)
+        .instrument(tracing::info_span!("enrich"))
+        .await
+}
+
+/// The region's deploy-tracking start and the end of its warm-up; both null until its first rollup.
+pub async fn tracking(org: &str) -> Result<Value, Response> {
+    let epoch = tracking_epoch(org).await?;
+    Ok(json!({"epoch":epoch,"warmup_ends_at":epoch.map(warmup_end)}))
+}
+
+/// The newest serving version; the history or newest one stands while it serves or none does.
+pub fn current_version(
+    shown: Option<VersionImage>,
+    serving: &[&config::meta::service_identity::ServiceVersionRecord],
+) -> Option<VersionImage> {
+    if serving.is_empty()
+        || serving
+            .iter()
+            .any(|row| shown.as_ref() == Some(&row.identity()))
+    {
+        return shown;
+    }
+    serving
+        .iter()
+        .max_by(|a, b| (a.first_seen, &a.version_key).cmp(&(b.first_seen, &b.version_key)))
+        .map(|row| row.identity())
+        .or(shown)
+}
+
+pub fn rank(verdict: &str) -> u8 {
+    match verdict {
+        "regressed" => 5,
+        "not_serving" => 4,
+        "watch" => 3,
+        "insufficient" => 2,
+        "ok" => 1,
+        _ => 0,
+    }
+}
+
+/// The windows the stored verdict last judged; `b` is null until a baseline window was stored.
+pub fn stored_windows(row: &verdicts::Model) -> Value {
+    let b = match (row.baseline_start, row.baseline_end) {
+        (Some(start), Some(end)) => json!({"start_time":start,"end_time":end}),
+        _ => Value::Null,
+    };
+    json!({"a":{"start_time":row.eval_start,"end_time":row.window_end},"b":b})
+}
+
+async fn enrich_catalog_page(
+    ctx: &Context,
+    scopes: &mut Vec<Value>,
+    params: &BTreeMap<String, String>,
+) -> Result<(), Response> {
     let (limit, offset) = crate::service_identity::api::page(params, 100)?;
     *scopes = scopes.drain(..).skip(offset).take(limit).collect();
     for scope in scopes.iter_mut() {
@@ -344,49 +359,53 @@ pub async fn enrich_catalog(
     Ok(())
 }
 
-/// The region's deploy-tracking start and the end of its warm-up; both null until its first rollup.
-pub async fn tracking(org: &str) -> Result<Value, Response> {
-    let epoch = tracking_epoch(org).await?;
-    Ok(json!({"epoch":epoch,"warmup_ends_at":epoch.map(warmup_end)}))
-}
-
-/// The newest serving version; the history or newest one stands while it serves or none does.
-pub fn current_version(
-    shown: Option<VersionImage>,
-    serving: &[&config::meta::service_identity::ServiceVersionRecord],
-) -> Option<VersionImage> {
-    if serving.is_empty()
-        || serving
-            .iter()
-            .any(|row| shown.as_ref() == Some(&row.identity()))
-    {
-        return shown;
+fn merge_deploy_markers(
+    markers: Vec<(Value, Option<AuthzUnavailable>)>,
+) -> Result<Vec<Value>, AuthzUnavailable> {
+    let mut merged: Vec<(Value, Option<AuthzUnavailable>)> = Vec::new();
+    for (marker, error) in markers {
+        if let Some((existing, existing_error)) = merged.iter_mut().find(|(other, _)| {
+            other["version"] == marker["version"]
+                && other["image"] == marker["image"]
+                && other["where_key"] == marker["where_key"]
+                && other["kind"] == marker["kind"]
+                && other["from_version"] == marker["from_version"]
+                && other["from_image"] == marker["from_image"]
+                && marker["at"]
+                    .as_i64()
+                    .unwrap_or_default()
+                    .abs_diff(other["at"].as_i64().unwrap_or_default())
+                    <= 600_000_000
+                && !other["regions"]
+                    .as_array()
+                    .expect("regions")
+                    .contains(&marker["regions"][0])
+        }) {
+            existing["regions"]
+                .as_array_mut()
+                .expect("regions")
+                .push(marker["regions"][0].clone());
+            if marker["verdict"]["restricted"] == true
+                || (existing["verdict"]["restricted"] != true
+                    && rank(marker["verdict"]["verdict"].as_str().unwrap_or_default())
+                        > rank(existing["verdict"]["verdict"].as_str().unwrap_or_default()))
+            {
+                existing["verdict"] = marker["verdict"].clone();
+                existing["badge"] = marker["badge"].clone();
+            }
+            if existing["verdict"]["restricted"] == true {
+                *existing_error = None;
+            } else if existing_error.is_none() {
+                *existing_error = error;
+            }
+        } else {
+            merged.push((marker, error));
+        }
     }
-    serving
-        .iter()
-        .max_by(|a, b| (a.first_seen, &a.version_key).cmp(&(b.first_seen, &b.version_key)))
-        .map(|row| row.identity())
-        .or(shown)
-}
-
-pub fn rank(verdict: &str) -> u8 {
-    match verdict {
-        "regressed" => 5,
-        "not_serving" => 4,
-        "watch" => 3,
-        "insufficient" => 2,
-        "ok" => 1,
-        _ => 0,
-    }
-}
-
-/// The windows the stored verdict last judged; `b` is null until a baseline window was stored.
-pub fn stored_windows(row: &verdicts::Model) -> Value {
-    let b = match (row.baseline_start, row.baseline_end) {
-        (Some(start), Some(end)) => json!({"start_time":start,"end_time":end}),
-        _ => Value::Null,
-    };
-    json!({"a":{"start_time":row.eval_start,"end_time":row.window_end},"b":b})
+    merged
+        .into_iter()
+        .map(|(marker, error)| error.map_or(Ok(marker), Err))
+        .collect()
 }
 
 async fn summarize(
@@ -394,6 +413,16 @@ async fn summarize(
     rows: &[verdicts::Model],
     details: bool,
 ) -> Result<Value, Response> {
+    summarize_outcome(ctx, rows, details)
+        .await?
+        .map_err(evidence_authz_response)
+}
+
+async fn summarize_outcome(
+    ctx: &Context,
+    rows: &[verdicts::Model],
+    details: bool,
+) -> Result<Result<Value, AuthzUnavailable>, Response> {
     let mut latest: BTreeMap<&str, &verdicts::Model> = BTreeMap::new();
     for row in rows {
         let stored = latest.entry(&row.cluster).or_insert(row);
@@ -414,33 +443,52 @@ async fn summarize(
             .then(a.last_evaluated_at.cmp(&b.last_evaluated_at))
             .then_with(|| b.verdict_key.cmp(&a.verdict_key))
     }) else {
-        return Ok(Value::Null);
+        return Ok(Ok(Value::Null));
     };
-    let admin = crate::service_identity::access::org_wide_read(&ctx.org, &ctx.user).await;
-    for evidence in &rows {
-        let streams: Vec<String> =
-            serde_json::from_str(&evidence.source_streams).map_err(unavailable)?;
-        if streams.is_empty()
-            || !ctx
-                .readable
-                .evidence(
+    let admin = org_wide_read(&ctx.org, &ctx.user).await;
+    let mut parse_error = None;
+    let folded = all_of(Calls::Send, &rows, |evidence, calls| {
+        let streams = match serde_json::from_str::<Vec<String>>(&evidence.source_streams) {
+            Ok(streams) => streams,
+            Err(error) => {
+                parse_error = Some(error);
+                Vec::new()
+            }
+        };
+        async move {
+            if streams.is_empty() {
+                return Some(Outcome::Deny);
+            }
+            ctx.readable
+                .evidence_outcome(
                     &ctx.org,
                     &ctx.user,
                     &streams,
                     evidence.source_streams_overflow,
                     admin,
                     &ctx.evidence,
+                    calls,
                 )
                 .await
-                .map_err(authz_unavailable_response)?
-        {
+        }
+    })
+    .await;
+    if let Some(err) = parse_error {
+        return Err(unavailable(err));
+    }
+    match folded.outcome {
+        Some(Outcome::Error(reason)) => return Ok(Err(reason.into())),
+        Some(Outcome::Allow) => (),
+        Some(Outcome::Deny) | None => {
             let mut restricted = json!({"verdict_key":row.verdict_key,"version_key":row.version_key,"service":row.service_name,"where_key":row.where_key,"version":row.version,"image":row.image,"restricted":true});
             count_verdict_images(row, &mut restricted).await?;
-            return Ok(restricted);
+            return Ok(Ok(restricted));
         }
     }
     if !details {
-        return Ok(json!({"verdict":row.verdict,"state":row.state,"reason_code":row.reason_code}));
+        return Ok(Ok(
+            json!({"verdict":row.verdict,"state":row.state,"reason_code":row.reason_code}),
+        ));
     }
     let deploy =
         table::service_version_deploys::get(get_orm_client_rw().await, &ctx.org, &row.deploy_key)
@@ -479,7 +527,7 @@ async fn summarize(
         Err(err) => return Err(unavailable(err)),
     };
     count_verdict_images(row, &mut result).await?;
-    Ok(result)
+    Ok(Ok(result))
 }
 
 async fn version_rows(
@@ -557,25 +605,50 @@ async fn count_verdict_images(row: &verdicts::Model, result: &mut Value) -> Resu
     Ok(())
 }
 
-async fn deploy_readable(ctx: &Context, row: &deploys::Model) -> Result<bool, Response> {
+async fn deploy_verdict(
+    ctx: &Context,
+    row: &deploys::Model,
+) -> Result<Result<Value, AuthzUnavailable>, Response> {
+    match deploy_outcome(ctx, row, Calls::Send).await {
+        Some(Outcome::Allow) => (),
+        Some(Outcome::Error(reason)) => return Ok(Err(reason.into())),
+        Some(Outcome::Deny) | None => return Ok(Ok(json!({"restricted":true}))),
+    }
+    let Some(key) = row.verdict_key.as_deref() else {
+        return Ok(Ok(Value::Null));
+    };
+    let verdict = table::service_version_verdicts::get(get_orm_client_rw().await, &ctx.org, key)
+        .await
+        .map_err(unavailable)?;
+    match verdict {
+        Some(verdict) => summarize_outcome(ctx, &[verdict], true).await,
+        None => Ok(Ok(Value::Null)),
+    }
+}
+
+async fn deploy_outcome(ctx: &Context, row: &deploys::Model, calls: Calls) -> Option<Outcome> {
     let Ok(streams) = serde_json::from_str::<Vec<String>>(&row.source_streams) else {
-        return Ok(false);
+        return Some(Outcome::Deny);
     };
     if streams.is_empty() {
-        return Ok(false);
+        return Some(Outcome::Deny);
     }
-    let admin = crate::service_identity::access::org_wide_read(&ctx.org, &ctx.user).await;
+    let admin = org_wide_read(&ctx.org, &ctx.user).await;
     ctx.readable
-        .evidence(
+        .evidence_outcome(
             &ctx.org,
             &ctx.user,
             &streams,
             row.source_streams_overflow,
             admin,
             &ctx.evidence,
+            calls,
         )
         .await
-        .map_err(authz_unavailable_response)
+}
+
+fn evidence_authz_response(error: AuthzUnavailable) -> Response {
+    authz_unavailable_response(evidence_unavailable(error.reason))
 }
 
 async fn filter_catalog(
@@ -603,6 +676,15 @@ async fn filter_catalog(
     let Some(filter) = params.get("verdict") else {
         return Ok(());
     };
+    let has_version = |key: &str| {
+        ctx.summaries
+            .iter()
+            .any(|row| row.scope_key == key && row.has_version)
+    };
+    if filter.split(',').all(|code| code == "no_version") {
+        scopes.retain(|scope| !has_version(scope["scope_key"].as_str().unwrap_or_default()));
+        return Ok(());
+    }
     let mut candidates: BTreeMap<String, Vec<verdicts::Model>> = BTreeMap::new();
     let mut latest_deploys = BTreeMap::new();
     for batch in scopes.chunks(500) {
@@ -641,11 +723,7 @@ async fn filter_catalog(
     let mut selected = Vec::new();
     for scope in scopes.drain(..) {
         let key = scope["scope_key"].as_str().unwrap_or_default();
-        let code = if !ctx
-            .summaries
-            .iter()
-            .any(|row| row.scope_key == key && row.has_version)
-        {
+        let code = if !has_version(key) {
             json!("no_version")
         } else {
             let shown = verdict_version(&scope, latest_deploys.get(key));
@@ -817,29 +895,27 @@ fn error(status: StatusCode, message: &str) -> Response {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "test-utils")]
+    use config::meta::service_identity::WhereSummaryRecord;
+
     use super::*;
+    #[cfg(feature = "test-utils")]
+    use crate::{
+        authz::{fake_checker, list::ListMode},
+        service_identity::access::{ReadableStreams, RumReads},
+    };
 
     #[cfg(feature = "test-utils")]
     #[tokio::test]
     async fn deploys_answers_503_when_an_evidence_check_fails() {
-        use config::meta::{
-            service_identity::{EnvSource, WhereSummaryRecord},
-            stream::StreamType,
-        };
+        use config::meta::stream::StreamType;
         use sea_orm::IntoActiveModel;
 
-        use crate::{
-            authz::{
-                TypedStream, fake_checker,
-                list::{ListMode, UnavailableReason},
-            },
-            service_identity::access::ReadableStreams,
-        };
+        use crate::authz::{TypedStream, list::UnavailableReason};
 
         let org = format!("deploys_authz_{}", config::utils::time::now_micros());
         let user = "deploys-evidence-failure@example.com";
         let checker = fake_checker();
-        checker.set_list_mode(user, ListMode::On);
         checker.grant_read(
             user,
             &TypedStream {
@@ -848,41 +924,9 @@ mod tests {
                 name: "t1".into(),
             },
         );
-        let summary = WhereSummaryRecord {
-            summary_key: org.clone(),
-            org_id: org.clone(),
-            service_name: "svc".into(),
-            where_key: "default".into(),
-            scope_key: org.clone(),
-            source_stream: "t1".into(),
-            signal: "traces".into(),
-            k8s_cluster: String::new(),
-            k8s_namespace: String::new(),
-            env: "default".into(),
-            env_source: EnvSource::Default,
-            env_source_value: String::new(),
-            envs: Vec::new(),
-            newest_version: "v1".into(),
-            newest_version_key: "v1".into(),
-            newest_first_seen: 1,
-            has_version: true,
-            first_seen: 1,
-            last_seen: 2,
-            purged_versions: 0,
-            updated_at: 2,
-        };
-        let readable = ReadableStreams::load(&org, user, std::slice::from_ref(&summary))
-            .await
-            .unwrap();
-        let ctx = Context {
-            org: org.clone(),
-            user: user.into(),
-            summaries: readable.visible(std::slice::from_ref(&summary)),
-            readable,
-            evidence: Default::default(),
-            identity: Default::default(),
-            aliases: Default::default(),
-        };
+        let summary = deploy_summary(&org);
+        let ctx =
+            evidence_context(&org, user, ListMode::On, 0, std::slice::from_ref(&summary)).await;
         checker.fail_object_check_once(user, UnavailableReason::Server(500));
 
         crate::service_identity::global_tables_for_tests().await;
@@ -914,6 +958,459 @@ mod tests {
             .unwrap();
         let body: Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(body["error_code"], "authz_unavailable");
+    }
+
+    #[cfg(feature = "test-utils")]
+    #[tokio::test]
+    async fn enrich_versions_keeps_a_definite_restriction_without_checking_later_deploys() {
+        use sea_orm::IntoActiveModel;
+
+        use crate::authz::{
+            fake_checker,
+            list::{ModeAnswers, UnavailableReason},
+        };
+
+        let org = format!("versions_authz_{}", config::utils::time::now_micros());
+        let user = "versions-denied-deploy@example.com";
+        let ctx = evidence_context(&org, user, ListMode::On, 0, &[deploy_summary(&org)]).await;
+        assert!(matches!(ctx.readable.answers, ModeAnswers::Serve(_)));
+        let checker = fake_checker();
+        let failing_stream = "x".repeat(300);
+        checker.fail_object_check_of(user, &failing_stream, UnavailableReason::Timeout);
+        let denied = deploys::Model {
+            deploy_key: format!("{org}-denied"),
+            org_id: org.clone(),
+            to_version_key: "v1".into(),
+            at: 2,
+            source_streams: json!(["traces/denied"]).to_string(),
+            ..Default::default()
+        };
+        let failing = deploys::Model {
+            deploy_key: format!("{org}-failing"),
+            at: 1,
+            source_streams: json!([format!("logs/{failing_stream}")]).to_string(),
+            ..denied.clone()
+        };
+
+        crate::service_identity::global_tables_for_tests().await;
+        let conn = get_orm_client_rw().await;
+        deploys::Entity::insert_many(
+            [denied.clone(), failing.clone()].map(IntoActiveModel::into_active_model),
+        )
+        .exec_without_returning(conn)
+        .await
+        .unwrap();
+
+        let before = checker.calls(user);
+        let mut versions = [json!({"version_key":"v1"})];
+        enrich_versions(&ctx, &mut versions).await.unwrap();
+        assert_eq!(versions[0]["restricted"], true);
+        assert_eq!(versions[0]["deploys"][0]["deploy_key"], denied.deploy_key);
+        assert_eq!(versions[0]["deploys"][1]["deploy_key"], failing.deploy_key);
+        assert_eq!(checker.calls(user), before);
+        assert_eq!(
+            deploy_outcome(&ctx, &failing, Calls::Send).await,
+            Some(Outcome::Error(UnavailableReason::Timeout))
+        );
+    }
+
+    #[cfg(feature = "test-utils")]
+    #[tokio::test]
+    async fn summary_keeps_a_later_definite_restriction_after_an_evidence_error() {
+        use crate::authz::{
+            fake_checker,
+            list::{ModeAnswers, SMALL_REQUEST_OBJECTS},
+        };
+
+        let org = format!("verdict_authz_{}", config::utils::time::now_micros());
+        let user = "verdict-denied-evidence@example.com";
+        let ctx = on_evidence_context(&org, user, SMALL_REQUEST_OBJECTS).await;
+        assert!(matches!(ctx.readable.answers, ModeAnswers::SmallOn));
+        let checker = fake_checker();
+        assert_eq!(
+            ctx.readable
+                .evidence(
+                    &org,
+                    user,
+                    &["traces/denied".into()],
+                    false,
+                    false,
+                    &ctx.evidence
+                )
+                .await,
+            Ok(false)
+        );
+        checker.fail_stream_read_once(user, "app");
+        let failing = verdicts::Model {
+            verdict_key: format!("{org}-failing"),
+            org_id: org.clone(),
+            cluster: "a".into(),
+            source_streams: json!(["traces/app"]).to_string(),
+            ..Default::default()
+        };
+        let denied = verdicts::Model {
+            verdict_key: format!("{org}-denied"),
+            cluster: "b".into(),
+            source_streams: json!(["traces/denied"]).to_string(),
+            ..failing.clone()
+        };
+
+        crate::service_identity::global_tables_for_tests().await;
+        let before = checker.calls(user);
+        let result = summary(&ctx, &[failing, denied]).await.unwrap();
+        assert_eq!(result["restricted"], true);
+        let after = checker.calls(user);
+        assert_eq!(after.streams - before.streams, 1);
+        assert_eq!((after.types_access, after.lists), (0, 0));
+    }
+
+    #[cfg(feature = "test-utils")]
+    #[tokio::test]
+    async fn summary_returns_a_reached_parse_error_after_an_evidence_error() {
+        use crate::authz::list::SMALL_REQUEST_OBJECTS;
+
+        let org = "malformed_verdict_sources";
+        let user = "malformed-verdict-sources@example.com";
+        let ctx = on_evidence_context(org, user, SMALL_REQUEST_OBJECTS).await;
+        let checker = fake_checker();
+        checker.fail_stream_read_once(user, "app");
+        let failing = verdicts::Model {
+            org_id: org.into(),
+            cluster: "a".into(),
+            source_streams: json!(["traces/app"]).to_string(),
+            ..Default::default()
+        };
+        let malformed = verdicts::Model {
+            cluster: "b".into(),
+            source_streams: "{".into(),
+            ..failing.clone()
+        };
+        let before = checker.calls(user);
+        let response = summary(&ctx, &[failing, malformed]).await.unwrap_err();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(!response.headers().contains_key("x-o2-authz"));
+        assert_eq!(checker.calls(user).streams - before.streams, 1);
+    }
+
+    #[cfg(feature = "test-utils")]
+    #[tokio::test]
+    async fn small_on_versions_stop_checks_at_the_first_error_or_denial() {
+        use sea_orm::IntoActiveModel;
+
+        use crate::authz::list::{ModeAnswers, SMALL_REQUEST_OBJECTS};
+
+        crate::service_identity::global_tables_for_tests().await;
+        let conn = get_orm_client_rw().await;
+        let checker = fake_checker();
+        let run = config::utils::time::now_micros();
+        for newer_fails in [true, false] {
+            let org = format!("small_versions_authz_{run}_{newer_fails}");
+            let on_user = format!("small-versions-on-{newer_fails}@example.com");
+            let off_user = format!("small-versions-off-{newer_fails}@example.com");
+            let on = on_evidence_context(&org, &on_user, SMALL_REQUEST_OBJECTS).await;
+            assert!(matches!(on.readable.answers, ModeAnswers::SmallOn));
+            let off = evidence_context(&org, &off_user, ListMode::Off, 0, &[]).await;
+            let (newer_source, older_source) = if newer_fails {
+                ("logs/failing", "logs/denied")
+            } else {
+                ("logs/denied", "logs/failing")
+            };
+            let newer = deploys::Model {
+                deploy_key: format!("{org}-newer"),
+                org_id: org.clone(),
+                to_version_key: "v1".into(),
+                at: 2,
+                source_streams: json!([newer_source]).to_string(),
+                ..Default::default()
+            };
+            let older = deploys::Model {
+                deploy_key: format!("{org}-older"),
+                at: 1,
+                source_streams: json!([older_source]).to_string(),
+                ..newer.clone()
+            };
+            deploys::Entity::insert_many([newer, older].map(IntoActiveModel::into_active_model))
+                .exec_without_returning(conn)
+                .await
+                .unwrap();
+            for user in [&on_user, &off_user] {
+                checker.fail_stream_read_once(user, "failing");
+            }
+
+            let mut on_versions = [json!({"version_key":"v1"})];
+            let mut off_versions = on_versions.clone();
+            let before = checker.calls(&on_user);
+            let result = enrich_versions(&on, &mut on_versions).await;
+            enrich_versions(&off, &mut off_versions).await.unwrap();
+            assert_eq!(off_versions[0]["restricted"], true);
+            assert_eq!(off_versions[0]["deploys"].as_array().unwrap().len(), 2);
+            if newer_fails {
+                let response = result.unwrap_err();
+                assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+                assert_eq!(response.headers()["x-o2-authz"], "unavailable");
+            } else {
+                result.unwrap();
+                assert_eq!(on_versions, off_versions);
+            }
+            let after = checker.calls(&on_user);
+            assert_eq!(
+                after.streams - before.streams,
+                1,
+                "only the newer deploy needs a Check"
+            );
+            assert_eq!(after, checker.calls(&off_user));
+        }
+    }
+
+    #[cfg(feature = "test-utils")]
+    #[tokio::test]
+    async fn deploys_merges_region_restrictions_before_surfacing_evidence_errors() {
+        use config::meta::stream::StreamType;
+        use sea_orm::IntoActiveModel;
+
+        use crate::authz::{TypedStream, list::UnavailableReason};
+
+        crate::service_identity::global_tables_for_tests().await;
+        infra::db::get_db().await.create_table().await.unwrap();
+        let conn = get_orm_client_rw().await;
+        let checker = fake_checker();
+        let params = BTreeMap::from([("service".into(), "svc".into())]);
+        let failing = "x".repeat(300);
+        let run = config::utils::time::now_micros();
+        for (sibling_readable, failure_in_verdict) in
+            [(false, false), (true, false), (false, true), (true, true)]
+        {
+            let case = format!("{sibling_readable}_{failure_in_verdict}");
+            let org = format!("merged_deploy_{run}_{case}");
+            let user = format!("merged-deploy-on-{case}@example.com");
+            let off_user = format!("merged-deploy-off-{case}@example.com");
+            for user in [&user, &off_user] {
+                checker.grant_read(
+                    user,
+                    &TypedStream {
+                        org_id: org.clone(),
+                        stream_type: StreamType::Traces,
+                        name: "t1".into(),
+                    },
+                );
+            }
+            let summary = deploy_summary(&org);
+            let rows = std::slice::from_ref(&summary);
+            let ctx = evidence_context(&org, &user, ListMode::On, 0, rows).await;
+            let off = evidence_context(&org, &off_user, ListMode::Off, 0, rows).await;
+            checker.fail_object_check_of(&user, &failing, UnavailableReason::Timeout);
+            checker.fail_stream_read_once(&off_user, &failing);
+            let failing_sources = json!([format!("logs/{failing}")]).to_string();
+            let first = deploys::Model {
+                deploy_key: format!("{org}-a"),
+                org_id: org,
+                service_name: summary.service_name,
+                where_key: summary.where_key,
+                scope_key: summary.scope_key,
+                cluster: "a".into(),
+                to_version: "v1".into(),
+                to_version_key: "v1".into(),
+                kind: "deploy".into(),
+                at: 1,
+                source_streams: if failure_in_verdict {
+                    json!(["traces/t1"]).to_string()
+                } else {
+                    failing_sources.clone()
+                },
+                verdict_key: failure_in_verdict.then(|| format!("verdict-{}", ctx.org)),
+                ..Default::default()
+            };
+            let sibling = if sibling_readable {
+                "traces/t1"
+            } else {
+                "traces/denied"
+            };
+            let second = deploys::Model {
+                deploy_key: format!("{}-b", first.org_id),
+                cluster: "b".into(),
+                at: first.at + 599_000_000,
+                source_streams: json!([sibling]).to_string(),
+                verdict_key: None,
+                ..first.clone()
+            };
+            if let Some(key) = &first.verdict_key {
+                verdicts::Entity::insert(
+                    verdicts::Model {
+                        verdict_key: key.clone(),
+                        org_id: first.org_id.clone(),
+                        deploy_key: first.deploy_key.clone(),
+                        service_name: first.service_name.clone(),
+                        where_key: first.where_key.clone(),
+                        scope_key: first.scope_key.clone(),
+                        cluster: first.cluster.clone(),
+                        deploy_kind: first.kind.clone(),
+                        verdict: "insufficient".into(),
+                        state: "frozen".into(),
+                        signal: "traces".into(),
+                        baseline_rule: "none".into(),
+                        baseline_rule_initial: "none".into(),
+                        reason_code: "below_min_count".into(),
+                        source_streams: failing_sources,
+                        ..Default::default()
+                    }
+                    .into_active_model(),
+                )
+                .exec_without_returning(conn)
+                .await
+                .unwrap();
+            }
+            deploys::Entity::insert_many([first, second].map(IntoActiveModel::into_active_model))
+                .exec_without_returning(conn)
+                .await
+                .unwrap();
+
+            let result = deploys(&ctx, &params).await;
+            if sibling_readable {
+                let response = result.unwrap_err();
+                assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+                assert_eq!(response.headers()["x-o2-authz"], "unavailable");
+            } else {
+                let answer = result.unwrap();
+                assert_eq!(answer["deploys"].as_array().unwrap().len(), 1);
+                assert_eq!(answer["deploys"][0]["regions"], json!(["a", "b"]));
+                assert_eq!(answer["deploys"][0]["verdict"], json!({"restricted":true}));
+                assert_eq!(answer, deploys(&off, &params).await.unwrap());
+            }
+            assert_eq!(checker.calls(&user).object_checks, 1);
+        }
+    }
+
+    #[cfg(feature = "test-utils")]
+    #[tokio::test]
+    async fn catalog_no_version_skips_excluded_verdict_evidence() {
+        use config::meta::stream::StreamType;
+        use sea_orm::IntoActiveModel;
+
+        use crate::authz::{TypedStream, list::SMALL_REQUEST_OBJECTS};
+
+        crate::service_identity::global_tables_for_tests().await;
+        infra::db::get_db().await.create_table().await.unwrap();
+        let org = format!("catalog_no_version_{}", config::utils::time::now_micros());
+        let user = "catalog-no-version-authz@example.com";
+        let checker = fake_checker();
+        checker.grant_read(
+            user,
+            &TypedStream {
+                org_id: org.clone(),
+                stream_type: StreamType::Traces,
+                name: "t1".into(),
+            },
+        );
+        let versioned = deploy_summary(&org);
+        let unversioned = WhereSummaryRecord {
+            scope_key: format!("{org}-unversioned"),
+            has_version: false,
+            ..versioned.clone()
+        };
+        let scopes = vec![
+            json!({"scope_key": versioned.scope_key, "newest_version": "v1"}),
+            json!({"scope_key": unversioned.scope_key}),
+        ];
+        let ctx = evidence_context(
+            &org,
+            user,
+            ListMode::On,
+            SMALL_REQUEST_OBJECTS,
+            &[versioned, unversioned],
+        )
+        .await;
+        verdicts::Entity::insert(
+            verdicts::Model {
+                verdict_key: org.clone(),
+                org_id: org.clone(),
+                scope_key: org,
+                version: "v1".into(),
+                verdict: "ok".into(),
+                source_streams: json!(["traces/verdict_evidence"]).to_string(),
+                ..Default::default()
+            }
+            .into_active_model(),
+        )
+        .exec_without_returning(get_orm_client_rw().await)
+        .await
+        .unwrap();
+        checker.fail_stream_read_once(user, "verdict_evidence");
+        let before = checker.calls(user);
+        let mut filtered = scopes.clone();
+        let params = |verdict: &str| BTreeMap::from([("verdict".into(), verdict.into())]);
+
+        filter_catalog(&ctx, &mut filtered, &params("no_version"))
+            .await
+            .unwrap();
+        assert_eq!(filtered, scopes[1..]);
+        assert_eq!(checker.calls(user), before);
+
+        let mut mixed = scopes;
+        let response = filter_catalog(&ctx, &mut mixed, &params("no_version,ok"))
+            .await
+            .unwrap_err();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers()["x-o2-authz"], "unavailable");
+        assert_eq!(checker.calls(user).streams, before.streams + 1);
+    }
+
+    #[cfg(feature = "test-utils")]
+    async fn on_evidence_context(org: &str, user: &str, cutoff: usize) -> Context {
+        evidence_context(org, user, ListMode::On, cutoff, &[]).await
+    }
+
+    #[cfg(feature = "test-utils")]
+    async fn evidence_context(
+        org: &str,
+        user: &str,
+        mode: ListMode,
+        cutoff: usize,
+        summaries: &[WhereSummaryRecord],
+    ) -> Context {
+        let checker = fake_checker();
+        checker.set_list_mode(user, mode);
+        checker.set_small_request_objects(user, cutoff);
+        let readable = ReadableStreams::load(org, user, summaries, RumReads::Summaries)
+            .await
+            .unwrap();
+        Context {
+            org: org.into(),
+            user: user.into(),
+            summaries: readable.visible(summaries),
+            readable,
+            evidence: Default::default(),
+            identity: Default::default(),
+            aliases: Default::default(),
+        }
+    }
+
+    #[cfg(feature = "test-utils")]
+    fn deploy_summary(org: &str) -> WhereSummaryRecord {
+        use config::meta::service_identity::EnvSource;
+
+        WhereSummaryRecord {
+            summary_key: org.into(),
+            org_id: org.into(),
+            service_name: "svc".into(),
+            where_key: "default".into(),
+            scope_key: org.into(),
+            source_stream: "t1".into(),
+            signal: "traces".into(),
+            k8s_cluster: String::new(),
+            k8s_namespace: String::new(),
+            env: "default".into(),
+            env_source: EnvSource::Default,
+            env_source_value: String::new(),
+            envs: Vec::new(),
+            newest_version: "v1".into(),
+            newest_version_key: "v1".into(),
+            newest_first_seen: 1,
+            has_version: true,
+            first_seen: 1,
+            last_seen: 2,
+            purged_versions: 0,
+            updated_at: 2,
+        }
     }
 
     #[test]

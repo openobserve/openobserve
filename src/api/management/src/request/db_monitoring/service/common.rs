@@ -22,9 +22,9 @@ use config::utils::time::validate_time_range;
 use openobserve_core::authz::{
     StreamAccessChecker,
     list::{
-        AuthzUnavailable, LegacyChecks, ObjectRef, ObjectsQuery, OrgWideCheck, SITE_DB_MONITORING,
-        StreamSet, TodayChecks, authz_unavailable_response, legacy_readable_streams,
-        objects_in_mode, stream_read_query,
+        AuthzUnavailable, LegacyChecks, ObjectRef, ObjectsQuery, OrgWideCheck, Scope, StreamSet,
+        TodayChecks, authz_unavailable_response, db_monitoring_query, legacy_readable_streams,
+        objects_in_mode,
     },
 };
 use openobserve_core::http::map_error_to_http_response;
@@ -1102,7 +1102,7 @@ pub(super) async fn involved_streams(
         involved_readable(
             checker.as_ref(),
             &TodayChecks,
-            &involved_read_query(org_id, user_id, &stream_types),
+            &db_monitoring_query(org_id, user_id, &stream_types),
             streams,
             get_openfga_config().enabled,
         )
@@ -2251,19 +2251,7 @@ pub(super) async fn server_prologue(org_id: &str, user_id: &str) -> Option<DbmSe
 }
 
 #[cfg(feature = "enterprise")]
-fn involved_read_query<'a>(
-    org_id: &'a str,
-    user_id: &'a str,
-    stream_types: &'a [StreamType],
-) -> ObjectsQuery<'a> {
-    ObjectsQuery {
-        prelude: Some(DBM_MODULE_READ_CHECK),
-        ..stream_read_query(SITE_DB_MONITORING, org_id, user_id, stream_types)
-    }
-}
-
-#[cfg(feature = "enterprise")]
-async fn involved_readable(
+pub(crate) async fn involved_readable(
     checker: &dyn StreamAccessChecker,
     checks: &dyn LegacyChecks,
     query: &ObjectsQuery<'_>,
@@ -2278,8 +2266,8 @@ async fn involved_readable(
         .iter()
         .map(|name| ObjectRef::stream(stream_type, name))
         .collect();
-    let readable = objects_in_mode(checker, query, &objects, || {
-        legacy_involved_readable(checker, checks, query, &streams, openfga_enabled)
+    let readable = objects_in_mode(checker, query, &objects, &Scope::every(), |objects| {
+        legacy_involved_readable(checker, checks, query, objects, openfga_enabled)
     })
     .await?;
     Ok(streams
@@ -2297,7 +2285,7 @@ async fn legacy_involved_readable(
     checker: &dyn StreamAccessChecker,
     checks: &dyn LegacyChecks,
     query: &ObjectsQuery<'_>,
-    streams: &[String],
+    objects: Vec<ObjectRef<'_>>,
     openfga_enabled: bool,
 ) -> Option<StreamSet> {
     if !openfga_enabled
@@ -2307,10 +2295,9 @@ async fn legacy_involved_readable(
     {
         return None;
     }
-    let stream_type = required_stream_for(DbmVantage::Client);
-    let wanted = streams
-        .iter()
-        .map(|name| (stream_type, name.clone()))
+    let wanted = objects
+        .into_iter()
+        .map(|object| (object.stream_type, object.id.to_string()))
         .collect();
     legacy_readable_streams(checker, query.user_id, query.org_id, wanted).await
 }
@@ -2339,15 +2326,24 @@ mod tests {
     #[cfg(feature = "enterprise")]
     mod involved_streams_authz {
         use openobserve_core::authz::{
-            FakeStreamChecker, TypedStream,
-            list::{Bypass, CheckerChecks, Identity, ListMode, UnavailableReason},
+            FakeStreamChecker, TypedStream, fake_checker,
+            list::{
+                Bypass, CheckerChecks, Identity, ListMode, SITE_DB_MONITORING, UnavailableReason,
+            },
             within_budget,
         };
 
         use super::*;
+        use crate::request::service_streams::tests::{
+            SHADOW_TESTS, assert_authz_unavailable, shadow_list_counts,
+        };
 
         const ORG: &str = "dbm-list-org";
         const TYPES: [StreamType; 1] = [required_stream_for(DbmVantage::Client)];
+        const DBM_PRELUDE_CALLS: u32 = 1;
+        const SHARED_C_PROBE: u32 = 1;
+        const B_PROBES_AND_LIST: u32 = 2 + 1;
+        const LIST_CALL_CAP: u32 = DBM_PRELUDE_CALLS + SHARED_C_PROBE + B_PROBES_AND_LIST;
 
         fn streams() -> Vec<String> {
             ["allowed", "denied"].map(String::from).to_vec()
@@ -2372,7 +2368,7 @@ mod tests {
             involved_readable(
                 fake,
                 &CheckerChecks(fake),
-                &involved_read_query(ORG, user, &TYPES),
+                &db_monitoring_query(ORG, user, &TYPES),
                 streams,
                 true,
             )
@@ -2381,7 +2377,7 @@ mod tests {
 
         #[test]
         fn involved_query_matches_the_live_stream_check() {
-            let query = involved_read_query(ORG, "user", &TYPES);
+            let query = db_monitoring_query(ORG, "user", &TYPES);
             assert_eq!(query.permission, "GET");
             assert_eq!(query.identity, Identity::StoredEmail);
             assert_eq!(query.bypass, Bypass::RbacOffRootOrOrgAdmin);
@@ -2393,6 +2389,7 @@ mod tests {
 
         #[tokio::test]
         async fn empty_stream_set_sends_no_call_in_any_mode() {
+            let _slot = SHADOW_TESTS.lock().await;
             for (user, mode) in [
                 ("dbm-empty-off", ListMode::Off),
                 ("dbm-empty-shadow", ListMode::Shadow),
@@ -2466,7 +2463,10 @@ mod tests {
 
         #[tokio::test]
         async fn shadow_keeps_legacy_when_new_path_disagrees_or_fails() {
+            let _slot = SHADOW_TESTS.lock().await;
             for failed in [false, true] {
+                let (compared, mismatches) =
+                    shadow_list_counts(SITE_DB_MONITORING, StreamType::Traces);
                 let fake = FakeStreamChecker::default();
                 let user = "dbm-shadow";
                 grant(&fake, user);
@@ -2481,6 +2481,11 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(actual, vec!["allowed"]);
+                let expected_delta = u64::from(!failed);
+                assert_eq!(
+                    shadow_list_counts(SITE_DB_MONITORING, StreamType::Traces),
+                    (compared + expected_delta, mismatches + expected_delta),
+                );
             }
         }
 
@@ -2494,7 +2499,7 @@ mod tests {
                 involved_readable(
                     &fake,
                     &CheckerChecks(&fake),
-                    &involved_read_query(ORG, user, &TYPES),
+                    &db_monitoring_query(ORG, user, &TYPES),
                     names.clone(),
                     false,
                 ),
@@ -2554,7 +2559,7 @@ mod tests {
             grant(&fake, user);
             let mut names = vec!["allowed".to_string()];
             names.extend((0..2000).map(|i| format!("denied_{i}")));
-            let actual = within_budget(5, readable(&fake, user, names))
+            let actual = within_budget(LIST_CALL_CAP, readable(&fake, user, names))
                 .await
                 .unwrap();
             assert_eq!(actual, vec!["allowed"]);
@@ -2592,12 +2597,12 @@ mod tests {
                     }
                     "list" => {
                         fake.fail_list_once(user, reason);
-                        5
+                        LIST_CALL_CAP
                     }
                     "object" => {
                         fake.fail_object_check_once(user, reason);
                         names.push("x".repeat(300));
-                        6
+                        LIST_CALL_CAP + 1
                     }
                     _ => unreachable!(),
                 };
@@ -2605,14 +2610,60 @@ mod tests {
                     .await
                     .unwrap_err();
                 assert_eq!(err.reason, reason, "{failure}");
-                let response = authz_unavailable_response(err);
-                assert_eq!(
-                    response.status(),
-                    axum::http::StatusCode::SERVICE_UNAVAILABLE
-                );
-                assert_eq!(response.headers()["x-o2-authz"], "unavailable");
-                assert_eq!(response.headers()["retry-after"], "3");
             }
+        }
+
+        #[tokio::test]
+        async fn databases_handler_returns_typed_503_on_inferred_stream_list_failure() {
+            use axum::extract::{Path, Query};
+            use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache, insert_latest, remove_latest};
+            use openobserve_api_common::extractors::Headers;
+            use openobserve_core::auth::UserEmail;
+
+            use crate::request::{
+                db_monitoring::handler::get_dbm_databases, security::tests::meta_store,
+            };
+
+            meta_store().await;
+            let org = format!("dbm-outage-{}", config::ider::uuid());
+            let user = format!("{org}@example.com");
+            let schema_key = format!("{org}/traces/inferred");
+            {
+                let mut w = STREAM_SCHEMAS_LATEST.write().await;
+                insert_latest(
+                    &mut w,
+                    schema_key.clone(),
+                    SchemaCache::new(arrow_schema::Schema::empty()),
+                );
+            }
+
+            let fake = fake_checker();
+            fake.set_list_mode(&user, ListMode::On);
+            fake.fail_list_once(&user, UnavailableReason::Timeout);
+            let response = get_dbm_databases(
+                Path(org),
+                Headers(UserEmail {
+                    user_id: user.clone(),
+                }),
+                Query(DatabasesQuery {
+                    start_time: None,
+                    end_time: None,
+                    stream: None,
+                    system: None,
+                    service: None,
+                    baseline_start_time: None,
+                    baseline_end_time: None,
+                    include_breakdown: None,
+                }),
+            )
+            .await;
+
+            {
+                let mut w = STREAM_SCHEMAS_LATEST.write().await;
+                remove_latest(&mut w, &schema_key);
+            }
+            assert_eq!(fake.calls(&user).lists, 1);
+            assert_authz_unavailable(response).await;
         }
     }
 

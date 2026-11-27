@@ -31,8 +31,9 @@ use config::{
 use infra::{db::get_orm_client_rw, table::service_versions};
 use o2_enterprise::enterprise::service_identity::infer::{self, InferredEnv, WhereIdentity};
 use serde_json::{Value, json};
+use tracing::Instrument;
 
-use super::access::{self, ReadableStreams};
+use super::access::{self, ReadableStreams, RumReads};
 
 // The env picker counts only scopes seen in the last 7 days.
 const ENV_WINDOW_US: i64 = 7 * 86_400_000_000;
@@ -48,20 +49,36 @@ pub struct Context {
 }
 
 impl Context {
-    pub async fn load(org: &str, user: &str, method: &str) -> Result<Self, Response> {
-        if !access::endpoint(org, user, method).await {
+    #[tracing::instrument(name = "service_identity.context", skip_all)]
+    pub async fn load(
+        org: &str,
+        user: &str,
+        method: &str,
+        rum_reads: RumReads,
+    ) -> Result<Self, Response> {
+        let authz = tracing::info_span!("authz.filter");
+        if !access::endpoint(org, user, method)
+            .instrument(authz.clone())
+            .await
+        {
             return Err(error(StatusCode::FORBIDDEN, "Unauthorized Access"));
         }
+        let load = tracing::info_span!("db.load");
         let summaries = db::service_identity::get_cached_summaries(org)
+            .instrument(load.clone())
             .await
             .map_err(unavailable)?;
-        let readable = ReadableStreams::load(org, user, &summaries)
+        let readable = ReadableStreams::load(org, user, &summaries, rum_reads)
+            .instrument(authz.clone())
             .await
             .map_err(crate::authz::list::authz_unavailable_response)?;
-        let summaries = readable.visible(&summaries);
-        let overrides = infra::table::service_identity_rules::list(get_orm_client_rw().await, org)
-            .await
-            .map_err(unavailable)?;
+        let summaries = authz.in_scope(|| readable.visible(&summaries));
+        let overrides = async {
+            infra::table::service_identity_rules::list(get_orm_client_rw().await, org).await
+        }
+        .instrument(load.clone())
+        .await
+        .map_err(unavailable)?;
         Ok(Self {
             org: org.to_string(),
             user: user.to_string(),
@@ -70,6 +87,7 @@ impl Context {
             evidence: Default::default(),
             identity: OrgIdentity { overrides },
             aliases: db::service_identity::get_cached_aliases(org)
+                .instrument(load)
                 .await
                 .map_err(unavailable)?,
         })
@@ -351,6 +369,7 @@ pub async fn versions(ctx: &Context, params: &BTreeMap<String, String>) -> Resul
     Ok(response)
 }
 
+#[tracing::instrument(name = "service_identity._services", skip_all)]
 pub async fn catalog(ctx: &Context, params: &BTreeMap<String, String>) -> Result<Value, Response> {
     if params
         .get("signal")
@@ -384,9 +403,12 @@ pub async fn catalog(ctx: &Context, params: &BTreeMap<String, String>) -> Result
         .values()
         .flat_map(|rows| rows.iter().map(|row| row.newest_version_key.clone()))
         .collect();
-    let registry = service_versions::get_by_keys(get_orm_client_rw().await, &ctx.org, &keys)
-        .await
-        .map_err(unavailable)?;
+    let load = tracing::info_span!("db.load");
+    let registry =
+        async { service_versions::get_by_keys(get_orm_client_rw().await, &ctx.org, &keys).await }
+            .instrument(load.clone())
+            .await
+            .map_err(unavailable)?;
     let ranks: BTreeMap<_, _> = registry
         .iter()
         .filter(|row| row.is_live())
@@ -465,22 +487,30 @@ pub async fn catalog(ctx: &Context, params: &BTreeMap<String, String>) -> Result
         .iter()
         .filter_map(|row| row["scope_key"].as_str().map(str::to_string))
         .collect();
-    let active = service_versions::active_by_scopes(
-        get_orm_client_rw().await,
-        &ctx.org,
-        &scope_keys,
-        now_micros() - 900_000_000,
-    )
+    let active = async {
+        service_versions::active_by_scopes(
+            get_orm_client_rw().await,
+            &ctx.org,
+            &scope_keys,
+            now_micros() - 900_000_000,
+        )
+        .await
+    }
+    .instrument(load.clone())
     .await
     .map_err(unavailable)?;
     let verdict_counts = catalog_verdict_counts(&scopes);
     let images = version_images(
-        service_versions::imaged_by_scopes(get_orm_client_rw().await, &ctx.org, &scope_keys)
-            .await
-            .map_err(unavailable)?
-            .iter(),
+        async {
+            service_versions::imaged_by_scopes(get_orm_client_rw().await, &ctx.org, &scope_keys)
+                .await
+        }
+        .instrument(load.clone())
+        .await
+        .map_err(unavailable)?
+        .iter(),
     );
-    for scope in &mut scopes {
+    tracing::info_span!("enrich").in_scope(|| for scope in &mut scopes {
         let serving: Vec<_> = active
             .iter()
             .filter(|row| scope["scope_key"] == row.scope_key)
@@ -529,12 +559,13 @@ pub async fn catalog(ctx: &Context, params: &BTreeMap<String, String>) -> Result
             }
         }
         count_pre_existing_images(scope, &images);
-    }
+    });
     let env_groups = catalog_env_groups(&labels);
     let tracking = super::signals::reads::tracking(&ctx.org).await?;
     let stripped = stripped_versions(
         &ctx.summaries,
-        &service_versions::raw_versions(get_orm_client_rw().await, &ctx.org)
+        &async { service_versions::raw_versions(get_orm_client_rw().await, &ctx.org).await }
+            .instrument(load)
             .await
             .map_err(unavailable)?,
     );
@@ -636,6 +667,7 @@ pub fn previous_version<'a>(
         })
 }
 
+#[tracing::instrument(name = "service_identity.envs", skip_all)]
 pub async fn envs(ctx: &Context, params: &BTreeMap<String, String>) -> Result<Value, Response> {
     let since = now_micros() - ENV_WINDOW_US;
     let rows: Vec<_> = ctx
@@ -647,16 +679,19 @@ pub async fn envs(ctx: &Context, params: &BTreeMap<String, String>) -> Result<Va
     let versions = match place {
         Some(_) => Some(
             db::service_identity::get_cached_scope_versions(&ctx.org)
+                .instrument(tracing::info_span!("db.load"))
                 .await
                 .map_err(unavailable)?,
         ),
         None => None,
     };
-    let envs = env_options(&rows, &ctx.scope_labels(), versions.as_deref());
-    let mut result =
-        json!({"envs":envs,"can_edit":access::endpoint(&ctx.org, &ctx.user, "PUT").await});
+    let enrich = tracing::info_span!("enrich");
+    let envs = enrich.in_scope(|| env_options(&rows, &ctx.scope_labels(), versions.as_deref()));
+    let mut result = json!({"envs":envs,"can_edit":access::endpoint(&ctx.org, &ctx.user, "PUT")
+            .instrument(tracing::info_span!("authz.filter")).await});
     if let (Some(place), Some(counts)) = (place, &versions) {
-        let (services, versions) = scope_counts(&rows, place, params.get("service"), counts);
+        let (services, versions) =
+            enrich.in_scope(|| scope_counts(&rows, place, params.get("service"), counts));
         result["scope_counts"] = services;
         result["scope_versions"] = versions;
     }
@@ -686,41 +721,45 @@ pub async fn unresolved(
     )
 }
 
+#[tracing::instrument(name = "service_identity.overrides", skip_all)]
 pub async fn overrides(
     ctx: &Context,
     params: &BTreeMap<String, String>,
 ) -> Result<Value, Response> {
-    let rows: Vec<_> = ctx
-        .identity
-        .overrides
-        .iter()
-        .filter(|row| {
-            override_visible(ctx, row)
-                && params
-                    .get("scope")
-                    .is_none_or(|scope| scope == row.scope.as_str())
-                && params.get("q").is_none_or(|q| {
-                    row.value.contains(q)
-                        || row.service_name.contains(q)
-                        || row.where_key.contains(q)
-                })
-        })
-        .collect();
+    let rows: Vec<_> = tracing::info_span!("authz.filter").in_scope(|| {
+        ctx.identity
+            .overrides
+            .iter()
+            .filter(|row| {
+                override_visible(ctx, row)
+                    && params
+                        .get("scope")
+                        .is_none_or(|scope| scope == row.scope.as_str())
+                    && params.get("q").is_none_or(|q| {
+                        row.value.contains(q)
+                            || row.service_name.contains(q)
+                            || row.where_key.contains(q)
+                    })
+            })
+            .collect()
+    });
     let total = rows.len();
     let (limit, offset) = page(params, 50)?;
     let counts = db::service_identity::get_cached_scope_versions(&ctx.org)
+        .instrument(tracing::info_span!("db.load"))
         .await
         .map_err(unavailable)?;
-    let rows: Vec<_> = rows
-        .into_iter()
-        .skip(offset)
-        .take(limit)
-        .map(|row| {
-            let mut item = serde_json::to_value(row).expect("override serialization");
-            item["affected"] = override_affected(ctx, row, &counts);
-            item
-        })
-        .collect();
+    let rows: Vec<_> = tracing::info_span!("enrich").in_scope(|| {
+        rows.into_iter()
+            .skip(offset)
+            .take(limit)
+            .map(|row| {
+                let mut item = serde_json::to_value(row).expect("override serialization");
+                item["affected"] = override_affected(ctx, row, &counts);
+                item
+            })
+            .collect()
+    });
     Ok(json!({"overrides":rows,"total":total}))
 }
 
@@ -1284,12 +1323,75 @@ mod tests {
 
     #[cfg(feature = "test-utils")]
     #[tokio::test]
+    async fn envs_and_overrides_emit_load_filter_and_enrich_spans() {
+        use common::infra::config::ORG_USERS;
+        use config::{DEFAULT_ORG, meta::user::UserRole};
+        use infra::table::org_users::OrgUserRecord;
+        use tracing::instrument::WithSubscriber;
+
+        use crate::authz::list::tests::CapturedSpans;
+
+        crate::service_identity::global_tables_for_tests().await;
+        let org = "identity_spans";
+        let user = "identity-spans-root@example.com";
+        let root_key = format!("{DEFAULT_ORG}/{user}");
+        ORG_USERS.insert(
+            root_key.clone(),
+            OrgUserRecord {
+                email: user.into(),
+                org_id: DEFAULT_ORG.into(),
+                role: UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+        let load_spans = std::sync::Arc::new(CapturedSpans::default());
+        let env_spans = std::sync::Arc::new(CapturedSpans::default());
+        let override_spans = std::sync::Arc::new(CapturedSpans::default());
+        let result = async {
+            let ctx = Context::load(org, user, "GET", RumReads::Summaries)
+                .with_subscriber(load_spans.clone())
+                .await?;
+            let params = BTreeMap::from([("where".into(), "default".into())]);
+            envs(&ctx, &params)
+                .with_subscriber(env_spans.clone())
+                .await?;
+            overrides(&ctx, &params)
+                .with_subscriber(override_spans.clone())
+                .await?;
+            Ok::<_, Response>(())
+        }
+        .await;
+        ORG_USERS.remove(&root_key);
+        result.unwrap();
+
+        for name in ["service_identity.context", "db.load", "authz.filter"] {
+            assert!(load_spans.fields(name).is_some(), "missing {name} span");
+        }
+        for (handler, spans) in [
+            ("service_identity.envs", env_spans),
+            ("service_identity.overrides", override_spans),
+        ] {
+            for name in [handler, "db.load", "authz.filter", "enrich"] {
+                assert!(
+                    spans.fields(name).is_some(),
+                    "{handler}: missing {name} span"
+                );
+            }
+        }
+    }
+
+    #[cfg(feature = "test-utils")]
+    #[tokio::test]
     async fn services_answers_503_when_an_evidence_check_fails() {
         use config::meta::stream::StreamType;
         use infra::table::entity::{
             service_version_deploys as deploys, service_version_verdicts as verdicts,
         };
         use sea_orm::{EntityTrait, IntoActiveModel};
+        use tracing::instrument::WithSubscriber;
 
         use crate::authz::{
             TypedStream, fake_checker,
@@ -1314,7 +1416,7 @@ mod tests {
         let mut ctx = context(vec![summary]);
         ctx.org.clone_from(&org);
         ctx.user = user.into();
-        ctx.readable = ReadableStreams::load(&org, user, &ctx.summaries)
+        ctx.readable = ReadableStreams::load(&org, user, &ctx.summaries, RumReads::Summaries)
             .await
             .unwrap();
         ctx.summaries = ctx.readable.visible(&ctx.summaries);
@@ -1350,7 +1452,19 @@ mod tests {
         .await
         .unwrap();
 
-        let response = catalog(&ctx, &BTreeMap::new()).await.unwrap_err();
+        let spans = std::sync::Arc::new(crate::authz::list::tests::CapturedSpans::default());
+        let response = catalog(&ctx, &BTreeMap::new())
+            .with_subscriber(spans.clone())
+            .await
+            .unwrap_err();
+        for name in [
+            "service_identity._services",
+            "db.load",
+            "authz.filter",
+            "enrich",
+        ] {
+            assert!(spans.fields(name).is_some(), "missing {name} span");
+        }
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(response.headers()[axum::http::header::RETRY_AFTER], "3");
         assert_eq!(response.headers()["x-o2-authz"], "unavailable");
@@ -1428,17 +1542,22 @@ mod tests {
             },
         );
         let summaries = [record("allowed", "open"), record("hidden", "closed")];
-        let visible = ReadableStreams::load(org, user, &summaries)
+        let visible = ReadableStreams::load(org, user, &summaries, RumReads::Summaries)
             .await
             .unwrap()
             .visible(&summaries);
         let rows = raw_rows(&[("closed", "1.4.2", "1.4.2-a1b2c3d")]);
         assert_eq!(stripped_versions(&summaries, &rows), 1);
         assert_eq!(stripped_versions(&visible, &rows), 0);
-        let none = ReadableStreams::load(org, "s8w-no-streams@example.com", &summaries)
-            .await
-            .unwrap()
-            .visible(&summaries);
+        let none = ReadableStreams::load(
+            org,
+            "s8w-no-streams@example.com",
+            &summaries,
+            RumReads::Summaries,
+        )
+        .await
+        .unwrap()
+        .visible(&summaries);
         assert!(none.is_empty());
         assert_eq!(stripped_versions(&none, &rows), 0);
     }

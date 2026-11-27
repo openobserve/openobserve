@@ -30,9 +30,9 @@ use serde::Deserialize;
 use crate::authz::{
     StreamAccessChecker, check_each,
     list::{
-        AuthzUnavailable, Bypass, Identity, LegacyChecks, ListMode, ObjectRef, ObjectsQuery,
-        OrgWideCheck, SITE_SERVICE_GRAPH, ShadowComparison, StreamAnswer, StreamSet,
-        answer_in_mode_with, type_answers,
+        AuthzUnavailable, Bypass, Identity, LegacyChecks, ListCaller, ListMode, ObjectRef,
+        ObjectsQuery, OrgWideCheck, SITE_SERVICE_GRAPH, Scope, ShadowComparison, StreamAnswer,
+        StreamSet, answer_in_mode_with, request_wide_answers, scoped_type_answers,
     },
 };
 
@@ -67,6 +67,16 @@ pub struct ServiceGraphQuery {
     pub agent_env: Option<String>,
 }
 
+/// Query parameters for edge trend endpoint
+#[derive(Debug, Deserialize)]
+pub struct EdgeHistoryQuery {
+    pub client_service: Option<String>,
+    pub server_service: Option<String>,
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    pub stream_name: Option<String>,
+}
+
 /// The trace streams one request reads, after its user's stream permissions are applied.
 #[cfg(any(feature = "enterprise", test))]
 #[derive(Debug, PartialEq)]
@@ -99,6 +109,8 @@ struct StreamScope {
         (status = 400, description = "Invalid time window (negative start_time, end_time not after start_time, end_time more than a day ahead, or longer than the data retention, at least 3650 days) or a stream name the metrics query cannot quote", content_type = "application/json", body = String),
         (status = 403, description = "Forbidden: an enterprise feature, or the user may not read the requested trace stream or any trace stream", content_type = "application/json", body = String),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+        (status = 503, description = "Permission service unavailable", body = inline(crate::authz::list::AuthzUnavailableBody),
+            headers(("Retry-After" = u32, description = "3 seconds"), ("X-O2-Authz" = String, description = "unavailable"))),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "get"})),
@@ -122,12 +134,13 @@ pub async fn get_current_topology(
         Err(e) => return MetaHttpResponse::bad_request(e),
     };
 
-    let readable = match readable_trace_streams(org_id, user_id).await {
-        Ok(readable) => readable,
-        Err(err) => return crate::authz::list::authz_unavailable_response(err),
-    };
-    let Some(scope) = scope_streams(trace_stream_filter(query.stream_name.clone()), readable)
-    else {
+    let selected = trace_stream_filter(query.stream_name.clone());
+    let readable =
+        match readable_trace_streams(org_id, user_id, selected.as_deref(), &Scope::every()).await {
+            Ok(readable) => readable,
+            Err(err) => return crate::authz::list::authz_unavailable_response(err),
+        };
+    let Some(scope) = scope_streams(selected, readable) else {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     };
     let filter = v4_read_filter(&query, scope);
@@ -143,49 +156,51 @@ pub async fn get_current_topology(
     }
 }
 
-#[cfg(feature = "enterprise")]
-async fn topology_v4(
-    org_id: &str,
-    filter: &super::v4::read::ReadFilter,
-    start_time: i64,
-    end_time: i64,
-) -> Result<config::meta::service_graph::ServiceGraphData, anyhow::Error> {
-    use config::meta::service_graph::ServiceGraphData;
-
-    use super::v4::read::fetch_topology;
-
-    let (input, meta) = fetch_topology(org_id, filter, start_time, end_time).await?;
-    let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology_v4(input);
-    Ok(ServiceGraphData {
-        nodes,
-        edges,
-        meta: Some(meta),
-    })
-}
-
-#[cfg(feature = "enterprise")]
-fn v4_read_filter(query: &ServiceGraphQuery, scope: StreamScope) -> super::v4::read::ReadFilter {
-    super::v4::read::ReadFilter {
-        trace_stream: scope.trace_stream,
-        agent_env: query.agent_env.clone().filter(|s| !s.is_empty()),
-        visible_streams: scope.visible_streams,
+#[cfg(any(feature = "enterprise", test))]
+pub fn trace_stream_query<'a>(org_id: &'a str, user_id: &'a str) -> ObjectsQuery<'a> {
+    ObjectsQuery {
+        site: SITE_SERVICE_GRAPH,
+        org_id,
+        user_id,
+        stream_types: &[StreamType::Traces],
+        permission: "GET",
+        use_all_org: false,
+        use_self_parent: true,
+        use_self_context: false,
+        parent_id: "",
+        bypass: Bypass::RbacOffOrRoot,
+        identity: Identity::StoredEmail,
+        prelude: Some(TRACE_STREAM_PRELUDE),
     }
 }
 
-/// `stream_name=all` is the front end's "every stream" choice, not a stream.
-#[cfg(feature = "enterprise")]
-fn trace_stream_filter(stream_name: Option<String>) -> Option<String> {
-    stream_name.filter(|s| !s.is_empty() && s != "all")
+#[cfg(any(feature = "enterprise", test))]
+pub fn trace_stream_object<'a>(stream: &'a str, placeholder: &str) -> Option<ObjectRef<'a>> {
+    (stream != placeholder).then(|| ObjectRef::stream(StreamType::Traces, stream))
 }
 
-/// Query parameters for edge trend endpoint
-#[derive(Debug, Deserialize)]
-pub struct EdgeHistoryQuery {
-    pub client_service: Option<String>,
-    pub server_service: Option<String>,
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub stream_name: Option<String>,
+/// The production trace authorization path with a supplied stream inventory for the Level B bench.
+#[cfg(feature = "enterprise")]
+pub async fn readable_trace_streams_among<F: Future<Output = Vec<String>>>(
+    org_id: &str,
+    user_id: &str,
+    list: impl Fn() -> F,
+    selected: Option<&str>,
+    scope: &Scope,
+) -> Result<Option<Vec<String>>, AuthzUnavailable> {
+    let checker = crate::authz::active_checker();
+    let placeholder = &config::get_config().common.dashboard_placeholder;
+    readable_among(
+        checker.as_ref(),
+        &crate::authz::list::TodayChecks,
+        org_id,
+        user_id,
+        list,
+        placeholder,
+        selected,
+        scope,
+    )
+    .await
 }
 
 /// GetEdgeTrend (Enterprise)
@@ -211,6 +226,8 @@ pub struct EdgeHistoryQuery {
         (status = 400, description = "Invalid time window (negative start_time, end_time not after start_time, end_time more than a day ahead, or longer than the data retention, at least 3650 days), or a service or stream name the metrics query cannot quote", content_type = "application/json", body = String),
         (status = 403, description = "Forbidden: an enterprise feature, or the user may not read the requested trace stream or any trace stream"),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+        (status = 503, description = "Permission service unavailable", body = inline(crate::authz::list::AuthzUnavailableBody),
+            headers(("Retry-After" = u32, description = "3 seconds"), ("X-O2-Authz" = String, description = "unavailable"))),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
@@ -237,11 +254,14 @@ pub async fn get_edge_history(
         Ok(window) => window,
         Err(e) => return MetaHttpResponse::bad_request(e),
     };
-    let readable = match readable_trace_streams(org_id, user_id).await {
+    let selected = trace_stream_filter(query.stream_name.clone());
+    let scope = edge_history_scope(selected.as_deref());
+    let readable = match readable_trace_streams(org_id, user_id, selected.as_deref(), &scope).await
+    {
         Ok(readable) => readable,
         Err(err) => return crate::authz::list::authz_unavailable_response(err),
     };
-    let Some(scope) = scope_streams(trace_stream_filter(query.stream_name), readable) else {
+    let Some(scope) = scope_streams(selected, readable) else {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     };
     let non_empty = |v: Option<String>| v.filter(|s| !s.is_empty());
@@ -306,52 +326,47 @@ pub async fn get_current_topology(
     MetaHttpResponse::forbidden("Not Supported")
 }
 
-/// The trace streams `user_id` may read in `org_id`, sorted; `None` when it may read all of them.
-#[cfg(feature = "enterprise")]
-async fn readable_trace_streams(
-    org_id: &str,
-    user_id: &str,
-) -> Result<Option<Vec<String>>, AuthzUnavailable> {
-    let checker = crate::authz::active_checker();
-    let placeholder = &config::get_config().common.dashboard_placeholder;
-    readable_among(
-        checker.as_ref(),
-        &crate::authz::list::TodayChecks,
-        org_id,
-        user_id,
-        || crate::db::schema::list_streams_from_cache(org_id, StreamType::Traces),
-        placeholder,
-    )
-    .await
-}
-
 #[cfg(any(feature = "enterprise", test))]
-async fn readable_among<F: Future<Output = Vec<String>>>(
+#[expect(clippy::too_many_arguments)]
+pub(crate) async fn readable_among<F: Future<Output = Vec<String>>>(
     checker: &dyn StreamAccessChecker,
     checks: &dyn LegacyChecks,
     org_id: &str,
     user_id: &str,
     list: impl Fn() -> F,
     placeholder: &str,
+    selected: Option<&str>,
+    scope: &Scope,
 ) -> Result<Option<Vec<String>>, AuthzUnavailable> {
     let query = trace_stream_query(org_id, user_id);
     let streams = tokio::sync::OnceCell::<Vec<String>>::new();
-    // Legacy owns the snapshot whenever its prelude requires stream checks.
+    let list_scoped = || async {
+        let mut listed = list().await;
+        listed.retain(|name| scope.shows(StreamType::Traces, name));
+        listed
+    };
+    // In shadow, legacy owns the snapshot whenever its prelude requires stream checks.
     let legacy_list_ready = tokio::sync::Notify::new();
     let (readable, _) = answer_in_mode_with(
-        checker,
-        SITE_SERVICE_GRAPH,
-        user_id,
-        || {
-            streams
-                .get()
-                .into_iter()
-                .flatten()
-                .filter(|stream| stream.as_str() != placeholder)
-                .map(|stream| (StreamType::Traces, stream.clone()))
-                .collect()
+        ListCaller {
+            checker,
+            site: SITE_SERVICE_GRAPH,
+            user_id,
+        },
+        |_| {
+            let streams = &streams;
+            async move {
+                streams
+                    .get()
+                    .map(Vec::as_slice)
+                    .unwrap_or_default()
+                    .iter()
+                    .filter(move |stream| stream.as_str() != placeholder)
+                    .map(|stream| (StreamType::Traces, stream.as_str()))
+            }
         },
         ShadowComparison::PreserveUnscoped(StreamType::Traces),
+        scope,
         || async {
             let readable = legacy_trace_stream_set(
                 checker,
@@ -362,7 +377,7 @@ async fn readable_among<F: Future<Output = Vec<String>>>(
                     streams
                         .get_or_init(|| {
                             legacy_list_ready.notify_one();
-                            list()
+                            list_scoped()
                         })
                         .await
                         .as_slice()
@@ -375,7 +390,7 @@ async fn readable_among<F: Future<Output = Vec<String>>>(
         },
         |mode| {
             let streams = &streams;
-            let list = &list;
+            let list_scoped = &list_scoped;
             let legacy_list_ready = &legacy_list_ready;
             trace_stream_answers(
                 checker,
@@ -384,9 +399,10 @@ async fn readable_among<F: Future<Output = Vec<String>>>(
                     if mode == ListMode::Shadow {
                         legacy_list_ready.notified().await;
                     }
-                    streams.get_or_init(list).await.as_slice()
+                    streams.get_or_init(list_scoped).await.as_slice()
                 },
                 placeholder,
+                if mode == ListMode::On { selected } else { None },
             )
         },
     )
@@ -398,43 +414,110 @@ async fn readable_among<F: Future<Output = Vec<String>>>(
     }))
 }
 
+#[cfg(feature = "enterprise")]
+async fn topology_v4(
+    org_id: &str,
+    filter: &super::v4::read::ReadFilter,
+    start_time: i64,
+    end_time: i64,
+) -> Result<config::meta::service_graph::ServiceGraphData, anyhow::Error> {
+    use config::meta::service_graph::ServiceGraphData;
+
+    use super::v4::read::fetch_topology;
+
+    let (input, meta) = fetch_topology(org_id, filter, start_time, end_time).await?;
+    let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology_v4(input);
+    Ok(ServiceGraphData {
+        nodes,
+        edges,
+        meta: Some(meta),
+    })
+}
+
+#[cfg(feature = "enterprise")]
+fn v4_read_filter(query: &ServiceGraphQuery, scope: StreamScope) -> super::v4::read::ReadFilter {
+    super::v4::read::ReadFilter {
+        trace_stream: scope.trace_stream,
+        agent_env: query.agent_env.clone().filter(|s| !s.is_empty()),
+        visible_streams: scope.visible_streams,
+    }
+}
+
+/// Edge history with a selected stream reads only that stream, so no other stream's answer matters.
+#[cfg(any(feature = "enterprise", test))]
+fn edge_history_scope(selected: Option<&str>) -> Scope {
+    selected.map_or_else(Scope::every, |name| {
+        Scope::requested([(StreamType::Traces, name.to_string())])
+    })
+}
+
+/// `stream_name=all` is the front end's "every stream" choice, not a stream.
+#[cfg(feature = "enterprise")]
+fn trace_stream_filter(stream_name: Option<String>) -> Option<String> {
+    stream_name.filter(|s| !s.is_empty() && s != "all")
+}
+
+/// The trace streams `user_id` may read in `org_id`, sorted; `None` when it may read all of them.
+#[cfg(feature = "enterprise")]
+async fn readable_trace_streams(
+    org_id: &str,
+    user_id: &str,
+    selected: Option<&str>,
+    scope: &Scope,
+) -> Result<Option<Vec<String>>, AuthzUnavailable> {
+    readable_trace_streams_among(
+        org_id,
+        user_id,
+        || crate::db::schema::list_streams_from_cache(org_id, StreamType::Traces),
+        selected,
+        scope,
+    )
+    .await
+}
+
 #[cfg(any(feature = "enterprise", test))]
 async fn trace_stream_answers<'s>(
     checker: &dyn StreamAccessChecker,
     query: &ObjectsQuery<'_>,
     streams: impl Future<Output = &'s [String]>,
     placeholder: &str,
+    selected: Option<&str>,
 ) -> StreamAnswer {
-    let answers = type_answers(checker, query, &[StreamType::Traces]).await?;
-    if answers.reads_every() {
+    if let Some(answers) = request_wide_answers(checker, query).await? {
         return Ok((None, answers));
     }
-    let streams = streams.await;
     let objects: Vec<_> = streams
+        .await
         .iter()
-        .filter(|stream| stream.as_str() != placeholder)
-        .map(|stream| ObjectRef::stream(StreamType::Traces, stream))
+        .filter_map(|stream| trace_stream_object(stream, placeholder))
         .collect();
+    let chosen = selected.map(|name| {
+        objects
+            .iter()
+            .find(|object| object.id == name)
+            .map(std::slice::from_ref)
+            .unwrap_or_default()
+    });
+    let cutoff = checker.list_settings(query.user_id).small_request_objects;
+    // At or below the cutoff, one Check per stream costs less than the probes and the list.
+    let types = if objects.len() <= cutoff || chosen.is_some_and(|objects| objects.is_empty()) {
+        &[]
+    } else {
+        query.stream_types
+    };
+    let answers = scoped_type_answers(checker, query, types).await;
+    // Other stream answers cannot change a 403 for the selected stream.
+    if let Some(chosen) = chosen
+        && answers
+            .decide(checker, query.site, chosen)
+            .await?
+            .into_streams()
+            .is_some_and(|streams| streams.is_empty())
+    {
+        return Ok((Some(StreamSet::new()), answers));
+    }
     let readable = answers.decide(checker, query.site, &objects).await?;
     Ok((readable.into_streams(), answers))
-}
-
-#[cfg(any(feature = "enterprise", test))]
-fn trace_stream_query<'a>(org_id: &'a str, user_id: &'a str) -> ObjectsQuery<'a> {
-    ObjectsQuery {
-        site: SITE_SERVICE_GRAPH,
-        org_id,
-        user_id,
-        stream_types: &[StreamType::Traces],
-        permission: "GET",
-        use_all_org: false,
-        use_self_parent: true,
-        use_self_context: false,
-        parent_id: "",
-        bypass: Bypass::RbacOffOrRoot,
-        identity: Identity::StoredEmail,
-        prelude: Some(TRACE_STREAM_PRELUDE),
-    }
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -528,7 +611,10 @@ mod tests {
     use super::*;
     use crate::authz::{
         FakeStreamChecker, TypedStream,
-        list::{CheckerChecks, ListMode, ListPolicy, SHADOW_TESTS, UnavailableReason},
+        list::{
+            CheckerChecks, ListMode, ListPolicy, SHADOW_TESTS, SMALL_REQUEST_OBJECTS,
+            UnavailableReason,
+        },
         within_budget,
     };
 
@@ -722,6 +808,8 @@ mod tests {
                     std::future::ready(trace_streams())
                 },
                 PLACEHOLDER,
+                None,
+                &Scope::every(),
             )
             .await
             .unwrap();
@@ -736,7 +824,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_on_lists_streams_only_after_a_scoped_type_answer() {
+    async fn test_on_lists_streams_only_after_the_wide_check_denies() {
         let checker = FakeStreamChecker::default();
         let root = "on-root@example.com";
         let wide = "on-wide@example.com";
@@ -762,11 +850,13 @@ mod tests {
                     std::future::ready(trace_streams())
                 },
                 PLACEHOLDER,
+                None,
+                &Scope::every(),
             )
             .await
             .unwrap();
             if user == scoped {
-                assert_eq!(*snapshots.lock().unwrap(), vec![(1, 1)]);
+                assert_eq!(*snapshots.lock().unwrap(), vec![(1, 0)]);
                 assert_eq!(readable, Some(vec!["a".to_string()]));
             } else {
                 assert!(snapshots.lock().unwrap().is_empty());
@@ -794,6 +884,8 @@ mod tests {
                 std::future::ready(trace_streams())
             },
             PLACEHOLDER,
+            None,
+            &Scope::every(),
         )
         .await
         .unwrap();
@@ -819,7 +911,7 @@ mod tests {
             ORG,
             user,
             || {
-                assert_eq!(checker.calls(user).types_access, 1);
+                assert_eq!(checker.calls(user).types_access, 0);
                 listings.fetch_add(1, Ordering::Relaxed);
                 let mut snapshot = vec!["early".to_string()];
                 if checks.finished.load(Ordering::Relaxed) {
@@ -828,6 +920,8 @@ mod tests {
                 std::future::ready(snapshot)
             },
             PLACEHOLDER,
+            None,
+            &Scope::every(),
         )
         .await
         .unwrap();
@@ -837,6 +931,7 @@ mod tests {
             Some(vec!["early".to_string(), "late".to_string()])
         );
         assert_eq!(listings.load(Ordering::Relaxed), 1);
+        assert_eq!(checker.calls(user).types_access, 1);
     }
 
     #[tokio::test]
@@ -847,14 +942,18 @@ mod tests {
         let user = "shadow-scope-mismatch@example.com";
         checker.set_list_mode(user, ListMode::Shadow);
         checker.set_shadow_sample(user, 1.0);
-        checker.grant_read_every_stream(user, ORG);
+        for name in ["a", "b", "c"] {
+            grant_trace_read(&checker, user, name);
+        }
         legacy_checker.grant_org_wide_check(user, ORG, TRACE_STREAM_PRELUDE.resource);
         let mismatch = metrics::AUTHZ_LIST_SHADOW_MISMATCH_TOTAL.with_label_values(&[
             SITE_SERVICE_GRAPH,
             StreamType::Traces.as_str(),
             "new_allows_less",
         ]);
-        let before = mismatch.get();
+        let compared = metrics::AUTHZ_LIST_SHADOW_COMPARED_TOTAL
+            .with_label_values(&[SITE_SERVICE_GRAPH, "list"]);
+        let before = (mismatch.get(), compared.get());
 
         let readable = readable_among(
             &checker,
@@ -863,12 +962,17 @@ mod tests {
             user,
             || std::future::ready(trace_streams()),
             PLACEHOLDER,
+            None,
+            &Scope::every(),
         )
         .await
         .unwrap();
 
         assert_eq!(readable, None);
-        assert_eq!(mismatch.get(), before + 1);
+        assert_eq!(
+            (mismatch.get() - before.0, compared.get() - before.1),
+            (1, 1)
+        );
     }
 
     #[tokio::test]
@@ -886,7 +990,9 @@ mod tests {
                 ORG,
                 user,
                 || std::future::ready(trace_streams()),
-                PLACEHOLDER
+                PLACEHOLDER,
+                None,
+                &Scope::every(),
             )
             .await
             .unwrap(),
@@ -901,11 +1007,340 @@ mod tests {
                 ORG,
                 user,
                 || std::future::ready(Vec::new()),
-                PLACEHOLDER
+                PLACEHOLDER,
+                None,
+                &Scope::every(),
             )
             .await
             .unwrap(),
             Some(vec![])
+        );
+    }
+
+    #[tokio::test]
+    async fn test_on_skips_type_authorization_for_empty_and_placeholder_only_inventories() {
+        for names in [vec![], vec![PLACEHOLDER.to_string()]] {
+            let checker = FakeStreamChecker::default();
+            let user = "empty-traces@example.com";
+            checker.set_list_mode(user, ListMode::On);
+            checker.fail_types_access_once(user, UnavailableReason::Transport);
+            let readable = readable_among(
+                &checker,
+                &CheckerChecks(&checker),
+                ORG,
+                user,
+                || std::future::ready(names.clone()),
+                PLACEHOLDER,
+                None,
+                &Scope::every(),
+            )
+            .await
+            .unwrap();
+            assert_eq!(readable, Some(vec![]));
+            let calls = checker.calls(user);
+            assert_eq!((calls.total(), calls.org_wide_checks), (1, 1));
+            assert_eq!((calls.types_access, calls.streams), (0, 0));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_on_sends_the_same_calls_as_off_for_one_eligible_trace() {
+        let checker = FakeStreamChecker::default();
+        let off_user = "small-traces-off@example.com";
+        let on_user = "small-traces-on@example.com";
+        checker.set_list_mode(on_user, ListMode::On);
+        checker.set_small_request_objects(on_user, 1);
+        for user in [off_user, on_user] {
+            grant_trace_read(&checker, user, "a");
+            let listings = AtomicUsize::new(0);
+            let readable = readable_among(
+                &checker,
+                &CheckerChecks(&checker),
+                ORG,
+                user,
+                || {
+                    listings.fetch_add(1, Ordering::Relaxed);
+                    std::future::ready(vec!["a".to_string(), PLACEHOLDER.to_string()])
+                },
+                PLACEHOLDER,
+                None,
+                &Scope::every(),
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(readable, Some(vec!["a".to_string()]));
+            assert_eq!(listings.load(Ordering::Relaxed), 1);
+        }
+        let legacy = checker.calls(off_user);
+        assert_eq!((legacy.org_wide_checks, legacy.streams), (1, 1));
+        let on = checker.calls(on_user);
+        assert_eq!(
+            (
+                on.org_wide_checks,
+                on.object_checks,
+                on.types_access,
+                on.lists
+            ),
+            (1, 1, 0, 0)
+        );
+        assert_eq!(on.total() + on.streams, legacy.total() + legacy.streams);
+    }
+
+    #[tokio::test]
+    async fn test_on_answers_403_for_a_denied_selected_stream_when_another_check_fails() {
+        let checker = FakeStreamChecker::default();
+        let on_user = "denied-selected-on@example.com";
+        let off_user = "denied-selected-off@example.com";
+        checker.set_list_mode(on_user, ListMode::On);
+        checker.set_small_request_objects(on_user, SMALL_REQUEST_OBJECTS);
+        checker.set_list_mode(off_user, ListMode::Off);
+        let checks = CheckerChecks(&checker);
+        let list = || std::future::ready(["sel", "other"].map(str::to_string).to_vec());
+        for user in [on_user, off_user] {
+            checker.fail_object_check_of(user, "other", UnavailableReason::Timeout);
+            let readable = readable_among(
+                &checker,
+                &checks,
+                ORG,
+                user,
+                list,
+                PLACEHOLDER,
+                Some("sel"),
+                &Scope::every(),
+            )
+            .await
+            .unwrap();
+            if user == on_user {
+                assert_eq!(readable, Some(vec![]));
+            }
+            assert_eq!(scope_streams(Some("sel".into()), readable), None);
+        }
+        let on = checker.calls(on_user);
+        let off = checker.calls(off_user);
+        assert_eq!(on.object_checks, 1);
+        assert!(on.total() + on.streams <= off.total() + off.streams);
+    }
+
+    #[tokio::test]
+    async fn test_selected_stream_coverage_determines_whether_a_failed_list_changes_the_graph() {
+        let checker = FakeStreamChecker::default();
+        let uncovered = "s".repeat(300);
+        for (user, mode, selected) in [
+            ("uncovered-off", ListMode::Off, uncovered.as_str()),
+            ("uncovered-on", ListMode::On, uncovered.as_str()),
+            ("covered-on", ListMode::On, "covered"),
+        ] {
+            checker.set_list_mode(user, mode);
+            checker.set_small_request_objects(user, SMALL_REQUEST_OBJECTS);
+            checker.fail_list_once(user, UnavailableReason::Timeout);
+            grant_trace_read(&checker, user, "covered");
+            let streams: Vec<_> = [selected.to_string()]
+                .into_iter()
+                .chain((0..SMALL_REQUEST_OBJECTS).map(|i| format!("other_{i}")))
+                .collect();
+            let result = readable_among(
+                &checker,
+                &CheckerChecks(&checker),
+                ORG,
+                user,
+                || std::future::ready(streams.clone()),
+                PLACEHOLDER,
+                Some(selected),
+                &Scope::every(),
+            )
+            .await;
+            if selected == "covered" {
+                assert_eq!(result, Err(UnavailableReason::Timeout.into()));
+            } else {
+                let readable = result.unwrap();
+                if mode == ListMode::On {
+                    assert_eq!(readable, Some(vec![]));
+                }
+                assert_eq!(scope_streams(Some(selected.to_string()), readable), None);
+            }
+            if mode == ListMode::On {
+                let calls = checker.calls(user);
+                assert_eq!(calls.lists, 1, "{user}");
+                assert_eq!(calls.object_checks, usize::from(selected != "covered"));
+                assert!(calls.total() + calls.streams <= 6, "{calls:?}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_topology_scope_reports_a_failing_unselected_trace_stream() {
+        let checker = FakeStreamChecker::default();
+        let user = "granted-selected@example.com";
+        grant_trace_read(&checker, user, "sel");
+        let checks = CheckerChecks(&checker);
+        let scope = Scope::every();
+        let read = || {
+            readable_among(
+                &checker,
+                &checks,
+                ORG,
+                user,
+                || std::future::ready(["sel", "other"].map(str::to_string).to_vec()),
+                PLACEHOLDER,
+                Some("sel"),
+                &scope,
+            )
+        };
+        checker.fail_stream_read_once(user, "other");
+        assert_eq!(read().await, Ok(Some(vec!["sel".into()])));
+
+        checker.set_list_mode(user, ListMode::On);
+        checker.set_small_request_objects(user, SMALL_REQUEST_OBJECTS);
+        checker.fail_object_check_of(user, "other", UnavailableReason::Timeout);
+        assert_eq!(read().await, Err(UnavailableReason::Timeout.into()));
+        assert_eq!(checker.calls(user).object_checks, 2);
+    }
+
+    #[tokio::test]
+    async fn test_history_scope_skips_a_failing_unselected_trace_stream() {
+        let checker = FakeStreamChecker::default();
+        let off_user = "history-other-off@example.com";
+        let on_user = "history-other-on@example.com";
+        checker.set_list_mode(on_user, ListMode::On);
+        checker.set_small_request_objects(on_user, SMALL_REQUEST_OBJECTS);
+        for user in [off_user, on_user] {
+            grant_trace_read(&checker, user, "sel");
+        }
+        checker.fail_stream_read_once(off_user, "other");
+        checker.fail_object_check_of(on_user, "other", UnavailableReason::Timeout);
+        let checks = CheckerChecks(&checker);
+        let scope = edge_history_scope(Some("sel"));
+        let read = |user| {
+            readable_among(
+                &checker,
+                &checks,
+                ORG,
+                user,
+                || std::future::ready(["sel", "other"].map(str::to_string).to_vec()),
+                PLACEHOLDER,
+                Some("sel"),
+                &scope,
+            )
+        };
+
+        let off = read(off_user).await;
+        assert_eq!(off, Ok(Some(vec!["sel".into()])));
+        assert_eq!(read(on_user).await, off);
+        assert_eq!(checker.calls(off_user).streams, 1);
+        assert_eq!(checker.calls(on_user).object_checks, 1);
+    }
+
+    #[tokio::test]
+    async fn test_history_scope_reports_a_failing_selected_trace_stream() {
+        let checker = FakeStreamChecker::default();
+        let user = "history-selected-on@example.com";
+        checker.set_list_mode(user, ListMode::On);
+        checker.set_small_request_objects(user, SMALL_REQUEST_OBJECTS);
+        grant_trace_read(&checker, user, "sel");
+        checker.fail_object_check_of(user, "sel", UnavailableReason::Timeout);
+        let result = readable_among(
+            &checker,
+            &CheckerChecks(&checker),
+            ORG,
+            user,
+            || std::future::ready(["sel", "other"].map(str::to_string).to_vec()),
+            PLACEHOLDER,
+            Some("sel"),
+            &edge_history_scope(Some("sel")),
+        )
+        .await;
+        assert_eq!(result, Err(UnavailableReason::Timeout.into()));
+        assert_eq!(checker.calls(user).object_checks, 1);
+    }
+
+    #[tokio::test]
+    async fn test_on_skips_unrelated_checks_when_the_selected_stream_is_missing() {
+        let checker = FakeStreamChecker::default();
+        let user = "missing-selected@example.com";
+        checker.set_list_mode(user, ListMode::On);
+        checker.set_small_request_objects(user, 1);
+        checker.fail_types_access_once(user, UnavailableReason::Timeout);
+        checker.fail_object_check_of(user, "other", UnavailableReason::Timeout);
+        let readable = readable_among(
+            &checker,
+            &CheckerChecks(&checker),
+            ORG,
+            user,
+            || std::future::ready(["sel", "other"].map(str::to_string).to_vec()),
+            PLACEHOLDER,
+            Some("missing"),
+            &Scope::every(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(readable, Some(vec![]));
+        let calls = checker.calls(user);
+        assert_eq!((calls.types_access, calls.object_checks), (0, 0));
+    }
+
+    #[tokio::test]
+    async fn test_on_lists_no_streams_for_a_request_wide_answer() {
+        let checker = FakeStreamChecker::default();
+        let root = "cutoff-root@example.com";
+        let wide = "cutoff-wide@example.com";
+        checker.grant_root(root);
+        checker.grant_org_wide_check(wide, ORG, TRACE_STREAM_PRELUDE.resource);
+        for user in [root, wide] {
+            checker.set_list_mode(user, ListMode::On);
+            checker.set_small_request_objects(user, SMALL_REQUEST_OBJECTS);
+            let listings = AtomicUsize::new(0);
+            let readable = readable_among(
+                &checker,
+                &CheckerChecks(&checker),
+                ORG,
+                user,
+                || {
+                    listings.fetch_add(1, Ordering::Relaxed);
+                    std::future::ready(trace_streams())
+                },
+                PLACEHOLDER,
+                None,
+                &Scope::every(),
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(readable, None, "{user}");
+            assert_eq!(listings.load(Ordering::Relaxed), 0, "{user}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_on_uses_the_list_path_above_the_trace_cutoff() {
+        let checker = FakeStreamChecker::default();
+        let user = "above-trace-cutoff@example.com";
+        checker.set_list_mode(user, ListMode::On);
+        checker.set_small_request_objects(user, 1);
+        grant_trace_read(&checker, user, "a");
+        let listings = AtomicUsize::new(0);
+        let readable = readable_among(
+            &checker,
+            &CheckerChecks(&checker),
+            ORG,
+            user,
+            || {
+                listings.fetch_add(1, Ordering::Relaxed);
+                std::future::ready(trace_streams())
+            },
+            PLACEHOLDER,
+            None,
+            &Scope::every(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(readable, Some(vec!["a".to_string()]));
+        assert_eq!(listings.load(Ordering::Relaxed), 1);
+        let calls = checker.calls(user);
+        assert_eq!(
+            (calls.org_wide_checks, calls.lists, calls.streams),
+            (1, 1, 0)
         );
     }
 
@@ -937,6 +1372,8 @@ mod tests {
                 user,
                 || std::future::ready(trace_streams()),
                 PLACEHOLDER,
+                None,
+                &Scope::every(),
             )
             .await
             .unwrap();
@@ -948,6 +1385,8 @@ mod tests {
                 user,
                 || std::future::ready(trace_streams()),
                 PLACEHOLDER,
+                None,
+                &Scope::every(),
             )
             .await
             .unwrap();
@@ -967,6 +1406,7 @@ mod tests {
         let user = "legacy@example.com";
         grant_trace_read(&checker, user, "a");
         let checks = CheckerChecks(&checker);
+        let scope = Scope::every();
         let resolve = || {
             readable_among(
                 &checker,
@@ -975,6 +1415,8 @@ mod tests {
                 user,
                 || std::future::ready(trace_streams()),
                 PLACEHOLDER,
+                None,
+                &scope,
             )
         };
         let legacy = resolve().await.unwrap();
@@ -1007,6 +1449,8 @@ mod tests {
                         user,
                         || std::future::ready(trace_streams()),
                         PLACEHOLDER,
+                        None,
+                        &Scope::every(),
                     ),
                 )
                 .await
@@ -1036,6 +1480,8 @@ mod tests {
                     user,
                     || std::future::ready(trace_streams()),
                     PLACEHOLDER,
+                    None,
+                    &Scope::every(),
                 ),
             )
             .await
@@ -1068,6 +1514,8 @@ mod tests {
                 user,
                 || std::future::ready(streams.clone()),
                 PLACEHOLDER,
+                None,
+                &Scope::every(),
             ),
         )
         .await
@@ -1101,6 +1549,8 @@ mod tests {
                     user,
                     || std::future::ready(trace_streams()),
                     PLACEHOLDER,
+                    None,
+                    &Scope::every(),
                 ),
             )
             .await
@@ -1123,6 +1573,8 @@ mod tests {
             user,
             || std::future::ready(trace_streams()),
             PLACEHOLDER,
+            None,
+            &Scope::every(),
         )
         .await;
         assert_eq!(result.unwrap_err().reason, UnavailableReason::Timeout);
@@ -1290,5 +1742,26 @@ mod tests {
             near_max_topology.status(),
             axum::http::StatusCode::BAD_REQUEST
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn graph_routes_document_the_authz_unavailable_response() {
+        use utoipa::Path;
+
+        for operation in [
+            __path_get_current_topology::operation(),
+            __path_get_edge_history::operation(),
+        ] {
+            let docs = serde_json::to_value(operation).unwrap();
+            let unavailable = &docs["responses"]["503"];
+            assert!(unavailable["headers"]["Retry-After"].is_object());
+            assert!(unavailable["headers"]["X-O2-Authz"].is_object());
+            let schema = &unavailable["content"]["application/json"]["schema"];
+            assert_eq!(
+                schema["properties"]["error_code"]["example"],
+                "authz_unavailable"
+            );
+        }
     }
 }

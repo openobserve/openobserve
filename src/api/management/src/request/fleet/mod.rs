@@ -32,7 +32,10 @@ use config::meta::fleet::{
     ValidateRequest,
 };
 #[cfg(feature = "enterprise")]
-use config::meta::folder::{Folder, FolderType};
+use config::meta::{
+    fleet::{Fleet, FleetList},
+    folder::{Folder, FolderType},
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::auditor::AuditTarget;
 #[cfg(feature = "enterprise")]
@@ -386,8 +389,6 @@ pub async fn list_fleets(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use config::meta::fleet::FleetList;
-
         let user_id = &user_email.user_id;
         if let Some(failed) = ensure_default_fleet(&org_id).await {
             return failed;
@@ -402,20 +403,7 @@ pub async fn list_fleets(
             Ok(states) => states,
             Err(e) => return to_response(e),
         };
-        let mut fleets = Vec::with_capacity(listed.len());
-        for folder in listed {
-            let readable = fleet_read(&org_id, user_id, &folder.folder_id)
-                .await
-                .is_none();
-            let mut item = fleet_item(folder, &states);
-            if !readable {
-                item.state = None;
-                item.settings = FleetSettings::default();
-            }
-            fleets.push(item);
-        }
-        let (total, items) = page.page(fleets);
-        MetaHttpResponse::json(FleetList { total, items })
+        MetaHttpResponse::json(fleet_page(&org_id, user_id, page, listed, &states).await)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1977,6 +1965,31 @@ async fn fleet_read(org_id: &str, user_id: &str, fleet: &str) -> Option<Response
     fleet_write(org_id, user_id, fleet, "GET").await
 }
 
+#[cfg(feature = "enterprise")]
+async fn fleet_page(
+    org_id: &str,
+    user_id: &str,
+    page: PageQuery,
+    listed: Vec<Folder>,
+    states: &[Fleet],
+) -> FleetList {
+    // GET controls detail visibility only, so it cannot change page membership or total.
+    let (total, folders) = page.page(listed);
+    let mut items = Vec::with_capacity(folders.len());
+    for folder in folders {
+        let readable = fleet_read(org_id, user_id, &folder.folder_id)
+            .await
+            .is_none();
+        let mut item = fleet_item(folder, states);
+        if !readable {
+            item.state = None;
+            item.settings = FleetSettings::default();
+        }
+        items.push(item);
+    }
+    FleetList { total, items }
+}
+
 /// Lifted RBAC passes every item read in `check_permissions`, so no list is bounded either.
 #[cfg(feature = "enterprise")]
 async fn rbac_enforced() -> bool {
@@ -2669,6 +2682,50 @@ mod tests {
             );
         }
         forget(custom, ORG);
+    }
+
+    #[tokio::test]
+    async fn fleet_page_checks_only_returned_fleets_and_redacts_denied_details() {
+        let user = "page-reader@fleet-fleets-handlers.test";
+        let page = PageQuery {
+            offset: Some(1),
+            limit: Some(2),
+        };
+        let settings = FleetSettings::builtin();
+        let states = ["f1", "f2"].map(|id| Fleet {
+            id: id.to_string(),
+            name: id.to_string(),
+            state: Some(Default::default()),
+            settings,
+        });
+        for total in [4, 2_000] {
+            openfga_on(&[("fleets:f1", "GET"), ("fleets:f3", "GET")], None);
+            let folders = (0..total)
+                .map(|i| Folder {
+                    folder_id: format!("f{i}"),
+                    name: format!("Fleet {i}"),
+                    description: String::new(),
+                    icon: None,
+                })
+                .collect();
+            let result = fleet_page(ORG, user, page, folders, &states).await;
+            assert_eq!(result.total, total);
+            assert_eq!(result.items.len(), 2);
+            assert_eq!(result.items[0].id, "f1");
+            assert!(result.items[0].state.is_some());
+            assert_eq!(result.items[0].settings, settings);
+            assert_eq!(result.items[1].id, "f2");
+            assert!(result.items[1].state.is_none());
+            assert_eq!(result.items[1].settings, FleetSettings::default());
+            assert_eq!(
+                asked(),
+                [
+                    ("fleets:f1".to_string(), "GET".to_string()),
+                    ("fleets:f2".to_string(), "GET".to_string()),
+                ],
+            );
+            openfga_off();
+        }
     }
 
     #[tokio::test]

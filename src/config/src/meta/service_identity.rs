@@ -609,6 +609,15 @@ pub struct NotServingPods {
 }
 
 impl NotServingPods {
+    /// A list with no typed source cannot be authorized, so it fails closed.
+    pub fn shows_pods(&self, verdict: &serde_json::Value) -> bool {
+        !self.source_streams.is_empty()
+            && verdict["verdict"] == "not_serving"
+            && (verdict["reason_code"] == NOT_SERVING_K8S_REASON
+                || verdict["reason"] == NOT_SERVING_K8S_REASON)
+            && verdict["restricted"] == false
+    }
+
     /// Adds `pods`/`pods_total` to a readable K8s not_serving summary; returns whether it did.
     pub fn attach(
         &self,
@@ -616,15 +625,7 @@ impl NotServingPods {
         sources_readable: bool,
         status_readable: bool,
     ) -> bool {
-        let k8s_not_serving = verdict["verdict"] == "not_serving"
-            && (verdict["reason_code"] == NOT_SERVING_K8S_REASON
-                || verdict["reason"] == NOT_SERVING_K8S_REASON);
-        // A list with no typed source cannot be authorized, so it fails closed.
-        if !sources_readable
-            || self.source_streams.is_empty()
-            || !k8s_not_serving
-            || verdict["restricted"] != false
-        {
+        if !sources_readable || !self.shows_pods(verdict) {
             return false;
         }
         let Some(object) = verdict.as_object_mut() else {

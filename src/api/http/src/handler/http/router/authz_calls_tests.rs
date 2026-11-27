@@ -192,12 +192,14 @@ async fn list_services_counts_the_route_check_with_handler_calls() {
             "object": format!("service_streams:_all_{org}"),
         })
     );
-    let probe_object = format!("stream:_all_{org}");
+    // One stream is under the small-request cutoff, so `on` serves the legacy per-stream Check.
     assert!(
         handler_checks
             .iter()
-            .any(|check| check["tuple_key"]["object"] == probe_object),
-        "missing handler stream probe: {handler_checks:?}"
+            .any(|check| check["tuple_key"]["object"]
+                .as_str()
+                .is_some_and(|object| object.ends_with(":checkout_logs"))),
+        "missing handler stream Check: {handler_checks:?}"
     );
     assert_eq!(metric.get_sample_count() - count, 1);
     assert_eq!(metric.get_sample_sum() - sum, mock.requests().len() as f64);

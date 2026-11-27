@@ -813,13 +813,13 @@ pub(crate) async fn audit_security_change(
     .await;
 }
 
-/// Keeps only the name and stats of each stream `can_read` refuses: settings name fields too.
+/// Keeps only the name and stats of each stream `is_granted` refuses: settings name fields too.
 #[cfg(any(feature = "enterprise", test))]
 fn hide_unreadable_schemas(
     streams: &mut [meta::stream::Stream],
-    can_read: impl Fn(&meta::stream::Stream) -> bool,
+    is_granted: impl Fn(&meta::stream::Stream) -> bool,
 ) {
-    for stream in streams.iter_mut().filter(|s| !can_read(s)) {
+    for stream in streams.iter_mut().filter(|s| !is_granted(s)) {
         stream.schema.clear();
         stream.uds_schema.clear();
         stream.total_fields = 0;

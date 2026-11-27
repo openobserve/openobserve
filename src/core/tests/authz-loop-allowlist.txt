@@ -6,7 +6,7 @@
 src/api/management/src/request/alerts/destinations.rs | delete_destination_bulk | request-bounded: one Check per id in the body
 src/api/management/src/request/alerts/mod.rs | delete_alert_bulk | request-bounded: one Check per id in the body, plus its composite references
 src/api/management/src/request/alerts/mod.rs | enable_alert_bulk | request-bounded: one Check per id in the body, plus its composite references
-src/api/management/src/request/alerts/mod.rs | move_alerts | request-bounded: one anomaly move Check per id in the body
+src/api/management/src/request/alerts/mod.rs | move_alerts | request-bounded: one source-folder move Check per anomaly or composite alert id in the body
 src/api/management/src/request/alerts/templates.rs | delete_template_bulk | request-bounded: one Check per id in the body
 src/api/management/src/request/authz/fga.rs | delete_group_bulk | request-bounded: one Check per id in the body
 src/api/management/src/request/authz/fga.rs | delete_role_bulk | request-bounded: one Check per id in the body
@@ -44,7 +44,12 @@ src/api/management/src/request/synthetics/mod.rs | readable_parents | object-bou
 src/core/src/alerts/ack.rs | may_edit_any_alert | object-bounded: the alerts of one incident
 src/core/src/alerts/incidents.rs | readable_definitions | object-bounded: the alert definitions of one incident
 src/core/src/alerts/incidents.rs | get_incident_with_alerts | object-bounded: the alerts of one incident, via incident_with_alerts
+src/core/src/alerts/incidents.rs | incident_with_alerts | object-bounded: the alerts and composites of one incident, through its can_read callback into readable_definitions
 src/core/src/auth.rs | first_unreadable | object-bounded: the objects one saved object references, deduplicated
+src/core/src/autoresolve/approve.rs | approve_with | object-bounded: one PUT Check per distinct connection in one run's chosen option, capped at O2_AUTORESOLVE_MAX_CONNECTIONS (default 20)
+src/core/src/autoresolve/approve.rs | authorize_decision | object-bounded: one PUT Check per distinct connection of one run's current plan until one passes, capped at O2_AUTORESOLVE_MAX_CONNECTIONS (default 20)
+src/core/src/autoresolve/approve.rs | edit_refusal_with | object-bounded: one PUT Check per connection of one saved AutoResolve, plus one candidate on add, capped at O2_AUTORESOLVE_MAX_CONNECTIONS (default 20)
+src/core/src/autoresolve/approve.rs | first_unapproved_with | object-bounded: one PUT Check per connection of one saved AutoResolve or run until the first denial, capped at O2_AUTORESOLVE_MAX_CONNECTIONS (default 20)
 src/core/src/downtimes/access.rs | check_target_folders | object-bounded: target folders of one downtime
 src/core/src/downtimes/access.rs | check_target_ids | object-bounded: target ids of one downtime
 src/core/src/downtimes/access.rs | check_targets | object-bounded: target folders and ids of one downtime
@@ -52,6 +57,7 @@ src/core/src/downtimes/access.rs | check_targets | object-bounded: target folder
 # Query-bounded: the streams, metrics or keys named in one query (D 7.2 S1a, S1b, S2).
 src/api/search/src/promql/mod.rs | check_metric_permissions | phase 1 keeps today's path; P2-5 (D 7.2 S2, query-bounded)
 src/api/search/src/search/mod.rs | can_clear_cache | query-bounded: streams named in the cache-clear request
+src/api/search/src/search/mod.rs | check_query_fn_permissions | query-bounded: deduplicated VRL layers from submitted query functions, with each layer's compiled enrichment-table references deduplicated
 src/api/search/src/search/mod.rs | check_sql_stream_permissions | phase 1 keeps today's path; P2-5 (D 7.2 S1a, query-bounded)
 src/api/search/src/search/mod.rs | security_scope_admits | phase 1 keeps today's path; P2-5 (D 7.2 S1b, query-bounded)
 src/api/search/src/search/multi_streams.rs | around_multi | query-bounded: streams named in one multi-stream around query
@@ -92,23 +98,39 @@ src/core/src/public_dashboards/status.rs | hide_unreadable_details | phase 1 kee
 
 # The list primitive, its fallbacks and the legacy copies of converted sites (D 6.9, D 15 item 1).
 src/core/src/authz.rs | check_each | per-stream fallback used by legacy_readable_streams and the other legacy_* copies; 16 in flight
-src/core/src/authz/list.rs | TypeAnswers::decide | primitive fallback: one Check per id the type answers do not cover
+src/core/src/authz/list.rs | TypeAnswers::decide_outcomes | primitive fallback: one Check per distinct id the type answers do not cover, 16 in flight, none started after the first error
+src/core/src/authz/list.rs | TypeAnswers::all_allowed | primitive fallback for one all-of row: one serial Check per uncovered id, stopping at the first deny and sending none after the first error
 src/api/management/src/request/gen_ai.rs | load_agent_list | D 7.1 row 13: rows whose stream_type is not a listable StreamType keep today's per-row can_read_stream, deduplicated
 src/api/management/src/request/gen_ai.rs | legacy_agent_stream_permissions | legacy copy of D 7.1 row 13 for the off and shadow modes
-src/core/src/service_identity/access.rs | legacy_verdict | legacy copy of D 7.1 row 12 for the off and shadow modes
+src/core/src/service_identity/access.rs | legacy_evidence | legacy copy of D 7.1 row 12 for the off, shadow and small on modes: one evidence row, serial, stops at the first deny and sends no call after the first error (all_of)
+src/core/src/service_identity/signals/reads.rs | deploys | one evidence row per deploy row of one service in the window; each stream is read once per request through the Context memo
+src/core/src/service_identity/signals/reads.rs | enrich_catalog_page | verdicts of one catalog page; each evidence stream is read once per request through the Context memo
+src/core/src/service_identity/signals/reads.rs | enrich_versions | all_of over at most 5 deploys of one version: stops at the first deny, sends no call after the first error, streams read once per request
+src/core/src/service_identity/signals/reads.rs | filter_catalog | verdict filter over the catalog scopes; each evidence stream is read once per request through the Context memo
+src/core/src/service_identity/signals/reads.rs | summarize_outcome | all_of over one row per region of a verdict: stops at the first deny, sends no call after the first error
+src/core/src/service_identity/signals/reads.rs | verdicts | at most 100 version keys or the rows of one version; each evidence stream is read once per request through the Context memo
 src/core/src/authz.rs | FakeStreamChecker::org_wide_readable | test-utils fake checker; no OpenFGA call
 src/core/src/authz.rs | FakeStreamChecker::types_access | test-utils fake checker; no OpenFGA call
 
 # Bounded by something other than org size.
+src/api/management/src/request/fleet/mod.rs | fleet_page | page-bounded: one GET Check per fleet on the returned page (PageQuery limit, at most 1000); GET only redacts details, so it is decided after paging
+src/api/management/src/request/ai/shares.rs | hidden_steps | bounded: one Search Check per distinct step stream of one shared chat, at most MAX_STREAM_CHECKS=32
+src/api/management/src/request/ai/shares.rs | hidden_steps_with | bounded: one cached can_read call per distinct step stream, at most MAX_STREAM_CHECKS=32
 src/api/management/src/request/db_monitoring/service/server_samples.rs | read_server_samples_body | bounded: at most the two fixed DBM server streams
+src/api/management/src/request/oncall/mod.rs | delete_unavailability | bounded: the two fixed DELETE grants (oncall_responses, oncall) for withdrawing another user's absence
 src/api/management/src/request/organization/org.rs | organizations | user-bounded: one users GET Check per org the caller belongs to
-src/api/management/src/request/resources/rbac.rs | resolve | bounded: one resolve_kind per requested ResourceKind of one Command K search
+src/api/management/src/request/resources/rbac.rs | resolve | bounded: one grant resolution per requested resource kind from the eight fixed Command K kinds
 src/api/management/src/request/resources/rbac.rs | signals | bounded: one LIST entry Check per fixed signal (logs, metrics, traces)
 src/api/management/src/request/security/sources.rs | attach | bounded: a fixed list of object types plus one pipeline
-src/api/management/src/request/stream/mod.rs | hide_unreadable_schemas | no Check: can_read is a lookup in ids listed once per stream type
+src/api/management/src/request/security/sources.rs | classify_sources | bounded: classify_queue selects at most 40 streams per pass; each sample checks read access and each proposed write checks stream RBAC
+src/core/src/autoresolve/approve.rs | LiveApproverFacts::has_module_access | bounded: MODULE_PERMISSIONS, GET and POST on the one autoresolve module object
 src/core/src/authz.rs | check_stream_permissions | bounded: the stream model plus at most one feature model for one stream
 src/core/src/overview.rs | module_access | bounded: one LIST Check per overview stream type plus alerts and pipelines
 
 # Not converted yet; scale with the org (follow-up, P2-5).
-src/api/management/src/request/fleet/mod.rs | list_fleets | not converted: one fleet_read Check per listed fleet folder; P2-5
-src/api/management/src/request/prompts.rs | match_prompts | not converted: one Check per prompt version when list filtering is off; P2-5
+src/api/management/src/request/prompts.rs | match_prompts | not converted: one Check per content-matched prompt version when list filtering is off; the prompt listing differs from that Check in identity and self-parent context, so it cannot stand in; P2-5
+src/api/management/src/request/security/sources.rs | list_sources | not converted: one guard_stream_reads Check per configured source whose activity count is stale, two in flight, each before its own count search; P2-5
+
+# Pre-existing on main, not converted in this PR; scale with the org (follow-up).
+src/api/management/src/request/ai/toolsets.rs | hide_mcp_urls | pre-existing on main, not converted in this PR: one PUT Check per MCP toolset in the response, unbounded join_all; a list without limit grows with the org's MCP toolsets
+src/core/src/autoresolve/approve.rs | may_approve_each | pre-existing on main, not converted in this PR: one PUT Check per connection; the summary page passes every usable MCP the caller may list, which grows with the org

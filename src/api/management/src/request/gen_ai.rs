@@ -15,7 +15,6 @@
 
 #[cfg(feature = "enterprise")]
 use std::{
-    borrow::Cow,
     collections::{HashMap, HashSet},
     future::Future,
 };
@@ -41,8 +40,8 @@ use openobserve_core::auth::check_permissions;
 use openobserve_core::authz::{
     StreamAccessChecker,
     list::{
-        AuthzUnavailable, Bypass, Identity, LegacyChecks, ObjectRef, ObjectsQuery, SITE_GEN_AI,
-        TodayChecks, authz_unavailable_response, listable_stream_type, objects_in_mode,
+        self, AuthzUnavailable, LegacyChecks, ObjectsQuery, SITE_GEN_AI, Scope, TodayChecks,
+        authz_unavailable_response, gen_ai_object, gen_ai_query, objects_in_mode,
     },
 };
 #[cfg(not(feature = "enterprise"))]
@@ -426,6 +425,66 @@ pub async fn clear_agent_registry(
 }
 
 #[cfg(feature = "enterprise")]
+pub(crate) async fn agent_stream_permissions_with<'a, F, Fut>(
+    checker: &dyn StreamAccessChecker,
+    legacy: &dyn LegacyChecks,
+    org_id: &str,
+    user_id: &str,
+    pairs: &'a [(String, String)],
+    fallback: F,
+) -> Result<HashMap<(String, String), bool>, AuthzUnavailable>
+where
+    F: Fn(&'a str, &'a str) -> Fut + Send + Sync,
+    Fut: Future<Output = bool> + Send,
+{
+    let query = gen_ai_query(org_id, user_id);
+    let mut seen = HashSet::new();
+    let objects: Vec<_> = pairs
+        .iter()
+        .filter(|pair| seen.insert(*pair))
+        .filter_map(|(stream_type, name)| gen_ai_object(stream_type, name))
+        .collect();
+    let mut permission_cache = HashMap::new();
+    let readable = objects_in_mode(
+        checker,
+        &query,
+        &objects,
+        &Scope::every(),
+        |objects| async {
+            permission_cache =
+                legacy_agent_stream_permissions(legacy, &query, pairs, &fallback).await;
+            Some(
+                objects
+                    .into_iter()
+                    .filter(|object| {
+                        permission_cache
+                            .get(&(object.stream_type.to_string(), object.id.to_string()))
+                            == Some(&true)
+                    })
+                    .map(|object| (object.stream_type, object.id.to_string()))
+                    .collect(),
+            )
+        },
+    )
+    .await?;
+    for (stream_type, name) in pairs {
+        let key = (stream_type.clone(), name.clone());
+        // Legacy may have run before the list path answered, so `readable` decides every object.
+        let allowed = match gen_ai_object(stream_type, name) {
+            Some(object) => readable.as_ref().is_none_or(|streams| {
+                streams.contains(&(object.stream_type, object.id.to_string()))
+            }),
+            None => match permission_cache.get(&key) {
+                Some(allowed) => *allowed,
+                None => fallback_agent_stream(&fallback, stream_type, name).await,
+            },
+        };
+        permission_cache.insert(key, allowed);
+    }
+    Ok(permission_cache)
+}
+
+#[cfg(feature = "enterprise")]
 fn agent_list_error_response(org_id: &str, error: anyhow::Error) -> Response {
     if let Some(error) = error.downcast_ref::<AuthzUnavailable>() {
         return authz_unavailable_response(*error);
@@ -493,84 +552,6 @@ async fn load_agent_list(
 }
 
 #[cfg(feature = "enterprise")]
-fn agent_stream_query<'a>(org_id: &'a str, user_id: &'a str) -> ObjectsQuery<'a> {
-    ObjectsQuery {
-        site: SITE_GEN_AI,
-        org_id,
-        user_id,
-        stream_types: &[],
-        permission: "GET",
-        use_all_org: false,
-        use_self_parent: true,
-        use_self_context: false,
-        parent_id: "",
-        bypass: Bypass::RbacOffOrRoot,
-        identity: Identity::StoredEmail,
-        prelude: None,
-    }
-}
-
-#[cfg(feature = "enterprise")]
-fn agent_stream_object<'a>(stream_type: &str, name: &'a str) -> Option<ObjectRef<'a>> {
-    Some(ObjectRef {
-        id: name,
-        stream_type: listable_stream_type(stream_type)?,
-        ofga_id: Cow::Borrowed(name),
-    })
-}
-
-#[cfg(feature = "enterprise")]
-async fn agent_stream_permissions_with<'a, F, Fut>(
-    checker: &dyn StreamAccessChecker,
-    legacy: &dyn LegacyChecks,
-    org_id: &str,
-    user_id: &str,
-    pairs: &'a [(String, String)],
-    fallback: F,
-) -> Result<HashMap<(String, String), bool>, AuthzUnavailable>
-where
-    F: Fn(&'a str, &'a str) -> Fut + Send + Sync,
-    Fut: Future<Output = bool> + Send,
-{
-    let query = agent_stream_query(org_id, user_id);
-    let mut seen = HashSet::new();
-    let objects: Vec<_> = pairs
-        .iter()
-        .filter(|pair| seen.insert(*pair))
-        .filter_map(|(stream_type, name)| agent_stream_object(stream_type, name))
-        .collect();
-    let mut permission_cache = HashMap::new();
-    let readable = objects_in_mode(checker, &query, &objects, || async {
-        permission_cache = legacy_agent_stream_permissions(legacy, &query, pairs, &fallback).await;
-        Some(
-            objects
-                .iter()
-                .filter(|object| {
-                    permission_cache.get(&(object.stream_type.to_string(), object.id.to_string()))
-                        == Some(&true)
-                })
-                .map(|object| (object.stream_type, object.id.to_string()))
-                .collect(),
-        )
-    })
-    .await?;
-    for (stream_type, name) in pairs {
-        let key = (stream_type.clone(), name.clone());
-        if permission_cache.contains_key(&key) {
-            continue;
-        }
-        let allowed = match agent_stream_object(stream_type, name) {
-            Some(object) => readable.as_ref().is_none_or(|streams| {
-                streams.contains(&(object.stream_type, object.id.to_string()))
-            }),
-            None => fallback_agent_stream(&fallback, stream_type, name).await,
-        };
-        permission_cache.insert(key, allowed);
-    }
-    Ok(permission_cache)
-}
-
-#[cfg(feature = "enterprise")]
 async fn legacy_agent_stream_permissions<'a, F, Fut>(
     checks: &dyn LegacyChecks,
     query: &ObjectsQuery<'_>,
@@ -587,13 +568,14 @@ where
         if permission_cache.contains_key(&key) {
             continue;
         }
-        let allowed = match agent_stream_object(stream_type, name) {
-            Some(object) => {
-                checks
-                    .object(query.org_id, query.user_id, query, &object)
+        let allowed = match gen_ai_object(stream_type, name) {
+            Some(object) => list::legacy_object_outcome(checks, query, &object)
+                .await
+                .allowed(),
+            None => {
+                list::without_error_denials(fallback_agent_stream(fallback, stream_type, name))
                     .await
             }
-            None => fallback_agent_stream(fallback, stream_type, name).await,
         };
         permission_cache.insert(key, allowed);
     }
@@ -661,12 +643,15 @@ mod tests {
 
     use config::meta::stream::StreamType;
     use openobserve_core::authz::{
-        FakeStreamChecker, TypedStream,
-        list::{CheckerChecks, ListMode, UnavailableReason},
+        FakeStreamChecker, TypedStream, fake_checker,
+        list::{CheckerChecks, ListMode, SMALL_REQUEST_OBJECTS, UnavailableReason},
         within_budget,
     };
 
     use super::*;
+    use crate::request::service_streams::tests::{
+        SHADOW_TESTS, assert_authz_unavailable, shadow_list_counts,
+    };
 
     const ORG: &str = "gen_ai_list_org";
 
@@ -717,7 +702,7 @@ mod tests {
                 4,
                 legacy_agent_stream_permissions(
                     &CheckerChecks(&fake),
-                    &agent_stream_query(ORG, user),
+                    &gen_ai_query(ORG, user),
                     &pairs,
                     &deny_fallback,
                 ),
@@ -749,7 +734,92 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_small_request_answers_a_legacy_check_error_with_its_reason() {
+        let user = "gen-ai-small-error@example.com";
+        let off_user = "gen-ai-small-error-off@example.com";
+        let pairs = stream_pairs(&[("logs", "a"), ("logs", "b"), ("logs", "a")]);
+        let fake = FakeStreamChecker::default();
+        fake.set_list_mode(user, ListMode::On);
+        fake.set_small_request_objects(user, SMALL_REQUEST_OBJECTS);
+        fake.set_list_mode(off_user, ListMode::Off);
+        for user in [user, off_user] {
+            grant(&fake, user, StreamType::Logs, "a");
+            grant(&fake, user, StreamType::Logs, "b");
+            fake.fail_object_check_once(user, UnavailableReason::Timeout);
+        }
+        let actual = agent_stream_permissions_with(
+            &fake,
+            &CheckerChecks(&fake),
+            ORG,
+            user,
+            &pairs,
+            deny_fallback,
+        )
+        .await;
+        assert_eq!(actual, Err(UnavailableReason::Timeout.into()));
+        legacy_agent_stream_permissions(
+            &CheckerChecks(&fake),
+            &gen_ai_query(ORG, off_user),
+            &pairs,
+            &deny_fallback,
+        )
+        .await;
+        let calls = fake.calls(user);
+        assert_eq!(calls.lists, 0);
+        assert!(calls.object_checks <= fake.calls(off_user).object_checks);
+    }
+
+    #[tokio::test]
+    async fn a_failed_fallback_check_keeps_the_legacy_answer() {
+        let user = "gen-ai-fallback-error@example.com";
+        let pairs = stream_pairs(&[("logs", "allowed"), ("logs", "denied"), ("foo", "fallback")]);
+        let fake = FakeStreamChecker::default();
+        let checker = &fake;
+        grant(&fake, user, StreamType::Logs, "allowed");
+        grant(&fake, user, StreamType::Logs, "fallback");
+        let fallback = |_: &str, name: &str| {
+            let stream = TypedStream {
+                org_id: ORG.to_string(),
+                stream_type: StreamType::Logs,
+                name: name.to_string(),
+            };
+            async move { checker.can_read_stream(user, &stream).await }
+        };
+        fake.fail_stream_read_once(user, "fallback");
+        let expected = legacy_agent_stream_permissions(
+            &CheckerChecks(&fake),
+            &gen_ai_query(ORG, user),
+            &pairs,
+            &fallback,
+        )
+        .await;
+
+        fake.set_list_mode(user, ListMode::On);
+        fake.set_small_request_objects(user, SMALL_REQUEST_OBJECTS);
+        fake.fail_stream_read_once(user, "fallback");
+        let actual = agent_stream_permissions_with(
+            &fake,
+            &CheckerChecks(&fake),
+            ORG,
+            user,
+            &pairs,
+            fallback,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(actual, expected);
+        assert!(actual[&pairs[0]]);
+        assert!(!actual[&pairs[1]]);
+        assert!(!actual[&pairs[2]]);
+        let calls = fake.calls(user);
+        assert_eq!(calls.streams, 2);
+        assert_eq!((calls.types_access, calls.lists), (0, 0));
+    }
+
+    #[tokio::test]
     async fn off_and_shadow_keep_legacy_answers_and_deduplicate_checks() {
+        let _slot = SHADOW_TESTS.lock().await;
         let user = "gen-ai-legacy@example.com";
         let pairs = stream_pairs(&[
             ("logs", "first"),
@@ -765,7 +835,7 @@ mod tests {
             fake.fail_object_check_once(user, UnavailableReason::Timeout);
             let expected = legacy_agent_stream_permissions(
                 &CheckerChecks(&fake),
-                &agent_stream_query(ORG, user),
+                &gen_ai_query(ORG, user),
                 &pairs,
                 &deny_fallback,
             )
@@ -807,6 +877,35 @@ mod tests {
                 assert_eq!(fake.calls(user).types_access, 0);
             }
         }
+    }
+
+    #[tokio::test]
+    async fn shadow_compares_a_disagreeing_list_without_changing_agent_grants() {
+        let _slot = SHADOW_TESTS.lock().await;
+        let (compared, mismatches) = shadow_list_counts(SITE_GEN_AI, StreamType::Logs);
+        let fake = FakeStreamChecker::default();
+        let user = "gen-ai-shadow-disagreement@example.com";
+        fake.set_list_mode(user, ListMode::Shadow);
+        fake.set_shadow_sample(user, 1.0);
+        fake.list_extra_once(user, StreamType::Logs, "hidden");
+        grant(&fake, user, StreamType::Logs, "allowed");
+        let pairs = stream_pairs(&[("logs", "allowed"), ("logs", "hidden")]);
+        let actual = agent_stream_permissions_with(
+            &fake,
+            &CheckerChecks(&fake),
+            ORG,
+            user,
+            &pairs,
+            deny_fallback,
+        )
+        .await
+        .unwrap();
+        assert!(actual[&pairs[0]]);
+        assert!(!actual[&pairs[1]]);
+        assert_eq!(
+            shadow_list_counts(SITE_GEN_AI, StreamType::Logs),
+            (compared + 1, mismatches + 1),
+        );
     }
 
     #[tokio::test]
@@ -878,7 +977,7 @@ mod tests {
             fake.grant_read_all(user, ORG, StreamType::Logs);
             let expected = legacy_agent_stream_permissions(
                 &CheckerChecks(&fake),
-                &agent_stream_query(ORG, user),
+                &gen_ai_query(ORG, user),
                 &pairs,
                 &deny_fallback,
             )
@@ -909,12 +1008,22 @@ mod tests {
 
     #[tokio::test]
     async fn list_path_uses_one_c_probe_plus_three_calls_per_type() {
+        const TYPES: [StreamType; 3] = [StreamType::Logs, StreamType::Metrics, StreamType::Traces];
+        const UNLISTABLE_PAIRS: [(&str, &str); 3] = [
+            ("Logs", "raw"),
+            ("foo", "raw"),
+            ("enrichment_tables", "raw"),
+        ];
+        const PER_TYPE_CALL_CAP: usize = 3 * TYPES.len();
+        // types_access shares one C probe across all types.
+        const LIST_CALL_CAP: usize = PER_TYPE_CALL_CAP + 1;
+        const TOTAL_CALL_CAP: usize = LIST_CALL_CAP + UNLISTABLE_PAIRS.len();
+
         let fake = FakeStreamChecker::default();
         let user = "gen-ai-budget@example.com";
         fake.set_list_mode(user, ListMode::On);
-        let types = [StreamType::Logs, StreamType::Metrics, StreamType::Traces];
         let mut pairs = Vec::new();
-        for stream_type in types {
+        for stream_type in TYPES {
             for i in 0..200 {
                 let name = format!("stream_{i}");
                 if i % 5 == 0 {
@@ -923,16 +1032,11 @@ mod tests {
                 pairs.push((stream_type.to_string(), name));
             }
         }
-        pairs.extend(stream_pairs(&[
-            ("Logs", "raw"),
-            ("foo", "raw"),
-            ("enrichment_tables", "raw"),
-        ]));
+        pairs.extend(stream_pairs(&UNLISTABLE_PAIRS));
         pairs.push(pairs[0].clone());
         let fallbacks = Mutex::new(0);
-        let budget = 1 + 3 * types.len() + 3;
         let actual = within_budget(
-            budget as u32,
+            TOTAL_CALL_CAP as u32,
             agent_stream_permissions_with(
                 &fake,
                 &CheckerChecks(&fake),
@@ -959,11 +1063,11 @@ mod tests {
             ),
             (1, 1, 6, 3)
         );
-        assert_eq!(calls.total() + *fallbacks.lock().unwrap(), budget);
+        assert_eq!(calls.total() + *fallbacks.lock().unwrap(), TOTAL_CALL_CAP);
     }
 
     #[tokio::test]
-    async fn on_failures_return_errors_and_the_handler_answers_typed_503() {
+    async fn on_failures_return_unavailable_instead_of_partial_grants() {
         let user = "gen-ai-failure@example.com";
         for failure in ["probe", "list", "object"] {
             let fake = FakeStreamChecker::default();
@@ -997,25 +1101,51 @@ mod tests {
             .await
             .unwrap_err();
             assert_eq!(error.reason, UnavailableReason::Timeout, "{failure}");
-            let response = agent_list_error_response(ORG, error.into());
-            assert_eq!(
-                response.status(),
-                axum::http::StatusCode::SERVICE_UNAVAILABLE
-            );
-            assert_eq!(response.headers()["retry-after"], "3");
-            assert_eq!(response.headers()["x-o2-authz"], "unavailable");
-            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-                .await
-                .unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
-            assert_eq!(
-                body,
-                serde_json::json!({
-                    "code": 503,
-                    "error_code": "authz_unavailable",
-                    "message": "Permission service unavailable, try again",
-                })
-            );
         }
+    }
+
+    #[tokio::test]
+    async fn agent_list_handler_returns_typed_503_on_list_failure() {
+        use infra::table::gen_ai_agents::{self, AgentRecord};
+
+        use crate::request::security::tests::meta_store;
+
+        meta_store().await;
+        let org = format!("gen-ai-outage-{}", config::ider::uuid());
+        let user = format!("{org}@example.com");
+        let now = config::utils::time::now_micros();
+        gen_ai_agents::upsert_many(vec![AgentRecord {
+            agent_key: org.clone(),
+            org_id: org.clone(),
+            stream_type: "logs".into(),
+            stream_name: "registered".into(),
+            agent_id: Some("agent".into()),
+            agent_name: None,
+            env: None,
+            version: None,
+            identity_source: "agent_id".into(),
+            first_seen: now,
+            last_seen: now,
+            created_at: now,
+            updated_at: now,
+        }])
+        .await
+        .unwrap();
+        let fake = fake_checker();
+        fake.set_list_mode(&user, ListMode::On);
+        fake.fail_list_once(&user, UnavailableReason::Timeout);
+        let query = Query::<AgentListQuery>::try_from_uri(&"/?from=0&size=25".parse().unwrap())
+            .expect("agent list query");
+        let response = list_scored_agents(
+            Path(org.clone()),
+            Headers(UserEmail {
+                user_id: user.clone(),
+            }),
+            query,
+        )
+        .await;
+        gen_ai_agents::delete_by_org(&org).await.unwrap();
+        assert_eq!(fake.calls(&user).lists, 1);
+        assert_authz_unavailable(response).await;
     }
 }

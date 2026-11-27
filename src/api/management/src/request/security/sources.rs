@@ -15,7 +15,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    future::Future,
     sync::{Arc, LazyLock, Mutex},
 };
 
@@ -60,16 +59,11 @@ use o2_enterprise::enterprise::security::{
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, check_permissions},
-    authz::{
-        StreamAccessChecker,
-        list::{
-            AuthzUnavailable, SITE_SECURITY_SOURCES, StreamSet, answer_in_mode,
-            authz_unavailable_response, stream_answers,
-        },
-    },
+    authz::list::{AuthzUnavailableBody, ListMode, Scope, StreamSet, authz_unavailable_response},
     background_access::StreamReadCheck,
     pipeline as pipeline_service,
     pipeline::db::PipelineError,
+    security::{admit_security_sources_once, readable_sources_in_mode},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -200,6 +194,8 @@ pub struct SourcesResponse {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SourcesResponse),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+        (status = 503, description = "Permission service unavailable", body = inline(AuthzUnavailableBody),
+            headers(("Retry-After" = u32, description = "3 seconds"), ("X-O2-Authz" = String, description = "unavailable"))),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Security", "operation": "list"})),
@@ -214,10 +210,11 @@ pub async fn list_sources(
     if let Err(denied) = require(&org_id, &user_id, "GET").await {
         return denied;
     }
-    let (streams, streams_readable) = match readable_streams(&org_id, &user_id).await {
-        Ok(found) => found,
-        Err(denied) => return denied,
-    };
+    let (streams, streams_readable) =
+        match readable_streams(&org_id, &user_id, &Scope::every()).await {
+            Ok(found) => found,
+            Err(denied) => return denied,
+        };
     let now = now_micros();
     let recount: Vec<&str> = streams
         .iter()
@@ -350,6 +347,8 @@ pub async fn match_source(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = ClassifyResponse),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+        (status = 503, description = "Permission service unavailable", body = inline(AuthzUnavailableBody),
+            headers(("Retry-After" = u32, description = "3 seconds"), ("X-O2-Authz" = String, description = "unavailable"))),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Security", "operation": "update"})),
@@ -366,7 +365,8 @@ pub async fn classify_sources(
         return denied;
     }
     let wanted = body.map(|Json(b)| b.streams).unwrap_or_default();
-    let streams = match readable_streams(&org_id, &user_id).await {
+    let automatic = wanted.is_empty();
+    let streams = match readable_streams(&org_id, &user_id, &classify_scope(wanted)).await {
         Ok((streams, _)) => streams,
         Err(denied) => return denied,
     };
@@ -374,7 +374,6 @@ pub async fn classify_sources(
     let memo = CLASSIFY_MEMO.lock().unwrap().clone();
     let candidates: Vec<ClassifyCandidate<'_>> = streams
         .iter()
-        .filter(|s| wanted.is_empty() || wanted.contains(&s.name))
         .map(|s| ClassifyCandidate {
             stream: StreamRef {
                 name: &s.name,
@@ -382,7 +381,7 @@ pub async fn classify_sources(
             },
             created_at: s.stats.created_at,
             doc_num: s.stats.doc_num,
-            memo: if wanted.is_empty() {
+            memo: if automatic {
                 memo.get(&(org_id.clone(), s.name.clone())).copied()
             } else {
                 None
@@ -697,6 +696,7 @@ fn conflict(err: AttachError) -> Response {
 async fn readable_streams(
     org_id: &str,
     user_id: &str,
+    scope: &Scope,
 ) -> Result<(Vec<common::meta::stream::Stream>, bool), Response> {
     use o2_openfga::meta::mapping::OFGA_MODELS;
 
@@ -713,8 +713,10 @@ async fn readable_streams(
                 !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&s.name)
             })
             .collect();
+    let non_protected_logs = streams.len();
+    streams.retain(|s| scope.shows(StreamType::Logs, &s.name));
     // With list_only_permitted off the list above is every stream, so ask what the caller holds.
-    let readable = if needs_stream_grant_lookup(permitted.as_deref(), streams.len()) {
+    let readable = if needs_stream_grant_lookup(permitted.as_deref(), non_protected_logs) {
         db::authz::list_permitted_objects(org_id, user_id, "GET", key)
             .await
             .map_or(true, |held| any_stream_readable(held.as_deref()))
@@ -740,93 +742,64 @@ async fn readable_streams(
         return Ok((streams, still_readable(readable, 0, 0)));
     }
     // An unfiltered list would hand out doc counts and verdicts of streams a search refuses.
-    let names: Vec<_> = streams.iter().map(|s| s.name.clone()).collect();
-    let requested = names
-        .iter()
-        .map(|name| (StreamType::Logs, name.clone()))
-        .collect();
     let checker = openobserve_core::authz::active_checker();
+    if checker.list_settings(user_id).mode == ListMode::Off {
+        let denied =
+            super::unreadable_streams(org_id, user_id, streams.iter().map(|s| s.name.as_str()))
+                .await;
+        streams.retain(|s| !denied.contains(s.name.as_str()));
+        let readable = !streams.is_empty();
+        return Ok((streams, readable));
+    }
+    let requested = streams
+        .iter()
+        .map(|s| (StreamType::Logs, s.name.clone()))
+        .collect();
     let allowed = readable_sources_in_mode(
         checker.as_ref(),
         org_id,
         user_id,
         &requested,
-        || async {
-            let denied =
-                super::unreadable_streams(org_id, user_id, names.iter().map(String::as_str)).await;
-            Some(
-                requested
-                    .iter()
-                    .filter(|(_, name)| !denied.contains(name))
-                    .cloned()
-                    .collect(),
-            )
-        },
-        |denied| {
-            openobserve_core::security::admit_security_sources_once(
-                checker.as_ref(),
-                org_id,
-                user_id,
-                denied,
-            )
-        },
+        scope,
+        |requested| legacy_sources(org_id, user_id, requested),
+        |denied| admit_security_sources_once(checker.as_ref(), org_id, user_id, denied),
     )
     .await
     .map_err(authz_unavailable_response)?;
     let before = streams.len();
-    streams.retain(|s| {
-        allowed
-            .as_ref()
-            .is_none_or(|readable| readable.contains(&(StreamType::Logs, s.name.clone())))
-    });
+    if let Some(allowed) = allowed {
+        let names: HashSet<_> = allowed
+            .into_iter()
+            .filter_map(|(kind, name)| (kind == StreamType::Logs).then_some(name))
+            .collect();
+        streams.retain(|s| names.contains(s.name.as_str()));
+    }
     let readable = still_readable(readable, before, streams.len());
     Ok((streams, readable))
 }
 
-async fn readable_sources_in_mode<
-    LF: Future<Output = Option<StreamSet>>,
-    SF: Future<Output = Result<HashSet<String>, AuthzUnavailable>>,
->(
-    checker: &dyn StreamAccessChecker,
+/// Classification of named streams reads only those, so no other stream's answer matters.
+fn classify_scope(wanted: Vec<String>) -> Scope {
+    if wanted.is_empty() {
+        Scope::every()
+    } else {
+        Scope::requested(wanted.into_iter().map(|name| (StreamType::Logs, name)))
+    }
+}
+
+async fn legacy_sources(
     org_id: &str,
     user_id: &str,
-    requested: &StreamSet,
-    legacy: impl FnOnce() -> LF,
-    admit: impl FnOnce(Vec<String>) -> SF,
-) -> Result<Option<StreamSet>, AuthzUnavailable> {
-    let (readable, _) = answer_in_mode(
-        checker,
-        SITE_SECURITY_SOURCES,
+    mut requested: StreamSet,
+) -> Option<StreamSet> {
+    let denied = super::unreadable_streams(
+        org_id,
         user_id,
-        requested,
-        legacy,
-        || async {
-            let (mut readable, answers) = stream_answers(
-                checker,
-                SITE_SECURITY_SOURCES,
-                user_id,
-                org_id,
-                requested,
-                &[StreamType::Logs],
-            )
-            .await?;
-            if let Some(readable) = &mut readable {
-                let denied = requested
-                    .difference(readable)
-                    .map(|(_, name)| name.clone())
-                    .collect();
-                readable.extend(
-                    admit(denied)
-                        .await?
-                        .into_iter()
-                        .map(|name| (StreamType::Logs, name)),
-                );
-            }
-            Ok((readable, answers))
-        },
+        requested.iter().map(|(_, name)| name.as_str()),
     )
-    .await?;
-    Ok(readable)
+    .await;
+    requested.retain(|(_, name)| !denied.contains(name));
+    Some(requested)
 }
 
 fn needs_stream_grant_lookup(permitted: Option<&[String]>, non_protected_logs: usize) -> bool {
@@ -1477,80 +1450,53 @@ async fn detach(
 
 #[cfg(test)]
 mod tests {
-    use openobserve_core::authz::{
-        FakeStreamChecker, TypedStream, fake_checker,
-        list::{ListMode, OrgWideCheck, UnavailableReason},
-        within_budget,
+    use openobserve_core::{
+        authz::{
+            FakeStreamChecker, TypedStream, fake_checker,
+            list::{
+                AuthzUnavailable, SITE_SECURITY_SOURCES, SMALL_REQUEST_OBJECTS, UnavailableReason,
+            },
+            within_budget,
+        },
+        security::admit_security_sources_once_with,
     };
 
     use super::*;
+    use crate::request::{
+        authz_error_table::security_sources,
+        service_streams::tests::{SHADOW_TESTS, shadow_list_counts},
+    };
 
-    fn source_names() -> Vec<String> {
+    fn source_streams() -> StreamSet {
         ["granted", "private", "security_source"]
-            .map(String::from)
-            .to_vec()
-    }
-
-    fn security_get() -> OrgWideCheck<'static> {
-        OrgWideCheck {
-            resource: "security",
-            permission: "GET",
-            use_all_org: true,
-            use_self_context: false,
-            use_self_parent: false,
-        }
-    }
-
-    async fn legacy_sources(org_id: &str, user_id: &str, names: &[String]) -> Option<StreamSet> {
-        let denied =
-            super::super::unreadable_streams(org_id, user_id, names.iter().map(String::as_str))
-                .await;
-        Some(
-            names
-                .iter()
-                .filter(|name| !denied.contains(name.as_str()))
-                .map(|name| (StreamType::Logs, name.clone()))
-                .collect(),
-        )
-    }
-
-    async fn admit_fake_sources(
-        checker: &FakeStreamChecker,
-        org_id: &str,
-        user_id: &str,
-        denied: Vec<String>,
-    ) -> Result<HashSet<String>, AuthzUnavailable> {
-        let mut admitted: HashSet<_> = denied
             .into_iter()
-            .filter(|name| name == "security_source")
-            .collect();
-        if !admitted.is_empty()
-            && !checker
-                .org_wide_check(user_id, org_id, &security_get())
-                .await?
-        {
-            admitted.clear();
-        }
-        Ok(admitted)
+            .map(|name| (StreamType::Logs, name.to_string()))
+            .collect()
     }
 
     async fn fake_sources_in_mode(
         checker: &FakeStreamChecker,
         org_id: &str,
         user_id: &str,
-        names: &[String],
+        requested: &StreamSet,
     ) -> Result<Option<StreamSet>, AuthzUnavailable> {
-        let requested = names
-            .iter()
-            .map(|name| (StreamType::Logs, name.clone()))
-            .collect();
         readable_sources_in_mode(
             checker,
             org_id,
             user_id,
-            &requested,
-            || legacy_sources(org_id, user_id, names),
-            |denied| admit_fake_sources(checker, org_id, user_id, denied),
+            requested,
+            &Scope::every(),
+            |requested| legacy_sources(org_id, user_id, requested),
+            |denied| {
+                admit_security_sources_once_with(checker, org_id, user_id, denied, true, |name| {
+                    std::future::ready((name == "security_source").then_some(
+                        SecuritySourceSetting {
+                            included: Some(true),
+                            ..Default::default()
+                        },
+                    ))
+                })
+            },
         )
         .await
     }
@@ -1569,7 +1515,7 @@ mod tests {
     #[tokio::test]
     async fn test_source_modes_match_legacy_roles() {
         let checker = fake_checker();
-        let names = source_names();
+        let requested = source_streams();
         for role in ["user", "custom", "editor", "admin"] {
             for mode in [ListMode::Off, ListMode::On] {
                 let org_id = format!("security_sources_modes_{role}_{mode:?}");
@@ -1591,14 +1537,16 @@ mod tests {
                         name: "granted".to_string(),
                     },
                 );
-                let legacy = legacy_sources(&org_id, &user_id, &names).await.unwrap();
+                let legacy = legacy_sources(&org_id, &user_id, requested.clone())
+                    .await
+                    .unwrap();
                 let expected_len = if matches!(role, "editor" | "admin") {
-                    names.len()
+                    requested.len()
                 } else {
                     1
                 };
                 assert_eq!(legacy.len(), expected_len);
-                let readable = fake_sources_in_mode(&checker, &org_id, &user_id, &names)
+                let readable = fake_sources_in_mode(&checker, &org_id, &user_id, &requested)
                     .await
                     .unwrap();
                 let expected = if role == "admin" && mode == ListMode::On {
@@ -1618,11 +1566,14 @@ mod tests {
         let user_id = "security_sources_budget_analyst";
         checker.set_list_mode(user_id, ListMode::On);
         checker.grant_org_wide_check(user_id, "org", "security");
-        let names = source_names();
-        let readable = within_budget(5, fake_sources_in_mode(&checker, "org", user_id, &names))
-            .await
-            .unwrap()
-            .unwrap();
+        let requested = source_streams();
+        let readable = within_budget(
+            5,
+            fake_sources_in_mode(&checker, "org", user_id, &requested),
+        )
+        .await
+        .unwrap()
+        .unwrap();
         assert_eq!(
             readable,
             StreamSet::from([(StreamType::Logs, "security_source".to_string())])
@@ -1634,7 +1585,84 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_source_failures_return_authz_unavailable_response() {
+    async fn test_source_check_error_only_fails_when_security_does_not_admit_the_stream() {
+        let failing = "a".repeat(220);
+        for count in [2, SMALL_REQUEST_OBJECTS + 1] {
+            let mut names = vec![failing.clone()];
+            names.extend((1..count).map(|i| format!("denied_{i}")));
+            let checker = FakeStreamChecker::default();
+            for (user, admitted) in [("admitted", true), ("denied", false)] {
+                checker.set_list_mode(user, ListMode::On);
+                checker.set_small_request_objects(user, SMALL_REQUEST_OBJECTS);
+                checker.grant_read(
+                    user,
+                    &TypedStream {
+                        org_id: "org".to_string(),
+                        stream_type: StreamType::Logs,
+                        name: failing.clone(),
+                    },
+                );
+                if admitted {
+                    checker.grant_org_wide_check(user, "org", "security");
+                }
+                if count <= SMALL_REQUEST_OBJECTS {
+                    checker.fail_stream_read_once(user, &failing);
+                } else {
+                    checker.fail_object_check_of(user, &failing, UnavailableReason::Timeout);
+                }
+                let result = within_budget(
+                    7,
+                    security_sources(
+                        &checker,
+                        "org",
+                        user,
+                        &names,
+                        &Scope::every(),
+                        Some(&failing),
+                    ),
+                )
+                .await;
+                let expected = if admitted {
+                    Ok(Some(StreamSet::from([(StreamType::Logs, failing.clone())])))
+                } else {
+                    Err(UnavailableReason::Timeout.into())
+                };
+                assert_eq!(result, expected, "{count} streams, {user}");
+                assert_eq!(checker.calls(user).org_wide_checks, 1);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_classify_scope_ignores_an_unrequested_stream_timeout() {
+        let checker = FakeStreamChecker::default();
+        let names = vec!["denied".to_string(), "timeout".to_string()];
+        let scope = classify_scope(vec!["denied".to_string()]);
+        for (user, mode) in [("off", ListMode::Off), ("on", ListMode::On)] {
+            checker.set_list_mode(user, mode);
+            checker.set_small_request_objects(user, SMALL_REQUEST_OBJECTS);
+            checker.grant_read(
+                user,
+                &TypedStream {
+                    org_id: "org".to_string(),
+                    stream_type: StreamType::Logs,
+                    name: "timeout".to_string(),
+                },
+            );
+            checker.fail_stream_read_once(user, "timeout");
+        }
+        let off = security_sources(&checker, "org", "off", &names, &scope, None).await;
+        let on = security_sources(&checker, "org", "on", &names, &scope, None).await;
+        assert_eq!(off, Ok(Some(StreamSet::new())));
+        assert_eq!(on, off);
+        for user in ["off", "on"] {
+            let calls = checker.calls(user);
+            assert_eq!((calls.streams, calls.object_checks), (1, 0));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_source_failures_return_unavailable_instead_of_partial_grants() {
         let checker = fake_checker();
         for security_failure in [false, true] {
             let user_id = format!("security_sources_failure_{security_failure}");
@@ -1644,50 +1672,40 @@ mod tests {
             } else {
                 checker.fail_types_access_once(&user_id, UnavailableReason::Transport);
             }
-            let response = fake_sources_in_mode(&checker, "org", &user_id, &source_names())
+            let error = fake_sources_in_mode(&checker, "org", &user_id, &source_streams())
                 .await
-                .map_err(authz_unavailable_response)
                 .unwrap_err();
-            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-            assert_eq!(response.headers()["x-o2-authz"], "unavailable");
-            assert_eq!(response.headers()["retry-after"], "3");
-            assert_eq!(
-                checker.calls(&user_id).org_wide_checks,
-                usize::from(security_failure)
-            );
-            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-                .await
-                .unwrap();
-            assert_eq!(
-                serde_json::from_slice::<Value>(&body).unwrap(),
-                serde_json::json!({
-                    "code": 503,
-                    "error_code": "authz_unavailable",
-                    "message": "Permission service unavailable, try again",
-                })
-            );
+            assert_eq!(error.reason, UnavailableReason::Transport);
+            assert_eq!(checker.calls(&user_id).org_wide_checks, 1);
         }
     }
 
     #[tokio::test]
     async fn test_shadow_sources_keep_the_legacy_answer() {
+        let _slot = SHADOW_TESTS.lock().await;
+        let (compared, mismatches) = shadow_list_counts(SITE_SECURITY_SOURCES, StreamType::Logs);
         let checker = fake_checker();
         let user_id = "security_sources_shadow_reader";
         checker.set_list_mode(user_id, ListMode::Shadow);
         checker.set_shadow_sample(user_id, 1.0);
         checker.list_extra_once(user_id, StreamType::Logs, "private");
-        let names = source_names();
-        let legacy = legacy_sources("org", user_id, &names).await;
-        let readable = fake_sources_in_mode(&checker, "org", user_id, &names)
+        let requested = source_streams();
+        let legacy = legacy_sources("org", user_id, requested.clone()).await;
+        let readable = fake_sources_in_mode(&checker, "org", user_id, &requested)
             .await
             .unwrap();
         assert_eq!(readable, legacy);
-        assert_eq!(checker.calls(user_id).streams, names.len() * 2);
+        assert_eq!(checker.calls(user_id).streams, requested.len() * 2);
         assert_eq!(checker.calls(user_id).object_checks, 0);
+        assert_eq!(
+            shadow_list_counts(SITE_SECURITY_SOURCES, StreamType::Logs),
+            (compared + 1, mismatches + 1),
+        );
     }
 
     #[tokio::test]
     async fn test_off_and_shadow_sources_keep_legacy_check_denials() {
+        let _slot = SHADOW_TESTS.lock().await;
         let checker = fake_checker();
         for mode in [ListMode::Off, ListMode::Shadow] {
             let user_id = format!("security_sources_legacy_denials_{mode:?}");
@@ -1702,16 +1720,35 @@ mod tests {
                 },
             );
             checker.fail_stream_read_once(&user_id, "granted");
-            let names = source_names();
-            let readable = fake_sources_in_mode(&checker, "org", &user_id, &names)
+            let requested = source_streams();
+            let readable = fake_sources_in_mode(&checker, "org", &user_id, &requested)
                 .await
                 .unwrap();
             assert_eq!(readable, Some(StreamSet::new()));
-            assert_eq!(checker.calls(&user_id).streams, names.len());
+            assert_eq!(checker.calls(&user_id).streams, requested.len());
             assert_eq!(checker.calls(&user_id).object_checks, 0);
             if mode == ListMode::Off {
                 assert_eq!(checker.calls(&user_id).types_access, 0);
             }
+        }
+    }
+
+    #[test]
+    fn test_source_routes_document_the_authz_unavailable_response() {
+        use utoipa::Path;
+
+        for operation in [
+            __path_list_sources::operation(),
+            __path_classify_sources::operation(),
+        ] {
+            let docs = serde_json::to_value(operation).unwrap();
+            let unavailable = &docs["responses"]["503"];
+            assert!(unavailable["headers"]["Retry-After"].is_object());
+            assert!(unavailable["headers"]["X-O2-Authz"].is_object());
+            assert_eq!(
+                unavailable["content"]["application/json"]["schema"]["properties"]["error_code"]["example"],
+                "authz_unavailable"
+            );
         }
     }
 
@@ -1818,7 +1855,10 @@ mod tests {
         };
 
         use super::*;
-        use crate::request::security::tests::{grant, meta_store};
+        use crate::request::{
+            security::tests::{grant, meta_store},
+            service_streams::tests::assert_authz_unavailable,
+        };
 
         /// A fresh org's logs stream, and a root user whose Security grants are only `security`.
         async fn org_with_stream(security: &[&'static str]) -> (String, String) {
@@ -1888,6 +1928,20 @@ mod tests {
             Headers(UserEmail {
                 user_id: user.to_string(),
             })
+        }
+
+        #[tokio::test]
+        async fn list_and_classify_handlers_return_typed_503_on_list_failure() {
+            let (org, user) = org_with_stream(&["GET", "POST"]).await;
+            let checker = fake_checker();
+            checker.set_list_mode(&user, ListMode::On);
+
+            checker.fail_list_once(&user, UnavailableReason::Timeout);
+            assert_authz_unavailable(list_sources(Path(org.clone()), as_user(&user)).await).await;
+
+            checker.fail_list_once(&user, UnavailableReason::Timeout);
+            assert_authz_unavailable(classify_sources(Path(org), as_user(&user), None).await).await;
+            assert_eq!(checker.calls(&user).lists, 2);
         }
 
         async fn stored(org: &str) -> Option<SecuritySourceSetting> {

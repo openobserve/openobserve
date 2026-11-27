@@ -45,12 +45,17 @@ use openobserve_core::{
         accounting::{CallCounts, REQUEST_CALLS},
         active_checker,
         list::{
-            Bypass, Identity, ObjectRef, ObjectsQuery, OrgWideCheck, Readable,
+            Bypass, Identity, ListMode, ObjectRef, ObjectsQuery, OrgWideCheck, Readable,
             SITE_AUTOOBSERVE_STREAMS, SITE_DB_MONITORING, SITE_GEN_AI, SITE_SECURITY_SOURCES,
-            SITE_SERVICE_GRAPH, StreamSet, authorize_objects, probe_covers, stream_answers,
+            SITE_SERVICE_GRAPH, SITE_SERVICE_IDENTITY, SITE_SERVICE_STREAMS,
+            SITE_SERVICE_STREAMS_CORRELATE, SMALL_REQUEST_OBJECTS, Scope, Site, StreamSet,
+            authorize_objects, autoobserve_streams_query, db_monitoring_query, gen_ai_object,
+            gen_ai_query, objects_in_mode, probe_covers, security_sources_query, stream_answers,
             stream_read_query,
         },
     },
+    service_identity::access::service_identity_read_query,
+    traces::service_graph::api::{trace_stream_object, trace_stream_query},
 };
 
 const ORG: &str = "i1b_org";
@@ -91,16 +96,25 @@ const MEMBERS: [Member; 5] = [
     },
 ];
 
-const STREAMS: [(StreamType, &str); 9] = [
+const STREAMS: [(StreamType, &str); 18] = [
     (StreamType::Logs, "s1"),
+    (StreamType::Metrics, "m1"),
+    (StreamType::Traces, "t1"),
+    (StreamType::Traces, "t2"),
     (StreamType::Logs, "s2"),
     (StreamType::Logs, "_all_i1b_org"),
     (StreamType::Logs, "foo.bar"),
     (StreamType::Logs, "foo:bar"),
-    (StreamType::Metrics, "m1"),
+    (StreamType::Logs, "s3"),
     (StreamType::Metrics, "m2"),
-    (StreamType::Traces, "t1"),
-    (StreamType::Traces, "t2"),
+    (StreamType::Metrics, "m3"),
+    (StreamType::Metrics, "m4"),
+    (StreamType::Metrics, "m5"),
+    (StreamType::Metrics, "m6"),
+    (StreamType::Traces, "t3"),
+    (StreamType::Traces, "t4"),
+    (StreamType::Traces, "t5"),
+    (StreamType::Traces, "t6"),
 ];
 
 const PERMISSIONS: [&str; 3] = ["GET", "LIST", "PUT"];
@@ -110,6 +124,28 @@ const SHAPES: [(bool, bool, bool, &str); 5] = [
     (true, false, false, ""),
     (false, true, true, ""),
     (true, false, false, "i1b_parent"),
+];
+
+const S5_CASES: [(Site, &[StreamType]); 10] = [
+    (SITE_SECURITY_SOURCES, &[StreamType::Logs]),
+    (SITE_DB_MONITORING, &[StreamType::Traces]),
+    (SITE_SERVICE_GRAPH, &[StreamType::Traces]),
+    (SITE_GEN_AI, &[StreamType::Logs, StreamType::Metrics]),
+    (SITE_AUTOOBSERVE_STREAMS, &[StreamType::Logs]),
+    (SITE_AUTOOBSERVE_STREAMS, &[StreamType::Metrics]),
+    (SITE_AUTOOBSERVE_STREAMS, &[StreamType::Traces]),
+    (
+        SITE_SERVICE_IDENTITY,
+        &[StreamType::Traces, StreamType::Logs, StreamType::Metrics],
+    ),
+    (
+        SITE_SERVICE_STREAMS,
+        &[StreamType::Logs, StreamType::Metrics, StreamType::Traces],
+    ),
+    (
+        SITE_SERVICE_STREAMS_CORRELATE,
+        &[StreamType::Logs, StreamType::Metrics, StreamType::Traces],
+    ),
 ];
 
 /// One request user: the id the request carries, the stored email, and the org role.
@@ -231,13 +267,18 @@ fn meta_role_override_uses_the_identity_sent_to_openfga() {
 fn s5_site_answers_equal_per_object_checks_end_to_end() {
     RUNTIME.block_on(async {
         let _serial = SERIAL.lock().await;
+        // SAFETY: tests hold `SERIAL`, and no other thread reads the environment meanwhile.
+        unsafe { std::env::set_var("O2_OPENFGA_LIST_AUTHZ_MODE", "on") };
         connect().await;
         seed().await;
+        let settings = active_checker().list_settings(MEMBERS[0].id);
+        assert_eq!(settings.mode, ListMode::On);
+        assert_eq!(settings.small_request_objects, SMALL_REQUEST_OBJECTS);
         for deadline in ["5000", "0"] {
             declare_deadline(deadline);
             for member in &MEMBERS {
-                for query in s5_queries(member.id) {
-                    assert_s5_matches(&query, deadline).await;
+                for (site, types) in S5_CASES {
+                    assert_s5_matches(site, types, member.id, deadline).await;
                 }
             }
         }
@@ -384,7 +425,7 @@ async fn assert_meta_override(member: Member, role_name: &str) {
     save_org_tuples(org).await;
     let override_role = seed_meta_member(&member, role_name).await;
     let override_key = format!("{org}/{}", member.email);
-    let streams = [(StreamType::Logs, "s1"), (StreamType::Logs, "s2")];
+    let streams = ["s1", "s2", "s3", "s4", "s5", "s6"].map(|name| (StreamType::Logs, name));
     let expected = HashSet::from([(StreamType::Logs, "s1".to_string())]);
     for deadline in ["5000", "0"] {
         declare_deadline(deadline);
@@ -730,89 +771,149 @@ async fn legacy_given_id_check(query: &ObjectsQuery<'_>, object: &ObjectRef<'_>)
     .await
 }
 
-fn s5_queries(user_id: &str) -> Vec<ObjectsQuery<'_>> {
-    let stored = ObjectsQuery {
-        bypass: Bypass::RbacOffOrRoot,
-        identity: Identity::StoredEmail,
-        ..stream_read_query(
-            SITE_GEN_AI,
-            ORG,
-            user_id,
-            &[StreamType::Logs, StreamType::Metrics],
-        )
+fn s5_query<'a>(site: Site, types: &'a [StreamType], user_id: &'a str) -> ObjectsQuery<'a> {
+    match site {
+        SITE_SECURITY_SOURCES => security_sources_query(ORG, user_id),
+        SITE_DB_MONITORING => db_monitoring_query(ORG, user_id, types),
+        SITE_SERVICE_GRAPH => trace_stream_query(ORG, user_id),
+        SITE_GEN_AI => gen_ai_query(ORG, user_id),
+        SITE_AUTOOBSERVE_STREAMS => autoobserve_streams_query(ORG, user_id, types),
+        SITE_SERVICE_IDENTITY => service_identity_read_query(ORG, user_id),
+        SITE_SERVICE_STREAMS | SITE_SERVICE_STREAMS_CORRELATE => {
+            stream_read_query(site, ORG, user_id, types)
+        }
+        _ => unreachable!("unknown equivalence site {site}"),
+    }
+}
+
+fn legacy_s5_query<'a>(site: Site, types: &'a [StreamType], user_id: &'a str) -> ObjectsQuery<'a> {
+    let prelude = match site {
+        SITE_SERVICE_GRAPH => Some("traces"),
+        SITE_DB_MONITORING => Some("db_monitoring"),
+        _ => None,
     };
-    let mut queries = vec![
-        stream_read_query(SITE_SECURITY_SOURCES, ORG, user_id, &[StreamType::Logs]),
-        ObjectsQuery {
-            prelude: Some(s5_prelude("db_monitoring")),
-            ..stream_read_query(SITE_DB_MONITORING, ORG, user_id, &[StreamType::Traces])
-        },
-        ObjectsQuery {
-            site: SITE_SERVICE_GRAPH,
-            stream_types: &[StreamType::Traces],
-            prelude: Some(s5_prelude("traces")),
-            ..stored
-        },
-        stored,
-    ];
-    for stream_types in [
-        &[StreamType::Logs],
-        &[StreamType::Metrics],
-        &[StreamType::Traces],
-    ] {
-        queries.push(stream_read_query(
-            SITE_AUTOOBSERVE_STREAMS,
-            ORG,
-            user_id,
-            stream_types,
-        ));
-    }
-    queries
-}
-
-fn s5_prelude(resource: &str) -> OrgWideCheck<'_> {
-    OrgWideCheck {
-        resource,
+    ObjectsQuery {
+        site,
+        org_id: ORG,
+        user_id,
+        stream_types: if site == SITE_GEN_AI { &[] } else { types },
         permission: "GET",
-        use_all_org: true,
+        use_all_org: false,
         use_self_context: false,
-        use_self_parent: false,
+        use_self_parent: true,
+        parent_id: "",
+        identity: Identity::StoredEmail,
+        bypass: if matches!(site, SITE_SERVICE_GRAPH | SITE_GEN_AI) {
+            Bypass::RbacOffOrRoot
+        } else {
+            Bypass::RbacOffRootOrOrgAdmin
+        },
+        prelude: prelude.map(|resource| OrgWideCheck {
+            resource,
+            permission: "GET",
+            use_all_org: true,
+            use_self_context: false,
+            use_self_parent: false,
+        }),
     }
 }
 
-async fn assert_s5_matches(query: &ObjectsQuery<'_>, deadline: &str) {
+async fn assert_s5_matches(site: Site, types: &[StreamType], user_id: &str, deadline: &str) {
     let checker = active_checker();
-    let objects: Vec<ObjectRef<'_>> = STREAMS
-        .iter()
-        .filter(|(stream_type, _)| query.stream_types.contains(stream_type))
-        .map(|(stream_type, name)| {
-            if query.site == SITE_GEN_AI {
-                ObjectRef {
-                    id: name,
-                    stream_type: *stream_type,
-                    ofga_id: Cow::Borrowed(name),
-                }
-            } else {
-                ObjectRef::stream(*stream_type, name)
-            }
+    let query = s5_query(site, types, user_id);
+    let legacy_query = legacy_s5_query(site, types, user_id);
+    let label = format!("{site} {user_id} {types:?} deadline {deadline}");
+    assert_eq!(query, legacy_query, "{label}: Check shape");
+
+    let placeholder = &config::get_config().common.dashboard_placeholder;
+    let requested = STREAMS
+        .into_iter()
+        .filter(|(stream_type, _)| types.contains(stream_type));
+    let objects: Vec<_> = requested
+        .clone()
+        .filter_map(|(stream_type, name)| match site {
+            SITE_SERVICE_GRAPH => trace_stream_object(name, placeholder),
+            SITE_GEN_AI => gen_ai_object(stream_type.as_str(), name),
+            _ => Some(ObjectRef::stream(stream_type, name)),
         })
         .collect();
-    let label = format!(
-        "{} {} {:?} deadline {deadline}",
-        query.site, query.user_id, query.stream_types
+    let form = if site == SITE_GEN_AI {
+        IdForm::Raw
+    } else {
+        IdForm::Sanitized
+    };
+    let legacy_objects: Vec<_> = requested
+        .filter(|(_, name)| site != SITE_SERVICE_GRAPH || *name != placeholder.as_str())
+        .map(|(stream_type, name)| ObjectRef {
+            stream_type,
+            id: name,
+            ofga_id: match form {
+                IdForm::Raw => Cow::Borrowed(name),
+                IdForm::Sanitized => {
+                    Cow::Owned(config::utils::str::into_ofga_supported_format(name))
+                }
+            },
+        })
+        .collect();
+    let ids = |objects: &[ObjectRef<'_>]| {
+        objects
+            .iter()
+            .map(|object| {
+                (
+                    object.stream_type,
+                    object.id.to_owned(),
+                    object.ofga_id.to_string(),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(ids(&objects), ids(&legacy_objects), "{label}: object ids");
+
+    assert!(
+        objects.len() > SMALL_REQUEST_OBJECTS,
+        "{label}: fixture must exceed the cutoff"
     );
-    let oracle = s5_per_object_answer(checker.as_ref(), query, &objects, &label).await;
-    let readable = authorize_objects(checker.as_ref(), query, &objects)
+    for count in [SMALL_REQUEST_OBJECTS, objects.len()] {
+        let oracle = s5_per_object_answer(
+            checker.as_ref(),
+            &legacy_query,
+            &legacy_objects[..count],
+            form,
+        )
         .await
-        .expect(&label);
-    assert_eq!(readable, oracle, "{label}");
+        .into_streams();
+        let mut ran_legacy = false;
+        let readable = objects_in_mode(
+            checker.as_ref(),
+            &query,
+            &objects[..count],
+            &Scope::every(),
+            |objects| {
+                ran_legacy = true;
+                let checker = checker.as_ref();
+                async move {
+                    s5_per_object_answer(checker, &legacy_query, &objects, form)
+                        .await
+                        .into_streams()
+                }
+            },
+        )
+        .await
+        .unwrap_or_else(|error| panic!("{label}, {count} objects: {error}"));
+        assert_eq!(
+            ran_legacy,
+            count == SMALL_REQUEST_OBJECTS,
+            "{label}, {count} objects"
+        );
+        assert_eq!(readable, oracle, "{label}, {count} objects");
+    }
 }
 
 async fn s5_per_object_answer(
     checker: &dyn StreamAccessChecker,
     query: &ObjectsQuery<'_>,
     objects: &[ObjectRef<'_>],
-    label: &str,
+    form: IdForm,
 ) -> Readable {
     if !checker.enforces_rbac().await
         || checker.is_root(query.user_id).await
@@ -822,22 +923,20 @@ async fn s5_per_object_answer(
         return Readable::All;
     }
     if let Some(prelude) = &query.prelude
-        && checker
-            .org_wide_check(query.user_id, query.org_id, prelude)
-            .await
-            .expect(label)
+        && auth::check_permissions(
+            query.org_id,
+            query.org_id,
+            query.user_id,
+            prelude.resource,
+            prelude.permission,
+            None,
+            prelude.use_all_org,
+            prelude.use_self_context,
+            prelude.use_self_parent,
+        )
+        .await
     {
         return Readable::All;
     }
-    let mut oracle = HashSet::new();
-    for object in objects {
-        if checker
-            .check_object(query.user_id, query.org_id, query, object)
-            .await
-            .expect(label)
-        {
-            oracle.insert((object.stream_type, object.id.to_string()));
-        }
-    }
-    Readable::Only(oracle)
+    Readable::Only(legacy_readable(checker, query, objects, form).await)
 }

@@ -1282,39 +1282,44 @@ async fn attach_not_serving_pods(
     Ok(())
 }
 
-async fn attach_pod_evidence(
+pub(crate) async fn attach_pod_evidence(
     ctx: &crate::service_identity::api::Context,
     table: &config::meta::service_identity::NotServingPods,
     summary: &mut Value,
     admin: bool,
 ) -> Result<(), axum::response::Response> {
-    use crate::authz::list::authz_unavailable_response;
+    use crate::{
+        authz::list::{Calls, Outcome, authz_unavailable_response},
+        service_identity::access::evidence_unavailable,
+    };
 
-    let pods_ok = ctx
+    if !table.shows_pods(summary) {
+        return Ok(());
+    }
+    let evidence = async |streams: &[String]| match ctx
         .readable
-        .evidence(
+        .evidence_outcome(
             &ctx.org,
             &ctx.user,
-            &table.source_streams,
+            streams,
             false,
             admin,
             &ctx.evidence,
+            Calls::Send,
         )
         .await
-        .map_err(authz_unavailable_response)?;
-    let status_ok = ctx
-        .readable
-        .evidence(
-            &ctx.org,
-            &ctx.user,
-            &table.status_streams,
-            false,
-            admin,
-            &ctx.evidence,
-        )
-        .await
-        .map_err(authz_unavailable_response)?;
-    table.attach(summary, pods_ok, status_ok);
+    {
+        Some(Outcome::Error(reason)) => {
+            Err(authz_unavailable_response(evidence_unavailable(reason)))
+        }
+        outcome => Ok(outcome == Some(Outcome::Allow)),
+    };
+    if !evidence(&table.source_streams).await? {
+        table.attach(summary, false, false);
+        return Ok(());
+    }
+    let status_ok = !table.status_streams.is_empty() && evidence(&table.status_streams).await?;
+    table.attach(summary, true, status_ok);
     Ok(())
 }
 
@@ -1784,7 +1789,10 @@ mod tests {
                 TypedStream, fake_checker,
                 list::{ListMode, UnavailableReason},
             },
-            service_identity::{access::ReadableStreams, api::Context},
+            service_identity::{
+                access::{ReadableStreams, RumReads},
+                api::Context,
+            },
         };
 
         let now = now_micros();
@@ -1804,9 +1812,14 @@ mod tests {
             },
         );
         let summary = observation.to_summary(&org, &version, now);
-        let readable = ReadableStreams::load(&org, user, std::slice::from_ref(&summary))
-            .await
-            .unwrap();
+        let readable = ReadableStreams::load(
+            &org,
+            user,
+            std::slice::from_ref(&summary),
+            RumReads::Summaries,
+        )
+        .await
+        .unwrap();
         let ctx = Context {
             org,
             user: user.into(),
@@ -1848,6 +1861,67 @@ mod tests {
         let body: Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(body["error_code"], "authz_unavailable");
         assert_eq!(checker.calls(user).object_checks, 1);
+    }
+
+    #[cfg(feature = "test-utils")]
+    #[tokio::test]
+    async fn pod_evidence_skips_hidden_status_and_ineligible_tables() {
+        use config::meta::service_identity::{NOT_SERVING_K8S_REASON, NotServingPods};
+        use serde_json::json;
+
+        use crate::{
+            authz::{
+                fake_checker,
+                list::{ListMode, SMALL_REQUEST_OBJECTS},
+            },
+            service_identity::{
+                access::{ReadableStreams, RumReads},
+                api::Context,
+            },
+        };
+
+        let org = "hidden_pod_evidence";
+        let checker = fake_checker();
+        for restricted in [false, true] {
+            let user = format!("hidden-pod-evidence-{restricted}@example.com");
+            checker.set_list_mode(&user, ListMode::On);
+            checker.set_small_request_objects(&user, SMALL_REQUEST_OBJECTS);
+            let readable = ReadableStreams::load(org, &user, &[], RumReads::Summaries)
+                .await
+                .unwrap();
+            assert!(matches!(readable.answers, ModeAnswers::SmallOn));
+            let ctx = Context {
+                org: org.into(),
+                user: user.clone(),
+                summaries: Vec::new(),
+                readable,
+                evidence: Default::default(),
+                identity: Default::default(),
+                aliases: Default::default(),
+            };
+            let table = NotServingPods {
+                source_streams: vec!["logs/pods".into()],
+                status_streams: vec!["logs/status".into()],
+                ..Default::default()
+            };
+            let mut summary = json!({
+                "verdict": "not_serving",
+                "reason_code": NOT_SERVING_K8S_REASON,
+                "restricted": restricted,
+            });
+            checker.fail_stream_read_once(&user, "status");
+            let before = checker.calls(&user);
+            let original = summary.clone();
+
+            attach_pod_evidence(&ctx, &table, &mut summary, false)
+                .await
+                .unwrap();
+            assert_eq!(summary, original);
+            let after = checker.calls(&user);
+            assert_eq!(after.streams - before.streams, usize::from(!restricted));
+            assert_eq!(after.org_wide, before.org_wide);
+            assert_eq!(after.total(), before.total());
+        }
     }
 
     #[cfg(feature = "test-utils")]
