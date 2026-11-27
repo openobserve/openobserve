@@ -21915,7 +21915,10 @@
       "excludeFromQuery": "Exclude",
       "createAlertAction": "Create alert",
       "noMatchTerms": "This pattern has no distinctive text to filter on.",
-      "noDistinctTextTooltip": "Every piece of fixed text in this pattern also appears in another pattern, so a filter would match their logs too.",
+      "noDistinctTextTooltip": "This pattern's text also appears in another pattern's logs, often the same message at a different log level, so a filter can't count it on its own.",
+      "volumeUnsupported": "Volume isn't available for searches that use WITH, JOIN, UNION, a table alias or a subquery.",
+      "volumeFailedRetry": "Couldn't load the volume. The server may be busy, so try again.",
+      "volumeFailed": "Couldn't load the volume for this pattern.",
       "noStreamSelected": "No stream selected. Please select a stream before creating an alert.",
       "alertBroadMatch": "This pattern has no distinctive constant text — the alert query will match broadly. Consider adding manual filters."
     },

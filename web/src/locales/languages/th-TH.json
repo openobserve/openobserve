@@ -21895,7 +21895,10 @@
       "excludeFromQuery": "Exclude",
       "createAlertAction": "Create alert",
       "noMatchTerms": "This pattern has no distinctive text to filter on.",
-      "noDistinctTextTooltip": "Every piece of fixed text in this pattern also appears in another pattern, so a filter would match their logs too.",
+      "noDistinctTextTooltip": "ข้อความของรูปแบบนี้ปรากฏในล็อกของรูปแบบอื่นด้วย ซึ่งมักเป็นข้อความเดียวกันแต่ระดับล็อกต่างกัน ตัวกรองจึงนับรูปแบบนี้แยกต่างหากไม่ได้",
+      "volumeUnsupported": "ไม่สามารถแสดงปริมาณสำหรับการค้นหาที่ใช้ WITH, JOIN, UNION, ชื่อแทนตาราง หรือคิวรีย่อย",
+      "volumeFailedRetry": "โหลดปริมาณไม่สำเร็จ เซิร์ฟเวอร์อาจไม่ว่าง โปรดลองอีกครั้ง",
+      "volumeFailed": "โหลดปริมาณของรูปแบบนี้ไม่สำเร็จ",
       "noStreamSelected": "No stream selected. Please select a stream before creating an alert.",
       "alertBroadMatch": "This pattern has no distinctive constant text — the alert query will match broadly. Consider adding manual filters."
     },

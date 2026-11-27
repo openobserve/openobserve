@@ -21892,7 +21892,10 @@
       "excludeFromQuery": "排除",
       "createAlertAction": "建立警示",
       "noMatchTerms": "此模式沒有可篩選的獨特文字。",
-      "noDistinctTextTooltip": "此模式中的每段固定文字也出現在其他模式中，因此篩選器也會比對它們的日誌。",
+      "noDistinctTextTooltip": "此模式的文字也出現在另一個模式的日誌中（常見於同一訊息、不同日誌級別），因此篩選器無法單獨統計此模式。",
+      "volumeUnsupported": "使用 WITH、JOIN、UNION、資料表別名或子查詢的搜尋無法顯示數量。",
+      "volumeFailedRetry": "無法載入數量，伺服器可能忙碌，請重試。",
+      "volumeFailed": "無法載入此模式的數量。",
       "noStreamSelected": "未選取串流。請在建立警示前選取一個串流。",
       "alertBroadMatch": "此模式沒有獨特的常數文字 — 警示查詢將廣泛匹配。請考慮加入手動篩選器。"
     },

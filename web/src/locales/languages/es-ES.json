@@ -21897,7 +21897,10 @@
       "excludeFromQuery": "Excluir",
       "createAlertAction": "Crear alerta",
       "noMatchTerms": "Este patrón no tiene texto distintivo para filtrar.",
-      "noDistinctTextTooltip": "Cada fragmento de texto fijo de este patrón también aparece en otro patrón, por lo que un filtro coincidiría también con sus registros.",
+      "noDistinctTextTooltip": "El texto de este patrón también aparece en los registros de otro patrón, a menudo el mismo mensaje con otro nivel de registro, así que un filtro no puede contarlo por separado.",
+      "volumeUnsupported": "El volumen no está disponible para búsquedas que usan WITH, JOIN, UNION, un alias de tabla o una subconsulta.",
+      "volumeFailedRetry": "No se pudo cargar el volumen. Es posible que el servidor esté ocupado; inténtelo de nuevo.",
+      "volumeFailed": "No se pudo cargar el volumen de este patrón.",
       "noStreamSelected": "No se ha seleccionado ningún stream. Seleccione un stream antes de crear una alerta.",
       "alertBroadMatch": "Este patrón no tiene texto constante distintivo: la consulta de alerta coincidirá ampliamente. Considere agregar filtros manuales."
     },
