@@ -623,8 +623,11 @@ export default defineComponent({
       // with userChangedValue=false — so we don't loop or double-fetch.
       if (value.userChangedValue) fetchSearchHistory();
     };
-    const formatTime = (took) => {
-      return t("logs.searchHistory.tookSeconds", { seconds: took.toFixed(2) });
+    // The usage row stores `took` in milliseconds.
+    const formatTime = (tookMs) => {
+      return t("logs.searchHistory.tookSeconds", {
+        seconds: (tookMs / 1000).toFixed(2),
+      });
     };
     const calculateDuration = (startTime, endTime) => {
       const durationMicroseconds = endTime - startTime;

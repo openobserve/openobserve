@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
     <!-- LEFT SIDE: Logo; the sidebar carries it from md up -->
-    <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5 md:hidden">
+    <div
+      class="flex shrink-0 items-center justify-start gap-1 ps-3 max-xl:min-w-0 max-xl:shrink max-md:ps-1.5 md:ps-0 xl:flex-1 xl:basis-0"
+    >
       <OButton
         v-if="!focusMode"
         variant="ghost"
@@ -33,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
       <!-- Shows custom logo/text if configured in enterprise mode -->
       <div
-        class="relative-position flex"
+        class="relative-position flex md:hidden"
         v-if="
           (config.isEnterprise == 'true' &&
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
@@ -54,8 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :href="homeUrl"
           @click.prevent="goToHome"
-          class="me-2 flex cursor-pointer items-center p-0 text-xl font-bold font-semibold text-inherit no-underline"
-          >{{ store.state.zoConfig.custom_logo_text }}</a
+          class="me-2 flex min-w-0 cursor-pointer items-center p-0 text-xl font-semibold text-inherit no-underline"
+          ><OTruncatedText class="max-w-37.5 max-xl:max-w-24">{{
+            store.state.zoConfig.custom_logo_text
+          }}</OTruncatedText></a
         >
 
         <!-- Custom logo image - shows appropriate logo based on current theme -->
@@ -69,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_dark_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
-            style="max-width: 9.375rem; max-height: 2rem"
+            class="max-h-8 max-w-37.5 object-contain max-xl:max-w-24 max-md:max-h-6"
           />
           <!-- Light mode: Show light logo, fallback to dark logo -->
           <img
@@ -80,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 9.375rem; max-height: 2rem"
+            class="max-h-8 max-w-37.5 object-contain max-xl:max-w-24 max-md:max-h-6"
           />
           <!-- Fallback: Show whichever logo exists (dark or light) -->
           <img
@@ -90,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_dark_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
-            style="max-width: 9.375rem; max-height: 2rem"
+            class="max-h-8 max-w-37.5 object-contain max-xl:max-w-24 max-md:max-h-6"
           />
           <img
             :alt="t('common.customLogoAlt')"
@@ -99,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 9.375rem; max-height: 2rem"
+            class="max-h-8 max-w-37.5 object-contain max-xl:max-w-24 max-md:max-h-6"
           />
         </a>
 
@@ -126,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Default OpenObserve logo (when no custom logo) -->
-      <div v-else class="relative-position relative inline-flex min-h-10 items-center">
+      <div v-else class="relative-position relative inline-flex min-h-10 items-center md:hidden">
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <img
             data-test="header-openobserve-logo"
@@ -142,39 +146,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </a>
       </div>
+      <div
+        v-if="securityAccess.canOpen.value"
+        class="flex shrink-0 items-center max-xl:min-w-0 max-xl:shrink max-md:min-w-12 md:-ms-0.75"
+      >
+        <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
+      </div>
     </div>
     <!-- end left side -->
 
+    <!-- A crowded header (wide custom logo, solution switcher) sheds the label, then the keycap, never the button. -->
     <div
-      v-if="securityAccess.canOpen.value"
-      class="-ms-0.75 flex shrink-0 items-center max-xl:min-w-0 max-xl:shrink max-md:ms-1 max-md:min-w-12"
+      class="@container/search flex min-w-14 flex-1 justify-center px-3 max-md:px-1 xl:w-66 xl:flex-none"
     >
-      <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
-    </div>
-
-    <div class="flex min-w-0 flex-1 justify-center px-3 max-md:min-w-auto max-md:px-1">
       <OButton
-        variant="outline"
+        variant="field"
         size="xs"
-        class="w-full max-w-112 justify-start max-md:w-auto"
+        class="w-full max-w-60 justify-start ps-1.5! pe-0.75! max-md:w-auto max-md:px-3! @max-[10rem]/search:w-auto @max-[6rem]/search:px-3!"
         data-test="header-command-palette"
         :aria-label="t('commandPalette.title')"
         icon-left="search"
         @click="$emit('open-command-palette')"
       >
-        <span class="text-input-placeholder min-w-0 flex-1 text-start font-normal max-md:hidden">{{
-          t("commandPalette.title")
-        }}</span>
+        <OTruncatedText
+          class="text-input-placeholder min-w-0 flex-1 text-start font-normal max-md:hidden @max-[10rem]/search:hidden"
+          >{{ t("commandPalette.trigger") }}</OTruncatedText
+        >
         <OShortcut
           id="commandPalette"
-          class="-me-[0.3125rem] max-md:hidden [&_kbd]:h-4 [&_kbd]:min-w-4 [&_kbd]:rounded-[0.125rem] [&_kbd]:px-1 [&_kbd]:shadow-none"
+          class="-me-[0.3125rem] max-md:hidden @max-[6rem]/search:hidden [&_kbd]:h-4 [&_kbd]:min-w-4 [&_kbd]:rounded-[0.125rem] [&_kbd]:px-1 [&_kbd]:shadow-none"
         />
       </OButton>
     </div>
 
     <!-- RIGHT SIDE: Controls -->
     <div
-      class="flex shrink-0 items-center justify-end gap-1 pe-2 max-xl:min-w-0 max-xl:shrink max-md:pe-1.5"
+      class="flex shrink-0 items-center justify-end gap-1 pe-2 max-xl:min-w-0 max-xl:shrink max-md:pe-1.5 xl:flex-1 xl:basis-0"
     >
       <!-- SAMPLE DATA: stays visible while the org holds sample data -->
       <SampleDataHeaderChip class="me-2" />
@@ -488,6 +495,7 @@ import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
@@ -524,6 +532,7 @@ export default defineComponent({
     LinkedAccountsDialog,
     OButton,
     OShortcut,
+    OTruncatedText,
     OIcon,
     AssistantSpark,
     OLockBadge,

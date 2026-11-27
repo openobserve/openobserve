@@ -10109,6 +10109,7 @@
       "boxplotUpperWhisker": "หนวดบน",
       "boxplotMedian": "มัธยฐาน",
       "boxplotSamples": "ตัวอย่าง",
+      "boxplotValueNotNumeric": "ค่าของ box plot ต้องเป็นฟิลด์ตัวเลข",
       "boxplotOutlier": "ค่าผิดปกติ",
       "fieldNotAllowedForDistribution": "ไม่สามารถใช้ฟิลด์ {label} กับแผนภูมิการกระจายได้",
       "distributionCount": "จำนวน",
@@ -34547,7 +34548,15 @@
     "offline": "ออฟไลน์ ยังดูการเข้าชมล่าสุดได้",
     "sourceUnavailable": "ทรัพยากรประเภทนี้ไม่พร้อมใช้งาน",
     "emptyHelp": "ป้อนชื่อหรือ ID เพื่อค้นหา",
-    "globalShortcut": "เปิดการค้นหาทั่วระบบ"
+    "globalShortcut": "เปิดการค้นหาทั่วระบบ",
+    "trigger": "ค้นหาหรือไปที่…",
+    "allTypes": "ทั้งหมด",
+    "capped": "แสดงรายการที่ตรงกันรายการแรก | แสดงรายการที่ตรงกัน {count} รายการแรก",
+    "hintNavigate": "นำทาง",
+    "hintOpen": "เปิด",
+    "hintNewTab": "เปิดในแท็บใหม่",
+    "hintTypes": "กรองตามประเภท",
+    "hintClose": "ปิด"
   },
   "timeRangeInput": {
     "label": "พิมพ์ช่วงเวลา",

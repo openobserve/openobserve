@@ -64,6 +64,12 @@ const props = withDefaults(
     compactValues?: boolean;
     /** Puts each label under its value, for strips too narrow to fit them side by side. */
     stacked?: boolean;
+    /** One tab stop for the chips: arrows, Home and End move between them, and a single-select strip selects the chip they land on. */
+    roving?: boolean;
+    /** Chips without count badges, while their counts are not known. */
+    hideValues?: boolean;
+    /** Shorter, tighter chips, for a strip inside a dialog or popover. */
+    dense?: boolean;
   }>(),
   {
     items: () => [],
@@ -79,6 +85,9 @@ const props = withDefaults(
     compact: false,
     resetKey: undefined,
     compactValues: false,
+    roving: false,
+    hideValues: false,
+    dense: false,
   },
 );
 
@@ -283,6 +292,41 @@ const onChipClick = (item: StatItem) => {
   else emit("update:selectedKeys", [...pickedKeys.value, item.key]);
 };
 
+const rovingKey = ref<string | null>(null);
+const tabStopKey = computed(() => {
+  if (chipItems.value.some((item) => item.key === rovingKey.value)) return rovingKey.value;
+  return (chipItems.value.find(isPressed) ?? chipItems.value[0])?.key ?? null;
+});
+const chipTabindex = (item: StatItem) =>
+  props.roving ? (item.key === tabStopKey.value ? 0 : -1) : undefined;
+
+const onChipKeydown = (event: KeyboardEvent) => {
+  const el = scrollRef.value;
+  if (!props.roving || !el || event.altKey || event.ctrlKey || event.metaKey) return;
+  const chips = Array.from(el.querySelectorAll<HTMLElement>(":scope > button"));
+  const index = chips.indexOf(document.activeElement as HTMLElement);
+  if (index < 0) return;
+  const rtl = getComputedStyle(el).direction === "rtl";
+  const last = chips.length - 1;
+  const forward = index === last ? -last : 1;
+  const back = index === 0 ? last : -1;
+  const steps: Record<string, number> = {
+    ArrowRight: rtl ? back : forward,
+    ArrowLeft: rtl ? forward : back,
+    Home: -index,
+    End: last - index,
+  };
+  const step = steps[event.key];
+  if (step === undefined) return;
+  const next = index + step;
+  const item = chipItems.value[next];
+  if (!item) return;
+  event.preventDefault();
+  rovingKey.value = item.key;
+  chips[next].focus();
+  if (!props.multiple && !isPressed(item)) onChipClick(item);
+};
+
 const onCardClick = (item: StatItem) => {
   if (props.selectable && item.selectable !== false) emit("select", item.key);
 };
@@ -347,13 +391,15 @@ const clear = () => {
       <!-- The padding keeps the chips' focus outline inside the scroll box, which clips both axes. -->
       <div
         ref="scrollRef"
-        role="group"
+        :role="roving ? 'toolbar' : 'group'"
         :aria-label="t('components.statStrip.filters')"
-        class="-m-1 flex min-w-0 flex-1 [scrollbar-width:none] items-center gap-1.5 overflow-x-auto overscroll-x-contain p-1 [&::-webkit-scrollbar]:hidden"
+        class="-m-1 flex min-w-0 flex-1 [scrollbar-width:none] items-center overflow-x-auto overscroll-x-contain p-1 [&::-webkit-scrollbar]:hidden"
+        :class="dense ? 'gap-1' : 'gap-1.5'"
         data-test="o-stat-strip-chips"
         @scroll.passive="updateScrollState"
         @wheel="onWheel"
         @keydown.esc="clear"
+        @keydown="onChipKeydown"
       >
         <OStatCard
           v-for="item in chipItems"
@@ -369,8 +415,12 @@ const clear = () => {
           :selected="isPressed(item)"
           :quiet="item.key === defaultKey"
           :hint="chipHint(item)"
+          :hide-value="hideValues"
+          :dense="dense"
+          :tabindex="chipTabindex(item)"
           :data-test="item.dataTest"
           @click="onChipClick(item)"
+          @focus="rovingKey = item.key"
         />
         <slot name="chips-end" />
       </div>

@@ -9037,6 +9037,7 @@ mod tests {
                 destinations: Set("[]".to_string()),
                 l0_json: Set(serde_json::to_string(&l0).unwrap()),
                 template: Set(None),
+                saved_by_person: Set(false),
                 created_at: Set(1),
                 updated_at: Set(1),
             }

@@ -54,6 +54,7 @@ markup — don't guess a prop name.
 | Pick one/many from a fixed list                      | `OSelect` (+ `OSelectItem`)                                                                                          | forms-inputs            |
 | Typeahead / free-entry combobox                      | `OCombobox`                                                                                                          | forms-inputs            |
 | A search box                                         | `OSearchInput`                                                                                                       | forms-inputs            |
+| Result row of a search-driven list (command palette) | `OListboxOption`                                                                                                     | overlay-navigation      |
 | Boolean checkbox / group                             | `OCheckbox` / `OCheckboxGroup`                                                                                       | forms-inputs            |
 | Mutually exclusive choice                            | `ORadioGroup` (few) / `OSelect` (many)                                                                               | forms-inputs            |
 | Instant on/off toggle                                | `OSwitch`                                                                                                            | forms-inputs            |

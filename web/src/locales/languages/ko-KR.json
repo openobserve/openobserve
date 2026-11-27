@@ -10111,6 +10111,7 @@
       "boxplotUpperWhisker": "위쪽 수염",
       "boxplotMedian": "중앙값",
       "boxplotSamples": "샘플 수",
+      "boxplotValueNotNumeric": "박스 플롯 값은 숫자 필드여야 합니다",
       "boxplotOutlier": "이상치",
       "fieldNotAllowedForDistribution": "{label} 필드는 분포 차트에서 사용할 수 없습니다",
       "distributionCount": "개수",
@@ -34549,7 +34550,15 @@
     "offline": "오프라인입니다. 최근 방문은 계속 볼 수 있습니다.",
     "sourceUnavailable": "현재 이 리소스 유형을 사용할 수 없습니다",
     "emptyHelp": "이름 또는 ID로 리소스 검색",
-    "globalShortcut": "전체 검색 열기"
+    "globalShortcut": "전체 검색 열기",
+    "trigger": "검색하거나 이동…",
+    "allTypes": "전체",
+    "capped": "첫 번째 일치 항목 표시 중. | 처음 {count}개의 일치 항목 표시 중.",
+    "hintNavigate": "이동",
+    "hintOpen": "열기",
+    "hintNewTab": "새 탭에서 열기",
+    "hintTypes": "유형으로 필터링",
+    "hintClose": "닫기"
   },
   "timeRangeInput": {
     "label": "시간 범위 입력",

@@ -10111,6 +10111,7 @@
       "boxplotUpperWhisker": "Górny wąs",
       "boxplotMedian": "Mediana",
       "boxplotSamples": "Próbki",
+      "boxplotValueNotNumeric": "Wartość wykresu pudełkowego musi być polem liczbowym",
       "boxplotOutlier": "Wartość odstająca",
       "fieldNotAllowedForDistribution": "Pole {label} jest niedozwolone na wykresie rozkładu",
       "distributionCount": "Liczba",
@@ -34549,7 +34550,15 @@
     "offline": "Tryb offline. Ostatnie wizyty są nadal dostępne.",
     "sourceUnavailable": "Ten typ zasobu jest niedostępny",
     "emptyHelp": "Wpisz nazwę lub identyfikator",
-    "globalShortcut": "Otwórz wyszukiwanie globalne"
+    "globalShortcut": "Otwórz wyszukiwanie globalne",
+    "trigger": "Szukaj lub przejdź do…",
+    "allTypes": "Wszystkie",
+    "capped": "Wyświetlanie pierwszego dopasowania. | Wyświetlanie pierwszych dopasowań: {count}.",
+    "hintNavigate": "Nawiguj",
+    "hintOpen": "Otwórz",
+    "hintNewTab": "Otwórz w nowej karcie",
+    "hintTypes": "Filtruj według typu",
+    "hintClose": "Zamknij"
   },
   "timeRangeInput": {
     "label": "Wpisz zakres czasu",

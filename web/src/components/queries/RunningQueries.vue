@@ -637,7 +637,7 @@ export default defineComponent({
         const search_type = row?.search_type;
         var query_source = "-unknown-";
 
-        if (search_type === "dashboards") {
+        if (search_type === "dashboards" || search_type === "reports") {
           query_source =
             row?.search_event_context?.folder_name +
             "/" +

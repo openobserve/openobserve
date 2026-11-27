@@ -67,6 +67,10 @@ const props = withDefaults(
     variant?: StatCardVariant;
     /** Placeholder for the value until it first arrives; a 0 shown meanwhile reads as a real count. */
     loading?: boolean;
+    /** A chip with no count badge, for a filter whose counts are not known yet. */
+    hideValue?: boolean;
+    /** A shorter, tighter chip, for a strip inside a dialog or popover. */
+    dense?: boolean;
     dataTest?: string;
   }>(),
   {
@@ -77,6 +81,8 @@ const props = withDefaults(
     variant: "card",
     loading: false,
     compactValue: false,
+    hideValue: false,
+    dense: false,
   },
 );
 
@@ -213,7 +219,8 @@ const trendClass = computed(() =>
     :class="[
       variant === 'chip'
         ? [
-            'rounded-default text-compact focus-visible:outline-accent h-7 shrink-0 items-center gap-1.5 border px-2.5 font-medium focus-visible:outline-2 focus-visible:outline-offset-1',
+            'rounded-default focus-visible:outline-accent shrink-0 items-center border font-medium focus-visible:outline-2 focus-visible:outline-offset-1',
+            dense ? 'h-7 gap-1 px-2 text-xs' : 'text-compact h-7 gap-1.5 px-2.5',
             selected && !quiet
               ? 'border-accent bg-surface-accent-hover'
               : [
@@ -269,8 +276,9 @@ const trendClass = computed(() =>
         >
       </span>
       <span
-        class="text-2xs inline-flex h-4.5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 leading-none whitespace-nowrap tabular-nums"
-        :class="chipBadgeClass"
+        v-if="!hideValue"
+        class="text-2xs inline-flex shrink-0 items-center justify-center rounded-full leading-none whitespace-nowrap tabular-nums"
+        :class="[chipBadgeClass, dense ? 'h-4 min-w-4.5 px-1' : 'h-4.5 min-w-5 px-1.5']"
         data-test="o-stat-card-value"
       >
         <OSkeleton

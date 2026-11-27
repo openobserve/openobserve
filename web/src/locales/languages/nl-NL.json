@@ -10111,6 +10111,7 @@
       "boxplotUpperWhisker": "Bovenste snorhaar",
       "boxplotMedian": "Mediaan",
       "boxplotSamples": "Steekproeven",
+      "boxplotValueNotNumeric": "De waarde van de boxplot moet een numeriek veld zijn",
       "boxplotOutlier": "Uitschieter",
       "fieldNotAllowedForDistribution": "Het veld {label} is niet toegestaan voor de verdelingsgrafiek",
       "distributionCount": "Aantal",
@@ -34549,7 +34550,15 @@
     "offline": "Offline. Recente bezoeken blijven beschikbaar.",
     "sourceUnavailable": "Dit brontype is niet beschikbaar",
     "emptyHelp": "Voer een naam of ID in",
-    "globalShortcut": "Globaal zoeken openen"
+    "globalShortcut": "Globaal zoeken openen",
+    "trigger": "Zoeken of ga naar…",
+    "allTypes": "Alle",
+    "capped": "Toont de eerste match. | Toont de eerste {count} matches.",
+    "hintNavigate": "Navigeren",
+    "hintOpen": "Openen",
+    "hintNewTab": "Openen in nieuw tabblad",
+    "hintTypes": "Filteren op type",
+    "hintClose": "Sluiten"
   },
   "timeRangeInput": {
     "label": "Typ een tijdsbereik",

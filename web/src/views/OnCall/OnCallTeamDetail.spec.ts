@@ -1103,7 +1103,7 @@ describe("OnCallTeamDetail", () => {
         -1,
       );
       expect(message?.textContent?.trim()).toMatch(
-        /^Clear ana@corp\.com's away, .+\? It applies on every team\.$/,
+        /^Clear ana@corp\.com's away, .+\? It applies on every team in this org\.$/,
       );
 
       confirm.vm.$emit("click:primary");

@@ -170,7 +170,26 @@ describe("OrganizationSelector", () => {
       expect($$('[role="row"].bg-dropdown-item-hover-bg')).toHaveLength(0);
     });
 
-    it("D14 keeps every existing id, marks the current org selected and links to the orgs page", async () => {
+    it("places the Manage button between the count and Create with no footer link", async () => {
+      await mountSelector(MANY);
+      await openMenu();
+      const count = $('[data-test="organization-menu-count"]')!;
+      const manage = $<HTMLButtonElement>('[data-test="organization-menu-manage-btn"]')!;
+      const create = $<HTMLButtonElement>('[data-test="organization-menu-create-btn"]')!;
+
+      expect(count.nextElementSibling).toBe(manage);
+      expect(manage.nextElementSibling).toBe(create);
+      expect($('[data-test="organization-menu-manage-link"]')).toBeNull();
+      expect(manage.getAttribute("aria-label")).toBe(
+        i18n.global.t("organization.manageOrganizations"),
+      );
+      for (const button of [manage, create]) {
+        expect(button.tabIndex).toBe(0);
+        expect(button.disabled).toBe(false);
+      }
+    });
+
+    it("D14 preserves the panel ids, marks the current org selected and opens the orgs page", async () => {
       await mountSelector(MANY, MANY[2]);
       await openMenu();
       for (const id of [
@@ -180,14 +199,14 @@ describe("OrganizationSelector", () => {
         "organization-menu-table",
         "organization-menu-item-copy-id",
         "organization-menu-create-btn",
-        "organization-menu-manage-link",
+        "organization-menu-manage-btn",
       ]) {
         expect($(`[data-test="${id}"]`), id).not.toBeNull();
       }
       const selected = $$('[role="row"][aria-selected="true"]');
       expect(selected.map((r) => r.getAttribute("data-test-org-identifier"))).toEqual(["charlie"]);
 
-      $('[data-test="organization-menu-manage-link"]')!.click();
+      $('[data-test="organization-menu-manage-btn"]')!.click();
       await flushPromises();
       expect(router.currentRoute.value.name).toBe("organizations");
       expect(router.currentRoute.value.query.org_identifier).toBe("charlie");

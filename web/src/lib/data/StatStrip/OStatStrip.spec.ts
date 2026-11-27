@@ -432,6 +432,78 @@ describe("OStatStrip filter chips (selectable)", () => {
     expect(idle.emitted("select")).toBeUndefined();
   });
 
+  it("leaves every chip a tab stop unless the strip is roving", () => {
+    const tabindexes = (w: ReturnType<typeof mountChips>) =>
+      w.findAll("[aria-pressed]").map((c) => c.attributes("tabindex"));
+    expect(tabindexes(mountChips())).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    const roving = mountChips({ roving: true, selectedKey: "active" });
+    expect(roving.get('[role="toolbar"]').attributes("aria-label")).toBe("Filters");
+    expect(tabindexes(roving)).toEqual(["-1", "-1", "0", "-1", "-1"]);
+  });
+
+  it("moves along a roving strip with arrows, Home and End, selecting each chip it lands on", async () => {
+    const w = mount(OStatStrip, {
+      props: { items: tiles, selectable: true, defaultKey: "total", roving: true },
+      attachTo: document.body,
+    });
+    (chip(w, "Total").element as HTMLElement).focus();
+    await chip(w, "Total").trigger("keydown", { key: "ArrowRight" });
+    expect(document.activeElement).toBe(chip(w, "Failed").element);
+    await chip(w, "Failed").trigger("keydown", { key: "End" });
+    expect(document.activeElement).toBe(chip(w, "Paused").element);
+    await chip(w, "Paused").trigger("keydown", { key: "ArrowRight" });
+    expect(document.activeElement).toBe(chip(w, "Total").element);
+    await chip(w, "Total").trigger("keydown", { key: "ArrowLeft" });
+    // Total is the pressed default chip, so landing on it selects nothing new.
+    expect(w.emitted("select")).toEqual([["failed"], ["paused"], ["paused"]]);
+    await chip(w, "Paused").trigger("keydown", { key: "ArrowRight", ctrlKey: true });
+    expect(document.activeElement).toBe(chip(w, "Paused").element);
+    w.unmount();
+  });
+
+  it("moves focus without toggling in a multi-select roving strip", async () => {
+    const w = mount(OStatStrip, {
+      props: {
+        items: tiles,
+        selectable: true,
+        multiple: true,
+        roving: true,
+        defaultKey: "total",
+        selectedKeys: [],
+      },
+      attachTo: document.body,
+    });
+    (chip(w, "Total").element as HTMLElement).focus();
+    await chip(w, "Total").trigger("keydown", { key: "ArrowRight" });
+    expect(document.activeElement).toBe(chip(w, "Failed").element);
+    expect(w.emitted("update:selectedKeys")).toBeUndefined();
+    await chip(w, "Failed").trigger("click");
+    expect(w.emitted("update:selectedKeys")).toEqual([[["failed"]]]);
+    w.unmount();
+  });
+
+  it("hides the count badges on request", () => {
+    const w = mountChips({ hideValues: true });
+    expect(w.find('[data-test="o-stat-card-value"]').exists()).toBe(false);
+    expect(chip(w, "Failed").text()).toBe("Failed");
+  });
+
+  it("renders shorter, tighter chips when dense", () => {
+    const w = mountChips({ dense: true });
+    expect(chip(w, "Failed").classes()).toEqual(expect.arrayContaining(["h-7", "text-xs"]));
+    expect(badge(w, "Failed")).toContain("h-4");
+    expect(w.get('[data-test="o-stat-strip-chips"]').classes()).toContain("gap-1");
+    expect(chip(mountChips(), "Failed").classes()).toEqual(
+      expect.arrayContaining(["h-7", "gap-1.5", "text-compact"]),
+    );
+  });
+
   it("keeps the data-test hooks on the chips", () => {
     const w = mountChips();
     expect(w.get('[data-test="x-failed"]').attributes("aria-pressed")).toBe("false");

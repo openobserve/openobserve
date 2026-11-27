@@ -22,6 +22,7 @@ import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import { validatePanel } from "@/utils/dashboard/panelValidation";
 import { CUSTOM_QUERY_CHART_TYPES } from "@/utils/dashboard/constants";
+import { collapseBoxplotSummaryColumns } from "@/utils/dashboard/boxplotStats";
 import useStreams from "../useStreams";
 import useValuesWebSocket from "./useValuesWebSocket";
 import queryService from "@/services/search";
@@ -662,11 +663,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
         ].fields.value_for_maps = null;
       }
 
-      // Loop through each custom query field in the dashboard panel data's stream meta
-      dashboardPanelData.meta.stream.customQueryFields.forEach((it: any, index: number) => {
-        // Get the name of the current custom query field
-        const { name } = it;
+      // A box plot's builder SQL returns one summary column set per value; the value keeps its base alias.
+      const customFieldNames = dashboardPanelData.meta.stream.customQueryFields.map(
+        (it: any) => it?.name,
+      );
+      const mappedFieldNames =
+        dashboardPanelData.data.type === "boxplot"
+          ? collapseBoxplotSummaryColumns(customFieldNames)
+          : customFieldNames;
 
+      mappedFieldNames.forEach((name: string, index: number) => {
         // Determine the current field type based on the name
         let field;
         if (name === "latitude") {
@@ -766,12 +772,14 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
               ];
           }
           // If the current field is a y or z field, set the aggregation function to "count"
-          if ((currentFieldType === "y" || currentFieldType === "z") && !field.isDerived) {
+          if ((currentFieldType === "y" || currentFieldType === "z") && field && !field.isDerived) {
             field.functionName = "count";
             // take first arg
             field.args = field.args.length ? [field?.args?.[0]] : [];
           }
         }
+        // A column past the builder fields has no field to take it.
+        if (!field) return;
 
         // Update the properties of the current field
         field.alias = name; // Set the alias to the name of the custom query field

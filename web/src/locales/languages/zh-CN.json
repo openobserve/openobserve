@@ -10111,6 +10111,7 @@
       "boxplotUpperWhisker": "上须线",
       "boxplotMedian": "中位数",
       "boxplotSamples": "样本数",
+      "boxplotValueNotNumeric": "箱线图的值必须是数值字段",
       "boxplotOutlier": "离群值",
       "fieldNotAllowedForDistribution": "分布图不允许使用 {label} 字段",
       "distributionCount": "计数",
@@ -34551,7 +34552,15 @@
     "offline": "当前离线，仍可查看最近访问。",
     "sourceUnavailable": "此资源类型当前不可用",
     "emptyHelp": "输入名称或 ID 搜索资源",
-    "globalShortcut": "打开全局搜索"
+    "globalShortcut": "打开全局搜索",
+    "trigger": "搜索或跳转到…",
+    "allTypes": "全部",
+    "capped": "显示第一个匹配项。 | 显示前 {count} 个匹配项。",
+    "hintNavigate": "导航",
+    "hintOpen": "打开",
+    "hintNewTab": "在新标签页中打开",
+    "hintTypes": "按类型过滤",
+    "hintClose": "关闭"
   },
   "timeRangeInput": {
     "label": "输入时间范围",

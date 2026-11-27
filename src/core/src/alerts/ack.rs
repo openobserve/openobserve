@@ -48,6 +48,8 @@ pub enum Act {
     TakeOver,
     Resolve,
     Mute,
+    Escalate,
+    HandOff,
 }
 
 impl From<Verb> for Act {
@@ -55,7 +57,8 @@ impl From<Verb> for Act {
         match verb {
             Verb::Acknowledge => Self::Ack,
             Verb::TakeOver => Self::TakeOver,
-            Verb::Unack | Verb::HandOff => Self::Unack,
+            Verb::Unack => Self::Unack,
+            Verb::HandOff => Self::HandOff,
             Verb::Resolve => Self::Resolve,
         }
     }
@@ -358,6 +361,8 @@ pub fn refusal(
         Act::TakeOver => (RefusalCode::AckRefused, "take over"),
         Act::Resolve => (RefusalCode::AckRefused, "resolve"),
         Act::Mute => (RefusalCode::MuteRefused, "mute"),
+        Act::Escalate => (RefusalCode::AckRefused, "escalate"),
+        Act::HandOff => (RefusalCode::AckRefused, "hand off"),
     };
     let message = if facts.fga_enabled {
         format!("You need edit access to this alert, or to be on call for it, to {verb} it")
@@ -2766,6 +2771,8 @@ mod tests {
             (Act::from(Verb::TakeOver), "take over"),
             (Act::from(Verb::Unack), "unacknowledge"),
             (Act::from(Verb::Resolve), "resolve"),
+            (Act::Escalate, "escalate"),
+            (Act::from(Verb::HandOff), "hand off"),
         ] {
             let r = refusal(act, &facts(Some(UserRole::Viewer)), &[]);
             assert_eq!(r.code, RefusalCode::AckRefused, "{verb}");

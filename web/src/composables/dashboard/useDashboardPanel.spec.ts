@@ -265,6 +265,62 @@ describe("useDashboardPanel", () => {
     expect(data.data.queries[1].query).toBe("stale");
   });
 
+  describe("switching a builder box plot to custom SQL", () => {
+    const switchToCustom = (type: string, columns: string[]) => {
+      const panel = useDashboardPanelData(`dashboard-panel-test-boxplot-custom-${type}`);
+      const data = panel.dashboardPanelData;
+      data.data.type = type;
+      data.data.queryType = "sql";
+      data.layout.currentQueryIndex = 0;
+      data.data.queries[0].customQuery = true;
+      data.data.queries[0].fields.x = [
+        { alias: "x_axis_1", column: "cat", functionName: null, args: [], isDerived: false },
+      ];
+      data.data.queries[0].fields.y = [
+        {
+          alias: "y_axis_1",
+          column: "val",
+          functionName: null,
+          args: [{ type: "field", value: { field: "val" } }],
+          isDerived: false,
+        },
+      ];
+      data.data.queries[0].fields.breakdown = [];
+      data.data.queries[0].fields.z = [];
+      data.meta.stream.customQueryFields = columns.map((name) => ({ name, type: "" }));
+      panel.updateXYFieldsForCustomQueryMode();
+      return data.data.queries[0].fields;
+    };
+    const summaryColumns = [
+      "x_axis_1",
+      "y_axis_1_min",
+      "y_axis_1_q1",
+      "y_axis_1_median",
+      "y_axis_1_q3",
+      "y_axis_1_max",
+      "y_axis_1_count",
+    ];
+
+    it("maps Value to the base alias of the kept summary columns, without throwing", () => {
+      const fields = switchToCustom("boxplot", summaryColumns);
+      expect(fields.x.map((f: any) => f.alias)).toEqual(["x_axis_1"]);
+      expect(fields.y.map((f: any) => f.alias)).toEqual(["y_axis_1"]);
+      expect(fields.y[0].column).toBe("y_axis_1");
+    });
+
+    it("maps raw-value columns one to one, as before", () => {
+      const fields = switchToCustom("boxplot", ["cat", "val"]);
+      expect(fields.x[0].alias).toBe("cat");
+      expect(fields.y[0].alias).toBe("val");
+    });
+
+    it("leaves extra columns of other chart types unmapped instead of throwing", () => {
+      const fields = switchToCustom("bar", summaryColumns);
+      expect(fields.y.map((f: any) => f.alias)).toEqual(["y_axis_1_min"]);
+      expect(fields.z).toEqual([]);
+    });
+  });
+
   it("escapes stored identifiers, allows only ASC or DESC and caps a box plot's rows", () => {
     const panel = useDashboardPanelData("dashboard-panel-test-boxplot-sql");
     const data = panel.dashboardPanelData;
